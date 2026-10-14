@@ -2,8 +2,8 @@ import AppKit
 import SwiftUI
 import WebKit
 
-/// (1.3.17) A Knewton Alta assignment in a popup over the window, as a quiz is taken (QuizScreen): Close and the
-/// assignment's name across the top; down the left, its objectives as the quiz's question tiles — the one being worked
+/// (1.3.17) A Knewton Alta assignment in a popup over the window, as a quiz is taken (QuizScreen): the assignment's
+/// name and when it is due across the top, Close at its right end (1.3.78); down the left, its objectives as the quiz's question tiles — the one being worked
 /// on filled, a mastered one ticked, the others filling as they are mastered — with each by name, and the total
 /// mastery bar. (1.3.45) In the rest, Alta's own page, as it is: the student works on it there. AltaSession.swift reads
 /// the objectives and their mastery from it.
@@ -17,6 +17,8 @@ struct AltaQuizScreen: View {
     @State private var saved: URL?
     @State private var showLogs = false
     @ObservedObject private var dev = DevMode.shared
+    /// (1.3.78) The Canvas assignment's own due line ("Due Oct 12 at 11:59 PM"), as every other screen writes it.
+    @State private var dueLine: String?
 
     init(launch: AltaLaunch) {
         _session = StateObject(wrappedValue: AltaSession(launch: launch))
@@ -50,6 +52,7 @@ struct AltaQuizScreen: View {
             session.appearance(dark: scheme == .dark)
             await session.start(engine: engine)
         }
+        .task { dueLine = await CanvasDue.line(engine, course: session.launch.course, assignment: session.launch.assignment) }
         .onChange(of: scheme) { _, s in session.appearance(dark: s == .dark) }
         .onDisappear { session.closePic() } // (1.3.70: the popup closed, its graph's window with it)
         // (1.3.51) Alta's pop-ups as the Mac's own sheet: Alta's picture of it, its buttons the Mac's
@@ -66,14 +69,10 @@ struct AltaQuizScreen: View {
 
     // MARK: The top
 
+    /// Alta's mark, the assignment and when it is due across the top; (1.3.78) Close at the right end, where every full
+    /// popup has it.
     private var topBar: some View {
         HStack(spacing: 14) {
-            GlassGroup(spacing: 8) {
-                Button("Close") { dismiss() }
-                    .glassButton()
-                    .keyboardShortcut(.cancelAction)
-                    .help("Close — your progress is kept by Alta")
-            }
             IconTile(symbol: "brain.head.profile", color: Theme.accent, size: 32)
             VStack(alignment: .leading, spacing: 2) {
                 Text(session.report?.name ?? session.overview?.name ?? session.launch.title)
@@ -98,6 +97,10 @@ struct AltaQuizScreen: View {
                     .transition(.opacity)
                 }
                 // (1.3.72: Save Page Code is in the Developer menu now)
+                Button("Close") { dismiss() }
+                    .glassButton()
+                    .keyboardShortcut(.cancelAction)
+                    .help("Close — your progress is kept by Alta")
             }
         }
         .controlSize(.large)
@@ -147,15 +150,26 @@ struct AltaQuizScreen: View {
         }
     }
 
+    /// (1.3.78) "Knewton Alta · Due Oct 12 at 11:59 PM": the Canvas assignment's due line, as every screen writes a date;
+    /// Alta's own date written the same way when Canvas gives none; Alta's own words only when there is nothing else.
     private var subtitle: String {
         var parts = ["Knewton Alta"]
-        if let due = session.report?.due ?? session.overview?.due {
-            parts.append("Due \(Date(timeIntervalSince1970: due / 1000).formatted(date: .abbreviated, time: .shortened))")
-        } else if let words = session.overview?.dueText, !words.isEmpty {
-            parts.append("Due \(words)")
-        }
+        if let due = headerDue { parts.append(due) }
         if (session.report?.current.source ?? "").uppercased() == "PRACTICE" { parts.append("Practice") }
         return parts.joined(separator: " · ")
+    }
+
+    private var headerDue: String? {
+        if let line = dueLine, !line.isEmpty { return line }
+        if let due = session.report?.due ?? session.overview?.due { return "Due \(CanvasDue.text(Date(timeIntervalSince1970: due / 1000)))" }
+        // (Alta's own words — the overview's, else the cover's Due Date — read as a date and written as every date is;
+        // as Alta words them, their times written the same way, only when they cannot be read)
+        let coverDue = session.cover?.details.first { $0.label.lowercased().hasPrefix("due") }
+        let words = session.overview?.dueText ?? coverDue.map { [$0.value, $0.sub ?? ""].joined(separator: " ") } ?? ""
+        let trimmed = words.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if let d = CanvasDue.date(fromWords: trimmed) { return "Due \(CanvasDue.text(d))" }
+        return "Due \(CanvasDue.words(trimmed))"
     }
 
     // MARK: Alta's page
@@ -229,7 +243,7 @@ struct AltaQuizScreen: View {
             // (1.3.59) the assignment's cover as the popup's own start screen, on Liquid Glass: its name and details,
             // its objectives by topic, and a clear Start (pressing Alta's); Alta's page waits under it
             if let c = session.cover, !session.focused, session.dialog == nil, session.failure == nil, !session.opening {
-                AltaStartScreen(cover: c, start: { session.startCover() }, review: { session.reviewCover() })
+                AltaStartScreen(cover: c, dueShown: headerDue != nil, start: { session.startCover() }, review: { session.reviewCover() })
                     .transition(.opacity)
             }
             // (1.3.60) while Alta's page loads, out of sight, the popup's own Loading in its place
@@ -253,6 +267,76 @@ struct AltaQuizScreen: View {
                 .transition(.opacity)
             }
         }
+    }
+}
+
+/// (1.3.78) A publisher's assignment (Knewton Alta, Macmillan) as Canvas has it, for its popup's header: its name and
+/// its due line as every screen writes them (the engine's `assignment`), and a date of the publisher's own written the
+/// same way ("Oct 12 at 11:59 PM"; the year only when it is not this year).
+enum CanvasDue {
+    struct Facts: Decodable {
+        var title: String
+        var dueLine: String?
+    }
+
+    static func facts(_ engine: Engine, course: String, assignment: String) async -> Facts? {
+        guard !course.isEmpty, !assignment.isEmpty else { return nil }
+        return try? await engine.call("assignment", ["course": course, "id": assignment], as: Facts.self)
+    }
+
+    static func line(_ engine: Engine, course: String, assignment: String) async -> String? {
+        await facts(engine, course: course, assignment: assignment)?.dueLine
+    }
+
+    static func text(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = Calendar.current.isDate(date, equalTo: Date(), toGranularity: .year) ? "MMM d 'at' h:mm a" : "MMM d, yyyy 'at' h:mm a"
+        return f.string(from: date)
+    }
+
+    /// (1.3.78) A publisher's own words with their times written as every screen writes one: "11:59pm" → "11:59 PM",
+    /// "8pm" → "8:00 PM" (Alta's "Last updated Oct 10 at 8:08pm", "Complete by 11:59pm today").
+    static func words(_ s: String) -> String {
+        guard let re = timeWords else { return s }
+        let ns = s as NSString
+        var out = s
+        for m in re.matches(in: s, range: NSRange(location: 0, length: ns.length)).reversed() {
+            guard let r = Range(m.range, in: out) else { continue }
+            let hour = Int(ns.substring(with: m.range(at: 1))) ?? 0
+            let minutes = m.range(at: 2).location == NSNotFound ? "00" : ns.substring(with: m.range(at: 2))
+            let half = ns.substring(with: m.range(at: 3)).uppercased()
+            out.replaceSubrange(r, with: "\(hour):\(minutes) \(half)M")
+        }
+        return out
+    }
+
+    /// A time as words have it: its hour, its minutes if any, and am or pm in any case, with or without dots.
+    private static let timeWords = try? NSRegularExpression(pattern: "\\b(\\d{1,2})(?::(\\d{2}))?\\s?([AaPp])\\.?[Mm]\\.?(?![A-Za-z])")
+
+    /// (1.3.78) A due date as a publisher's page words it ("Monday, Oct 12 11:59pm PDT"), read as a date when it can be:
+    /// its weekday set aside, its zone (when it says one) taken into account, this year's — or next year's, when this
+    /// year's would be months gone — so it is written in the Mac's own time zone as every screen writes a date.
+    static func date(fromWords raw: String) -> Date? {
+        var s = words(raw).trimmingCharacters(in: .whitespacesAndNewlines)
+        if let comma = s.firstIndex(of: ","), !s[..<comma].isEmpty, s[..<comma].allSatisfy(\.isLetter) {
+            s = String(s[s.index(after: comma)...]).trimmingCharacters(in: .whitespaces)
+        }
+        guard !s.isEmpty else { return nil }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        for format in ["MMM d, yyyy h:mm a zzz", "MMM d, yyyy h:mm a", "MMM d, yyyy 'at' h:mm a zzz", "MMM d, yyyy 'at' h:mm a"] {
+            f.dateFormat = format
+            if let d = f.date(from: s) { return d }
+        }
+        let year = Calendar.current.component(.year, from: Date())
+        for format in ["MMM d h:mm a zzz", "MMM d h:mm a", "MMM d 'at' h:mm a zzz", "MMM d 'at' h:mm a"] {
+            f.dateFormat = format + " yyyy"
+            guard let d = f.date(from: "\(s) \(year)") else { continue }
+            if d.timeIntervalSinceNow < -180 * 86_400, let next = f.date(from: "\(s) \(year + 1)") { return next }
+            return d
+        }
+        return nil
     }
 }
 
@@ -283,11 +367,15 @@ private struct AltaPicControls: View {
     }
 }
 
-/// (1.3.59) The assignment's start screen: a glass card with its name, its details (due, status, grade) and its note,
-/// a large Start (named as Alta names it — Start, Continue, Resume) and Review Instruction; under it a glass card of its
-/// objectives by topic, each topic's estimate beside it and each objective's mastery as a small ring.
+/// (1.3.59) The assignment's start screen: a glass card with its details (status, grade) and its note, a large Start
+/// (named as Alta names it — Start, Continue, Resume) and Review Instruction; under it a glass card of its topics, each
+/// with Alta's estimate of the questions it takes and its objectives by number. (1.3.78) Only what the popup shows
+/// nowhere else: the assignment's name and its due date are the bar's (the date here only when the bar has none), and
+/// how far each objective is mastered is the rail's.
 private struct AltaStartScreen: View {
     let cover: AltaCover
+    /// The popup's bar says when it is due.
+    let dueShown: Bool
     let start: () -> Void
     let review: () -> Void
     @State private var going = false
@@ -297,7 +385,12 @@ private struct AltaStartScreen: View {
         return t.isEmpty ? "Start" : t.lowercased().capitalized
     }
 
-    private var objectiveCount: Int { cover.topics.reduce(0) { $0 + $1.objectives.count } }
+    /// The details the bar does not say, their times written as every screen writes one.
+    private var details: [AltaCover.Detail] {
+        cover.details
+            .filter { !(dueShown && $0.label.lowercased().hasPrefix("due")) }
+            .map { AltaCover.Detail(label: $0.label, value: CanvasDue.words($0.value), sub: $0.sub.map(CanvasDue.words)) }
+    }
 
     var body: some View {
         ZStack {
@@ -317,16 +410,9 @@ private struct AltaStartScreen: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("ASSIGNMENT").font(.system(size: 11.5, weight: .semibold)).tracking(0.6).foregroundStyle(.secondary)
-                Text(cover.name.isEmpty ? "Knewton Alta" : cover.name)
-                    .font(.system(size: 30, weight: .bold))
-                    .tracking(-0.4)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if !cover.details.isEmpty {
+            if !details.isEmpty {
                 HStack(alignment: .top, spacing: 28) {
-                    ForEach(cover.details, id: \.self) { d in
+                    ForEach(details, id: \.self) { d in
                         VStack(alignment: .leading, spacing: 3) {
                             Text(d.label.uppercased()).font(.system(size: 10.5, weight: .semibold)).tracking(0.5).foregroundStyle(.secondary)
                             Text(d.value).font(.sBody.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
@@ -338,7 +424,7 @@ private struct AltaStartScreen: View {
                 }
             }
             if !cover.note.isEmpty {
-                Label(cover.note, systemImage: "sparkles")
+                Label(CanvasDue.words(cover.note), systemImage: "sparkles")
                     .font(.sCallout)
                     .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
@@ -376,16 +462,14 @@ private struct AltaStartScreen: View {
         .glassCard(radius: 26)
     }
 
+    /// The topics, each with how many questions Alta expects it to take, and its objectives by the rail's numbers.
     private var objectives: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Objectives").font(.system(size: 18, weight: .semibold))
-                Spacer()
-                Text("\(objectiveCount) to master").font(.sCallout).foregroundStyle(.secondary)
-            }
+        let firsts = cover.topics.indices.map { k in cover.topics[..<k].reduce(0) { $0 + $1.objectives.count } }
+        return VStack(alignment: .leading, spacing: 14) {
+            Text(cover.topics.count == 1 ? "Topic" : "Topics").font(.system(size: 18, weight: .semibold))
             ForEach(Array(cover.topics.enumerated()), id: \.offset) { k, t in
                 if k > 0 { Divider() }
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .firstTextBaseline, spacing: 10) {
                         Text(t.name).font(.sBody.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 8)
@@ -398,15 +482,15 @@ private struct AltaStartScreen: View {
                                 .background(Color.primary.opacity(0.07), in: Capsule())
                         }
                     }
-                    ForEach(t.objectives, id: \.self) { o in
-                        HStack(spacing: 12) {
-                            ring(o.mastery ?? 0)
-                            Text(o.name).font(.sCallout).fixedSize(horizontal: false, vertical: true)
-                            Spacer(minLength: 0)
-                            if let m = o.mastery {
-                                Text("\(Int((m * 100).rounded()))%").font(.sCaption.monospacedDigit()).foregroundStyle(.secondary)
-                            }
+                    ForEach(Array(t.objectives.enumerated()), id: \.offset) { i, o in
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Text("\(firsts[k] + i + 1)")
+                                .font(.sFootnote.weight(.bold).monospacedDigit())
+                                .foregroundStyle(.secondary)
+                                .frame(width: 16, alignment: .leading)
+                            Text(o.name).font(.sCallout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                         }
+                        .accessibilityElement(children: .combine)
                     }
                 }
             }
@@ -414,16 +498,6 @@ private struct AltaStartScreen: View {
         .padding(22)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassCard(radius: 26)
-    }
-
-    private func ring(_ v: Double) -> some View {
-        ZStack {
-            Circle().stroke(Color.primary.opacity(0.14), lineWidth: 3)
-            Circle().trim(from: 0, to: max(0.001, min(v, 1)))
-                .stroke(v >= 0.999 ? Color.green : Theme.accent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-        }
-        .frame(width: 18, height: 18)
     }
 }
 
@@ -523,16 +597,10 @@ private struct AltaRail: View {
         .scrollIndicators(.never)
     }
 
+    /// (1.3.78) How many are mastered is said once, under the Mastery bar; not again at the tiles' head.
     private func objectivesCard(_ list: [AltaObjective]) -> some View {
-        let mastered = list.filter(\.mastered).count
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Objectives").font(.sHeadline)
-                Spacer(minLength: 6)
-                Text("\(mastered) of \(list.count)")
-                    .font(.sFootnote.monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Objectives").font(.sHeadline)
             if list.isEmpty {
                 ProgressView().controlSize(.small).frame(maxWidth: .infinity, minHeight: 32)
             } else {

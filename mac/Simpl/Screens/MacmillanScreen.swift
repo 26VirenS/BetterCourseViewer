@@ -2,9 +2,9 @@ import AppKit
 import SwiftUI
 import WebKit
 
-/// (1.3.66) A Macmillan Learning assignment in a popup over the window, as an Alta one opens: Close and the assignment's
-/// name across the top, Save Page Code at the right; below, Macmillan's page as it draws it, the student working on it
-/// there. (The page laid out as the app's own comes next, from its saved code, as Alta's was.)
+/// (1.3.66) A Macmillan Learning assignment in a popup over the window, as an Alta one opens: the assignment's name and
+/// when it is due across the top, Close at its right end (1.3.78); below, Macmillan's page as it draws it, the student
+/// working on it there. (The page laid out as the app's own comes next, from its saved code, as Alta's was.)
 struct MacmillanScreen: View {
     @EnvironmentObject private var engine: Engine
     @Environment(\.dismiss) private var dismiss
@@ -12,6 +12,8 @@ struct MacmillanScreen: View {
     @State private var ideal = MacmillanScreen.idealSize()
     @State private var saving = false
     @State private var saved: URL?
+    /// (1.3.78) The Canvas assignment's name and due line, for the header as Alta's has it.
+    @State private var canvas: CanvasDue.Facts?
 
     init(launch: AltaLaunch) {
         _session = StateObject(wrappedValue: MacmillanSession(launch: launch))
@@ -36,6 +38,7 @@ struct MacmillanScreen: View {
         .background(PageGround())
         .tint(Theme.accent)
         .task { await session.start(engine: engine) }
+        .task { canvas = await CanvasDue.facts(engine, course: session.launch.course, assignment: session.launch.assignment) }
         .alert("Page code saved", isPresented: Binding(get: { saved != nil }, set: { if !$0 { saved = nil } })) {
             Button("Show in Finder") { if let saved { NSWorkspace.shared.activateFileViewerSelecting([saved]) } }
             Button("OK", role: .cancel) {}
@@ -44,27 +47,41 @@ struct MacmillanScreen: View {
         }
     }
 
+    /// (1.3.78) As Alta's popup: the assignment's own name (Canvas's, else the page's heading) and "Macmillan Learning ·
+    /// Due Oct 12 at 11:59 PM" under it; Close at the right end, where every full popup has it.
     private var topBar: some View {
         HStack(spacing: 14) {
+            IconTile(symbol: "books.vertical", color: .red, size: 32)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.sTitle3).lineLimit(1)
+                Text(subtitle).font(.sCallout).foregroundStyle(.secondary).lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            PopupPins() // (1.3.73: the toolbar's pins, here too — the toolbar is under the sheet)
+            // (1.3.72: Save Page Code is in the Developer menu now)
             GlassGroup(spacing: 8) {
                 Button("Close") { dismiss() }
                     .glassButton()
                     .keyboardShortcut(.cancelAction)
                     .help("Close — your work is kept by Macmillan")
             }
-            IconTile(symbol: "books.vertical", color: .red, size: 32)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(session.launch.title).font(.sTitle3).lineLimit(1)
-                Text("Macmillan Learning").font(.sCallout).foregroundStyle(.secondary).lineLimit(1)
-            }
-            Spacer(minLength: 8)
-            PopupPins() // (1.3.73: the toolbar's pins, here too — the toolbar is under the sheet)
-            // (1.3.72: Save Page Code is in the Developer menu now)
         }
         .controlSize(.large)
         .padding(.horizontal, 22)
         .padding(.top, 16)
         .padding(.bottom, 12)
+    }
+
+    /// Canvas's name for the assignment; else the page's own heading (a launch from a tool's row is named for the tool);
+    /// else what it was opened as.
+    private var title: String {
+        if let t = canvas?.title, !t.isEmpty { return t }
+        if let h = session.heading { return h }
+        return session.launch.title.isEmpty ? "Macmillan Learning" : session.launch.title
+    }
+
+    private var subtitle: String {
+        ["Macmillan Learning", canvas?.dueLine ?? ""].filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
     private func saveCode() {

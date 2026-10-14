@@ -11,6 +11,9 @@ final class MacmillanSession: ObservableObject {
     @Published private(set) var opening = true
     /// The launch could not be had from Canvas.
     @Published private(set) var failure: String?
+    /// (1.3.78) The page's own heading (its assignment's name, as Macmillan titles it), read once it has loaded: the
+    /// popup's title when Canvas's name for it is not to be had.
+    @Published private(set) var heading: String?
 
     let launch: AltaLaunch
     let web: WKWebView
@@ -48,8 +51,19 @@ final class MacmillanSession: ObservableObject {
         MacmillanSession.current = self
         loading = web.observe(\.isLoading, options: [.new]) { [weak self] w, _ in
             let done = !w.isLoading && w.url != nil
-            Task { @MainActor in if done, self?.opening == true { withAnimation(Motion.gentle) { self?.opening = false } } }
+            Task { @MainActor in
+                if done, self?.opening == true { withAnimation(Motion.gentle) { self?.opening = false } }
+                if done, self?.heading == nil { await self?.readHeading() } // (the first page's: never a later page's)
+            }
         }
+    }
+
+    /// The page's main heading, as it reads now (nil while it has none).
+    private func readHeading() async {
+        let js = "return ((document.querySelector('main h1') || document.querySelector('h1') || {}).innerText || '').trim()"
+        guard let h = await run(js, in: nil) as? String else { return }
+        let words = h.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        if !words.isEmpty, words.count <= 160 { heading = words }
     }
 
     /// Opened: the assignment's launch through Canvas (or the page asked for).
