@@ -780,6 +780,13 @@ jobs:
           Shot 'chem-atom-1024' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'atom', '--tool-state', 'Na:cloud'))
           Shot 'chem-atom-narrow' '780x683' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'atom', '--tool-state', 'O'))
           Shot 'chem-atom-from-element' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-element', 'Fe', '--ptable-atoms'))
+          # (the Dashboard's counters again, at the end so the pictures before keep their parts) Overdue with nothing late
+          # (--overdue-none: the mock always has something late) in its own red wash beside the others', light and dark;
+          # and Overdue's panel caught a quarter of the way through growing out of its late card (--open sheetmorph), the
+          # card's alert face still in the surface as it gives way to the panel's
+          Shot 'dashboard-overdue-none' '1024x681' 45 ($mock + @('--appearance', 'light', '--overdue-none'))
+          Shot 'dashboard-overdue-none-dark' '1024x681' 45 ($mock + @('--appearance', 'dark', '--overdue-none'))
+          Shot 'dashboard-counter-morph-overdue' '1024x681' 45 ($mock + @('--appearance', 'dark', '--sheet', 'overdue', '--open', 'sheetmorph'))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
