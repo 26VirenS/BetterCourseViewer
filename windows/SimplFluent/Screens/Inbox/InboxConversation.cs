@@ -69,8 +69,9 @@ public sealed class ConversationScreen : Screen
 /// One conversation (the Mac's ConversationView), beside the Inbox's list or on a screen of its own: its subject and star
 /// (beside the list), who is in it and its course, then its messages in order as a mail app shows a thread — each with
 /// its sender's picture and name, when it was sent, its words (selectable, their web addresses live) and its files as
-/// chips, a hairline between one and the next — and the reply box at its foot (a line that grows with what is written,
-/// to six, then scrolls; Ctrl+Enter sends). The messages keep a readable width however wide the pane; from 1,100 wide,
+/// chips, a hairline between one and the next — and the reply box at its foot (Attach at its start, the files going with
+/// it as chips over it; a line that grows with what is written, to six, then scrolls; Ctrl+Enter sends). The messages
+/// keep a readable width however wide the pane; from 1,100 wide,
 /// who is in it, its course and every file sent in it stand in a column at the right. It opens at its newest message.
 /// </summary>
 internal sealed class InboxThreadView
@@ -96,6 +97,11 @@ internal sealed class InboxThreadView
     private readonly InboxColumn readArea = new(), barArea = new();
     private readonly TextBox reply;
     private readonly Wpf.Ui.Controls.Button send;
+    private readonly Button attach;
+    /// <summary>The files going with the reply, uploaded as they are picked, and their chips over it.</summary>
+    private readonly MessageFiles files;
+    private readonly ContentControl filesHost = new() { Focusable = false, IsTabStop = false, Visibility = Visibility.Collapsed };
+    private readonly HashSet<Guid> chipsSeen = new();
     private readonly TextBlock hint;
     private readonly InfoBar errorBar;
     private bool sending, counted, wide;
@@ -140,8 +146,31 @@ internal sealed class InboxThreadView
         send.VerticalAlignment = VerticalAlignment.Bottom;
         send.ToolTip = "Send (Ctrl+Enter)";
         errorBar = new InfoBar { Title = "Not sent", Severity = InfoBarSeverity.Error, IsClosable = false, IsOpen = false, Margin = new Thickness(0, 0, 0, 8) };
-        var line = K.Columns("*, auto, auto", reply.Col(0), hint.Margin(10, 0, 10, 0).Col(1), send.Col(2));
-        barHolder.Child = K.V(0, errorBar, line);
+        files = new MessageFiles(engine);
+        files.Changed += () =>
+        {
+            filesHost.Visibility = files.Items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            filesHost.Content = files.Items.Count > 0 ? files.Chips(chipsSeen) : null;
+            Bar();
+        };
+        attach = K.IconButton(SymbolRegular.Attach24, ChooseFiles, "Attach files to this reply", 16, 32);
+        attach.VerticalAlignment = VerticalAlignment.Bottom;
+        System.Windows.Automation.AutomationProperties.SetName(attach, "Attach");
+        var line = K.Columns("auto, *, auto, auto", attach.Margin(0, 0, 6, 0).Col(0), reply.Col(1), hint.Margin(10, 0, 10, 0).Col(2), send.Col(3));
+        barHolder.Child = K.V(0, errorBar, filesHost.Margin(0, 0, 0, 2), line);
+        // (files dropped on the reply bar go with the reply, as Attach's do)
+        barHolder.AllowDrop = true;
+        barHolder.PreviewDragOver += (_, e) =>
+        {
+            e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) && !sending ? DragDropEffects.Copy : DragDropEffects.None;
+            e.Handled = true;
+        };
+        barHolder.PreviewDrop += (_, e) =>
+        {
+            if (sending || e.Data.GetData(DataFormats.FileDrop) is not string[] dropped) return;
+            e.Handled = true;
+            files.Add(dropped.Where(System.IO.File.Exists));
+        };
         barArea.Children.Add(barHolder);
 
         var thread = K.Rows("*, auto", scroller.Row(0), barArea.Row(1));
@@ -187,6 +216,7 @@ internal sealed class InboxThreadView
     private void Answered()
     {
         Draw(force: false);
+        if (model.Data != null) files.TakeLaunchFile(); // (the screenshot suite's --attach, once the reply bar shows)
         if (counted || model.Data == null) return;
         counted = true;
         _ = Count();
@@ -344,7 +374,7 @@ internal sealed class InboxThreadView
             e.Handled = true;
             var menu = new ContextMenu();
             menu.Items.Add(InboxUi.Item("Open", SymbolRegular.Open24, () => InboxUi.OpenFile(engine, f.Url, f.Name)));
-            menu.Items.Add(InboxUi.Item("Copy Link", SymbolRegular.Link24, () => InboxUi.CopyLink(engine, f.Url)));
+            menu.Items.Add(InboxUi.Item("Copy link", SymbolRegular.Link24, () => InboxUi.CopyLink(engine, f.Url)));
             InboxUi.Open(menu, b, atPointer: true);
         };
         return b;
@@ -418,12 +448,23 @@ internal sealed class InboxThreadView
         };
     }
 
-    private bool CanSend => !sending && model.Data != null && reply.Text.Trim().Length > 0;
+    /// <summary>Windows' Open dialog, any kind of file, several at once.</summary>
+    private void ChooseFiles()
+    {
+        if (sending) return;
+        var picked = Simpl.Tools.Files.Choose("All files|*.*", true, Window.GetWindow(outer), "Attach files");
+        if (picked.Count > 0) files.Add(picked);
+    }
 
-    /// <summary>Send ready when there is something to send; while it goes, a ring in its place; why it did not go, above.</summary>
+    private bool CanSend => !sending && model.Data != null && reply.Text.Trim().Length > 0 && !files.Uploading;
+
+    /// <summary>Send ready when there is something to send and every file is up; while it goes, a ring in its place; why
+    /// it did not go, above.</summary>
     private void Bar()
     {
         send.IsEnabled = CanSend;
+        attach.IsEnabled = !sending;
+        send.ToolTip = files.Uploading ? "Send once the files are up" : "Send (Ctrl+Enter)";
         hint.Visibility = reply.Text.Length > 0 && !sending ? Visibility.Visible : Visibility.Collapsed;
         if (sending)
         {
@@ -449,8 +490,9 @@ internal sealed class InboxThreadView
         Bar();
         try
         {
-            await engine.Call<OK>("sendReply", new { id = Id, body = text });
+            await engine.Call<OK>("sendReply", new { id = Id, body = text, attachments = files.Ids });
             reply.Text = "";
+            files.Clear();
             model.Reload(engine, "conversation", new { id = Id });
             engine.DataChanged();
         }

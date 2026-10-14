@@ -23,7 +23,7 @@ namespace Simpl.Screens;
 /// width of its own (about a third of the Inbox, dragged wider or narrower at the line between them, double-clicked
 /// back); on a narrow page the list is shown alone and a conversation opens on a screen of its own. Choosing one reads it
 /// (Canvas marks it read) and the arrow keys walk the list; a double-click or Enter opens it on a screen of its own; the
-/// star in its hover actions, or a right-click, stars it; New Message writes one.
+/// star in its hover actions, or a right-click, stars it; New message writes one.
 /// </summary>
 public sealed class InboxScreen : Screen
 {
@@ -86,9 +86,9 @@ public sealed class InboxScreen : Screen
         filter = new TextBox
         {
             PlaceholderText = "Filter conversations", Icon = new SymbolIcon { Symbol = SymbolRegular.Search24 }, ClearButtonEnabled = true,
-            MinHeight = 34, VerticalContentAlignment = VerticalAlignment.Center, ToolTip = "Filter Conversations (Ctrl+E)",
+            MinHeight = 34, VerticalContentAlignment = VerticalAlignment.Center, ToolTip = "Filter conversations (Ctrl+E)",
         };
-        System.Windows.Automation.AutomationProperties.SetName(filter, "Filter Conversations");
+        System.Windows.Automation.AutomationProperties.SetName(filter, "Filter conversations");
         filter.TextChanged += (_, _) =>
         {
             if (filter.Text == query) return;
@@ -109,13 +109,13 @@ public sealed class InboxScreen : Screen
             Content = rowsPanel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
             Padding = new Thickness(4, 2, 4, 6), Focusable = false,
         };
-        // (a right-click under the conversations: New Message)
+        // (a right-click under the conversations: New message)
         listScroll.MouseRightButtonUp += (_, e) =>
         {
             if (e.Handled) return;
             e.Handled = true;
             var m = new ContextMenu();
-            m.Items.Add(InboxUi.Item("New Message", SymbolRegular.Compose24, engine.AskNewMessage));
+            m.Items.Add(InboxUi.Item("New message", SymbolRegular.Compose24, engine.AskNewMessage));
             InboxUi.Open(m, listScroll, atPointer: true);
         };
         var listArea = new Grid { Children = { listScroll, emptyHost } };
@@ -161,13 +161,13 @@ public sealed class InboxScreen : Screen
         }
     }
 
-    /// <summary>New Message, and the Canvas menu for the conversation chosen (else the Inbox).</summary>
+    /// <summary>New message, and the Canvas menu for the conversation chosen (else the Inbox).</summary>
     public override FrameworkElement? Commands
     {
         get
         {
-            var write = K.Button("New Message", engine.AskNewMessage, icon: SymbolRegular.Compose24);
-            write.ToolTip = "New Message (Ctrl+Shift+N)";
+            var write = K.Button("New message", engine.AskNewMessage, icon: SymbolRegular.Compose24);
+            write.ToolTip = "New message (Ctrl+Shift+N)";
             var more = InboxUi.CanvasMenu(engine, () => selection != null ? InboxUi.Address(selection) : "/conversations", () => SelectedRow?.Subject ?? Shown.Label);
             return K.H(8, write, more);
         }
@@ -416,9 +416,9 @@ public sealed class InboxScreen : Screen
             var text = d.Empty ?? "No messages.";
             return InboxUi.Unavailable(Shown.Icon, text.EndsWith('.') ? text[..^1] : text, null);
         }
-        if (Trimmed.Length > 0) return InboxUi.Unavailable(SymbolRegular.Search24, $"No Results for “{Trimmed}”", "Check the spelling or try a new search.");
-        return InboxUi.Unavailable(SymbolRegular.Filter24, "Nothing from This Course", $"{Shown.Label} holds no conversations about {course ?? "this course"}.",
-            K.Button("Show Every Course", () => SetCourse(null)));
+        if (Trimmed.Length > 0) return InboxUi.Unavailable(SymbolRegular.Search24, $"No results for “{Trimmed}”", "Check the spelling or try a new search.");
+        return InboxUi.Unavailable(SymbolRegular.Filter24, "Nothing from this course", $"{Shown.Label} holds no conversations about {course ?? "this course"}.",
+            K.Button("Show every course", () => SetCourse(null)));
     }
 
     /// <summary>The course menu's button (its filter filled in the accent while one course is shown) and the chip of the course chosen.</summary>
@@ -427,7 +427,7 @@ public sealed class InboxScreen : Screen
         var on = course != null;
         courseButton.Content = K.Icon(SymbolRegular.Filter24, 18, on ? B.AccentText : B.Text2, filled: on);
         courseButton.IsEnabled = on || CourseNames(d).Count > 0;
-        courseButton.ToolTip = on ? $"Showing {course}" : "Show One Course";
+        courseButton.ToolTip = on ? $"Showing {course}" : "Show one course";
         if (course == null) { chipHost.Content = null; chipHost.Visibility = Visibility.Collapsed; return; }
         chipHost.Visibility = Visibility.Visible;
         chipHost.Content = CourseChip(course);
@@ -446,7 +446,7 @@ public sealed class InboxScreen : Screen
     {
         if (shown is not { } d) return;
         var m = new ContextMenu();
-        var every = new System.Windows.Controls.MenuItem { Header = "Every Course", IsCheckable = true, IsChecked = course == null };
+        var every = new System.Windows.Controls.MenuItem { Header = "Every course", IsCheckable = true, IsChecked = course == null };
         every.Click += (_, _) => SetCourse(null);
         m.Items.Add(every);
         var names = CourseNames(d);
@@ -479,7 +479,7 @@ public sealed class InboxScreen : Screen
         var b = K.Subtle(content, () => SetCourse(null), new Thickness(12, 4, 10, 5), 14);
         b.Background = K.Brush(Color.FromArgb(Appearance.Dark ? (byte)60 : (byte)40, tone.R, tone.G, tone.B));
         b.HorizontalAlignment = HorizontalAlignment.Left;
-        b.ToolTip = "Show Every Course";
+        b.ToolTip = "Show every course";
         System.Windows.Automation.AutomationProperties.SetName(b, $"{name}, show every course");
         return b;
     }
@@ -508,7 +508,7 @@ public sealed class InboxScreen : Screen
     /// <summary>
     /// A conversation as Windows 11's mail apps draw a message (the Mac's InboxRowView): the accent's dot while it is
     /// unread, a picture of who it is with, their name and how many messages it holds, a pencil for a reply begun, its
-    /// star and paperclip, when (under the pointer, Star and Mark as Read in its place); the subject, its last words, its
+    /// star and paperclip, when (under the pointer, Star and Mark as read in its place); the subject, its last words, its
     /// course in its colour. Chosen, the list's fill with the accent's pill at its left.
     /// </summary>
     private RowView Row(ConvRow c)
@@ -545,8 +545,8 @@ public sealed class InboxScreen : Screen
         readAction.Width = 28;
         readAction.Height = 20;
         readAction.HorizontalContentAlignment = HorizontalAlignment.Center;
-        readAction.ToolTip = "Mark as Read";
-        System.Windows.Automation.AutomationProperties.SetName(readAction, "Mark as Read");
+        readAction.ToolTip = "Mark as read";
+        System.Windows.Automation.AutomationProperties.SetName(readAction, "Mark as read");
         var actions = K.H(2, starButton, readAction);
         actions.Visibility = Visibility.Collapsed;
         var corner = new Grid { Children = { when, actions }, Margin = new Thickness(8, 0, 0, 0) };
@@ -625,16 +625,16 @@ public sealed class InboxScreen : Screen
         if (Find(id) is not { } c) return;
         var m = new ContextMenu();
         m.Items.Add(InboxUi.Item("Open", SymbolRegular.Open24, () => OpenAlone(id)));
-        if (IsUnread(c)) m.Items.Add(InboxUi.Item("Mark as Read", SymbolRegular.MailRead24, () => MarkRead(id)));
+        if (IsUnread(c)) m.Items.Add(InboxUi.Item("Mark as read", SymbolRegular.MailRead24, () => MarkRead(id)));
         m.Items.Add(InboxUi.Item(c.Starred == true ? "Unstar" : "Star", c.Starred == true ? SymbolRegular.StarOff24 : SymbolRegular.Star24, () => Star(id, c.Starred != true)));
         if (!string.IsNullOrEmpty(c.Context) && course != c.Context)
         {
             var ctx = c.Context!;
-            m.Items.Add(InboxUi.Item($"Show Only {ctx}", SymbolRegular.Filter24, () => SetCourse(ctx)));
+            m.Items.Add(InboxUi.Item($"Show only {ctx}", SymbolRegular.Filter24, () => SetCourse(ctx)));
         }
         m.Items.Add(new Separator());
         m.Items.Add(InboxUi.Item($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen(InboxUi.Address(id), c.Subject)));
-        m.Items.Add(InboxUi.Item("Copy Link", SymbolRegular.Link24, () => InboxUi.CopyLink(engine, InboxUi.Address(id))));
+        m.Items.Add(InboxUi.Item("Copy link", SymbolRegular.Link24, () => InboxUi.CopyLink(engine, InboxUi.Address(id))));
         InboxUi.Open(m, at, atPointer: true);
     }
 
@@ -672,8 +672,8 @@ public sealed class InboxScreen : Screen
         if (selection == null)
         {
             reader = null;
-            var write = K.Button("New Message", engine.AskNewMessage, accent: true, icon: SymbolRegular.Compose24);
-            readerHost.Content = InboxUi.Unavailable(SymbolRegular.MailRead24, "No Conversation Selected",
+            var write = K.Button("New message", engine.AskNewMessage, accent: true, icon: SymbolRegular.Compose24);
+            readerHost.Content = InboxUi.Unavailable(SymbolRegular.MailRead24, "No conversation selected",
                 "Choose a conversation to read it, or write a new message to a teacher, a classmate or a course.", write);
             return;
         }
@@ -820,8 +820,10 @@ internal sealed class InboxNameLine : Panel
 }
 
 /// <summary>
-/// The mailboxes as one switcher (the Mac's InboxMailboxSwitcher, in Windows 11's SelectorBar's manner): each its symbol,
-/// the one showing filled in the accent with its name too, the accent's short bar under it sliding from one to the next.
+/// The mailboxes as one switcher (the Mac's InboxMailboxSwitcher, in Windows 11's SelectorBar's manner): each its symbol
+/// and its name where the list is wide enough for every name (as the narrow page's list always is), the one showing
+/// filled in the accent; where it is not, the one showing alone keeps its name and the others their tooltips. The
+/// accent's short bar under the one showing slides from one to the next.
 /// </summary>
 internal sealed class InboxSwitcher : Grid
 {
@@ -832,6 +834,11 @@ internal sealed class InboxSwitcher : Grid
     private int selected;
     private double? barAt;
     private bool slide;
+    /// <summary>Every mailbox named (there is room for them all), else the one showing alone.</summary>
+    private bool named;
+    /// <summary>How wide each mailbox is with its name, and all of them together.</summary>
+    private double[] widths = Array.Empty<double>();
+    private double allNamed;
 
     public event Action<int>? Changed;
 
@@ -847,6 +854,7 @@ internal sealed class InboxSwitcher : Grid
             var label = K.Text(boxes[i].Label, Ty.Body, B.AccentText);
             label.FontWeight = FontWeights.SemiBold;
             label.Margin = new Thickness(7, 0, 0, 0);
+            label.TextTrimming = TextTrimming.None;
             var b = K.Subtle(K.H(0, icon, label), () => Select(n), new Thickness(9, 6, 9, 9));
             b.HorizontalContentAlignment = HorizontalAlignment.Center;
             b.ToolTip = boxes[i].Label;
@@ -859,6 +867,7 @@ internal sealed class InboxSwitcher : Grid
         Children.Add(overlay);
         Paint();
         LayoutUpdated += (_, _) => Place();
+        SizeChanged += (_, e) => Fit(e.NewSize.Width);
     }
 
     public void Select(int i)
@@ -870,6 +879,28 @@ internal sealed class InboxSwitcher : Grid
         Changed?.Invoke(i);
     }
 
+    /// <summary>The room it has: every mailbox named when every name fits (at its semibold width, the one showing's), else
+    /// the one showing alone.</summary>
+    private void Fit(double width)
+    {
+        if (widths.Length == 0)
+        {
+            // (each mailbox's width with its name: its symbol, the gap, the name as the one showing draws it, the padding)
+            // (measured on a copy of each name: one folded away measures nothing)
+            widths = items.Select(it =>
+            {
+                var t = K.Text(it.T.Text, Ty.Body).Strong();
+                t.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                return 16 + 7 + t.DesiredSize.Width + 18 + 4;
+            }).ToArray();
+            allNamed = widths.Sum();
+        }
+        var fits = width >= allNamed;
+        if (fits == named) return;
+        named = fits;
+        Paint();
+    }
+
     private void Paint()
     {
         for (var i = 0; i < items.Count; i++)
@@ -877,8 +908,13 @@ internal sealed class InboxSwitcher : Grid
             var on = i == selected;
             items[i].I.Filled = on;
             items[i].I.SetResourceReference(Control.ForegroundProperty, on ? B.AccentText : B.Text2);
-            items[i].T.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
-            row.ColumnDefinitions[i].Width = on ? GridLength.Auto : new GridLength(1, GridUnitType.Star);
+            items[i].T.Visibility = on || named ? Visibility.Visible : Visibility.Collapsed;
+            items[i].T.FontWeight = on ? FontWeights.SemiBold : FontWeights.Normal;
+            items[i].T.SetResourceReference(TextBlock.ForegroundProperty, on ? B.AccentText : B.Text2);
+            // (named: each as wide as its name asks, the room left shared out in the same proportion; else the one
+            // showing as wide as its name and the symbols sharing the rest)
+            row.ColumnDefinitions[i].Width = named && i < widths.Length ? new GridLength(widths[i], GridUnitType.Star)
+                : on ? GridLength.Auto : new GridLength(1, GridUnitType.Star);
             System.Windows.Automation.AutomationProperties.SetItemStatus(items[i].B, on ? "Selected" : "");
         }
     }

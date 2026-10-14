@@ -67,6 +67,170 @@ internal static class InboxStore
 /// </summary>
 internal sealed record InboxLink(Func<bool?> Starred, Action<bool> Star);
 
+/// <summary>What the page's <c>messageUpload</c> answers: the file's id in Canvas, its name and its size in words.</summary>
+internal sealed class MessageUploaded
+{
+    public string Id { get; set; } = "";
+    public string? Name { get; set; }
+    public long? Size { get; set; }
+    public string? SizeText { get; set; }
+}
+
+/// <summary>
+/// The files going with one message, a new one or a reply (the Mac's MessageAttachments): each picked file is uploaded at
+/// once to the student's own "conversation attachments" folder in Canvas (<c>messageUpload</c>), as Canvas's own Inbox
+/// does, and the message carries its id. Send waits until every one is up and takes the ids of those that are; one that
+/// could not go up shows why and is left out. A file already uploaded and then taken out stays in the student's files in
+/// Canvas, as Canvas's own Inbox leaves it.
+/// </summary>
+internal sealed class MessageFiles
+{
+    /// <summary>A file going with the message: its name and size, Canvas's id once it is up, or why it could not go.</summary>
+    public sealed class Item
+    {
+        public Guid Key { get; } = Guid.NewGuid();
+        public required string Name { get; init; }
+        public string SizeText { get; set; } = "";
+        public string? Id { get; set; }
+        public string? Failed { get; set; }
+        public bool Uploading => Id == null && Failed == null;
+    }
+
+    /// <summary>The largest file sent (as a hand-in's): a larger one is sent from Canvas's own Inbox.</summary>
+    public const long Limit = 50L * 1024 * 1024;
+
+    private readonly Engine.Engine engine;
+    private readonly List<Item> items = new();
+
+    public MessageFiles(Engine.Engine engine) => this.engine = engine;
+
+    /// <summary>The list changed (a file added, up, failed or taken out): its chips are drawn again.</summary>
+    public event Action? Changed;
+
+    public IReadOnlyList<Item> Items => items;
+    /// <summary>A file still on its way up.</summary>
+    public bool Uploading => items.Any(i => i.Uploading);
+    /// <summary>Canvas's ids of the files that are up.</summary>
+    public List<string> Ids => items.Where(i => i.Id != null).Select(i => i.Id!).ToList();
+
+    /// <summary>Files picked or dropped: each read and uploaded (one picked twice is taken once).</summary>
+    public void Add(IEnumerable<string> paths)
+    {
+        foreach (var path in paths)
+        {
+            var name = System.IO.Path.GetFileName(path);
+            if (name.Length == 0 || items.Any(i => i.Name == name && i.Failed == null)) continue;
+            long size;
+            try { size = new System.IO.FileInfo(path).Length; }
+            catch { continue; }
+            var item = new Item { Name = name, SizeText = SizeText(size) };
+            items.Add(item);
+            if (size > Limit) item.Failed = $"Larger than 50 MB: send it from {engine.LmsName}’s own Inbox.";
+            else _ = Upload(item, path);
+        }
+        Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// The screenshot suite's (a development run only): --attach sample attaches a small text file of its own making
+    /// ("Lab notes.txt"), --attach &lt;path&gt; that file — to the first new message or reply opened, once.
+    /// </summary>
+    public void TakeLaunchFile()
+    {
+        if (!Support.Launch.IsDevelopment || Support.Launch.Take("", "attach") is not { Length: > 0 } a) return;
+        var path = a;
+        if (a is "sample" or "true")
+        {
+            try
+            {
+                var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "Simpl-shots");
+                System.IO.Directory.CreateDirectory(dir);
+                path = System.IO.Path.Combine(dir, "Lab notes.txt");
+                System.IO.File.WriteAllText(path, "Notes for the lab: the readings for week 2, and the questions to bring.\n");
+            }
+            catch { return; }
+        }
+        if (System.IO.File.Exists(path)) Add(new[] { path });
+    }
+
+    /// <summary>A file taken out.</summary>
+    public void Remove(Item item)
+    {
+        items.Remove(item);
+        Changed?.Invoke();
+    }
+
+    /// <summary>Every file let go (the message sent).</summary>
+    public void Clear()
+    {
+        if (items.Count == 0) return;
+        items.Clear();
+        Changed?.Invoke();
+    }
+
+    private async Task Upload(Item item, string path)
+    {
+        try
+        {
+            var data = await System.IO.File.ReadAllBytesAsync(path);
+            var up = await engine.Call<MessageUploaded>("messageUpload", new { name = item.Name, type = AssignKit.Mime(item.Name), data = Convert.ToBase64String(data) });
+            item.Id = up.Id;
+            if (!string.IsNullOrEmpty(up.SizeText)) item.SizeText = up.SizeText!;
+        }
+        catch (System.IO.IOException) { item.Failed = "This file could not be read."; }
+        catch (UnauthorizedAccessException) { item.Failed = "This file could not be read."; }
+        catch (Exception e) { item.Failed = e.Message.Length > 0 ? e.Message : "It could not be attached."; }
+        if (items.Contains(item)) Changed?.Invoke(); // (not one taken out while it went up)
+    }
+
+    /// <summary>A file's size as the page writes one: "16 B", "12 KB", "1.5 MB".</summary>
+    public static string SizeText(long n) =>
+        n < 1024 ? $"{n} B"
+        : n < 1048576 ? $"{Math.Round((decimal)n / 1024, 0, MidpointRounding.AwayFromZero)} KB"
+        : $"{Math.Round((decimal)n / 1048576, 1, MidpointRounding.AwayFromZero).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} MB";
+
+    /// <summary>
+    /// The files as chips in lines that wrap (the Mac's MessageAttachmentChips): each its name and size, a ring while it
+    /// goes up (a red mark, and why under the pointer, if it could not), and × to take it out. A chip comes in by a short
+    /// fade and rise, as the To field's people do; with Windows' animation effects off, at once.
+    /// </summary>
+    public FrameworkElement Chips(HashSet<Guid> seen)
+    {
+        var flow = new WrapPanel { Orientation = Orientation.Horizontal };
+        foreach (var f in items)
+        {
+            var file = f;
+            var failed = f.Failed != null;
+            UIElement mark = f.Uploading ? K.Spinner(12)
+                : failed ? K.Icon(SymbolRegular.Warning16, 14, B.Critical, filled: true)
+                : K.Icon(SymbolRegular.Attach16, 14, B.Text2);
+            var name = K.Text(f.Name, Ty.Body);
+            name.MaxWidth = 220;
+            var size = K.Text(f.SizeText, Ty.Caption, B.Text2);
+            size.VerticalAlignment = VerticalAlignment.Center;
+            var remove = K.Subtle(K.Icon(SymbolRegular.DismissCircle24, 15, B.Text2, filled: true), () => Remove(file), new Thickness(0), 9);
+            remove.Width = 20;
+            remove.Height = 20;
+            remove.HorizontalContentAlignment = HorizontalAlignment.Center;
+            remove.ToolTip = $"Remove {f.Name}";
+            System.Windows.Automation.AutomationProperties.SetName(remove, $"Remove {f.Name}");
+            var row = K.H(6, mark, name, size, remove);
+            var tint = failed ? K.Tone("red") : Support.Appearance.Accent;
+            var chip = new Border
+            {
+                Child = row, Padding = new Thickness(9, 3, 3, 3), CornerRadius = new CornerRadius(13), Margin = new Thickness(0, 0, 6, 6),
+                Background = K.Brush(Color.FromArgb(Support.Appearance.Dark ? (byte)56 : (byte)30, tint.R, tint.G, tint.B)),
+                ToolTip = f.Failed ?? (f.Uploading ? $"Uploading {f.Name}…" : f.Name),
+            };
+            System.Windows.Automation.AutomationProperties.SetName(chip, failed ? $"{f.Name}, not attached: {f.Failed}" : f.Uploading ? $"{f.Name}, uploading" : $"{f.Name}, {f.SizeText}, attached");
+            if (seen.Add(f.Key)) Motion.Enter(chip, 0, 6, Motion.Normal);
+            flow.Children.Add(chip);
+        }
+        seen.IntersectWith(items.Select(i => i.Key));
+        return flow;
+    }
+}
+
 /// <summary>The Inbox's own pieces, drawn alike on its screens.</summary>
 internal static class InboxUi
 {
@@ -176,7 +340,7 @@ internal static class InboxUi
         menu.IsOpen = true;
     }
 
-    /// <summary>The Mac's CanvasMenu in a screen's commands (⋯): Open in Canvas, Copy Link — for the address at the moment.</summary>
+    /// <summary>The Mac's CanvasMenu in a screen's commands (⋯): Open in Canvas, Copy link — for the address at the moment.</summary>
     public static FrameworkElement CanvasMenu(Engine.Engine engine, Func<string?> url, Func<string> title)
     {
         System.Windows.Controls.Button? b = null;
@@ -185,7 +349,7 @@ internal static class InboxUi
             var u = url();
             var m = new ContextMenu();
             m.Items.Add(Item($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => { if (u != null) engine.OpenWebScreen(u, title()); }, u != null));
-            m.Items.Add(Item("Copy Link", SymbolRegular.Link24, () => { if (u != null) CopyLink(engine, u); }, u != null));
+            m.Items.Add(Item("Copy link", SymbolRegular.Link24, () => { if (u != null) CopyLink(engine, u); }, u != null));
             Open(m, b!);
         }, "More");
         return b;
