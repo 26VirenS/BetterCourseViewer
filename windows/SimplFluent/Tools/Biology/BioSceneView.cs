@@ -435,25 +435,26 @@ public sealed class BioSceneView : Grid
         if (!double.IsFinite(d) || d <= 0) return ball;
         fitReach = BioLabelLayout.Reach;
         if (!showLabels || content is not { Labels.Count: > 0 }) return d;
-        double Search(double reach)
+        (double D, int InRows) Search(double reach)
         {
-            var (best, fewest) = (d, int.MaxValue);
+            var (best, fewest, inRows) = (d, int.MaxValue, 0);
             for (var k = d; k <= 2.5 * d; k *= 1.04)
             {
-                var on = LabelsOn(s, m, c, corners, k, f, reach);
-                if (on < fewest) (best, fewest) = (k, on);
+                var (on, rowed) = LabelsOn(s, m, c, corners, k, f, reach);
+                if (on < fewest) (best, fewest, inRows) = (k, on, rowed);
                 if (on == 0) break;
             }
-            return best;
+            return (best, inRows);
         }
         // (twice: with a label a little over the model kept in its column, and with every label over it moved to a row
-        //  above or below — the rows taken only where they make the model a sixth larger or more, so a peptide's four
-        //  labels go above and below it and a cell's sixteen keep to their columns, their leaders uncrossed)
+        //  above or below — the rows taken only where they make the model a sixth larger or more and hold six labels at
+        //  most, so a peptide's five go above and below it and a cell's sixteen keep to their columns, their leaders
+        //  uncrossed, not run down across the cell)
         var columns = Search(BioLabelLayout.Reach);
         var rows = Search(4);
-        if (rows > 0.85 * columns) return columns;
+        if (rows.D > 0.85 * columns.D || rows.InRows > 6) return columns.D;
         fitReach = 4;
-        return rows;
+        return rows.D;
     }
 
     /// <summary>How far a column's label may reach into a narrow model before it moves to a row, as the fit last chose it
@@ -478,7 +479,7 @@ public sealed class BioSceneView : Grid
     /// <summary>How many labels would lie on the model (its box on the view) or on another label's anchor with the camera
     /// <paramref name="d"/> from its ball's centre along +z: the labels laid out as <see cref="TickLabels"/> lays them —
     /// the box kept clear too — each anchor seen unless its normal faces away or a ray has found it hidden.</summary>
-    private int LabelsOn(BioSphere s, Matrix3D m, Point3D c, List<Vector3D> corners, double d, double f, double reach)
+    private (int On, int InRows) LabelsOn(BioSphere s, Matrix3D m, Point3D c, List<Vector3D> corners, double d, double f, double reach)
     {
         double w = ActualWidth, h = ActualHeight, near = Math.Max(0.001, d * 0.01);
         (double X, double Y, bool InFront) At(Vector3D p) => d - p.Z <= near ? (0, 0, false) : (w / 2 + p.X * f / (d - p.Z), h / 2 - p.Y * f / (d - p.Z), true);
@@ -486,7 +487,7 @@ public sealed class BioSceneView : Grid
         foreach (var p in corners)
         {
             var a = At(p);
-            if (!a.InFront) return int.MaxValue;
+            if (!a.InFront) return (int.MaxValue, 0);
             x0 = Math.Min(x0, a.X);
             y0 = Math.Min(y0, a.Y);
             x1 = Math.Max(x1, a.X);
@@ -504,7 +505,7 @@ public sealed class BioSceneView : Grid
             inputs.Add(new BioLabelInput(l.Id, l.Text, x, y, visible, l.Area, LabelWidth(l.Text)));
         }
         var (placed, _) = BioLabelLayout.Layout(inputs, w / 2, h / 2, Math.Min(f * s.Radius / d, w * 0.32), w, h, box, KeepClearBox(), reach);
-        return BioLabelLayout.Conflicts(placed, box);
+        return (BioLabelLayout.Conflicts(placed, box), placed.Count(p => p.Row));
     }
 
     /// <summary>The view's corner kept clear of labels, as a box on the view (none: null).</summary>
@@ -1201,8 +1202,9 @@ public sealed class BioSceneView : Grid
                 moreWords = words;
                 labelLayer.Children.Add(moreText);
             }
-            // (under the lowest label — or, with no room under it, beside it toward the model: under a column that reached
-            //  the view's foot it was cut off, and a label was left out with nothing to say so)
+            // (under the lowest label — or, with no room under it, beside it, out toward the view's edge where it fits and
+            //  else toward the model: under a column that reached the view's foot it was cut off, and a label was left out
+            //  with nothing to say so)
             moreText.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             var (mw, mh) = (moreText.DesiredSize.Width, moreText.DesiredSize.Height);
             if (last.Y + 11 + mh <= ActualHeight)
@@ -1212,7 +1214,8 @@ public sealed class BioSceneView : Grid
             }
             else
             {
-                var x = last.Left ? last.Frame.X + last.Frame.Width + 6 : last.Frame.X - 6 - mw;
+                var outer = last.Left ? last.Frame.X - 6 - mw : last.Frame.X + last.Frame.Width + 6;
+                var x = outer >= 0 && outer + mw <= ActualWidth ? outer : last.Left ? last.Frame.X + last.Frame.Width + 6 : last.Frame.X - 6 - mw;
                 Canvas.SetLeft(moreText, Math.Clamp(x, 0, Math.Max(0, ActualWidth - mw)));
                 Canvas.SetTop(moreText, last.Y - mh / 2);
             }

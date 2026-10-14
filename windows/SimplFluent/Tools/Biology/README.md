@@ -219,8 +219,8 @@ per term d (UnitVector), f = U(1.5, 3.5), φ = U(0, 2π), weight U(0.5, 1), weig
   model's box or on another label's anchor: the room is what the labels placed there take, none at a side with no
   column, a row's height for those moved above or below (`BioLabelLayout.Conflicts`). It tries that twice, with a
   label a little over the model kept in its column (`BioLabelLayout.Reach`, 40) and with every label over it moved to
-  a row, and takes the rows only where they make the model a sixth larger or more (a peptide's four labels go above
-  and below it; a cell's sixteen keep to their columns). 0.3.1's first fit kept a column's room at each side for the
+  a row, and takes the rows only where they make the model a sixth larger or more and hold six labels at most (a
+  peptide's five labels go above and below it; a cell's sixteen keep to their columns). 0.3.1's first fit kept a column's room at each side for the
   widest label whether a label sat there or not, which held every model under half the view's width and still left
   wider labels on it. A scene that names its ball (`Frame`) is fitted, and its labels' room measured, by that ball (a
   bacterium's cell, not its flagella). It keeps that share as the view is resized (a zoom of the student's own kept as
@@ -248,7 +248,8 @@ per term d (UnitVector), f = U(1.5, 3.5), φ = U(0, 2π), weight U(0.5, 1), weig
   a label's far edge is led to that edge. Given the model's box on the view (its items' boxes, projected), a label
   that would still hide its own anchor or another label's, or reach more than `Reach` into a model narrower than 70% of
   the view (over half its width, for a short label), goes to a row just above the model (an anchor in its upper half)
-  or below it; a row's labels are packed side by side in their anchors' order, clear of the leaders crossing the row on
+  or below it — or, for an anchor in the middle half of the model's height, to the other side where its own has no
+  room; a row's labels are packed side by side in their anchors' order, clear of the leaders crossing the row on
   their way to a column, their leaders straight up or down and never through a capsule in a row nearer the model; a
   label that fits no row stays in its column (and a row's label packed over it goes back to its own). It draws frame by frame only while something moves. Keep a scene under 300k triangles (§3.4: Viewport3D
   draws on one thread; icospheres for the many small spheres). `BioSceneCard.Make(bar, scene, hint)` and `BioSceneCard.Buttons(scene)` (Turn / Reset view) give the
@@ -294,8 +295,9 @@ chemistry builders' layout, `ChemLayout`, decided on the width it is given — a
 by side from 1180 wide; from 840 — the popup on a 1280 or 1366 window — the drawing beside one column, the controls
 over the facts, each scrolling in its own share of it (`ChemSide`: as tall as each needs while they fit, else 55% and
 45%); narrower — the popup on a 1024 window, or a narrow one — the drawing across the top, as tall as leaves 100 of the
-page for the two columns' headings and first controls under it (180 to 560: room beside an animal cell for its sixteen
-labels; on the smallest window, 720 by 520, a floor of 240 left only the columns' first line in sight), the page's
+page for the two columns' headings and first controls under it (240 to 560: room beside an animal cell for its sixteen
+labels; on the smallest window, 720 by 520, the columns' headings under it — a lower floor left the cell's view too
+short for its labels), the page's
 room at its sides inside its scroller, so the scroll bar runs down the page's edge, not down the 3D view beside Reset
 view. The controls and the facts are always in
 sight: 0.3.0 gave the drawing the whole page under 1180, and they sat out of sight below it. A scene's

@@ -21,10 +21,11 @@ namespace Simpl.Tools;
 // model's box on the view, a label that would hide its own anchor or another label's, or (beside a model narrower than
 // 70% of the view) reach more than Reach into the model's box (40, or 4 where the 3D view finds rows make the model
 // larger; over half its own width, for a short label), goes instead to a row just above the model (an anchor in its
-// upper half) or below it. A row's labels are packed side by side in their anchors' order, each as near over its anchor
-// as the others allow (a label already there slides aside for a new one) and clear of the leaders crossing the row on
-// their way to a column, their own leaders straight up or down and never through a capsule in a row nearer the model; a
-// label that fits no row (three at most) stays in its column. An anchor straight over or under its own column label is
+// upper half) or below it, or (an anchor in the middle half of its height) the other side where its own has no room. A
+// row's labels are packed side by side in their anchors' order, each as near over its anchor as the others allow (a
+// label already there slides aside for a new one) and clear of the leaders crossing the row on their way to a column,
+// their own leaders straight up or down and never through a capsule in a row nearer the model; a label that fits no row
+// (three at most) stays in its column. An anchor straight over or under its own column label is
 // led straight to the label's edge. The 3D view stands its camera back until no label lies on the model (Conflicts).
 
 /// <summary>A label to place: its object, its words, where its anchor projects (y down), whether it can be seen (not
@@ -34,9 +35,10 @@ public sealed record BioLabelInput(string Id, string Text, double X, double Y, b
 
 /// <summary>A placed label: its column (left: its capsule ends at EdgeX; right: it starts there), its capsule's edge nearest
 /// the model, its vertical centre, its width, and its leader (anchor → elbow → (LeaderX, Y)); a label in a row above or
-/// below the model starts at EdgeX, and its leader runs from the anchor straight to (ElbowX, EdgeY), its edge — as does a
-/// column's label whose anchor lies straight over or under it.</summary>
-public sealed record BioLabelPlacement(string Id, string Text, bool Left, double EdgeX, double Y, double Width, double AnchorX, double AnchorY, double ElbowX, double? EdgeY = null)
+/// below the model (<paramref name="Row"/>) starts at EdgeX, and its leader runs from the anchor straight to (ElbowX,
+/// EdgeY), its edge — as does a column's label whose anchor lies straight over or under it.</summary>
+public sealed record BioLabelPlacement(string Id, string Text, bool Left, double EdgeX, double Y, double Width, double AnchorX, double AnchorY, double ElbowX, double? EdgeY = null,
+    bool Row = false)
 {
     /// <summary>The capsule's frame (x, y, width, height), y down.</summary>
     public (double X, double Y, double Width, double Height) Frame => (Left ? EdgeX - Width : EdgeX, Y - BioLabelLayout.Height / 2, Width, BioLabelLayout.Height);
@@ -67,7 +69,7 @@ public static class BioLabelLayout
     public const int BandRows = 3;
     /// <summary>How far a column's label may reach into a narrow model before it moves to a row (or half its width, for a
     /// short label): the 3D view asks for 4 instead where moving every label off the model makes the model a sixth larger
-    /// or more (a peptide's four labels; never a cell's sixteen, whose leaders would cross it).</summary>
+    /// or more with six labels in rows at most (a peptide's five; never a cell's sixteen, whose leaders would cross it).</summary>
     public const double Reach = 40;
 
     /// <summary>The labels placed round a model whose screen circle is centred at (cx, cy) with radius r, in a view w × h;
@@ -316,9 +318,14 @@ public static class BioLabelLayout
             var moved = swap is { } t && t.Row == j ? t.Trial : Row(above, j);
             return Fixed(above, j).Concat(moved.Select(m => (m.X - space, m.X + m.P.Width + space)));
         }
+        // (each label in the first row on its own side that takes it — above for an anchor in the model's upper half —
+        //  or, for an anchor in the middle half of the model's height where none on its side does, on the other: a
+        //  longer leader across the model rather than the label left on it, as the helix's C-terminus was beside the
+        //  H-bond's and the peptide bond's below it; an anchor near the top or bottom is never led right across it)
         foreach (var p in moving)
+            if (!IntoRow(p, p.AnchorY < mid) && Math.Abs(p.AnchorY - mid) <= 0.25 * (box.Y1 - box.Y0)) IntoRow(p, p.AnchorY >= mid);
+        bool IntoRow(BioLabelPlacement p, bool above)
         {
-            var above = p.AnchorY < mid;
             for (var k = 0; k < BandRows; k++)
             {
                 var y = RowY(above, k);
@@ -355,8 +362,9 @@ public static class BioLabelLayout
                     && Enumerable.Range(k + 1, BandRows - k - 1).All(o => Row(above, o).All(m => !Crosses(above, o, m.P, m.X, j => Capsules(above, j, swap))));
                 if (!clear) continue;
                 rows[(above, k)] = trial;
-                break;
+                return true;
             }
+            return false;
         }
         // (a label that found no row stays in its column, where a row's label may since have been packed over it — the
         //  membrane's "Peripheral protein" under "Extracellular side": that one goes back to its own column too)
@@ -372,7 +380,7 @@ public static class BioLabelLayout
             var yRow = RowY(above, k);
             foreach (var (p, x) in list)
                 placed[placed.IndexOf(p)] = new BioLabelPlacement(p.Id, p.Text, false, x, yRow, p.Width, p.AnchorX, p.AnchorY, ElbowOf(p, x),
-                    above ? yRow + Height / 2 : yRow - Height / 2);
+                    above ? yRow + Height / 2 : yRow - Height / 2, Row: true);
         }
     }
 

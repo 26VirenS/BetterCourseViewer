@@ -111,10 +111,11 @@ internal sealed class ChemLayout : Grid
     public event Action? WideChanged;
 
     /// <summary>The drawing's height over the rest: about half the page, never so small the molecule is lost — or, tall, as
-    /// tall as leaves 100 of the page for the columns' headings and first controls under it, from 180 to 560 (in a tool's
+    /// tall as leaves 100 of the page for the columns' headings and first controls under it, from 240 to 560 (in a tool's
     /// popup on a 1024 or 780 window, room for an animal cell's sixteen labels beside it; on the smallest window, 720 by
-    /// 520, a floor of 240 left only the columns' first line in sight).</summary>
-    private double NarrowHeight(double page) => tall ? Math.Max(180, Math.Min(560, page - 100)) : Math.Max(Floor, Math.Min(Math.Max(560, Floor), page * 0.5));
+    /// 520, the 240 leaves the columns' headings in sight — at 180 the cell's view was 80 tall, its labels on its scale
+    /// bar).</summary>
+    private double NarrowHeight(double page) => tall ? Math.Max(240, Math.Min(560, page - 100)) : Math.Max(Floor, Math.Min(Math.Max(560, Floor), page * 0.5));
 
     /// <summary>The least the drawing is given over the rest (320): more while the drawing's card holds more than the
     /// drawing — the Lewis maker's resonance structures under it, which left the structure itself a few lines tall.</summary>

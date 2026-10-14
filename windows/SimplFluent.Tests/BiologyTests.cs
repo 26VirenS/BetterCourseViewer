@@ -554,6 +554,14 @@ public class BiologyTests
         Assert.Equal(400 + 6 + 9, fim.Y, 6);
         Assert.Equal(new[] { (205.0, fla.Y - 9) }, fla.Leader);
         Assert.Equal(0, BioLabelLayout.Conflicts(placed, box));
+        // (a model reaching the view's top: a label over it anchored in the middle half of its height goes to a row below,
+        //  as there is none above; one anchored near its top is not led right across it)
+        var tall = new BioLabelBox(300, 30, 500, 300);
+        var (middle, _) = BioLabelLayout.Layout(new[] { new BioLabelInput("mid", "Middle label", 420, 150, Width: 200) }, 400, 165, 150, 600, 600, tall);
+        Assert.True(middle[0].Row);
+        Assert.Equal(300 + 6 + 9, middle[0].Y, 6);
+        var (topmost, _) = BioLabelLayout.Layout(new[] { new BioLabelInput("top", "Top label", 420, 40, Width: 200) }, 400, 165, 150, 600, 600, tall);
+        Assert.False(topmost[0].Row);
         // (and a label over the model counts against the camera's fit; one beside it does not)
         Assert.Equal(1, BioLabelLayout.Conflicts(new[] { new BioLabelPlacement("x", "Over", true, 340, 300, 80, 320, 300, 352) }, box));
         Assert.Equal(0, BioLabelLayout.Conflicts(new[] { new BioLabelPlacement("x", "Beside", true, 296, 300, 80, 320, 300, 308) }, box));
