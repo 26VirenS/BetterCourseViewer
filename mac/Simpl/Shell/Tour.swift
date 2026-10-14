@@ -303,7 +303,7 @@ struct TourOverlay: View {
     /// The offer up or put away: it rises in from the window's foot on the gentle spring and goes the way it came; under
     /// Reduce Motion it fades.
     private func offer(_ on: Bool) {
-        withAnimation(reduceMotion ? .easeOut(duration: 0.2) : Motion.gentle) { offering = on }
+        withAnimation(reduceMotion ? Animation.easeOut(duration: 0.2) : Motion.gentle) { offering = on }
     }
 
     // MARK: The web's steps (welcome.js's setup run), but the Simpl switch's
