@@ -8,6 +8,8 @@ struct LoginLayer: View {
     /// The school's page is what the window shows (the app's own screens are not up over it).
     var pageShown = true
 
+    private static let shotLoggingIn = UserDefaults.standard.bool(forKey: "SimplShowLoggingIn")
+
     var body: some View {
         ZStack {
             switch assist.phase {
@@ -28,6 +30,11 @@ struct LoginLayer: View {
                 LoginForm(assist: assist, host: host, error: error)
                     .transition(.opacity)
             }
+            // (the screenshot suite: -SimplShowLoggingIn YES puts "Logging you in" over the window for the run, its
+            // "Still signing in…" offer coming after a moment as it does; its buttons do nothing)
+            if LoginLayer.shotLoggingIn {
+                LoggingInView()
+            }
         }
         .animation(.easeInOut(duration: 0.22), value: assist.phase)
         .animation(Motion.gentle, value: assist.handoff)
@@ -42,11 +49,13 @@ struct LoginLayer: View {
 }
 
 /// "Logging you in": the Mac's own spinner over the window while the page underneath is filled in and sent — and,
-/// after a moment, a way to the page, for a sign-in that wants something done by hand.
+/// after a moment, (onboarding-9) why it may be taking a while and the one thing to do about it: the school's sign-in
+/// page opened, where a code or a click is most often waiting; Start Over beside it.
 private struct LoggingInView: View {
     var showPage: () -> Void = {}
     var restart: () -> Void = {}
     @State private var offer = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
@@ -54,29 +63,31 @@ private struct LoggingInView: View {
             VStack(spacing: 16) {
                 ProgressView()
                     .controlSize(.large)
-                Text("Logging you in")
+                Text(offer ? "Still signing in…" : "Logging you in")
                     .font(.sTitle3.weight(.semibold))
+                    .contentTransition(.opacity)
                     .accessibilityAddTraits(.isHeader)
                 if offer {
-                    VStack(spacing: 10) {
-                        Text("Something to do on your school’s page?")
+                    VStack(spacing: 12) {
+                        Text("Your school may be asking for a code or a click.")
                             .font(.sCallout)
                             .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
                         HStack(spacing: 10) {
                             Button("Start Over", action: restart)
                                 .controlSize(.large)
                             Button(action: showPage) {
-                                Label("Show the Page", systemImage: "safari")
+                                Label("Open Sign-In Page", systemImage: "safari")
                             }
                             .buttonStyle(.borderedProminent)
                             .controlSize(.large)
                             .keyboardShortcut(.defaultAction)
                         }
                     }
-                    .padding(.top, 10)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
                 }
             }
+            .frame(maxWidth: 420)
             .animation(Motion.gentle, value: offer)
         }
         .task {
@@ -179,11 +190,15 @@ private struct Shake: ViewModifier {
 }
 
 /// The app's own sign-in card over the school's page. What is typed goes into that page's own username and password
-/// fields, and its own button is pressed; the address it goes to is shown.
+/// fields, and its own button is pressed. (onboarding-13) It names the school the student chose ("Sign in to University
+/// of California Merced"), with the address the details go to under it in grey; (onboarding-2) a school chosen wrongly
+/// is changed from here.
 private struct LoginForm: View {
     @ObservedObject var assist: LoginAssist
     let host: String
     let error: String?
+    @EnvironmentObject private var session: AppSession
+    @Environment(\.colorScheme) private var scheme
     @State private var user = ""
     @State private var pass = ""
     @FocusState private var focus: Field?
@@ -194,7 +209,11 @@ private struct LoginForm: View {
 
     private var ready: Bool { !user.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !pass.isEmpty }
 
+    /// The school's name as the search listed it when it was chosen (none for an address typed by hand).
+    private var school: String? { SchoolNames.name(for: session.host) }
+
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
         ZStack {
             PageGround().ignoresSafeArea()
             VStack(spacing: 18) {
@@ -202,11 +221,16 @@ private struct LoginForm: View {
                     Image(systemName: "lock.shield.fill")
                         .font(.system(size: 40))
                         .foregroundStyle(.tint)
-                    Text("Sign in to your school")
+                    Text(school.map { "Sign in to \($0)" } ?? "Sign in to your school")
                         .font(.sTitle2.bold())
-                    Text("Signing in at \(host)")
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("at \(host)")
                         .font(.sCallout)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .help("Your username and password go into the sign-in page at \(host).")
                 }
                 .multilineTextAlignment(.center)
                 VStack(spacing: 10) {
@@ -223,11 +247,13 @@ private struct LoginForm: View {
                 .textFieldStyle(.roundedBorder)
                 .controlSize(.large)
                 .modifier(Shake(trigger: shake))
+                // (onboarding-14, onboarding-15) one short line — the dialog after it says the rest — that fits the
+                // card on one line, never a word alone on a second
                 Group {
                     if let error {
                         Text(error).foregroundStyle(.red)
                     } else {
-                        Text("These go into your school’s own sign-in page. After you sign in, you can choose to stay logged in.")
+                        Text("Simpl types these into your school’s page.")
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -242,13 +268,27 @@ private struct LoginForm: View {
                     .controlSize(.large)
                     .keyboardShortcut(.defaultAction)
                     .disabled(!ready)
-                    Button("Use the website instead") { assist.useWebsite() }
+                    // (onboarding-13) says which page: the school's own, full-window, not Simpl's site or Canvas's
+                    Button("Sign In on My School’s Own Page") { assist.useWebsite() }
                         .buttonStyle(.link)
+                    // (onboarding-2) the most likely first-run slip, put right where it is noticed (Simpl ▸ Change
+                    // School… does the same)
+                    HStack(spacing: 4) {
+                        Text("Not your school?")
+                            .foregroundStyle(.secondary)
+                        Button("Change School…") { session.changeSchool() }
+                            .buttonStyle(.link)
+                    }
+                    .font(.sCallout)
                 }
             }
             .padding(28)
             .frame(width: 380)
+            // (onboarding-15) in dark, a card a shade lighter than the page with an edge, so it reads as a card and
+            // the fields do not float; in light, the card as every other
+            .background { if scheme == .dark { shape.fill(Color.white.opacity(0.06)) } }
             .card(radius: 20)
+            .overlay { if scheme == .dark { shape.strokeBorder(Color.white.opacity(0.14), lineWidth: 1) } }
             .shadow(color: Theme.shadow, radius: 24, y: 10)
         }
         .onAppear {

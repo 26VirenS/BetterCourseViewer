@@ -77,6 +77,21 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   reverses it (1.3.78, below); a tick shows before its row moves. Under Reduce Motion, moves become cross-fades.
 - **Keyboard.** ⌘1–6 the places, ⌘[ ⌘] Back and Forward, ⌘N a task, ⇧⌘N a message, ⌘R reload, ⌘, Settings; arrows and
   Return in lists and pickers; ⌘Return sends.
+- **The first run and Settings, after the UI review (1.3.78, the onboarding findings; the same on Windows).** The
+  school search lists one row an address (`SchoolSearch.merged`, shared with the iPhone): the best-matching name, the
+  others it is listed under beside the address ("also: …"); the school chosen is kept by name for its address
+  (`SchoolNames`), so the sign-in card says "Sign in to <school>" with the sign-in page's host under it, offers "Sign In
+  on My School's Own Page" and "Not your school? Change School…", and is a shade lighter than the page in dark. "Is this
+  your school?" shows white only under a loaded page; loading or failed, a smaller tile in the card's colour ("Couldn't
+  load a preview. You can still sign in."). "Logging you in" becomes "Still signing in…" with Open Sign-In Page. The
+  setup has no welcome of its own: it opens on "Which courses should Simpl show?" (every course ticked on a first run,
+  one line a course — the sidebar's name and the engine's `sub`), with Set Up Later on the first run (`SetupLater`: not
+  put up again at launch). The tour is offered at the window's foot ("Take a 1-minute tour?", Not Now counts as seen;
+  `-SimplOpen touroffer` for the pictures) rather than begun on its own. Settings: one name a thing ("Courses shown and
+  goals", "Keep grade history", "Term GPA goal"), no header repeating its tab, Save Sign-In… when nothing is saved,
+  plain footnotes, one Version row with the interface's version in it, the goal half up on its decimal value, a
+  drawing pop-up that shows what a place wears, the colour wheel's names at 11 points ("Shade") with a Hex field under
+  it, and panes 620 points tall.
 - **The Dashboard's counters (1.3.78).** On a window 1024 points wide or wider — the sidebar out or not — the six
   counters stand in one row of six, each a compact tile about 72 points tall: its name, then its number with its line
   beside it (whole where it fits, ending in an ellipsis where a few words of it still fit, else left out — never a
@@ -654,9 +669,12 @@ Simpl.app/Contents/MacOS/Simpl -SimplBaseURL http://localhost:8800 -SimplDemo YE
 
 Launch arguments (each read once): `-SimplPlace dashboard|courses|todo|calendar|grades|notifications|inbox|groups|
 search:<q>|course:<id>|group:<id>|section:<ctx>:<kind>`, `-SimplPush <Canvas address>`, `-SimplOpen quiz:<course>:<quiz>
-[:take:<n>|:review] | tool:<course>:<id> | settings | setup | newtask | compose | whatsnew | handin`,
-`-SimplAppearance light|dark`, `-SimplSettingsTab notifications|grades|data|updates|about` (the tab Settings opens on),
-`-SimplSidebar hidden` (the window opens with its sidebar folded away).
+[:take:<n>|:review] | tool:<course>:<id> | settings | setup | newtask | compose | whatsnew | handin | tour[:<n>] |
+touroffer`, `-SimplSetupFirstRun YES` (with `-SimplOpen setup`: the setup as a first run draws it, every course ticked
+and Set Up Later), `-SimplShowLoggingIn YES` ("Logging you in" over the window, "Still signing in…" after a moment),
+`-SimplPreviewFail YES` (with `-SimplPickerConfirm YES`: "Is this your school?" with a preview that could not load),
+`-SimplAppearance light|dark`, `-SimplSettingsTab notifications|grades|data|updates|about` (the tab
+Settings opens on), `-SimplSidebar hidden` (the window opens with its sidebar folded away).
 
 ## Releasing
 

@@ -8,6 +8,7 @@ struct SchoolConfirm: View {
     let yes: () -> Void
     let no: () -> Void
     @State private var state: LoginPreview.State = .loading
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 20) {
@@ -44,34 +45,56 @@ struct SchoolConfirm: View {
     }
 
     /// The sign-in page in a square, as it is now: it cannot be pressed or scrolled (it is a look, not the page).
+    /// (onboarding-12) White only under a page that is in: while it loads, and if it cannot be loaded, a smaller tile in
+    /// the card's own colour in the middle of the square's place (never a bright white box in a dark window), saying
+    /// the student can sign in all the same. The page fades in over it, settling from a touch smaller; the place is
+    /// kept the square's size throughout, so nothing under it moves.
     private var preview: some View {
         let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+        let shown = state == .shown
         return ZStack {
-            Color.white
-            LoginPreview(host: school.domain, state: $state)
-                .opacity(state == .shown ? 1 : 0)
-            switch state {
-            case .loading:
-                ProgressView().controlSize(.regular)
-            case .failed:
-                VStack(spacing: 8) {
-                    Image(systemName: "globe")
-                        .font(.system(size: 28, weight: .light))
-                    Text("No preview of this page")
-                        .font(.sCallout)
-                }
-                .foregroundStyle(Color.black.opacity(0.45))
-            case .shown:
-                EmptyView()
+            ZStack {
+                Color.white
+                LoginPreview(host: school.domain, state: $state)
+            }
+            .frame(width: LoginPreview.side, height: LoginPreview.side)
+            .clipShape(shape)
+            .overlay { shape.strokeBorder(Color.primary.opacity(0.12), lineWidth: 1) }
+            .shadow(color: Color.black.opacity(0.14), radius: 18, y: 8)
+            .opacity(shown ? 1 : 0)
+            .scaleEffect(shown || reduceMotion ? 1 : 0.97)
+            if !shown {
+                waiting
+                    .transition(.opacity)
             }
         }
         .frame(width: LoginPreview.side, height: LoginPreview.side)
-        .clipShape(shape)
-        .overlay { shape.strokeBorder(Color.primary.opacity(0.12), lineWidth: 1) }
-        .shadow(color: Color.black.opacity(0.14), radius: 18, y: 8)
-        .animation(.easeOut(duration: 0.2), value: state)
+        // (the strong ease-out the house uses for a state that arrives: quick to start, soft to land)
+        .animation(.timingCurve(0.23, 1, 0.32, 1, duration: 0.22), value: state)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(state == .failed ? "No preview of \(school.domain)'s sign-in page" : "A preview of \(school.domain)'s sign-in page")
+        .accessibilityLabel(state == .failed ? "Couldn’t load a preview of \(school.domain)’s sign-in page. You can still sign in." : "A preview of \(school.domain)’s sign-in page")
+    }
+
+    /// The tile while the page loads (a spinner), or once it has not (what that means: nothing stops the sign-in).
+    private var waiting: some View {
+        VStack(spacing: 8) {
+            if state == .failed {
+                Image(systemName: "globe")
+                    .font(.system(size: 24, weight: .light))
+                    .foregroundStyle(.secondary)
+                Text("Couldn’t load a preview.")
+                    .font(.sFootnote.weight(.semibold))
+                Text("You can still sign in.")
+                    .font(.sFootnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                ProgressView().controlSize(.regular)
+            }
+        }
+        .multilineTextAlignment(.center)
+        .padding(14)
+        .frame(width: 200, height: 160)
+        .card(radius: 16)
     }
 }
 
@@ -126,6 +149,11 @@ struct LoginPreview: NSViewRepresentable {
         func load(_ view: WKWebView, host: String) {
             self.host = host
             set(.loading)
+            // (the screenshot suite: -SimplPreviewFail YES — a preview that could not be loaded, without waiting for one)
+            if UserDefaults.standard.bool(forKey: "SimplPreviewFail") {
+                set(.failed)
+                return
+            }
             guard let url = URL(string: "https://\(host)/") else { set(.failed); return }
             view.load(URLRequest(url: url, timeoutInterval: 15))
             // (a page that never finishes — a sign-in that keeps redirecting — shows what it has after a while)

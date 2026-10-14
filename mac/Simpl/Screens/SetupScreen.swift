@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The courses and goals the setup reads and writes (`setupInfo`), as the page answers them.
 private struct SetupChoices: Decodable {
-    /// A course this term: whether it counts (`on`), its nickname and the grade aimed for in it.
+    /// A course this term: whether Simpl shows it (`on`), its nickname and the grade aimed for in it.
     struct Course: Decodable, Identifiable {
         var id: String
         var code: String
@@ -12,6 +12,10 @@ private struct SetupChoices: Decodable {
         var color: String
         var on: Bool
         var target: String
+        /// (2.99.33) The name the sidebar will show (its nickname, else its name), and what is new about it — its real
+        /// title where a nickname hides it, its term, its teacher ("Fall 2026 · Yue Lei"). Nil from an older page.
+        var label: String?
+        var sub: String?
     }
 
     var done: Bool
@@ -21,22 +25,23 @@ private struct SetupChoices: Decodable {
     var tracking: Bool
 }
 
-/// The guided setup, as a sheet over the window: a welcome; the courses that count, by their names alone (1.3); a
-/// nickname for each, if you like (1.3: a step of its own); the grade history, its GPA goal and the grade aimed for in each course; and a read-back. Back and Continue sit at its
-/// foot, and each step slides in from the side it is going to. Shown on the first run, and again from Settings ▸ General
-/// ▸ Courses and Goals (straight to the courses, with Cancel).
+/// The guided setup, as a sheet over the window: (onboarding-4) straight to the courses Simpl shows — the school's search
+/// has said its welcome — each by one name (onboarding-1, onboarding-30); a nickname for each, if you like; the grade
+/// history, the term's GPA goal and the grade aimed for in each course; and a read-back. Back and Continue sit at its
+/// foot, and each step slides in from the side it is going to. Shown on the first run, every course ticked, with Set Up
+/// Later (the app works as it stands until then); and again from Settings ▸ General ▸ Courses shown and goals, with
+/// Cancel.
 struct SetupScreen: View {
     @EnvironmentObject private var engine: Engine
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var info = Loader<SetupChoices>()
 
-    private enum Step: Int, CaseIterable { case welcome, courses, nicknames, grades, done }
-    @State private var step: Step = .welcome
+    private enum Step: Int, CaseIterable { case courses, nicknames, grades, done }
+    @State private var step: Step = .courses
     /// The way the last step went (Back slides the other way): set a moment before the step itself.
     @State private var forward = true
-    /// The welcome and the end, up: their pieces arrive one after another.
-    @State private var welcomed = false
+    /// The end, up: its seal bounces once.
     @State private var finished = false
     @State private var chosen: Set<String> = []
     @State private var nicknames: [String: String] = [:]
@@ -71,7 +76,6 @@ struct SetupScreen: View {
     @ViewBuilder
     private func stepView(_ d: SetupChoices) -> some View {
         switch step {
-        case .welcome: welcome
         case .courses: courses(d)
         case .nicknames: nicknamesStep(d)
         case .grades: grades(d)
@@ -95,62 +99,9 @@ struct SetupScreen: View {
 
     // MARK: - Steps
 
-    private var welcome: some View {
-        VStack(spacing: 22) {
-            Spacer(minLength: 0)
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .frame(width: 88, height: 88)
-                .accessibilityHidden(true)
-                .modifier(SetupArrive(index: 0, shown: welcomed))
-            VStack(spacing: 6) {
-                Text("Welcome to Simpl")
-                    .font(.system(size: 28, weight: .bold))
-                Text("\(engine.lmsName), simply, on your Mac. A few quick questions and you’re in.")
-                    .font(.sTitle3)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            .modifier(SetupArrive(index: 1, shown: welcomed))
-            VStack(alignment: .leading, spacing: 16) {
-                feature("sun.max.fill", .orange, "Dashboard", "What is due, what is new, and what was graded — at a glance.")
-                    .modifier(SetupArrive(index: 2, shown: welcomed))
-                feature("chart.bar.fill", .green, "Grades", "Rings for every course, your GPA, and what-if scores.")
-                    .modifier(SetupArrive(index: 3, shown: welcomed))
-                feature("checklist", .blue, "Quizzes and hand-ins", "Take quizzes and hand in work without leaving the app.")
-                    .modifier(SetupArrive(index: 4, shown: welcomed))
-            }
-            .frame(maxWidth: 420, alignment: .leading)
-            .padding(.top, 6)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 48)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear { welcomed = true } // (the one hello: its pieces arrive one after another)
-    }
-
-    private func feature(_ symbol: String, _ tint: Color, _ title: String, _ text: String) -> some View {
-        HStack(alignment: .top, spacing: 14) {
-            Image(systemName: symbol)
-                .font(.sTitle2)
-                .foregroundStyle(tint)
-                .frame(width: 32)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.sHeadline)
-                Text(text)
-                    .font(.sCallout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .accessibilityElement(children: .combine)
-    }
-
     private func courses(_ d: SetupChoices) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            stepHeading("Which classes are you in?", "Only select the courses that count towards your GPA.", accent: true)
+            stepHeading("Which courses should Simpl show?", coursesLine)
             Form {
                 if d.courses.isEmpty {
                     Section {
@@ -180,25 +131,61 @@ struct SetupScreen: View {
         }
     }
 
-    /// A course to tick, by its names alone (1.3): its code, and its full name under it.
+    /// (onboarding-1) What a tick does — the course in the sidebar and on the Dashboard, and on Canvas one of the
+    /// student's favourites (Brightspace's ticks are kept on this Mac) — and where the GPA is decided instead: a tick is
+    /// never "only the courses that count towards your GPA", which would hide a lab's or a pass/fail course's work.
+    private var coursesLine: String {
+        let shown = "Ticked courses show in the sidebar and on your Dashboard"
+        let gpa = "Pass/Fail, on the Grades step, keeps a course out of your GPA."
+        return engine.onBrightspace ? "\(shown). \(gpa)" : "\(shown), and become your Canvas favourites. \(gpa)"
+    }
+
+    /// A course to tick, on one line (onboarding-30): the name the sidebar will show, and what is new about it beside it.
     private func courseRow(_ c: SetupChoices.Course) -> some View {
         Toggle(isOn: Binding(get: { chosen.contains(c.id) }, set: { pick(c.id, $0) })) {
-            courseNames(c)
+            courseLine(c)
         }
         .toggleStyle(.checkbox)
         .padding(.vertical, 2)
     }
 
-    private func courseNames(_ c: SetupChoices.Course) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(c.code)
+    /// The sidebar's name, bold, and after it in grey what that name does not say — the term and the teacher, the real
+    /// title under a nickname — never the code over the same name spelled another way ("MATH-021-20" over "F26-MATH
+    /// 021 20"). One line a course, so the whole term's list is in view; the pointer on it shows the line whole.
+    private func courseLine(_ c: SetupChoices.Course) -> some View {
+        let name = shown(c)
+        let more = detail(c, under: name)
+        return HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(name)
                 .fontWeight(.semibold)
                 .lineLimit(1)
-            if !c.name.isEmpty && c.name != c.code {
-                Text(c.name)
+                .layoutPriority(1)
+            Spacer(minLength: 0)
+            if !more.isEmpty {
+                Text(more)
                     .font(.sCallout)
                     .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .help(more.isEmpty ? name : "\(name) · \(more)")
+    }
+
+    /// A course by its own name (what the sidebar shows with no nickname), and what is new about it under it.
+    private func courseNames(_ c: SetupChoices.Course) -> some View {
+        let name = ownName(c)
+        let more = detail(c, under: name)
+        return VStack(alignment: .leading, spacing: 1) {
+            Text(name)
+                .fontWeight(.semibold)
+                .lineLimit(1)
+            if !more.isEmpty {
+                Text(more)
+                    .font(.sCallout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
         }
     }
@@ -216,7 +203,7 @@ struct SetupScreen: View {
                     }
                     ForEach(picked) { c in
                         LabeledContent {
-                            TextField("Nickname", text: nickname(c), prompt: Text(c.code))
+                            TextField("Nickname", text: nickname(c), prompt: Text(ownName(c)))
                                 .labelsHidden()
                                 .textFieldStyle(.roundedBorder)
                                 .frame(width: 220)
@@ -225,7 +212,7 @@ struct SetupScreen: View {
                         }
                     }
                 } footer: {
-                    Text(engine.onBrightspace ? "A nickname shows everywhere in place of the course’s code — on this Mac only." : "A nickname shows everywhere in place of the course’s code — in Canvas too.")
+                    Text(engine.onBrightspace ? "A nickname shows everywhere in place of the course’s name — on this Mac only." : "A nickname shows everywhere in place of the course’s name — in Canvas too.")
                         .font(.sCallout)
                         .foregroundStyle(.secondary)
                 }
@@ -241,20 +228,21 @@ struct SetupScreen: View {
             stepHeading("Grades", "\(engine.lmsName) keeps no history. Simpl can, on this Mac.")
             Form {
                 Section {
+                    // (onboarding-20) one name for it everywhere — grade history — as Settings ▸ Grades says it
                     Toggle(isOn: $tracking.animation(Motion.snappy)) {
-                        Text("Keep a History")
-                        Text("One snapshot a day, on this Mac only.")
+                        Text("Keep grade history")
+                        Text("One snapshot a day, on this Mac.")
                     }
                     .toggleStyle(.switch)
                     if tracking {
-                        LabeledContent("GPA Goal") {
+                        LabeledContent("Term GPA goal") {
                             HStack(spacing: 4) {
-                                TextField("GPA Goal", value: goalValue, format: .number.precision(.fractionLength(2)))
+                                TextField("Term GPA goal", value: goalValue, format: .number.precision(.fractionLength(2)))
                                     .labelsHidden()
                                     .textFieldStyle(.roundedBorder)
                                     .multilineTextAlignment(.trailing)
                                     .frame(width: 64)
-                                Stepper("GPA Goal", value: goalValue, in: 0...4, step: 0.05)
+                                Stepper("Term GPA goal", value: goalValue, in: 0...4, step: 0.05)
                                     .labelsHidden()
                             }
                         }
@@ -274,7 +262,7 @@ struct SetupScreen: View {
                             Divider()
                             Text("Pass/Fail").tag("P/F")
                         } label: {
-                            Text(label(c))
+                            Text(shown(c))
                                 .lineLimit(1)
                         }
                         .pickerStyle(.menu)
@@ -303,7 +291,7 @@ struct SetupScreen: View {
                     .accessibilityHidden(true)
                 Text("You’re Set")
                     .font(.system(size: 22, weight: .bold))
-                Text("Change any of this later in Settings (⌘,) ▸ General ▸ Courses and Goals.")
+                Text("Change any of this later in Settings (⌘,) ▸ General ▸ Courses shown and goals.")
                     .font(.sCallout)
                     .foregroundStyle(.secondary)
             }
@@ -314,7 +302,7 @@ struct SetupScreen: View {
             Form {
                 Section {
                     LabeledContent("Courses shown", value: "\(chosen.count) of \(d.courses.count)")
-                    LabeledContent("Grade history", value: tracking ? "On · goal \(String(format: "%.2f", goal))" : "Off")
+                    LabeledContent("Grade history", value: tracking ? "On · goal \(GoalFigure.text(goal))" : "Off")
                 }
                 if let error {
                     Section {
@@ -328,13 +316,15 @@ struct SetupScreen: View {
         }
     }
 
-    private func stepHeading(_ title: String, _ sub: String, accent: Bool = false) -> some View {
+    /// A step's title and its line under it, in grey (onboarding-1: an accent-coloured line read as a link).
+    private func stepHeading(_ title: String, _ sub: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(.system(size: 22, weight: .bold))
             Text(sub)
-                .font(accent ? Font.sCallout.weight(.semibold) : Font.sCallout)
-                .foregroundStyle(accent ? Theme.accent : Color.secondary)
+                .font(.sCallout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 30)
@@ -342,7 +332,7 @@ struct SetupScreen: View {
         .padding(.bottom, 2)
     }
 
-    // MARK: - The foot: Cancel, Back, Continue
+    // MARK: - The foot: Cancel (or Set Up Later), Back, Continue
 
     private var footer: some View {
         HStack(spacing: 10) {
@@ -350,10 +340,16 @@ struct SetupScreen: View {
                 Button("Cancel") { dismiss() }
                     .keyboardShortcut(.cancelAction)
                     .disabled(saving)
+            } else if info.data?.done == false {
+                // (onboarding-4) the first run's way past it: the app works as it stands meanwhile
+                Button("Set Up Later") { later() }
+                    .keyboardShortcut(.cancelAction)
+                    .disabled(saving)
+                    .help("Use Simpl as it is now, and set it up any time from Settings ▸ General ▸ Courses shown and goals.")
             }
             Spacer(minLength: 0)
             if let d = info.data {
-                if step.rawValue > (d.done ? 1 : 0) {
+                if step.rawValue > 0 {
                     Button("Back") { go(-1) }
                         .disabled(saving)
                 }
@@ -370,35 +366,33 @@ struct SetupScreen: View {
             }
         }
         .overlay {
-            if step != .welcome && info.data != nil { progress }
+            if info.data != nil { progress }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
     }
 
-    /// The steps after the welcome, as a bar of as many.
+    /// The steps, as a bar of as many.
     private var progress: some View {
         HStack(spacing: 6) {
-            ForEach(1..<Step.allCases.count, id: \.self) { i in
+            ForEach(Step.allCases, id: \.self) { s in
                 Capsule()
-                    .fill(i <= step.rawValue ? Theme.accent : Color.secondary.opacity(0.25))
+                    .fill(s.rawValue <= step.rawValue ? Theme.accent : Color.secondary.opacity(0.25))
                     .frame(width: 26, height: 5)
             }
         }
         .animation(Motion.snappy, value: step)
         .accessibilityElement()
-        .accessibilityLabel(Text("Step \(step.rawValue) of \(Step.allCases.count - 1)"))
+        .accessibilityLabel(Text("Step \(step.rawValue + 1) of \(Step.allCases.count)"))
     }
 
-    /// Run again from Settings, or the courses could not be read: a way out. (The first run's setup is finished, not
-    /// cancelled.)
+    /// Run again from Settings, or the courses could not be read: a way out. (The first run's has Set Up Later.)
     private var canCancel: Bool {
         info.data?.done == true || (info.data == nil && info.error != nil)
     }
 
     private func nextWord(_ d: SetupChoices) -> String {
         switch step {
-        case .welcome: return "Get Started"
         case .done: return saving ? "Saving…" : (d.done ? "Done" : "Start Using Simpl")
         default: return "Continue"
         }
@@ -420,17 +414,32 @@ struct SetupScreen: View {
         Binding(get: { targets[c.id] ?? "A+" }, set: { targets[c.id] = $0 })
     }
 
-    /// The GPA goal, typed or stepped: kept between 0 and 4, to the hundredth.
+    /// The GPA goal, typed or stepped: kept between 0 and 4, to the hundredth (half up, as the engine keeps it).
     private var goalValue: Binding<Double> {
         Binding(get: { goal }, set: { v in
             let kept = min(max(v.isFinite ? v : 0, 0), 4)
-            goal = (kept * 100).rounded() / 100
+            goal = GoalFigure.value(kept)
         })
     }
 
-    private func label(_ c: SetupChoices.Course) -> String {
+    /// The course's own name: what the sidebar shows when it has no nickname.
+    private func ownName(_ c: SetupChoices.Course) -> String {
+        c.name.isEmpty ? c.code : c.name
+    }
+
+    /// The name the sidebar will show once this is saved: the nickname typed here, else the course's own.
+    private func shown(_ c: SetupChoices.Course) -> String {
         let n = (nicknames[c.id] ?? "").trimmingCharacters(in: .whitespaces)
-        return n.isEmpty ? c.code : n
+        return n.isEmpty ? ownName(c) : n
+    }
+
+    /// What the page says is new about a course (`sub`: its term and teacher, its real title under a nickname), less
+    /// anything that only repeats `name` — a nickname cleared here leaves the real title as the name itself.
+    private func detail(_ c: SetupChoices.Course, under name: String) -> String {
+        let sub = (c.sub ?? "").trimmingCharacters(in: .whitespaces)
+        if sub == name { return "" }
+        if sub.hasPrefix(name + " · ") { return String(sub.dropFirst(name.count + 3)) }
+        return sub
     }
 
     // MARK: - Moving and saving
@@ -457,14 +466,29 @@ struct SetupScreen: View {
 
     private func load() async {
         await info.load(engine, "setupInfo")
-        guard let d = info.data, !seeded else { return }
+        guard var d = info.data, !seeded else { return }
         seeded = true
+        // (the screenshot suite: -SimplSetupFirstRun YES draws the setup as a first run has it — every course ticked, Set
+        // Up Later — for a student who has set up already; nothing is saved unless it is finished)
+        if UserDefaults.standard.bool(forKey: "SimplSetupFirstRun"), d.done {
+            d.done = false
+            for i in d.courses.indices { d.courses[i].on = true }
+            info.data = d
+        }
         chosen = Set(d.courses.filter(\.on).map(\.id))
         nicknames = Dictionary(d.courses.map { ($0.id, $0.nickname) }, uniquingKeysWith: { first, _ in first })
         targets = Dictionary(d.courses.map { ($0.id, $0.target) }, uniquingKeysWith: { first, _ in first })
         tracking = d.tracking
         goal = d.goal
-        if d.done { step = .courses } // (run again from Settings: straight to the courses)
+    }
+
+    /// (onboarding-4) Set Up Later: nothing saved — the courses stay as the school's site has them, the Dashboard working
+    /// with them as it does — and the setup not put up again at launch; Settings ▸ General ▸ Courses shown and goals (or
+    /// Courses ▸ Choose Courses) runs it whenever the student likes.
+    private func later() {
+        SetupLater.postpone()
+        dismiss()
+        Task { await NotificationAsk.afterSetup(engine) } // (asked once, as after a setup finished)
     }
 
     private func save(_ d: SetupChoices) async {
@@ -492,17 +516,26 @@ struct SetupScreen: View {
     private var errorMotion: Animation { reduceMotion ? .easeInOut(duration: 0.15) : Motion.snappy }
 }
 
-/// A rare moment's pieces arriving one after another (the setup's welcome): each rises a little and fades in, a beat
-/// after the one before, on the house's gentle spring. Under Reduce Motion a plain fade, all at once.
-private struct SetupArrive: ViewModifier {
-    let index: Int
-    let shown: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+/// (onboarding-4) The first run's setup put off with Set Up Later: it is not put up again at launch (Engine.swift), and
+/// the tour may be offered meanwhile (Tour.swift). Kept on this Mac; a setup finished later makes it moot.
+enum SetupLater {
+    private static let key = "setup:later"
 
-    func body(content: Content) -> some View {
-        content
-            .opacity(shown ? 1 : 0)
-            .offset(y: shown || reduceMotion ? 0 : 8)
-            .animation(reduceMotion ? Motion.gentle : Motion.gentle.delay(0.06 * Double(index)), value: shown)
+    static var asked: Bool { UserDefaults.standard.bool(forKey: key) }
+
+    static func postpone() { UserDefaults.standard.set(true, forKey: key) }
+}
+
+/// (1.3.78) The goal as every app and the engine round it: half up to the hundredth, on its decimal value — 3.425 is
+/// 3.43, where `(v * 100).rounded() / 100` and "%.2f" read the double's 3.42499… as 3.42.
+private enum GoalFigure {
+    static func value(_ v: Double) -> Double {
+        guard v.isFinite, var d = Decimal(string: "\(v)", locale: Locale(identifier: "en_US_POSIX")) else { return v }
+        var out = Decimal()
+        NSDecimalRound(&out, &d, 2, .plain)
+        return NSDecimalNumber(decimal: out).doubleValue
     }
+
+    /// Always two decimals: "3.43", "4.00".
+    static func text(_ v: Double) -> String { String(format: "%.2f", value(v)) }
 }

@@ -246,6 +246,8 @@ struct TourOverlay: View {
     @ObservedObject private var tour = MacTour.shared
     @ObservedObject private var preview = WorkPreview.shared
     @AppStorage("tour:done") private var done = false
+    /// (onboarding-4) The tour offered at the window's foot, waiting for Take the Tour or Not Now.
+    @State private var offering = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var cardSize = CGSize(width: TourCard.width, height: 170)
     @State private var nudged = false
@@ -280,6 +282,27 @@ struct TourOverlay: View {
             if let i = tour.step, i < list.count { check(list[i], count: list.count) }
         }
         .task { await autoStart() }
+        // (outside the hit-testing above: the offer takes presses while the tour is off)
+        .overlay(alignment: .bottom) {
+            if offering && tour.step == nil && !done {
+                TourOffer(take: {
+                    offer(false)
+                    tour.start()
+                }, decline: {
+                    offer(false)
+                    tour.finish() // (seen: Help ▸ Take the Tour brings it back)
+                })
+                .padding(.horizontal, 24)
+                .padding(.bottom, 22)
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+    }
+
+    /// The offer up or put away: it rises in from the window's foot on the gentle spring and goes the way it came; under
+    /// Reduce Motion it fades.
+    private func offer(_ on: Bool) {
+        withAnimation(reduceMotion ? Animation.easeOut(duration: 0.2) : Motion.gentle) { offering = on }
     }
 
     // MARK: The steps (the same six as Windows': windows/SimplFluent/Shell/Tour.cs)
@@ -392,9 +415,16 @@ struct TourOverlay: View {
         if step >= steps.count { tour.finish() }
     }
 
-    /// Once, after the window first appears and nothing else is over it for a moment. (The screenshot suite, whose
-    /// student has used the app, never sees it on its own: -SimplOpen tour, or tour:4 for the fourth step, shows it.)
+    /// Once, after the window first appears and nothing else is over it for a moment — (onboarding-4) offered, not begun:
+    /// "Take a 1-minute tour?" at the window's foot, after a setup that was already a few pages long. (The screenshot
+    /// suite, whose student has used the app, never sees it on its own: -SimplOpen tour, or tour:4 for the fourth step,
+    /// starts it; -SimplOpen touroffer shows the offer.)
     private func autoStart() async {
+        if LaunchOpen.take("touroffer") != nil { // (before "tour", which it starts with)
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            offer(true)
+            return
+        }
         if let at = LaunchOpen.take("tour") {
             try? await Task.sleep(nanoseconds: 3_000_000_000)
             let n = Int(at.trimmingCharacters(in: CharacterSet(charactersIn: ": "))) ?? 1
@@ -412,7 +442,7 @@ struct TourOverlay: View {
             let ready = free && (!engine.courses.isEmpty || ticks >= 20)
             calm = ready ? calm + 1 : 0
             if calm >= 5 {
-                tour.start()
+                offer(true)
                 return
             }
         }
@@ -421,7 +451,7 @@ struct TourOverlay: View {
     /// Nothing over the window, nothing on the way: the app's own screens up, the setup done, no sheet, nothing typed.
     private var free: Bool {
         guard engine.phase == .native, let snap = engine.snapshot else { return false }
-        let setUp = snap.setupDone != false || sawSetup
+        let setUp = snap.setupDone != false || sawSetup || SetupLater.asked
         return setUp && !engine.setup && engine.whatsNew == nil && engine.quiz == nil && !engine.newTask && !engine.newMessage
             && !engine.settingsOpen && engine.query.isEmpty && preview.item == nil
     }
@@ -707,5 +737,39 @@ struct CalloutShape: Shape {
         p.addArc(tangent1End: CGPoint(x: b.minX, y: b.minY), tangent2End: CGPoint(x: b.maxX, y: b.minY), radius: rad)
         p.closeSubpath()
         return p
+    }
+}
+
+/// (onboarding-4) The tour offered rather than begun on its own: one line on glass at the window's foot, with Not Now
+/// (seen: Help ▸ Take the Tour still has it) and Take the Tour. No key of its own — Return and Escape stay the
+/// window's (the search field's, a sheet's) — and nothing dimmed: the Dashboard can be used round it.
+private struct TourOffer: View {
+    let take: () -> Void
+    let decline: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.tint)
+                .accessibilityHidden(true)
+            Text("Take a 1-minute tour?")
+                .font(.sCallout.weight(.semibold))
+                .lineLimit(1)
+                .layoutPriority(1)
+            Spacer(minLength: 10)
+            Button("Not Now", action: decline)
+                .glassButton()
+            Button("Take the Tour", action: take)
+                .glassButton(prominent: true)
+        }
+        .controlSize(.regular)
+        .padding(.leading, 18)
+        .padding(.trailing, 10)
+        .padding(.vertical, 10)
+        .frame(maxWidth: 460)
+        .glassCard(radius: 20)
+        .shadow(color: Theme.shadow, radius: 16, y: 6)
+        .accessibilityElement(children: .contain)
     }
 }
