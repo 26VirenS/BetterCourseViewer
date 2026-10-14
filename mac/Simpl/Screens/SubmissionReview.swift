@@ -5,7 +5,9 @@ import WebKit
 /// (1.3.8) Your work and what was said about it, in a popup over the assignment: on the left the file in Canvas's own
 /// viewer (DocViewer: the teacher's marks drawn on it, as Canvas shows them), one file at a time where there are several;
 /// on the right the comments. A file Canvas has no viewer for is shown in Quick Look; work with no file at all shows the
-/// submission's own page in Canvas. Escape or Done closes it.
+/// submission's own page in Canvas. (1.3.78) Escape or Close — at the bar's right end, as on every full popup — closes
+/// it; with no comments there is no empty pane beside the work saying so next to the teacher's marks on it: the viewer
+/// takes the width, and the bar says there are no comments on this submission.
 struct SubmissionReview: View {
     let assignment: AssignmentData
     @State var picked: Attachment?
@@ -38,9 +40,11 @@ struct SubmissionReview: View {
             HStack(spacing: 0) {
                 viewer
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                Divider()
-                comments
-                    .frame(width: min(360, max(280, size.width * 0.28)))
+                if !assignment.comments.isEmpty {
+                    Divider()
+                    comments
+                        .frame(width: min(360, max(280, size.width * 0.28)))
+                }
             }
         }
         .frame(width: size.width, height: size.height)
@@ -62,6 +66,17 @@ struct SubmissionReview: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 12)
+            if assignment.comments.isEmpty {
+                // (1.3.78) said once, in the bar, rather than an empty pane beside the teacher's marks on the work
+                ViewThatFits(in: .horizontal) {
+                    Label("No comments on this submission", systemImage: "text.bubble")
+                    Label("No comments", systemImage: "text.bubble")
+                }
+                .font(.sCallout)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .help("Your teacher left no comments on this submission. Any marks they made on the file show on it.")
+            }
             if files.count > 1 {
                 Picker("File", selection: Binding(get: { picked?.id ?? files.first?.id ?? "" }, set: { id in picked = files.first { $0.id == id } })) {
                     ForEach(files) { f in Text(f.name).tag(f.id) }
@@ -82,10 +97,13 @@ struct SubmissionReview: View {
                 .fixedSize()
                 .help("More for \(f.name)")
             }
-            Button("Done") { dismiss() }
-                .glassButton(prominent: true)
+            // (1.3.78) Close, as the quiz, Knewton Alta and Macmillan popups have it: the same word in the same place
+            Button("Close") { dismiss() }
+                .glassButton()
                 .keyboardShortcut(.cancelAction)
+                .help("Close the feedback")
         }
+        .controlSize(.large)
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
     }
@@ -136,18 +154,12 @@ struct SubmissionReview: View {
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 14)
-            if list.isEmpty {
-                EmptyNote(text: "No comments yet.", symbol: "text.bubble")
-                    .padding(.horizontal, 18)
-                Spacer()
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        ForEach(list) { c in comment(c) }
-                    }
-                    .padding(.horizontal, 18)
-                    .padding(.bottom, 20)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    ForEach(list) { c in comment(c) }
                 }
+                .padding(.horizontal, 18)
+                .padding(.bottom, 20)
             }
         }
     }

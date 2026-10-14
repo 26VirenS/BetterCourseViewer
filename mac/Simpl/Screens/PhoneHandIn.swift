@@ -565,9 +565,10 @@ struct PhoneQRCode: View {
 }
 
 /// (1.3.78) Send from Phone's panel, over the Hand In form: the QR code and "Waiting for your phone…" (its dot
-/// breathing — never the code), where this Mac is and the same-Wi-Fi tip; once the phone has the page, "Phone
+/// breathing — never the code), whether photos become one PDF (said before anything is sent, not after), and that the
+/// phone needs this Mac's network — the address itself behind Trouble Connecting?; once the phone has the page, "Phone
 /// connected", the code small in the corner and each file coming in with its picture and progress. Said plainly when
-/// there is no Wi-Fi, when it could not start, or when it stopped for want of use.
+/// there is no network, when it could not start, or when it stopped for want of use. Done, at its foot, closes it.
 struct PhonePanel: View {
     @ObservedObject var session: PhoneSession
     let title: String
@@ -579,13 +580,19 @@ struct PhonePanel: View {
 
     private var connected: Bool { session.phase == .connected }
 
+    /// The code's size: a little smaller where the photos' choice sits under it, so the panel fits the Hand In sheet.
+    private var qrSide: CGFloat { session.combineOffered ? 188 : 212 }
+
+    /// The same words wherever the panel says what the phone needs.
+    static let sameNetwork = "Your phone needs to be on the same network as this Mac (your phone’s hotspot works)."
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             header
             Group {
                 switch session.phase {
                 case .noNetwork:
-                    problem("wifi.slash", "Connect this computer to Wi-Fi to use your phone.", nil, button: "Try Again")
+                    problem("wifi.slash", "Connect this Mac to Wi-Fi or a network to use your phone.", PhonePanel.sameNetwork, button: "Try Again")
                 case .failed(let why):
                     problem("exclamationmark.triangle", "Send from Phone couldn’t start.", why, button: "Try Again")
                 case .idle:
@@ -598,21 +605,13 @@ struct PhonePanel: View {
                         .transition(.opacity)
                 }
             }
-            if session.phase == .waiting || session.phase == .starting || connected { whereNote }
-            if session.combineOffered && session.phase != .noNetwork {
-                Toggle(isOn: $session.combine) {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Combine photos into one PDF")
-                        Text("A page each, in the order they come, as \(session.pdfName)")
-                            .font(.sCaption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-                }
-                .toggleStyle(.switch)
-                .controlSize(.small)
+            // (what the photos will become, before any is sent; once one has come, its row says where it went)
+            if session.combineOffered && (session.phase == .waiting || session.phase == .starting || (connected && session.items.isEmpty)) {
+                combineToggle
+                    .transition(.opacity)
             }
+            // (how to reach this Mac, while the phone has not: gone once it has)
+            if session.phase == .waiting || session.phase == .starting { whereNote }
             footer
         }
         .padding(20)
@@ -647,16 +646,28 @@ struct PhonePanel: View {
                     .id(connected)
                     .transition(.opacity)
             }
-            Spacer(minLength: 8)
-            Button(action: close) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 18))
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help("Close — your phone stops sending")
-            .accessibilityLabel("Close Send from Phone")
+            Spacer(minLength: 0)
+            // (1.3.78: one way to close it — Done, at the foot — not a × as well)
         }
+    }
+
+    /// (1.3.78) Whether the phone's photos become one PDF, with what it will be called; under the code, before anything
+    /// is sent.
+    private var combineToggle: some View {
+        Toggle(isOn: $session.combine) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Combine photos into one PDF")
+                Text(session.combine ? "Photos become one PDF: \(session.pdfName)" : "Each photo is added on its own")
+                    .font(.sCaption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .contentTransition(.opacity)
+            }
+        }
+        .toggleStyle(.switch)
+        .controlSize(.small)
+        .animation(Motion.snappy, value: session.combine)
     }
 
     private var waiting: some View {
@@ -671,7 +682,7 @@ struct PhonePanel: View {
                         .overlay(ProgressView().controlSize(.small).environment(\.colorScheme, .light))
                 }
             }
-            .frame(width: 212, height: 212)
+            .frame(width: qrSide, height: qrSide)
             .shadow(color: .black.opacity(0.1), radius: 8, y: 2)
             HStack(spacing: 8) {
                 PulseDot(color: accent)
@@ -723,18 +734,29 @@ struct PhonePanel: View {
         }
     }
 
+    /// (1.3.78) What the phone needs, in a line; this Mac's network and address — which mean little until something does
+    /// not connect — behind Trouble Connecting?.
     private var whereNote: some View {
         VStack(alignment: .leading, spacing: 6) {
-            if let a = session.address {
-                Label(a.kind == "network" ? "This Mac is at \(a.ip)" : "This Mac is on \(a.kind) at \(a.ip)",
-                      systemImage: a.kind == "Wi-Fi" ? "wifi" : "network")
-                    .font(.sCallout)
-                    .textSelection(.enabled)
-            }
-            Text("Your phone must be on the same Wi-Fi. Some school networks block this — your phone’s hotspot works.")
-                .font(.sCaption)
+            Label(PhonePanel.sameNetwork, systemImage: "network")
+                .font(.sCallout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            DisclosureGroup("Trouble Connecting?") {
+                VStack(alignment: .leading, spacing: 6) {
+                    if let a = session.address {
+                        Text(a.kind == "network" ? "This Mac’s address is \(a.ip)." : "This Mac is on \(a.kind), at \(a.ip).")
+                            .textSelection(.enabled)
+                    }
+                    Text("Check that your phone is on that same network. Some school networks keep devices apart: turn on your phone’s hotspot, join it from this Mac, then start again.")
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .font(.sCaption)
+                .foregroundStyle(.secondary)
+                .padding(.top, 4)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .font(.sCallout)
         }
     }
 
@@ -750,13 +772,6 @@ struct PhonePanel: View {
             if let more {
                 Text(more)
                     .font(.sCallout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if words.contains("Wi-Fi") {
-                Text("Your phone must be on the same Wi-Fi. Some school networks block this — your phone’s hotspot works.")
-                    .font(.sCaption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)

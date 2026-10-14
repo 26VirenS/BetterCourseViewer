@@ -330,8 +330,17 @@ struct Sidebar: View {
     var body: some View {
         VStack(spacing: 0) {
             SchoolHeader() // (1.3.8) the school at the top, as the web's sidebar has it; Dashboard under it
-            list
-                .scrollContentBackground(.hidden) // (the sidebar's glass is the column's own)
+            // (1.3.78) the row of the place showing kept in sight: a window opened on a course's section far down the
+            // list (a window more, on its Grades) shows it, and so does a move to a place whose row is scrolled away
+            ScrollViewReader { proxy in
+                list
+                    .scrollContentBackground(.hidden) // (the sidebar's glass is the column's own)
+                    .task {
+                        try? await Task.sleep(nanoseconds: 250_000_000) // (once the course's sections are in the list)
+                        proxy.scrollTo(whereabouts.nav.current.place)
+                    }
+                    .onChange(of: whereabouts.nav.current.place) { _, p in proxy.scrollTo(p) }
+            }
             AccountBar()
         }
         .background { SidebarGround() } // (1.3.1) the sidebar's photo, frosted, behind its rows
@@ -478,6 +487,7 @@ struct Sidebar: View {
         .onHover { on in if on { MacTour.shared.did(.courseHover) } } // (the tour's "Hover over a course")
         .readsAhead { engine.readAhead(.home(ctx)) } // (1.3.78: its home, read ahead)
         .tag(Place.home(ctx))
+        .id(Place.home(ctx)) // (1.3.78: the list scrolls to it)
         .contextMenu {
             Button("Open in New Window") { openWindow(id: "window", value: Engine.name(of: .home(ctx))) } // (1.3.69)
             Divider()
@@ -496,7 +506,7 @@ struct Sidebar: View {
 }
 
 /// (1.3.69) A sidebar row's menu: its place in a window of its own. (1.3.78) And what the row opens, read ahead while
-/// the pointer rests on it.
+/// the pointer rests on it; and its place as its name in the list, for the list to scroll to it.
 private struct WindowMenu: ViewModifier {
     let place: Place
     @EnvironmentObject private var engine: Engine
@@ -504,6 +514,7 @@ private struct WindowMenu: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            .id(place)
             .contextMenu {
                 Button("Open in New Window") { openWindow(id: "window", value: Engine.name(of: place)) }
             }

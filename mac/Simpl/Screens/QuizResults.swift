@@ -8,7 +8,8 @@ import SwiftUI
 
 /// The attempt before it is handed in: every question as a row of a plain list — whether it is answered, its words, its
 /// answer at the row's end (or that it is blank, or flagged) — a click on one to change it; on a wide sheet a column
-/// beside it of how much is answered. Back to Questions and Submit (⌘Return) float at the foot.
+/// beside it of how much is answered. Back to Questions and Submit (⌘Return) at the foot. (1.3.78) The list ends above
+/// the foot's buttons, so no row is ever under them.
 struct QuizReviewPane: View {
     @ObservedObject var run: QuizRun
     let tint: Color
@@ -21,29 +22,32 @@ struct QuizReviewPane: View {
     var body: some View {
         GeometryReader { geo in
             let wide = geo.size.width >= QuizLayout.wide
-            ScrollView {
-                HStack(alignment: .top, spacing: 52) {
-                    VStack(alignment: .leading, spacing: 20) {
-                        heading(wide: wide)
-                        list
-                        Text(note)
-                            .font(.sCallout)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+            VStack(spacing: 0) {
+                ScrollView {
+                    HStack(alignment: .top, spacing: 52) {
+                        VStack(alignment: .leading, spacing: 20) {
+                            heading(wide: wide)
+                            list
+                            Text(note)
+                                .font(.sCallout)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .frame(maxWidth: QuizLayout.column, alignment: .leading)
+                        if wide {
+                            summary
+                                .frame(width: 230, alignment: .leading)
+                                .padding(.top, 10)
+                        }
                     }
-                    .frame(maxWidth: QuizLayout.column, alignment: .leading)
-                    if wide {
-                        summary
-                            .frame(width: 230, alignment: .leading)
-                            .padding(.top, 10)
-                    }
+                    .padding(.horizontal, 40)
+                    .padding(.top, 18)
+                    .padding(.bottom, 24)
+                    .frame(maxWidth: .infinity)
                 }
-                .padding(.horizontal, 40)
-                .padding(.top, 18)
-                .padding(.bottom, QuizLayout.barClearance)
-                .frame(maxWidth: .infinity)
+                Divider()
+                bar
             }
-            .overlay(alignment: .bottom) { bar }
         }
     }
 
@@ -92,13 +96,16 @@ struct QuizReviewPane: View {
         .padding(.horizontal, -10)
     }
 
+    /// (1.3.78) The question's words take the row, up to three lines, and its answer a column of its own at the end —
+    /// never the words squeezed into a narrow strip beside a wide one.
     private func row(_ q: QuizQuestion) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 14) {
             glyph(q)
             VStack(alignment: .leading, spacing: 4) {
                 Text(q.plain.isEmpty ? q.name : q.plain)
                     .font(.sBody)
-                    .lineLimit(2)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 6) {
                     Text("Question \(q.n)")
                     if q.flagged {
@@ -112,9 +119,10 @@ struct QuizReviewPane: View {
                 .font(.sFootnote)
                 .foregroundStyle(.secondary)
             }
-            Spacer(minLength: 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
             answer(q)
-                .frame(maxWidth: 260, alignment: .trailing)
+                .frame(width: 180, alignment: .trailing)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
@@ -190,7 +198,7 @@ struct QuizReviewPane: View {
     }
 
     private var bar: some View {
-        QuizFloatingBar {
+        QuizFloatingBar(docked: true) {
             Button { Task { await run.keepWorking() } } label: { Label("Back to Questions", systemImage: "chevron.left") }
                 .glassButton()
                 .disabled(run.stage == .submitting)
@@ -404,16 +412,11 @@ struct QuizFeedbackPane: View {
                 filterRows(rows)
             }
             if !rows.isEmpty {
-                // (1.3.9) the questions as a small card of tiles, as the attempt's are — no bubbles
+                // (1.3.9) the questions as a small card of tiles, as the attempt's are — no bubbles; (1.3.78) no count at
+                // its head: the filter above it counts them
                 VStack(alignment: .leading, spacing: 12) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("Questions")
-                            .font(.sHeadline)
-                        Spacer(minLength: 6)
-                        Text("\(rows.filter { $0.verdict == "right" }.count) of \(rows.count) right")
-                            .font(.sFootnote.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                    }
+                    Text("Questions")
+                        .font(.sHeadline)
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 5), spacing: 6) {
                         ForEach(rows) { r in
                             Button { go(to: r, proxy: proxy) } label: {
@@ -453,22 +456,28 @@ struct QuizFeedbackPane: View {
 
     // MARK: The score
 
-    private func color(_ fb: QuizFeedback) -> Color { fb.color.map { Color(hex: $0) } ?? tint }
+    /// (1.3.78) The score's colour: its band (an F red, whatever the course's colour), else the course's.
+    private func color(_ fb: QuizFeedback) -> Color { GradeBand.color(fb.band) ?? fb.color.map { Color(hex: $0) } ?? tint }
 
+    /// (1.3.78) The ring's figure: the whole percent of the one shown everywhere else (81.3% → 81), as the engine
+    /// rounds it.
     private func scoreRing(_ fb: QuizFeedback, size: CGFloat) -> some View {
         let c = color(fb)
         return ZStack {
-            Ring(value: fb.pct, color: c, lineWidth: 9)
-            Text(fb.pct.map { "\(Int($0.rounded()))%" } ?? "—")
+            Ring(value: fb.pctWhole.map(Double.init) ?? fb.pct, color: c, lineWidth: 9)
+            Text(fb.pctWhole.map { "\($0)%" } ?? "–")
                 .font(.sTitle3.weight(.bold).monospacedDigit())
                 .foregroundStyle(c)
         }
         .frame(width: size, height: size)
+        .help(fb.pctText ?? "")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel((fb.pctText ?? "").isEmpty ? "No score" : "Score \(fb.pctText ?? "")")
     }
 
     private func scoreWords(_ fb: QuizFeedback) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("\(fb.score ?? "—") / \(fb.possible ?? "—")")
+            Text("\(fb.score ?? "–") / \(fb.possible ?? "–")")
                 .font(.sTitle.monospacedDigit())
             Text("Attempt \(fb.attempt ?? 1)")
                 .font(.sBody.weight(.semibold))

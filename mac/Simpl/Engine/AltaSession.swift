@@ -1403,12 +1403,15 @@ final class AltaSession: ObservableObject {
         return min(max(t?.progress ?? 0, 0), 1)
     }
 
-    /// The whole assignment's mastery, 0…1.
+    /// The whole assignment's mastery, 0…1. (1.3.78) Before Alta has said it (the cover, before a question), the mean
+    /// of the objectives' own — never 0% over a list with some of them mastered.
     var mastery: Double {
         guard let r = report else {
             if overview?.completed == true { return 1 }
             if let p = livePercent { return p }
-            return min(max((overview?.percent ?? 0) / 100, 0), 1)
+            if let p = overview?.percent { return min(max(p / 100, 0), 1) }
+            let list = objectives
+            return list.isEmpty ? 0 : list.map(\.mastery).reduce(0, +) / Double(list.count)
         }
         if r.completed || (r.status ?? "").lowercased() == "complete" { return 1 }
         if let p = livePercent { return p }

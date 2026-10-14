@@ -6,11 +6,12 @@ import UniformTypeIdentifiers
 /// One assignment, as a page of its own (1.2: sections on the page itself, one card deep): its kind, its course and
 /// where your work stands over its name; then the instructions, what you handed in and the comments on the left, and on
 /// the right the one thing to do next — Hand In, Take Quiz, Open Discussion, Open Tool — in glass, with the grade and
-/// the facts: due, points, when it is open, how it is handed in, the attempts. The rubric is one row under the name (and
-/// a button on the grade card) that brings the rubric ring up over the window (1.2.2, RubricPopup.swift). A narrow
-/// window shows the right's cards first, in one column. A file handed in or attached opens in Quick Look with a click
-/// (or previews in the page); files dropped on the page open Hand In with them already in it; arriving from a piece of
-/// work's Hand In or See Feedback does that at once.
+/// the facts: due, points, when it is open, how it is handed in, the attempts. The rubric is one button on the grade
+/// card (a row under the name before there is a grade) that brings the rubric ring up over the window (1.2.2,
+/// RubricPopup.swift). (1.3.78) A narrow window shows one column in the order it is read: the next step with the facts
+/// in a line under it, the grade once there is one, then the instructions — the rubric a row under the name. A file
+/// handed in or attached opens in Quick Look with a click (or previews in the page); files dropped on the page open
+/// Hand In with them already in it; arriving from a piece of work's Hand In or See Feedback does that at once.
 struct AssignmentView: View {
     let course: String
     let id: String
@@ -33,7 +34,13 @@ struct AssignmentView: View {
     /// (1.3.8) How tall the heading is: the fixed right column starts level with the left one's first card.
     @State private var headerHeight: CGFloat = 90
     /// (1.3.5) A quiz taken: its intro (`quizIntro`), for whether its feedback can be seen and another attempt begun.
+    /// (1.3.78) Any quiz's: its attempts as the quiz counts them, so the facts and New Attempt say the same.
     @State private var quizIntro: QuizIntro?
+    /// (1.3.78) The quiz's intro could not be had: New Attempt goes by the assignment's own count, never left waiting.
+    @State private var quizIntroFailed = false
+    /// (1.3.78) One column, scrolled on: the page's own next step is out of sight, so its copy fades into the toolbar —
+    /// never both on one screen.
+    @State private var stepOutOfSight = false
 
     var body: some View {
         Group {
@@ -53,11 +60,12 @@ struct AssignmentView: View {
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 NeighbourButtons(ctx: "courses/\(course)", type: "Assignment", id: id) // (a quiz's too: the next opens as a page, not a quiz)
-                if let d = model.data, let next = nextStep(d) {
+                if stepOutOfSight, let d = model.data, let next = nextStep(d) {
                     Button { act(d, next) } label: {
                         Label(next.title, systemImage: next.symbol)
                     }
                     .help(next.help)
+                    .transition(.opacity)
                 }
                 CanvasMenu(url: canvasURL, title: model.data?.title ?? "Assignment")
             }
@@ -86,21 +94,21 @@ struct AssignmentView: View {
     // MARK: - The page
 
     /// (1.3.8) On a wide window the page scrolls in its left column and the right one — what to do, the grade, the facts
-    /// — stays put beside it, its top level with the left column's first card (as To Do's side column does); on a narrow
-    /// one, one column that scrolls, the right one's cards first.
+    /// — stays put beside it, its top level with the left column's first card (as To Do's side column does). (1.3.78) On
+    /// a narrow one, one column that scrolls in the order it is read: the next step with the facts in a line under it
+    /// (not a card of them), the grade once there is one, then the instructions, the work and the comments.
     private func page(_ d: AssignmentData) -> some View {
         GeometryReader { g in
             let pad: CGFloat = g.size.width < 700 ? 22 : 40
             let room = max(0, min(1480, g.size.width - pad * 2))
             if room >= AssignmentColumns.twoFrom {
                 widePage(d, room: room, pad: pad)
+                    .onAppear { stepOutOfSight = false } // (the step stays in sight beside the page)
             } else {
-                Page(spacing: 32) {
-                    header(d)
-                    AssignmentColumns() {
-                        mainColumn(d)
-                        sideColumn(d)
-                    }
+                Page(spacing: 28) {
+                    header(d, wide: false)
+                    narrowSide(d)
+                    mainColumn(d)
                 }
             }
         }
@@ -117,7 +125,7 @@ struct AssignmentView: View {
         return HStack(alignment: .top, spacing: AssignmentColumns.gap) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 32) {
-                    header(d)
+                    header(d, wide: true)
                         .background {
                             GeometryReader { h in Color.clear.preference(key: AssignmentHeaderKey.self, value: h.size.height) }
                         }
@@ -142,7 +150,9 @@ struct AssignmentView: View {
         }
     }
 
-    private func header(_ d: AssignmentData) -> some View {
+    /// The kind, the course, where the work stands, and the name. (1.3.78) The rubric's row under the name in one
+    /// column, and in two only until there is a grade card to hold it — never in both places.
+    private func header(_ d: AssignmentData, wide: Bool) -> some View {
         let color = courseTint(d)
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
@@ -165,7 +175,7 @@ struct AssignmentView: View {
                 }
             }
             ScreenHeading(title: d.title)
-            if !d.rubric.isEmpty {
+            if !d.rubric.isEmpty && !(wide && d.grade != nil) {
                 RubricSummaryRow(data: d) { openRubric(d) }
                     .padding(.top, 4)
             }
@@ -365,13 +375,58 @@ struct AssignmentView: View {
         VStack(alignment: .leading, spacing: 16) {
             actionPanel(d)
             if let g = d.grade {
-                gradeCard(g, d)
+                gradeCard(g, d, wide: true)
             } else if d.held == true {
                 heldNote
             }
             factsCard(d)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    /// (1.3.78) One column's top: the next step with the facts in a line under it, then the grade once there is one.
+    /// The step watched as the page scrolls: once it is out of sight, its copy is in the toolbar.
+    private func narrowSide(_ d: AssignmentData) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 12) {
+                actionPanel(d)
+                    .modifier(SightWatch { inSight in
+                        guard stepOutOfSight == inSight else { return }
+                        withAnimation(.timingCurve(0.23, 1, 0.32, 1, duration: 0.2)) { stepOutOfSight = !inSight }
+                    })
+                factsLine(d)
+            }
+            if let g = d.grade {
+                gradeCard(g, d, wide: false)
+            } else if d.held == true {
+                heldNote
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    /// (1.3.78) The facts in a line, for one column: due, points and the attempts — the quiz's own, once its intro is
+    /// in, so the line and New Attempt say the same — and when it opens or closes under it.
+    @ViewBuilder
+    private func factsLine(_ d: AssignmentData) -> some View {
+        let line = quizIntro?.factsLine ?? d.factsLine ?? ""
+        let available = d.available ?? ""
+        if !line.isEmpty || !available.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                if !line.isEmpty {
+                    Label(line, systemImage: "calendar")
+                        .contentTransition(.opacity)
+                }
+                if !available.isEmpty {
+                    Label(available, systemImage: "clock")
+                }
+            }
+            .font(.sCallout)
+            .foregroundStyle(.secondary)
+            .textSelection(.enabled)
+            .fixedSize(horizontal: false, vertical: true)
+            .animation(Motion.snappy, value: line)
+        }
     }
 
     /// The one thing to do next, in glass in the course's colour and as wide as the column, with why it cannot be
@@ -382,7 +437,8 @@ struct AssignmentView: View {
         let steps = nextSteps(d)
         if !steps.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
-                // (1.3.5) a quiz taken with an attempt left: See Feedback and New Attempt side by side, the new one lit
+                // (1.3.5) a quiz taken with an attempt left: See Feedback and New Attempt side by side, the new one lit;
+                // (1.3.78) New Attempt held in its place, waiting, until the quiz says whether one is left
                 HStack(spacing: 10) {
                     ForEach(Array(steps.enumerated()), id: \.offset) { i, step in
                         Button { act(d, step) } label: {
@@ -393,7 +449,8 @@ struct AssignmentView: View {
                         .glassButton(prominent: i == steps.count - 1)
                         .controlSize(.extraLarge)
                         .tint(courseTint(d))
-                        .help(step.help)
+                        .disabled(step.pending)
+                        .help(step.pending ? "Checking whether another attempt is left" : step.help)
                     }
                 }
                 .animation(Motion.snappy, value: steps.map(\.title))
@@ -459,7 +516,8 @@ struct AssignmentView: View {
                 .foregroundStyle(.secondary)
                 .accessibilityLabel(word.capitalized)
         default:
-            Text(word.isEmpty ? (g.pct.map { "\(Int($0.rounded()))%" } ?? "") : word)
+            // (1.3.78: the whole percent of the figure shown beside it, as the engine rounds it — never 81 by 81.3%)
+            Text(word.isEmpty ? (g.pctWhole.map { "\($0)%" } ?? "") : word)
                 .font(.sTitle3.weight(.bold))
                 .foregroundStyle(color)
                 .lineLimit(1)
@@ -468,22 +526,34 @@ struct AssignmentView: View {
         }
     }
 
-    private func gradeCard(_ g: GradeInfo, _ d: AssignmentData) -> some View {
+    /// (1.3.78) The ring's and the letter's colour: the grade's band (an F red, an A green, whatever the course's own
+    /// colour), so the colour says how it went; a pass green; a grade with no band the course's colour.
+    private func gradeTone(_ g: GradeInfo, _ d: AssignmentData) -> Color {
+        if let c = GradeBand.color(g.band) { return c }
+        switch (g.letter ?? "").trimmingCharacters(in: .whitespaces).lowercased() {
+        case "complete", "pass": return .green
+        case "incomplete", "fail": return .secondary
+        default: return courseTint(d)
+        }
+    }
+
+    private func gradeCard(_ g: GradeInfo, _ d: AssignmentData, wide: Bool) -> some View {
         let color = courseTint(d)
+        let tone = gradeTone(g, d)
         return VStack(alignment: .leading, spacing: 14) {
             Text("Grade")
                 .font(.sHeadline)
                 .foregroundStyle(.secondary)
             HStack(spacing: 16) {
                 ZStack {
-                    Ring(value: g.pct, color: color, lineWidth: 7, key: "assignment:\(course)/\(id)")
-                    ringMark(g, color)
+                    Ring(value: g.pctWhole.map(Double.init) ?? g.pct, color: tone, lineWidth: 7, key: "assignment:\(course)/\(id)")
+                    ringMark(g, tone)
                 }
                 .frame(width: 76, height: 76)
                 VStack(alignment: .leading, spacing: 3) {
                     scoreText(g)
-                    if let pct = g.pct {
-                        Text(String(format: "%.1f%%", pct))
+                    if let pct = g.pctText, !pct.isEmpty {
+                        Text(pct)
                             .font(.sBody)
                             .foregroundStyle(.secondary)
                     }
@@ -503,7 +573,7 @@ struct AssignmentView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let cs = d.classStats { ClassBoxPlot(stats: cs, tint: color) } // (1.3.10: the web's box plot)
-            if !d.rubric.isEmpty { rubricJump(d) }
+            if wide && !d.rubric.isEmpty { rubricJump(d) } // (1.3.78: one column keeps it under the name)
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -582,7 +652,8 @@ struct AssignmentView: View {
         if let p = d.points, !p.isEmpty { out.append((symbol: "star", label: "Points", value: p)) }
         if let a = d.available, !a.isEmpty { out.append((symbol: "clock", label: "Available", value: a)) }
         if let t = d.typesText, !t.isEmpty { out.append((symbol: "tray.and.arrow.up", label: "Handed In As", value: t)) }
-        if let at = d.attemptsText, !at.isEmpty { out.append((symbol: "arrow.counterclockwise", label: "Attempts", value: at)) }
+        // (1.3.78) a quiz's attempts as the quiz counts them, once its intro is in: the same count New Attempt follows
+        if let at = quizIntro?.attemptsText ?? d.attemptsText, !at.isEmpty { out.append((symbol: "arrow.counterclockwise", label: "Attempts", value: at)) }
         return out
     }
 
@@ -598,6 +669,8 @@ struct AssignmentView: View {
                     .font(.sBody)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
+                    .contentTransition(.opacity)
+                    .animation(Motion.snappy, value: value)
             }
             Spacer(minLength: 0)
         }
@@ -664,22 +737,25 @@ struct AssignmentView: View {
 
     // MARK: - Doing
 
-    /// The one thing to do next (the lit one, where there are two): see that, `nextSteps`.
-    private func nextStep(_ d: AssignmentData) -> NextStep? { nextSteps(d).last }
+    /// The one thing to do next (the lit one, where there are two): see that, `nextSteps`. Never one still waiting.
+    private func nextStep(_ d: AssignmentData) -> NextStep? { nextSteps(d).last { !$0.pending } }
 
     /// What to do next: hand in (again), take the quiz, open the discussion or the tool. A quiz taken (1.3.5): See
     /// Feedback where its results can be seen, and New Attempt beside it while an attempt is left — as the quiz's own
-    /// screen puts them; New Attempt alone where its results are hidden.
+    /// screen puts them; New Attempt alone where its results are hidden. (1.3.78) Before the quiz's intro is in, New
+    /// Attempt is held in its place, waiting, wherever one may be left — the buttons never re-flow when it answers.
     private func nextSteps(_ d: AssignmentData) -> [NextStep] {
-        if d.quizId != nil, quizTaken(d) {
+        if let q = d.quizId, quizTaken(d) {
             let underWay = quizIntro?.begin.hasPrefix("Continue") == true
             if underWay { return [NextStep(title: "Continue Quiz", symbol: "checklist", help: "Go back to the attempt under way", again: true)] }
             // (before the intro is in: its feedback, as the quiz was taken)
             let feedback = quizIntro.map { $0.last?.feedback == true } ?? true
-            let again = quizIntro?.canStart == true
+            let mayRetake = AssignmentView.mayRetake(d, key: "\(course)/\(q)")
+            let again = quizIntro.map(\.canStart) ?? (quizIntroFailed && mayRetake)
+            let waiting = quizIntro == nil && !quizIntroFailed && mayRetake
             var out: [NextStep] = []
             if feedback { out.append(NextStep(title: "See Feedback", symbol: "text.bubble", help: "See your last attempt’s results", short: "Feedback", feedback: true)) }
-            if again { out.append(NextStep(title: "New Attempt", symbol: "arrow.counterclockwise", help: "Take this quiz again", short: "Retake", again: true)) }
+            if again || waiting { out.append(NextStep(title: "New Attempt", symbol: "arrow.counterclockwise", help: "Take this quiz again", short: "Retake", again: true, pending: waiting)) }
             if !out.isEmpty { return out }
         }
         // (1.3.10) handed in, and it may be handed in again: what was handed in (its feedback, once there is any) beside
@@ -700,11 +776,29 @@ struct AssignmentView: View {
     }
 
     /// (1.3.5) A taken quiz's intro, read once the page is: whether its feedback shows and another attempt may begin.
+    /// (1.3.78) Any quiz's, for its attempts as the quiz counts them (the facts' Attempts and the one-column line).
     private func loadQuizIntro(_ d: AssignmentData) async {
-        guard let q = d.quizId, quizTaken(d) else { return }
+        guard let q = d.quizId else { return }
         if let i = try? await engine.call("quizIntro", ["course": course, "quiz": q], as: QuizIntro.self) {
-            withAnimation(Motion.snappy) { quizIntro = i }
+            AssignmentView.retakes["\(course)/\(q)"] = i.canStart && !i.begin.hasPrefix("Continue")
+            withAnimation(Motion.snappy) {
+                quizIntro = i
+                quizIntroFailed = false
+            }
+        } else if quizIntro == nil {
+            withAnimation(Motion.snappy) { quizIntroFailed = true }
         }
+    }
+
+    /// (1.3.78) Whether a taken quiz may have another attempt, before its intro answers: what its intro said the last
+    /// time it was open here, else the assignment's own count ("1 of 2 attempts used"; none given: no limit it knows).
+    @MainActor private static var retakes: [String: Bool] = [:]
+
+    @MainActor private static func mayRetake(_ d: AssignmentData, key: String) -> Bool {
+        if let known = retakes[key] { return known }
+        let words = (d.attemptsText ?? "").split(separator: " ")
+        guard words.count >= 3, words[1] == "of", let used = Int(words[0]), let allowed = Int(words[2]) else { return true }
+        return used < allowed
     }
 
     private func nextStepOne(_ d: AssignmentData) -> NextStep? {
@@ -726,6 +820,7 @@ struct AssignmentView: View {
     }
 
     private func act(_ d: AssignmentData, _ step: NextStep? = nil) {
+        if step?.pending == true { return } // (1.3.78: New Attempt waiting on the quiz's word)
         if let step, step.feedback, d.quizId == nil { // (1.3.10: work handed in, looked at in the popup)
             review = SubmissionReview.Target(file: d.submission?.files?.first)
         } else if let step, let q = d.quizId, step.feedback || step.again {
@@ -859,9 +954,16 @@ private struct StepLabel: View {
     private func row(_ words: String, symbol: Bool) -> some View {
         HStack(alignment: .center, spacing: 8) {
             if symbol {
-                Image(systemName: step.symbol)
-                    .imageScale(.medium)
-                    .frame(width: 22, height: 22)
+                // (1.3.78: a step still waiting shows it turning in the symbol's place)
+                Group {
+                    if step.pending {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Image(systemName: step.symbol)
+                            .imageScale(.medium)
+                    }
+                }
+                .frame(width: 22, height: 22)
             }
             Text(words).lineLimit(1).fixedSize()
         }
@@ -877,58 +979,39 @@ private struct NextStep {
     /// (1.3.5) A quiz's: its last attempt's feedback, or a new attempt begun (or the one under way gone back to).
     var feedback = false
     var again = false
+    /// (1.3.78) Held in its place, not to be pressed yet: New Attempt while the quiz is asked whether one is left.
+    var pending = false
 }
 
-/// The assignment's page in two columns on a wide window — what to read and what was said on the left, the next step,
-/// the grade and the facts on the right (a little wider as the window grows) — and in one column on a narrow one, the
-/// right's cards first.
+/// (1.3.78) Says whether a view is in sight in the scroll view it is in (macOS 15 and later; before that it says
+/// nothing, and the toolbar keeps to itself).
+private struct SightWatch: ViewModifier {
+    let changed: (Bool) -> Void
+
+    func body(content: Content) -> some View {
+        if #available(macOS 15.0, *) {
+            content.onScrollVisibilityChange(threshold: 0.2) { changed($0) }
+        } else {
+            content
+        }
+    }
+}
+
 /// The page's heading's height (the fixed right column's start).
 private struct AssignmentHeaderKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
-private struct AssignmentColumns: Layout {
+/// The assignment's page in two columns on a wide window — what to read and what was said on the left, the next step,
+/// the grade and the facts on the right (a little wider as the window grows) — and in one column on a narrow one.
+private enum AssignmentColumns {
     static let gap: CGFloat = 28
     /// The narrowest the page's column may be and still hold the two side by side.
     static let twoFrom: CGFloat = 780
 
     /// The right column's width for the page's room.
     static func sideWidth(_ width: CGFloat) -> CGFloat { min(400, max(290, ((width - gap) * 0.32).rounded())) }
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        guard subviews.count == 2 else { return .zero }
-        let width = proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? 900
-        return CGSize(width: width, height: frames(width, subviews).height)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        guard subviews.count == 2 else { return }
-        let f = frames(bounds.width, subviews)
-        subviews[0].place(at: CGPoint(x: bounds.minX + f.main.minX, y: bounds.minY + f.main.minY), anchor: .topLeading,
-                          proposal: ProposedViewSize(width: f.main.width, height: nil))
-        subviews[1].place(at: CGPoint(x: bounds.minX + f.side.minX, y: bounds.minY + f.side.minY), anchor: .topLeading,
-                          proposal: ProposedViewSize(width: f.side.width, height: nil))
-    }
-
-    /// Where each column goes, and how tall the two are together.
-    private func frames(_ width: CGFloat, _ subviews: Subviews) -> (main: CGRect, side: CGRect, height: CGFloat) {
-        if width >= AssignmentColumns.twoFrom {
-            let sideWidth = AssignmentColumns.sideWidth(width)
-            let mainWidth = width - AssignmentColumns.gap - sideWidth
-            let mainHeight = subviews[0].sizeThatFits(ProposedViewSize(width: mainWidth, height: nil)).height
-            let sideHeight = subviews[1].sizeThatFits(ProposedViewSize(width: sideWidth, height: nil)).height
-            return (CGRect(x: 0, y: 0, width: mainWidth, height: mainHeight),
-                    CGRect(x: width - sideWidth, y: 0, width: sideWidth, height: sideHeight),
-                    max(mainHeight, sideHeight))
-        }
-        let sideHeight = subviews[1].sizeThatFits(ProposedViewSize(width: width, height: nil)).height
-        let mainHeight = subviews[0].sizeThatFits(ProposedViewSize(width: width, height: nil)).height
-        let gap = sideHeight > 0 && mainHeight > 0 ? AssignmentColumns.gap : 0
-        return (CGRect(x: 0, y: sideHeight + gap, width: width, height: mainHeight),
-                CGRect(x: 0, y: 0, width: width, height: sideHeight),
-                sideHeight + gap + mainHeight)
-    }
 }
 
 /// A file handed in, as a row of Your Work: a click — or Preview — opens it with its feedback in the popup (Canvas's
@@ -1208,12 +1291,15 @@ private struct HandInSheet: View {
         .padding(.bottom, 6)
     }
 
+    /// (1.3.78) A kind's own heading only where no Hand In As picker above already names it.
+    private var kindNamed: Bool { assignment.types.count > 1 }
+
     /// The fields of the kind of hand-in chosen.
     @ViewBuilder
     private var kindSection: some View {
         switch type {
         case "online_text_entry":
-            Section("Your Text") {
+            Section {
                 ZStack(alignment: .topLeading) {
                     TextEditor(text: $text)
                         .font(.sBody)
@@ -1226,12 +1312,16 @@ private struct HandInSheet: View {
                             .allowsHitTesting(false)
                     }
                 }
+            } header: {
+                if !kindNamed { Text("Your Text") }
             }
         case "online_url":
-            Section("Website Address") {
-                TextField("Address", text: $url, prompt: Text("https://"))
+            Section {
+                TextField("Website Address", text: $url, prompt: Text("https://"))
                     .labelsHidden()
                     .autocorrectionDisabled()
+            } header: {
+                if !kindNamed { Text("Website Address") }
             }
         case "online_upload":
             filesSection
@@ -1250,23 +1340,29 @@ private struct HandInSheet: View {
                     Text("Converting \(name)…").foregroundStyle(.secondary)
                 }
             }
-            // (1.3.78) Send from Phone beside them; on its own line when the three will not fit
+            // (1.3.78) Send from Phone beside them; Photos said shorter before any goes to a line of its own, so the
+            // empty form fits the sheet without scrolling
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 10) {
-                    chooseButtons
+                    chooseButtons(short: false)
+                    phoneButton
+                    Spacer(minLength: 0)
+                }
+                HStack(spacing: 10) {
+                    chooseButtons(short: true)
                     phoneButton
                     Spacer(minLength: 0)
                 }
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 10) {
-                        chooseButtons
+                        chooseButtons(short: false)
                         Spacer(minLength: 0)
                     }
                     phoneButton
                 }
             }
         } header: {
-            Text("Files")
+            if !kindNamed { Text("Files") }
         } footer: {
             if let a = assignment.allowed, !a.isEmpty {
                 Text("This assignment takes \(allowedList) files." + (convertible.line.isEmpty ? "" : " \(convertible.line)."))
@@ -1277,13 +1373,14 @@ private struct HandInSheet: View {
     }
 
     @ViewBuilder
-    private var chooseButtons: some View {
+    private func chooseButtons(short: Bool) -> some View {
         Button { importing = true } label: {
             Label("Choose Files…", systemImage: "folder")
         }
         PhotosPicker(selection: $photos, maxSelectionCount: 10, matching: .any(of: [.images, .videos])) {
-            Label("Choose from Photos…", systemImage: "photo.on.rectangle")
+            Label(short ? "Photos…" : "Choose from Photos…", systemImage: "photo.on.rectangle")
         }
+        .help("Choose photos or videos from Photos")
     }
 
     /// (1.3.78) Send from Phone: a QR code the phone's camera opens, and what the phone sends comes into this hand-in.
@@ -1294,30 +1391,25 @@ private struct HandInSheet: View {
         .help("Scan a code with your phone to send photos and files to this hand-in")
     }
 
-    /// (1.3) A press on it opens the Open panel, as Choose Files… does.
+    /// Where files are dropped. (1.3.78) Only that: Choose Files… under it is the one way to pick them, and the zone is
+    /// shorter, so the empty form fits the sheet.
     private var dropZone: some View {
-        Button { importing = true } label: {
-            VStack(spacing: 6) {
-                Image(systemName: "arrow.down.doc")
-                    .font(.system(size: 26))
-                    .foregroundStyle(.secondary)
-                Text("Drop files here")
-                    .font(.sCallout.weight(.semibold))
-                Text("or click to choose them")
-                    .font(.sCaption)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 18)
-            .background {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(targeted ? Theme.accent : Color.secondary.opacity(0.4), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        HStack(spacing: 10) {
+            Image(systemName: "arrow.down.doc")
+                .font(.system(size: 22))
+                .foregroundStyle(targeted ? Theme.accent : Color.secondary)
+            Text("Drop files here")
+                .font(.sCallout.weight(.semibold))
+                .foregroundStyle(targeted ? Theme.accent : Color.primary)
         }
-        .buttonStyle(RowButtonStyle(radius: 10))
-        .help("Choose files to hand in")
-        .accessibilityLabel("Drop files here, or choose them")
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+        .background {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(targeted ? Theme.accent : Color.secondary.opacity(0.4), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+        }
+        .animation(Motion.hover, value: targeted)
+        .accessibilityElement(children: .combine)
     }
 
     /// (1.3) A press on the file shows it in a pane at the sheet's right, the sheet widening for it (again: puts it away).

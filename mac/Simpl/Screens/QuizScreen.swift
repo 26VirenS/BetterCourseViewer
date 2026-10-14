@@ -138,24 +138,18 @@ struct QuizScreen: View {
         return parts.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
-    /// The sheet's own bar, on the page with no band behind it (1.2): Close (and Back, in the feedback) in glass, the
-    /// quiz and where it stands, and during an attempt the clock and the instructions in glass; the quiz on Canvas in
-    /// its menu. Submit is at the foot of the attempt, with Next.
+    /// The sheet's own bar, on the page with no band behind it (1.2): the quiz and where it stands, and during an attempt
+    /// the clock and the instructions in glass; the quiz on Canvas in its menu. Submit is at the foot of the attempt,
+    /// with Next. (1.3.78) Close at the right end, where every full popup has it (the quiz, Knewton Alta, Macmillan, the
+    /// feedback on a file) — and the feedback's way back to the quiz a chevron by the title, apart from it.
     private var topBar: some View {
         HStack(spacing: 14) {
-            GlassGroup(spacing: 8) {
-                HStack(spacing: 8) {
-                    if run.stage == .feedback {
-                        Button { run.leaveFeedback() } label: { Label("Back", systemImage: "chevron.left") }
-                            .glassButton()
-                            .help("Back")
-                    }
-                    Button("Close", action: close)
-                        .glassButton()
-                        .keyboardShortcut(.cancelAction)
-                        .disabled(run.stage == .submitting)
-                        .help(inAttempt ? "Save your answers and close — the attempt stays open" : "Close the quiz")
-                }
+            if run.stage == .feedback {
+                Button { run.leaveFeedback() } label: { Label("Quiz", systemImage: "chevron.left") }
+                    .glassButton()
+                    .help("Back to the quiz")
+                    .accessibilityLabel("Back to the Quiz")
+                    .transition(.opacity)
             }
             IconTile(symbol: "checklist", color: tint, size: 32)
             VStack(alignment: .leading, spacing: 2) {
@@ -178,6 +172,11 @@ struct QuizScreen: View {
                         instructionsButton
                     }
                     moreMenu
+                    Button("Close", action: close)
+                        .glassButton()
+                        .keyboardShortcut(.cancelAction)
+                        .disabled(run.stage == .submitting)
+                        .help(inAttempt ? "Save your answers and close — the attempt stays open" : "Close the quiz")
                 }
             }
         }
@@ -351,8 +350,10 @@ enum QuizLayout {
 }
 
 /// The floating bar at the foot of a pane (1.2): its buttons in Liquid Glass, drawn together, over a soft fade of the
-/// page so what scrolls under it never fights the words on it. Only its buttons take clicks.
+/// page so what scrolls under it never fights the words on it. Only its buttons take clicks. (1.3.78) `docked`: the
+/// bar under a list that ends above it (the review), no fade and less room over it.
 struct QuizFloatingBar<Content: View>: View {
+    var docked = false
     @ViewBuilder var content: Content
 
     var body: some View {
@@ -361,18 +362,20 @@ struct QuizFloatingBar<Content: View>: View {
         }
         .controlSize(.large)
         .padding(.horizontal, 24)
-        .padding(.top, 30)
-        .padding(.bottom, 20)
+        .padding(.top, docked ? 14 : 30)
+        .padding(.bottom, docked ? 16 : 20)
         .background {
             // (1.3.70) a soft haze behind the buttons, not a box: no edge of its own anywhere, so it never cuts across
             // what is under it (a graph, a picture)
-            Capsule()
-                .fill(Theme.page.opacity(0.5))
-                .padding(.horizontal, 6)
-                .padding(.top, 18)
-                .padding(.bottom, 8)
-                .blur(radius: 18)
-                .allowsHitTesting(false)
+            if !docked {
+                Capsule()
+                    .fill(Theme.page.opacity(0.5))
+                    .padding(.horizontal, 6)
+                    .padding(.top, 18)
+                    .padding(.bottom, 8)
+                    .blur(radius: 18)
+                    .allowsHitTesting(false)
+            }
         }
     }
 }
@@ -505,28 +508,45 @@ private struct QuizIntroPane: View {
         .frame(maxWidth: 700, alignment: .leading)
     }
 
+    /// (1.3.78) What the quiz is, under the bar that already names it and its course: its facts, each with its symbol,
+    /// and where the attempts stand (the engine's one line: "Attempt 1 of 5 · 4 more after this one").
     private var heading: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label(intro.context ?? "Quiz", systemImage: "checklist")
-                .font(.sBody.weight(.semibold))
-                .foregroundStyle(tint)
-                .lineLimit(1)
-            Text(intro.title)
-                .font(.sLargeTitle)
-                .tracking(-0.5)
-                .fixedSize(horizontal: false, vertical: true)
-                .textSelection(.enabled)
+        VStack(alignment: .leading, spacing: 12) {
             if !intro.facts.isEmpty {
-                Text(intro.facts.joined(separator: " · "))
-                    .font(.sBody)
-                    .foregroundStyle(.secondary)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 22) { facts }
+                    VStack(alignment: .leading, spacing: 8) { facts }
+                }
+                .font(.sHeadline)
             }
             if let note = intro.note, !note.isEmpty {
-                Text(note)
-                    .font(.sCallout)
+                Label(note, systemImage: "arrow.counterclockwise")
+                    .font(.sBody)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .textSelection(.enabled)
+    }
+
+    @ViewBuilder
+    private var facts: some View {
+        ForEach(intro.facts, id: \.self) { f in
+            Label {
+                Text(f)
+            } icon: {
+                Image(systemName: Self.factSymbol(f))
+                    .foregroundStyle(tint)
+            }
+            .lineLimit(1)
+        }
+    }
+
+    private static func factSymbol(_ f: String) -> String {
+        let lower = f.lowercased()
+        if lower.hasPrefix("due") || lower.hasPrefix("no due") { return "calendar" }
+        if lower.contains("question") { return "list.number" }
+        return "star"
     }
 
     /// Why it cannot begin, and when it unlocks: a line each, in its colour.
@@ -681,21 +701,24 @@ private struct QuizIntroPane: View {
                     .glassButton(prominent: true)
                     .keyboardShortcut(.defaultAction)
                     .disabled(codeMissing)
+                    .help(codeMissing ? "Type the access code first" : takeTitle)
             } else if feedback {
                 Button(action: openLastFeedback) { Label("See Feedback", systemImage: "text.bubble") }
                     .glassButton(prominent: true)
                     .keyboardShortcut(.defaultAction)
             } else {
-                Button(beginTitle, action: startAttempt)
+                Button(intro.begin, action: startAttempt)
                     .glassButton(prominent: true)
                     .keyboardShortcut(.defaultAction)
                     .disabled(!intro.canStart || codeMissing)
+                    .help(codeMissing && intro.canStart ? "Type the access code first" : intro.begin)
             }
         }
     }
 
-    private var takeTitle: String { codeMissing ? "Enter the Code" : (intro.survey ? "Take Survey" : "Take Quiz") }
-    private var beginTitle: String { codeMissing && intro.canStart ? "Enter the Access Code" : intro.begin }
+    /// (1.3.78) The buttons keep their own names while the access code is missing — Begin Attempt, waiting (greyed out)
+    /// for the code, with the field ready to type in — never words that read as an instruction.
+    private var takeTitle: String { intro.survey ? "Take Survey" : "Take Quiz" }
     private var codeMissing: Bool { intro.needsCode && run.code.trimmingCharacters(in: .whitespaces).isEmpty }
 
     private func startAttempt() {

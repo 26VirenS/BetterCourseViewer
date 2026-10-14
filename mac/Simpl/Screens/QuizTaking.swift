@@ -266,8 +266,9 @@ private struct QuizStripView: View {
     }
 }
 
-/// The questions down the side of a wide sheet: every question's number in a small card (QuizNumberCard), what the tiles
-/// mean, how much is answered (and whether it is saved), and the review.
+/// The questions down the side of a wide sheet: every question's number in a small card (QuizNumberCard) and the
+/// review. (1.3.78) How much is answered is said once, at the foot of the page; here the card's bar shows it, and what
+/// the tiles mean is one line under them (each tile's tooltip says it too).
 private struct QuizRail: View {
     @ObservedObject var run: QuizRun
     let tint: Color
@@ -277,11 +278,16 @@ private struct QuizRail: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 16) {
                     QuizNumberCard(run: run, tint: tint, jump: jump)
-                    legend
-                    Divider()
-                    progress
+                    Button(action: review) {
+                        Label("Review Answers", systemImage: "list.bullet.rectangle")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .glassButton()
+                    .controlSize(.large)
+                    .disabled(run.moving != nil)
+                    .help("Review every answer before submitting")
                 }
                 .padding(.horizontal, 22)
                 .padding(.top, 10)
@@ -293,90 +299,85 @@ private struct QuizRail: View {
             }
         }
     }
-
-    private var legend: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            key(fill: tint, ring: nil, "On screen")
-            key(fill: tint.opacity(0.2), ring: nil, "Answered")
-            key(fill: Theme.well, ring: .orange, "Flagged")
-            key(fill: Theme.well, ring: nil, "Not answered")
-        }
-        .font(.sFootnote)
-        .foregroundStyle(.secondary)
-        .accessibilityElement(children: .combine)
-    }
-
-    private func key(fill: Color, ring: Color?, _ text: String) -> some View {
-        HStack(spacing: 10) {
-            RoundedRectangle(cornerRadius: 3.5, style: .continuous)
-                .fill(fill)
-                .overlay(RoundedRectangle(cornerRadius: 3.5, style: .continuous).strokeBorder(ring ?? Color.clear, lineWidth: 1.5))
-                .frame(width: 13, height: 13)
-            Text(text)
-        }
-    }
-
-    private var progress: some View {
-        let total = run.questions.count
-        let done = run.answeredCount
-        return VStack(alignment: .leading, spacing: 10) {
-            Text("\(done) of \(total) answered")
-                .font(.sHeadline.monospacedDigit())
-                .contentTransition(.numericText(value: Double(done)))
-                .animation(Motion.snappy, value: done)
-            ProgressView(value: Double(done), total: Double(max(total, 1)))
-                .progressViewStyle(.linear)
-                .tint(tint)
-                .animation(Motion.fill, value: done)
-                .accessibilityHidden(true)
-            if !run.saveWord.isEmpty {
-                Text(run.saveWord)
-                    .font(.sFootnote)
-                    .foregroundStyle(.secondary)
-            }
-            Button(action: review) {
-                Label("Review Answers", systemImage: "list.bullet.rectangle")
-                    .frame(maxWidth: .infinity)
-            }
-            .glassButton()
-            .controlSize(.large)
-            .disabled(run.moving != nil)
-            .help("Review every answer before submitting")
-            .padding(.top, 6)
-        }
-    }
 }
 
-/// (1.3.8) Every question's number in a small card, a clean grid of tiles five across, with how many are answered at its
-/// head: in place of the glass bubbles (a glass face drawn inside each button, under which a click could be lost).
+/// (1.3.8) Every question's number in a small card, a clean grid of tiles five across: in place of the glass bubbles (a
+/// glass face drawn inside each button, under which a click could be lost). (1.3.78) Under the tiles, a thin bar of how
+/// much is answered (the count itself is the foot's) and one line of what the tiles mean.
 private struct QuizNumberCard: View {
     @ObservedObject var run: QuizRun
     let tint: Color
     let jump: (Int) -> Void
+    @Environment(\.colorScheme) private var scheme
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 5)
 
     var body: some View {
+        let total = run.questions.count
+        let done = run.answeredCount
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Questions")
-                    .font(.sHeadline)
-                Spacer(minLength: 6)
-                Text("\(run.answeredCount) of \(run.questions.count)")
-                    .font(.sFootnote.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .contentTransition(.numericText(value: Double(run.answeredCount)))
-                    .animation(Motion.snappy, value: run.answeredCount)
-            }
+            Text("Questions")
+                .font(.sHeadline)
             LazyVGrid(columns: columns, spacing: 6) {
                 ForEach(Array(run.questions.enumerated()), id: \.element.id) { k, q in
                     QuizChip(run: run, q: q, k: k, tint: tint, jump: jump)
                         .id(k)
                 }
             }
+            ProgressView(value: Double(done), total: Double(max(total, 1)))
+                .progressViewStyle(.linear)
+                .tint(tint)
+                .animation(Motion.fill, value: done)
+                .accessibilityLabel("Answered")
+                .accessibilityValue("\(done) of \(total)")
+            legend
         }
         .padding(14)
         .card(radius: 16)
+    }
+
+    /// What the tiles mean, in a line: answered (washed, with a tick), flagged (edged in orange), not answered — on two
+    /// where the column is too narrow for one, never cut short.
+    private var legend: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                answeredKey
+                flaggedKey
+                blankKey
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 12) {
+                    answeredKey
+                    flaggedKey
+                }
+                blankKey
+            }
+        }
+        .font(.sCaption)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var answeredKey: some View { key(fill: tint.opacity(QuizNumberTile.answeredWash(scheme)), ring: nil, tick: true, "Answered") }
+    private var flaggedKey: some View { key(fill: Color.primary.opacity(0.07), ring: .orange, tick: false, "Flagged") }
+    private var blankKey: some View { key(fill: Color.primary.opacity(0.07), ring: nil, tick: false, "Not answered") }
+
+    private func key(fill: Color, ring: Color?, tick: Bool, _ text: String) -> some View {
+        HStack(spacing: 5) {
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .fill(fill)
+                .overlay(RoundedRectangle(cornerRadius: 3, style: .continuous).strokeBorder(ring ?? Color.clear, lineWidth: 1.5))
+                .overlay {
+                    if tick {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 6.5, weight: .heavy))
+                            .foregroundStyle(tint)
+                    }
+                }
+                .frame(width: 12, height: 12)
+            Text(text)
+        }
     }
 }
 
@@ -420,8 +421,9 @@ private struct QuizChip: View {
 }
 
 /// A tile's face: the number in a small rounded square — the one showing filled with the colour, an answered one washed
-/// in it, one not yet answered a quiet grey; a flagged one edged in orange with its flag in the corner, one on its way a
-/// spinner. Flat: no glass.
+/// in it with a small tick in its corner, one not yet answered a quiet grey; a flagged one edged in orange with its flag
+/// in the corner, one on its way a spinner. Flat: no glass. (1.3.78) In dark mode the wash is deeper — a dark green
+/// beside a dark grey could hardly be told apart — and the tick says it without the colour.
 private struct QuizNumberTile: View {
     let number: Int
     let current: Bool
@@ -430,15 +432,19 @@ private struct QuizNumberTile: View {
     var loading = false
     let tint: Color
     var width: CGFloat? = nil
+    @Environment(\.colorScheme) private var scheme
+
+    /// How deep an answered tile's wash is.
+    static func answeredWash(_ scheme: ColorScheme) -> Double { scheme == .dark ? 0.4 : 0.18 }
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
         Text("\(number)")
             .font(.sCallout.weight(.semibold).monospacedDigit())
-            .foregroundStyle(current ? Color.white : (done ? tint : Color.secondary))
+            .foregroundStyle(current ? Color.white : (done ? (scheme == .dark ? Color.white : tint) : Color.secondary))
             .frame(width: width, height: 32)
             .frame(maxWidth: width == nil ? .infinity : nil)
-            .background(shape.fill(current ? tint : (done ? tint.opacity(0.18) : Color.primary.opacity(0.07))))
+            .background(shape.fill(current ? tint : (done ? tint.opacity(QuizNumberTile.answeredWash(scheme)) : Color.primary.opacity(0.07))))
             .overlay(shape.strokeBorder(flagged && !current ? Color.orange : Color.clear, lineWidth: 1.5))
             .overlay(alignment: .topTrailing) {
                 if flagged {
@@ -447,6 +453,16 @@ private struct QuizNumberTile: View {
                         .foregroundStyle(current ? Color.white : Color.orange)
                         .padding(4)
                         .transition(.opacity)
+                }
+            }
+            .overlay(alignment: .bottomTrailing) {
+                if done && !current {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 7, weight: .heavy))
+                        .foregroundStyle(scheme == .dark ? Color.white.opacity(0.85) : tint)
+                        .padding(4)
+                        .transition(.opacity)
+                        .accessibilityHidden(true)
                 }
             }
             .overlay {
@@ -549,6 +565,15 @@ private struct QuizQuestionPage: View {
     @State private var importing = false
     @State private var photos: [PhotosPickerItem] = []
     @State private var dropping = false
+    /// (1.3.78) Canvas's own rich text for the words (a picture, a formula in them) has told its height, or long
+    /// enough has gone by: the answers come in then, never ahead of the question they answer.
+    @State private var stemShown = false
+    @State private var waited = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// The words drawn by the Mac itself (QuizStemText), when they are plain enough to be: there at once.
+    private var nativeStem: Bool { QuizStemText.attributed(q.html, fills: [:], tint: tint, size: 18) != nil }
+    private var answersShown: Bool { nativeStem || stemShown || waited }
 
     var body: some View {
         ScrollView {
@@ -559,13 +584,18 @@ private struct QuizQuestionPage: View {
                         .font(.sBody)
                         .frame(maxWidth: .infinity, minHeight: 160)
                 } else {
-                    RichText(html: q.html, size: 18)
-                    answer
-                    if !q.hint.isEmpty {
-                        Label(q.hint, systemImage: "info.circle")
-                            .font(.sCallout)
-                            .foregroundStyle(.secondary)
+                    QuizStemView(html: q.html, fills: fills, liveInWeb: q.kind == "drops", tint: tint, shown: $stemShown)
+                    Group {
+                        answer
+                        if !q.hint.isEmpty {
+                            Label(q.hint, systemImage: "info.circle")
+                                .font(.sCallout)
+                                .foregroundStyle(.secondary)
+                        }
                     }
+                    .opacity(answersShown ? 1 : 0)
+                    .allowsHitTesting(answersShown)
+                    .animation(.timingCurve(0.23, 1, 0.32, 1, duration: reduceMotion ? 0.12 : 0.18), value: answersShown)
                 }
             }
             .frame(maxWidth: QuizLayout.column, alignment: .leading)
@@ -577,6 +607,23 @@ private struct QuizQuestionPage: View {
             .onTapGesture { focus.wrappedValue = .keys } // (a click off the answers: the keys are the attempt's again)
         }
         .background(PageGround())
+        .task {
+            // (Canvas's rich text that never says its height — a slow picture — holds the answers back no longer)
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            waited = true
+        }
+    }
+
+    /// (1.3.78) Each blank's answer by its number, to show in its box in the question's words: the menu's pick, or the
+    /// words typed.
+    private var fills: [Int: String] {
+        var out: [Int: String] = [:]
+        for b in q.blanks {
+            guard let v = q.map[b.id], !v.trimmingCharacters(in: .whitespaces).isEmpty else { continue }
+            let word = q.kind == "drops" ? (b.options.first { $0.id == v }?.text ?? "") : v
+            if !word.isEmpty { out[b.n] = word }
+        }
+        return out
     }
 
     private var header: some View {
@@ -634,9 +681,10 @@ private struct QuizQuestionPage: View {
     }
 
     // one answer: a row per option with its radio, the whole row the target; its number on the keyboard picks it. The
-    // rows reach a little past the column, so their words start where the question's do.
+    // rows reach a little past the column, so their words start where the question's do. (1.3.78) Rows close together,
+    // so five short answers sit above the floating bar.
     private var choices: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 2) {
             ForEach(Array(q.options.enumerated()), id: \.element.id) { k, o in
                 let on = q.pick == o.id
                 Button { choose(o) } label: {
@@ -652,10 +700,14 @@ private struct QuizQuestionPage: View {
         .padding(.horizontal, -20)
     }
 
-    // every answer that applies: a row per option with its box, the whole row the target
+    // every answer that applies: a row per option with its box, the whole row the target. (1.3.78) What the question
+    // asks for said first, at the reading size, above its boxes — not after them in small type.
     private var multiple: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Select all that apply", systemImage: "checklist")
+                .font(.sBody.weight(.medium))
+                .foregroundStyle(tint)
+            VStack(spacing: 2) {
                 ForEach(Array(q.options.enumerated()), id: \.element.id) { k, o in
                     let on = q.picks.contains(o.id)
                     let ticked = Binding(get: { on }, set: { v in if v != on { choose(o) } })
@@ -671,9 +723,6 @@ private struct QuizQuestionPage: View {
                 }
             }
             .padding(.horizontal, -20)
-            Text("Pick every answer that applies.")
-                .font(.sCallout)
-                .foregroundStyle(.secondary)
         }
     }
 
@@ -727,7 +776,9 @@ private struct QuizQuestionPage: View {
         .controlSize(.large)
     }
 
-    // one field per blank, numbered as its mark in the question's words: a menu to pick from, or a line to type
+    // one field per blank, numbered as its mark in the question's words: a menu to pick from, or a line to type.
+    // (1.3.78) Each says the words around its blank ("the ___ of"), and what is picked or typed shows in the blank's
+    // box in the question's words, so the sentence reads whole.
     private var blanks: some View {
         VStack(alignment: .leading, spacing: 12) {
             ForEach(q.blanks) { b in
@@ -738,8 +789,18 @@ private struct QuizQuestionPage: View {
                         .frame(minWidth: 28, minHeight: 28)
                         .background(Circle().fill(tint.opacity(0.16)))
                         .accessibilityHidden(true)
+                    if let words = b.around, !words.isEmpty {
+                        Text(words)
+                            .font(.sBody)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.head)
+                            .frame(maxWidth: 260, alignment: .leading)
+                            .layoutPriority(1)
+                            .accessibilityHidden(true)
+                    }
                     if q.kind == "drops" {
-                        Picker(b.label, selection: Binding(get: { q.map[b.id] }, set: { v in run.set(q.id) { $0.map[b.id] = v } })) {
+                        Picker(blankName(b), selection: Binding(get: { q.map[b.id] }, set: { v in run.set(q.id) { $0.map[b.id] = v } })) {
                             // (1.3.9: never the blank's own name — an instructor often names it after its answer — so an
                             // empty menu never looks answered)
                             Text("Select…").tag(String?.none)
@@ -751,9 +812,10 @@ private struct QuizQuestionPage: View {
                         .labelsHidden()
                         .frame(maxWidth: 340, alignment: .leading)
                     } else {
-                        TextField("Your answer", text: Binding(get: { q.map[b.id] ?? "" }, set: { v in run.set(q.id, typed: true) { $0.map[b.id] = v } }))
+                        TextField(blankName(b), text: Binding(get: { q.map[b.id] ?? "" }, set: { v in run.set(q.id, typed: true) { $0.map[b.id] = v } }), prompt: Text("Your answer"))
                             .textFieldStyle(.roundedBorder)
                             .font(.sBody)
+                            .labelsHidden()
                             .focused(focus, equals: .field("\(q.id)#\(b.id)"))
                             .onSubmit(onReturn)
                             .frame(maxWidth: 380)
@@ -763,6 +825,13 @@ private struct QuizQuestionPage: View {
             }
         }
         .controlSize(.large)
+    }
+
+    /// A blank's name for VoiceOver: the words around it, else its number — never its own name, which an instructor
+    /// often makes its answer.
+    private func blankName(_ b: QuizQuestion.Blank) -> String {
+        let words = (b.around ?? "").replacingOccurrences(of: "___", with: "blank")
+        return words.trimmingCharacters(in: .whitespaces).isEmpty ? "Blank \(b.n)" : "Blank \(b.n): \(words)"
     }
 
     // a file: chosen in the Open panel, dragged in from the Finder, or picked from Photos; uploaded to the student's own
@@ -889,7 +958,8 @@ private struct QuizQuestionPage: View {
 // MARK: - An option's row
 
 /// An option's row: its mark (a radio, a box), its letter, its words or Canvas's own content, and the number key that
-/// picks it.
+/// picks it. (1.3.78) A row about 46 points tall, the whole of it the target; the key shows on the row under the
+/// pointer, where it can be matched to its answer, not faint at the far edge of every row.
 private struct QuizOptionRow<Mark: View>: View {
     let letter: String
     let text: String
@@ -898,6 +968,7 @@ private struct QuizOptionRow<Mark: View>: View {
     let on: Bool
     let tint: Color
     @ViewBuilder var mark: () -> Mark
+    @State private var hover = false
 
     var body: some View {
         HStack(alignment: .center, spacing: 16) {
@@ -909,19 +980,22 @@ private struct QuizOptionRow<Mark: View>: View {
             QuizOptionText(text: text, html: html)
             if let number {
                 Text("\(number)")
-                    .font(.sCaption.monospacedDigit())
-                    .foregroundStyle(.tertiary)
+                    .font(.sCaption.weight(.medium).monospacedDigit())
+                    .foregroundStyle(.secondary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 1)
-                    .overlay(RoundedRectangle(cornerRadius: 5, style: .continuous).strokeBorder(Color.secondary.opacity(0.3)))
+                    .overlay(RoundedRectangle(cornerRadius: 5, style: .continuous).strokeBorder(Color.secondary.opacity(0.4)))
+                    .opacity(hover ? 1 : 0)
+                    .animation(Motion.hover, value: hover)
                     .help("Press \(number) to choose this answer")
                     .accessibilityHidden(true)
             }
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, minHeight: 46, alignment: .leading)
         .contentShape(Rectangle())
+        .onHover { hover = $0 }
     }
 }
 
@@ -1022,6 +1096,317 @@ struct QuizOptionText: View {
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+// MARK: - The question's words
+
+/// (1.3.78) A question's words: drawn by the Mac itself when they are plain enough (QuizStemText) — on the page the
+/// moment the question is, never after its answers — else in Canvas's own rich text (a picture, a formula, a table),
+/// which says so once it has its height (`shown`). A blank's box holds what was picked or typed for it.
+private struct QuizStemView: View {
+    let html: String
+    /// Each blank's answer, by its number.
+    let fills: [Int: String]
+    /// Whether Canvas's rich text is drawn again as the answers change: a menu's pick, yes; typed words, no (a page
+    /// drawn again at every key would flicker).
+    let liveInWeb: Bool
+    let tint: Color
+    @Binding var shown: Bool
+    @EnvironmentObject private var engine: Engine
+    @State private var height: CGFloat = 0
+
+    var body: some View {
+        if let text = QuizStemText.attributed(html, fills: fills, tint: tint, size: 18, base: engine.web.baseURL) {
+            // (words to select and copy; words with a link in them keep the click for the link)
+            let linked = text.runs.contains { $0.link != nil }
+            Group {
+                if linked {
+                    Text(text)
+                        .lineSpacing(6)
+                } else {
+                    Text(text)
+                        .lineSpacing(6)
+                        .textSelection(.enabled)
+                }
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .environment(\.openURL, OpenURLAction { url in
+                engine.openLink(url) // (as the rich text's links go: the app's own screen for one of the school's)
+                return .handled
+            })
+        } else {
+            HTMLBlock(html: liveInWeb ? QuizStemText.filled(html, fills) : html, base: engine.web.baseURL, size: 18, height: $height) { url in
+                engine.openLink(url)
+            }
+            .frame(height: max(height, 24))
+            .accessibilityElement(children: .contain)
+            .onChange(of: height) { _, h in
+                if h > 0 && !shown { shown = true }
+            }
+        }
+    }
+}
+
+/// (1.3.78) A question's words as the Mac's own text, when Canvas's HTML holds only words and simple marks: paragraphs
+/// and line breaks, bold, italic, underline, sub- and superscript, spans, links (against `base`, the school's), and the
+/// blanks' boxes (the engine's marks: a number in a tinted box — the answer in it, once there is one). Anything else — a
+/// picture, a formula, a list, a table, a character it does not know — answers nil, and Canvas's rich text draws it as
+/// before.
+enum QuizStemText {
+    private typealias UI = AttributeScopes.SwiftUIAttributes
+
+    /// The engine's mark for a blank (native-app.js BLANK_MARK), as its style reads with the spaces taken out.
+    private static let blankStyle = "min-width:1.5em"
+    private static let allowed: Set<String> = ["p", "div", "br", "span", "b", "strong", "i", "em", "u", "sub", "sup", "font", "a"]
+
+    static func attributed(_ html: String, fills: [Int: String], tint: Color, size: CGFloat, base: URL? = nil) -> AttributedString? {
+        guard html.utf8.count < 8000 else { return nil }
+        var b = Builder(size: size, tint: tint)
+        var spans: [Bool] = [] // (each span open: whether it is a blank's box)
+        var blank: String? // (a blank's number, read while inside its box)
+        var rest = Substring(html)
+        while !rest.isEmpty {
+            let lt = rest.firstIndex(of: "<") ?? rest.endIndex
+            if lt > rest.startIndex {
+                guard let t = decode(rest[rest.startIndex..<lt]) else { return nil }
+                if let n = blank { blank = n + t } else { b.words(t) }
+            }
+            guard lt < rest.endIndex else { break }
+            let tag = rest[lt...]
+            if tag.hasPrefix("<!--") {
+                guard let end = tag.range(of: "-->") else { return nil }
+                rest = tag[end.upperBound...]
+                continue
+            }
+            guard let gt = tagEnd(tag) else { return nil }
+            let inner = tag[tag.index(after: lt)..<gt]
+            rest = tag[tag.index(after: gt)...]
+            let closing = inner.hasPrefix("/")
+            let body = closing ? inner.dropFirst() : inner
+            let name = String(body.prefix { $0.isLetter || $0.isNumber }).lowercased()
+            guard allowed.contains(name) else { return nil }
+            let attrs = body.dropFirst(name.count).lowercased().replacingOccurrences(of: " ", with: "")
+            switch name {
+            case "br":
+                b.breaks += 1
+            case "p", "div":
+                if closing || !b.out.characters.isEmpty {
+                    b.breaks = max(b.breaks, 1)
+                    if name == "p" { b.paragraph = true }
+                }
+            case "b", "strong":
+                b.bold = max(0, b.bold + (closing ? -1 : 1))
+            case "i", "em":
+                b.italic = max(0, b.italic + (closing ? -1 : 1))
+            case "u":
+                b.under = max(0, b.under + (closing ? -1 : 1))
+            case "sub":
+                b.sub = max(0, b.sub + (closing ? -1 : 1))
+            case "sup":
+                b.sup = max(0, b.sup + (closing ? -1 : 1))
+            case "a":
+                b.link = closing ? nil : href(body.dropFirst(name.count), base: base)
+            case "span":
+                if closing {
+                    if spans.popLast() == true, let n = blank {
+                        let number = n.trimmingCharacters(in: .whitespacesAndNewlines)
+                        b.box(Int(number).flatMap { fills[$0] } ?? number)
+                        blank = nil
+                    }
+                } else {
+                    let isBlank = attrs.contains(blankStyle)
+                    spans.append(isBlank)
+                    if isBlank { blank = "" }
+                }
+            default:
+                break // (font: its words as they are)
+            }
+        }
+        return b.out
+    }
+
+    /// A link's address, made whole against the school's (Canvas writes "/courses/…"): a web or mail address only — none
+    /// for a link within the page or a script's.
+    private static func href(_ attrs: Substring, base: URL?) -> URL? {
+        let s = String(attrs) as NSString
+        guard let re = hrefPattern, let m = re.firstMatch(in: s as String, range: NSRange(location: 0, length: s.length)) else { return nil }
+        let raw = m.range(at: 1).location != NSNotFound ? s.substring(with: m.range(at: 1)) : s.substring(with: m.range(at: 2))
+        let value = (decode(Substring(raw)) ?? raw).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty, !value.hasPrefix("#"), let u = URL(string: value, relativeTo: base)?.absoluteURL,
+              ["http", "https", "mailto"].contains(u.scheme?.lowercased() ?? "") else { return nil }
+        return u
+    }
+
+    private static let hrefPattern = try? NSRegularExpression(pattern: "href\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)')", options: [.caseInsensitive])
+
+    /// Where a tag ends: its first ">" outside a quoted attribute (a title="a > b" does not end it).
+    private static func tagEnd(_ tag: Substring) -> Substring.Index? {
+        var quote: Character?
+        var i = tag.startIndex
+        while i < tag.endIndex {
+            let ch = tag[i]
+            if let q = quote {
+                if ch == q { quote = nil }
+            } else if ch == "\"" || ch == "'" {
+                quote = ch
+            } else if ch == ">" {
+                return i
+            }
+            i = tag.index(after: i)
+        }
+        return nil
+    }
+
+    /// Canvas's HTML with each blank's box holding its answer, for the rich text (the box's number where there is none).
+    static func filled(_ html: String, _ fills: [Int: String]) -> String {
+        guard !fills.isEmpty,
+              let re = try? NSRegularExpression(pattern: "(<span[^>]*min-width:\\s*1\\.5em[^>]*>)\\s*(\\d+)\\s*(</span>)", options: [.caseInsensitive]) else { return html }
+        let ns = html as NSString
+        var out = html
+        for m in re.matches(in: html, range: NSRange(location: 0, length: ns.length)).reversed() {
+            guard let n = Int(ns.substring(with: m.range(at: 2))), let word = fills[n], let r = Range(m.range(at: 2), in: out) else { continue }
+            out.replaceSubrange(r, with: escape(word))
+        }
+        return out
+    }
+
+    private static func escape(_ s: String) -> String {
+        s.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\"", with: "&quot;")
+    }
+
+    private static let named: [String: String] = [
+        "amp": "&", "lt": "<", "gt": ">", "quot": "\"", "apos": "'", "nbsp": "\u{00A0}", "ndash": "–", "mdash": "—",
+        "hellip": "…", "lsquo": "‘", "rsquo": "’", "ldquo": "“", "rdquo": "”", "times": "×", "divide": "÷", "minus": "−",
+        "plusmn": "±", "deg": "°", "middot": "·", "le": "≤", "ge": "≥", "ne": "≠", "asymp": "≈", "infin": "∞", "radic": "√",
+        "frac12": "½", "frac14": "¼", "frac34": "¾", "sup2": "²", "sup3": "³", "micro": "µ", "pi": "π", "theta": "θ",
+        "alpha": "α", "beta": "β", "gamma": "γ", "delta": "δ", "Delta": "Δ", "lambda": "λ", "mu": "μ", "sigma": "σ",
+        "Sigma": "Σ", "omega": "ω", "Omega": "Ω", "rarr": "→", "larr": "←", "harr": "↔", "thinsp": "\u{2009}",
+        "ensp": "\u{2002}", "emsp": "\u{2003}", "zwj": "\u{200D}", "zwnj": "\u{200C}", "shy": "\u{00AD}",
+    ]
+
+    /// Character references made characters; nil for one it does not know (the rich text knows them all).
+    private static func decode(_ s: Substring) -> String? {
+        guard s.contains("&") else { return String(s) }
+        var out = ""
+        var i = s.startIndex
+        while i < s.endIndex {
+            let ch = s[i]
+            if ch == "&", let semi = s[i...].prefix(12).firstIndex(of: ";") {
+                let name = s[s.index(after: i)..<semi]
+                if name.hasPrefix("#") {
+                    let digits = name.dropFirst()
+                    let value = digits.hasPrefix("x") || digits.hasPrefix("X") ? UInt32(digits.dropFirst(), radix: 16) : UInt32(digits)
+                    guard let v = value, let u = Unicode.Scalar(v) else { return nil }
+                    out.unicodeScalars.append(u)
+                } else if let w = named[String(name)] {
+                    out += w
+                } else {
+                    return nil
+                }
+                i = s.index(after: semi)
+            } else {
+                out.append(ch)
+                i = s.index(after: i)
+            }
+        }
+        return out
+    }
+
+    /// The text as it is put together: the marks open, the space and the line breaks owed before the next words.
+    private struct Builder {
+        let size: CGFloat
+        let tint: Color
+        var out = AttributedString()
+        var bold = 0, italic = 0, under = 0, sub = 0, sup = 0
+        /// The link the words are in (a link Canvas's words make: the chapter's notes), if any.
+        var link: URL?
+        var breaks = 0
+        /// The break owed ends a paragraph: a little room under it, as the rich text leaves.
+        var paragraph = false
+        var space = false
+        var lineStart = true
+
+        /// The line breaks owed, before what comes next (never at the very start).
+        mutating func flush() {
+            guard breaks > 0 else { return }
+            if !out.characters.isEmpty {
+                add(String(repeating: "\n", count: min(breaks, 2)))
+                if paragraph && breaks < 2 { gap() }
+            }
+            breaks = 0
+            paragraph = false
+            lineStart = true
+            space = false
+        }
+
+        /// A paragraph's room under it: a line of next to no height (a small type's), holding nothing to see.
+        mutating func gap() {
+            var run = AttributedString("\u{200B}\n")
+            run[UI.FontAttribute.self] = Font.system(size: max(4, size * 0.3))
+            out.append(run)
+        }
+
+        /// Words as HTML spaces them: every run of white space one space, none at the start of a line.
+        mutating func words(_ raw: String) {
+            var w = ""
+            for ch in raw {
+                if ch == " " || ch == "\n" || ch == "\t" || ch == "\r" {
+                    space = true
+                    continue
+                }
+                if w.isEmpty {
+                    flush()
+                    if space && !lineStart { plainSpace() }
+                } else if space {
+                    w.append(" ")
+                }
+                space = false
+                w.append(ch)
+            }
+            if !w.isEmpty {
+                add(w)
+                lineStart = false
+            }
+        }
+
+        /// A blank's box: its number, or the answer given for it, on a wash of the colour.
+        mutating func box(_ label: String) {
+            flush()
+            if space && !lineStart { plainSpace() }
+            space = false
+            var run = AttributedString("\u{00A0}\(label)\u{00A0}")
+            run[UI.FontAttribute.self] = Font.system(size: size, weight: .semibold)
+            run[UI.ForegroundColorAttribute.self] = tint
+            run[UI.BackgroundColorAttribute.self] = tint.opacity(0.16)
+            out.append(run)
+            lineStart = false
+        }
+
+        /// The space between two runs of words, in neither one's marks (never a link's or an underline's).
+        mutating func plainSpace() {
+            var run = AttributedString(" ")
+            run[UI.FontAttribute.self] = Font.system(size: size)
+            out.append(run)
+        }
+
+        mutating func add(_ s: String) {
+            var run = AttributedString(s)
+            let small = sub > 0 || sup > 0
+            var font = Font.system(size: small ? size * 0.72 : size, weight: bold > 0 ? .semibold : .regular)
+            if italic > 0 { font = font.italic() }
+            run[UI.FontAttribute.self] = font
+            if under > 0 { run[UI.UnderlineStyleAttribute.self] = Text.LineStyle.single }
+            if sup > 0 {
+                run[UI.BaselineOffsetAttribute.self] = size * 0.36
+            } else if sub > 0 {
+                run[UI.BaselineOffsetAttribute.self] = -size * 0.18
+            }
+            if let link { run.link = link }
+            out.append(run)
         }
     }
 }
