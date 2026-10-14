@@ -17,11 +17,8 @@ struct BioMaterial: Hashable, Sendable {
     var emission: Double = 0
     /// Unlit, its colour as is (marks, leader dots).
     var unlit: Bool = false
-    /// Drawn from both sides (always so when translucent, unless `side` says which).
+    /// Drawn from both sides (always so when translucent).
     var doubleSided: Bool = false
-    /// (1.3.79) A translucent surface round its object's centre drawn one side at a time (`BioMesh.facing`): its far
-    /// side before what it holds, its near side after.
-    var side: BioFaceSide = .both
 
     init(_ hex: String, alpha: Double = 1, roughness: Double = 0.35, emission: Double = 0, unlit: Bool = false, doubleSided: Bool = false) {
         self.hex = hex
@@ -38,16 +35,6 @@ struct BioMaterial: Hashable, Sendable {
     }
 
     var isTranslucent: Bool { alpha < 0.999 }
-}
-
-/// (1.3.79) Which faces of a translucent surface round a centre are drawn. Translucent surfaces write no depth, so what
-/// is drawn after them goes over them: a cell's membrane drawn whole after the organelles inside it laid its far side
-/// over them too — the whole cell one gold veil until a part was picked and the rest dimmed. Drawn in two passes, the far
-/// side (`far`: the faces turned away from the camera) goes before what is inside and the near side (`near`) after.
-enum BioFaceSide: Hashable, Sendable {
-    case both
-    case far
-    case near
 }
 
 /// A thing in a scene: its id (what a click on it picks — "atom:12", "residue:7", "organelle:mito:3"; nil for what is

@@ -41,27 +41,15 @@ enum BioSceneKit {
             s.transparency = CGFloat(m.alpha)
             s.blendMode = .alpha
             s.writesToDepthBuffer = false
-            // (1.3.79) a surface round a centre drawn one side at a time (BioMesh.facing winds it outward): its far side
-            // is the faces turned away from the camera, its near side those turned toward it
-            switch m.side {
-            case .both:
-                s.isDoubleSided = true
-            case .far:
-                s.isDoubleSided = false
-                s.cullMode = .front
-            case .near:
-                s.isDoubleSided = false
-                s.cullMode = .back
-            }
+            s.isDoubleSided = true
         }
         return s
     }
 
-    /// A node for a mesh in a material (translucent ones drawn after the opaque: rendering order 100 + `order`; (1.3.79)
-    /// the far side of a surface round a centre before every other translucent thing, 60 − `order`, the outermost first).
+    /// A node for a mesh in a material (translucent ones drawn after the opaque: rendering order 100 + `order`).
     static func node(_ mesh: BioMesh, _ m: BioMaterial, order: Int = 0) -> SCNNode {
         let n = SCNNode(geometry: geometry(mesh, material(m)))
-        n.renderingOrder = m.isTranslucent ? (m.side == .far ? 60 - order : 100 + order) : order
+        n.renderingOrder = m.isTranslucent ? 100 + order : order
         return n
     }
 
