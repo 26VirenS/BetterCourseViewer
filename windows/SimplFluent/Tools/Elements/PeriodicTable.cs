@@ -201,6 +201,8 @@ internal sealed class PTGrid : Panel
             if (!Pointer()) return;
             for (var o = a.OriginalSource as DependencyObject; o != null && o != this; o = VisualTreeHelper.GetParent(o))
                 if (o is PTCell c) { if (c.Element.Number != pointed?.Number) PointedAt(c.Element); return; }
+            // (moved onto the gaps between the squares)
+            if (pointed != null) leave.Start();
         };
         foreach (var e in PeriodicTable.Elements)
         {
@@ -241,17 +243,9 @@ internal sealed class PTGrid : Panel
         Hover?.Invoke(e);
     }
 
-    /// <summary>Where the pointer is on the screen, noted: whether it has moved since it was last noted.</summary>
-    private bool Pointer()
-    {
-        if (PresentationSource.FromVisual(this) == null) return true;
-        Point at;
-        try { at = PointToScreen(Mouse.GetPosition(this)); }
-        catch (InvalidOperationException) { return true; }
-        var moved = pointer is not { } was || Math.Abs(was.X - at.X) > 0.5 || Math.Abs(was.Y - at.Y) > 0.5;
-        pointer = at;
-        return moved;
-    }
+    /// <summary>Where the pointer is on the screen, noted: whether it has moved since it was last noted (Windows' own
+    /// answer — ScreenPointer — so the table settling under a still pointer never puts in an element).</summary>
+    private bool Pointer() => ScreenPointer.Moved(ref pointer);
 
     private static TextBlock RowLabel(string s)
     {

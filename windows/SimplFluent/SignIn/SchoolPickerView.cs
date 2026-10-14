@@ -282,16 +282,7 @@ public sealed class SchoolPickerView : Grid
     private Point? pointerAt;
 
     /// <summary>Whether the pointer has moved since it was last noted (and notes where it is now).</summary>
-    private bool PointerMoved(Visual over)
-    {
-        if (PresentationSource.FromVisual(over) == null) return false;
-        Point at;
-        try { at = over.PointToScreen(Mouse.GetPosition((IInputElement)over)); }
-        catch (InvalidOperationException) { return false; }
-        var moved = pointerAt is { } was && (Math.Abs(was.X - at.X) > 0.5 || Math.Abs(was.Y - at.Y) > 0.5);
-        pointerAt = at;
-        return moved;
-    }
+    private bool PointerMoved(Visual over) => PresentationSource.FromVisual(over) != null && ScreenPointer.Moved(ref pointerAt);
 
     private void Highlight()
     {
