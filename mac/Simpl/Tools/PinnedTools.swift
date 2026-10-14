@@ -246,7 +246,9 @@ struct PinnedToolQuick: View {
         case .pomo: FocusTimerCompact()
         case .calc: CalculatorCompact()
         case .need: GradeNeededCompact { openFull($0, []) }
-        case .ptable: PeriodicTableCompact { openFull($0, []) }
+        case .ptable, .lewis, .molecule, .atoms:
+            // (1.3.80) the chemistry tools': Chemistry/ChemTools.swift
+            ChemQuick(kind: kind) { openFull($0, []) }
         case .cite: CitationCompact { openFull($0, []) }
         case .fc: FlashcardsCompact { openFull($0, []) }
         case .graph: GraphCompact()

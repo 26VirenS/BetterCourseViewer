@@ -2,15 +2,15 @@ import SwiftUI
 
 /// (1.3.59) A short tour of the full Periodic Table — (tools-3) offered the first time it opens ("Take a quick tour?"),
 /// never started on its own, and run from its Tour button. (1.3.61) Each step dims the tool and lights the control it is
-/// about. (1.3.62) Each suggests one thing — hover an element, pick a colour view, open an element, see its orbitals, go
-/// to the Lewis builder, choose a preset, draw, look at a resonance structure, go to the 3D builder, turn the model,
-/// search — and moves on by itself once it is done, its card (where it is, what it is, what to try, a bar for how far)
-/// beside the control, not over it. (tools-3) As the app's own tour: every card has Skip Tour, a ✕, Back and a Next that
-/// always works; Escape ends it; ended early, it counts as seen.
+/// about. (1.3.62) Each suggests one thing — (1.3.80) hover an element, pick a colour view, open an element, search, and
+/// last, open the element's atom in Atoms & Orbitals — and moves on by itself once it is done, its card (where it is,
+/// what it is, what to try, a bar for how far) beside the control, not over it. (1.3.80: the table's tour only — its
+/// steps through the Lewis and 3D builders went with them, now tools of their own; the last step's press takes the
+/// student into Atoms & Orbitals, and the tour, done, with it.) (tools-3) As the app's own tour: every card has Skip
+/// Tour, a ✕, Back and a Next that always works; Escape ends it; ended early, it counts as seen.
 struct PTTourStep {
     enum Act {
         case hover, colour, open, typed
-        case page(PeriodicTableTool.Page)
         case event(PTTourEvent)
     }
     enum Gesture { case click, hover, drag, type }
@@ -23,10 +23,8 @@ struct PTTourStep {
     let act: Act
     /// The control the step lights (`tourTarget`).
     let target: String
-    /// What the tool is set to when the step comes: an element's page, the Lewis builder's preset, the 3D builder's.
+    /// The element whose page the tool opens when the step comes, if none is open.
     var element: Int? = nil
-    var lewis: String? = nil
-    var molecule: String? = nil
 
     static let all: [PTTourStep] = [
         // (tools-3: the table's top rows lit — where an element's card shows — the card under them, not over the table)
@@ -34,46 +32,28 @@ struct PTTourStep {
                    doing: "Hover an element", gesture: .hover, act: .hover, target: "ptTop"),
         PTTourStep(title: "Colour by a property", text: "Each view colours the table; arrows show its trend.",
                    doing: "Click Electronegativity", act: .colour, target: "ptColours"),
-        PTTourStep(title: "Every element, in depth", text: "Its page has a 3D atom, its electrons and every fact.",
+        PTTourStep(title: "Every element, in depth", text: "Its page has its electrons, how it compares and every fact.",
                    doing: "Click carbon, or any element", act: .open, target: "ptCarbon"),
-        PTTourStep(title: "Orbitals", text: "See the shapes its electrons fill. Drag to turn it.",
-                   doing: "Click Orbitals", act: .event(.orbitals), target: "ptModel", element: 6),
-        PTTourStep(title: "Lewis structures", text: "Draw any molecule's bonds and lone pairs.",
-                   doing: "Click Lewis structures", act: .page(.lewis), target: "ptPages"),
-        PTTourStep(title: "Start from a preset", text: "Or pick a centre atom and what surrounds it.",
-                   doing: "Choose a preset", act: .event(.preset), target: "lewisPreset"),
-        PTTourStep(title: "Draw your own", text: "Place atoms, drag to bond, click a bond to change it.",
-                   doing: "Click Draw", act: .event(.draw), target: "lewisWay"),
-        PTTourStep(title: "Resonance", text: "Equivalent structures sit side by side.",
-                   doing: "Click a structure", act: .event(.resonance), target: "lewisResonance", lewis: "NO₃⁻"),
-        PTTourStep(title: "Build it in 3D", text: "Open in 3D sends any Lewis structure here too.",
-                   doing: "Click Molecule builder", act: .page(.molecules), target: "ptPages"),
-        PTTourStep(title: "Turn it", text: "Scroll to zoom; click an atom for its shape.",
-                   doing: "Drag the model", gesture: .drag, act: .event(.turned), target: "molViewer", molecule: "Ethanol"),
         PTTourStep(title: "Find anything", text: "A symbol, name or number; Return opens it.",
                    doing: "Search for an element", gesture: .type, act: .typed, target: "ptSearch"),
+        PTTourStep(title: "Its atom in 3D", text: "Its shells, orbitals and electron cloud open in Atoms & Orbitals.",
+                   doing: "Click Open in Atoms & Orbitals", act: .event(.atoms), target: "ptAtoms", element: 6),
     ]
 }
 
-/// (1.3.62) What a step may wait for that the tool's own state does not show.
-enum PTTourEvent: Equatable { case orbitals, preset, draw, resonance, turned }
+/// (1.3.62) What a step may wait for that the tool's own state does not show: (1.3.80) the element's atom opened in
+/// Atoms & Orbitals.
+enum PTTourEvent: Equatable { case atoms }
 
-/// The tour's word with the parts that keep their own state: a preset for the Lewis builder, and what was just done.
+/// The tour's word with the parts that keep their own state: what was just done.
 final class PTTour: ObservableObject {
     static let shared = PTTour()
-    @Published var lewisPreset: String?
-    @Published var lewisNonce = 0
     /// Whether the tour is on (nothing done is told it otherwise; tools-3: and the sheet's Done leaves Escape to it).
     @Published var active = false
     /// Which table runs it (PeriodicTableTool's mark): only that one puts it away.
     var owner: UUID?
     @Published private(set) var event: PTTourEvent?
     @Published private(set) var events = 0
-
-    func showLewis(_ name: String?) {
-        lewisPreset = name
-        if name != nil { lewisNonce += 1 }
-    }
 
     /// Something a step may be waiting for, done in the tool.
     func did(_ e: PTTourEvent) {
@@ -328,7 +308,7 @@ struct PTTourCard: View {
 
 /// (tools-3) The tour offered, the first time the table opens, rather than started: a small card at the tool's foot —
 /// Take the Tour, or Not Now, which counts as seen (the Tour button runs it any time). A student who came to look up one
-/// element is not put through eleven steps first.
+/// element is not put through the steps first.
 struct PTTourOffer: View {
     let take: () -> Void
     let later: () -> Void
@@ -342,7 +322,7 @@ struct PTTourOffer: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Take a quick tour?")
                     .font(.sHeadline)
-                Text("A few short steps: the table, an element’s page, and the Lewis and 3D builders.")
+                Text("A few short steps: the table, its colours, an element’s page and its atom in 3D.")
                     .font(.sCallout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
