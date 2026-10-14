@@ -67,9 +67,28 @@ public class Sheet
     /// first setup, the sign-in's questions and the questions that must be answered first ("Discard changes?").
     /// </summary>
     public bool Floats { get; set; }
-    /// <summary>Floating, as large as the page beside the pane less a margin, resized with the window (a tool, Knewton
-    /// Alta, Macmillan).</summary>
+    /// <summary>Floating, as large as the window under its title bar less a margin — over the navigation pane too —
+    /// resized with the window, and sized by its edges and corners (a tool, Knewton Alta, Macmillan, feedback, a
+    /// rubric).</summary>
     public bool Large { get; set; }
+    /// <summary>Large, the most it opens at on a big window (a rubric's ring, feedback's file and comments), the size the
+    /// student gave it apart: null, the whole room.</summary>
+    public Size? Most { get; set; }
+    /// <summary>Large, the name the size the student gives it by its edges is kept under, for the next time it opens (a
+    /// tool's key, "rubric"): null, not kept. Changed while it is open — a tool handing over to another in its popup —
+    /// that one's size is taken.</summary>
+    public string? SizeKey
+    {
+        get => sizeKey;
+        set
+        {
+            if (sizeKey == value) return;
+            sizeKey = value;
+            SizeKeyChanged?.Invoke();
+        }
+    }
+    private string? sizeKey;
+    internal Action? SizeKeyChanged;
     /// <summary>Floating, its heading has a Close of its own (×, Close, Done): the popup adds no × of its own.</summary>
     public bool OwnClose { get; set; }
     /// <summary>Floating, the part it is moved by (its heading): a press there that is not on a control drags it. Null: the

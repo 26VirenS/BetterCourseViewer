@@ -61,7 +61,8 @@ internal sealed class MacmillanPopupView
         // the popup's own ground in its place while it opens)
         stateSlot.Bg(B.Solid);
         var holder = new Grid { Background = Brushes.White, Children = { web, stateSlot } };
-        web.Margin = new Thickness(0, 0, 0, 8);
+        // (clear of the popup's sides, which size it: FloatPopup.EdgeRoom)
+        web.Margin = new Thickness(FloatPopup.EdgeRoom, 0, FloatPopup.EdgeRoom, 8);
         var page = new Border { Child = holder, BorderThickness = new Thickness(0, 1, 0, 0) }.Stroke(B.Divider);
         page.BorderThickness = new Thickness(0, 1, 0, 0);
         root.Children.Add(page.Row(1));
@@ -69,7 +70,7 @@ internal sealed class MacmillanPopupView
 
     public void Open()
     {
-        sheet = AltaLook.Popup(root, header, Close, "Macmillan Learning");
+        sheet = AltaLook.Popup(root, header, Close, "Macmillan Learning", "macmillan");
         sheet.Closed += Cleanup;
         // (no update goes in while it is open: Support/Updates.cs, the Mac's UpdateHold)
         sheet.Closed += Support.Updates.Hold("Macmillan Learning", "when you close Macmillan Learning").Dispose;

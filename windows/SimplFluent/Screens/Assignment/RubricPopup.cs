@@ -16,8 +16,8 @@ namespace Simpl.Screens;
 
 /// <summary>
 /// The rubric over the window (the Mac's RubricPopup): one at a time, put up by an assignment's page — its rubric row or
-/// the grade card's rubric button — and taken down with that page. A Windows 11 dialog over the dimmed window, as large
-/// as the window has room for.
+/// the grade card's rubric button — and taken down with that page. A popup floating over the window (nothing dimmed), as
+/// large as the window has room for, at most 1180 by 880, and sized by its edges.
 /// </summary>
 internal static class RubricPopup
 {
@@ -33,8 +33,14 @@ internal static class RubricPopup
         var w = win is { ActualWidth: > 0 } ? win.ActualWidth : 1280;
         var h = win is { ActualHeight: > 0 } ? win.ActualHeight : 820;
         var v = new RubricView(d, open, view);
-        // (floating over the window: the assignment and the rest of Simpl at hand beside it; Escape is its own)
-        var s = new Sheet { Bare = true, Modal = true, Body = v, Width = Math.Clamp(w - 64, 360, 1180), Height = Math.Clamp(h - 96, 360, 880), Floats = true, OwnClose = true, Name = "Rubric" };
+        // (floating over the window: the assignment and the rest of Simpl at hand beside it; Escape is its own. A large
+        //  popup — the window under its title bar less a margin, over the pane too, at most 1180 by 880 — sized by its
+        //  edges, the size kept for the next rubric)
+        var s = new Sheet
+        {
+            Bare = true, Modal = true, Body = v, Width = Math.Clamp(w - 64, 360, 1180), Height = Math.Clamp(h - 96, 360, 880), Floats = true, Large = true,
+            Most = new Size(1180, 880), SizeKey = "rubric", OwnClose = true, Name = "Rubric",
+        };
         v.Close = () => s.Close();
         v.Loaded += (_, _) =>
         {

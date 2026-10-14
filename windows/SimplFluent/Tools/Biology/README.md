@@ -213,7 +213,8 @@ per term d (UnitVector), f = U(1.5, 3.5), φ = U(0, 2π), weight U(0.5, 1), weig
 - **The view:** `var scene = new BioSceneView("3D model of …")`, then `scene.Show(key, () => MakeScene(copies…),
   frameKey:, billboards:, marks:)`. The build runs off the UI thread — capture copies, never a view — and again only when `key`
   changes (put the page, the options and light or dark in it); asked again for the scene shown while another is being
-  made, it lets the other go. The camera frames the content on the first scene and when `frameKey` is new: 40°, from
+  made, it lets the other go. The camera frames the content on the first scene and when `frameKey` is new, as every 3D
+  view in Simpl frames its model (`Tools/SceneFrame.cs`): 40°, from
   the model's own boxes (not its ball) filling 85% of the view each way, so a long helix or a wide cell fills it, it
   stands back a step at a time — the labels laid out at each step as they will be drawn — until none lies on the
   model's box or on another label's anchor: the room is what the labels placed there take, none at a side with no
@@ -223,8 +224,10 @@ per term d (UnitVector), f = U(1.5, 3.5), φ = U(0, 2π), weight U(0.5, 1), weig
   peptide's five labels go above and below it; a cell's sixteen keep to their columns). 0.3.1's first fit kept a column's room at each side for the
   widest label whether a label sat there or not, which held every model under half the view's width and still left
   wider labels on it. A scene that names its ball (`Frame`) is fitted, and its labels' room measured, by that ball (a
-  bacterium's cell, not its flagella). It keeps that share as the view is resized (a zoom of the student's own kept as
-  the same share of it); `ResetView()` frames it again;
+  bacterium's cell, not its flagella). It keeps that share as the view is resized — a tool's popup sized by its edges
+  or with the window (a zoom of the student's own kept as the same share of it); `ResetView()` frames it again. A
+  development run's log says, once the labels settle, the view's size, the model's and the model with its labels' (`3d
+  view 560×370: the model 160×315, with its labels 420×330, 85% of the view (…)`);
   `ZoomTo(id)` frames an object. Set
   `Selection` (the selection glows, the rest dims to 35%: `DimOthers`), `ShowLabels`, `Turning` (auto-turn, 30 s a turn;
   never with animations off), `PickSelects`, `Accessibility`; listen to `Picked`, `DoubleClicked`, `HoverChanged`, and
@@ -291,10 +294,11 @@ anim.Stop();`): `phase.From`, `phase.To`, `phase.T` (eased; 600 ms at 1×; back 
 `.Maternal`, `.HBond` … are `BioHexPair`s (`Light`, `Dark`, `HexFor(dark)`): `.ToColor()` (as the app is drawn now),
 `.ToColor(dark)`, `.ToBrush()`; `BioColors.Base(char)`, `.AminoAcid(char)`, `.Of(BioAAClass)`, `.Tool(key)`,
 `.Hex(color)`. Never colour alone: show the letter or a `BioUI.Legend`. Pieces: `BioUI.Work(left, centre, right)` (the
-chemistry builders' layout, `ChemLayout`, decided on the width it is given — a tool's popup's: the three columns side
-by side from 1180 wide; from 840 — the popup on a 1280 or 1366 window — the drawing beside one column, the controls
-over the facts, each scrolling in its own share of it (`ChemSide`: as tall as each needs while they fit, else 55% and
-45%); narrower — the popup on a 1024 window, or a narrow one — the drawing across the top, as tall as leaves 100 of the
+chemistry builders' layout, `ChemLayout`, decided on the width it is given — a tool's popup's, the window's width less
+48 since it spans the pane too: the three columns side by side from 1180 wide — the popup on a 1280 or 1366 window;
+from 840 — on a 1024 window — the drawing beside one column, the controls over the facts, each scrolling in its own
+share of it (`ChemSide`: as tall as each needs while they fit, else 55% and 45%); narrower — on a narrow window, or a
+popup the student made narrow by its edges — the drawing across the top, as tall as leaves 100 of the
 page for the two columns' headings and first controls under it (240 to 560: room beside an animal cell for its sixteen
 labels; on the smallest window, 720 by 520, the columns' headings under it — a lower floor left the cell's view too
 short for its labels), the page's

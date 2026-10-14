@@ -10,8 +10,9 @@ namespace Simpl.Tools;
 public sealed class CloudRaster
 {
     // ---- the look (cloud-spec.md §3) ----
-    public const double TanHalfFov = 0.34432761328966527; // tan(19°): SceneKit's 38° field, measured on the height
-    public const double CameraDistance = 4.0;              // scene units; the frame radius is 1 unit
+    public const double TanHalfFov = 0.34432761328966527; // tan(19°): SceneKit's 38° field, across the view's smaller side
+    public const double CameraDistance = 4.0;              // scene units, the frame radius 1 unit: the spec's (the view
+                                                           // frames it by SceneFrame, Atom3DView.CloudDistance)
     public const double PointSize = 0.012;                 // a dot's diameter in scene units …
     public const double DotMin = 1.0, DotMax = 3.0;        // … held between 1 and 3 DIPs on screen
     public const float LightAlpha = 0.55f;                 // light: each dot's opacity
@@ -84,7 +85,8 @@ public sealed class CloudRaster
                 Array.Clear(cov, j0, n); Array.Clear(cr, j0, n); Array.Clear(cg, j0, n); Array.Clear(cb, j0, n); Array.Clear(rest, j0, n);
                 Array.Clear(Pixels, j0, n);
             }
-        var f = h / 2.0 / TanHalfFov;
+        // (the lens across the view's smaller side, as every 3D view's: a tall narrow view keeps the cloud's sides)
+        var f = Math.Min(w, h) / 2.0 / TanHalfFov;
         var inv = 1.0 / frame;
         double dMin = DotMin * dipScale, dMax = DotMax * dipScale;
         // each type's colour, as it is added (dark: linear light × gain; light: sRGB × alpha)

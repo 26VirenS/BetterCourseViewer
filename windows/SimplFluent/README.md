@@ -722,9 +722,10 @@ internal static class CalculatorRegistration
 
 A tool opens whole in a popup over where you are (`ToolPopup`, a popup floating over the window: Popups, below) —
 from its tile on the Tools page (or the tile's menu), a pin's menu or its flyout's name, a pulled-out pin's name, a
-command, a link, or another tool handing it something (`ToolsCenter.Show`) — as large as the page beside the pane less
-a margin and resized with the window, the Tools page (or whatever shows) behind it and the pane, the title bar and the
-search still at hand. Its heading, which moves it: the tool's tile and name, its line, its own controls (a biology
+command, a link, or another tool handing it something (`ToolsCenter.Show`) — as large as the window under its title
+bar less a margin, over the pane too, and resized with the window; sized by its edges and corners, the size kept for
+that tool the next time (Popups, below); the Tools page (or whatever shows) behind it and the title bar and its search
+still at hand. Its heading, which moves it: the tool's tile and name, its line, its own controls (a biology
 tool's pages, the Periodic Table's search — on a line of their own under the name where the popup is too narrow for
 them beside it), its pin and ×; × or Escape closes it. One popup a tool: opened again, the one there comes forward,
 taking what was handed to it. A tool that shows pages of its own names the one shown after its name
@@ -744,8 +745,20 @@ pins sit in the heading of a quiz (which covers the title bar), Knewton Alta and
 true)`); the whole tool opens in its popup from them too, above them. A popup focuses its first field only when it
 shows without scrolling, and never read-only words, so it opens at its top; a tool opens at its top too
 (`ToolKit.Edged`), whatever takes the focus as it comes up. The work and its side panel (`ToolKit.Columns`) sit side by
-side from about 860 of the popup's width — about 960 in a 1366 window, 870 in a 1280 one — and one over the other below
-that, a side that holds the tool's answer (Grade needed, Citations) first.
+side from about 860 of the popup's width — the popup is the window's width less 48 (1318 in a 1366 window, 976 in a
+1024 one, 748 in a 780 one) — and one over the other below that, a side that holds the tool's answer (Grade needed,
+Citations) first. The chemistry builders' and the biology tools' layout (`ChemLayout`) puts the controls, the drawing
+and the facts side by side from 1180 of it (a 1366 window), the drawing beside one column of the controls over the
+facts from 840 (a 1024 window), and the drawing over the two below that (a 780 window).
+
+Every 3D view frames its model the same way (`Tools/SceneFrame.cs`): the model, with its labels, fills about 85% of the
+view where it meets the view's edges first — the biology tools' (`BioSceneView`, its labels kept off the model), the
+element's atom, orbitals and electron cloud (`Atom3DView`: the atom by the ball round it, the orbitals at their widest
+turn, the cloud by the ball 95% of its dots lie in, at 80%) and the molecule builder's (`MoleculeSceneView`, at its
+widest turn about the view's up) — on first show, on Reset view, and whenever the view's size changes (a popup sized by
+its edges, or with the window), a zoom of the student's own kept as the same share of it. The lens is measured across
+the view's smaller side, so a tall narrow view keeps the model's sides. A development run's log says each view's size
+and framing (`3d view …: … % of the view`, `element view …`, `molecule view …`).
 
 `ToolContext` hands a tool the engine, where it is (`Quick`; `Owner`, the window it is in), what was handed over
 (`TakeFiles`, `TakeInfo`), `OpenFull` / `Close`, and `ShowPage` / `ShowNote`. `ToolKit` has the page, two columns,
@@ -768,14 +781,28 @@ area and shown again with it — so nothing takes the window's clicks: the pane,
 behind it go on working, and another place opened under a popup leaves it where it is. Nothing is dimmed; Windows' own
 shadow and rounded corners set it apart (pictures draw them, `Support/Shot.cs`). Its window is as large as its card,
 however small (WPF-UI's least window size, 460 × 320, let go). It opens centred over the page beside
-the pane (`MainWindow.PopupRoom`); a large one (`Large`: a tool, Knewton Alta, Macmillan) is that page less a margin
-(24, 16 on a narrow page) and is resized with the window; it moves with the window, keeping where it was put, and its
-heading moves it (a press there that is not on a control, `Kit/Drag.cs`; `Handle` names the heading, else its top 60).
+the pane (`MainWindow.PopupRoom`); it moves with the window, keeping where it was put, and its heading moves it (a
+press there that is not on a control, `Kit/Drag.cs`; `Handle` names the heading, else its top 60).
 × (or its own Close: `OwnClose`), Escape while it has the keyboard (not while what it shows must be answered first:
 `Modal`, the popup's own keys then) and Alt+F4 close it — through its Cancel, or `Dismiss` (New message asks before a
 message is thrown away). Enter presses its default button. Its own questions show over it (its own `SheetHost`), and
 Windows' Open dialog over it. Windows' own window motion brings it in and takes it away, as Windows' Animation effects
 say. Each popup with something of the student's in it holds an update while it is open (`Shell/UpdateWatch.cs`).
+
+A large one (`Large`: a tool, Knewton Alta, Macmillan, a submission's feedback, the rubric) spans the window under its
+title bar — over the pane too (`MainWindow.LargePopupRoom`; the owner's choice, Oct 2026: in 0.3.1 it kept to the page
+beside the pane, 688 wide in a 1024 window) — less a margin all round (24, 16 under 900 wide), never larger than the
+screen's work area nor, the feedback and the rubric, than their `Most` (1500 × 1000, 1180 × 880); it is sized again with
+the window, and one over another opens a step down and along (28). It is sized by its edges and corners too: Windows'
+own sizing (`ResizeMode.CanResize`, WPF-UI's 4 of edge), at least 480 × 340 and at most its room, what it shows laid
+out afresh as it goes; never maximized, minimized or snapped (its boxes taken off, `NoBoxes`, and not sizable while its
+heading moves it). Let go, the size is the student's: kept in the preferences under its `SizeKey` (`popup:tool:dna`,
+`popup:alta`, `popup:macmillan`, `popup:feedback`, `popup:rubric` — width and height) and taken the next time it opens,
+held to the room it then has; a window made smaller takes it in with it, and larger again gives back that size. A tool
+handing over to another in its popup takes that one's size. In a development run `--popup-size 900x560` opens large
+popups as if the student had sized them so, and `--popup-drag 300` sizes one by its right edge as the student does (the
+pointer pressed there, moved 300 left and let go; CI's check, alone on the runner), the log saying its size and the
+size kept (`large popup … opens at`, `sized by its edges to`, `popup drag: …`).
 
 What each is now: a tool opened whole (its `ToolPopup`; the Periodic Table's builders are its pages in it); Knewton Alta
 and Macmillan (homework, not quizzes); Hand In (with its Send from Phone panel and its files' preview); a submission's

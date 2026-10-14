@@ -36,8 +36,9 @@ internal sealed class SubmissionReview : Grid
     private int generation;
     public Action? Done;
 
-    /// <summary>The popup opened on a file (the first where none is named), or on the work as a whole. Most of the window
-    /// it opens over.</summary>
+    /// <summary>The popup opened on a file (the first where none is named), or on the work as a whole: a large popup (the
+    /// window under its title bar less a margin, over the pane too, at most 1500 by 1000), sized by its edges, the size
+    /// kept for the next time.</summary>
     public static void Show(Engine.Engine engine, AssignmentData a, Attachment? file)
     {
         var win = Application.Current?.MainWindow;
@@ -46,7 +47,11 @@ internal sealed class SubmissionReview : Grid
         var width = Math.Min(Math.Max(w - 64, 760), 1500);
         var height = Math.Min(Math.Max(h - 80, 520), 1000);
         var view = new SubmissionReview(engine, a, file, width);
-        var s = new Sheet { Bare = true, Width = width, Height = height, Body = view, Floats = true, OwnClose = true, Name = a.Title };
+        var s = new Sheet
+        {
+            Bare = true, Width = width, Height = height, Body = view, Floats = true, Large = true, Most = new Size(1500, 1000), SizeKey = "feedback",
+            OwnClose = true, Name = a.Title,
+        };
         view.Done = s.Close;
         view.Loaded += (_, _) =>
         {
@@ -67,6 +72,8 @@ internal sealed class SubmissionReview : Grid
         RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         Children.Add(Top().Row(0));
         Children.Add(new Border().Bg(B.Divider).Row(1));
+        // (the file clear of the popup's edges and foot, which size it: FloatPopup.EdgeRoom)
+        viewer.Margin = new Thickness(FloatPopup.EdgeRoom, 0, a.Comments.Count == 0 ? FloatPopup.EdgeRoom : 0, FloatPopup.EdgeRoom);
         if (a.Comments.Count == 0) Children.Add(viewer.Row(2));
         else
         {

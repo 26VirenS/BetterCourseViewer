@@ -15,7 +15,8 @@ namespace Simpl.Tools;
 /// the viewer on the near side of its sphere (hidden, like the atom, behind nearer ones), and the selected atom ringed in
 /// the accent, the ring always facing the viewer. Lit by a soft ambient light, a key light from the upper right and a
 /// fill from behind. Dragged to turn, scrolled to zoom, an atom selected by a click; turning slowly by itself if asked,
-/// waiting three seconds after the last touch. A new molecule is framed afresh.
+/// waiting three seconds after the last touch. A new molecule is framed afresh, as every 3D view frames its model
+/// (SceneFrame): filling 85% of the view at its widest turn about the view's up, and again as the view's size changes.
 /// </summary>
 internal sealed class MoleculeSceneView : Border
 {
@@ -39,6 +40,8 @@ internal sealed class MoleculeSceneView : Border
     /// <summary>What faces the viewer and follows its atom as the molecule turns: where it goes, its atom, how far it is lifted toward the viewer.</summary>
     private readonly List<(TranslateTransform3D Move, Vector3D At, double Lift)> follow = new();
     private double spin, yaw, pitch, distance = 5;
+    /// <summary>The distance the molecule was last framed at for the view's size (0: not yet).</summary>
+    private double fitted;
     private string drawn = "";
     private int framing = -1;
     private Point? downAt;
@@ -85,11 +88,55 @@ internal sealed class MoleculeSceneView : Border
         };
         SizeChanged += (_, e) =>
         {
-            // (SceneKit's 40° is the height's; WPF's field of view is the width's)
-            if (e.NewSize.Height > 0)
-                camera.FieldOfView = 2 * Math.Atan(Math.Tan(20 * Math.PI / 180) * e.NewSize.Width / e.NewSize.Height) * 180 / Math.PI;
+            // (SceneKit's 40°, across the view's smaller side; WPF's field of view is the width's)
+            camera.FieldOfView = SceneFrame.FieldOfView(Lens, e.NewSize.Width, e.NewSize.Height);
+            Refit();
         };
         Update();
+    }
+
+    private const double Lens = 40;
+
+    /// <summary>How far back the camera stands for the molecule to fill the view (SceneFrame): each atom's sphere, and each
+    /// lone pair's lobe, at its widest turn about the view's up — the way it turns by itself and by a drag across.</summary>
+    private double Fitted()
+    {
+        if (model.Atoms.Count == 0) return 3.6;
+        var style = model.Style;
+        var points = new List<Vector3D>();
+        foreach (var a in model.Atoms)
+        {
+            var r = Radius(a.Symbol, style);
+            foreach (var d in new[] { new Vector3D(r, 0, 0), new Vector3D(-r, 0, 0), new Vector3D(0, r, 0), new Vector3D(0, -r, 0), new Vector3D(0, 0, r), new Vector3D(0, 0, -r) })
+                points.Add(a.Pos + d);
+        }
+        if (model.ShowLonePairs && style != MBStyle.SpaceFill)
+            foreach (var p in model.LonePairs)
+            {
+                if (model.Atom(p.Atom) is not { } a || p.Pos - a.Pos is not { Length: > 1e-6 } d) continue;
+                d.Normalize();
+                points.Add(a.Pos + d * (Radius(a.Symbol, style) + 0.22 + 0.25));
+            }
+        return Math.Max(1.2, SceneFrame.Points(points, Lens, ActualWidth, ActualHeight, upright: true));
+    }
+
+    /// <summary>The molecule kept filling the view as its size changes: framed again for the new size, a zoom of the
+    /// student's own kept as the same share of it.</summary>
+    private void Refit()
+    {
+        if (fitted <= 0 || ActualWidth <= 0 || ActualHeight <= 0) return;
+        var fit = Fitted();
+        if (Math.Abs(fit - fitted) < 1e-6) return;
+        distance = Math.Clamp(distance * fit / fitted, 1.2, 80);
+        fitted = fit;
+        Apply();
+        Said();
+    }
+
+    /// <summary>For the screenshot suite's log (a development run's): the view's size and the camera's distance.</summary>
+    private void Said()
+    {
+        if (Launch.IsDevelopment) Log.Write(FormattableString.Invariant($"molecule view {ActualWidth:0}×{ActualHeight:0}: framed at {fitted:0.00} ({model.Atoms.Count} atoms, {SceneFrame.Fill * 100:0}% of the view)"));
     }
 
     // ---- the model drawn ----
@@ -104,14 +151,14 @@ internal sealed class MoleculeSceneView : Border
             drawn = now;
             Build();
         }
-        // (a new molecule: the camera back in front of it, far enough to see it all)
+        // (a new molecule: the camera back in front of it, as far as it fills the view)
         if (framing != model.Framing)
         {
             framing = model.Framing;
-            var extent = model.Atoms.Count == 0 ? 1 : model.Atoms.Max(a => a.Pos.Length);
-            distance = Math.Max(3.6, extent * 2.3 + 2.4);
+            distance = fitted = Fitted();
             yaw = pitch = spin = 0;
             Apply();
+            Said();
         }
         Rendering(model.AutoRotate && IsLoaded);
     }

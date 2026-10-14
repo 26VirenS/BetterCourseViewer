@@ -12,7 +12,8 @@ namespace Simpl.Screens;
 /// <summary>
 /// What the Knewton Alta and Macmillan Learning popups share (the Mac's quiz-style popup): a popup floating over the
 /// window (Shell/FloatPopup.cs: homework, not a quiz — the rest of the window stays at hand while it is open), as large as
-/// the page beside the pane less a margin, its own header row — the vendor's tile, the assignment's name over a line
+/// the window under its title bar less a margin — over the pane too — and sized by its edges, the size kept for the next
+/// time (each vendor's apart), its own header row — the vendor's tile, the assignment's name over a line
 /// about it, and Close — that it is moved by, the ground under the vendor's page, the popup's Loading and failure in its
 /// place, and dialogs of the popup's own (a Windows 11 ContentDialog over the popup, the page stepped aside: nothing can
 /// be drawn over a web view).
@@ -20,9 +21,10 @@ namespace Simpl.Screens;
 internal static class AltaLook
 {
     /// <summary>A large floating popup, its body edge to edge, moved by its <paramref name="header"/>; Escape is the
-    /// popup's to answer, and its Close (<paramref name="close"/>) is the window's too (Alt+F4).</summary>
-    public static Sheet Popup(FrameworkElement body, FrameworkElement header, Action close, string name) =>
-        new() { Body = body, Bare = true, Modal = true, Floats = true, Large = true, OwnClose = true, Handle = header, Dismiss = close, Name = name, Width = 960, Height = 640 };
+    /// popup's to answer, and its Close (<paramref name="close"/>) is the window's too (Alt+F4); the size the student gives
+    /// it is kept under <paramref name="sizeKey"/>.</summary>
+    public static Sheet Popup(FrameworkElement body, FrameworkElement header, Action close, string name, string sizeKey) =>
+        new() { Body = body, Bare = true, Modal = true, Floats = true, Large = true, OwnClose = true, Handle = header, Dismiss = close, Name = name, Width = 960, Height = 640, SizeKey = sizeKey };
 
     /// <summary>
     /// Up over the window: the sheet's card as large as the window allows (a card is first held to a dialog's width until

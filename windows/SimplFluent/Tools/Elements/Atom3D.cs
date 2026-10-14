@@ -39,7 +39,9 @@ internal static class ElectronClouds
 /// <summary>
 /// The 3D view of an element (the Mac's Atom3DView): its atom or a subshell's orbitals, lit from above left, or its electron
 /// cloud, on nothing (the card shows through). Drag turns it, the wheel zooms; it moves on its own while Windows' animation
-/// effects are on.
+/// effects are on. Framed as every 3D view frames its model (SceneFrame): the atom by the ball round it, the orbitals at
+/// their widest turn, the cloud by the ball 95% of its dots lie in, each filling the view, and again as the view's size
+/// changes.
 /// </summary>
 internal sealed class Atom3DView : Border
 {
@@ -67,7 +69,7 @@ internal sealed class Atom3DView : Border
         Cursor = Cursors.SizeAll;
         view.Camera = camera;
         view.Children.Add(holder);
-        SizeChanged += (_, _) => Lens();
+        SizeChanged += (_, _) => { Lens(); Refit(); Said(); };
         Loaded += (_, _) => Hook();
         Unloaded += (_, _) => Unhook();
         IsVisibleChanged += (_, _) => { if (IsVisible) Hook(); else Unhook(); };
@@ -130,7 +132,7 @@ internal sealed class Atom3DView : Border
             scene = null;
             var c = ElectronClouds.For(e);
             cloud.Set(c, focus, Appearance.Dark);
-            baseDistance = distance = CloudRaster.CameraDistance;
+            baseDistance = distance = CloudDistance;
             camera.Position = new Point3D(0, 0, distance);
             cloud.Distance = distance;
             cloud.Turn = turn;
@@ -146,20 +148,47 @@ internal sealed class Atom3DView : Border
             var orbitals = model == PTModel.Orbitals;
             scene = orbitals ? AtomScene.Orbitals(subshell ?? new PTSubshell(1, 0, 1), turnRotation) : AtomScene.Atom(e, turnRotation);
             holder.Content = scene.Root;
-            baseDistance = distance = scene.Distance;
+            baseDistance = distance = scene.Distance(LensDegrees, ActualWidth, ActualHeight);
             camera.Position = new Point3D(0, 0, distance);
             scene.Sort(camera.Position);
             name = orbitals && subshell is { } s ? $"The {s.Name} orbitals of {e.Name} in 3D" : $"{e.Name}’s atom in 3D";
         }
         System.Windows.Automation.AutomationProperties.SetName(this, name);
+        Said();
     }
 
-    /// <summary>SceneKit's 38° is the view's height; WPF's lens is measured across its width.</summary>
+    /// <summary>SceneKit's 38°, across the view's smaller side (as the cloud's picture measures it, CloudRaster).</summary>
+    private const double LensDegrees = 38;
+
+    /// <summary>The cloud's camera: the ball 95% of its dots lie in (one scene unit) filling 80% of the view's smaller side
+    /// — a little under the other models' share, so its last few dots, out past that ball, stay in the view.</summary>
+    private static double CloudDistance => SceneFrame.Ball(1, LensDegrees, fill: SceneFrame.Fill - 0.05);
+
+    /// <summary>WPF's lens is measured across the view's width: SceneKit's 38° across its smaller side.</summary>
     private void Lens()
     {
         if (ActualHeight <= 0) return;
-        var aspect = ActualWidth / ActualHeight;
-        camera.FieldOfView = 2 * Math.Atan(Math.Tan(19 * Math.PI / 180) * aspect) * 180 / Math.PI;
+        camera.FieldOfView = SceneFrame.FieldOfView(LensDegrees, ActualWidth, ActualHeight);
+    }
+
+    /// <summary>The model kept filling the view as its size changes (the orbitals' row may meet a narrow view's sides
+    /// first): framed again for the new size, a zoom of the student's own kept as the same share of it.</summary>
+    private void Refit()
+    {
+        if (mode == PTModel.Cloud || scene == null || baseDistance <= 0 || ActualWidth <= 0 || ActualHeight <= 0) return;
+        var fit = scene.Distance(LensDegrees, ActualWidth, ActualHeight);
+        if (Math.Abs(fit - baseDistance) < 1e-6) return;
+        distance *= fit / baseDistance;
+        baseDistance = fit;
+        camera.Position = new Point3D(0, 0, distance);
+        scene.Sort(camera.Position);
+    }
+
+    /// <summary>For the screenshot suite's log (a development run's): the view's size and the camera's distance.</summary>
+    private void Said()
+    {
+        if (Launch.IsDevelopment && ActualWidth > 0)
+            Log.Write(FormattableString.Invariant($"element view {mode} {ActualWidth:0}×{ActualHeight:0}: framed at {baseDistance:0.00}"));
     }
 
     private void Hook()
@@ -281,7 +310,7 @@ internal sealed class CloudPicture : FrameworkElement
         set { turn = value; dirty = true; }
     }
 
-    /// <summary>The camera's distance in scene units (4, unless zoomed).</summary>
+    /// <summary>The camera's distance in scene units (Atom3DView.CloudDistance, about 3.8, unless zoomed).</summary>
     public double Distance
     {
         get => distance;
@@ -393,11 +422,43 @@ internal static class AtomScene
     public sealed class Built
     {
         public required Model3DGroup Root { get; init; }
-        public required double Distance { get; init; }
+        /// <summary>The atom or the orbitals themselves, the lights left out (turned by the drag, and the orbitals by their
+        /// revolving).</summary>
+        public required Model3DGroup Model { get; init; }
+        /// <summary>It revolves about the view's up (the orbitals' row): framed for every turn of it; else (the atom) by
+        /// the ball round it, which keeps it whole in view at any slant a drag gives it.</summary>
+        public bool Revolves { get; init; }
         public List<(AxisAngleRotation3D Rotation, double PerSecond)> Spins { get; } = new();
         public Model3DGroup? Glass { get; init; }
         public Transform3D? Frame { get; init; }
         private readonly List<(GeometryModel3D Model, Point3D Centre)> centres = new();
+        private List<Vector3D>? points;
+
+        /// <summary>How far back the camera stands for the model to fill a view this large (SceneFrame), with the lens of
+        /// <paramref name="degrees"/> across the view's smaller side.</summary>
+        public double Distance(double degrees, double width, double height)
+        {
+            points ??= PointsOf(Model);
+            if (points.Count == 0) return 6;
+            return Revolves ? SceneFrame.Points(points, degrees, width, height, upright: true) : SceneFrame.Ball(points.Max(p => p.Length), degrees);
+        }
+
+        /// <summary>Where every part's surface stands as it was made — each mesh moved by its own place and slant, the
+        /// spins at their start and the model's own turn left out (an electron's ring holds every place it goes round to).</summary>
+        private static List<Vector3D> PointsOf(Model3DGroup model)
+        {
+            var all = new List<Vector3D>();
+            void Walk(Model3D m, Matrix3D above)
+            {
+                var at = (m.Transform?.Value ?? Matrix3D.Identity) * above;
+                if (m is Model3DGroup g)
+                    foreach (var c in g.Children) Walk(c, at);
+                else if (m is GeometryModel3D { Geometry: MeshGeometry3D mesh })
+                    foreach (var p in mesh.Positions) all.Add((Vector3D)at.Transform(p));
+            }
+            foreach (var c in model.Children) Walk(c, Matrix3D.Identity);
+            return all;
+        }
 
         public void AddGlass(GeometryModel3D m)
         {
@@ -545,7 +606,7 @@ internal static class AtomScene
         var solid = new Model3DGroup();
         var glass = new Model3DGroup();
         var content = new Model3DGroup { Children = { solid, glass }, Transform = new RotateTransform3D(turn) };
-        var b = new Built { Root = Lit(content), Distance = outer * 2.9 + 1.2, Glass = glass, Frame = content.Transform };
+        var b = new Built { Root = Lit(content), Model = content, Glass = glass, Frame = content.Transform };
 
         var total = e.Number + e.Neutrons;
         var count = Math.Min(total, 72);
@@ -660,13 +721,12 @@ internal static class AtomScene
         var names = OrbitalNames(sub.L);
         const double gap = 2.6;
         var width = (names.Length - 1) * gap;
-        // (far enough back that an s orbital's sphere, or the row of p, d or f orbitals, sits well inside the view)
         var sRadius = 0.45 + 0.12 * sub.N;
         var solid = new Model3DGroup();
         var glass = new Model3DGroup();
         var content = new Model3DGroup { Children = { solid, glass } };
         var frame = new Transform3DGroup();
-        var b = new Built { Root = Lit(content), Distance = Math.Max(5.4, Math.Max(width * 0.95 + 4.6, sub.L == 0 ? sRadius * 6.2 : 0)), Glass = glass, Frame = frame };
+        var b = new Built { Root = Lit(content), Model = content, Revolves = true, Glass = glass, Frame = frame };
         frame.Children.Add(Spin(b, new Vector3D(0, 1, 0), 360.0 / 40));
         frame.Children.Add(new RotateTransform3D(turn));
         content.Transform = frame;

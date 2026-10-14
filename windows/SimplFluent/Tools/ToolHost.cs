@@ -522,10 +522,12 @@ public static class Files
 /// <summary>
 /// A tool opened whole (the Mac's ToolPopup) — from its tile on the Tools page, a pin's menu or flyout, a command, a link
 /// or another tool handing it something — in a popup floating over where you are (Shell/FloatPopup.cs): as large as the
-/// page beside the pane less a margin and resized with the window, nothing dimmed, the Tools page (or whatever shows)
-/// behind it and the pane, the title bar and the search still at hand. Its heading: the tool's tile and name (and the
-/// page of its own that shows, "Periodic table › Lewis structures", the name going back to its first page), its line,
-/// its own controls (a biology tool's pages, the Periodic Table's search), its pin and ×; the popup is moved by it. It
+/// window under its title bar less a margin — over the pane too, so the tool has the window's whole width — and resized
+/// with the window; sized by its edges and corners, the size kept for that tool the next time it opens. Nothing is
+/// dimmed: the Tools page (or whatever shows) behind it, the title bar and its search still at hand. Its heading: the
+/// tool's tile and name (and the page of its own that shows, "Periodic table › Lewis structures", the name going back to
+/// its first page), its line, its own controls (a biology tool's pages, the Periodic Table's search), its pin and ×; the
+/// popup is moved by it. It
 /// opens at the tool's top, a hairline under the heading once the tool scrolls beneath it; its own pages, and another
 /// tool it hands something to, change inside it. One popup a tool: opened again, the one there comes forward.
 /// </summary>
@@ -543,7 +545,7 @@ public sealed class ToolPopup
     {
         this.key = key;
         this.engine = engine;
-        sheet = new Sheet { Floats = true, Large = true, Bare = true, OwnClose = true, Body = host, Name = ToolsCenter.KindOf(key)?.Name };
+        sheet = new Sheet { Floats = true, Large = true, Bare = true, OwnClose = true, Body = host, Name = ToolsCenter.KindOf(key)?.Name, SizeKey = SizeKeyOf(key) };
         sheet.Closed += () => Open.Remove(this);
     }
 
@@ -604,10 +606,14 @@ public sealed class ToolPopup
         host.Content = g;
         sheet.Handle = head;
         sheet.Name = kind.Name;
+        sheet.SizeKey = SizeKeyOf(toolKey);
         if (window != null) window.Title = kind.Name;
         if (fade) Motion.FadeIn(g, Motion.Medium);
         Shot.Moved();
     }
+
+    /// <summary>What the size the student gives a tool's popup is kept under (Shell/FloatPopup.cs): each tool its own.</summary>
+    private static string SizeKeyOf(string toolKey) => $"tool:{toolKey}";
 
     /// <summary>The tool asked its popup closed: closed once whatever it asks next has had its turn (a hand-off to another
     /// tool, BioTools.Open, comes on the next turn and keeps it).</summary>

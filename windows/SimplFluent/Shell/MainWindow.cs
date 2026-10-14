@@ -74,13 +74,20 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
 
     /// <summary>
     /// Where a popup over the window is centred (Shell/FloatPopup.cs), in the window's content's terms: the page beside
-    /// the pane while the app shows — a large popup is as large as it, less a margin, so the pane and the title bar stay
-    /// in sight beside it — else everything under the title bar.
+    /// the pane while the app shows, else everything under the title bar.
     /// </summary>
     public Rect PopupRoom =>
         shell != null && ReferenceEquals(cover.Content, shell) && shell.PageArea(root) is { IsEmpty: false } page
             ? page
-            : new Rect(0, TitleBarHeight, root.ActualWidth, Math.Max(0, root.ActualHeight - TitleBarHeight));
+            : LargePopupRoom;
+
+    /// <summary>
+    /// Where a large popup goes (a tool, Knewton Alta, Macmillan, feedback, a rubric), in the window's content's terms:
+    /// everything under the title bar — over the pane too, so a tool has the window's whole width (the owner's choice: in
+    /// 0.3.1 it kept to the page beside the pane, and a tool on a 1024 window was 688 wide). The title bar stays in sight
+    /// over it.
+    /// </summary>
+    public Rect LargePopupRoom => new(0, TitleBarHeight, root.ActualWidth, Math.Max(0, root.ActualHeight - TitleBarHeight));
 
     /// <summary>The page beside the pane changed its place or size (the pane folded away on a narrow window).</summary>
     public event EventHandler? PopupRoomChanged;

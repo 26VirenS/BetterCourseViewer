@@ -16,7 +16,9 @@ namespace Simpl.Tools;
 /// <summary>
 /// The biology toolkit's 3D view (spec §3.4, §3.5, §9), the Mac's BioSceneView: WPF's Viewport3D with the molecule
 /// builder's lights on a clear ground, and an orbit camera — drag to turn, scroll to zoom, right-drag to pan; framing the
-/// content's ball with a 40° field of view at 1.15·R/sin 20°; double-click empty space to reset, an object to zoom to it.
+/// model with a 40° field of view as every 3D view does (SceneFrame: 85% of the view where the model meets its edges
+/// first, its labels kept off it — <see cref="FitDistance"/>) on first show, on Reset view and whenever the view's size
+/// changes (a tool's popup sized by its edges); double-click empty space to reset, an object to zoom to it.
 /// A scene is made off the UI thread from values (<see cref="BioSceneContent"/>, by <see cref="Show"/>) and batched one
 /// frozen mesh per material; a click picks an object by its id (the nearest opaque one, through translucent membranes);
 /// the pointer over an object outlines it in the accent and turns to a hand; the selection glows and the rest dims to
@@ -403,7 +405,8 @@ public sealed class BioSceneView : Grid
 
     /// <summary>
     /// How far from its ball's centre the camera stands for the model, turned by <paramref name="q"/>: as near as leaves
-    /// its labels off it. From the model filling 85% of the view each way — measured on its own boxes (<see
+    /// its labels off it. From the model filling 85% of the view where it meets the view's edges first (SceneFrame.Fill,
+    /// every 3D view's share) — measured on its own boxes (<see
     /// cref="extents"/>), not its ball, so a long helix or a wide cell fills its view — the camera stands back a step at a
     /// time, the labels laid out at each step as they will be drawn (<see cref="LabelsOn"/>), until none lies on the
     /// model's box or on another label's anchor: the room is what the labels placed there take — none at a side with no
@@ -417,7 +420,7 @@ public sealed class BioSceneView : Grid
         var ball = 1.15 * Math.Max(s.Radius, 1e-3) / Math.Sin(20 * Math.PI / 180);
         if (ActualWidth < 40 || ActualHeight < 40 || extents.Count == 0) return ball;
         var f = ActualHeight / (2 * Tan20);
-        double hw = 0.425 * ActualWidth, hh = 0.425 * ActualHeight;
+        double hw = SceneFrame.Fill / 2 * ActualWidth, hh = SceneFrame.Fill / 2 * ActualHeight;
         var c = BioWpf.P(s.Centre);
         var m = Matrix3D.Identity;
         m.RotateAt(q, c);
@@ -1066,6 +1069,28 @@ public sealed class BioSceneView : Grid
         var r = ActualHeight / (2 * Tan20) * framing.Radius / Math.Max(distance, 1e-6);
         var (placed, more) = BioLabelLayout.Layout(inputs, c.X, c.Y, Math.Min(r, ActualWidth * 0.32), ActualWidth, ActualHeight, ModelBox(), KeepClearBox(), fitReach);
         DrawLabels(placed, more);
+        if (still) SayFill(placed);
+    }
+
+    private string saidFill = "";
+
+    /// <summary>For the screenshot suite's log (a development run's), once the labels have settled: how much of the view
+    /// the model fills, and the model with its labels — SceneFrame's 85% where it meets the view first.</summary>
+    private void SayFill(List<BioLabelPlacement> placed)
+    {
+        if (!Launch.IsDevelopment || ModelBox() is not { } b) return;
+        double x0 = b.X0, y0 = b.Y0, x1 = b.X1, y1 = b.Y1;
+        foreach (var p in placed)
+        {
+            var (fx, fy, fw, fh) = p.Frame;
+            (x0, y0, x1, y1) = (Math.Min(x0, fx), Math.Min(y0, fy), Math.Max(x1, fx + fw), Math.Max(y1, fy + fh));
+        }
+        var share = Math.Max((x1 - x0) / Math.Max(ActualWidth, 1), (y1 - y0) / Math.Max(ActualHeight, 1));
+        var said = FormattableString.Invariant(
+            $"3d view {ActualWidth:0}×{ActualHeight:0}: the model {b.X1 - b.X0:0}×{b.Y1 - b.Y0:0}, with its labels {x1 - x0:0}×{y1 - y0:0}, {share * 100:0}% of the view ({Accessibility})");
+        if (said == saidFill) return;
+        saidFill = said;
+        Log.Write(said);
     }
 
     /// <summary>The content as boxes: its items in runs (one item a run for up to 256 of them), each run's least and greatest

@@ -82,7 +82,8 @@ internal sealed class AltaPopupView
         body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         body.Children.Add(rail.Col(0));
         webHolder.Child = session.Web;
-        webHolder.Margin = new Thickness(0, 0, 0, 8);
+        // (clear of the popup's right edge, which sizes it: FloatPopup.EdgeRoom)
+        webHolder.Margin = new Thickness(0, 0, FloatPopup.EdgeRoom, 8);
         var area = new Grid { Children = { webHolder, skeleton, startSlot, stateSlot } };
         skeleton.Visibility = Visibility.Collapsed;
         footer.SetResourceReference(Border.BorderBrushProperty, B.Divider);
@@ -97,7 +98,7 @@ internal sealed class AltaPopupView
 
     public void Open()
     {
-        sheet = AltaLook.Popup(root, header, Close, "Knewton Alta");
+        sheet = AltaLook.Popup(root, header, Close, "Knewton Alta", "alta");
         // (the rail wider in a wide popup)
         root.SizeChanged += (_, e) => railColumn.Width = new GridLength(e.NewSize.Width >= 960 ? 290 : 240);
         sheet.Closed += Cleanup;
@@ -324,7 +325,7 @@ internal sealed class AltaPopupView
         var show = buttons.Count > 0 || pics.Count > 0;
         var was = footer.Visibility == Visibility.Visible;
         footer.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-        webHolder.Margin = new Thickness(0, 0, 0, show ? 0 : 8);
+        webHolder.Margin = new Thickness(0, 0, FloatPopup.EdgeRoom, show ? 0 : 8);
         if (!show) { footer.Child = null; return; }
         var left = K.H(8);
         foreach (var p in pics)
