@@ -551,7 +551,7 @@ public static class WorkPreview
         {
             if (excerpt == null) return null;
             var e = engine;
-            var text = new RichText(html, url => { Dismiss(); e.GoTo(url); }, engine.BaseUrl, 14) { Focusable = false };
+            var text = new RichText(html, url => { Dismiss(); e.GoTo(url); }, engine.BaseUrl, 14);
             text.Document.SetResourceReference(System.Windows.Documents.FlowDocument.ForegroundProperty, B.Text2);
             // (five of its lines: 14 at 1.45 each)
             var most = Math.Ceiling(14 * 1.45 * 5) + 2;

@@ -700,6 +700,9 @@ public sealed partial class AppShell : Grid, IDisposable
         Loaded += async (_, _) =>
         {
             if (narrow && Launch.Flag("pane-open")) OpenPane();
+            // (the screenshot suite: --search-bar has a narrow window's title bar hold the search box, as its Search
+            //  button does — a moment before --open palette:… types into it)
+            if (narrow && Launch.Flag("search-bar")) { await Task.Delay(2500); OpenSearchBar(); }
             // (the screenshot suite: --open menu shows the account menu once the window has settled)
             if (Launch.Get("open") == "menu") { await Task.Delay(3000); if (accountTile != null) AccountMenu(accountTile); }
         };
