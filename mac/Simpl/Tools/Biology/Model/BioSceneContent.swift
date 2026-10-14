@@ -176,3 +176,61 @@ struct BioSceneShape: Sendable {
     let framing: BioSphere
     let outline: [BioVec]
 }
+
+/// (1.3.80) How every 3D view frames its model — the biology scenes (BioSceneView), the element's atom, orbitals and
+/// electron cloud (Atom3D) and the molecule builder: the model, with its columns of labels beside it where it has them,
+/// fills 84% of the view's limiting side (its height, or its width), on its first frame, on Reset view and each time
+/// the view is sized again — a tool's popup resized by its edges. Worked out for a camera whose field of view is up and
+/// down (SceneKit's), looking along −z at `aim`. Before, a biology scene was framed by a ball round it within the
+/// narrower of the two (a helix's ball, round its length, is as wide as the helix is long, and the label columns had
+/// already taken most of the width), and the chemistry views stood their camera at a set distance whatever the view's
+/// shape: DNA & RNA's helix stood in 40% of its view's height, small in the middle.
+enum SceneFill {
+    /// The share of the view's limiting side the model, with its labels, fills.
+    static let share = 0.84
+
+    /// The tangents of the half-angles the model may fill, across and up and down, for a camera of `fov` degrees up and
+    /// down and a view `width` × `height` points: `share` of the height, and `share` of the width less `beside` points
+    /// at each side for a column of labels — so the model and its labels together fill `share` of the width — the model
+    /// keeping 46% of the width at least where its labels would leave it less (they then come in over its edges).
+    static func limits(fov: Double, width: Double, height: Double, beside: Double = 0, share: Double = SceneFill.share) -> (across: Double, up: Double) {
+        let t = tan(fov / 2 * Double.pi / 180)
+        guard width > 1, height > 1 else { return (share * t, share * t) }
+        let room = max(share * width - 2 * beside, 0.46 * width)
+        return (t * room / height, share * t)
+    }
+
+    /// How far from `aim` the camera stands, looking along −z, for each of `points` — at its own depth — to fall within
+    /// `limits`; `turning`: wherever a turn of the model about the up axis through `aim` takes it (a point `r` from the
+    /// axis reaches furthest across where its line of sight grazes its circle, and highest at the circle's front).
+    static func distance(_ points: [BioVec], aim: BioVec, limits: (across: Double, up: Double), turning: Bool = false) -> Double {
+        var d = 0.0
+        for p in points {
+            let q = p - aim
+            if turning {
+                let r = (q.x * q.x + q.z * q.z).squareRoot()
+                d = max(d, r / sin(atan(limits.across)), r + abs(q.y) / limits.up)
+            } else {
+                d = max(d, q.z + abs(q.x) / limits.across, q.z + abs(q.y) / limits.up)
+            }
+        }
+        return d
+    }
+
+    /// How far from its centre the camera stands for a ball of `radius` to fall within `limits`.
+    static func distance(radius: Double, limits: (across: Double, up: Double)) -> Double {
+        max(radius, 1e-6) / sin(atan(min(limits.across, limits.up)))
+    }
+
+    /// The middle of the box round `points` (nil for none): where the camera looks, for the model to stand in the
+    /// middle of its view.
+    static func middle(_ points: [BioVec]) -> BioVec? {
+        guard var lo = points.first else { return nil }
+        var hi = lo
+        for p in points {
+            lo = BioVec(min(lo.x, p.x), min(lo.y, p.y), min(lo.z, p.z))
+            hi = BioVec(max(hi.x, p.x), max(hi.y, p.y), max(hi.z, p.z))
+        }
+        return (lo + hi) / 2
+    }
+}

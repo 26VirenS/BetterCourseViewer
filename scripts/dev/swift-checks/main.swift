@@ -208,5 +208,41 @@ check(change?.what == "done" && change?.after == 8 && plainChange?.what == "task
       && LivePlan.devChange(":8") == nil && LivePlan.devChange("done:soon") == nil && LivePlan.devChange(nil) == nil,
       "the screenshot suite's change to the mock school (-SimplLiveChange done:8)")
 
+// ---- the 3D views' framing (1.3.80) ------------------------------------------------------------------------------
+// (SceneFill: a model put where it says, seen through a 40° camera, fills 84% of its view's limiting side — the height,
+// or the width with a label column at each side — and, turning, never more over a whole turn)
+print("the 3D views' framing")
+func framed(_ pts: [BioVec], w: Double, h: Double, beside: Double = 0, turning: Bool = false) -> (across: Double, up: Double) {
+    let aim = SceneFill.middle(pts) ?? BioVec(0, 0, 0)
+    let d = SceneFill.distance(pts, aim: aim, limits: SceneFill.limits(fov: 40, width: w, height: h, beside: beside), turning: turning)
+    let t = tan(20 * Double.pi / 180)
+    var across = 0.0, up = 0.0
+    for k in 0..<(turning ? 360 : 1) {
+        let a = Double(k) * Double.pi / 180
+        for p in pts {
+            let q = p - aim
+            let r = BioVec(q.x * cos(a) + q.z * sin(a), q.y, -q.x * sin(a) + q.z * cos(a))
+            across = max(across, abs(r.x) / (d - r.z) / (t * w / h))
+            up = max(up, abs(r.y) / (d - r.z) / t)
+        }
+    }
+    return (across, up)
+}
+func corners(_ x: Double, _ y: Double, _ z: Double, at c: BioVec) -> [BioVec] {
+    var out: [BioVec] = []
+    for sx in [-x, x] { for sy in [-y, y] { for sz in [-z, z] { out.append(c + BioVec(sx, sy, sz)) } } }
+    return out
+}
+// a helix 20 Å across and 45 tall in the owner's 430 × 420 view, its widest label 150 points: 84% of the height (its
+// 1.3.79 ball, 29 Å round, held it to 36%)
+let helixFit = framed(corners(10, 22.5, 10, at: BioVec(0, 22, 0)), w: 430, h: 420, beside: 174)
+check(abs(helixFit.up - 0.84) < 0.005, "a helix in the owner's view fills 84% of its height (\(Int((helixFit.up * 100).rounded()))%)")
+// a cell in a wide view with labels: the cell and its two label columns fill 84% of the width
+let cellFit = framed(corners(11, 8, 9.5, at: BioVec(0, 0, 0)), w: 800, h: 500, beside: 144)
+check(abs(cellFit.across * 800 + 2 * 144 - 0.84 * 800) < 4 && cellFit.up < 0.84, "a cell and its labels fill 84% of a wide view's width")
+// a molecule turning by itself: at most 84% of the limiting side over a whole turn, and that side's 84% reached
+let spin = framed(corners(5, 3, 2, at: BioVec(1, 0, 0)), w: 600, h: 400, turning: true)
+check(max(spin.across, spin.up) < 0.845 && max(spin.across, spin.up) > 0.83, "a turning molecule fills 84% of its view over a whole turn (\(Int((max(spin.across, spin.up) * 100).rounded()))%)")
+
 print("\(passed) passed, \(failed) failed")
 exit(Int32(failed))

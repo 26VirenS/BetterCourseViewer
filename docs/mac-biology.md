@@ -203,11 +203,19 @@ z, then φ), `inBall()`, `rotation()` — each helper's draw order is documented
   at the bottom, for that scale bar — `CEScaleBar.room`). The build closure
   runs off the main thread — capture copies, not your ObservableObject; it runs again only when `key` changes (put
   page, options and light/dark in it). The camera frames the content on the first scene, when `frameKey` changes and
-  — until the model is turned or zoomed — when the view changes size; `reset += 1` puts it back; `zoom` frames an
-  object. Framing (1.3.79) fills 84% of the room the model has (the view's height, or the width beside the label
-  columns: each the widest label and 40 points), worked out from the content's outline (`BioSceneContent.outline()`,
-  26 extreme points, made off the main thread with the scene by `measured()`), and no nearer than a `frame` ball the
-  scene gives. Translucent things write no depth and are drawn after the opaque, by `order` (a cell's shells last,
+  when the view changes size (a tool's popup resized by its edges; (1.3.80) a model turned or zoomed by hand is kept as
+  large in its view as it was, its turn kept); `reset += 1` puts it back; `zoom` frames an object. Framing (1.3.80,
+  `SceneFill`, shared with the element's atom, orbitals and cloud and the molecule builder) looks at the middle of the
+  content's outline (`BioSceneContent.outline()`, 26 extreme points, made off the main thread with the scene by
+  `measured()`, with the extras' corners) and stands back until the model fills 84% of the view's height, or 84% of
+  its width together with a label column at each side (the widest label and the 24 points it stands out), whichever
+  runs out first — the model keeping 46% of the width at least — each outline point at its own depth (while the model
+  turns by itself, wherever its turn takes it). A `frame` ball the scene gives is no longer framed too (1.3.79 framed
+  it within the narrower side: DNA & RNA's helix, its ball as wide as the helix is long, stood in 40% of its view's
+  height): only a scene drawn wholly by its extras (a molecule morphing between two shapes) keeps its ball as the
+  least, and a new scene of the same model that needs more room than is framed — a cell pulled apart, a helix
+  unzipped, a sugar split — eases the camera back to take it in, unless it has been moved by hand.
+  Translucent things write no depth and are drawn after the opaque, by `order` (a cell's shells last,
   from both sides); (1.3.80) a translucent shell's faces each take 1 − ⁴√(1 − α) (`CEBuilder.faceAlpha`), so the four
   over a point inside the cell — outer and inner, near and far side — make the part's own α: the plasma membrane's
   0.30 over the organelles, not the gold veil of 0.51 or 0.76 that hid their colours until a click dimmed it. Click

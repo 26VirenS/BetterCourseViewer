@@ -4,9 +4,10 @@ import SceneKit
 import SwiftUI
 
 // The biology toolkit's 3D view (spec §3.4, §3.5, §9): a SceneKit view with the molecule builder's lights, a clear
-// ground, and an orbit camera (drag to turn, scroll or pinch to zoom; (1.3.79) the model framed with a 40° field of view
-// to fill 84% of its room — the height, or the width beside the label columns — on its first frame, on Reset view and
-// on a new size; double-click empty space to reset, an object to zoom to it); a scene made off the main
+// ground, and an orbit camera (drag to turn, scroll or pinch to zoom; (1.3.80) the model framed with a 40° field of view
+// so that it and its label columns fill 84% of the view's height or width, whichever runs out first (`SceneFill`) — on
+// its first frame, on Reset view and on every new size, a model turned or zoomed by hand kept as large in its view as
+// it was; double-click empty space to reset, an object to zoom to it); a scene made off the main
 // thread from values (BioSceneContent) and batched one geometry per material; a click picking an object by its id, a
 // hover outlining it (the pointer a hand); the selected object glowing and the rest dimmed to 35%; labels with leader
 // lines in 2D over it; arrow keys turning it 15° a press, + and − zooming, Escape letting go. Auto-turn is off unless
@@ -270,7 +271,8 @@ final class BioSCNView: SCNView {
 
     override var acceptsFirstResponder: Bool { true }
 
-    /// (1.3.79) A new size: the camera framed for it, unless the model has been turned or zoomed since it was framed.
+    /// (1.3.79) A new size: the camera framed for it — (1.3.80) or, the model turned or zoomed by hand, moved to keep it
+    /// as large in its view as it was.
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
         coordinator?.resized()
@@ -424,10 +426,15 @@ final class BioSceneCoordinator: NSObject {
     private var framing = BioSphere(centre: BioVec(0, 0, 0), radius: 1)
     /// (1.3.79) The scene's outline (BioSceneContent.outline()): what the camera frames and the labels sit beside.
     private var outlinePoints: [BioVec] = []
-    /// The camera has been turned, zoomed or moved since it was last framed: a new size then leaves it be.
+    /// (1.3.80) Where the camera looks: the middle of the outline's box (the ball's centre, with no outline), so the
+    /// model stands in the middle of its view — the labels' columns parted at it.
+    private var aim = BioVec(0, 0, 0)
+    /// The camera has been turned, zoomed or moved since it was last framed: a new size then keeps it as large as it was.
     private var touched = false
-    /// The view's size when the camera was last framed.
+    /// The view's size when the camera was last framed (or, turned by hand, last kept as large for a new size).
     private var framedSize = CGSize.zero
+    /// (1.3.80) How far from `aim` the camera stood when it was last framed.
+    private var framedDistance = 0.0
     /// The label hovered and where it was when its hover began (a label that moves from under the pointer lets go).
     private var labelHoverAt: (id: String, x: Double, y: Double)?
     private var resetSeen = 0
@@ -466,7 +473,7 @@ final class BioSceneCoordinator: NSObject {
             if appliedSelection != c.selection || appliedDim != c.dimOthers { applySelection() }
             if c.reset != resetSeen {
                 resetSeen = c.reset
-                frameCamera(framing, animated: true)
+                frameCamera(animated: true)
             }
             if let z = c.zoom, z != zoomSeen {
                 zoomSeen = z
@@ -531,6 +538,7 @@ final class BioSceneCoordinator: NSObject {
             let corners = extrasCorners(extras)
             if !corners.isEmpty { outlinePoints = BioSceneContent.extremes(of: outlinePoints + corners) }
         }
+        aim = SceneFill.middle(outlinePoints) ?? framing.centre
         // (the camera frames the first scene, and a scene whose frame key is new)
         let fk = config?.frameKey
         if framedKey == nil || (fk != nil && framedKey != .some(fk)) {
@@ -542,7 +550,13 @@ final class BioSceneCoordinator: NSObject {
                 zoomSeen = config?.zoom
             }
             framedKey = .some(fk)
-            frameCamera(framing, animated: false)
+            frameCamera(animated: false)
+        } else if !touched, framedDistance > 0, frameDistance() > framedDistance * 1.02 {
+            // (1.3.80) the same model needing more room than it is framed for — a cell pulled apart, a helix unzipped, a
+            // sugar split in two — while nothing has moved the camera: it eases back to take it all in (never nearer:
+            // that waits for Reset view or a new size). Framed by its ball, it had that room from the first, and stood
+            // smaller for it.
+            frameCamera(animated: true)
         }
         // (a new scene starts with nothing hovered: what the pointer was over may no longer be there)
         live.hoverFromLabel = false
@@ -597,14 +611,15 @@ final class BioSceneCoordinator: NSObject {
 
     // MARK: Camera
 
-    /// The camera framing the model: 40° field of view (up and down), looking along −z at the ball's centre, as far
-    /// away as `frameDistance` says.
-    private func frameCamera(_ s: BioSphere, animated: Bool) {
+    /// The camera framing the model: 40° field of view (up and down), looking along −z at `aim`, as far away as
+    /// `frameDistance` says.
+    private func frameCamera(animated: Bool) {
         guard let v = view, let cam = v.pointOfView else { return }
-        let d = frameDistance(s)
+        let d = frameDistance()
         touched = false
         framedSize = v.bounds.size
-        let c = SIMD3<Float>(Float(s.centre.x), Float(s.centre.y), Float(s.centre.z))
+        framedDistance = d
+        let c = SIMD3<Float>(Float(aim.x), Float(aim.y), Float(aim.z))
         cam.camera?.zNear = max(0.001, d * 0.01)
         cam.camera?.zFar = d * 20
         let move = animated && !(config?.reduceMotion ?? false)
@@ -615,52 +630,61 @@ final class BioSceneCoordinator: NSObject {
         cam.simdOrientation = simd_quatf(angle: 0, axis: SIMD3<Float>(0, 1, 0))
         if let turn = node("turn"), !(config?.turning ?? false) { turn.simdOrientation = simd_quatf(angle: 0, axis: SIMD3<Float>(0, 1, 0)) }
         SCNTransaction.commit()
-        v.defaultCameraController.target = SCNVector3(CGFloat(s.centre.x), CGFloat(s.centre.y), CGFloat(s.centre.z))
+        v.defaultCameraController.target = SCNVector3(CGFloat(aim.x), CGFloat(aim.y), CGFloat(aim.z))
         lastSignature = []
     }
 
-    /// The tangent of the half-angles the model may fill, across and up and down: 84% of the view's height, and 84% of
-    /// the width left beside the label columns (each the widest label and 40 points; the model keeps 55% of the width
-    /// at least) — `labels` false: of the whole width.
-    private func fillLimits(labels: Bool) -> (across: Double, up: Double) {
-        let tanV = tan(20 * Double.pi / 180), fill = 0.84
-        let size = view?.bounds.size ?? .zero
-        let w = Double(size.width), h = Double(size.height)
-        guard w > 1, h > 1 else { return (fill * tanV, fill * tanV) }
-        var room = w
+    /// The tangents of the half-angles the model may fill, across and up and down (`SceneFill.limits`), in a view of
+    /// `size` (nil: the view's own): (1.3.80) 84% of the height, and 84% of the width less a label column at each side
+    /// (the widest label and the 24 points it stands out from the model) — so the model and its labels fill 84% of the
+    /// width together; `labels` false, or none shown: 84% of the whole width.
+    private func fillLimits(labels: Bool, size: CGSize? = nil) -> (across: Double, up: Double) {
+        let s = size ?? view?.bounds.size ?? .zero
+        var beside = 0.0
         if labels, config?.showLabels == true, let texts = content?.labels.map(\.text), !texts.isEmpty {
-            let widest = texts.map { BioLabelWidth.of($0) }.max() ?? 0
-            room = max(w - 2 * (widest + 40), w * 0.55)
+            beside = (texts.map { BioLabelWidth.of($0) }.max() ?? 0) + BioLabelLayout.columnOffset
         }
-        return (fill * tanV * room / h, fill * tanV)
+        return SceneFill.limits(fov: 40, width: Double(s.width), height: Double(s.height), beside: beside)
     }
 
-    /// (1.3.79) How far from the ball's centre the camera stands for the model to fill its room (`fillLimits`): worked
-    /// out from the model's outline, each point at its own depth, and — where the tool asked for a ball of its own (a
-    /// cell, as far apart as it is exploded) — no nearer than that ball needs; the ball alone while the model turns by
-    /// itself (its outline turns with it). Before, the ball was framed to 85% of the height whatever the width: a narrow
-    /// card cut a wide model short at its sides, and a helix, framed by the ball round its length, stood thin in the
-    /// middle of a wide card.
-    private func frameDistance(_ s: BioSphere) -> Double {
-        let limit = fillLimits(labels: true)
-        let r = max(s.radius, 1e-3)
-        let ball = r / sin(atan(min(limit.across, limit.up)))
-        guard !(config?.turning ?? false), !outlinePoints.isEmpty else { return ball }
-        var d = 0.0
-        for p in outlinePoints {
-            let q = p - s.centre
-            d = max(d, q.z + abs(q.x) / limit.across, q.z + abs(q.y) / limit.up, q.z + r * 0.05)
-        }
-        return content?.frame != nil ? max(d, ball) : d
+    /// How far from `aim` the camera stands for the model to fill its room (`fillLimits`) in a view of `size` (nil: the
+    /// view's own): (1.3.79) worked out from the model's outline, each point at its own depth — (1.3.80) wherever its
+    /// turn takes it while it turns by itself — and the ball alone for a scene with no outline. (1.3.80) A ball the
+    /// tool gives (a cell's, as far apart as it may be pulled; a helix's, with room to unzip) is no longer framed too:
+    /// framed within the narrower of the two sides, it left the model small — the helix 40% of its view's height. Only a
+    /// scene drawn wholly by its extras (a molecule morphing from one shape into another, whose ball holds both) keeps
+    /// it as the least.
+    private func frameDistance(_ size: CGSize? = nil) -> Double {
+        let limit = fillLimits(labels: true, size: size)
+        let ball = SceneFill.distance(radius: framing.radius, limits: limit)
+        guard !outlinePoints.isEmpty else { return ball }
+        let d = max(SceneFill.distance(outlinePoints, aim: aim, limits: limit, turning: config?.turning ?? false), ball * 0.1)
+        return content?.items.isEmpty == true && content?.frame != nil ? max(d, ball) : d
     }
 
     /// (1.3.79) The view's new size: the camera framed for it at once, if nothing has moved it since it was last framed
-    /// — a first show's scene can come before its view has its size, and a window can be made wider or narrower.
+    /// — a first show's scene can come before its view has its size, and a window or a tool's popup can be made wider or
+    /// narrower. (1.3.80) Turned or zoomed by hand, the camera keeps its turn and comes nearer or goes further back by
+    /// as much as the framing for the new size would: the model stays as large in its view as it was.
     func resized() {
-        guard content != nil, !touched, let v = view else { return }
+        guard content != nil, let v = view else { return }
         let s = v.bounds.size
-        guard abs(s.width - framedSize.width) > 1 || abs(s.height - framedSize.height) > 1 else { return }
-        frameCamera(framing, animated: false)
+        guard s.width > 1, s.height > 1, abs(s.width - framedSize.width) > 1 || abs(s.height - framedSize.height) > 1 else { return }
+        guard touched else {
+            frameCamera(animated: false)
+            return
+        }
+        guard framedSize.width > 1, framedSize.height > 1, let cam = v.pointOfView else {
+            framedSize = s
+            return
+        }
+        let k = frameDistance(s) / max(frameDistance(framedSize), 1e-6)
+        framedSize = s
+        guard k.isFinite, k > 0, abs(k - 1) > 0.005 else { return }
+        let t = v.defaultCameraController.target
+        let target = SIMD3<Float>(Float(t.x), Float(t.y), Float(t.z))
+        cam.simdPosition = target + (cam.simdPosition - target) * Float(k)
+        lastSignature = []
     }
 
     /// The camera moved by hand (dragged, scrolled, pinched, a key): a new size no longer frames it afresh.
@@ -790,7 +814,7 @@ final class BioSceneCoordinator: NSObject {
         if let id = object(at: g.location(in: v))?.id {
             config?.doubleClick(id)
         } else {
-            frameCamera(framing, animated: true)
+            frameCamera(animated: true)
         }
     }
 
@@ -930,9 +954,9 @@ final class BioSceneCoordinator: NSObject {
             inputs.append(BioLabelInput(id: l.id, text: l.text, x: p.x, y: p.y, visible: visible, area: l.area, width: BioLabelWidth.of(l.text)))
         }
         if testRays { raysDone = true }
-        // (the model's circle on the screen: its framing ball's centre and edge, projected; and its outline's leftmost
-        // and rightmost points, the columns' edges beside them — inside the circle)
-        let c3 = model.point(framing.centre)
+        // (the model's circle on the screen: (1.3.80) the middle the camera looks at, and its framing ball's edge,
+        // projected; and its outline's leftmost and rightmost points, the columns' edges beside them — inside the circle)
+        let c3 = model.point(aim)
         let e3 = c3 + camera.right * Float(framing.radius)
         let pc = project.point(c3), pe = project.point(e3)
         let r = hypot(pe.x - pc.x, pe.y - pc.y)

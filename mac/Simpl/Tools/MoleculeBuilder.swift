@@ -634,15 +634,22 @@ struct MoleculeBuilder: View {
 
 // MARK: - The 3D view
 
-/// (1.3.59) The molecule's view, telling when it is handled (dragged, scrolled, pinched) so turning by itself can wait.
+/// (1.3.59) The molecule's view, telling when it is handled (dragged, scrolled, pinched) so turning by itself can wait —
+/// (1.3.80) and when its camera is moved by hand, and when it is sized again, for its framing.
 final class MoleculeSCNView: SCNView {
     var handled: (() -> Void)?
+    var moved: (() -> Void)?
+    var resized: (() -> Void)?
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        resized?()
+    }
     override func mouseDown(with event: NSEvent) { handled?(); super.mouseDown(with: event) }
-    override func mouseDragged(with event: NSEvent) { handled?(); super.mouseDragged(with: event) }
-    override func rightMouseDragged(with event: NSEvent) { handled?(); super.rightMouseDragged(with: event) }
-    override func scrollWheel(with event: NSEvent) { handled?(); super.scrollWheel(with: event) }
-    override func magnify(with event: NSEvent) { handled?(); super.magnify(with: event) }
-    override func rotate(with event: NSEvent) { handled?(); super.rotate(with: event) }
+    override func mouseDragged(with event: NSEvent) { handled?(); moved?(); super.mouseDragged(with: event) }
+    override func rightMouseDragged(with event: NSEvent) { handled?(); moved?(); super.rightMouseDragged(with: event) }
+    override func scrollWheel(with event: NSEvent) { handled?(); moved?(); super.scrollWheel(with: event) }
+    override func magnify(with event: NSEvent) { handled?(); moved?(); super.magnify(with: event) }
+    override func rotate(with event: NSEvent) { handled?(); moved?(); super.rotate(with: event) }
 }
 
 struct MoleculeSceneView: NSViewRepresentable {
@@ -655,7 +662,55 @@ struct MoleculeSceneView: NSViewRepresentable {
         var drawn: Drawn?
         weak var view: SCNView?
         private var resume: DispatchWorkItem?
+        /// (1.3.80) Points on the outside of the molecule as it is drawn (its atoms, bonds, lone pairs and letters), in
+        /// its turning node's space: what the camera frames.
+        var points: [BioVec] = []
+        /// (1.3.80) The camera turned or zoomed by hand since the molecule was framed.
+        var touched = false
+        /// (1.3.80) The view's size when the molecule was last framed (or kept as large).
+        var framedSize = CGSize.zero
         init(model: MoleculeModel) { self.model = model }
+
+        /// (1.3.80) How far from the molecule's middle the camera stands for it — wherever its turn takes it, while it
+        /// turns by itself — to fill 84% of a view of `size`'s height or width, whichever runs out first (`SceneFill`).
+        /// Before, the camera stood back by the molecule's reach whatever the view's shape.
+        func distance(_ size: CGSize) -> Double {
+            let limits = SceneFill.limits(fov: 40, width: Double(size.width), height: Double(size.height))
+            return SceneFill.distance(points, aim: SceneFill.middle(points) ?? BioVec(0, 0, 0), limits: limits, turning: model.autoRotate)
+        }
+
+        /// (1.3.80) The camera in front of the molecule, looking along −z at its middle, as far back as `distance` says.
+        func frame() {
+            guard let v = view, let cam = v.scene?.rootNode.childNode(withName: "camera", recursively: false), !points.isEmpty else { return }
+            let s = v.bounds.size
+            guard s.width > 1, s.height > 1 else { return }
+            let aim = SceneFill.middle(points) ?? BioVec(0, 0, 0)
+            let d = max(distance(s), 0.5)
+            cam.simdPosition = SIMD3<Float>(Float(aim.x), Float(aim.y), Float(aim.z + d))
+            cam.eulerAngles = SCNVector3(0, 0, 0)
+            v.defaultCameraController.target = SCNVector3(CGFloat(aim.x), CGFloat(aim.y), CGFloat(aim.z))
+            touched = false
+            framedSize = s
+        }
+
+        /// (1.3.80) The view sized again (a tool's popup resized by its edges): the molecule framed for it — or, its
+        /// camera moved by hand, brought nearer or further back by as much, so it stays as large in its view as it was.
+        func resized() {
+            guard let v = view, !points.isEmpty else { return }
+            let s = v.bounds.size
+            guard s.width > 1, s.height > 1, abs(s.width - framedSize.width) > 1 || abs(s.height - framedSize.height) > 1 else { return }
+            guard touched, framedSize.width > 1, framedSize.height > 1,
+                  let cam = v.scene?.rootNode.childNode(withName: "camera", recursively: false) else {
+                frame()
+                return
+            }
+            let k = distance(s) / max(distance(framedSize), 1e-6)
+            framedSize = s
+            guard k.isFinite, k > 0, abs(k - 1) > 0.005 else { return }
+            let t = v.defaultCameraController.target
+            let target = SIMD3<Float>(Float(t.x), Float(t.y), Float(t.z))
+            cam.simdPosition = target + (cam.simdPosition - target) * Float(k)
+        }
 
         /// The model handled: its turning paused, taken up again three seconds after the last touch.
         func handled() {
@@ -691,6 +746,8 @@ struct MoleculeSceneView: NSViewRepresentable {
     func makeNSView(context: Context) -> SCNView {
         let v = MoleculeSCNView(frame: .zero)
         v.handled = { [weak coordinator = context.coordinator] in coordinator?.handled() }
+        v.moved = { [weak coordinator = context.coordinator] in coordinator?.touched = true }
+        v.resized = { [weak coordinator = context.coordinator] in coordinator?.resized() }
         v.allowsCameraControl = true
         v.autoenablesDefaultLighting = false
         v.antialiasingMode = .multisampling4X
@@ -761,13 +818,15 @@ struct MoleculeSceneView: NSViewRepresentable {
             c.drawn = now
             spin.childNodes.forEach { $0.removeFromParentNode() }
             spin.addChildNode(MoleculeScene.node(model))
+            c.points = AtomScene.outline(spin) // (1.3.80: what the camera frames, as drawn)
         }
         if model.autoRotate {
             if spin.action(forKey: "turn") == nil { spin.runAction(.repeatForever(.rotateBy(x: 0, y: .pi * 2, z: 0, duration: 14)), forKey: "turn") }
         } else {
             spin.removeAction(forKey: "turn")
         }
-        // (a new molecule: the camera back in front of it, far enough to see it all)
+        // (a new molecule: the camera back in front of it, far enough to see it all — (1.3.80) framed to fill 84% of the
+        // view's height or width as it is drawn, wherever its turn takes it; until the view has its size, at a guess)
         if c.framing != model.framing, let cam = root.childNode(withName: "camera", recursively: false) {
             c.framing = model.framing
             let extent = model.atoms.map { simd_length($0.pos) }.max() ?? 1
@@ -775,6 +834,9 @@ struct MoleculeSceneView: NSViewRepresentable {
             cam.eulerAngles = SCNVector3(0, 0, 0)
             spin.eulerAngles = SCNVector3(0, 0, 0)
             v.pointOfView = cam
+            c.touched = false
+            c.framedSize = .zero
+            c.frame()
         }
     }
 }
