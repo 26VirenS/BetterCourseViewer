@@ -125,6 +125,7 @@ struct ExternalToolsView: View {
             await load()
             await openAskedList()
         }
+        .liveChecks(model) // (1.3.80: checked every minute while it is on show; only what changed moves)
         .onChange(of: query) { _, _ in
             keptOpen = nil
             listed = nil

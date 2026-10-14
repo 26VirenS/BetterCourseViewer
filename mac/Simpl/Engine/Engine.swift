@@ -31,6 +31,14 @@ enum EngineError: LocalizedError {
 
 private struct ErrorBox: Decodable { var error: String? }
 
+/// (1.3.80) The head of a live check's answer (`Engine.liveScript`): the same answer as the one on screen or a new one,
+/// its fingerprint, or the page's error.
+private struct LiveHead: Decodable {
+    var unchanged: Bool?
+    var hash: String?
+    var error: String?
+}
+
 /// What's New as a sheet's item.
 struct WhatsNewSheetItem: Identifiable {
     let id = UUID()
@@ -131,6 +139,11 @@ final class Engine: ObservableObject, ShellListener {
     let memo = AnswerMemo()
     /// (1.3.78) What is read ahead of the student (ReadAhead.swift).
     let ahead = ReadAhead()
+    /// (1.3.80) This window's live checks: the screen on show asked again, now and then, for what is new on it
+    /// (Engine/LiveRefresh.swift).
+    private(set) lazy var live = LiveRefresh(engine: self)
+    /// (1.3.80) What the live checks know of what the whole window shows beside its screen: the sidebar's counts.
+    let liveMarks = LiveMarks()
     private var queuedPopups: [Popup] = []
     private var popupCheck: DispatchWorkItem?
     private var loginWatch: AnyCancellable?
@@ -310,6 +323,7 @@ final class Engine: ObservableObject, ShellListener {
         if let primary { nav.replace(.dashboard); primary.signedOut(); return }
         answers.clear()
         memo.clear()
+        liveMarks.forget()
         ready = false
         openedOnKept = false
         shownNative = false
@@ -485,6 +499,7 @@ final class Engine: ObservableObject, ShellListener {
         if let primary { await primary.refreshSnapshot(); return }
         if let s = try? await call("snapshot", as: Snapshot.self) {
             snapshot = s
+            liveMarks.shown("snapshot", by: self) // (1.3.80: the counts shown are this read's, the answer a live check asks after)
             if !countsLive { withAnimation(Motion.gentle) { countsLive = true } }
             if let k = s.lms, k != lms { lms = k; NotificationCenter.default.post(name: .simplLMSKnown, object: nil, userInfo: ["lms": k]) }
         }
@@ -585,16 +600,18 @@ final class Engine: ObservableObject, ShellListener {
         let generation = memo.generation
         let started = CACurrentMediaTime()
         let data = try await answer(name, args, shared: held)
-        let decoded: T
+        let got: (value: T, fingerprint: String?)
         do {
-            decoded = try await Engine.decoded(data, as: T.self) // (off the main thread: a long answer never holds up the window)
+            // (off the main thread: a long answer never holds up the window; a read's fingerprint with it, 1.3.80)
+            got = try await Engine.decoded(data, as: T.self, fingerprinted: held)
         } catch let e as DecodingError {
             print("[Simpl] \(name) answer not understood:", e)
             throw EngineError.unreadable
         }
+        let decoded = got.value
         if held {
             answers.keep(data, name, args) // (a read: kept for next time, AnswerCache)
-            if let key = AnswerMemo.key(name, args) { memo.put(key, decoded, generation: generation) }
+            if let key = AnswerMemo.key(name, args) { memo.put(key, decoded, generation: generation, fingerprint: got.fingerprint) }
         } else if !AnswerMemo.neutral.contains(name) {
             memo.invalidate() // (something was done: what the screens hold is asked for again as each opens)
         }
@@ -652,6 +669,13 @@ final class Engine: ObservableObject, ShellListener {
         try JSONDecoder().decode(V.self, from: data)
     }
 
+    /// (1.3.80) An answer decoded off the main thread, with — when it is a read to be held — its JSON's fingerprint, the
+    /// page's own for the same JSON (LiveFingerprint): a screen that shows it asks its first live check with it.
+    private nonisolated static func decoded<V: Decodable>(_ data: Data, as type: V.Type, fingerprinted: Bool) async throws -> (value: V, fingerprint: String?) {
+        let value = try JSONDecoder().decode(V.self, from: data)
+        return (value, fingerprinted ? LiveFingerprint.of(String(decoding: data, as: UTF8.self)) : nil)
+    }
+
     /// (1.3.72) The Developer window's console: a call's answer as the page gives it, as JSON text.
     func callText(_ name: String, _ args: [String: Any] = [:]) async throws -> String {
         if let primary { return try await primary.callText(name, args) }
@@ -659,6 +683,89 @@ final class Engine: ObservableObject, ShellListener {
         guard ready else { throw EngineError.notReady(lmsName) }
         let raw = try await web.webView.callAsyncJavaScript("return JSON.stringify(await BCVNative.call(name, args))", arguments: ["name": name, "args": args], in: nil, contentWorld: .defaultClient)
         return raw as? String ?? "null"
+    }
+
+    // MARK: - Live checks (1.3.80)
+
+    /// What a live check heard of one read (`liveAnswer`): the answer is the one on screen, or a new one — each with its
+    /// fingerprint, for the next check to ask with.
+    enum LiveAnswer<T> {
+        case same(String)
+        case new(T, String)
+    }
+
+    /// The page is ready for a call: a live check is held back while it is not (a page loading under the screens).
+    var pageReady: Bool { (primary ?? self).ready }
+
+    /// A live check's call: the page's answer as a line for its head — `{unchanged, hash}`, or `{error}` — and, when the
+    /// answer is new, its JSON on the line after it, exactly as a screen's read would get it (so it is kept as one is).
+    private static let liveScript = """
+    const r = await BCVNative.call(name, args);
+    if (r && r.unchanged === true) return JSON.stringify({ unchanged: true, hash: r.hash });
+    if (r && r.unchanged === false) return JSON.stringify({ unchanged: false, hash: r.hash }) + '\\n' + JSON.stringify(r.value);
+    return JSON.stringify({ error: r && r.error ? String(r.error) : 'No answer.' });
+    """
+
+    /// (1.3.80) One of a screen's reads asked again for a live check (LiveRefresh.swift): every Canvas read its answer is
+    /// made from that is older than `maxAge` seconds is read again, and none that is younger (native-app.js's `maxAge`);
+    /// the answer is compared with the one on screen by its fingerprint (`known`: nil or "" when the screen knows none)
+    /// and comes back as only that when it is the same — nothing sent, decoded or drawn. A new one is decoded, held for
+    /// the session and kept for next time, as a screen's read is. It never waits for the page (one not ready says so at
+    /// once) and never counts as a screen waiting (the screenshot suite's settling, reading ahead). The page's error is
+    /// thrown.
+    func liveAnswer<T: Decodable>(_ name: String, _ args: [String: Any], as type: T.Type, maxAge: Double, known: String?) async throws -> LiveAnswer<T> {
+        if let primary { return try await primary.liveAnswer(name, args, as: type, maxAge: maxAge, known: known) }
+        guard ready else { throw EngineError.notReady(lmsName) }
+        var asked = args
+        asked["maxAge"] = maxAge
+        asked["known"] = known ?? ""
+        let generation = memo.generation
+        let raw = try await web.webView.callAsyncJavaScript(Engine.liveScript, arguments: ["name": name, "args": asked], in: nil, contentWorld: .defaultClient)
+        guard let text = raw as? String else { throw EngineError.unreadable }
+        let found = try await Engine.liveParts(text)
+        guard let data = found.value else { return .same(found.fingerprint) }
+        guard let decoded = try? await Engine.decoded(data, as: T.self) else { throw EngineError.unreadable }
+        if AnswerMemo.held.contains(name) {
+            answers.keep(data, name, args) // (kept for next time, and held for the session, as a screen's read is)
+            if let key = AnswerMemo.key(name, args) { memo.put(key, decoded, generation: generation, fingerprint: found.fingerprint) }
+        }
+        return .new(decoded, found.fingerprint)
+    }
+
+    /// (1.3.80) A live check's answer read off the main thread: its fingerprint, and the new answer's JSON when there is
+    /// one; the page's error thrown.
+    private nonisolated static func liveParts(_ text: String) async throws -> (fingerprint: String, value: Data?) {
+        let data = Data(text.utf8)
+        let cut = data.firstIndex(of: UInt8(ascii: "\n")) ?? data.endIndex
+        guard let head = try? JSONDecoder().decode(LiveHead.self, from: Data(data[data.startIndex..<cut])) else { throw EngineError.unreadable }
+        if let message = head.error { throw EngineError.page(message) }
+        guard let fingerprint = head.hash else { throw EngineError.unreadable }
+        if head.unchanged == true { return (fingerprint, nil) }
+        guard cut < data.endIndex else { throw EngineError.unreadable }
+        return (fingerprint, Data(data[data.index(after: cut)...]))
+    }
+
+    /// (1.3.80) The fingerprint of this session's answer to a read, if it holds one: a screen showing that answer asks its
+    /// first live check with it.
+    func heldFingerprint(_ name: String, _ args: [String: Any] = [:]) -> String? {
+        if let primary { return primary.heldFingerprint(name, args) }
+        guard let key = AnswerMemo.key(name, args) else { return nil }
+        return memo.fingerprint(key)
+    }
+
+    /// (1.3.80) How many reads the page has made of the school so far (BCVNative.stats), for a live check's line: nil when
+    /// the page cannot say.
+    func liveReads() async -> Int? {
+        if let primary { return await primary.liveReads() }
+        guard ready else { return nil }
+        let raw = try? await web.webView.callAsyncJavaScript("return BCVNative.stats ? BCVNative.stats().reads : null", arguments: [:], in: nil, contentWorld: .defaultClient)
+        return (raw as? NSNumber)?.intValue
+    }
+
+    /// (1.3.80) The sidebar's counts as a live check found them (only when they changed): the badges move to them.
+    func showLiveSnapshot(_ s: Snapshot) {
+        if let primary { primary.showLiveSnapshot(s); return }
+        withAnimation(Motion.gentle) { snapshot = s }
     }
 
     /// An action whose answer is only whether it worked.

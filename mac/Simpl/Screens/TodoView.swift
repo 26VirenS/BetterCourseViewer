@@ -66,6 +66,7 @@ struct TodoView: View {
             expectingTask = false
             await load(animated: animated)
         }
+        .liveChecks(model) // (1.3.80: checked every minute while it is on show; only what changed moves)
         .onChange(of: engine.newTask) { _, open in
             if open { expectingTask = true }
         }

@@ -41,6 +41,8 @@ struct InboxView: View {
             .openTimed("Inbox", ready: model.data != nil, source: shownFrom)
             .toolbar { toolbar }
             .task(id: engine.dataVersion) { await load() }
+            // (1.3.80: checked every minute while it is on show; only what changed moves)
+            .liveChecks("inbox", since: { model.marks.at }) { engine, age in try await liveCheck(engine, age) }
             .onChange(of: scope) { _, _ in switchMailbox() }
             .onChange(of: selection) { _, id in chose(id) }
             .onChange(of: compact) { _, narrow in
@@ -461,6 +463,7 @@ struct InboxView: View {
                 }
             }
             store.lists[wanted] = d
+            model.marks.shown("inbox", ["scope": wanted], by: engine) // (1.3.80: the answer a live check asks after)
             opened.formIntersection(d.rows.filter { $0.unread == true }.map(\.id))
             // (the screenshot suite: -SimplOpen conversation:<id>, or conversation:first, opens one beside the list)
             if let pick = LaunchOpen.take("conversation:") {
@@ -468,6 +471,29 @@ struct InboxView: View {
             }
         } catch {
             if model.data == nil { model.error = error.localizedDescription }
+        }
+    }
+
+    /// (1.3.80) The live check (LiveRefresh): the mailbox shown asked again (Canvas's conversations are always read
+    /// afresh); a new answer is put in place — a conversation that came arrives, one that changed changes — and the
+    /// others are left as they are (the list draws them by their ids).
+    private func liveCheck(_ engine: Engine, _ age: Double) async throws -> LiveFound {
+        let wanted = scope
+        guard let shown = model.data,
+              let c = try await engine.liveCheck("inbox", ["scope": wanted], as: InboxData.self, shown: shown, marks: model.marks, maxAge: age) else {
+            model.marks.at = Date()
+            return .unchanged
+        }
+        return LiveFound(parts: ["inbox"]) {
+            guard wanted == scope else { return } // (another mailbox chosen meanwhile: never undone)
+            c.put {
+                withAnimation(LiveRefresh.motion) {
+                    model.data = c.value
+                    model.error = nil
+                }
+                store.lists[wanted] = c.value
+            }
+            model.marks.at = Date()
         }
     }
 }
@@ -804,6 +830,7 @@ struct GroupsView: View {
             }
         }
         .task(id: engine.dataVersion) { await load() }
+        .liveChecks(model) // (1.3.80: checked every minute while it is on show; only what changed moves)
     }
 
     private func section(_ title: String, _ rows: [GroupRow]) -> some View {

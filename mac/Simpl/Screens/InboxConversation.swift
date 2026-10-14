@@ -46,6 +46,7 @@ struct ConversationView: View {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 if !Task.isCancelled { await engine.refreshSnapshot() }
             }
+            .liveChecks(model) // (1.3.80: checked every minute while on show; a reply that came arrives)
             .onChange(of: link?.starred) { _, on in
                 // (the list's star is the one shown; kept here too, for when the list no longer holds the conversation)
                 if let on, model.data?.starred != on { model.data?.starred = on }

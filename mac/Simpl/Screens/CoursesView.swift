@@ -46,6 +46,7 @@ struct CoursesView: View {
             }
         }
         .task(id: engine.dataVersion) { await load() }
+        .liveChecks(model) // (1.3.80: checked every minute while it is on show; only what changed moves)
         // (1.3.79: a popup over the window that never blocks it)
         .floatingPopup("nickname", title: "Nickname", item: $naming) { c in
             NicknameSheet(course: c, onBrightspace: engine.onBrightspace) { name in save(c, name) }

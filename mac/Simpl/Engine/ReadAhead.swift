@@ -13,6 +13,9 @@ final class AnswerMemo {
         let value: Any
         let at: Date
         let generation: Int
+        /// (1.3.80) Its JSON's fingerprint, as the page's engine gives one (LiveFingerprint): a screen that shows it asks
+        /// its first live check with it.
+        let fingerprint: String?
     }
 
     /// How long an answer counts as fresh: a screen opened within it is not asked for again.
@@ -42,9 +45,15 @@ final class AnswerMemo {
     /// What an answer is held by: its read's name and its arguments, in a stable order, without the ones that only set a
     /// preference.
     static func key(_ name: String, _ args: [String: Any]) -> String? {
+        callKey(name, plainArgs(name, args))
+    }
+
+    /// (1.3.80) A read's arguments without the ones that only set a preference: what a live check asks with (it never
+    /// sets one — To Do's grouping, the Dashboard's Hide Completed — nor asks the page to read afresh by one).
+    static func plainArgs(_ name: String, _ args: [String: Any]) -> [String: Any] {
         var plain = args
         for k in settings[name] ?? [] { plain.removeValue(forKey: k) }
-        return callKey(name, plain)
+        return plain
     }
 
     /// The read sets a preference as it reads: it is always asked, never answered from what is held. (A course's grades
@@ -70,13 +79,19 @@ final class AnswerMemo {
         entries[key].map(fresh) ?? false
     }
 
+    /// (1.3.80) The fingerprint of the answer held under `key`, if one is held (fresh or not).
+    func fingerprint(_ key: String) -> String? {
+        entries[key]?.fingerprint
+    }
+
     private func fresh(_ e: Entry) -> Bool {
         e.generation == generation && Date().timeIntervalSince(e.at) < Self.freshFor
     }
 
-    /// An answer, held as of `generation` (the one when it was asked: an action finished meanwhile leaves it stale).
-    func put(_ key: String, _ value: Any, generation g: Int) {
-        if entries.updateValue(Entry(value: value, at: Date(), generation: g), forKey: key) != nil {
+    /// An answer, held as of `generation` (the one when it was asked: an action finished meanwhile leaves it stale), with
+    /// (1.3.80) its JSON's fingerprint when that is known.
+    func put(_ key: String, _ value: Any, generation g: Int, fingerprint: String? = nil) {
+        if entries.updateValue(Entry(value: value, at: Date(), generation: g, fingerprint: fingerprint), forKey: key) != nil {
             order.removeAll { $0 == key }
         }
         order.append(key)

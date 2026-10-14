@@ -71,6 +71,8 @@ struct AssignmentView: View {
             }
         }
         .task(id: engine.dataVersion) { await load() }
+        // (1.3.80: checked every ten minutes while on show — never while Hand In or the feedback is up over it)
+        .liveChecks(model, pace: .course)
         // (1.3.79) Hand In and the feedback are popups over the window that never block it: the page, and every other
         // screen, stay usable under them, and they stay up as the window goes elsewhere, until they are closed
         .floatingPopup("handin:\(owner)", title: "Hand In", isPresented: $handIn, onDismiss: { dropped = [] }) {

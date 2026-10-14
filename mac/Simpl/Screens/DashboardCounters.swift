@@ -103,17 +103,19 @@ struct DashMorphHold: CustomAnimation {
 
 /// A counter's number: rolling to a new count on the house spring, a dash while it is still being counted. (home-25)
 /// `stale`: the number kept from last time, shown faint while the live one is on its way — it rolls to the live one in
-/// place, as the list under it changes in place.
+/// place, as the list under it changes in place. (1.3.80) A live check's new count rolls in the same way; under Reduce
+/// Motion the number is simply the new one, nothing rolling.
 struct DashCount: View {
     let value: Int?
     var alert = false
     var stale = false
     var size: CGFloat = 34
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Group {
             if let v = value {
-                Text("\(v)").contentTransition(.numericText(value: Double(v)))
+                Text("\(v)").contentTransition(reduceMotion ? .identity : .numericText(value: Double(v)))
             } else {
                 Text("–").foregroundStyle(.tertiary)
             }
@@ -154,6 +156,7 @@ struct DashCounterTile: View {
     /// (1.3.1) Its photo's editor, from its context menu.
     @State private var editing = false
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var alert: Bool { counter.tone == "red" && (value ?? 0) > 0 }
 
@@ -206,7 +209,7 @@ struct DashCounterTile: View {
                 PhotoSlotSheet(slot: slot)
             }
         }
-        .animation(Motion.snappy, value: value)
+        .animation(reduceMotion ? nil : Motion.snappy, value: value) // (1.3.80: a new count rolls in; under Reduce Motion it is simply there)
         .help(tooltip)
         .accessibilityLabel(DashCounterLook.spoken(counter.key, counter.label, value))
         .accessibilityValue(note ?? "")

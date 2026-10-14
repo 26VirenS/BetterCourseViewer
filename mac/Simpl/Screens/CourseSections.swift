@@ -559,6 +559,7 @@ struct PageView: View {
             }
         }
         .task(id: engine.dataVersion) { await load() }
+        .liveChecks(model, pace: .course) // (1.3.80: a course's pages checked every ten minutes while on show)
     }
 
     /// The page's own address on Canvas (the front page's, when it has no name).
@@ -728,6 +729,7 @@ private struct SectionLoaded<T: Decodable, Content: View>: View {
             }
         }
         .task(id: engine.dataVersion) { await load() }
+        .liveChecks(model, pace: .course) // (1.3.80: a course's pages checked every ten minutes while on show)
     }
 }
 

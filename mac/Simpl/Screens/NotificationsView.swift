@@ -46,6 +46,7 @@ struct NotificationsView: View {
             Text("They can be restored from the foot of the list.")
         }
         .task(id: engine.dataVersion) { await load() }
+        .liveChecks(model) // (1.3.80: checked every minute while it is on show; only what changed moves)
     }
 
     /// The kinds beside the list on a wide window; over it, as a switch, on a narrow one.

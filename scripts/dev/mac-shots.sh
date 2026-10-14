@@ -437,6 +437,65 @@ richtext_check() {
   if [ -n "$hits" ]; then echo "::warning::a post's web view never measured (its words shown as plain text): $hits"; fi
 }
 
+# (1.3.80) Live checks (mac/Simpl/Engine/LiveRefresh.swift): the screen on show asked again, every 4 seconds here
+# (-SimplLiveEvery 4; a minute in the app), the mock school changed behind the engine's back 6 seconds in
+# (-SimplLiveChange: a piece of work marked done, a course's total moved, a task added — the engine's liveDevChange), and
+# the picture taken once 5 checks are done (-SimplLiveShotAfter 5). Against a mock of their own (:8810, so their changes
+# never show in another picture) and one at a time, after every other picture: a check runs only while its app is in
+# front, and with the other copies of the app at work it would not be. Each check says one line on the console —
+# "live: dashboard unchanged · 12 reads · 0 redraws", "live: dashboard updated counters,day,list · 9 reads · 1 redraw" —
+# and live_check reads them.
+live_shots() {
+  node scripts/dev/mock-canvas.mjs 8810 8811 > "$HOMES/mock-live.log" 2>&1 &
+  local mock=$! live=(-SimplLiveEvery 4 -SimplLiveShotAfter 5)
+  sleep 2
+  MODE=light BASE=http://localhost:8810 shoot light-48a-live-dashboard 50 "${live[@]}" -SimplLiveChange done:6
+  wait
+  MODE=light BASE=http://localhost:8810 shoot light-48b-live-cards 50 "${live[@]}" -SimplDashView cards -SimplLiveChange grade:6
+  wait
+  MODE=light BASE=http://localhost:8810 shoot light-48c-live-todo 50 "${live[@]}" -SimplPlace todo -SimplLiveChange task:6
+  wait
+  # (a course's page at its own pace: every 4 seconds here too, -SimplLiveCourseEvery, ten minutes in the app)
+  MODE=light BASE=http://localhost:8810 shoot light-48d-live-course 40 -SimplLiveEvery 4 -SimplLiveCourseEvery 4 -SimplLiveShotAfter 3 \
+    -SimplPlace section:courses/101:assignments
+  wait
+  kill "$mock" >/dev/null 2>&1 || true
+}
+
+# (1.3.80) live_check: what the live pictures' consoles say, as live-check.txt (the workflow fails on a FAIL line). A
+# check that found nothing new drew nothing; the mock school's change was found by a check that put in place only what
+# it changed — the counters and the List's row, one course's card, To Do's new row — and the next check found nothing
+# new again; a course's page was checked at its own pace; no check went without an answer.
+live_check() {
+  local out="$OUT_ABS/live-check.txt"
+  local d="$OUT_ABS/console-light-48a-live-dashboard.txt" k="$OUT_ABS/console-light-48b-live-cards.txt"
+  local t="$OUT_ABS/console-light-48c-live-todo.txt" a="$OUT_ABS/console-light-48d-live-course.txt"
+  : > "$out"
+  say() { if [ "$1" = 0 ]; then echo "ok   $2" >> "$out"; else echo "FAIL $2" >> "$out"; fi; }
+  after() { awk -v a="$2" -v b="$3" 'index($0, a) { seen = 1 } seen && index($0, b) { found = 1 } END { exit !found }' "$1" 2>/dev/null; }
+  grep -Eq 'live: dashboard unchanged · [0-9]+ reads? · 0 redraws' "$d" 2>/dev/null && ! grep -Eq 'live: dashboard unchanged .* · [1-9][0-9]* redraws?' "$d" 2>/dev/null
+  say $? "the Dashboard checked with nothing new drew nothing: $(grep -Ec 'live: dashboard unchanged' "$d" 2>/dev/null) unchanged, each 0 redraws ($(grep -Eo 'live: dashboard unchanged · [0-9]+ reads?' "$d" 2>/dev/null | head -1 | grep -Eo '[0-9]+ reads?'))"
+  grep -q 'live: dev change done made' "$d" 2>/dev/null
+  say $? "the mock school's soonest work marked done behind the engine's back"
+  grep -Eq 'live: dashboard updated ([a-z-]+,)*counters[, ].* · [1-9][0-9]* redraws?' "$d" 2>/dev/null
+  say $? "a check found it and put in place the counters: $(grep -Eo 'live: dashboard updated [a-z,-]+' "$d" 2>/dev/null | head -1)"
+  grep -Eq 'live: dashboard updated ([a-z-]+,)*list[, ]' "$d" 2>/dev/null
+  say $? "and the List's row (Coming up)"
+  after "$d" 'live: dashboard updated' 'live: dashboard unchanged'
+  say $? "the check after it found nothing new again"
+  grep -q 'live: dev change grade made' "$k" 2>/dev/null && grep -Eq 'live: dashboard updated ([a-z-]+,)*cards[, ]' "$k" 2>/dev/null
+  say $? "a course's total moved: the Cards view's card changed ($(grep -Eo 'live: dashboard updated [a-z,-]+' "$k" 2>/dev/null | head -1))"
+  grep -q 'live: dev change task made' "$t" 2>/dev/null && grep -q 'live: todo updated todo' "$t" 2>/dev/null
+  say $? "a task added: To Do's list changed"
+  after "$t" 'live: todo updated' 'live: todo unchanged'
+  say $? "and To Do's next check found nothing new again"
+  grep -Eq 'live: assignments unchanged' "$a" 2>/dev/null
+  say $? "a course's assignments checked at their own pace: $(grep -Ec 'live: assignments ' "$a" 2>/dev/null) checks"
+  ! grep -q 'live: .* not checked' "$d" "$k" "$t" "$a" 2>/dev/null
+  say $? "no check went without an answer"
+  cat "$out"
+}
+
 # (1.2.1) SHOTS=quick, a push's set: the main screens once each, a few minutes — every screen in light and dark is
 # SHOTS=full (the workflow's own choice, or a commit's message saying [full shots])
 if [ "${SHOTS:-full}" = quick ]; then
@@ -588,8 +647,10 @@ if [ "${SHOTS:-full}" = quick ]; then
   bio_quick # (after the phone's files are on their way: a shot waits for a free worker, and the phone's app must not)
   wait
   walks
+  live_shots # (1.3.80: alone, last)
   phone_check
   richtext_check
+  live_check
   keep_crashes
   exit 0
 fi
@@ -701,6 +762,8 @@ shoot light-45-dashboard-pins 14 -SimplFocusDemo YES -SimplPinnedTools "calc,nee
 shoot light-54f-pin-timer 14 -SimplFocusDemo YES -SimplPinnedTools pomo -SimplPinOpen pomo # (1.3.78: the timer's quick version)
 wait
 bio_pins
+live_shots # (1.3.80: alone, last)
 richtext_check
+live_check
 keep_crashes
 exit 0
