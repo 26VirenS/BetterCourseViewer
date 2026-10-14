@@ -736,7 +736,8 @@ public sealed partial class DashboardScreen : Screen
     /// </summary>
     private bool Follow(bool evenMoving = false)
     {
-        if (frame == null || panelMoved || openKey == null || Layer is not { } layer) return false;
+        // (not while its heading is held: it is the pointer's to move then)
+        if (frame == null || panelMoved || frame.IsMouseCaptured || openKey == null || Layer is not { } layer) return false;
         // (the page still sliding into place — back from another place — has its tile where it will not stay: once it rests)
         if (!evenMoving && PageMoving()) { FollowWhenStill(); return false; }
         var tile = TileRect(openKey);
