@@ -196,11 +196,11 @@ struct DashboardView: View {
 
     // MARK: - Counters
 
-    /// The counters in rows: (1.3.78) one row of six compact tiles on a window `rowOfSix` wide or wider, else tall tiles
-    /// three across, or two on a very narrow page. (1.2.8) A counter opened grows out of its own tile into a panel that
-    /// floats over the page — as wide as a panel needs, not the page — over its tile, placed by where the tile is
-    /// (1.3.16): the left-most tile's panel from its left edge, the right-most's from its right, one in the middle centred
-    /// on it, each kept on the page; nothing under it moves.
+    /// The counters in rows: (1.3.78) one row of six on a window `rowOfSix` wide or wider, else three across, or two on
+    /// a very narrow page — (1.3.79) each 1.3.77's tile, square in the row of six. (1.2.8) A counter opened grows out of
+    /// its own tile into a panel that floats over the page — as wide as a panel needs, not the page — over its tile,
+    /// placed by where the tile is (1.3.16): the left-most tile's panel from its left edge, the right-most's from its
+    /// right, one in the middle centred on it, each kept on the page; nothing under it moves.
     private func counters(_ d: Today) -> some View {
         // (until the window has said how wide it is: six where the page alone has room for them, as before 1.3.78)
         let six = wideWindow ?? (width >= 900)
@@ -210,10 +210,13 @@ struct DashboardView: View {
             Array(list[start..<min(start + cols, list.count)])
         }
         let tile = (width - Self.counterSpacing * CGFloat(cols - 1)) / CGFloat(cols)
-        let (style, full) = Self.wording(list, six: six, tileWidth: tile)
+        let (style, full) = Self.wording(list, tileWidth: tile)
+        // (1.3.79) in the row of six, each tile as tall as it is wide — up to `squareMost`, past which a wide window's
+        // tiles stand no taller (they never stand shorter than what is on them)
+        let square = six ? min(tile, Self.squareMost) : 0
         return VStack(alignment: .leading, spacing: Self.counterSpacing) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                counterRow(row, cols: cols, style: style, full: full)
+                counterRow(row, cols: cols, style: style, full: full, tile: tile, square: square)
             }
         }
         .tourSpot(.counters) // (the tour's first step: everything due, at a glance)
@@ -226,9 +229,9 @@ struct DashboardView: View {
                     // the last one's from its right, one between them centred on it in step — kept on the page
                     let along = g.size.width > tile.width ? min(max((tile.minX) / (g.size.width - tile.width), 0), 1) : 0
                     let x = min(max(tile.minX + (tile.width - w) * along, 0), max(0, g.size.width - w))
-                    // (home-18) its list as tall as the window has room for under the tile's top, less its header and
-                    // footer (about 170 points of them) and a margin at the window's foot
-                    let room = windowHeight > 0 ? windowHeight - (g.frame(in: .global).minY + tile.minY) - 186 : 380
+                    // (home-18) its list no taller than the window has room for under the tile's top, less its header
+                    // (about 130 points of it) and a margin at the window's foot
+                    let room = windowHeight > 0 ? windowHeight - (g.frame(in: .global).minY + tile.minY) - 150 : 240
                     DashCounterPanel(counter: c, value: value(c), note: fullNote(c), width: w, room: room, close: { setOpen(nil) },
                                      onHeight: { h in
                                          if abs(h - panelHeight) > 0.5 { withAnimation(Motion.gentle) { panelHeight = h } }
@@ -262,11 +265,13 @@ struct DashboardView: View {
 
     /// The room between two tiles, across and down.
     static let counterSpacing: CGFloat = 14
+    /// (1.3.79) The tallest a square tile in the row of six stands.
+    static let squareMost: CGFloat = 150
 
-    private func counterRow(_ row: [Counter], cols: Int, style: DashCounterTile.Style, full: Bool) -> some View {
+    private func counterRow(_ row: [Counter], cols: Int, style: DashCounterTile.Style, full: Bool, tile: CGFloat, square: CGFloat) -> some View {
         HStack(alignment: .top, spacing: Self.counterSpacing) {
             ForEach(row) { c in
-                counterSlot(c, style: style, full: full).frame(maxWidth: .infinity, maxHeight: .infinity)
+                counterSlot(c, style: style, full: full, tile: tile, square: square).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             ForEach(0..<max(cols - row.count, 0), id: \.self) { _ in
                 Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
@@ -277,30 +282,32 @@ struct DashboardView: View {
 
     /// (home-17) Which names a row of tiles shows, decided once for the row where it measures them: every counter's full
     /// name — the one that says exactly what it counts ("Announcements", "Graded this week") — where every one of them
-    /// fits as the tile draws it (beside its symbol, or else with the symbols in the corners); else every short name
-    /// ("Unread", "Graded"), whose line says the rest ("announcements · 2 courses"). Never a mix, and never a name cut.
-    static func wording(_ list: [Counter], six: Bool, tileWidth: CGFloat) -> (style: DashCounterTile.Style, full: Bool) {
+    /// fits beside its symbol as the tile draws it; else every short name ("Unread", "Graded"), whose line says the rest
+    /// ("announcements · 2 courses"). (1.3.79) A tile too narrow for even those beside their symbols (the row of six
+    /// beside the sidebar on the narrowest window) puts each symbol over its name. Never a mix, and never a name cut.
+    static func wording(_ list: [Counter], tileWidth: CGFloat) -> (style: DashCounterTile.Style, full: Bool) {
         let full = list.map { $0.fullLabel ?? $0.label }
         let short = list.map(\.label)
-        guard six else { return (.tall, DashCounterTile.tallFits(full, tileWidth: tileWidth)) }
-        if DashCounterTile.rowFits(full, tileWidth: tileWidth, symbolBeside: true) { return (.row(symbolBeside: true), true) }
-        if DashCounterTile.rowFits(full, tileWidth: tileWidth, symbolBeside: false) { return (.row(symbolBeside: false), true) }
-        return (.row(symbolBeside: DashCounterTile.rowFits(short, tileWidth: tileWidth, symbolBeside: true)), false)
+        if DashCounterTile.namesFit(full, tileWidth: tileWidth, style: .beside) { return (.beside, true) }
+        if DashCounterTile.namesFit(short, tileWidth: tileWidth, style: .beside) { return (.beside, false) }
+        return (.over, DashCounterTile.namesFit(full, tileWidth: tileWidth, style: .over))
     }
 
     /// A counter's place in its row: the tile, or — while it has grown into its panel — the same tile unseen, so the row
     /// keeps its shape. (Under Reduce Motion nothing grows: the tile stays, and the panel fades in under its row.)
     @ViewBuilder
-    private func counterSlot(_ c: Counter, style: DashCounterTile.Style, full: Bool) -> some View {
+    private func counterSlot(_ c: Counter, style: DashCounterTile.Style, full: Bool, tile: CGFloat, square: CGFloat) -> some View {
         let name = full ? (c.fullLabel ?? c.label) : c.label
         let line = full ? fullNote(c) : note(c)
         Group {
             if open == c.key && !reduceMotion {
-                DashCounterTile(counter: c, name: name, value: value(c), note: line, stale: stale(c), style: style) {}
+                DashCounterTile(counter: c, name: name, value: value(c), note: line, stale: stale(c), style: style,
+                                width: tile, minHeight: square, tip: fullNote(c)) {}
                     .hidden()
                     .accessibilityHidden(true)
             } else {
-                DashCounterTile(counter: c, name: name, value: value(c), note: line, stale: stale(c), style: style) { setOpen(open == c.key ? nil : c.key) }
+                DashCounterTile(counter: c, name: name, value: value(c), note: line, stale: stale(c), style: style,
+                                width: tile, minHeight: square, tip: fullNote(c)) { setOpen(open == c.key ? nil : c.key) }
                     .tourSpot(c.key == "next" ? .counterNext : nil)
                     .dashMorph(c.key, in: morph, enabled: !reduceMotion)
                     .transition(.opacity)
@@ -379,11 +386,12 @@ struct DashboardView: View {
     }
 
     /// (1.3.62) While a counter is open, a click anywhere in the app but its panel — the sidebar, the toolbar, the page —
-    /// folds it back (the click still does what it does; on another counter, that one opens).
+    /// folds it back (the click still does what it does; on another counter, that one opens). (1.3.79) While a row's card
+    /// is out over it, a click is the card's — on it, or round it to fold it back — and the panel stays under it.
     private func watchClicks(_ on: Bool) {
         if on, clickWatch == nil {
             clickWatch = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { e in
-                guard open != nil, let view = e.window?.contentView else { return e }
+                guard open != nil, WorkPreview.shared.item == nil, let view = e.window?.contentView else { return e }
                 let p = CGPoint(x: e.locationInWindow.x, y: view.bounds.height - e.locationInWindow.y)
                 if !panelFrame.insetBy(dx: -2, dy: -2).contains(p) { setOpen(nil) }
                 return e

@@ -363,9 +363,10 @@ struct PreviewLink<Label: View>: View {
     }
 
     /// The screenshot suite (-SimplOpen preview): the first row that is on screen opens its preview (1.2.8: one laid out
-    /// below the fold no longer takes it, so the card is pictured where it grows from).
+    /// below the fold no longer takes it, so the card is pictured where it grows from); (1.3.79) -SimplOpen
+    /// preview:counter, the first row of the counter's panel opened (-SimplSheet), not one of the page's under it.
     private func shot() {
-        guard PreviewShot.wanted, !PreviewShot.taken else { return }
+        guard PreviewShot.wanted, !PreviewShot.taken, PreviewShot.wants(item) else { return }
         let item = item
         let anchor = anchor
         Task { @MainActor in
@@ -377,11 +378,18 @@ struct PreviewLink<Label: View>: View {
     }
 }
 
-/// The screenshot suite's preview, asked for once at launch (-SimplOpen preview) and opened once.
+/// The screenshot suite's preview, asked for once at launch (-SimplOpen preview, or preview:counter) and opened once.
 @MainActor
 enum PreviewShot {
-    static let wanted = LaunchOpen.take("preview") != nil
+    /// What follows "preview" in what was asked: "" (any row's), ":counter" (a row of a counter's panel); nil: none.
+    static let asked = LaunchOpen.take("preview")
+    static var wanted: Bool { asked != nil }
     static var taken = false
+
+    /// The row whose preview is pictured is one of these.
+    static func wants(_ item: PreviewItem) -> Bool {
+        asked != ":counter" || item.id.hasPrefix("sheet:")
+    }
 }
 
 // MARK: - From the rows
