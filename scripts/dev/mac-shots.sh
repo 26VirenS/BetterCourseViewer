@@ -174,17 +174,19 @@ bio_quick() {
 bio_full() {
   # the three cells, a part's card, inside an organelle, pulled apart, at true scale, the membrane, the three compared
   # (each picture waits for its cell to be built — seconds in a debug build, the plant and the three compared longest —
-  # and is taken as soon as it is: the wait is the longest it may take)
+  # and is taken as soon as it is: the wait is the longest it may take; the plant's and the three compared's were 40
+  # and 45, and with four copies of the app at work the plant took 39 s after the app had been up 8, and was pictured
+  # before it came)
   bio both 57-cell-animal 30 cell animal
   bio light 57b-cell-mito-card 30 cell animal:select=mito
-  bio both 57c-cell-plant 40 cell plant:select=chloroplast
+  bio both 57c-cell-plant 60 cell plant:select=chloroplast
   bio light 57d-cell-bacterium 30 cell bacterium
   bio light 57e-cell-explode 30 cell animal:explode=0.7
   bio light 57f-cell-true-scale 40 cell animal:true
   bio light 57g-cell-mito-inside 30 cell animal:inside=mito
   bio light 57h-cell-nucleus-inside 30 cell animal:inside=nucleus
   bio both 57i-cell-membrane 30 cell membrane:select=integral:channel:osmosis
-  bio light 57j-cell-compare 45 cell compare
+  bio light 57j-cell-compare 60 cell compare
   bio light 57k-cell-quiz 30 cell animal:quiz=name
   bio light 57l-cell-gram-positive 30 cell bacterium:gram+:select=wall
   # the double helix (measured, its grooves, in atoms, unzipped), the nucleotides, a strand's facts, replication, RNA

@@ -72,19 +72,31 @@ parts split at `:` (`plant:cutaway`, `helix:style=atoms:seq=ATGC`). A first part
 that page by itself. Read the rest with `state?.has("cutaway")` and `state?.value("style")`. The spec's flags read the
 same way: `-SimplBioSeq ATGC` is `value("Seq")`, `-SimplBioStep 4` is `value("Step")`, `-SimplBioPage <page>` picks
 the page. Make it part of the view's first state, not a change made on appear: in a store's `init` (DNA & RNA's
-`DNAStore`), in a page's `init` as `@State`/`@StateObject` initial values (the Cell Explorer's pages, Photosynthesis &
-Respiration's step-throughs), so every page made for the launch shows it from its first frame — applied once on
-appear, some of it never reached the pictures (the grooves, the unzip, a cell at true scale, a step-through's step).
+`DNAStore`, Gene Expression's `GXStore`), in a page's `init` as `@State`/`@StateObject` initial values (the Cell
+Explorer's pages, Photosynthesis & Respiration's map and step-throughs), so every page made for the launch shows it
+from its first frame — SwiftUI makes a tool's page more than once as the window settles at its size, and state applied
+once on appear, or taken once, never reached the pictures (the grooves, the unzip, a cell at true scale, a step's
+number, the codon grid's lookup, the map's stage).
 In the screenshot suite those tools also say on the console what the page shows of its launch
 (`[Simpl] bio launch: dna helix:grooves: style cartoon, grooves on, …`), and every scene says when it is made
 (`[Simpl] bio scene: <key> made in <ms> ms, <n> objects`). `-SimplBioCheck YES` prints the self-check on the console
 (`bio-check <name> <value> <OK|FAIL>`, each group's lines as it ends — the whole check takes about a minute in a debug
 build — then `bio-check summary n/m OK`). `-SimplToolsScroll biology` scrolls the Tools page to the Biology section.
-The pictures are in `scripts/dev/mac-shots.sh` (see **Pictures** below): `bio both 57c-cell-plant 40 cell
+The pictures are in `scripts/dev/mac-shots.sh` (see **Pictures** below): `bio both 57c-cell-plant 60 cell
 plant:select=chloroplast` opens a tool at 1440×920 (the runner's screen holds it to 1024×683) in light and dark. A
 picture is taken once the app has settled, and a scene being made (`BioSceneView`) or a cell being built counts as not
-settled (`Shot.began()`/`ended()`), so the wait is only the longest a picture may take. A picture's launch keeps the
+settled (`Shot.began()`/`ended()`), so the wait is only the longest a picture may take; it is taken with the app in
+front, asked again when another copy of the app has the front (`Shot.settle`). A picture's launch keeps the
 tools' settings in a suite of its own that starts empty (`BioPrefs`), so one picture's choices never show in the next.
+
+A scene is made once for its key at a time (`BioSceneMaking`): a page made again while its scene is on its way waits
+for that one, rather than making it a second time beside it (the cells' models are kept the same way,
+`CEBuildCache`). A debug build makes the cells slowly — the plant cell took 39 s on the runner with four copies of the
+app at work — so the cell builder's hot paths are written for it: a rounded box's or a lens's radius along a direction
+is found by false position (`BioShapes.byDistance`) or worked out (`lensRadius`) rather than by 48 halvings, a mesh's
+normals are moved with their matrix made once (`BioMesh.transformed`), a nuclear envelope's pores are looked up by
+height (`CERecipes.envelope`), and a chloroplast is made once and placed sixty times (`CEShapeShelf`). Each gives the
+same meshes, to a float's last digit.
 
 ## Data (Model, any thread)
 

@@ -95,15 +95,33 @@ enum Shot {
         // (1.3.78) the window brought to the front first, and pictured a moment later: the suite's copies of the app share
         // the screen, and a copy another has covered draws nothing new — an animation under way in it (its screens
         // fading in as it opens) stopped where it was and was pictured so, faint or blank. In front, it finishes.
-        if let w = target() {
-            // (what was in front of it and over it — the search field's suggestions — noted first, and brought back to
-            // the front after it: the window brought forward went over them, and they were left out of the picture)
-            lifted = above(w)
-            NSApp.activate(ignoringOtherApps: true)
-            w.orderFrontRegardless()
-            for s in lifted.reversed() { s.orderFrontRegardless() }
+        front(noting: true)
+        settle(file)
+    }
+
+    /// The window to picture brought to the front, with what was in front of it and over it — the search field's
+    /// suggestions — noted first (`noting`, the first time), and brought back to the front after it: the window brought
+    /// forward went over them, and they were left out of the picture.
+    private static func front(noting: Bool = false) {
+        guard let w = target() else { return }
+        if noting { lifted = above(w) }
+        NSApp.activate(ignoringOtherApps: true)
+        w.orderFrontRegardless()
+        for s in lifted.reversed() { s.orderFrontRegardless() }
+    }
+
+    /// (1.3.78) Pictured once the app is in front — asked again, up to four times, when another copy has taken the front
+    /// at the same moment: a pin's popover closes when its app is put behind another (it opens again as the app comes
+    /// back), and two of the four pins were pictured closed, their windows inactive.
+    private static func settle(_ file: String, attempt: Int = 0) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+            if NSApp.isActive || attempt >= 4 {
+                capture(file)
+            } else {
+                front()
+                settle(file, attempt: attempt + 1)
+            }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { capture(file) }
     }
 
     /// (1.3.78) The windows that were in front of the one pictured, over it, when its picture was asked for.
