@@ -665,13 +665,15 @@ private struct TodoPriority: Identifiable {
 // MARK: - A new task
 
 /// A task of your own (a Canvas planner note): what it is, its day, a course and a repeat if wanted, and its priority.
-/// File → New Task and To Do's + put it over the window; Return adds it, Escape puts it away.
+/// File → New Task and To Do's + put it over the window (1.3.79: a popup that never blocks it); Return adds it, Escape
+/// puts it away.
 struct NewTaskSheet: View {
     /// (1.2) The day the next sheet opens on (the Calendar's New Task on a day), taken once; today when nothing is set.
     @MainActor static var startDay: Date?
 
     @EnvironmentObject private var engine: Engine
-    @Environment(\.dismiss) private var dismiss
+    /// (1.3.79) Its popup over the window (never blocking it: Shell/FloatingPopup.swift), which Cancel and Add close.
+    @Environment(\.popup) private var dismiss
     @State private var title = ""
     @State private var date = Date()
     @State private var course = ""
@@ -696,6 +698,7 @@ struct NewTaskSheet: View {
             .padding(.horizontal, 20)
             .padding(.top, 18)
             .padding(.bottom, 2)
+            .popupHeader() // (1.3.79: dragged by its head, the popup moves)
             form
             Divider()
             HStack(spacing: 10) {

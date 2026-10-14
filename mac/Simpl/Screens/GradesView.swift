@@ -513,9 +513,9 @@ private struct GradeCourseDetail: View {
             }
             .controlSize(.large)
         }
-        .sheet(isPresented: $editingScale) {
+        // (1.3.79: a popup over the window that never blocks it)
+        .floatingPopup("grading-scale:\(row.id)", title: "Grading Scale", isPresented: $editingScale) {
             GradingScaleSheet(courseID: row.id, course: row.code, scale: row.scale ?? scale, own: row.ownScale == true)
-                .environmentObject(engine)
         }
     }
 
@@ -1180,7 +1180,8 @@ struct CourseGradesView: View {
             // (the screenshot suite: -SimplWhatIf YES turns What-If on once the grades are in, nothing typed)
             if data != nil, !whatIf, LaunchOpen.take("", key: "SimplWhatIf") != nil { setWhatIf(true) }
         }
-        .sheet(item: $addingTo) { g in
+        // (1.3.79: a popup over the window that never blocks it)
+        .floatingPopup("whatif-add", title: "What-If Assignment", item: $addingTo) { g in
             AddWhatIfSheet(group: g, lmsName: engine.lmsName) { name, possible, score in
                 addWhatIf(to: g, name: name, possible: possible, score: score)
             }
@@ -1881,7 +1882,8 @@ private struct AddWhatIfSheet: View {
     /// The school's site by name (Engine.lmsName), for the note that nothing is saved to it.
     let lmsName: String
     let add: (String, Double, Double?) -> Void
-    @Environment(\.dismiss) private var dismiss
+    /// (1.3.79) Its popup over the window, which Cancel and Add close.
+    @Environment(\.popup) private var dismiss
     @State private var name = ""
     @State private var score = ""
     @State private var possible = "100"
@@ -2103,7 +2105,8 @@ private struct GradingScaleSheet: View {
     let scale: [ScaleStep]
     let own: Bool
     @EnvironmentObject private var engine: Engine
-    @Environment(\.dismiss) private var dismiss
+    /// (1.3.79) Its popup over the window, which Cancel and Save close.
+    @Environment(\.popup) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var values: [String: String] = [:]
     @State private var error: String?
@@ -2119,6 +2122,7 @@ private struct GradingScaleSheet: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(20)
+            .popupHeader() // (1.3.79: dragged by its head, the popup moves)
             Form {
                 Section {
                     ForEach(letters, id: \.letter) { s in

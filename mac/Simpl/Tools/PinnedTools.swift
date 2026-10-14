@@ -69,7 +69,7 @@ struct PinnedToolButton: View {
 
     @ViewBuilder
     private var menu: some View {
-        Button("Open \(kind.name)") { tools.show(kind, engine: engine) }
+        Button("Open \(kind.name)") { tools.popUp(kind, engine: engine) } // (1.3.79: in its popup over the window)
         if kind == .pomo && focus.active {
             Divider()
             Button(focus.running ? "Pause" : "Resume") { focus.toggle() }
@@ -201,11 +201,11 @@ struct PinnedToolPopover: View {
         }
     }
 
-    /// The whole tool (1.2.1): over the window where you are, as a large sheet — not on the Tools page (1.3.73: or, when
-    /// a popup already has the window, on the Tools page of a window more).
+    /// The whole tool (1.2.1): over the window where you are — (1.3.79) in its popup, which never blocks the window (and
+    /// comes up over a quiz or an Alta assignment's popup too) — not on the Tools page.
     private func openFull(info: [String: String] = [:], files: [URL] = []) {
         close()
-        tools.openFull(kind, engine: engine, files: files, info: info)
+        tools.popUp(kind, engine: engine, files: files, info: info)
     }
 }
 

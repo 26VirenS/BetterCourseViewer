@@ -2,7 +2,8 @@ import AppKit
 import SwiftUI
 import WebKit
 
-/// (1.3.8) Your work and what was said about it, in a popup over the assignment: on the left the file in Canvas's own
+/// (1.3.8) Your work and what was said about it, in a popup over the assignment (1.3.79: one that never blocks the
+/// window — the assignment, and every other screen, stay usable under it): on the left the file in Canvas's own
 /// viewer (DocViewer: the teacher's marks drawn on it, as Canvas shows them), one file at a time where there are several;
 /// on the right the comments. A file Canvas has no viewer for is shown in Quick Look; work with no file at all shows the
 /// submission's own page in Canvas. (1.3.78) Escape or Close — at the bar's right end, as on every full popup — closes
@@ -12,8 +13,10 @@ struct SubmissionReview: View {
     let assignment: AssignmentData
     @State var picked: Attachment?
     @EnvironmentObject private var engine: Engine
-    @Environment(\.dismiss) private var dismiss
-    @State private var size = SubmissionReview.idealSize()
+    /// (1.3.79) Its popup over the window (never blocking it: Shell/FloatingPopup.swift), which Close closes.
+    @Environment(\.popup) private var dismiss
+    /// (1.3.79) The popup's size, as the window gives it — sized again with the window.
+    @Environment(\.popupSize) private var popupSize
 
     /// What the popup opens on: a file, or the work as a whole.
     struct Target: Identifiable {
@@ -21,15 +24,8 @@ struct SubmissionReview: View {
         let file: Attachment?
     }
 
-    /// Most of the window it opens over, as the quiz's sheet is (a sheet keeps to its least width, so it is set exactly).
-    private static func idealSize() -> CGSize {
-        let windows = NSApp.windows.filter { $0.isVisible && $0.sheetParent == nil && !($0 is NSPanel) }
-        guard let w = NSApp.mainWindow ?? windows.max(by: { $0.frame.width < $1.frame.width }), w.sheetParent == nil else {
-            return CGSize(width: 1100, height: 720)
-        }
-        let room = w.contentLayoutRect.size
-        return CGSize(width: min(max(room.width - 64, 760), 1500), height: min(max(room.height - 36, 520), 1000))
-    }
+    /// Most of the window it is over: the large popup's size.
+    private var size: CGSize { popupSize ?? CGSize(width: 1100, height: 720) }
 
     private var files: [Attachment] { assignment.submission?.files ?? [] }
 
@@ -106,6 +102,7 @@ struct SubmissionReview: View {
         .controlSize(.large)
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
+        .popupHeader() // (1.3.79: dragged by its head, the popup moves)
     }
 
     // MARK: The work

@@ -619,9 +619,9 @@ private struct PeopleList: View {
                 }
             }
         }
-        .sheet(item: $writeTo) { r in
+        // (1.3.79: a popup over the window that never blocks it — the message written as the course is looked at)
+        .floatingPopup("compose:\(ctx)", title: "New Message", item: $writeTo) { r in
             ComposeSheet(to: [r], context: ctx.hasPrefix("courses/") ? "course_\(ContextHome.id(of: ctx))" : nil)
-                .environmentObject(engine)
         }
     }
 

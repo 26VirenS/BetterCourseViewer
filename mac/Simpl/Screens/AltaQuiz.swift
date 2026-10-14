@@ -9,10 +9,12 @@ import WebKit
 /// it there. AltaSession.swift reads the objectives and their mastery from it.
 struct AltaQuizScreen: View {
     @EnvironmentObject private var engine: Engine
-    @Environment(\.dismiss) private var dismiss
+    /// (1.3.79) Its popup over the window (never blocking it: Shell/FloatingPopup.swift), which Close closes.
+    @Environment(\.popup) private var dismiss
     @Environment(\.colorScheme) private var scheme
     @StateObject private var session: AltaSession
-    @State private var ideal = AltaQuizScreen.idealSize()
+    /// (1.3.79) The popup's size, as the window gives it — sized again with the window.
+    @Environment(\.popupSize) private var popupSize
     @State private var saving = false
     @State private var saved: URL?
     @State private var showLogs = false
@@ -24,15 +26,8 @@ struct AltaQuizScreen: View {
         _session = StateObject(wrappedValue: AltaSession(launch: launch))
     }
 
-    /// Most of the window it opens over, as the quiz sheet takes.
-    private static func idealSize() -> CGSize {
-        let windows = NSApp.windows.filter { $0.isVisible && $0.sheetParent == nil && !($0 is NSPanel) }
-        guard let w = NSApp.mainWindow ?? windows.max(by: { $0.frame.width < $1.frame.width }), w.sheetParent == nil else {
-            return CGSize(width: 1040, height: 700)
-        }
-        let room = w.contentLayoutRect.size
-        return CGSize(width: min(max(room.width - 64, 760), 1400), height: min(max(room.height - 36, 520), 960))
-    }
+    /// Most of the window it is over: the large popup's size.
+    private var ideal: CGSize { popupSize ?? CGSize(width: 1040, height: 700) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -86,7 +81,7 @@ struct AltaQuizScreen: View {
                 }
             }
             Spacer(minLength: 8)
-            PopupPins() // (1.3.73: the toolbar's pins, here too — the toolbar is under the sheet)
+            PopupPins() // (1.3.73: the toolbar's pins, here too)
             GlassGroup(spacing: 8) {
                 // (1.3.47) shown once Alta's page was not recognised (and given back as it is); (1.3.72) to developers
                 if dev.unlocked && !session.errorLogs.isEmpty {
@@ -109,6 +104,7 @@ struct AltaQuizScreen: View {
         .padding(.horizontal, 22)
         .padding(.top, 16)
         .padding(.bottom, 12)
+        .popupHeader() // (1.3.79: dragged by its head, the popup moves)
     }
 
     /// (1.3.47) The Error Logs: each time Alta's page was not recognised — when, why, what it held — to copy, or to save

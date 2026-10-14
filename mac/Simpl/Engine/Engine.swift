@@ -95,9 +95,16 @@ final class Engine: ObservableObject, ShellListener {
     @Published var whatsNew: WhatsNewSheetItem? {
         didSet { if whatsNew == nil && oldValue != nil { schedulePopups() } }
     }
-    /// A new task (File → New Task, the + on To Do) and a new message (File → New Message): their sheets.
-    @Published var newTask = false
-    @Published var newMessage = false
+    /// A new task (File → New Task, the + on To Do) and a new message (File → New Message): (1.3.79) their popups —
+    /// asked for again while up, brought to the front.
+    @Published var newTask = false {
+        didSet { if newTask && oldValue { popups.raise("newtask") } }
+    }
+    @Published var newMessage = false {
+        didSet { if newMessage && oldValue { popups.raise("compose") } }
+    }
+    /// (1.3.79) This window's popups over it, none of which blocks it (Shell/FloatingPopup.swift).
+    private(set) lazy var popups = FloatingPopups(engine: self)
     /// What a press on a piece of work asked for, for the screen it opens to do on arriving: Hand In, or the feedback.
     struct Arrival: Equatable {
         let id: String
@@ -158,7 +165,10 @@ final class Engine: ObservableObject, ShellListener {
         guard main !== self, main !== primary else { return }
         primary = main
         mirrors = []
-        main.$phase.sink { [weak self] v in self?.phase = v }.store(in: &mirrors)
+        main.$phase.sink { [weak self] v in
+            self?.phase = v
+            if v != .native { self?.popups.closeAll() } // (1.3.79: the app's screens gone, its popups go with them)
+        }.store(in: &mirrors)
         main.$snapshot.sink { [weak self] v in self?.snapshot = v }.store(in: &mirrors)
         main.$lms.sink { [weak self] v in self?.lms = v }.store(in: &mirrors)
         main.$dataVersion.sink { [weak self] v in self?.dataVersion = v }.store(in: &mirrors)
@@ -265,6 +275,7 @@ final class Engine: ObservableObject, ShellListener {
         // screens and back, and why — a picture taken as it changes is explained by it)
         if OpenClock.verbose { NSLog("[Simpl] window: %@ (%@)", p == .native ? "the app's screens" : p == .web ? "the school's page" : "starting", web.webView.url?.path ?? "no page") }
         withAnimation(.easeInOut(duration: 0.35)) { phase = p }
+        if p != .native { popups.closeAll() } // (1.3.79: the app's screens gone — the sign-in shown — its popups go too)
         if p == .native {
             // (the page underneath lets go of the keyboard: what is typed goes to the app's own screens, never to it)
             DispatchQueue.main.async { [weak self] in

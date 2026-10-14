@@ -71,19 +71,18 @@ struct AssignmentView: View {
             }
         }
         .task(id: engine.dataVersion) { await load() }
-        .sheet(isPresented: $handIn, onDismiss: { dropped = [] }) {
+        // (1.3.79) Hand In and the feedback are popups over the window that never block it: the page, and every other
+        // screen, stay usable under them, and they stay up as the window goes elsewhere, until they are closed
+        .floatingPopup("handin:\(owner)", title: "Hand In", isPresented: $handIn, onDismiss: { dropped = [] }) {
             if let d = model.data {
                 HandInSheet(assignment: d, dropped: dropped) { await handedInHere() }
-                    .environmentObject(engine)
             }
         }
-        .sheet(item: $review) { t in
+        .floatingPopup("feedback:\(owner)", title: "Feedback", item: $review, layout: .large) { t in
             if let d = model.data {
                 SubmissionReview(assignment: d, picked: t.file)
-                    .environmentObject(engine)
             }
         }
-        .onDisappear { RubricPopup.shared.dismiss(owner: owner) } // (the ring goes with its page)
     }
 
     /// Which assignment this is, to the rubric ring over the window.
@@ -191,7 +190,7 @@ struct AssignmentView: View {
 
     /// The rubric ring up over the window (RubricPopup.swift).
     private func openRubric(_ d: AssignmentData, open k: Int? = nil, view: String? = nil) {
-        RubricPopup.shared.show(RubricPopup.Item(data: d, owner: owner, open: k, view: view))
+        RubricPopup.shared.show(RubricPopup.Item(data: d, owner: owner, open: k, view: view), engine: engine)
     }
 
     /// The screenshot suite's way to the ring: "" opens it, ":2" opened on the second criterion, ":grid" as the grid.
@@ -828,7 +827,7 @@ struct AssignmentView: View {
         } else if let step = nextStep(d), step.feedback || step.again {
             act(d, step)
         } else if d.canSubmit {
-            handIn = true
+            if handIn { engine.popups.raise("handin:\(owner)") } else { handIn = true } // (1.3.79: up already: brought forward)
         } else if let q = d.quizId {
             engine.openQuiz(QuizLaunch(course: course, quiz: q, title: d.title))
         } else if let q = d.quizUrl {
@@ -1155,7 +1154,9 @@ private struct HandInSheet: View {
     let dropped: [URL]
     let done: () async -> Void
     @EnvironmentObject private var engine: Engine
-    @Environment(\.dismiss) private var dismiss
+    /// (1.3.79) Its popup over the window (never blocking it: Shell/FloatingPopup.swift), which Cancel and a hand-in
+    /// sent close.
+    @Environment(\.popup) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var type: String
     @State private var text = ""
@@ -1233,7 +1234,7 @@ private struct HandInSheet: View {
             phone.end() // (the hand-in sent or cancelled: the server stopped, what the phone sent thrown away)
         }
         .task { await loadConvertible() }
-        .interactiveDismissDisabled(sending)
+        .popupCloseHeld(sending) // (1.3.79: not closed by Escape or ⌘W while it is on its way)
     }
 
     private var form: some View {
@@ -1289,6 +1290,7 @@ private struct HandInSheet: View {
         .padding(.horizontal, 20)
         .padding(.top, 18)
         .padding(.bottom, 6)
+        .popupHeader() // (1.3.79: dragged by its head, the popup moves)
     }
 
     /// (1.3.78) A kind's own heading only where no Hand In As picker above already names it.

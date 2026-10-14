@@ -9,8 +9,6 @@ struct MainShell: View {
     @EnvironmentObject private var whereabouts: Whereabouts // (1.3.78: Back and Forward follow the window's moves)
     @ObservedObject private var tools = ToolsCenter.shared
     @ObservedObject private var focus = FocusTimer.shared
-    /// (planning-6) While the rubric is up, everything under it rests — the toolbar's buttons and the search too.
-    @ObservedObject private var rubric = RubricPopup.shared
     // (the screenshot suite: -SimplSidebar hidden opens the window with the sidebar folded away)
     @State private var columns: NavigationSplitViewVisibility = UserDefaults.standard.string(forKey: "SimplSidebar") == "hidden" ? .detailOnly : .all
     /// (1.3) The window was last wide enough for the sidebar beside the screen: crossing below folds it away, crossing
@@ -42,11 +40,8 @@ struct MainShell: View {
         }
         .overlay { TourOverlay(columns: $columns) } // (1.2) the Mac tour (Shell/Tour.swift)
         .overlay { WorkPreviewOverlay() } // (1.2.3) a piece of work's quick look, grown out of its row (Shell/WorkPreviewOverlay.swift)
-        // (1.2.1) a pinned tool opened whole: over the window, where you are
-        .sheet(item: $tools.popup) { k in
-            ToolPopup(kind: k)
-                .environmentObject(engine)
-        }
+        // (1.3.79) a tool opened whole, the rubric ring, Hand In and the rest are popups over the window that never block
+        // it (Shell/FloatingPopup.swift: ToolsCenter.popUp, RubricPopup.show, EngineSheets)
         // (1.2) the field finds and does: its suggestions are the web search box's — a sum, commands, courses and their
         // sections, groups — and "/" (or ">") lists every command (Shell/SearchCommands.swift); one picked runs.
         // (home-29) Its prompt short enough to show whole in the field on every school ("Search Brightspa…" was cut).
@@ -67,7 +62,10 @@ struct MainShell: View {
                 engine.goBack()
             }
         }
-        .onAppear { palette.launch(engine) }
+        .onAppear {
+            palette.launch(engine)
+            if engine.primary == nil { tools.openLaunchTool(engine) } // (the screenshot suite's -SimplTool, over the main window)
+        }
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 ControlGroup {
@@ -115,11 +113,6 @@ struct MainShell: View {
                 }
             }
         }
-        // (planning-6) the rubric ring is modal: while it is up, the window under it — the toolbar's buttons, the
-        // screen's own Previous and Next, the search — rests, and only its × and Ring / Grid answer. It is laid over all
-        // of it, outside what rests (Screens/RubricPopup.swift, which puts the window's title away meanwhile).
-        .disabled(rubric.item != nil)
-        .overlay { RubricPopupLayer() } // (1.2.3) the rubric ring, over the whole window
     }
 }
 

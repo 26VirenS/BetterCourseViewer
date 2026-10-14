@@ -46,6 +46,7 @@ mac/
     Shell/SettingsView.swift    Simpl ▸ Settings: General, Notifications, Grades, Data, Updates, About
     Shell/ToolWindow.swift      an external tool (or a page Simpl does not draw) in a window of its own
     Shell/WhatsNewSheet.swift   what changed, after an update
+    Shell/FloatingPopup.swift   the popups over a window that never block it (a tool, Alta, Hand In, What's New…)
     Shell/PageMotion.swift      how a screen arrives and leaves as the window moves (push, Back, a place picked)
     Screens/                    the native screens (Dashboard, Courses, To Do, Calendar, Grades, Notifications, Inbox,
                                 Groups, Search, a course's home and sections, an assignment, a discussion, a quiz, setup)
@@ -547,7 +548,7 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   replaced `PTHeaderControls`); the 3D builder's symbol is its own. On an element's page the heading's one back is
   "‹ Table" (⌘[) (`PTNav.elementOpen`, `closeElement`). The tour is offered the first time ("Take a quick tour?", Take
   the Tour / Not Now; `-SimplPTTourOffer YES` shows it for a picture), never started on its own; every card has Skip
-  Tour, a ✕, Back and a Next that always works; Esc ends it (the sheet's Done gives Escape up while it is on); ended
+  Tour, a ✕, Back and a Next that always works; Esc ends it (before it closes the tool's popup); ended
   early it counts as seen; the card sits beside the lit spot — under, over, or to its right (`PTTourOverlay.place`) —
   the first steps lighting the top rows and carbon rather than the whole table. Coloured by a property, a square too
   small for three lines shows the value in place of the number, and the trend gutter is slimmer. The legend and colour
@@ -614,6 +615,40 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
     as it appeared (the console said `stack: … set its own path, 1 screens to 0`) and showed its place's list.
     Under Reduce Motion every move is a cross-fade. No element is morphed from one screen into the next: the card and
     the course's heading are drawn by different screens, and a morph between them could not be kept clean.
+
+- **Popups that never block the window (1.3.79).** Every popup but a quiz being taken stands over the window without
+  getting in its way (`Shell/FloatingPopup.swift`): each is a window of its own over the main window (`PopupPanel`, a
+  child panel — above it, moving with it, key when clicked, never the main window), put up and closed by the window's
+  `FloatingPopups` (`Engine.popups`, by key). Nothing round one is dimmed or caught: the sidebar, the toolbar, the
+  search and the screen under it are used as ever, a soft shadow under it; going to another screen leaves it where it
+  is until it is closed — its ×, Escape while it has the keys, ⌘W, or its own Close, Cancel or Done (what it shows
+  closes it through `@Environment(\.popup)`, called as SwiftUI's `dismiss` was; `popupCloseHeld` keeps Escape, ⌘W and
+  × from closing a hand-in or a message on its way, or a message with something written, whose Cancel asks first).
+  Dragged by its head (`popupHeader()`; a strip along the top edge of every popup too) it moves, past the window if
+  wanted. It comes in a little smaller and faded on a short ease-out (0.22 s; a fade alone under Reduce Motion) and goes
+  the same way. Three sizes (`PopupLayout`): *large* — the screen's side of the window (under the toolbar, past the
+  sidebar while it is out) less 20 points all round, at most 1480 × 1040, sized again as the window is (`\.popupSize`
+  tells what it shows), a large one over another a step down and along; *fitted* — as large as what it shows asks, as
+  a sheet was, centred across the screen's side a little above its middle, its top and middle kept as it grows; *at* a
+  point, as a counter's list over its tile. A `.floatingPopup(key, title:, item:/isPresented:)` modifier puts one up
+  as `.sheet` did. What each popup is now: a **tool opened whole** — from its tile on the Tools page, its pin's popover
+  or floating panel (its name, or what it hands on), the pin's Open, a hand-off from another tool (`BioTools.open`) or
+  `-SimplTool` — a large popup over the window (`ToolsCenter.popUp`, `ToolPopup`; one at a time, another switched in
+  place with a cross-fade, opening at its top; its heading has its tile, name, pages, Pin and × and drags it; the Tools
+  page stays behind it — no more "‹ Tools"); **Knewton Alta** and **Macmillan** assignments, the **feedback** on a
+  piece of work and the **rubric ring**: large popups; **What's New**, **Hand In** (with Send from Phone and the file
+  preview inside it, the popup widening for the preview), **New Task**, **New Message** (File ▸ New Message, or a
+  person's Message in a course), the **grading scale**, a **what-if** assignment, a course's **nickname**, a counter's
+  **card photo**, the Cell Explorer's **POPC** and Crosses' **Why these gametes?**: fitted popups; a **counter's
+  list**: a popup at its tile (its glass its own; another counter's takes its place; Overdue's number follows its rows
+  cleared); the **quick look** at a piece of work: still the card grown out of its row in the window, but a press
+  round it no longer closes it, going to another screen leaves it where it is, and dragged it moves (its ✕ and Escape
+  close it). Unchanged: the pinned tools' popovers and their pulled-out floating panels, popovers and menus, Quick Look's
+  own panel and the Alta graph's window (all of which never blocked the window), the external tools' windows, and
+  Alta's own pop-ups (a sheet on its popup alone). Still blocking, by design: a quiz being taken (a sheet: its timer and
+  its integrity), the first run's setup, the sign-in, the tour, the Mac's confirmations and file choosers. An update
+  never installs itself while a popup is up (`Updater.quiet`). The pictures: `light-35p…`/`dark-35p…` a tool's popup
+  (the Periodic Table, Cell Explorer, Flashcards) over the Tools page at 1024 and at the narrow size.
 
 ## Data and encryption
 

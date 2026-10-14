@@ -101,12 +101,11 @@ enum BioTools {
     }
 
     /// Another tool opened with something handed to it (spec §3.2: "Open in Gene Expression" hands over
-    /// ["sequence": "ATG…"]; the tool takes it once with ToolsCenter.shared.takeInfo("sequence")) — in the pin's sheet
-    /// when the tool was opened there, else on the Tools page.
+    /// ["sequence": "ATG…"]; the tool takes it once with ToolsCenter.shared.takeInfo("sequence")) — (1.3.79) in the same
+    /// popup over the window, switched in place.
     @MainActor
     static func open(_ k: ToolKind, info: [String: String] = [:]) {
-        let tools = ToolsCenter.shared
-        if tools.popup != nil { tools.popUp(k, info: info) } else { tools.show(k, engine: AppModel.shared.engine, info: info) }
+        ToolsCenter.shared.popUp(k, info: info)
     }
 
     @MainActor private static var selfCheckStarted = false

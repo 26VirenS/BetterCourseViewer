@@ -62,8 +62,8 @@ or other resource in `mac/Simpl/`).
   `@ObservedObject private var nav = BioNav.shared` and `nav.page(.cell)`; change it with `nav.set(.cell, "plant")`. It
   is remembered (`SimplBio.cell.page`).
 - **Prefs:** `BioPrefs.string/bool/set(.cell, "field", …)` → UserDefaults `SimplBio.<key>.<field>` (§3.2).
-- **Hand-off:** `BioTools.open(.gene, info: ["sequence": "ATG…"])` (in the pin's sheet if that is where you are, else
-  on the Tools page); the receiving tool reads it once with `ToolsCenter.shared.takeInfo("sequence")` on appear.
+- **Hand-off:** `BioTools.open(.gene, info: ["sequence": "ATG…"])` (1.3.79: in the same popup over the window, the
+  tool switched in place); the receiving tool reads it once with `ToolsCenter.shared.takeInfo("sequence")` on appear.
 
 ## Launch flags (pictures)
 

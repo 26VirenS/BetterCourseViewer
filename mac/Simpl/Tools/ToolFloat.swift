@@ -156,7 +156,7 @@ struct ToolFloatView: View {
 
     private func openFull(info: [String: String] = [:], files: [URL] = []) {
         floats.dock(kind)
-        tools.openFull(kind, engine: engine, files: files, info: info)
+        tools.popUp(kind, engine: engine, files: files, info: info) // (1.3.79: in its popup over the window)
     }
 }
 
@@ -223,8 +223,9 @@ struct PullOutGrip: View {
 }
 
 /// The tools pinned to the toolbar, on a popup's own bar (a quiz, an Alta or a Macmillan assignment): the window's
-/// toolbar is under the sheet, so its pins come here — each opens its quick panel over the popup, and pulled out they
-/// float over it. (tools-6) As in the toolbar: three at most, past that two and the Tools pull-down.
+/// toolbar is under a quiz's sheet, so its pins come here — (1.3.79) and stay on an assignment's popup, by the work —
+/// each opening its quick panel over the popup; pulled out they float over it. (tools-6) As in the toolbar: three at
+/// most, past that two and the Tools pull-down.
 struct PopupPins: View {
     @EnvironmentObject private var engine: Engine
     @ObservedObject private var tools = ToolsCenter.shared

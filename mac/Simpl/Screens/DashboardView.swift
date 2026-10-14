@@ -28,13 +28,8 @@ struct DashboardView: View {
     /// (home-25) Overdue's and Graded's numbers are Canvas's word now, not the ones counted from what was kept.
     @State private var countsLive = false
     @State private var open: String?
-    /// (home-18) How tall the window is: a counter's panel stays in it.
-    @State private var windowHeight: CGFloat = 0
-    /// (1.3.62) Where the opened counter's panel is, in the window, and the watch for a click anywhere else in the app.
-    @State private var panelFrame: CGRect = .zero
-    @State private var clickWatch: Any?
-    /// (1.2.8) The opened counter's panel, as tall as what it lists (measured).
-    @State private var panelHeight: CGFloat = 0
+    /// (1.3.79) Where each counter's list opens — over its tile, in the window from its top left — and how wide.
+    @State private var tileSpots: [String: CGRect] = [:]
     @State private var sheetAsked = false
     @State private var width: CGFloat = 0
     /// (1.3.78) The window is at least `rowOfSix` wide (nil until the window has said how wide it is).
@@ -47,8 +42,6 @@ struct DashboardView: View {
     @State private var listError: String?
     @State private var activity: DashActivityData?
     @State private var activityError: String?
-    @Namespace private var morph
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     // (written out: the state above is private)
     init(active: Bool, version: Int, brightspace: Bool) {
@@ -84,11 +77,10 @@ struct DashboardView: View {
         }
         // (1.3.78: its title and toolbar are DashboardChrome's, in the window's stack)
         .background {
-            // (1.3.78) how wide the window is, for the counters' row of six; (home-18) how tall, for a counter's panel
+            // (1.3.78) how wide the window is, for the counters' row of six
             WindowWidthProbe { size in
                 let wide = size.width >= Self.rowOfSix
                 if wide != wideWindow { wideWindow = wide }
-                if abs(size.height - windowHeight) > 0.5 { windowHeight = size.height }
             }
         }
         .openTimed("Dashboard", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.source)
@@ -103,11 +95,14 @@ struct DashboardView: View {
                     behind = false
                     Task { await load() }
                 }
-            } else if open != nil {
-                setOpen(nil) // (a counter left open folds back as the Dashboard is put away)
             }
+            // (1.3.79: a counter's list left open stays up over the window as the Dashboard is put away)
         }
         .onChange(of: chosen) { _, _ in Task { await loadView() } }
+        // (1.3.79) the open counter's list told its number and line afresh as they change (a row cleared, a count read)
+        .onChange(of: openFacts) { _, _ in
+            if let key = open { showPanel(key, afresh: true) }
+        }
     }
 
     /// (1.3.78) What the Dashboard opens on, as it asks for it (read ahead when it is not the first screen).
@@ -139,9 +134,6 @@ struct DashboardView: View {
                     content(d)
                 }
                 .frame(maxWidth: .infinity, alignment: .topLeading)
-                // (1.2.2) a click anywhere round an opened counter's panel folds it back (the panel keeps its own)
-                .contentShape(Rectangle())
-                .onTapGesture { if open != nil { setOpen(nil) } }
             }
         }
     }
@@ -197,10 +189,12 @@ struct DashboardView: View {
     // MARK: - Counters
 
     /// The counters in rows: (1.3.78) one row of six compact tiles on a window `rowOfSix` wide or wider, else tall tiles
-    /// three across, or two on a very narrow page. (1.2.8) A counter opened grows out of its own tile into a panel that
-    /// floats over the page — as wide as a panel needs, not the page — over its tile, placed by where the tile is
-    /// (1.3.16): the left-most tile's panel from its left edge, the right-most's from its right, one in the middle centred
-    /// on it, each kept on the page; nothing under it moves.
+    /// three across, or two on a very narrow page. (1.2.8) A counter opened shows what it counted in a panel over its
+    /// tile — as wide as a panel needs, not the page — placed by where the tile is (1.3.16): the left-most tile's panel
+    /// from its left edge, the right-most's from its right, one in the middle centred on it, each kept on the page;
+    /// nothing under it moves. (1.3.79) The panel is a popup over the window (Shell/FloatingPopup.swift) that never blocks
+    /// it: a click round it does what it does and leaves it up, as going to another screen does; its ✕, Escape, ⌘W or its
+    /// tile pressed again closes it, and its head drags it.
     private func counters(_ d: Today) -> some View {
         // (until the window has said how wide it is: six where the page alone has room for them, as before 1.3.78)
         let six = wideWindow ?? (width >= 900)
@@ -219,45 +213,29 @@ struct DashboardView: View {
         .tourSpot(.counters) // (the tour's first step: everything due, at a glance)
         .overlayPreferenceValue(DashTileAnchors.self) { anchors in
             GeometryReader { g in
-                if let key = open, let c = list.first(where: { $0.key == key }), let a = anchors[key] {
-                    let tile = g[a]
-                    let w = min(DashCounterPanel.width, g.size.width)
-                    // (1.3.16) placed by where its tile sits across the row: the first tile's panel from its left edge,
-                    // the last one's from its right, one between them centred on it in step — kept on the page
-                    let along = g.size.width > tile.width ? min(max((tile.minX) / (g.size.width - tile.width), 0), 1) : 0
-                    let x = min(max(tile.minX + (tile.width - w) * along, 0), max(0, g.size.width - w))
-                    // (home-18) its list as tall as the window has room for under the tile's top, less its header and
-                    // footer (about 170 points of them) and a margin at the window's foot
-                    let room = windowHeight > 0 ? windowHeight - (g.frame(in: .global).minY + tile.minY) - 186 : 380
-                    DashCounterPanel(counter: c, value: value(c), note: fullNote(c), width: w, room: room, close: { setOpen(nil) },
-                                     onHeight: { h in
-                                         if abs(h - panelHeight) > 0.5 { withAnimation(Motion.gentle) { panelHeight = h } }
-                                     },
-                                     onCleared: cleared)
-                    // (1.2.9: the shape that moves is the panel itself, sized to the tile on its way in and out — the
-                    // size it rests at is the frame round it — so it grows out of its tile and folds back into it)
-                    .dashMorph(key, in: morph, enabled: !reduceMotion)
-                    .frame(width: w, height: panelHeight > 0 ? panelHeight : max(tile.height, 160), alignment: .topLeading)
-                    .tourSpot(.counterPanel)
-                    .background {
-                        GeometryReader { p in
-                            let f = p.frame(in: .global)
-                            Color.clear
-                                .onAppear { panelFrame = f }
-                                .onChange(of: f) { _, n in panelFrame = n }
-                        }
-                    }
-                    .shadow(color: Color.black.opacity(0.18), radius: 24, y: 10)
-                    .id(key)
-                    .transition(.opacity)
-                    .padding(.leading, x)
-                    .padding(.top, tile.minY)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                }
+                let spots = DashboardView.panelSpots(anchors, in: g)
+                Color.clear
+                    .onAppear { tileSpots = spots }
+                    .onChange(of: spots) { _, now in tileSpots = now }
             }
+            .allowsHitTesting(false)
         }
-        .zIndex(1) // (over the page below it)
-        .onDisappear { watchClicks(false) }
+    }
+
+    /// (1.3.16) Where each counter's panel opens, in the window from its top left: over its tile, placed by where the
+    /// tile sits across the row — the first tile's panel from its left edge, the last one's from its right, one between
+    /// them centred on it in step — kept on the page; as wide as a panel needs (narrower only on a narrower page).
+    private static func panelSpots(_ anchors: [String: Anchor<CGRect>], in g: GeometryProxy) -> [String: CGRect] {
+        let page = g.frame(in: .global)
+        let w = min(DashCounterPanel.width, g.size.width)
+        var spots: [String: CGRect] = [:]
+        for (key, a) in anchors {
+            let tile = g[a]
+            let along = g.size.width > tile.width ? min(max(tile.minX / (g.size.width - tile.width), 0), 1) : 0
+            let x = min(max(tile.minX + (tile.width - w) * along, 0), max(0, g.size.width - w))
+            spots[key] = CGRect(x: (page.minX + x).rounded(), y: (page.minY + tile.minY).rounded(), width: w, height: tile.height)
+        }
+        return spots
     }
 
     /// The room between two tiles, across and down.
@@ -288,25 +266,14 @@ struct DashboardView: View {
         return (.row(symbolBeside: DashCounterTile.rowFits(short, tileWidth: tileWidth, symbolBeside: true)), false)
     }
 
-    /// A counter's place in its row: the tile, or — while it has grown into its panel — the same tile unseen, so the row
-    /// keeps its shape. (Under Reduce Motion nothing grows: the tile stays, and the panel fades in under its row.)
+    /// A counter's place in its row: its tile, which opens its list over it (and, pressed again, closes it).
     @ViewBuilder
     private func counterSlot(_ c: Counter, style: DashCounterTile.Style, full: Bool) -> some View {
         let name = full ? (c.fullLabel ?? c.label) : c.label
         let line = full ? fullNote(c) : note(c)
-        Group {
-            if open == c.key && !reduceMotion {
-                DashCounterTile(counter: c, name: name, value: value(c), note: line, stale: stale(c), style: style) {}
-                    .hidden()
-                    .accessibilityHidden(true)
-            } else {
-                DashCounterTile(counter: c, name: name, value: value(c), note: line, stale: stale(c), style: style) { setOpen(open == c.key ? nil : c.key) }
-                    .tourSpot(c.key == "next" ? .counterNext : nil)
-                    .dashMorph(c.key, in: morph, enabled: !reduceMotion)
-                    .transition(.opacity)
-            }
-        }
-        .anchorPreference(key: DashTileAnchors.self, value: .bounds) { [c.key: $0] } // (where its panel grows from)
+        DashCounterTile(counter: c, name: name, value: value(c), note: line, stale: stale(c), style: style) { setOpen(open == c.key ? nil : c.key) }
+            .tourSpot(c.key == "next" ? .counterNext : nil)
+            .anchorPreference(key: DashTileAnchors.self, value: .bounds) { [c.key: $0] } // (where its panel opens)
     }
 
     /// (1.2.2) The counters in the day's order: today, tomorrow, the next seven days, overdue, unread, graded.
@@ -371,27 +338,48 @@ struct DashboardView: View {
         }
     }
 
+    /// (1.3.79) A counter's list opened in its popup over the window, over its tile — another counter's takes its place
+    /// in the same popup — or closed.
     private func setOpen(_ key: String?) {
-        if key != open { panelHeight = 0 } // (a new panel is measured afresh)
-        withAnimation(reduceMotion ? .easeInOut(duration: 0.18) : Motion.gentle) { open = key }
-        if key != nil { MacTour.shared.did(.counterOpened) } // (the tour's "The cards open")
-        watchClicks(key != nil)
+        guard let key else {
+            open = nil
+            engine.popups.close(Self.panelKey)
+            return
+        }
+        guard showPanel(key) else { return }
+        open = key
+        MacTour.shared.did(.counterOpened) // (the tour's "The cards open")
     }
 
-    /// (1.3.62) While a counter is open, a click anywhere in the app but its panel — the sidebar, the toolbar, the page —
-    /// folds it back (the click still does what it does; on another counter, that one opens).
-    private func watchClicks(_ on: Bool) {
-        if on, clickWatch == nil {
-            clickWatch = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { e in
-                guard open != nil, let view = e.window?.contentView else { return e }
-                let p = CGPoint(x: e.locationInWindow.x, y: view.bounds.height - e.locationInWindow.y)
-                if !panelFrame.insetBy(dx: -2, dy: -2).contains(p) { setOpen(nil) }
-                return e
-            }
-        } else if !on, let w = clickWatch {
-            NSEvent.removeMonitor(w)
-            clickWatch = nil
+    /// The counters' list among the window's popups.
+    static let panelKey = "counter"
+
+    /// The open counter's number and line, for its list to be told them afresh as they change.
+    private var openFacts: String {
+        guard let key = open, let c = model.data?.counters.first(where: { $0.key == key }) else { return "" }
+        return "\(value(c).map(String.init) ?? "-")|\(fullNote(c) ?? "")"
+    }
+
+    /// A counter's list up in its popup, its top left over its tile's; `afresh`: the one up, told its counter's number and
+    /// line again, where it is. False when it could not be put up (its tile not yet laid out).
+    @discardableResult
+    private func showPanel(_ key: String, afresh: Bool = false) -> Bool {
+        guard let d = model.data, let c = d.counters.first(where: { $0.key == key }), let spot = tileSpots[key],
+              let window = engine.hostView.window, let view = window.contentView else { return false }
+        // (home-18) its list as tall as the window has room for under the tile's top, less its header and footer (about
+        // 170 points of them) and a margin at the window's foot
+        let room = view.bounds.height - spot.minY - 186
+        let panel = DashCounterPanel(counter: c, value: value(c), note: fullNote(c), width: spot.width, room: room,
+                                     close: { engine.popups.close(Self.panelKey) }, onCleared: cleared)
+        if afresh {
+            engine.popups.update(Self.panelKey) { panel.id(key) }
+            return true
         }
+        // (the window's coordinates count from its foot; the popup's corner is a point on the screen)
+        let corner = window.convertToScreen(NSRect(x: spot.minX, y: view.bounds.height - spot.minY, width: 0, height: 0)).origin
+        engine.popups.present(Self.panelKey, title: DashCounterLook.fullName(c.key, c.label), layout: .at(corner), ground: false,
+                              anchor: .topLeading, onClose: { if open == key { open = nil } }) { panel.id(key) } // (another counter: its own list, afresh)
+        return true
     }
 
     // MARK: - The view and the side column
@@ -584,10 +572,11 @@ struct DashboardView: View {
         Task { await loadView() }
         await model.load(engine, "today", animated: animated)
         guard model.data != nil else { return }
-        // (the screenshot suite: -SimplSheet next opens a counter's panel)
+        // (the screenshot suite: -SimplSheet next opens a counter's panel, once its tile has been laid out)
         if let key = UserDefaults.standard.string(forKey: "SimplSheet"), !key.isEmpty, !sheetAsked {
             sheetAsked = true
-            open = key
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            setOpen(key)
         }
     }
 

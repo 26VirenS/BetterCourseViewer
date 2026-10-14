@@ -75,15 +75,17 @@ struct RootView: View {
     }
 }
 
-/// A window's sheets — What's New, a quiz, an Alta or a Macmillan assignment, the setup, a new task or message — and
-/// the tool windows it opens: the main window's and (1.3.69) each window more's, over its own window.
+/// A window's popups and sheets — What's New, a quiz, an Alta or a Macmillan assignment, the setup, a new task or
+/// message — and the tool windows it opens: the main window's and (1.3.69) each window more's, over its own window.
+/// (1.3.79) Only a quiz being taken and the setup are sheets, blocking the window; the rest are popups over it that
+/// never do (Shell/FloatingPopup.swift).
 struct EngineSheets: ViewModifier {
     @ObservedObject var engine: Engine
     @Environment(\.openWindow) private var openWindow
 
     func body(content: Content) -> some View {
         content
-            .sheet(item: $engine.whatsNew) { item in
+            .floatingPopup("whatsnew", title: "What’s New", item: $engine.whatsNew, engine: engine) { item in
                 WhatsNewSheet(data: item.data) { MacWhatsNew.markSeen() }
             }
             .sheet(item: $engine.quiz) { q in
@@ -91,27 +93,23 @@ struct EngineSheets: ViewModifier {
                     .environmentObject(engine)
                     .modifier(UpdateHold()) // (1.2.19: nor while a quiz is open)
             }
-            .sheet(item: $engine.alta) { a in
+            .floatingPopup("alta", title: "Knewton Alta", item: $engine.alta, layout: .large, engine: engine) { a in
                 AltaQuizScreen(launch: a)
-                    .environmentObject(engine)
                     .modifier(UpdateHold()) // (nor while an Alta assignment is open)
             }
-            .sheet(item: $engine.macmillan) { a in
+            .floatingPopup("macmillan", title: "Macmillan Learning", item: $engine.macmillan, layout: .large, engine: engine) { a in
                 MacmillanScreen(launch: a)
-                    .environmentObject(engine)
                     .modifier(UpdateHold()) // (1.3.66: nor while a Macmillan assignment is open)
             }
             .sheet(isPresented: $engine.setup) {
                 SetupScreen()
                     .environmentObject(engine)
             }
-            .sheet(isPresented: $engine.newTask) {
+            .floatingPopup("newtask", title: "New Task", isPresented: $engine.newTask, engine: engine) {
                 NewTaskSheet()
-                    .environmentObject(engine)
             }
-            .sheet(isPresented: $engine.newMessage) {
+            .floatingPopup("compose", title: "New Message", isPresented: $engine.newMessage, engine: engine) {
                 ComposeSheet()
-                    .environmentObject(engine)
             }
             .onChange(of: engine.tool) { _, t in
                 guard let t else { return }

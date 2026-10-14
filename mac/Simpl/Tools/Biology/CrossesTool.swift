@@ -307,7 +307,7 @@ struct CrossPage: View {
         } right: {
             CrossResults(setup: model.setup)
         }
-        .sheet(isPresented: $model.whyShown) {
+        .floatingPopup("cross-why", title: "Why these gametes?", isPresented: $model.whyShown) { // (1.3.79: never blocking)
             AssortmentSheet(setup: model.setup) { model.whyShown = false }
         }
     }

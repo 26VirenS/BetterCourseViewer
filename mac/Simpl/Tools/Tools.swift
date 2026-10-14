@@ -6,10 +6,11 @@ import UniformTypeIdentifiers
 // a calculator, a graphing calculator, the periodic table, Grade needed, a file converter, Merge & split PDFs, a PDF
 // annotator, Image to text and flashcards — drawn natively, with a unit converter of the Mac's own beside them, and
 // (1.3.78) the biology toolkit's ten under a heading of their own (Biology/BioTools.swift). One row in the sidebar opens
-// a page of tiles, (tools-32) in sections by what they are for: Study, Math & science, Files and Biology; a tile opens
-// its tool in the window, under a "‹ Tools" back to the tiles. Any tool can be pinned: it then sits in the toolbar on
-// every screen and opens a compact version of itself in a popover (PinnedTools.swift). Everything a tool keeps stays on
-// this Mac; nothing is sent to Canvas.
+// a page of tiles, (tools-32) in sections by what they are for: Study, Math & science, Files and Biology; (1.3.79) a tile
+// opens its tool in a popup over the window — the Tools page staying behind it, and the whole window usable round it
+// (Shell/FloatingPopup.swift) — as its pin, a hand-off from another tool and a launch do. Any tool can be pinned: it then
+// sits in the toolbar on every screen and opens a compact version of itself in a popover (PinnedTools.swift). Everything
+// a tool keeps stays on this Mac; nothing is sent to Canvas.
 
 /// A tool: its key (the web's own, so a pin means the same thing on both), its name, the line under it, its symbol and
 /// its colour (used for its tile and its pin, nothing else).
@@ -146,18 +147,21 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
 }
 
 /// What the tools share across the window: which are pinned to the toolbar (kept in the app's defaults, the keys joined
-/// by commas), the tool open on the Tools page, and files handed to a tool from its pin (dropped or chosen there) for it
-/// to take when it opens.
+/// by commas), the tool open in its popup over the window, and files handed to a tool from its pin (dropped or chosen
+/// there) for it to take when it opens.
 @MainActor
 final class ToolsCenter: ObservableObject {
     static let shared = ToolsCenter()
     static let pinsKey = "SimplPinnedTools"
 
     @Published private(set) var pinned: [ToolKind] = []
-    /// The tool open on the Tools page (nil: the page of tiles). Kept while you go elsewhere: Back brings it back as left.
-    @Published var open: ToolKind?
-    /// (1.2.1) A pinned tool opened whole over the window, where you are, in a large sheet — not on the Tools page.
-    @Published var popup: ToolKind?
+    /// (1.3.79) The tool open whole — from its tile, its pin, a hand-off from another tool — in its popup over the window
+    /// (nil: none). One at a time: another opened takes its place in the same popup.
+    @Published private(set) var popup: ToolKind?
+    /// The window its popup is over.
+    private weak var popupEngine: Engine?
+    /// The tool's popup among its window's popups.
+    static let popupKey = "tool"
     /// Files handed over from a pin's popover, for `handoffTool` to take.
     @Published private(set) var handoff: [URL] = []
     private(set) var handoffTool: ToolKind?
@@ -171,13 +175,17 @@ final class ToolsCenter: ObservableObject {
         let raw = UserDefaults.standard.string(forKey: ToolsCenter.pinsKey) ?? ""
         var seen = Set<ToolKind>()
         pinned = raw.split(separator: ",").compactMap { ToolKind(rawValue: String($0).trimmingCharacters(in: .whitespaces)) }.filter { seen.insert($0).inserted }
-        // (the screenshot suite: -SimplTool calc opens the Calculator on the Tools page; -SimplToolFile <path> hands the
-        // tool opened a file, as a drop on its pin does — the annotator's page, Split's pages)
-        if let t = LaunchOpen.take("", key: "SimplTool"), let k = ToolKind(rawValue: t) { open = k }
-        if let k = open, let path = LaunchOpen.take("", key: "SimplToolFile"), !path.isEmpty {
+        // (the screenshot suite: -SimplTool calc opens the Calculator in its popup, over the Tools page with -SimplPlace
+        // tools; -SimplToolFile <path> hands the tool opened a file, as a drop on its pin does — the annotator's page,
+        // Split's pages)
+        if let t = LaunchOpen.take("", key: "SimplTool"), let k = ToolKind(rawValue: t) { launchTool = k }
+        if let k = launchTool, let path = LaunchOpen.take("", key: "SimplToolFile"), !path.isEmpty {
             launchFile = (k, URL(fileURLWithPath: path))
         }
     }
+
+    /// The screenshot suite's tool (-SimplTool), opened in its popup once the main window is up.
+    private var launchTool: ToolKind?
 
     /// The screenshot suite's file for the tool its launch opened: handed to that tool each time it is drawn afresh (the
     /// window's screens are made again as the app's answers come in, and a file taken once was gone by then).
@@ -237,36 +245,39 @@ final class ToolsCenter: ObservableObject {
         if quiet { quietHeadings.insert(k) } else { quietHeadings.remove(k) }
     }
 
-    /// A tool opened on the Tools page from anywhere (a pin's popover, the Go menu), with any files or details for it.
-    func show(_ k: ToolKind, engine: Engine?, files: [URL] = [], info: [String: String] = [:]) {
+    /// A tool opened whole — (1.3.79) from its tile on the Tools page, its pin, a hand-off from another tool, a launch —
+    /// with any files or details for it: in its popup over the window it was asked for in (`engine`; else the one its
+    /// popup is already over, else the main window's), the screen under it staying as it was, and usable. A tool already
+    /// open is switched in place, in the same popup; over another window, that popup closes first.
+    func popUp(_ k: ToolKind, engine: Engine? = nil, files: [URL] = [], info: [String: String] = [:]) {
         handoff = files
         handoffTool = files.isEmpty ? nil : k
         handoffInfo = info
-        withAnimation(Motion.gentle) { open = k }
-        engine?.go(.tools)
-    }
-
-    /// A pinned tool opened whole (1.2.1): over the window, in a large sheet, with any files or details for it — the
-    /// screen you were on stays as it was under it.
-    func popUp(_ k: ToolKind, files: [URL] = [], info: [String: String] = [:]) {
-        handoff = files
-        handoffTool = files.isEmpty ? nil : k
-        handoffInfo = info
-        popup = k
-    }
-
-    /// (1.3.73) A tool opened whole from its pin: in the large sheet over the window — or, when a sheet already has the
-    /// window (a quiz, an Alta or a Macmillan assignment: a second sheet cannot come up), on the Tools page of a window
-    /// more, beside it.
-    func openFull(_ k: ToolKind, engine: Engine?, files: [URL] = [], info: [String: String] = [:]) {
-        let window = engine?.hostView.window
-        let taken = window.map { $0.attachedSheet != nil || !$0.sheets.isEmpty } ?? false
-        if taken {
-            show(k, engine: nil, files: files, info: info)
-            NotificationCenter.default.post(name: .simplOpenWindow, object: "tools")
-        } else {
-            popUp(k, files: files, info: info)
+        guard let host = engine ?? popupEngine ?? AppModel.shared.engine else { return }
+        if let was = popupEngine, was !== host { was.popups.close(Self.popupKey) }
+        withAnimation(Motion.gentle) { popup = k }
+        popupEngine = host
+        host.popups.present(Self.popupKey, title: k.name, layout: .large, onClose: { [weak self] in self?.popupClosed() }) {
+            ToolPopup()
         }
+    }
+
+    /// The tool's popup closed (its ×, Escape, ⌘W, or its window closing).
+    private func popupClosed() {
+        popup = nil
+        popupEngine = nil
+    }
+
+    /// The tool's popup closed from within it (its ×).
+    func closePopup() {
+        popupEngine?.popups.close(Self.popupKey)
+    }
+
+    /// (the screenshot suite) The tool its launch asked for (-SimplTool), opened in its popup over the main window.
+    func openLaunchTool(_ engine: Engine) {
+        guard let k = launchTool else { return }
+        launchTool = nil
+        popUp(k, engine: engine)
     }
 
     /// The files handed to a tool, taken once.
@@ -291,27 +302,13 @@ final class ToolsCenter: ObservableObject {
 
 // MARK: - The Tools place
 
-/// The Tools place: the page of tiles, or the tool open on it with its own heading (Back to the tiles, its name, and its
-/// pin) — a tool switched in place, as the web's popup opens over its page. (tools-5) The pin is the heading's alone:
-/// the window's toolbar no longer carries a second one while a tool is open.
+/// The Tools place: the page of tiles. (1.3.79) A tile opens its tool in a popup over the window (ToolPopup), as the
+/// web's popup opens over its page — the page staying behind it, never put away for it. (tools-5) The pin is the tool's
+/// heading's alone: the window's toolbar carries no second one.
 struct ToolsView: View {
-    @ObservedObject private var tools = ToolsCenter.shared
-    @ObservedObject private var ptNav = PTNav.shared
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
-        ZStack {
-            if let k = tools.open {
-                ToolScreen(kind: k)
-                    .id(k)
-                    .transition(reduceMotion ? AnyTransition.opacity : AnyTransition.opacity.combined(with: .scale(scale: 0.985)))
-            } else {
-                ToolsGrid()
-                    .transition(.opacity)
-            }
-        }
-        .animation(reduceMotion ? nil : Motion.gentle, value: tools.open)
-        .navigationTitle(tools.open?.title ?? "Tools")
+        ToolsGrid()
+            .navigationTitle("Tools")
     }
 }
 
@@ -384,13 +381,15 @@ struct ToolTile: View {
     let kind: ToolKind
     @ObservedObject private var tools = ToolsCenter.shared
     @ObservedObject private var focus = FocusTimer.shared
+    /// (1.3.79) The window's engine, for its tool's popup to open over this window.
+    @Environment(\.engineLink) private var link
 
     /// (tools-32) Three across from about 900 points of page, two below.
     static let columns = [GridItem(.adaptive(minimum: 280), spacing: 14)]
 
     var body: some View {
         Button {
-            withAnimation(Motion.gentle) { tools.open = kind }
+            tools.popUp(kind, engine: link.engine)
         } label: {
             HStack(alignment: .top, spacing: 12) {
                 IconTile(symbol: kind.symbol, color: kind.color, size: 44)
@@ -412,7 +411,7 @@ struct ToolTile: View {
         .buttonStyle(CardButtonStyle(radius: 20))
         .overlay(alignment: .topTrailing) { pinButton.padding(10) }
         .contextMenu {
-            Button("Open") { withAnimation(Motion.gentle) { tools.open = kind } }
+            Button("Open") { tools.popUp(kind, engine: link.engine) }
             Button(tools.isPinned(kind) ? "Unpin from Toolbar" : "Pin to Toolbar") { tools.togglePin(kind) }
         }
         .accessibilityLabel("\(kind.name). \(kind.note)")
@@ -450,21 +449,20 @@ private struct FocusTileLine: View {
     }
 }
 
-/// A tool open on the Tools page: its heading (Back to the tiles, its tile, its name and line, its pin), and the tool
-/// under it, filling the window.
+/// A tool open whole, in its popup over the window (1.3.79): its heading (its tile, its name and line, its pages, its pin
+/// and its ×) — dragged, the popup moves — and the tool under it, filling the popup.
 struct ToolScreen: View {
     let kind: ToolKind
-    /// (1.2.1) Over the window as a sheet (a pinned tool opened whole): Done closes it.
-    var done: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ToolHeader(kind: kind, done: done)
+            ToolHeader(kind: kind)
                 .padding(.horizontal, 40)
                 .padding(.top, 20)
                 .padding(.bottom, 12)
                 .frame(maxWidth: 1480 + 80)
                 .frame(maxWidth: .infinity)
+                .popupHeader()
                 .zIndex(2) // (1.3.64: what opens under it — the Periodic Table's search results — over the tool)
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -492,15 +490,14 @@ struct ToolScreen: View {
     }
 }
 
-/// A tool's heading: Back to the tiles, the tool's tile, its name and line, and its pin. (tools-4) The Periodic Table's
-/// names the page it is on, with its pages, Tour and search in words on a row of their own under it; (tools-29) while one
-/// of its elements is open, its one Back goes to the table ("‹ Table"), not to the tiles.
+/// A tool's heading: the tool's tile, its name and line, its pin and — (1.3.79) at its right end, where every full popup
+/// has its Close — its popup's ×. (tools-4) The Periodic Table's names the page it is on, with its pages, Tour and search
+/// in words on a row of their own under it; (tools-29) while one of its elements is open, "‹ Table" leads it, back to
+/// the table.
 struct ToolHeader: View {
     let kind: ToolKind
-    var done: (() -> Void)? = nil
     @ObservedObject private var tools = ToolsCenter.shared
     @ObservedObject private var ptNav = PTNav.shared
-    @ObservedObject private var ptTour = PTTour.shared
 
     var body: some View {
         // (1.3.78) a biology tool with pages: its pages' names, and its pin's words, only where the header has room for
@@ -525,19 +522,10 @@ struct ToolHeader: View {
         }
     }
 
-    /// Done (in the pin's sheet) or Back to the tiles — (tools-29) or, while one of the Periodic Table's elements is
-    /// open, Back to the table (beside Done in the sheet).
+    /// (tools-29) While one of the Periodic Table's elements is open, Back to the table. (1.3.79: the tool's × closes its
+    /// popup, as Escape does — (tools-3) while the Periodic Table's tour is on, Escape ends the tour first.)
     @ViewBuilder
     private var leading: some View {
-        if let done {
-            Button("Done", action: done)
-                .font(.sCallout.weight(.medium))
-                .glassButton()
-                .controlSize(.large)
-                // (tools-3: while the Periodic Table's tour is on, Escape ends the tour, not the sheet)
-                .keyboardShortcut(kind == .ptable && ptTour.active ? nil : KeyboardShortcut.cancelAction)
-                .help("Close \(kind.name) (Escape)")
-        }
         if kind == .ptable && ptNav.elementOpen {
             Button {
                 ptNav.closeElement()
@@ -551,19 +539,23 @@ struct ToolHeader: View {
             .keyboardShortcut("[", modifiers: .command)
             .help("Back to the table (⌘[)")
             .transition(.opacity)
-        } else if done == nil {
-            Button {
-                withAnimation(Motion.gentle) { tools.open = nil }
-            } label: {
-                Label("Tools", systemImage: "chevron.left")
-                    .font(.sCallout.weight(.medium))
-                    .padding(.horizontal, 4)
-            }
-            .glassButton()
-            .controlSize(.large)
-            .help("Back to all the tools")
-            .transition(.opacity)
         }
+    }
+
+    /// (1.3.79) The popup's ×: the tool closed, the window under it as it was.
+    private var closeButton: some View {
+        Button {
+            tools.closePopup()
+        } label: {
+            Label("Close", systemImage: "xmark")
+                .font(.sCallout.weight(.semibold))
+                .labelStyle(.iconOnly)
+                .frame(minWidth: 16)
+        }
+        .glassButton()
+        .controlSize(.large)
+        .help("Close \(kind.name) (Esc)")
+        .accessibilityLabel("Close \(kind.name)")
     }
 
     /// The heading's row: `pages` squishes a biology tool's page buttons to their symbols (nil: as they fit).
@@ -599,6 +591,7 @@ struct ToolHeader: View {
             .glassButton()
             .controlSize(.large)
             .help(tools.isPinned(kind) ? "\(kind.name) is in the toolbar on every screen. Click to unpin it." : "Keep \(kind.name) in the toolbar on every screen")
+            closeButton
         }
         .animation(Motion.gentle, value: ptNav.elementOpen)
         .animation(Motion.gentle, value: tools.quietHeadings)
@@ -633,6 +626,7 @@ struct ToolHeader: View {
             .glassButton()
             .controlSize(.large)
             .help(tools.isPinned(kind) ? "\(kind.name) is in the toolbar on every screen. Click to unpin it." : "Keep \(kind.name) in the toolbar on every screen")
+            closeButton
         }
     }
 }
@@ -844,22 +838,26 @@ func toolPlural(_ n: Int, _ one: String, _ many: String? = nil) -> String {
     "\(n) \(n == 1 ? one : (many ?? one + "s"))"
 }
 
-/// (1.2.1) A pinned tool opened whole, over the window: the tool as the Tools page has it, in a sheet nearly the
-/// window's size.
+/// (1.3.79) A tool open whole, in its popup over the window (ToolsCenter.popUp; the popup is Shell/FloatingPopup.swift's,
+/// as large as the screen's side of the window less a margin all round, and sized again with it): the tool asked for,
+/// at its top, switched in place — a cross-fade — when another is opened in it (a hand-off from another tool); the last
+/// one still drawn as the popup goes.
 struct ToolPopup: View {
-    let kind: ToolKind
     @ObservedObject private var tools = ToolsCenter.shared
+    @State private var last: ToolKind?
 
     var body: some View {
-        let size = ToolPopup.size()
-        ToolScreen(kind: kind) { tools.popup = nil }
-            .frame(width: size.width, height: size.height)
-    }
-
-    /// Nearly the main window's size.
-    @MainActor
-    static func size() -> CGSize {
-        let f = AppModel.shared.engine?.hostView.window?.frame.size ?? CGSize(width: 1280, height: 860)
-        return CGSize(width: max(860, f.width - 70), height: max(600, f.height - 90))
+        ZStack {
+            if let k = tools.popup ?? last {
+                ToolScreen(kind: k)
+                    .id(k)
+                    .transition(.opacity)
+            }
+        }
+        .animation(Motion.gentle, value: tools.popup)
+        .onAppear { last = tools.popup }
+        .onChange(of: tools.popup) { _, k in
+            if let k { last = k }
+        }
     }
 }

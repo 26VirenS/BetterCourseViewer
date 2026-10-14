@@ -15,7 +15,8 @@ struct ComposeSheet: View {
     private let context: String?
     private let sent: () -> Void
     @EnvironmentObject private var engine: Engine
-    @Environment(\.dismiss) private var dismiss
+    /// (1.3.79) Its popup over the window (never blocking it: Shell/FloatingPopup.swift), which Cancel and Send close.
+    @Environment(\.popup) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var people: [Recipient]
     @State private var course: String?
@@ -50,6 +51,8 @@ struct ComposeSheet: View {
                 .padding(.horizontal, ComposeMetrics.side)
                 .padding(.top, 20)
                 .padding(.bottom, 14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .popupHeader() // (1.3.79: dragged by its head, the popup moves)
             Divider()
             fields
                 .zIndex(1) // (the people found float over the message under them)
@@ -83,7 +86,8 @@ struct ComposeSheet: View {
             if case .success(let urls) = result { files.add(urls, engine: engine) }
         }
         .defaultFocus($focus, firstFocus)
-        .interactiveDismissDisabled(sending)
+        // (1.3.79) never closed by Escape or ⌘W with something written, or on its way: Cancel asks first
+        .popupCloseHeld(sending || !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !files.items.isEmpty)
         .task { await loadContexts() }
         .onAppear {
             // (the screenshot suite: -SimplAttach <file> attaches that file as the sheet comes up)

@@ -420,10 +420,11 @@ struct PhotoSlotEditor: View {
     }
 }
 
-/// A place's photo editor as a sheet (a counter's context menu: Card Photo…).
+/// A place's photo editor in a popup over the window (a counter's context menu: Card Photo…; 1.3.79: never blocking it).
 struct PhotoSlotSheet: View {
     let slot: PhotoSlot
-    @Environment(\.dismiss) private var dismiss
+    /// (1.3.79) Its popup, which Done closes.
+    @Environment(\.popup) private var dismiss
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
