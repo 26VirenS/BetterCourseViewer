@@ -74,10 +74,12 @@ enum Shot {
 
     /// The window to picture: this app's frontmost (Settings, a tool's window), else the main window; with its sheets.
     /// (1.3.1: by the app's own order, not the key window — the suite runs several copies at once, and only one is key.)
-    /// (1.3.78) Never a window that belongs to another — the search field's suggestions, a child window — nor one only a
-    /// strip tall: the suggestions open in front of the window they belong to, and were pictured alone.
+    /// (1.3.78) Never a window that belongs to another — the search field's suggestions, a child window — nor one without
+    /// a title bar of its own (a sheet aside): the suggestions open in front of the window they belong to, borderless, a
+    /// strip or the window's whole height tall, and were pictured alone.
     private static func target() -> NSWindow? {
-        if let front = NSApp.orderedWindows.first(where: { $0.isVisible && !($0 is NSPanel) && $0.parent == nil && $0.frame.width > 300 && $0.frame.height > 200 }) {
+        if let front = NSApp.orderedWindows.first(where: { $0.isVisible && !($0 is NSPanel) && $0.parent == nil && $0.frame.width > 300
+                && $0.frame.height > 200 && ($0.styleMask.contains(.titled) || $0.sheetParent != nil) }) {
             return front.sheetParent ?? front
         }
         return mainWindow()
