@@ -32,6 +32,8 @@ public sealed class NavEntry
     public Action? Hover;
     /// <summary>Its screen got ready ahead of a click: read as a pointer rests on the row, built as it is pressed (Kit.Ahead).</summary>
     public Action<bool>? Prepare;
+    /// <summary>The place in a window of its own (the row's menu: Open in new window; Shift+click), or null.</summary>
+    public Action? OpenApart;
 }
 
 /// <summary>
@@ -169,11 +171,24 @@ public sealed class NavList : Grid
             t.ToolTip = e.Expanded ? "Hide sections" : "Show sections";
             grid.Children.Add(t.Col(3));
         }
-        var b = K.Subtle(grid, () => e.Go?.Invoke(), new Thickness(12 + depth * 28, 0, 8, 0));
+        // (Shift+click, as Windows opens a link in a window of its own)
+        var b = K.Subtle(grid, () =>
+        {
+            if (e.OpenApart is { } apart && System.Windows.Input.Keyboard.Modifiers == System.Windows.Input.ModifierKeys.Shift) apart();
+            else e.Go?.Invoke();
+        }, new Thickness(12 + depth * 28, 0, 8, 0));
         b.Height = 36;
         b.Margin = new Thickness(4, 0, 4, 0);
         b.ToolTip = e.Title.Length > 26 ? e.Title : null;
         System.Windows.Automation.AutomationProperties.SetName(b, e.Title);
+        if (e.OpenApart is { } open)
+        {
+            var menu = new ContextMenu();
+            var item = new System.Windows.Controls.MenuItem { Header = "Open in new window", Icon = new SymbolIcon { Symbol = SymbolRegular.WindowNew24 }, InputGestureText = "Shift+click" };
+            item.Click += (_, _) => open();
+            menu.Items.Add(item);
+            b.ContextMenu = menu;
+        }
         return b;
     }
 

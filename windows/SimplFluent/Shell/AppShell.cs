@@ -145,6 +145,10 @@ public sealed partial class AppShell : Grid, IDisposable
         BuildPane();
         _ = engine.LoadSidebar();
         prefetch.Start();
+        // (the screenshot suite: --place-window section:courses/101:grades opens that place in a window of its own, over
+        // the main one, once it is up)
+        if (Launch.Take("", "place-window") is { Length: > 0 } apart && Engine.Engine.PlaceNamed(apart) is { } elsewhere)
+            Dispatcher.BeginInvoke(() => PlaceWindow.Open(engine, elsewhere), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
     }
 
     /// <summary>A screen is being read ahead now (a pointer resting on another waits its turn).</summary>
@@ -284,8 +288,29 @@ public sealed partial class AppShell : Grid, IDisposable
                 list.Add(new NavEntry { Key = ctx, Title = g.Name, Icon = SymbolRegular.People24, Tint = Teal, Go = () => GoPlace(Place.Home(ctx)), Prepare = Ready(Place.Home(ctx)) });
             }
         }
+        foreach (var e in list) Apart(e);
         if (redraw) nav.Set(list, SelectedKey(engine.Nav.Current.Place));
         else nav.Show(list, SelectedKey(engine.Nav.Current.Place));
+    }
+
+    /// <summary>A row's place in a window of its own (its menu's Open in new window, Shift+click): every place row, its
+    /// sections too — the place read back from the row's key.</summary>
+    private void Apart(NavEntry e)
+    {
+        if (!e.Header && !e.Separator && PlaceOfKey(e.Key) is { } place) e.OpenApart = () => PlaceWindow.Open(engine, place);
+        foreach (var c in e.Children ?? new List<NavEntry>()) Apart(c);
+    }
+
+    /// <summary>The place a pane row's key names (SelectedKey backwards): "grades", "courses/101", "courses/101:assignments".</summary>
+    private static Place? PlaceOfKey(string key)
+    {
+        if (key.Length == 0) return null;
+        if (key.StartsWith("courses/") || key.StartsWith("groups/"))
+        {
+            var at = key.IndexOf(':');
+            return at < 0 ? Place.Home(key) : Place.Section(key[..at], key[(at + 1)..]);
+        }
+        return Engine.Engine.PlaceNamed(key);
     }
 
     private static string Initial(string s)
