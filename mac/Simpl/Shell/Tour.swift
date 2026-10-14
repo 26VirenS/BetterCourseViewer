@@ -1,14 +1,14 @@
 import AppKit
 import SwiftUI
 
-// The Mac tour (1.2.1): the web's guided tour (extension/content/app/welcome.js), with its steps — all but the Simpl
-// switch's, which the Mac has no use for — and its words. One thing at a time is lit, the window dimmed round it, with a
-// short card beside it that says what it is and what to do; a step that asks for something (click Grades, hover a
-// ring, change a score) waits for it and moves on once it is done, as the web's do. Each lit thing says where it is
-// itself, measured in the window (TourProbe), so the light sits exactly on it however the window is laid out. It comes
-// once, after the app's own window first appears and nothing else is over it; Help ▸ Take the Tour, or /tour in the
-// search field, runs it again. (1.3.4) There is no Skip, nor does Escape end it, as on the web (welcome.js): it ends on
-// its last step.
+// The Mac tour (1.2.1). One thing at a time is lit, the whole window dimmed round it — the toolbar too, its buttons
+// resting while it is on (home-28) — with a short card beside it that says what it is. (home-2, home-9) Six steps, from
+// the Dashboard — the counters, Grades, a course, Tools, Search — to where a bug is reported, the same six as on
+// Windows: a step may suggest something to try (click Grades) and moves on once it is done, but Next always works; Skip
+// Tour, the card's ✕ or Escape end it, and that counts as seen. Each lit thing says where it is itself, measured in the
+// window (TourProbe), so the light sits exactly on it however the window is laid out. It comes once, after the app's
+// own window first appears and nothing else is over it; Help ▸ Take the Tour, or /tour in the search field, runs it
+// again.
 
 /// Where the tour is (nil: not on), and what was just done that a step may be waiting for.
 @MainActor
@@ -30,7 +30,8 @@ final class MacTour: ObservableObject {
         step = index
     }
 
-    /// Ended (its last step done): not again on its own.
+    /// Ended — its last step done, or (home-2) left early with Skip Tour, its ✕ or Escape: seen either way, so not
+    /// again on its own (Help ▸ Take the Tour brings it back).
     func finish() {
         step = nil
         UserDefaults.standard.set(true, forKey: "tour:done")
@@ -49,7 +50,8 @@ enum TourEvent: Equatable {
     case ringHover, whatIfOn, whatIfEdited, whatIfOff, courseHover, pinned, counterOpened
 }
 
-/// The parts of the window the tour lights.
+/// The parts of the window the tour lights. (Some are no longer lit since the tour was cut to six steps — the What-If
+/// switch, a ring, a pin — and still say where they are, for a tour that wants them again.)
 enum TourSpot: Hashable {
     case overlay, sidebar, account, dashboardRow, gradesRow, toolsRow, firstCourse, counters
     case gradeRing, gradeDetails, whatIfSwitch, whatIfScore, toolPin, counterNext, counterPanel
@@ -162,7 +164,8 @@ extension View {
 
 // MARK: - The steps
 
-/// A step: what it lights, what it says, and what it waits for.
+/// A step: what it lights, what it says, and what it suggests trying (it moves on once that is done; Next never waits
+/// for it).
 struct TourStep: Identifiable {
     enum Aim { case none, spot(TourSpot), search, back }
     enum Act {
@@ -183,11 +186,6 @@ struct TourStep: Identifiable {
     var gesture: Gesture = .click
     var act: Act = .next
     var nextLabel = "Next"
-
-    var waits: Bool {
-        if case .next = act { return false }
-        return true
-    }
 }
 
 /// Where the light, the card and its arrow go for a step, in the tour's own coordinates.
@@ -253,7 +251,6 @@ struct TourOverlay: View {
     @State private var nudged = false
     @State private var sawSetup = false
     @State private var advancing = false
-    @State private var since = Date()
 
     var body: some View {
         GeometryReader { proxy in
@@ -264,14 +261,16 @@ struct TourOverlay: View {
                     TimelineView(.periodic(from: .now, by: 0.2)) { time in
                         let placed = self.plan(for: list[i], size: proxy.size, top: proxy.safeAreaInsets.top)
                         TourStage(step: list[i], index: i, count: list.count, plan: placed, size: proxy.size, cardSize: $cardSize, nudged: nudged,
-                                  stuck: time.date.timeIntervalSince(since) > 6,
-                                  next: { next(list.count) }, back: back, poke: poke)
+                                  next: { next(list.count) }, back: back, skip: skip, poke: poke)
                             .onChange(of: time.date) { _, _ in check(list[i], count: list.count) }
                     }
                     .transition(.opacity)
                 }
             }
         }
+        // (home-28) over the whole window, the toolbar's strip as well: its coordinates start at the window's top, and
+        // `safeAreaInsets.top` is the toolbar's height, which the cards keep clear of
+        .ignoresSafeArea()
         .allowsHitTesting(tour.step != nil)
         .animation(reduceMotion ? nil : Motion.gentle, value: tour.step)
         .onChange(of: engine.setup) { _, on in if on { sawSetup = true } }
@@ -283,68 +282,30 @@ struct TourOverlay: View {
         .task { await autoStart() }
     }
 
-    // MARK: The web's steps (welcome.js's setup run), but the Simpl switch's
+    // MARK: The steps (the same six as Windows': windows/SimplFluent/Shell/Tour.cs)
 
     private var steps: [TourStep] {
         var s: [TourStep] = [
-            TourStep(id: "report", aim: .spot(.account), title: "Report a bug",
-                     body: Text("Found a bug or want something added? Tell us here.")),
-            TourStep(id: "grades", aim: .spot(.gradesRow), title: "Grades", body: Text("All your grades in one place."),
-                     doing: "Click Grades", act: .place { p, _ in p == .grades }),
-            TourStep(id: "ring", aim: .spot(.gradeRing), title: "A quick breakdown", body: Text("Each ring shows what makes up the grade."),
-                     doing: "Hover over a ring", gesture: .hover, act: .event(.ringHover)),
-            TourStep(id: "details", aim: .spot(.gradeDetails), title: "What if?", body: Text("See every grade, and try out scores."),
-                     doing: "Click it", act: .place { p, _ in
-                         if case .section(_, "grades") = p { return true }
-                         return false
-                     }),
-            TourStep(id: "whatif", aim: .spot(.whatIfSwitch), title: "Try what-if scores", body: Text("See how new scores would change your grade."),
-                     doing: "Turn on What-If Scores", act: .event(.whatIfOn)),
-            TourStep(id: "score", aim: .spot(.whatIfScore), title: "Change a score", body: Text("Type any score. Nothing is saved."),
-                     doing: "Change a score", gesture: .type, act: .event(.whatIfEdited)),
-            TourStep(id: "real", aim: .spot(.whatIfSwitch), title: "Back to the real scores", body: Text("Close it to go back to your real scores."),
-                     doing: "Turn What-If off", act: .event(.whatIfOff)),
+            TourStep(id: "dashboard", aim: .spot(.counters), title: "Everything due, at a glance",
+                     body: Text("Each counter opens what it counts: work due today, tomorrow and in the next 7 days, anything overdue, new announcements and this week’s grades.")),
+            TourStep(id: "grades", aim: .spot(.gradesRow), title: "Grades", body: Text("All your grades and your GPA in one place."),
+                     doing: "Click Grades to look", act: .place { p, _ in p == .grades }),
         ]
         if !engine.courses.isEmpty {
-            s.append(TourStep(id: "courses", aim: .spot(.firstCourse), title: "Your courses", body: Text("Your classes are listed here."),
-                              doing: "Hover over a course", gesture: .hover, act: .event(.courseHover)))
+            s.append(TourStep(id: "courses", aim: .spot(.firstCourse), title: "Your courses",
+                              body: Text("Each course opens to its home, with its sections under it here.")))
         }
         s += [
-            TourStep(id: "tools", aim: .spot(.toolsRow), title: "Tools and widgets", body: TourOverlay.toolsLine,
-                     doing: "Click Tools", act: .place { p, _ in p == .tools }),
-            // (1.2.16) the graphing calculator's pin, to keep it at the top; pinned already, the step says so and moves on
-            ToolsCenter.shared.pinned.contains(.graph)
-                ? TourStep(id: "pin", aim: .none, title: "Pinned tools", body: Text("The graphing calculator is pinned at the top, one click away."))
-                : TourStep(id: "pin", aim: .spot(.toolPin), title: "Pin the graphing calculator", body: Text("Pin it to keep it at the top, one click away."),
-                           doing: "Click the graphing calculator’s pin", act: .event(.pinned)),
-            TourStep(id: "dashboard", aim: .spot(.dashboardRow), title: "Back to the Dashboard", body: Text("Everything due, at a glance."),
-                     doing: "Click Dashboard", act: .place { p, pushed in p == .dashboard && !pushed }),
-            TourStep(id: "cards", aim: .spot(.counterNext), title: "The cards open", body: Text("Click a card to see what’s in it."),
-                     doing: "Click Next 7 days", act: .event(.counterOpened)),
-            TourStep(id: "look", aim: .spot(.counterPanel), title: "A quick look", body: Text("Click anything to preview it here."),
-                     doing: "Click an item", act: .opened),
-            // (1.2.3) an item previewed closes where it is, as the web's does; one opened whole (a double-click) goes Back
-            preview.item != nil
-                ? TourStep(id: "close", aim: .spot(.preview), title: "Close it", body: Text("You’ll be right where you were."),
-                           doing: "Close it", act: .closed)
-                : TourStep(id: "close", aim: .back, title: "Close it", body: Text("You’ll be right where you were."),
-                           doing: "Click Back", act: .closed),
-            // (1.2.16) pointed out, not tried: Next moves on
-            TourStep(id: "search", aim: .search, title: "Search everything", body: Text("Find anything in your courses. Type / for commands.")),
-            TourStep(id: "end", aim: .none, title: "You’re all set", body: Text("Replay it any time from Help ▸ Take the Tour."), nextLabel: "Done"),
+            TourStep(id: "tools", aim: .spot(.toolsRow), title: "Tools",
+                     body: Text("A PDF editor, a file converter, calculators, flashcards, a citation maker and more. Pin one to keep it in the toolbar."),
+                     doing: "Click Tools to look", act: .place { p, _ in p == .tools }),
+            TourStep(id: "search", aim: .search, title: "Search everything", body: Text("Find anything in your courses. Type / for commands, or press ⌘K.")),
+            // (home-9) the way to report a bug last, where it is a help rather than the first thing said
+            TourStep(id: "report", aim: .spot(.account), title: "Something wrong? Tell us here",
+                     body: Text("Report a bug or ask for something new from this menu. Take this tour again from Help ▸ Take the Tour."),
+                     nextLabel: "Done"),
         ]
         return s
-    }
-
-    /// The web's line, its tools in their colours.
-    private static var toolsLine: Text {
-        Text("Find a ")
-            + Text("PDF Editor, ").foregroundColor(Color(hex: "#ff9f0a"))
-            + Text("File Converter, ").foregroundColor(Color(hex: "#34c759"))
-            + Text("Calculators, ").foregroundColor(Color(hex: "#bf5af2"))
-            + Text("Flashcards, ").foregroundColor(Color(hex: "#2f7cf6"))
-            + Text("Citation Generator").foregroundColor(Color(hex: "#40c8e0"))
-            + Text(" & more.")
     }
 
     // MARK: Placing it
@@ -376,6 +337,7 @@ struct TourOverlay: View {
     /// The step's thing done: on to the next, a moment later (the press seen landing first).
     private func check(_ step: TourStep, count: Int) {
         guard !advancing, let i = tour.step else { return }
+        if case .next = step.act { return }
         let here = engine.nav.current
         let pushed = !here.path.isEmpty
         let did: Bool
@@ -406,6 +368,12 @@ struct TourOverlay: View {
         tour.show(i - 1)
     }
 
+    /// (home-2) Left before its end: over, and seen.
+    private func skip() {
+        guard tour.step != nil else { return }
+        tour.finish()
+    }
+
     /// A press outside the light: the card nudges, so the eye goes to it.
     private func poke() {
         guard !reduceMotion else { return }
@@ -415,7 +383,6 @@ struct TourOverlay: View {
 
     /// A step arriving: the sidebar shown; the tour begun from the Dashboard, as the web's is.
     private func arrive(_ step: Int?, from old: Int?) {
-        since = Date()
         guard let step else { return }
         if old == nil {
             if columns != .all { columns = .all }
@@ -469,9 +436,9 @@ private struct TourStage: View {
     let size: CGSize
     @Binding var cardSize: CGSize
     let nudged: Bool
-    let stuck: Bool
     let next: () -> Void
     let back: () -> Void
+    let skip: () -> Void
     let poke: () -> Void
     @FocusState private var focused: Bool
 
@@ -481,32 +448,35 @@ private struct TourStage: View {
                 // (the light takes presses through to what is under it; the rest of the window nudges the card)
                 .contentShape(TourHoleShape(hole: plan.hole), eoFill: true)
                 .onTapGesture(perform: poke)
-            TourCard(step: step, index: index, count: count, arrow: plan.arrow, arrowAt: plan.arrowAt, stuck: stuck, cardSize: $cardSize, next: next, back: back)
+            TourCard(step: step, index: index, count: count, arrow: plan.arrow, arrowAt: plan.arrowAt, cardSize: $cardSize, next: next, back: back, skip: skip)
                 .scaleEffect(nudged ? 1.025 : 1)
                 .offset(x: plan.card.x - (plan.arrow == .leading ? CalloutMetrics.length : 0),
                         y: plan.card.y - (plan.arrow == .top ? CalloutMetrics.length : 0))
                 .animation(Motion.gentle, value: plan.card)
         }
         .frame(width: size.width, height: size.height, alignment: .topLeading)
-        // the keys, on a step that waits for nothing: Return and → on, ← back (a step that asks for typing keeps them)
-        .focusable(!step.waits, interactions: .edit)
+        // the keys: Return and → on, ← back, (home-2) Escape ends it
+        .focusable(true, interactions: .edit)
         .focused($focused)
         .focusEffectDisabled()
         .onKeyPress(phases: .down) { press in key(press) }
         .task(id: index) {
             try? await Task.sleep(nanoseconds: 80_000_000) // (once the window has let go of what had the keys)
-            focused = !step.waits
+            focused = true
         }
     }
 
     private func key(_ press: KeyPress) -> KeyPress.Result {
-        guard !step.waits, press.modifiers.isDisjoint(with: [.command, .control, .option]) else { return .ignored }
+        guard press.modifiers.isDisjoint(with: [.command, .control, .option]) else { return .ignored }
         switch press.key {
         case .rightArrow, .return:
             next()
             return .handled
         case .leftArrow:
             back()
+            return .handled
+        case .escape:
+            skip()
             return .handled
         default:
             return .ignored
@@ -555,20 +525,20 @@ private struct TourVeil: View {
     }
 }
 
-/// The card: its count, the title and its line, what to do, a bar of how far along, and Next where the step
-/// waits for nothing (or for something that has not come in a while).
+/// The card: its count and its ✕, the title and its line, what to try, a bar of how far along, and (home-2) the same
+/// controls on every step — Skip Tour, Back, and a Next that always works (Done on the last).
 private struct TourCard: View {
-    static let width: CGFloat = 300
+    static let width: CGFloat = 320
 
     let step: TourStep
     let index: Int
     let count: Int
     let arrow: TourArrow
     let arrowAt: CGFloat
-    let stuck: Bool
     @Binding var cardSize: CGSize
     let next: () -> Void
     let back: () -> Void
+    let skip: () -> Void
 
     private var last: Bool { index == count - 1 }
 
@@ -602,13 +572,28 @@ private struct TourCard: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if step.id == "end" {
-                // (1.3.76) the setup's seal, bouncing once the card has glided to the middle (Motion.gentle, above)
+            if last {
+                // (1.3.76) the setup's seal, bouncing once the card has glided to its place (Motion.gentle, above)
                 FinishMark(size: 28, weight: .semibold, delay: 300_000_000)
             }
-            Text("\(index + 1) of \(count)")
-                .font(.sFootnote.weight(.semibold).monospacedDigit())
-                .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                Text("\(index + 1) of \(count)")
+                    .font(.sFootnote.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 8)
+                Button(action: skip) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 22, height: 22)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut(.cancelAction) // (Escape ends it wherever the keys are)
+                .help("Close the Tour (Esc)")
+                .accessibilityLabel("Close the tour")
+                .padding(.trailing, -6)
+            }
             Text(step.title)
                 .font(.sHeadline)
             step.body
@@ -642,26 +627,26 @@ private struct TourCard: View {
     }
 
     private var footer: some View {
-        HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 10) {
             ProgressView(value: Double(index + 1), total: Double(count))
                 .progressViewStyle(.linear)
                 .tint(Theme.accent)
-                .frame(maxWidth: 90)
                 .accessibilityHidden(true)
-            Spacer(minLength: 6)
-            if !step.waits {
-                if index > 0 && !last {
+            HStack(spacing: 8) {
+                if !last {
+                    Button("Skip Tour", action: skip)
+                        .buttonStyle(.plain)
+                        .font(.sCallout)
+                        .foregroundStyle(.secondary)
+                        .help("End the tour (Esc). Take it again from Help ▸ Take the Tour.")
+                }
+                Spacer(minLength: 6)
+                if index > 0 {
                     Button("Back", action: back)
                         .glassButton()
                 }
                 Button(step.nextLabel, action: next) // (Return, as the stage takes its keys)
                     .glassButton(prominent: true)
-            } else if stuck {
-                // (the step's thing not done in a while — or not to be found here: on without it)
-                Button("Next", action: next)
-                    .buttonStyle(.plain)
-                    .font(.sFootnote.weight(.medium))
-                    .foregroundStyle(.secondary)
             }
         }
         .controlSize(.regular)

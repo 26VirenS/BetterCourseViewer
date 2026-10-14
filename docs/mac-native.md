@@ -86,6 +86,23 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   `WindowWidthProbe`), not the page's, so showing the sidebar or the side column coming in never sends the row back to
   two. A tile's panel still opens over the page from its tile: the first from its left edge, the last from its right,
   one between them in step, each kept on the page.
+- **The Dashboard and the window, after the UI review (the home findings; the same on Windows).** The view (Cards,
+  List, Activity) and a labelled New Task sit in the page by the greeting, so a tool pinned to the toolbar never pushes
+  them into its » menu; on a one-column page the view chosen comes straight under the counters. Each row of tiles shows
+  every counter's full name ("Announcements" with "3 unread · 2 courses", "Graded this week") where every one fits as
+  the tile draws it, else every short one with the engine's note ("Unread", "announcements · 2 courses") — never a mix,
+  never a name cut; tooltips and VoiceOver say the count in words ("3 unread announcements"). Red is for late work only:
+  Overdue with work in it wears a red wash and edge of its own (not the glass's tint, which macOS mutes in a window in
+  the background), Due today the accent. While the page shows what was kept from last time, the numbers stay, faint, and
+  the date line says "Updating…". A counter's panel lists its work as every Dashboard list does (course and kind over
+  the title, time over points on the right), about six rows before it scrolls, a row's preview opening under it in the
+  panel, and ends with "See All 14 in To Do" (Grades, Notifications). Course cards: a 48-point band with the sidebar's
+  name, the term and teacher under it, "2 new" announcements, quick links named where the card is wide. A colour worn
+  marks the sidebar's chosen row's glyph and the controls — never the words or the titles — and a drawn scene stays
+  faint behind the sidebar's rows and out of a tile's top. Typing in Search answers in its suggestions only; the page
+  changes on Return (a sum's Return copies its answer). The tour is six steps (the counters, Grades, a course, Tools,
+  Search, then Report a Bug at the account menu), with Skip Tour, ✕ and Escape, a Next that always works, and the whole
+  window dimmed, toolbar too, its buttons resting meanwhile; a quick look dims the toolbar's strip with the page.
 
 - **Knewton Alta (1.3.17, Mac only; cut back in 1.3.45).** Open Tool on a Knewton Alta assignment (the engine's
   `alta`: its launch address, or a title naming it) opens a popup as a quiz does (`Screens/AltaQuiz.swift`): Close and
@@ -409,7 +426,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   - *The Dashboard kept* (`DetailStack`): opened once, it stays — over the stack, out of sight and out of reach of the
     pointer while another screen shows — so its cards, their pictures and where it was scrolled are as they were when
     the window comes back to it. It reads again only when it is shown and what it holds is stale or something was done
-    meanwhile, each card changing in place. Its title and toolbar stay in the stack (`DashboardChrome`). It and its
+    meanwhile, each card changing in place. Its title stays in the stack (`DashboardChrome`; its view and New Task are
+    in its page, by the greeting). It and its
     parts act through the engine held as a plain value of the environment (`EngineLink`) rather than observe it, so,
     put away, the Dashboard is not drawn again each time the engine changes (a search typed, a count read).
   - *Waiting*: a screen's spinner shows only after a third of a second, so a quick answer replaces an empty page rather

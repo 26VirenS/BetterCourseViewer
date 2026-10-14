@@ -3,10 +3,10 @@ import SwiftUI
 
 // The work preview over the window (1.2.3; Components/WorkPreview.swift has what it shows and the rows that open it).
 // MainShell puts it over the split view, above the tour. Nothing is drawn, and nothing takes a press, while no card is
-// out. With one: the window lightly dimmed but for the row it grew from, and the card — Liquid Glass — growing out of
-// that row on the house spring to its place: just under the row (1.2.20), or just over it when there is no room under,
-// else in the middle of the screen's side of the window. It folds back into the row when it closes. Under Reduce Motion it fades
-// in and out in its place.
+// out. With one: the window — the toolbar's strip with it (home-28) — lightly dimmed but for the row it grew from, and
+// the card — Liquid Glass — growing out of that row on the house spring to its place: just under the row (1.2.20), or
+// just over it when there is no room under, else in the middle of the screen's side of the window. It folds back into
+// the row when it closes. Under Reduce Motion it fades in and out in its place.
 
 struct WorkPreviewOverlay: View {
     @EnvironmentObject private var engine: Engine
@@ -31,6 +31,9 @@ struct WorkPreviewOverlay: View {
                 }
             }
         }
+        // (home-28) its dim over the whole window, the toolbar's strip too — not the page alone under a lit toolbar; the
+        // card keeps under the toolbar (`safeAreaInsets.top` is its height)
+        .ignoresSafeArea()
         .allowsHitTesting(preview.item != nil && preview.shown)
         // (the window gone somewhere else — a place picked, Back — takes the card with it)
         .onChange(of: whereabouts.nav.current) { _, _ in preview.dismiss() }
