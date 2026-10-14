@@ -30,6 +30,8 @@ public sealed partial class AssignmentScreen : Screen
     private readonly string course, id;
     private readonly Loader<AssignmentData> model;
     private QuizIntroLite? quizIntro;
+    /// <summary>The quiz's intro could not be read: its buttons as the assignment says, nothing waiting on it.</summary>
+    private bool quizIntroFailed;
     private ItemNeighbours? around;
     private bool aroundAsked;
     private bool commenting;
@@ -46,6 +48,14 @@ public sealed partial class AssignmentScreen : Screen
     private readonly Grid dropOverlay = new() { IsHitTestVisible = false, Visibility = Visibility.Collapsed };
     private FrameworkElement? sideContent, headerPart;
     private double pinTop;
+    /// <summary>The page laid out in two columns (the right's cards beside the left's), as last built.</summary>
+    private bool wide;
+
+    // the next step on the page, and its copy in the header — shown only while the page's own is out of sight
+    private FrameworkElement? actionPart;
+    private Wpf.Ui.Controls.Button? headerStep;
+    private bool actionInView = true;
+    private int headerStepTurn;
 
     // the parts of this build a jump goes to
     private FrameworkElement? workPart, gradePart, commentsPart, seal;
@@ -63,6 +73,8 @@ public sealed partial class AssignmentScreen : Screen
         root.PreviewDrop += Drop;
         side.VerticalScrollBarVisibility = ScrollBarVisibility.Hidden;
         side.SizeChanged += (_, _) => PinSide();
+        one.ScrollChanged += (_, _) => WatchAction();
+        side.ScrollChanged += (_, _) => WatchAction();
     }
 
     private static ScrollViewer Scroller() => new()
@@ -78,7 +90,9 @@ public sealed partial class AssignmentScreen : Screen
     private string CanvasUrl => model.Data?.CanvasUrl ?? $"/courses/{course}/assignments/{id}?bcv=native";
 
     public override string Title => model.Data?.Title ?? "Assignment";
-    public override string? Subtitle => model.Data?.Context is { Length: > 0 } c ? c : null;
+    // (no line under the title: the course is named by the chip under it — its way back — and, opened from the course,
+    // by the breadcrumb; a long name wraps to a second line rather than being cut)
+    public override int TitleLines => 2;
     public override bool Scrolls => false;
 
     public override void Refresh()
@@ -141,6 +155,10 @@ public sealed partial class AssignmentScreen : Screen
         public bool CanStart { get; set; }
         public LastAttempt? Last { get; set; }
         public sealed class LastAttempt { public bool Feedback { get; set; } }
+        /// <summary>(2.99.33) The attempts as the quiz itself counts them — the count New attempt follows — for the facts
+        /// ("1 of 2 attempts used"), and the one-column facts line with them.</summary>
+        public string? AttemptsText { get; set; }
+        public string? FactsLine { get; set; }
     }
 
     private sealed class ItemNeighbours
@@ -157,9 +175,10 @@ public sealed partial class AssignmentScreen : Screen
         try
         {
             quizIntro = await engine.Call<QuizIntroLite>("quizIntro", new { course, quiz = q });
-            Render();
+            quizIntroFailed = false;
         }
-        catch { /* as the quiz was taken: its feedback */ }
+        catch { quizIntroFailed = quizIntro == null; /* as the quiz was taken: its feedback */ }
+        Render();
     }
 
     /// <summary>The assignments either side of this one (the web's Previous and Next), asked for once the screen is up.</summary>
@@ -176,7 +195,8 @@ public sealed partial class AssignmentScreen : Screen
 
     // ---- the header's commands (the Mac's toolbar) ----
 
-    /// <summary>Previous and Next (each naming where it goes), the next step, and More (Open in Canvas, Copy Link).</summary>
+    /// <summary>Previous and Next (each naming where it goes), the next step — only while the page's own button is out of
+    /// sight: two of the same would compete, and the title needs the room — and More (Open in Canvas, Copy link).</summary>
     public override FrameworkElement? Commands
     {
         get
@@ -199,11 +219,15 @@ public sealed partial class AssignmentScreen : Screen
                 next.Click += (_, _) => OpenNeighbour(around?.Next);
                 bar.Children.Add(K.H(4, prev, next));
             }
+            headerStep = null;
             if (model.Data is { } d && NextStepOf(d) is { } step)
             {
                 var b = K.Button(step.Title, () => Act(d, step), icon: step.Symbol);
                 b.MinWidth = 0;
                 b.ToolTip = step.Help;
+                b.IsEnabled = !step.Pending;
+                b.Visibility = actionInView ? Visibility.Collapsed : Visibility.Visible;
+                headerStep = b;
                 bar.Children.Add(b);
             }
             Button? more = null;
@@ -211,12 +235,37 @@ public sealed partial class AssignmentScreen : Screen
             {
                 var m = new ContextMenu { PlacementTarget = more, Placement = PlacementMode.Bottom };
                 m.Items.Add(AssignKit.Item($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen(CanvasUrl, Title)));
-                m.Items.Add(AssignKit.Item("Copy Link", SymbolRegular.Link24, () => { if (engine.Absolute(CanvasUrl) is { } u) AssignKit.Copy(u.ToString()); }));
+                m.Items.Add(AssignKit.Item("Copy link", SymbolRegular.Link24, () => { if (engine.Absolute(CanvasUrl) is { } u) AssignKit.Copy(u.ToString()); }));
                 m.IsOpen = true;
             }, "More");
             bar.Children.Add(more);
             return bar;
         }
+    }
+
+    /// <summary>
+    /// Whether the page's own next step is in sight (scrolled or not): out of it, its copy fades into the header beside
+    /// Next — 200 ms, the pages' strong ease-out, its opacity only — and back in sight it goes again. Under Windows'
+    /// "Animation effects" off it simply shows and goes.
+    /// </summary>
+    private void WatchAction()
+    {
+        var inView = true;
+        if (actionPart is { IsLoaded: true } part && (wide ? side : one) is { IsLoaded: true } scroller)
+        {
+            try { inView = part.TranslatePoint(new Point(0, part.ActualHeight), scroller).Y > 8; }
+            catch (InvalidOperationException) { }
+        }
+        if (inView == actionInView) return;
+        actionInView = inView;
+        if (headerStep is not { } b) return;
+        var turn = ++headerStepTurn;
+        if (!inView)
+        {
+            b.Visibility = Visibility.Visible;
+            Motion.FromTo(b, UIElement.OpacityProperty, 0, 1, 200, Motion.Out);
+        }
+        else Motion.To(b, UIElement.OpacityProperty, 0, 120, Motion.Out, done: () => { if (turn == headerStepTurn && actionInView) b.Visibility = Visibility.Collapsed; });
     }
 
     private void OpenNeighbour(ItemNeighbours.Item? item)
@@ -227,7 +276,7 @@ public sealed partial class AssignmentScreen : Screen
     /// <summary>The header drawn again when what it says has changed (the title, the course, the next step).</summary>
     private void HeaderCheck(AssignmentData? d)
     {
-        var key = d == null ? "" : $"{d.Title}|{d.Context}|{NextStepOf(d)?.Title}";
+        var key = d == null ? "" : $"{d.Title}|{d.Context}|{NextStepOf(d)?.Title}|{NextStepOf(d)?.Pending}";
         if (key == headerKey) return;
         headerKey = key;
         HeaderChange();
@@ -236,26 +285,39 @@ public sealed partial class AssignmentScreen : Screen
     // ---- the page ----
 
     private double PageWidth => Width + 80;
-    private double Pad => PageWidth < 560 ? 20 : 40;
-    private double Room => Math.Min(1480, PageWidth - 2 * Pad);
+    private double Pad => PadOf(Width);
+    private double Room => RoomOf(Width);
     private const double Gap = 28, TwoFrom = 780;
+    /// <summary>The widest the left column grows (the instructions and comments: lines that can still be read).</summary>
+    private const double ReadMax = 760;
+
+    private static double PadOf(double w) => w + 80 < 560 ? 20 : 40;
+    private static double RoomOf(double w) => Math.Min(1480, w + 80 - 2 * PadOf(w));
 
     /// <summary>The right column's width for the page's room (a little wider as the window grows).</summary>
-    private static double SideWidth(double room) => Math.Min(400, Math.Max(290, Math.Round((room - Gap) * 0.32)));
+    private static double SideWidth(double room) => Math.Min(440, Math.Max(290, Math.Round((room - Gap) * 0.32)));
+
+    /// <summary>The page's own width for a width the shell gives: the room, but in two columns no wider than a reading
+    /// column and the side beside it (on a large window the rest stays empty at the right, as Windows' Settings pages
+    /// do, rather than drawing lines too long to read).</summary>
+    private static double RootWidthOf(double w)
+    {
+        var room = RoomOf(w);
+        var used = room >= TwoFrom ? Math.Min(room, ReadMax + Gap + SideWidth(room)) : room;
+        return Math.Min(w + 80, used + 2 * PadOf(w));
+    }
 
     protected override bool LayoutChanges(double before, double now)
     {
-        double PadOf(double w) => w + 80 < 560 ? 20 : 40;
-        double RoomOf(double w) => Math.Min(1480, w + 80 - 2 * PadOf(w));
-        var wide = RoomOf(now) >= TwoFrom;
-        if (now > 0) root.Width = Math.Min(1480 + 2 * PadOf(now), now + 80);
+        var wideNow = RoomOf(now) >= TwoFrom;
+        if (now > 0) root.Width = RootWidthOf(now);
         // (the side column follows the width without the page being built again)
-        if (wide && (RoomOf(before) >= TwoFrom) && root.ColumnDefinitions.Count == 4 && PadOf(before) == PadOf(now))
+        if (wideNow && (RoomOf(before) >= TwoFrom) && root.ColumnDefinitions.Count == 4 && PadOf(before) == PadOf(now))
         {
             root.ColumnDefinitions[2].Width = new GridLength(SideWidth(RoomOf(now)));
             return false;
         }
-        return (RoomOf(before) >= TwoFrom) != wide || PadOf(before) != PadOf(now) || before == 0;
+        return (RoomOf(before) >= TwoFrom) != wideNow || PadOf(before) != PadOf(now) || before == 0;
     }
 
     protected override FrameworkElement Build()
@@ -272,16 +334,16 @@ public sealed partial class AssignmentScreen : Screen
         var offsets = (one.VerticalOffset, left.VerticalOffset, side.VerticalOffset);
         var pad = Pad;
         var room = Room;
-        var wide = room >= TwoFrom;
+        wide = room >= TwoFrom;
         headerPart = Header(d);
         var main = MainColumn(d);
-        var sideCol = SideColumn(d);
         root.ColumnDefinitions.Clear();
         root.Children.Clear();
         one.Content = left.Content = side.Content = null;
-        // (as wide as the page, up to the reading width, from the left: sized, never shrunk to what it holds)
+        // (as wide as the page, up to a reading column and the side beside it, from the left: sized, never shrunk to
+        // what it holds)
         root.MaxWidth = 1480 + 2 * pad;
-        root.Width = Math.Min(root.MaxWidth, PageWidth);
+        root.Width = RootWidthOf(Width);
         root.HorizontalAlignment = HorizontalAlignment.Left;
         if (wide)
         {
@@ -293,7 +355,7 @@ public sealed partial class AssignmentScreen : Screen
             var leftContent = K.V(32, headerPart, main);
             leftContent.Margin = new Thickness(pad, 0, 12, 40); // (the left's scroll bar in the gap between the columns)
             left.Content = leftContent;
-            sideContent = sideCol;
+            sideContent = SideColumn(d);
             sideContent.Margin = new Thickness(0, pinTop, 0, 24);
             side.Content = sideContent;
             headerPart.SizeChanged += (_, _) => PinSide();
@@ -304,7 +366,7 @@ public sealed partial class AssignmentScreen : Screen
         else
         {
             sideContent = null;
-            var stack = K.V(32, headerPart, K.V(Gap, sideCol, main));
+            var stack = K.V(32, headerPart, NarrowColumn(d, main));
             stack.Margin = new Thickness(pad, 0, pad, 40);
             one.Content = stack;
             root.Children.Add(one);
@@ -312,12 +374,13 @@ public sealed partial class AssignmentScreen : Screen
         BuildDropOverlay(d);
         root.Children.Add(dropOverlay);
         Grid.SetColumnSpan(dropOverlay, Math.Max(1, root.ColumnDefinitions.Count));
-        // (the scroll where it was, the page built anew under it)
+        // (the scroll where it was, the page built anew under it; then whether the next step is in sight)
         root.Dispatcher.BeginInvoke(() =>
         {
             if (offsets.Item1 > 0) one.ScrollToVerticalOffset(offsets.Item1);
             if (offsets.Item2 > 0) left.ScrollToVerticalOffset(offsets.Item2);
             if (offsets.Item3 > 0) side.ScrollToVerticalOffset(offsets.Item3);
+            WatchAction();
         }, DispatcherPriority.Loaded);
         return root;
     }
@@ -366,7 +429,8 @@ public sealed partial class AssignmentScreen : Screen
         }
         if (d.Status is { Word.Length: > 0 } s) row.Children.Add(K.Chip(s.Word, AssignKit.StatusTone(s.Kind), strong: true).Margin(0, 0, 8, 0));
         var v = K.V(10, row);
-        if (d.Rubric.Count > 0) v.Children.Add(RubricSummaryRow(d).Margin(0, 4, 0, 0));
+        // (the rubric once on the page: here — unless two columns put the grade card beside, which has it)
+        if (d.Rubric.Count > 0 && (!wide || d.Grade == null)) v.Children.Add(RubricSummaryRow(d).Margin(0, 4, 0, 0));
         return v;
     }
 
@@ -449,55 +513,65 @@ public sealed partial class AssignmentScreen : Screen
     private AssignStep? NextStepOf(AssignmentData d) => NextSteps(d).LastOrDefault();
 
     /// <summary>What to do next: hand in (again), take the quiz, open the discussion or the tool. A quiz taken: See
-    /// Feedback where its results can be seen, and New Attempt beside it while an attempt is left — New Attempt alone where
-    /// its results are hidden. Handed in, and it may be handed in again: what was handed in (its feedback, once there is
-    /// any) beside Hand In Again.</summary>
+    /// feedback where its results can be seen, and New attempt beside it while an attempt is left — New attempt alone where
+    /// its results are hidden. Until the quiz's own intro is in, New attempt waits beside See feedback (greyed, a spinner
+    /// in it) wherever the assignment says an attempt is left, so the buttons never move when it answers. Handed in, and
+    /// it may be handed in again: what was handed in (its feedback, once there is any) beside Hand in again.</summary>
     private List<AssignStep> NextSteps(AssignmentData d)
     {
         if (d.QuizId != null && QuizTaken(d))
         {
             var underWay = quizIntro?.Begin.StartsWith("Continue") == true;
-            if (underWay) return new() { new AssignStep("Continue Quiz", SymbolRegular.TaskListLtr24, "Go back to the attempt under way", Again: true) };
+            if (underWay) return new() { new AssignStep("Continue quiz", SymbolRegular.TaskListLtr24, "Go back to the attempt under way", Again: true) };
             // (before the intro is in: its feedback, as the quiz was taken)
+            var asking = quizIntro == null && !quizIntroFailed;
             var feedback = quizIntro == null || quizIntro.Last?.Feedback == true;
-            var again = quizIntro?.CanStart == true;
+            var again = quizIntro != null ? quizIntro.CanStart : asking && AttemptLeft(d);
             var o = new List<AssignStep>();
-            if (feedback) o.Add(new AssignStep("See Feedback", SymbolRegular.Comment24, "See your last attempt’s results", "Feedback", Feedback: true));
-            if (again) o.Add(new AssignStep("New Attempt", SymbolRegular.ArrowCounterclockwise24, "Take this quiz again", "Retake", Again: true));
+            if (feedback) o.Add(new AssignStep("See feedback", SymbolRegular.Comment24, "See your last attempt’s results", "Feedback", Feedback: true));
+            if (again) o.Add(new AssignStep("New attempt", SymbolRegular.ArrowCounterclockwise24, asking ? "Checking the attempts left…" : "Take this quiz again", "Retake", Again: true, Pending: asking));
             if (o.Count > 0) return o;
         }
         if (d.CanSubmit && d.Resubmit == true && HasWork(d))
         {
             var marked = d.Grade != null || d.Comments.Count > 0;
             var look = marked
-                ? new AssignStep("See Feedback", SymbolRegular.Comment24, "Your work, with your teacher's marks and comments", "Feedback", Feedback: true)
-                : new AssignStep("View Submission", SymbolRegular.DocumentSearch24, "What you handed in", "Submission", Feedback: true);
+                ? new AssignStep("See feedback", SymbolRegular.Comment24, "Your work, with your teacher's marks and comments", "Feedback", Feedback: true)
+                : new AssignStep("View submission", SymbolRegular.DocumentSearch24, "What you handed in", "Submission", Feedback: true);
             if (NextStepOne(d) is { } again) return new() { look, again };
         }
         return NextStepOne(d) is { } one ? new() { one } : new();
+    }
+
+    /// <summary>Whether the assignment's own count leaves an attempt ("1 of 2 attempts used"; no limit: "", "Attempt 3").</summary>
+    private static bool AttemptLeft(AssignmentData d)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(d.AttemptsText ?? "", @"^(\d+) of (\d+)");
+        return !m.Success || int.Parse(m.Groups[1].Value) < int.Parse(m.Groups[2].Value);
     }
 
     private static AssignStep? NextStepOne(AssignmentData d)
     {
         if (d.CanSubmit)
             return d.Resubmit == true
-                ? new AssignStep("Hand In Again", SymbolRegular.ArrowUpload24, "Hand in this assignment again", "Hand In")
-                : new AssignStep("Hand In", SymbolRegular.ArrowUpload24, "Hand in this assignment");
-        if (d.QuizUrl != null) return new AssignStep("Take Quiz", SymbolRegular.TaskListLtr24, "Take this quiz");
-        if (d.DiscussionUrl != null) return new AssignStep("Open Discussion", SymbolRegular.ChatMultiple24, "Open this assignment’s discussion");
+                ? new AssignStep("Hand in again", SymbolRegular.ArrowUpload24, "Hand in this assignment again", "Hand in")
+                : new AssignStep("Hand in", SymbolRegular.ArrowUpload24, "Hand in this assignment");
+        if (d.QuizUrl != null) return new AssignStep("Take quiz", SymbolRegular.TaskListLtr24, "Take this quiz");
+        if (d.DiscussionUrl != null) return new AssignStep("Open discussion", SymbolRegular.ChatMultiple24, "Open this assignment’s discussion");
         if (d.ToolUrl != null)
             return d.LtiQuiz == true
-                ? new AssignStep("Take Quiz", SymbolRegular.TaskListLtr24, "Open this quiz in a window of its own")
-                : new AssignStep("Open Tool", SymbolRegular.PuzzlePiece24, "Open this assignment’s tool in a window of its own");
+                ? new AssignStep("Take quiz", SymbolRegular.TaskListLtr24, "Open this quiz in a window of its own")
+                : new AssignStep("Open tool", SymbolRegular.PuzzlePiece24, "Open this assignment’s tool in a window of its own");
         return null;
     }
 
     private void Act(AssignmentData d, AssignStep? step = null)
     {
+        if (step is { Pending: true }) return; // (the quiz's attempts still being read)
         if (step is { Feedback: true } && d.QuizId == null) Review(d, d.Submission?.Files?.FirstOrDefault()); // (work handed in, looked at in the popup)
         else if (step != null && d.QuizId is { } q && (step.Feedback || step.Again))
             engine.OpenQuiz(new QuizLaunch(course, q, d.Title) { Begin = step.Again, Feedback = step.Feedback });
-        else if (NextStepOf(d) is { } s && (s.Feedback || s.Again)) Act(d, s);
+        else if (NextSteps(d).LastOrDefault(x => !x.Pending) is { } s && (s.Feedback || s.Again)) Act(d, s);
         else if (d.CanSubmit) OpenHandIn(d);
         else if (d.QuizId is { } quiz) engine.OpenQuiz(new QuizLaunch(course, quiz, d.Title));
         else if (d.QuizUrl is { } qu) engine.GoTo(qu, d.Title);
@@ -684,7 +758,7 @@ public sealed partial class AssignmentScreen : Screen
         dropOverlay.Children.Add(frame);
         var words = K.V(8,
             K.Icon(SymbolRegular.ArrowUpload24, 32, color, filled: true),
-            K.Text(d.Resubmit == true ? "Drop to Hand In Again" : "Drop to Hand In", Ty.Subtitle).Center(),
+            K.Text(d.Resubmit == true ? "Drop to hand in again" : "Drop to hand in", Ty.Subtitle).Center(),
             K.Text(d.Title, Ty.Body, B.Text2).Center());
         var card = new Border { Child = words, Padding = new Thickness(30, 22, 30, 22), CornerRadius = new CornerRadius(8), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Effect = K.Shadow(32, 8, 0.2), MaxWidth = 420 };
         card.Bg(B.Flyout).Stroke(B.FlyoutStroke);

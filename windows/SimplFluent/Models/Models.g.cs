@@ -588,6 +588,12 @@ public sealed class GradeInfo
     public double? Pct { get; set; }
     public string? Letter { get; set; }
     public string? Late { get; set; }
+    // (2.99.33) the figures as every app shows them: "81.3%", the ring's 81, the band (A–F) its colour comes from, and
+    // the score and letter as one chip ("13/16 · B−")
+    public string? PctText { get; set; }
+    public int? PctWhole { get; set; }
+    public string? Band { get; set; }
+    public string? Chip { get; set; }
 }
 
 public sealed class RubricRating
@@ -653,6 +659,9 @@ public sealed class AssignmentData
     public string? Kind { get; set; }
     public string? Points { get; set; }
     public string? Due { get; set; }
+    // (2.99.33) "Due Oct 13 at 11:59 PM" ("" with no due date), and the facts in one line for a one-column page
+    public string? DueLine { get; set; }
+    public string? FactsLine { get; set; }
     public string? Available { get; set; }
     public string? TypesText { get; set; }
     public string Html { get; set; } = "";

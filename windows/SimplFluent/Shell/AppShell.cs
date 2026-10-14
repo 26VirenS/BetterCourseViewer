@@ -413,7 +413,8 @@ public sealed partial class AppShell : Grid, IDisposable
         {
             var (title, go) = crumbs[i];
             var last = i == crumbs.Count - 1;
-            var t = K.Text(title, Ty.Title, last ? B.Text : B.Text2);
+            var t = last && current.TitleLines > 1 ? K.Wrapped(title, Ty.Title, B.Text, current.TitleLines) : K.Text(title, Ty.Title, last ? B.Text : B.Text2);
+            if (last) TipWhenCut(t);
             if (go != null)
             {
                 var b = K.Subtle(t, go, new Thickness(2, 0, 2, 0));
@@ -427,6 +428,21 @@ public sealed partial class AppShell : Grid, IDisposable
         if (subtitle is { Length: > 0 } sub) stack.Children.Add(K.Text(sub, Ty.Body, B.Text2));
         titleHost.Content = stack;
         commandsHost.Content = commands;
+    }
+
+    /// <summary>The title's whole words as its tooltip, while it is cut short (too long for the header beside the
+    /// commands); none while it all shows.</summary>
+    private static void TipWhenCut(TextBlock t)
+    {
+        t.SizeChanged += (_, _) =>
+        {
+            if (t.ActualWidth <= 0) return;
+            var face = new Typeface(t.FontFamily, t.FontStyle, t.FontWeight, t.FontStretch);
+            var full = new FormattedText(t.Text, System.Globalization.CultureInfo.CurrentUICulture, t.FlowDirection, face, t.FontSize, Brushes.Black, VisualTreeHelper.GetDpi(t).PixelsPerDip);
+            if (t.TextWrapping != TextWrapping.NoWrap) full.MaxTextWidth = t.ActualWidth;
+            var cut = t.TextWrapping == TextWrapping.NoWrap ? full.Width > t.ActualWidth + 0.5 : full.Height > t.ActualHeight + 1;
+            t.ToolTip = cut ? t.Text : null;
+        };
     }
 
     private double ContentWidth => Math.Max(200, page.ActualWidth - 80);
