@@ -48,7 +48,7 @@ public static class Taskbar
     {
         if (Prefs.Bool(AskedKey) || Shot.Asked || Launch.IsDevelopment) return;
         var opens = (int)Prefs.Double(OpensKey) + 1;
-        Prefs.Set(OpensKey, opens);
+        Prefs.Set(OpensKey, (double)opens);
         if (opens < AskOnOpen || waiting) return;
         waiting = true;
         await Task.Delay(TimeSpan.FromMinutes(1));

@@ -76,8 +76,8 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
     private static readonly (string Key, string Title, SymbolRegular Icon, Color Tint, string Words)[] Tabs =
     {
         ("general", "General", SymbolRegular.Settings24, Color.FromRgb(0x76, 0x76, 0x7c), "school sign out change saved sign-in password credential windows hello face fingerprint lock courses goals set up background notification area close taskbar pin uninstall remove delete"),
-        ("appearance", "Appearance", SymbolRegular.PaintBrush24, Color.FromRgb(0xd1, 0x34, 0x8b), "light dark mode theme colour color accent photo picture"),
-        ("notifications", "Notifications", SymbolRegular.Alert24, Color.FromRgb(0xe3, 0x6c, 0x0a), "reminders due alerts activity announcements"),
+        ("appearance", "Appearance", SymbolRegular.PaintBrush24, Color.FromRgb(0xd1, 0x34, 0x8b), "light dark mode theme colour color accent custom hex photo picture drawing"),
+        ("notifications", "Notifications", SymbolRegular.Alert24, Color.FromRgb(0xe3, 0x6c, 0x0a), "reminders due alerts posts activity announcements"),
         ("grades", "Grades", SymbolRegular.DataBarVertical24, Color.FromRgb(0x88, 0x64, 0xd8), "gpa goal history record what-if track"),
         ("data", "Data", SymbolRegular.Database24, Color.FromRgb(0x00, 0x99, 0xbc), "export import reset erase everything backup encryption encrypted security privacy tpm"),
         ("updates", "Updates", SymbolRegular.ArrowSync24, Color.FromRgb(0x10, 0x89, 0x3e), "version update beta automatic check earlier download install restart"),
@@ -283,7 +283,9 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
             if (name.StartsWith(q)) return 0;
             if (name.Contains(q)) return 1;
             if (s.Words.Split(' ').Any(w => w.StartsWith(q))) return 2;
-            return Tabs.First(t => t.Key == s.Tab).Title.ToLowerInvariant().StartsWith(q) ? 3 : 9;
+            // (the page's own name or words: each of its settings, after the ones named for it)
+            var page = Tabs.First(t => t.Key == s.Tab);
+            return page.Title.ToLowerInvariant().StartsWith(q) || page.Words.Split(' ').Any(w => w.StartsWith(q)) ? 3 : 9;
         }
         found = Spots().Select(s => (s, r: Rank(s))).Where(x => x.r < 9).OrderBy(x => x.r).Select(x => x.s).Take(8).ToList();
         foundAt = 0;
@@ -1140,15 +1142,6 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
     }
 
     // ---- Data ----
-
-    /// <summary>Who holds the key Simpl's data is encrypted with (Support/Vault.cs), in Settings' words; null when nothing
-    /// could keep it (it lasts while Simpl runs).</summary>
-    private static string? KeyHolder() => Vault.Protection switch
-    {
-        VaultProtection.Tpm => "this PC’s security chip (TPM)",
-        VaultProtection.WindowsAccount => "your Windows account",
-        _ => null,
-    };
 
     /// <summary>Data ▸ Encryption's words, plain (onboarding-21: no cipher's or mechanism's name): Simpl's data is
     /// encrypted and who can open it (Support/Vault.cs), then how the saved sign-in is locked (Support/LoginVault.cs) —
