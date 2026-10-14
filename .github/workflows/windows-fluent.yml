@@ -627,6 +627,14 @@ jobs:
             Shot "bio-open-$t-780" '780x683' 50 ($inTools + @('--appearance', 'dark', '--tool', $t))
           }
           Shot 'tool-window-light' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'course:101', '--open', 'tool:101:9', '--web-scheme', 'dark'))
+          # a tool opened whole is a popup floating over the Tools page (the pane and the title bar beside it, nothing
+          # dimmed): the Periodic Table, a biology tool and Flashcards, light and dark, on a 1024 window and a narrow one
+          foreach ($t in @(@('ptable', @()), @('cell', @('--tool-state', 'animal')), @('fc', @('--fc-demo')))) {
+            foreach ($size in @(@('1024', '1024x681'), @('narrow', '780x683'))) {
+              Shot "tool-popup-$($t[0])-$($size[0])" $size[1] 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', $t[0]) + $t[1])
+              Shot "tool-popup-$($t[0])-$($size[0])-dark" $size[1] 50 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', $t[0]) + $t[1])
+            }
+          }
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
