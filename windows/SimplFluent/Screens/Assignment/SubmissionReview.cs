@@ -72,8 +72,9 @@ internal sealed class SubmissionReview : Grid
         RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         Children.Add(Top().Row(0));
         Children.Add(new Border().Bg(B.Divider).Row(1));
-        // (the file clear of the popup's edges and foot, which size it: FloatPopup.EdgeRoom)
-        viewer.Margin = new Thickness(FloatPopup.EdgeRoom, 0, a.Comments.Count == 0 ? FloatPopup.EdgeRoom : 0, FloatPopup.EdgeRoom);
+        // (the file clear of the popup's edges and foot, which size it: FloatPopup.EdgeRoom — inside the viewer's own room,
+        //  which a page paints in its ground: Tint)
+        viewer.Padding = new Thickness(FloatPopup.EdgeRoom, 0, a.Comments.Count == 0 ? FloatPopup.EdgeRoom : 0, FloatPopup.EdgeRoom);
         if (a.Comments.Count == 0) Children.Add(viewer.Row(2));
         else
         {

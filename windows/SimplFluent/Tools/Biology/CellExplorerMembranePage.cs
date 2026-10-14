@@ -85,6 +85,9 @@ internal sealed class CellMembranePage : Grid
         host.Children.Add(scene);
         host.Children.Add(new CellScaleBar(scene, "nm"));
         host.Children.Add(caption);
+        // (the note on osmosis kept clear of the labels while it shows — the patch filling its view took the labels up
+        //  under it — but not a part's name shown for a moment under the pointer, which would move them about)
+        caption.SizeChanged += (_, _) => { if (hovered == null) scene.LabelTop = caption.Content != null ? caption.Margin.Top + caption.ActualHeight + 4 : 0; };
         var card = CellUI.SceneCard(bar, host);
 
         Children.Add(BioUI.Work(left, card, right));

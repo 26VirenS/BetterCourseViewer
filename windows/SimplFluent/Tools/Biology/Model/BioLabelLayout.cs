@@ -214,12 +214,12 @@ public static class BioLabelLayout
     /// round cell goes up or down to where the cell narrows, so the cell can fill its view and its labels use the corners
     /// its box left empty; and given <paramref name="folded"/> too, a label that still lies on the model, over another's
     /// anchor or with its leader through another's capsule tries a row above or below the model, and then, the smallest
-    /// object's first, is folded into "+N more" (its id added to the list). Returns the placements and how many visible
-    /// labels were left out.</summary>
+    /// object's first, is folded into "+N more" (its id added to the list). No label goes above <paramref name="clearTop"/>
+    /// (a note laid over the view's top). Returns the placements and how many visible labels were left out.</summary>
     public static (List<BioLabelPlacement> Placed, int More) Layout(IReadOnlyList<BioLabelInput> inputs, double cx, double cy, double r, double w, double h, BioLabelBox? model = null,
-        BioLabelBox? keepClear = null, double reach = Reach, BioOutline? outline = null, List<string>? folded = null)
+        BioLabelBox? keepClear = null, double reach = Reach, BioOutline? outline = null, List<string>? folded = null, double clearTop = 0)
     {
-        if (outline == null || folded == null) return Place(inputs, cx, cy, r, w, h, model, keepClear, reach, outline);
+        if (outline == null || folded == null) return Place(inputs, cx, cy, r, w, h, model, keepClear, reach, outline, clearTop: clearTop);
         // (beside an outline, asked to: a label that cannot be placed off the model, or whose leader runs through another's
         //  capsule, is folded into "+N more" — the smallest object's first, of those in one another's way — and the rest
         //  laid out again, until none is: the 3D view does not stand its camera back past SceneFrame's least for a label)
@@ -227,7 +227,7 @@ public static class BioLabelLayout
         var toRows = new HashSet<(string, string)>();
         while (true)
         {
-            var (placed, more) = Place(shownNow, cx, cy, r, w, h, model, keepClear, reach, outline, toRows);
+            var (placed, more) = Place(shownNow, cx, cy, r, w, h, model, keepClear, reach, outline, toRows, clearTop);
             var bad = Conflicting(placed, outline.Box, outline, withOthers: true);
             if (bad.Count == 0) return (placed, more + folded.Count);
             // (a label in the way that has not tried a row above or below the model tries one first)
@@ -248,7 +248,7 @@ public static class BioLabelLayout
     }
 
     private static (List<BioLabelPlacement> Placed, int More) Place(IReadOnlyList<BioLabelInput> inputs, double cx, double cy, double r, double w, double h, BioLabelBox? model,
-        BioLabelBox? keepClear, double reach, BioOutline? outline, HashSet<(string, string)>? toRows = null)
+        BioLabelBox? keepClear, double reach, BioOutline? outline, HashSet<(string, string)>? toRows = null, double clearTop = 0)
     {
         if (outline != null) model = outline.Box;
         var hugging = outline != null;
@@ -279,7 +279,7 @@ public static class BioLabelLayout
             return edge;
         }
         double EdgeOfSide(bool left, BioLabelInput l) => left ? Math.Max(EdgeFor(true), Inset + l.Width) : Math.Min(EdgeFor(false), w - Inset - l.Width);
-        double top = Inset + Height / 2;
+        double top = Math.Max(Inset, clearTop) + Height / 2;
         // (a column's lowest place: a column that reaches over the box kept clear ends above it, with a line's room for
         //  "+N more")
         double BottomOf(bool left, List<int> mine)
@@ -421,7 +421,7 @@ public static class BioLabelLayout
                 else out_.Add(new BioLabelPlacement(l.Id, l.Text, left, e, ys[k], l.Width, l.X, l.Y, ElbowOf(l, ys[k])));
             }
         }
-        if (model is { } box) IntoBands(out_, box, w, h, keepClear, reach, outline, homeless);
+        if (model is { } box) IntoBands(out_, box, w, h, keepClear, reach, outline, homeless, clearTop);
         return (out_, more);
     }
 
@@ -550,7 +550,7 @@ public static class BioLabelLayout
     /// row just above the model (an anchor in its upper half) or below it, as near over its anchor as the row allows (and
     /// never over the box kept clear, or the leaders crossing the row to a column).</summary>
     private static void IntoBands(List<BioLabelPlacement> placed, BioLabelBox box, double w, double h, BioLabelBox? keepClear, double reach, BioOutline? outline,
-        HashSet<(string, string)>? homeless = null)
+        HashSet<(string, string)>? homeless = null, double clearTop = 0)
     {
         const double step = Height + Gap, space = 6;
         var narrow = box.X1 - box.X0 < 0.7 * w;
@@ -567,7 +567,7 @@ public static class BioLabelLayout
         var moving = placed.Where(Hides).OrderBy(p => p.AnchorX).ThenBy(p => p.Id, StringComparer.Ordinal).ToList();
         if (moving.Count == 0) return;
         var mid = (box.Y0 + box.Y1) / 2;
-        double top = Inset + Height / 2, bottom = h - Inset - Height / 2;
+        double top = Math.Max(Inset, clearTop) + Height / 2, bottom = h - Inset - Height / 2;
         double RowY(bool above, int k) => above ? box.Y0 - space - Height / 2 - k * step : box.Y1 + space + Height / 2 + k * step;
         // (each row's capsules left in the columns that reach into it, which stay put)
         var fixedIn = new Dictionary<(bool Above, int Row), List<(double X0, double X1)>>();

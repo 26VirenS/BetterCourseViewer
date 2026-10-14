@@ -78,6 +78,8 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
         {
             w.cascade = new Vector(28, 28) * (All.Count(p => p.sheet.Large && ReferenceEquals(p.over, over)) % 4);
             w.offset = w.cascade / 2;
+            // (sized again for its step, before it first shows)
+            w.Fit();
         }
         All.Add(w);
         if (over.IsVisible) w.Open();

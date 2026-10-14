@@ -207,6 +207,15 @@ public sealed class BioSceneView : Grid
     }
     private Size labelKeepClear;
 
+    /// <summary>The height at the view's top kept clear of labels (what a page lays over it there for a while: the
+    /// membrane's note on osmosis); none by default.</summary>
+    public double LabelTop
+    {
+        get => labelTop;
+        set { if (Math.Abs(labelTop - value) < 0.5) return; labelTop = value; labelSignature = ""; Refit(); Wake(); }
+    }
+    private double labelTop;
+
     /// <summary>Auto-turn (the "Turn" button): once round in 30 s; never with Windows' animations off.</summary>
     public bool Turning
     {
@@ -431,8 +440,8 @@ public sealed class BioSceneView : Grid
         var points = Outer(s, m, c);
         // (the camera d out along +z from the point it looks at: a point p shows (p.X − aim)·f / (d − p.Z) from the view's
         //  middle; the aim across and up that lets it nearest)
-        var aim = new Vector3D(Middle(points.Select(p => (p.Z, p.X)), f / (SceneFrame.Fill / 2 * w)),
-            Middle(points.Select(p => (p.Z, p.Y)), f / (SceneFrame.Fill / 2 * h)), 0);
+        var aim = new Vector3D(SceneFrame.Middle(points.Select(p => (p.Z, p.X)), f / (SceneFrame.Fill / 2 * w)),
+            SceneFrame.Middle(points.Select(p => (p.Z, p.Y)), f / (SceneFrame.Fill / 2 * h)), 0);
         double Filling(double share) => points.Max(p => p.Z + Math.Max(Math.Abs(p.X - aim.X) * f / (share / 2 * w), Math.Abs(p.Y - aim.Y) * f / (share / 2 * h)));
         // (never inside the model)
         var d = Math.Max(Filling(SceneFrame.Fill), points.Max(p => p.Z) + 0.05 * Math.Max(s.Radius, 1e-3));
@@ -451,21 +460,6 @@ public sealed class BioSceneView : Grid
             if (folded < fewest) (best, fewest) = (k, folded);
         }
         return (best, aim);
-    }
-
-    /// <summary>Along one of the view's axes, where the camera looks so it can stand nearest with every point inside the
-    /// view: the least, over aims o, of the most of a + k·|x − o| (a point's depth term a, its place x), found by thirds.</summary>
-    private static double Middle(IEnumerable<(double A, double X)> points, double k)
-    {
-        var list = points.ToList();
-        double lo = list.Min(p => p.X), hi = list.Max(p => p.X);
-        double Most(double o) => list.Max(p => p.A + k * Math.Abs(p.X - o));
-        for (var i = 0; i < 48 && hi - lo > 1e-9; i++)
-        {
-            double m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3;
-            if (Most(m1) <= Most(m2)) hi = m2; else lo = m1;
-        }
-        return (lo + hi) / 2;
     }
 
     /// <summary>The scene's outermost points, turned by <paramref name="m"/>, from its ball's centre — a scene that names the
@@ -513,7 +507,7 @@ public sealed class BioSceneView : Grid
         var box = outline.Box;
         var folded = fold ? new List<string>() : null;
         var (placed, _) = BioLabelLayout.Layout(inputs, (box.X0 + box.X1) / 2, (box.Y0 + box.Y1) / 2, Math.Min(f * s.Radius / d, w * 0.32), w, h, box, KeepClearBox(),
-            outline: outline, folded: folded);
+            outline: outline, folded: folded, clearTop: labelTop);
         return folded?.Count ?? BioLabelLayout.Conflicts(placed, box, outline);
     }
 
@@ -1096,8 +1090,8 @@ public sealed class BioSceneView : Grid
         var outline = ModelOutline();
         var (mx, my) = outline is { Box: var b } ? ((b.X0 + b.X1) / 2, (b.Y0 + b.Y1) / 2) : (c.X, c.Y);
         var (placed, more) = BioLabelLayout.Layout(inputs, mx, my, Math.Min(r, ActualWidth * 0.32), ActualWidth, ActualHeight, outline?.Box, KeepClearBox(),
-            outline: outline, folded: outline != null ? new List<string>() : null);
-        DrawLabels(placed, more);
+            outline: outline, folded: outline != null ? new List<string>() : null, clearTop: labelTop);
+        DrawLabels(placed, more, outline);
         if (still) SayFill(placed, outline, more);
     }
 
@@ -1150,7 +1144,7 @@ public sealed class BioSceneView : Grid
         moreText = null;
     }
 
-    private void DrawLabels(List<BioLabelPlacement> placed, int more)
+    private void DrawLabels(List<BioLabelPlacement> placed, int more, BioOutline? outline = null)
     {
         var geo = new StreamGeometry();
         using (var g = geo.Open())
@@ -1221,21 +1215,27 @@ public sealed class BioSceneView : Grid
             }
             // (under the lowest label — or, with no room under it, beside it, out toward the view's edge where it fits and
             //  else toward the model: under a column that reached the view's foot it was cut off, and a label was left out
-            //  with nothing to say so)
+            //  with nothing to say so; never over a label)
             moreText.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             var (mw, mh) = (moreText.DesiredSize.Width, moreText.DesiredSize.Height);
-            if (last.Y + 11 + mh <= ActualHeight)
+            var outer = last.Left ? last.Frame.X - 6 - mw : last.Frame.X + last.Frame.Width + 6;
+            var inner = last.Left ? last.Frame.X + last.Frame.Width + 6 : last.Frame.X - 6 - mw;
+            // (with the model's outline: the first of those places that lies off the model and every label — under another
+            //  label, or over the highest, before one beside the lowest toward the model, which a model filling its view
+            //  lay under)
+            var spots = new List<Point> { new(last.Frame.X + 6, last.Y + 11), new(outer, last.Y - mh / 2) };
+            if (outline != null)
             {
-                Canvas.SetLeft(moreText, last.Frame.X + 6);
-                Canvas.SetTop(moreText, last.Y + 11);
+                spots.AddRange(placed.OrderByDescending(p => p.Y).Select(p => new Point(p.Frame.X + 6, p.Y + 11)));
+                spots.AddRange(placed.OrderBy(p => p.Y).Select(p => new Point(p.Frame.X + 6, p.Frame.Y - 2 - mh)));
             }
-            else
-            {
-                var outer = last.Left ? last.Frame.X - 6 - mw : last.Frame.X + last.Frame.Width + 6;
-                var x = outer >= 0 && outer + mw <= ActualWidth ? outer : last.Left ? last.Frame.X + last.Frame.Width + 6 : last.Frame.X - 6 - mw;
-                Canvas.SetLeft(moreText, Math.Clamp(x, 0, Math.Max(0, ActualWidth - mw)));
-                Canvas.SetTop(moreText, last.Y - mh / 2);
-            }
+            spots.Add(new(inner, last.Y - mh / 2));
+            bool Clear(Point at) => at.X >= 0 && at.Y >= 0 && at.X + mw <= ActualWidth && at.Y + mh <= ActualHeight
+                && (outline == null || !outline.Overlaps(at.X, at.Y, at.X + mw, at.Y + mh, 1))
+                && !labelFrames.Any(f => f.IntersectsWith(new Rect(at.X, at.Y, mw, mh)));
+            var spot = spots.Cast<Point?>().FirstOrDefault(at => Clear(at!.Value)) ?? spots[^1];
+            Canvas.SetLeft(moreText, Math.Clamp(spot.X, 0, Math.Max(0, ActualWidth - mw)));
+            Canvas.SetTop(moreText, Math.Clamp(spot.Y, 0, Math.Max(0, ActualHeight - mh)));
         }
         else if (moreText != null)
         {

@@ -74,4 +74,42 @@ internal static class SceneFrame
         // (never inside the model)
         return Math.Max(d, reach * 1.05);
     }
+
+    /// <summary>
+    /// <see cref="Points"/> as they stand, the camera moved across and up to look at their middle: where it can stand
+    /// nearest with every point inside the view, each axis on its own (<see cref="Middle"/>). A model off its own centre
+    /// — a molecule's atoms about their mean, an amino acid in its ball — framed from the centre filled 85% of the view on
+    /// one side and 65% on the other. Returns the distance and where the camera looks, from the centre.
+    /// </summary>
+    public static (double Distance, Vector3D Aim) PointsCentred(IReadOnlyCollection<Vector3D> points, double degrees, double width, double height, double fill = Fill)
+    {
+        if (points.Count == 0) return (0, new Vector3D());
+        var (tx, ty) = HalfTangents(degrees, width, height);
+        double ax = fill * tx, ay = fill * ty;
+        var aim = new Vector3D(Middle(points.Select(p => (p.Z, p.X)), 1 / ax), Middle(points.Select(p => (p.Z, p.Y)), 1 / ay), 0);
+        double d = 0, reach = 0;
+        foreach (var p in points)
+        {
+            d = Math.Max(d, p.Z + Math.Max(Math.Abs(p.X - aim.X) / ax, Math.Abs(p.Y - aim.Y) / ay));
+            reach = Math.Max(reach, (p - aim).Length);
+        }
+        // (never inside the model)
+        return (Math.Max(d, reach * 1.05), aim);
+    }
+
+    /// <summary>Along one of the view's axes, where the camera looks so it can stand nearest with every point inside the
+    /// view: the least, over aims o, of the most of a + k·|x − o| (a point's depth term a, its place x), found by thirds.</summary>
+    public static double Middle(IEnumerable<(double A, double X)> points, double k)
+    {
+        var list = points.ToList();
+        if (list.Count == 0) return 0;
+        double lo = list.Min(p => p.X), hi = list.Max(p => p.X);
+        double Most(double o) => list.Max(p => p.A + k * Math.Abs(p.X - o));
+        for (var i = 0; i < 48 && hi - lo > 1e-9; i++)
+        {
+            double m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3;
+            if (Most(m1) <= Most(m2)) hi = m2; else lo = m1;
+        }
+        return (lo + hi) / 2;
+    }
 }

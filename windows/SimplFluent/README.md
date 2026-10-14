@@ -813,7 +813,8 @@ Every 3D view frames its model the same way (`Tools/SceneFrame.cs`): the model f
 meets the view's edges first — the element's atom, orbitals and electron cloud (`Atom3DView`: the atom by the ball round
 it, the orbitals at their widest turn as they revolve, as they stand with Windows' animations off, the cloud by the ball
 95% of its dots lie in, at 80%), the molecule builder's (`MoleculeSceneView`: as it stands, or at its widest turn about
-the view's up while it turns by itself) and the biology tools' (`BioSceneView`) — on first show, on Reset view, and
+the view's up while it turns by itself — as it stands, looked at in its middle: `SceneFrame.PointsCentred`) and the
+biology tools' (`BioSceneView`) — on first show, on Reset view, and
 whenever the view's size changes (a popup sized by its edges, or with the window), a zoom of the student's own kept as
 the same share of it. The lens is measured across the view's smaller side, so a tall narrow view keeps the model's
 sides.
@@ -827,7 +828,8 @@ column's labels, in order round the model's middle, are spread down the column t
 where each fits beside the outline, so a round cell has its labels in the corners its outline leaves (beside its box,
 sixteen labels in columns held the cell to half its view: 46% of a 1280 window's view); one with no room there goes to a
 row above or below it, and one still in the way — on the model, over another's anchor, or led through another's capsule
-— is folded into "+N more", the smallest object's first. The fit is worked out again once the view's size settles, not
+— is folded into "+N more", the smallest object's first, the note itself put where it lies off the model and every
+label. A note over the view's top (the membrane's on osmosis) keeps the labels under it (`BioSceneView.LabelTop`). The fit is worked out again once the view's size settles, not
 at every step of a popup sized by its edge. A development run's log says each view's size and framing (`3d view …: the
 model W×H, N% of the view; with its L labels …, M% (+F more)`, `element view …`, `molecule view …`); CI holds the
 biology views' own share to 70% or more.
