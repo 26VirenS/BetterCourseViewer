@@ -435,7 +435,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   # panel over the page (held there: -SimplMorphHold)
   SIZE=1024x820 shoot light-01k-dashboard-1024 12
   SIZE=1024x820 shoot light-01l-dashboard-1024-no-sidebar 12 -SimplSidebar hidden
-  shoot light-01m-counter-morph 14 -SimplSheet next -SimplMorphHold 0.5
+  shoot light-01m-counter-morph 30 -SimplSheet next -SimplMorphHold 0.5 # (its wait the longest: under load the panel came 15 seconds in)
   # (1.3.79) a window under 1024 points with the sidebar out: 1.3.77's tiles in two rows of three
   SIZE=940x820 shoot light-40-narrow-dashboard 14
   shoot light-21a-alta 20 -SimplOpen alta:104:4003 # (1.3.17: a Knewton Alta assignment in the quiz-style popup)
@@ -533,7 +533,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   SIZE=1024x820 shoot dark-01k-dashboard-1024 12
   SIZE=1024x820 shoot dark-01l-dashboard-1024-no-sidebar 12 -SimplSidebar hidden
   SIZE=1024x820 shoot dark-01n-counter-1024-overdue 14 -SimplSheet overdue
-  shoot dark-01m-counter-morph 14 -SimplSheet graded -SimplMorphHold 0.4
+  shoot dark-01m-counter-morph 30 -SimplSheet graded -SimplMorphHold 0.4
   SIZE=940x820 shoot dark-40-narrow-dashboard 14
   shoot dark-03-todo 12 -SimplPlace todo
   shoot dark-04-grades 12 -SimplPlace grades
