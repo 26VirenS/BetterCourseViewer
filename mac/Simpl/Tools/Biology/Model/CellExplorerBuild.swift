@@ -29,8 +29,6 @@ struct CEPiece: Sendable {
     var alpha: Double
     var roughness: Double
     var order: Int
-    /// (1.3.79) A surface round the cell's centre (CEShape.Piece.round).
-    var round = false
 }
 
 /// One organelle in the cell (one mitochondrion, one ribosome, the membrane).
@@ -257,7 +255,7 @@ struct CEBuilder {
         var inst = CEInstance(part: part, index: index, centre: centre, radius: radius, explodeFrom: explodeFrom ?? centre,
                               shell: shell, fixed: fixed, frame: frame)
         inst.pieces = shape.pieces.map { p in
-            CEPiece(mesh: p.mesh, colour: colour(part, p.role), alpha: p.alpha ?? partAlpha, roughness: p.roughness, order: p.order, round: p.round)
+            CEPiece(mesh: p.mesh, colour: colour(part, p.role), alpha: p.alpha ?? partAlpha, roughness: p.roughness, order: p.order)
         }
         if !inst.pieces.isEmpty && count { model.shown[part, default: 0] += 1 }
         model.instances.append(inst)
@@ -311,18 +309,23 @@ struct CEBuilder {
 
     // MARK: The cell's shells
 
-    /// One of the cell's own shells (§5.1.5 Membranes and walls), cut by the octant with the cut faces lighter. (1.3.79)
-    /// A translucent shell's two faces each take the part of its translucency that makes, the two together, the part's
-    /// own (1 − √(1 − α) each), and each is drawn far side first and near side last (`round`): what is inside is seen
-    /// through its near side only, at the part's own α, not under its far side as well.
+    /// One of the cell's own shells (§5.1.5 Membranes and walls), cut by the octant with the cut faces lighter.
+    /// (1.3.80) A translucent shell's faces each take the part of its translucency that makes, all four together, the
+    /// part's own (`faceAlpha`). Drawn after the organelles (translucent things last, the outermost last of all) and
+    /// from both sides, the shell lays four faces over the cell: its outer and inner face on the near side, and on the
+    /// far side too, over every translucent organelle (which writes no depth to hold it back). At α each, a plasma
+    /// membrane at 0.30 veiled the organelles at 0.76; at 1 − √(1 − α) each (1.3.79's first try), still 0.51 — the
+    /// whole cell one gold tint, the parts' colours lost under it until a click dimmed it. (1.3.79 then drew the far
+    /// side before the organelles, each side culled to itself a pass: on CI's Macs the cell came out solid gold, every
+    /// organelle hidden.)
     mutating func cellShell(_ part: String, outer: @escaping (BioVec) -> Double, inner: @escaping (BioVec) -> Double,
                             rings: Int, segments: Int, order: Int, darkOuter: Bool = false, capAlpha: Double = 1) {
         let sh = CERecipes.shell(outer: outer, inner: inner, cut: cut, rings: rings, segments: segments)
         let alpha = parts[part]?.alpha ?? 1
-        let face: Double? = alpha < 0.999 ? 1 - (1 - alpha).squareRoot() : nil
+        let face: Double? = alpha < 0.999 ? CEBuilder.faceAlpha(alpha) : nil
         var s = CEShape()
-        s.add(sh.outer, darkOuter ? .dark : .body, alpha: face, roughness: darkOuter ? 0.7 : 0.25, order: order, round: true)
-        s.add(sh.inner, alpha: face, roughness: darkOuter ? 0.6 : 0.25, order: order, round: true)
+        s.add(sh.outer, darkOuter ? .dark : .body, alpha: face, roughness: darkOuter ? 0.7 : 0.25, order: order)
+        s.add(sh.inner, alpha: face, roughness: darkOuter ? 0.6 : 0.25, order: order)
         s.add(sh.caps, .cap, alpha: capAlpha, roughness: 0.6, order: order)
         if darkOuter {
             // (the wall's outer face only a little darker)
@@ -330,6 +333,10 @@ struct CEBuilder {
         }
         add(part, s, centre: BioVec(0, 0, 0), radius: outer(BioVec(1, 0, 0)), shell: true)
     }
+
+    /// (1.3.80) A translucent shell's face's own translucency: the four faces over a point of the cell together the
+    /// part's `alpha` (1 − ⁴√(1 − α): 0.085 a face for the plasma membrane's 0.30).
+    static func faceAlpha(_ alpha: Double) -> Double { 1 - pow(1 - alpha, 0.25) }
 
     // MARK: The nucleus (§5.1.5)
 

@@ -95,33 +95,6 @@ struct BioMesh: Sendable {
         return out
     }
 
-    /// (1.3.79) A surface round `centre` (a cell's membrane or wall) made ready to be drawn one side at a time
-    /// (BioFaceSide): every triangle wound to face away from the centre, so the faces turned from the camera are its far
-    /// side; and every normal turned the way the side drawn is seen from — away from the centre for the near side
-    /// (`outward`), toward it for the far side, which is seen from within.
-    func facing(outward: Bool, from centre: BioVec) -> BioMesh {
-        let c = SIMD3<Float>(Float(centre.x), Float(centre.y), Float(centre.z))
-        var out = self
-        out.indices = []
-        out.indices.reserveCapacity(indices.count)
-        for t in stride(from: 0, to: indices.count - 2, by: 3) {
-            let a = positions[Int(indices[t])], b = positions[Int(indices[t + 1])], d = positions[Int(indices[t + 2])]
-            let e1 = b - a, e2 = d - a
-            let n = SIMD3<Float>(e1.y * e2.z - e1.z * e2.y, e1.z * e2.x - e1.x * e2.z, e1.x * e2.y - e1.y * e2.x)
-            let m = (a + b + d) / 3 - c
-            let keep = n.x * m.x + n.y * m.y + n.z * m.z >= 0
-            out.indices.append(indices[t])
-            out.indices.append(indices[keep ? t + 1 : t + 2])
-            out.indices.append(indices[keep ? t + 2 : t + 1])
-        }
-        for i in normals.indices {
-            let n = normals[i], r = positions[i] - c
-            let away = n.x * r.x + n.y * r.y + n.z * r.z >= 0
-            if away != outward { out.normals[i] = -n }
-        }
-        return out
-    }
-
     /// The bounding sphere of its vertices.
     var bounds: (centre: BioVec, radius: Double) {
         BioV.boundingSphere(positions.map { BioVec(Double($0.x), Double($0.y), Double($0.z)) })

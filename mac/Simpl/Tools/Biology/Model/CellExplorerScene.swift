@@ -81,17 +81,6 @@ enum CEScene {
             for p in inst.pieces {
                 let mat = material(p, shell: inst.shell)
                 let mesh = CEGeo.moved(p.mesh, d)
-                if p.round && mat.isTranslucent {
-                    // (1.3.79) a membrane's or a wall's face, translucent: its far side drawn before the organelles
-                    // and its near side after them (BioFaceSide) — drawn whole after them, its far side lay over them
-                    // too, and the whole cell was one gold veil on a first look
-                    for side in [BioFaceSide.far, .near] {
-                        var m = mat
-                        m.side = side
-                        items.append(BioSceneItem(id: id, mesh: mesh.facing(outward: side == .near, from: BioVec(0, 0, 0)), material: m, order: p.order))
-                    }
-                    continue
-                }
                 if id != inst.id {
                     let key = id + "|" + String(describing: mat) + "|\(p.order)"
                     if let k = clusters[key] {

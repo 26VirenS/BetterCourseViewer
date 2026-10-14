@@ -78,6 +78,9 @@ final class Engine: ObservableObject, ShellListener {
     @Published private(set) var groups: [GroupRow] = []
     /// A course's sections as its home says (its own tabs), once looked at: the sidebar lists them under it.
     @Published private(set) var sections: [String: [SectionLink]] = [:]
+    /// What the school added to Canvas's own navigation — its tools, History, Help — for the sidebar's last section
+    /// (Shell/MoreFromCanvas.swift); nil or no items: no section.
+    @Published private(set) var more: MoreNav?
     /// The toolbar's search field.
     @Published var query = ""
     /// A quiz in the app's own quiz screen (a sheet over the window).
@@ -177,6 +180,7 @@ final class Engine: ObservableObject, ShellListener {
         main.$courses.sink { [weak self] v in self?.courses = v }.store(in: &mirrors)
         main.$groups.sink { [weak self] v in self?.groups = v }.store(in: &mirrors)
         main.$sections.sink { [weak self] v in self?.sections = v }.store(in: &mirrors)
+        main.$more.sink { [weak self] v in self?.more = v }.store(in: &mirrors)
         main.$refreshing.sink { [weak self] v in self?.refreshing = v }.store(in: &mirrors)
     }
 
@@ -202,6 +206,7 @@ final class Engine: ObservableObject, ShellListener {
         if let k = s.lms { lms = k }
         if let c = kept("courses", as: CoursesData.self) { courses = c.rows }
         if let g = kept("groups", as: GroupsData.self) { groups = g.current }
+        more = kept("moreFromCanvas", as: MoreNav.self)
         openedOnKept = true
         takeLaunchPlace()
         setPhase(.native)
@@ -311,6 +316,7 @@ final class Engine: ObservableObject, ShellListener {
         snapshot = nil
         courses = []
         groups = []
+        more = nil
         countsLive = false
         coursesLive = false
         nav.replace(.dashboard)
@@ -338,6 +344,7 @@ final class Engine: ObservableObject, ShellListener {
         takeLaunchPlace()
         if let push = UserDefaults.standard.string(forKey: "SimplPush"), !push.isEmpty { openWeb(push, title: "") }
         Walk.startIfAsked(self) // (1.3.78: the screenshot suite's walk, -SimplWalk)
+        var moreTool = false
         if let q = LaunchOpen.take("quiz:") {
             let parts = q.split(separator: ":").map(String.init)
             if parts.count >= 2 { quiz = QuizLaunch(course: parts[0], quiz: parts[1], title: "Quiz", begin: parts.count > 2 && (parts[2] == "take" || parts[2] == "review"), startAt: parts.count > 3 ? Int(parts[3]) : nil, feedback: parts.count > 2 && parts[2] == "feedback", review: parts.count > 2 && parts[2] == "review") }
@@ -361,9 +368,14 @@ final class Engine: ObservableObject, ShellListener {
             newTask = true
         } else if LaunchOpen.take("compose") != nil {
             newMessage = true
+        } else if let m = LaunchOpen.take("more:") {
+            // (-SimplOpen more:history | more:help — the sidebar's History or Help popup; more:tool — its first tool,
+            // once the sidebar has read it)
+            if let list = MoreList(rawValue: m) { openMore(list) } else { moreTool = m == "tool" }
         }
         await refreshSnapshot()
         await loadSidebar()
+        if moreTool, let t = more?.items.first(where: { $0.kind == "tool" }) { openMore(t) }
         readAheadAfterLaunch() // (1.3.78: once the window is quiet, the places most opened next, read ahead)
         Task { await Reminders.shared.reschedule(self) } // (each launch: the reminders set again from what Canvas says now)
         Task { await Activity.shared.sync(self) }
@@ -489,6 +501,10 @@ final class Engine: ObservableObject, ShellListener {
         }
         if let g = try? await call("groups", as: GroupsData.self) {
             withAnimation(Motion.gentle) { groups = g.current }
+        }
+        // (what the school added to Canvas's own navigation, read from the page's menu: the sidebar's last section)
+        if let m = try? await call("moreFromCanvas", as: MoreNav.self), m != more {
+            withAnimation(Motion.gentle) { more = m }
         }
     }
 

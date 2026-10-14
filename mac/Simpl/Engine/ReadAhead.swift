@@ -20,12 +20,12 @@ final class AnswerMemo {
     /// The calls whose answers are held: what the screens open on.
     static let held: Set<String> = AnswerCache.reads.union(["todayCounts", "externalTools", "neighbours", "quizAssignment"])
     /// Calls that are neither held nor change anything a screen shows: an address resolved, a search, a tool's launch,
-    /// a quiz's start screen, what a message or a hand-in may hold, the settings' own reads. Any call not named here or
-    /// in `held` makes what is held stale when it succeeds.
+    /// a quiz's start screen, what a message or a hand-in may hold, the settings' own reads, History and Help (read
+    /// afresh as each opens). Any call not named here or in `held` makes what is held stale when it succeeds.
     static let neutral: Set<String> = [
         "resolveUrl", "pageFor", "search", "toolLaunch", "quizIntro", "quizRules", "quizAttempt", "quizFeedback",
         "composeContexts", "recipients", "gradeNeeded", "settingsInfo", "settingsExport", "historyExport", "convertInfo",
-        "convertFile", "reminders", "watchInfo", "setupInfo", "whatsNew", "appearance",
+        "convertFile", "reminders", "watchInfo", "setupInfo", "whatsNew", "appearance", "moreHistory", "moreHelp",
     ]
     /// A read's arguments that set a preference as it reads (To Do's grouping and Show Completed, the Dashboard's Hide
     /// Completed, the calendar's view) or ask the page to read afresh (a course's grades): its answer is the plain read's

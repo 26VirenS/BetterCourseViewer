@@ -148,26 +148,12 @@ extension BioSelfCheck {
         let zoomID = CEScene.anchorItemID(animal, part: "ribosome") ?? "-"
         r.check("cell.clusters", "\(riboItems.count)ribosome-objects", riboItems.count > 10 && riboItems.count < 400 && riboItems.contains(zoomID)
                 && scene.items.filter { $0.id?.hasPrefix("organelle:ribosome:") == true }.reduce(0) { $0 + $1.mesh.triangleCount } == (animal.shown["ribosome"] ?? 0) * 20)
-        // (1.3.79: the translucent membrane drawn far side first and near side last, each of its triangles facing away
-        // from the cell's centre, its normals as the side drawn is seen from — so nothing inside lies under its far side)
-        let pm = scene.items.filter { $0.id?.hasPrefix("organelle:pm:") == true && $0.material.isTranslucent }
-        let outward = pm.allSatisfy { item in
-            let m = item.mesh
-            return stride(from: 0, to: m.indices.count - 2, by: 3).allSatisfy { t in
-                let a = m.positions[Int(m.indices[t])], b = m.positions[Int(m.indices[t + 1])], c = m.positions[Int(m.indices[t + 2])]
-                let e1 = b - a, e2 = c - a, mid = (a + b + c) / 3
-                let n = SIMD3<Float>(e1.y * e2.z - e1.z * e2.y, e1.z * e2.x - e1.x * e2.z, e1.x * e2.y - e1.y * e2.x)
-                return n.x * mid.x + n.y * mid.y + n.z * mid.z >= 0
-            }
-        }
-        let lit = pm.allSatisfy { item in
-            zip(item.mesh.positions, item.mesh.normals).allSatisfy { p, n in
-                let d = (p * n).sum()
-                return item.material.side == .near ? d >= -1e-5 : d <= 1e-5
-            }
-        }
-        r.check("cell.membrane-sides", pm.map { "\($0.material.side)" }.joined(separator: ","),
-                pm.count == 4 && pm.filter { $0.material.side == .far }.count == 2 && pm.filter { $0.material.side == .near }.count == 2 && outward && lit)
+        // (1.3.80: the plasma membrane's four faces over a point of the cell — outer and inner, near and far side —
+        // together the spec's 0.30, not one gold veil over every organelle)
+        let pmAlphas = Set(scene.items.filter { $0.id?.hasPrefix("organelle:pm:") == true && $0.material.isTranslucent }.map(\.material.alpha))
+        let through = pmAlphas.first.map { 1 - pow(1 - $0, 4) } ?? 0
+        r.check("cell.membrane-veil", String(format: "%.3f/face,%.2f", pmAlphas.first ?? 0, through),
+                pmAlphas.count == 1 && abs(through - (CEParts.part(.animal, "pm")?.alpha ?? 0)) < 0.005)
         let compare = CEBuild.compareScene(dark: false)
         r.check("cell.compare-scene", "\(compare.items.count)items", Set(compare.items.compactMap(\.id)) == ["cell:animal", "cell:plant", "cell:bacterium"]
                 && compare.labels.count == 3)

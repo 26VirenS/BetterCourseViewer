@@ -114,7 +114,7 @@ extension CEBuilder {
         if cut { wall.add(CERecipes.boxCaps(half: half, n: n, outer: wallOut, inner: wallIn), .cap, alpha: 1, roughness: 0.6) }
         add("wall", wall, centre: BioVec(0, 0, 0), radius: 28, shell: true)
         var membrane = CEShape()
-        membrane.add(CERecipes.boxSurface(half: half, n: n, cut: cut, radius: pmIn, inward: true), roughness: 0.25, order: 8, round: true)
+        membrane.add(CERecipes.boxSurface(half: half, n: n, cut: cut, radius: pmIn, inward: true), roughness: 0.25, order: 8)
         if cut { membrane.add(CERecipes.boxCaps(half: half, n: n, outer: pmOut, inner: pmIn), .cap, alpha: 1, roughness: 0.6, order: 8) }
         add("pm", membrane, centre: BioVec(0, 0, 0), radius: 28, shell: true)
         // (the central vacuole first: a rounded box with a blob's ripple, dented by the nucleus — each tonoplast point

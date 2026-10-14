@@ -264,16 +264,13 @@ struct CEShape: Sendable {
         var alpha: Double? = nil
         var roughness = 0.5
         var order = 0
-        /// (1.3.79) A surface round the cell's centre (a membrane's or a wall's face): translucent, it is drawn far side
-        /// first and near side last (BioFaceSide).
-        var round = false
     }
 
     var pieces: [Piece] = []
 
-    mutating func add(_ m: BioMesh, _ role: Role = .body, alpha: Double? = nil, roughness: Double = 0.5, order: Int = 0, round: Bool = false) {
+    mutating func add(_ m: BioMesh, _ role: Role = .body, alpha: Double? = nil, roughness: Double = 0.5, order: Int = 0) {
         guard !m.isEmpty else { return }
-        pieces.append(Piece(mesh: m, role: role, alpha: alpha, roughness: roughness, order: order, round: round))
+        pieces.append(Piece(mesh: m, role: role, alpha: alpha, roughness: roughness, order: order))
     }
 
     /// Placed by a frame.
