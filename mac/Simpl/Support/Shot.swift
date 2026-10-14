@@ -124,17 +124,19 @@ enum Shot {
         for s in lifted.reversed() { s.orderFrontRegardless() }
     }
 
-    /// (1.3.78) Pictured once the app is in front — asked again, up to four times, when another copy has taken the front
-    /// at the same moment: a pin's popover closes when its app is put behind another (it opens again as the app comes
-    /// back), and two of the four pins were pictured closed, their windows inactive.
-    private static func settle(_ file: String, attempt: Int = 0) {
+    /// (1.3.78) Pictured once the app is in front — brought forward once more when another copy has taken the front at
+    /// the same moment: a pin's popover closes when its app is put behind another (it opens again as the app comes back),
+    /// and two of the four pins were pictured closed, their windows inactive. Once only, and never past two seconds: the
+    /// copies bringing themselves forward in turn took the front from each other, and under the full set's load each
+    /// turn took seconds — two pictures were never taken before the suite gave up on them.
+    private static func settle(_ file: String, again: Bool = true, since: Date = Date()) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-            if NSApp.isActive || attempt >= 4 {
+            if NSApp.isActive || !again || Date().timeIntervalSince(since) > 2 {
                 capture(file)
             } else {
-                NSLog("[Simpl] shot: another copy of the app is in front; brought forward again (%d)", attempt + 1)
+                NSLog("[Simpl] shot: another copy of the app is in front; brought forward again")
                 front()
-                settle(file, attempt: attempt + 1)
+                settle(file, again: false, since: since)
             }
         }
     }
