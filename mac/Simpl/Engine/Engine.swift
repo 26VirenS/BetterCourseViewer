@@ -358,8 +358,9 @@ final class Engine: ObservableObject, ShellListener {
         Task { await Activity.shared.sync(self) }
         // (the screenshot suite: -SimplActivityProbe YES — one read of the school as the new-activity check makes it, on the console)
         if UserDefaults.standard.bool(forKey: "SimplActivityProbe") { Task { await Activity.shared.probe(self) } }
-        // the first run: the app's own setup (the courses that count, the goals), before anything else
-        if snapshot?.setupDone == false || LaunchOpen.take("setup") != nil {
+        // the first run: the app's own setup (the courses shown, the goals), before anything else — unless (onboarding-4)
+        // it was put off with Set Up Later, when it waits for Settings ▸ General ▸ Courses shown and goals
+        if (snapshot?.setupDone == false && !SetupLater.asked) || LaunchOpen.take("setup") != nil {
             if snapshot?.setupDone == false { MacWhatsNew.markSeen() } // (a first run: nothing is new to it)
             queuePopup(.setup)
             return
