@@ -198,6 +198,13 @@ struct GradeInfo: Codable, Hashable {
     var pct: Double?
     var letter: String?
     var late: String?
+    /// (2.99.33) The percentage as every app shows it ("81.3%": half up, one decimal), the whole percent of that shown
+    /// figure for a ring (81), the letter's band for its colour ("A"…"F"; nil for pass/fail), and the score and letter
+    /// as one chip ("13/16 · B−").
+    var pctText: String?
+    var pctWhole: Int?
+    var band: String?
+    var chip: String?
 }
 
 struct RubricRating: Codable, Hashable {
@@ -262,6 +269,10 @@ struct AssignmentData: Codable {
     var kind: String?
     var points: String?
     var due: String?
+    /// (2.99.33) "Due Oct 13 at 11:59 PM" ("" with no due date), and the facts in one line for a one-column page ("Due
+    /// Sep 30 at 10:30 AM · 16 pts · 1 of 2 attempts used").
+    var dueLine: String?
+    var factsLine: String?
     var available: String?
     var typesText: String?
     var html: String

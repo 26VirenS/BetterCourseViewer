@@ -61,6 +61,11 @@ struct QuizIntro: Decodable {
     var attempts: [Attempt]?
     var keptNote: String?
     var takeUrl: String
+    /// (2.99.33) The attempts from the quiz's own limit — the one New Attempt follows — in the assignment's words ("1 of
+    /// 2 attempts used"), how many are left (nil: no limit), and the assignment's one-line facts with them.
+    var attemptsText: String?
+    var attemptsLeft: Int?
+    var factsLine: String?
 }
 
 /// Begin's answer: the attempt, or why it did not begin (an access code wanted or refused, a network refused).
@@ -111,6 +116,8 @@ struct QuizQuestion: Decodable, Identifiable, Equatable {
         var n: Int
         var label: String
         var options: [Choice]
+        /// (2.99.33) The words either side of it in the question ("the ___ of"), to label its menu or field.
+        var around: String?
     }
 
     struct File: Decodable, Identifiable, Hashable {
@@ -290,6 +297,11 @@ struct QuizFeedback: Decodable {
     var score: String?
     var possible: String?
     var pct: Double?
+    /// (2.99.33) The percentage as shown ("81.3%"), its whole percent for the ring (81) and its band ("A"…"F") for the
+    /// ring's colour, all from the one shown figure.
+    var pctText: String?
+    var pctWhole: Int?
+    var band: String?
     var summary: String?
     var released: Bool?
     var comments: [Comment]?
