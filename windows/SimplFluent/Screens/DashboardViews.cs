@@ -32,15 +32,8 @@ public sealed partial class DashboardScreen
     {
         var l = list.Data;
         var v = new Stack { Orientation = Orientation.Vertical, Spacing = 0 };
-        string? trailing = l is { Total: > 0 } ? $"{l.Total - (l.Done ?? 0)} to do · {l.Done ?? 0} done" : null;
-        UIElement? action = null;
-        if (l != null && ((l.Done ?? 0) > 0 || l.HideDone == true))
-        {
-            var hiding = l.HideDone == true;
-            action = K.Button(hiding ? $"Show completed · {l.Done ?? 0}" : "Hide completed", () => { hideDone = !hiding; list.Again(); Refresh(); },
-                icon: hiding ? SymbolRegular.Eye24 : SymbolRegular.CheckmarkCircle24);
-        }
-        v.Children.Add(Heading.Section("Coming up", trailing, action));
+        var heading = UpcomingHeading(l);
+        v.Children.Add(heading);
         if (l == null)
         {
             v.Children.Add(list.Error is { } err ? K.Empty(SymbolRegular.ErrorCircle24, err) : K.Reading("Reading your planner…"));
@@ -49,27 +42,50 @@ public sealed partial class DashboardScreen
         if (l.Days.Count == 0) { v.Children.Add(K.Card(K.Empty(SymbolRegular.WeatherSunny24, l.Empty ?? "Nothing coming up."))); return v; }
         var wide = w >= 760;
         var days = new Stack { Orientation = Orientation.Vertical, Spacing = 22 };
+        var blocks = new List<DayRefs>();
         foreach (var day in l.Days)
         {
-            // (the day's date beside its name, saying only what the name does not — none beside Today: the greeting over
-            //  the counters says it already)
-            var date = string.IsNullOrEmpty(day.Date) || day.Title == "Today" ? "" : day.Date!.StartsWith(day.Title + ", ") ? day.Date![(day.Title.Length + 2)..] : day.Date!;
-            var head = K.Columns("auto, *, auto",
-                K.Text(day.Title, Ty.BodyStrong).Col(0),
-                K.Text(date, Ty.Body, B.Text2).Margin(10, 0, 0, 0).Col(1),
-                K.Text($"{day.Rows.Count} {(day.Rows.Count == 1 ? "item" : "items")}", Ty.Caption, B.Text3).Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(2));
-            head.Margin = new Thickness(4, 0, 4, 8);
-            var rows = new Stack { Orientation = Orientation.Vertical, Spacing = 0 };
-            for (var k = 0; k < day.Rows.Count; k++)
-            {
-                if (k > 0) rows.Children.Add(K.Divider(84));
-                rows.Children.Add(WorkLine(day.Rows[k], day.Title, wide));
-            }
-            days.Children.Add(K.V(0, head, K.Card(rows, new Thickness(4))));
+            var b = DayBlock(day, wide);
+            days.Children.Add(b.Block);
+            blocks.Add(b);
         }
         v.Children.Add(days);
+        if (noting != null) noting.Upcoming = new UpcomingRefs(v, heading, UpcomingSaid(l), days, wide, blocks);
         return v;
     }
+
+    /// <summary>Coming up's heading: what is left to do and what is done, and Hide (or Show) completed.</summary>
+    private FrameworkElement UpcomingHeading(DashListData? l)
+    {
+        string? trailing = l is { Total: > 0 } ? $"{l.Total - (l.Done ?? 0)} to do · {l.Done ?? 0} done" : null;
+        UIElement? action = null;
+        if (l != null && ((l.Done ?? 0) > 0 || l.HideDone == true))
+        {
+            var hiding = l.HideDone == true;
+            action = K.Button(hiding ? $"Show completed · {l.Done ?? 0}" : "Hide completed", () => { hideDone = !hiding; list.Again(); Refresh(); },
+                icon: hiding ? SymbolRegular.Eye24 : SymbolRegular.CheckmarkCircle24);
+        }
+        return Heading.Section("Coming up", trailing, action);
+    }
+
+    /// <summary>A day of Coming up: its name and date, how many items, and its rows in a card.</summary>
+    private DayRefs DayBlock(DashDay day, bool wide)
+    {
+        // (the day's date beside its name, saying only what the name does not — none beside Today: the greeting over
+        //  the counters says it already)
+        var date = string.IsNullOrEmpty(day.Date) || day.Title == "Today" ? "" : day.Date!.StartsWith(day.Title + ", ") ? day.Date![(day.Title.Length + 2)..] : day.Date!;
+        var count = K.Text(Items(day.Rows.Count), Ty.Caption, B.Text3);
+        var head = K.Columns("auto, *, auto",
+            K.Text(day.Title, Ty.BodyStrong).Col(0),
+            K.Text(date, Ty.Body, B.Text2).Margin(10, 0, 0, 0).Col(1),
+            count.Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(2));
+        head.Margin = new Thickness(4, 0, 4, 8);
+        var rows = new Stack { Orientation = Orientation.Vertical, Spacing = 0 };
+        var kept = RowsInto(rows, 84, day.Rows.Select(r => (r.Id, DashLook(r, day.Title, wide), (FrameworkElement)WorkLine(r, day.Title, wide))));
+        return new DayRefs(DayKey(day), K.V(0, head, K.Card(rows, new Thickness(4))), count, kept);
+    }
+
+    private static string Items(int n) => $"{n} {(n == 1 ? "item" : "items")}";
 
     /// <summary>
     /// The Dashboard's one row of work — Coming up's and Today's alike, so the same work reads the same wherever it
@@ -187,14 +203,17 @@ public sealed partial class DashboardScreen
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         }
         var cardW = (w - gap * (cols - 1)) / cols;
+        var made = new List<(string Id, string Look, FrameworkElement Card)>();
         for (var k = 0; k < c.Rows.Count; k++)
         {
             var card = CourseCard(c.Rows[k], cardW);
             Grid.SetColumn(card, (k % cols) * 2);
             Grid.SetRow(card, (k / cols) * 2);
             grid.Children.Add(card);
+            made.Add((c.Rows[k].Id, CardLook(c.Rows[k], cardW), card));
         }
         v.Children.Add(grid);
+        if (noting != null) noting.Cards = new CardsRefs(cardW, made);
         // (the cards come in one after another when Cards is chosen, not with the page, nor at every answer or count)
         if (!courseCardsShown) Motion.Stagger(grid.Children.OfType<UIElement>(), 40, 20);
         courseCardsShown = true;
@@ -358,9 +377,9 @@ public sealed partial class DashboardScreen
     private FrameworkElement ActivitySection(double w)
     {
         var a = activity.Data;
-        var fresh = a?.Rows.Count(r => r.Unread == true && !seen.Contains(r.Id)) ?? 0;
         var v = new Stack { Orientation = Orientation.Vertical, Spacing = 0 };
-        v.Children.Add(Heading.Section("Recent activity", fresh > 0 ? $"{fresh} new" : null));
+        var heading = Heading.Section("Recent activity", ActivitySaid(a));
+        v.Children.Add(heading);
         if (a == null)
         {
             v.Children.Add(activity.Error is { } err ? K.Empty(SymbolRegular.ErrorCircle24, err) : K.Reading("Reading recent activity…"));
@@ -368,13 +387,17 @@ public sealed partial class DashboardScreen
         }
         if (a.Rows.Count == 0) { v.Children.Add(K.Card(K.Empty(SymbolRegular.Clock24, a.Empty ?? "No recent activity."))); return v; }
         var rows = new Stack { Orientation = Orientation.Vertical, Spacing = 0 };
-        for (var k = 0; k < a.Rows.Count; k++)
-        {
-            if (k > 0) rows.Children.Add(K.Divider(72));
-            rows.Children.Add(ActivityRow(a.Rows[k]));
-        }
+        var kept = RowsInto(rows, 72, a.Rows.Select(r => (r.Id, ActivityLook(r), (FrameworkElement)ActivityRow(r))));
         v.Children.Add(K.Card(rows, new Thickness(4)));
+        if (noting != null) noting.Activity = new ActivityRefs(v, heading, ActivitySaid(a), kept);
         return v;
+    }
+
+    /// <summary>Recent activity's heading line: how many are new ("3 new"), or none.</summary>
+    private string? ActivitySaid(DashActivityData? a)
+    {
+        var fresh = a?.Rows.Count(r => r.Unread == true && !seen.Contains(r.Id)) ?? 0;
+        return fresh > 0 ? $"{fresh} new" : null;
     }
 
     private FrameworkElement ActivityRow(DashActivityRow row)

@@ -55,6 +55,7 @@ public sealed partial class DashboardScreen : Screen
         view = Launch.Get("dash-view") switch { "cards" => 0, "activity" => 2, "list" => 1, _ => (int)Prefs.Double("dashView", 1) };
         openKey = Launch.Get("sheet") is { Length: > 0 } k ? k : null;
         sheetAsked = openKey != null;
+        ChecksForView();
     }
 
     private string[] ViewsHere => engine.OnBrightspace ? Views[..2] : Views;
@@ -89,6 +90,7 @@ public sealed partial class DashboardScreen : Screen
             {
                 if (v == 0 && view != 0) courseCardsShown = false;
                 view = v;
+                ChecksForView();
                 Prefs.Set("dashView", v);
                 Refresh();
                 Render();
@@ -145,20 +147,14 @@ public sealed partial class DashboardScreen : Screen
         var d = today.Data;
         if (Title != lastTitle || Subtitle != lastSubtitle) { lastTitle = Title; lastSubtitle = Subtitle; HeaderChange(); }
         if (d == null) return K.LoadState(today.Error, () => today.Reload(engine, "today"));
-        var width = Math.Max(320, Width);
         var page = new Stack { Orientation = Orientation.Vertical, Spacing = 28 };
-        var look = (Appearance.Dark, Appearance.Accent, Appearance.ThemeName);
-        var layout = CounterLayout(width);
-        page.Children.Add(Part("counters", new object?[] { d, countsQuick.Data, countsFresh.Data, TodayUpdating, CountsUpdating, overdueAdjust, openKey, layout, look }, () => Counters(d, layout)));
-        var two = width >= 900;
-        var railW = RailWidth(width);
-        var mainW = two ? Math.Min(MainMost, width - railW - 28) : width;
-        // (the view: what it shows, at its width; the cards are the courses' and their progress, the list the planner's,
-        //  the activity the school's — not today's, so a new count leaves them as they are)
-        var main = Part("main", new object?[] { View, Math.Round(mainW), courses.Data, progress.Data, courses.Error, list.Data, list.Error, activity.Data, activity.Error, ticks, seenTurn, courseCardsShown, look }, () => Main(d, mainW));
+        builtWidth = Width;
+        var (specs, two, railW) = Specs(d);
+        page.Children.Add(Part("counters", specs["counters"]));
+        var main = Part("main", specs["main"]);
         if (two)
         {
-            var rail = Part("rail", new object?[] { d, skyFresh.Data, skyKept.Data, View, railW, false, ticks, look }, () => Rail(d, railW, false));
+            var rail = Part("rail", specs["rail"]);
             var g = K.Columns($"*, 28, {railW.ToString(System.Globalization.CultureInfo.InvariantCulture)}", main.Col(0), rail.Col(2));
             // (on a page wider still, what is over stays as room at the right, not between a row's title and its time)
             g.ColumnDefinitions[0].MaxWidth = MainMost;
@@ -168,9 +164,10 @@ public sealed partial class DashboardScreen : Screen
         {
             // (one column: the view chosen right under the counters — Activity or Cards shows at once — then the day's work)
             page.Children.Add(main);
-            if (View != 1) page.Children.Add(Part("today", new object?[] { d, ticks, look }, () => TodaySection(d, true)));
-            page.Children.Add(Part("rail", new object?[] { d, skyFresh.Data, skyKept.Data, View, Math.Round(width), true, ticks, look }, () => Rail(d, width, true)));
+            if (specs.TryGetValue("today", out var todaySpec)) page.Children.Add(Part("today", todaySpec));
+            page.Children.Add(Part("rail", specs["rail"]));
         }
+        shownParts = specs.Keys.ToList();
         root = new Grid();
         overlay = new Canvas { ClipToBounds = false };
         root.Children.Add(page);
@@ -183,20 +180,57 @@ public sealed partial class DashboardScreen : Screen
 
     // ---- parts kept from build to build ----
 
+    /// <summary>A part of the page: what it is built from (compared from build to build), and how it is built.</summary>
+    private sealed record PartSpec(object?[] Inputs, Func<FrameworkElement> Make);
+
     /// <summary>Each part of the page as it was built last, with what it was built from.</summary>
     private readonly Dictionary<string, (object?[] Inputs, FrameworkElement Part)> parts = new();
+    /// <summary>The parts on the page as last built ("counters", "main", "rail", and "today" in one column), and the width
+    /// it was built at (what a live check lays its changes out for).</summary>
+    private List<string> shownParts = new();
+    private double builtWidth;
     /// <summary>Bumped as a tick is shown, or an activity seen: the parts that draw them are built again.</summary>
     private int ticks, seenTurn;
+
+    /// <summary>
+    /// The page's parts for what is read now, at the page's width: the counters, the view chosen, the rail beside it on a
+    /// page 900 wide or wider (else under it, the day's work its own part) — each with what it is built from. Build lays
+    /// them out; a live check compares them again to change only the parts whose answers changed.
+    /// </summary>
+    private (Dictionary<string, PartSpec> Specs, bool Two, double RailW) Specs(Today d, double? at = null)
+    {
+        var width = Math.Max(320, at ?? Width);
+        var look = (Appearance.Dark, Appearance.Accent, Appearance.ThemeName);
+        var layout = CounterLayout(width);
+        var specs = new Dictionary<string, PartSpec>
+        {
+            ["counters"] = new(new object?[] { d, countsQuick.Data, countsFresh.Data, TodayUpdating, CountsUpdating, overdueAdjust, openKey, layout, look }, () => Counters(d, layout)),
+        };
+        var two = width >= 900;
+        var railW = RailWidth(width);
+        var mainW = two ? Math.Min(MainMost, width - railW - 28) : width;
+        // (the view: what it shows, at its width; the cards are the courses' and their progress, the list the planner's,
+        //  the activity the school's — not today's, so a new count leaves them as they are)
+        specs["main"] = new(new object?[] { View, Math.Round(mainW), courses.Data, progress.Data, courses.Error, list.Data, list.Error, activity.Data, activity.Error, ticks, seenTurn, courseCardsShown, look }, () => Main(d, mainW));
+        if (two) specs["rail"] = new(new object?[] { d, skyFresh.Data, skyKept.Data, View, railW, false, ticks, look }, () => Rail(d, railW, false));
+        else
+        {
+            if (View != 1) specs["today"] = new(new object?[] { d, ticks, look }, () => TodaySection(d, true));
+            specs["rail"] = new(new object?[] { d, skyFresh.Data, skyKept.Data, View, Math.Round(width), true, ticks, look }, () => Rail(d, width, true));
+        }
+        return (specs, two, railW);
+    }
 
     /// <summary>
     /// A part of the page (the counters, the view, the rail): the one built last time when what it shows has not changed —
     /// the same answers, the same width and view, the same ticks and look — taken from the page before and put in this
     /// one. A new count leaves the courses' cards exactly as they were (not built again, not redrawn), so the Dashboard's
-    /// answers read again in the background change only what they change, in place.
+    /// answers read again in the background change only what they change, in place. What a live check may change in it
+    /// later (a counter's number, a list's rows) is noted as it is built (<see cref="PartRefs"/>).
     /// </summary>
-    private FrameworkElement Part(string key, object?[] inputs, Func<FrameworkElement> make)
+    private FrameworkElement Part(string key, PartSpec spec)
     {
-        if (parts.TryGetValue(key, out var was) && was.Inputs.Length == inputs.Length && was.Inputs.Zip(inputs).All(p => Equals(p.First, p.Second)))
+        if (parts.TryGetValue(key, out var was) && SameInputs(was.Inputs, spec.Inputs))
         {
             switch (was.Part.Parent)
             {
@@ -206,9 +240,24 @@ public sealed partial class DashboardScreen : Screen
             }
             return was.Part;
         }
-        var e = make();
-        parts[key] = (inputs, e);
-        return e;
+        return Make(key, spec);
+    }
+
+    private static bool SameInputs(object?[] a, object?[] b) => a.Length == b.Length && a.Zip(b).All(p => Equals(p.First, p.Second));
+
+    /// <summary>A part built (its pieces noted for the live check), and kept as built.</summary>
+    private FrameworkElement Make(string key, PartSpec spec)
+    {
+        var was = noting;
+        noting = new PartRefs();
+        try
+        {
+            var e = spec.Make();
+            parts[key] = (spec.Inputs, e);
+            refs[key] = noting;
+            return e;
+        }
+        finally { noting = was; }
     }
 
     // ---- the counters (the Mac's DashCounterTile, as Windows 11 cards) ----
@@ -369,11 +418,14 @@ public sealed partial class DashboardScreen : Screen
         //  than cut)
         var name = new Viewbox { Child = label, Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(gap, 0, 0, 0) };
         var head = K.Columns("auto, *", K.IconTile(Glyph.Counter(c.Key), color, size).Col(0), name.Col(1));
-        var count = Number(n, alert);
-        count.Margin = new Thickness(0, cols == 6 ? 8 : 10, 0, 0);
-        var content = K.V(0, head, count, new NoteLines(n.Note));
+        // (the number in a holder of its own, cut at its edges: a live check's new number rolls in there, the old out)
+        var number = new Grid { ClipToBounds = true, Margin = new Thickness(0, cols == 6 ? 8 : 10, 0, 0) };
+        number.Children.Add(Number(n, alert));
+        var content = K.V(0, head, number, new NoteLines(n.Note));
         content.Margin = new Thickness(pad, pad, pad, pad - 2);
-        return TileButton(c, content, n, alert, color);
+        var tile = TileButton(c, content, n, alert, color);
+        if (noting != null) noting.Tiles[c.Key] = new TileRefs(tile, number, content, (n.Value, n.Note, n.Kept, alert, NameOf(c, full)));
+        return tile;
     }
 
     /// <summary>

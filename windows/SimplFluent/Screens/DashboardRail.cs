@@ -25,6 +25,14 @@ public sealed partial class DashboardScreen
             if (sky != null) v.Children.Add(sky);
             if (load != null) v.Children.Add(load);
         }
+        if (noting != null)
+        {
+            noting.RailWidth = w;
+            noting.Sky = sky;
+            noting.SkySaid = SkySaid();
+            noting.Load = load;
+            noting.LoadSaid = LoadSaid(d);
+        }
         return v;
     }
 
@@ -33,16 +41,15 @@ public sealed partial class DashboardScreen
     private FrameworkElement TodaySection(Today d, bool narrow)
     {
         var v = new Stack { Orientation = Orientation.Vertical, Spacing = 0 };
-        v.Children.Add(Heading.Section(d.List.Heading.Length > 0 ? d.List.Heading : "Today", d.List.Note));
+        var heading = Heading.Section(d.List.Heading.Length > 0 ? d.List.Heading : "Today", d.List.Note);
+        v.Children.Add(heading);
         var rows = d.List.Rows;
         var list = new Stack { Orientation = Orientation.Vertical, Spacing = 0 };
+        RowList? kept = null;
         if (rows.Count == 0) list.Children.Add(K.Empty(SymbolRegular.WeatherSunny24, d.List.Empty ?? "Nothing due."));
-        for (var k = 0; k < rows.Count; k++)
-        {
-            if (k > 0) list.Children.Add(K.Divider(84));
-            list.Children.Add(TodayLine(rows[k], narrow));
-        }
+        else kept = RowsInto(list, 84, rows.Select(r => (r.Id, TodayLook(r, narrow), (FrameworkElement)TodayLine(r, narrow))));
         v.Children.Add(K.Card(list, new Thickness(4)));
+        if (noting != null) noting.Today = new TodayRefs(v, heading, TodaySaid(d), kept, narrow);
         return v;
     }
 
