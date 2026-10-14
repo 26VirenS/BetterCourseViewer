@@ -3,11 +3,12 @@ import simd
 
 // The Mac app's models that need no window, checked on their own: compiled with swiftc beside the files they check —
 // mac/Simpl/Tools/PeriodicData.swift, PeriodicExtraData.swift (the elements' data), MoleculeShape.swift (VSEPR, the
-// molecule builder's and the Lewis maker's shapes) and every file in mac/Simpl/Tools/Biology/Model (the biology
-// toolkit's data and arithmetic, and its self-check) — and run, in seconds, by the Mac app's workflow (Models). By hand
-// on a Mac: swiftc -o /tmp/model-checks mac/Simpl/Tools/{PeriodicData,PeriodicExtraData,MoleculeShape}.swift
-// mac/Simpl/Tools/Biology/Model/*.swift scripts/dev/swift-checks/main.swift && /tmp/model-checks. A failed check is
-// printed with what was found, and the exit code is the number that failed.
+// molecule builder's and the Lewis maker's shapes), every file in mac/Simpl/Tools/Biology/Model (the biology toolkit's
+// data and arithmetic, and its self-check) and (1.3.80) every file in mac/Simpl/Tools/Chemistry/Model (the chemistry
+// tools' launch flags and what they keep) — and run, in seconds, by the Mac app's workflow (Models). By hand on a Mac:
+// swiftc -o /tmp/model-checks mac/Simpl/Tools/{PeriodicData,PeriodicExtraData,MoleculeShape}.swift
+// mac/Simpl/Tools/Biology/Model/*.swift mac/Simpl/Tools/Chemistry/Model/*.swift scripts/dev/swift-checks/main.swift
+// && /tmp/model-checks. A failed check is printed with what was found, and the exit code is the number that failed.
 
 var passed = 0, failed = 0
 func check(_ ok: Bool, _ what: String) {
@@ -91,6 +92,61 @@ let bio = BioSelfCheck.run()
 for line in bio.lines {
     check(line.hasSuffix(" OK"), String(line.dropFirst("bio-check ".count).dropLast(line.hasSuffix(" OK") ? 3 : 5)))
 }
+
+// ---- the chemistry tools (1.3.80) ---------------------------------------------------------------------------------
+// (mac/Simpl/Tools/Chemistry/Model: the old Periodic Table's launch flags read as the tools they are now; the Lewis
+// maker's and the molecule builder's molecules kept as text, read back whole or not at all)
+print("the chemistry tools")
+check(ChemLaunch.tool("ptable", page: "lewis", model: nil) == "lewis", "-SimplTool ptable -SimplPTPage lewis opens Lewis Structures")
+check(ChemLaunch.tool("ptable", page: "molecules", model: nil) == "molecule", "-SimplPTPage molecules opens the Molecule Builder")
+check(ChemLaunch.tool("ptable", page: nil, model: "cloud") == "atoms", "-SimplPTModel (an element's 3D view) opens Atoms & Orbitals")
+check(ChemLaunch.tool("ptable", page: "table", model: nil) == "ptable" && ChemLaunch.tool("ptable", page: nil, model: "") == "ptable",
+      "the table's own page, or no view, is the Periodic Table")
+check(ChemLaunch.tool("lewis", page: "molecules", model: "cloud") == "lewis" && ChemLaunch.tool("cell", page: nil, model: nil) == "cell",
+      "any other tool is itself, whatever the Periodic Table's flags say")
+check(ChemLaunch.tool(nil, page: "lewis", model: nil) == nil && ChemLaunch.tool("", page: nil, model: nil) == nil, "no tool asked for, none opened")
+check(ChemLaunch.step(1, by: -1, count: 118) == 1 && ChemLaunch.step(118, by: 1, count: 118) == 118 && ChemLaunch.step(26, by: 1, count: 118) == 27,
+      "an element stepped stays between hydrogen and oganesson")
+
+// (the Lewis maker's draft: a drawn ion, its positions to a tenth of a point, read back as it was)
+let ion = ChemLewisDraft(way: "draw", mode: "octet", central: "N", counts: ["O": 3, "H": 0], charge: -1, preset: "NO₃⁻", manual: true,
+                         atoms: [.init(id: 1, symbol: "N", x: 0, y: 0), .init(id: 2, symbol: "O", x: 90, y: -0.04),
+                                 .init(id: 4, symbol: "O", x: -45.06, y: 77.9), .init(id: 6, symbol: "Cl", x: -45, y: -77.94)],
+                         bonds: [.init(id: 3, a: 1, b: 2, order: 2), .init(id: 5, a: 1, b: 4, order: 1), .init(id: 7, a: 1, b: 6, order: 1)])
+let ionBack = ChemLewisDraft(text: ion.text)
+check(ionBack?.way == "draw" && ionBack?.mode == "octet" && ionBack?.central == "N" && ionBack?.charge == -1 && ionBack?.manual == true,
+      "a Lewis draft keeps how it was made, its ranking, its centre, its charge and its hand-set bonds")
+check(ionBack?.counts == ["O": 3] && ionBack?.preset == "NO₃⁻", "and the quick way's atoms (none of a kind left out) and the preset's name")
+check(ionBack?.atoms.map(\.symbol) == ["N", "O", "O", "Cl"] && ionBack?.atoms[2].x == -45.1 && ionBack?.atoms[1].y == 0,
+      "its atoms in order, where they were drawn to a tenth of a point (\(ionBack?.atoms.map { "\($0.x),\($0.y)" } ?? []))")
+check(ionBack?.bonds == ion.bonds && ionBack?.nextID == 8, "its bonds with their orders, and the next id past them all")
+check(ChemLewisDraft(text: "preset Ethanol (C₂H₆O)\natom 1 C 0 0")?.preset == "Ethanol (C₂H₆O)", "a preset's name with spaces in it read whole")
+check(ChemLewisDraft(text: ChemLewisDraft(text: ion.text)?.text ?? "") == ionBack, "written again, read again: the same draft")
+check(ChemLewisDraft(text: "way quick\nmode formal") == nil, "a draft with no atoms is none")
+check(ChemLewisDraft(text: "atom 1 C 0 0\nbond 2 1 9 1") == nil, "nor one with a bond to an atom not there")
+check(ChemLewisDraft(text: "atom 1 C 0 0\natom 2 O 1 0\nbond 3 1 2 4") == nil, "nor a bond of order 4")
+check(ChemLewisDraft(text: "atom 1 C 0 0\natom 1 O 1 0") == nil, "nor an id twice")
+check(ChemLewisDraft(text: "atom 1 C 0 0\natom 2 O 1 0\nbond 3 1 2 1\nbond 4 2 1 2") == nil, "nor two bonds between the same atoms")
+check(ChemLewisDraft(text: "atom 1 c 0 0") == nil && ChemLewisDraft(text: "atom 1 C nan 0") == nil, "nor an atom it cannot read")
+check(ChemLewisDraft(text: "atom 1 C 0 0\ncharge 9") == nil && ChemLewisDraft(text: "atom 1 C 0 0\nway sideways") == nil,
+      "nor a charge or a way it does not know")
+check(ChemLewisDraft(text: "atom 1 C 0 0\nsparkle on\n\n") != nil, "a line from a later version passed over")
+
+// (the molecule builder's: an atom's lone electrons when the Lewis maker gave them, a fixed shape, bonds by place)
+let h2o = ChemMoleculeDraft(title: "Water", fixed: false,
+                              atoms: [.init(symbol: "O", x: 0, y: 0.0001, z: 0, lone: 4), .init(symbol: "H", x: 0.7581234, y: -0.587, z: 0),
+                                      .init(symbol: "H", x: -0.758, y: -0.587, z: 1e-9)],
+                              bonds: [.init(a: 0, b: 1, order: 1), .init(a: 0, b: 2, order: 1)])
+let h2oBack = ChemMoleculeDraft(text: h2o.text)
+check(h2oBack?.title == "Water" && h2oBack?.fixed == false && h2oBack?.bonds == h2o.bonds, "a molecule keeps its title, its shape's kind and its bonds")
+check(h2oBack?.atoms.map(\.lone) == [4, nil, nil] && h2oBack?.atoms[1].x == 0.758 && h2oBack?.atoms[0].y == 0 && h2oBack?.atoms[2].z == 0,
+      "its atoms to a thousandth of an ångström, lone electrons where the Lewis maker set them (\(h2o.text.replacingOccurrences(of: "\n", with: " | ")))")
+check(ChemMoleculeDraft(text: "title Acetic acid\nfixed 1\natom C 0 0 0")?.title == "Acetic acid" && ChemMoleculeDraft(text: "fixed 1\natom C 0 0 0")?.fixed == true,
+      "a title with a space in it, and a shape kept as it came")
+check(ChemMoleculeDraft(text: "title Empty\nfixed 0") == nil, "a molecule with no atoms is none")
+check(ChemMoleculeDraft(text: "atom C 0 0 0\nbond 0 1 1") == nil, "nor one with a bond past its atoms")
+check(ChemMoleculeDraft(text: "atom C 0 0 0\natom O 1 0 0\nbond 0 1 0") == nil && ChemMoleculeDraft(text: "atom C 0 0 0 12") == nil,
+      "nor a bond of no order or an atom with twelve lone electrons")
 
 print("\(passed) passed, \(failed) failed")
 exit(Int32(failed))
