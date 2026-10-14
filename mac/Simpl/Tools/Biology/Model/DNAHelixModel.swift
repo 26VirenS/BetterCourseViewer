@@ -388,24 +388,26 @@ enum DNAHelix {
             let yd = top + 5
             mesh.append(DNAMesh.line(BioVec(-10, yd, 0), BioVec(10, yd, 0)))
             for x in [-10.0, 10.0] { mesh.append(DNAMesh.line(BioVec(x, yd - 1.2, 0), BioVec(x, yd + 1.2, 0))) }
-            marks.append(DNATextMark(text: "2 nm wide", pos: BioVec(0, yd + 2.6, 0), size: 2.6, hex: ink, onTop: true, bold: false))
+            // (the words at 3–3.2 Å: at 2.3–2.6 they were too small to read at the narrow window's size)
+            marks.append(DNATextMark(text: "2 nm wide", pos: BioVec(0, yd + 3, 0), size: 3.2, hex: ink, onTop: true, bold: false))
             func pairHeight(_ k: Int) -> Double {
                 let ys = d.atoms.filter { $0.pair == k && !backboneNames.contains($0.name) }.map(\.pos.y)
                 return ys.isEmpty ? Double(k) * BioBDNA.rise + 2 : ys.reduce(0, +) / Double(ys.count)
             }
             if n >= 2 {
-                let k = max(0, n / 2 - 1)
+                // (a fifth of the way up a long helix, under the labels the middle's backbones have on that side)
+                let k = n >= 10 ? n / 5 : max(0, n / 2 - 1)
                 let ya = pairHeight(k), yb = pairHeight(k + 1)
                 mesh.append(DNAMesh.line(BioVec(13, ya, 0), BioVec(13, yb, 0)))
                 for y in [ya, yb] { mesh.append(DNAMesh.line(BioVec(10.5, y, 0), BioVec(14, y, 0))) }
-                marks.append(DNATextMark(text: "0.34 nm between base pairs", pos: BioVec(15.5, (ya + yb) / 2, 0), size: 2.3, hex: ink,
+                marks.append(DNATextMark(text: "0.34 nm between base pairs", pos: BioVec(15.5, (ya + yb) / 2, 0), size: 3, hex: ink,
                                          align: .leading, onTop: true, bold: false))
             }
             if Double(n - 1) * BioBDNA.rise >= pitch - 0.01 {
                 let ya = 0.0, yb = pitch
                 mesh.append(DNAMesh.line(BioVec(-13, ya, 0), BioVec(-13, yb, 0)))
                 for y in [ya, yb] { mesh.append(DNAMesh.line(BioVec(-14, y, 0), BioVec(-10.5, y, 0))) }
-                marks.append(DNATextMark(text: "≈3.6 nm per turn (10.5 bp)", pos: BioVec(-15.5, (ya + yb) / 2, 0), size: 2.3, hex: ink,
+                marks.append(DNATextMark(text: "≈3.6 nm per turn (10.5 bp)", pos: BioVec(-15.5, (ya + yb) / 2, 0), size: 3, hex: ink,
                                          align: .trailing, onTop: true, bold: false))
             }
             items.append(BioSceneItem(id: nil, mesh: mesh, material: BioMaterial(ink, unlit: true)))

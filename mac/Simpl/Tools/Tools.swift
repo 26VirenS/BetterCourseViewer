@@ -618,6 +618,9 @@ struct ToolHeader: View {
                     .help(kind.note)
                 BioHeaderControls(kind: kind, squished: true)
             }
+            // (the name first offered the row's room, before the spacer: offered half, "Biomolecule Builder" was cut
+            // to "Biomolecule Buil…" with room to spare)
+            .layoutPriority(1)
             Spacer(minLength: 12)
             // (tools-31, as the row's: what a press does, in a plain glass button)
             Button {

@@ -428,4 +428,7 @@ commit saying `[full shots]` or Run workflow → full) takes every tool's pages,
 asked: 57–57l Cell Explorer, 58a–58l DNA & RNA, 59a–59k Gene Expression, 61a–61r Biomolecule Builder, 62a–62h Genetics
 Crosses, 63a–63j Cell Division, 64a–64d Hardy–Weinberg, 65a–65d Bio Lab Calculator, 66a–66b Enzyme Lab, 67a–67e
 Photosynthesis & Respiration, and the pins' quick versions 54b–54e. CI's runner shows a window about 1,024 × 683
-whatever is asked, so the pictures show each tool at the narrow end of a Mac's sizes.
+whatever is asked, so the pictures show each tool at the narrow end of a Mac's sizes. A pin's picture opens its popover
+with `-SimplPinOpen <tool>`; the suite runs several copies of the app at once, and a popover closes when its app is put
+behind another, so a pin opened that way opens its popover again whenever its app comes back to the front
+(`PinnedToolButton`, Tools/PinnedTools.swift) — without that, 54d and 54e were pictured with the popover closed.
