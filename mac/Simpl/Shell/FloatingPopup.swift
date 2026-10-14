@@ -379,12 +379,15 @@ final class FloatingPopups {
     /// (1.3.79) The window's sidebar is out, as the window last said (`sidebarMoved`): a large popup keeps clear of it.
     /// (Its view is still found where it was once it is folded away, so where it stands is not enough to say.)
     private(set) var sidebarShown = true
+    /// (1.3.79) The window has a sidebar and has said whether it is out (a window without one never does).
+    private(set) var sidebarSaid = false
 
     /// The window's sidebar shown or hidden: its large popups placed again in the screen's side of the window once the
     /// sidebar has moved — one put up while the sidebar was out kept clear of where it had been, off the window's middle,
     /// and one put up while it was folded away lay over it when it came out.
     func sidebarMoved(shown: Bool) {
         sidebarShown = shown
+        sidebarSaid = true
         // (and again once it has surely finished sliding: placed while it was still on its way in, a popup lay over it)
         for delay in [0.6, 1.6] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
@@ -395,41 +398,34 @@ final class FloatingPopups {
 
     // MARK: Where a popup goes
 
-    /// The screen's side of a window, on the screen: under its toolbar, past its sidebar while that is out (`sidebar`).
-    static func area(of window: NSWindow, sidebar: Bool = true) -> NSRect {
+    /// (1.3.79) Where a sidebar last said it ends across its window — at first its usual width (MainShell's ideal 270)
+    /// and the inset round it. A sidebar's view says where it stands only some seconds after the window opens, and a
+    /// tool's popup put up as the window opened lay over the sidebar until then.
+    private static var sidebarEdge: CGFloat = 278
+
+    /// The screen's side of a window, on the screen: under its toolbar, past its sidebar while that is out (`sidebar`) —
+    /// where its view says it ends, or (`guessed`: the window has a sidebar, out) where it last did.
+    static func area(of window: NSWindow, sidebar: Bool = true, guessed: Bool = false) -> NSRect {
         var r = window.convertToScreen(window.contentLayoutRect)
-        if sidebar, let edge = sidebarEdge(in: window), edge > 40, edge < r.width * 0.5 {
+        guard sidebar else { return r }
+        var edge: CGFloat?
+        if let side = TourFrames.shared.rect(.sidebar, in: window), side.maxX > 40 {
+            edge = side.maxX
+            if side.maxX < r.width * 0.5 { sidebarEdge = side.maxX }
+        } else if guessed {
+            edge = sidebarEdge
+        }
+        if let edge, edge < r.width * 0.5 {
             r.origin.x += edge
             r.size.width -= edge
         }
         return r
     }
 
-    /// (1.3.79) Where a window's sidebar ends, across its content: as its view says it stands (TourFrames), else from the
-    /// split view the window's columns are in — a tool's popup put up as the window opened, before the sidebar's view had
-    /// said where it is, lay over the sidebar.
-    private static func sidebarEdge(in window: NSWindow) -> CGFloat? {
-        if let side = TourFrames.shared.rect(.sidebar, in: window), side.maxX > 40 { return side.maxX }
-        // (the outermost split view across the window: its first pane, unless folded away)
-        var queue: [NSView] = window.contentView.map { [$0] } ?? []
-        var i = 0
-        while i < queue.count {
-            let v = queue[i]
-            i += 1
-            if let split = v as? NSSplitView, split.isVertical, split.arrangedSubviews.count >= 2 {
-                let first = split.arrangedSubviews[0]
-                guard !split.isSubviewCollapsed(first), !first.isHidden else { return nil }
-                return first.convert(first.bounds, to: nil).maxX
-            }
-            queue.append(contentsOf: v.subviews)
-        }
-        return nil
-    }
-
     /// Where a large popup opens over a window: the screen's side of it less the margin all round (no wider or taller
     /// than a tool needs), centred — then as far as it was moved.
-    static func largeFrame(over window: NSWindow, moved: CGSize, sidebar: Bool = true) -> NSRect {
-        let a = area(of: window, sidebar: sidebar)
+    static func largeFrame(over window: NSWindow, moved: CGSize, sidebar: Bool = true, guessed: Bool = false) -> NSRect {
+        let a = area(of: window, sidebar: sidebar, guessed: guessed)
         let w = max(320, min(a.width - margin * 2, 1480))
         let h = max(260, min(a.height - margin * 2, 1040))
         return NSRect(x: (a.midX - w / 2 + moved.width).rounded(), y: (a.midY - h / 2 + moved.height).rounded(), width: w, height: h)
@@ -579,8 +575,8 @@ final class PopupPanel: NSPanel {
         var f: NSRect
         switch popupLayout {
         case .large:
-            f = FloatingPopups.largeFrame(over: over, moved: moved, sidebar: owner?.sidebarShown ?? true)
-            model.size = f.size
+            f = FloatingPopups.largeFrame(over: over, moved: moved, sidebar: owner?.sidebarShown ?? true, guessed: owner?.sidebarSaid ?? false)
+            if model.size != f.size { model.size = f.size } // (the same size: what it shows is not laid out again)
             f = moved == .zero ? FloatingPopups.within(f, on: over.screen) : FloatingPopups.kept(f, on: over.screen)
             if OpenClock.verbose, f != frame {
                 NSLog("[Simpl] popup %@: %.0f × %.0f, %.0f in from the window (sidebar %@)", popupKey, f.width, f.height,
@@ -591,7 +587,7 @@ final class PopupPanel: NSPanel {
             if placed {
                 f = NSRect(x: (frame.midX - s.width / 2).rounded(), y: frame.maxY - s.height, width: s.width, height: s.height)
             } else {
-                let a = FloatingPopups.area(of: over, sidebar: owner?.sidebarShown ?? true)
+                let a = FloatingPopups.area(of: over, sidebar: owner?.sidebarShown ?? true, guessed: owner?.sidebarSaid ?? false)
                 let top = max(m, (a.height - s.height) * 0.3)
                 f = NSRect(x: (a.midX - s.width / 2).rounded(), y: (a.maxY - top - s.height).rounded(), width: s.width, height: s.height)
             }
@@ -608,18 +604,19 @@ final class PopupPanel: NSPanel {
                 : FloatingPopups.under(r, size: s, on: over.screen)
             f = FloatingPopups.within(f, on: over.screen)
         }
+        guard !placed || f != frame else { return } // (where it is already)
         setFrame(f, display: true)
         placed = true
         invalidateShadow()
     }
 
-    /// (1.3.79) A large popup placed again a moment after it came in, and once more a little later: one put up as the
-    /// window opened (a tool asked for at launch) was placed before the sidebar had said where it is, and lay over the
-    /// sidebar until the window was next sized. Not while it is being dragged; one dragged keeps how far it was moved.
+    /// (1.3.79) A large popup placed again over the first seconds after it came in: one put up as the window opened (a
+    /// tool asked for at launch) was placed before the sidebar's view had said where it ends — it says so only some
+    /// seconds on — and lay over the sidebar until the window was next sized. Not once it has been dragged somewhere.
     fileprivate func placeAgainSoon() {
-        for delay in [0.5, 1.5] {
+        for delay in [0.5, 1.5, 4, 8, 14] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                guard let self, !self.closing, self.drag == nil, self.popupLayout.isLarge else { return }
+                guard let self, !self.closing, self.drag == nil, !self.userMoved, self.popupLayout.isLarge else { return }
                 self.place()
             }
         }
@@ -645,7 +642,7 @@ final class PopupPanel: NSPanel {
     fileprivate func prepare() {
         guard let over, !shown else { return } // (measured already, and in)
         if !placed {
-            let a = FloatingPopups.area(of: over, sidebar: owner?.sidebarShown ?? true)
+            let a = FloatingPopups.area(of: over, sidebar: owner?.sidebarShown ?? true, guessed: owner?.sidebarSaid ?? false)
             setFrame(NSRect(x: a.midX - 240, y: a.maxY - 420, width: 480, height: 360), display: false)
         }
         if parent == nil { over.addChildWindow(self, ordered: .above) }
@@ -734,7 +731,7 @@ final class PopupPanel: NSPanel {
         if let w = dragWatch { NSEvent.removeMonitor(w) }
         dragWatch = nil
         if popupLayout.isLarge, let over {
-            let home = FloatingPopups.largeFrame(over: over, moved: .zero, sidebar: owner?.sidebarShown ?? true)
+            let home = FloatingPopups.largeFrame(over: over, moved: .zero, sidebar: owner?.sidebarShown ?? true, guessed: owner?.sidebarSaid ?? false)
             moved = CGSize(width: frame.minX - home.minX, height: frame.minY - home.minY)
         }
     }

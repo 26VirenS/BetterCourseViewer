@@ -694,9 +694,9 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   the window to what it showed, and a tool asking for more room the more it had grew it until AppKit stopped the app),
   and a large popup is placed again once the sidebar is shown or hidden (the window says whether it is out:
   `FloatingPopups.sidebarMoved`, as a folded sidebar's view is still found where it stood — and again a second on, once
-  the sidebar has surely finished sliding) and a moment after it comes in; the sidebar's edge is taken from the split
-  view the window's columns are in when its view has not yet said where it is (a tool's popup put up as the window
-  opened lay over the sidebar). A fitted
+  the sidebar has surely finished sliding) and again over its first seconds; until the sidebar's view says where it
+  ends (only some seconds after the window opens) it is taken to end where it last did, at first its usual width (a
+  tool's popup put up as the window opened lay over the sidebar). A fitted
   popup is measured as what it shows appears and as it changes (a measure handed up as a SwiftUI preference never
   reached a popup whose view is not its window's content view: Hand In, New Task, New Message and Why these gametes?
   stayed at the size they were guessed at, cut off at their sides); one that draws its own glass — a counter's list, a
