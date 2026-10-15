@@ -5,10 +5,12 @@
 //  Keeps the app up to date on its own. Every two hours (and at launch when the last check is older
 //  than that, and on Check now) it reads the
 //  feed on simplcourses.com — one small JSON file naming the newest version, where its zip is and
-//  the zip's SHA-256 — and when that version is newer than this one, on Update now (or at once,
-//  when updates are set to install themselves) downloads the zip, checks the hash, unpacks it,
-//  checks the app inside is Simpl Courses and signed, puts it in this copy's place (this copy goes
-//  to the Trash) and relaunches. State goes to the settings window through `onChange`.
+//  the zip's SHA-256 — and when that version is newer than this one, at once (2.99.35: always —
+//  there is no setting to turn that off) downloads the zip, checks the hash, unpacks it, checks
+//  the app inside is Simpl Courses and signed, puts it in this copy's place (this copy goes to the
+//  Trash) and relaunches. Only a version put back (the Developer section's rollback) holds one
+//  back: a version found no newer than the one it replaced waits for Update now
+//  (`rolledBackFrom`). State goes to the settings window through `onChange`.
 //
 
 import Foundation
@@ -58,10 +60,28 @@ final class Updater {
     private var timer: Timer?
     private var progressObservation: NSKeyValueObservation?
 
-    /// Updates install themselves when they arrive (the setting in the window; on unless turned off).
-    var automatic: Bool {
-        get { UserDefaults.standard.object(forKey: "autoUpdate") as? Bool ?? true }
-        set { UserDefaults.standard.set(newValue, forKey: "autoUpdate") }
+    /// (2.99.35) The version a version put back (the Developer section's rollback) replaced, while this copy is older
+    /// than it: the app stays on this one, and a version found up to that one is offered (Update now) but never
+    /// installed by itself — or the next check would bring it straight back. A version newer than it installs by
+    /// itself as usual, and Update now ends the hold. Nil when nothing is held.
+    private(set) var rolledBackFrom: String?
+    private static let rolledBackKey = "SimplRolledBackFrom"
+    /// (before 2.99.35) Install updates by themselves' switch, gone: only written now for a version from before 2.99.35
+    /// put back, which still reads it (`rollback`).
+    private static let oldAutomaticKey = "autoUpdate"
+
+    private init() {
+        let defaults = UserDefaults.standard
+        // (2.99.35) updates always install themselves: a Mac that had Install updates by themselves off has it on
+        // again, its old switch forgotten
+        defaults.removeObject(forKey: Self.oldAutomaticKey)
+        if let from = defaults.string(forKey: Self.rolledBackKey) {
+            if Self.isNewer(from, than: currentVersion) {
+                rolledBackFrom = from
+            } else {
+                defaults.removeObject(forKey: Self.rolledBackKey) // (this copy is that version or newer: nothing left to hold)
+            }
+        }
     }
 
     func start() {
@@ -113,7 +133,7 @@ final class Updater {
                 if Updater.isNewer(version, than: self.currentVersion) {
                     let release = Release(version: version, url: url, sha256: json["sha256"] as? String, notes: json["notes"] as? String, size: json["size"] as? Int)
                     self.state = .available(release)
-                    if self.automatic { self.install() }
+                    if !self.waitsForUpdateNow(release) { self.begin() }
                 } else {
                     self.state = .upToDate(Date())
                 }
@@ -133,7 +153,34 @@ final class Updater {
         return false
     }
 
+    /// Update now: the version found, installed now (the app quits and opens again on it). (2.99.35) It ends a version
+    /// put back's hold, too: updates install themselves again from here on.
     func install() {
+        guard case .available = state else { return }
+        endHold()
+        begin()
+    }
+
+    /// (2.99.35) A version found that a version put back holds back: no newer than the one it replaced.
+    func waitsForUpdateNow(_ release: Release) -> Bool {
+        guard let from = rolledBackFrom else { return false }
+        return !Self.isNewer(release.version, than: from)
+    }
+
+    /// (2.99.35) The version a version put back now would hold back to: the one this copy replaces, or the one held
+    /// already when that is newer (two steps back still keep the newest away).
+    var holdAfterRollback: String {
+        if let from = rolledBackFrom, Self.isNewer(from, than: currentVersion) { return from }
+        return currentVersion
+    }
+
+    private func endHold() {
+        rolledBackFrom = nil
+        UserDefaults.standard.removeObject(forKey: Self.rolledBackKey)
+    }
+
+    /// The version found (or the one a rollback names): downloaded, checked and put in this copy's place.
+    private func begin() {
         guard case .available(let release) = state else { return }
         state = .downloading(0)
         let task = URLSession.shared.downloadTask(with: release.url) { [weak self] tempURL, response, error in
@@ -247,21 +294,29 @@ final class Updater {
     }
 
     /// The Developer section's rollback: the version named, put in this copy's place — the same
-    /// download, checks and relaunch as an update — with automatic updates turned off first, or the
-    /// next hourly check would put the newest straight back.
+    /// download, checks and relaunch as an update. (2.99.35) The hold is kept first (`rolledBackFrom`,
+    /// read by the version put back as it opens), or the next check would put the newest straight
+    /// back: the app stays on the version put back until a version newer than the one it replaced
+    /// comes out or Update now is pressed.
     func rollback(to version: String, url: URL, sha256: String?) {
         switch state {
         case .downloading, .installing: return
         default: break
         }
-        automatic = false
+        let defaults = UserDefaults.standard
+        defaults.set(holdAfterRollback, forKey: Self.rolledBackKey)
+        // (a version from before 2.99.35 knows no hold, only the old switch: off, it stays too; this version and later
+        // ones forget it as they open)
+        defaults.set(false, forKey: Self.oldAutomaticKey)
         state = .available(Release(version: version, url: url, sha256: (sha256 ?? "").isEmpty ? nil : sha256, notes: nil, size: nil))
-        install()
+        begin()
     }
 
-    /// The state as the settings window shows it.
+    /// The state as the settings window shows it. (2.99.35) `rolledBackFrom` while a version put back is held, `hold`
+    /// the version a rollback now would hold back to, and `waits` when the version found waits for Update now.
     var report: [String: Any] {
-        var d: [String: Any] = ["version": currentVersion, "feed": feedURL.absoluteString, "automatic": automatic, "checked": lastCheck?.timeIntervalSince1970 ?? 0]
+        var d: [String: Any] = ["version": currentVersion, "feed": feedURL.absoluteString, "hold": holdAfterRollback, "checked": lastCheck?.timeIntervalSince1970 ?? 0]
+        if let from = rolledBackFrom { d["rolledBackFrom"] = from }
         switch state {
         case .idle: d["state"] = "idle"
         case .checking: d["state"] = "checking"
@@ -269,6 +324,7 @@ final class Updater {
         case .available(let r):
             d["state"] = "available"
             d["available"] = r.version
+            d["waits"] = waitsForUpdateNow(r)
             if let n = r.notes { d["notes"] = n }
             if let s = r.size { d["size"] = s }
         case .downloading(let p):

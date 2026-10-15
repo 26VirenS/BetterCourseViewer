@@ -5,7 +5,8 @@
 // the page is served over http, the real Bridge.js goes in as an init script, and a fake app answers
 // its messages (and records them). Checks: the sections the window shows (This Mac first, no
 // Courses & targets or Grades — those need the browser's Canvas session); Safari's word and the
-// update states as the app pushes them; the buttons reaching the app; a setting written to the
+// update states as the app pushes them, and a version put back held (2.99.35: no switch for updates
+// any more); the buttons reaching the app; a setting written to the
 // store, and a change the extension made arriving; a site added; export, import and reset through
 // the app's panels; the Mac's uninstall steps.
 // Run: node scripts/dev/mac-window-test.mjs
@@ -45,7 +46,7 @@ const FAKE_APP = () => {
   const store = { settings: null, commands: [], site: { host: 'canvas.school.test', origin: 'https://canvas.school.test' }, setupDone: true, prefs: { gpaGoal: 3.5, gpaTracking: { priorGpa: null, priorCourses: 0, since: '2026-09-01' }, gpaSnapshots: [{ date: '2026-09-01', gpa: 3.2 }], whatIfScores: true }, prefsHost: 'canvas.school.test' };
   window.__store = store;
   window.__calls = [];
-  window.__appState = { version: '9.9.9', extension: { state: 'on', detail: '' }, update: { state: 'upToDate', checked: 1700000000, automatic: true, version: '9.9.9', feed: 'https://simplcourses.com/app/latest.json' }, loginItem: true, setupDone: true, site: store.site };
+  window.__appState = { version: '9.9.9', extension: { state: 'on', detail: '' }, update: { state: 'upToDate', checked: 1700000000, hold: '9.9.9', version: '9.9.9', feed: 'https://simplcourses.com/app/latest.json' }, loginItem: true, setupDone: true, site: store.site };
   const all = () => { const o = {}; if (store.settings) o.settings = store.settings; if (store.site) o['site:last'] = store.site; if (store.setupDone) o['setup:done'] = true; if (store.prefs && store.prefsHost) o[`prefs:${store.prefsHost}`] = store.prefs; return o; };
   // the app's storage.set for a site's preferences: the copy kept, the keys that changed queued for the extension as a command
   const setPrefs = (key, next) => { const host = key.slice(6); const before = store.prefsHost === host ? (store.prefs || {}) : {}; const patch = {}; for (const [k, v] of Object.entries(next)) if (JSON.stringify(before[k]) !== JSON.stringify(v)) patch[k] = v; for (const k of Object.keys(before)) if (!(k in next)) patch[k] = null; store.prefs = clone(next); store.prefsHost = host; if (Object.keys(patch).length) store.commands.push({ id: `p${store.commands.length + 1}`, type: 'setPrefs', host, patch }); };
@@ -90,7 +91,8 @@ try {
   const page = await browser.newPage({ viewport: { width: 960, height: 660 } });
   fastMotion(page.context()); // every page's animations MOTION_RATE× faster (harness.mjs)
   page.on('pageerror', (e) => { console.log('  page error:', e.message); failures.push(`page error: ${e.message}`); });
-  page.on('dialog', (d) => d.accept());
+  const dialogs = [];
+  page.on('dialog', (d) => { dialogs.push(d.message()); d.accept(); });
   await page.addInitScript(FAKE_APP);
   await page.addInitScript(BRIDGE);
   await page.addInitScript(() => { try { localStorage.setItem('app:version', '9.9.8'); } catch { /* none */ } }); // (as after an update: the window used to say quit Safari here)
@@ -108,7 +110,8 @@ try {
   check(nav.join(' | ') === 'This Mac | General | Grades | Appearance | Sites | Data & about', `the sections the app's window shows, This Mac first, Grades among them (from the copy of the site's preferences the extension sends), no Courses & targets (that needs the browser's Canvas session): ${nav.join(' | ')}`);
   check((await page.$eval('.section.is-active', (e) => e.id)) === 'app' && (await text('#title')) === 'This Mac' && (await text('#version')) === 'Version 9.9.9', `it opens on This Mac, with the app's version in the corner (${await text('#title')}, ${await text('#version')})`);
   check((await text('#extTitle')) === 'Simpl Courses is on in Safari' && /Settings → Extensions/.test(await text('#extSub')) && (await page.$eval('#extSteps', (e) => e.hidden)), `Safari's word, from the app's state: ${await text('#extTitle')}`);
-  check((await text('#updTitle')) === 'Version 9.9.9 is the newest' && /Checked at .* · checks every 2 hours/.test(await text('#updSub')) && (await page.$eval('#updAction', (e) => e.hidden)) && (await page.$eval('#autoUpdate', (e) => e.classList.contains('is-on'))) && (await page.$eval('#loginItem', (e) => e.classList.contains('is-on'))), `the update line: the newest, checked at a time, every hour; both switches on (${await text('#updTitle')} · ${await text('#updSub')})`);
+  check((await text('#updTitle')) === 'Version 9.9.9 is the newest' && /Checked at .* · checks every 2 hours/.test(await text('#updSub')) && (await page.$eval('#updAction', (e) => e.hidden)) && (await page.$eval('#loginItem', (e) => e.classList.contains('is-on'))), `the update line: the newest, checked at a time, every two hours; Open at login on (${await text('#updTitle')} · ${await text('#updSub')})`);
+  check(!(await page.$('#autoUpdate')) && !/by themselves|automatic/i.test(await text('#app')) && (await page.$eval('#updHold', (e) => e.hidden && getComputedStyle(e).display === 'none')), `updates always install themselves (2.99.35): no switch for it, and nothing held: ${await text('#app .card:nth-of-type(2)')}`);
   check(!/Quit Safari|open it again/.test(await text('#updSub')), `just after an update the window says nothing about quitting Safari (2.98.87): ${await text('#updSub')}`);
   await page.screenshot({ path: join(root, 'scripts', 'dev', 'out', 'mac-window-app.png') });
 
@@ -151,26 +154,39 @@ try {
   await push({ extension: { state: 'missing', detail: 'Safari has not registered the extension yet. Open Safari once, then come back here.' }, placement: { translocated: false, inApplications: true, path: '/Applications/Simpl Courses.app' } });
   check((await page.$eval('#moveApp', (e) => e.hidden)) && !(await page.$eval('#openSafari', (e) => e.hidden)), 'in the Applications folder, the button is Open Safari Settings again');
   await page.evaluate(() => { document.getElementById('appMsg').hidden = true; });
-  await push({ extension: { state: 'on', detail: '' }, update: { state: 'available', available: '9.10.0', automatic: true, checked: 1700000000, version: '9.9.9' } });
+  await push({ extension: { state: 'on', detail: '' }, update: { state: 'available', available: '9.10.0', waits: false, hold: '9.9.9', checked: 1700000000, version: '9.9.9' } });
   check((await text('#updTitle')) === 'Version 9.10.0 is ready' && /You have 9\.9\.9\. It installs by itself in a moment\./.test(await text('#updSub')) && !(await page.$eval('#updAction', (e) => e.hidden)), `an update found: ${await text('#updTitle')} · ${await text('#updSub')}`);
-  await push({ update: { state: 'downloading', progress: 0.42, automatic: true } });
+  await push({ update: { state: 'downloading', progress: 0.42, hold: '9.9.9' } });
   check((await text('#updTitle')) === 'Downloading the update…' && (await text('#updSub')) === '42%' && (await page.$eval('#checkUpdates', (e) => e.disabled)), `downloading, with the progress: ${await text('#updSub')}`);
   await page.screenshot({ path: join(root, 'scripts', 'dev', 'out', 'mac-window-update.png') });
-  await push({ update: { state: 'installing', automatic: true } });
+  await push({ update: { state: 'installing', hold: '9.9.9' } });
   check((await text('#updTitle')) === 'Installing…' && /opens again by itself/.test(await text('#updSub')), 'installing: the app opens again by itself');
-  await push({ update: { state: 'failed', message: 'The update feed could not be read.', automatic: false, checked: 1700000000 } });
-  check((await text('#updTitle')) === 'Could not check for updates' && (await text('#updSub')) === 'The update feed could not be read.' && !(await page.$eval('#autoUpdate', (e) => e.classList.contains('is-on'))) && !(await page.$eval('#checkUpdates', (e) => e.disabled)), 'a failed check says why, and Check now is back');
-  await push({ update: { state: 'available', available: '9.10.0', automatic: false, checked: 1700000000 } });
+  await push({ update: { state: 'failed', message: 'The update feed could not be read.', hold: '9.9.9', checked: 1700000000 } });
+  check((await text('#updTitle')) === 'Could not check for updates' && (await text('#updSub')) === 'The update feed could not be read.' && !(await page.$eval('#checkUpdates', (e) => e.disabled)), 'a failed check says why, and Check now is back');
+
+  // (2.99.35) a version put back (9.9.9 in 9.10.1's place): the app stays on it, said where the switch was, until a
+  // version newer than 9.10.1 is found — up to 9.10.1, one waits for Update now
+  console.log('a version put back, held');
+  const hold = async () => ((await page.$eval('#updHold', (e) => e.hidden)) ? null : `${await text('#updHoldTitle')} — ${await text('#updHoldSub')}`);
+  await push({ update: { state: 'upToDate', checked: 1700000000, rolledBackFrom: '9.10.1', hold: '9.10.1', version: '9.9.9' } });
+  check((await hold()) === 'Staying on 9.9.9 — You put this version back, so versions up to 9.10.1 wait for Update now; a newer one installs by itself.', `held, nothing found: ${await hold()}`);
+  await push({ update: { state: 'available', available: '9.10.0', waits: true, rolledBackFrom: '9.10.1', hold: '9.10.1', checked: 1700000000, version: '9.9.9' } });
+  check((await hold()) === 'Staying on 9.9.9 — You put this version back. Update now installs 9.10.0; a version newer than 9.10.1 installs by itself.' && (await text('#updSub')) === 'You have 9.9.9.' && !(await page.$eval('#updAction', (e) => e.hidden)), `held, a version up to it found: offered, not said to install itself (${await text('#updSub')} · ${await hold()})`);
+  await page.screenshot({ path: join(root, 'scripts', 'dev', 'out', 'mac-window-held.png') });
+  await push({ update: { state: 'available', available: '9.10.2', waits: false, rolledBackFrom: '9.10.1', hold: '9.10.1', checked: 1700000000, version: '9.9.9' } });
+  check((await hold()) === null && /It installs by itself in a moment\./.test(await text('#updSub')), `held, a version newer than the one put back from found: it installs itself, and the hold is no longer said (${await text('#updSub')})`);
+  await push({ update: { state: 'downloading', progress: 0.1, rolledBackFrom: '9.10.1', hold: '9.10.1' } });
+  check((await hold()) === null, 'an install under way: the hold is not said');
+  await push({ update: { state: 'available', available: '9.10.0', waits: true, rolledBackFrom: '9.10.1', hold: '9.10.1', checked: 1700000000, version: '9.9.9' } });
 
   console.log('the buttons reach the app');
   await page.click('#checkUpdates');
   await page.click('#updAction');
-  await page.click('#autoUpdate');
   await page.click('#loginItem');
   await page.click('#openSafari');
   await page.waitForTimeout(200);
   const sent = await page.evaluate(() => window.__calls.filter((m) => m.cmd.startsWith('app.') && m.cmd !== 'app.state').map((m) => `${m.cmd}${'on' in m ? `:${m.on}` : ''}`));
-  check(sent.join(',') === 'app.moveToApplications,app.checkUpdates,app.installUpdate,app.setAutoUpdate:true,app.setLoginItem:false,app.openSafariSettings', `Check now, Update now, the two switches and Open Safari Settings each reach the app: ${sent.join(',')}`);
+  check(sent.join(',') === 'app.moveToApplications,app.checkUpdates,app.installUpdate,app.setLoginItem:false,app.openSafariSettings', `Check now, Update now, Open at login and Open Safari Settings each reach the app: ${sent.join(',')}`);
   check(/Safari is not running\. Open Safari, then Safari → Settings → Extensions/.test(await text('#appMsg')) && !(await page.$eval('#appMsg', (e) => e.hidden)), `Safari refusing to open its settings is said under the button: ${await text('#appMsg')}`);
 
   console.log('a setting, both ways');
@@ -224,11 +240,12 @@ try {
   await page.waitForSelector('#dev:not([hidden])', { timeout: 5000 });
   await page.waitForFunction(() => document.querySelectorAll('#devVersions option').length === 3, null, { timeout: 5000 });
   const roll = await page.evaluate(() => ({ card: !document.getElementById('devRoll').hidden, options: [...document.querySelectorAll('#devVersions option')].map((o) => o.textContent).join(','), sub: document.getElementById('devRollSub').textContent }));
-  check(roll.card && roll.options === '9.9.9 (this one),9.9.8,9.9.7' && /Automatic updates go off/.test(roll.sub), `the Developer section lists the versions published, this one marked: ${JSON.stringify(roll)}`);
+  check(roll.card && roll.options === '9.9.9 (this one),9.9.8,9.9.7' && roll.sub === 'Another version, put in this one’s place. It stays until a version newer than 9.10.1 comes out, or Update now.', `the Developer section lists the versions published, this one marked, and says how long a version put back stays (2.99.35: held back to 9.10.1, the one put back from already): ${JSON.stringify(roll)}`);
   await page.selectOption('#devVersions', '9.9.8');
   await page.click('#devRollback');
   await page.waitForTimeout(300);
   const rolled = await calls('app.rollback');
+  check(dialogs.at(-1) === 'Install Simpl Courses 9.9.8 in place of this one?\n\nIt stays on 9.9.8 until a version newer than 9.10.1 comes out, or you choose Update now.', `the rollback asks first, and says the version put back stays: ${JSON.stringify(dialogs.at(-1))}`);
   check(rolled.length === 1 && rolled[0].version === '9.9.8' && rolled[0].url === 'https://example.test/Simpl-Courses-Mac-9.9.8.zip' && rolled[0].sha256 === 'def' && (await text('#devRollMsg')) === 'Installing 9.9.8: the app relaunches once it is in place.', `Install asks the app for that version, its zip and its checksum, and says so: ${JSON.stringify(rolled)}`);
   await page.screenshot({ path: join(root, 'scripts', 'dev', 'out', 'mac-window-rollback.png') });
 

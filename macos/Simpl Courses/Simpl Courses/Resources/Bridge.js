@@ -71,7 +71,6 @@
     moveToApplications: () => call('app.moveToApplications'),
     checkUpdates: () => call('app.checkUpdates'),
     installUpdate: () => call('app.installUpdate'),
-    setAutoUpdate: (on) => call('app.setAutoUpdate', { on: !!on }),
     setLoginItem: (on) => call('app.setLoginItem', { on: !!on }),
     openStore: () => call('app.openStore'),
     releases: () => call('app.releases'), // (the Developer section: the versions published)

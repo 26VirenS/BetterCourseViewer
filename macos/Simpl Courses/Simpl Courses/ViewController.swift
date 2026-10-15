@@ -331,10 +331,6 @@ class ViewController: NSViewController, WKNavigationDelegate, WKUIDelegate, WKSc
         case "app.installUpdate":
             Updater.shared.install()
             replyHandler(["ok": true], nil)
-        case "app.setAutoUpdate":
-            Updater.shared.automatic = body["on"] as? Bool ?? true
-            replyHandler(["ok": true], nil)
-            pushState()
         case "app.releases": // the Developer section: the versions published, for a rollback
             Updater.shared.releases { replyHandler(["ok": true, "releases": $0], nil) }
         case "app.rollback": // the Developer section: another version put in this one's place

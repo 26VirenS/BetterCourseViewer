@@ -251,7 +251,7 @@
       const checked = u.checked ? `Checked at ${when(u.checked)} · checks every 2 hours` : 'Checks every 2 hours.';
       switch (u.state) {
         case 'checking': $('updTitle').textContent = 'Checking for updates…'; $('updSub').textContent = `Version ${st.version}`; break;
-        case 'available': $('updTitle').textContent = `Version ${u.available} is ready`; $('updSub').textContent = `You have ${st.version}.${u.automatic === false ? '' : ' It installs by itself in a moment.'}`; act.hidden = false; break;
+        case 'available': $('updTitle').textContent = `Version ${u.available} is ready`; $('updSub').textContent = `You have ${st.version}.${u.waits ? '' : ' It installs by itself in a moment.'}`; act.hidden = false; break;
         case 'downloading': $('updTitle').textContent = 'Downloading the update…'; $('updSub').textContent = `${Math.round((u.progress || 0) * 100)}%`; break;
         case 'installing': $('updTitle').textContent = 'Installing…'; $('updSub').textContent = 'The app opens again by itself.'; break;
         case 'failed': $('updTitle').textContent = 'Could not check for updates'; $('updSub').textContent = u.message || ''; break;
@@ -259,7 +259,19 @@
         default: $('updTitle').textContent = `Version ${st.version}`; $('updSub').textContent = checked;
       }
       $('checkUpdates').disabled = ['checking', 'downloading', 'installing'].includes(u.state);
-      setSwitch($('autoUpdate'), u.automatic !== false);
+      // (2.99.35) updates always install themselves; a version put back (the Developer section's rollback) says the app
+      // stays on it, where the switch used to be — not once a version newer than the one it replaced is found (that one
+      // installs itself) or an install is under way
+      const from = u.rolledBackFrom;
+      const held = !!from && !['downloading', 'installing'].includes(u.state) && !(u.state === 'available' && !u.waits);
+      $('updHold').hidden = !held;
+      if (held) {
+        $('updHoldTitle').textContent = `Staying on ${st.version}`;
+        $('updHoldSub').textContent = u.state === 'available'
+          ? `You put this version back. Update now installs ${u.available}; a version newer than ${from} installs by itself.`
+          : `You put this version back, so versions up to ${from} wait for Update now; a newer one installs by itself.`;
+      }
+      $('devRollSub').textContent = `Another version, put in this one’s place. It stays until a version newer than ${u.hold || st.version} comes out, or Update now.`;
       setSwitch($('loginItem'), !!st.loginItem);
       if (document.querySelector('.section.is-active')?.id === 'data') renderStats();
     };
@@ -278,7 +290,6 @@
     });
     $('checkUpdates').addEventListener('click', () => { self.SimplApp.checkUpdates(); });
     $('updAction').addEventListener('click', () => { self.SimplApp.installUpdate(); });
-    onSwitch($('autoUpdate'), (on) => { setSwitch($('autoUpdate'), on); self.SimplApp.setAutoUpdate(on); });
     onSwitch($('loginItem'), async (on) => {
       setSwitch($('loginItem'), on);
       const r = await self.SimplApp.setLoginItem(on).catch(() => null);
@@ -994,6 +1005,9 @@
   // ---- the Mac app: roll back to a version published (Updater.rollback): the releases listed, one picked, installed in this copy's place ----
   function devRollInit() {
     if (!inApp || !self.SimplApp.releases) return;
+    // (2.99.35) 2.99.35 is newer than 2.99.34, as Updater.isNewer reads them: a missing part counts as 0
+    const parts = (v) => String(v).split('.').map((n) => (/^\d+$/.test(n) ? Number(n) : 0));
+    const newer = (a, b) => { const x = parts(a), y = parts(b); for (let i = 0; i < Math.max(x.length, y.length); i++) { const p = x[i] || 0, q = y[i] || 0; if (p !== q) return p > q; } return false; };
     const card = $('devRoll'), sel = $('devVersions'), msg = $('devRollMsg');
     card.hidden = false;
     let list = [];
@@ -1008,7 +1022,11 @@
     $('devRollback').addEventListener('click', async () => {
       const r = list.find((x) => x.version === sel.value);
       if (!r) return;
-      if (!confirm(`Install Simpl Courses ${r.version} in place of this one?\n\nAutomatic updates go off, so it stays until you turn them back on.`)) return;
+      // (2.99.35) the version it replaces (or one held already, if newer) is held back: said when the one chosen is older
+      const st = self.SimplApp.state() || {};
+      const hold = (st.update && st.update.hold) || st.version || '';
+      const stays = hold && newer(hold, r.version) ? `\n\nIt stays on ${r.version} until a version newer than ${hold} comes out, or you choose Update now.` : '';
+      if (!confirm(`Install Simpl Courses ${r.version} in place of this one?${stays}`)) return;
       const res = await self.SimplApp.rollback(r).catch(() => null);
       say(res && res.ok ? `Installing ${r.version}: the app relaunches once it is in place.` : (res && res.message) || 'The rollback could not start.');
     });

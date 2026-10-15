@@ -6,7 +6,8 @@ simplcourses.com rather than the App Store. The app is more than a wrapper now:
 - **Its window is the settings.** The extension's own settings page (`extension/options/`) runs in
   the app's window over a small bridge (`macos/Simpl Courses/Simpl Courses/Resources/Bridge.js`),
   with a *This Mac* section first: Safari's word on the extension and a button to Safari's
-  Extensions settings, updates, *Install updates by themselves* and *Open at login*. The two
+  Extensions settings, updates (and, after a version was put back, that the app stays on it) and
+  *Open at login*. The two
   sections that need the browser's Canvas session (courses and targets, grades) are not there;
   those are set on Canvas's own pages (the Grades page, All Courses).
 - **The extension follows the app.** Settings live in one JSON file in the app group container
@@ -17,13 +18,24 @@ simplcourses.com rather than the App Store. The app is more than a wrapper now:
   the app leaves the extension a *wipe* command, run and acknowledged on the next sync. Settings
   in the popup and in the account panel open the app (`simplcourses://settings`).
 - **It keeps itself up to date.** `Updater.swift` reads `https://simplcourses.com/app/latest.json`
-  at launch and every hour (the app stays running after its window closes, as a mark in the menu
+  at launch (when the last check is older than two hours) and every two hours (the app stays running after its window closes, as a mark in the menu
   bar; it is a login item unless that is turned off). A newer version is downloaded, its SHA-256
   checked against the feed, unpacked with `ditto`, checked to be Simpl Courses and signed, moved
   into this copy's place (this copy goes to the Trash) and opened again — or into the Applications
   folder when this copy cannot be replaced where it is (a temporary copy macOS made, a folder that
-  cannot be written). *Install updates by themselves* is on by default; off, the window shows
-  *Update now*.
+  cannot be written). It always installs by itself: since 2.99.35 there is no *Install updates by
+  themselves* switch, and a Mac that had it off has it on again (the old `autoUpdate` key is
+  removed at launch). The one exception is a version put back (the Developer section's *Roll back
+  the app*, which keeps old versions installable): the rollback first keeps the version it
+  replaces — or one held already, if newer, so two steps back still keep the newest away — as
+  `SimplRolledBackFrom` in the app's defaults. The version put back reads it as it opens: a
+  version found up to that one is offered (*Update now*) but never installs itself, a newer one
+  installs itself as usual, *Update now* ends the hold, and the hold is forgotten once the app is
+  that version or newer (so a rollback that failed holds nothing). *This Mac* says so where the
+  switch was: "Staying on 2.99.35 — You put this version back. Update now installs 2.99.36; a
+  version newer than 2.99.36 installs by itself." A version from before 2.99.35 knows no hold, so
+  a rollback also writes the old `autoUpdate` key off for it: it stays too, on its switch; 2.99.35
+  and later forget the key.
 - **It opens on a first screen, and lives in the Applications folder.** The first launch shows a
   black screen — *Let’s make Canvas simpler*, *Open Safari* — and the button opens Safari's
   Extensions settings on the extension. A downloaded app opened straight from Downloads is run by

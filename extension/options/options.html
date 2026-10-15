@@ -57,7 +57,8 @@
             <button class="btn btn--primary" id="updAction" type="button" hidden>Update now</button>
             <button class="btn" id="checkUpdates" type="button">Check now</button>
           </div>
-          <div class="row row--pad row--line"><span class="row__body"><span class="row__t row__t--med">Install updates by themselves</span><span class="row__s">Found on the hourly check, installed, and the app opens again.</span></span><button class="switch" id="autoUpdate" type="button" role="switch" aria-checked="true" aria-label="Install updates by themselves"><span class="switch__knob"></span></button></div>
+          <!-- (2.99.35) updates always install themselves: no switch. A version put back (Developer ▸ Roll back the app) says here that the app stays on it -->
+          <div class="row row--pad row--line hold" id="updHold" hidden><span class="row__body"><span class="row__t row__t--med" id="updHoldTitle">Staying on this version</span><span class="row__s" id="updHoldSub"></span></span><svg class="hold__pin" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6"/></svg></div>
           <div class="row row--pad row--line"><span class="row__body"><span class="row__t row__t--med">Open at login</span><span class="row__s">The app keeps watch from the menu bar. Closing this window leaves it running.</span></span><button class="switch" id="loginItem" type="button" role="switch" aria-checked="true" aria-label="Open at login"><span class="switch__knob"></span></button></div>
           <p class="note note--msg" id="appMsg" hidden></p>
         </div>
@@ -189,7 +190,7 @@
       <section class="section" id="dev" data-title="Developer" data-sub="Test Simpl the way it is used." data-words="developer dev debug test simulate update version quiz import answers rubric ring scores tour storage state reset error codes tool tab window code log" hidden>
         <!-- the app's window alone: another version of Simpl Courses put in this one's place (first: never behind a tab) -->
         <div class="card card--list" id="devRoll" hidden>
-          <div class="row row--pad"><span class="row__body"><span class="row__t">Roll back the app</span><span class="row__s" id="devRollSub">Another version, put in this one&rsquo;s place. Automatic updates go off, so it stays.</span></span><select class="input" id="devVersions" aria-label="Version"></select><button type="button" class="btn" id="devRollback">Install</button></div>
+          <div class="row row--pad"><span class="row__body"><span class="row__t">Roll back the app</span><span class="row__s" id="devRollSub">Another version, put in this one&rsquo;s place. It stays until a newer version comes out, or Update now.</span></span><select class="input" id="devVersions" aria-label="Version"></select><button type="button" class="btn" id="devRollback">Install</button></div>
           <p class="note note--msg devroll__msg" id="devRollMsg" hidden></p>
         </div>
         <div class="devtabs" id="devTabs" role="tablist" aria-label="Developer tools">
