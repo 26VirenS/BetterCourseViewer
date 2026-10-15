@@ -356,7 +356,15 @@ try {
   // (a popup that stays after its Escape says where the keyboard was and what was open, before and after: now and
   //  then in CI the graphing tool's did, and only its state can say why)
   const keyState = () => page.evaluate(() => ({ active: document.activeElement ? `${document.activeElement.tagName.toLowerCase()}.${String(document.activeElement.className).trim().replace(/\s+/g, '.')}` : null, focused: document.hasFocus(), visible: document.visibilityState, overlays: [...document.querySelectorAll('.bcv-sheet-ov')].map((o) => o.className) })).catch((e) => String(e));
+  // (2.99.35) that was Desmos taking the keyboard as it starts, before the Escape came: in its frame every key is
+  // desmos.com's. The popup now takes it back a task later (tools.js keepKeys), so a graphing popup's Escape waits for
+  // Desmos to have started (loaded and faded in: data-started) and the keyboard to be out of its frame — it always meets
+  // the state a student is in after the first second, the one that failed every time before the popup took it back
   const closeTool = async () => {
+    if (await page.$('.bcv-tool-ov .bcv-graph__frame')) {
+      await page.waitForSelector('.bcv-tool-ov .bcv-graph__frame[data-started]', { timeout: 15000 }).catch(() => {}); // (desmos.com itself, over the network)
+      await eventually(() => page.evaluate(() => document.activeElement?.tagName !== 'IFRAME'), 2000);
+    }
     const before = await keyState();
     await page.keyboard.press('Escape');
     try { await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov'), null, { timeout: 5000 }); } catch (e) {
@@ -6546,6 +6554,20 @@ try {
   await openTool('graph');
   const graphTall = await eventually(() => page.$eval('.bcv-tool[data-tool="graph"]', (e) => e.getBoundingClientRect().height >= 600).catch(() => false), 3000); // (the popup grows in from the card)
   check((await page.$eval('.bcv-graph__frame', (e) => e.getAttribute('src'))) === 'https://www.desmos.com/calculator' && (await page.$eval('.bcv-graph__out', (e) => e.href)) === 'https://www.desmos.com/calculator' && graphTall && (await toolSub()) === 'Powered by Desmos', 'the graphing calculator is Desmos in a frame, tall, with the way out to desmos.com beside it');
+  // (2.99.35) Desmos takes the keyboard as it starts (its page focuses its first expression line), and in its frame every
+  // key is desmos.com's: an Escape after that never reached the popup — now and then in CI, where Desmos starts within the
+  // quarter of a second the checks round a popup take. Desmos started, the keyboard is the popup's again (tools.js keepKeys).
+  const graphShown = await page.waitForSelector('.bcv-graph__frame[data-started]', { timeout: 15000 }).then(() => true).catch(() => false); // (desmos.com itself, over the network)
+  const graphBack = await eventually(() => page.evaluate(() => { const a = document.activeElement; return !!a?.closest('.bcv-tool-ov') && a.tagName !== 'IFRAME'; }), 2000);
+  check(graphBack, `${graphShown ? 'Desmos started, its frame shown' : 'Desmos had not started after 15s (no network?)'}: the keyboard is the popup's, not Desmos's, so Escape closes it (${(await keyState()).active})`);
+  // and a press in Desmos is the student's: the keyboard goes into it and stays there (its keys, Escape among them, are
+  // then desmos.com's), until a press back on the popup
+  const graphMid = await page.$eval('.bcv-graph__frame', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+  await page.mouse.click(graphMid.x, graphMid.y);
+  const graphIn = await eventually(() => page.evaluate(() => document.activeElement?.tagName === 'IFRAME'), 2000);
+  await page.waitForTimeout(300); // (longer than a hand-back takes)
+  check(graphIn && (await page.evaluate(() => document.activeElement?.tagName === 'IFRAME')), `a press in Desmos gives it the keyboard, and it keeps it (${(await keyState()).active})`);
+  await page.click('.bcv-tool-ov .bcv-tool__title');
   await closeTool();
   // the calculator: a tool of its own, the same scientific calculator larger, the keyboard on it
   await openTool('calc');
@@ -7392,6 +7414,11 @@ try {
   const qg = await quickOpen('graph', 490);
   check(qg.w === 340 && qg.h === 490 && qg.radius === '26px' && qg.name === 'Graphing' &&(await page.$eval(`${quickPin('graph')} .bcv-qgraph__frame`, (e) => e.getAttribute('src'))) === 'https://www.desmos.com/calculator' && (await page.$eval(`${quickPin('graph')} .bcv-qgraph__out`, (e) => e.href)) === 'https://www.desmos.com/calculator' && (await page.$eval(`${quickPin('graph')} .bcv-qgraph__body`, (e) => { const r = e.getBoundingClientRect(); return r.height > r.width; })), 'the graphing pin swells into a small Desmos, portrait, loaded on the first hover, with the way out to desmos.com');
   await shot(page, '45b-graph-pin');
+  // (2.99.35) Desmos takes the keyboard as it starts, as in the popup: a hover is not a press, so once it has started the
+  // keyboard is the page's again — the pin's Escape and the page's own keys are heard
+  const qgShown = await page.waitForSelector(`${quickPin('graph')} .bcv-qgraph__frame[data-started]`, { timeout: 15000 }).then(() => true).catch(() => false); // (desmos.com itself, over the network)
+  const qgBack = await eventually(() => page.evaluate(() => document.activeElement?.tagName !== 'IFRAME'), 2000);
+  check(qgBack, `${qgShown ? 'the pin\'s Desmos started' : 'Desmos had not started after 15s (no network?)'}: the keyboard is the page's, not Desmos's (${await page.evaluate(() => `${document.activeElement?.tagName.toLowerCase()}.${String(document.activeElement?.className).trim()}`)})`);
   await page.mouse.move(700, 500);
   await page.mouse.click(700, 500);
   check(await eventually(() => page.$eval(quickPin('graph'), (e) => !e.classList.contains('is-open') && e.querySelector('.bcv-qgraph__frame') && Math.round(e.getBoundingClientRect().width) === 24), 3000), 'the Desmos panel folds and keeps its frame (the graph survives)');

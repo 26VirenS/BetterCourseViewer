@@ -800,6 +800,46 @@
   // whose Canvas forbids the frame (its content-security policy) gets a plain message and the link
   // out instead of a blank pane.
   const DESMOS = 'https://www.desmos.com/calculator';
+  /** (2.99.35) Desmos takes the keyboard as it starts: its page focuses its first expression line by itself while it
+   *  loads — a fifth of a second after the frame is put up with Desmos in the cache, a second or more without, and
+   *  always a little before the frame's load event. In another site's frame every key goes to that site, so from then
+   *  on Escape never reached the popup's listener (or the pin's), and whatever the student was typing on the page went
+   *  on in Desmos. Until Desmos has loaded and faded in (the frame is see-through till its load, then fades in), the
+   *  student cannot have chosen it: a keyboard the frame takes by then is handed back — to where it was, else
+   *  `home()`, else the page itself. Afterwards a press or a Tab into Desmos is the student's, and the keyboard stays
+   *  there (its keys, Escape among them, are desmos.com's: the page hears none of them); the frame carries
+   *  data-started from then on. Returns { restart() }, for a frame pointed at Desmos afresh; it stops by itself once
+   *  the frame goes. */
+  const FADE_MS = 400; // (app.css: .bcv-graph__frame and .bcv-qgraph__frame fade in over .4s once loaded)
+  function keepKeys(frame, home = () => null) {
+    let starting = true; // (Desmos not yet loaded and shown in the frame)
+    let shown = 0;
+    let left = null; // (what lost the keyboard in this turn: the frame took it from there)
+    const onOut = (e) => { left = e.target; setTimeout(() => { left = null; }, 0); };
+    // (Desmos's own load: not the blank page a frame is made with, nor the one the pin's is emptied to)
+    const onLoad = () => { if (!frame.src.startsWith(DESMOS)) return; clearTimeout(shown); shown = setTimeout(() => { starting = false; frame.dataset.started = '1'; }, FADE_MS); };
+    const onBlur = () => {
+      if (document.activeElement !== frame || !starting) return;
+      const from = left;
+      // (after the blur, not in it: given back inside it, the page's element had the keyboard while Chrome kept sending
+      //  the keys to the frame)
+      setTimeout(() => {
+        if (!frame.isConnected || document.activeElement !== frame) return;
+        for (const to of [from, home()]) {
+          if (!to?.isConnected || to === document.body || to === frame) continue;
+          to.focus({ preventScroll: true });
+          if (document.activeElement !== frame) return;
+        }
+        frame.blur();
+      }, 0);
+    };
+    frame.addEventListener('load', onLoad);
+    document.addEventListener('focusout', onOut, true);
+    window.addEventListener('blur', onBlur);
+    const stop = () => { clearTimeout(shown); document.removeEventListener('focusout', onOut, true); window.removeEventListener('blur', onBlur); forget(); };
+    const forget = U.onGone(frame, stop);
+    return { restart: () => { clearTimeout(shown); starting = true; delete frame.dataset.started; } };
+  }
   function openGraph(app, { from = null } = {}) {
     const tool = toolOf('graph');
     const body = U.el('bcv-graph');
@@ -821,6 +861,7 @@
     document.addEventListener('securitypolicyviolation', onCsp);
     frame.addEventListener('error', fail);
     frame.addEventListener('load', () => frame.classList.add('is-in'));
+    keepKeys(frame, () => p.ov); // (Escape closes it however soon Desmos has started; the popup holds the keyboard as it opens)
     U.onGone(p.ov, () => document.removeEventListener('securitypolicyviolation', onCsp));
   }
 
@@ -1361,6 +1402,7 @@
     // the frame is made on the first open, not with the panel: a panel built ahead (primeSoon) would
     // otherwise carry an empty page of its own on every Canvas tab with the pin
     let frame = null;
+    let keys = null;
     const body = U.el('bcv-qgraph__body');
     const root = U.el('bcv-qgraph', [U.el('bcv-qgraph__head', [quickName('Graphing', go, 'Open the graphing calculator, larger'), h('a', { class: 'bcv-qgraph__out', href: DESMOS, target: '_blank', rel: 'noopener', text: 'desmos.com ↗' })]), body]);
     let loaded = false;
@@ -1372,13 +1414,14 @@
       frame.addEventListener('error', fail);
       frame.addEventListener('load', () => { if (loaded) frame.classList.add('is-in'); });
       body.append(frame);
+      keys = keepKeys(frame); // (a hover is not a press: what was being typed on the page stays there, and the pin's Escape is heard)
       return frame;
     };
     // Desmos is a whole page of its own (WebGL and all), and every Canvas tab with the pin would carry
     // one for as long as the tab lived: it is let go five minutes after the pin folds, and loaded
     // afresh on the next open — the memory is what Safari reloads tabs for.
     let letGo = 0;
-    const onOpen = () => { clearTimeout(letGo); if (loaded) return; loaded = true; document.addEventListener('securitypolicyviolation', onCsp); frameNow().src = DESMOS; };
+    const onOpen = () => { clearTimeout(letGo); if (loaded) return; loaded = true; document.addEventListener('securitypolicyviolation', onCsp); frameNow().src = DESMOS; keys.restart(); }; // (Desmos started afresh takes the keyboard afresh)
     const onFold = () => { clearTimeout(letGo); letGo = setTimeout(() => { if (!loaded) return; loaded = false; frame.classList.remove('is-in'); frame.src = 'about:blank'; document.removeEventListener('securitypolicyviolation', onCsp); }, 5 * 60 * 1000); };
     return { els: [root], onOpen, onFold };
   }
