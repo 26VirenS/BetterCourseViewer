@@ -362,8 +362,12 @@ internal sealed class AltaPopupView
         var pics = s.Split && s.PageShown ? s.Pics : new List<AltaPic>();
         // (the graphs' Light or Dark while Alta's page is dark — 0.3.5: as chosen for the page, not the app's appearance)
         var dark = s.Dark;
-        var sig = string.Join("|", buttons) + "#" + pics.Count + "#" + (dark ? s.PicsLight.ToString() : "");
+        // (0.3.19) Alta's verdict on the question, Correct or Incorrect, as a pill at the left of the buttons while Alta
+        // shows its strip
+        var verdict = buttons.Count > 0 ? s.Verdict : "";
+        var sig = string.Join("|", buttons) + "#" + pics.Count + "#" + (dark ? s.PicsLight.ToString() : "") + "#" + verdict;
         if (sig == footerSig) return;
+        var verdictWas = footerSig.EndsWith("#" + verdict, StringComparison.Ordinal);
         footerSig = sig;
         var show = buttons.Count > 0 || pics.Count > 0;
         var was = footer.Visibility == Visibility.Visible;
@@ -385,6 +389,12 @@ internal sealed class AltaPopupView
                 light ? "Graphs in dark colours" : "Graphs in their own light colours"));
         }
         var right = K.H(8);
+        if (verdict != "")
+        {
+            var pill = VerdictPill(verdict == "right");
+            if (!verdictWas && was) Motion.FadeIn(pill, Motion.Normal);
+            right.Children.Add(pill);
+        }
         foreach (var b in buttons)
         {
             var id = b.Id;
@@ -397,6 +407,28 @@ internal sealed class AltaPopupView
         }
         footer.Child = K.Columns("auto, *, auto", left.Col(0), right.Align(HorizontalAlignment.Right).Col(2));
         if (!was) Motion.FadeIn(footer, Motion.Normal);
+    }
+
+    /// <summary>(0.3.19) Alta's verdict on the question as the popup's own pill: a green one with a tick and "Correct",
+    /// or a red one with a cross and "Incorrect" — the kit's tones, the tint behind, the colour itself for the word.</summary>
+    private static Border VerdictPill(bool right)
+    {
+        var tint = K.Tone(right ? "good" : "bad");
+        var fore = K.Darkened(tint);
+        var word = right ? "Correct" : "Incorrect";
+        var t = K.Text(word, Ty.Body);
+        t.Foreground = K.Brush(fore);
+        t.FontWeight = FontWeights.SemiBold;
+        t.VerticalAlignment = VerticalAlignment.Center;
+        var pill = new Border
+        {
+            Child = K.H(6, K.Icon(right ? SymbolRegular.CheckmarkCircle24 : SymbolRegular.DismissCircle24, 16, fore, filled: true), t),
+            Padding = new Thickness(12, 5, 14, 6), CornerRadius = new CornerRadius(16),
+            Background = K.Brush(Color.FromArgb(Support.Appearance.Dark ? (byte)56 : (byte)36, tint.R, tint.G, tint.B)),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        System.Windows.Automation.AutomationProperties.SetName(pill, word);
+        return pill;
     }
 
     // ---- (1.3.51) Alta's pop-ups as the popup's own ----

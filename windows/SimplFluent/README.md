@@ -1202,7 +1202,12 @@ panels, its buttons as the popup's own, its cover as the popup's start screen, i
 `--open alta:104:4003` opens one at launch, by the assignment's launch through Canvas; `--open
 alta:104:4003:/mock-alta/learn/course/c1/assignment/a3?sample=1` opens it on a page of the mock's own instead — Alta's
 learn page with a question, the rail filled from the player's own answer — and `?sample=dialog` there also opens a pop-up
-built as Alta's are, its rich body coming in a second and a half after it (`window.mockRichDialog`), for the pictures.
+built as Alta's are, its rich body coming in a second and a half after it (`window.mockRichDialog`), for the pictures;
+`?sample=right` / `?sample=wrong` open it answered (Alta's verdict strip and Next Question). (0.3.19) Alta's verdict on
+the question — its green "Yes that's right. Keep it up!" strip, its red "Not quite…" — is read from the parts laid out
+(`verdict` in the page script's panels message: a banner, an alert or a box marked by its class, told by its words first,
+else by its class) and shown as the popup's own pill at the left of its buttons, Correct in green or Incorrect in red
+(`VerdictPill`), until the strip goes with the next question.
 
 A pop-up of Alta's (0.3.5) is hidden in the page as soon as the page script sees it and read once it has settled —
 nothing it says changed for a moment, nothing in it loading, its fade done; three seconds at most, five while its body

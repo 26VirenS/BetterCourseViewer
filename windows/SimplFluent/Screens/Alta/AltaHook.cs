@@ -474,6 +474,38 @@ internal static class AltaHook
                 return { kind: p[0], x: Math.round(p[1].l + sx), y: Math.round(p[1].t + sy), w: Math.round(p[1].r - p[1].l), h: Math.round(p[1].b - p[1].t) };
               });
             };
+            // (1.3.99) Alta's verdict on the question — its green "Yes that's right. Keep it up!" strip, its red "Not quite…"
+            // one — read from the parts kept, for the app's own pill beside its buttons: 'right', 'wrong' or '' (none shown).
+            // Only a banner, an alert or a box marked by its class is looked at (this runs every 350 ms), never the bars put
+            // away; each is told by its words first — short ones, Alta's own phrases — else by its class, the first that
+            // decides. It is said with the panels, so the app hears it as it comes and as it goes with the next question.
+            var VERDICT_SEL = '[role="alert"], [role="status"], [class*="feedback" i], [class*="alert" i], [class*="notice" i], [class*="banner" i], [class*="result" i], [class*="status" i], [class*="correct" i], [class*="success" i], [class*="wrong" i], [class*="error" i], [class*="fail" i]';
+            var RIGHT_WORDS = /yes that's right|that's right|that is right|correct!|correct\.|well done|keep it up|nice work|great job/;
+            var WRONG_WORDS = /not quite|incorrect|that's not right|that is not right|not correct|try again|wrong/;
+            var verdictOf = function (el) {
+              var t = String(el.textContent || '').replace(/[‘’]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
+              if (t && t.length < 160) {
+                if (WRONG_WORDS.test(t)) return 'wrong';
+                if (RIGHT_WORDS.test(t)) return 'right';
+              }
+              var c = el.getAttribute('class') || '';
+              if (/incorrect|error|wrong|fail/i.test(c)) return 'wrong';
+              if (/correct|success|right/i.test(c)) return 'right';
+              return '';
+            };
+            var verdict = function () {
+              var secs = cards();
+              for (var i = 0; i < secs.length; i++) {
+                var els = secs[i].querySelectorAll(VERDICT_SEL);
+                for (var j = 0; j < els.length; j++) {
+                  var el = els[j];
+                  if (el.closest('[data-simpl-bar], [data-simpl-hide]') || !visible(el)) continue;
+                  var v = verdictOf(el);
+                  if (v) return v;
+                }
+              }
+              return '';
+            };
             var publish = function () {
               var on = document.documentElement.hasAttribute('data-simpl-q');
               var bs = on ? bars() : [];
@@ -485,7 +517,7 @@ internal static class AltaHook
               var bottom = ps.reduce(function (m, p) { return Math.max(m, p.y + p.h); }, 0);
               var sx0 = window.scrollX || 0, sy0 = window.scrollY || 0;
               var pr = picEls.map(function (el) { var r = el.getBoundingClientRect(); return { x: Math.round(r.left + sx0), y: Math.round(r.top + sy0), w: Math.round(r.width), h: Math.round(r.height) }; });
-              var psSaid = JSON.stringify({ panels: ps, height: ps.length ? bottom + 48 : 0, gen: gen, pics: pr });
+              var psSaid = JSON.stringify({ panels: ps, height: ps.length ? bottom + 48 : 0, gen: gen, pics: pr, verdict: on ? verdict() : '' });
               if (psSaid !== lastPanels) { lastPanels = psSaid; var m = JSON.parse(psSaid); m.kind = 'panels'; post(m); }
             };
             setInterval(publish, 350);

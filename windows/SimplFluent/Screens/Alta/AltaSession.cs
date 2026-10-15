@@ -222,6 +222,9 @@ internal sealed class AltaSession
     public double PageHeight { get; private set; }
     public int PanelGen { get; private set; }
     public List<AltaButton> Buttons { get; private set; } = new();
+    /// <summary>(0.3.19) Alta's verdict on the question, as the page script reads its strip under the answer: "right",
+    /// "wrong" or "" (none shown) — the popup's own pill beside its buttons, gone with the next question.</summary>
+    public string Verdict { get; private set; } = "";
     /// <summary>(1.3.70) Where each small graph is in the page.</summary>
     public List<AltaPic> Pics { get; private set; } = new();
     /// <summary>In dark mode a graph's colours are turned over with the question's unless the student asks for them as
@@ -473,6 +476,7 @@ internal sealed class AltaSession
                     Panels = new();
                     Buttons = new();
                     Pics = new();
+                    Verdict = "";
                     lastPaint = "";
                     ClosePic();
                     // (0.3.5: and the last page's pop-up with them, whether the app showed it or the page)
@@ -514,6 +518,9 @@ internal sealed class AltaSession
                     ClosePic();
                     _ = Run("window.scrollTo(0, 0); null");
                 }
+                // (0.3.19) Alta's verdict, as it comes and as it goes: the pill beside the buttons
+                var verdict = Str(head["verdict"]) ?? "";
+                if (verdict != Verdict) Verdict = verdict;
                 PaintPanels();
                 Notify();
                 return;

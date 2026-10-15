@@ -439,6 +439,17 @@ try {
       `a pop-up the page script cannot read is given back to the page at once, never left out of sight (${d6.live})`);
     await wp.evaluate(() => document.getElementById('baddlg').remove());
     await wwait((p, k) => k >= n10 && p.kind === 'dialog' && p.open === false, 'the unreadable pop-up gone');
+    // (0.3.19) Alta's verdict on the question, told with the panels for the popup's pill: the page opened answered
+    // (?sample=wrong), then the strip's words changed, then the strip gone
+    await wp.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a3?sample=wrong`);
+    const wv = await wwait((p) => p.kind === 'panels' && p.panels.length === 2, 'the answered page’s panels');
+    check(wv.verdict === 'wrong', `a page opened answered tells its verdict with its first panels (${wv.verdict})`);
+    const nwv = (await wposts()).length;
+    await wp.evaluate(() => { document.getElementById('verdict').textContent = 'Yes that’s right. Keep it up!'; });
+    check(!!(await wwait((p, k) => k >= nwv && p.kind === 'panels' && p.verdict === 'right', 'the verdict (right)')), 'Alta’s “Yes that’s right” strip is read as a right answer');
+    const nwv2 = (await wposts()).length;
+    await wp.evaluate(() => document.getElementById('verdict').remove());
+    check(!!(await wwait((p, k) => k >= nwv2 && p.kind === 'panels' && p.verdict === '', 'the verdict gone')), 'and when the strip goes, so does the verdict');
     await wp.close();
   }
 } finally {
