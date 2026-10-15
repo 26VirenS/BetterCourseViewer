@@ -1492,6 +1492,47 @@ window.mockLesson = function () { var q = document.getElementById('qsec'); var l
 window.mockUnlesson = function () { var l = document.getElementById('lsec'); if (l) l.remove(); };
 window.mockDialog = function () { var d = document.createElement('div'); d.className = 'MuiModal-root MuiDialog-root'; d.id = 'dlg'; d.setAttribute('role', 'presentation');
   d.innerHTML = '<div role="dialog" style="position:fixed;top:30%;left:30%;background:#fff;padding:20px">Having trouble?<button id="vi">VIEW INSTRUCTION</button></div>'; document.body.appendChild(d); };
+// (Windows 0.3.5) window.mockRichDialog(ms) opens a pop-up built as Alta's own are (Material's dialog: titled by its
+// heading, its buttons in a row at its foot, put in capitals by a style), its body coming in that long after it opens —
+// a spinner first — and rich: words in bold, a list, a formula of KaTeX's and one of MathJax's not drawn yet, a drawing,
+// a picture and a link. Next shows its second step, Back the first; Not now and Got it close it.
+window.mockRichDialog = function (slow) {
+  var B = String.fromCharCode(92);
+  var d = document.createElement('div'); d.className = 'MuiDialog-root MuiModal-root'; d.setAttribute('role', 'presentation'); d.id = 'rich';
+  d.innerHTML = '<div class="MuiBackdrop-root" style="position:fixed;inset:0;background:rgba(0,0,0,.5)"></div>'
+    + '<div class="MuiDialog-container" role="presentation" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center">'
+    + '<div class="MuiPaper-root MuiDialog-paper" role="dialog" aria-labelledby="rich-title" style="background:#fff;border-radius:4px;width:560px;max-width:90vw;font:16px Helvetica,Arial,sans-serif;color:#1d2a36">'
+    + '<h2 id="rich-title" class="MuiDialogTitle-root" style="margin:0;padding:16px 24px;font-size:20px;font-weight:500">Knewton Alta</h2>'
+    + '<div id="rich-body" class="MuiDialogContent-root" style="padding:0 24px 8px"><span class="MuiCircularProgress-root" role="progressbar" style="display:inline-block;width:28px;height:28px;border-radius:50%;border:3px solid #1b8a9c"></span></div>'
+    + '<div class="MuiDialogActions-root" style="display:flex;justify-content:flex-end;gap:8px;padding:8px 16px 16px"><button id="rich-no" class="MuiButton-root MuiButton-text" style="text-transform:uppercase">Not now</button>'
+    + '<button id="rich-go" class="MuiButton-root MuiButton-contained MuiButton-containedPrimary" style="text-transform:uppercase;background:#1b8a9c;color:#fff;border:0;padding:6px 16px">Next</button></div></div></div>';
+  document.body.appendChild(d);
+  var body = document.getElementById('rich-body'), go = document.getElementById('rich-go'), no = document.getElementById('rich-no'), step = 0;
+  var chart = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="80"><rect width="200" height="80" fill="#eef6f7"/><rect x="20" y="40" width="30" height="30" fill="#1b8a9c"/><rect x="85" y="25" width="30" height="45" fill="#1b8a9c"/><rect x="150" y="10" width="30" height="60" fill="#1b8a9c"/></svg>';
+  var first = function () {
+    step = 0; go.textContent = 'Next'; no.textContent = 'Not now';
+    body.innerHTML = '<p>Your instructor turned on <b>adaptive practice</b> for this assignment. Here is what changes:</p>'
+      + '<ul><li>Each question is chosen for you from what you have answered so far.</li>'
+      + '<li>An objective is mastered once <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>p</mi><mo>≥</mo><mn>0.9</mn></mrow><annotation encoding="application/x-tex">p ' + B + 'geq 0.9</annotation></semantics></math></span><span class="katex-html" aria-hidden="true">p ≥ 0.9</span></span> for it.</li>'
+      + '<li>A wrong answer brings another way in, never a penalty.</li></ul>'
+      + '<p><script type="math/tex; mode=display">' + B + 'frac{d}{dx}' + B + 'ln x = ' + B + 'frac{1}{x}</scr' + 'ipt></p>'
+      + '<p><svg width="240" height="90" role="img" aria-label="Mastery rising over five questions"><rect width="240" height="90" fill="#f4f6f8"/><polyline points="10,80 60,66 110,50 160,34 230,12" fill="none" stroke="#1b8a9c" stroke-width="4"/></svg></p>'
+      + '<p><img alt="Mastery by objective" width="200" height="80" src="data:image/svg+xml,' + encodeURIComponent(chart) + '"></p>'
+      + '<p>Read <a href="/mock-alta/help/mastery">how mastery works</a> for more.</p>';
+  };
+  var second = function () {
+    step = 1; go.textContent = 'Got it'; no.textContent = 'Back';
+    body.innerHTML = '<p>That is all. Your mastery of each objective shows beside the question at any time.</p>';
+  };
+  go.onclick = function () { if (step === 0) second(); else d.remove(); };
+  no.onclick = function () { if (step === 1) first(); else d.remove(); };
+  setTimeout(first, slow || 0);
+};
+// (?demo=1, a picture run's: the rail's objectives and mastery from the player's own answer, as Alta's page reads it;
+// ?demo=dialog also opens the rich pop-up, its body a second and a half late)
+var demo = new URLSearchParams(location.search).get('demo');
+if (demo) fetch('/mock-alta/api/content?assignmentId=a1');
+if (demo === 'dialog') setTimeout(function () { window.mockRichDialog(1500); }, 900);
 </script></body></html>`);
     }
     // (1.3.19) an overview as a school's Alta may draw it: its objectives only as words on the page (no answer of Alta's

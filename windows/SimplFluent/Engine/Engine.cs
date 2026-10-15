@@ -447,8 +447,10 @@ public sealed partial class Engine : Observable, IShellListener
         }
         else if (Launch.Take("alta:") is { } a)
         {
-            var parts = a.Split(':');
-            if (parts.Length == 2) AltaRequested?.Invoke(new AltaLaunch(parts[0], parts[1], "Knewton Alta"));
+            // (0.3.5: alta:104:4003:/mock-alta/… opens the popup on that page of the mock's, not the assignment's launch —
+            //  its learn page with a question, a pop-up of Alta's, for the pictures)
+            var parts = a.Split(':', 3);
+            if (parts.Length >= 2) AltaRequested?.Invoke(new AltaLaunch(parts[0], parts[1], "Knewton Alta", parts.Length == 3 && parts[2].StartsWith('/') ? parts[2] : null));
         }
         else if (Launch.Take("macmillan:") is { } mm)
         {
