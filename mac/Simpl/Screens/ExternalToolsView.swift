@@ -445,8 +445,14 @@ private struct ToolCard: View {
     /// open list (the tools' answer coming in a second time) asked 460 points of a screen with some 330 over and under
     /// the card, AppKit kept the popover on the screen, SwiftUI made its window as tall as the list again, and the two
     /// went on until AppKit stopped the app (more passes laying a window out than it has views).
-    private func reckonRoom() {
-        guard let v = spot.view, let window = v.window else { return }
+    private func reckonRoom(again: Bool = true) {
+        // (1.3.97) a list opened by the page as its answer comes in (the launch's -SimplExternalToolList, a card made
+        // afresh) can find its card not yet in a window: the room is reckoned once more a turn of the run loop later,
+        // when it is — before, it stayed its 460 of the start, and the suite's console had no room line to read
+        guard let v = spot.view, let window = v.window else {
+            if again { DispatchQueue.main.async { reckonRoom(again: false) } }
+            return
+        }
         let card = window.convertToScreen(v.convert(v.bounds, to: nil))
         let screen = (window.screen ?? NSScreen.main)?.visibleFrame ?? window.frame
         // (the popover's arrow and its gap from the card take some 40 points of the screen's room on its side)
