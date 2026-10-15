@@ -7,7 +7,8 @@ namespace Simpl.Support;
 /// The Windows versions published, and the one this copy updates to (Support/Updates.cs looks, downloads and installs):
 /// GitHub's releases of this repository read by their tags, and chosen by run number and by Get beta updates — the
 /// usual releases for every copy, the betas too only for one with it on (the Mac's beta feed). Nothing here asks the
-/// network or reads a setting, so the tests (windows/SimplFluent.Tests/UpdatesTests.cs) give it releases of their own.
+/// network or reads a setting, so the tests (windows/SimplFluent.Tests/UpdatesTests.cs) give it releases of their own —
+/// and whether one an earlier version put back stays back from waits (<see cref="StaysBack"/>).
 /// </summary>
 public static partial class Updates
 {
@@ -87,4 +88,13 @@ public static partial class Updates
         var newest = mine.OrderByDescending(r => r.Run).ThenBy(r => r.Beta).FirstOrDefault();
         return new Choice(newest, mine.Any(r => r.Critical));
     }
+
+    /// <summary>
+    /// The version found waits for Update now (0.3.7, Updates.KeptBack): an earlier version put back from run
+    /// <paramref name="stayingFrom"/> stays, so that version and those before it are not put in by themselves — or the
+    /// newest would go straight back in — while one newer than it is, as every update is, and a Critical Update
+    /// (<paramref name="critical"/>, as <see cref="Choose"/> says) whatever it.
+    /// </summary>
+    internal static bool StaysBack(Release? found, bool critical, int? stayingFrom) =>
+        !critical && found != null && stayingFrom is { } back && found.Run <= back;
 }

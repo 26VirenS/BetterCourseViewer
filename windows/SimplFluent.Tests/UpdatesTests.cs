@@ -7,8 +7,9 @@ namespace Simpl.Tests;
 /// <summary>
 /// Which published version a copy updates to (Support/UpdatesChoice.cs): the usual releases for everyone, betas only
 /// with Get beta updates on, a usual release newer than a beta taking over from it, a Critical Update reaching only
-/// the copies that may take it, and a copy on a beta staying on it once betas are turned off. The releases are the
-/// tests' own, made as an update played through makes them (Updates.TestReleases); nothing is asked of GitHub.
+/// the copies that may take it, a copy on a beta staying on it once betas are turned off, and an earlier version put
+/// back staying (the version it went back from waiting for Update now). The releases are the tests' own, made as an
+/// update played through makes them (Updates.TestReleases); nothing is asked of GitHub.
 /// </summary>
 public class UpdatesTests
 {
@@ -115,6 +116,32 @@ public class UpdatesTests
         Assert.Null(Updates.Read("mac-v1.3.78", "Simpl for Mac 1.3.78 Beta"));
         Assert.Null(Updates.Read("v2.99.33", "Simpl Courses 2.99.33"));
         Assert.Null(Updates.Read("windows-fluent-beta-v", ""));
+    }
+
+    [Fact]
+    public void AnEarlierVersionPutBackStays()
+    {
+        // (0.3.7: put back from v132 to v130 — v132 and v131 wait for Update now; v133 goes in as every update does)
+        Assert.True(Updates.StaysBack(Stable(132), critical: false, stayingFrom: 132));
+        Assert.True(Updates.StaysBack(Stable(131), critical: false, stayingFrom: 132));
+        Assert.False(Updates.StaysBack(Stable(133), critical: false, stayingFrom: 132));
+        // (a Critical Update goes in all the same; with nothing put back, or nothing found, nothing waits)
+        Assert.False(Updates.StaysBack(Stable(132, critical: true), critical: true, stayingFrom: 132));
+        Assert.False(Updates.StaysBack(Stable(132), critical: false, stayingFrom: null));
+        Assert.False(Updates.StaysBack(null, critical: false, stayingFrom: 132));
+        // (as a look finds it on v130: the version it went back from is the update, and it waits)
+        var published = new List<Updates.Release> { Stable(132), Stable(131), Stable(130), Stable(128) };
+        var c = Updates.Choose(published, 130, betas: false);
+        Assert.Equal("windows-fluent-v132", c.Found?.Tag);
+        Assert.True(Updates.StaysBack(c.Found, c.Critical, 132));
+        // (a newer one published: it is the update, and it goes in by itself)
+        published.Insert(0, Stable(133));
+        c = Updates.Choose(published, 130, betas: false);
+        Assert.Equal("windows-fluent-v133", c.Found?.Tag);
+        Assert.False(Updates.StaysBack(c.Found, c.Critical, 132));
+        // (v132 a Critical Update: it goes back in, whatever the stay)
+        c = Updates.Choose(new[] { Stable(132, critical: true), Stable(130) }, 130, betas: false);
+        Assert.False(Updates.StaysBack(c.Found, c.Critical, 132));
     }
 
     [Fact]

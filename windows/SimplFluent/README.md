@@ -105,9 +105,10 @@ window's side of it, `Shell/UpdateWatch.cs`:
   by run number (`Support/UpdatesChoice.cs`: the newest newer than this copy that it may take — a beta only with Get
   beta updates on, Betas below). **Check for updates automatically** (on) turns it off. A development run (the mock,
   a demo, a picture) never looks.
-- **Install updates automatically** (on): a copy the installer put here downloads the newest version's Simpl-Setup.exe
-  by itself — picked up where it stopped (an HTTP range), tried again 2, 10, 30 and then 60 minutes after a failure,
-  and not on a metered connection (Windows' own word for a phone's hotspot or a capped plan; Download fetches it
+- **Installing by itself** (always, 0.3.7: Install updates automatically is no longer a setting, and one turned off
+  in 0.3.6 or earlier is let go of at the first start, `updates:install` removed): a copy the installer put here
+  downloads the newest version's Simpl-Setup.exe by itself — picked up where it stopped (an HTTP range), tried again
+  2, 10, 30 and then 60 minutes after a failure, and not on a metered connection (Windows' own word for a phone's hotspot or a capped plan; Download fetches it
   anyway) — and checks it: its size, that it is a program and not a web page, the SHA-256 GitHub publishes for it, and,
   when this copy is Authenticode-signed (Signing, above), that Windows trusts its signature (WinVerifyTrust; revocation
   not looked up, so nothing is asked of anyone) and that it is signed by this copy's own publisher (the certificate's
@@ -135,7 +136,7 @@ window's side of it, `Shell/UpdateWatch.cs`:
   no question is asked, and the notice takes no clicks.
 - **A Critical Update**: a release whose notes carry `<!-- simpl-critical -->` (the workflow's Run workflow ▸ critical
   adds it, with a line saying so, as `scripts/release-mac-native.sh` does for the Mac). Every installed copy older than
-  it downloads the newest and puts it in whatever Install updates automatically, the pause or a metered connection say,
+  it downloads the newest and puts it in whatever the pause, an earlier version put back or a metered connection say,
   and a failed download is tried again every ten minutes. Unlike the Mac's, it still waits for what is open — a quiz,
   a hand-in, a dialog — though only five seconds for the student's own typing; its notice stays while it waits
   ("Critical Update v132 installs when you close the quiz."). Turning Check for updates automatically off stops every
@@ -152,13 +153,23 @@ window's side of it, `Shell/UpdateWatch.cs`:
 - **Paused** (the Mac's Developer ▸ Pause updates): `Simpl.exe --pause-updates on` (with Simpl quit; `off` again) keeps
   the hourly look but installs nothing by itself, a Critical Update apart. Settings ▸ Updates says so.
 - **A copy run from its zip** cannot put a version in its own place: it says one is available, and Download opens its
-  page. Install updates automatically is off there, and says why.
+  page. Settings ▸ Updates says why (Installing updates, where the toggle was in 0.3.6).
 - **Earlier versions** (Settings ▸ Updates, folded away as the Mac's are; `--settings-earlier yes` opens it for a
   picture): the last twelve, each with its date ("Oct 11"; the year only when it is not this one) and size. For the copy
-  the installer put here each has Install… (the Mac's), which asks first, turns Install updates automatically off (or
-  the newer version would go back in at the next quiet moment; a Critical Update still does), then downloads that
-  version's Simpl-Setup.exe, checks it as an update's is and runs it the same way (`Updates.InstallEarlier`). A copy run
-  from its zip has Open…, the version's page.
+  the installer put here each has Install… (the Mac's), which asks first, then downloads that version's
+  Simpl-Setup.exe, checks it as an update's is and runs it the same way (`Updates.InstallEarlier`). A copy run from its
+  zip has Open…, the version's page.
+- **Staying on an earlier version** (0.3.7, in place of Install… turning Install updates automatically off): before
+  the earlier version goes in, Simpl notes the run it goes back from (`updates:staying`, with the other settings,
+  encrypted as they are; the higher of it and one noted before, when it goes back twice). That version and those before
+  it are not fetched or put in by themselves — or the newest would go straight back in at the next quiet moment — and
+  a version newer than it is, as every update is; a Critical Update goes in all the same. Settings ▸ Updates says so
+  where the toggle was ("Staying on 0.3.5 (v130)": v132 doesn't install by itself, a version newer than v132 does), and
+  the card's button is **Update now** in place of Download: the version downloaded, the stay let go of (even if the
+  download fails, which is then tried again as any update's), and put in at once. The stay is let go of too once
+  Simpl is that version or newer (Simpl-Setup.exe run by hand). `update: v132 found, kept back: staying back from
+  v132` in `simpl.log`; `--update-test-staying` plays an update through as a copy put back from the version it finds
+  (`settings-updates-staying`).
 
 `simpl.log`'s `update:` lines say each step: found, downloaded and checked (or why not), `held (quiz)`, `no longer held
 (by quiz)`, `where it was: grades, the window hidden`, `installing …, and quitting`; and, opened again, `back after
@@ -169,11 +180,12 @@ next run number is found at once, its installer that file (its SHA-256 the file'
 mismatch), downloaded into the profile's `Update\` and checked, held and put in as above: the file is run as the
 installer, so give it a Simpl-Setup.exe. `--update-test-installed` acts as a copy the installer put here,
 `--update-test-critical` as a Critical Update, `--update-test-hold quiz` holds as an open quiz would (for Settings'
-pictures), `--update-test-earlier yes` lists this version and the one before it under Earlier versions (their dates,
+pictures), `--update-test-staying` as a copy staying on an earlier version put back from the one it finds,
+`--update-test-earlier yes` lists this version and the one before it under Earlier versions (their dates,
 sizes and Install…), `--update-test-close <s>` closes what is open over the window after that long, and `--update-test-tray`
 closes the window to the notification area a moment after it opens. With `--shot` nothing is ever run: the notice of
-an update going in stays for the picture. CI pictures Settings ▸ Updates (`settings-updates-waiting`, `-dark`, `-zip`)
-and the notice (`update-waiting-quiz`, `update-critical-quiz`, `update-restarting`) this way, with the build's own
+an update going in stays for the picture. CI pictures Settings ▸ Updates (`settings-updates-waiting`, `-dark`, `-zip`,
+`-staying`) and the notice (`update-waiting-quiz`, `update-critical-quiz`, `update-restarting`) this way, with the build's own
 Simpl.exe as the file, and plays one through for real in the installer job (2b): the installed Simpl with a quiz open
 and its window in the notification area, the installer just made as the next version — every step logged in its
 order, the installer run and Simpl opened again, then that profile opened again: at the Grades, out of sight, its

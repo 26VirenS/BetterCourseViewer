@@ -19,18 +19,20 @@ namespace Simpl.Support;
 /// hour old, and every hour after (Check for updates automatically, on unless turned off), it reads the versions
 /// published — GitHub's releases of this repository, the Windows ones (Support/UpdatesChoice.cs: a beta only with Get
 /// beta updates on) — and a newer one is offered in Settings ▸ Updates, with the versions published before and whether
-/// betas are wanted. When updates install themselves (Install
-/// updates automatically, on unless turned off), a copy Simpl-Setup.exe installed downloads the new version's installer
-/// by itself (picked up where it stopped, tried again a while later when it fails; checked against the size and
-/// SHA-256 published, and — when this copy is signed — signed by the same publisher) and puts it in at once, unless
+/// betas are wanted. A copy Simpl-Setup.exe installed always installs its updates itself (0.3.7: Install updates
+/// automatically is no longer a setting): it downloads the new version's installer by itself (picked up where it
+/// stopped, tried again a while later when it fails; checked against the size and SHA-256 published, and — when this
+/// copy is signed — signed by the same publisher) and puts it in at once, unless
 /// something is open that an update must not cut off (<see cref="HeldBy"/>: a quiz, an Alta or a Macmillan assignment,
 /// a page of the school's own or a tool's, a dialog, a hand-in, the sign-in, the tour; or the student working in the
 /// window that moment) — then it waits, and goes in as soon as all of it is closed. Going in, it notes where the window
 /// was (<see cref="Resume"/>), Simpl quits as Quit Simpl does, and the installer, run quietly, puts the new version in
 /// place and opens it again, where the student was. A Critical Update (a release whose notes carry
-/// <see cref="CriticalMark"/>) goes in whatever these settings say. Restart to Update puts a downloaded version in at
-/// once. A copy run from its zip opens the new version's page instead, to be unzipped over it (or installed). A
-/// development run never checks or installs anything; --update-test plays an update through against a local file
+/// <see cref="CriticalMark"/>) goes in whatever the pause or an earlier version put back say. Restart to Update puts a
+/// downloaded version in at once. After an earlier version is put back (Earlier versions ▸ Install…), Simpl stays on it
+/// (<see cref="StayingFrom"/>) until a version newer than the one it went back from comes, or Update now. A copy run
+/// from its zip opens the new version's page instead, to be unzipped over it (or installed). A development run never
+/// checks or installs anything; --update-test plays an update through against a local file
 /// (windows/SimplFluent/README.md, Updates).
 /// </summary>
 public static partial class Updates
@@ -116,12 +118,38 @@ public static partial class Updates
 
     /// <summary>Check for updates automatically: at launch and every hour (Settings ▸ Updates; on unless turned off).</summary>
     public static bool Automatic { get => Prefs.Bool("updates:auto", true); set { Prefs.Set("updates:auto", value); Changed?.Invoke(); if (value) CheckIfDue(); } }
-    /// <summary>Install updates automatically: one found goes in at a quiet moment (Settings ▸ Updates; on unless turned off).</summary>
-    public static bool InstallAutomatically
+    /// <summary>
+    /// Where 0.3.6 and earlier kept Install updates automatically (0.3.7: an update always installs itself in a copy the
+    /// installer put here). One turned off is let go of once, at the first start (<see cref="Settle"/>), so it installs
+    /// again; nothing reads it any more.
+    /// </summary>
+    private const string OldInstallKey = "updates:install";
+
+    private const string StayKey = "updates:staying";
+
+    /// <summary>
+    /// An earlier version put back (Earlier versions ▸ Install…) stays: the run of the version it went back from (0.3.7,
+    /// in place of Install updates automatically turning off). That version and those before it are not put in by
+    /// themselves — or the newest would go straight back in at the next quiet moment — while one newer than it is, as
+    /// every update is, and a Critical Update whatever this says. Update now lets it go (<see cref="UpdateNow"/>), and so
+    /// does this copy reaching that version another way (Simpl-Setup.exe run by hand). Null: Simpl stays on nothing. Kept
+    /// with the other settings, encrypted as they are. (--update-test-staying: an update played through as a copy put
+    /// back from the version it finds would have it, for Settings' picture.)
+    /// </summary>
+    public static int? StayingFrom
     {
-        get => Prefs.Bool("updates:install", true);
-        set { Prefs.Set("updates:install", value); Changed?.Invoke(); if (value) Proceed(); }
+        get
+        {
+            if (Testing && Launch.Flag("update-test-staying")) return CurrentRun + 1;
+            var run = (int)Prefs.Double(StayKey);
+            return run > 0 ? run : null;
+        }
+        private set { Prefs.Set(StayKey, value is { } run ? (double)run : null); Changed?.Invoke(); }
     }
+
+    /// <summary>The version found is one Simpl stays back from (<see cref="StayingFrom"/>): not put in by itself, unless
+    /// it is a Critical Update.</summary>
+    public static bool KeptBack => StaysBack(Found, Critical, StayingFrom);
     /// <summary>Get beta updates (Settings ▸ Updates; off unless turned on): the betas are offered too, not only the usual
     /// releases (<see cref="Choose"/>). Turned off, the versions are read again — a beta found and not yet in is let go —
     /// and a copy on a beta stays on it until a usual release newer than it comes.</summary>
@@ -188,9 +216,9 @@ public static partial class Updates
     /// <summary>The version found is installed from here (Download, then Restart to Update), not from its page.</summary>
     public static bool InstallsHere => Installed && Found?.Setup != null;
 
-    /// <summary>The version found goes in by itself once it is here: a Critical Update always; another when Install
-    /// updates automatically is on and updates are not paused.</summary>
-    private static bool GoesInByItself => Critical || (InstallAutomatically && !Paused);
+    /// <summary>The version found goes in by itself once it is here: a Critical Update always; another when updates are
+    /// not paused and it is not one an earlier version put back stays back from (<see cref="KeptBack"/>).</summary>
+    public static bool GoesInByItself => Critical || (!Paused && !KeptBack);
 
     // (the list of releases, read once an hour, comes compressed: a tenth of its size or less)
     private static readonly HttpClient Http = new(new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.All }) { Timeout = TimeSpan.FromSeconds(20) };
@@ -228,14 +256,31 @@ public static partial class Updates
         waiter.Tick += (_, _) => Proceed();
         app.Activated += (_, _) => CheckIfDue();
         app.Deactivated += (_, _) => Proceed();
+        Settle();
         if (Testing)
         {
-            Log.Write($"update test: {TestFile}{(Installed ? ", as an installed copy" : "")}{(Launch.Flag("update-test-critical") ? ", a Critical Update" : "")}");
+            Log.Write($"update test: {TestFile}{(Installed ? ", as an installed copy" : "")}{(Launch.Flag("update-test-critical") ? ", a Critical Update" : "")}{(StayingFrom is { } from ? $", staying back from v{from:000}" : "")}");
             if (Launch.Get("update-test-hold") is { Length: > 0 } what) Hold(what, $"when you close the {what}");
             _ = Check();
             return;
         }
         CheckIfDue();
+    }
+
+    /// <summary>
+    /// As the checks begin (0.3.7): Install updates automatically, turned off in 0.3.6 or earlier, let go of — an update
+    /// always installs itself now; and an earlier version's stay (<see cref="StayingFrom"/>) let go of once this copy is
+    /// the version it went back from, or newer (Simpl-Setup.exe run by hand, a Critical Update gone in).
+    /// </summary>
+    private static void Settle()
+    {
+        if (!Prefs.Bool(OldInstallKey, true)) Log.Write("update: Install updates automatically was off; updates install themselves now");
+        Prefs.Remove(OldInstallKey);
+        if (StayingFrom is { } from && CurrentRun >= from)
+        {
+            Log.Write($"update: on {Version}, so no longer staying back from v{from:000}");
+            StayingFrom = null;
+        }
     }
 
     private static void Tick()
@@ -299,7 +344,9 @@ public static partial class Updates
                 // (a Critical Update newer than this copy, of those it may take: the newest goes in, whatever the settings)
                 Critical = critical;
                 State = ready ? Mode.Ready : Mode.Available;
-                if (was is not (Mode.Available or Mode.Ready)) Log.Write($"update: {newest.Version} found{(Critical ? " (a Critical Update)" : "")}");
+                // (one an earlier version put back stays back from says so: it waits for Update now)
+                if (was is not (Mode.Available or Mode.Ready))
+                    Log.Write($"update: {newest.Version} found{(Critical ? " (a Critical Update)" : "")}{(KeptBack ? $", kept back: staying back from v{StayingFrom:000}" : "")}");
             }
             else { Found = null; Critical = false; downloaded = null; State = Mode.UpToDate; }
         }
@@ -453,17 +500,19 @@ public static partial class Updates
     /// <summary>
     /// An earlier version put in this one's place (Settings ▸ Updates ▸ Earlier versions ▸ Install…, the Mac's): for the
     /// copy the installer put here, that version's installer downloaded and checked as an update's is, then run as one
-    /// is — Simpl closes and opens again on it. Install updates automatically turns off first, or the newer version would
-    /// go back in at the next quiet moment (a Critical Update still does). Null once it is going in, else why not — and
-    /// then all is as it was: the setting as the student had it, the versions read again for what is really newer.
+    /// is — Simpl closes and opens again on it. It stays on it first (<see cref="StayingFrom"/>: this version, or the one
+    /// an earlier stay went back from when that is newer), or this version would go back in at the next quiet moment (a
+    /// Critical Update still does) — and meanwhile nothing else is fetched or put in by itself. Null once it is going in,
+    /// else why not — and then all is as it was: the stay as it was, the versions read again for what is really newer.
     /// </summary>
     public static async Task<string?> InstallEarlier(Release r)
     {
         if (Off || !Installed || r.Setup == null || r.Run >= CurrentRun) return "This copy can’t put that version in its place: its page has the download.";
         if (checking || restarting || State is Mode.Checking or Mode.Downloading or Mode.Installing) return "Simpl is busy with an update. Try again in a moment.";
-        var wasAutomatic = InstallAutomatically;
+        var wasStaying = StayingFrom;
         var wasFailures = failures;
-        Prefs.Set("updates:install", false); // (not the setter: nothing should go in meanwhile, nor be fetched)
+        // (0.3.7: in place of turning Install updates automatically off — kept with the settings before the installer runs)
+        StayingFrom = Math.Max(wasStaying ?? 0, CurrentRun);
         Found = r;
         Critical = false;
         downloaded = null;
@@ -475,11 +524,13 @@ public static partial class Updates
         if (State == Mode.Ready && Found == r)
         {
             InstallAndRestart();
+            // (the installer could not be started — the card says why: this version stays, and so does the stay as it was)
+            if (State == Mode.Failed) StayingFrom = wasStaying;
             return null;
         }
         var why = Message ?? $"Could not download {r.Version}.";
         Log.Write($"update: {r.Version} not put in ({why})");
-        Prefs.Set("updates:install", wasAutomatic);
+        StayingFrom = wasStaying;
         Found = null;
         downloaded = null;
         State = Mode.Idle;
@@ -858,6 +909,25 @@ public static partial class Updates
         State = Mode.Installing;
         Changed?.Invoke();
         InstallNow();
+    }
+
+    /// <summary>
+    /// Update now (Settings ▸ Updates, while Simpl stays on an earlier version put back, <see cref="StayingFrom"/>): the
+    /// version found downloaded and checked as an update's is, the stay let go of — the student chose to update, so it
+    /// is let go of even when the download fails, and that is tried again as any update's is — and the version put in at
+    /// once, as Restart to Update does. Kept back until the download is done, so nothing else starts it meanwhile.
+    /// </summary>
+    public static async Task UpdateNow()
+    {
+        if (restarting) return;
+        if (Found != null && State is Mode.Available or Mode.Failed) await Download();
+        if (StayingFrom is { } from)
+        {
+            Log.Write($"update: Update now: no longer staying back from v{from:000}");
+            StayingFrom = null;
+        }
+        if (State == Mode.Ready) InstallAndRestart();
+        else Proceed();
     }
 
     /// <summary>

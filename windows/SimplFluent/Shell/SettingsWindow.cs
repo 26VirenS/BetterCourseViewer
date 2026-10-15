@@ -266,7 +266,6 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         new("data", "Export or import settings", new[] { "Settings" }, "export import backup file settings"),
         new("data", "Erase everything", new[] { "Erase everything" }, "reset erase delete everything"),
         new("updates", "Check for updates", new[] { "Check for updates automatically" }, "update updates check version automatic"),
-        new("updates", "Install updates automatically", new[] { "Install updates automatically" }, "install automatic restart"),
         new("updates", "Get beta updates", new[] { "Get beta updates" }, "beta preview"),
         new("updates", "Earlier versions", new[] { "Earlier versions" }, "rollback older earlier previous version install"),
         new("about", "Version", new[] { "Version" }, "version interface build about"),
@@ -292,7 +291,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         found = Spots().Select(s => (s, r: Rank(s))).Where(x => x.r < 9).OrderBy(x => x.r).Select(x => x.s).Take(8).ToList();
         foundAt = 0;
         FoundList();
-        // (wide enough for a setting's whole name beside its page's — "Install updates automatically · Updates" — as
+        // (wide enough for a setting's whole name beside its page's — "Check for updates automatically · Updates" — as
         //  Windows Settings' suggestions are, over the pane's edge if need be)
         findPopup.Width = Math.Max(340, find.ActualWidth);
         findPopup.IsOpen = true;
@@ -1228,8 +1227,9 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         var dev = Updates.Off;
         var found = Updates.Found;
         var critical = Updates.Critical && found != null;
-        // (it goes in by itself: a Critical Update always; another while Install updates automatically is on, not paused)
-        var byItself = Updates.InstallsHere && (critical || (Updates.InstallAutomatically && !Updates.Paused));
+        // (it goes in by itself: a Critical Update always; another while updates are not paused and it is not one an
+        //  earlier version put back stays back from — 0.3.7: Install updates automatically is always on)
+        var byItself = Updates.InstallsHere && Updates.GoesInByItself;
         // (a beta says so, as Earlier versions' rows do: "Version v113 (beta) is available")
         var name = found is { Beta: true } ? $"{found.Version} (beta)" : found?.Version;
         var v = Column(K.SectionHeader("Simpl for Windows", 0));
@@ -1260,11 +1260,13 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         if (critical && Updates.State is Updates.Mode.Available or Updates.Mode.Downloading or Updates.Mode.Ready)
             when = (when != null ? when + " " : "") + "A critical update installs whatever these settings say.";
         if (Updates.Paused && !dev) when = (when != null ? when + " " : "") + "Updates are paused (--pause-updates): only a critical update installs by itself.";
-        // (Download: fetched here for a copy the installer put here, then Restart to Update; else the version's page)
+        // (Download: fetched here for a copy the installer put here, then Restart to Update; else the version's page.
+        //  Update now, for one an earlier version put back stays back from: fetched and put in at once, the stay let go)
         FrameworkElement action = Updates.State switch
         {
             Updates.Mode.Checking or Updates.Mode.Installing => K.Spinner(20),
             Updates.Mode.Downloading => new Border(),
+            Updates.Mode.Available or Updates.Mode.Failed when found != null && Updates.KeptBack && Updates.InstallsHere => K.Button("Update now", () => _ = Updates.UpdateNow(), accent: true),
             Updates.Mode.Available or Updates.Mode.Failed when found != null => K.Button("Download", () => _ = Updates.Download(), accent: true),
             Updates.Mode.Ready => K.Button("Restart to update", Updates.InstallAndRestart, accent: true),
             _ => Enabled(K.Button("Check for updates", () => _ = Updates.Check()), !dev),
@@ -1302,19 +1304,16 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         var auto = new ToggleSwitch { IsChecked = Updates.Automatic, IsEnabled = !dev };
         auto.Checked += (_, _) => Updates.Automatic = true;
         auto.Unchecked += (_, _) => Updates.Automatic = false;
-        // (a copy run from its zip cannot put a version in its own place: the toggle is off, and says why)
-        var install = new ToggleSwitch { IsChecked = (Updates.Installed || dev) && Updates.InstallAutomatically, IsEnabled = !dev && Updates.Installed };
-        install.Checked += (_, _) => Updates.InstallAutomatically = true;
-        install.Unchecked += (_, _) => Updates.InstallAutomatically = false;
         var beta = new ToggleSwitch { IsChecked = Updates.Beta, IsEnabled = !dev };
         beta.Checked += (_, _) => Updates.Beta = true;
         beta.Unchecked += (_, _) => Updates.Beta = false;
         v.Children.Add(K.Group(
             K.Row(SymbolRegular.Info24, "Version", Updates.Installed ? "Installed with Simpl-Setup.exe" : null, K.Text(Updates.Version, Ty.Body, B.Text2)),
             K.Row(SymbolRegular.ArrowSync24, "Check for updates automatically", "Simpl looks for a new version when it opens and every hour, and says so here when there is one.", auto),
-            K.Row(SymbolRegular.ArrowDownload24, "Install updates automatically", Updates.Installed || dev
-                ? "A new version goes in when it arrives, and Simpl opens again where you were — never while a quiz, a tool or a dialog is open."
-                : "This copy wasn’t installed with Simpl-Setup.exe, so it can’t put a new version in its own place: Download opens the version’s page.", install),
+            // (0.3.7: where Install updates automatically was — an update always installs itself now: an earlier version
+            //  put back says it stays, and until when; a copy run from its zip says why it can't put a version in)
+            StayingRow(found) ?? (Updates.Installed || dev ? null
+                : K.Row(SymbolRegular.ArrowDownload24, "Installing updates", "This copy wasn’t installed with Simpl-Setup.exe, so it can’t put a new version in its own place: Download opens the version’s page.")),
             K.Row(SymbolRegular.Beaker24, "Get beta updates", "Get test versions of Simpl before everyone else. A beta may have rough edges. Turn this off to stop getting betas: Simpl keeps the version you have until a newer regular version comes out.", beta)));
 
         // the versions published before (onboarding-6): folded away, as the Mac's are; for the copy the installer put here,
@@ -1346,8 +1345,25 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         v.Children.Add(earlier);
         // (a copy from a zip: the expander's own line already says where earlier versions open — no footnote saying it
         //  again)
-        if (Updates.Installed) v.Children.Add(Foot("Updates are checked before they install. Installing an earlier version turns Install updates automatically off."));
+        if (Updates.Installed) v.Children.Add(Foot("Updates install by themselves at a quiet moment — never while a quiz, a tool or a dialog is open — and are checked first. After you install an earlier version, Simpl stays on it until a newer version comes out or you choose Update now."));
         return v;
+    }
+
+    /// <summary>
+    /// "Staying on 0.3.5 (v130)" (0.3.7): an earlier version put back stays (Updates.StayingFrom), in the row where
+    /// Install updates automatically was — what doesn't come back by itself, and what does; Update now is the card's
+    /// button. Null when Simpl stays on nothing, or for a copy the installer didn't put here.
+    /// </summary>
+    private static FrameworkElement? StayingRow(Updates.Release? found)
+    {
+        if (!Updates.Installed || Updates.StayingFrom is not { } from) return null;
+        var back = $"v{from:000}";
+        var words = Updates.KeptBack && found != null
+            ? $"You went back to this version, so {found.Version} doesn’t install by itself: choose Update now to install it. A version newer than {back} installs by itself, as usual."
+            : Updates.Critical && found != null
+                ? $"You went back to this version, but {found.Version} is a critical update: it installs by itself all the same."
+                : $"You went back to this version, so {back} doesn’t install by itself. A version newer than it does, as usual.";
+        return K.Row(SymbolRegular.History24, $"Staying on {Updates.Version}", words);
     }
 
     /// <summary>"12.4 of 61.2 MB": how far the installer's download has come.</summary>
@@ -1358,11 +1374,14 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
     }
 
     /// <summary>Install… on an earlier version (the Mac's): asked first — Simpl closes and opens again on it, and stays
-    /// there because Install updates automatically turns off — then downloaded, checked and put in, as an update is.</summary>
+    /// there (0.3.7: Updates.StayingFrom, the version it goes back from not put in again by itself) — then downloaded,
+    /// checked and put in, as an update is.</summary>
     private void AskInstallEarlier(Updates.Release r)
     {
+        // (the version Simpl stays back from: this one, or the one an earlier stay went back from when that is newer)
+        var back = $"v{Math.Max(Updates.StayingFrom ?? 0, Updates.CurrentRun):000}";
         Dialogs.Confirm(this, $"Install Simpl {r.Version}?",
-            $"Simpl closes and opens again on {r.Version}, your settings and sign-in as they were. Install updates automatically turns off, so it stays on this version until you turn it back on.",
+            $"Simpl closes and opens again on {r.Version}, your settings and sign-in as they were. It stays on {r.Version} until a version newer than {back} comes out, or you choose Update now in Settings ▸ Updates.",
             "Install", async () =>
             {
                 if (await Updates.InstallEarlier(r) is { } problem && open == this) Say(problem, true);
