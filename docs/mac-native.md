@@ -633,8 +633,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
 
 - **The tools after the UI review (1.3.78).** The Tools page is in sections by what a tool is for — *Study* (Flashcards,
   Focus timer, Citation generator, Grade needed; since the tools of their own, the Word Counter), *Math & science*
-  (Calculator, Graphing calculator, Unit converter, since then Statistics; the Periodic table until 1.3.80 moved it to
-  *Chemistry*), *Files*
+  (Calculator, Graphing calculator, Unit converter, since then Statistics and the Matrix Calculator; the Periodic table
+  until 1.3.80 moved it to *Chemistry*), *Files*
   (File converter, Merge & split PDFs, PDF annotator, Image to text) and *Biology*, as on
   Windows — each tile's line one short line, three tiles across from about 900 points of page (`ToolGroup`, `ToolGroupSection`,
   `ToolTile.columns`). An open tool has one pin control, in its heading, named for what a press does (*Unpin* / *Pin to
@@ -713,7 +713,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   speed and angle from Kinematics & Projectiles' pin (`MotionCompact`), two vectors from Vectors' (`VectorsCompact`),
   the Circuit Builder's Ohm's law and list (`CircuitCompact`), the calculator's
   line, sums, memory and Rad/Deg (`CalcEngine.handOff`), a codon looked up, a cross, a Hardy–Weinberg value, the lab
-  calculator shown, (tools) the Equation Balancer's equation, the Word Counter's text, Statistics' line of data (to its Describe page); the graph's whole drawing — expressions, sliders, tables, notes and view — by Desmos's own
+  calculator shown, (tools) the Equation Balancer's equation, the Word Counter's text, Statistics' line of data (to its Describe page), the Matrix Calculator's A;
+  the graph's whole drawing — expressions, sliders, tables, notes and view — by Desmos's own
   `Calc.getState`/`Calc.setState` from the pin's web view to the whole one's (`GraphWeb.carryOver`; the whole one's graph
   before it is a ⌘Z away). The focus timer, Flashcards' sets and the lab's numbers are the whole tool's already. A panel
   as it opens carries nothing, and the tool opens as from its tile; with something carried, the tool's popup if it is
@@ -1073,6 +1074,26 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
     columns set apart by `;`); a pin's `-SimplStatsData`. Pictures: `light-73c-stats-describe`,
     `dark-73c-stats-describe`, `light-73d-stats-regression`, `light-73e-stats-dist`, `light-73f-stats-tests`,
     `light-73g-stats-describe-narrow`, `light-54n-pin-stats`.
+  - **Matrix Calculator** (`matrix`, *Math & science*; `Tools/MatrixCalculator.swift`, `Model/MatrixModel.swift`): two
+    matrices A and B typed into grids of 1 to 6 rows and columns (steppers; Tab moves between cells; a block of rows
+    pasted into any cell, or Paste, fills the grid — rows on lines or apart by `;`, cells by spaces, commas or tabs;
+    `MatrixDraft`), an operation from a row of chips — A + B, A − B, A × B, k·A, Aᵀ, det A, A⁻¹, rank, RREF, trace,
+    A·x = b (B the column b), the eigenvalues, Aⁿ — and the result: a matrix between brackets, a number, or the
+    eigenvalues as λ₁… with a complex pair written once as a ± bi; the RREF's row operations in a disclosure, each
+    with the matrix after it ("R₂ ← R₂ − 4R₁", "R₁ ↔ R₂", "R₂ ← R₂ ÷ 3"). Cells are exact fractions while what was
+    typed is whole numbers, fractions or short decimals (`Fraction`, Int64 in lowest terms; a result past 62 bits goes
+    on as a decimal — `MNum`), shown as fractions with a Fractions / Decimals toggle, decimals otherwise. What goes
+    wrong is said in a line ("A × B needs A's columns to match B's rows — A has 3, B has 2", "A has no inverse: its
+    determinant is 0", "No solution: the equations contradict each other", "Infinitely many solutions (1 free
+    variable)"). Determinant and inverse by elimination, the eigenvalues by reduction to Hessenberg form and the
+    shifted QR algorithm (EISPACK's hqr as Numerical Recipes gives it), real and complex, up to 6 × 6; the checks
+    confirm each eigenvalue makes det(A − λI) vanish. A, B, the operation, k, n and the toggle are kept. Pin: a 2 × 2
+    or 3 × 3 A with det A and A⁻¹ (its popover 380 wide); Open Full Screen carries A (`takeInfo("a")`). Command
+    `/matrix` ("determinant", "inverse", "linear algebra", "system of equations", "eigenvalues", "rref"). Launch
+    flags: `-SimplTool matrix -SimplMatrixA "1 2;3 4" -SimplMatrixB "…" -SimplMatrixOp add|subtract|multiply|scale|
+    transpose|det|inverse|rank|rref|trace|solve|eigen|power -SimplMatrixSteps YES` (the RREF's steps open); a pin's
+    `-SimplMatrixA`. Pictures: `light-74-tool-matrix`, `dark-74-tool-matrix`, `light-74b-tool-matrix-rref`,
+    `light-74c-tool-matrix-solve`, `light-74d-tool-matrix-narrow`, `light-54o-pin-matrix`.
 
 ## Data and encryption
 

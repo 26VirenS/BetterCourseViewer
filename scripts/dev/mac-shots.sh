@@ -634,7 +634,9 @@ phys_tools() {
 # (tools) the study and maths tools, each its popup over the Tools page in light and in dark, narrow, and its pin
 # opened: the Word Counter on an essay's opening (-SimplWordsText) with a target of 150 words; Statistics on each of
 # its pages (-SimplStats <page> -SimplStatsData "…": a class's exam scores described, hours of revision against marks,
-# the normal curve and Student's t, a one-sample t-test), the Describe page in dark and narrow too
+# the normal curve and Student's t, a one-sample t-test), the Describe page in dark and narrow too; the Matrix
+# Calculator on a 3 × 3's inverse (-SimplMatrixA, -SimplMatrixOp), its RREF with the steps open (-SimplMatrixSteps YES),
+# and A·x = b (-SimplMatrixB the column)
 study_tools() {
   local m
   local essay="The printing press changed Europe faster than any invention before it. Within fifty years of Gutenberg's first Bible, presses in two hundred towns had printed some twenty million books — more than every scribe of the previous thousand years. Ideas that once travelled at the pace of a copyist's hand now crossed the continent in a season.
@@ -654,6 +656,14 @@ This essay argues that the press did not simply spread ideas; it changed which i
   MODE=light SIZE=1440x920 shoot light-73f-stats-tests 14 -SimplPlace tools -SimplTool stats -SimplStats tests -SimplStatsData "$scores"
   MODE=light SIZE=780x700 shoot light-73g-stats-describe-narrow 14 -SimplPlace tools -SimplTool stats -SimplStats describe -SimplStatsData "$scores"
   MODE=light shoot light-54n-pin-stats 14 -SimplPinnedTools stats -SimplPinOpen stats -SimplStatsData "2, 4, 4, 4, 5, 5, 7, 9"
+  local three="2 1 -1;-3 -1 2;-2 1 2"
+  for m in light dark; do
+    MODE="$m" SIZE=1440x920 shoot "$m-74-tool-matrix" 14 -SimplPlace tools -SimplTool matrix -SimplMatrixA "$three" -SimplMatrixB "8;-11;-3" -SimplMatrixOp inverse
+  done
+  MODE=light SIZE=1440x920 shoot light-74b-tool-matrix-rref 14 -SimplPlace tools -SimplTool matrix -SimplMatrixA "1 2 3;4 5 6;7 8 9" -SimplMatrixOp rref -SimplMatrixSteps YES
+  MODE=light SIZE=1440x920 shoot light-74c-tool-matrix-solve 14 -SimplPlace tools -SimplTool matrix -SimplMatrixA "$three" -SimplMatrixB "8;-11;-3" -SimplMatrixOp solve
+  MODE=light SIZE=780x700 shoot light-74d-tool-matrix-narrow 14 -SimplPlace tools -SimplTool matrix -SimplMatrixA "$three" -SimplMatrixB "8;-11;-3" -SimplMatrixOp eigen
+  MODE=light shoot light-54o-pin-matrix 14 -SimplPinnedTools matrix -SimplPinOpen matrix -SimplMatrixA "1 2;3 4"
 }
 
 # (1.3.80) how each 3D model was framed, from the consoles ("[Simpl] bio frame <scene>: view W × H, model X% across,

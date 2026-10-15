@@ -9,9 +9,9 @@ import UniformTypeIdentifiers
 // table split into the chemistry tools' four, under theirs (Chemistry/ChemTools.swift), (tools) the chemistry
 // calculators — the Equation Balancer — beside them, (tools) the physics tools under a "Physics" heading between
 // them (Physics/PhysTools.swift), and (tools) the study and maths tools after them — the Word Counter under Study
-// (WordCounter.swift), Statistics under Math & science (Statistics.swift); their arithmetic in Model/, checked by the
-// Models job. One row in the sidebar opens a page of tiles, (tools-32) in sections by what they are for: Study,
-// Math & science, Files, Chemistry, Physics and Biology;
+// (WordCounter.swift), Statistics and the Matrix Calculator under Math & science (Statistics.swift,
+// MatrixCalculator.swift); their arithmetic in Model/, checked by the Models job. One row in the sidebar opens a page
+// of tiles, (tools-32) in sections by what they are for: Study, Math & science, Files, Chemistry, Physics and Biology;
 // (1.3.79) a tile opens its tool in a popup over the window — the Tools page staying behind it, and the whole window
 // usable round it (Shell/FloatingPopup.swift) — as its pin, a hand-off from another tool and a launch do. Any tool can be
 // pinned: it then sits in the toolbar on every screen and opens a compact version of itself in a popover
@@ -31,8 +31,9 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
     // (1.3.78) the biology toolkit: its names, lines, symbols and colours are BioTools.info's
     case cell, dna, gene, biomol, cross, divide, popgen, biolab, enzyme, energy
     // (tools) the study and maths tools of the Mac's own, each with its name, line, symbol and colour below as the
-    // first tools have them: the Word Counter (WordCounter.swift), Statistics (Statistics.swift)
-    case words, stats
+    // first tools have them: the Word Counter (WordCounter.swift), Statistics (Statistics.swift), the Matrix Calculator
+    // (MatrixCalculator.swift)
+    case words, stats, matrix
 
     var id: String { rawValue }
 
@@ -53,6 +54,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .fc: return "Flashcards"
         case .words: return "Word Counter"
         case .stats: return "Statistics"
+        case .matrix: return "Matrix Calculator"
         default: return BioTools.info(self).name
         }
     }
@@ -76,6 +78,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .fc: return "Flashcards"
         case .words: return "Words"
         case .stats: return "Stats"
+        case .matrix: return "Matrix"
         default: return BioTools.info(self).shortName
         }
     }
@@ -98,6 +101,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .fc: return "Flip, learn, test and match."
         case .words: return "Words, characters, reading time."
         case .stats: return "Mean, SD, regression, z and t."
+        case .matrix: return "Determinant, inverse, solve, RREF."
         default: return BioTools.info(self).note
         }
     }
@@ -119,6 +123,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .fc: return "rectangle.on.rectangle.angled"
         case .words: return "text.word.spacing"
         case .stats: return "chart.bar.xaxis"
+        case .matrix: return "square.grid.3x3"
         default: return BioTools.symbol(self)
         }
     }
@@ -140,6 +145,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .fc: return "#0a84ff"
         case .words: return "#8e8e93"
         case .stats: return "#ff2d55"
+        case .matrix: return "#5e5ce6"
         default: return BioTools.info(self).hex
         }
     }
@@ -155,6 +161,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .cite: return 400
         case .graph: return 360
         case .fc: return 340
+        case .matrix: return 380 // (tools) a 3 × 3 and its inverse side by side
         case .cell, .dna, .gene, .biomol, .cross, .divide, .popgen, .biolab, .enzyme, .energy: return BioTools.popoverWidth(self)
         default: return 330
         }
@@ -373,7 +380,7 @@ enum ToolGroup: CaseIterable {
     var kinds: [ToolKind] {
         switch self {
         case .study: return [.fc, .pomo, .cite, .need, .words]
-        case .science: return [.calc, .graph, .units, .stats]
+        case .science: return [.calc, .graph, .units, .stats, .matrix]
         case .files: return [.conv, .pdfx, .mark, .ocr]
         case .chemistry: return ChemTools.kinds
         case .physics: return PhysTools.kinds
@@ -543,6 +550,7 @@ struct ToolScreen: View {
         case .fc: FlashcardsTool()
         case .words: WordCounterTool()
         case .stats: StatisticsTool()
+        case .matrix: MatrixCalculatorTool()
         case .cell, .dna, .gene, .biomol, .cross, .divide, .popgen, .biolab, .enzyme, .energy: BioToolScreen(kind: kind)
         }
     }

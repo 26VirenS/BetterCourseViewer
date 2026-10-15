@@ -126,4 +126,95 @@ func studyChecks(_ check: (Bool, String) -> Void) {
           "a paired test is the differences' one-sample test against zero (t −5.196, 3 df)")
     check(Stats.oneSample(Stats.Sample(n: 3, mean: 5, sd: 0)!, mu0: 4) == nil && Stats.paired([1, 2], [1]) == nil && Stats.Sample(n: 1, mean: 5, sd: 1) == nil,
           "no test on a sample without spread, columns of different lengths, or one value")
+
+    // ---- the Matrix Calculator ----------------------------------------------------------------------------------------
+    print("the Matrix Calculator")
+    func mat(_ s: String) -> Matrix { Matrix(text: s) ?? Matrix(rows: 0, cols: 0, cells: []) }
+    func same(_ a: Matrix?, _ s: String) -> Bool { a.map { $0.rows == mat(s).rows && $0.cols == mat(s).cols && zip($0.cells, mat(s).cells).allSatisfy { abs($0.double - $1.double) < 1e-9 } } ?? false }
+    check(Fraction(text: "3/4")?.description == "3/4" && Fraction(text: "6/8")?.description == "3/4" && Fraction(text: "-2")?.description == "−2"
+          && Fraction(text: "0.25")?.description == "1/4" && Fraction(text: "-0.5")?.description == "−1/2" && Fraction(text: "1,5")?.description == "3/2"
+          && Fraction(text: "1e5") == nil && Fraction(text: "x") == nil && Fraction(text: "1/0") == nil,
+          "fractions read from what was typed, in lowest terms; a decimal is one; 1e5 and a word are not")
+    check((Fraction(1, 3)! + Fraction(1, 6)!)?.description == "1/2" && (Fraction(2, 3)! * Fraction(3, 4)!)?.description == "1/2"
+          && (Fraction(1, 2)! / Fraction(1, 4)!)?.description == "2" && (Fraction(1, 2)! - Fraction(1, 2)!)?.description == "0",
+          "1/3 + 1/6 = 1/2, 2/3 × 3/4 = 1/2, (1/2) ÷ (1/4) = 2")
+    let big = Fraction(1 << 40, 3)!, big2 = Fraction(1 << 40, 5)!
+    check(big * big2 == nil && (MNum.exact(big) * MNum.exact(big2)).isExact == false && abs((MNum.exact(big) * MNum.exact(big2)).double - big.double * big2.double) < 1e3,
+          "a product too big for 62 bits is not kept exact: the cell goes on as a decimal")
+    check(MNum(text: "0.1")?.text() == "1/10" && MNum(text: "0.1")?.text(decimals: true) == "0.1" && MNum(text: "2.5e3")?.text() == "2500"
+          && (MNum(text: "0.1")! + MNum(text: "0.2")!).text() == "3/10" && (MNum(text: "1")! / MNum.zero) == nil,
+          "a cell shown as a fraction or a decimal as asked, 0.1 + 0.2 = 3/10 exactly, no division by zero")
+    let readOK = Matrix(text: "1 2;3 4")?.rows == 2 && Matrix(text: "1, 2\n3, 4")?.cols == 2 && Matrix(text: "1\t2\t3")?.cols == 3 && mat("1 2;3 4").text == "1 2;3 4"
+    let refused = Matrix(text: "1 2;3") == nil && Matrix(text: "1 a") == nil && Matrix(text: "") == nil
+    check(readOK && refused,
+          "a matrix read from rows set apart by ; or new lines, cells by spaces, commas or tabs; ragged rows and words refused")
+    let a = mat("1 2;3 4")
+    check(MatrixMath.determinant(a)?.text() == "−2", "det [[1,2],[3,4]] = −2")
+    check(MatrixMath.inverse(a)?.text == "-2 1;3/2 -1/2" && same(MatrixMath.inverse(a), "-2 1;1.5 -0.5"), "its inverse [[−2, 1], [3/2, −1/2]] (\(MatrixMath.inverse(a)?.text ?? "none"))")
+    check(same(MatrixMath.multiply(a, MatrixMath.inverse(a)!), "1 0;0 1") && MatrixMath.multiply(a, MatrixMath.inverse(a)!)!.isExact, "A × A⁻¹ = I, exactly")
+    check(MatrixMath.inverse(mat("1 2;2 4")) == nil && MatrixMath.determinant(mat("1 2;2 4"))?.isZero == true && MatrixMath.inverse(mat("1 2 3")) == nil,
+          "a singular matrix has no inverse and a zero determinant; nor has one that is not square")
+    let r = MatrixMath.rref(mat("1 2 3;4 5 6;7 8 9"))
+    check(same(r.result, "1 0 -1;0 1 2;0 0 0") && r.pivots == [0, 1] && MatrixMath.rank(mat("1 2 3;4 5 6;7 8 9")) == 2,
+          "RREF of [[1,2,3],[4,5,6],[7,8,9]] is [[1,0,−1],[0,1,2],[0,0,0]], rank 2")
+    check(r.steps.first?.text == "R₂ ← R₂ − 4R₁" && r.steps.contains { $0.text == "R₂ ← R₂ ÷ −3" } && r.steps.last.map { same($0.after, "1 0 -1;0 1 2;0 0 0") } == true,
+          "its steps listed, each with the matrix after it (\(r.steps.map(\.text)))")
+    check(MatrixMath.rref(mat("0 1;1 0")).steps.first?.text == "R₁ ↔ R₂" && MatrixMath.rank(mat("0 0;0 0")) == 0 && MatrixMath.rank(Matrix.identity(4)) == 4,
+          "a swap is a step; the zero matrix has rank 0, the identity full rank")
+    if case .unique(let x)? = MatrixMath.solve(mat("2 1;1 3"), mat("3;5")) {
+        check(x.text == "4/5;7/5" && same(x, "0.8;1.4"), "[[2,1],[1,3]] x = [3,5] gives x = [4/5, 7/5] = [0.8, 1.4]")
+    } else {
+        check(false, "[[2,1],[1,3]] x = [3,5] solved")
+    }
+    check(MatrixMath.solve(mat("1 2;2 4"), mat("3;7")) == .noSolution && MatrixMath.solve(mat("1 2;2 4"), mat("3;6")) == .many(free: 1)
+          && MatrixMath.solve(mat("1 2;3 4"), mat("1 2")) == nil,
+          "an inconsistent system has no solution, a dependent one many, and b must be a column")
+    check(MatrixMath.add(a, mat("1 0;0 1"))?.text == "2 2;3 5" && MatrixMath.subtract(a, a)?.text == "0 0;0 0" && MatrixMath.add(a, mat("1 2 3")) == nil,
+          "A + I, A − A, and no sum of different shapes")
+    check(MatrixMath.multiply(mat("1 2 3;4 5 6"), mat("7 8;9 10;11 12"))?.text == "58 64;139 154" && MatrixMath.multiply(a, mat("1 2 3")) == nil,
+          "a 2×3 by a 3×2 is [[58,64],[139,154]]; a 2×2 by a 1×3 is nothing")
+    check(MatrixMath.transpose(mat("1 2 3;4 5 6")).text == "1 4;2 5;3 6" && MatrixMath.trace(a)?.text() == "5" && MatrixMath.trace(mat("1 2 3")) == nil,
+          "the transpose of a 2×3 is a 3×2; trace [[1,2],[3,4]] = 5")
+    check(MatrixMath.scale(a, by: MNum(text: "1/2")!).text == "1/2 1;3/2 2" && MatrixMath.power(a, 2)?.text == "7 10;15 22"
+          && MatrixMath.power(a, 0)?.text == "1 0;0 1" && same(MatrixMath.power(a, -1), "-2 1;1.5 -0.5") && MatrixMath.power(mat("1 2;2 4"), -1) == nil,
+          "½A, A², A⁰ = I, A⁻¹ as a power, and no negative power of a singular matrix")
+    let decimal = MatrixMath.inverse(mat("1.5 2;0.1 4"))
+    check(decimal?.text == "20/29 -10/29;-1/58 15/58" && decimal?.isExact == true,
+          "short decimals typed stay exact: the inverse of [[1.5, 2], [0.1, 4]] is [[20/29, −10/29], [−1/58, 15/58]] (\(decimal?.text ?? "none"))")
+    check(MatrixMath.eigenvalues(mat("2 0;0 3"))?.map(\.text) == ["2", "3"], "[[2,0],[0,3]] has eigenvalues 2 and 3")
+    let rot = MatrixMath.eigenvalues(mat("0 -1;1 0"))
+    check(rot?.map(\.text) == ["i", "−i"] && MatrixMath.pairText(rot ?? []) == ["±i"], "[[0,−1],[1,0]] has eigenvalues ±i (\(rot?.map(\.text) ?? []))")
+    check(MatrixMath.eigenvalues(a).map { $0.map { StudyMath.text($0.re, sig: 5) } } == ["-0.37228", "5.3723"].map { $0.replacingOccurrences(of: "-", with: "−") },
+          "[[1,2],[3,4]] has eigenvalues (5 ± √33)/2: −0.3723 and 5.3723")
+    // (any square matrix: each eigenvalue makes det(A − λI) vanish, and together they add up to the trace)
+    func vanishes(_ m: Matrix, _ v: MatrixMath.Complex) -> Bool {
+        let n = m.rows
+        var z = (0..<n).map { r in (0..<n).map { c in (re: m[r, c].double - (r == c ? v.re : 0), im: r == c ? -v.im : 0) } }
+        var det = (re: 1.0, im: 0.0)
+        for c in 0..<n {
+            var p = c
+            for i in c..<n where hypot(z[i][c].re, z[i][c].im) > hypot(z[p][c].re, z[p][c].im) { p = i }
+            if hypot(z[p][c].re, z[p][c].im) < 1e-14 { return true }
+            if p != c { z.swapAt(p, c); det = (-det.re, -det.im) }
+            let piv = z[c][c]
+            det = (det.re * piv.re - det.im * piv.im, det.re * piv.im + det.im * piv.re)
+            let d = piv.re * piv.re + piv.im * piv.im
+            for i in (c + 1)..<n {
+                let f = ((z[i][c].re * piv.re + z[i][c].im * piv.im) / d, (z[i][c].im * piv.re - z[i][c].re * piv.im) / d)
+                for j in c..<n {
+                    z[i][j] = (z[i][j].re - (f.0 * z[c][j].re - f.1 * z[c][j].im), z[i][j].im - (f.0 * z[c][j].im + f.1 * z[c][j].re))
+                }
+            }
+        }
+        let scale = m.cells.map { abs($0.double) }.max() ?? 1
+        return hypot(det.re, det.im) < 1e-6 * pow(max(scale, 1), Double(n))
+    }
+    let tricky = [mat("4 1 2;0 3 1;1 0 2"), mat("1 2 3 4;4 3 2 1;0 1 0 1;2 0 1 3"), mat("0 1 0 0 0;0 0 1 0 0;0 0 0 1 0;0 0 0 0 1;1 0 0 0 0"),
+                  mat("2 -1 0 0 0 0;1 2 0 0 0 0;0 0 3 0 0 0;0 0 0 1 1 0;0 0 0 -4 1 0;0 0 0 0 0 -2"), mat("1 1;0 1"), mat("5")]
+    let allVanish = tricky.allSatisfy { m in (MatrixMath.eigenvalues(m) ?? []).count == m.rows && (MatrixMath.eigenvalues(m) ?? []).allSatisfy { vanishes(m, $0) } }
+    let traces = tricky.allSatisfy { m in abs((MatrixMath.eigenvalues(m) ?? []).reduce(0) { $0 + $1.re } - (MatrixMath.trace(m)?.double ?? .nan)) < 1e-8 }
+    check(allVanish && traces, "3×3 to 6×6 matrices with real and complex eigenvalues: each makes det(A − λI) vanish, and they sum to the trace")
+    let six = MatrixMath.eigenvalues(mat("2 -1 0 0 0 0;1 2 0 0 0 0;0 0 3 0 0 0;0 0 0 1 1 0;0 0 0 -4 1 0;0 0 0 0 0 -2"))
+    check(MatrixMath.pairText(six ?? []) == ["−2", "3", "1 ± 2i", "2 ± i"], "a 6×6 with two complex pairs: −2, 3, 1 ± 2i, 2 ± i (\(MatrixMath.pairText(six ?? [])))")
+    check(MatrixMath.eigenvalues(mat("1 2 3")) == nil && MatrixMath.eigenvalues(mat("5"))?.map(\.text) == ["5"], "no eigenvalues of a non-square matrix; a 1×1's is itself")
 }
