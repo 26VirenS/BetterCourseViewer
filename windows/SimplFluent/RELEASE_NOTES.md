@@ -1,3 +1,7 @@
+**What's new in 0.3.16** (beta)
+
+- **Study planner order** — when two pieces of work share a deadline day (finishing a day early put one due tonight and one due tomorrow night on the same day), the one due sooner now takes the day's first blocks; before, the heavier one took the whole day and the one due tonight was said not to fit.
+
 **What's new in 0.3.15** (beta)
 
 - **Verb conjugations** — a new Study tool: type a verb in Spanish, French, German, Italian or Portuguese and every main tense is laid out with its pronouns — regular verbs by rule, the most common irregular ones from a table, stem and spelling changes included — with a switch that tints the irregular forms, suggestions as you type, and Copy for a table; `/verbs` in the search box, and the present tense as a pin.

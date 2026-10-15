@@ -26,6 +26,8 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.16", "2026-10-15",
+            ("fixed", "Study planner order", "Work due sooner comes first on a shared day.")),
         R("0.3.15", "2026-10-15",
             ("new", "Verb conjugations", "Conjugate any verb in five languages, every tense.")),
         R("0.3.14", "2026-10-15",
