@@ -458,21 +458,18 @@ Launch states: a page, then `plant`, `2n=6`, `nocross`, `chiasma=0.3`, `flip`, `
 
 ## Pictures
 
-`scripts/dev/mac-shots.sh`'s `bio <light|dark|both> <name> <wait> <tool> <state>`. A push takes each tool once, in light
-(`bio_quick`): 57 the animal cell, 58a the helix measured, 59a a gene being transcribed, 61b the peptide builder, 62a a
-dihybrid cross, 63a metaphase, 64a Hardy–Weinberg worked out, 65a the lab's solutions, 66a a competitive inhibitor,
-67a the energy map at the Calvin cycle, beside 35b (the Tools page's Biology section); and (1.3.79, `bio_plain_all`,
-in both sets) the Cell Explorer, DNA & RNA and the Biomolecule Builder opened plainly — no launch state, so nothing
-selected — in dark at 1,024 × 683 and 720 × 520, the sidebar out and folded (`dark-57z-cell-plain-1024`, `-1024-folded`,
-`-720`, `-720-folded`; `58z-dna-plain`, `61z-biomol-plain` alike): the launch states' pictures never showed what a
-plain open did in the 1.3.78 beta. The full set (`bio_full`, a
-commit saying `[full shots]` or Run workflow → full) takes every tool's pages, in light and dark where the builders
-asked: 57–57l Cell Explorer, 58a–58l DNA & RNA, 59a–59k Gene Expression, 61a–61r Biomolecule Builder, 62a–62h Genetics
+`scripts/dev/mac-shots.sh`'s `bio <light|dark|both> <name> <wait> <tool> <state>`. Every run (1.3.80: a push's too,
+the whole set in four parts at once) takes every tool's pages (`bio_full`) beside 35b (the Tools page's Biology
+section); and (1.3.79, `bio_plain_all`) the Cell Explorer, DNA & RNA and the Biomolecule Builder opened plainly — no
+launch state, so nothing selected — in dark at 1,024 × 683 and 720 × 520, the sidebar out and folded
+(`dark-57z-cell-plain-1024`, `-1024-folded`, `-720`, `-720-folded`; `58z-dna-plain`, `61z-biomol-plain` alike): the
+launch states' pictures never showed what a plain open did in the 1.3.78 beta. `bio_full` takes every tool's pages, in
+light and dark where the builders asked: 57–57l Cell Explorer, 58a–58l DNA & RNA, 59a–59k Gene Expression, 61a–61r Biomolecule Builder, 62a–62h Genetics
 Crosses, 63a–63j Cell Division, 64a–64d Hardy–Weinberg, 65a–65d Bio Lab Calculator, 66a–66b Enzyme Lab, 67a–67e
 Photosynthesis & Respiration, and the pins' quick versions 54b–54e. CI's runner shows a window about 1,024 × 683
 whatever is asked, so the pictures show each tool at the narrow end of a Mac's sizes. A pin's picture opens its popover
 with `-SimplPinOpen <tool>`; the suite runs several copies of the app at once, and a popover closes when its app is put
 behind another, so a pin opened that way opens its popover again whenever its app comes back to the front
 (`PinnedToolButton`, Tools/PinnedTools.swift) — without that, 54d and 54e were pictured with the popover closed. The
-four biology pins are pictured at the end of the full set, each alone (`bio_pins`): four copies picturing their pins
+four biology pins are pictured at the end of their part, each alone (`bio_pins`): four copies picturing their pins
 at once took the front from each other, and three were pictured closed.

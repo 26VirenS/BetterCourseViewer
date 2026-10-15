@@ -5,15 +5,21 @@
 # assignment, its grades, its content, a discussion. Run by .github/workflows/mac.yml once the app is built and the
 # mocks are serving on :8800 (node scripts/dev/mock-canvas.mjs 8800 8801) and :8860 (mock-brightspace.mjs 8860 --open).
 # Pictures in ./shots: <name>-app.png, taken from inside the app of its own windows (Shot.swift).
+# (1.3.80) Every run takes the whole set — what a push took and what "full" took, every screen in light and dark
+# (SHOTS=quick is the same set now) — shared out between the workflow's runners: SHARDS=4 SHARD=<0…3> takes one part
+# of it (share_out, below), and SHOTS=check reads what the parts' apps said once they are put together (phone_check,
+# live_check). With neither, one Mac takes every picture, as before. SHOTS=plan launches nothing: it shares the set
+# out and writes shot-plan.txt (each picture, its part and the time it is counted at), on any machine.
 set -u
 OUT="${OUT:-shots}"
 APP="${APP:-build/Build/Products/Debug/Simpl.app}"
 BIN="$APP/Contents/MacOS/Simpl"
 mkdir -p "$OUT"
 OUT_ABS="$(cd "$OUT" && pwd)"
-# every kind of quiz question in the mock's quizzes (matching, blanks, essay, formula, file upload), for the quiz pictures
-curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"richQuestions":true,"moreTypes":true}' http://localhost:8800/__mock/config || true
-defaults write com.simplcourses.mac ApplePersistenceIgnoreState -bool YES >/dev/null 2>&1 || true
+SHARDS="${SHARDS:-1}"
+SHARD="${SHARD:-0}"
+# (1.3.80) yes while the list (the_set) is walked only to share it out: nothing is launched or changed then
+PLANNING=""
 
 # (1.3.1) Several copies of the app at once (JOBS, 5 by default), each with a home of its own (CFFIXED_USER_HOME: its
 # settings, its caches and its web storage apart from the others'), each picture taken from inside its app of its own
@@ -21,14 +27,15 @@ defaults write com.simplcourses.mac ApplePersistenceIgnoreState -bool YES >/dev/
 # only the longest it waits. A picture of a web page loading (a school's sign-in, a tool's window, Quick Look) waits
 # the whole <wait> (-SimplShotSettle NO).
 JOBS="${JOBS:-5}"
-HOMES="$(mktemp -d /tmp/simpl-shots.XXXXXX)"
-for i in $(seq 1 "$JOBS"); do mkdir -p "$HOMES/home$i/Library/Preferences"; done
+HOMES=""
 
-# a free worker's number (its lock taken), waiting for one while all are busy
+# a free worker's number (its lock taken), waiting for one while all are busy (a lock looked for before it is tried:
+# a busy worker costs no process started every fifth of a second)
 take_slot() {
+  local i
   while true; do
-    for i in $(seq 1 "$JOBS"); do
-      if mkdir "$HOMES/lock$i" 2>/dev/null; then echo "$i"; return; fi
+    for ((i = 1; i <= JOBS; i++)); do
+      if [ ! -d "$HOMES/lock$i" ] && mkdir "$HOMES/lock$i" 2>/dev/null; then echo "$i"; return; fi
     done
     sleep 0.2
   done
@@ -40,21 +47,113 @@ take_slot() {
 # before its worker's.
 HEAVY="${HEAVY:-3}"
 take_heavy() {
+  local i
   while true; do
-    for i in $(seq 1 "$HEAVY"); do
-      if mkdir "$HOMES/heavy$i" 2>/dev/null; then echo "$i"; return; fi
+    for ((i = 1; i <= HEAVY; i++)); do
+      if [ ! -d "$HOMES/heavy$i" ] && mkdir "$HOMES/heavy$i" 2>/dev/null; then echo "$i"; return; fi
     done
     sleep 0.2
   done
 }
 
+# (1.3.80) share_out: which part takes each picture, the same in every part (each walks the whole list first, the same
+# way, before it launches anything: the_set, PLANNING): the part with the least time on it so far, by what it took in a
+# run (TIMES_FILE, a run's shot-times.txt — scripts/dev/baselines/mac-shot-times.txt; a new picture not in it counts its
+# <wait>), so the runners end together rather than each taking an equal count of the pictures. A 3D model's picture
+# (HEAVY_SHOT) goes to the part with the least time of those, at most HEAVY of which are taken at once. The groups
+# taken alone at the end are placed first (alone), each charged its whole time for every worker it keeps idle. Every
+# picture and its part go in shot-plan.txt — the same file from every part, which the workflow checks, and holds the
+# gathered pictures to; this part's own pictures marked mine (M_<name>). The plan depends on nothing but the files
+# checked out and SHARDS, so a part run again (a failed job re-run) takes the same pictures as the first time.
+# (Each picture's time, each name planned and each of this part's is a variable of its own — T_, P_ and M_ with the
+# name's every other character made "_" — looked up at once: searched for in one long string, the list took 12 seconds.)
+TIMES_FILE="${TIMES_FILE:-scripts/dev/baselines/mac-shot-times.txt}"
+if [ -f "$TIMES_FILE" ]; then
+  eval "$(awk '!/^#/ && NF >= 2 { n = $1; gsub(/[^A-Za-z0-9]/, "_", n); t = $2; sub(/s$/, "", t); if (t ~ /^[0-9]+$/) printf "T_%s=%d\n", n, t }' "$TIMES_FILE")"
+fi
+LOADS=()
+HEAVIES=()
+COUNTS=()
+SHOT_PID=""
+for ((k = 0; k < SHARDS; k++)); do LOADS[k]=0; HEAVIES[k]=0; COUNTS[k]=0; done
+
+# time_of <name> <wait>: what the picture took in the run TIMES_FILE is from, else its <wait>, in COST (seconds)
+time_of() {
+  local v="T_${1//[!A-Za-z0-9]/_}"
+  COST="${!v:-$2}"
+}
+
+# alone <variable> <together|one-by-one> <name>…: a group taken alone at the end of its part — its pictures one after
+# another, or at once (the longest of them) — placed on the part with the least time on it so far (from the last part
+# down: part 0 also keeps the build and sends the app), charged for each of the workers it keeps idle (PLAN_JOBS, the
+# parts' JOBS: the same in every part, so every part shares the pictures out alike); its part in <variable>
+PLAN_JOBS="${PLAN_JOBS:-$JOBS}"
+alone() {
+  local var="$1" how="$2" n total=0 part=$((SHARDS - 1)) k
+  shift 2
+  for n in "$@"; do
+    time_of "$n" 25
+    if [ "$how" = together ]; then [ "$COST" -gt "$total" ] && total=$COST; else total=$((total + COST)); fi
+  done
+  for ((k = SHARDS - 2; k >= 0; k--)); do [ "${LOADS[k]}" -lt "${LOADS[part]}" ] && part=$k; done
+  LOADS[part]=$(( ${LOADS[part]} + total * PLAN_JOBS ))
+  printf -v "$var" '%s' "$part"
+}
+
+# share_out <name> <wait>: the picture given its part, in shot-plan.txt (PART=<k> shoot …: a picture of a group taken
+# alone, on its group's part, already charged). A name in the list twice would be two launches writing one picture:
+# said as an error, and the workflow fails on it.
+share_out() {
+  local name="$1" part k key="${1//[!A-Za-z0-9]/_}" seen
+  case "$name" in warmup*) return 0 ;; esac
+  seen="P_$key"
+  if [ -n "${!seen:-}" ]; then echo "::error::mac-shots.sh: $name is in the list twice"; fi
+  printf -v "$seen" '%s' 1
+  time_of "$name" "$2"
+  if [ -n "${PART:-}" ]; then
+    part="$PART"
+  elif [ -n "${HEAVY_SHOT:-}" ]; then
+    part=0
+    for ((k = 1; k < SHARDS; k++)); do
+      if [ "${HEAVIES[k]}" -lt "${HEAVIES[part]}" ] || { [ "${HEAVIES[k]}" -eq "${HEAVIES[part]}" ] && [ "${LOADS[k]}" -lt "${LOADS[part]}" ]; }; then part=$k; fi
+    done
+    HEAVIES[part]=$(( ${HEAVIES[part]} + COST ))
+    LOADS[part]=$(( ${LOADS[part]} + COST ))
+  else
+    part=0
+    for ((k = 1; k < SHARDS; k++)); do [ "${LOADS[k]}" -lt "${LOADS[part]}" ] && part=$k; done
+    LOADS[part]=$(( ${LOADS[part]} + COST ))
+  fi
+  COUNTS[part]=$(( ${COUNTS[part]} + 1 ))
+  echo "$name part$part ${COST}s" >> "$OUT_ABS/shot-plan.txt"
+  if [ "$part" = "$SHARD" ]; then printf -v "M_$key" '%s' 1; fi
+}
+
+# mine <name>: whether this part takes the picture <name> (warm-ups: every part)
+mine() {
+  case "$1" in warmup*) return 0 ;; esac
+  local m="M_${1//[!A-Za-z0-9]/_}"
+  [ -n "${!m:-}" ]
+}
+
 # shoot <name> <wait> [args…]: the app afresh with the mock as its Canvas (as a student who has used it: -SimplDemo),
 # pictured once it has settled, <wait> seconds at most (SIZE=900x820 shoot …: a window of another size). It runs in the
-# background on a free worker; `wait` at the end gathers them. (1.3.79) A picture not taken 15 seconds after its <wait>
-# has the app's threads sampled (sample-<name>.txt: what kept it), and is waited for 45 seconds past its <wait> in all.
+# background on a free worker; `wait` at the end gathers them (SHOT_PID: this one's, when this part takes it). (1.3.79)
+# A picture not taken 15 seconds after its <wait> has the app's threads sampled (sample-<name>.txt: what kept it), and
+# is waited for 45 seconds past its <wait> in all. (1.3.80) By the clock now — the times in shot-times.txt are the
+# clock's too — and the counted quarter-second naps those were ran nearly twice as long on a busy runner, so as long as
+# they gave in fact: sampled 30 seconds past its <wait>, given up on 90 seconds past it (a picture under load came 20
+# to 30 seconds late, 1.3.79; one later than 45 was taken then, and is now). While the list is walked to share it out
+# (PLANNING), the picture is only given its part; then each part takes its own (mine).
 shoot() {
   local name="$1" wait="$2"
   shift 2
+  SHOT_PID=""
+  if [ -n "$PLANNING" ]; then
+    share_out "$name" "$wait"
+    return 0
+  fi
+  mine "$name" || return 0
   local heavy="" slot
   [ -n "${HEAVY_SHOT:-}" ] && heavy="$(take_heavy)"
   slot="$(take_slot)"
@@ -65,52 +164,87 @@ shoot() {
   case " $* " in *PickerConfirm*|*" tool:"*|*" more:tool "*|*" alta:"*|*" macmillan:"*|*" file:"*|*SimplHandInPreview*|*"SimplOpen whatsnew"*|*SimplPinGraph*|*SimplPinFull*) settle=NO ;; esac
   (
     rm -f "$OUT_ABS/$name.rect" "$OUT_ABS/$name.png" "$OUT_ABS/$name-app.png"
+    local start=$SECONDS took=0 sampled=""
     CFFIXED_USER_HOME="$HOMES/home$slot" "$BIN" -SimplBaseURL "${BASE:-http://localhost:8800}" -SimplDemo YES -SimplAppearance "$MODE" \
       -SimplShotFile "$OUT_ABS/$name.png" -SimplShotAfter "$wait" -SimplShotSettle "$settle" -SimplWindowSize "${SIZE:-1280x820}" \
       -NSQuitAlwaysKeepsWindows NO "$@" > "$OUT_ABS/console-$name.txt" 2>&1 &
     local pid=$!
-    local i=0
-    while [ ! -f "$OUT_ABS/$name.rect" ] && [ $i -lt $(( (wait + 45) * 4 )) ] && kill -0 "$pid" 2>/dev/null; do
-      if [ $i -eq $(( (wait + 15) * 4 )) ]; then sample "$pid" 3 -file "$OUT_ABS/sample-$name.txt" >/dev/null 2>&1 & fi
+    while [ ! -f "$OUT_ABS/$name.rect" ] && [ $took -lt $((wait + 90)) ] && kill -0 "$pid" 2>/dev/null; do
+      if [ -z "$sampled" ] && [ $took -ge $((wait + 30)) ]; then
+        sampled=yes
+        sample "$pid" 3 -file "$OUT_ABS/sample-$name.txt" >/dev/null 2>&1 &
+      fi
       sleep 0.25
-      i=$((i + 1))
+      took=$((SECONDS - start))
     done
-    if [ -f "$OUT_ABS/$name-app.png" ]; then echo "shot $name ($((i / 4))s)"; else echo "no picture $name (the app did not get there)"; fi
-    echo "$name $((i / 4))s worker$slot" >> "$OUT_ABS/shot-times.txt"
+    if [ -f "$OUT_ABS/$name-app.png" ]; then echo "shot $name (${took}s)"; else echo "no picture $name (the app did not get there)"; fi
+    echo "$name ${took}s worker$slot part$SHARD at ${start}s" >> "$OUT_ABS/shot-times.txt"
+    # (its worker free once the app has gone — at the most 0.3 seconds after it is asked to, then it is stopped)
     kill "$pid" >/dev/null 2>&1 || true
-    sleep 0.3
+    for _ in 1 2 3 4 5 6; do kill -0 "$pid" 2>/dev/null || break; sleep 0.05; done
     kill -9 "$pid" >/dev/null 2>&1 || true
     # (a console with nothing worth keeping is dropped)
     [ -s "$OUT_ABS/console-$name.txt" ] || rm -f "$OUT_ABS/console-$name.txt"
     rmdir "$HOMES/lock$slot"
     if [ -n "$heavy" ]; then rmdir "$HOMES/heavy$heavy"; fi
   ) &
+  SHOT_PID=$!
+}
+
+# wait_shot: the last picture asked for waited for, when this part took it (`wait "$!"` would wait for another, or for
+# nothing at all)
+wait_shot() {
+  if [ -n "$SHOT_PID" ]; then wait "$SHOT_PID"; fi
+}
+
+# console_says <console> <words> <tenths>: whether an app has said <words> on its console, looked for every tenth of a
+# second, <tenths> times at most
+console_says() {
+  local i
+  for ((i = 0; i < $3; i++)); do
+    grep -qF -- "$2" "$1" 2>/dev/null && return 0
+    sleep 0.1
+  done
+  return 1
+}
+
+# mock_config <json> [port]: the mock school (:8800, or <port>) told to answer otherwise, from here on — except while
+# the list is only being shared out
+mock_config() {
+  [ -z "$PLANNING" ] || return 0
+  curl -s -o /dev/null -X POST -H 'content-type: application/json' -d "$1" "http://localhost:${2:-8800}/__mock/config" || true
 }
 
 # (1.3.78) Send from Phone, tried as a phone would: phone_send <name> <file>… waits for the picture <name>'s app to say
 # its server's address on the console (-SimplPhoneTest), opens the page there, asks for a wrong key's, then posts each
 # file as the phone's page does (X-File-Name, its type, its length); what it got back goes in phone-test.txt. The app
 # holds its picture until a file has come, so the picture shows them arriving; phone_check reads the consoles after.
+# (In the part that takes the picture <name>.) (1.3.80) Each next step as soon as the app has said it is done with
+# the one before — the page seen opened, a file received — and never later than the fixed second (and 0.6 seconds)
+# it was given before.
 phone_send() {
   local name="$1"
   shift
+  [ -z "$PLANNING" ] && mine "$name" || return 0
   (
-    local console="$OUT_ABS/console-$name.txt" url="" i=0 codes=""
-    while [ -z "$url" ] && [ $i -lt 360 ]; do
+    local console="$OUT_ABS/console-$name.txt" url="" start=$SECONDS codes="" code
+    while [ -z "$url" ] && [ $((SECONDS - start)) -lt 90 ]; do
       url="$(grep -o 'SimplPhone ready http://[^ ]*' "$console" 2>/dev/null | head -1 | cut -d' ' -f3)"
-      if [ -z "$url" ]; then sleep 0.25; i=$((i + 1)); fi
+      if [ -z "$url" ]; then sleep 0.25; fi
     done
     if [ -z "$url" ]; then echo "$name: no address on the console" >> "$OUT_ABS/phone-test.txt"; exit 0; fi
     local base="${url%/*/}"
     local page wrong
     page="$(curl -s -m 10 -o "$OUT_ABS/phone-page-$name.html" -w '%{http_code}' "$url")"
     wrong="$(curl -s -m 10 -o /dev/null -w '%{http_code}' "$base/AAAAAAAAAAAAAAAAAAAAAA/")"
-    sleep 1
+    console_says "$console" "SimplPhone opened" 10 || true
     for f in "$@"; do
       local as="${f##*=}" path="${f%%=*}"
-      codes="$codes $(curl -s -m 30 -o /dev/null -w '%{http_code}' -X POST -H 'Expect:' -H "X-File-Name: ${as// /%20}" \
+      code="$(curl -s -m 30 -o /dev/null -w '%{http_code}' -X POST -H 'Expect:' -H "X-File-Name: ${as// /%20}" \
         -H "Content-Type: $(file -b --mime-type "$path")" --data-binary @"$path" "${url}upload")"
-      sleep 0.6
+      codes="$codes $code"
+      # (a file refused says nothing more)
+      if [ "$code" = 200 ]; then console_says "$console" "SimplPhone received $as " 6 || true; fi
     done
     echo "$name: page $page, wrong key $wrong, uploads$codes" >> "$OUT_ABS/phone-test.txt"
   ) &
@@ -131,10 +265,11 @@ phone_check() {
   cat "$out"
 }
 
-# a first launch in each worker's home to warm WebKit and the mock (the first start is slow), not pictured
-for i in $(seq 1 "$JOBS"); do MODE=light shoot "warmup$i" 20; done
-wait
-rm -f "$OUT_ABS"/warmup* "$OUT_ABS"/console-warmup*
+# a first launch in each worker's home to warm WebKit and the mock (the first start is slow), not pictured. (1.3.80)
+# Not waited for together: a worker's first picture starts as soon as its own warm-up is done.
+warm_up() {
+  for i in $(seq 1 "$JOBS"); do MODE=light shoot "warmup$i" 20; done
+}
 
 # the app's crash reports, kept with the pictures (a missing picture is an app that did not stay up: these say why)
 keep_crashes() {
@@ -151,15 +286,19 @@ keep_crashes() {
 # Dashboard not kept), side by side, so the two are timed alike — against a Canvas a quarter of a second away, as a
 # school's is (its assignment lists 0.6 s: the web's fluid suite's), not the mock's instant answers. Last, the
 # assignment opened from the Dashboard — its course's place, made with the assignment on it — and Back: the console
-# says "open Assignment" there, not the course's list.
+# says "open Assignment" there, not the course's list. (1.3.80: in a part of their own, WALKS_PART, once its other
+# pictures are done.)
 WALK="todo,grades,calendar,notifications,inbox,course:101,externaltools,dashboard,todo,grades,calendar,notifications,inbox,course:101,push:/courses/101/assignments/1001,back,externaltools,dashboard,push:/courses/101/assignments/1001,back"
 walks() {
   MODE=light
-  curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"apiDelay":{"/assignments$":600,"":250}}' http://localhost:8800/__mock/config || true
-  shoot light-01w-walk 200 -SimplWalk "$WALK"
-  shoot light-01v-walk-plain 200 -SimplWalk "$WALK" -SimplPlain YES
+  local here=""
+  [ "$WALKS_PART" = "$SHARD" ] && here=yes
+  [ -n "$here" ] && mock_config '{"apiDelay":{"/assignments$":600,"":250}}'
+  PART=$WALKS_PART shoot light-01w-walk 200 -SimplWalk "$WALK"
+  PART=$WALKS_PART shoot light-01v-walk-plain 200 -SimplWalk "$WALK" -SimplPlain YES
   wait
-  curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"apiDelay":null}' http://localhost:8800/__mock/config || true
+  [ -n "$here" ] && mock_config '{"apiDelay":null}'
+  return 0
 }
 
 # (1.3.78) bio <light|dark|both> <name> <wait> <tool> <state> [flags…]: a biology tool on the Tools page at 1440×920,
@@ -175,21 +314,6 @@ bio() {
   for m in $modes; do
     HEAVY_SHOT="$heavy" MODE="$m" SIZE=1440x920 shoot "$m-$name" "$wait" -SimplPlace tools -SimplTool "$tool" -SimplToolState "$state" "$@"
   done
-}
-
-# a push's biology pictures: each of the ten tools once, in light
-bio_quick() {
-  bio light 57-cell-animal 30 cell animal
-  bio light 58a-dna-helix 24 dna helix:measure:pair=3
-  bio light 59a-gene-transcribe 14 gene express:eukaryote:gene=teaching:step=22
-  bio light 61b-biomol-peptide 16 biomol proteins:build:ribbon=over:colour=part
-  bio light 62a-cross-dihybrid 14 cross cross -SimplBioCross "AaBb x AaBb"
-  bio light 63a-divide-metaphase 14 divide mitosis:step=6
-  bio light 64a-popgen-calculate 14 popgen calculate:q2=0.16
-  bio light 65a-biolab-solutions 14 biolab solutions
-  bio light 66a-enzyme-competitive 14 enzyme competitive
-  bio light 67a-energy-map 14 energy map:stage=calvin
-  bio_plain_all
 }
 
 # (1.3.79) bio_plain <name> <wait> <tool>: a biology tool opened as a student opens it — no launch state, so nothing
@@ -214,7 +338,7 @@ bio_plain_all() {
   bio_plain 61z-biomol-plain 40 biomol
 }
 
-# every biology tool's pages and what each is for (the full set): 57 Cell Explorer, 58 DNA & RNA, 59 Gene Expression,
+# every biology tool's pages and what each is for: 57 Cell Explorer, 58 DNA & RNA, 59 Gene Expression,
 # 61 Biomolecule Builder, 62 Genetics Crosses, 63 Cell Division, 64 Hardy–Weinberg, 65 Bio Lab Calculator, 66 Enzyme
 # Lab, 67 Photosynthesis & Respiration; then the four pins' quick versions
 bio_full() {
@@ -325,21 +449,23 @@ bio_full() {
 
 # the biology pins' quick versions: a codon looked up, a cross, Hardy–Weinberg, the lab's dilution and molarity — each
 # alone, once the rest are done: a pin's popover is there only while its app is in front, and four copies picturing
-# their pins at once took the front from each other (three of the four were pictured closed)
+# their pins at once took the front from each other (three of the four were pictured closed). (1.3.80: in a part of
+# their own, PINS_PART.)
+BIO_PIN_NAMES="light-54b-pin-gene light-54c-pin-cross light-54d-pin-popgen light-54e-pin-biolab"
 bio_pins() {
   [ -n "${BIO_PINS:-}" ] || return 0
-  MODE=light shoot light-54b-pin-gene 14 -SimplPinnedTools gene -SimplPinOpen gene -SimplPinCodon UGG
-  wait
-  MODE=light shoot light-54c-pin-cross 14 -SimplPinnedTools "cross,popgen" -SimplPinOpen cross
-  wait
-  MODE=light shoot light-54d-pin-popgen 14 -SimplPinnedTools "cross,popgen" -SimplPinOpen popgen
-  wait
-  MODE=light shoot light-54e-pin-biolab 14 -SimplPinnedTools biolab -SimplPinOpen biolab
-  wait
+  PART=$PINS_PART MODE=light shoot light-54b-pin-gene 14 -SimplPinnedTools gene -SimplPinOpen gene -SimplPinCodon UGG
+  wait_shot
+  PART=$PINS_PART MODE=light shoot light-54c-pin-cross 14 -SimplPinnedTools "cross,popgen" -SimplPinOpen cross
+  wait_shot
+  PART=$PINS_PART MODE=light shoot light-54d-pin-popgen 14 -SimplPinnedTools "cross,popgen" -SimplPinOpen popgen
+  wait_shot
+  PART=$PINS_PART MODE=light shoot light-54e-pin-biolab 14 -SimplPinnedTools biolab -SimplPinOpen biolab
+  wait_shot
 }
 
-# (1.3.78) the UI review's new states, each once (in both sets: what the review's findings changed, seen on every
-# push): the Dashboard's cards and the Announcements panel, Search's answer to a sum, the tour's search step and its
+# (1.3.78) the UI review's new states, each once (what the review's findings changed, seen on every run): the
+# Dashboard's cards and the Announcements panel, Search's answer to a sum, the tour's search step and its
 # offer; a quiz's access code and its multiple answers, an assignment's rubric wide and narrow; the periodic table's
 # tour offered and an element compared, the citation, unit and Grade needed tools, the PDF tools with a file; the
 # Calendar's Week and List, What-If, a message with a file, Grades, To Do and Notifications wide; a locked module,
@@ -383,7 +509,7 @@ ui_review() {
   MODE=light shoot light-23f-settings-notifications 12 -SimplOpen settings -SimplSettingsTab notifications
 }
 
-# (1.3.79) in both sets: five pins in the toolbar at 1024 points and narrow (every pin that fits shown, the rest in the
+# (1.3.79) five pins in the toolbar at 1024 points and narrow (every pin that fits shown, the rest in the
 # Tools pull-down: ToolbarFit) and on a popup's bar; the focus timer's panel pulled out, over the window in dark (1.3.83:
 # Open Full Screen at its head's right end); and an external tool's page light in Dark Mode — a tool window, an Alta and
 # a Macmillan assignment. (1.3.83) A pin's panel with Open Full Screen at its top right, where Pop Out was — the graphing
@@ -403,7 +529,7 @@ pins_pages() {
   MODE=dark shoot dark-21j-macmillan-light-page 26 -SimplOpen macmillan:104:4005
 }
 
-# (1.3.83) in both sets: Alta's pop-ups read whole — the mock's "Knewton Alta" pop-up over its learn page, its body
+# (1.3.83) Alta's pop-ups read whole — the mock's "Knewton Alta" pop-up over its learn page, its body
 # coming 1.2 s after its box (a spinner first) with a list, a link, two formulas, a picture and a drawing, as the Mac's
 # own sheet in light and in dark; and one holding a video, given back to Alta's page, shown as it is
 # (1.3.83) and Light or Dark above the objectives (-SimplAltaPageDark YES: Dark picked): the cover's start screen in Dark
@@ -446,11 +572,11 @@ tool_popups() {
   HEAVY_SHOT=yes MODE=light SIZE=1280x820 shoot light-35t-popup-dna-kept-size 30 -SimplPlace tools -SimplTool dna -SimplPopupSize tool.dna=760x520
 }
 
-# (1.3.80) in both sets: the Tools page's Chemistry section — the Periodic Table split into four tools — in light and in
-# dark; Atoms & Orbitals on iron's atom, and narrow on oxygen's 2p orbitals (its controls and facts in sight under the
-# model); Atoms & Orbitals as a student comes to it from carbon's facts page (-SimplPTHandOff atoms presses Open in
-# Atoms & Orbitals there); Lewis Structures in dark (each tool's light picture is in the push's set: light-55-ptable-
-# trends, light-55c-lewis, light-55d-molecule; Atoms & Orbitals' dark one dark-55l-atoms-cloud); Atoms & Orbitals' pin
+# (1.3.80) the Tools page's Chemistry section — the Periodic Table split into four tools — in light and in dark; Atoms
+# & Orbitals on iron's atom, and narrow on oxygen's 2p orbitals (its controls and facts in sight under the model);
+# Atoms & Orbitals as a student comes to it from carbon's facts page (-SimplPTHandOff atoms presses Open in Atoms &
+# Orbitals there); Lewis Structures in dark (each tool's light picture is in push_set: light-55-ptable-trends,
+# light-55c-lewis, light-55d-molecule; Atoms & Orbitals' dark one dark-55l-atoms-cloud); Atoms & Orbitals' pin
 # opened; and "orbitals" typed in the search field, its tool among the suggestions
 chem_tools() {
   local m
@@ -501,23 +627,28 @@ richtext_check() {
 # never show in another picture) and one at a time, after every other picture: a check runs only while its app is in
 # front, and with the other copies of the app at work it would not be. Each check says one line on the console —
 # "live: dashboard unchanged · 12 reads · 0 redraws", "live: dashboard updated counters,day,list · 9 reads · 1 redraw" —
-# and live_check reads them.
+# and live_check reads them. (1.3.80: in a part of their own, LIVE_PART; the mock is up once it answers, not after a
+# fixed two seconds.)
+LIVE_NAMES="light-48a-live-dashboard light-48b-live-cards light-48c-live-todo light-48d-live-course"
 live_shots() {
-  node scripts/dev/mock-canvas.mjs 8810 8811 > "$HOMES/mock-live.log" 2>&1 &
-  local mock=$! live=(-SimplLiveEvery 4 -SimplLiveShotAfter 5)
-  sleep 2
+  local mock="" live=(-SimplLiveEvery 4 -SimplLiveShotAfter 5) i
+  if [ -z "$PLANNING" ] && [ "$LIVE_PART" = "$SHARD" ]; then
+    node scripts/dev/mock-canvas.mjs 8810 8811 > "$HOMES/mock-live.log" 2>&1 &
+    mock=$!
+    for i in $(seq 1 50); do curl -s -o /dev/null http://localhost:8810/ && break; sleep 0.1; done
+  fi
   # (each picture waited for by its own worker's pid: a bare `wait` would wait for the mock above too, which never ends)
-  MODE=light BASE=http://localhost:8810 shoot light-48a-live-dashboard 50 "${live[@]}" -SimplLiveChange done:6
-  wait "$!"
-  MODE=light BASE=http://localhost:8810 shoot light-48b-live-cards 50 "${live[@]}" -SimplDashView cards -SimplLiveChange grade:6
-  wait "$!"
-  MODE=light BASE=http://localhost:8810 shoot light-48c-live-todo 50 "${live[@]}" -SimplPlace todo -SimplLiveChange task:6
-  wait "$!"
+  PART=$LIVE_PART MODE=light BASE=http://localhost:8810 shoot light-48a-live-dashboard 50 "${live[@]}" -SimplLiveChange done:6
+  wait_shot
+  PART=$LIVE_PART MODE=light BASE=http://localhost:8810 shoot light-48b-live-cards 50 "${live[@]}" -SimplDashView cards -SimplLiveChange grade:6
+  wait_shot
+  PART=$LIVE_PART MODE=light BASE=http://localhost:8810 shoot light-48c-live-todo 50 "${live[@]}" -SimplPlace todo -SimplLiveChange task:6
+  wait_shot
   # (a course's page at its own pace: every 4 seconds here too, -SimplLiveCourseEvery, ten minutes in the app)
-  MODE=light BASE=http://localhost:8810 shoot light-48d-live-course 40 -SimplLiveEvery 4 -SimplLiveCourseEvery 4 -SimplLiveShotAfter 3 \
+  PART=$LIVE_PART MODE=light BASE=http://localhost:8810 shoot light-48d-live-course 40 -SimplLiveEvery 4 -SimplLiveCourseEvery 4 -SimplLiveShotAfter 3 \
     -SimplPlace section:courses/101:assignments
-  wait "$!"
-  kill "$mock" >/dev/null 2>&1 || true
+  wait_shot
+  if [ -n "$mock" ]; then kill "$mock" >/dev/null 2>&1 || true; fi
 }
 
 # (1.3.80) live_check: what the live pictures' consoles say, as live-check.txt (the workflow fails on a FAIL line). A
@@ -557,9 +688,10 @@ live_check() {
 # (1.3.82) tool_list_check: what the External Tools lists' consoles say, as tool-list-check.txt (a FAIL line is said as
 # a warning of the run): each list reckoned its room once as it opened ("[Simpl] tool list room: 303 (…)"), the list
 # read again under it was still open after the read, and no copy of the app crashed (a crash report is kept beside the
-# pictures by keep_crashes: 1.3.81's was a popover sized again and again until AppKit stopped the app)
+# pictures by keep_crashes: 1.3.81's was a popover sized again and again until AppKit stopped the app). (1.3.80: the
+# crash reports looked for on this Mac and among the parts' files put together, where SHOTS=check finds them.)
 tool_list_check() {
-  local out="$OUT_ABS/tool-list-check.txt" r="$OUT_ABS/console-light-36d-external-tools-list-reread.txt" f
+  local out="$OUT_ABS/tool-list-check.txt" r="$OUT_ABS/console-light-36d-external-tools-list-reread.txt" f crashes=0
   : > "$out"
   say() { if [ "$1" = 0 ]; then echo "ok   $2" >> "$out"; else echo "FAIL $2" >> "$out"; fi; }
   for f in "$OUT_ABS"/console-*-36[bcd]-external-tools-*.txt; do
@@ -569,41 +701,35 @@ tool_list_check() {
   done
   grep -q "read again; Knewton Alta's list still open" "$r" 2>/dev/null
   say $? "the list was still open after the tools were read again under it: $(grep -o 'read again; .*' "$r" 2>/dev/null | head -1)"
-  ! ls "$HOME"/Library/Logs/DiagnosticReports/*Simpl* >/dev/null 2>&1
-  say $? "no copy of the app crashed: $(ls "$HOME"/Library/Logs/DiagnosticReports/ 2>/dev/null | grep -c Simpl) crash reports"
+  for f in "$HOME"/Library/Logs/DiagnosticReports/*Simpl* "$OUT_ABS"/crash-*.txt; do
+    if [ -f "$f" ]; then crashes=$((crashes + 1)); fi
+  done
+  [ "$crashes" = 0 ]
+  say $? "no copy of the app crashed: $crashes crash reports"
   if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::warning::tool list: /'; fi
   cat "$out"
 }
 
-# (1.2.1) SHOTS=quick, a push's set: the main screens once each, a few minutes — every screen in light and dark is
-# SHOTS=full (the workflow's own choice, or a commit's message saying [full shots])
-if [ "${SHOTS:-full}" = quick ]; then
+# (1.3.80) push_set: the pictures only a push took before every run took them all (SHOTS=quick was a set of its own,
+# 1.2.1–1.3.80) — in the order a push took them. Where the two sets gave one name two launches, the full set's keeps
+# the name and the push's is here under its own: light-01m-counter-morph-next and dark-01m-counter-morph-graded (Next
+# 7 days' and Graded's tiles half-way through growing; the full set's is Tomorrow's), light-35-tools-plain (the Tools
+# page with nothing pinned; the full set's light-35-tools has four pins). light-32-rubric-ring is the push's (the ring
+# alone): the full set's opened the first criterion, as light-32b-rubric-open does.
+push_set() {
   MODE=light
-  shoot light-01-dashboard 12
   # (1.3.80: a counter's panel waits up to 30 seconds — taken as soon as it has settled — for its list: at 14, under load,
   # the first tile's said "Loading…")
-  shoot light-01d-dashboard-counter 30 -SimplSheet next
   shoot light-01r-counter-middle 30 -SimplSheet tomorrow # (1.3.16: a middle tile's panel centred on it)
   # (1.3.78) the row of six: the first tile's panel from its left edge, the last one's from its right; and the row with
   # the sidebar folded away
   shoot light-01e-counter-first 30 -SimplSheet today
   shoot light-01f-counter-last 30 -SimplSheet graded
   shoot light-01s-dashboard-no-sidebar 12 -SimplSidebar hidden
-  # (1.3.80) a 1024-point window: with the sidebar out, the tiles three across in two rows, as tall as what is on them;
-  # with it folded away, six across — each tile washed with its own colour; a tile half-way through growing into its
-  # panel over the page (held there: -SimplMorphHold)
-  SIZE=1024x820 shoot light-01k-dashboard-1024 12
-  SIZE=1024x820 shoot light-01l-dashboard-1024-no-sidebar 12 -SimplSidebar hidden
-  shoot light-01m-counter-morph 30 -SimplSheet next -SimplMorphHold 0.5 # (its wait the longest: under load the panel came 15 seconds in)
-  # (1.3.79) a window under 1024 points with the sidebar out: 1.3.77's tiles in two rows of three
-  SIZE=940x820 shoot light-40-narrow-dashboard 14
-  shoot light-21a-alta 20 -SimplOpen alta:104:4003 # (1.3.17: a Knewton Alta assignment in the quiz-style popup)
-  shoot light-21c-alta-start 20 -SimplOpen alta:104:4004 # (1.3.59: an assignment's cover as the popup's start screen)
-  shoot light-21f-alta-pins 20 -SimplOpen alta:104:4003 -SimplPinnedTools "calc,need,ptable" # (1.3.73: the toolbar's pins on the popup's own bar)
-  shoot light-21g-alta-float 22 -SimplOpen alta:104:4003 -SimplPinnedTools "calc,need" -SimplPinFloat calc # (1.3.73: a quick panel pulled out, floating over the popup)
+  # (1.3.80) Next 7 days' tile half-way through growing into its panel over the page (held there: -SimplMorphHold)
+  shoot light-01m-counter-morph-next 30 -SimplSheet next -SimplMorphHold 0.5 # (its wait the longest: under load the panel came 15 seconds in)
   shoot light-21d-macmillan 26 -SimplOpen macmillan:104:4005 # (1.3.66: a Macmillan Learning assignment's popup)
   shoot light-21e-second-window 18 -SimplOpen window:section:courses/101:grades # (1.3.69: a window more, on a course's grades: its breakdown bar)
-  shoot light-11-course-grades 14 -SimplPlace section:courses/101:grades # (1.3.69: the breakdown bar in the main window)
   shoot light-36-external-tools 16 -SimplPlace externaltools # (1.3.67: every external tool in the courses)
   shoot light-36b-external-tools-list 12 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77: every place Knewton Alta is used, to choose from)
   shoot light-36c-external-tools-macmillan 12 -SimplPlace externaltools -SimplExternalToolList macmillan # (1.3.79: CHEM's week-titled Macmillan assignments and module item, one tool)
@@ -611,62 +737,34 @@ if [ "${SHOTS:-full}" = quick ]; then
   # in 1.3.81 the tools' answer coming in a second time under the open list had its popover sized and sized again
   # until AppKit stopped the app; its console says the list is still open after the read (tool_list_check)
   shoot light-36d-external-tools-list-reread 16 -SimplPlace externaltools -SimplExternalToolList knewton -SimplExternalToolReread YES
-  # More from Canvas: the sidebar's last section (History, the school's My Materials on its own icon, Help), scrolled
-  # to; its History and Help popups over the window; My Materials in the tool window, on Canvas's launch page for it.
-  # (Each taken as soon as it has settled; at most 20 and 24 seconds — on a loaded runner the Dashboard took 15 seconds
-  # to open, and at 14 History's popup had not come and Help's was still fading in.)
-  shoot light-70-more-sidebar 20 -SimplSidebarScroll more
-  shoot light-70b-more-history 24 -SimplOpen more:history -SimplSidebarScroll more
-  shoot light-70c-more-help 24 -SimplOpen more:help -SimplSidebarScroll more
-  MODE=dark shoot dark-70b-more-history 24 -SimplOpen more:history -SimplSidebarScroll more
-  shoot light-70d-more-tool 30 -SimplOpen more:tool # (its whole wait: a page loading, after the sidebar's reads)
   shoot light-37-developer 16 -SimplOpen developer # (1.3.72: the Developer window)
   shoot light-01p-dashboard-preview 16 -SimplOpen preview
-  shoot light-01q-counter-preview 30 -SimplSheet today -SimplOpen preview:counter # (1.3.79: a row of the panel's own)
   shoot light-05p-calendar-preview 16 -SimplPlace calendar -SimplOpen preview
-  shoot light-02-courses 10 -SimplPlace courses
-  shoot light-04-grades 12 -SimplPlace grades
-  shoot light-07-inbox 10 -SimplPlace inbox
-  shoot light-07b-inbox-thread 18 -SimplPlace inbox -SimplOpen conversation:first
-  shoot light-10-assignment 12 -SimplPlace course:101 -SimplPush /courses/101/assignments/1001
   shoot light-10b-grades-assignment 12 -SimplPlace grades -SimplPush /courses/101/assignments/1001
   shoot light-10c-feedback 18 -SimplPlace course:101 -SimplPush /courses/101/assignments/1008 -SimplOpen feedback
   shoot light-10d-assignment-submitted 12 -SimplPlace course:101 -SimplPush /courses/101/assignments/1008
   SIZE=1440x900 shoot light-10e-assignment-wide 12 -SimplPlace course:101 -SimplPush /courses/101/assignments/1008
   SIZE=1440x900 shoot light-10f-assignment-wide-quiz 12 -SimplPlace course:101 -SimplPush /courses/101/assignments/1001
-  shoot light-32-rubric-ring 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric
   shoot light-32b-rubric-open 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1
-  shoot light-19-quiz-question 14 -SimplOpen quiz:101:9011:take:5
   shoot light-19d-quiz-click 18 -SimplOpen quiz:101:9011:take:1 -SimplQuizClick 4
   shoot light-19f-quiz-feedback 24 -SimplOpen quiz:101:9001:feedback
   shoot light-19e-quiz-click-next 18 -SimplOpen quiz:101:9011:take:1 -SimplQuizClick next
-  shoot light-35-tools 10 -SimplPlace tools
-  shoot light-26-school 8 -SimplPicker merced
-  shoot light-26b-school-confirm 18 -SimplPicker catcourses -SimplPickerConfirm YES
-  # (1.3.73) the sign-in: Simpl's own card over the school's sign-in page (the mock run with --login, on :8802)
-  BASE=http://localhost:8802 shoot light-60-sign-in 10
-  shoot light-27-tour 12 -SimplOpen tour
+  shoot light-35-tools-plain 10 -SimplPlace tools
   # (1.3) themes, To Do's fixed side column, a narrow window, the setup's nicknames
   shoot light-50-theme-dusk 12 -SimplTheme Dusk
   shoot light-50b-theme-ocean-todo 12 -SimplTheme Ocean -SimplPlace todo
   shoot light-50d-theme-photo 12 -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg"
   shoot light-51-settings-appearance 12 -SimplOpen settings -SimplSettingsTab appearance -SimplTheme Ocean -SimplPhotoSlot today
   shoot light-51b-settings-picker 14 -SimplOpen settings -SimplSettingsTab appearance -SimplPickerOpen YES
-  shoot light-03-todo 12 -SimplPlace todo
-  # (1.3.78) the main screens in both looks, so a change to how screens load and move is seen to leave them as they were
-  shoot light-05-calendar 12 -SimplPlace calendar
-  shoot light-08-course 14 -SimplPlace course:101
-  shoot light-12-hand-in 16 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin
   shoot light-12b-hand-in-preview 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplHandInPreview "$PWD/docs/screenshots/calendar.png"
-  # (1.3.78) Send from Phone: its panel with the code; the phone connected and two files in (posted by phone_send); a
-  # PDF-only assignment's photos made into one PDF, and a kind it does not take refused
-  shoot light-12c-hand-in-phone 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES
-  printf 'Notes from class, sent from a phone.\n' > "$HOMES/phone-notes.txt"
-  printf 'ID3 not really music\n' > "$HOMES/phone-song.mp3"
+  # (1.3.78) Send from Phone: the phone connected and two files in (posted by phone_send); a PDF-only assignment's
+  # photos made into one PDF, and a kind it does not take refused (1013 made PDF-only above)
+  if [ -z "$PLANNING" ]; then
+    printf 'Notes from class, sent from a phone.\n' > "$HOMES/phone-notes.txt"
+    printf 'ID3 not really music\n' > "$HOMES/phone-song.mp3"
+  fi
   shoot light-12d-hand-in-phone-connected 40 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES -SimplPhoneTest YES
   phone_send light-12d-hand-in-phone-connected "$PWD/scripts/dev/fixtures/photo.jpg=Photo from phone.jpg" "$HOMES/phone-notes.txt=Notes.txt"
-  curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"ext":{"1013":["pdf"]}}' http://localhost:8800/__mock/config || true
-  shoot light-22-setup 20 -SimplOpen setup
   shoot light-53-whats-new 32 -SimplOpen whatsnew
   shoot light-54-pin-element 14 -SimplPinnedTools "ptable" -SimplPinOpen ptable -SimplPinElement 25 -SimplPTColour category
   # (1.3.52) the Periodic Table: coloured by electronegativity with its trend arrows; an element's page (1.3.80: its
@@ -702,162 +800,175 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot dark-50c-theme-dusk 12 -SimplTheme Dusk
   shoot dark-50d-theme-photo 12 -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg"
   shoot dark-51b-settings-picker 14 -SimplOpen settings -SimplSettingsTab appearance -SimplPickerOpen YES
-  shoot dark-01-dashboard 12
-  # (1.3.79) a counter's panel, and the card of one of its rows over the window, in dark
-  shoot dark-01d-dashboard-counter 30 -SimplSheet next
-  shoot dark-01q-counter-preview 30 -SimplSheet today -SimplOpen preview:counter
-  # (1.3.80) the tiles in their colours by night at 1024 points, the sidebar out and folded away; the first tile of the
-  # second row grown into its panel over the page under it; the last tile half-way through growing
-  SIZE=1024x820 shoot dark-01k-dashboard-1024 12
-  SIZE=1024x820 shoot dark-01l-dashboard-1024-no-sidebar 12 -SimplSidebar hidden
+  # (1.3.80) Overdue's panel at 1024 points, the first tile of the second row grown over the page under it; Graded's,
+  # the last tile, half-way through growing
   SIZE=1024x820 shoot dark-01n-counter-1024-overdue 30 -SimplSheet overdue
-  shoot dark-01m-counter-morph 30 -SimplSheet graded -SimplMorphHold 0.4
+  shoot dark-01m-counter-morph-graded 30 -SimplSheet graded -SimplMorphHold 0.4
   SIZE=940x820 shoot dark-40-narrow-dashboard 14
-  shoot dark-03-todo 12 -SimplPlace todo
-  shoot dark-04-grades 12 -SimplPlace grades
-  shoot dark-05-calendar 12 -SimplPlace calendar
-  shoot dark-08-course 14 -SimplPlace course:101
   shoot dark-36-external-tools 16 -SimplPlace externaltools
   shoot dark-36b-external-tools-list 12 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77)
   shoot dark-32b-rubric-open 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1
-  BASE=http://localhost:8802 shoot dark-60-sign-in 10
-  shoot dark-12c-hand-in-phone 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES
   shoot dark-12e-hand-in-phone-photos 40 -SimplPlace course:101 -SimplPush /courses/101/assignments/1013 -SimplOpen handin -SimplPhone YES -SimplPhoneTest YES
-  # (1.3.78) the Tools page's Biology section, with the toolkit's self-check on its console; each biology tool once, on
-  # the page its launch asked for (-SimplTool <key> -SimplToolState <page>[:…]) — every page of each is in the full set
-  MODE=light SIZE=1280x900 shoot light-35b-tools-biology 12 -SimplPlace tools -SimplToolsScroll biology -SimplBioCheck YES
   phone_send dark-12e-hand-in-phone-photos "$PWD/scripts/dev/fixtures/photo.jpg=IMG_0001.jpg" "$PWD/scripts/dev/fixtures/photo.jpg=IMG_0002.jpg" "$HOMES/phone-song.mp3=Song.mp3"
-  # (1.3.78) the PDF-only assignment waiting for the phone: Combine photos under the code before anything is sent
-  shoot dark-12f-hand-in-phone-photos-waiting 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1013 -SimplOpen handin -SimplPhone YES
-  ui_review
-  pins_pages # (1.3.79)
-  alta_pages # (1.3.83)
-  tool_popups # (1.3.79)
-  chem_tools # (1.3.80)
-  bio_quick # (after the phone's files are on their way: a shot waits for a free worker, and the phone's app must not)
-  wait
-  walks
-  live_shots # (1.3.80: alone, last)
+}
+
+# (1.3.80) SHOTS=check: the parts' pictures put together in $OUT (the workflow's last job), what their apps said read
+# as one — Send from Phone's files, a post's web view that never measured, how each 3D model was framed, the live checks
+if [ "${SHOTS:-full}" = check ]; then
   phone_check
   richtext_check
   frame_check
   live_check
   tool_list_check # (1.3.82)
-  keep_crashes
   exit 0
 fi
 
-for MODE in light dark; do
-  shoot "$MODE-01-dashboard" 14 -SimplActivityProbe YES
-  shoot "$MODE-02-courses" 12 -SimplPlace courses
-  shoot "$MODE-03-todo" 12 -SimplPlace todo
-  shoot "$MODE-04-grades" 14 -SimplPlace grades
-  shoot "$MODE-05-calendar" 12 -SimplPlace calendar
-  shoot "$MODE-06-notifications" 12 -SimplPlace notifications
-  shoot "$MODE-07-inbox" 12 -SimplPlace inbox
-  shoot "$MODE-08-course" 14 -SimplPlace course:101
-  shoot "$MODE-09-assignments" 12 -SimplPlace section:courses/101:assignments
-  shoot "$MODE-10-assignment" 14 -SimplPlace course:101 -SimplPush /courses/101/assignments/1001
-  shoot "$MODE-11-course-grades" 14 -SimplPlace section:courses/101:grades
-  shoot "$MODE-12-hand-in" 16 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin
-  shoot "$MODE-12c-hand-in-phone" 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES
-  shoot "$MODE-13-discussion" 14 -SimplPlace course:101 -SimplPush /courses/101/discussion_topics/7003
-  shoot "$MODE-14-modules" 12 -SimplPlace section:courses/101:modules
-  shoot "$MODE-15-files" 12 -SimplPlace section:courses/101:files
-  shoot "$MODE-16-groups" 12 -SimplPlace groups
-  shoot "$MODE-17-search" 12 -SimplPlace search:dis
-  shoot "$MODE-18-quiz" 14 -SimplOpen quiz:101:9011
-  shoot "$MODE-19-quiz-question" 18 -SimplOpen quiz:101:9011:take:5
-  shoot "$MODE-20-quiz-review" 18 -SimplOpen quiz:101:9011:review
-  shoot "$MODE-21-tool" 24 -SimplOpen tool:101:9
-  shoot "$MODE-21a-alta" 20 -SimplOpen alta:104:4003
-  shoot "$MODE-21c-alta-start" 20 -SimplOpen alta:104:4004
-  shoot "$MODE-21f-alta-pins" 20 -SimplOpen alta:104:4003 -SimplPinnedTools "calc,need,ptable"
-  shoot "$MODE-21g-alta-float" 22 -SimplOpen alta:104:4003 -SimplPinnedTools "calc,need" -SimplPinFloat calc
-  shoot "$MODE-22-setup" 20 -SimplOpen setup
-  shoot "$MODE-23-settings" 18 -SimplOpen settings
-  shoot "$MODE-24-new-task" 12 -SimplPlace todo -SimplOpen newtask
-  shoot "$MODE-25-compose" 12 -SimplPlace inbox -SimplOpen compose
-  shoot "$MODE-26-school" 8 -SimplPicker merced
-  shoot "$MODE-26b-school-confirm" 18 -SimplPicker catcourses -SimplPickerConfirm YES
-  BASE=http://localhost:8802 shoot "$MODE-60-sign-in" 10 # (1.3.73) Simpl's own sign-in card over the school's page
-  # (1.2) the Dashboard's other views and a counter grown into its list, a thread beside the Inbox, the tour, the
-  # search field's commands
-  shoot "$MODE-01b-dashboard-list" 14 -SimplDashView list
-  # (1.3.79: under the full set's load the Dashboard's counts came 24 seconds in, and the panel after them: each taken
-  # as soon as it has settled, its wait only the longest)
-  shoot "$MODE-01d-dashboard-counter" 30 -SimplSheet next
-  shoot "$MODE-01q-counter-preview" 45 -SimplSheet today -SimplOpen preview:counter # (1.3.79: a panel row's card)
-  # (1.3.80) the tiles at 1024 points, the sidebar out (three across) and folded away (six); a tile half-way through
-  # growing into its panel
-  SIZE=1024x820 shoot "$MODE-01k-dashboard-1024" 14
-  SIZE=1024x820 shoot "$MODE-01l-dashboard-1024-no-sidebar" 14 -SimplSidebar hidden
-  shoot "$MODE-01m-counter-morph" 30 -SimplSheet tomorrow -SimplMorphHold 0.5
-  shoot "$MODE-07b-inbox-thread" 18 -SimplPlace inbox -SimplOpen conversation:first
-  shoot "$MODE-27-tour" 14 -SimplOpen tour
-  shoot "$MODE-30-commands" 14 -SimplOpen palette:/
-  # More from Canvas: the sidebar's section, and its History and Help popups
-  shoot "$MODE-70-more-sidebar" 20 -SimplSidebarScroll more
-  shoot "$MODE-70b-more-history" 24 -SimplOpen more:history -SimplSidebarScroll more
-  shoot "$MODE-70c-more-help" 24 -SimplOpen more:help -SimplSidebarScroll more
+# (1.3.80) the_set: every picture, in the order a part takes its own — walked twice in each part: first to share the
+# whole list out (PLANNING: nothing launched, shot-plan.txt written), then to take this part's pictures
+the_set() {
+  for MODE in light dark; do
+    shoot "$MODE-01-dashboard" 14 -SimplActivityProbe YES
+    shoot "$MODE-02-courses" 12 -SimplPlace courses
+    shoot "$MODE-03-todo" 12 -SimplPlace todo
+    shoot "$MODE-04-grades" 14 -SimplPlace grades
+    shoot "$MODE-05-calendar" 12 -SimplPlace calendar
+    shoot "$MODE-06-notifications" 12 -SimplPlace notifications
+    shoot "$MODE-07-inbox" 12 -SimplPlace inbox
+    shoot "$MODE-08-course" 14 -SimplPlace course:101
+    shoot "$MODE-09-assignments" 12 -SimplPlace section:courses/101:assignments
+    shoot "$MODE-10-assignment" 14 -SimplPlace course:101 -SimplPush /courses/101/assignments/1001
+    shoot "$MODE-11-course-grades" 14 -SimplPlace section:courses/101:grades
+    shoot "$MODE-12-hand-in" 16 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin
+    shoot "$MODE-12c-hand-in-phone" 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES
+    shoot "$MODE-13-discussion" 14 -SimplPlace course:101 -SimplPush /courses/101/discussion_topics/7003
+    shoot "$MODE-14-modules" 12 -SimplPlace section:courses/101:modules
+    shoot "$MODE-15-files" 12 -SimplPlace section:courses/101:files
+    shoot "$MODE-16-groups" 12 -SimplPlace groups
+    shoot "$MODE-17-search" 12 -SimplPlace search:dis
+    shoot "$MODE-18-quiz" 14 -SimplOpen quiz:101:9011
+    shoot "$MODE-19-quiz-question" 18 -SimplOpen quiz:101:9011:take:5
+    shoot "$MODE-20-quiz-review" 18 -SimplOpen quiz:101:9011:review
+    shoot "$MODE-21-tool" 24 -SimplOpen tool:101:9
+    shoot "$MODE-21a-alta" 20 -SimplOpen alta:104:4003
+    shoot "$MODE-21c-alta-start" 20 -SimplOpen alta:104:4004
+    shoot "$MODE-21f-alta-pins" 20 -SimplOpen alta:104:4003 -SimplPinnedTools "calc,need,ptable"
+    shoot "$MODE-21g-alta-float" 22 -SimplOpen alta:104:4003 -SimplPinnedTools "calc,need" -SimplPinFloat calc
+    shoot "$MODE-22-setup" 20 -SimplOpen setup
+    shoot "$MODE-23-settings" 18 -SimplOpen settings
+    shoot "$MODE-24-new-task" 12 -SimplPlace todo -SimplOpen newtask
+    shoot "$MODE-25-compose" 12 -SimplPlace inbox -SimplOpen compose
+    shoot "$MODE-26-school" 8 -SimplPicker merced
+    shoot "$MODE-26b-school-confirm" 18 -SimplPicker catcourses -SimplPickerConfirm YES
+    BASE=http://localhost:8802 shoot "$MODE-60-sign-in" 10 # (1.3.73) Simpl's own sign-in card over the school's page
+    # (1.2) the Dashboard's other views and a counter grown into its list, a thread beside the Inbox, the tour, the
+    # search field's commands
+    shoot "$MODE-01b-dashboard-list" 14 -SimplDashView list
+    # (1.3.79: under the full set's load the Dashboard's counts came 24 seconds in, and the panel after them: each taken
+    # as soon as it has settled, its wait only the longest)
+    shoot "$MODE-01d-dashboard-counter" 30 -SimplSheet next
+    shoot "$MODE-01q-counter-preview" 45 -SimplSheet today -SimplOpen preview:counter # (1.3.79: a panel row's card)
+    # (1.3.80) the tiles at 1024 points, the sidebar out (three across) and folded away (six); a tile half-way through
+    # growing into its panel
+    SIZE=1024x820 shoot "$MODE-01k-dashboard-1024" 14
+    SIZE=1024x820 shoot "$MODE-01l-dashboard-1024-no-sidebar" 14 -SimplSidebar hidden
+    shoot "$MODE-01m-counter-morph" 30 -SimplSheet tomorrow -SimplMorphHold 0.5
+    shoot "$MODE-07b-inbox-thread" 18 -SimplPlace inbox -SimplOpen conversation:first
+    shoot "$MODE-27-tour" 14 -SimplOpen tour
+    shoot "$MODE-30-commands" 14 -SimplOpen palette:/
+    # More from Canvas: the sidebar's section, and its History and Help popups
+    shoot "$MODE-70-more-sidebar" 20 -SimplSidebarScroll more
+    shoot "$MODE-70b-more-history" 24 -SimplOpen more:history -SimplSidebarScroll more
+    shoot "$MODE-70c-more-help" 24 -SimplOpen more:help -SimplSidebarScroll more
+  done
+  bio_full # (1.3.78) the biology toolkit, every tool's pages
+  bio_plain_all # (1.3.79) three of them opened plainly, in dark, at two window sizes, the sidebar out and folded
+  ui_review # (1.3.78) the UI review's new states
+  pins_pages # (1.3.79) the pins' room, a panel pulled out, external tools' pages light
+  alta_pages # (1.3.83) Alta's popup: its pop-ups read whole, Light or Dark, Show Browser
+  tool_popups # (1.3.79) a tool's popup over the Tools page
+  chem_tools # (1.3.80) the Chemistry section and its tools
+  # (1.3.78) a PDF-only assignment (1013, made so here) waiting for the phone: Combine photos under the code
+  mock_config '{"ext":{"1013":["pdf"]}}'
+  MODE=dark shoot dark-12f-hand-in-phone-photos-waiting 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1013 -SimplOpen handin -SimplPhone YES
+  push_set # (1.3.80) what only a push took before
+  # (1.2) in light only: more of the redesign, and the narrow window's layouts
+  MODE=light
+  shoot light-01c-dashboard-activity 14 -SimplDashView activity
+  shoot light-02b-courses-past 12 -SimplPlace courses -SimplCoursesFilter past
+  shoot light-19b-quiz-matching 18 -SimplOpen quiz:101:9011:take:4
+  shoot light-23b-settings-updates 12 -SimplOpen settings -SimplSettingsTab updates
+  shoot light-28-tour-grades 16 -SimplOpen tour:2
+  shoot light-29-tour-last 16 -SimplOpen tour:6 # (1.3.78: the tour's last step, Report a Bug at the account menu)
+  shoot light-31-command-grades 16 -SimplOpen "palette:/grades "
+  shoot light-32-rubric-ring 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric
+  shoot light-33-rubric-grid 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:grid
+  shoot light-34-files-preview 14 -SimplPlace section:courses/101:files -SimplOpen file:f1
+  shoot light-35-tools 12 -SimplPlace tools -SimplPinnedTools "pomo,calc,need,ptable"
+  shoot light-37-tool-calc 12 -SimplPlace tools -SimplTool calc
+  shoot light-38-tool-ptable 12 -SimplPlace tools -SimplTool ptable -SimplPTColour category
+  shoot light-39-tool-need 14 -SimplPlace tools -SimplTool need
+  shoot light-70d-more-tool 30 -SimplOpen more:tool # (More from Canvas: My Materials in the tool window)
+  MODE=dark shoot dark-70d-more-tool 30 -SimplOpen more:tool # (1.3.80: the app dark, the school's tool page light)
+  SIZE=1280x900 shoot light-35b-tools-biology 12 -SimplPlace tools -SimplToolsScroll biology -SimplBioCheck YES # (1.3.78)
+  SIZE=940x820 shoot light-40-narrow-dashboard 14
+  SIZE=940x820 shoot light-41-narrow-grades 14 -SimplPlace grades
+  SIZE=940x820 shoot light-42-narrow-inbox 12 -SimplPlace inbox
+  SIZE=1720x1040 shoot light-43-wide-dashboard 14
+  SIZE=1720x1040 shoot light-44-wide-inbox 14 -SimplPlace inbox -SimplOpen conversation:first
+  # Brightspace: a made-up student's (scripts/dev/mock-brightspace.mjs), in light — no Inbox or Groups in the sidebar
+  export BASE=http://localhost:8860
+  MODE=light
+  shoot d2l-01-dashboard 16 -SimplActivityProbe YES # (and the new-activity check's read of Brightspace, on the console)
+  shoot d2l-02-course 14 -SimplPlace course:31001
+  shoot d2l-03-assignments 12 -SimplPlace section:courses/31001:assignments
+  shoot d2l-04-assignment 14 -SimplPlace course:31001 -SimplPush /courses/31001/assignments/702
+  shoot d2l-05-grades 14 -SimplPlace section:courses/31001:grades
+  shoot d2l-06-content 12 -SimplPlace section:courses/31001:modules
+  shoot d2l-07-discussion 14 -SimplPlace course:31001 -SimplPush /courses/31001/discussion_topics/2000000902
+  shoot d2l-08-todo 12 -SimplPlace todo
+  unset BASE
+  wait # (the rest alone: a running focus timer is kept)
+  walks
+  # (1.2) last, since a running focus timer is kept: the timer, and the pinned tools in the toolbar with it live
+  PART=$TIMER_PART shoot light-36-tool-timer 12 -SimplPlace tools -SimplTool pomo -SimplFocusDemo YES -SimplPinnedTools "calc,need"
+  PART=$TIMER_PART shoot light-45-dashboard-pins 14 -SimplFocusDemo YES -SimplPinnedTools "calc,need,cite"
+  PART=$TIMER_PART shoot light-54f-pin-timer 14 -SimplFocusDemo YES -SimplPinnedTools pomo -SimplPinOpen pomo # (1.3.78: the timer's quick version)
+  wait
+  bio_pins
+  live_shots # (1.3.80: alone, last)
+}
+
+# the groups taken alone at the end, each placed on a part before the rest are shared out (the longest first)
+TIMER_NAMES="light-36-tool-timer light-45-dashboard-pins light-54f-pin-timer"
+alone LIVE_PART one-by-one $LIVE_NAMES
+alone WALKS_PART together light-01w-walk light-01v-walk-plain
+alone PINS_PART one-by-one $BIO_PIN_NAMES
+alone TIMER_PART together $TIMER_NAMES
+: > "$OUT_ABS/shot-plan.txt"
+PLANNING=yes
+the_set
+PLANNING=""
+for ((k = 0; k < SHARDS; k++)); do
+  echo "part $k of $SHARDS: ${COUNTS[k]} pictures, about $(( ${LOADS[k]} / PLAN_JOBS ))s with $PLAN_JOBS copies at once"
 done
-bio_full # (1.3.78) the biology toolkit, every tool's pages
-bio_plain_all # (1.3.79) three of them opened plainly, in dark, at two window sizes, the sidebar out and folded
-ui_review # (1.3.78) the UI review's new states
-pins_pages # (1.3.79) the pins' room, a panel pulled out, external tools' pages light
-alta_pages # (1.3.83) Alta's popup: its pop-ups read whole, Light or Dark, Show Browser
-tool_popups # (1.3.79) a tool's popup over the Tools page
-chem_tools # (1.3.80) the Chemistry section and its tools
-# (1.3.78) a PDF-only assignment (as the push's set makes 1013) waiting for the phone: Combine photos under the code
-curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"ext":{"1013":["pdf"]}}' http://localhost:8800/__mock/config || true
-MODE=dark shoot dark-12f-hand-in-phone-photos-waiting 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1013 -SimplOpen handin -SimplPhone YES
-# (1.2) in light only: more of the redesign, and the narrow window's layouts
-MODE=light
-shoot light-01c-dashboard-activity 14 -SimplDashView activity
-shoot light-02b-courses-past 12 -SimplPlace courses -SimplCoursesFilter past
-shoot light-19b-quiz-matching 18 -SimplOpen quiz:101:9011:take:4
-shoot light-23b-settings-updates 12 -SimplOpen settings -SimplSettingsTab updates
-shoot light-28-tour-grades 16 -SimplOpen tour:2
-shoot light-29-tour-last 16 -SimplOpen tour:6 # (1.3.78: the tour's last step, Report a Bug at the account menu)
-shoot light-31-command-grades 16 -SimplOpen "palette:/grades "
-shoot light-32-rubric-ring 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1
-shoot light-33-rubric-grid 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:grid
-shoot light-34-files-preview 14 -SimplPlace section:courses/101:files -SimplOpen file:f1
-shoot light-35-tools 12 -SimplPlace tools -SimplPinnedTools "pomo,calc,need,ptable"
-shoot light-37-tool-calc 12 -SimplPlace tools -SimplTool calc
-shoot light-38-tool-ptable 12 -SimplPlace tools -SimplTool ptable -SimplPTColour category
-shoot light-39-tool-need 14 -SimplPlace tools -SimplTool need
-shoot light-70d-more-tool 30 -SimplOpen more:tool # (More from Canvas: My Materials in the tool window)
-MODE=dark shoot dark-70d-more-tool 30 -SimplOpen more:tool # (1.3.80: the app dark, the school's tool page light)
-SIZE=1280x900 shoot light-35b-tools-biology 12 -SimplPlace tools -SimplToolsScroll biology -SimplBioCheck YES # (1.3.78)
-SIZE=940x820 shoot light-40-narrow-dashboard 14
-SIZE=940x820 shoot light-41-narrow-grades 14 -SimplPlace grades
-SIZE=940x820 shoot light-42-narrow-inbox 12 -SimplPlace inbox
-SIZE=1720x1040 shoot light-43-wide-dashboard 14
-SIZE=1720x1040 shoot light-44-wide-inbox 14 -SimplPlace inbox -SimplOpen conversation:first
-# Brightspace: a made-up student's (scripts/dev/mock-brightspace.mjs), in light — no Inbox or Groups in the sidebar
-export BASE=http://localhost:8860
-MODE=light
-shoot d2l-01-dashboard 16 -SimplActivityProbe YES # (and the new-activity check's read of Brightspace, on the console)
-shoot d2l-02-course 14 -SimplPlace course:31001
-shoot d2l-03-assignments 12 -SimplPlace section:courses/31001:assignments
-shoot d2l-04-assignment 14 -SimplPlace course:31001 -SimplPush /courses/31001/assignments/702
-shoot d2l-05-grades 14 -SimplPlace section:courses/31001:grades
-shoot d2l-06-content 12 -SimplPlace section:courses/31001:modules
-shoot d2l-07-discussion 14 -SimplPlace course:31001 -SimplPush /courses/31001/discussion_topics/2000000902
-shoot d2l-08-todo 12 -SimplPlace todo
-unset BASE
-wait # (the rest alone: a running focus timer is kept)
-walks
-# (1.2) last, since a running focus timer is kept: the timer, and the pinned tools in the toolbar with it live
-shoot light-36-tool-timer 12 -SimplPlace tools -SimplTool pomo -SimplFocusDemo YES -SimplPinnedTools "calc,need"
-shoot light-45-dashboard-pins 14 -SimplFocusDemo YES -SimplPinnedTools "calc,need,cite"
-shoot light-54f-pin-timer 14 -SimplFocusDemo YES -SimplPinnedTools pomo -SimplPinOpen pomo # (1.3.78: the timer's quick version)
-wait
-bio_pins
-live_shots # (1.3.80: alone, last)
-richtext_check
-frame_check
-live_check
+if [ "${SHOTS:-full}" = plan ]; then exit 0; fi
+
+# every kind of quiz question in the mock's quizzes (matching, blanks, essay, formula, file upload), for the quiz pictures
+mock_config '{"richQuestions":true,"moreTypes":true}'
+defaults write com.simplcourses.mac ApplePersistenceIgnoreState -bool YES >/dev/null 2>&1 || true
+HOMES="$(mktemp -d /tmp/simpl-shots.XXXXXX)"
+for i in $(seq 1 "$JOBS"); do mkdir -p "$HOMES/home$i/Library/Preferences"; done
+
+warm_up
+the_set
+rm -f "$OUT_ABS"/warmup* "$OUT_ABS"/console-warmup*
+# (one Mac taking every picture reads its consoles itself; the workflow's parts are read once they are put together)
+if [ "$SHARDS" = 1 ]; then
+  phone_check
+  richtext_check
+  frame_check
+  live_check
+  tool_list_check # (1.3.82)
+fi
 keep_crashes
 exit 0

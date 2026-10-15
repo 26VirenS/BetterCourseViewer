@@ -9,14 +9,16 @@ is named in the allowlist (scripts/dev/shot-checks.json), each with its reason a
     python3 scripts/dev/check-shots.py <dir> [--expect names.txt] [--pattern '*.png'] [--allow shot-checks.json]
                                              [--app mac|ios|windows] [--report out.txt]
 
---expect: a file whose lines start with each picture's name (mac-shots.sh's shot-times.txt, a list of names): every
-one must have a picture (<name>.png or <name>-app.png). Each picture is measured at a width of 320 pixels:
+--expect: a file whose lines start with each picture's name (mac-shots.sh's shot-plan.txt, every part's pictures;
+ios-shots.sh's shot-times.txt; a list of names): every one must have a picture (<name>.png or <name>-app.png). Each
+picture is measured at a width of 320 pixels:
   spread   the standard deviation of its grey (0 a flat colour; a screen of text and cards is 20 and more)
   dominant the share of it in its commonest colour (colours counted in steps of 16 per channel)
   colours  how many such colours cover at least 0.2% of it
 and fails when spread < MIN_SPREAD, dominant > MAX_DOMINANT or colours < MIN_COLOURS. Needs Pillow.
 """
 import argparse
+import concurrent.futures
 import fnmatch
 import json
 import os
@@ -55,6 +57,14 @@ def measure(path):
     return spread, dominant, colours, width, height
 
 
+def measure_or_why(path):
+    """measure(path), or why the file would not open as a picture."""
+    try:
+        return measure(path)
+    except Exception as e:
+        return str(e) or type(e).__name__
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("dir")
@@ -78,14 +88,16 @@ def main():
         return None, None
 
     files = sorted(f for f in os.listdir(a.dir) if fnmatch.fnmatch(f, a.pattern)) if os.path.isdir(a.dir) else []
+    # (the pictures measured on every core at once, each as it would be alone: 400 of them in two seconds, not six)
+    with concurrent.futures.ProcessPoolExecutor() as pool:
+        measured = list(pool.map(measure_or_why, [os.path.join(a.dir, f) for f in files], chunksize=8))
     problems, rows = [], []
-    for f in files:
+    for f, m in zip(files, measured):
         name = f[:-4]
-        try:
-            spread, dominant, colours, w, h = measure(os.path.join(a.dir, f))
-        except Exception as e:  # (a file that is not a picture at all)
-            problems.append(f"{f}: not a picture that opens ({e})")
+        if isinstance(m, str):  # (a file that is not a picture at all)
+            problems.append(f"{f}: not a picture that opens ({m})")
             continue
+        spread, dominant, colours, w, h = m
         rows.append(f"{name:44} {w:5}x{h:<5} spread {spread:6.1f}  dominant {dominant:5.3f}  colours {colours:4}")
         pattern, rule = allowance(name)
         lo_spread = rule.get("min_spread", MIN_SPREAD) if rule else MIN_SPREAD
