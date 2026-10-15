@@ -1,6 +1,6 @@
 import SwiftUI
 
-// (tools) The Word Counter, a study tool: a big text area to paste or type an essay into, and beside it — live, as the
+// (1.3.91) The Word Counter, a study tool: a big text area to paste or type an essay into, and beside it — live, as the
 // text changes — its words, characters with and without spaces, sentences and paragraphs, the time it takes to read
 // and to say, the average and the longest word, how far it is from a target length (a bar, "12 to go" or "40 over")
 // and the ten words it uses most as chips (the stop words left out). The counting is WordCount's (Model/WordCountModel

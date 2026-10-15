@@ -1,6 +1,6 @@
 import Foundation
 
-// (tools) Statistics' arithmetic (Foundation only, checked by the Models job against the specification's vectors): a
+// (1.3.91) Statistics' arithmetic (Foundation only, checked by the Models job against the specification's vectors): a
 // data set described — its mean, median, modes, quartiles (the medians of the lower and upper halves, the median
 // itself left out when n is odd), standard deviations and variances (sample and population), standard error, the
 // outliers past 1.5 IQR, and the histogram's bins by Sturges' rule; linear regression; the normal distribution by an

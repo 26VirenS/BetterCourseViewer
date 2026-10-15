@@ -1,6 +1,6 @@
 import Foundation
 
-// (tools) The Matrix Calculator's arithmetic (Foundation only, checked by the Models job against the specification's
+// (1.3.91) The Matrix Calculator's arithmetic (Foundation only, checked by the Models job against the specification's
 // vectors): matrices of up to 6 × 6 whose cells are exact fractions when what was typed is whole numbers, fractions or
 // short decimals (Int64 numerators and denominators, a sum or product that would overflow falling back to a decimal),
 // decimals otherwise; sums, differences, products, a scalar multiple, the transpose, the determinant and inverse by

@@ -1,6 +1,6 @@
 import SwiftUI
 
-// (tools) Statistics, a maths tool: four pages under one heading — Describe (a data set's n, mean, median, modes,
+// (1.3.91) Statistics, a maths tool: four pages under one heading — Describe (a data set's n, mean, median, modes,
 // quartiles, spreads and outliers, with a histogram and a box plot), Regression (two columns, the least-squares line,
 // r and r², a scatter with the line, a prediction), Distributions (the normal curve's probabilities, z and inverse;
 // Student's t and its p) and Tests (one-sample, Welch's two-sample and paired t-tests with their 95% intervals). The

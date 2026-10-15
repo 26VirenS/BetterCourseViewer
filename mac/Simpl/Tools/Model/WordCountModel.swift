@@ -1,6 +1,6 @@
 import Foundation
 
-// (tools) The Word Counter's counting (Foundation only, checked by the Models job): a text's words, characters with and
+// (1.3.91) The Word Counter's counting (Foundation only, checked by the Models job): a text's words, characters with and
 // without spaces, sentences and paragraphs; the time it takes to read (238 words a minute) and to say (150); the
 // average word and the longest; the ten words it uses most, the stop words left out; and how far a text is from a
 // target length.

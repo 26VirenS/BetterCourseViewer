@@ -1,6 +1,6 @@
 import SwiftUI
 
-// (tools) The Matrix Calculator, a maths tool: two matrices A and B typed into grids (1 to 6 rows and columns each,
+// (1.3.91) The Matrix Calculator, a maths tool: two matrices A and B typed into grids (1 to 6 rows and columns each,
 // Tab moving from cell to cell, a block of rows pasted into a cell filling the grid), an operation chosen from a row of
 // chips — A + B, A − B, A × B, k·A, Aᵀ, det A, A⁻¹, rank, RREF, trace, A·x = b with B as the column b, the eigenvalues,
 // Aⁿ — and the result under them: exact fractions while the cells are whole numbers, fractions or short decimals (a
