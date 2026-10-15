@@ -222,6 +222,36 @@ check(redox?.counts.last == ChemCountRow(label: "Charge", left: 17, right: 17), 
 check(ChemBalancer.split("Cu + Ag+") == ["Cu", "Ag+"] && ChemBalancer.split("H2+O2") == ["H2", "O2"] && ChemBalancer.split("Fe^3+ + e-") == ["Fe^3+", "e-"]
       && ChemBalancer.split("Ag+(aq) + Cl-(aq)") == ["Ag+(aq)", "Cl-(aq)"], "a side split at its pluses, not at its charges")
 
+// (Molar Mass & Stoichiometry, Model/ChemStoich.swift: an amount in every unit, a reaction's limiting reagent, yields
+// and excess, a percent yield, and an empirical formula)
+let tenGrams = ChemStoich.convert(10, .grams, molarMass: molar("H2O"))
+check(tenGrams.map { abs($0.moles - 0.5551) < 0.0005 && abs($0.particles - 3.343e23) < 0.002e23 && abs($0.litres - 12.44) < 0.01 } == true,
+      "10 g of water: 0.5551 mol, 3.343e23 molecules, 12.44 L at STP (\(tenGrams.map { "\(ChemNumber.sig($0.moles)) \(ChemNumber.sig($0.particles)) \(ChemNumber.sig($0.litres))" } ?? ""))")
+check(ChemStoich.convert(1, .moles, molarMass: 18.015)?.grams == 18.015 && ChemStoich.convert(22.4, .litres, molarMass: 18.015)?.moles == 1
+      && abs((ChemStoich.convert(6.02214076e23, .particles, molarMass: 18.015)?.moles ?? 0) - 1) < 1e-12 && ChemStoich.convert(1, .grams, molarMass: 0) == nil,
+      "and back from moles, litres and particles; no mass, no amount")
+let waterReaction = (try? ChemBalancer.balance("2H2 + O2 -> 2H2O").get()).flatMap { ChemStoich.reaction($0, given: [0: .init(value: 4, grams: true), 1: .init(value: 16, grams: true)]) }
+check(waterReaction?.limiting.text == "O2" && waterReaction.map { abs($0.extent - 0.5) < 0.001 } == true, "4 g of hydrogen and 16 g of oxygen: oxygen runs out first (0.5 mol)")
+check(waterReaction?.yields.count == 1 && waterReaction.map { abs($0.yields[0].moles - 1) < 0.001 && abs($0.yields[0].grams - 18.015) < 0.02 } == true,
+      "water's yield 1 mol, 18.015 g (\(waterReaction.map { ChemNumber.sig($0.yields[0].grams, 5) } ?? ""))")
+check(waterReaction?.excess.count == 1 && waterReaction?.excess[0].species.text == "H2" && waterReaction.map { abs($0.excess[0].moles - 0.984) < 0.001 && abs($0.excess[0].grams - 1.98) < 0.01 } == true,
+      "0.984 mol (1.98 g) of hydrogen left (\(waterReaction.map { ChemNumber.sig($0.excess[0].moles) } ?? ""))")
+check(ChemStoich.percentYield(actual: 15, theoretical: 18.015).map { abs($0 - 83.3) < 0.05 } == true && ChemStoich.percentYield(actual: 1, theoretical: 0) == nil,
+      "15 g made of 18.015: 83.3 %")
+let molesOnly = (try? ChemBalancer.balance("2H2 + O2 -> 2H2O").get()).flatMap { ChemStoich.reaction($0, given: [0: .init(value: 1, grams: false)]) }
+check(molesOnly?.limiting.text == "H2" && molesOnly?.excess.isEmpty == true && molesOnly.map { abs($0.yields[0].moles - 1) < 1e-9 } == true,
+      "one reactant given in moles limits; the rest are in excess and not counted")
+check(ChemStoich.givens("H2=4g, O2=16 g,N2=2mol")["O2"] == .init(value: 16, grams: true) && ChemStoich.givens("H2=4g,N2=2mol")["N2"] == .init(value: 2, grams: false),
+      "what is given read from the launch's list")
+let chons = ChemStoich.empirical([("C", 40.0), ("H", 6.71), ("O", 53.3)], molarMass: nil)
+check((try? chons.get())?.empiricalText == "CH2O" && (try? chons.get())?.multiple == nil, "C 40.0 %, H 6.71 %, O 53.3 %: CH2O")
+let glucoseEmp = try? ChemStoich.empirical([("C", 40.0), ("H", 6.71), ("O", 53.3)], molarMass: 180).get()
+check(glucoseEmp?.molecularText == "C6H12O6" && glucoseEmp?.multiple == 6 && glucoseEmp.map { abs($0.empiricalMass - 30.026) < 0.01 } == true, "with a molar mass of 180: C6H12O6")
+check((try? ChemStoich.empirical([("Fe", 69.94), ("O", 30.06)], molarMass: nil).get())?.empiricalText == "Fe2O3", "Fe 69.94 %, O 30.06 %: Fe2O3 (a ratio of 1.5, doubled)")
+check(ChemStoich.empirical([("Xx", 50), ("O", 50)], molarMass: nil) == .failure(.unknown("Xx")) && ChemStoich.empirical([], molarMass: nil) == .failure(.empty),
+      "an element it does not know, named; nothing given")
+check(ChemStoich.shares("C=40,H=6.71, O=53.3").map(\.symbol) == ["C", "H", "O"] && ChemStoich.shares("C=40,H=6.71, O=53.3")[2].amount == 53.3, "each element's share read from the launch's list")
+
 // ---- the physics tools (tools) ------------------------------------------------------------------------------------
 // (mac/Simpl/Tools/Physics/Model: the specification's test vectors for each tool's arithmetic)
 print("the physics tools")

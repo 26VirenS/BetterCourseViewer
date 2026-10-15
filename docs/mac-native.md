@@ -713,7 +713,7 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   speed and angle from Kinematics & Projectiles' pin (`MotionCompact`), two vectors from Vectors' (`VectorsCompact`),
   the Circuit Builder's Ohm's law and list (`CircuitCompact`), the calculator's
   line, sums, memory and Rad/Deg (`CalcEngine.handOff`), a codon looked up, a cross, a Hardy–Weinberg value, the lab
-  calculator shown, (tools) the Equation Balancer's equation, the Word Counter's text, Statistics' line of data (to its Describe page), the Matrix Calculator's A;
+  calculator shown, (tools) the Equation Balancer's equation, a formula for its molar mass, the Word Counter's text, Statistics' line of data (to its Describe page), the Matrix Calculator's A;
   the graph's whole drawing — expressions, sliders, tables, notes and view — by Desmos's own
   `Calc.getState`/`Calc.setState` from the pin's web view to the whole one's (`GraphWeb.carryOver`; the whole one's graph
   before it is a ⌘Z away). The focus timer, Flashcards' sets and the lab's numbers are the whole tool's already. A panel
@@ -1037,6 +1037,25 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
     "<equation>"` (the pin reads `-SimplBalance` too). Pictures (`chem_calc_tools`): `light-71-tool-balance`,
     `dark-71-tool-balance`, `light-71b-tool-balance-narrow` (780 × 700), `light-71a-tool-balance-cant` (Na + Cl2 → NaBr),
     `light-54l-pin-balance`.
+  - **Molar Mass & Stoichiometry** (`moles`, `Tools/Chemistry/MolarMass.swift`; `/moles`, words *molar mass*,
+    *grams*, *stoichiometry*, *limiting reagent*, *percent yield*, *empirical*): four tabs in a segmented control, the
+    tab and each tab's inputs kept (`moles.tab`, `.formula`, `.convertFormula`, `.convertValue`, `.convertUnit`,
+    `.equation`, `.given`, `.actual`, `.actualOf`, `.shares`, `.sharesInGrams`, `.empiricalMass`). *Molar mass*: a formula
+    (chips Ca(OH)2, C6H12O6, CuSO4·5H2O) to its molar mass in g/mol, with the breakdown beside it — element, count,
+    atomic mass, subtotal, mass % (the percent composition; `ChemMolar.breakdown`). *Convert*: a formula and one amount
+    in grams, moles, molecules / formula units or litres of gas at STP (22.4 L/mol; Avogadro 6.02214076 × 10²³) to the
+    other three (`ChemStoich.convert`). *Reaction*: an equation, balanced for you by the balancer's arithmetic (a
+    "balanced for you" chip when the coefficients changed), a *Given* row per reactant (an amount, g or mol; blank
+    is in excess), and the result — the limiting reagent, how far the reaction runs, each product's theoretical yield
+    in g and mol, what is left of the other reactants (`ChemStoich.reaction`) — with an *Actual yield* field and a
+    product picker for the percent yield. *Empirical*: each element's mass % (or grams) in rows, add or take one out, an
+    optional molar mass: the empirical formula (moles over the smallest, times 2 to 6 until every ratio is within 0.08
+    of a whole number) and the molecular one (`ChemStoich.empirical`). Copy on each tab. Pin: the Molar mass tab small
+    (`MolarMassCompact`: a formula to g/mol; carried: `formula`). Launch: `-SimplTool moles -SimplMoles
+    molar|convert|reaction|empirical`, `-SimplMolesFormula "<f>"`, `-SimplMolesEquation "<eq>"`, `-SimplMolesGiven
+    "H2=4g,O2=16g"`, `-SimplMolesEmpirical "C=40,H=6.71,O=53.3"`, `-SimplMolesMass 180` (the pin reads
+    `-SimplMolesFormula`). Pictures: `light-71c-tool-moles`, `dark-71c-tool-moles`, `light-71d-tool-moles-reaction`,
+    `light-71f-tool-moles-narrow` (the Empirical tab, 780 × 700), `light-54v-pin-moles`.
 
 - **The study and maths tools.** Tools of the Mac's own after the chemistry ones, each a `ToolKind` case with its
   name, line, symbol and colour inline (as the first tools have them), a tile at the end of its section's row, a popup,
@@ -1226,7 +1245,8 @@ hold's row under Version), `-SimplSidebar hidden` (the window opens with its sid
 `-SimplMorphHold <share>` (with `-SimplSheet <counter>`: the counter's tile grows that share of the way into its
 panel, 0.5 half-way, and stays there — the real grow, stopped, so a picture shows it under way, even where the Mac
 reduces motion; `DashMorphHold`), (tools) `-SimplTool balance -SimplBalance "<equation>"` (the Equation Balancer on
-that equation). In the pictures' consoles a counter opened says how it came (`[Simpl] counter: next
+that equation), `-SimplTool moles -SimplMoles <tab> -SimplMolesFormula|-SimplMolesEquation|-SimplMolesGiven|
+-SimplMolesEmpirical|-SimplMolesMass …` (Molar Mass & Stoichiometry on a tab with its inputs). In the pictures' consoles a counter opened says how it came (`[Simpl] counter: next
 grows`, or `fades in (Reduce Motion)`).
 
 ## Releasing

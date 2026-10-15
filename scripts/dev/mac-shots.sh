@@ -593,8 +593,8 @@ chem_tools() {
   MODE=light shoot light-30c-palette-chemistry 14 -SimplOpen "palette:orbitals"
 }
 
-# (tools) the chemistry calculators: the Equation Balancer on a redox equation in light and dark, narrow on
-# propane's combustion, an equation that can't be balanced (an element on one side only, named), and its pin opened
+# (tools) the chemistry calculators. The Equation Balancer on a redox equation in light and dark, narrow on
+# propane's combustion, an equation that can't be balanced (an element on one side only, named), and its pin opened.
 chem_calc_tools() {
   local m
   for m in light dark; do
@@ -603,6 +603,14 @@ chem_calc_tools() {
   MODE=light SIZE=780x700 shoot light-71b-tool-balance-narrow 14 -SimplPlace tools -SimplTool balance -SimplBalance "C3H8 + O2 → CO2 + H2O"
   MODE=light SIZE=1440x920 shoot light-71a-tool-balance-cant 14 -SimplPlace tools -SimplTool balance -SimplBalance "Na + Cl2 -> NaBr"
   MODE=light shoot light-54l-pin-balance 14 -SimplPinnedTools balance -SimplPinOpen balance -SimplBalance "Fe + O2 -> Fe2O3"
+  # Molar Mass & Stoichiometry: glucose's molar mass and breakdown in light and dark, the Reaction tab on water from
+  # 4 g of hydrogen and 16 g of oxygen (oxygen limits), the Empirical tab narrow, and its pin on slaked lime
+  for m in light dark; do
+    MODE="$m" SIZE=1440x920 shoot "$m-71c-tool-moles" 14 -SimplPlace tools -SimplTool moles -SimplMoles molar -SimplMolesFormula "C6H12O6"
+  done
+  MODE=light SIZE=1440x920 shoot light-71d-tool-moles-reaction 14 -SimplPlace tools -SimplTool moles -SimplMoles reaction -SimplMolesEquation "2H2 + O2 → 2H2O" -SimplMolesGiven "H2=4g,O2=16g"
+  MODE=light SIZE=780x700 shoot light-71f-tool-moles-narrow 14 -SimplPlace tools -SimplTool moles -SimplMoles empirical -SimplMolesEmpirical "C=40,H=6.71,O=53.3" -SimplMolesMass 180
+  MODE=light shoot light-54v-pin-moles 14 -SimplPinnedTools moles -SimplPinOpen moles -SimplMolesFormula "Ca(OH)2"
 }
 
 # (tools) the Tools page's Physics section in light and in dark; Kinematics & Projectiles' 1D page (a fall of 20 m:

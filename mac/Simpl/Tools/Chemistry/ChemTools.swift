@@ -10,8 +10,9 @@ import SwiftUI
 // were, they now hand over to one another in the same popup: an element's facts page opens Atoms & Orbitals on it, which
 // goes back to the facts; the Lewis maker's "Open in Molecule Builder" hands its molecule over. Each tool's view is its
 // own file's (PeriodicTable.swift, LewisMaker.swift, MoleculeBuilder.swift, AtomsOrbitals.swift). (tools) After them
-// the chemistry calculators: the Equation Balancer (EquationBalancer.swift), whose arithmetic needs no window and is
-// checked by the Models job (Model/ChemFormula.swift, Model/ChemBalance.swift).
+// the chemistry calculators: the Equation Balancer (EquationBalancer.swift) and Molar Mass & Stoichiometry
+// (MolarMass.swift), whose arithmetic needs no window and is checked by the Models job (Model/ChemFormula.swift,
+// Model/ChemBalance.swift, Model/ChemStoich.swift).
 
 /// What the Tools page, the toolbar and a pin's popover show of a chemistry tool.
 struct ChemToolInfo {
@@ -25,7 +26,7 @@ struct ChemToolInfo {
 
 enum ChemTools {
     /// The tools in the Tools page's order: the Periodic Table's four, then (tools) the calculators.
-    static let kinds: [ToolKind] = [.ptable, .lewis, .molecule, .atoms, .balance]
+    static let kinds: [ToolKind] = [.ptable, .lewis, .molecule, .atoms, .balance, .moles]
 
     /// Each tool's name, line, symbol and colour — a palette of their own (red, cyan, green and violet; the
     /// calculators' orange-red and the rest), none of them near a biology tile's colour.
@@ -33,6 +34,8 @@ enum ChemTools {
         switch k {
         case .balance: return ChemToolInfo(name: "Equation Balancer", shortName: "Balance", note: "Balance any chemical equation.",
                                            symbol: "equal.square", hex: "#ff6b35")
+        case .moles: return ChemToolInfo(name: "Molar Mass & Stoichiometry", shortName: "Moles", note: "Molar mass, moles and yields.",
+                                         symbol: "scalemass", hex: "#2fb37a")
         case .ptable: return ChemToolInfo(name: "Periodic Table", shortName: "Elements", note: "Every element, its trends and its facts.",
                                           symbol: "square.grid.3x3", hex: "#e5484d")
         case .lewis: return ChemToolInfo(name: "Lewis Structures", shortName: "Lewis", note: "Bonds, lone pairs, formal charges and resonance.",
@@ -93,7 +96,7 @@ enum ChemTools {
 /// `SimplChem.<key>.<field>` — the Periodic Table's colouring and the last element opened (`ptable.colour`,
 /// `ptable.element`), the Lewis maker's molecule (`lewis.draft`, ChemLewisDraft), the Molecule Builder's and how it is
 /// shown (`molecule.saved`, ChemMoleculeDraft; `.style`, `.lonePairs`, `.labels`), Atoms & Orbitals' element and
-/// view (`atoms.element`, `atoms.view`), and (tools) the calculators' last inputs (`balance.equation`). A picture's
+/// view (`atoms.element`, `atoms.view`), and (tools) the calculators' last inputs (`balance.equation`, `moles.*`). A picture's
 /// launch (-SimplShotFile) keeps them in a suite of its own that starts
 /// empty, as BioPrefs does, so each picture shows its tool as its launch asks and nothing more.
 enum ChemPrefs {
@@ -213,8 +216,8 @@ struct MoleculeBuilderTool: View {
 }
 
 /// A chemistry tool's quickest use in its pin's popover: the Periodic Table small (PeriodicTableCompact), an element to
-/// see in Atoms & Orbitals (AtomsOrbitalsCompact), (tools) an equation balanced (EquationBalancerCompact), and for the
-/// Lewis maker and the builder, the tool's tile, its line and Open.
+/// see in Atoms & Orbitals (AtomsOrbitalsCompact), (tools) an equation balanced (EquationBalancerCompact), a formula's
+/// molar mass (MolarMassCompact), and for the Lewis maker and the builder, the tool's tile, its line and Open.
 struct ChemQuick: View {
     let kind: ToolKind
     let openFull: (_ info: [String: String]) -> Void
@@ -224,6 +227,7 @@ struct ChemQuick: View {
         case .ptable: PeriodicTableCompact(openFull: openFull)
         case .atoms: AtomsOrbitalsCompact(openFull: openFull)
         case .balance: EquationBalancerCompact(openFull: openFull)
+        case .moles: MolarMassCompact(openFull: openFull)
         default: BioQuickOpen(kind: kind) { openFull([:]) }
         }
     }

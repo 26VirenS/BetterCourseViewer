@@ -7,13 +7,13 @@ import UniformTypeIdentifiers
 // annotator, Image to text and flashcards — drawn natively, with a unit converter of the Mac's own beside them,
 // (1.3.78) the biology toolkit's ten under a heading of their own (Biology/BioTools.swift), (1.3.80) the periodic
 // table split into the chemistry tools' four, under theirs (Chemistry/ChemTools.swift), (tools) the chemistry
-// calculators — the Equation Balancer — beside them, (tools) the physics tools under a "Physics" heading between
-// them (Physics/PhysTools.swift), (tools) the study and maths tools after them — the Word Counter under Study
-// (WordCounter.swift), Statistics and the Matrix Calculator under Math & science (Statistics.swift,
-// MatrixCalculator.swift); their arithmetic in Model/, checked by the Models job — and (tools) Compress Files among
-// the file tools (CompressFiles.swift) and the Study Planner among the study tools (Planner/StudyPlanner.swift). One
-// row in the sidebar opens a page of tiles, (tools-32) in sections by what they are for: Study, Math & science, Files,
-// Chemistry, Physics and Biology;
+// calculators — the Equation Balancer, Molar Mass & Stoichiometry — beside them, (tools) the physics tools under a
+// "Physics" heading between them (Physics/PhysTools.swift), (tools) the study and maths tools after them — the Word
+// Counter under Study (WordCounter.swift), Statistics and the Matrix Calculator under Math & science
+// (Statistics.swift, MatrixCalculator.swift); their arithmetic in Model/, checked by the Models job — and (tools)
+// Compress Files among the file tools (CompressFiles.swift) and the Study Planner among the study tools
+// (Planner/StudyPlanner.swift). One row in the sidebar opens a page of tiles, (tools-32) in sections by what they are
+// for: Study, Math & science, Files, Chemistry, Physics and Biology;
 // (1.3.79) a tile opens its tool in a popup over the window — the Tools page staying behind it, and the whole window
 // usable round it (Shell/FloatingPopup.swift) — as its pin, a hand-off from another tool and a launch do. Any tool can be
 // pinned: it then sits in the toolbar on every screen and opens a compact version of itself in a popover
@@ -27,7 +27,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
     // symbols and colours, and the Periodic Table's, are ChemTools.info's
     case lewis, molecule, atoms
     // (tools) the chemistry calculators after them — the Equation Balancer and the rest, ChemTools.info's too
-    case balance
+    case balance, moles
     // (tools) the physics tools: their names, lines, symbols and colours are PhysTools.info's
     case motion, vectors, circuit
     // (1.3.78) the biology toolkit: its names, lines, symbols and colours are BioTools.info's
@@ -47,8 +47,8 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .pomo: return "Focus timer"
         case .calc: return "Calculator"
         case .graph: return "Graphing calculator"
-        case .ptable, .lewis, .molecule, .atoms, .balance: return ChemTools.info(self).name
         case .motion, .vectors, .circuit: return PhysTools.info(self).name
+        case .ptable, .lewis, .molecule, .atoms, .balance, .moles: return ChemTools.info(self).name
         case .need: return "Grade needed"
         case .conv: return "File converter"
         case .units: return "Unit converter"
@@ -73,8 +73,8 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .pomo: return "Focus"
         case .calc: return "Calculator"
         case .graph: return "Graphing"
-        case .ptable, .lewis, .molecule, .atoms, .balance: return ChemTools.info(self).shortName
         case .motion, .vectors, .circuit: return PhysTools.info(self).shortName
+        case .ptable, .lewis, .molecule, .atoms, .balance, .moles: return ChemTools.info(self).shortName
         case .need: return "Grade needed"
         case .conv: return "Convert"
         case .units: return "Units"
@@ -98,8 +98,8 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .pomo: return "Focus, then take a break."
         case .calc: return "Scientific, from your keyboard."
         case .graph: return "Desmos, right here."
-        case .ptable, .lewis, .molecule, .atoms, .balance: return ChemTools.info(self).note
         case .motion, .vectors, .circuit: return PhysTools.info(self).note
+        case .ptable, .lewis, .molecule, .atoms, .balance, .moles: return ChemTools.info(self).note
         case .need: return "What you need on the final."
         case .conv: return "Convert Word, PDF and images."
         case .units: return "Lengths, weights, temperatures."
@@ -122,8 +122,8 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .pomo: return "timer"
         case .calc: return "plus.forwardslash.minus"
         case .graph: return "chart.xyaxis.line"
-        case .ptable, .lewis, .molecule, .atoms, .balance: return ChemTools.info(self).symbol
         case .motion, .vectors, .circuit: return PhysTools.info(self).symbol
+        case .ptable, .lewis, .molecule, .atoms, .balance, .moles: return ChemTools.info(self).symbol
         case .need: return "percent"
         case .conv: return "arrow.triangle.2.circlepath"
         case .units: return "ruler"
@@ -146,8 +146,8 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .pomo: return "#ff9500"
         case .calc: return "#ff9f0a"
         case .graph: return "#5856d6"
-        case .ptable, .lewis, .molecule, .atoms, .balance: return ChemTools.info(self).hex
         case .motion, .vectors, .circuit: return PhysTools.info(self).hex
+        case .ptable, .lewis, .molecule, .atoms, .balance, .moles: return ChemTools.info(self).hex
         case .need: return "#ff375f"
         case .conv: return "#34c759"
         case .units: return "#64d2ff"
@@ -169,8 +169,8 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
     /// The width of its pinned popover. (tools-34) The Periodic Table's wider, for squares big enough to point at.
     var popoverWidth: CGFloat {
         switch self {
-        case .ptable, .lewis, .molecule, .atoms, .balance: return ChemTools.popoverWidth(self)
         case .motion, .vectors, .circuit: return PhysTools.popoverWidth(self)
+        case .ptable, .lewis, .molecule, .atoms, .balance, .moles: return ChemTools.popoverWidth(self)
         case .calc: return 420
         case .cite: return 400
         case .graph: return 360
@@ -556,6 +556,7 @@ struct ToolScreen: View {
         case .motion: KinematicsTool()
         case .vectors: VectorsTool()
         case .circuit: CircuitTool()
+        case .moles: MolarMassTool()
         case .need: GradeNeededTool()
         case .conv: FileConverterTool()
         case .units: UnitConverterTool()
