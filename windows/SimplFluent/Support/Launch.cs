@@ -10,7 +10,8 @@ namespace Simpl.Support;
 /// --tools-scroll physics (the Tools page scrolled to a section), --tool motion --tool-state projectile:v0=20,angle=45
 /// and --motion-values (a physics tool in that state: Tools/Physics/PhysTools.cs).
 /// --tool words --words-text "…" --words-target 500 (the Word Counter's text and target), --tool stats --tool-state
-/// describe --stats-data "2, 4, 4" (Statistics' page and numbers: StatsState.FromLaunch).
+/// describe --stats-data "2, 4, 4" (Statistics' page and numbers: StatsState.FromLaunch), --tool matrix --matrix-a
+/// "1 2; 3 4" --matrix-b "3; 5" --matrix-op det (the Matrix Calculator's matrices and operation).
 /// </summary>
 public static class Launch
 {

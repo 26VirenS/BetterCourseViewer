@@ -224,6 +224,7 @@ internal sealed class PaletteCommand
         {
             ("words", "words", ["word count", "word counter", "characters", "reading time", "essay"]),
             ("stats", "stats", ["statistics", "mean", "standard deviation", "regression", "normal", "z-score", "t-test"]),
+            ("matrix", "matrix", ["matrices", "determinant", "inverse", "linear algebra", "system of equations", "eigenvalues"]),
         };
         foreach (var (key, name, aliases) in words)
             if (Simpl.Tools.ToolsCenter.KindOf(key) is { } kind)

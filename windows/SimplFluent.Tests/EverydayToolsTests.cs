@@ -29,10 +29,26 @@ public class EverydayToolsTests
     }
 
     [Fact]
-    public void StatisticsEndsTheMathAndScienceGroup()
+    public void TheMatrixCalculatorEndsTheMathAndScienceGroup()
     {
         var maths = ToolsScreen.Groups.First(g => g.Title == "Math & science").Keys;
-        Assert.Equal("stats", maths[^1]);
+        Assert.Equal("matrix", maths[^1]);
+        var kind = ToolsCenter.KindOf("matrix");
+        Assert.NotNull(kind);
+        Assert.Equal("Matrix Calculator", kind!.Name);
+        Assert.Equal("Determinant, inverse, solve, RREF.", kind.Note);
+        Assert.Equal("#5e5ce6", kind.Hex);
+        Assert.Equal("Matrix", ToolsCenter.ShortName("matrix"));
+        // (its symbol is no biology tile's: a table of cells, not Crosses' grid)
+        Assert.DoesNotContain(BioTools.Kinds, b => b.Symbol == kind.Symbol);
+        Assert.Equal(new[] { "add", "sub", "mul", "scale", "transpose", "det", "inverse", "rank", "rref", "trace", "solve", "eigen", "power" }, MatrixState.Ops.Select(o => o.Key));
+    }
+
+    [Fact]
+    public void StatisticsComesBeforeTheMatrixCalculator()
+    {
+        var maths = ToolsScreen.Groups.First(g => g.Title == "Math & science").Keys;
+        Assert.Equal("stats", maths[^2]);
         var kind = ToolsCenter.KindOf("stats");
         Assert.NotNull(kind);
         Assert.Equal("Statistics", kind!.Name);
@@ -68,6 +84,10 @@ public class EverydayToolsTests
     [InlineData("standard deviation", "stats")]
     [InlineData("t-test", "stats")]
     [InlineData("regression", "stats")]
+    [InlineData("matrix", "matrix")]
+    [InlineData("determinant", "matrix")]
+    [InlineData("eigenvalues", "matrix")]
+    [InlineData("linear algebra", "matrix")]
     public void TheSearchBoxOpensEachByItsWords(string typed, string key)
     {
         var command = PaletteCommand.Named(PaletteCommand.EverydayTools().ToList(), typed);

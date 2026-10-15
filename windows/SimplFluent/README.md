@@ -426,7 +426,7 @@ never fails a run, and nothing waits for it but the pictures' merge.
 show checked against the school while the window shows `LiveCheck`), the popups floating over the window (`FloatPopup`, Popups below), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once, the third time Simpl is opened, at a calm moment, and from Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, a place or a page in a window of its own (`PlaceWindow`: a pane row's or a list row's Open in new window, Shift+click on a pane row, a page's ⋯ ▸ Open in new window, or Ctrl+Shift+O for what shows), the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
 | `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In and its Send from Phone, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
-| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed, Word Counter, Statistics; `Model/` holds their counting and sums with no window in them, tested in `SimplFluent.Tests`), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table, Atoms & Orbitals), `Chemistry/` (the Chemistry section's tools: `ChemTools.cs`, Lewis Structures, the Molecule Builder, and the calculators — the Equation Balancer — with their sums in `Chemistry/Model/`, plain .NET), `Physics/` (the Physics section's tools: `PhysTools.cs`, Kinematics & Projectiles, Vectors; their maths in `Model/`, free of WPF), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
+| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed, Word Counter, Statistics, Matrix Calculator; `Model/` holds their counting and sums with no window in them, tested in `SimplFluent.Tests`), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table, Atoms & Orbitals), `Chemistry/` (the Chemistry section's tools: `ChemTools.cs`, Lewis Structures, the Molecule Builder, and the calculators — the Equation Balancer — with their sums in `Chemistry/Model/`, plain .NET), `Physics/` (the Physics section's tools: `PhysTools.cs`, Kinematics & Projectiles, Vectors; their maths in `Model/`, free of WPF), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
 
 ## A screen
 
@@ -1002,6 +1002,22 @@ box opens each by its name and words, `PaletteCommand.EverydayTools`; `--tool <k
   `--stats-b`, `--stats-mu0`, `--stats-test one|two|paired`, `--stats-normal "μ,σ,x,a,b,p"` and `--stats-t "df,t,p"` fill
   the fields for a picture; the log says `stats: shows <page>`. The search box: `/stats`, `statistics`, `mean`,
   `standard deviation`, `regression`, `normal`, `z-score`, `t-test`.
+- **Matrix Calculator** (`matrix`, Math & science; `Tools/Everyday/MatrixCalculator.cs`, `Model/Matrix.cs`): A and B
+  in editors of cells (1 to 6 rows and columns by − and +, Tab from cell to cell, a block pasted into any cell —
+  rows on lines or after semicolons, cells apart by spaces, commas or tabs — fills and sizes the matrix), k and n
+  beside them, the operations as a row of buttons (A + B, A − B, A × B, kA, Aᵀ, det A, A⁻¹, rank A, RREF A, trace A,
+  Solve A·x = B with B's first column as b, the eigenvalues of A, Aⁿ for n from −64 to 64), and the answer at the right:
+  a matrix between brackets, a number large, or the eigenvalues listed (real and complex, "1 + 2i"), with a
+  reduction's row operations under it ("R2 ← R2 − 4R1"). Cells are exact fractions (big integers over big integers,
+  `Rational`), so answers come as fractions when every cell is an integer or a fraction, with a Fractions / Decimals
+  switch; a decimal cell or the eigenvalues (the shifted QR iteration on the Hessenberg form, `Eigen`) make the answer
+  decimals. Why an operation cannot be done is said plainly (sizes that do not match, a singular A, a system with no
+  or many solutions). The matrices, operation, k, n and the switch are kept (`SimplMatrix.a`, `.b`, `.op`, `.k`, `.n`,
+  `.fractions`); the pin holds a 2×2 or 3×3 A of its own with its determinant and inverse, and Open full screen hands
+  it over. `--matrix-a "1 2; 3 4"`, `--matrix-b "3; 5"` and `--matrix-op det` (or the operation as `--tool-state`)
+  fill it for a picture; the log says `matrix: shows <op>`. Its tile wears `TableSimple24`, not the `Grid24` the
+  biology Crosses tile has. The search box: `/matrix`, `matrices`, `determinant`, `inverse`, `linear algebra`,
+  `system of equations`, `eigenvalues`.
 
 The biology toolkit's ten (`Tools/Biology/`, a "Biology" section of their own on the Tools page) register through
 `BioTools.Register`, which adds their pages in the header and what a launch asks of them (`--tool cell --tool-state
