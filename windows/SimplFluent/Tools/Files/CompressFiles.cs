@@ -15,7 +15,7 @@ using TextBox = Wpf.Ui.Controls.TextBox;
 
 namespace Simpl.Tools;
 
-// Compress files (tools), as the Mac's: pictures and PDFs dropped in and made small enough to upload — a JPEG written
+// Compress files (0.3.11), as the Mac's: pictures and PDFs dropped in and made small enough to upload — a JPEG written
 // again at a chosen quality and no wider than the preset allows, a PNG kept for its see-through parts, a PDF's embedded
 // pictures written again inside it (its pages never drawn as pictures) — all on this PC (Tools/Files/Shrink.cs). The
 // smaller copies go to Downloads as "<name>-smaller", the originals never touched; each row says what it was and what it

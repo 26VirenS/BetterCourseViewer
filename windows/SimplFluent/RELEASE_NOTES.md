@@ -1,3 +1,8 @@
+**What's new in 0.3.11** (beta)
+
+- **Compress files** — a new Files tool: drop in pictures and PDFs and they are made small enough to upload — Max quality, Balanced, Smallest or Fit under a size in MB — saved to Downloads as `<name>-smaller`, never over the original, with a before-and-after table and a preview; `/compress` in the search box, and a pin.
+- **Study planner** — a new Study tool: the work due in the next six weeks shared out as study blocks over the days before each is due, weighted by points and kind (an exam most), with your hours per weekday, block length and preferred time of day; a week view and a list, blocks marked done, Regenerate, and Add to Calendar as an .ics file; `/plan` in the search box, and today's blocks as a pin.
+
 **What's new in 0.3.10** (beta)
 
 - **Word counter** — a new Study tool: paste or type an essay and it is counted as it changes — words, characters with and without spaces, sentences, paragraphs, reading and speaking time, the longest word, a word target with "to go" and the ten words used most; `/words` in the search box, and a pin.

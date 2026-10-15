@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 
 namespace Simpl.Tools.Planner;
 
-// The Study Planner's sums (tools), free of any window (no System.Windows, Simpl.Kit or Simpl.Support here, as the
+// The Study Planner's sums (0.3.11), free of any window (no System.Windows, Simpl.Kit or Simpl.Support here, as the
 // biology models are): the work due, weighted by its points and its kind, shared out as study blocks over the days
 // before each is due — never past it — earliest due first, each day's hours respected, blocks already done kept where
 // they were and taken off what is left. Tested in SimplFluent.Tests/PlannerTests.cs.

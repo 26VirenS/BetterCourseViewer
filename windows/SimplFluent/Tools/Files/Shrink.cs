@@ -10,7 +10,7 @@ using PdfSharp.Pdf.IO;
 
 namespace Simpl.Tools;
 
-// Compress files (tools): the sums behind the Compress files tool, free of any window — a picture read with Windows'
+// Compress files (0.3.11): the sums behind the Compress files tool, free of any window — a picture read with Windows'
 // own codecs (WPF's imaging, which is WIC underneath: JPEG, PNG, BMP, TIFF, GIF, and HEIC or WebP where Windows has the
 // codec), turned the way the camera held it, made smaller on its long edge where the preset asks, and written as a JPEG
 // of the preset's quality (or a PNG again, for see-through parts); and a PDF's embedded pictures found in its pages'

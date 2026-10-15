@@ -16,7 +16,7 @@ using TextBox = Wpf.Ui.Controls.TextBox;
 
 namespace Simpl.Tools;
 
-// Study Planner (tools), as the Mac's: the work due in the next six weeks — the same assignments, quizzes and exams
+// Study Planner (0.3.11), as the Mac's: the work due in the next six weeks — the same assignments, quizzes and exams
 // the Dashboard, To Do and Calendar show, read from the engine's calendar — shared out as study blocks over the days
 // before each is due, by its points and its kind (Tools/Planner/Model/StudyPlan.cs). A week view, today first; a list
 // view; how each piece stands; the hours a day, the block length, the time of day, the days to finish early and the
