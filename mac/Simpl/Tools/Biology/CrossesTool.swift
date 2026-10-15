@@ -770,6 +770,9 @@ struct CrossesCompact: View {
             .keyboardShortcut(.defaultAction)
             .help("This cross in the whole tool, with dihybrids, other patterns, probability and chi-square (Return)")
         }
+        // (1.3.83) Open Full Screen carries the cross, as Open in Genetics Crosses does — once it is not the panel's own
+        // Aa × Aa
+        .quickCarry(p1 == [0, 1] && p2 == [0, 1] ? [:] : ["cross": setup.text])
     }
 
     private func picker(_ value: Binding<[Int]>, _ label: String) -> some View {

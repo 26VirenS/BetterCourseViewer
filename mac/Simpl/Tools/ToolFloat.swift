@@ -2,14 +2,15 @@ import AppKit
 import SwiftUI
 
 // (1.3.73) A pin's quick panel pulled out of its popover into a small window of its own, as the web's quick panels come
-// out of their tray: (tools-20) by the popover's Pop Out button, or dragged by the grip along its foot. It floats over
-// everything — a quiz or an Alta assignment's popup too — where it is put, and stays open; its head is the popover's:
-// the tool's name (a press opens the whole tool) and, at its top left as a Mac panel has it, a plain ✕ that puts it back
-// (Escape too). The panel never takes the app's activation (a nonactivating panel), so what is under it carries on as it
-// was; it hides with the app when another app comes to the front. The pins themselves come to a popup's own bar
-// (PopupPins), since the window's toolbar is under the sheet. (1.3.79) Out, it is moved by its ground, its head — the
-// name too: a press opens the whole tool, a drag moves the panel — and its grip (PanelMover), kept on the screen, and it
-// comes out again where it was last put.
+// out of their tray: dragged by the grip along its foot, or (tools-20) by Pop Out — (1.3.83) the pin's menu's, where the
+// popover's head had it until Open Full Screen took its place. It floats over everything — a quiz or an Alta
+// assignment's popup too — where it is put, and stays open; its head is the popover's: the tool's name, (1.3.83) Open
+// Full Screen at its right end (the whole tool, with what was begun in the panel, the panel put back) and, at its top
+// left as a Mac panel has it, a plain ✕ that puts it back (Escape too). The panel never takes the app's activation (a
+// nonactivating panel), so what is under it carries on as it was; it hides with the app when another app comes to the
+// front. The pins themselves come to a popup's own bar (PopupPins), since the window's toolbar is under the sheet.
+// (1.3.79) Out, it is moved by its ground, its head — the name too — and its grip (PanelMover), kept on the screen, and
+// it comes out again where it was last put.
 
 /// The panels out, by tool.
 @MainActor
@@ -37,8 +38,8 @@ final class ToolFloats: ObservableObject {
         if let mouse { follow(panel, grab: NSPoint(x: mouse.x - origin.x, y: mouse.y - origin.y)) }
     }
 
-    /// (tools-20) Out by the popover's Pop Out button: put where the popover was (the window under the pointer that
-    /// pressed it), and left there.
+    /// (tools-20) Out by Pop Out — (1.3.83) the pin's menu's: put where it was last put, else where a popover under the
+    /// pointer is, else at the window's top right, and left there.
     func popOut(_ kind: ToolKind, engine: Engine) {
         let mouse = NSEvent.mouseLocation
         let popover = NSApp.windows.first { $0.isVisible && String(describing: type(of: $0)).contains("Popover") && $0.frame.contains(mouse) }
@@ -210,13 +211,16 @@ private struct ToolFloatRoot: View {
 }
 
 /// What a pulled-out panel shows: (tools-20) its ✕ and the tool's name at its head, as the popover's — no window lights,
-/// whose green would have opened another view instead of zooming — and its quick use (the popover's). (1.3.79) Its
-/// ground, its head and its grip move it (PanelMover); the controls over them take their own presses.
+/// whose green would have opened another view instead of zooming — (1.3.83) and, as the popover's, Open Full Screen at
+/// its head's right end; and its quick use (the popover's). (1.3.79) Its ground, its head and its grip move it
+/// (PanelMover); the controls over them take their own presses.
 struct ToolFloatView: View {
     let kind: ToolKind
     let engine: Engine
     @ObservedObject private var tools = ToolsCenter.shared
     @ObservedObject private var floats = ToolFloats.shared
+    /// What the quick version has begun, for the whole tool (QuickCarry).
+    @State private var carry = QuickCarry()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -224,15 +228,17 @@ struct ToolFloatView: View {
                 QuickClose { floats.dock(kind) }
                 IconTile(symbol: kind.symbol, color: kind.color, size: 28)
                     .overlay(PanelMover(help: "Drag to move the panel"))
-                // (the name as a window's title: dragged, it moves the panel; a press that does not move opens the
-                // whole tool, as before)
-                QuickPanelName(kind: kind) { openFull() }
-                    .overlay(PanelMover(help: "Open \(kind.name) full size, or drag to move the panel", click: { openFull() }))
+                // (the name as a window's title: dragged, it moves the panel — (1.3.83) and a press on it no longer
+                // opens the whole tool: Open Full Screen does, the one way to it)
+                QuickPanelName(kind: kind)
+                    .overlay(PanelMover(help: "Drag to move the panel"))
                 PanelMover(help: "Drag to move the panel")
                     .frame(minWidth: 8, maxWidth: .infinity)
                     .frame(height: 28)
+                QuickFullScreenButton(kind: kind, action: openFullScreen)
             }
             PinnedToolQuick(kind: kind) { info, files in openFull(info: info, files: files) }
+                .onPreferenceChange(QuickCarryKey.self) { c in MainActor.assumeIsolated { carry = c } }
             GripBar(movesPanel: true)
                 .padding(.bottom, -10)
         }
@@ -243,9 +249,16 @@ struct ToolFloatView: View {
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.primary.opacity(0.12), lineWidth: 1))
     }
 
+    /// (1.3.83) Open Full Screen: the panel put back, the tool whole over the window with what was begun in it.
+    private func openFullScreen() {
+        floats.dock(kind)
+        tools.openFullScreen(kind, engine: engine, carry: carry)
+    }
+
     private func openFull(info: [String: String] = [:], files: [URL] = []) {
         floats.dock(kind)
-        tools.popUp(kind, engine: engine, files: files, info: info) // (1.3.79: in its popup over the window)
+        // (1.3.79: in its popup over the window; 1.3.83: made afresh to take what it is handed if it is open already)
+        tools.popUp(kind, engine: engine, files: files, info: info, afresh: !info.isEmpty || !files.isEmpty)
     }
 }
 
@@ -294,25 +307,23 @@ struct GripBar: View {
 
 /// (1.3.79) A place a floating panel is moved by — its ground, its head, its grip: pressed and dragged, the panel goes
 /// with the pointer, kept on the screen (ToolFloats.kept), and where it is let go is where it comes out next time
-/// (ToolFloats.placed). A press that does not move is `click`'s, if any (the name's: the whole tool). It lies under the
-/// panel's controls, or over a part that has no press of its own, and takes the first click even while the panel is
-/// not key. (The panel's window is "movable by its background", but no press ever reached AppKit as one: SwiftUI's
-/// views are drawn in the one hosting view, which never lets a mouse-down move its window.)
+/// (ToolFloats.placed). (A press that did not move opened the whole tool on the name until 1.3.83, when Open Full Screen
+/// became the one way to it.) It lies under the panel's controls, or over a part that has no press of its own, and
+/// takes the first click even while the panel is not key. (The panel's window is "movable by its background", but no
+/// press ever reached AppKit as one: SwiftUI's views are drawn in the one hosting view, which never lets a mouse-down
+/// move its window.)
 struct PanelMover: NSViewRepresentable {
     var help: String? = nil
-    var click: (() -> Void)? = nil
     var hover: ((Bool) -> Void)? = nil
 
     func makeNSView(context: Context) -> MoverView { MoverView() }
 
     func updateNSView(_ v: MoverView, context: Context) {
-        v.click = click
         v.hover = hover
         v.toolTip = help
     }
 
     final class MoverView: NSView {
-        var click: (() -> Void)?
         var hover: ((Bool) -> Void)?
         private var tracking: NSTrackingArea?
 
@@ -333,7 +344,7 @@ struct PanelMover: NSViewRepresentable {
                 let to = NSPoint(x: origin.x + now.x - start.x, y: origin.y + now.y - start.y)
                 window.setFrameOrigin(ToolFloats.kept(to, size: window.frame.size, at: now))
             }
-            if moved { ToolFloats.shared.placed(window) } else { click?() }
+            if moved { ToolFloats.shared.placed(window) }
         }
 
         override func updateTrackingAreas() {
@@ -359,7 +370,7 @@ struct PullOutGrip: View {
 
     var body: some View {
         GripBar()
-            .help("Drag to pull this out into a window of its own (or press Pop Out)")
+            .help("Drag to pull this out into a window of its own (or choose Pop Out in its pin's menu)")
             .gesture(DragGesture(minimumDistance: 4, coordinateSpace: .global).onChanged { _ in
                 guard !pulled else { return }
                 pulled = true

@@ -731,6 +731,12 @@ struct PeriodicTableCompact: View {
     private var typed: Bool { !query.trimmingCharacters(in: .whitespaces).isEmpty }
     private var found: [PTElement] { PeriodicTable.find(query) }
 
+    /// (1.3.83) What Open Full Screen carries to the whole table: the element searched for, the one Return opens.
+    private var carried: [String: String] {
+        guard typed, let e = found.first else { return [:] }
+        return ["element": String(e.number)]
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
@@ -749,6 +755,7 @@ struct PeriodicTableCompact: View {
             PTGrid(shown: over ?? (typed ? found.first : nil), matches: typed ? Set(found.map(\.number)) : nil, category: nil, compact: true,
                    pick: { e, _ in openFull(["element": String(e.number)]) }, hover: { e in over = e })
         }
+        .quickCarry(carried)
         // (the screenshot suite: -SimplPinElement 25 shows that element's card)
         .onAppear {
             let n = UserDefaults.standard.integer(forKey: "SimplPinElement")

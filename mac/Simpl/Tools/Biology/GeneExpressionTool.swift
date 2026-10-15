@@ -419,6 +419,8 @@ struct GeneExpressionCompact: View {
                     .help("The whole codon table, with this lookup")
             }
         }
+        // (1.3.83) Open Full Screen carries the lookup to the codon table, as Open in the codon table does
+        .quickCarry(query.trimmingCharacters(in: .whitespaces).isEmpty ? [:] : ["codon": query, "page": "codons"])
         .onAppear {
             // (the screenshot suite: -SimplPinCodon UGG fills the field)
             if query.isEmpty, let c = UserDefaults.standard.string(forKey: "SimplPinCodon") { query = c }

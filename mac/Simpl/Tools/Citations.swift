@@ -658,6 +658,14 @@ struct CitationCompact: View {
                 }
             }
         }
+        .quickCarry(carried)
+    }
+
+    /// (1.3.83) What Open Full Screen carries to the generator: the link pasted, as Cite hands it (the style is the
+    /// generator's own already).
+    private var carried: [String: String] {
+        let v = link.trimmingCharacters(in: .whitespaces)
+        return v.isEmpty ? [:] : ["link": v, "style": store.style]
     }
 
     private func cite() {

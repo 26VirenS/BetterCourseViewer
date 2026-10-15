@@ -564,6 +564,9 @@ struct HardyWeinbergCompact: View {
             .controlSize(.large)
             .help("The steps, the 100 people, the test and the simulation")
         }
+        // (1.3.83) Open Full Screen carries the value, as Open in Hardy–Weinberg does — once it is not the panel's own
+        // q² = 0.16
+        .quickCarry(given == .q2 && value == "0.16" ? [:] : ["given": given.rawValue, "value": value])
     }
 
     private func cell(_ name: String, _ x: Double) -> some View {

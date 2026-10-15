@@ -158,6 +158,18 @@ struct UnitConverterTool: View {
                 everyUnit
             }
         }
+        .onAppear(perform: takeHandOff)
+    }
+
+    /// (1.3.83) What the pin's converter had, its panel opened full screen: its kind, its two units and its value.
+    private func takeHandOff() {
+        let tools = ToolsCenter.shared
+        guard let id = tools.takeInfo("kind"), let c = UnitCategory.all.first(where: { $0.id == id }) else { return }
+        let f = tools.takeInfo("from"), t = tools.takeInfo("to")
+        category = c
+        from = c.units.first { $0.id == f } ?? c.units[c.from]
+        to = c.units.first { $0.id == t } ?? c.units[c.to]
+        if let v = tools.takeInfo("value") { value = v }
     }
 
     /// (tools-27) One column — the value, From, Swap between From and To, To — and the answer with its unit large
@@ -305,5 +317,14 @@ struct UnitConverterCompact: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .quickCarry(carried)
+    }
+
+    /// (1.3.83) What Open Full Screen carries to the whole converter, once anything is changed from how the panel opens:
+    /// the kind, the two units and the value (UnitConverterTool.takeHandOff).
+    private var carried: [String: String] {
+        let start = UnitCategory.all[0]
+        guard category != start || from != start.units[start.from] || to != start.units[start.to] || value != "1" else { return [:] }
+        return ["kind": category.id, "from": from.id, "to": to.id, "value": value]
     }
 }

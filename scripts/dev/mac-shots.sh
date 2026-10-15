@@ -61,7 +61,8 @@ shoot() {
   local settle=YES
   # (What's New comes up once the page is loaded and the app is quiet — 20 s on, with four copies of the app at work: a
   # settled picture caught it on its way in, faint, so its picture waits its whole time)
-  case " $* " in *PickerConfirm*|*" tool:"*|*" more:tool "*|*" alta:"*|*" macmillan:"*|*" file:"*|*SimplHandInPreview*|*"SimplOpen whatsnew"*) settle=NO ;; esac
+  # ((1.3.83) Desmos in a pin's panel, and a pin's Open Full Screen pressed a few seconds in: their whole time too)
+  case " $* " in *PickerConfirm*|*" tool:"*|*" more:tool "*|*" alta:"*|*" macmillan:"*|*" file:"*|*SimplHandInPreview*|*"SimplOpen whatsnew"*|*SimplPinGraph*|*SimplPinFull*) settle=NO ;; esac
   (
     rm -f "$OUT_ABS/$name.rect" "$OUT_ABS/$name.png" "$OUT_ABS/$name-app.png"
     CFFIXED_USER_HOME="$HOMES/home$slot" "$BIN" -SimplBaseURL "${BASE:-http://localhost:8800}" -SimplDemo YES -SimplAppearance "$MODE" \
@@ -383,13 +384,20 @@ ui_review() {
 }
 
 # (1.3.79) in both sets: five pins in the toolbar at 1024 points and narrow (every pin that fits shown, the rest in the
-# Tools pull-down: ToolbarFit) and on a popup's bar; the focus timer's panel pulled out, over the window in dark; and an
-# external tool's page light in Dark Mode — a tool window, an Alta and a Macmillan assignment
+# Tools pull-down: ToolbarFit) and on a popup's bar; the focus timer's panel pulled out, over the window in dark (1.3.83:
+# Open Full Screen at its head's right end); and an external tool's page light in Dark Mode — a tool window, an Alta and
+# a Macmillan assignment. (1.3.83) A pin's panel with Open Full Screen at its top right, where Pop Out was — the graphing
+# calculator's, as the owner pictured it, a graph drawn in it (-SimplPinGraph) — and a tool opened full screen from its
+# pin (-SimplPinFull presses the button), what was begun in the panel carried over: Grade needed with the panel's three
+# numbers (-SimplPinNeed), and the graph with the panel's graph (its console says what was carried)
 pins_pages() {
   MODE=light SIZE=1024x700 shoot light-45c-toolbar-five-pins 14 -SimplPinnedTools "calc,need,cite,graph,units"
   MODE=light SIZE=780x700 shoot light-52b-narrow-five-pins 14 -SimplPinnedTools "calc,need,cite,graph,units"
   MODE=light shoot light-21k-alta-five-pins 20 -SimplOpen alta:104:4003 -SimplPinnedTools "calc,need,ptable,cite,units"
   MODE=dark shoot dark-54g-pin-float-timer 16 -SimplPinnedTools "pomo,calc" -SimplPinFloat pomo
+  MODE=light shoot light-54i-pin-graph 24 -SimplPinnedTools graph -SimplPinOpen graph -SimplPinGraph "y=x^2"
+  MODE=light shoot light-54j-pin-full-need 16 -SimplPinnedTools need -SimplPinFull need -SimplPinNeed 85,30,90
+  MODE=light shoot light-54k-pin-full-graph 40 -SimplPinnedTools graph -SimplPinFull graph -SimplPinGraph "y=x^2"
   MODE=dark shoot dark-21h-tool-light-page 24 -SimplOpen tool:101:9
   MODE=dark shoot dark-21i-alta-light-page 20 -SimplOpen alta:104:4003
   MODE=dark shoot dark-21j-macmillan-light-page 26 -SimplOpen macmillan:104:4005
