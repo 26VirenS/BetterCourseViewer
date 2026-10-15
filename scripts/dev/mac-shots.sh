@@ -555,11 +555,13 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-36b-external-tools-list 12 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77: every place Knewton Alta is used, to choose from)
   shoot light-36c-external-tools-macmillan 12 -SimplPlace externaltools -SimplExternalToolList macmillan # (1.3.79: CHEM's week-titled Macmillan assignments and module item, one tool)
   # More from Canvas: the sidebar's last section (History, the school's My Materials on its own icon, Help), scrolled
-  # to; its History and Help popups over the window; My Materials in the tool window, on Canvas's launch page for it
-  shoot light-70-more-sidebar 12 -SimplSidebarScroll more
-  shoot light-70b-more-history 14 -SimplOpen more:history -SimplSidebarScroll more
-  shoot light-70c-more-help 14 -SimplOpen more:help -SimplSidebarScroll more
-  MODE=dark shoot dark-70b-more-history 14 -SimplOpen more:history -SimplSidebarScroll more
+  # to; its History and Help popups over the window; My Materials in the tool window, on Canvas's launch page for it.
+  # (Each taken as soon as it has settled; at most 20 and 24 seconds — on a loaded runner the Dashboard took 15 seconds
+  # to open, and at 14 History's popup had not come and Help's was still fading in.)
+  shoot light-70-more-sidebar 20 -SimplSidebarScroll more
+  shoot light-70b-more-history 24 -SimplOpen more:history -SimplSidebarScroll more
+  shoot light-70c-more-help 24 -SimplOpen more:help -SimplSidebarScroll more
+  MODE=dark shoot dark-70b-more-history 24 -SimplOpen more:history -SimplSidebarScroll more
   shoot light-70d-more-tool 30 -SimplOpen more:tool # (its whole wait: a page loading, after the sidebar's reads)
   shoot light-37-developer 16 -SimplOpen developer # (1.3.72: the Developer window)
   shoot light-01p-dashboard-preview 16 -SimplOpen preview
@@ -736,9 +738,9 @@ for MODE in light dark; do
   shoot "$MODE-27-tour" 14 -SimplOpen tour
   shoot "$MODE-30-commands" 14 -SimplOpen palette:/
   # More from Canvas: the sidebar's section, and its History and Help popups
-  shoot "$MODE-70-more-sidebar" 12 -SimplSidebarScroll more
-  shoot "$MODE-70b-more-history" 14 -SimplOpen more:history -SimplSidebarScroll more
-  shoot "$MODE-70c-more-help" 14 -SimplOpen more:help -SimplSidebarScroll more
+  shoot "$MODE-70-more-sidebar" 20 -SimplSidebarScroll more
+  shoot "$MODE-70b-more-history" 24 -SimplOpen more:history -SimplSidebarScroll more
+  shoot "$MODE-70c-more-help" 24 -SimplOpen more:help -SimplSidebarScroll more
 done
 bio_full # (1.3.78) the biology toolkit, every tool's pages
 bio_plain_all # (1.3.79) three of them opened plainly, in dark, at two window sizes, the sidebar out and folded
