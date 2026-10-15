@@ -786,6 +786,8 @@ live_check() {
   cat "$out"
 }
 
+# (1.3.92: the lists' pictures wait 16 s like 36d's — at 12 s, with the app grown by the tools of 1.3.89–1.3.91, a list
+# had not always reckoned its room before its picture on GitHub's Macs, and this check failed three runs out of four)
 # (1.3.82) tool_list_check: what the External Tools lists' consoles say, as tool-list-check.txt (a FAIL line is said as
 # a warning of the run): each list reckoned its room once as it opened ("[Simpl] tool list room: 303 (…)"), the list
 # read again under it was still open after the read, and no copy of the app crashed (a crash report is kept beside the
@@ -832,8 +834,8 @@ push_set() {
   shoot light-21d-macmillan 26 -SimplOpen macmillan:104:4005 # (1.3.66: a Macmillan Learning assignment's popup)
   shoot light-21e-second-window 18 -SimplOpen window:section:courses/101:grades # (1.3.69: a window more, on a course's grades: its breakdown bar)
   shoot light-36-external-tools 16 -SimplPlace externaltools # (1.3.67: every external tool in the courses)
-  shoot light-36b-external-tools-list 12 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77: every place Knewton Alta is used, to choose from)
-  shoot light-36c-external-tools-macmillan 12 -SimplPlace externaltools -SimplExternalToolList macmillan # (1.3.79: CHEM's week-titled Macmillan assignments and module item, one tool)
+  shoot light-36b-external-tools-list 16 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77: every place Knewton Alta is used, to choose from)
+  shoot light-36c-external-tools-macmillan 16 -SimplPlace externaltools -SimplExternalToolList macmillan # (1.3.79: CHEM's week-titled Macmillan assignments and module item, one tool)
   # (1.3.82) Knewton Alta's list open while the tools are read again and put in place under it (-SimplExternalToolReread):
   # in 1.3.81 the tools' answer coming in a second time under the open list had its popover sized and sized again
   # until AppKit stopped the app; its console says the list is still open after the read (tool_list_check)
@@ -907,7 +909,7 @@ push_set() {
   shoot dark-01m-counter-morph-graded 30 -SimplSheet graded -SimplMorphHold 0.4
   SIZE=940x820 shoot dark-40-narrow-dashboard 14
   shoot dark-36-external-tools 16 -SimplPlace externaltools
-  shoot dark-36b-external-tools-list 12 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77)
+  shoot dark-36b-external-tools-list 16 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77)
   shoot dark-32b-rubric-open 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1
   shoot dark-12e-hand-in-phone-photos 40 -SimplPlace course:101 -SimplPush /courses/101/assignments/1013 -SimplOpen handin -SimplPhone YES -SimplPhoneTest YES
   phone_send dark-12e-hand-in-phone-photos "$PWD/scripts/dev/fixtures/photo.jpg=IMG_0001.jpg" "$PWD/scripts/dev/fixtures/photo.jpg=IMG_0002.jpg" "$HOMES/phone-song.mp3=Song.mp3"
