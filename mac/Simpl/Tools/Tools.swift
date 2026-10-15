@@ -536,9 +536,12 @@ struct ToolHeader: View {
             }
         } else if kind == .ptable {
             // (1.3.87) the search and Tour up on the heading's row, left of the pin — the owner: "push these buttons up"
-            // — measured with the search open (`ptRoom`), so opening it never moves them to a row of their own
+            // — measured with the search open (`ptRoom`), so opening it never moves them to a row of their own; (1.3.88)
+            // where that leaves no room for the pin's words ("Pin to Toolbar" beside an element's "‹ Table"), the pin its
+            // symbol alone first, as a biology tool's is, before they go down to a row under it
             ViewThatFits(in: .horizontal) {
                 row(pages: nil, pinWords: true, ptControls: true)
+                row(pages: nil, pinWords: false, ptControls: true)
                 VStack(alignment: .leading, spacing: 12) {
                     row(pages: nil, pinWords: true)
                     PTHeaderBar(alone: true)
