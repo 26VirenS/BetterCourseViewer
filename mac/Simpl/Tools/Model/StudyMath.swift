@@ -112,6 +112,11 @@ enum StudyPrefs {
         store.set(value, forKey: key(tool, field))
     }
 
+    /// Several fields at once, each kept only when it has changed: a view watches them as one list.
+    static func remember(_ tool: String, _ fields: [String], _ values: [String]) {
+        for (field, value) in zip(fields, values) { set(tool, field, value) }
+    }
+
     static func bool(_ tool: String, _ field: String, default d: Bool) -> Bool {
         store.object(forKey: key(tool, field)) == nil ? d : store.bool(forKey: key(tool, field))
     }

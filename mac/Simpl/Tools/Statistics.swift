@@ -538,17 +538,13 @@ struct StatsDistributionsPage: View {
         } side: {
             if kind == .normal { normalResults } else { tResults }
         }
-        .onChange(of: kind) { _, k in StudyPrefs.set("stats", "dist", k.rawValue) }
-        .onChange(of: mu) { _, v in StudyPrefs.set("stats", "mu", v) }
-        .onChange(of: sigma) { _, v in StudyPrefs.set("stats", "sigma", v) }
-        .onChange(of: x) { _, v in StudyPrefs.set("stats", "xValue", v) }
-        .onChange(of: a) { _, v in StudyPrefs.set("stats", "a", v) }
-        .onChange(of: b) { _, v in StudyPrefs.set("stats", "b", v) }
-        .onChange(of: p) { _, v in StudyPrefs.set("stats", "p", v) }
-        .onChange(of: df) { _, v in StudyPrefs.set("stats", "df", v) }
-        .onChange(of: t) { _, v in StudyPrefs.set("stats", "t", v) }
-        .onChange(of: tp) { _, v in StudyPrefs.set("stats", "tp", v) }
+        .onChange(of: remembered) { _, values in StudyPrefs.remember("stats", Self.rememberedFields, values) }
     }
+
+    // the fields kept between visits, watched as one list (ten .onChange modifiers in a row were more than the
+    // compiler could type-check in reasonable time)
+    private static let rememberedFields = ["dist", "mu", "sigma", "xValue", "a", "b", "p", "df", "t", "tp"]
+    private var remembered: [String] { [kind.rawValue, mu, sigma, x, a, b, p, df, t, tp] }
 
     private var muV: Double? { StudyMath.number(mu) }
     private var sigmaV: Double? { StudyMath.number(sigma).flatMap { $0 > 0 ? $0 : nil } }
@@ -770,18 +766,13 @@ struct StatsTestsPage: View {
                 }
             }
         }
-        .onChange(of: kind) { _, k in StudyPrefs.set("stats", "test", k.rawValue) }
         .onChange(of: summary) { _, s in StudyPrefs.set("stats", "testSummary", s) }
-        .onChange(of: data1) { _, t in StudyPrefs.set("stats", "sample1", t) }
-        .onChange(of: data2) { _, t in StudyPrefs.set("stats", "sample2", t) }
-        .onChange(of: mu0) { _, t in StudyPrefs.set("stats", "mu0", t) }
-        .onChange(of: n1) { _, t in StudyPrefs.set("stats", "n1", t) }
-        .onChange(of: m1) { _, t in StudyPrefs.set("stats", "m1", t) }
-        .onChange(of: sd1) { _, t in StudyPrefs.set("stats", "sd1", t) }
-        .onChange(of: n2) { _, t in StudyPrefs.set("stats", "n2", t) }
-        .onChange(of: m2) { _, t in StudyPrefs.set("stats", "m2", t) }
-        .onChange(of: sd2) { _, t in StudyPrefs.set("stats", "sd2", t) }
+        .onChange(of: remembered) { _, values in StudyPrefs.remember("stats", Self.rememberedFields, values) }
     }
+
+    // the text fields kept between visits, watched as one list (see StatsDistributionsPage)
+    private static let rememberedFields = ["test", "sample1", "sample2", "mu0", "n1", "m1", "sd1", "n2", "m2", "sd2"]
+    private var remembered: [String] { [kind.rawValue, data1, data2, mu0, n1, m1, sd1, n2, m2, sd2] }
 
     @ViewBuilder
     private var inputs: some View {
