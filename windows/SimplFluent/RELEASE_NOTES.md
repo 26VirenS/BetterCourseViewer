@@ -1,3 +1,8 @@
+**What's new in 0.3.12** (beta)
+
+- **Molar Mass & Stoichiometry** — a new Chemistry tool with four tabs: Molar mass (a formula's mass with each element's count, mass and percent), Convert (grams, moles, molecules and litres at STP from any one), Reaction (a balanced equation with what you have of each reactant gives the limiting reagent, every product's yield, what is left over and the percent yield) and Empirical (mass percents to an empirical and molecular formula); `/moles` in the search box, and a pin.
+- **Gas Laws** — a new Chemistry tool: PV = nRT with units for each field, leave one blank and it is solved; the combined law with Boyle, Charles and Gay-Lussac chips; a piston drawing that follows the volume, the amount and the temperature; `/gas` in the search box, and a pin.
+
 **What's new in 0.3.11** (beta)
 
 - **Compress files** — a new Files tool: drop in pictures and PDFs and they are made small enough to upload — Max quality, Balanced, Smallest or Fit under a size in MB — saved to Downloads as `<name>-smaller`, never over the original, with a before-and-after table and a preview; `/compress` in the search box, and a pin.
