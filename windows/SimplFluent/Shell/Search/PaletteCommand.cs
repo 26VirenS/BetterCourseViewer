@@ -196,7 +196,7 @@ internal sealed class PaletteCommand
 
     /// <summary>
     /// The Chemistry section's tools, each opened in its popup by its name or a word a student would type for it ("periodic",
-    /// "lewis", "vsepr", "orbitals", "balance", "molar mass"): the four split out of the Periodic Table in 0.3.2, findable from anywhere
+    /// "lewis", "vsepr", "orbitals", "balance", "molar mass", "gas law"): the four split out of the Periodic Table in 0.3.2, findable from anywhere
     /// as the one tool was from its tile — by the Mac's names and words (SearchCommands.swift) — and the calculators after
     /// them. Their titles, lines and symbols are their tiles' (Tools/Chemistry/ChemTools.cs).
     /// </summary>
@@ -211,6 +211,7 @@ internal sealed class PaletteCommand
             // (the chemistry calculators (tools), by the spec's words)
             ("balance", "balance", ["equation", "reaction", "coefficients", "balance equation", "equation balancer"]),
             ("moles", "moles", ["molar mass", "mole", "grams", "stoichiometry", "limiting reagent", "percent yield", "empirical", "empirical formula"]),
+            ("gas", "gas", ["gas law", "gas laws", "ideal gas", "pv=nrt", "boyle", "charles", "pressure", "volume"]),
         };
         foreach (var (key, name, aliases) in words)
             if (Simpl.Tools.ChemTools.Kind(key) is { } kind)

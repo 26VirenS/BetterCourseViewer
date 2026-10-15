@@ -30,6 +30,7 @@ public static class ChemTools
         new("atoms", "Atoms & Orbitals", "Any element’s shells, orbitals and cloud in 3D.", SymbolRegular.Target24, "#b452e0"),
         new("balance", "Equation Balancer", "Balance any chemical equation.", SymbolRegular.ArrowSwap24, "#ff6b35"),
         new("moles", "Molar Mass & Stoichiometry", "Molar mass, moles and yields.", SymbolRegular.Scales24, "#2fb37a"),
+        new("gas", "Gas Laws", "PV = nRT and the combined law.", SymbolRegular.Balloon24, "#3f8ef7"),
     };
 
     public static ToolsScreen.Kind? Kind(string key) => Kinds.FirstOrDefault(k => k.Key == key);
@@ -38,7 +39,8 @@ public static class ChemTools
     /// What a launch asked of a chemistry tool, once, and only of the tool the launch opened (--tool &lt;key&gt;):
     /// <c>--tool-state</c> as it was given — a molecule for the builders ("NO3-", "Ethanol"), an element, its view and its
     /// subshell for Atoms &amp; Orbitals ("Fe:cloud:3d"), an equation for the Equation Balancer ("Fe + O2 -> Fe2O3"), a tab
-    /// for Molar Mass &amp; Stoichiometry ("reaction", with --moles-equation and the like for what it holds).
+    /// for Molar Mass &amp; Stoichiometry ("reaction", with --moles-equation and the like for what it holds) and for Gas Laws
+    /// ("ideal", with --gas-values).
     /// </summary>
     public static string? LaunchState(string key)
     {
@@ -56,7 +58,8 @@ public static class ChemTools
 /// (<c>molecule.saved</c>, <c>.style</c>, <c>.lonePairs</c>, <c>.labels</c>), and Atoms &amp; Orbitals' element and view
 /// (<c>atoms.element</c>, <c>atoms.view</c>), the Equation Balancer's equation (<c>balance.equation</c>), and Molar Mass
 /// &amp; Stoichiometry's tab and each tab's fields (<c>moles.tab</c>, <c>.formula</c>, <c>.convert.*</c>, <c>.equation</c>,
-/// <c>.given</c>, <c>.actual</c>, <c>.empirical</c>, <c>.empirical.mass</c>). Written as they change (Prefs writes the
+/// <c>.given</c>, <c>.actual</c>, <c>.empirical</c>, <c>.empirical.mass</c>), Gas Laws' tab, fields and units
+/// (<c>gas.tab</c>, <c>gas.P</c>, <c>gas.P.unit</c> … <c>gas.T2.unit</c>, <c>gas.formula</c>, <c>gas.constant</c>). Written as they change (Prefs writes the
 /// file a moment after the last change); a picture's run has a profile of its own that starts empty, so each picture
 /// shows its tool as its launch asks.
 /// </summary>

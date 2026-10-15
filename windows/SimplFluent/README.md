@@ -426,7 +426,7 @@ never fails a run, and nothing waits for it but the pictures' merge.
 show checked against the school while the window shows `LiveCheck`), the popups floating over the window (`FloatPopup`, Popups below), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once, the third time Simpl is opened, at a calm moment, and from Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, a place or a page in a window of its own (`PlaceWindow`: a pane row's or a list row's Open in new window, Shift+click on a pane row, a page's ⋯ ▸ Open in new window, or Ctrl+Shift+O for what shows), the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
 | `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In and its Send from Phone, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
-| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed, Word Counter, Statistics, Matrix Calculator; `Model/` holds their counting and sums with no window in them, tested in `SimplFluent.Tests`), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Compress files, Graphing calculator), `Elements/` (the Periodic Table, Atoms & Orbitals), `Chemistry/` (the Chemistry section's tools: `ChemTools.cs`, Lewis Structures, the Molecule Builder, and the calculators — the Equation Balancer, Molar Mass & Stoichiometry — with their sums in `Chemistry/Model/`, plain .NET), `Physics/` (the Physics section's tools: `PhysTools.cs`, Kinematics & Projectiles, Vectors; their maths in `Model/`, free of WPF), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
+| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed, Word Counter, Statistics, Matrix Calculator; `Model/` holds their counting and sums with no window in them, tested in `SimplFluent.Tests`), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Compress files, Graphing calculator), `Elements/` (the Periodic Table, Atoms & Orbitals), `Chemistry/` (the Chemistry section's tools: `ChemTools.cs`, Lewis Structures, the Molecule Builder, and the calculators — the Equation Balancer, Molar Mass & Stoichiometry, Gas Laws — with their sums in `Chemistry/Model/`, plain .NET), `Physics/` (the Physics section's tools: `PhysTools.cs`, Kinematics & Projectiles, Vectors; their maths in `Model/`, free of WPF), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
 
 ## A screen
 
@@ -943,6 +943,20 @@ cube). What each keeps for next time is the Mac's too (`ChemPrefs`, `SimplChem.<
   "H2O=15g"`, `--moles-empirical "C=40,H=6.71,O=53.3"` and `--moles-mass 180` for what it holds; a picture run logs
   `moles: shows reaction` and each tab's `moles reaction: shows …`. The search box opens it with `/moles`, `molar mass`,
   `stoichiometry`, `limiting reagent`, `percent yield` or `empirical`.
+- **Gas Laws** (`gas`, `Tools/Chemistry/GasTool.cs`; the sums in `Model/ChemGas.cs`): two tabs. **Ideal gas**: P, V,
+  n and T, each with its unit (atm, kPa, mmHg, bar, psi; L, mL, m³; mol or g of a formula; K, °C, °F); leave exactly
+  one blank and it is solved (R = 0.082057 L·atm/(mol·K), every sum in atm, L, mol, K), the answer shown large and
+  faintly in the blank field, the formula with the solved letter in the accent; two blanks say "Fill in all but one."
+  **Combined**: P1V1/T1 = P2V2/T2 with six fields, one blank solved; the chips Boyle (T constant), Charles (P constant)
+  and Gay-Lussac (V constant) hide the constant pair. A piston drawing (`PistonView`) follows the answer: its height
+  the volume, its dots the density n/V, its colour the temperature's warmth, each change over 200 ms easing out —
+  at once where Windows' animation effects are off (`Motion.On`). Fields and units are remembered (`gas.P`,
+  `gas.P.unit` … `gas.T2.unit`, `gas.formula`, `gas.constant`, `gas.tab`). Its pin's flyout is the Ideal gas tab compact
+  (the same remembered fields, so Open full screen goes on from them). `--tool gas --tool-state ideal|combined` (or
+  `--gas …`) with `--gas-values "P=1 atm,V=22.4 L,T=273.15 K"` (a letter left out is the blank; `P1`…`T2` for the
+  combined law) and `--gas-constant T|P|V` open it for pictures; a picture run logs `gas: shows ideal` and `gas ideal:
+  shows n=0.9994 mol`. The search box opens it with `/gas`, `ideal gas`, `pv=nrt`, `boyle`, `charles`, `pressure` or
+  `volume`.
 
 The builders and Atoms & Orbitals share one layout (`ChemLayout`): the controls and the facts in sight at every size,
 the drawing's own heading holding what to show when the drawing is over the rest, and the drawing held to the page less
