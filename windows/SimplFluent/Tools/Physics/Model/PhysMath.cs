@@ -2,7 +2,7 @@ using System.Globalization;
 
 namespace Simpl.Tools;
 
-// The physics tools' numbers (tools), the Mac's PhysMath line for line: a field's number read, and a result written to
+// The physics tools' numbers (0.3.9), the Mac's PhysMath line for line: a field's number read, and a result written to
 // four significant figures with no float noise ("40.77 m", "2.883 s", "0.03 A"), the minus the typeset "−". Plain .NET
 // — no WPF — so the unit tests check it on any machine.
 

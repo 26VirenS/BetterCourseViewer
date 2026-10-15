@@ -4,7 +4,7 @@ using Wpf.Ui.Controls;
 
 namespace Simpl.Tools;
 
-// The physics tools' place among the tools (tools), as the chemistry tools' is (Tools/Chemistry/ChemTools.cs): a
+// The physics tools' place among the tools (0.3.9), as the chemistry tools' is (Tools/Chemistry/ChemTools.cs): a
 // "Physics" section of their own on the Tools page, after Chemistry and before Biology, with their keys, names, lines,
 // symbols and colours (the Mac's, both apps the same); each tool's file registers its own views (Tools/Physics/MotionTool.cs
 // and the rest), its maths kept apart from WPF in Tools/Physics/Model so the unit tests check it on any machine; and

@@ -1,3 +1,9 @@
+**What's new in 0.3.9** (beta)
+
+- **Physics** — a new section on the Tools page, between Chemistry and Biology.
+- **Kinematics & Projectiles** — 1D motion: fill any three of Δx, v₀, v, a and t and the other two are solved, with the equation used and position and velocity graphs; projectiles: speed, angle and height give the time of flight, range, highest point and the impact, drawn and animated, with the two angles that hit a target; `/motion` in the search box, and a pin.
+- **Vectors** — up to six vectors by components or by magnitude and angle, in 2D or 3D: magnitudes, the resultant, dot and cross products, the angle between, unit vectors and projections, drawn; `/vectors` in the search box, and a pin.
+
 **What's new in 0.3.8** (beta)
 
 - **Equation balancer** — a new Chemistry tool: type any chemical equation (phases, charges, brackets, hydrates) and it is balanced as you type, with each element's count on both sides, a mass check and plain words when it can't be balanced; `/balance` in the search box, and a pin.

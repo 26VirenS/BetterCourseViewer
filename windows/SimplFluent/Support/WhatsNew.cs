@@ -26,6 +26,9 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.9", "2026-10-15",
+            ("new", "Motion & projectiles", "1D motion and projectile paths, in a new Physics section."),
+            ("new", "Vectors", "Add, dot and cross vectors, with components and a diagram.")),
         R("0.3.8", "2026-10-15",
             ("new", "Equation balancer", "Balance any chemical equation, with an atom count.")),
         R("0.3.7", "2026-10-15",

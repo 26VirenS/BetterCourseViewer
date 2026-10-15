@@ -2,7 +2,7 @@ using System.Globalization;
 
 namespace Simpl.Tools;
 
-// Vectors' maths (tools), the Mac's VectorModel line for line: a vector by its components or by its magnitude and angle,
+// Vectors' maths (0.3.9), the Mac's VectorModel line for line: a vector by its components or by its magnitude and angle,
 // magnitudes and directions, the sum, dot and cross products, the angle between two, unit vectors and projections; and
 // the launch's list ("3,4;1,2") read and written. Plain .NET, no WPF, so the unit tests check it on any machine.
 

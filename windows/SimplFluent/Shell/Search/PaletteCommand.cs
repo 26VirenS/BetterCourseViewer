@@ -196,7 +196,7 @@ internal sealed class PaletteCommand
     }
 
     /// <summary>
-    /// The Physics section's tools (tools), each opened in its popup by its name or a word a student would type for it
+    /// The Physics section's tools (0.3.9), each opened in its popup by its name or a word a student would type for it
     /// ("kinematics", "projectile", "dot product"), by the Mac's names and words. Their titles, lines and symbols are
     /// their tiles' (Tools/Physics/PhysTools.cs). No word here is another command's ("light" is the appearance's).
     /// </summary>

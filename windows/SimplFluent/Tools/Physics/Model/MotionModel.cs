@@ -1,6 +1,6 @@
 namespace Simpl.Tools;
 
-// Kinematics & Projectiles' maths (tools), the Mac's MotionModel line for line: the five quantities of motion in a
+// Kinematics & Projectiles' maths (0.3.9), the Mac's MotionModel line for line: the five quantities of motion in a
 // straight line with constant acceleration, any three given, the other two solved and the equation each came from
 // named; and a projectile's flight — its time, range, highest point and impact — with the two angles that hit a target.
 // Plain .NET, no WPF, so the unit tests check it on any machine.
