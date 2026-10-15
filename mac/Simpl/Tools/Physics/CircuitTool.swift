@@ -812,7 +812,7 @@ struct CircuitPicture: View {
         // the name and value on one side, the reading on the other — upright, beside a part on its side
         let upright = part.rotation == 0 || part.rotation == 180
         var label = name
-        if let unit = part.kind.unit { label += " \(part.kind == .battery ? CircuitMath.volts(part.value) : CircuitMath.ohms(part.value))" }
+        if part.kind.unit != nil { label += " \(part.kind == .battery ? CircuitMath.volts(part.value) : CircuitMath.ohms(part.value))" }
         if part.kind == .switch { label += part.closed ? " closed" : " open" }
         var readout: String?
         if reading.connected {
