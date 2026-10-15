@@ -41,17 +41,26 @@ public class ShrinkTests
         return ms.ToArray();
     }
 
-    /// <summary>A PNG whose left half is see-through.</summary>
-    private static byte[] Png(int w, int h, bool alpha)
+    /// <summary>
+    /// A PNG whose left half is see-through, with a camera's grain on every pixel (as a photo cut out has), so a JPEG of
+    /// it is far the smaller — or, with <paramref name="grain"/> off, one flat colour: a kilobyte as a PNG, smaller than
+    /// any JPEG of it, so the compressor leaves it as it was.
+    /// </summary>
+    private static byte[] Png(int w, int h, bool alpha, bool grain = true)
     {
+        var rnd = new Random(7);
         var px = new byte[w * h * 4];
         for (var y = 0; y < h; y++)
             for (var x = 0; x < w; x++)
             {
                 var i = (y * w + x) * 4;
-                px[i] = (byte)(x * 255 / w);
-                px[i + 1] = (byte)(y * 255 / h);
-                px[i + 2] = 200;
+                if (grain)
+                {
+                    px[i] = (byte)Math.Clamp(x * 255 / w + rnd.Next(-30, 31), 0, 255);
+                    px[i + 1] = (byte)Math.Clamp(y * 255 / h + rnd.Next(-30, 31), 0, 255);
+                    px[i + 2] = (byte)Math.Clamp(200 + rnd.Next(-30, 31), 0, 255);
+                }
+                else { px[i] = 120; px[i + 1] = 160; px[i + 2] = 200; }
                 px[i + 3] = (byte)(alpha && x < w / 2 ? 0 : 255);
             }
         var b = BitmapSource.Create(w, h, 96, 96, PixelFormats.Bgra32, null, px, w * 4);
@@ -96,8 +105,15 @@ public class ShrinkTests
         var flat = Shrink.Image(png, ".png", ShrinkPreset.Smallest);
         Assert.Equal("jpg", flat.Ext);
         Assert.False(Shrink.HasAlpha(Decoded(flat.Bytes)));
+        Assert.True(flat.Bytes.Length < kept.Bytes.Length, $"flattened {flat.Bytes.Length}, kept {kept.Bytes.Length}");
         // (a PNG with nothing see-through is a JPEG at every preset)
         Assert.Equal("jpg", Shrink.Image(Png(600, 400, alpha: false), ".png", ShrinkPreset.Max).Ext);
+        // (but never a larger file: a flat PNG, a kilobyte that no JPEG of it gets under, is left as it was — a PNG still)
+        var flatColour = Png(600, 400, alpha: false, grain: false);
+        var left = Shrink.Image(flatColour, ".png", ShrinkPreset.Max);
+        Assert.Same(flatColour, left.Bytes);
+        Assert.Equal("png", left.Ext);
+        Assert.Contains("left as it was", left.Note);
     }
 
     [Fact]
@@ -127,6 +143,8 @@ public class ShrinkTests
     public void APdfsPicturesAreWrittenSmallerAndItStillOpens()
     {
         var photo = Photo(1800, 1200);
+        // (the profile's folder is made when Simpl first reaches for it — AppPaths.Root — which nothing here has; so, made)
+        Directory.CreateDirectory(Profile.Folder);
         var path = Path.Combine(Profile.Folder, "shrink-test.pdf");
         PdfWork.Pictures(new[] { new PdfWork.Picture(photo, 612, 408), new PdfWork.Picture(Png(500, 300, alpha: false), 500, 300) }, path);
         var pdf = File.ReadAllBytes(path);
