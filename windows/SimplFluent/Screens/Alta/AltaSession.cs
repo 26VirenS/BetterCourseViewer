@@ -146,15 +146,27 @@ internal sealed record AltaPic(int Id, Rect Rect);
 /// <summary>(1.3.53) One of the buttons in Alta's button bars, whatever it says: shown as the app's own, pressing Alta's.</summary>
 internal sealed record AltaButton(int Id, string Label, bool Primary, bool Enabled);
 
-/// <summary>(1.3.51) A pop-up of Alta's, shown as the app's own: its title, words and buttons, and a picture of it as Alta draws it.</summary>
+/// <summary>(0.3.5) One of a pop-up's buttons as Alta has it: its words, whether Alta makes it the main one, whether it can
+/// be pressed, and whether it is the pop-up's close button (an icon, a ×).</summary>
+internal sealed record AltaDialogButton(string Label, bool Primary, bool Enabled, bool Close);
+
+/// <summary>(1.3.51) A pop-up of Alta's, shown as the app's own: (0.3.5) its title, its body as plain HTML the app draws as
+/// its own words — its formulas' TeX, its pictures as the page made them — and its buttons; and how much of it was read
+/// and when, for the log.</summary>
 internal sealed class AltaDialog
 {
-    public string Title { get; set; } = "";
-    public string Text { get; set; } = "";
-    public List<string> Buttons { get; set; } = new();
-    public BitmapSource? Picture { get; set; }
-    /// <summary>The picture's size as the page draws it (its CSS pixels: the popup's own).</summary>
-    public Size PictureSize { get; set; }
+    public string Title { get; init; } = "";
+    public string Html { get; init; } = "";
+    public List<AltaDialogButton> Buttons { get; init; } = new();
+    public int Words { get; init; }
+    public int Maths { get; init; }
+    public int Pics { get; init; }
+    /// <summary>Pictures of its body that could not be had (their words, if they had any, are shown in their place).</summary>
+    public int Missed { get; init; }
+    /// <summary>What it holds that the app cannot show as its own ("a video", "a form", "a frame of another site’s"), or "".</summary>
+    public string Live { get; init; } = "";
+    /// <summary>"settled", or how long it was waited for ("after 3 s").</summary>
+    public string Ready { get; init; } = "";
 }
 
 /// <summary>
@@ -175,7 +187,8 @@ internal sealed class AltaSession
     private readonly Dictionary<string, string> names;
     private readonly List<CoreWebView2Frame> frames = new();
     private readonly Dictionary<string, TaskCompletionSource<JsonNode?>> codeAsked = new();
-    private CancellationTokenSource? dialogWait;
+    private DispatcherTimer? dialogHoldLimit;
+    private bool dialogHeld;
     private string? darkScript;
     private bool started, closed, isDark, notifyQueued;
     private string lastPaint = "";
@@ -218,6 +231,9 @@ internal sealed class AltaSession
     /// <summary>(1.3.51) Alta's pop-up open, shown as the app's own; bumped each time it is said again.</summary>
     public AltaDialog? Dialog { get; private set; }
     public int DialogVersion { get; private set; }
+    /// <summary>(0.3.5) Alta's pop-up open in its page, shown there as Alta draws it — the app could not show it as its
+    /// own, or the student asked for Alta's — the page in sight under it until it closes.</summary>
+    public bool DialogInPage { get; private set; }
     /// <summary>(1.3.47) Each time Alta's page was not recognised and shown as it is: when, why, and what the page held.</summary>
     public List<string> ErrorLogs { get; } = new();
     /// <summary>(1.3.23) The assignment's objectives as its overview lists them, kept for this assignment.</summary>
@@ -354,7 +370,7 @@ internal sealed class AltaSession
         if (closed) return;
         closed = true;
         Hold(false);
-        dialogWait?.Cancel();
+        HoldForDialog(false);
         ClosePic();
         foreach (var t in codeAsked.Values) t.TrySetResult(null);
         try { Web.Dispose(); } catch { }
@@ -409,6 +425,9 @@ internal sealed class AltaSession
                     Pics = new();
                     lastPaint = "";
                     ClosePic();
+                    // (0.3.5: and the last page's pop-up with them, whether the app showed it or the page)
+                    HoldForDialog(false);
+                    if (Dialog != null || DialogInPage) { Dialog = null; DialogInPage = false; DialogVersion++; }
                     Notify();
                     return;
                 }
@@ -466,17 +485,32 @@ internal sealed class AltaSession
                 if (!main) return;
                 if (Bool(head["open"]) != true)
                 {
-                    dialogWait?.Cancel();
-                    if (Dialog != null) { Dialog = null; DialogVersion++; Notify(); }
+                    HoldForDialog(false);
+                    if (Dialog != null || DialogInPage) { Dialog = null; DialogInPage = false; DialogVersion++; Notify(); }
                     return;
                 }
-                var title = Str(head["title"]) ?? "";
-                var words = Str(head["text"]) ?? "";
-                var buttons = (head["buttons"] as JsonArray ?? new JsonArray()).Select(Str).OfType<string>().ToList();
-                dialogWait?.Cancel();
-                var wait = new CancellationTokenSource();
-                dialogWait = wait;
-                ShowDialogSoon(title, words, buttons, wait.Token);
+                // (0.3.5) one seen, out of sight in the page until it has settled: a picture waits for it
+                if (Bool(head["pending"]) == true) { HoldForDialog(true); return; }
+                HoldForDialog(false);
+                var d = new AltaDialog
+                {
+                    Title = Str(head["title"]) ?? "", Html = Str(head["html"]) ?? "",
+                    Buttons = (head["buttons"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+                        .Select(b => new AltaDialogButton(Str(b["label"]) ?? "", Bool(b["primary"]) ?? false, Bool(b["enabled"]) ?? true, Bool(b["close"]) ?? false))
+                        .Where(b => b.Label.Length > 0).ToList(),
+                    Words = (int)(Num(head["words"]) ?? 0), Maths = (int)(Num(head["maths"]) ?? 0), Pics = (int)(Num(head["pics"]) ?? 0),
+                    Missed = (int)(Num(head["missed"]) ?? 0), Live = Str(head["live"]) ?? "", Ready = Str(head["ready"]) ?? "",
+                };
+                // (never an empty dialog: what the app cannot draw, or a body with nothing read in it, is Alta's own, in its page)
+                if (d.Live.Length > 0) { GiveBack($"it holds {d.Live}, which the app cannot show as its own", d); return; }
+                if (d.Words == 0 && d.Maths == 0 && d.Pics == 0) { GiveBack("nothing in its body could be read", d); return; }
+                Dialog = d;
+                DialogInPage = false;
+                DialogVersion++;
+                _ = Run("window.__simplDialog ? window.__simplDialog.hide() : null");
+                if (Shot.Asked)
+                    Log.Write($"alta: a pop-up shown as the app's own: \"{d.Title}\", {d.Words} words, {d.Maths} formulas, {d.Pics} pictures ({d.Missed} not had), buttons {string.Join(" | ", d.Buttons.Select(b => b.Label))} ({d.Ready})");
+                Notify();
                 return;
             }
             case "focus":
@@ -782,52 +816,49 @@ internal sealed class AltaSession
     /// <summary>One of the pop-up's buttons, pressed in Alta's own.</summary>
     public void PressDialog(int index) => _ = Run($"window.__simplDialog ? window.__simplDialog.press({index}) : null");
 
-    /// <summary>The app's dialog put away without a button: Alta's pop-up given back to the page.</summary>
-    public void DialogDismissed()
+    /// <summary>(0.3.5) A link in the pop-up's body, followed as Alta's page follows it (the page's own link pressed).</summary>
+    public void DialogLink(string href) => _ = Run($"window.__simplDialog ? window.__simplDialog.link({Json.Str(href)}) : null");
+
+    /// <summary>The app's dialog put away without a button (Escape with no way out of Alta's, Show in Alta's page): Alta's
+    /// pop-up given back to the page.</summary>
+    public void DialogDismissed() => GiveBack(null, null);
+
+    /// <summary>
+    /// (0.3.5) Alta's pop-up shown in its page as Alta draws it, the page in sight under it, until it closes: one the app
+    /// cannot show as its own — what it holds cannot be drawn (a video, a form, another site's frame), or nothing in its
+    /// body could be read (<paramref name="why"/>, written in the Error Logs with what was read of it) — never shown as an
+    /// empty dialog; or one the student asked to see there.
+    /// </summary>
+    private void GiveBack(string? why, AltaDialog? read)
     {
-        dialogWait?.Cancel();
         Dialog = null;
+        DialogInPage = true;
         DialogVersion++;
-        Notify();
-        _ = Run("window.__simplDialog ? window.__simplDialog.show(true) : null");
-    }
-
-    /// <summary>(1.3.51) Alta's pop-up: its opening fade done, a picture of it as Alta draws it — then hidden in the page,
-    /// the app's own shown.</summary>
-    private async void ShowDialogSoon(string title, string text, List<string> buttons, CancellationToken stop)
-    {
-        try { await Task.Delay(380, stop); } catch { return; }
-        var same = Dialog is { } was && was.Title == title && was.Text == text && was.Buttons.SequenceEqual(buttons);
-        var picture = await DialogPicture();
-        if (stop.IsCancellationRequested || closed) return;
-        _ = Run("window.__simplDialog ? window.__simplDialog.show(false) : null");
-        // (the page out of sight under the app's dialog: the picture taken before is kept while the pop-up says the same)
-        if (picture == null && same) picture = (Dialog!.Picture, Dialog.PictureSize) is ({ } img, var size) ? (img, size) : null;
-        Dialog ??= new AltaDialog();
-        Dialog.Title = title;
-        Dialog.Text = text;
-        Dialog.Buttons = buttons;
-        Dialog.Picture = picture?.Image;
-        Dialog.PictureSize = picture?.Size ?? default;
-        DialogVersion++;
-        Notify();
-    }
-
-    /// <summary>A picture of Alta's pop-up as it draws it, shown in the page for the moment it is taken (its buttons
-    /// hidden, the row of them cropped off — the app's dialog has them as its own).</summary>
-    private async Task<(BitmapSource Image, Size Size)?> DialogPicture()
-    {
-        if (!Web.IsVisible) return null;
-        _ = await Run("window.__simplDialog ? (window.__simplDialog.show(true), window.__simplDialog.shot(true)) : null");
-        await Task.Delay(80);
-        try
+        _ = Run("window.__simplDialog ? window.__simplDialog.giveBack() : null");
+        if (why != null)
         {
-            if (await Run("(function () { var r = window.__simplDialog ? window.__simplDialog.rect() : null; if (r) { r.dpr = window.devicePixelRatio || 1; } return r; })()") is not JsonObject r
-                || Num(r["x"]) is not { } x || Num(r["y"]) is not { } y || Num(r["w"]) is not { } w || Num(r["h"]) is not { } h || w <= 4 || h <= 4) return null;
-            var rect = new Rect(x, y, w, h);
-            return await Preview(rect, Num(r["dpr"]) ?? 1) is { } img ? (img, rect.Size) : null;
+            var entry = $"{DateTime.Now.ToString("MMM d, yyyy, h:mm:ss tt", CultureInfo.CurrentCulture)} — a pop-up of Alta’s shown in its page: {why}";
+            if (read != null)
+                entry += $"\n  title \"{read.Title}\", {read.Words} words, {read.Maths} formulas, {read.Pics} pictures, buttons {string.Join(" | ", read.Buttons.Select(b => b.Label))} ({read.Ready})";
+            ErrorLogs.Add(entry);
+            if (ErrorLogs.Count > 50) ErrorLogs.RemoveAt(0);
+            if (Shot.Asked) Log.Write("alta: a pop-up shown in Alta's page: " + why);
         }
-        finally { _ = Run("window.__simplDialog ? window.__simplDialog.shot(false) : null"); }
+        Notify();
+    }
+
+    /// <summary>(0.3.5) A picture waits while a pop-up of Alta's settles in the page (twelve seconds at most).</summary>
+    private void HoldForDialog(bool on)
+    {
+        if (on == dialogHeld) return;
+        dialogHeld = on;
+        dialogHoldLimit?.Stop();
+        dialogHoldLimit = null;
+        if (!on) { Shot.Ended(); return; }
+        Shot.Began();
+        dialogHoldLimit = new DispatcherTimer { Interval = TimeSpan.FromSeconds(12) };
+        dialogHoldLimit.Tick += (_, _) => HoldForDialog(false);
+        dialogHoldLimit.Start();
     }
 
     /// <summary>What the page shows now, cropped to a part of it (the page's own coordinates in its view).</summary>

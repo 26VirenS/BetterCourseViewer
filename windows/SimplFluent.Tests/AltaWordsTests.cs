@@ -4,7 +4,8 @@ using Xunit;
 namespace Simpl.Tests;
 
 /// <summary>Knewton Alta's own words for a time (Screens/Alta/AltaLook.cs): written as every screen writes one —
-/// "11:59 PM", never "11:59pm", and no time zone — and its due words read as a date where they can be.</summary>
+/// "11:59 PM", never "11:59pm", and no time zone — and its due words read as a date where they can be; (0.3.5) its pop-ups'
+/// buttons in sentence case.</summary>
 public class AltaWordsTests
 {
     [Fact]
@@ -17,6 +18,18 @@ public class AltaWordsTests
         // (what is written already, and words that only look like a time, are left as they are)
         Assert.Equal("Due Oct 12 at 11:59 PM", AltaLook.Times("Due Oct 12 at 11:59 PM"));
         Assert.Equal("10 amounts", AltaLook.Times("10 amounts"));
+    }
+
+    [Fact]
+    public void APopUpsButtonsAreInSentenceCase()
+    {
+        // (0.3.5: a pop-up of Alta's shown as the app's own dialog — Screens/Alta/AltaPopup.cs, AltaDialogCard)
+        Assert.Equal("Got it", AltaParts.ButtonWords("GOT IT"));
+        Assert.Equal("View instruction", AltaParts.ButtonWords("VIEW INSTRUCTION"));
+        Assert.Equal("Next", AltaParts.ButtonWords("NEXT"));
+        Assert.Equal("Not now", AltaParts.ButtonWords("Not now"));
+        Assert.Equal("OK", AltaParts.ButtonWords("OK"));
+        Assert.Equal("×", AltaParts.ButtonWords("×"));
     }
 
     [Fact]

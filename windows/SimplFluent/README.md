@@ -975,6 +975,21 @@ alta:104:4003:/mock-alta/learn/course/c1/assignment/a3?demo=1` opens it on a pag
 learn page with a question, the rail filled from the player's own answer — and `?demo=dialog` there also opens a pop-up
 built as Alta's are, its rich body coming in a second and a half after it (`window.mockRichDialog`), for the pictures.
 
+A pop-up of Alta's (0.3.5) is hidden in the page as soon as the page script sees it and read once it has settled —
+nothing it says changed for a moment, nothing in it loading, its fade done; three seconds at most, five while its body
+says nothing — and again at each change (a next step): its title, its body as plain HTML (its formulas as their TeX,
+each picture, drawing or formula without TeX made into a picture by the page, on a canvas at twice its size) and every
+button, Alta's main one told. The popup draws it as its own dialog (`AltaDialogCard`: the body as `Kit/RichText` draws
+the school's rich text, its links followed in Alta's page, its buttons pressing Alta's). Before, the pop-up was read the
+moment it was seen and pictured 380 ms later — often before its body came in, or as it faded in, or blank under the
+page's veil — and once hidden it could be neither read whole again (its words ran together) nor pictured again (the
+popup's dialog covers the web view), so it showed its title and buttons round an empty body. A pop-up that holds what
+the app cannot draw (a video, a form, another site's frame), whose body has nothing that can be read, or that the page
+script fails to read is never shown empty, nor left out of sight: it is given back to the page, shown there as Alta
+draws it until it closes (`DialogInPage`), and why goes in the Error Logs. A picture run waits for a pop-up seen to be
+shown, and writes "alta: a pop-up shown as the app's own: …" with its words, formulas and pictures
+(`scripts/dev/alta-test.mjs` reads the page script's side of it in Chromium).
+
 ## Icons
 
 WPF-UI 4.3 draws only the Fluent icons whose code is at most U+FFFF; the rest show as a stray character. Check a new

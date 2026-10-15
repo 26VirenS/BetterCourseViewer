@@ -2,8 +2,9 @@ namespace Simpl.Screens;
 
 /// <summary>
 /// The Knewton Alta popup's page script (the Mac's AltaHook, mac/Simpl/Engine/AltaSession.swift — the one to change; this
-/// is its copy, word for word but for how it speaks to the app: WebView2's <c>chrome.webview.postMessage</c> where WebKit
-/// has its message handler). In every frame of the popup's own web view, which holds nothing but Alta's launch: it reads
+/// is its copy, word for word but for how it speaks to the app — WebView2's <c>chrome.webview.postMessage</c> where WebKit
+/// has its message handler — and, since 0.3.5, for how it reads Alta's pop-ups: whole, once they have settled, here first
+/// until the Mac's takes it up). In every frame of the popup's own web view, which holds nothing but Alta's launch: it reads
 /// a copy of Alta's own answers as its page receives them and passes the app the assignment, its objectives and their
 /// mastery and the objective on screen — never the question, its answer key or who the student is; it lays Alta's
 /// question out alone (its parts, their panels and buttons told to the app), keeps the page out of sight until it is laid
@@ -25,6 +26,9 @@ internal static class AltaHook
           // shows its own Loading meanwhile. A page that is not Alta's (the launch on the way to it) is shown at once.
           var reveal = function () {};
           var veilAgain = function () {};
+          // (Windows 0.3.5) a pop-up of Alta's given back to the page, shown there as Alta draws it: the page stays in
+          // sight under it until it closes
+          var dialogInPage = false;
           if (window.top === window) {
             var showing = false;
             var veils = /knewton|alta/i.test(location.hostname + location.pathname);
@@ -34,7 +38,7 @@ internal static class AltaHook
             };
             // (1.3.62) out of sight again — Alta between one part and the next, taking its time — until the next is laid out
             veilAgain = function () {
-              if (!veils || !showing) return;
+              if (!veils || !showing || dialogInPage) return;
               if (document.documentElement) document.documentElement.removeAttribute('data-simpl-shown');
               showing = false;
               post({ kind: 'hidden' });
@@ -316,7 +320,7 @@ internal static class AltaHook
                 flow: flow ? [].slice.call(flow.children).slice(0, 14).map(function (k) { return lab(k) + (shown(k) ? '' : ' (unseen)'); }) : null,
                 main: !flow && main ? [].slice.call(main.querySelectorAll('*')).filter(function (e) { return e.children.length > 1 && shown(e); }).slice(0, 12).map(lab) : null,
                 buttons: all('button, [role="button"], a[href]').filter(shown).map(function (b) { return norm(b.innerText || b.textContent || b.getAttribute('aria-label')).slice(0, 40); }).filter(Boolean).slice(0, 30),
-                dialogs: all('[role="dialog"], [role="alertdialog"], .MuiModal-root').filter(shown).length
+                dialogs: all(DIALOG_SEL + ', .MuiModal-root').filter(shown).length
               };
             };
             var marked = [], keptNow = [];
@@ -491,65 +495,401 @@ internal static class AltaHook
               told = state;
               post({ kind: 'focus', state: state, reason: (r && r.reason) || '', shape: /^(question|lesson|overview)$/.test(state) ? null : shape(r || {}) });
             };
-            // ---- (1.3.51) Alta's pop-ups as the Mac's own: each one open passed to the app — its title, words and buttons,
-            // and where it is, for a picture of it as Alta draws it — and hidden in the page while the app shows it; the
-            // app's buttons press Alta's ----
-            var dialogSig = '', dialogEl = null;
+            // ---- (1.3.51) Alta's pop-ups as the app's own: each one open passed to the app and hidden in the page while
+            // the app shows it, the app's buttons pressing Alta's ----
+            // (Windows 0.3.5) Read whole, once it has settled. Before, a pop-up was read the moment it was seen — often
+            // before its body was in — and pictured 380 ms later, as it faded in or with its body still empty (or blank,
+            // under the page's veil); once the app had hidden it, a new reading of it lost its words' breaks and no new
+            // picture could be taken (the app's dialog covers the web view), so the app's dialog showed its title and
+            // its buttons round an empty body. Now a pop-up is a dialog by its role, one marked modal, or Material's,
+            // React Toolbox's or react-modal's own box — in the page or in a web component's own tree — the innermost of
+            // them. It is hidden in the page as soon as it is seen (the app shows it as its own, or gives it back) and
+            // passed once it has settled — nothing it says changed for a moment, nothing in it still loading (a spinner,
+            // a picture not in yet), its fade done; three seconds at most, five while it says nothing yet — and again
+            // whenever what it says changes (a next step). It is read with the app's hiding lifted for that moment (no
+            // paint comes between): its title (what names it, else a heading it opens with), its body as plain HTML the
+            // app draws as its own words (paragraphs, headings, lists, tables, links; each formula as its TeX — MathJax's
+            // own script, KaTeX's annotation, the formula's attribute), each picture, drawing or formula with no TeX made
+            // into a picture here (drawn on a canvas; a picture of another site's that the page may not read back by its
+            // address, for the app to fetch), and every one of its buttons, whatever it says — its words, whether Alta
+            // makes it the main one, whether it can be pressed, a close button told apart. What the app cannot draw — a
+            // video, a form, a frame of another site's — is said too, and an empty body: the app gives that pop-up back to
+            // the page, shown there as Alta draws it.
+            var DIALOG_SEL = '[role="dialog"], [role="alertdialog"], dialog[open], [aria-modal="true"], .MuiDialog-paper, [data-react-toolbox="dialog"], .ReactModal__Content, mat-dialog-container, .modal.show .modal-content, .modal.in .modal-content';
+            var BTN = 'button, [role="button"], input[type="button"], input[type="submit"], input[type="reset"], a[href][class*="btn" i], a[href][class*="button" i]';
+            var MATHS = '.MathJax_Display, .MathJax_SVG_Display, .MathJax, .MathJax_CHTML, .MathJax_SVG, mjx-container, .katex-display, .katex, math, .mq-math-mode, [data-latex], [data-tex]';
+            var HEADING = 'h1, h2, h3, h4, h5, h6, [role="heading"], [class*="DialogTitle"], [class*="title" i]';
+            var KEEP_TAGS = /^(p|h[1-6]|ul|ol|li|table|thead|tbody|tfoot|tr|td|th|b|strong|i|em|u|sup|sub|code|pre|blockquote|dl|dt|dd|s|small|mark|figure|figcaption)$/;
+            var dialogEl = null, dialogSaid = '', dialogRead = '', dialogDirty = 0, dialogWaiting = 0, dialogSeen = 0, dialogTicks = 0, dialogGen = 0;
+            var dialogBtns = [], dialogLinks = [], dialogPics = [], dialogHosts = [];
+            var esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+            var styleOf = function (el) { return (el.ownerDocument.defaultView || window).getComputedStyle(el); };
+            // (the app's own hiding lifted for the moment a pop-up is looked for and read — no paint comes between — so
+            // one the app is showing reads as it is)
+            var unhidden = function (fn) {
+              var de = document.documentElement, was = de.hasAttribute('data-simpl-native-dialog');
+              if (was) de.removeAttribute('data-simpl-native-dialog');
+              try { return fn(); } finally { if (was) de.setAttribute('data-simpl-native-dialog', ''); }
+            };
+            // (how see-through it is with what holds it: its fade, its holder's — never the page's veil, the app's own)
+            var opacityOf = function (el) {
+              var o = 1;
+              for (var x = el; x && x !== document.body && x !== document.documentElement; x = x.parentElement || (x.parentNode && x.parentNode.host) || null) o *= parseFloat(styleOf(x).opacity);
+              return isFinite(o) ? o : 1;
+            };
+            var fading = function (el) {
+              try {
+                return el.getAnimations({ subtree: true }).some(function (a) { var t = a.effect && a.effect.getComputedTiming ? a.effect.getComputedTiming() : null; return a.playState === 'running' && !!t && isFinite(t.endTime); });
+              } catch (e) { return false; }
+            };
+            // (still loading: a spinner or a bar that goes round, something marked busy, or words saying so — a bar that
+            // shows how far something is, a mastery ring, is not)
+            var dialogBusy = function (d) {
+              if ([].some.call(d.querySelectorAll(BUSY), function (b) { return shown(b) && !b.hasAttribute('aria-valuenow') && !b.querySelector('[aria-valuenow]'); })) return true;
+              var t = norm(d.innerText || '');
+              return /^(loading|please wait|one moment|just a moment|preparing)\b/.test(t) && t.length < 120;
+            };
+            // (what holds a pop-up in the page — its backdrop with it — out of a web component's own tree to its host)
+            var holderOf = function (d) {
+              var x = d;
+              while (x.getRootNode && x.getRootNode() !== document && x.getRootNode().host) x = x.getRootNode().host;
+              return x.closest('.MuiModal-root, .MuiDialog-root, [data-react-toolbox="portal"], .ReactModalPortal, .cdk-overlay-container, .modal') || x.closest('[role="presentation"]') || x;
+            };
+            var dialogOpen = function (d) {
+              var r = d.getBoundingClientRect();
+              return r.width >= 60 && r.height >= 36 && styleOf(d).visibility !== 'hidden' && opacityOf(d) > 0.02;
+            };
+            // (the one open now: the last, the innermost of those nested; a web component's own trees looked in every
+            // fourth time, or every time while one there is open — and its host kept in sight by the focus, below)
             var dialogNow = function () {
-              var ds = all('[role="dialog"], [role="alertdialog"], dialog[open]').filter(function (d) {
-                return shown(d) && (txt(d).length > 0 || d.querySelector('button, svg, img'));
-              });
+              dialogTicks++;
+              var inside = dialogTicks % 4 === 1 || !!(dialogEl && dialogEl.isConnected && dialogEl.getRootNode() !== document);
+              var ds = (inside ? deep(DIALOG_SEL) : all(DIALOG_SEL)).filter(function (d) { return !d.closest('#simpl-panels'); });
+              if (inside) {
+                var hosts = ds.filter(function (d) { return d.getRootNode() !== document; }).map(holderOf);
+                if (hosts.length !== dialogHosts.length || hosts.some(function (h, i) { return h !== dialogHosts[i]; })) { dialogHosts = hosts; schedule(); }
+              }
+              ds = ds.filter(dialogOpen);
+              ds = ds.filter(function (d) { return !ds.some(function (e) { return e !== d && d.contains(e); }); });
               return ds[ds.length - 1] || null;
             };
-            var dialogButtons = function (d) {
-              return [].slice.call(d.querySelectorAll('button, [role="button"], a[href]')).filter(shown).map(function (b) {
-                return { el: b, label: String(b.innerText || b.textContent || b.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim() };
-              }).filter(function (x) { return x.label; });
+            // (an element's words as they show, its buttons' left out)
+            var wordsOf = function (el) {
+              var w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), n, out = [];
+              while ((n = w.nextNode())) {
+                var p = n.parentElement;
+                if (!n.data.trim() || !p || p.closest('script, style, template, noscript, ' + BTN) || !p.getClientRects().length) continue;
+                out.push(n.data);
+              }
+              return out.join(' ').replace(/\s+/g, ' ').trim();
             };
-            var DIALOG_CSS = 'html[data-simpl-native-dialog] [data-simpl-dialog] { visibility: hidden !important; }\n'
-              // (1.3.54) its picture taken without its buttons — the app's sheet has them as its own
-              + 'html[data-simpl-dialog-shot] [data-simpl-dialog] :is(button, [role="button"]) { visibility: hidden !important; }\n';
+            var firstWords = function (d) {
+              var w = document.createTreeWalker(d, NodeFilter.SHOW_TEXT), n;
+              while ((n = w.nextNode())) {
+                var p = n.parentElement;
+                if (!n.data.trim() || !p || p.closest('script, style, template, noscript, ' + BTN) || !p.getClientRects().length) continue;
+                return p;
+              }
+              return null;
+            };
+            var titleOf = function (d) {
+              var by = d.getAttribute('aria-labelledby'), root = d.getRootNode(), t = by && root.getElementById ? root.getElementById(by.split(' ')[0]) : null;
+              if (t && wordsOf(t)) return { el: d.contains(t) ? t : null, text: wordsOf(t) };
+              if ((d.getAttribute('aria-label') || '').trim()) return { el: null, text: d.getAttribute('aria-label').trim() };
+              var h = d.querySelector(HEADING), first = firstWords(d);
+              if (h && first && h.contains(first) && wordsOf(h).length <= 160) return { el: h, text: wordsOf(h) };
+              return { el: null, text: '' };
+            };
+            // (every button of its own, in its order, in its web components' trees too: a close button — an icon named
+            // Close, a ×, or an icon's own word for it, with no words of its own — told apart; its words as Alta writes
+            // them, not as a style puts them in capitals)
+            var buttonsOf = function (d) {
+              var found = [];
+              var visit = function (root) {
+                [].forEach.call(root.querySelectorAll(BTN), function (b) { if (found.indexOf(b) < 0) found.push(b); });
+                [].forEach.call(root.querySelectorAll('*'), function (el) { if (el.shadowRoot) visit(el.shadowRoot); });
+              };
+              visit(d);
+              if (d.shadowRoot) visit(d.shadowRoot);
+              var out = [];
+              found.forEach(function (b) {
+                if (!b.getClientRects().length || (b.parentElement && b.parentElement.closest(BTN))) return;
+                var cs = styleOf(b);
+                if (cs.visibility === 'hidden' || cs.display === 'none') return;
+                var seen = String(b.innerText || b.value || '').replace(/\s+/g, ' ').trim();
+                var source = String(b.textContent || b.value || '').replace(/\s+/g, ' ').trim();
+                var words = source && source.toLowerCase() === seen.toLowerCase() ? source : seen;
+                var named = String(b.getAttribute('aria-label') || b.getAttribute('title') || '').replace(/\s+/g, ' ').trim();
+                var icon = !!b.querySelector('svg, img, [class*="icon" i]');
+                var close = ((!words || /^[×✕✖xX]$/.test(words)) && /close|dismiss|×|✕/i.test(named + ' ' + words)) || (icon && /^(close|clear)$/i.test(words));
+                var label = close ? 'Close' : (words || named);
+                if (!label) return;
+                var cls = String(b.className && b.className.baseVal !== undefined ? b.className.baseVal : b.className || '');
+                out.push({ el: b, label: label.slice(0, 60), close: close,
+                  primary: /(contained|raised|button-primary|btn-primary|__primary|-primary)/i.test(cls) && !/flat|outlined/i.test(cls),
+                  enabled: !b.disabled && b.getAttribute('aria-disabled') !== 'true' });
+              });
+              return out;
+            };
+            // (a formula's TeX, from wherever it is kept beside what was drawn)
+            var texOf = function (m) {
+              var a = m.getAttribute('data-latex') || m.getAttribute('data-tex');
+              if (a) return { tex: a, display: false };
+              var shows = m.matches('.MathJax_Display, .MathJax_SVG_Display, .katex-display') || (m.tagName.toLowerCase() === 'math' && m.getAttribute('display') === 'block');
+              // (MathJax 2: the formula's own script, beside what it drew)
+              var f = m.matches('.MathJax_Display, .MathJax_SVG_Display') ? (m.querySelector('[id$="-Frame"]') || m) : m;
+              var root = m.getRootNode().getElementById ? m.getRootNode() : m.ownerDocument;
+              var s = f.id && /-Frame$/.test(f.id) ? root.getElementById(f.id.replace(/-Frame$/, '')) : null;
+              if (s && /^math\/tex/i.test(s.type || '')) return { tex: s.textContent, display: shows || /mode\s*=\s*display/i.test(s.type) };
+              // (MathJax 3: the formula it typeset there)
+              try {
+                var doc = window.MathJax && window.MathJax.startup && window.MathJax.startup.document;
+                var items = doc && doc.getMathItemsWithin ? doc.getMathItemsWithin(m) : [];
+                if (items && items.length && /tex/i.test((items[0].inputJax && items[0].inputJax.name) || '')) return { tex: items[0].math, display: !!items[0].display };
+              } catch (e) {}
+              // (KaTeX, and MathML with its TeX beside it)
+              var ann = m.querySelector('annotation[encoding="application/x-tex"]');
+              if (ann) return { tex: ann.textContent, display: shows };
+              // (MathQuill's own copy of its LaTeX)
+              var mq = m.matches('.mq-math-mode') ? m.querySelector('.mq-selectable') : null;
+              if (mq) return { tex: mq.textContent.replace(/^\$+|\$+$/g, ''), display: false };
+              return null;
+            };
+            // (a formula's words for a reader, when it has no TeX and no picture can be made of it)
+            var mathWords = function (m) {
+              var said = m.getAttribute('aria-label') || m.getAttribute('alttext');
+              var mml = m.querySelector('mjx-assistive-mml, .MJX_Assistive_MathML, math');
+              return String(said || (mml && mml.textContent) || m.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+            };
+            // (its body: all of it but its title, its buttons left out — theirs are the app's; in a frame of the page's
+            // own site, the frame's page read too)
+            var readDialog = function (d) {
+              var t = titleOf(d), btns = buttonsOf(d);
+              var out = { title: t.text, words: 0, maths: 0, live: '', loading: false };
+              var pics = [], links = [];
+              var formula = function (tex, display) {
+                out.maths++;
+                var img = '<img class="equation_image" data-equation-content="' + esc(tex.trim()) + '">';
+                return display ? '<p style="text-align:center">' + img + '</p>' : img;
+              };
+              var pic = function (el, inline, alt) {
+                var r = el.getBoundingClientRect();
+                if (r.width < 6 || r.height < 6) return '';
+                pics.push({ el: el });
+                return '<img data-simpl-pic="' + (pics.length - 1) + '" width="' + Math.round(r.width) + '" height="' + Math.round(r.height) + '"' + (inline ? ' class="equation"' : '') + (alt ? ' alt="' + esc(alt) + '"' : '') + '>';
+              };
+              var kids = function (n) {
+                var list = n.shadowRoot ? n.shadowRoot.childNodes : (n.tagName === 'SLOT' ? n.assignedNodes({ flatten: true }) : n.childNodes), s = '';
+                for (var i = 0; i < list.length; i++) s += walk(list[i]);
+                return s;
+              };
+              var walk = function (n) {
+                if (n.nodeType === 3) { var w = n.data.trim(); if (w) out.words += w.split(/\s+/).length; return esc(n.data); }
+                if (n.nodeType !== 1 || n === t.el) return '';
+                var tag = n.tagName.toLowerCase();
+                if (/^(script|style|template|noscript|link|meta|title)$/.test(tag)) {
+                  // (MathJax 2's formula not drawn yet: its script is all there is of it)
+                  var root = n.getRootNode().getElementById ? n.getRootNode() : n.ownerDocument;
+                  if (tag === 'script' && /^math\/tex/i.test(n.type || '') && !(n.id && root.getElementById(n.id + '-Frame'))) return formula(n.textContent, /mode\s*=\s*display/i.test(n.type));
+                  return '';
+                }
+                if (n.matches(BTN)) return '';
+                var cs = styleOf(n);
+                if (cs.display === 'none') return '';
+                if (n.matches(MATHS)) { var f = texOf(n); return f && f.tex.trim() ? formula(f.tex, f.display) : pic(n, cs.display.indexOf('inline') === 0, mathWords(n) || 'A formula'); }
+                if (n.getAttribute('aria-hidden') === 'true' || cs.visibility === 'hidden' || n.matches('.MathJax_Preview, .MJX_Assistive_MathML, .sr-only, .visually-hidden')) return '';
+                var r = n.getBoundingClientRect();
+                if ((r.width <= 1 || r.height <= 1) && cs.position === 'absolute') return '';
+                var small = r.height <= 28 && cs.display.indexOf('inline') === 0;
+                if (tag === 'img') { if (!n.complete) out.loading = true; return pic(n, small, n.alt || ''); }
+                if (/^(svg|canvas|picture)$/.test(tag)) return pic(n, small, n.getAttribute('aria-label') || '');
+                if (/^(video|audio|object|embed)$/.test(tag)) { out.live = out.live || (tag === 'audio' ? 'a sound' : 'a video'); return pic(n, false, ''); }
+                if (/^(input|select|textarea)$/.test(tag)) { if (!/^hidden$/i.test(n.type || '')) out.live = out.live || 'a form'; return ''; }
+                if (tag === 'iframe') {
+                  var body = null;
+                  try { body = n.contentDocument && n.contentDocument.body; } catch (e) {}
+                  if (!body) { out.live = out.live || 'a frame of another site’s'; return ''; }
+                  return '<div>' + kids(body) + '</div>';
+                }
+                if (tag === 'br') return '<br>';
+                if (tag === 'hr') return '<hr>';
+                var inner = kids(n);
+                if (tag === 'a' && n.getAttribute('href')) { links.push(n); return '<a href="' + esc(n.href) + '">' + inner + '</a>'; }
+                if (!inner.replace(/<[^>]*>|&nbsp;|\s/g, '') && !/<(img|hr|br)\b/.test(inner)) return /\s/.test(inner) ? ' ' : '';
+                var name = KEEP_TAGS.test(tag) ? tag : cs.display === 'list-item' ? 'li' : /^(block|flex|grid|table|flow-root)/.test(cs.display) ? 'div' : 'span';
+                // (bold and italic as Alta's own styles make them)
+                var up = n.parentElement ? styleOf(n.parentElement) : null, flat = !/<(div|p|ul|ol|table|h[1-6]|blockquote|pre)\b/.test(inner);
+                if (flat && !/^(b|strong|h[1-6]|th)$/.test(name) && +cs.fontWeight >= 600 && up && +up.fontWeight < 600) inner = '<b>' + inner + '</b>';
+                if (flat && !/^(i|em)$/.test(name) && cs.fontStyle === 'italic' && up && up.fontStyle !== 'italic') inner = '<i>' + inner + '</i>';
+                if (name === 'span') return inner;
+                return '<' + name + ((name === 'td' || name === 'th') && n.colSpan > 1 ? ' colspan="' + n.colSpan + '"' : '') + '>' + inner + '</' + name + '>';
+              };
+              out.html = kids(d).trim().slice(0, 60000);
+              out.busy = dialogBusy(d);
+              out.buttons = btns.map(function (b) { return { label: b.label, primary: b.primary, enabled: b.enabled, close: b.close }; });
+              dialogBtns = btns.map(function (b) { return b.el; });
+              dialogLinks = links;
+              dialogPics = pics;
+              return out;
+            };
+            // (a picture, a drawing or a formula with no TeX in its body, as a picture the app can show: drawn on a canvas
+            // at twice its size, so it is sharp — a picture of the page's own, a drawing (its looks written on it, the
+            // symbols it draws from put in, its colour), a canvas — or, a picture of another site's the page may not read
+            // back, its address; nothing if it cannot be had in two and a half seconds)
+            var pictureOf = function (p) {
+              var el = p.el;
+              if (!el.isConnected) return Promise.resolve(null);
+              var r = el.getBoundingClientRect(), w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height));
+              var scale = Math.max(2, Math.min(3, window.devicePixelRatio || 1));
+              var paint = function (draw) {
+                var c = document.createElement('canvas');
+                c.width = Math.round(w * scale); c.height = Math.round(h * scale);
+                var g = c.getContext('2d');
+                g.scale(scale, scale);
+                draw(g);
+                return c.toDataURL('image/png');
+              };
+              var tag = el.tagName.toLowerCase();
+              var made = new Promise(function (ok) {
+                try {
+                  if (tag === 'img' || tag === 'picture') {
+                    var img = tag === 'picture' ? el.querySelector('img') : el;
+                    var src = img ? img.currentSrc || img.src || '' : '';
+                    if (!img) return ok(null);
+                    if (/^data:image\/(png|jpe?g|gif|bmp)[;,]/i.test(src)) return ok(src);
+                    try { if (img.complete && img.naturalWidth) return ok(paint(function (g) { g.drawImage(img, 0, 0, w, h); })); } catch (e) {}
+                    return ok(/^https?:/i.test(src) ? src : null);
+                  }
+                  if (tag === 'canvas') { try { return ok(el.toDataURL('image/png')); } catch (e) { return ok(null); } }
+                  var svg = tag === 'svg' ? el : el.querySelector('svg');
+                  if (!svg) return ok(null);
+                  var sr = svg.getBoundingClientRect();
+                  if (svg !== el) { w = Math.max(1, Math.round(sr.width)); h = Math.max(1, Math.round(sr.height)); }
+                  var copy = svg.cloneNode(true);
+                  var from = [svg].concat([].slice.call(svg.querySelectorAll('*'))), to = [copy].concat([].slice.call(copy.querySelectorAll('*')));
+                  var LOOKS = ['fill', 'fill-opacity', 'stroke', 'stroke-width', 'stroke-opacity', 'stroke-dasharray', 'stroke-linecap', 'stroke-linejoin', 'opacity', 'font-family', 'font-size', 'font-weight', 'font-style', 'text-anchor', 'dominant-baseline', 'visibility', 'color'];
+                  for (var i = 0; i < from.length && i < 3000; i++) {
+                    var cs = getComputedStyle(from[i]), s = '';
+                    LOOKS.forEach(function (k) { var v = cs.getPropertyValue(k); if (v) s += k + ':' + v + ';'; });
+                    if (to[i]) to[i].setAttribute('style', s);
+                  }
+                  // (the symbols it draws from, kept elsewhere in the page — MathJax's own, a sprite sheet's)
+                  var defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs'), had = {};
+                  var pull = function (node) {
+                    [].forEach.call(node.querySelectorAll('use'), function (u) {
+                      var ref = (u.getAttribute('href') || u.getAttribute('xlink:href') || '').replace(/^#/, '');
+                      if (!ref || had[ref]) return;
+                      had[ref] = 1;
+                      if (copy.querySelector('[id="' + ref.replace(/"/g, '') + '"]')) return;
+                      var at = svg.getRootNode().getElementById ? svg.getRootNode() : document;
+                      var target = at.getElementById(ref) || document.getElementById(ref);
+                      if (!target) return;
+                      var c = target.cloneNode(true);
+                      defs.appendChild(c);
+                      pull(c);
+                    });
+                  };
+                  pull(copy);
+                  if (defs.childNodes.length) copy.insertBefore(defs, copy.firstChild);
+                  copy.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+                  copy.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+                  copy.setAttribute('width', String(w));
+                  copy.setAttribute('height', String(h));
+                  var im = new Image();
+                  im.onload = function () { try { ok(paint(function (g) { g.drawImage(im, 0, 0, w, h); })); } catch (e) { ok(null); } };
+                  im.onerror = function () { ok(null); };
+                  im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(copy));
+                } catch (e) { ok(null); }
+              });
+              var late = new Promise(function (ok) { setTimeout(function () { ok(null); }, 2500); });
+              return Promise.race([made, late]).then(function (src) { return src && src.length < 4000000 ? src : null; });
+            };
+            var DIALOG_CSS = 'html[data-simpl-native-dialog] [data-simpl-dialog] { visibility: hidden !important; }\n';
             var dialogStyle = function () {
               var st = document.getElementById('simpl-dialog');
               if (!st) { st = document.createElement('style'); st.id = 'simpl-dialog'; (document.head || document.documentElement).appendChild(st); }
               if (st.textContent !== DIALOG_CSS) st.textContent = DIALOG_CSS;
             };
             var dialogTick = function () {
-              var d = dialogNow();
+              var d = unhidden(dialogNow);
               if (!d) {
-                if (dialogSig) {
-                  dialogSig = ''; dialogEl = null;
+                if (dialogEl || dialogSaid || dialogInPage) {
+                  dialogEl = null; dialogSaid = ''; dialogRead = ''; dialogWaiting = 0; dialogInPage = false; dialogGen++;
+                  dialogBtns = []; dialogLinks = []; dialogPics = [];
                   document.documentElement.removeAttribute('data-simpl-native-dialog');
                   post({ kind: 'dialog', open: false });
                 }
                 return;
               }
-              var bs = dialogButtons(d);
-              var title = '', by = d.getAttribute('aria-labelledby');
-              if (by) { var t = document.getElementById(by.split(' ')[0]); if (t) title = txt(t); }
-              var sig = txt(d).slice(0, 4000) + '|' + bs.map(function (x) { return x.label; }).join('|') + '|' + d.innerHTML.length;
-              if (sig === dialogSig && d === dialogEl) return;
-              dialogSig = sig; dialogEl = d;
-              dialogStyle();
-              var holder = d.closest('.MuiModal-root, [role="presentation"]') || d;
-              holder.setAttribute('data-simpl-dialog', '');
-              post({ kind: 'dialog', open: true, title: title.slice(0, 200), text: txt(d).slice(0, 2000), buttons: bs.map(function (x) { return x.label.slice(0, 60); }) });
+              var holder = holderOf(d);
+              if (d !== dialogEl) {
+                // (a pop-up seen: out of sight at once — the app shows it as its own once it has settled, or gives it back —
+                // and the app told one is coming)
+                dialogEl = d; dialogSeen = dialogDirty = Date.now(); dialogSaid = dialogRead = ''; dialogWaiting = 0; dialogInPage = false; dialogGen++;
+                dialogStyle();
+                document.documentElement.setAttribute('data-simpl-native-dialog', '');
+                post({ kind: 'dialog', open: true, pending: true });
+              }
+              if (!holder.hasAttribute('data-simpl-dialog')) holder.setAttribute('data-simpl-dialog', '');
+              var r;
+              try { r = unhidden(function () { return readDialog(d); }); }
+              catch (e) {
+                // (never a pop-up of Alta's left out of sight: one the page script cannot read is given back to the page,
+                // the app told why)
+                if (!dialogInPage) {
+                  dialogInPage = true;
+                  dialogGen++;
+                  document.documentElement.removeAttribute('data-simpl-native-dialog');
+                  post({ kind: 'dialog', open: true, title: '', html: '', words: 0, maths: 0, pics: 0, missed: 0, buttons: [], ready: 'failed',
+                    live: 'what the page script could not read (' + String((e && e.message) || e).slice(0, 160) + ')' });
+                }
+                return;
+              }
+              var sig = JSON.stringify([r.title, r.html, r.buttons, r.live]);
+              if (sig !== dialogRead) { dialogRead = sig; dialogDirty = Date.now(); }
+              // (given back to the page: Alta's own there, as Alta draws it, until it closes)
+              if (dialogInPage || sig === dialogSaid) { dialogWaiting = 0; return; }
+              if (!dialogWaiting) dialogWaiting = Date.now();
+              var empty = !r.words && !r.maths && !dialogPics.length;
+              var settled = Date.now() - dialogDirty >= 350 && !r.busy && !r.loading && !empty && !unhidden(function () { return fading(holder) || opacityOf(d) < 0.97; });
+              if (!settled && !r.live && Date.now() - dialogWaiting < (empty ? 5000 : 3000)) return;
+              dialogSaid = sig;
+              dialogWaiting = 0;
+              var gen = ++dialogGen, took = Date.now(), pics = dialogPics.slice();
+              Promise.all(pics.map(pictureOf)).then(function (made) {
+                if (gen !== dialogGen || d !== dialogEl) return;
+                var missed = 0;
+                var html = r.html.replace(/<img data-simpl-pic="(\d+)"([^>]*)>/g, function (all, i, rest) {
+                  if (made[+i]) return '<img src="' + esc(made[+i]) + '"' + rest + '>';
+                  missed++;
+                  var alt = /\salt="([^"]*)"/.exec(rest);
+                  return alt ? '<span>' + alt[1] + '</span>' : '';
+                });
+                post({ kind: 'dialog', open: true, title: r.title.slice(0, 200), html: html, words: r.words, maths: r.maths, pics: pics.length - missed, missed: missed,
+                  live: r.live, ready: settled ? 'settled' : 'after ' + (Math.round((took - dialogSeen) / 100) / 10) + ' s', buttons: r.buttons });
+              });
             };
-            setInterval(dialogTick, 600);
+            setInterval(dialogTick, 300);
             window.__simplDialog = {
-              // (shown in the page — for its picture, or given back — or hidden while the app shows it)
-              show: function (on) { document.documentElement.toggleAttribute('data-simpl-native-dialog', !on); return true; },
-              // (its picture: buttons hidden for the moment it is taken, and the row of them at its foot cropped off)
-              shot: function (on) { document.documentElement.toggleAttribute('data-simpl-dialog-shot', !!on); return true; },
-              rect: function () {
-                if (!dialogEl) return null;
-                var r = dialogEl.getBoundingClientRect(), bottom = r.bottom;
-                var low = dialogButtons(dialogEl).map(function (b) { return b.el.getBoundingClientRect(); })
-                  .filter(function (b) { return b.height > 0 && b.top > r.top + r.height * 0.5; });
-                if (low.length) bottom = Math.min.apply(null, low.map(function (b) { return b.top; })) - 6;
-                return { x: r.left, y: r.top, w: r.width, h: Math.max(24, bottom - r.top) };
+              // (hidden in the page while the app shows it as its own)
+              hide: function () { if (!dialogEl) return false; document.documentElement.setAttribute('data-simpl-native-dialog', ''); return true; },
+              // (given back to the page — the app could not show it as its own, or the student asked — and shown there as
+              // Alta draws it, the page in sight under it, until it closes)
+              giveBack: function () {
+                dialogInPage = !!dialogEl;
+                document.documentElement.removeAttribute('data-simpl-native-dialog');
+                if (dialogEl) reveal('dialog');
+                return dialogInPage;
               },
-              press: function (i) { if (!dialogEl) return false; var b = dialogButtons(dialogEl)[i]; if (!b) return false; b.el.click(); return true; }
+              press: function (i) {
+                var b = dialogBtns[i];
+                if (!b || !b.isConnected || b.disabled || b.getAttribute('aria-disabled') === 'true') return false;
+                b.click();
+                dialogDirty = Date.now();
+                return true;
+              },
+              // (a link in its body, followed as Alta's page follows it)
+              link: function (href) { var a = dialogLinks.filter(function (x) { return x.href === href; })[0]; if (!a) return false; a.click(); return true; }
             };
             var tick = function () {
               timer = null;
@@ -574,9 +914,11 @@ internal static class AltaHook
                 // (Alta's pop-ups and MathJax's helpers kept with it; its Feedback — a report to Alta — and its Content
                 // attribution link put away)
                 // (1.3.51: and the page's sprite sheets — an <svg> of symbols its pictures draw from, a pop-up's among them)
-                var extra = all('[role="dialog"], [role="alertdialog"], body > .MuiModal-root, body > [role="presentation"], #MathJax_Hidden, #MathJax_Font_Test, #MathJax_Message')
+                // (0.3.5: each pop-up with what holds it — its backdrop, a web component's host — however it is built)
+                var extra = all(DIALOG_SEL).map(holderOf).concat(dialogHosts, dialogEl && dialogEl.isConnected ? [holderOf(dialogEl)] : [])
+                  .concat(all('body > .MuiModal-root, body > [role="presentation"], #MathJax_Hidden, #MathJax_Font_Test, #MathJax_Message'))
                   .concat(all('svg').filter(function (g) { return g.querySelector('symbol, defs'); }))
-                  .filter(function (e) { return !r.keep.some(function (k) { return k.contains(e); }); });
+                  .filter(function (e, i, list) { return list.indexOf(e) === i && e !== document.body && e !== document.documentElement && !r.keep.some(function (k) { return k.contains(e); }); });
                 apply(r.keep.concat(extra));
                 pics(r.keep);
                 r.keep.forEach(function (k) { [].forEach.call(k.querySelectorAll('button'), function (b) { if (/^(feedback|content attribution\b.*)$/.test(norm(b.innerText || b.textContent || b.getAttribute('aria-label')))) mark(b, 'data-simpl-hide'); }); });

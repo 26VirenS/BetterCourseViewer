@@ -189,8 +189,9 @@ internal sealed class AltaPopupView
         subtitle.Text = Subtitle();
         UpdateLogs();
         UpdateRail();
-        // (1.3.59) the cover as the start screen; (1.3.60) the skeleton while Alta's page is out of sight
-        var showStart = s.Cover != null && !s.Focused && s.Dialog == null && s.Failure == null && !s.Opening;
+        // (1.3.59) the cover as the start screen; (1.3.60) the skeleton while Alta's page is out of sight; (0.3.5) Alta's
+        // own page while a pop-up of Alta's is shown in it
+        var showStart = s.Cover != null && !s.Focused && s.Dialog == null && !s.DialogInPage && s.Failure == null && !s.Opening;
         var showSkeleton = !s.PageShown && s.Cover == null && !s.Opening && s.Failure == null;
         UpdateStart(showStart);
         Reveal(skeleton, showSkeleton);
@@ -199,7 +200,7 @@ internal sealed class AltaPopupView
         UpdateFooter();
         // Alta's page in sight only while nothing of the popup's own is in its place — on white when it is shown as it
         // is, else on the popup's ground (its parts' panels drawn on it)
-        var asItIs = !s.Focused && s.PageShown && s.Cover == null;
+        var asItIs = !s.Focused && s.PageShown && (s.Cover == null || s.DialogInPage);
         var want = AltaLook.Drawing(asItIs ? Colors.White : AltaLook.Ground());
         if (ground != want) { ground = want; s.Web.DefaultBackgroundColor = want; }
         var covered = showStart || showSkeleton || s.Failure != null || s.Opening || layer.Covers;
@@ -366,11 +367,8 @@ internal sealed class AltaPopupView
             if (layer.Kind is "logs" or "saved") return; // (the student's own first; Alta's waits for it)
             if (dialogShown == s.DialogVersion && layer.Kind == "alta") return;
             dialogShown = s.DialogVersion;
-            var cancel = d.Buttons.FindIndex(b => CancelWords.Contains(b.ToLowerInvariant()));
-            var last = d.Buttons.Count - 1;
-            layer.Show("alta", AltaDialogCard(d, cancel),
-                escape: () => { if (cancel >= 0) session.PressDialog(cancel); else session.DialogDismissed(); },
-                enter: last >= 0 && last != cancel ? () => session.PressDialog(last) : null);
+            var (card, escape, enter) = AltaDialogCard(d);
+            layer.Show("alta", card, escape, enter);
         }
         else if (layer.Kind == "alta")
         {
@@ -379,31 +377,43 @@ internal sealed class AltaPopupView
         }
     }
 
-    /// <summary>A pop-up of Alta's as a dialog of the popup's: Alta's own picture of it, and its buttons as the app's —
-    /// each pressing Alta's. Escape presses its Close, Got it or OK, if it has one, else gives the pop-up back to the page.</summary>
-    private Border AltaDialogCard(AltaDialog d, int cancel)
+    /// <summary>
+    /// A pop-up of Alta's as a dialog of the popup's (0.3.5: drawn as the app's own words, no longer Alta's picture of it):
+    /// its title by Alta's tile; its body as Canvas's rich text is drawn — paragraphs, lists, tables, its formulas typeset,
+    /// its pictures as the page made them, its links followed in Alta's page — scrolled when it is long; and its buttons
+    /// as the app's, in Alta's order, Alta's main one the accent's (Enter), a greyed-out one greyed out, each pressing
+    /// Alta's. Escape presses its close button (×), else its Close, Cancel, Got it or OK; with neither, Escape — and Show
+    /// in Alta's page beside its buttons — gives the pop-up back to the page.
+    /// </summary>
+    private (Border Card, Action Escape, Action? Enter) AltaDialogCard(AltaDialog d)
     {
-        var body = K.V(16, AltaLook.DialogTitle(d.Title.Length == 0 ? "Knewton Alta" : d.Title, Tile(26)));
-        if (d.Picture is { } pic)
+        var buttons = d.Buttons;
+        var close = buttons.FindIndex(b => b.Close);
+        var cancel = close >= 0 ? close : buttons.FindIndex(b => CancelWords.Contains(b.Label.Trim().ToLowerInvariant()));
+        var shown = Enumerable.Range(0, buttons.Count).Where(i => !buttons[i].Close).ToList();
+        var accent = shown.FirstOrDefault(i => buttons[i].Primary && buttons[i].Enabled, -1);
+        if (accent < 0) accent = shown.LastOrDefault(i => i != cancel && buttons[i].Enabled, -1);
+        var text = new RichText(d.Html, session.DialogLink);
+        var scroll = new ScrollViewer
         {
-            var img = new Image
-            {
-                Source = pic, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center,
-                MaxWidth = Math.Min(d.PictureSize.Width > 0 ? d.PictureSize.Width : 640, 640), MaxHeight = Math.Min(d.PictureSize.Height > 0 ? d.PictureSize.Height : 560, 560),
-            };
-            RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
-            img.SizeChanged += (_, e) => img.Clip = new RectangleGeometry(new Rect(0, 0, e.NewSize.Width, e.NewSize.Height), 8, 8);
-            body.Children.Add(img);
-        }
-        else if (d.Text.Length > 0) body.Children.Add(AltaLook.Selectable(d.Text));
+            Content = text, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Focusable = false, MaxHeight = Math.Max(200, root.ActualHeight - 260),
+        };
+        var body = K.V(16, AltaLook.DialogTitle(d.Title.Length == 0 ? "Knewton Alta" : d.Title, Tile(26)), scroll);
         var choices = new List<AltaLook.Choice>();
         if (cancel < 0) choices.Add(new("Show in Alta’s page", session.DialogDismissed));
-        for (var i = 0; i < d.Buttons.Count; i++)
+        foreach (var i in shown)
         {
             var n = i;
-            choices.Add(new(d.Buttons[i], () => session.PressDialog(n), Accent: i == d.Buttons.Count - 1 && i != cancel));
+            choices.Add(new(AltaParts.ButtonWords(buttons[i].Label), () => session.PressDialog(n), Accent: i == accent, Enabled: buttons[i].Enabled));
         }
-        return AltaLook.Dialog(body, choices, 380, 700);
+        if (shown.Count == 0 && close >= 0) choices.Add(new("Close", () => session.PressDialog(close), Accent: true));
+        // (as wide as Windows' own dialogs, wider for a picture that needs it)
+        var widest = System.Text.RegularExpressions.Regex.Matches(d.Html, @"<img\b[^>]*\swidth=""(\d+)""").Select(m => int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture)).DefaultIfEmpty(0).Max();
+        var card = AltaLook.Dialog(body, choices, 380, Math.Clamp(widest + 48, 560, 760));
+        Action escape = cancel >= 0 ? () => session.PressDialog(cancel) : session.DialogDismissed;
+        Action? enter = accent >= 0 ? () => session.PressDialog(accent) : null;
+        return (card, escape, enter);
     }
 
     // ---- (1.3.47) the Error Logs, to developers ----

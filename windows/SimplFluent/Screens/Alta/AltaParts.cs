@@ -15,6 +15,10 @@ internal static class AltaParts
 {
     public static int Percent(double v) => (int)Math.Round(v * 100, MidpointRounding.AwayFromZero);
 
+    /// <summary>(0.3.5) A button of Alta's pop-up in the words Windows writes it in: Alta's in capitals ("GOT IT") in sentence
+    /// case ("Got it"), the rest — "OK", "Not now" — as they are.</summary>
+    public static string ButtonWords(string words) => words.Any(char.IsLower) || words.Count(char.IsLetter) <= 3 ? words : Capital(words);
+
     // ---- the mastery bar (where the quiz has its progress bar): Windows 11's progress bar, filling to its value ----
 
     /// <summary>The mastery bar: Windows 11's thin track, the accent's rounded bar over it — growing from where it was.</summary>
@@ -173,7 +177,7 @@ internal static class AltaParts
     }
 
     /// <summary>A label of Alta's ("STATUS", "START ASSIGNMENT") in Windows' sentence case: "Status", "Start assignment".</summary>
-    private static string Capital(string s)
+    internal static string Capital(string s)
     {
         var t = s.Trim();
         if (t.Length == 0) return t;
