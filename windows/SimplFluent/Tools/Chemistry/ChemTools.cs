@@ -16,10 +16,11 @@ namespace Simpl.Tools;
 public static class ChemTools
 {
     /// <summary>
-    /// The four, in the Tools page's order, as the Mac has them (ChemTools.swift: both apps the same): their keys, names
-    /// in the biology tools' Title Case, lines and colours — red, cyan, green and violet. The Periodic Table keeps its key,
-    /// so a pin of it stays the Periodic Table; its symbol a frame of element tiles (a table's grid read as the
-    /// Biomolecule Builder's cube a few rows below). Every symbol's code is at most U+FFFF (README, Icons).
+    /// The chemistry tools in the Tools page's order, as the Mac has them (ChemTools.swift: both apps the same): their
+    /// keys, names in the biology tools' Title Case, lines and colours — red, cyan, green and violet for the four that were
+    /// the Periodic Table, then the calculators' (tools) orange-red. The Periodic Table keeps its key, so a pin of it stays
+    /// the Periodic Table; its symbol a frame of element tiles (a table's grid read as the Biomolecule Builder's cube a
+    /// few rows below). Every symbol's code is at most U+FFFF (README, Icons).
     /// </summary>
     public static readonly ToolsScreen.Kind[] Kinds =
     {
@@ -27,6 +28,7 @@ public static class ChemTools
         new("lewis", "Lewis Structures", "Bonds, lone pairs, formal charges and resonance.", SymbolRegular.GridDots24, "#0ea5c6"),
         new("molecule", "Molecule Builder", "Build molecules in 3D, shaped by VSEPR.", SymbolRegular.Molecule24, "#3faa4b"),
         new("atoms", "Atoms & Orbitals", "Any element’s shells, orbitals and cloud in 3D.", SymbolRegular.Target24, "#b452e0"),
+        new("balance", "Equation Balancer", "Balance any chemical equation.", SymbolRegular.ArrowSwap24, "#ff6b35"),
     };
 
     public static ToolsScreen.Kind? Kind(string key) => Kinds.FirstOrDefault(k => k.Key == key);
@@ -34,7 +36,7 @@ public static class ChemTools
     /// <summary>
     /// What a launch asked of a chemistry tool, once, and only of the tool the launch opened (--tool &lt;key&gt;):
     /// <c>--tool-state</c> as it was given — a molecule for the builders ("NO3-", "Ethanol"), an element, its view and its
-    /// subshell for Atoms &amp; Orbitals ("Fe:cloud:3d").
+    /// subshell for Atoms &amp; Orbitals ("Fe:cloud:3d"), an equation for the Equation Balancer ("Fe + O2 -> Fe2O3").
     /// </summary>
     public static string? LaunchState(string key)
     {
@@ -50,9 +52,9 @@ public static class ChemTools
 /// the Mac's ChemPrefs keys): the Periodic Table's colouring and the last element opened (<c>ptable.colour</c>,
 /// <c>ptable.element</c>), the Lewis maker's molecule (<c>lewis.draft</c>), the Molecule Builder's and how it is shown
 /// (<c>molecule.saved</c>, <c>.style</c>, <c>.lonePairs</c>, <c>.labels</c>), and Atoms &amp; Orbitals' element and view
-/// (<c>atoms.element</c>, <c>atoms.view</c>). Written as they change (Prefs writes the file a moment after the last
-/// change); a picture's run has a profile of its own that starts empty, so each picture shows its tool as its launch
-/// asks.
+/// (<c>atoms.element</c>, <c>atoms.view</c>), and the Equation Balancer's equation (<c>balance.equation</c>). Written as
+/// they change (Prefs writes the file a moment after the last change); a picture's run has a profile of its own that
+/// starts empty, so each picture shows its tool as its launch asks.
 /// </summary>
 internal static class ChemPrefs
 {

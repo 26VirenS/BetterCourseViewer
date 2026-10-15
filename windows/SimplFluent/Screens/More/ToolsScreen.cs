@@ -66,7 +66,7 @@ public static class ToolsPins
 /// colour, its name and a one-line note, and its pin — under a heading for what they are for: Study (flashcards, the focus
 /// timer, citations, Grade needed), Math &amp; science (the calculators, the unit converter), Files (the file converter,
 /// Merge &amp; split PDFs, the PDF annotator, Image to text), Chemistry (the Periodic Table, Lewis Structures, the Molecule
-/// Builder, Atoms &amp; Orbitals: Tools/Chemistry/ChemTools.cs) and Biology (the biology toolkit's ten, Tools/Biology). A
+/// Builder, Atoms &amp; Orbitals and the calculators: Tools/Chemistry/ChemTools.cs) and Biology (the biology toolkit's ten, Tools/Biology). A
 /// tile opens its tool in a popup over this page (Tools/ToolHost.cs, ToolPopup), the page and the rest of the window still
 /// at hand under it.
 /// </summary>
@@ -78,7 +78,7 @@ public sealed class ToolsScreen : Screen
         public Color Color => K.Hex(Hex);
     }
 
-    /// <summary>Every tool: the eleven of Study, Math &amp; science and Files, the Chemistry section's four
+    /// <summary>Every tool: the eleven of Study, Math &amp; science and Files, the Chemistry section's
     /// (Tools/Chemistry/ChemTools.cs), then the biology toolkit's ten (Tools/Biology/BioTools.cs).</summary>
     public static readonly Kind[] Kinds = Everyday.Concat(Simpl.Tools.ChemTools.Kinds).Concat(Simpl.Tools.BioTools.Kinds).ToArray();
 
@@ -100,7 +100,7 @@ public sealed class ToolsScreen : Screen
     };
 
     /// <summary>The Tools page's sections in its order (the Mac's ToolGroup): what each set of tools is for, the study
-    /// tools first (the chemistry tools' four come after, under "Chemistry", then the biology toolkit's ten under
+    /// tools first (the chemistry tools come after, under "Chemistry", then the biology toolkit's ten under
     /// "Biology").</summary>
     public static readonly (string Title, string[] Keys)[] Groups =
     {
@@ -194,11 +194,11 @@ public sealed class ToolsScreen : Screen
             //  science's three three across where they fit, else two and one — one column of three read as a list)
             page.Children.Add(new MoreGrid(TileWidth, 16, kinds.Select(k2 => (UIElement)Tile(k2)), stretch: true) { Even = kinds.Count % 2 == 0 });
         }
-        // (the chemistry tools' four, then the biology toolkit's ten, each under a heading of their own, as the Mac's Tools
-        //  page has them — the chemistry's four in full rows, as a section's four above)
-        var chemistry = Heading("Chemistry", "The periodic table, Lewis structures, molecules in 3D, and each element’s atom and orbitals.");
+        // (the chemistry tools, then the biology toolkit's ten, each under a heading of their own, as the Mac's Tools
+        //  page has them — the chemistry's in full rows while they are an even number, as a section's four above)
+        var chemistry = Heading("Chemistry", "The periodic table, Lewis structures, molecules and atoms in 3D, and the balancer.");
         page.Children.Add(chemistry);
-        page.Children.Add(new MoreGrid(TileWidth, 16, Simpl.Tools.ChemTools.Kinds.Select(k2 => (UIElement)Tile(k2)), stretch: true) { Even = true });
+        page.Children.Add(new MoreGrid(TileWidth, 16, Simpl.Tools.ChemTools.Kinds.Select(k2 => (UIElement)Tile(k2)), stretch: true) { Even = Simpl.Tools.ChemTools.Kinds.Length % 2 == 0 });
         var biology = Heading("Biology", "Cells, DNA, genes and biomolecules in 3D, and the maths of crosses, populations and the lab.");
         page.Children.Add(biology);
         page.Children.Add(new MoreGrid(TileWidth, 16, Simpl.Tools.BioTools.Kinds.Select(k2 => (UIElement)Tile(k2)), stretch: true));

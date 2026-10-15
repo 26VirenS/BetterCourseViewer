@@ -426,7 +426,7 @@ never fails a run, and nothing waits for it but the pictures' merge.
 show checked against the school while the window shows `LiveCheck`), the popups floating over the window (`FloatPopup`, Popups below), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once, the third time Simpl is opened, at a calm moment, and from Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, a place or a page in a window of its own (`PlaceWindow`: a pane row's or a list row's Open in new window, Shift+click on a pane row, a page's ⋯ ▸ Open in new window, or Ctrl+Shift+O for what shows), the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
 | `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In and its Send from Phone, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
-| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table, Atoms & Orbitals), `Chemistry/` (the Chemistry section's tools: `ChemTools.cs`, Lewis Structures, the Molecule Builder), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
+| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table, Atoms & Orbitals), `Chemistry/` (the Chemistry section's tools: `ChemTools.cs`, Lewis Structures, the Molecule Builder, and the calculators — the Equation Balancer — with their sums in `Chemistry/Model/`, plain .NET), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
 
 ## A screen
 
@@ -916,6 +916,17 @@ cube). What each keeps for next time is the Mac's too (`ChemPrefs`, `SimplChem.<
   until it has shown one, on the element last opened in the Periodic Table. The line under the field is read by
   Narrator as it changes; a subshell's chip keeps the keyboard when it is chosen. Its pin's flyout takes an element and
   Enter, opening the whole tool on it.
+- **Equation Balancer** (`balance`, `Tools/Chemistry/BalancerTool.cs`; the sums in `Tools/Chemistry/Model/`: the
+  formula reader `ChemFormula`, the solver `ChemBalancer`, molar masses `ChemMolarMass`, numbers `ChemNum`): one field
+  for the whole equation (`->`, `→` or `=`; phases, charges like `Fe3+` or `SO4^2-`, brackets, hydrates `CuSO4·5H2O`),
+  balanced as it is typed (150 ms after the last key; Return at once) by Gaussian elimination over exact fractions —
+  the balanced equation typeset with its coefficients in bold, each element's (and the charge's) count on each side
+  with a tick, the mass check; or why not, in plain words: more than one way (two reactions written as one), an
+  element on one side only (named), a formula it cannot read (named). Copy, Clear and four example chips; Ctrl+C with
+  no field focused copies the plain-text equation. It keeps its equation (`balance.equation`). Its pin's flyout is the
+  field and the balanced line, and Open full screen carries the equation. `--tool balance --tool-state "Fe + O2 ->
+  Fe2O3"` (or `--balance "…"`, which the flyout reads too) opens it on an equation; a picture run logs `balance: shows
+  balanced 4,3,2`. The search box opens it with `/balance`, `equation`, `reaction` or `coefficients`.
 
 The builders and Atoms & Orbitals share one layout (`ChemLayout`): the controls and the facts in sight at every size,
 the drawing's own heading holding what to show when the drawing is over the rest, and the drawing held to the page less
