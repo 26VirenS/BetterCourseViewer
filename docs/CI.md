@@ -53,7 +53,8 @@ own Tests workflow on its own copy of the extension and suites.
   — kinematics, projectiles, vectors, the circuit solver — `mac/Simpl/Tools/Physics/Model`, the study and maths
   tools' arithmetic in `mac/Simpl/Tools/Model` — the numbers they show and read, word counts, statistics, matrices —
   checked by `scripts/dev/swift-checks/StudyChecks.swift` against the specification's test vectors, and the Study
-  Planner's planner, `mac/Simpl/Tools/Planner/Model`).
+  Planner's planner, `mac/Simpl/Tools/Planner/Model`, and Verb Conjugations' engine, `mac/Simpl/Tools/Verbs/Model`, run against
+  the languages' data files in `mac/Simpl/Resources/Verbs` and the reference test vectors).
 - The checks that were already there stay as they were: the Mac's project as the generator writes it and its What's
   New entry, kept data sealed (Mac, Windows), Send from Phone, the installer tried, the test school as the mock makes it.
 

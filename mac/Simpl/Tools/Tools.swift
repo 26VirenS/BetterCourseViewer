@@ -11,9 +11,9 @@ import UniformTypeIdentifiers
 // physics tools under a "Physics" heading between them (Physics/PhysTools.swift), (tools) the study and maths tools
 // after them — the Word Counter under Study (WordCounter.swift), Statistics and the Matrix Calculator under Math & science
 // (Statistics.swift, MatrixCalculator.swift); their arithmetic in Model/, checked by the Models job — and (tools)
-// Compress Files among the file tools (CompressFiles.swift) and the Study Planner among the study tools
-// (Planner/StudyPlanner.swift). One row in the sidebar opens a page of tiles, (tools-32) in sections by what they are
-// for: Study, Math & science, Files, Chemistry, Physics and Biology;
+// Compress Files among the file tools (CompressFiles.swift) and the Study Planner and Verb Conjugations among the study
+// tools (Planner/StudyPlanner.swift, Verbs/VerbConjugations.swift). One row in the sidebar opens a page of tiles,
+// (tools-32) in sections by what they are for: Study, Math & science, Files, Chemistry, Physics and Biology;
 // (1.3.79) a tile opens its tool in a popup over the window — the Tools page staying behind it, and the whole window
 // usable round it (Shell/FloatingPopup.swift) — as its pin, a hand-off from another tool and a launch do. Any tool can be
 // pinned: it then sits in the toolbar on every screen and opens a compact version of itself in a popover
@@ -36,8 +36,9 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
     // first tools have them: the Word Counter (WordCounter.swift), Statistics (Statistics.swift), the Matrix Calculator
     // (MatrixCalculator.swift)
     case words, stats, matrix
-    // (tools) Compress Files, in the Files group (CompressFiles.swift); the Study Planner, in Study (Planner/StudyPlanner.swift)
-    case shrink, plan
+    // (tools) Compress Files, in the Files group (CompressFiles.swift); the Study Planner and Verb Conjugations, in Study
+    // (Planner/StudyPlanner.swift, Verbs/VerbConjugations.swift)
+    case shrink, plan, verbs
 
     var id: String { rawValue }
 
@@ -61,6 +62,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .matrix: return "Matrix Calculator"
         case .shrink: return "Compress Files"
         case .plan: return "Study Planner"
+        case .verbs: return "Verb Conjugations"
         default: return BioTools.info(self).name
         }
     }
@@ -87,6 +89,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .matrix: return "Matrix"
         case .shrink: return "Compress"
         case .plan: return "Plan"
+        case .verbs: return "Verbs"
         default: return BioTools.info(self).shortName
         }
     }
@@ -112,6 +115,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .matrix: return "Determinant, inverse, solve, RREF."
         case .shrink: return "Shrink images and PDFs to fit."
         case .plan: return "Study blocks from your due dates."
+        case .verbs: return "Conjugate verbs in 5 languages."
         default: return BioTools.info(self).note
         }
     }
@@ -136,6 +140,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .matrix: return "square.grid.3x3"
         case .shrink: return "arrow.down.right.and.arrow.up.left"
         case .plan: return "calendar.badge.clock"
+        case .verbs: return "character.book.closed"
         default: return BioTools.symbol(self)
         }
     }
@@ -160,6 +165,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .matrix: return "#5e5ce6"
         case .shrink: return "#ff9500"
         case .plan: return "#34c759"
+        case .verbs: return "#30b0c7"
         default: return BioTools.info(self).hex
         }
     }
@@ -394,7 +400,7 @@ enum ToolGroup: CaseIterable {
 
     var kinds: [ToolKind] {
         switch self {
-        case .study: return [.fc, .pomo, .cite, .need, .words, .plan]
+        case .study: return [.fc, .pomo, .cite, .need, .words, .verbs, .plan]
         case .science: return [.calc, .graph, .units, .stats, .matrix]
         case .files: return [.conv, .pdfx, .mark, .ocr, .shrink]
         case .chemistry: return ChemTools.kinds
@@ -572,6 +578,7 @@ struct ToolScreen: View {
         case .cell, .dna, .gene, .biomol, .cross, .divide, .popgen, .biolab, .enzyme, .energy: BioToolScreen(kind: kind)
         case .shrink: CompressFilesTool()
         case .plan: StudyPlannerTool()
+        case .verbs: VerbConjugationsTool()
         }
     }
 }

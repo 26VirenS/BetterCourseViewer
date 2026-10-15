@@ -360,6 +360,9 @@ struct PinnedToolQuick: View {
         case .plan:
             // (tools) today's study blocks as a checklist
             StudyPlannerCompact { openFull($0, []) }
+        case .verbs:
+            // (tools) the language, a verb and its present tense
+            VerbConjugationsCompact { openFull($0, []) }
         }
     }
 

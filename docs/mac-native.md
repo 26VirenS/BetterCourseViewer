@@ -632,7 +632,7 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   ground. The tool window's Dark Page moon shows only in Dark Mode, where it does something.
 
 - **The tools after the UI review (1.3.78).** The Tools page is in sections by what a tool is for — *Study* (Flashcards,
-  Focus timer, Citation generator, Grade needed; since the tools of their own, the Word Counter and the Study Planner), *Math & science*
+  Focus timer, Citation generator, Grade needed; since the tools of their own, the Word Counter, the Study Planner and Verb Conjugations), *Math & science*
   (Calculator, Graphing calculator, Unit converter, since then Statistics and the Matrix Calculator; the Periodic table
   until 1.3.80 moved it to *Chemistry*), *Files*
   (File converter, Merge & split PDFs, PDF annotator, Image to text; (tools) Compress Files) and *Biology*, as on
@@ -1201,6 +1201,30 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   `-SimplPlanDone "<item id>:2"` (that many blocks of that work done), `-SimplPlanView week|list`. Pictures
   (`planner_tool`): `light-75c-tool-plan`, `dark-75c-tool-plan`, `light-75d-tool-plan-list`, `light-75e-tool-plan-narrow`,
   `light-54q-pin-plan`.
+- **Verb Conjugations (tools).** The Study group's sixth tool (`verbs`, `Tools/Verbs/VerbConjugations.swift`; `/verbs`,
+  or "conjugate", "spanish", "french", "german", "italian", "portuguese", "tense"): any verb's main tenses in Spanish,
+  French, German, Italian or Portuguese. The languages' data files — the rules for the regular classes, the stem
+  changes (e→ie, o→ue, e→i…), the spelling changes (-car/-gar/-zar, -cer/-ger/-yer/-eler…), the compound and
+  composed tenses, a table of the irregular verbs (the sixty-odd most common and more) and a list of common verbs —
+  are `Resources/Verbs/<lang>.json`, the same files the Windows app reads, bundled by the synchronized folder as
+  `PhoneHandIn.html` is and read once each (`VerbStore`). Their schema, the reference engine and the generators that
+  write them are `scripts/dev/verbs/` (`README.md`, `check.mjs`, `gen/gen-<lang>.mjs`): `node scripts/dev/verbs/check.mjs
+  mac/Simpl/Resources/Verbs` validates the bundled files and runs the reference's test vectors; a change is made in a
+  generator and written with `VERBS_OUT=mac/Simpl/Resources/Verbs node scripts/dev/verbs/gen/gen-es.mjs` (the
+  generators write the bundled files byte for byte). The engine (`Tools/Verbs/Model/VerbEngine.swift`, Foundation only, checked by the Models job against
+  the data files and the reference's test vectors) follows the reference step for step: an irregular verb's forms from
+  its table, else the infinitive's stem and the class's endings with the stem and spelling changes, a compound tense
+  from its auxiliary and participle, a composed one (an imperative) from other tenses' forms, a separable German prefix
+  sent to the end; `table` says which forms are irregular (other than what the rules alone give) for tinting. The tool:
+  the language (chips, remembered), the verb's field with suggestions from the data's verbs as it is typed, *Highlight
+  irregular forms* (tinted in the tool's colour, bold), *Copy Table* (every tense as text), and the tenses as cards under
+  their groups' headings — the pronouns beside the forms, "—" where a person has none (the first-person imperative), a
+  participle or gerund as one form. A verb the rules cannot read is said inline ("Can't conjugate “xyz” — is it an
+  infinitive? Try hablar, comer, vivir."). What it keeps (`VerbPrefs`: `SimplVerbs.lang`, `.verb`, `.highlight`; a
+  picture's in a suite of its own). The pin: the language, a verb and its present tense (`VerbConjugationsCompact`;
+  Return or Open Full Screen opens the whole tool on them, carried as `lang` and `verb`). Launch flags: `-SimplVerbs
+  es|fr|de|it|pt`, `-SimplVerb "<infinitive>"`. Pictures (`verbs_tool`): `light-76-tool-verbs` (Spanish, tener),
+  `dark-76-tool-verbs` (French, aller), `light-76b-tool-verbs-narrow` (German, anfangen), `light-54r-pin-verbs`.
 
 ## Data and encryption
 

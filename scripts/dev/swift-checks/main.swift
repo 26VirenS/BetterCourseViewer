@@ -725,5 +725,225 @@ check(ics.hasPrefix("BEGIN:VCALENDAR\r\nVERSION:2.0\r\n") && ics.hasSuffix("END:
       "the calendar file: an event a block, in UTC, with its work's name")
 check(StudyICS.escape("a, b; c\\d\nnext") == "a\\, b\\; c\\\\d\\nnext", "a calendar text's commas, semicolons, backslashes and line breaks escaped")
 
+// ---- Verb Conjugations (tools) ---------------------------------------------------------------------------------
+// (mac/Simpl/Tools/Verbs/Model/VerbEngine.swift over the languages' data files, mac/Simpl/Resources/Verbs/<lang>.json,
+// read from the repository as the Models job runs from its root: the reference engine's test vectors — check.mjs's
+// TESTS, the specification's among them — and every verb the data names conjugated in every tense)
+print("Verb Conjugations")
+enum VerbExpect {
+    case persons([String])
+    case single(String)
+    case some([Int: String])
+}
+var verbVectors: [String: [(String, String, VerbExpect)]] = [:]
+verbVectors["es"] = [
+    ("hablar", "presente", .persons(["hablo", "hablas", "habla", "hablamos", "habláis", "hablan"])),
+    ("ser", "preterito", .persons(["fui", "fuiste", "fue", "fuimos", "fuisteis", "fueron"])),
+    ("tener", "presente", .persons(["tengo", "tienes", "tiene", "tenemos", "tenéis", "tienen"])),
+    ("comer", "presente", .persons(["como", "comes", "come", "comemos", "coméis", "comen"])),
+    ("vivir", "preterito", .persons(["viví", "viviste", "vivió", "vivimos", "vivisteis", "vivieron"])),
+    ("hablar", "imperfectoSubj", .persons(["hablara", "hablaras", "hablara", "habláramos", "hablarais", "hablaran"])),
+    ("tener", "imperfectoSubj", .persons(["tuviera", "tuvieras", "tuviera", "tuviéramos", "tuvierais", "tuvieran"])),
+    ("buscar", "preterito", .some([0: "busqué"])),
+    ("buscar", "presenteSubj", .persons(["busque", "busques", "busque", "busquemos", "busquéis", "busquen"])),
+    ("empezar", "presente", .persons(["empiezo", "empiezas", "empieza", "empezamos", "empezáis", "empiezan"])),
+    ("empezar", "presenteSubj", .persons(["empiece", "empieces", "empiece", "empecemos", "empecéis", "empiecen"])),
+    ("dormir", "preterito", .persons(["dormí", "dormiste", "durmió", "dormimos", "dormisteis", "durmieron"])),
+    ("dormir", "presenteSubj", .persons(["duerma", "duermas", "duerma", "durmamos", "durmáis", "duerman"])),
+    ("pedir", "presente", .persons(["pido", "pides", "pide", "pedimos", "pedís", "piden"])),
+    ("seguir", "presente", .persons(["sigo", "sigues", "sigue", "seguimos", "seguís", "siguen"])),
+    ("conocer", "presente", .some([0: "conozco", 1: "conoces"])),
+    ("leer", "preterito", .persons(["leí", "leíste", "leyó", "leímos", "leísteis", "leyeron"])),
+    ("leer", "gerundio", .single("leyendo")),
+    ("construir", "presente", .persons(["construyo", "construyes", "construye", "construimos", "construís", "construyen"])),
+    ("hacer", "futuro", .persons(["haré", "harás", "hará", "haremos", "haréis", "harán"])),
+    ("ir", "imperfecto", .persons(["iba", "ibas", "iba", "íbamos", "ibais", "iban"])),
+    ("decir", "imperativo", .persons(["—", "di", "diga", "digamos", "decid", "digan"])),
+    ("hablar", "imperativo", .persons(["—", "habla", "hable", "hablemos", "hablad", "hablen"])),
+    ("jugar", "presenteSubj", .persons(["juegue", "juegues", "juegue", "juguemos", "juguéis", "jueguen"])),
+    ("estar", "presente", .persons(["estoy", "estás", "está", "estamos", "estáis", "están"])),
+    ("volver", "participio", .single("vuelto")),
+    ("coger", "presente", .some([0: "cojo", 1: "coges"])),
+    ("llegar", "preterito", .some([0: "llegué", 2: "llegó"])),
+    ("continuar", "presente", .some([0: "continúo", 3: "continuamos"])),
+    ("enviar", "presente", .some([0: "envío", 5: "envían"])),
+    ("poner", "condicional", .persons(["pondría", "pondrías", "pondría", "pondríamos", "pondríais", "pondrían"])),
+]
+verbVectors["fr"] = [
+    ("aller", "present", .persons(["vais", "vas", "va", "allons", "allez", "vont"])),
+    ("manger", "present", .some([3: "mangeons"])),
+    ("parler", "present", .persons(["parle", "parles", "parle", "parlons", "parlez", "parlent"])),
+    ("finir", "present", .persons(["finis", "finis", "finit", "finissons", "finissez", "finissent"])),
+    ("vendre", "present", .persons(["vends", "vends", "vend", "vendons", "vendez", "vendent"])),
+    ("manger", "imparfait", .persons(["mangeais", "mangeais", "mangeait", "mangions", "mangiez", "mangeaient"])),
+    ("commencer", "present", .some([3: "commençons"])),
+    ("commencer", "passeSimple", .persons(["commençai", "commenças", "commença", "commençâmes", "commençâtes", "commencèrent"])),
+    ("acheter", "present", .persons(["achète", "achètes", "achète", "achetons", "achetez", "achètent"])),
+    ("acheter", "futur", .some([0: "achèterai", 3: "achèterons"])),
+    ("appeler", "present", .persons(["appelle", "appelles", "appelle", "appelons", "appelez", "appellent"])),
+    ("jeter", "futur", .some([0: "jetterai"])),
+    ("nettoyer", "present", .persons(["nettoie", "nettoies", "nettoie", "nettoyons", "nettoyez", "nettoient"])),
+    ("préférer", "present", .persons(["préfère", "préfères", "préfère", "préférons", "préférez", "préfèrent"])),
+    ("préférer", "futur", .some([0: "préférerai"])),
+    ("être", "passeCompose", .persons(["ai été", "as été", "a été", "avons été", "avez été", "ont été"])),
+    ("aller", "passeCompose", .persons(["suis allé", "es allé", "est allé", "sommes allés", "êtes allés", "sont allés"])),
+    ("prendre", "subjonctifPresent", .persons(["prenne", "prennes", "prenne", "prenions", "preniez", "prennent"])),
+    ("boire", "present", .persons(["bois", "bois", "boit", "buvons", "buvez", "boivent"])),
+    ("venir", "passeSimple", .persons(["vins", "vins", "vint", "vînmes", "vîntes", "vinrent"])),
+    ("faire", "futur", .persons(["ferai", "feras", "fera", "ferons", "ferez", "feront"])),
+    ("parler", "imperatif", .persons(["—", "parle", "—", "parlons", "parlez", "—"])),
+    ("finir", "imperatif", .persons(["—", "finis", "—", "finissons", "finissez", "—"])),
+    ("avoir", "imperatif", .persons(["—", "aie", "—", "ayons", "ayez", "—"])),
+    ("vendre", "participePasse", .single("vendu")),
+    ("finir", "participePresent", .single("finissant")),
+    ("apprendre", "passeCompose", .some([0: "ai appris"])),
+    ("devenir", "passeCompose", .some([0: "suis devenu", 5: "sont devenus"])),
+    ("pouvoir", "conditionnel", .persons(["pourrais", "pourrais", "pourrait", "pourrions", "pourriez", "pourraient"])),
+    ("envoyer", "futur", .some([0: "enverrai"])),
+    ("ouvrir", "imperatif", .some([1: "ouvre"])),
+    ("savoir", "subjonctifPresent", .persons(["sache", "saches", "sache", "sachions", "sachiez", "sachent"])),
+]
+verbVectors["de"] = [
+    ("sein", "praesens", .persons(["bin", "bist", "ist", "sind", "seid", "sind"])),
+    ("anfangen", "praesens", .persons(["fange an", "fängst an", "fängt an", "fangen an", "fangt an", "fangen an"])),
+    ("lernen", "praesens", .persons(["lerne", "lernst", "lernt", "lernen", "lernt", "lernen"])),
+    ("arbeiten", "praesens", .persons(["arbeite", "arbeitest", "arbeitet", "arbeiten", "arbeitet", "arbeiten"])),
+    ("arbeiten", "praeteritum", .persons(["arbeitete", "arbeitetest", "arbeitete", "arbeiteten", "arbeitetet", "arbeiteten"])),
+    ("arbeiten", "partizip2", .single("gearbeitet")),
+    ("heißen", "praesens", .some([1: "heißt"])),
+    ("studieren", "partizip2", .single("studiert")),
+    ("besuchen", "partizip2", .single("besucht")),
+    ("lächeln", "praesens", .some([0: "lächle", 3: "lächeln"])),
+    ("haben", "praeteritum", .persons(["hatte", "hattest", "hatte", "hatten", "hattet", "hatten"])),
+    ("gehen", "perfekt", .persons(["bin gegangen", "bist gegangen", "ist gegangen", "sind gegangen", "seid gegangen", "sind gegangen"])),
+    ("lernen", "perfekt", .some([0: "habe gelernt"])),
+    ("lernen", "futur1", .persons(["werde lernen", "wirst lernen", "wird lernen", "werden lernen", "werdet lernen", "werden lernen"])),
+    ("lernen", "konjunktiv2", .some([0: "würde lernen"])),
+    ("sein", "konjunktiv2", .persons(["wäre", "wärst", "wäre", "wären", "wärt", "wären"])),
+    ("fahren", "praesens", .persons(["fahre", "fährst", "fährt", "fahren", "fahrt", "fahren"])),
+    ("lesen", "praesens", .some([1: "liest", 2: "liest"])),
+    ("halten", "praesens", .some([1: "hältst", 2: "hält"])),
+    ("finden", "praeteritum", .persons(["fand", "fandest", "fand", "fanden", "fandet", "fanden"])),
+    ("nehmen", "imperativ", .persons(["—", "nimm", "—", "nehmen wir", "nehmt", "nehmen Sie"])),
+    ("anfangen", "perfekt", .some([0: "habe angefangen"])),
+    ("anfangen", "imperativ", .some([1: "fang an", 5: "fangen Sie an"])),
+    ("aufstehen", "praeteritum", .some([0: "stand auf"])),
+    ("vorbereiten", "partizip2", .single("vorbereitet")),
+    ("verstehen", "partizip2", .single("verstanden")),
+    ("wissen", "praesens", .persons(["weiß", "weißt", "weiß", "wissen", "wisst", "wissen"])),
+    ("können", "konjunktiv2", .persons(["könnte", "könntest", "könnte", "könnten", "könntet", "könnten"])),
+    ("werden", "praesens", .persons(["werde", "wirst", "wird", "werden", "werdet", "werden"])),
+    ("bringen", "praeteritum", .some([0: "brachte"])),
+    ("ankommen", "perfekt", .some([2: "ist angekommen"])),
+]
+verbVectors["it"] = [
+    ("essere", "presente", .persons(["sono", "sei", "è", "siamo", "siete", "sono"])),
+    ("parlare", "presente", .persons(["parlo", "parli", "parla", "parliamo", "parlate", "parlano"])),
+    ("credere", "presente", .persons(["credo", "credi", "crede", "crediamo", "credete", "credono"])),
+    ("dormire", "presente", .persons(["dormo", "dormi", "dorme", "dormiamo", "dormite", "dormono"])),
+    ("capire", "presente", .persons(["capisco", "capisci", "capisce", "capiamo", "capite", "capiscono"])),
+    ("cercare", "presente", .some([1: "cerchi", 3: "cerchiamo"])),
+    ("cercare", "futuro", .some([0: "cercherò"])),
+    ("pagare", "congiuntivoPresente", .some([0: "paghi", 4: "paghiate"])),
+    ("mangiare", "presente", .some([1: "mangi", 3: "mangiamo"])),
+    ("mangiare", "futuro", .some([0: "mangerò"])),
+    ("cominciare", "condizionale", .some([0: "comincerei"])),
+    ("studiare", "presente", .some([1: "studi", 3: "studiamo"])),
+    ("studiare", "futuro", .some([0: "studierò"])),
+    ("parlare", "passatoRemoto", .persons(["parlai", "parlasti", "parlò", "parlammo", "parlaste", "parlarono"])),
+    ("prendere", "passatoRemoto", .persons(["presi", "prendesti", "prese", "prendemmo", "prendeste", "presero"])),
+    ("avere", "passatoRemoto", .persons(["ebbi", "avesti", "ebbe", "avemmo", "aveste", "ebbero"])),
+    ("fare", "imperfetto", .persons(["facevo", "facevi", "faceva", "facevamo", "facevate", "facevano"])),
+    ("andare", "futuro", .persons(["andrò", "andrai", "andrà", "andremo", "andrete", "andranno"])),
+    ("volere", "condizionale", .persons(["vorrei", "vorresti", "vorrebbe", "vorremmo", "vorreste", "vorrebbero"])),
+    ("parlare", "imperativo", .persons(["—", "parla", "parli", "parliamo", "parlate", "parlino"])),
+    ("prendere", "imperativo", .persons(["—", "prendi", "prenda", "prendiamo", "prendete", "prendano"])),
+    ("finire", "imperativo", .persons(["—", "finisci", "finisca", "finiamo", "finite", "finiscano"])),
+    ("parlare", "congiuntivoImperfetto", .persons(["parlassi", "parlassi", "parlasse", "parlassimo", "parlaste", "parlassero"])),
+    ("essere", "congiuntivoImperfetto", .persons(["fossi", "fossi", "fosse", "fossimo", "foste", "fossero"])),
+    ("bere", "presente", .persons(["bevo", "bevi", "beve", "beviamo", "bevete", "bevono"])),
+    ("uscire", "presente", .persons(["esco", "esci", "esce", "usciamo", "uscite", "escono"])),
+    ("venire", "participio", .single("venuto")),
+    ("dire", "gerundio", .single("dicendo")),
+    ("scrivere", "participio", .single("scritto")),
+    ("stare", "imperativo", .some([1: "stai", 2: "stia"])),
+    ("dovere", "presente", .persons(["devo", "devi", "deve", "dobbiamo", "dovete", "devono"])),
+]
+verbVectors["pt"] = [
+    ("ser", "presente", .persons(["sou", "és", "é", "somos", "sois", "são"])),
+    ("falar", "presente", .persons(["falo", "falas", "fala", "falamos", "falais", "falam"])),
+    ("comer", "presente", .persons(["como", "comes", "come", "comemos", "comeis", "comem"])),
+    ("partir", "presente", .persons(["parto", "partes", "parte", "partimos", "partis", "partem"])),
+    ("falar", "preteritoPerfeito", .persons(["falei", "falaste", "falou", "falámos", "falastes", "falaram"])),
+    ("comer", "preteritoPerfeito", .persons(["comi", "comeste", "comeu", "comemos", "comestes", "comeram"])),
+    ("ter", "presente", .persons(["tenho", "tens", "tem", "temos", "tendes", "têm"])),
+    ("ter", "preteritoPerfeito", .persons(["tive", "tiveste", "teve", "tivemos", "tivestes", "tiveram"])),
+    ("ir", "preteritoPerfeito", .persons(["fui", "foste", "foi", "fomos", "fostes", "foram"])),
+    ("fazer", "futuro", .persons(["farei", "farás", "fará", "faremos", "fareis", "farão"])),
+    ("falar", "imperfeitoSubj", .persons(["falasse", "falasses", "falasse", "falássemos", "falásseis", "falassem"])),
+    ("comer", "imperfeitoSubj", .persons(["comesse", "comesses", "comesse", "comêssemos", "comêsseis", "comessem"])),
+    ("ter", "imperfeitoSubj", .persons(["tivesse", "tivesses", "tivesse", "tivéssemos", "tivésseis", "tivessem"])),
+    ("ficar", "presenteSubj", .persons(["fique", "fiques", "fique", "fiquemos", "fiqueis", "fiquem"])),
+    ("ficar", "preteritoPerfeito", .some([0: "fiquei"])),
+    ("começar", "presenteSubj", .some([0: "comece"])),
+    ("chegar", "preteritoPerfeito", .some([0: "cheguei"])),
+    ("conhecer", "presente", .some([0: "conheço", 1: "conheces"])),
+    ("conhecer", "presenteSubj", .some([0: "conheça"])),
+    ("dormir", "presente", .persons(["durmo", "dormes", "dorme", "dormimos", "dormis", "dormem"])),
+    ("dormir", "presenteSubj", .persons(["durma", "durmas", "durma", "durmamos", "durmais", "durmam"])),
+    ("preferir", "presente", .some([0: "prefiro", 1: "preferes"])),
+    ("subir", "presente", .persons(["subo", "sobes", "sobe", "subimos", "subis", "sobem"])),
+    ("seguir", "presente", .some([0: "sigo", 1: "segues"])),
+    ("passear", "presente", .persons(["passeio", "passeias", "passeia", "passeamos", "passeais", "passeiam"])),
+    ("pôr", "presente", .persons(["ponho", "pões", "põe", "pomos", "pondes", "põem"])),
+    ("falar", "imperativo", .persons(["—", "fala", "fale", "falemos", "falai", "falem"])),
+    ("ser", "imperativo", .persons(["—", "sê", "seja", "sejamos", "sede", "sejam"])),
+    ("estar", "presente", .persons(["estou", "estás", "está", "estamos", "estais", "estão"])),
+    ("ver", "participio", .single("visto")),
+    ("possuir", "preteritoPerfeito", .persons(["possuí", "possuíste", "possuiu", "possuímos", "possuístes", "possuíram"])),
+    ("vir", "presente", .persons(["venho", "vens", "vem", "vimos", "vindes", "vêm"])),
+]
+let verbNames = ["es": "Spanish", "fr": "French", "de": "German", "it": "Italian", "pt": "Portuguese"]
+var verbData: [String: VerbData] = [:]
+for lang in ["es", "fr", "de", "it", "pt"] {
+    let name = verbNames[lang] ?? lang
+    let path = "mac/Simpl/Resources/Verbs/\(lang).json"
+    guard let raw = FileManager.default.contents(atPath: path), let data = try? VerbData(json: raw) else {
+        check(false, "\(name): \(path) read")
+        continue
+    }
+    verbData[lang] = data
+    check(data.language == lang && data.pronouns.count == 6 && data.imperativePronouns.count == 6 && data.tenses.count >= 7 && data.knownVerbs.count >= 300,
+          "\(name): six pronouns, \(data.tenses.count) tenses, \(data.knownVerbs.count) verbs named")
+    var failures: [String] = []
+    let vectors = verbVectors[lang] ?? []
+    for (verb, tense, expect) in vectors {
+        guard let got = try? data.conjugate(verb, tense) else { failures.append("\(verb).\(tense) threw"); continue }
+        switch expect {
+        case .persons(let p): if got != .persons(p) { failures.append("\(verb).\(tense): \(got.list)") }
+        case .single(let s): if got != .single(s) { failures.append("\(verb).\(tense): \(got.list)") }
+        case .some(let map):
+            for (i, f) in map where i >= got.list.count || got.list[i] != f { failures.append("\(verb).\(tense)[\(i)]: \(i < got.list.count ? got.list[i] : "none")") }
+        }
+    }
+    check(failures.isEmpty, "\(name): the reference's \(vectors.count) test vectors\(failures.isEmpty ? "" : " — not \(failures.prefix(4))")")
+    var threw: [String] = []
+    for v in data.knownVerbs {
+        for t in data.tenses where (try? data.conjugate(v, t.id)) == nil { threw.append("\(v).\(t.id)") }
+    }
+    check(threw.isEmpty, "\(name): every verb the data names conjugates in every tense (\(data.knownVerbs.count) × \(data.tenses.count))\(threw.isEmpty ? "" : " — not \(threw.prefix(4))")")
+}
+if let es = verbData["es"] {
+    let tener = try? es.table("tener")
+    check(tener?.irregular["presente"] == [true, true, true, false, false, true] && tener?.irregular["futuro"] == [true, true, true, true, true, true]
+          && (try? es.table("hablar"))?.irregular["presente"] == [false, false, false, false, false, false],
+          "the irregular forms marked for tinting: tener's tengo, tienes, tiene, tienen and its whole future; none of hablar's")
+    check(es.knows("hablar") && es.knows("ser") && !es.knows("xyz") && (try? es.conjugate("xyz", "presente")) == nil, "a word that is no infinitive is not conjugated")
+}
+if let de = verbData["de"] {
+    check((try? de.conjugate("anfangen", "partizip2")) == .single("angefangen") && (try? de.conjugate("anfangen", "praeteritum"))?.list.first == "fing an",
+          "a separable prefix goes to the end, and into the participle")
+}
+
 print("\(passed) passed, \(failed) failed")
 exit(Int32(failed))

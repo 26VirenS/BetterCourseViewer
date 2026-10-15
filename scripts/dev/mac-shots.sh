@@ -718,6 +718,15 @@ planner_tool() {
   MODE=light shoot light-54q-pin-plan 16 -SimplPinnedTools plan -SimplPinOpen plan
 }
 
+# (tools) the Study group's Verb Conjugations: a Spanish table in light (tener, its irregular forms tinted), a French one
+# in dark (aller), a German separable verb narrow (anfangen), and its pin (-SimplVerbs, -SimplVerb)
+verbs_tool() {
+  MODE=light SIZE=1440x920 shoot light-76-tool-verbs 14 -SimplPlace tools -SimplTool verbs -SimplVerbs es -SimplVerb tener
+  MODE=dark SIZE=1440x920 shoot dark-76-tool-verbs 14 -SimplPlace tools -SimplTool verbs -SimplVerbs fr -SimplVerb aller
+  MODE=light SIZE=780x700 shoot light-76b-tool-verbs-narrow 14 -SimplPlace tools -SimplTool verbs -SimplVerbs de -SimplVerb anfangen
+  MODE=light shoot light-54r-pin-verbs 14 -SimplPinnedTools verbs -SimplPinOpen verbs
+}
+
 # (1.3.80) how each 3D model was framed, from the consoles ("[Simpl] bio frame <scene>: view W × H, model X% across,
 # Y% up", and the atom's and the molecule's frames): each picture's last framing and its model's share of its view's
 # limiting side (the larger of the two) in frame-check.txt — 75% to 85% is as framed (SceneFill); under 70% is said
@@ -1021,6 +1030,7 @@ the_set() {
   study_tools # (tools) the study and maths tools
   files_tools # (tools) Compress Files
   planner_tool # (tools) the Study Planner
+  verbs_tool # (tools) Verb Conjugations
   # (1.3.78) a PDF-only assignment (1013, made so here) waiting for the phone: Combine photos under the code
   mock_config '{"ext":{"1013":["pdf"]}}'
   MODE=dark shoot dark-12f-hand-in-phone-photos-waiting 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1013 -SimplOpen handin -SimplPhone YES
