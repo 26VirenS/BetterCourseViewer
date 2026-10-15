@@ -265,6 +265,38 @@ try {
   check(gb.why === 'the student asked for it' && (await vis('#vi')) && !(await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))), 'Show in Alta’s Page gives it back to the page, in sight');
   await page.evaluate(() => document.getElementById('dlg').remove());
   await page.waitForTimeout(700);
+  // (1.3.83) Show Browser: Alta's own page as Alta draws it — nothing hidden, its buttons and panels not the app's, never
+  // out of sight (not even between parts), its pop-ups its own and a pop-up the app was showing given back; Dark drawing
+  // it dark; off, the question shown alone again and its pop-ups the app's
+  const nbr = (await posts()).length;
+  await page.evaluate(() => window.mockDialog());
+  await waitFor((p, k) => k >= nbr && p.kind === 'dialog' && p.open && !p.inPage, 'a pop-up for the app');
+  await page.evaluate(() => { window.__simplDialog.hide(); window.__simplBrowser = true; window.__simplBrowserNow(); });
+  await page.waitForTimeout(500);
+  const br = await page.evaluate(() => ({ q: document.documentElement.hasAttribute('data-simpl-q'), shown: document.documentElement.hasAttribute('data-simpl-shown'), hidden: document.documentElement.hasAttribute('data-simpl-native-dialog'), bar: !!document.querySelector('[data-simpl-bar]') }));
+  const brPosts = (await posts()).slice(nbr);
+  const brLast = (kind) => brPosts.filter((p) => p.kind === kind).pop();
+  check(!br.q && br.shown && !br.hidden && !br.bar && (await vis('header')) && (await vis('h1')) && (await vis('#submit')) && (await vis('#vi')) && brLast('dialog').open === false
+    && brLast('buttons').items.length === 0 && brLast('panels').panels.length === 0,
+    'with Show Browser, Alta’s page is shown whole as Alta draws it — its header, its own buttons, its pop-up — and the app’s sheet, buttons and panels are put away');
+  await page.evaluate(() => { window.__simplDark = true; window.__simplFocusDark(); });
+  const brDark = await page.evaluate(() => getComputedStyle(document.documentElement).filter);
+  await page.evaluate(() => { window.__simplDark = false; window.__simplFocusDark(); });
+  check(/invert\(0\.92\)/.test(brDark), `and Dark draws it dark (${brDark})`);
+  const nq = (await posts()).length;
+  await page.evaluate(() => { window.__brq = document.getElementById('qsec'); window.__brq.remove(); });
+  await page.waitForTimeout(1200);
+  check(!(await posts()).slice(nq).some((p) => p.kind === 'hidden' || (p.kind === 'dialog' && p.open)) && (await page.evaluate(() => getComputedStyle(document.body).opacity)) === '1',
+    'between parts it stays in sight, and its pop-up stays its own');
+  await page.evaluate(() => { document.querySelector('[class*="learn-flow-body"]').appendChild(window.__brq); });
+  const nf = (await posts()).length;
+  await page.evaluate(() => { window.__simplBrowser = false; window.__simplBrowserNow(); });
+  const backDlg = await waitFor((p, k) => k >= nf && p.kind === 'dialog' && p.open && !p.inPage, 'the pop-up the app’s again', 40);
+  await page.waitForTimeout(300);
+  check(!!backDlg && (await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))) && !(await vis('header')) && (await vis('#asks')),
+    'Show Browser off: the question shown alone again, the pop-up the app’s again');
+  await page.evaluate(() => document.getElementById('dlg').remove());
+  await page.waitForTimeout(700);
   // (the page's sprite sheet — an svg of symbols its pictures, a pop-up's among them, draw from — is never hidden)
   await page.evaluate(() => { const d = document.createElement('div'); d.innerHTML = '<svg id="sprite" style="position:absolute;width:0;height:0"><defs><symbol id="intro"><circle r="5"/></symbol></defs></svg>'; document.body.appendChild(d); });
   await page.waitForTimeout(500);

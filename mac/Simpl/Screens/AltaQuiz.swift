@@ -25,6 +25,11 @@ struct AltaQuizScreen: View {
     /// `bool(forKey:)`, so the pictures' -SimplAltaPageDark YES is read as the setting.)
     @State private var pageDark = UserDefaults.standard.bool(forKey: AltaQuizScreen.pageDarkKey)
     static let pageDarkKey = "SimplAltaPageDark"
+    /// (1.3.83) Show Browser, beside Light / Dark: Knewton Alta's own page on the right — the same assignment, signed in,
+    /// as Alta draws it — in place of the app's view of it; the objectives and the mastery stay. Remembered
+    /// (`SimplAltaShowBrowser`; -SimplAltaShowBrowser YES for the pictures).
+    @State private var showBrowser = UserDefaults.standard.bool(forKey: AltaQuizScreen.showBrowserKey)
+    static let showBrowserKey = "SimplAltaShowBrowser"
 
     init(launch: AltaLaunch) {
         _session = StateObject(wrappedValue: AltaSession(launch: launch))
@@ -37,7 +42,7 @@ struct AltaQuizScreen: View {
         VStack(spacing: 0) {
             topBar
             HStack(spacing: 0) {
-                AltaRail(session: session, dark: $pageDark)
+                AltaRail(session: session, dark: $pageDark, browser: $showBrowser)
                     .frame(width: ideal.width >= 960 ? 290 : 240)
                 Divider()
                 // (1.3.79) Alta's page in light whatever the app's appearance — on light glass, over a light ground —
@@ -55,12 +60,17 @@ struct AltaQuizScreen: View {
         .background(PageGround())
         .tint(Theme.accent)
         .task {
+            session.setBrowser(showBrowser) // (1.3.83)
             session.appearance(dark: pageDark) // (1.3.79: the page light, in dark mode too — 1.3.83: unless Dark is picked)
             await session.start(engine: engine)
         }
         .onChange(of: pageDark) { _, dark in
             UserDefaults.standard.set(dark, forKey: Self.pageDarkKey)
             session.appearance(dark: dark)
+        }
+        .onChange(of: showBrowser) { _, on in
+            UserDefaults.standard.set(on, forKey: Self.showBrowserKey)
+            session.setBrowser(on)
         }
         .task { dueLine = await CanvasDue.line(engine, course: session.launch.course, assignment: session.launch.assignment) }
         .onDisappear { session.closePic() } // (1.3.70: the popup closed, its graph's window with it)
@@ -208,8 +218,8 @@ struct AltaQuizScreen: View {
             // glass panel behind each part — what it asks, its answer, a lesson — where the page lays it out: the page as
             // tall as its question and the popup scrolling it, the panels scrolling with it. Alta's page as it is (not
             // recognised): edge to edge, on white, scrolling itself — (1.3.83) as it is too while a pop-up of Alta's is
-            // given back to it, nothing of the app's over it. (The page is always in the same place in the views, so it
-            // is never taken out and put back.)
+            // given back to it, and with Show Browser on, nothing of the app's over it. (The page is always in the same
+            // place in the views, so it is never taken out and put back.)
             GeometryReader { g in
                 let split = session.split
                 ScrollViewReader { proxy in
@@ -596,20 +606,33 @@ private struct AltaPageHost: NSViewRepresentable {
 // MARK: - The rail
 
 /// Down the left: the objectives as the quiz's question tiles, each by name with its own bar, and the total mastery;
-/// (1.3.83) above them, how Alta's side is shown — Light or Dark.
+/// (1.3.83) above them, how Alta's side is shown — Light or Dark, and Show Browser — in one row: in words while they
+/// fit, Show Browser as "Browser" before the sun and moon lose theirs.
 private struct AltaRail: View {
     @ObservedObject var session: AltaSession
     @Binding var dark: Bool
+    @Binding var browser: Bool
 
     var body: some View {
         let list = session.objectives
         VStack(spacing: 0) {
-            AltaLookPicker(dark: $dark)
-                .controlSize(.small)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 20)
-                .padding(.top, 10)
+            ViewThatFits(in: .horizontal) {
+                controls(words: true, browser: "Show Browser")
+                controls(words: true, browser: "Browser")
+                controls(words: false, browser: "Browser")
+            }
+            .controlSize(.small)
+            .padding(.horizontal, 20)
+            .padding(.top, 10)
             rail(list)
+        }
+    }
+
+    private func controls(words: Bool, browser label: String) -> some View {
+        HStack(spacing: 8) {
+            AltaLookPicker(dark: $dark, words: words)
+            Spacer(minLength: 0)
+            AltaBrowserToggle(on: $browser, label: label)
         }
     }
 
@@ -706,6 +729,26 @@ private struct AltaLookPicker: View {
         .glassChip(Theme.accent, on: on)
         .fixedSize()
         .help(d ? "Show Knewton Alta's page dark" : "Show Knewton Alta's page light, as Alta draws it")
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+}
+
+/// (1.3.83) Beside Light / Dark: Show Browser — Knewton Alta's own page on the right, as Alta draws it, in place of the
+/// app's view of it — a glass chip filled while it is on.
+private struct AltaBrowserToggle: View {
+    @Binding var on: Bool
+    let label: String
+
+    var body: some View {
+        Button {
+            withAnimation(Motion.gentle) { on.toggle() }
+        } label: {
+            Label(label, systemImage: "globe").labelStyle(.titleAndIcon)
+        }
+        .glassChip(Theme.accent, on: on)
+        .fixedSize()
+        .help(on ? "Back to Simpl's view of the assignment" : "Show Knewton Alta's own page, as Alta draws it")
+        .accessibilityLabel("Show Browser")
         .accessibilityAddTraits(on ? .isSelected : [])
     }
 }

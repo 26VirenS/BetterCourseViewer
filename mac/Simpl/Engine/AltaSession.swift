@@ -49,7 +49,7 @@ enum AltaHook {
         };
         // (1.3.62) out of sight again — Alta between one part and the next, taking its time — until the next is laid out
         veilAgain = function () {
-          if (!veils || !showing || dialogInPage) return;
+          if (!veils || !showing || dialogInPage || window.__simplBrowser) return;
           if (document.documentElement) document.documentElement.removeAttribute('data-simpl-shown');
           showing = false;
           post({ kind: 'hidden' });
@@ -820,6 +820,18 @@ enum AltaHook {
           return true;
         };
         var dialogTick = function () {
+          // (1.3.83) Show Browser: Alta's pop-ups are its page's own, shown there as Alta draws them — one the app was
+          // showing given back
+          if (window.__simplBrowser) {
+            if (dialogEl || dialogSaid || dialogInPage) {
+              if (dialogHolder && dialogHolder.isConnected) dialogHolder.removeAttribute('data-simpl-dialog');
+              dialogEl = null; dialogHolder = null; dialogSaid = ''; dialogRead = ''; dialogWaiting = 0; dialogInPage = false;
+              dialogBtns = []; dialogLinks = [];
+              document.documentElement.removeAttribute('data-simpl-native-dialog');
+              post({ kind: 'dialog', open: false });
+            }
+            return;
+          }
           var d = dialogNow();
           if (!d) {
             if (dialogEl || dialogSaid || dialogInPage) {
@@ -888,13 +900,14 @@ enum AltaHook {
         var tick = function () {
           timer = null;
           dialogTick();
-          // (1.3.83) a pop-up of Alta's given back to its page: Alta's page as it is, in sight, under it until it closes
-          if (dialogInPage) {
+          // (1.3.83) a pop-up of Alta's given back to its page: Alta's page as it is, in sight, under it until it closes —
+          // and so with Show Browser on: Knewton Alta's own page as Alta draws it, nothing hidden, never out of sight
+          if (dialogInPage || window.__simplBrowser) {
             badSince = 0; loadingSince = 0; steadySince = 0;
             if (steadyTimer) { clearTimeout(steadyTimer); steadyTimer = null; }
             unmark();
             publish();
-            reveal('dialog');
+            reveal(window.__simplBrowser ? 'browser' : 'dialog');
             return;
           }
           keepDialogs();
@@ -973,6 +986,8 @@ enum AltaHook {
           steadyTimer = setTimeout(function () { steadyTimer = null; revealSteady(state); }, 120);
         };
         try { new MutationObserver(function () { lastChange = Date.now(); schedule(); }).observe(document, { childList: true, subtree: true, characterData: true }); } catch (e) {}
+        // (1.3.83) Show Browser turned on or off: the page laid out again at once — as it is, or the app's way
+        window.__simplBrowserNow = function () { dialogTick(); schedule(0); };
         schedule();
       }
 
@@ -1351,17 +1366,36 @@ final class AltaSession: ObservableObject {
     /// student picks it above the objectives (light unless Dark is picked): the web view's own appearance with it (the
     /// page's colour scheme, its fields), and the graph window's.
     func appearance(dark: Bool) {
-        let ucc = web.configuration.userContentController
-        ucc.removeAllUserScripts()
-        ucc.addUserScript(WKUserScript(source: "window.__simplDark = \(dark); window.__simplPicsLight = \(picsLight);", injectionTime: .atDocumentStart, forMainFrameOnly: true))
-        ucc.addUserScript(AltaHook.script)
-        web.evaluateJavaScript("window.__simplDark = \(dark); window.__simplPicsLight = \(picsLight); if (window.__simplFocusDark) window.__simplFocusDark();", completionHandler: nil)
         web.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
         pageDark = dark
         AltaGraphWindow.shared.dark(dark)
+        tellPage()
     }
     /// (1.3.83) Alta's side of the popup dark: the student's Dark, above the objectives.
     private(set) var pageDark = false
+
+    /// (1.3.83) Show Browser, beside Light / Dark: Knewton Alta's own page — the same assignment, signed in, where the
+    /// student is in it — as Alta draws it, in place of the app's view of it: nothing of it hidden or laid on glass, never
+    /// out of sight, its pop-ups its own; the objectives and the mastery still read from it for the rail.
+    @Published private(set) var browser = false
+
+    func setBrowser(_ on: Bool) {
+        guard on != browser else { return }
+        browser = on
+        if on { dialog = nil } // (its pop-up, if one was the app's sheet, given back to the page by the hook)
+        tellPage()
+    }
+
+    /// (1.3.83) How the page is to be shown — light or dark, its graphs' colours, Show Browser — told before each page (a
+    /// script ahead of the page script) and at once to the page shown.
+    private func tellPage() {
+        let flags = "window.__simplDark = \(pageDark); window.__simplPicsLight = \(picsLight); window.__simplBrowser = \(browser);"
+        let ucc = web.configuration.userContentController
+        ucc.removeAllUserScripts()
+        ucc.addUserScript(WKUserScript(source: flags, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        ucc.addUserScript(AltaHook.script)
+        web.evaluateJavaScript(flags + " if (window.__simplFocusDark) window.__simplFocusDark(); if (window.__simplBrowserNow) window.__simplBrowserNow();", completionHandler: nil)
+    }
 
     // MARK: (1.3.70) The question's graphs: small, opened large in a window of their own
 
@@ -1423,8 +1457,8 @@ final class AltaSession: ObservableObject {
     var split: Bool { !asIs && focused && !panels.isEmpty && pageHeight > 0 }
 
     /// (1.3.83) Alta's page shown as it is — edge to edge, in sight, scrolling itself, nothing of the app's over it —
-    /// while a pop-up of Alta's is given back to it.
-    var asIs: Bool { dialogInPage }
+    /// while a pop-up of Alta's is given back to it, and with Show Browser on.
+    var asIs: Bool { browser || dialogInPage }
 
     /// (1.3.60) Whether Alta's page is laid out and in sight (it is kept out of sight while it loads, so it never flashes
     /// in before its question).

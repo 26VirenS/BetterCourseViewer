@@ -411,6 +411,12 @@ alta_pages() {
   MODE=dark shoot dark-21q-alta-question-dark 22 -SimplOpen "$page" -SimplAltaPageDark YES
   MODE=light shoot light-21q-alta-question-dark 22 -SimplOpen "$page" -SimplAltaPageDark YES
   MODE=dark shoot dark-21r-alta-page-dark 20 -SimplOpen alta:104:4003 -SimplAltaPageDark YES
+  # (1.3.83) Show Browser (-SimplAltaShowBrowser YES): Knewton Alta's own page on the right as Alta draws it — the
+  # cover, light, in light mode; the learn page in Dark Mode with Dark picked, drawn dark; and a 1024-point window, the
+  # rail narrow, its row of controls in short words
+  MODE=light shoot light-21s-alta-browser 20 -SimplOpen alta:104:4004 -SimplAltaShowBrowser YES
+  MODE=dark shoot dark-21s-alta-browser-dark 22 -SimplOpen "$page" -SimplAltaShowBrowser YES -SimplAltaPageDark YES
+  MODE=light SIZE=1024x768 shoot light-21t-alta-browser-narrow 22 -SimplOpen "$page" -SimplAltaShowBrowser YES
 }
 
 # (1.3.79) a tool opened whole is a popup over the window, never in its place (Shell/FloatingPopup.swift): the Periodic
@@ -765,7 +771,7 @@ bio_full # (1.3.78) the biology toolkit, every tool's pages
 bio_plain_all # (1.3.79) three of them opened plainly, in dark, at two window sizes, the sidebar out and folded
 ui_review # (1.3.78) the UI review's new states
 pins_pages # (1.3.79) the pins' room, a panel pulled out, external tools' pages light
-alta_pages # (1.3.83) Alta's popup: its pop-ups read whole, Light or Dark
+alta_pages # (1.3.83) Alta's popup: its pop-ups read whole, Light or Dark, Show Browser
 tool_popups # (1.3.79) a tool's popup over the Tools page
 chem_tools # (1.3.80) the Chemistry section and its tools
 # (1.3.78) a PDF-only assignment (as the push's set makes 1013) waiting for the phone: Combine photos under the code

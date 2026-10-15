@@ -245,6 +245,15 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   hue-rotate(180deg)`, its pictures, videos and frames turned back), unless it has a dark look of its own (a dark ground,
   or a `color-scheme` meta naming dark), which the hook tells once the page is in sight and out of the focus. The bar
   and the rail keep the app's appearance.
+  (1.3.83) *Show Browser* beside them (`AltaBrowserToggle`, a glass chip filled while on; the row says "Browser", then
+  drops the sun's and moon's words, where the rail is narrow): Knewton Alta's own page on the right — the same web view,
+  so the same assignment, signed in, where the student is in it — as Alta draws it, in place of the app's view; off, the
+  app's view again. Remembered (`SimplAltaShowBrowser`; `-SimplAltaShowBrowser YES`). The app tells the page
+  `window.__simplBrowser` (with the other flags, before each page and at once: `AltaSession.tellPage`), and the hook
+  stands down while it is on — no focus (`unmark`), no veil (never out of sight, not even between parts), no panels or
+  buttons for the app, its pop-ups its own (one the app was showing given back) — while it still reads the objectives,
+  the mastery and the cover for the rail. The popup shows the page as it is (`AltaSession.asIs`), and Light or Dark
+  applies (Dark draws it dark as above).
   (1.3.53) Two glass panels, the question's words and its answer (a lesson: one): the hook tells the app each kept
   part's question and answer boxes (the card's children before and from the one holding Learnosity's box, which gets a
   gap above it — `data-simpl-answer`) in the page's own coordinates, and the page's height. The app sizes the page to
