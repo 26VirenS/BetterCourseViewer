@@ -26,6 +26,10 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.6", "2026-10-15",
+            ("new", "Dark mode for Alta", "Switch Alta's page between light and dark."),
+            ("new", "Show browser", "See Alta's own page beside your objectives."),
+            ("fixed", "Alta pop-ups in full", "Alta's pop-ups now show their whole message.")),
         R("0.3.5", "2026-10-15",
             ("improved", "Open pins full screen", "A pin's flyout button now opens its tool full screen."),
             ("improved", "Pins keep your work", "Your graph, numbers or search carry over to the full tool.")),

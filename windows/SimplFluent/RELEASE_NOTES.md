@@ -1,3 +1,9 @@
+**What's new in 0.3.6** (beta)
+
+- **Dark mode for Alta** — a Light/Dark choice above the objectives in Knewton Alta's popup, remembered.
+- **Show browser** — Knewton Alta's own page on the right, beside your objectives.
+- **Alta pop-ups in full** — Alta's own pop-ups show their whole message: words, lists, formulas and pictures; one that can't be read is shown in Alta's page, never empty.
+
 **What's new in 0.3.5** (beta)
 
 - **Open pins full screen** — the button at the top of a pinned tool's flyout opens the tool full screen (its popup across the window), not in a floating window.
