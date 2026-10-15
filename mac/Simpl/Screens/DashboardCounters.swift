@@ -191,15 +191,8 @@ struct DashCounterTile: View {
                 // (1.3.80) its own colour, a soft wash over the whole tile, over its photo and under its words; (home-1)
                 // something late, a stronger red one — both drawn here, not as the glass's tint, which macOS mutes in a
                 // window in the background — whatever is worn
+                // (1.3.81: no coloured edge round it — the owner: "remove the unnecessary border"; the wash alone says it)
                 shape.fill(alert ? DashCounterTile.alertWash : wash)
-            }
-            .overlay {
-                // (1.3.80) a faint edge in its colour; something late, a red one
-                if alert {
-                    shape.strokeBorder(DashCounterLook.alert.opacity(0.55), lineWidth: 1.5)
-                } else {
-                    shape.strokeBorder(DashCounterLook.color(counter.key).opacity(scheme == .dark ? 0.26 : 0.22), lineWidth: 1)
-                }
             }
         }
         .buttonStyle(CardButtonStyle(radius: 18))
