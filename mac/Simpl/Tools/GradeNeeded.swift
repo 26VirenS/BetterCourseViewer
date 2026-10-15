@@ -423,6 +423,13 @@ struct GradeNeededCompact: View {
     @State private var worth = ""
     @State private var goal = ""
 
+    /// (1.3.83) What Open Full Screen carries to the whole tool: the numbers typed, as Return hands them (none typed:
+    /// nothing — the tool opens on a course's own).
+    private var carried: [String: String] {
+        guard [now, worth, goal].contains(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }) else { return [:] }
+        return ["now": now, "worth": worth, "goal": goal]
+    }
+
     var body: some View {
         let r = NeedMath.needed(NeedMath.number(now), NeedMath.number(worth), NeedMath.number(goal))
         VStack(alignment: .leading, spacing: 12) {
@@ -445,6 +452,14 @@ struct GradeNeededCompact: View {
             .animation(Motion.snappy, value: big(r))
         }
         .onSubmit { openFull(["now": now, "worth": worth, "goal": goal]) }
+        .quickCarry(carried)
+        // (the screenshot suite: -SimplPinNeed 85,30,90 types them in)
+        .onAppear {
+            guard now.isEmpty, worth.isEmpty, goal.isEmpty,
+                  let parts = UserDefaults.standard.string(forKey: "SimplPinNeed")?.split(separator: ",").map({ $0.trimmingCharacters(in: .whitespaces) }),
+                  parts.count == 3 else { return }
+            (now, worth, goal) = (parts[0], parts[1], parts[2])
+        }
     }
 
     private func field(_ label: String, _ text: Binding<String>, prompt: String, unit: String) -> some View {

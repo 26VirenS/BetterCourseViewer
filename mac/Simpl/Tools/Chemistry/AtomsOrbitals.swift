@@ -470,6 +470,13 @@ struct AtomsOrbitalsCompact: View {
     private var typed: String { query.trimmingCharacters(in: .whitespaces) }
     private var found: PTElement? { typed.isEmpty ? AtomsOrbitalsTool.remembered : PeriodicTable.find(typed).first }
 
+    /// (1.3.83) What Open Full Screen carries to the whole tool: the element typed, the one Return opens (nothing typed:
+    /// nothing — the tool opens on its own, the one it showed last).
+    private var carried: [String: String] {
+        guard !typed.isEmpty, let e = found else { return [:] }
+        return ["element": String(e.number)]
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             TextField("Symbol, name or number", text: $query)
@@ -507,6 +514,7 @@ struct AtomsOrbitalsCompact: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .quickCarry(carried)
     }
 
     /// The tool opened whole on the element.

@@ -951,5 +951,8 @@ struct BioLabCompact: View {
             .controlSize(.large)
             .help("Open Bio Lab Calculator at this calculator, with its working step by step")
         }
+        // (1.3.83) Open Full Screen opens the whole tool at this calculator, as Show the Steps does (its numbers are the
+        // whole tool's already)
+        .quickCarry(["calc": which])
     }
 }

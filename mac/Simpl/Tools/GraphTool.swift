@@ -4,7 +4,8 @@ import WebKit
 
 // The graphing calculator, as the web's: Desmos, embedded, not reimplemented — their calculator page in a web view of
 // its own. Each web view is kept for as long as the app runs, so a graph survives the tool closing or its pin's popover
-// folding. Where Desmos cannot load, a plain message and the way out to desmos.com instead of a blank pane.
+// folding. Where Desmos cannot load, a plain message and the way out to desmos.com instead of a blank pane. (1.3.83)
+// The pin's graph goes on in the whole one when its panel is opened full screen (GraphWeb.carryOver).
 
 @MainActor
 final class GraphWeb: ObservableObject {
@@ -16,6 +17,15 @@ final class GraphWeb: ObservableObject {
     @Published private(set) var failed = false
     private var made: WKWebView?
     private let delegate = GraphWebDelegate()
+    /// (1.3.83) What is to be done to the graph once its page has loaded (`whenReady`).
+    private var pending: [Pending] = []
+
+    /// A script for Desmos's page, the text it is given (`s`), and what it does, for the console.
+    private struct Pending {
+        let script: String
+        let s: String
+        let said: String
+    }
 
     /// The web view, made (and Desmos asked for) the first time it is shown.
     var webView: WKWebView {
@@ -35,17 +45,83 @@ final class GraphWeb: ObservableObject {
     func reload() {
         failed = false
         loading = true
+        pending = [] // (an empty graph asked for: nothing put into it)
         webView.load(URLRequest(url: GraphWeb.desmos))
     }
 
     func finished() {
         loading = false
         failed = false
+        let waiting = pending
+        pending = []
+        for p in waiting { run(p) }
     }
 
     func couldNotLoad() {
         loading = false
         failed = true
+    }
+
+    // MARK: (1.3.83) The pin's graph, carried to the whole one
+
+    /// The pin's graph — its expressions, sliders, tables, notes and view — put into the whole one as the pin's panel
+    /// opens full screen (ToolsCenter.openFullScreen), by Desmos's own `Calc.getState` and `Calc.setState` on its page:
+    /// the graph begun small goes on large. The whole one's graph before it is a ⌘Z away (`allowUndo`). Nothing is
+    /// carried while the pin's Desmos has not loaded, or its graph is empty — the whole one is left as it was.
+    static func carryOver() {
+        guard let from = mini.made, !mini.loading, !mini.failed else { return }
+        Task { @MainActor in
+            let read = try? await from.callAsyncJavaScript(GraphWeb.readState, arguments: [:], in: nil, contentWorld: .page)
+            guard let state = read as? String, !state.isEmpty else {
+                GraphWeb.shotLog("graph: the pin's graph is empty; nothing carried")
+                return
+            }
+            GraphWeb.shotLog("graph: the pin's graph read (\(state.count) characters)")
+            GraphWeb.full.whenReady("Calc.setState(JSON.parse(s), { allowUndo: true })", state, said: "the pin's graph put in the whole one")
+        }
+    }
+
+    /// The graph's state as JSON, or "" when it has nothing in it (one empty expression line, as Desmos starts) or
+    /// Desmos's calculator is not there.
+    private static let readState = """
+    if (!(window.Calc && Calc.getState)) return "";
+    const state = Calc.getState();
+    const list = (state.expressions && state.expressions.list) || [];
+    return list.some(e => e.type !== "expression" || (e.latex || "").trim() !== "") ? JSON.stringify(state) : "";
+    """
+
+    /// (the screenshot suite: -SimplPinGraph "y=x^2" draws that in the pin's graph once Desmos is up, for the picture of
+    /// the graph opened full screen from its pin to carry)
+    func seedForPicture(_ latex: String) {
+        whenReady("Calc.setExpression({ id: 'simpl-pin', latex: s })", latex, said: "drew \(latex) for the picture")
+    }
+
+    /// A script for Desmos's page, given `s`: run once the page has loaded (now, if it has) and Desmos's calculator is
+    /// up on it — it comes a moment after the page — asked for every tenth of a second, ten seconds at most. `said`:
+    /// what it does, for the console in a picture's run.
+    private func whenReady(_ script: String, _ s: String, said: String) {
+        let step = Pending(script: script, s: s, said: said)
+        if made != nil, !loading, !failed { run(step) } else { pending.append(step) }
+    }
+
+    private func run(_ step: Pending) {
+        guard let w = made else { return }
+        let body = """
+        for (let i = 0; i < 100 && !(window.Calc && Calc.setState); i++) await new Promise(r => setTimeout(r, 100));
+        if (!(window.Calc && Calc.setState)) return false;
+        \(step.script);
+        return true;
+        """
+        Task { @MainActor in
+            let done = (try? await w.callAsyncJavaScript(body, arguments: ["s": step.s], in: nil, contentWorld: .page)) as? Bool
+            GraphWeb.shotLog("graph: \(step.said)\(done == true ? "" : " — not done: Desmos's calculator was not there")")
+        }
+    }
+
+    /// A line on the console in a picture's run (-SimplShotFile), for CI to read what was carried.
+    private static func shotLog(_ line: String) {
+        guard UserDefaults.standard.string(forKey: "SimplShotFile") != nil else { return }
+        NSLog("[Simpl] %@", line)
     }
 }
 
@@ -173,13 +249,21 @@ struct GraphTool: View {
     }
 }
 
-/// The graphing calculator's pin, opened: a small Desmos, portrait, that keeps its graph while folded.
+/// The graphing calculator's pin, opened: a small Desmos, portrait, that keeps its graph while folded — (1.3.83) and goes
+/// on in the whole one when its panel is opened full screen (GraphWeb.carryOver).
 struct GraphCompact: View {
     @ObservedObject private var web = GraphWeb.mini
+    /// (the screenshot suite) -SimplPinGraph's drawing asked for, once a launch.
+    @MainActor private static var seeded = false
 
     var body: some View {
         GraphPane(web: web)
             .frame(height: 460)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .onAppear {
+                guard !Self.seeded, let latex = UserDefaults.standard.string(forKey: "SimplPinGraph"), !latex.isEmpty else { return }
+                Self.seeded = true
+                web.seedForPicture(latex)
+            }
     }
 }

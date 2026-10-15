@@ -52,8 +52,9 @@ enum CalcResult: Equatable {
     case ok(Double, String)
 }
 
-/// The calculator's state and its keys. A value: a view keeps one in its state.
-struct CalcEngine {
+/// The calculator's state and its keys. A value: a view keeps one in its state — (1.3.83) and compared, so the pin's is
+/// carried to the whole calculator only once something has been typed in it (QuickCarry).
+struct CalcEngine: Equatable {
     struct Past: Identifiable, Equatable {
         let id = UUID()
         let sum: String
@@ -785,8 +786,21 @@ func calcKeyFor(_ press: KeyPress) -> String? {
 
 // MARK: - The calculator as a tool
 
+extension CalcEngine {
+    /// (1.3.83) The pin's calculator, handed to the whole one as its panel opens full screen (ToolsCenter.openFullScreen):
+    /// its line, its sums, its memory and Rad/Deg — taken once, as the whole calculator comes up.
+    @MainActor static var handOff: CalcEngine?
+
+    @MainActor
+    static func takeHandOff() -> CalcEngine? {
+        defer { handOff = nil }
+        return handOff
+    }
+}
+
 /// Calculator: the display over Apple's scientific keys, the keyboard on it; beside it on a wide window, the sums worked
-/// out with = (a press puts a result back on the line), and Copy.
+/// out with = (a press puts a result back on the line), and Copy. (1.3.83) Opened full screen from its pin, it goes on
+/// from the pin's line and sums.
 struct CalculatorTool: View {
     @State private var eng = CalcEngine()
     @FocusState private var focused: Bool
@@ -799,7 +813,10 @@ struct CalculatorTool: View {
                 historyPanel
             }
         }
-        .onAppear { focused = true }
+        .onAppear {
+            if let pin = CalcEngine.takeHandOff() { eng = pin }
+            focused = true
+        }
     }
 
     private var calculator: some View {
@@ -878,7 +895,8 @@ struct CalculatorTool: View {
     }
 }
 
-/// The calculator's pin, opened: the display and the basic keys, the keyboard on it.
+/// The calculator's pin, opened: the display and the basic keys, the keyboard on it — (1.3.83) its line and sums carried
+/// to the whole calculator by Open Full Screen once something is typed.
 struct CalculatorCompact: View {
     @State private var eng = CalcEngine()
     @FocusState private var focused: Bool
@@ -889,6 +907,7 @@ struct CalculatorCompact: View {
                 .padding(.horizontal, 6)
             CalcKeypad(eng: $eng, rows: CalcKey.basic, keyHeight: 38, spacing: 6) { focused = true }
         }
+        .preference(key: QuickCarryKey.self, value: QuickCarry(calc: eng == CalcEngine() ? nil : eng))
         .focusable()
         .focused($focused)
         .focusEffectDisabled()

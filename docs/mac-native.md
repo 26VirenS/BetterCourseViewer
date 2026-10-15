@@ -639,8 +639,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   popup's bar shows every pin that fits beside the popup's name (240 points kept for it: `PopupPins`, a `ViewThatFits`
   of all the pins, then one fewer and the pull-down, and so on — never fewer than 1.3.78 showed there). *A pulled-out
   panel moves*: by its ground, its head (the
-  tool's tile, the room beside the name, and the name itself — a press that does not move opens the whole tool, as
-  before) and its grip (`PanelMover`: AppKit's "movable by its background" never moved it, every press landing on the
+  tool's tile, the room beside the name, and the name itself — a press that does not move opened the whole tool until
+  1.3.83) and its grip (`PanelMover`: AppKit's "movable by its background" never moved it, every press landing on the
   SwiftUI hosting view), kept on the screen (its head at least), and it comes out again where it was last put
   (`SimplToolFloatPlaces`, a top-left corner per tool; a grip drag that pulls a panel out puts it there too). *Tools'
   pages light*: an external tool's page is shown light whatever the app's appearance — the tool window's web view
@@ -650,6 +650,29 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   white). The tool window's Dark Page moon (Dark Mode only) is off until turned on, and turned on it draws the page
   dark as before; Canvas's own viewer in the feedback popup keeps Dark Page on by default. The popups' bars and rails
   and the tool window's toolbar keep the app's appearance.
+
+- **Open Full Screen in a pin's panel (1.3.83).** The owner, of the Graphing calculator's pinned panel: its top-right
+  button "shouldnt be pop out, it should be full screen". A pin's popover, and its pulled-out floating panel, now have
+  *Open Full Screen* at their head's right end (`QuickFullScreenButton`: `arrow.up.left.and.arrow.down.right`, its
+  tooltip and VoiceOver label "Open Full Screen") where the popover had *Pop Out*: the panel closes (a floating one is put
+  back) and the tool opens whole, as its tile on the Tools page opens it — its popup spanning the window over the
+  sidebar, or at the size last given it (`ToolsCenter.openFullScreen`, `popUp`) — with what was begun in the panel
+  carried over (`QuickCarry`, said by each quick version as it changes with `quickCarry(_:)` and read by the panel):
+  Grade needed's three numbers, the element searched for in the Periodic Table's or typed in Atoms & Orbitals', the
+  link pasted to cite, the unit converter's kind, units and value (`UnitConverterTool.takeHandOff`), the calculator's
+  line, sums, memory and Rad/Deg (`CalcEngine.handOff`), a codon looked up, a cross, a Hardy–Weinberg value, the lab
+  calculator shown; the graph's whole drawing — expressions, sliders, tables, notes and view — by Desmos's own
+  `Calc.getState`/`Calc.setState` from the pin's web view to the whole one's (`GraphWeb.carryOver`; the whole one's graph
+  before it is a ⌘Z away). The focus timer, Flashcards' sets and the lab's numbers are the whole tool's already. A panel
+  as it opens carries nothing, and the tool opens as from its tile; with something carried, the tool's popup if it is
+  open already is made afresh to take it (`popUp(afresh:)`, `ToolsCenter.popupMade`) — as it is too when a quick
+  version hands its tool something itself (Return, a set, a dropped file). The panel's name is its title alone: its ›,
+  which opened the whole tool as well, is gone, so Open Full Screen is the one way from the panel to the whole tool
+  (tools-22); on a floating panel the name still moves the panel. Pulling a panel out stays: by the grip along the
+  popover's foot, and by *Pop Out* in the pin's menu. Pictures: `light-54i-pin-graph` (the graph's panel), and
+  `light-54j-pin-full-need` and `light-54k-pin-full-graph`, a pin's Open Full Screen pressed (`-SimplPinFull <key>`; the
+  panel's numbers `-SimplPinNeed 85,30,90`, a graph drawn in the pin's Desmos `-SimplPinGraph "y=x^2"`; the console says
+  what was carried: "pin full screen: need (carried: goal, now, worth)", "graph: the pin's graph put in the whole one").
 
 - **Fast and fluid (1.3.78).** A screen shows its whole content at once whenever this session has already read what
   it shows, and the window moves the same way however it is moved:
@@ -786,7 +809,7 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   middle kept as it grows; *at* a point (a counter's list over its tile in 1.3.79; unused since 1.3.80, when the list
   grows out of its tile in the page again). A `.floatingPopup(key, title:, item:/isPresented:)` modifier puts one up
   as `.sheet` did. What each popup is now: a **tool opened whole** — from its tile on the Tools page, its pin's popover
-  or floating panel (its name, or what it hands on), the pin's Open, a hand-off from another tool (`BioTools.open`) or
+  or floating panel (1.3.83: its Open Full Screen, or what it hands on), the pin's Open, a hand-off from another tool (`BioTools.open`) or
   `-SimplTool` — a large popup over the window (`ToolsCenter.popUp`, `ToolPopup`; one at a time, another switched in
   place with a cross-fade, opening at its top; its heading has its tile, name, pages, Pin and × and drags it; the Tools
   page stays behind it — no more "‹ Tools"); **Knewton Alta** and **Macmillan** assignments, the **feedback** on a

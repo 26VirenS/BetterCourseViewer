@@ -4,11 +4,12 @@ import UniformTypeIdentifiers
 // The tools pinned to the toolbar (1.2): the web's tray at the top right, on every screen of the window. Each pin is a
 // toolbar button in its tool's colour; a press opens a popover with the tool's quickest use — the timer's controls, the
 // calculator, Grade needed's three numbers, the periodic table small, a link to cite, a set to study, a file to drop —
-// and its name opens the whole tool. A running focus timer is live in its pin, as the web's island: the minutes left on
-// a ring and in figures, in its phase's colour (it borrows a pin while it runs if the timer is not pinned). A pin's
-// context menu opens, moves or unpins it. (tools-6) The pins past the toolbar's room go into a Tools pull-down, so a
-// screen's own buttons keep theirs — (1.3.79) only those: every pin that fits is shown, the toolbar's room measured as it
-// is laid out (ToolbarFit), where tools-6 had three at most whatever the room.
+// and (1.3.83) Open Full Screen at its top right opens the whole tool with what was begun there. A running focus timer
+// is live in its pin, as the web's island: the minutes left on a ring and in figures, in its phase's colour (it borrows
+// a pin while it runs if the timer is not pinned). A pin's context menu opens, pops out, moves or unpins it. (tools-6)
+// The pins past the toolbar's room go into a Tools pull-down, so a screen's own buttons keep theirs — (1.3.79) only
+// those: every pin that fits is shown, the toolbar's room measured as it is laid out (ToolbarFit), where tools-6 had
+// three at most whatever the room.
 
 /// A pin in the toolbar.
 struct PinnedToolButton: View {
@@ -46,11 +47,13 @@ struct PinnedToolButton: View {
                 .environmentObject(engine)
         }
         .contextMenu { menu }
-        // (the screenshot suite: -SimplPinOpen ptable opens that pin's popover a moment after launch; -SimplPinFloat calc
-        // pulls that pin's panel out, near the window's top right)
+        // (the screenshot suite: -SimplPinOpen ptable opens that pin's popover a moment after launch — -SimplPinFull need
+        // too, and then presses its Open Full Screen: PinnedToolPopover; -SimplPinFloat calc pulls that pin's panel out,
+        // near the window's top right)
         .task {
             let d = UserDefaults.standard
-            if d.string(forKey: "SimplPinOpen") == kind.rawValue {
+            if d.string(forKey: "SimplPinOpen") == kind.rawValue
+                || (d.string(forKey: "SimplPinFull") == kind.rawValue && !PinnedToolPopover.launchFullPressed) {
                 try? await Task.sleep(nanoseconds: 2_500_000_000)
                 shown = true
                 launchOpened = true
@@ -63,7 +66,11 @@ struct PinnedToolButton: View {
         // (and open again as the app comes back to the front: a popover closes when its app is put behind another, and
         // the suite runs several copies of the app at once — Hardy–Weinberg's and the lab's were pictured closed)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            guard launchOpened, !shown, UserDefaults.standard.string(forKey: "SimplPinOpen") == kind.rawValue else { return }
+            let d = UserDefaults.standard
+            guard launchOpened, !shown else { return }
+            // (-SimplPinFull's until its Open Full Screen has been pressed)
+            guard d.string(forKey: "SimplPinOpen") == kind.rawValue
+                    || (d.string(forKey: "SimplPinFull") == kind.rawValue && !PinnedToolPopover.launchFullPressed) else { return }
             shown = true
         }
     }
@@ -71,6 +78,10 @@ struct PinnedToolButton: View {
     @ViewBuilder
     private var menu: some View {
         Button("Open \(kind.name)") { tools.popUp(kind, engine: engine) } // (1.3.79: in its popup over the window)
+        // (1.3.83) Pop Out, here since Open Full Screen took its place at the popover's top right: the quick panel in its
+        // floating window by a press as well as by the popover's grip
+        Button("Pop Out") { floats.popOut(kind, engine: engine) }
+            .disabled(floats.isOut(kind))
         if kind == .pomo && focus.active {
             Divider()
             Button(focus.running ? "Pause" : "Resume") { focus.toggle() }
@@ -152,85 +163,158 @@ struct MorePinsMenu: View {
     }
 }
 
-/// A pin's popover: (tools-21) the tool's name as its tile says it — a press opens the whole tool, (tools-22) the one way
-/// to — (tools-20) Pop Out, which takes the quick panel out into a small window of its own that floats over everything,
-/// and the tool's quickest use. Unpinning is in the pin's own menu, not a button beside the name where a slip would make
-/// the pin vanish.
+/// A pin's popover: (tools-21) the tool's name as its tile says it; (1.3.83) Open Full Screen at its top right — the
+/// tool's whole view in its popup over the window, with what was begun here (QuickCarry) — where Pop Out was (the grip
+/// along the foot still pulls the panel out, and so does Pop Out in the pin's menu); and the tool's quickest use.
+/// (tools-22) Open Full Screen is the one way from here to the whole tool: the name's ›, which opened it too, is gone,
+/// and the name is the panel's title. Unpinning is in the pin's own menu, not a button beside the name where a slip
+/// would make the pin vanish.
 struct PinnedToolPopover: View {
     let kind: ToolKind
     let engine: Engine
     let close: () -> Void
     @ObservedObject private var tools = ToolsCenter.shared
+    /// What the quick version has begun, for the whole tool (QuickCarry).
+    @State private var carry = QuickCarry()
+    /// (the screenshot suite) -SimplPinFull has pressed Open Full Screen, once a launch.
+    @MainActor static var launchFullPressed = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            header
+            HStack(spacing: 10) {
+                IconTile(symbol: kind.symbol, color: kind.color, size: 28)
+                QuickPanelName(kind: kind)
+                Spacer(minLength: 8)
+                QuickFullScreenButton(kind: kind, action: openFullScreen)
+            }
             PinnedToolQuick(kind: kind) { info, files in openFull(info: info, files: files) }
+                .onPreferenceChange(QuickCarryKey.self) { c in MainActor.assumeIsolated { carry = c } }
             // (1.3.73) the grip along the foot: dragged, the panel comes out into a window of its own (ToolFloat.swift)
             PullOutGrip(kind: kind, engine: engine, close: close)
                 .padding(.bottom, -10)
         }
         .padding(16)
         .frame(width: kind.popoverWidth)
+        .task { await pressForPicture() }
     }
 
-    /// (a long name beside Pop Out's words: Pop Out its symbol alone)
-    private var header: some View {
-        ViewThatFits(in: .horizontal) {
-            headerRow(words: true)
-            headerRow(words: false)
-        }
+    /// (1.3.83) Open Full Screen: the popover closed, the tool whole over the window with what was begun here.
+    private func openFullScreen() {
+        close()
+        tools.openFullScreen(kind, engine: engine, carry: carry)
     }
 
-    private func headerRow(words: Bool) -> some View {
-        HStack(spacing: 10) {
-            IconTile(symbol: kind.symbol, color: kind.color, size: 28)
-            QuickPanelName(kind: kind) { openFull() }
-            Spacer(minLength: 8)
-            Button {
-                ToolFloats.shared.popOut(kind, engine: engine)
-                close()
-            } label: {
-                Label("Pop Out", systemImage: "pip.exit")
-                    .font(.sCallout.weight(.medium))
-                    .labelStyle(SquishLabel(squished: !words))
-            }
-            .glassButton()
-            .controlSize(.small)
-            .help("Pop out: keep \(kind.name) open in a small window that floats over everything, quizzes too")
-            .accessibilityLabel("Pop Out")
-        }
-    }
-
-    /// The whole tool (1.2.1): over the window where you are — (1.3.79) in its popup, which never blocks the window (and
-    /// comes up over a quiz or an Alta assignment's popup too) — not on the Tools page.
+    /// The whole tool (1.2.1) with what the quick version hands it (a set to study, a link to cite, a file): over the
+    /// window where you are — (1.3.79) in its popup, which never blocks the window (and comes up over a quiz or an Alta
+    /// assignment's popup too) — not on the Tools page; (1.3.83) made afresh to take it if it is open already.
     private func openFull(info: [String: String] = [:], files: [URL] = []) {
         close()
-        tools.popUp(kind, engine: engine, files: files, info: info)
+        tools.popUp(kind, engine: engine, files: files, info: info, afresh: !info.isEmpty || !files.isEmpty)
+    }
+
+    /// (the screenshot suite: -SimplPinFull need presses Open Full Screen a moment after the popover opens — the graph's
+    /// once Desmos has loaded and drawn what -SimplPinGraph put in it — once a launch)
+    @MainActor
+    private func pressForPicture() async {
+        guard UserDefaults.standard.string(forKey: "SimplPinFull") == kind.rawValue, !Self.launchFullPressed else { return }
+        if kind == .graph {
+            var waited = 0
+            while GraphWeb.mini.loading && waited < 60 {
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                waited += 1
+            }
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+        } else {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+        }
+        guard !Task.isCancelled, !Self.launchFullPressed else { return }
+        Self.launchFullPressed = true
+        openFullScreen()
     }
 }
 
-/// (tools-21, tools-22) A quick panel's name, as the tool's tile says it, with a › — a press opens the whole tool.
+/// (tools-21) A quick panel's name, as the tool's tile says it: (1.3.83) the panel's title, no longer a button — Open
+/// Full Screen beside it opens the whole tool, where a press on the name and its › did the same (tools-22: one way).
 struct QuickPanelName: View {
     let kind: ToolKind
-    let open: () -> Void
 
     var body: some View {
-        Button(action: open) {
-            HStack(spacing: 4) {
-                Text(kind.name)
-                    .font(.sHeadline)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-            }
-            .contentShape(Rectangle())
+        Text(kind.name)
+            .font(.sHeadline)
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// (1.3.83) A quick panel's Open Full Screen, at its head's right end (the pin's popover's and its pulled-out panel's):
+/// the tool's whole view, as its tile on the Tools page opens it — its popup over the window, spanning it, over the
+/// sidebar — the panel closed and what was begun in it carried over. It took Pop Out's place (the owner: "it should be
+/// full screen").
+struct QuickFullScreenButton: View {
+    let kind: ToolKind
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label("Open Full Screen", systemImage: "arrow.up.left.and.arrow.down.right")
+                .font(.sCallout.weight(.medium))
+                .labelStyle(.iconOnly)
         }
-        .buttonStyle(.plain)
-        .help("Open \(kind.name) full size")
-        .accessibilityLabel("Open \(kind.name)")
+        .glassButton()
+        .controlSize(.small)
+        .help("Open Full Screen")
+        .accessibilityLabel("Open Full Screen")
+        .accessibilityHint("Opens \(kind.name) whole, over the window, with what you began here")
+    }
+}
+
+// MARK: - (1.3.83) What a quick panel carries to the whole tool
+
+/// What was begun in a quick panel, for the whole tool as its Open Full Screen opens it: the details the tool's hand-offs
+/// take (`ToolsCenter.takeInfo`: Grade needed's numbers, the element searched for, a link to cite, a unit and its value,
+/// a codon, a cross…) and the calculator's line with its sums (`CalcEngine.handOff`). Empty — nothing begun, or the
+/// panel as it opens — the whole tool opens as its tile opens it. Each quick version says what it carries as it changes
+/// (`quickCarry`); the graph's drawing goes over by Desmos's own state (GraphWeb.carryOver), and the focus timer,
+/// Flashcards' sets and the lab's numbers are the whole tool's already.
+struct QuickCarry: Equatable {
+    var info: [String: String] = [:]
+    var calc: CalcEngine?
+
+    var isEmpty: Bool { info.isEmpty && calc == nil }
+}
+
+struct QuickCarryKey: PreferenceKey {
+    static let defaultValue = QuickCarry()
+
+    static func reduce(value: inout QuickCarry, nextValue: () -> QuickCarry) {
+        let next = nextValue()
+        value.info.merge(next.info) { _, new in new }
+        if let c = next.calc { value.calc = c }
+    }
+}
+
+extension View {
+    /// (1.3.83) What this quick version carries to the whole tool, were its panel opened full screen now (QuickCarry):
+    /// empty while nothing has been begun in it.
+    func quickCarry(_ info: [String: String]) -> some View {
+        preference(key: QuickCarryKey.self, value: QuickCarry(info: info))
+    }
+}
+
+extension ToolsCenter {
+    /// (1.3.83) A quick panel's Open Full Screen: the tool's whole view in its popup over the window — `popUp`, as its tile
+    /// opens it: spanning the window over the sidebar, or at the size the student last gave it — taking what was begun in
+    /// the panel (`carry`); with something carried, the tool's popup, if it is open already, is made afresh to take it.
+    /// The graph's drawing goes over by Desmos's own state (GraphWeb.carryOver).
+    func openFullScreen(_ k: ToolKind, engine: Engine, carry: QuickCarry) {
+        if k == .graph { GraphWeb.carryOver() }
+        if let c = carry.calc { CalcEngine.handOff = c }
+        popUp(k, engine: engine, info: carry.info, afresh: !carry.isEmpty)
+        if UserDefaults.standard.string(forKey: "SimplShotFile") != nil {
+            let what = carry.info.keys.sorted() + (carry.calc == nil ? [] : ["calculator"])
+            NSLog("[Simpl] pin full screen: %@ (carried: %@)", k.rawValue, what.isEmpty ? "nothing" : what.joined(separator: ", "))
+        }
     }
 }
 

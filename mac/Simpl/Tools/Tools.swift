@@ -156,6 +156,9 @@ final class ToolsCenter: ObservableObject {
     /// (1.3.79) The tool open whole — from its tile, its pin, a hand-off from another tool — in its popup over the window
     /// (nil: none). One at a time: another opened takes its place in the same popup.
     @Published private(set) var popup: ToolKind?
+    /// (1.3.83) How many times the tool open has been made afresh in its popup — something begun in its pin's panel
+    /// handed to it while it was open already (`popUp`'s `afresh`) — so it is drawn anew and takes it.
+    @Published private(set) var popupMade = 0
     /// The window its popup is over.
     private weak var popupEngine: Engine?
     /// The tool's popup among its window's popups.
@@ -253,14 +256,19 @@ final class ToolsCenter: ObservableObject {
     /// popup is already over, else the main window's), the screen under it staying as it was, and usable. A tool already
     /// open is switched in place, in the same popup; over another window, that popup closes first. (1.3.80) The popup
     /// spans the window, over the sidebar, at the size the student last gave this tool by the popup's edges, if any
-    /// (kept under `tool.<key>`).
-    func popUp(_ k: ToolKind, engine: Engine? = nil, files: [URL] = [], info: [String: String] = [:]) {
+    /// (kept under `tool.<key>`). (1.3.83) `afresh`: the tool, if it is the one open already, made again in its popup —
+    /// a cross-fade — to take what it is handed as it is made (what was begun in its pin's panel), where it would have
+    /// stayed as it was and left it untaken.
+    func popUp(_ k: ToolKind, engine: Engine? = nil, files: [URL] = [], info: [String: String] = [:], afresh: Bool = false) {
         handoff = files
         handoffTool = files.isEmpty ? nil : k
         handoffInfo = info
         guard let host = engine ?? popupEngine ?? AppModel.shared.engine else { return }
         if let was = popupEngine, was !== host { was.popups.close(Self.popupKey) }
-        withAnimation(Motion.gentle) { popup = k }
+        withAnimation(Motion.gentle) {
+            if afresh && popup == k { popupMade += 1 }
+            popup = k
+        }
         popupEngine = host
         host.popups.present(Self.popupKey, title: k.name, layout: .large, sizeKey: "tool.\(k.rawValue)",
                             onClose: { [weak self] in self?.popupClosed() }) {
@@ -853,8 +861,8 @@ func toolPlural(_ n: Int, _ one: String, _ many: String? = nil) -> String {
 
 /// (1.3.79) A tool open whole, in its popup over the window (ToolsCenter.popUp; the popup is Shell/FloatingPopup.swift's,
 /// as large as the screen's side of the window less a margin all round, and sized again with it): the tool asked for,
-/// at its top, switched in place — a cross-fade — when another is opened in it (a hand-off from another tool); the last
-/// one still drawn as the popup goes.
+/// at its top, switched in place — a cross-fade — when another is opened in it (a hand-off from another tool), (1.3.83)
+/// or when it is made afresh to take what its pin's panel hands it; the last one still drawn as the popup goes.
 struct ToolPopup: View {
     @ObservedObject private var tools = ToolsCenter.shared
     @State private var last: ToolKind?
@@ -863,11 +871,12 @@ struct ToolPopup: View {
         ZStack {
             if let k = tools.popup ?? last {
                 ToolScreen(kind: k)
-                    .id(k)
+                    .id("\(k.rawValue).\(tools.popupMade)")
                     .transition(.opacity)
             }
         }
         .animation(Motion.gentle, value: tools.popup)
+        .animation(Motion.gentle, value: tools.popupMade)
         .onAppear { last = tools.popup }
         .onChange(of: tools.popup) { _, k in
             if let k { last = k }
