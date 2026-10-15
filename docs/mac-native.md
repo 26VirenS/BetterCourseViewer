@@ -632,7 +632,7 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   ground. The tool window's Dark Page moon shows only in Dark Mode, where it does something.
 
 - **The tools after the UI review (1.3.78).** The Tools page is in sections by what a tool is for — *Study* (Flashcards,
-  Focus timer, Citation generator, Grade needed; since the tools of their own, the Word Counter), *Math & science*
+  Focus timer, Citation generator, Grade needed; since the tools of their own, the Word Counter and the Study Planner), *Math & science*
   (Calculator, Graphing calculator, Unit converter, since then Statistics and the Matrix Calculator; the Periodic table
   until 1.3.80 moved it to *Chemistry*), *Files*
   (File converter, Merge & split PDFs, PDF annotator, Image to text; (tools) Compress Files) and *Biology*, as on
@@ -1118,6 +1118,31 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   compresses the files as the tool opens (in a picture run the Finder is not brought up, and the console says what each
   came to: `[Simpl] shrink photo.jpg: 104 KB → 61 KB, 41% smaller`). Pictures (`files_tools`): `light-75-tool-shrink`,
   `dark-75-tool-shrink`, `light-75b-tool-shrink-narrow`, `light-54p-pin-shrink`.
+- **Study Planner (tools).** The Study group's fifth tool (`plan`, `Tools/Planner/StudyPlanner.swift`; `/plan`, or
+  "study plan", "schedule", "study time", "exam prep"): study blocks from the student's due dates. It reads the upcoming
+  work the Dashboard, To Do and the Calendar read — the engine's `reminders` (three weeks of open work with its due
+  dates, the student's own tasks among it), each piece's points and colour from the Dashboard's list (`dashList`, by
+  id) and, past that list's eight days, from the Calendar's events (`calendar` over three weeks, matched by name and
+  day) — and plans round it (`StudySource`). The planner itself is Foundation only (`Tools/Planner/Model/StudyPlan.swift`,
+  checked by the Models job): a piece of work's need is its points (10 with none) times its kind's factor — an exam 3
+  (a midterm, a final, a test or an exam by name counts as one whatever Canvas calls it), a quiz 1.5, an assignment 1,
+  a discussion 0.5 — at 4½ minutes a point, rounded up to whole blocks (one at least, 24 at most); the blocks are spread
+  evenly over the days from today to the due date less the days-before setting, never past the due time, each day's
+  hours filled by priority (the earliest due first, then the heaviest), a day's blocks ten minutes apart from the time of
+  day chosen (morning 9, afternoon 2, evening 7; today no earlier than now, to the quarter hour). What will not fit is
+  said ("2 won't fit"). Settings, kept (`PlanPrefs`: `SimplPlan.settings`, `.done`, `.view`; a picture's in a suite of
+  its own): hours for each weekday (2 on a weekday, 3 at the weekend), the block (25/45/60/90 min, 45), the time of day,
+  days before (1), and the courses to include. A week view — seven columns from today, a block "45 min · 2:00 PM", its
+  course chip and its work, its number among its work's — and a list of every day with a block; each piece of work's
+  progress under them (done, planned, won't fit, on a bar). A block ticked is done, kept on this Mac and taken off its
+  work's need; *Regenerate* plans again round what is done; *Add to Calendar* saves the blocks left as `Study plan.ics`
+  in Downloads (`StudyICS`, UTC times, an event a block) and shows it in the Finder — Calendar takes it with a
+  double-click (EventKit was left out: it asks for calendar access and a prompt, for a file Calendar reads as it is).
+  The pin: today's blocks as a checklist, ticked the same way (`StudyPlannerCompact`). Nothing is written to Canvas.
+  Launch flags (when the launch opened it): `-SimplPlanHours 2` (that many hours every day), `-SimplPlanBlock 45`,
+  `-SimplPlanDone "<item id>:2"` (that many blocks of that work done), `-SimplPlanView week|list`. Pictures
+  (`planner_tool`): `light-75c-tool-plan`, `dark-75c-tool-plan`, `light-75d-tool-plan-list`, `light-75e-tool-plan-narrow`,
+  `light-54q-pin-plan`.
 
 ## Data and encryption
 

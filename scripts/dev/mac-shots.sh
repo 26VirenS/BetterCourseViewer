@@ -679,6 +679,19 @@ files_tools() {
   MODE=light shoot light-54p-pin-shrink 14 -SimplPinnedTools shrink -SimplPinOpen shrink
 }
 
+# (tools) the Study group's Study Planner over the mock's work: the week view in light and in dark (two hours a day,
+# 45-minute blocks, two of the lab's blocks done: -SimplPlanHours, -SimplPlanBlock, -SimplPlanDone), the list view
+# (-SimplPlanView list), the week narrow, and its pin (today's blocks as a checklist)
+planner_tool() {
+  local m
+  for m in light dark; do
+    MODE="$m" SIZE=1440x920 shoot "$m-75c-tool-plan" 18 -SimplPlace tools -SimplTool plan -SimplPlanHours 2 -SimplPlanBlock 45 -SimplPlanDone "2003:1"
+  done
+  MODE=light SIZE=1440x920 shoot light-75d-tool-plan-list 18 -SimplPlace tools -SimplTool plan -SimplPlanHours 2 -SimplPlanBlock 45 -SimplPlanView list
+  MODE=light SIZE=780x700 shoot light-75e-tool-plan-narrow 18 -SimplPlace tools -SimplTool plan -SimplPlanHours 2 -SimplPlanBlock 45
+  MODE=light shoot light-54q-pin-plan 16 -SimplPinnedTools plan -SimplPinOpen plan
+}
+
 # (1.3.80) how each 3D model was framed, from the consoles ("[Simpl] bio frame <scene>: view W × H, model X% across,
 # Y% up", and the atom's and the molecule's frames): each picture's last framing and its model's share of its view's
 # limiting side (the larger of the two) in frame-check.txt — 75% to 85% is as framed (SceneFill); under 70% is said
@@ -979,6 +992,7 @@ the_set() {
   phys_tools # (tools) the Physics section and its tools
   study_tools # (tools) the study and maths tools
   files_tools # (tools) Compress Files
+  planner_tool # (tools) the Study Planner
   # (1.3.78) a PDF-only assignment (1013, made so here) waiting for the phone: Combine photos under the code
   mock_config '{"ext":{"1013":["pdf"]}}'
   MODE=dark shoot dark-12f-hand-in-phone-photos-waiting 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1013 -SimplOpen handin -SimplPhone YES

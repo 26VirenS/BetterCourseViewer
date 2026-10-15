@@ -50,9 +50,10 @@ own Tests workflow on its own copy of the extension and suites.
   the saved sign-in's seals, the bridge's JSON) and the Mac's (`scripts/dev/swift-checks/main.swift`: the elements'
   data, VSEPR's shapes, the biology toolkit's self-check over every file in `mac/Simpl/Tools/Biology/Model`, the
   chemistry tools' launch flags and what they keep, `mac/Simpl/Tools/Chemistry/Model`, the physics tools' arithmetic
-  — kinematics, projectiles, vectors, the circuit solver — `mac/Simpl/Tools/Physics/Model`, and the study and maths
+  — kinematics, projectiles, vectors, the circuit solver — `mac/Simpl/Tools/Physics/Model`, the study and maths
   tools' arithmetic in `mac/Simpl/Tools/Model` — the numbers they show and read, word counts, statistics, matrices —
-  checked by `scripts/dev/swift-checks/StudyChecks.swift` against the specification's test vectors).
+  checked by `scripts/dev/swift-checks/StudyChecks.swift` against the specification's test vectors, and the Study
+  Planner's planner, `mac/Simpl/Tools/Planner/Model`).
 - The checks that were already there stay as they were: the Mac's project as the generator writes it and its What's
   New entry, kept data sealed (Mac, Windows), Send from Phone, the installer tried, the test school as the mock makes it.
 

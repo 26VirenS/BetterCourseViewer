@@ -357,6 +357,9 @@ struct PinnedToolQuick: View {
         case .shrink:
             // (tools) a small drop zone and the target: the whole tool opens with the files
             CompressFilesCompact { openFull($0, $1) }
+        case .plan:
+            // (tools) today's study blocks as a checklist
+            StudyPlannerCompact { openFull($0, []) }
         }
     }
 

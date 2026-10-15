@@ -9,12 +9,14 @@ import simd
 // the balancer), (tools) every file in mac/Simpl/Tools/Physics/Model (the physics tools' arithmetic: kinematics,
 // projectiles, vectors, the circuit solver), (tools) every file in mac/Simpl/Tools/Model (the study and maths tools'
 // arithmetic: the Word Counter's, Statistics' and the Matrix Calculator's, checked by StudyChecks.swift beside this
-// file) and mac/Simpl/Engine/LivePlan.swift (1.3.80: the live checks' plan, fingerprint and comparison) — and run, in
-// seconds, by the Mac app's workflow (Models). By hand on a Mac: swiftc -o /tmp/model-checks
+// file), (tools) every file in mac/Simpl/Tools/Planner/Model (the Study Planner's planner) and
+// mac/Simpl/Engine/LivePlan.swift (1.3.80: the live checks' plan, fingerprint and comparison) — and run, in seconds,
+// by the Mac app's workflow (Models). By hand on a Mac: swiftc -o /tmp/model-checks
 // mac/Simpl/Tools/{PeriodicData,PeriodicExtraData,MoleculeShape}.swift mac/Simpl/Tools/Biology/Model/*.swift
 // mac/Simpl/Tools/Chemistry/Model/*.swift mac/Simpl/Tools/Physics/Model/*.swift mac/Simpl/Tools/Model/*.swift
-// mac/Simpl/Engine/LivePlan.swift scripts/dev/swift-checks/main.swift scripts/dev/swift-checks/StudyChecks.swift
-// && /tmp/model-checks. A failed check is printed with what was found, and the exit code is the number that failed.
+// mac/Simpl/Tools/Planner/Model/*.swift mac/Simpl/Engine/LivePlan.swift scripts/dev/swift-checks/main.swift
+// scripts/dev/swift-checks/StudyChecks.swift && /tmp/model-checks. A failed check is printed with what was found, and
+// the exit code is the number that failed.
 
 var passed = 0, failed = 0
 func check(_ ok: Bool, _ what: String) {
@@ -507,6 +509,113 @@ check(max(spin.across, spin.up) < 0.845 && max(spin.across, spin.up) > 0.83, "a 
 // (mac/Simpl/Tools/Model, checked in StudyChecks.swift: the numbers shown and read, and each tool's arithmetic against
 // the specification's test vectors)
 studyChecks(check)
+
+// ---- the Study Planner (tools) ------------------------------------------------------------------------------------
+// (mac/Simpl/Tools/Planner/Model/StudyPlan.swift: the specification's checks — never past a due date, minutes in
+// proportion to weight, a day's hours kept, a done block taken off, the same plan for the same input — and the
+// settings, the done blocks and the calendar file as text)
+print("the Study Planner")
+var utc = Calendar(identifier: .gregorian)
+utc.timeZone = TimeZone(identifier: "UTC")!
+let planNow = Date(timeIntervalSince1970: 1_792_051_200) // Thursday 2026-10-15 08:00 UTC
+func due(_ days: Int, _ hour: Int, _ minute: Int = 0) -> Date {
+    utc.date(bySettingHour: hour, minute: minute, second: 0, of: utc.date(byAdding: .day, value: days, to: utc.startOfDay(for: planNow))!)!
+}
+let lab = StudyItem(id: "2003", title: "Lab 2", course: "PHYS 008", color: "#5856d6", kind: "Assignment", points: 20, due: due(2, 23, 59))
+let midterm = StudyItem(id: "1015", title: "Midterm 1", course: "MATH 021", color: "#ff2d55", kind: "Assignment", points: 100, due: due(15, 10, 30))
+let prequiz = StudyItem(id: "1011", title: "Lec06-PreQuiz", course: "MATH 021", color: "#ff2d55", kind: "Quiz", points: 17, due: due(1, 10, 30))
+let thread = StudyItem(id: "7002", title: "Intro thread", course: "PHYS 008", color: "#5856d6", kind: "Discussion", points: 5, due: due(5, 9))
+let errand = StudyItem(id: "n1", title: "Buy a lab notebook", course: "", color: nil, kind: "My task", points: nil, due: due(3, 23, 59))
+let work = [lab, midterm, prequiz, thread, errand]
+check(StudyWeight.factor(kind: "Assignment", title: "Midterm 1") == 3 && StudyWeight.factor(kind: "Assignment", title: "Final Exam") == 3
+      && StudyWeight.factor(kind: "Quiz", title: "Lec06-PreQuiz") == 1.5 && StudyWeight.factor(kind: "Discussion", title: "Intro thread") == 0.5
+      && StudyWeight.factor(kind: "Assignment", title: "Skills_Check") == 1 && StudyWeight.factor(kind: "Assignment", title: "Testing the waters") == 1
+      && StudyWeight.factor(kind: "My task", title: "Buy a lab notebook") == 1,
+      "an exam counts three times (a midterm or a final by name too), a quiz one and a half, a discussion half, the rest once")
+check(StudyWeight.blocks(weight: 20, blockMinutes: 45) == 2 && StudyWeight.blocks(weight: 25.5, blockMinutes: 45) == 3
+      && StudyWeight.blocks(weight: 2.5, blockMinutes: 45) == 1 && StudyWeight.blocks(weight: 10, blockMinutes: 25) == 2
+      && StudyWeight.blocks(weight: 300, blockMinutes: 45) == StudyWeight.mostBlocks,
+      "the blocks a piece of work needs: 4.5 minutes a point of weight, rounded up to whole blocks, one at least, 24 at most")
+var roomyPlan = StudySettings()
+roomyPlan.hours = Array(repeating: 24, count: 7)
+let wide = StudyPlanner.plan(work, settings: roomyPlan, done: [:], now: planNow, calendar: utc)
+let byItem = Dictionary(grouping: wide.blocks, by: \.itemId)
+check(!wide.blocks.isEmpty && wide.blocks.allSatisfy { b in b.end <= work.first { $0.id == b.itemId }!.due } && wide.blocks.allSatisfy { $0.start >= planNow },
+      "no block ends past its work's due date, none starts before now (\(wide.blocks.count) blocks)")
+check(byItem["2003"]?.count == 2 && byItem["1011"]?.count == 3 && byItem["7002"]?.count == 1 && byItem["n1"]?.count == 1 && byItem["1015"]?.count == 24,
+      "with room for everything, each piece of work gets its blocks (2, 3, 1, 1; the midterm its 24)")
+let plain = [StudyItem(id: "a", title: "A", course: "C", color: nil, kind: "Assignment", points: 20, due: due(20, 23, 59)),
+             StudyItem(id: "b", title: "B", course: "C", color: nil, kind: "Assignment", points: 40, due: due(20, 23, 59)),
+             StudyItem(id: "c", title: "C", course: "C", color: nil, kind: "Assignment", points: 60, due: due(20, 23, 59))]
+let proportional = StudyPlanner.plan(plain, settings: roomyPlan, done: [:], now: planNow, calendar: utc).progress.sorted { $0.id < $1.id }.map { $0.planned * 45 }
+check(proportional == [90, 180, 270], "the minutes a piece of work gets are in proportion to its weight (\(proportional))")
+var two = StudySettings()
+two.hours = Array(repeating: 2, count: 7)
+let tight = StudyPlanner.plan(work, settings: two, done: [:], now: planNow, calendar: utc)
+let perDay = Dictionary(grouping: tight.blocks) { utc.startOfDay(for: $0.start) }.values.map(\.count)
+check(!perDay.isEmpty && perDay.allSatisfy { $0 <= 2 }, "two hours a day hold two blocks of 45 at most (\(perDay.max() ?? 0))")
+var three = StudySettings()
+three.hours = Array(repeating: 3, count: 7)
+let threeADay = Dictionary(grouping: StudyPlanner.plan(work, settings: three, done: [:], now: planNow, calendar: utc).blocks) { utc.startOfDay(for: $0.start) }.values.map(\.count)
+check(threeADay.contains(4) && threeADay.allSatisfy { $0 <= 4 }, "three hours hold four (\(threeADay.max() ?? 0))")
+// the day the pre-quiz must be done by holds two blocks: the quiz, due first, takes them; the lab's two go the day after
+let quizDay = tight.blocks.filter { $0.itemId == "1011" }
+let labDays = tight.blocks.filter { $0.itemId == "2003" }.map { utc.component(.day, from: $0.start) }
+check(quizDay.count == 2 && quizDay.allSatisfy { utc.isDate($0.start, inSameDayAs: planNow) } && tight.progress.first { $0.id == "1011" }?.unplanned == 1
+      && labDays == [16, 16],
+      "a full day goes to the work due first; what did not fit is said (the quiz's third block); the rest moves on (lab on \(labDays))")
+check(tight.blocks.filter { utc.isDate($0.start, inSameDayAs: planNow) }.map { utc.component(.hour, from: $0.start) } == [14, 14]
+      && tight.blocks.filter { utc.isDate($0.start, inSameDayAs: planNow) }.map { utc.component(.minute, from: $0.start) } == [0, 55],
+      "an afternoon's blocks start at two, ten minutes apart")
+let halfDone = StudyPlanner.plan(work, settings: roomyPlan, done: ["2003": 1, "1011": 5], now: planNow, calendar: utc)
+let labLeft = halfDone.progress.first { $0.id == "2003" }, quizLeft = halfDone.progress.first { $0.id == "1011" }
+check(labLeft?.planned == 1 && labLeft?.done == 1 && labLeft?.line == "1 of 2 blocks done · 1 planned" && halfDone.blocks.first { $0.itemId == "2003" }?.id == "2003:2"
+      && quizLeft?.done == 3 && quizLeft?.planned == 0 && quizLeft?.remaining == 0,
+      "a block done comes off its work's need (the lab's one left is block 2; more done than needed counts as all)")
+let again = StudyPlanner.plan(work, settings: two, done: [:], now: planNow, calendar: utc)
+check(again.blocks == tight.blocks && again.progress == tight.progress, "the same work, settings and moment give the same plan")
+var noPhys = roomyPlan
+noPhys.excludedCourses = ["PHYS 008"]
+let without = StudyPlanner.plan(work, settings: noPhys, done: [:], now: planNow, calendar: utc)
+check(without.progress.map(\.id).sorted() == ["1011", "1015", "n1"], "a course left out takes its work with it; a task of your own stays")
+let soon = StudyItem(id: "s", title: "Due in twenty minutes", course: "C", color: nil, kind: "Assignment", points: 10, due: planNow.addingTimeInterval(20 * 60))
+let late = StudyPlanner.plan([soon], settings: roomyPlan, done: [:], now: planNow, calendar: utc)
+check(late.blocks.isEmpty && late.progress.first?.unplanned == 1 && late.progress.first?.line == "0 of 1 block done · 1 won't fit",
+      "work due too soon for a block gets none, and says so")
+let spread = StudyPlanner.plan([StudyItem(id: "e", title: "Essay", course: "C", color: nil, kind: "Assignment", points: 40, due: due(8, 23, 59))],
+                               settings: roomyPlan, done: [:], now: planNow, calendar: utc)
+let spreadDays = spread.blocks.map { utc.dateComponents([.day], from: utc.startOfDay(for: planNow), to: $0.start).day! }
+check(spreadDays == [0, 2, 4, 6], "four blocks over a week to finish a day early are spread over it, every other day (\(spreadDays))")
+var morning = StudySettings()
+morning.timeOfDay = .morning
+let lateStart = StudyPlanner.plan([lab], settings: morning, done: [:], now: due(0, 10, 7), calendar: utc).blocks.first
+check(lateStart.map { utc.component(.hour, from: $0.start) == 10 && utc.component(.minute, from: $0.start) == 15 } == true,
+      "a morning's block today, past nine already, starts at the next quarter hour")
+check(wide.blocks.first { $0.itemId == "2003" }?.line == "45 min · PHYS 008 · Lab 2" && wide.blocks.first { $0.itemId == "n1" }?.line == "45 min · Buy a lab notebook",
+      "a block's line: its minutes, its course and its work")
+// the settings, the done blocks and the calendar file as text
+var kept = StudySettings()
+kept.hours = [1.5, 2, 2, 2, 2, 0, 3]
+kept.blockMinutes = 60
+kept.timeOfDay = .evening
+kept.finishDaysBefore = 2
+kept.excludedCourses = ["CHEM 001", "PHYS 008"]
+check(StudySettings(text: kept.text) == kept && kept.text == "1.5,2,2,2,2,0,3|60|evening|2|CHEM 001;PHYS 008", "the settings kept as one line and read back (\(kept.text))")
+check(StudySettings(text: "1,2,3|45|afternoon|1") == nil && StudySettings(text: "1,1,1,1,1,1,1|50|afternoon|1") == nil && StudySettings(text: "") == nil
+      && StudySettings(text: "2,2,2,2,2,2,2|45|afternoon|0") != nil,
+      "settings that are not seven days, a block of 25, 45, 60 or 90, or a time of day are not read")
+check(StudyDone.parse("2003:2,1011:1,bad,n1:0, x:3") == ["2003": 2, "1011": 1, "x": 3] && StudyDone.text(["b": 1, "a": 2, "c": 0]) == "a:2,b:1"
+      && StudyDone.parse(nil).isEmpty,
+      "the done blocks as one line and back")
+check(StudyPoints.parse("10 pts") == 10 && StudyPoints.parse("1 pt") == 1 && StudyPoints.parse("12.5 pts") == 12.5 && StudyPoints.parse("1,000 pts") == 1000
+      && StudyPoints.parse("") == nil && StudyPoints.parse(nil) == nil,
+      "the engine's points read as a number")
+let ics = StudyICS.text(Array(wide.blocks.prefix(2)), made: planNow)
+check(ics.hasPrefix("BEGIN:VCALENDAR\r\nVERSION:2.0\r\n") && ics.hasSuffix("END:VCALENDAR\r\n") && ics.components(separatedBy: "BEGIN:VEVENT").count == 3
+      && ics.contains("DTSTAMP:20261015T080000Z") && ics.contains("DTSTART:20261015T140000Z\r\nDTEND:20261015T144500Z")
+      && ics.contains("SUMMARY:Study: MATH 021 · Lec06-PreQuiz") && ics.contains("UID:simpl-study-1011:1@simpl"),
+      "the calendar file: an event a block, in UTC, with its work's name")
+check(StudyICS.escape("a, b; c\\d\nnext") == "a\\, b\\; c\\\\d\\nnext", "a calendar text's commas, semicolons, backslashes and line breaks escaped")
 
 print("\(passed) passed, \(failed) failed")
 exit(Int32(failed))
