@@ -29,6 +29,7 @@ public static class ChemTools
         new("molecule", "Molecule Builder", "Build molecules in 3D, shaped by VSEPR.", SymbolRegular.Molecule24, "#3faa4b"),
         new("atoms", "Atoms & Orbitals", "Any element’s shells, orbitals and cloud in 3D.", SymbolRegular.Target24, "#b452e0"),
         new("balance", "Equation Balancer", "Balance any chemical equation.", SymbolRegular.ArrowSwap24, "#ff6b35"),
+        new("moles", "Molar Mass & Stoichiometry", "Molar mass, moles and yields.", SymbolRegular.Scales24, "#2fb37a"),
     };
 
     public static ToolsScreen.Kind? Kind(string key) => Kinds.FirstOrDefault(k => k.Key == key);
@@ -36,7 +37,8 @@ public static class ChemTools
     /// <summary>
     /// What a launch asked of a chemistry tool, once, and only of the tool the launch opened (--tool &lt;key&gt;):
     /// <c>--tool-state</c> as it was given — a molecule for the builders ("NO3-", "Ethanol"), an element, its view and its
-    /// subshell for Atoms &amp; Orbitals ("Fe:cloud:3d"), an equation for the Equation Balancer ("Fe + O2 -> Fe2O3").
+    /// subshell for Atoms &amp; Orbitals ("Fe:cloud:3d"), an equation for the Equation Balancer ("Fe + O2 -> Fe2O3"), a tab
+    /// for Molar Mass &amp; Stoichiometry ("reaction", with --moles-equation and the like for what it holds).
     /// </summary>
     public static string? LaunchState(string key)
     {
@@ -52,9 +54,11 @@ public static class ChemTools
 /// the Mac's ChemPrefs keys): the Periodic Table's colouring and the last element opened (<c>ptable.colour</c>,
 /// <c>ptable.element</c>), the Lewis maker's molecule (<c>lewis.draft</c>), the Molecule Builder's and how it is shown
 /// (<c>molecule.saved</c>, <c>.style</c>, <c>.lonePairs</c>, <c>.labels</c>), and Atoms &amp; Orbitals' element and view
-/// (<c>atoms.element</c>, <c>atoms.view</c>), and the Equation Balancer's equation (<c>balance.equation</c>). Written as
-/// they change (Prefs writes the file a moment after the last change); a picture's run has a profile of its own that
-/// starts empty, so each picture shows its tool as its launch asks.
+/// (<c>atoms.element</c>, <c>atoms.view</c>), the Equation Balancer's equation (<c>balance.equation</c>), and Molar Mass
+/// &amp; Stoichiometry's tab and each tab's fields (<c>moles.tab</c>, <c>.formula</c>, <c>.convert.*</c>, <c>.equation</c>,
+/// <c>.given</c>, <c>.actual</c>, <c>.empirical</c>, <c>.empirical.mass</c>). Written as they change (Prefs writes the
+/// file a moment after the last change); a picture's run has a profile of its own that starts empty, so each picture
+/// shows its tool as its launch asks.
 /// </summary>
 internal static class ChemPrefs
 {

@@ -426,7 +426,7 @@ never fails a run, and nothing waits for it but the pictures' merge.
 show checked against the school while the window shows `LiveCheck`), the popups floating over the window (`FloatPopup`, Popups below), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once, the third time Simpl is opened, at a calm moment, and from Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, a place or a page in a window of its own (`PlaceWindow`: a pane row's or a list row's Open in new window, Shift+click on a pane row, a page's ⋯ ▸ Open in new window, or Ctrl+Shift+O for what shows), the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
 | `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In and its Send from Phone, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
-| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed, Word Counter, Statistics, Matrix Calculator; `Model/` holds their counting and sums with no window in them, tested in `SimplFluent.Tests`), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Compress files, Graphing calculator), `Elements/` (the Periodic Table, Atoms & Orbitals), `Chemistry/` (the Chemistry section's tools: `ChemTools.cs`, Lewis Structures, the Molecule Builder, and the calculators — the Equation Balancer — with their sums in `Chemistry/Model/`, plain .NET), `Physics/` (the Physics section's tools: `PhysTools.cs`, Kinematics & Projectiles, Vectors; their maths in `Model/`, free of WPF), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
+| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed, Word Counter, Statistics, Matrix Calculator; `Model/` holds their counting and sums with no window in them, tested in `SimplFluent.Tests`), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Compress files, Graphing calculator), `Elements/` (the Periodic Table, Atoms & Orbitals), `Chemistry/` (the Chemistry section's tools: `ChemTools.cs`, Lewis Structures, the Molecule Builder, and the calculators — the Equation Balancer, Molar Mass & Stoichiometry — with their sums in `Chemistry/Model/`, plain .NET), `Physics/` (the Physics section's tools: `PhysTools.cs`, Kinematics & Projectiles, Vectors; their maths in `Model/`, free of WPF), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
 
 ## A screen
 
@@ -927,6 +927,22 @@ cube). What each keeps for next time is the Mac's too (`ChemPrefs`, `SimplChem.<
   field and the balanced line, and Open full screen carries the equation. `--tool balance --tool-state "Fe + O2 ->
   Fe2O3"` (or `--balance "…"`, which the flyout reads too) opens it on an equation; a picture run logs `balance: shows
   balanced 4,3,2`. The search box opens it with `/balance`, `equation`, `reaction` or `coefficients`.
+- **Molar Mass & Stoichiometry** (`moles`, `Tools/Chemistry/MolesTool.cs`; the sums in `Model/ChemStoich.cs` on
+  `ChemMolarMass` and the balancer): four tabs, the one chosen remembered (`moles.tab`). **Molar mass**: a formula, its
+  mass large, and each element's count, atomic mass, subtotal and mass % (percent composition); chips for Ca(OH)2,
+  C6H12O6 and CuSO4·5H2O. **Convert**: a formula and one amount in grams, moles, molecules (or formula units, or atoms)
+  or litres of gas at STP (22.4 L/mol; Avogadro 6.02214076e23) → the other three, to the input's figures. **Reaction**:
+  an equation (balanced for you, and said so when the coefficients change), a row per reactant with what you have (g
+  or mol) → the limiting reagent, every product's theoretical yield in g and mol, what is left of the others, and the
+  percent yield of the product weighed. **Empirical**: up to six elements with their mass % (or grams) → the empirical
+  formula (ratios to the smallest, ×1–6 until whole within 0.08; said when it had to be rounded) and, with a molar
+  mass, the molecular one. Every tab keeps its fields (`moles.formula`, `.convert.*`, `.equation`, `.given`, `.actual`,
+  `.empirical`, `.empirical.mass`); Ctrl+C copies the tab's result. Its pin's flyout is the Molar mass tab compact, and
+  Open full screen carries the formula. `--tool moles --tool-state reaction` (or `--moles reaction`) opens a tab, with
+  `--moles-formula`, `--moles-amount "10 g"`, `--moles-equation`, `--moles-given "H2=4g,O2=16g"`, `--moles-actual
+  "H2O=15g"`, `--moles-empirical "C=40,H=6.71,O=53.3"` and `--moles-mass 180` for what it holds; a picture run logs
+  `moles: shows reaction` and each tab's `moles reaction: shows …`. The search box opens it with `/moles`, `molar mass`,
+  `stoichiometry`, `limiting reagent`, `percent yield` or `empirical`.
 
 The builders and Atoms & Orbitals share one layout (`ChemLayout`): the controls and the facts in sight at every size,
 the drawing's own heading holding what to show when the drawing is over the rest, and the drawing held to the page less

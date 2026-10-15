@@ -23,6 +23,7 @@ public class ChemistryToolsTests
         ("molecule", "Molecule Builder", "Molecules", "#3faa4b"),
         ("atoms", "Atoms & Orbitals", "Atoms", "#b452e0"),
         ("balance", "Equation Balancer", "Balance", "#ff6b35"),
+        ("moles", "Molar Mass & Stoichiometry", "Moles", "#2fb37a"),
     };
 
     [Fact]
@@ -70,6 +71,7 @@ public class ChemistryToolsTests
         Assert.Equal("Bonds, lone pairs, formal charges and resonance.", ChemTools.Kind("lewis")!.Note);
         Assert.Equal("Build molecules in 3D, shaped by VSEPR.", ChemTools.Kind("molecule")!.Note);
         Assert.Equal("Balance any chemical equation.", ChemTools.Kind("balance")!.Note);
+        Assert.Equal("Molar mass, moles and yields.", ChemTools.Kind("moles")!.Note);
         Assert.Equal(Expected.Select(e => e.Short), ChemTools.Kinds.Select(k => ToolsCenter.ShortName(k.Key)));
     }
 
@@ -84,6 +86,10 @@ public class ChemistryToolsTests
     [InlineData("balance", "balance")]
     [InlineData("equation", "balance")]
     [InlineData("coefficients", "balance")]
+    [InlineData("moles", "moles")]
+    [InlineData("molar mass", "moles")]
+    [InlineData("limiting reagent", "moles")]
+    [InlineData("empirical", "moles")]
     public void TheSearchBoxOpensEachByItsWords(string typed, string key)
     {
         var command = PaletteCommand.Named(PaletteCommand.ChemistryTools().ToList(), typed);

@@ -204,7 +204,7 @@ public sealed class ToolsScreen : Screen
         }
         // (the chemistry tools, then the biology toolkit's ten, each under a heading of their own, as the Mac's Tools
         //  page has them — the chemistry's in full rows while they are an even number, as a section's four above)
-        var chemistry = Heading("Chemistry", "The periodic table, Lewis structures, molecules and atoms in 3D, and the balancer.");
+        var chemistry = Heading("Chemistry", "The periodic table, Lewis structures, molecules and atoms in 3D, the balancer and molar mass.");
         page.Children.Add(chemistry);
         page.Children.Add(new MoreGrid(TileWidth, 16, Simpl.Tools.ChemTools.Kinds.Select(k2 => (UIElement)Tile(k2)), stretch: true) { Even = Simpl.Tools.ChemTools.Kinds.Length % 2 == 0 });
         // (the physics tools between them, as the Mac's Tools page has them: in full rows where their count is even)
