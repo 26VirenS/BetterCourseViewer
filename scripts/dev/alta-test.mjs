@@ -9,6 +9,7 @@ import { spawn, execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import vm from 'node:vm';
+import net from 'node:net';
 
 const ROOT = new URL('../../', import.meta.url).pathname;
 const swift = readFileSync(join(ROOT, 'mac/Simpl/Engine/AltaSession.swift'), 'utf8');
@@ -37,8 +38,11 @@ console.log('the Alta popup’s page script, off the web');
 }
 
 console.log('\nin Chromium, on the mock’s Alta player');
-const PORT = 8881;
-const mock = spawn(process.execPath, [join(ROOT, 'scripts/dev/mock-canvas.mjs'), String(PORT)], { stdio: 'ignore' });
+// (1.3.83) ports of its own, free now: another checkout's copy of this suite may be running beside it on 8881, and its
+// mock answered this one's questions
+const freePort = () => new Promise((done) => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => done(p)); }); });
+const PORT = await freePort(), SIM = await freePort();
+const mock = spawn(process.execPath, [join(ROOT, 'scripts/dev/mock-canvas.mjs'), String(PORT), String(SIM)], { stdio: 'ignore' });
 const stop = () => { try { mock.kill(); } catch { /* gone */ } };
 process.on('exit', stop);
 const BASE = `http://localhost:${PORT}`;
@@ -172,6 +176,9 @@ try {
     `in dark mode the question’s colours are turned over and its pictures turned back (${dk.sec} · picture ${dk.pic})`);
   await page.evaluate(() => { window.__simplDark = false; window.__simplFocusDark(); document.getElementById('pic').remove(); });
   check(await page.evaluate(() => !document.documentElement.hasAttribute('data-simpl-dark') && getComputedStyle(document.getElementById('qsec')).filter === 'none'), 'and in light mode, left as Alta draws them');
+  // (1.3.83) Dark picked, the question shown alone: only its parts are turned over, never the page as a whole
+  check(await page.evaluate(() => { window.__simplDark = true; window.__simplFocusDark(); const f = getComputedStyle(document.documentElement).filter, w = document.documentElement.hasAttribute('data-simpl-whole-dark'); window.__simplDark = false; window.__simplFocusDark(); return f === 'none' && !w; }),
+    'in Dark, the question shown alone has only its parts turned over, never the page whole');
   // typing and scrolling are left alone
   await page.setViewportSize({ width: 900, height: 200 });
   await page.evaluate(() => window.scrollTo(0, 120));
@@ -184,30 +191,112 @@ try {
   await page.evaluate(() => window.mockDialog());
   await page.waitForTimeout(400);
   check((await vis('#vi')) && (await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))), 'a pop-up of Alta’s (Having trouble?) is shown over the question');
-  // (1.3.51) Alta's pop-ups as the Mac's own: passed to the app (its words and buttons), hidden in the page on the app's word, its
-  // buttons pressed from the app
+  // (1.3.51) Alta's pop-ups as the Mac's own: passed to the app — (1.3.83) once settled, its body as HTML and every one of its
+  // buttons — hidden in the page on the app's word, its buttons pressed from the app
   const dlg = await waitFor((p) => p.kind === 'dialog' && p.open === true, 'the pop-up passed to the app');
-  check(/Having trouble/.test(dlg.text) && dlg.buttons.join() === 'VIEW INSTRUCTION' && (await page.evaluate(() => document.getElementById('dlg').hasAttribute('data-simpl-dialog'))),
+  check(/Having trouble/.test(dlg.html) && dlg.buttons.map((b) => b.label).join() === 'VIEW INSTRUCTION' && (await page.evaluate(() => document.getElementById('dlg').hasAttribute('data-simpl-dialog'))),
     `an open pop-up of Alta's is passed to the app, its words and buttons (${JSON.stringify(dlg.buttons)})`);
-  // (1.3.54) its picture taken without its buttons: hidden for that moment, the row at its foot cropped off
-  const full = await page.evaluate(() => document.querySelector('#dlg [role=dialog]').getBoundingClientRect().height);
-  await page.evaluate(() => window.__simplDialog.shot(true));
-  const hiddenBtn = await page.evaluate(() => getComputedStyle(document.getElementById('vi')).visibility);
-  await page.evaluate(() => window.__simplDialog.shot(false));
-  check(hiddenBtn === 'hidden' && (await page.evaluate(() => getComputedStyle(document.getElementById('vi')).visibility)) === 'visible', 'for its picture, the pop-up’s own buttons are hidden for that moment');
-  await page.evaluate(() => { const d = document.querySelector('#dlg [role=dialog]'); d.style.paddingBottom = '10px'; d.insertAdjacentHTML('afterbegin', '<p style="height:120px;margin:0">Welcome to your adaptive assignment!</p>'); });
-  const cropped = await page.evaluate(() => window.__simplDialog.rect());
-  const btnTop = await page.evaluate(() => document.getElementById('vi').getBoundingClientRect().top - document.querySelector('#dlg [role=dialog]').getBoundingClientRect().top);
-  check(cropped.h <= btnTop && cropped.h > 100, `and its picture stops above the row of buttons at its foot (${cropped.h} px of ${Math.round(full + 120)}, buttons at ${Math.round(btnTop)})`);
-  const rect = await page.evaluate(() => window.__simplDialog.rect());
-  await page.evaluate(() => window.__simplDialog.show(false));
-  check(rect && rect.w > 10 && rect.h > 10 && (await page.evaluate(() => getComputedStyle(document.querySelector('#dlg [role=dialog]')).visibility)) === 'hidden',
-    'the app is told where it is (for its picture of it), and it is hidden in the page while the app shows it');
+  check(await vis('#vi'), 'it stays in sight in the page until the app says it shows it');
+  await page.evaluate(() => window.__simplDialog.hide());
+  check((await page.evaluate(() => getComputedStyle(document.querySelector('#dlg [role=dialog]')).visibility)) === 'hidden', 'and is hidden in the page while the app shows it');
+  // (1.3.83) hidden, it still reads as it is: never passed again (before, its words read as nothing once hidden)
+  const nh = (await posts()).length;
+  await page.waitForTimeout(1500);
+  const again = (await posts()).slice(nh).filter((p) => p.kind === 'dialog');
+  check(again.length === 0, `hidden in the page, it is not passed again, emptied (${again.length} more)`);
   await page.evaluate(() => { document.getElementById('vi').onclick = () => document.getElementById('dlg').remove(); });
   const np = (await posts()).length;
   check(await page.evaluate(() => window.__simplDialog.press(0)), 'the app’s button presses Alta’s');
   await waitFor((p, k) => k >= np && p.kind === 'dialog' && p.open === false, 'the pop-up gone');
   check(!(await page.$('#dlg')) && !(await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-native-dialog'))), 'and when it closes, the app is told and the page left as it was');
+  // (1.3.83) Alta's "Knewton Alta" pop-up as Material draws it: fading in, a spinner until its body comes 1.2 s later — words
+  // in bold and italic, a list with a link, a formula as MathJax 2 sets one and one as KaTeX does, a picture that takes a
+  // moment, a drawing from the page's sprite sheet — an ×, Back (greyed) and Next. Passed once it has settled, whole.
+  const nr0 = (await posts()).length;
+  const t0 = Date.now();
+  await page.evaluate(() => window.mockRichDialog(1200));
+  const rd = await waitFor((p, k) => k >= nr0 && p.kind === 'dialog' && p.open, 'the rich pop-up', 80);
+  const waited = Date.now() - t0;
+  check(waited >= 1500 && (await posts()).slice(nr0).filter((p) => p.kind === 'dialog').length === 1, `passed once, only when its body is in and its picture loaded (${waited} ms after it opened, its spinner first)`);
+  check(rd.title === 'Knewton Alta' && !/Knewton Alta/.test(rd.html), `its title from what names it, not again in its body (“${rd.title}”)`);
+  check(/<i>you<\/i>/.test(rd.html) && /<b>mastered<\/b>/.test(rd.html) && /<ul><li>Answer the question on screen\.<\/li><li>Stuck\? <a href="simpl-link:0">More Instruction<\/a> explains it\.<\/li><\/ul>/.test(rd.html),
+    'its words as they read: italic, bold, a list with its link');
+  check(rd.html.includes('\\(\\frac{d}{dx}x^2 = 2x\\)') && rd.html.includes("\\(f'(x) = 2x\\)") && rd.maths === 2 && !/MathJax|d\/dx x/.test(rd.html),
+    `its formulas as their TeX — MathJax's own script, KaTeX's annotation — never their drawn copies (${rd.maths})`);
+  check(/<img src="http:\/\/localhost:\d+\/mock-alta\/tangent\.svg" width="220" height="120" alt="A tangent line touching a curve">/.test(rd.html) && /<svg[^>]*class="simpl-drawing"><defs><symbol id="alta-bulb"/.test(rd.html) && rd.pics === 2,
+    'its picture by its address, its drawing as itself with the symbol it draws from');
+  check(JSON.stringify(rd.buttons) === JSON.stringify([{ label: 'Close', primary: false, enabled: true, close: true }, { label: 'Back', primary: false, enabled: false, close: false }, { label: 'Next', primary: true, enabled: true, close: false }]) && rd.ready === 'settled',
+    `every one of its buttons: its × as Close, Back greyed out, Next Alta's main one (${JSON.stringify(rd.buttons)})`);
+  check((await page.evaluate(() => window.__simplDialog.link(0))) === '' && (await page.evaluate(() => location.hash)) === '#more-instruction', 'a link in it is followed in Alta’s page');
+  await page.evaluate(() => window.__simplDialog.hide());
+  // (a next step: passed again as it comes, the same pop-up)
+  const ns = (await posts()).length;
+  check(await page.evaluate(() => window.__simplDialog.press(2)), 'the app’s Next presses Alta’s');
+  const s2 = await waitFor((p, k) => k >= ns && p.kind === 'dialog' && p.open, 'the next step', 40);
+  check(/<h3>You are all set<\/h3>/.test(s2.html) && s2.buttons.map((b) => b.label + (b.enabled ? '' : '·off')).join() === 'Close,Back,Got it' && s2.buttons[2].primary,
+    `its next step is passed as it comes, its words and buttons (${s2.buttons.map((b) => b.label).join(', ')})`);
+  const ng = (await posts()).length;
+  await page.evaluate(() => window.__simplDialog.press(2));
+  await waitFor((p, k) => k >= ng && p.kind === 'dialog' && p.open === false, 'the rich pop-up closed');
+  check(!(await page.$('#rdlg')), 'Got it closes it');
+  // (1.3.83) a pop-up the app cannot draw as its own is given back to Alta's page — shown as it is, in sight, the focus
+  // lifted — and the app told why; once it closes, the question alone again
+  for (const [open, id, said, why] of [['mockVideoDialog', 'vdlg', 'Watch this first', /a video/], ['mockFrameDialog', 'fdlg', 'Chat with us', /a frame of another site/], ['mockBareDialog', 'bdlg', 'Are you still there?', /nothing in it could be read/]]) {
+    const nv = (await posts()).length;
+    await page.evaluate((f) => window[f](), open);
+    const vp = await waitFor((p, k) => k >= nv && p.kind === 'dialog' && p.open, `the pop-up (${id})`, 50);
+    await page.waitForTimeout(300);
+    const asIs = await page.evaluate(() => ({ q: document.documentElement.hasAttribute('data-simpl-q'), shown: document.documentElement.hasAttribute('data-simpl-shown'), hidden: document.documentElement.hasAttribute('data-simpl-native-dialog') }));
+    check(vp.inPage === true && why.test(vp.why) && vp.title === said && !asIs.q && asIs.shown && !asIs.hidden && (await vis('#' + id)) && (await vis('header')),
+      `a pop-up the app cannot show whole is given back to Alta’s page, shown as it is (“${vp.title}”: ${vp.why})`);
+    const nc = (await posts()).length;
+    await page.evaluate((i) => document.querySelector('#' + i + ' .shut').click(), id);
+    await waitFor((p, k) => k >= nc && p.kind === 'dialog' && p.open === false, `the pop-up (${id}) closed`);
+    await page.waitForTimeout(400);
+    check((await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))) && !(await vis('header')) && (await vis('#asks')), 'once it closes, the question is shown alone again');
+  }
+  // (and the student's Show in Alta's Page: the same)
+  const na = (await posts()).length;
+  await page.evaluate(() => window.mockDialog());
+  await waitFor((p, k) => k >= na && p.kind === 'dialog' && p.open && !p.inPage && /Having trouble/.test(p.html || ''), 'the pop-up again');
+  const nb2 = (await posts()).length;
+  await page.evaluate(() => { window.__simplDialog.hide(); window.__simplDialog.giveBack(); });
+  const gb = await waitFor((p, k) => k >= nb2 && p.kind === 'dialog' && p.inPage, 'the pop-up given back');
+  check(gb.why === 'the student asked for it' && (await vis('#vi')) && !(await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))), 'Show in Alta’s Page gives it back to the page, in sight');
+  await page.evaluate(() => document.getElementById('dlg').remove());
+  await page.waitForTimeout(700);
+  // (1.3.83) Show Browser: Alta's own page as Alta draws it — nothing hidden, its buttons and panels not the app's, never
+  // out of sight (not even between parts), its pop-ups its own and a pop-up the app was showing given back; Dark drawing
+  // it dark; off, the question shown alone again and its pop-ups the app's
+  const nbr = (await posts()).length;
+  await page.evaluate(() => window.mockDialog());
+  await waitFor((p, k) => k >= nbr && p.kind === 'dialog' && p.open && !p.inPage, 'a pop-up for the app');
+  await page.evaluate(() => { window.__simplDialog.hide(); window.__simplBrowser = true; window.__simplBrowserNow(); });
+  await page.waitForTimeout(500);
+  const br = await page.evaluate(() => ({ q: document.documentElement.hasAttribute('data-simpl-q'), shown: document.documentElement.hasAttribute('data-simpl-shown'), hidden: document.documentElement.hasAttribute('data-simpl-native-dialog'), bar: !!document.querySelector('[data-simpl-bar]') }));
+  const brPosts = (await posts()).slice(nbr);
+  const brLast = (kind) => brPosts.filter((p) => p.kind === kind).pop();
+  check(!br.q && br.shown && !br.hidden && !br.bar && (await vis('header')) && (await vis('h1')) && (await vis('#submit')) && (await vis('#vi')) && brLast('dialog').open === false
+    && brLast('buttons').items.length === 0 && brLast('panels').panels.length === 0,
+    'with Show Browser, Alta’s page is shown whole as Alta draws it — its header, its own buttons, its pop-up — and the app’s sheet, buttons and panels are put away');
+  await page.evaluate(() => { window.__simplDark = true; window.__simplFocusDark(); });
+  const brDark = await page.evaluate(() => getComputedStyle(document.documentElement).filter);
+  await page.evaluate(() => { window.__simplDark = false; window.__simplFocusDark(); });
+  check(/invert\(0\.92\)/.test(brDark), `and Dark draws it dark (${brDark})`);
+  const nq = (await posts()).length;
+  await page.evaluate(() => { window.__brq = document.getElementById('qsec'); window.__brq.remove(); });
+  await page.waitForTimeout(1200);
+  check(!(await posts()).slice(nq).some((p) => p.kind === 'hidden' || (p.kind === 'dialog' && p.open)) && (await page.evaluate(() => getComputedStyle(document.body).opacity)) === '1',
+    'between parts it stays in sight, and its pop-up stays its own');
+  await page.evaluate(() => { document.querySelector('[class*="learn-flow-body"]').appendChild(window.__brq); });
+  const nf = (await posts()).length;
+  await page.evaluate(() => { window.__simplBrowser = false; window.__simplBrowserNow(); });
+  const backDlg = await waitFor((p, k) => k >= nf && p.kind === 'dialog' && p.open && !p.inPage, 'the pop-up the app’s again', 40);
+  await page.waitForTimeout(300);
+  check(!!backDlg && (await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))) && !(await vis('header')) && (await vis('#asks')),
+    'Show Browser off: the question shown alone again, the pop-up the app’s again');
+  await page.evaluate(() => document.getElementById('dlg').remove());
+  await page.waitForTimeout(700);
   // (the page's sprite sheet — an svg of symbols its pictures, a pop-up's among them, draw from — is never hidden)
   await page.evaluate(() => { const d = document.createElement('div'); d.innerHTML = '<svg id="sprite" style="position:absolute;width:0;height:0"><defs><symbol id="intro"><circle r="5"/></symbol></defs></svg>'; document.body.appendChild(d); });
   await page.waitForTimeout(500);
@@ -251,6 +340,16 @@ try {
   await page.waitForTimeout(1200);
   const ldShown = (await posts()).slice(nld).some((p) => p.kind === 'shown');
   check(!!ldh && !ldShown && !(await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-shown'))), 'a loading part is recognised: kept out of sight, never shown');
+  // (1.3.83) the empty pop-up: Alta's pop-up coming while its page is out of sight (loading) — 1.3.51–1.3.82 pictured it
+  // see-through, the app's sheet empty — is passed whole all the same, its words read from the page as it is
+  const nw = (await posts()).length;
+  await page.evaluate(() => { const d = document.createElement('div'); d.id = 'wdlg'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-labelledby', 'wt'); d.style.cssText = 'position:fixed;top:20%;left:30%;width:420px;background:#fff;padding:20px'; d.innerHTML = '<h2 id="wt">Knewton Alta</h2><p>Your work is saved as you go.</p><button id="wgot">Got it</button>'; document.body.appendChild(d); document.getElementById('wgot').onclick = () => d.remove(); });
+  const wd = await waitFor((p, k) => k >= nw && p.kind === 'dialog' && p.open, 'the pop-up over the loading page', 40);
+  const veiled = await page.evaluate(() => getComputedStyle(document.body).opacity);
+  check(!wd.inPage && wd.title === 'Knewton Alta' && /<p>Your work is saved as you go\.<\/p>/.test(wd.html) && wd.buttons.map((b) => b.label).join() === 'Got it' && veiled === '0',
+    `a pop-up over Alta’s page while it is out of sight is passed whole — its title, its words, its Got it (page opacity ${veiled}: ${wd.html})`);
+  await page.evaluate(() => window.__simplDialog.press(0));
+  await waitFor((p, k) => k >= nw && p.kind === 'dialog' && p.open === false, 'the pop-up over the loading page closed');
   const nld2 = (await posts()).length;
   await page.evaluate(() => { document.getElementById('ldsec').remove(); window.__flow.appendChild(window.__q); });
   const ldBack = await waitFor((p, k) => k >= nld2 && p.kind === 'shown', 'the question shown once loaded', 60);
@@ -264,6 +363,17 @@ try {
   check(await page.evaluate(() => window.__simplAlta === undefined && !document.getElementById('simpl-theme')), 'it gives the app no hands in the page and no style of its own');
   const fo = await waitFor((p) => p.kind === 'focus', 'how the overview is shown');
   check(fo.state === 'overview' && !(await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))), 'the overview is recognised and shown as it is (no Error Logs for it)');
+  // (1.3.83) Dark picked: Alta's page as it is (here its overview) drawn dark — its colours turned round, its pictures kept
+  // — unless it has a dark look of its own; and light again on Light
+  await waitFor((p) => p.kind === 'shown', 'the overview in sight');
+  await page.evaluate(() => { document.body.style.background = '#16181c'; window.__simplDark = true; window.__simplFocusDark(); });
+  const own = await page.evaluate(() => ({ whole: document.documentElement.hasAttribute('data-simpl-whole-dark'), f: getComputedStyle(document.documentElement).filter }));
+  await page.evaluate(() => { document.body.style.background = ''; window.__simplFocusDark(); document.body.insertAdjacentHTML('beforeend', '<img id="dkimg" width="8" height="8" src="data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs=">'); });
+  const wdk = await page.evaluate(() => ({ whole: document.documentElement.hasAttribute('data-simpl-whole-dark'), f: getComputedStyle(document.documentElement).filter, img: getComputedStyle(document.getElementById('dkimg')).filter }));
+  await page.evaluate(() => { window.__simplDark = false; window.__simplFocusDark(); document.getElementById('dkimg').remove(); });
+  const lt = await page.evaluate(() => getComputedStyle(document.documentElement).filter);
+  check(!own.whole && own.f === 'none' && wdk.whole && /invert\(0\.92\)/.test(wdk.f) && /invert\(1\)/.test(wdk.img) && lt === 'none',
+    `in Dark, Alta's page as it is is drawn dark, its pictures kept (${wdk.f} · ${wdk.img}), not a page dark of its own, and light again on Light`);
 
   // the student starts it on Alta's own page
   await page.click('#start');

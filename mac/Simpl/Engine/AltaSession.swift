@@ -33,17 +33,23 @@ enum AltaHook {
       // shows its own Loading meanwhile. A page that is not Alta's (the launch on the way to it) is shown at once.
       var reveal = function () {};
       var veilAgain = function () {};
+      // (1.3.83) the page's look told again — light or dark, as the student picks it — once it is in sight
+      var lookNow = function () {};
+      // (1.3.83) a pop-up of Alta's given back to its page — what it holds the app cannot draw as its own, or the student
+      // asked — shown there as Alta draws it: Alta's page as it is, in sight under it, until it closes
+      var dialogInPage = false;
       if (window.top === window) {
         var showing = false, firstVeil = 0;
         var veils = /knewton|alta/i.test(location.hostname + location.pathname);
         reveal = function (how) {
           if (firstVeil) { clearTimeout(firstVeil); firstVeil = 0; }
           if (document.documentElement) document.documentElement.setAttribute('data-simpl-shown', '');
+          lookNow();
           if (!showing) { showing = true; post({ kind: 'shown', how: how || '' }); }
         };
         // (1.3.62) out of sight again — Alta between one part and the next, taking its time — until the next is laid out
         veilAgain = function () {
-          if (!veils || !showing) return;
+          if (!veils || !showing || dialogInPage || window.__simplBrowser) return;
           if (document.documentElement) document.documentElement.removeAttribute('data-simpl-shown');
           showing = false;
           post({ kind: 'hidden' });
@@ -326,7 +332,7 @@ enum AltaHook {
             flow: flow ? [].slice.call(flow.children).slice(0, 14).map(function (k) { return lab(k) + (shown(k) ? '' : ' (unseen)'); }) : null,
             main: !flow && main ? [].slice.call(main.querySelectorAll('*')).filter(function (e) { return e.children.length > 1 && shown(e); }).slice(0, 12).map(lab) : null,
             buttons: all('button, [role="button"], a[href]').filter(shown).map(function (b) { return norm(b.innerText || b.textContent || b.getAttribute('aria-label')).slice(0, 40); }).filter(Boolean).slice(0, 30),
-            dialogs: all('[role="dialog"], [role="alertdialog"], .MuiModal-root').filter(shown).length
+            dialogs: all(DIALOG_SEL + ', .MuiModal-root').filter(shown).length
           };
         };
         var marked = [], keptNow = [];
@@ -334,6 +340,7 @@ enum AltaHook {
           marked.forEach(function (m) { m[0].removeAttribute(m[1]); });
           marked = []; keptNow = [];
           document.documentElement.removeAttribute('data-simpl-q');
+          lookNow(); // (1.3.83: Alta's page as it is, dark too when Dark is picked, from the moment it is)
         };
         var mark = function (el, a) { if (!el.hasAttribute(a)) { el.setAttribute(a, ''); marked.push([el, a]); } };
         // (1.3.62) a graph or drawing in a part: a graph's box by its name, or an SVG at least 140 × 100 — the outermost
@@ -415,12 +422,34 @@ enum AltaHook {
           dark();
         };
         // (1.3.50) light or dark as the app is: the app sets window.__simplDark (before the page, and again when it changes)
+        // (1.3.83) as the student picks it above the objectives: light unless Dark is picked. Dark lays the parts kept on
+        // dark glass, turned over, as 1.3.50 did; and draws Alta's page as it is (not recognised, or under a pop-up of
+        // Alta's given back to it) dark as a tool's page is drawn dark (ToolDarkPage) — its colours turned round, its
+        // pictures, videos and frames kept as they are — unless it has a dark look of its own (a dark ground, or a colour
+        // scheme it says can be dark), which is told once the page is in sight and out of the focus, its own ground then
+        // reading as it is
+        var LOOK = 'html[data-simpl-dark][data-simpl-whole-dark]:not([data-simpl-q]) { filter: invert(.92) hue-rotate(180deg) !important; background: #fff !important; }\n'
+          + 'html[data-simpl-dark][data-simpl-whole-dark]:not([data-simpl-q]) :is(img, video, canvas, embed, object, iframe, svg image, [style*="background-image"]) { filter: invert(1) hue-rotate(180deg) !important; }\n';
+        var lum = function (c) { var m = String(c || '').match(/\d+(\.\d+)?/g); if (!m || m.length < 3 || (m.length > 3 && +m[3] === 0)) return null; return (0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2]) / 255; };
+        var lightPage = function () {
+          var meta = document.querySelector('meta[name="color-scheme"]');
+          if (meta && /dark/i.test(meta.content || '')) return false;
+          var b = document.body ? lum(getComputedStyle(document.body).backgroundColor) : null;
+          var h = lum(getComputedStyle(document.documentElement).backgroundColor);
+          var v = b !== null ? b : (h !== null ? h : 1);
+          return v > 0.55;
+        };
         var dark = function () {
-          if (!document.documentElement) return;
-          document.documentElement.toggleAttribute('data-simpl-dark', !!window.__simplDark);
-          document.documentElement.toggleAttribute('data-simpl-pics-light', !!window.__simplPicsLight); // (1.3.70)
+          var de = document.documentElement;
+          if (!de) return;
+          de.toggleAttribute('data-simpl-dark', !!window.__simplDark);
+          de.toggleAttribute('data-simpl-pics-light', !!window.__simplPicsLight); // (1.3.70)
+          if (!window.__simplDark) { de.removeAttribute('data-simpl-whole-dark'); return; }
+          if (!document.getElementById('simpl-look')) { var st = document.createElement('style'); st.id = 'simpl-look'; st.textContent = LOOK; (document.head || de).appendChild(st); }
+          if (!de.hasAttribute('data-simpl-whole-dark') && de.hasAttribute('data-simpl-shown') && !de.hasAttribute('data-simpl-q') && lightPage()) de.setAttribute('data-simpl-whole-dark', '');
         };
         window.__simplFocusDark = dark;
+        lookNow = dark;
         // ---- (1.3.53) the parts' panels and their buttons, for the app ----
         // Each part kept is a card: what a question asks (its heading and words) and its answer (Learnosity's box and
         // what follows) are told to the app as two panels — a lesson as one — in the page's own coordinates, with the
@@ -501,69 +530,387 @@ enum AltaHook {
           told = state;
           post({ kind: 'focus', state: state, reason: (r && r.reason) || '', shape: /^(question|lesson|overview)$/.test(state) ? null : shape(r || {}) });
         };
-        // ---- (1.3.51) Alta's pop-ups as the Mac's own: each one open passed to the app — its title, words and buttons,
-        // and where it is, for a picture of it as Alta draws it — and hidden in the page while the app shows it; the
-        // app's buttons press Alta's ----
-        var dialogSig = '', dialogEl = null;
+        // ---- (1.3.51) Alta's pop-ups as the Mac's own: each one open passed to the app and hidden in the page while the
+        // app shows it, the app's buttons pressing Alta's ----
+        // (1.3.83) Read whole, once it has settled. 1.3.51–1.3.82 passed a pop-up as soon as it was seen and the app showed
+        // a picture of it taken in the page: one that came while Alta's page was still out of sight (its learn page
+        // loading, or between parts: `body` see-through) was pictured see-through, and the app's sheet showed its title
+        // and its buttons round an empty picture; once the app had hidden it, its words read as nothing and it was
+        // passed again. Now a pop-up — a dialog by its role, one marked modal, or Material's, React Toolbox's or
+        // react-modal's own box, in the page or in a web component's own tree, the innermost — is read with the app's
+        // hiding lifted for that moment (no paint comes between), and passed once it has settled: nothing it says changed
+        // for a moment, nothing in it still loading (a spinner, a picture not in yet), its fade done — three seconds at
+        // most — and again whenever what it says changes (a next step). It is passed as its title (what names it, else a
+        // heading it opens with), its body as plain HTML the app draws as its own words (paragraphs, headings, lists,
+        // tables, links, bold and italic; each formula as its TeX — MathJax's own script or record, KaTeX's or MathML's
+        // annotation, the formula's attribute — else as MathML; a picture by its address, a drawing as itself, a canvas
+        // as its picture), and every one of its buttons, whatever it says: its words, whether Alta makes it the main one,
+        // whether it can be pressed, a close button (an ×) told apart. A pop-up the app cannot draw as its own — it holds
+        // a video, a form, a frame of another site's, a picture or formula that cannot be read — or one with nothing in
+        // it to read, or still loading after three seconds, is never shown as an empty sheet: it is given back to Alta's
+        // page, which the app shows as it is, in sight, until the pop-up closes.
+        var DIALOG_SEL = '[role="dialog"], [role="alertdialog"], dialog[open], [aria-modal="true"], .MuiDialog-paper, [data-react-toolbox="dialog"], .ReactModal__Content, mat-dialog-container, .modal.show .modal-content, .modal.in .modal-content';
+        var BTN = 'button, [role="button"], input[type="button"], input[type="submit"], input[type="reset"], a[href][class*="btn" i], a[href][class*="button" i]';
+        var MATHS = '.MathJax_Display, .MathJax_SVG_Display, .MathJax, .MathJax_CHTML, .MathJax_SVG, mjx-container, .katex-display, .katex, math, .mq-math-mode, [data-latex], [data-tex]';
+        var HEADING = 'h1, h2, h3, h4, h5, h6, [role="heading"], [class*="DialogTitle"], [class*="title" i]';
+        var KEEP_TAGS = /^(p|h[1-6]|ul|ol|li|table|thead|tbody|tfoot|tr|td|th|b|strong|i|em|u|sup|sub|code|pre|blockquote|dl|dt|dd|s|small|mark|figure|figcaption)$/;
+        var dialogEl = null, dialogHolder = null, dialogSaid = '', dialogRead = '', dialogDirty = 0, dialogWaiting = 0, dialogReadAt = 0, dialogTicks = 0;
+        var dialogBtns = [], dialogLinks = [], dialogHosts = [];
+        var esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+        var styleOf = function (el) { return (el.ownerDocument.defaultView || window).getComputedStyle(el); };
+        // (the app's own hiding lifted for the moment a pop-up is looked at and read, so one the app is showing reads as
+        // it is — hidden, its words read as nothing)
+        var unhidden = function (fn) {
+          var de = document.documentElement, on = de.hasAttribute('data-simpl-native-dialog');
+          if (on) de.removeAttribute('data-simpl-native-dialog');
+          try { return fn(); } finally { if (on) de.setAttribute('data-simpl-native-dialog', ''); }
+        };
+        // (how see-through it is with what holds it: its fade, its holder's — never the page's veil, the app's own)
+        var opacityOf = function (el) {
+          var o = 1;
+          for (var x = el; x && x !== document.body && x !== document.documentElement; x = x.parentElement || (x.parentNode && x.parentNode.host) || null) o *= parseFloat(styleOf(x).opacity);
+          return isFinite(o) ? o : 1;
+        };
+        var fading = function (el) {
+          try {
+            return el.getAnimations({ subtree: true }).some(function (a) { var t = a.effect && a.effect.getComputedTiming ? a.effect.getComputedTiming() : null; return a.playState === 'running' && !!t && isFinite(t.endTime); });
+          } catch (e) { return false; }
+        };
+        // (what holds a pop-up in the page — its backdrop with it — out of a web component's own tree to its host; a
+        // wrapper of no kind of its own only when it is the page's own layer over the rest)
+        var holderOf = function (d) {
+          var x = d;
+          while (x.getRootNode && x.getRootNode() !== document && x.getRootNode().host) x = x.getRootNode().host;
+          var h = x.closest('.MuiModal-root, .MuiDialog-root, [data-react-toolbox="portal"], .ReactModalPortal, .cdk-overlay-container, .modal');
+          if (h) return h;
+          var p = x.closest('[role="presentation"]');
+          return p && (p.parentElement === document.body || styleOf(p).position === 'fixed') ? p : x;
+        };
+        var dialogOpen = function (d) {
+          var r = d.getBoundingClientRect();
+          return r.width >= 60 && r.height >= 36 && styleOf(d).visibility !== 'hidden' && opacityOf(d) > 0.02;
+        };
+        // (the one open now: the last, the innermost of those nested; a web component's own trees looked in every fourth
+        // time, or every time while one there is open)
         var dialogNow = function () {
-          var ds = all('[role="dialog"], [role="alertdialog"], dialog[open]').filter(function (d) {
-            return shown(d) && (txt(d).length > 0 || d.querySelector('button, svg, img'));
-          });
+          dialogTicks++;
+          var inside = dialogTicks % 4 === 1 || !!(dialogEl && dialogEl.isConnected && dialogEl.getRootNode() !== document);
+          var ds = inside ? deep(DIALOG_SEL) : all(DIALOG_SEL);
+          if (inside) dialogHosts = ds.filter(function (d) { return d.getRootNode() !== document; }).map(holderOf);
+          if (!ds.length) return null;
+          ds = unhidden(function () { return ds.filter(dialogOpen); });
+          ds = ds.filter(function (d) { return !ds.some(function (e) { return e !== d && d.contains(e); }); });
           return ds[ds.length - 1] || null;
         };
-        var dialogButtons = function (d) {
-          return [].slice.call(d.querySelectorAll('button, [role="button"], a[href]')).filter(shown).map(function (b) {
-            return { el: b, label: String(b.innerText || b.textContent || b.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim() };
-          }).filter(function (x) { return x.label; });
+        // (Alta's pop-ups kept in sight with the parts the focus keeps, whatever the page is doing — before, one that came
+        // between parts was hidden with the rest of the page until the page was given back as it is)
+        var keepDialogs = function () {
+          if (!document.documentElement.hasAttribute('data-simpl-q')) return;
+          all(DIALOG_SEL).map(holderOf).concat(dialogHosts).forEach(function (h) {
+            if (!h.isConnected || h === document.body || h === document.documentElement || h.closest('[data-simpl-keep]')) return;
+            mark(h, 'data-simpl-keep');
+            for (var x = h.parentElement; x && x !== document.documentElement; x = x.parentElement) mark(x, 'data-simpl-path');
+          });
         };
-        var DIALOG_CSS = 'html[data-simpl-native-dialog] [data-simpl-dialog] { visibility: hidden !important; }\n'
-          // (1.3.54) its picture taken without its buttons — the app's sheet has them as its own
-          + 'html[data-simpl-dialog-shot] [data-simpl-dialog] :is(button, [role="button"]) { visibility: hidden !important; }\n';
+        // (an element's words as they show, its buttons' left out)
+        var wordsOf = function (el) {
+          var w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), n, out = [];
+          while ((n = w.nextNode())) {
+            var p = n.parentElement;
+            if (!n.data.trim() || !p || p.closest('script, style, template, noscript, ' + BTN) || !p.getClientRects().length) continue;
+            out.push(n.data);
+          }
+          return out.join(' ').replace(/\s+/g, ' ').trim();
+        };
+        var firstWords = function (d) {
+          var w = document.createTreeWalker(d, NodeFilter.SHOW_TEXT), n;
+          while ((n = w.nextNode())) {
+            var p = n.parentElement;
+            if (!n.data.trim() || !p || p.closest('script, style, template, noscript, ' + BTN) || !p.getClientRects().length) continue;
+            return p;
+          }
+          return null;
+        };
+        var titleOf = function (d) {
+          var by = d.getAttribute('aria-labelledby'), root = d.getRootNode(), t = by && root.getElementById ? root.getElementById(by.split(' ')[0]) : null;
+          if (t && wordsOf(t)) return { el: d.contains(t) ? t : null, text: wordsOf(t) };
+          if ((d.getAttribute('aria-label') || '').trim()) return { el: null, text: d.getAttribute('aria-label').trim() };
+          var h = d.querySelector(HEADING), first = firstWords(d);
+          if (h && first && h.contains(first) && wordsOf(h).length <= 160) return { el: h, text: wordsOf(h) };
+          return { el: null, text: '' };
+        };
+        // (every button of its own, in its order, in its web components' trees too: a close button — an icon named
+        // Close, or a ×, with no words of its own — told apart)
+        var buttonsOf = function (d) {
+          var found = [];
+          var visit = function (root) {
+            [].forEach.call(root.querySelectorAll(BTN), function (b) { if (found.indexOf(b) < 0) found.push(b); });
+            [].forEach.call(root.querySelectorAll('*'), function (el) { if (el.shadowRoot) visit(el.shadowRoot); });
+          };
+          visit(d);
+          if (d.shadowRoot) visit(d.shadowRoot);
+          var out = [];
+          found.forEach(function (b) {
+            if (!b.getClientRects().length || (b.parentElement && b.parentElement.closest(BTN))) return;
+            var cs = styleOf(b);
+            if (cs.visibility === 'hidden' || cs.display === 'none') return;
+            var words = String(b.innerText || b.value || '').replace(/\s+/g, ' ').trim();
+            var named = String(b.getAttribute('aria-label') || b.getAttribute('title') || '').replace(/\s+/g, ' ').trim();
+            var close = (!words || /^[×✕✖xX]$/.test(words)) && /close|dismiss|×|✕/i.test(named + ' ' + words);
+            var label = close ? 'Close' : (words || named);
+            if (!label) return;
+            var cls = String(b.className && b.className.baseVal !== undefined ? b.className.baseVal : b.className || '');
+            out.push({ el: b, label: label.slice(0, 60), close: close,
+              primary: /(contained|raised|button-primary|btn-primary|__primary|-primary)/i.test(cls) && !/flat|outlined/i.test(cls),
+              enabled: !b.disabled && b.getAttribute('aria-disabled') !== 'true' });
+          });
+          return out;
+        };
+        // (a formula's TeX, from wherever it is kept beside what was drawn)
+        var texOf = function (m) {
+          var a = m.getAttribute('data-latex') || m.getAttribute('data-tex');
+          if (a) return { tex: a, display: false };
+          var shows = m.matches('.MathJax_Display, .MathJax_SVG_Display, .katex-display') || (m.tagName.toLowerCase() === 'math' && m.getAttribute('display') === 'block');
+          // (MathJax 2: the formula's own script, beside what it drew)
+          var f = m.matches('.MathJax_Display, .MathJax_SVG_Display') ? (m.querySelector('[id$="-Frame"]') || m) : m;
+          var root = m.getRootNode().getElementById ? m.getRootNode() : m.ownerDocument;
+          var s = f.id && /-Frame$/.test(f.id) ? root.getElementById(f.id.replace(/-Frame$/, '')) : null;
+          if (s && /^math\/tex/i.test(s.type || '')) return { tex: s.textContent, display: shows || /mode\s*=\s*display/i.test(s.type) };
+          // (MathJax 3: the formula it typeset there)
+          try {
+            var doc = window.MathJax && window.MathJax.startup && window.MathJax.startup.document;
+            var items = doc && doc.getMathItemsWithin ? doc.getMathItemsWithin(m) : [];
+            if (items && items.length && /tex/i.test((items[0].inputJax && items[0].inputJax.name) || '')) return { tex: items[0].math, display: !!items[0].display };
+          } catch (e) {}
+          // (KaTeX, and MathML with its TeX beside it)
+          var ann = m.querySelector('annotation[encoding="application/x-tex"]');
+          if (ann) return { tex: ann.textContent, display: shows };
+          // (MathQuill's own copy of its LaTeX)
+          var mq = m.matches('.mq-math-mode') ? m.querySelector('.mq-selectable') : null;
+          if (mq) return { tex: mq.textContent.replace(/^\$+|\$+$/g, ''), display: false };
+          return null;
+        };
+        // (its body: all of it but its title, its buttons left out — theirs are the app's; in a frame of the page's own
+        // site, the frame's page read too)
+        var readDialog = function (d) {
+          var t = titleOf(d), btns = buttonsOf(d);
+          var out = { title: t.text, words: 0, maths: 0, pics: 0, live: '', loading: false };
+          var links = [];
+          // (typeset by the app with the KaTeX it carries: \( \) in a line, \[ \] on a line of its own)
+          var formula = function (tex, display) {
+            out.maths++;
+            tex = String(tex).trim();
+            return display ? '<p>\\[' + esc(tex) + '\\]</p>' : '\\(' + esc(tex) + '\\)';
+          };
+          // (a copy with nothing in it that runs)
+          var clean = function (c) {
+            [].forEach.call(c.querySelectorAll('script, foreignObject, annotation, annotation-xml'), function (x) { x.remove(); });
+            [c].concat([].slice.call(c.querySelectorAll('*'))).forEach(function (x) { [].slice.call(x.attributes).forEach(function (a) { if (/^on/i.test(a.name)) x.removeAttribute(a.name); }); });
+            return c;
+          };
+          // (a drawing as itself, with what it draws from elsewhere in the page — a sprite sheet's symbol — brought in)
+          var drawing = function (n, r) {
+            var c = clean(n.cloneNode(true)), ids = {}, defs = null, root = n.getRootNode();
+            [].forEach.call(c.querySelectorAll('[id]'), function (x) { ids[x.id] = 1; });
+            [].forEach.call(c.querySelectorAll('use'), function (u) {
+              var h = u.getAttribute('href') || u.getAttribute('xlink:href') || '';
+              if (h.charAt(0) !== '#' || ids[h.slice(1)]) return;
+              var src = (root.getElementById ? root.getElementById(h.slice(1)) : null) || document.getElementById(h.slice(1));
+              if (!src) return;
+              if (!defs) { defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs'); c.insertBefore(defs, c.firstChild); }
+              defs.appendChild(clean(src.cloneNode(true)));
+              ids[h.slice(1)] = 1;
+            });
+            c.setAttribute('width', String(Math.round(r.width)));
+            c.setAttribute('height', String(Math.round(r.height)));
+            if (r.width >= 40 && r.height >= 40) c.setAttribute('class', 'simpl-drawing');
+            out.pics++;
+            return c.outerHTML;
+          };
+          var kids = function (n) {
+            var list = n.shadowRoot ? n.shadowRoot.childNodes : (n.tagName === 'SLOT' ? n.assignedNodes({ flatten: true }) : n.childNodes), s = '';
+            for (var i = 0; i < list.length; i++) s += walk(list[i]);
+            return s;
+          };
+          var walk = function (n) {
+            if (n.nodeType === 3) { var w = n.data.trim(); if (w) out.words += w.split(/\s+/).length; return esc(n.data); }
+            if (n.nodeType !== 1 || n === t.el) return '';
+            var tag = n.tagName.toLowerCase();
+            if (/^(script|style|template|noscript|link|meta|title)$/.test(tag)) {
+              // (MathJax 2's formula not set yet: its script is all there is of it)
+              var root = n.getRootNode().getElementById ? n.getRootNode() : n.ownerDocument;
+              if (tag === 'script' && /^math\/tex/i.test(n.type || '') && !(n.id && root.getElementById(n.id + '-Frame'))) return formula(n.textContent, /mode\s*=\s*display/i.test(n.type));
+              return '';
+            }
+            if (n.matches(BTN)) return '';
+            var cs = styleOf(n);
+            if (cs.display === 'none') return '';
+            if (n.matches(MATHS)) {
+              var f = texOf(n);
+              if (f && f.tex.trim()) return formula(f.tex, f.display);
+              var ml = n.matches('math') ? n : n.querySelector('math');
+              if (ml) { out.maths++; return clean(ml.cloneNode(true)).outerHTML; }
+              out.live = out.live || 'a formula that could not be read';
+              return '';
+            }
+            if (cs.visibility === 'hidden' || +cs.opacity === 0 || n.matches('.MathJax_Preview, .MJX_Assistive_MathML, .sr-only, .visually-hidden, .screenreader-only')) return '';
+            var r = n.getBoundingClientRect();
+            if ((r.width <= 1 || r.height <= 1) && cs.position === 'absolute') return '';
+            var big = r.width >= 2 && r.height >= 2;
+            if (tag === 'img') {
+              if (!n.complete) out.loading = true;
+              var src = n.currentSrc || n.src || '';
+              if (n.complete && !n.naturalWidth) return n.alt ? esc(n.alt) : '';
+              if (!big) return '';
+              if (!/^(https?:|data:image\/)/i.test(src)) { out.live = out.live || 'a picture that could not be read'; return ''; }
+              out.pics++;
+              return '<img src="' + esc(src) + '" width="' + Math.round(r.width) + '" height="' + Math.round(r.height) + '"' + (n.alt ? ' alt="' + esc(n.alt) + '"' : '') + (r.height <= 28 && cs.display.indexOf('inline') === 0 ? ' class="simpl-inline"' : '') + '>';
+            }
+            if (tag === 'svg') return big ? drawing(n, r) : '';
+            if (tag === 'canvas') {
+              if (!big) return '';
+              try { var u = n.toDataURL('image/png'); out.pics++; return '<img class="simpl-drawing" src="' + u + '" width="' + Math.round(r.width) + '" height="' + Math.round(r.height) + '">'; }
+              catch (e) { out.live = out.live || 'a drawing that could not be read'; return ''; }
+            }
+            if (/^(video|audio|object|embed)$/.test(tag)) { out.live = out.live || (tag === 'audio' ? 'a sound' : 'a video'); return ''; }
+            if (/^(input|select|textarea)$/.test(tag)) { if (!/^hidden$/i.test(n.type || '')) out.live = out.live || 'a form'; return ''; }
+            if (tag === 'iframe') {
+              var body = null;
+              try { body = n.contentDocument && n.contentDocument.body; } catch (e) {}
+              if (!body) { if (big) out.live = out.live || 'a frame of another site\u2019s'; return ''; }
+              return '<div>' + kids(body) + '</div>';
+            }
+            if (tag === 'br') return '<br>';
+            if (tag === 'hr') return '<hr>';
+            var inner = kids(n);
+            if (tag === 'a' && n.getAttribute('href')) { links.push(n); return '<a href="simpl-link:' + (links.length - 1) + '">' + inner + '</a>'; }
+            if (!inner.replace(/<[^>]*>|&nbsp;|\s/g, '') && !/<(img|hr|br|svg|math)\b/i.test(inner)) return /\s/.test(inner) ? ' ' : '';
+            var name = KEEP_TAGS.test(tag) ? tag : cs.display === 'list-item' ? 'li' : /^(block|flex|grid|table|flow-root)/.test(cs.display) ? 'div' : 'span';
+            // (bold and italic as Alta's own styles make them)
+            var up = n.parentElement ? styleOf(n.parentElement) : null, flat = !/<(div|p|ul|ol|table|h[1-6]|blockquote|pre)\b/.test(inner);
+            if (flat && !/^(b|strong|h[1-6]|th)$/.test(name) && +cs.fontWeight >= 600 && up && +up.fontWeight < 600) inner = '<b>' + inner + '</b>';
+            if (flat && !/^(i|em)$/.test(name) && cs.fontStyle === 'italic' && up && up.fontStyle !== 'italic') inner = '<i>' + inner + '</i>';
+            if (name === 'span') return inner;
+            return '<' + name + ((name === 'td' || name === 'th') && n.colSpan > 1 ? ' colspan="' + n.colSpan + '"' : '') + '>' + inner + '</' + name + '>';
+          };
+          out.html = kids(d).trim();
+          // (still loading: a spinner or a busy mark in it, or words saying so — never MathJax at work, whose TeX is read)
+          out.busy = [].some.call(d.querySelectorAll(BUSY), function (b) { return shown(b) && !b.closest('.MathJax_Processing, .MathJax, mjx-container'); })
+            || (function (w) { return w.length < 120 && /^(loading|please wait|one moment|just a moment|preparing)\b/.test(w); })(norm(d.innerText || ''));
+          out.buttons = btns.map(function (b) { return { label: b.label, primary: b.primary, enabled: b.enabled, close: b.close }; });
+          dialogBtns = btns.map(function (b) { return b.el; });
+          dialogLinks = links;
+          return out;
+        };
+        var DIALOG_CSS = 'html[data-simpl-native-dialog] [data-simpl-dialog] { visibility: hidden !important; }\n';
         var dialogStyle = function () {
           var st = document.getElementById('simpl-dialog');
           if (!st) { st = document.createElement('style'); st.id = 'simpl-dialog'; (document.head || document.documentElement).appendChild(st); }
           if (st.textContent !== DIALOG_CSS) st.textContent = DIALOG_CSS;
         };
+        // (given back to the page: shown there as Alta draws it, Alta's page as it is, in sight, until it closes — the app
+        // told, and why, for its Error Logs)
+        var giveBack = function (why) {
+          if (!dialogEl) return false;
+          var first = !dialogInPage, d = dialogEl;
+          dialogInPage = true;
+          document.documentElement.removeAttribute('data-simpl-native-dialog');
+          if (first) post({ kind: 'dialog', open: true, inPage: true, title: unhidden(function () { return titleOf(d).text; }).slice(0, 200), why: why });
+          schedule(0);
+          return true;
+        };
         var dialogTick = function () {
-          var d = dialogNow();
-          if (!d) {
-            if (dialogSig) {
-              dialogSig = ''; dialogEl = null;
+          // (1.3.83) Show Browser: Alta's pop-ups are its page's own, shown there as Alta draws them — one the app was
+          // showing given back
+          if (window.__simplBrowser) {
+            if (dialogEl || dialogSaid || dialogInPage) {
+              if (dialogHolder && dialogHolder.isConnected) dialogHolder.removeAttribute('data-simpl-dialog');
+              dialogEl = null; dialogHolder = null; dialogSaid = ''; dialogRead = ''; dialogWaiting = 0; dialogInPage = false;
+              dialogBtns = []; dialogLinks = [];
               document.documentElement.removeAttribute('data-simpl-native-dialog');
               post({ kind: 'dialog', open: false });
             }
             return;
           }
-          var bs = dialogButtons(d);
-          var title = '', by = d.getAttribute('aria-labelledby');
-          if (by) { var t = document.getElementById(by.split(' ')[0]); if (t) title = txt(t); }
-          var sig = txt(d).slice(0, 4000) + '|' + bs.map(function (x) { return x.label; }).join('|') + '|' + d.innerHTML.length;
-          if (sig === dialogSig && d === dialogEl) return;
-          dialogSig = sig; dialogEl = d;
+          var d = dialogNow();
+          if (!d) {
+            if (dialogEl || dialogSaid || dialogInPage) {
+              var was = dialogInPage;
+              if (dialogHolder && dialogHolder.isConnected) dialogHolder.removeAttribute('data-simpl-dialog');
+              dialogEl = null; dialogHolder = null; dialogSaid = ''; dialogRead = ''; dialogWaiting = 0; dialogInPage = false;
+              dialogBtns = []; dialogLinks = [];
+              document.documentElement.removeAttribute('data-simpl-native-dialog');
+              post({ kind: 'dialog', open: false });
+              if (was) schedule(); // (the page laid out again as it was before the pop-up)
+            }
+            return;
+          }
+          if (d !== dialogEl) {
+            if (dialogHolder && dialogHolder.isConnected) dialogHolder.removeAttribute('data-simpl-dialog');
+            dialogEl = d; dialogHolder = holderOf(d); dialogDirty = Date.now(); dialogSaid = ''; dialogRead = ''; dialogWaiting = 0; dialogReadAt = 0;
+          }
+          // (given back to the page: Alta's own there until it closes)
+          if (dialogInPage) return;
           dialogStyle();
-          var holder = d.closest('.MuiModal-root, [role="presentation"]') || d;
-          holder.setAttribute('data-simpl-dialog', '');
-          post({ kind: 'dialog', open: true, title: title.slice(0, 200), text: txt(d).slice(0, 2000), buttons: bs.map(function (x) { return x.label.slice(0, 60); }) });
+          if (!dialogHolder.hasAttribute('data-simpl-dialog')) dialogHolder.setAttribute('data-simpl-dialog', '');
+          // (once passed, read again when the page has changed since — a next step — or every two seconds)
+          if (dialogSaid && lastChange < dialogReadAt && Date.now() - dialogReadAt < 2000) return;
+          dialogReadAt = Date.now();
+          var r = unhidden(function () { return readDialog(d); });
+          var sig = JSON.stringify([r.title, r.html, r.buttons, r.live]);
+          if (sig !== dialogRead) { dialogRead = sig; dialogDirty = Date.now(); }
+          if (sig === dialogSaid) { dialogWaiting = 0; return; }
+          if (!dialogWaiting) dialogWaiting = Date.now();
+          var settled = Date.now() - dialogDirty >= 350 && !r.busy && !r.loading && !unhidden(function () { return fading(dialogHolder) || opacityOf(d) < 0.97; });
+          if (!settled && Date.now() - dialogWaiting < 3000) return;
+          dialogSaid = sig;
+          dialogWaiting = 0;
+          var why = r.live ? 'it holds ' + r.live
+            : !(r.words || r.maths || r.pics) ? 'nothing in it could be read'
+            : !settled && (r.busy || r.loading) ? 'it was still loading after three seconds'
+            : r.html.length > 400000 ? 'it is too long' : '';
+          if (why) { giveBack(why); return; }
+          post({ kind: 'dialog', open: true, title: r.title.slice(0, 200), html: r.html, buttons: r.buttons, words: r.words, maths: r.maths, pics: r.pics, ready: settled ? 'settled' : 'after 3 s' });
         };
-        setInterval(dialogTick, 600);
+        setInterval(dialogTick, 300);
         window.__simplDialog = {
-          // (shown in the page — for its picture, or given back — or hidden while the app shows it)
-          show: function (on) { document.documentElement.toggleAttribute('data-simpl-native-dialog', !on); return true; },
-          // (its picture: buttons hidden for the moment it is taken, and the row of them at its foot cropped off)
-          shot: function (on) { document.documentElement.toggleAttribute('data-simpl-dialog-shot', !!on); return true; },
-          rect: function () {
-            if (!dialogEl) return null;
-            var r = dialogEl.getBoundingClientRect(), bottom = r.bottom;
-            var low = dialogButtons(dialogEl).map(function (b) { return b.el.getBoundingClientRect(); })
-              .filter(function (b) { return b.height > 0 && b.top > r.top + r.height * 0.5; });
-            if (low.length) bottom = Math.min.apply(null, low.map(function (b) { return b.top; })) - 6;
-            return { x: r.left, y: r.top, w: r.width, h: Math.max(24, bottom - r.top) };
+          // (hidden in the page while the app shows it as its own)
+          hide: function () { if (!dialogEl || dialogInPage) return false; document.documentElement.setAttribute('data-simpl-native-dialog', ''); return true; },
+          // (given back to the page — the sheet's Show in Alta's Page, or the sheet put away without a button)
+          giveBack: function (why) { return giveBack(why || 'the student asked for it'); },
+          press: function (i) {
+            var b = dialogBtns[i];
+            if (!b || !b.isConnected || b.disabled || b.getAttribute('aria-disabled') === 'true') return false;
+            b.click();
+            dialogDirty = Date.now();
+            dialogReadAt = 0;
+            setTimeout(dialogTick, 60);
+            return true;
           },
-          press: function (i) { if (!dialogEl) return false; var b = dialogButtons(dialogEl)[i]; if (!b) return false; b.el.click(); return true; }
+          // (a link in its body: one to another site or a window of its own is the app's to open, in the browser; any
+          // other is followed in Alta's page, as Alta follows it)
+          link: function (i) {
+            var a = dialogLinks[i];
+            if (!a || !a.isConnected) return null;
+            if (a.target === '_blank' || (a.origin && a.origin !== location.origin)) return a.href;
+            a.click();
+            return '';
+          }
         };
         var tick = function () {
           timer = null;
           dialogTick();
+          // (1.3.83) a pop-up of Alta's given back to its page: Alta's page as it is, in sight, under it until it closes —
+          // and so with Show Browser on: Knewton Alta's own page as Alta draws it, nothing hidden, never out of sight
+          if (dialogInPage || window.__simplBrowser) {
+            badSince = 0; loadingSince = 0; steadySince = 0;
+            if (steadyTimer) { clearTimeout(steadyTimer); steadyTimer = null; }
+            unmark();
+            publish();
+            reveal(window.__simplBrowser ? 'browser' : 'dialog');
+            return;
+          }
+          keepDialogs();
           var r = read();
           // (1.3.70) a loading page, or parts that are all still loading: out of sight, waited for (twenty seconds at
           // most, then shown as it is)
@@ -584,9 +931,10 @@ enum AltaHook {
             // (Alta's pop-ups and MathJax's helpers kept with it; its Feedback — a report to Alta — and its Content
             // attribution link put away)
             // (1.3.51: and the page's sprite sheets — an <svg> of symbols its pictures draw from, a pop-up's among them)
-            var extra = all('[role="dialog"], [role="alertdialog"], body > .MuiModal-root, body > [role="presentation"], #MathJax_Hidden, #MathJax_Font_Test, #MathJax_Message')
+            // (1.3.83: each pop-up with what holds it — its backdrop, a web component's host — however it is built)
+            var extra = all(DIALOG_SEL).map(holderOf).concat(dialogHosts, all('body > .MuiModal-root, body > [role="presentation"], #MathJax_Hidden, #MathJax_Font_Test, #MathJax_Message'))
               .concat(all('svg').filter(function (g) { return g.querySelector('symbol, defs'); }))
-              .filter(function (e) { return !r.keep.some(function (k) { return k.contains(e); }); });
+              .filter(function (e, i, list) { return list.indexOf(e) === i && e.isConnected && e !== document.body && e !== document.documentElement && !r.keep.some(function (k) { return k.contains(e); }); });
             apply(r.keep.concat(extra));
             pics(r.keep);
             r.keep.forEach(function (k) { [].forEach.call(k.querySelectorAll('button'), function (b) { if (/^(feedback|content attribution\b.*)$/.test(norm(b.innerText || b.textContent || b.getAttribute('aria-label')))) mark(b, 'data-simpl-hide'); }); });
@@ -638,6 +986,8 @@ enum AltaHook {
           steadyTimer = setTimeout(function () { steadyTimer = null; revealSteady(state); }, 120);
         };
         try { new MutationObserver(function () { lastChange = Date.now(); schedule(); }).observe(document, { childList: true, subtree: true, characterData: true }); } catch (e) {}
+        // (1.3.83) Show Browser turned on or off: the page laid out again at once — as it is, or the app's way
+        window.__simplBrowserNow = function () { dialogTick(); schedule(0); };
         schedule();
       }
 
@@ -834,7 +1184,8 @@ struct AltaPic: Identifiable, Equatable {
 
 /// (1.3.70) A question's graph, large, in a window of its own over the popup: moved and sized as the student likes,
 /// its colours dark or as Alta draws them (the same choice as the question's) — (1.3.79) as Alta draws them, on white,
-/// the question being light — and put away when the question is answered or gone, or the popup closed.
+/// the question being light; (1.3.83) dark again, with its Light, when the student picks Dark for Alta's side — and put
+/// away when the question is answered or gone, or the popup closed.
 @MainActor
 final class AltaGraphWindow: NSObject, NSWindowDelegate {
     static let shared = AltaGraphWindow()
@@ -844,6 +1195,8 @@ final class AltaGraphWindow: NSObject, NSWindowDelegate {
     final class Model: ObservableObject {
         @Published var image: NSImage?
         @Published var light = false
+        /// (1.3.83) Alta's side of the popup dark (the student's Dark): the window dark with it.
+        @Published var dark = false
         weak var session: AltaSession?
     }
 
@@ -851,6 +1204,7 @@ final class AltaGraphWindow: NSObject, NSWindowDelegate {
         model.image = image
         model.session = session
         model.light = session.picsLight
+        model.dark = session.pageDark
         if let panel {
             panel.title = title
             panel.orderFront(nil)
@@ -870,14 +1224,16 @@ final class AltaGraphWindow: NSObject, NSWindowDelegate {
         p.isReleasedWhenClosed = false
         p.delegate = self
         // (1.3.79) the graph as Alta draws it, on white, the question's page being light whatever the app's appearance
-        // (its window's bar keeps the app's)
-        p.contentView = NSHostingView(rootView: AltaGraphView(model: model).environment(\.colorScheme, .light))
+        // (its window's bar keeps the app's) — (1.3.83) or dark with it, when the student picks Dark
+        p.contentView = NSHostingView(rootView: AltaGraphRoot(model: model))
         p.center()
         p.orderFront(nil)
         panel = p
     }
 
     func light(_ on: Bool) { model.light = on }
+
+    func dark(_ on: Bool) { model.dark = on }
 
     func close() {
         guard let p = panel else { return }
@@ -890,6 +1246,15 @@ final class AltaGraphWindow: NSObject, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         panel = nil
         model.session?.picWindowClosed()
+    }
+}
+
+/// (1.3.83) The graph's window in the look of Alta's side of the popup: light (1.3.79), or dark when Dark is picked.
+private struct AltaGraphRoot: View {
+    @ObservedObject var model: AltaGraphWindow.Model
+
+    var body: some View {
+        AltaGraphView(model: model).environment(\.colorScheme, model.dark ? .dark : .light)
     }
 }
 
@@ -935,13 +1300,28 @@ struct AltaButton: Identifiable, Equatable {
     let enabled: Bool
 }
 
-/// (1.3.51) A pop-up of Alta's, shown as the Mac's own: its title, words and buttons, and a picture of it as Alta draws it.
+/// (1.3.51) A pop-up of Alta's, shown as the Mac's own. (1.3.83) Read whole once it has settled: its title, its body as
+/// plain HTML drawn as the app's own words (its formulas typeset, its pictures by their addresses) and every one of its
+/// buttons — updated in place as it changes (a next step).
 struct AltaDialog: Identifiable {
+    /// One of its buttons, whatever it says.
+    struct Choice: Equatable {
+        let label: String
+        /// Alta's main one.
+        let primary: Bool
+        let enabled: Bool
+        /// A close button with no words of its own (an ×), named Close.
+        let close: Bool
+    }
+
     let id = UUID()
     var title: String
-    var text: String
-    var buttons: [String]
-    var picture: NSImage?
+    var html: String
+    var buttons: [Choice]
+    /// Alta's page's address, which its pictures and links are read against.
+    var base: URL
+    /// Counted up each time it is passed again (a next step): the sheet's buttons rest from a press until it is.
+    var step = 0
 }
 
 struct AltaLaunch: Identifiable, Equatable {
@@ -982,16 +1362,40 @@ final class AltaSession: ObservableObject {
     @Published private(set) var focusState = ""
     /// (1.3.50) Light or dark as the app is, told to the page: before each page (a script ahead of the page script) and
     /// at once to the page shown; in dark mode the question's colours are turned over, for dark glass. (1.3.79) The popup
-    /// tells it light, always: Alta's page is shown light whatever the app's appearance.
+    /// tells it light, always: Alta's page is shown light whatever the app's appearance. (1.3.83) Light or dark as the
+    /// student picks it above the objectives (light unless Dark is picked): the web view's own appearance with it (the
+    /// page's colour scheme, its fields), and the graph window's.
     func appearance(dark: Bool) {
+        web.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        pageDark = dark
+        AltaGraphWindow.shared.dark(dark)
+        tellPage()
+    }
+    /// (1.3.83) Alta's side of the popup dark: the student's Dark, above the objectives.
+    private(set) var pageDark = false
+
+    /// (1.3.83) Show Browser, beside Light / Dark: Knewton Alta's own page — the same assignment, signed in, where the
+    /// student is in it — as Alta draws it, in place of the app's view of it: nothing of it hidden or laid on glass, never
+    /// out of sight, its pop-ups its own; the objectives and the mastery still read from it for the rail.
+    @Published private(set) var browser = false
+
+    func setBrowser(_ on: Bool) {
+        guard on != browser else { return }
+        browser = on
+        if on { dialog = nil } // (its pop-up, if one was the app's sheet, given back to the page by the hook)
+        tellPage()
+    }
+
+    /// (1.3.83) How the page is to be shown — light or dark, its graphs' colours, Show Browser — told before each page (a
+    /// script ahead of the page script) and at once to the page shown.
+    private func tellPage() {
+        let flags = "window.__simplDark = \(pageDark); window.__simplPicsLight = \(picsLight); window.__simplBrowser = \(browser);"
         let ucc = web.configuration.userContentController
         ucc.removeAllUserScripts()
-        ucc.addUserScript(WKUserScript(source: "window.__simplDark = \(dark); window.__simplPicsLight = \(picsLight);", injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        ucc.addUserScript(WKUserScript(source: flags, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         ucc.addUserScript(AltaHook.script)
-        web.evaluateJavaScript("window.__simplDark = \(dark); window.__simplPicsLight = \(picsLight); if (window.__simplFocusDark) window.__simplFocusDark();", completionHandler: nil)
-        isDark = dark
+        web.evaluateJavaScript(flags + " if (window.__simplFocusDark) window.__simplFocusDark(); if (window.__simplBrowserNow) window.__simplBrowserNow();", completionHandler: nil)
     }
-    private var isDark = false
 
     // MARK: (1.3.70) The question's graphs: small, opened large in a window of their own
 
@@ -1008,7 +1412,7 @@ final class AltaSession: ObservableObject {
         picsLight = on
         UserDefaults.standard.set(on, forKey: Self.picsLightKey)
         AltaGraphWindow.shared.light(on)
-        appearance(dark: isDark)
+        appearance(dark: pageDark)
         if let i = picOpen { Task { try? await Task.sleep(nanoseconds: 120_000_000); await openPic(i) } }
     }
 
@@ -1050,7 +1454,11 @@ final class AltaSession: ObservableObject {
     @Published private(set) var buttons: [AltaButton] = []
 
     /// The question laid on glass panels, one behind each part, the popup scrolling the page.
-    var split: Bool { focused && !panels.isEmpty && pageHeight > 0 }
+    var split: Bool { !asIs && focused && !panels.isEmpty && pageHeight > 0 }
+
+    /// (1.3.83) Alta's page shown as it is — edge to edge, in sight, scrolling itself, nothing of the app's over it —
+    /// while a pop-up of Alta's is given back to it, and with Show Browser on.
+    var asIs: Bool { browser || dialogInPage }
 
     /// (1.3.60) Whether Alta's page is laid out and in sight (it is kept out of sight while it loads, so it never flashes
     /// in before its question).
@@ -1077,35 +1485,39 @@ final class AltaSession: ObservableObject {
 
     /// (1.3.51) Alta's pop-up open, shown as the Mac's own sheet.
     @Published var dialog: AltaDialog?
-    private var dialogTask: Task<Void, Never>?
-
-    /// A picture of Alta's pop-up as it draws it, shown in the page for the moment it is taken.
-    private func dialogPicture() async -> NSImage? {
-        _ = await run("return window.__simplDialog ? (window.__simplDialog.show(true), window.__simplDialog.shot(true)) : null", in: nil)
-        try? await Task.sleep(nanoseconds: 80_000_000)
-        defer { Task { _ = await run("return window.__simplDialog ? window.__simplDialog.shot(false) : null", in: nil) } }
-        guard let r = await run("return window.__simplDialog ? window.__simplDialog.rect() : null", in: nil) as? [String: Any],
-              let x = (r["x"] as? NSNumber)?.doubleValue, let y = (r["y"] as? NSNumber)?.doubleValue,
-              let w = (r["w"] as? NSNumber)?.doubleValue, let h = (r["h"] as? NSNumber)?.doubleValue, w > 4, h > 4 else { return nil }
-        let rect = CGRect(x: x, y: y, width: w, height: h).intersection(web.bounds)
-        guard !rect.isEmpty else { return nil }
-        return await withCheckedContinuation { (go: CheckedContinuation<NSImage?, Never>) in
-            let config = WKSnapshotConfiguration()
-            config.rect = rect
-            config.afterScreenUpdates = true
-            web.takeSnapshot(with: config) { image, _ in go.resume(returning: image) }
-        }
-    }
+    /// (1.3.83) Alta's pop-up given back to its page — what it holds the app cannot draw as its own, nothing in it could
+    /// be read, or the student asked: Alta's page shown as it is, in sight, until the pop-up closes.
+    @Published private(set) var dialogInPage = false
 
     /// One of the pop-up's buttons, pressed in Alta's own.
     func pressDialog(_ index: Int) {
         Task { _ = await run("return window.__simplDialog ? window.__simplDialog.press(\(index)) : null", in: nil) }
     }
 
-    /// The Mac's sheet put away without a button: Alta's pop-up given back to the page.
-    func dialogDismissed() {
+    /// (1.3.83) A link in the pop-up's body: followed in Alta's page as Alta follows it, or — another site's, or one that
+    /// opens a window of its own — opened in the browser.
+    func followDialogLink(_ index: Int) {
+        Task {
+            guard let href = await run("return window.__simplDialog ? window.__simplDialog.link(\(index)) : null", in: nil) as? String,
+                  let url = URL(string: href), ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return }
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    /// The Mac's sheet put away without a button, or its Show in Alta's Page: Alta's pop-up given back to the page, shown
+    /// there as Alta draws it until it closes. (`empty`: it came with nothing the sheet could show.)
+    func dialogDismissed(empty: Bool = false) {
         dialog = nil
-        Task { _ = await run("return window.__simplDialog ? window.__simplDialog.show(true) : null", in: nil) }
+        let why = empty ? "'nothing in it could be shown'" : ""
+        Task { _ = await run("return window.__simplDialog ? window.__simplDialog.giveBack(\(why)) : null", in: nil) }
+    }
+
+    /// (1.3.83) Each time something of Alta's was shown as it is, for the Error Logs.
+    private func logShownAsIs(_ text: String) {
+        withAnimation(Motion.gentle) {
+            errorLogs.append("\(Date().formatted(date: .abbreviated, time: .standard)) — \(text)")
+            if errorLogs.count > 50 { errorLogs.removeFirst() }
+        }
     }
 
     /// (1.3.72) The Alta assignment open now, for the Developer menu's Save Page Code.
@@ -1129,7 +1541,7 @@ final class AltaSession: ObservableObject {
         web.isInspectable = true
         web.setValue(false, forKey: "drawsBackground") // (1.3.49: the question laid on the popup's glass; see AltaQuiz)
         // (1.3.79) Alta's page in light whatever the app's appearance (its own colour scheme, its fields), as every
-        // tool's is: AltaQuiz lays it on light glass
+        // tool's is: AltaQuiz lays it on light glass — (1.3.83) until the student picks Dark (`appearance(dark:)`)
         web.appearance = NSAppearance(named: .aqua)
         r.session = self
         loading = web.observe(\.isLoading, options: [.new]) { [weak self] w, _ in
@@ -1172,6 +1584,9 @@ final class AltaSession: ObservableObject {
                     panels = []
                     buttons = []
                     pics = []
+                    // (1.3.83: and the last page's pop-up, which can no longer say it has closed)
+                    dialog = nil
+                    dialogInPage = false
                 }
                 closePic()
                 return
@@ -1207,30 +1622,41 @@ final class AltaSession: ObservableObject {
         case "dialog":
             guard frame.isMainFrame else { return }
             guard head["open"] as? Bool == true else {
-                dialogTask?.cancel()
-                withAnimation(Motion.gentle) { dialog = nil }
+                withAnimation(Motion.gentle) {
+                    dialog = nil
+                    dialogInPage = false
+                }
                 return
             }
             let title = head["title"] as? String ?? ""
-            let text = head["text"] as? String ?? ""
-            let buttons = head["buttons"] as? [String] ?? []
-            dialogTask?.cancel()
-            dialogTask = Task { [weak self] in
-                // (its opening fade done, a picture of it as Alta draws it — then hidden in the page, the Mac's shown)
-                try? await Task.sleep(nanoseconds: 380_000_000)
-                guard let self, !Task.isCancelled else { return }
-                let picture = await self.dialogPicture()
-                guard !Task.isCancelled else { return }
-                _ = await self.run("return window.__simplDialog ? window.__simplDialog.show(false) : null", in: nil)
-                if self.dialog != nil {
-                    self.dialog?.title = title
-                    self.dialog?.text = text
-                    self.dialog?.buttons = buttons
-                    self.dialog?.picture = picture
-                } else {
-                    self.dialog = AltaDialog(title: title, text: text, buttons: buttons, picture: picture)
+            // (1.3.83) given back to Alta's page — it holds what the app cannot draw as its own, nothing in it could be
+            // read, or the student asked: shown there, Alta's page as it is, until it closes; said in the Error Logs
+            if head["inPage"] as? Bool == true {
+                withAnimation(Motion.gentle) {
+                    dialog = nil
+                    dialogInPage = true
                 }
+                logShownAsIs("Alta's pop-up\(title.isEmpty ? "" : " “\(title)”") shown in Alta's page: \(head["why"] as? String ?? "")")
+                return
             }
+            let html = head["html"] as? String ?? ""
+            let choices = (head["buttons"] as? [[String: Any]] ?? []).map { b in
+                AltaDialog.Choice(label: b["label"] as? String ?? "", primary: b["primary"] as? Bool ?? false,
+                                  enabled: b["enabled"] as? Bool ?? true, close: b["close"] as? Bool ?? false)
+            }
+            // (never an empty sheet: a pop-up with nothing to show is Alta's page's to show)
+            guard !html.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { dialogDismissed(empty: true); return }
+            dialogInPage = false
+            if dialog != nil {
+                dialog?.title = title
+                dialog?.html = html
+                dialog?.buttons = choices
+                dialog?.step += 1
+            } else {
+                dialog = AltaDialog(title: title, html: html, buttons: choices, base: web.url ?? URL(fileURLWithPath: "/"))
+            }
+            // (the sheet up: Alta's own hidden in the page meanwhile)
+            Task { _ = await run("return window.__simplDialog ? window.__simplDialog.hide() : null", in: nil) }
         case "focus":
             guard frame.isMainFrame else { return }
             let state = head["state"] as? String ?? ""

@@ -1443,6 +1443,17 @@ const server = http.createServer((req, res) => {
     // `section.compound__compound` — a card headed "Question" with what it asks, Learnosity's answer box and Alta's
     // Feedback / More Instruction / Submit — then Content attribution; MathJax's helpers and the chat at the foot.
     // window.mockLesson() puts a part headed "Instruction" above the question; window.mockDialog() opens a pop-up.
+    // (Mac 1.3.83) window.mockRichDialog(ms) opens Alta's "Knewton Alta" pop-up as Material draws one — fading in, a
+    // spinner until its body comes ms later: words in bold and italic, a list with a link, a formula as MathJax 2 sets
+    // one and one as KaTeX does, a picture that takes a moment to load and a drawing from the page's sprite sheet; an ×,
+    // Back (greyed) and Next, whose second step says "You are all set" with Got it. mockVideoDialog(), mockFrameDialog()
+    // and mockBareDialog() open pop-ups the app cannot draw as its own: a video, another site's frame, nothing but a
+    // title. With ?dialog=rich the rich one opens by itself, with ?dialog=video the video one (the Mac's pictures).
+    if (path === '/mock-alta/tangent.svg') {
+      await new Promise((r) => setTimeout(r, 400));
+      res.writeHead(200, { 'content-type': 'image/svg+xml' });
+      return res.end('<svg xmlns="http://www.w3.org/2000/svg" width="220" height="120" viewBox="0 0 220 120"><rect width="220" height="120" fill="#fff"/><path d="M10 110 Q 110 -50 210 110" fill="none" stroke="#1b8a9c" stroke-width="3"/><line x1="40" y1="20" x2="180" y2="20" stroke="#e8710a" stroke-width="2"/><circle cx="110" cy="30" r="5" fill="#e8710a"/></svg>');
+    }
     if (path === '/mock-alta/learn/course/c1/assignment/a3') {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       return res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Knewton Alta</title><style>
@@ -1478,6 +1489,9 @@ body{margin:0;font-family:Helvetica,Arial,sans-serif;background:#eef1f4}
 <iframe class="x-origin-frame" style="display:none" src="about:blank"></iframe>
 <div id="embedded-messaging"><button id="embeddedMessagingConversationButton">Chat</button></div>
 <div class="back-to-top-mount"><a href="#main">Back to Top</a></div>
+<svg style="position:absolute;width:0;height:0" aria-hidden="true"><defs><symbol id="alta-bulb" viewBox="0 0 24 24"><circle cx="12" cy="10" r="6" fill="#f5b400"/><rect x="9" y="17" width="6" height="4" fill="#888"/></symbol></defs></svg>
+<template id="rich-1"><p>Alta picks each question for <i>you</i>, from what you have <b>mastered</b> so far.</p><ul><li>Answer the question on screen.</li><li>Stuck? <a href="#more-instruction">More Instruction</a> explains it.</li></ul><p>For example, <span class="MathJax_Preview">d/dx x^2</span><span class="MathJax" id="MathJax-Element-9-Frame" tabindex="0"><nobr><span class="math">d/dx x² = 2x</span></nobr></span><script type="math/tex" id="MathJax-Element-9">\\frac{d}{dx}x^2 = 2x</script> and <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>f</mi></mrow><annotation encoding="application/x-tex">f'(x) = 2x</annotation></semantics></math></span><span class="katex-html" aria-hidden="true">f′(x) = 2x</span></span>.</p><p><img src="/mock-alta/tangent.svg" alt="A tangent line touching a curve" width="220" height="120"> <svg width="48" height="48" viewBox="0 0 24 24"><use href="#alta-bulb"></use></svg></p></template>
+<template id="rich-2"><h3>You are all set</h3><p>Your mastery fills as you answer questions correctly. It is saved as you go.</p></template>
 <script>
 window.mockLesson = function () { var q = document.getElementById('qsec'); var l = document.createElement('section'); l.className = 'compound compound__compound___Z4A7e'; l.id = 'lsec';
   l.innerHTML = '<div class="theme__card___3E6YM"><div class="compound-header__header___Plj5Q"><h2 class="content-title__heading___1PTj4">Instruction</h2></div><div class="compound-body__content___3FE-v"><p>' + 'The derivative of ln(x) is 1/x. '.repeat(20) + '</p></div></div>';
@@ -1485,7 +1499,28 @@ window.mockLesson = function () { var q = document.getElementById('qsec'); var l
 window.mockUnlesson = function () { var l = document.getElementById('lsec'); if (l) l.remove(); };
 window.mockDialog = function () { var d = document.createElement('div'); d.className = 'MuiModal-root MuiDialog-root'; d.id = 'dlg'; d.setAttribute('role', 'presentation');
   d.innerHTML = '<div role="dialog" style="position:fixed;top:30%;left:30%;background:#fff;padding:20px">Having trouble?<button id="vi">VIEW INSTRUCTION</button></div>'; document.body.appendChild(d); };
-</script></body></html>`);
+window.mockRichDialog = function (slow) {
+  var d = document.createElement('div'); d.className = 'MuiModal-root MuiDialog-root'; d.id = 'rdlg'; d.setAttribute('role', 'presentation');
+  d.innerHTML = '<div class="MuiBackdrop-root" aria-hidden="true" style="position:fixed;inset:0;background:rgba(0,0,0,.5)"></div><div class="MuiDialog-container" role="presentation" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .225s"><div class="MuiPaper-root MuiDialog-paper" role="dialog" aria-labelledby="rtitle" style="position:relative;background:#fff;border-radius:6px;width:560px;max-width:90vw"><h2 id="rtitle" style="margin:0;padding:18px 24px 8px;font-size:20px">Knewton Alta</h2><button id="rx" class="MuiIconButton-root" aria-label="close" style="position:absolute;top:10px;right:10px;border:0;background:none;font-size:20px">×</button><div id="rbody" class="MuiDialogContent-root" style="padding:0 24px 8px;min-height:60px"><div class="MuiCircularProgress-root" role="progressbar" style="width:28px;height:28px;border-radius:50%;border:3px solid #1b8a9c"></div></div><div class="MuiDialogActions-root" style="display:flex;justify-content:flex-end;gap:8px;padding:8px 16px 16px"><button id="rback" class="MuiButton-root MuiButton-text" disabled>Back</button><button id="rnext" class="MuiButton-root MuiButton-contained MuiButton-containedPrimary">Next</button></div></div></div>';
+  document.body.appendChild(d);
+  setTimeout(function () { d.querySelector('.MuiDialog-container').style.opacity = '1'; }, 30);
+  var body = d.querySelector('#rbody'), next = d.querySelector('#rnext'), back = d.querySelector('#rback');
+  var show = function (k) {
+    body.innerHTML = ''; body.appendChild(document.getElementById('rich-' + k).content.cloneNode(true));
+    back.disabled = k === 1; next.textContent = k === 1 ? 'Next' : 'Got it';
+    next.onclick = k === 1 ? function () { show(2); } : function () { d.remove(); };
+  };
+  back.onclick = function () { show(1); };
+  d.querySelector('#rx').onclick = function () { d.remove(); };
+  setTimeout(function () { show(1); }, slow || 0);
+};
+var plainDialog = function (id, label, inner) { var d = document.createElement('div'); d.id = id; d.setAttribute('role', 'dialog'); if (label) d.setAttribute('aria-label', label);
+  d.style.cssText = 'position:fixed;top:15%;left:25%;width:480px;background:#fff;padding:20px;border:1px solid #ccc'; d.innerHTML = inner + '<button class="shut">Close</button>';
+  document.body.appendChild(d); d.querySelector('.shut').onclick = function () { d.remove(); }; return d; };
+window.mockVideoDialog = function () { plainDialog('vdlg', 'Watch this first', '<p>A short video on the chain rule.</p><video width="400" height="220" controls></video>'); };
+window.mockFrameDialog = function () { plainDialog('fdlg', 'Chat with us', '<iframe src="http://127.0.0.1:${port}/mock-alta/chat" width="400" height="160" style="border:0"></iframe>'); };
+window.mockBareDialog = function () { plainDialog('bdlg', '', '<h2>Are you still there?</h2>'); };
+</script>${{ rich: '<script>setTimeout(function () { window.mockRichDialog(1200); }, 800);</script>', video: '<script>setTimeout(function () { window.mockVideoDialog(); }, 800);</script>' }[url.searchParams.get('dialog')] || ''}</body></html>`);
     }
     // (1.3.19) an overview as a school's Alta may draw it: its objectives only as words on the page (no answer of Alta's
     // naming them), and START a link inside a web component of its own

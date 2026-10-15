@@ -214,6 +214,46 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   symbols) are never hidden by the focus: a pop-up's picture draws from one.
   (1.3.54) A pop-up's picture leaves out its buttons (the sheet has them): hidden for that moment
   (`html[data-simpl-dialog-shot]`) and the row of them at its foot cropped off (`__simplDialog.rect`).
+  (1.3.83) Pop-ups read whole. The picture came out empty when a pop-up opened while Alta's page was still out of sight
+  (its learn page loading, or between parts: `body` see-through), so the sheet showed a title and a button round
+  nothing; and once the app hid it, its words read as nothing and it was passed again. Now the hook finds a pop-up
+  (`[role=dialog]`, `[role=alertdialog]`, `dialog[open]`, `[aria-modal=true]`, Material's, React Toolbox's and
+  react-modal's boxes, in web components' trees too; the innermost, the last), reads it with the app's hiding lifted,
+  and passes it once it has settled — 350 ms unchanged, no spinner in it, its pictures loaded, its fade done; three
+  seconds at most — and again when it changes (a next step): its title (`aria-labelledby`, `aria-label`, else the
+  heading it opens with), its body as plain HTML (paragraphs, headings, lists, tables, bold and italic as Alta's styles
+  make them, links as `simpl-link:N`; each formula as TeX — MathJax 2's script, MathJax 3's record, KaTeX's or MathML's
+  annotation, `data-latex` — else as MathML; a picture by its address, a drawing as SVG with the symbols it uses, a
+  canvas as its picture) and every button (`label`, `primary`, `enabled`, `close` for an ×). The sheet draws the body
+  with `HTMLBlock` (KaTeX on; its plain words until it has measured itself; a scroll past 440 points), presses Alta's
+  buttons and follows its links in Alta's page (another site's, or a new window's, in the browser), and hides Alta's
+  own only once it is up (`__simplDialog.hide`). A pop-up holding a video, a form, another site's frame, or a picture
+  or formula that cannot be read, one with nothing to read, or one still loading after three seconds is never an empty
+  sheet: it is given back to the page (`kind: 'dialog', inPage`, with why, for the Error Logs), as is one the student
+  sends there (Show in Alta's Page, Escape with no Close): the popup shows Alta's page as it is — revealed, the focus
+  lifted, edge to edge (`AltaSession.asIs`) — until it closes. Alta's pop-ups are kept in sight by the focus whatever
+  the page is doing (`keepDialogs`: one that came between parts was hidden with the page). In the mock's learn page
+  `mockRichDialog(ms)` opens a slow, rich, two-step one (`?dialog=rich` opens it by itself: the pictures'
+  `21m-alta-dialog`), and `mockVideoDialog`, `mockFrameDialog` and `mockBareDialog` ones the page keeps.
+  (1.3.83) *Light or Dark* above the objectives (`AltaLookPicker`: two glass chips at the rail's head, the one picked
+  filled): Alta's side of the popup light — 1.3.79's, the default — or dark,
+  remembered for every Alta assignment (`SimplAltaPageDark`; `-SimplAltaPageDark YES` for the pictures). Dark is 1.3.78's
+  look again: the page region in a dark environment (dark glass panels, the start screen, the skeleton), the web view's
+  appearance dark, `__simplDark` told to the page so each kept part is turned over (1.3.50), the graphs' own Light or
+  Dark beside them and the graph window dark (1.3.70); and Alta's page as it is — not recognised, its overview, or
+  under a pop-up given back to it — drawn dark as a tool's page is (`html[data-simpl-whole-dark]`: `invert(.92)
+  hue-rotate(180deg)`, its pictures, videos and frames turned back), unless it has a dark look of its own (a dark ground,
+  or a `color-scheme` meta naming dark), which the hook tells once the page is in sight and out of the focus. The bar
+  and the rail keep the app's appearance.
+  (1.3.83) *Show Browser* beside them (`AltaBrowserToggle`, a glass chip filled while on; the row says "Browser", then
+  drops the sun's and moon's words, where the rail is narrow): Knewton Alta's own page on the right — the same web view,
+  so the same assignment, signed in, where the student is in it — as Alta draws it, in place of the app's view; off, the
+  app's view again. Remembered (`SimplAltaShowBrowser`; `-SimplAltaShowBrowser YES`). The app tells the page
+  `window.__simplBrowser` (with the other flags, before each page and at once: `AltaSession.tellPage`), and the hook
+  stands down while it is on — no focus (`unmark`), no veil (never out of sight, not even between parts), no panels or
+  buttons for the app, its pop-ups its own (one the app was showing given back) — while it still reads the objectives,
+  the mastery and the cover for the rail. The popup shows the page as it is (`AltaSession.asIs`), and Light or Dark
+  applies (Dark draws it dark as above).
   (1.3.53) Two glass panels, the question's words and its answer (a lesson: one): the hook tells the app each kept
   part's question and answer boxes (the card's children before and from the one holding Learnosity's box, which gets a
   gap above it — `data-simpl-answer`) in the page's own coordinates, and the page's height. The app sizes the page to

@@ -20,6 +20,16 @@ struct AltaQuizScreen: View {
     @ObservedObject private var dev = DevMode.shared
     /// (1.3.78) The Canvas assignment's own due line ("Due Oct 12 at 11:59 PM"), as every other screen writes it.
     @State private var dueLine: String?
+    /// (1.3.83) Alta's side of the popup light or dark, as the student picks it above the objectives: light unless Dark is
+    /// picked (1.3.79 showed it light whatever the app's appearance), remembered for every Alta assignment. (Read with
+    /// `bool(forKey:)`, so the pictures' -SimplAltaPageDark YES is read as the setting.)
+    @State private var pageDark = UserDefaults.standard.bool(forKey: AltaQuizScreen.pageDarkKey)
+    static let pageDarkKey = "SimplAltaPageDark"
+    /// (1.3.83) Show Browser, beside Light / Dark: Knewton Alta's own page on the right — the same assignment, signed in,
+    /// as Alta draws it — in place of the app's view of it; the objectives and the mastery stay. Remembered
+    /// (`SimplAltaShowBrowser`; -SimplAltaShowBrowser YES for the pictures).
+    @State private var showBrowser = UserDefaults.standard.bool(forKey: AltaQuizScreen.showBrowserKey)
+    static let showBrowserKey = "SimplAltaShowBrowser"
 
     init(launch: AltaLaunch) {
         _session = StateObject(wrappedValue: AltaSession(launch: launch))
@@ -32,30 +42,42 @@ struct AltaQuizScreen: View {
         VStack(spacing: 0) {
             topBar
             HStack(spacing: 0) {
-                AltaRail(session: session)
+                AltaRail(session: session, dark: $pageDark, browser: $showBrowser)
                     .frame(width: ideal.width >= 960 ? 290 : 240)
                 Divider()
                 // (1.3.79) Alta's page in light whatever the app's appearance — on light glass, over a light ground —
                 // as every tool's page is: its question is made for a white page, and drawn dark (1.3.50: its colours
-                // turned over on dark glass) it read badly. The bar and the rail keep the app's appearance.
+                // turned over on dark glass) it read badly. The bar and the rail keep the app's appearance. (1.3.83) Dark
+                // again when the student picks it above the objectives: dark glass and ground, the question turned over
+                // as 1.3.50 drew it, Alta's page as it is drawn dark.
                 page
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(PageGround())
-                    .environment(\.colorScheme, .light)
+                    .environment(\.colorScheme, pageDark ? .dark : .light)
             }
         }
         .frame(width: ideal.width, height: ideal.height)
         .background(PageGround())
         .tint(Theme.accent)
         .task {
-            session.appearance(dark: false) // (1.3.79: the page is light, in dark mode too)
+            session.setBrowser(showBrowser) // (1.3.83)
+            session.appearance(dark: pageDark) // (1.3.79: the page light, in dark mode too — 1.3.83: unless Dark is picked)
             await session.start(engine: engine)
+        }
+        .onChange(of: pageDark) { _, dark in
+            UserDefaults.standard.set(dark, forKey: Self.pageDarkKey)
+            session.appearance(dark: dark)
+        }
+        .onChange(of: showBrowser) { _, on in
+            UserDefaults.standard.set(on, forKey: Self.showBrowserKey)
+            session.setBrowser(on)
         }
         .task { dueLine = await CanvasDue.line(engine, course: session.launch.course, assignment: session.launch.assignment) }
         .onDisappear { session.closePic() } // (1.3.70: the popup closed, its graph's window with it)
-        // (1.3.51) Alta's pop-ups as the Mac's own sheet: Alta's picture of it, its buttons the Mac's
+        // (1.3.51) Alta's pop-ups as the Mac's own sheet, its buttons the Mac's — (1.3.83) its body read whole and drawn
+        // as the app's own words
         .sheet(item: Binding(get: { session.dialog }, set: { if $0 == nil && session.dialog != nil { session.dialogDismissed() } })) { d in
-            AltaDialogSheet(dialog: d, press: { i in session.pressDialog(i) }, giveBack: { session.dialogDismissed() })
+            AltaDialogSheet(dialog: d, press: { i in session.pressDialog(i) }, link: { i in session.followDialogLink(i) }, giveBack: { session.dialogDismissed() })
         }
         .alert("Page code saved", isPresented: Binding(get: { saved != nil }, set: { if !$0 { saved = nil } })) {
             Button("Show in Finder") { if let saved { NSWorkspace.shared.activateFileViewerSelecting([saved]) } }
@@ -197,8 +219,9 @@ struct AltaQuizScreen: View {
             // whatever the app's appearance, the question as Alta draws it (body: the page's light environment). (1.3.53) A
             // glass panel behind each part — what it asks, its answer, a lesson — where the page lays it out: the page as
             // tall as its question and the popup scrolling it, the panels scrolling with it. Alta's page as it is (not
-            // recognised): edge to edge, on white, scrolling itself. (The page is always in the same place in the views,
-            // so it is never taken out and put back.)
+            // recognised): edge to edge, on white, scrolling itself — (1.3.83) as it is too while a pop-up of Alta's is
+            // given back to it, and with Show Browser on, nothing of the app's over it. (The page is always in the same
+            // place in the views, so it is never taken out and put back.)
             GeometryReader { g in
                 let split = session.split
                 ScrollViewReader { proxy in
@@ -212,7 +235,7 @@ struct AltaQuizScreen: View {
                                 let right: CGFloat = session.panels.map(\.rect.maxX).max() ?? 0
                                 ForEach(session.panels) { p in
                                     Rectangle().fill(Color.clear)
-                                        .glassCard(radius: 22, tint: Color.white.opacity(0.3))
+                                        .glassCard(radius: 22, tint: pageDark ? Color.black.opacity(0.18) : Color.white.opacity(0.3))
                                         .frame(width: right - left + 32, height: p.rect.height + 32)
                                         .offset(x: left - 16, y: p.rect.minY - 16)
                                         .transition(.opacity)
@@ -220,12 +243,13 @@ struct AltaQuizScreen: View {
                             }
                             AltaPageHost(web: session.web, forwardScroll: split)
                                 .frame(width: g.size.width, height: split ? max(session.pageHeight, g.size.height) : g.size.height)
-                                .background { if !session.focused && session.pageShown && session.cover == nil { Color.white } }
+                                .background { if session.asIs || (!session.focused && session.pageShown && session.cover == nil) { pageDark ? Color(white: 0.08) : Color.white } }
                             // (1.3.70) by each small graph: open it large in a window of its own — (1.3.79) the graphs
-                            // as Alta draws them, the page being light: no Light or Dark for them
+                            // as Alta draws them, the page being light: no Light or Dark for them (1.3.83: but in Dark,
+                            // Light or Dark for the graphs' colours, as 1.3.70 had)
                             if split && session.pageShown {
                                 ForEach(session.pics) { pic in
-                                    AltaPicControls(session: session, index: pic.id, dark: false)
+                                    AltaPicControls(session: session, index: pic.id, dark: pageDark)
                                         .offset(x: pic.rect.maxX + 10, y: pic.rect.minY)
                                         .transition(.opacity)
                                 }
@@ -243,7 +267,7 @@ struct AltaQuizScreen: View {
             // (1.3.53) the parts' buttons, whatever they say, as the app's own — Alta's main one prominent, a greyed-out
             // one greyed out — each pressing Alta's
             .overlay(alignment: .bottomTrailing) {
-                if session.focused && !session.buttons.isEmpty && session.dialog == nil {
+                if session.focused && !session.asIs && !session.buttons.isEmpty && session.dialog == nil {
                     QuizFloatingBar {
                         ForEach(session.buttons) { b in
                             Button { session.pressButton(b.id) } label: { Text(b.label).frame(minWidth: 70) }
@@ -258,12 +282,12 @@ struct AltaQuizScreen: View {
             }
             // (1.3.59) the assignment's cover as the popup's own start screen, on Liquid Glass: its name and details,
             // its objectives by topic, and a clear Start (pressing Alta's); Alta's page waits under it
-            if let c = session.cover, !session.focused, session.dialog == nil, session.failure == nil, !session.opening {
+            if let c = session.cover, !session.focused, !session.asIs, session.dialog == nil, session.failure == nil, !session.opening {
                 AltaStartScreen(cover: c, dueShown: headerDue != nil, start: { session.startCover() }, review: { session.reviewCover() })
                     .transition(.opacity)
             }
             // (1.3.60) while Alta's page loads, out of sight, the popup's own Loading in its place
-            if !session.pageShown && session.cover == nil && !session.opening && session.failure == nil {
+            if !session.pageShown && !session.asIs && session.cover == nil && !session.opening && session.failure == nil {
                 ZStack {
                     PageGround()
                     AltaSkeleton()
@@ -583,12 +607,38 @@ private struct AltaPageHost: NSViewRepresentable {
 
 // MARK: - The rail
 
-/// Down the left: the objectives as the quiz's question tiles, each by name with its own bar, and the total mastery.
+/// Down the left: the objectives as the quiz's question tiles, each by name with its own bar, and the total mastery;
+/// (1.3.83) above them, how Alta's side is shown — Light or Dark, and Show Browser — in one row: in words while they
+/// fit, Show Browser as "Browser" before the sun and moon lose theirs.
 private struct AltaRail: View {
     @ObservedObject var session: AltaSession
+    @Binding var dark: Bool
+    @Binding var browser: Bool
 
     var body: some View {
         let list = session.objectives
+        VStack(spacing: 0) {
+            ViewThatFits(in: .horizontal) {
+                controls(words: true, browser: "Show Browser")
+                controls(words: true, browser: "Browser")
+                controls(words: false, browser: "Browser")
+            }
+            .controlSize(.small)
+            .padding(.horizontal, 20)
+            .padding(.top, 10)
+            rail(list)
+        }
+    }
+
+    private func controls(words: Bool, browser label: String) -> some View {
+        HStack(spacing: 8) {
+            AltaLookPicker(dark: $dark, words: words)
+            Spacer(minLength: 0)
+            AltaBrowserToggle(on: $browser, label: label)
+        }
+    }
+
+    private func rail(_ list: [AltaObjective]) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 objectivesCard(list)
@@ -647,6 +697,61 @@ private struct AltaRail: View {
                 .foregroundStyle(.secondary)
         }
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// (1.3.83) Above the objectives: Alta's side of the popup Light or Dark — two glass chips that blend into one control,
+/// the one picked filled in the accent; with `words`, each says its name beside its sun or moon. Light (the default
+/// since 1.3.79) shows Alta's page as Alta draws it; Dark lays the question on dark glass, its colours turned over, and
+/// Alta's page as it is drawn dark.
+private struct AltaLookPicker: View {
+    @Binding var dark: Bool
+    var words = true
+
+    var body: some View {
+        GlassGroup(spacing: 4) {
+            HStack(spacing: 4) {
+                choice(dark: false)
+                choice(dark: true)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Knewton Alta's page")
+    }
+
+    private func choice(dark d: Bool) -> some View {
+        let on = dark == d
+        let name = d ? "Dark" : "Light"
+        let symbol = d ? "moon.fill" : "sun.max.fill"
+        return Button {
+            withAnimation(Motion.gentle) { dark = d }
+        } label: {
+            if words { Label(name, systemImage: symbol).labelStyle(.titleAndIcon) } else { Label(name, systemImage: symbol).labelStyle(.iconOnly) }
+        }
+        .glassChip(Theme.accent, on: on)
+        .fixedSize()
+        .help(d ? "Show Knewton Alta's page dark" : "Show Knewton Alta's page light, as Alta draws it")
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+}
+
+/// (1.3.83) Beside Light / Dark: Show Browser — Knewton Alta's own page on the right, as Alta draws it, in place of the
+/// app's view of it — a glass chip filled while it is on.
+private struct AltaBrowserToggle: View {
+    @Binding var on: Bool
+    let label: String
+
+    var body: some View {
+        Button {
+            withAnimation(Motion.gentle) { on.toggle() }
+        } label: {
+            Label(label, systemImage: "globe").labelStyle(.titleAndIcon)
+        }
+        .glassChip(Theme.accent, on: on)
+        .fixedSize()
+        .help(on ? "Back to Simpl's view of the assignment" : "Show Knewton Alta's own page, as Alta draws it")
+        .accessibilityLabel("Show Browser")
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 }
 
@@ -735,54 +840,117 @@ private struct AltaMasteryBar: View {
     }
 }
 
-/// (1.3.51) A pop-up of Alta's as a sheet of the Mac's: Alta's own picture of it, and its buttons as the Mac's — each
-/// pressing Alta's. Escape presses its Close, Got it or OK, if it has one, else gives the pop-up back to the page.
+/// (1.3.51) A pop-up of Alta's as a sheet of the Mac's, its buttons as the Mac's — each pressing Alta's. (1.3.83) Its body
+/// drawn as the app's own words, read whole from Alta's page once it has settled — its paragraphs, lists, tables and
+/// links, its formulas typeset with the KaTeX the app carries, its pictures — no longer a picture of it taken in the
+/// page, which came out empty while Alta's page was out of sight. Its words show at once as plain text, the drawn body
+/// taking their place once it has measured itself; a long one scrolls. A next step updates it in place, its buttons
+/// resting from a press until it comes. Return presses Alta's main button (else the last); Escape its Close, Cancel, Got
+/// it or OK, else Show in Alta's Page, which gives the pop-up back to the page.
 private struct AltaDialogSheet: View {
     let dialog: AltaDialog
     let press: (Int) -> Void
+    let link: (Int) -> Void
     let giveBack: () -> Void
+    @State private var height: CGFloat = 24
+    @State private var measured = false
+    /// A button pressed and Alta not yet moved on: the buttons rest (two seconds at most).
+    @State private var pressed = false
 
-    private var cancelIndex: Int? {
-        dialog.buttons.firstIndex { ["close", "cancel", "got it", "ok", "okay", "dismiss", "no thanks", "not now", "done"].contains($0.lowercased()) }
+    /// Taller than this, its body scrolls.
+    private static let tallest: CGFloat = 440
+    private static let cancelWords: Set<String> = ["close", "cancel", "got it", "ok", "okay", "dismiss", "no thanks", "not now", "done"]
+
+    /// Return: Alta's main button, else the last that is not a close button.
+    private var defaultIndex: Int? {
+        let all = dialog.buttons.indices
+        return all.last { dialog.buttons[$0].primary && !dialog.buttons[$0].close } ?? all.last { !dialog.buttons[$0].close }
+    }
+
+    /// Escape: its close button (an ×), else its Cancel, Got it, OK… — the main one too when it is the only one.
+    private var escapeIndex: Int? {
+        if let x = dialog.buttons.firstIndex(where: \.close) { return x }
+        let named = dialog.buttons.indices.filter { Self.cancelWords.contains(dialog.buttons[$0].label.lowercased()) }
+        return named.first { $0 != defaultIndex } ?? (dialog.buttons.count == 1 ? named.first : nil)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 10) {
                 IconTile(symbol: "brain.head.profile", color: Theme.accent, size: 26)
-                Text(dialog.title.isEmpty ? "Knewton Alta" : dialog.title).font(.sHeadline)
-                Spacer()
+                Text(dialog.title.isEmpty ? "Knewton Alta" : dialog.title)
+                    .font(.sHeadline)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
             }
-            if let picture = dialog.picture {
-                Image(nsImage: picture)
-                    .resizable()
-                    .interpolation(.high)
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxWidth: min(picture.size.width, 640), maxHeight: min(picture.size.height, 560))
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .frame(maxWidth: .infinity)
-            } else if !dialog.text.isEmpty {
-                Text(dialog.text).font(.sBody).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
-            }
-            HStack(spacing: 10) {
-                Spacer()
-                if cancelIndex == nil {
-                    Button("Show in Alta's Page", action: giveBack)
-                        .keyboardShortcut(.cancelAction)
-                }
-                ForEach(Array(dialog.buttons.enumerated()), id: \.offset) { i, label in
-                    if i == cancelIndex {
-                        Button(label) { press(i) }.keyboardShortcut(.cancelAction)
-                    } else if i == dialog.buttons.count - 1 {
-                        Button(label) { press(i) }.keyboardShortcut(.defaultAction)
-                    } else {
-                        Button(label) { press(i) }
-                    }
-                }
-            }
-            .controlSize(.large)
+            words
+            buttons
         }
         .padding(22)
-        .frame(minWidth: 380, maxWidth: 700)
+        .frame(width: 540)
+        .onChange(of: dialog.step) { _, _ in pressed = false }
+        // (new words — a next step: shown natively again until the drawn body has measured itself anew, never a blank)
+        .onChange(of: dialog.html) { _, _ in measured = false }
+    }
+
+    private var words: some View {
+        ZStack(alignment: .topLeading) {
+            ScrollView {
+                HTMLBlock(html: Self.styled(dialog.html), base: dialog.base, size: 14, height: $height, math: true, measured: $measured) { url in
+                    // (its links: the hook's own numbers for them, followed in Alta's page or opened in the browser)
+                    if url.scheme == "simpl-link", let i = Int(url.absoluteString.dropFirst("simpl-link:".count)) { link(i) }
+                }
+                .frame(height: height)
+            }
+            .scrollIndicators(height > Self.tallest ? .automatic : .never)
+            .frame(height: measured ? min(height, Self.tallest) : 1)
+            .opacity(measured ? 1 : 0)
+            if !measured {
+                Text(RichText.plainText(dialog.html))
+                    .font(.sBody)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .transition(.opacity)
+            }
+        }
+        .animation(Motion.gentle, value: measured)
+    }
+
+    private var buttons: some View {
+        HStack(spacing: 10) {
+            Button("Show in Alta's Page", action: giveBack)
+                .glassButton()
+                .keyboardShortcut(escapeIndex == nil ? KeyboardShortcut.cancelAction : nil)
+                .help("Show this pop-up as Alta draws it, in Alta's page")
+            Spacer(minLength: 8)
+            // (Escape on a lone Got it, which Return presses too)
+            if let e = escapeIndex, e == defaultIndex {
+                Button("") { tap(e) }
+                    .keyboardShortcut(.cancelAction)
+                    .frame(width: 0, height: 0)
+                    .opacity(0)
+                    .accessibilityHidden(true)
+            }
+            ForEach(Array(dialog.buttons.enumerated()), id: \.offset) { i, b in
+                Button { tap(i) } label: { Text(b.label).frame(minWidth: 64) }
+                    .glassButton(prominent: i == defaultIndex)
+                    .keyboardShortcut(i == defaultIndex ? KeyboardShortcut.defaultAction : (i == escapeIndex ? KeyboardShortcut.cancelAction : nil))
+                    .disabled(!b.enabled || pressed)
+                    .help(b.enabled ? "\(b.label) (Alta's own button)" : "Not ready yet")
+            }
+        }
+        .controlSize(.large)
+    }
+
+    private func tap(_ i: Int) {
+        pressed = true
+        press(i)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { pressed = false }
+    }
+
+    /// Its drawings on a white card of their own in dark mode (drawn for a white page); a small picture in its line.
+    static func styled(_ html: String) -> String {
+        "<style>@media (prefers-color-scheme:dark){.simpl-drawing{background:#fff;border-radius:8px}}img.simpl-inline{vertical-align:middle;border-radius:0}</style>" + html
     }
 }

@@ -403,6 +403,30 @@ pins_pages() {
   MODE=dark shoot dark-21j-macmillan-light-page 26 -SimplOpen macmillan:104:4005
 }
 
+# (1.3.83) in both sets: Alta's pop-ups read whole — the mock's "Knewton Alta" pop-up over its learn page, its body
+# coming 1.2 s after its box (a spinner first) with a list, a link, two formulas, a picture and a drawing, as the Mac's
+# own sheet in light and in dark; and one holding a video, given back to Alta's page, shown as it is
+# (1.3.83) and Light or Dark above the objectives (-SimplAltaPageDark YES: Dark picked): the cover's start screen in Dark
+# Mode with Dark picked and with Light (the default, 1.3.79's), a question in Dark in both modes, and Alta's page as it
+# is (the overview) drawn dark
+alta_pages() {
+  local page="alta:104:4003:/mock-alta/learn/course/c1/assignment/a3"
+  MODE=light shoot light-21m-alta-dialog 24 -SimplOpen "$page?dialog=rich"
+  MODE=dark shoot dark-21m-alta-dialog 24 -SimplOpen "$page?dialog=rich"
+  MODE=light shoot light-21n-alta-dialog-in-page 22 -SimplOpen "$page?dialog=video"
+  MODE=dark shoot dark-21o-alta-dark 20 -SimplOpen alta:104:4004 -SimplAltaPageDark YES
+  MODE=dark shoot dark-21p-alta-light 20 -SimplOpen alta:104:4004
+  MODE=dark shoot dark-21q-alta-question-dark 22 -SimplOpen "$page" -SimplAltaPageDark YES
+  MODE=light shoot light-21q-alta-question-dark 22 -SimplOpen "$page" -SimplAltaPageDark YES
+  MODE=dark shoot dark-21r-alta-page-dark 20 -SimplOpen alta:104:4003 -SimplAltaPageDark YES
+  # (1.3.83) Show Browser (-SimplAltaShowBrowser YES): Knewton Alta's own page on the right as Alta draws it — the
+  # cover, light, in light mode; the learn page in Dark Mode with Dark picked, drawn dark; and a 1024-point window, the
+  # rail narrow, its row of controls in short words
+  MODE=light shoot light-21s-alta-browser 20 -SimplOpen alta:104:4004 -SimplAltaShowBrowser YES
+  MODE=dark shoot dark-21s-alta-browser-dark 22 -SimplOpen "$page" -SimplAltaShowBrowser YES -SimplAltaPageDark YES
+  MODE=light SIZE=1024x768 shoot light-21t-alta-browser-narrow 22 -SimplOpen "$page" -SimplAltaShowBrowser YES
+}
+
 # (1.3.79) a tool opened whole is a popup over the window, never in its place (Shell/FloatingPopup.swift): the Periodic
 # Table, Cell Explorer, (1.3.80) DNA & RNA and Flashcards, each over the Tools page, in light and in dark, at 1024 points
 # wide and at the narrow size — (1.3.80) spanning the window over the sidebar, each 3D model filling its view; and DNA &
@@ -707,6 +731,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot dark-12f-hand-in-phone-photos-waiting 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1013 -SimplOpen handin -SimplPhone YES
   ui_review
   pins_pages # (1.3.79)
+  alta_pages # (1.3.83)
   tool_popups # (1.3.79)
   chem_tools # (1.3.80)
   bio_quick # (after the phone's files are on their way: a shot waits for a free worker, and the phone's app must not)
@@ -780,6 +805,7 @@ bio_full # (1.3.78) the biology toolkit, every tool's pages
 bio_plain_all # (1.3.79) three of them opened plainly, in dark, at two window sizes, the sidebar out and folded
 ui_review # (1.3.78) the UI review's new states
 pins_pages # (1.3.79) the pins' room, a panel pulled out, external tools' pages light
+alta_pages # (1.3.83) Alta's popup: its pop-ups read whole, Light or Dark, Show Browser
 tool_popups # (1.3.79) a tool's popup over the Tools page
 chem_tools # (1.3.80) the Chemistry section and its tools
 # (1.3.78) a PDF-only assignment (as the push's set makes 1013) waiting for the phone: Combine photos under the code
