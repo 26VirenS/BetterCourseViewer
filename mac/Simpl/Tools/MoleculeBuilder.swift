@@ -706,7 +706,8 @@ struct MoleculeSceneView: NSViewRepresentable {
             touched = false
             framedSize = s
             framedTurning = model.autoRotate
-            if OpenClock.verbose {
+            // (the coordinator is not the main actor's: the log's switch read there, on the main thread only)
+            if Thread.isMainThread && MainActor.assumeIsolated({ OpenClock.verbose }) {
                 let f = SceneFill.filled(drawnPoints(), aim: aim, distance: d, fov: 40, width: Double(s.width), height: Double(s.height))
                 NSLog("[Simpl] molecule frame%@: view %.0f × %.0f, model %.0f%% across, %.0f%% up", model.autoRotate ? " (turning)" : "",
                       s.width, s.height, f.across * 100, f.up * 100)
