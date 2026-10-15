@@ -844,6 +844,16 @@ jobs:
           Shot 'chem-balance-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'balance', '--tool-state', 'MnO4- + Fe2+ + H+ -> Mn2+ + Fe3+ + H2O'))
           Shot 'chem-balance-780' '780x683' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'balance', '--tool-state', 'KMnO4 + HCl -> KCl + MnCl2 + H2O + Cl2'))
           Shot 'pin-balance' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'balance', '--pin-open', 'balance', '--balance', 'Fe + O2 -> Fe2O3'))
+          # (the Physics section, at the end so the pictures before keep their parts) the Tools page scrolled to it, light
+          # and dark; Kinematics & Projectiles' 1D motion solved from rest (v0 = 0, a = 2, t = 5), its projectile at 20 m/s
+          # and 45° light and dark (the log says its range, checked below) and on a 780 window, and its pin's flyout
+          Shot 'tools-physics' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tools-scroll', 'physics'))
+          Shot 'tools-physics-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tools-scroll', 'physics'))
+          Shot 'phys-motion' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'motion', '--tool-state', '1d:v0=0,a=2,t=5'))
+          Shot 'phys-motion-projectile' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'motion', '--tool-state', 'projectile:v0=20,angle=45,h=0,d=30'))
+          Shot 'phys-motion-projectile-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'motion', '--tool-state', 'projectile:v0=20,angle=45,h=0'))
+          Shot 'phys-motion-780' '780x683' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'motion', '--tool-state', 'projectile:v0=25,angle=60,h=2'))
+          Shot 'pin-motion' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'motion', '--pin-open', 'motion'))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
@@ -997,6 +1007,18 @@ jobs:
             $l = PhoneLog 'chem-atom-from-element'
             Write-Host "chem-atom-from-element: $((@($l -split "`n" | Where-Object { $_ -match 'tool popup|atoms: shows' }) -join ' | '))"
             if (-not $l.Contains('tool popup changed to: atoms') -or -not $l.Contains('atoms: shows Fe')) { Write-Host "::error::chem-atom-from-element: iron's facts page did not hand its element to Atoms & Orbitals (shots/profile-chem-atom-from-element.log)"; exit 1 }
+          }
+          # Kinematics & Projectiles opened on a launch at 20 m/s and 45° from the ground: its range 40.77 m, highest point
+          # 10.19 m and 2.883 s in the air (the tool writes "motion: shows …" in a picture run)
+          if ($script:mine -contains 'phys-motion-projectile-dark') {
+            $l = PhoneLog 'phys-motion-projectile-dark'
+            Write-Host "phys-motion-projectile-dark: $((@($l -split "`n" | Where-Object { $_ -match 'motion: ' }) -join ' | '))"
+            if (-not $l.Contains('motion: shows projectile range=40.77 height=10.19 time=2.883')) { Write-Host "::error::phys-motion-projectile-dark: the projectile's flight was not worked out as expected (shots/profile-phys-motion-projectile-dark.log)"; exit 1 }
+          }
+          if ($script:mine -contains 'phys-motion') {
+            $l = PhoneLog 'phys-motion'
+            Write-Host "phys-motion: $((@($l -split "`n" | Where-Object { $_ -match 'motion: ' }) -join ' | '))"
+            if (-not $l.Contains('motion: shows 1d v=10 x=25')) { Write-Host "::error::phys-motion: the 1D motion was not solved as expected (shots/profile-phys-motion.log)"; exit 1 }
           }
           # Cell Explorer opened under a still pointer: nothing pointed at before its picture (the 3D view writes "bio scene:
           # pointed at …" in a picture run when what is under the pointer changes)
