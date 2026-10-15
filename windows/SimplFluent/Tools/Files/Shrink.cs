@@ -344,11 +344,13 @@ internal static class Shrink
             doc.Options.UseFlateDecoderForJpegImages = PdfUseFlateDecoderForJpegImages.Never;
             var seen = new HashSet<PdfDictionary>(ReferenceEqualityComparer.Instance);
             int changed = 0, left = 0;
-            for (var i = 0; i < doc.PageCount; i++)
+            // (everything the report says is read before the save: a saved PdfDocument may not be looked at again)
+            var pages = doc.PageCount;
+            for (var i = 0; i < pages; i++)
                 WalkResources(doc.Pages[i].Elements.GetDictionary("/Resources"), seen, quality, longEdge, ref changed, ref left, 0);
             var ms = new MemoryStream();
             doc.Save(ms, false);
-            return (ms.ToArray(), new PdfReport(changed, left, doc.PageCount));
+            return (ms.ToArray(), new PdfReport(changed, left, pages));
         }
     }
 
