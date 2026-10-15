@@ -892,6 +892,12 @@ jobs:
           Shot 'tool-shrink-dark' '1366x778' 50 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'shrink', '--shrink-files', 'sample', '--shrink-preset', 'smallest', '--shrink-go'))
           Shot 'tool-shrink-780' '780x683' 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'shrink', '--shrink-files', 'sample', '--shrink-preset', 'fit', '--shrink-fit', '0.5', '--shrink-go'))
           Shot 'pin-shrink' '1366x778' 45 ($mock + @('--appearance', 'dark', '--pin', 'shrink', '--pin-open', 'shrink'))
+          # (tools: Study planner, at the end so the pictures before keep their parts) the week, today first, in light; the
+          # week in dark with the midterm's first two blocks ticked (--plan-done); and the list with hour-long blocks (each
+          # log must say the plan has blocks: checked below)
+          Shot 'tool-plan' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'plan', '--plan-hours', '2', '--plan-block', '45'))
+          Shot 'tool-plan-dark' '1366x778' 50 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'plan', '--plan-hours', '2', '--plan-block', '45', '--plan-done', 'assignment_1015:2'))
+          Shot 'tool-plan-list' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'plan', '--plan-view', 'list', '--plan-block', '60'))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
@@ -1284,6 +1290,14 @@ jobs:
             $l = PhoneLog $sh
             Write-Host "${sh}: $((@($l -split "`n" | Where-Object { $_ -match 'shrink: ' }) -join ' | '))"
             if ($l -notmatch 'shrink: done at \w+, .+ \(\d+% saved\) across 3 files') { Write-Host "::error::${sh}: the sample files were not compressed before the picture (shots/profile-$sh.log)"; exit 1 }
+          }
+          # (tools) Study planner: the mock's work due was read and planned into blocks before each picture
+          # (Tools/Planner/StudyPlanner.cs: "plan: shows N blocks for M items over D days (view)")
+          foreach ($pl in @('tool-plan', 'tool-plan-dark', 'tool-plan-list')) {
+            if ($script:mine -notcontains $pl) { continue }
+            $l = PhoneLog $pl
+            Write-Host "${pl}: $((@($l -split "`n" | Where-Object { $_ -match 'plan: ' }) -join ' | '))"
+            if ($l -notmatch 'plan: shows [1-9]\d* blocks for [1-9]\d* items over \d+ days') { Write-Host "::error::${pl}: no study blocks were planned before the picture (shots/profile-$pl.log)"; exit 1 }
           }
           Get-ChildItem shots
       # (what Simpl keeps is encrypted — windows/SimplFluent/Support/Vault.cs — checked in this part's profiles as the
