@@ -20,6 +20,34 @@ extension Engine {
         FilePreview.shared.open(u, name: name, in: web.webView, for: .keep)
     }
 
+    /// (modules-file) A module's file, opened as the Files screen opens one: the file as Canvas's API has it — its own
+    /// download address, with the one-time key Canvas puts on it — fetched into Quick Look under the name the module
+    /// gives it. The module's own address for it (…/files/12/download, which needs the session and Canvas's redirect to
+    /// its file host) is kept for when Canvas will not say, as it was; a Brightspace content file goes that way always,
+    /// fetched from its topic.
+    func openModuleFile(_ url: String, title: String) {
+        guard !onBrightspace, let id = fileId(in: url) else {
+            go(url, title: title)
+            return
+        }
+        Task {
+            if let f = try? await call("fileInfo", ["id": id], as: FileRow.self), let u = f.url, !u.isEmpty, f.locked != true {
+                openFile(u, name: title.isEmpty ? f.name : title)
+            } else {
+                go(url, title: title)
+            }
+        }
+    }
+
+    /// A file's id in one of its addresses (…/courses/1/files/12/download?download_frd=1, …/files/12).
+    private func fileId(in url: String) -> String? {
+        guard let u = absolute(url) else { return nil }
+        let p = u.path.split(separator: "/").map(String.init)
+        guard let i = p.firstIndex(of: "files"), i + 1 < p.count else { return nil }
+        let id = p[i + 1]
+        return !id.isEmpty && id.allSatisfy({ $0.isLetter || $0.isNumber }) ? id : nil
+    }
+
     /// A file of the school's fetched for a preview in a page (no toast): its copy on this Mac.
     func fetchFile(_ url: String, name: String) async throws -> URL {
         guard let u = absolute(url) else { throw URLError(.badURL) }

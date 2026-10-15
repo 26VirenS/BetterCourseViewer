@@ -620,7 +620,10 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   (`PageSection`/`CardSection` `count:`) — Courses, Groups (no "1 current · 1 past" line any more), Files, Discussions,
   Assignments, People, Replies. Quizzes have their own symbol (`questionmark.square`); the checklist is To Do's. A
   course home shows the course's name under its title only when nothing on the page says it already. Modules: a course's
-  only module opens by itself, and a locked one says when it opens under its name, closed. A tool in a module, a tool's
+  only module opens by itself, and a locked one says when it opens under its name, closed. A module's file opens as the
+  Files screen opens one (`openModuleFile`): by its id, through the engine's `fileInfo` — the file's own download
+  address, with its one-time key — into Quick Look under the module's name for it; the module's own address (which needs
+  the session and Canvas's redirect to its file host) only when Canvas will not say. A tool in a module, a tool's
   course chip and the home's More rows end in the window's symbol (a Simpl window); ↗ is only for the browser. People:
   a section of one (the teacher) runs across the card with a named Message button. Files: one vocabulary for a file's
   kind (`typeText`: PDF, Image, Spreadsheet, Text…). A discussion's post is drawn as plain text at once and the web

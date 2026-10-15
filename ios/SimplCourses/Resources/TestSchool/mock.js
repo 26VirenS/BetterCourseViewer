@@ -495,7 +495,9 @@ const modules = {
   ],
   101: [{ id: 'm11', name: 'Unit 1: Functions', state: 'started', position: 1, items: [{ id: 'i11', type: 'Page', title: 'Course Information', html_url: '/courses/101/pages/course-information' }, { id: 'i14', type: 'Page', page_url: 'chapter-4-notes', title: 'Chapter 4 notes', html_url: '/courses/101/pages/chapter-4-notes', completion_requirement: { type: 'must_mark_done', completed: false } },{ id: 'i12', type: 'Quiz', title: 'Lec06-PreQuiz', html_url: '/courses/101/quizzes/9011', content_details: { due_at: at(1, 10, 30), points_possible: 17 }, completion_requirement: { type: 'min_score', min_score: 12, completed: false } },
     // an assignment with nothing to hand in: the module asks for a mark instead, as Canvas's "Mark as done"
-    { id: 'i13', type: 'Assignment', content_id: '1003', title: 'Dis00', html_url: '/courses/101/assignments/1003', completion_requirement: { type: 'must_mark_done', completed: false } }] }],
+    { id: 'i13', type: 'Assignment', content_id: '1003', title: 'Dis00', html_url: '/courses/101/assignments/1003', completion_requirement: { type: 'must_mark_done', completed: false } },
+    // (modules-file) a worksheet under its own sub-heading, as Canvas lists a module's files: the Mac and Windows open it by its id, as the Files screen does
+    { id: 'i15', type: 'SubHeader', title: 'Worksheets' }, { id: 'i16', type: 'File', content_id: 'f4', title: 'Dis01 worksheet.pdf', html_url: '/courses/101/files/f4', indent: 1, content_details: { locked_for_user: false } }] }],
   // a graded discussion sits in its module as the topic, not as its assignment: the sequence asked for
   // the assignment names nothing, as Canvas's does, and the item is found through the modules instead
   105: [{ id: 'm51', name: 'Journals', state: 'started', position: 1, items: [{ id: 'i51', type: 'Discussion', content_id: '7503', title: 'Journal #2', html_url: '/courses/105/discussion_topics/7503', completion_requirement: { type: 'must_mark_done', completed: false } }] }],

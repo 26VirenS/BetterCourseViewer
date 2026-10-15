@@ -3280,7 +3280,7 @@ try {
   // modules
   await tab('modules');
   await page.waitForSelector('.bcv-module', { timeout: 10000 });
-  check((await page.$$('.bcv-module')).length === 1 && (await texts('.bcv-module__item')).length === 4, `modules list: ${(await texts('.bcv-module__item')).length} items (two pages, the quiz, and the assignment the module asks a mark for)`);
+  check((await page.$$('.bcv-module')).length === 1 && (await texts('.bcv-module__item')).length === 6, `modules list: ${(await texts('.bcv-module__item')).length} items (two pages, the quiz, the assignment the module asks a mark for, and a worksheet under its sub-heading)`);
   // (2.99.12) nothing opens by itself: the module last opened here is the one open next time
   check((await page.$$('.bcv-module.bcv-module--open')).length === 0, 'no module is open before one has been opened');
   await page.click('.bcv-module__head');

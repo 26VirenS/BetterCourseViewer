@@ -161,7 +161,7 @@ shoot() {
   # (What's New comes up once the page is loaded and the app is quiet — 20 s on, with four copies of the app at work: a
   # settled picture caught it on its way in, faint, so its picture waits its whole time)
   # ((1.3.83) Desmos in a pin's panel, and a pin's Open Full Screen pressed a few seconds in: their whole time too)
-  case " $* " in *PickerConfirm*|*" tool:"*|*" more:tool "*|*" alta:"*|*" macmillan:"*|*" file:"*|*SimplHandInPreview*|*"SimplOpen whatsnew"*|*SimplPinGraph*|*SimplPinFull*) settle=NO ;; esac
+  case " $* " in *PickerConfirm*|*" tool:"*|*" more:tool "*|*" alta:"*|*" macmillan:"*|*" file:"*|*" modulefile:"*|*SimplHandInPreview*|*"SimplOpen whatsnew"*|*SimplPinGraph*|*SimplPinFull*) settle=NO ;; esac
   (
     rm -f "$OUT_ABS/$name.rect" "$OUT_ABS/$name.png" "$OUT_ABS/$name-app.png"
     local start=$SECONDS took=0 sampled=""
@@ -1062,6 +1062,8 @@ the_set() {
   SIZE=940x820 shoot light-42-narrow-inbox 12 -SimplPlace inbox
   SIZE=1720x1040 shoot light-43-wide-dashboard 14
   SIZE=1720x1040 shoot light-44-wide-inbox 14 -SimplPlace inbox -SimplOpen conversation:first
+  # (modules-file) a module's worksheet opened from its row: the file by its id, in Quick Look over the Modules screen
+  shoot light-14d-module-file-open 24 -SimplPlace section:courses/101:modules -SimplOpen modulefile:i16
   # Brightspace: a made-up student's (scripts/dev/mock-brightspace.mjs), in light — no Inbox or Groups in the sidebar
   export BASE=http://localhost:8860
   MODE=light

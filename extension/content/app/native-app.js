@@ -1831,6 +1831,15 @@
   const MIME_CLASS = { pdf: 'PDF', image: 'Image', video: 'Video', audio: 'Audio', xls: 'Spreadsheet', ppt: 'Slides', doc: 'Document', zip: 'Archive', html: 'Web page', text: 'Text' };
   const fileType = (x) => { const m = String(x?.['content-type'] || '').toLowerCase(); const hit = m && FILE_TYPES.find(([re]) => re.test(m)); return hit ? hit[1] : MIME_CLASS[String(x?.mime_class || '').toLowerCase()] || 'File'; };
   const sizeText = (n) => (!Number.isFinite(Number(n)) ? '' : n < 1024 ? `${n} B` : n < 1048576 ? `${roundHalfUp(n / 1024, 0)} KB` : `${roundHalfUp(n / 1048576, 1).toFixed(1)} MB`);
+  // a file's row as the Files screen has it: its own download address (absolute, with the one-time key Canvas puts on it), its name, its kind
+  const fileRow = (x) => ({ id: String(x.id), name: x.display_name || x.filename || 'File', sub: [sizeText(x.size), x.updated_at || x.modified_at ? dateText(x.updated_at || x.modified_at) : ''].filter(Boolean).join(' · '), url: absUrl(x.url), mime: x['content-type'] || '', kind: x.mime_class || '', typeText: fileType(x), locked: !!(x.locked_for_user || x.locked) });
+  /** (modules-file) One file by its id, as its row in the Files screen — for a module's File item, which the Mac and Windows
+   *  open as the Files screen opens one (the file's own download address), not by the module's address. */
+  async function fileInfo({ id } = {}) {
+    const x = await store.file(String(id || ''));
+    if (!x?.id) throw new Error('That file could not be found.');
+    return fileRow(x);
+  }
   async function files({ ctx, folder = null, age = NO_AGE } = {}) {
     const c = ctxOf(ctx, age);
     const info = await contextInfo(c);
@@ -1841,7 +1850,7 @@
     return {
       title: 'Files', context: info.title, color: info.color, empty: 'This folder is empty.',
       folders: (box?.folders || []).filter((x) => !x.hidden).sort(byName).map((x) => ({ id: String(x.id), name: x.name || 'Folder', sub: [x.files_count ? U.plural(x.files_count, 'file') : '', x.folders_count ? U.plural(x.folders_count, 'folder') : ''].filter(Boolean).join(' · ') || 'Empty', locked: !!x.locked })),
-      files: (box?.files || []).filter((x) => !x.hidden).sort(byName).map((x) => ({ id: String(x.id), name: x.display_name || x.filename || 'File', sub: [sizeText(x.size), x.updated_at || x.modified_at ? dateText(x.updated_at || x.modified_at) : ''].filter(Boolean).join(' · '), url: absUrl(x.url), mime: x['content-type'] || '', kind: x.mime_class || '', typeText: fileType(x), locked: !!(x.locked_for_user || x.locked) })),
+      files: (box?.files || []).filter((x) => !x.hidden).sort(byName).map(fileRow),
     };
   }
   const ROLE = { TeacherEnrollment: 'Teacher', TaEnrollment: 'TA', StudentEnrollment: 'Student', ObserverEnrollment: 'Observer', DesignerEnrollment: 'Designer' };
@@ -2935,7 +2944,7 @@
   }
 
   const CALLS = { setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, whatsNewSeen, refresh,
-    home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage, messageUpload,
+    home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, fileInfo, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage, messageUpload,
     toolLaunch, externalTools, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizAssignment, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback, neighbours };
   // (Mac 1.2) Grade needed: a course's score now (by the student's own weights where set, as the Grades screen) and each
   // piece of work not yet graded with its share of the final grade — tools/need.js pieces(), for the Mac's own tool

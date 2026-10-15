@@ -437,6 +437,9 @@ private struct ModulesList: View {
             engine.openWebScreen(ModulesList.page(url), title: it.title)
         } else if it.type == "ExternalTool", ctx.hasPrefix("courses/") {
             engine.openTool(.moduleItem(course: ContextHome.id(of: ctx), id: it.id, title: it.title))
+        } else if it.type == "File", let url = it.url, !url.isEmpty {
+            // (modules-file) a file as the Files screen opens one: by its id, in Quick Look, under the module's name for it
+            engine.openModuleFile(url, title: it.title)
         } else {
             engine.go(it.url, title: it.title)
         }
@@ -461,6 +464,12 @@ private struct ModulesList: View {
             opened = [last]
         } else if d.modules.count == 1, let only = d.modules.first {
             opened = [only.id] // (courses-16: a course's only module open at once — one closed card was a click for nothing)
+        }
+        // (the screenshot suite: -SimplOpen modulefile:i16 — that item's module open, and the item opened as a click opens it)
+        if let id = LaunchOpen.take("modulefile:"), let m = d.modules.first(where: { $0.items.contains(where: { $0.id == id }) }),
+           let it = m.items.first(where: { $0.id == id }) {
+            opened.insert(m.id)
+            openItem(it)
         }
     }
 
