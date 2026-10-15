@@ -268,6 +268,31 @@ check(ImperialDisplay.convert(1, unit: "m").value == 3.28084 && ImperialDisplay.
       "the ft/mph display converts lengths and speeds and leaves seconds")
 let line = Kinematics.samples(v0: 0, a: 2, t: 5, n: 10)
 check(line.count == 11 && close(line[10].x, 25, 1e-9) && close(line[10].v, 10, 1e-9) && line[0].t == 0, "the graphs' points run from 0 to t")
+// (Vectors: lengths and directions, sums, products, the angle between, projections, and the list a launch writes)
+let v34 = Vec3(3, 4), v12 = Vec3(1, 2)
+check(v34.magnitude == 5 && close(v34.angle, 53.13, 0.005), "(3, 4) is 5 long at 53.13° (\(PhysMath.text(v34.angle)))")
+check((v34 + v12) == Vec3(4, 6) && close((v34 + v12).magnitude, 7.211, 5e-4), "(3, 4) + (1, 2) = (4, 6), 7.211 long")
+check(Vec3(1, 2, 3).dot(Vec3(4, 5, 6)) == 32, "(1, 2, 3) · (4, 5, 6) = 32")
+check(Vec3(1, 0, 0).cross(Vec3(0, 1, 0)) == Vec3(0, 0, 1) && Vec3(0, 1, 0).cross(Vec3(1, 0, 0)) == Vec3(0, 0, -1), "x × y = z, and y × x = −z")
+check(Vec3(1, 0).angle(to: Vec3(0, 1)) == 90 && Vec3(1, 0).angle(to: Vec3(-1, 0)) == 180 && Vec3(1, 0).angle(to: .zero) == nil,
+      "the angle between x and y is 90°, between x and −x 180°, and none with the zero vector")
+let polar = Vec3.polar(10, degrees: 30)
+check(close(polar.x, 8.660, 5e-4) && close(polar.y, 5, 1e-9), "10 at 30° is (8.660, 5) (\(polar.text))")
+check(Vec3(0, -1).angle == 270 && Vec3(-1, 0).angle == 180 && Vec3.zero.angle == 0, "directions run from 0 up to 360°, the zero vector's 0")
+check(Vec3(3, 4).unit == Vec3(0.6, 0.8) && Vec3.zero.unit == nil, "a unit vector, none for zero")
+check(Vec3(2, 3).projection(onto: Vec3(4, 0)) == Vec3(2, 0) && Vec3(2, 3).scalarProjection(onto: Vec3(0, 5)) == 3 && Vec3(1, 1).projection(onto: .zero) == nil,
+      "(2, 3) projected onto x is (2, 0), onto y 3 long, onto nothing none")
+check(close(Vec3(0, 0, 1).elevation, 90, 1e-9) && close(Vec3(1, 0, 1).elevation, 45, 1e-9), "the elevation above the xy plane")
+check(VectorList.parse("3,4;1,2") == [Vec3(3, 4), Vec3(1, 2)] && VectorList.parse("1,2,3; 4, 5, 6") == [Vec3(1, 2, 3), Vec3(4, 5, 6)]
+      && VectorList.parse("1;2,x;3,4") == [Vec3(3, 4)] && VectorList.text([Vec3(3, 4), Vec3(-1, 2.5)], threeD: false) == "3,4;-1,2.5",
+      "a launch's list \"3,4;1,2\" read and written, a vector it cannot read left out")
+check(AngleUnit.radians.degrees(Double.pi / 2) == 90 && AngleUnit.radians.text(180) == "3.142 rad" && AngleUnit.degrees.text(53.13) == "53.13°",
+      "angles in degrees or radians")
+let rows = [VectorEntry(x: "3", y: "4"), VectorEntry(polar: true, magnitude: "10", angle: "30"), VectorEntry(x: "1", y: "", z: "2")]
+check(VectorEntry.rows(VectorEntry.text(rows)) == rows && rows[0].vector(threeD: false, unit: .degrees) == Vec3(3, 4)
+      && close(rows[1].vector(threeD: false, unit: .degrees)?.y ?? 0, 5, 1e-9) && rows[1].vector(threeD: true, unit: .degrees) == nil
+      && rows[2].vector(threeD: true, unit: .degrees) == nil && VectorEntry(x: "1", y: "2").vector(threeD: true, unit: .degrees) == Vec3(1, 2, 0),
+      "the rows kept and read back as typed; a row not whole is no vector yet, a blank z is 0")
 
 // ---- live checks ----------------------------------------------------------------------------------------------
 // (mac/Simpl/Engine/LivePlan.swift, 1.3.80: when the screen on show is checked again, the fingerprint the page gives an

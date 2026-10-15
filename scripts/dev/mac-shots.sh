@@ -607,7 +607,8 @@ chem_calc_tools() {
 
 # (tools) the Tools page's Physics section in light and in dark; Kinematics & Projectiles' 1D page (a fall of 20 m:
 # Δx, v₀ and a given, t and v found, the graphs beside) in light, its Projectile page (20 m/s at 45°, the path flown,
-# a target 30 m off) in light and in dark; and its pin opened (20 m/s at 45° to its range and height)
+# a target 30 m off) in light and in dark; and its pin opened (20 m/s at 45° to its range and height). Vectors on
+# (3, 4) and (1, 2) tip to tail in light and in dark, and its pin opened on the same two
 phys_tools() {
   local m
   for m in light dark; do
@@ -616,6 +617,10 @@ phys_tools() {
   done
   MODE=light SIZE=1440x920 shoot light-77-motion-1d 14 -SimplPlace tools -SimplTool motion -SimplMotion 1d -SimplMotionValues "x=-20,v0=0,a=-9.81"
   MODE=light shoot light-54s-pin-motion 14 -SimplPinnedTools motion -SimplPinOpen motion
+  for m in light dark; do
+    MODE="$m" SIZE=1440x920 shoot "$m-77c-vectors" 14 -SimplPlace tools -SimplTool vectors -SimplVectors "3,4;1,2" -SimplVectorsMode 2d
+  done
+  MODE=light shoot light-54t-pin-vectors 14 -SimplPinnedTools vectors -SimplPinOpen vectors
 }
 
 # (1.3.80) how each 3D model was framed, from the consoles ("[Simpl] bio frame <scene>: view W × H, model X% across,

@@ -708,7 +708,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   carried over (`QuickCarry`, said by each quick version as it changes with `quickCarry(_:)` and read by the panel):
   Grade needed's three numbers, the element searched for in the Periodic Table's or typed in Atoms & Orbitals', the
   link pasted to cite, the unit converter's kind, units and value (`UnitConverterTool.takeHandOff`), a projectile's
-  speed and angle from Kinematics & Projectiles' pin (`MotionCompact`), the calculator's
+  speed and angle from Kinematics & Projectiles' pin (`MotionCompact`), two vectors from Vectors' (`VectorsCompact`),
+  the calculator's
   line, sums, memory and Rad/Deg (`CalcEngine.handOff`), a codon looked up, a cross, a Hardy–Weinberg value, the lab
   calculator shown, (tools) the Equation Balancer's equation; the graph's whole drawing — expressions, sliders, tables, notes and view — by Desmos's own
   `Calc.getState`/`Calc.setState` from the pin's web view to the whole one's (`GraphWeb.carryOver`; the whole one's graph
@@ -973,6 +974,17 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   "v0=20,angle=45,h=0"` (also `x`, `v`, `a`, `t`, `g`, `target`, `units=imperial`), read only when the launch opened
   it. Pictures (`phys_tools`): `light-35d-tools-physics`, `dark-35d-tools-physics`, `light-77-motion-1d`,
   `light-77b-motion-projectile`, `dark-77b-motion-projectile`, `light-54s-pin-motion`.
+  **Vectors** (`vectors`, `Tools/Physics/VectorsTool.swift`; `/vectors`, or "vector", "dot product", "resultant"):
+  up to six vectors, lettered A–F in a colour each, typed as components (x, y, and z in 3D) or as a magnitude and an
+  angle from +x (2D), 2D or 3D, degrees or radians (`Vec3`, `VectorEntry`, Model/PhysVectors.swift). Beside them:
+  each's length and direction (in 3D the angle from +x and the elevation), the resultant with its length and angle,
+  and for a pair chosen by letter the dot product, the angle between, the cross product (in 2D its z component), the
+  unit vectors and the projection of one onto the other; Copy. The drawing (`VectorDiagram`, a Canvas): in 2D on a
+  grid, from the origin or *Tip to tail*, the resultant dashed; in 3D an isometric projection, each vector with its
+  shadow and drop to the xy plane. The pin: two 2D vectors to their sum (`VectorsCompact`), Return or Open Full Screen
+  opening the tool on them (`vectors` handed over as "3,4;1,2"). Launch flags: `-SimplTool vectors -SimplVectors
+  "3,4;1,2"` (components by commas, vectors by semicolons) `-SimplVectorsMode 2d|3d`. Pictures: `light-77c-vectors`,
+  `dark-77c-vectors`, `light-54t-pin-vectors`.
 
 - **The chemistry calculators (tools).** After the Periodic Table's four in the Chemistry section (appended to
   `ChemTools.kinds`, their names, lines, symbols and colours in `ChemTools.info`), each a tile, a pin with a real quick

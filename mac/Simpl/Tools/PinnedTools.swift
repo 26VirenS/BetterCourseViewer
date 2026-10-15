@@ -333,7 +333,7 @@ struct PinnedToolQuick: View {
         case .ptable, .lewis, .molecule, .atoms, .balance:
             // (1.3.80) the chemistry tools': Chemistry/ChemTools.swift
             ChemQuick(kind: kind) { openFull($0, []) }
-        case .motion:
+        case .motion, .vectors:
             // (tools) the physics tools': Physics/PhysTools.swift
             PhysQuick(kind: kind) { openFull($0, []) }
         case .cite: CitationCompact { openFull($0, []) }
