@@ -9,7 +9,7 @@ Simpl for Windows on `claude/windows-liquid-glass` (which carries its own copy o
 | Workflow | Runs on a push that changes | Runner | What it does | Time |
 | --- | --- | --- | --- | --- |
 | **Tests** (`tests.yml`) | `extension/**`, `scripts/dev/**`, `ios/SimplCourses/Resources/**`, itself; or by hand | ubuntu | every suite of `scripts/dev/test-all.mjs` (28 suites, ~2,350 checks) against the mock Canvas and Brightspace | ~5 min |
-| **Mac app** (`mac.yml`) | `mac/**`, the iPhone models the Mac shares, `native-app.js`, `mac-shots.sh`, the checks' scripts and lists, itself | macOS 26 | Models (Swift checks, beside the build); the project as generated; the build (incremental); the pictures (`mac-shots.sh`); kept data sealed; Send from Phone; pictures, consoles and warnings checked; results to the `mac-shots` branch | ~8 min |
+| **Mac app** (`mac.yml`) | `mac/**`, the iPhone models the Mac shares, `native-app.js`, `mac-shots.sh`, the checks' scripts and lists, the Mac release script, itself | macOS 26 ×5 + ubuntu | four parts at once, each: the project as generated, the build (incremental), its share of every picture in light and dark (`mac-shots.sh`, 423), kept data sealed; beside them the release's app built and signed ahead, and Models (Swift checks); then on Linux the parts put together — Send from Phone, the live checks, pictures, consoles and warnings checked, results to the `mac-shots` branch | ~12 min |
 | **iOS build** (`ios.yml`) | `ios/**`, the mock (the test school is made from it), its warnings baseline, itself | macOS 26 + ubuntu | the test school as the mock makes it; the app built for the simulator (incremental); no new warnings | ~1 min |
 | **iOS screenshots** (`ios-shots.yml`) | `ios/**`, `native-app.js`, `ios-shots.sh`, the checks' scripts and lists, itself | macOS 26 | the app built (incremental), every native screen pictured on the simulator, light and dark; pictures, consoles and warnings checked; results to the `ios-shots` branch | ~17 min |
 | **Package** (`package.yml`) | `extension/**`, `scripts/package.sh`, `scripts/chrome-manifest.py`, itself; every `v*` tag | ubuntu | the extension's zips (a tag also publishes) | ~30 s |
@@ -31,7 +31,8 @@ own Tests workflow on its own copy of the extension and suites.
 - **Every picture shows something** (`scripts/dev/check-shots.py`; Mac, iPhone, Windows): each picture the run was to
   take must be there (a missing one is an app that did not get there or quit), and must not be blank or nearly one
   colour. (1.3.79) On the Mac a picture not taken 15 seconds past its wait has its app's threads sampled
-  (`sample-<name>.txt` on `mac-shots`: what kept it), and the suite waits 45 seconds past its wait before giving up;
+  (`sample-<name>.txt` on `mac-shots`: what kept it), and the suite waits 45 seconds past its wait before giving up —
+  (1.3.80) counted in naps that ran twice as long on a busy runner: by the clock now, 30 and 90 seconds;
   the pictures of 3D models are taken at most three at once (`HEAVY_SHOT` in `mac-shots.sh`). Each is measured at 320 pixels wide: the spread of its grey (under 5 fails), the share of its commonest colour
   (over 99% fails) and how many colours cover at least 0.2% of it (under 3 fails). The plainest real screens (a sign-in
   card on an empty window) measure a spread of 9 and 97–98% one colour. Every picture's numbers are in
@@ -58,7 +59,8 @@ own Tests workflow on its own copy of the extension and suites.
   failed checks; the picture, log and warning checks print one line each, with the file and its numbers).
 - **Logs and pictures**: the Tests workflow's `test-logs` artifact (every suite's log, `test-all.txt`); the Mac's and
   the iPhone's latest run on the `mac-shots` and `ios-shots` branches (`git fetch origin mac-shots`: `build-errors.txt`,
-  `FAILED`, `console-*.txt`, `shot-times.txt`, `shot-checks.txt`, the pictures); Windows' `windows-fluent-shots`
+  `FAILED`, `console-*.txt`, `shot-times.txt`, `shot-checks.txt`, the pictures; the Mac's also `shot-plan.txt`, the
+  part each picture was taken in, and a part's own files under the run's `mac-part-<n>` artifacts); Windows' `windows-fluent-shots`
   artifact (`gh run download <run id> -R 26VirenS/BetterCourseViewer -n windows-fluent-shots -D <empty dir>`).
 - The same checks run on a machine of your own: `node scripts/dev/test-all.mjs` (`--only smoke:course,phone`,
   `BCV_NO_SHOTS=1`, `--jobs 4`); `python3 scripts/dev/check-shots.py <pictures> --app mac --report numbers.txt`
@@ -107,7 +109,34 @@ Measured from the runs' own step timings (`gh api repos/26VirenS/BetterCourseVie
   boot (about three minutes) and the eleven pictures that wait their whole time (a tool's page, the school's sign-in,
   the launches that settle the simulator after its appearance changes).
 - **The Mac app** already took each picture as the app settled (`Shot.swift`, several copies at once) and kept its
-  build; its run is mostly the pictures. The Models job runs beside the build on a runner of its own.
+  build; its run is mostly the pictures. (1.3.80) A push took a quick set (about 200 pictures, 13–22 minutes) and the
+  whole set (349) was a second run by hand (27–29 minutes). Now every run takes both, 423 pictures, in four parts on
+  four Macs at once: each builds the app from the last build (the build is seconds, so no part waits for another's)
+  and takes the share `mac-shots.sh` gives it — every part walks the whole list first and shares it out alike, by the
+  time each picture took (`scripts/dev/baselines/mac-shot-times.txt`; a new picture counts its wait), the groups that
+  must be taken alone (the live checks, the walks, the pins, the focus timer) charged to their part for every copy of
+  the app they keep idle, so the parts end within seconds of each other. Each part sends its files as an artifact;
+  a Linux job holds them to the plan every part wrote (`shot-plan.txt`, the same from each), checks them as one and
+  pushes `mac-shots`. A fifth Mac, for the first few minutes, builds the release's app ahead and runs Models (its
+  compiled checks are kept by a cache keyed by their sources and the compiler, so it is seconds unless those changed,
+  four minutes then; Mac releases, below). One Mac takes about 14 pictures a minute with five copies of the app at
+  once (it is the Mac's three cores that limit it, not the waits): each part about 9 minutes of pictures, about 12
+  minutes for the run from the push to `mac-shots`. Four parts, for a push to a beta in half the time: the account
+  runs five Macs at once, so a Mac release started in a run's first few minutes waits for the fifth to be done (a few
+  minutes), and a release with Package's Mac job (two Macs) has one of them wait for a part to finish (up to the
+  run's ten minutes or so); three parts would leave them room, at about 14 minutes a run. Each part's Mac's load is on `mac-shots` (`load-part<n>.txt`),
+  to choose the copies per Mac and the number of parts from. The number of parts is the matrix's list in `mac.yml`
+  alone: `mac-shots.sh` shares the set out over however many there are.
+- **Mac releases** (`mac-native-release.yml`) took about 9 minutes, nearly 8 of them compiling: the release's
+  intermediates were kept only by the releases, so each compiled every change since the last (1.3.80: 68 files
+  changed, 7 min 47 s; 1.3.79: 78, 10 min 32 s; 1.3.75: 5, 1 min 4 s), most of the module for both kinds of Mac — the
+  cache was found and the files' dates kept every time. (1.3.82) The Mac app workflow now builds a beta's app ahead
+  on every push, beside the parts, from the push before's intermediates (one push's changes), signed as the release
+  signs it (`MAC_RELEASE_STEP=build`), and keeps it by a cache keyed by the commit. The release run on that commit
+  checks it (this commit, version, build and kind; the team's Developer ID, the hardened runtime, a secure timestamp,
+  both kinds of Mac) and only notarizes, staples and publishes it: about a minute and a half, most of it Apple's
+  notary. A release proper (whole-module, about 5 minutes whatever changed), a commit the workflow has not finished,
+  or an app that fails a check is compiled by the release as before.
 - **Windows** already built once, pictured in eight parts at once, settled before each picture (`Support/Shot.cs`)
   and kept NuGet's packages. The unit tests and warnings run beside the build (about as long as it: nothing added);
   the checks read the parts in 14 seconds once the pictures and the installer are done. The installer's try waits for

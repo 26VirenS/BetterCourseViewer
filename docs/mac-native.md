@@ -512,7 +512,7 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   Canvas (the school's own) and Copy Link. A tool opens in the tool window on Canvas's launch page for it, borderless
   (light, as tool pages open, the app light or dark); a link opens its page in the app's browser window. The screenshot
   suite's `70` pictures: the section (`-SimplSidebarScroll more` scrolls the sidebar to it), History, Help, and My
-  Materials in the tool window (in light and, in the full set, in dark: its page light).
+  Materials in the tool window (in light and in dark: its page light).
   (1.3.68) Alta: a large picture or canvas (at least 140 × 100) counts as a graph too, and in dark mode each graph sits on
   a white card of its own (drawn in dark ink for a white page, its ground clear, it was lost on dark glass). A question
   is shown once Alta has finished drawing it — nothing changed on the page for 350 ms, no maths or answer box still
@@ -1021,7 +1021,9 @@ Intel, signs it with the team's Developer ID (the same five secrets the Safari a
 has Apple notarize it, staples the ticket and publishes `Simpl-Mac-<version>.zip` as a GitHub Release of its own,
 `mac-v<version>`. A version already released is refused, never replaced: raise the version (and the build) first and
 run `python3 scripts/dev/make-mac-project.py`. The site's Mac download stays the Safari app's; Simpl for Mac has an
-update feed of its own (Updates, below).
+update feed of its own (Updates, below). (1.3.82) A beta of a commit the Mac app workflow has finished with is not
+compiled again: that run built and signed its app ahead, and the release only notarizes, staples and publishes it once
+it has checked it (Betas, below).
 
 `simpl://` links open in the app: `simpl://courses/101/assignments/1001` opens that assignment.
 
@@ -1040,9 +1042,14 @@ Simpl for Mac keeps itself up to date (`Support/Updater.swift`, a port of the Sa
   feeds). Turned off, a Mac stays on the beta it has until a release newer than it comes. Earlier Versions marks betas.
   (1.3.31) A beta builds quickly: it is compiled a file at a time (`SWIFT_COMPILATION_MODE=singlefile`, still
   optimized) from the last beta's intermediates (its own cache, `mac-release-beta-…`), so only what changed is compiled;
-  a release proper is still compiled whole-module from its own (`mac-release-stable-…`). A beta needs no wait for the
-  Mac app workflow: the release builds the app itself, so it is dispatched as soon as the change is pushed, and the
-  screenshots come alongside.
+  a release proper is still compiled whole-module from its own (`mac-release-stable-…`). (1.3.82) The Mac app workflow
+  builds a beta's app ahead on every push, beside its pictures, signed as the release signs it, and keeps it by a
+  cache keyed by the commit (`mac-release-app-beta-<sha>`), with each push's intermediates for the next
+  (`mac-release-beta-<sha>`). A beta released on a commit whose run has finished that job ("Models, and the release
+  app built ahead") takes that app once it is checked — this commit, version, build and kind; the team's Developer
+  ID, the hardened runtime, a secure timestamp, both kinds of Mac — and is only notarized, stapled and published,
+  about a minute and a half. Dispatched sooner, it compiles the app itself from the newest push's intermediates, as
+  before but with one push's changes to compile.
 - **When.** At launch when the last check is more than four hours old, then every four hours (looked at every ten
   minutes and whenever the app comes to the front, so a Mac asleep does not stretch the wait), and on **Simpl ▸ Check
   for Updates…** or *Check Now* in **Settings ▸ Updates**. The menu opens Settings on Updates when there is a version
@@ -1066,12 +1073,20 @@ Simpl for Mac keeps itself up to date (`Support/Updater.swift`, a port of the Sa
 
 `.github/workflows/mac.yml` builds the app with Xcode 26 on every change to `mac/` or the shared files, runs it against
 the mock Canvas, and pictures every screen in light and dark (`scripts/dev/mac-shots.sh`). The pictures, the build's
-errors and warnings and the built app go to the `mac-shots` branch. Nothing is signed for distribution or published.
+errors and warnings and the built app go to the `mac-shots` branch. Nothing is published. (1.3.82) Beside the
+pictures a beta's app is built and signed with the Developer ID ahead of a release and kept for it by a cache, never
+notarized, published or downloadable here (Releasing, above).
+(1.3.80) Every run, a push's too, takes the whole set — 423 pictures, what a push and "full" took before — in four
+parts on four Macs at once, each building the app from the last build and taking the pictures `mac-shots.sh` shares
+out to it by the time each took (`scripts/dev/baselines/mac-shot-times.txt`); a Linux job puts the parts together,
+checks them and pushes them to `mac-shots` as one run's; the model checks run beside the parts (docs/CI.md). Which part
+takes which picture is in `shot-plan.txt` on `mac-shots`; `SHOTS=plan SHARDS=4 bash scripts/dev/mac-shots.sh` writes
+it on any machine without the app.
 (1.3.76) After the pictures, every storage, flashcards and kept-answer file the app wrote must start with the vault's
 `SIMPLENC` mark, and no `login.bin` or `cookies.bin` may be found (the sign-in and the cookies are Keychain items: Data
 and encryption, above), or the run fails. Where each worker's vault keeps its key (`vault.key`'s mode) is printed:
 `keychain`, or `file` when the runner's Keychain would not take it.
-(1.3.80) Live checks are pictured last, one at a time (a check runs only while its app is in front) and against a mock
+(1.3.80) Live checks are pictured last in their part, one at a time (a check runs only while its app is in front) and against a mock
 of their own on :8810 (its changes never show in another picture): `light-48a-live-dashboard` (List; the soonest work
 marked done 6 seconds in), `light-48b-live-cards` (Cards; a course's total moved), `light-48c-live-todo` (a task added)
 and `light-48d-live-course` (a course's assignments at their own pace), each checked every 4 seconds and pictured after
@@ -1082,12 +1097,12 @@ found nothing new, the course's assignments were checked, and no check went unan
 (1.3.78) Every screen's open is timed on the console — `[Simpl] open Grades: 14 ms (cached)`: from the press that
 opened it (a sidebar row, a link, Back) to the frame with its content, and where that content came from (`cached`, this
 session's answer in memory; `kept`, an answer kept from before, its counts held back until the `live` one is in;
-`fetched`, asked of the page while the screen waited; `alive`, a screen never put away) — and both picture sets take
+`fetched`, asked of the page while the screen waited; `alive`, a screen never put away) — and every run takes
 `light-01w-walk`: the app walks through its places as a student's clicks would (`-SimplWalk`, Support/OpenClock.swift),
 each root place, a course and an assignment and then each again, so its console has the time of every first visit and
 every visit again; last, the assignment opened from the Dashboard (its course's place, made with it on top) and Back,
 where the console must say `open Assignment`, not the course's list. `light-01v-walk-plain` walks the same way beside
-it, last and by themselves (the copies picturing the rest would slow them, and unevenly), with the screens loading as they did before 1.3.78 (`-SimplPlain`: nothing
+it, last in their part and by themselves (the copies picturing the rest would slow them, and unevenly), with the screens loading as they did before 1.3.78 (`-SimplPlain`: nothing
 held or read ahead, the Dashboard not kept), so the two consoles compare like for like — both against a Canvas a
 quarter of a second away, as a school's is (its assignment lists 0.6 s; the mock's `apiDelay`, as the web's fluid suite
 has it), not the mock's instant answers. In the screenshot suite and in
