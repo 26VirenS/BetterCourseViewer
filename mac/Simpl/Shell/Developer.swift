@@ -413,7 +413,7 @@ private struct DevInterface: View {
                 HStack {
                     Button("Reset Periodic Table Tour") { UserDefaults.standard.removeObject(forKey: "simpl.ptTourSeen") }
                     Button("Forget What They Keep") { ChemPrefs.forgetAll() }
-                        .help("The Periodic Table's colouring and last element, the Lewis maker's and the Molecule Builder's molecules, Atoms & Orbitals' element and view")
+                        .help("The Periodic Table's colouring and last element, the Lewis maker's and the Molecule Builder's molecules, Atoms & Orbitals' element and view, the calculators' last inputs")
                 }
             }
             Section("Look") {

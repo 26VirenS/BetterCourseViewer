@@ -6,7 +6,8 @@ import UniformTypeIdentifiers
 // a calculator, a graphing calculator, the periodic table, Grade needed, a file converter, Merge & split PDFs, a PDF
 // annotator, Image to text and flashcards — drawn natively, with a unit converter of the Mac's own beside them,
 // (1.3.78) the biology toolkit's ten under a heading of their own (Biology/BioTools.swift) and (1.3.80) the periodic
-// table split into the chemistry tools' four, under theirs (Chemistry/ChemTools.swift). One row in the sidebar opens a
+// table split into the chemistry tools' four, under theirs (Chemistry/ChemTools.swift), (tools) the chemistry
+// calculators — the Equation Balancer — beside them. One row in the sidebar opens a
 // page of tiles, (tools-32) in sections by what they are for: Study, Math & science, Files, Chemistry and Biology;
 // (1.3.79) a tile opens its tool in a popup over the window — the Tools page staying behind it, and the whole window
 // usable round it (Shell/FloatingPopup.swift) — as its pin, a hand-off from another tool and a launch do. Any tool can be
@@ -20,6 +21,8 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
     // (1.3.80) the chemistry tools beside the Periodic Table (`ptable`, the key its pin always had): their names, lines,
     // symbols and colours, and the Periodic Table's, are ChemTools.info's
     case lewis, molecule, atoms
+    // (tools) the chemistry calculators after them — the Equation Balancer and the rest, ChemTools.info's too
+    case balance
     // (1.3.78) the biology toolkit: its names, lines, symbols and colours are BioTools.info's
     case cell, dna, gene, biomol, cross, divide, popgen, biolab, enzyme, energy
 
@@ -31,7 +34,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .pomo: return "Focus timer"
         case .calc: return "Calculator"
         case .graph: return "Graphing calculator"
-        case .ptable, .lewis, .molecule, .atoms: return ChemTools.info(self).name
+        case .ptable, .lewis, .molecule, .atoms, .balance: return ChemTools.info(self).name
         case .need: return "Grade needed"
         case .conv: return "File converter"
         case .units: return "Unit converter"
@@ -51,7 +54,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .pomo: return "Focus"
         case .calc: return "Calculator"
         case .graph: return "Graphing"
-        case .ptable, .lewis, .molecule, .atoms: return ChemTools.info(self).shortName
+        case .ptable, .lewis, .molecule, .atoms, .balance: return ChemTools.info(self).shortName
         case .need: return "Grade needed"
         case .conv: return "Convert"
         case .units: return "Units"
@@ -70,7 +73,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .pomo: return "Focus, then take a break."
         case .calc: return "Scientific, from your keyboard."
         case .graph: return "Desmos, right here."
-        case .ptable, .lewis, .molecule, .atoms: return ChemTools.info(self).note
+        case .ptable, .lewis, .molecule, .atoms, .balance: return ChemTools.info(self).note
         case .need: return "What you need on the final."
         case .conv: return "Convert Word, PDF and images."
         case .units: return "Lengths, weights, temperatures."
@@ -88,7 +91,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .pomo: return "timer"
         case .calc: return "plus.forwardslash.minus"
         case .graph: return "chart.xyaxis.line"
-        case .ptable, .lewis, .molecule, .atoms: return ChemTools.info(self).symbol
+        case .ptable, .lewis, .molecule, .atoms, .balance: return ChemTools.info(self).symbol
         case .need: return "percent"
         case .conv: return "arrow.triangle.2.circlepath"
         case .units: return "ruler"
@@ -106,7 +109,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .pomo: return "#ff9500"
         case .calc: return "#ff9f0a"
         case .graph: return "#5856d6"
-        case .ptable, .lewis, .molecule, .atoms: return ChemTools.info(self).hex
+        case .ptable, .lewis, .molecule, .atoms, .balance: return ChemTools.info(self).hex
         case .need: return "#ff375f"
         case .conv: return "#34c759"
         case .units: return "#64d2ff"
@@ -123,7 +126,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
     /// The width of its pinned popover. (tools-34) The Periodic Table's wider, for squares big enough to point at.
     var popoverWidth: CGFloat {
         switch self {
-        case .ptable, .lewis, .molecule, .atoms: return ChemTools.popoverWidth(self)
+        case .ptable, .lewis, .molecule, .atoms, .balance: return ChemTools.popoverWidth(self)
         case .calc: return 420
         case .cite: return 400
         case .graph: return 360
@@ -499,6 +502,7 @@ struct ToolScreen: View {
         case .lewis: LewisStructuresTool()
         case .molecule: MoleculeBuilderTool()
         case .atoms: AtomsOrbitalsTool()
+        case .balance: EquationBalancerTool()
         case .need: GradeNeededTool()
         case .conv: FileConverterTool()
         case .units: UnitConverterTool()

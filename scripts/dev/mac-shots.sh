@@ -593,6 +593,18 @@ chem_tools() {
   MODE=light shoot light-30c-palette-chemistry 14 -SimplOpen "palette:orbitals"
 }
 
+# (tools) the chemistry calculators: the Equation Balancer on a redox equation in light and dark, narrow on
+# propane's combustion, an equation that can't be balanced (an element on one side only, named), and its pin opened
+chem_calc_tools() {
+  local m
+  for m in light dark; do
+    MODE="$m" SIZE=1440x920 shoot "$m-71-tool-balance" 14 -SimplPlace tools -SimplTool balance -SimplBalance "KMnO4 + HCl → KCl + MnCl2 + H2O + Cl2"
+  done
+  MODE=light SIZE=780x700 shoot light-71b-tool-balance-narrow 14 -SimplPlace tools -SimplTool balance -SimplBalance "C3H8 + O2 → CO2 + H2O"
+  MODE=light SIZE=1440x920 shoot light-71a-tool-balance-cant 14 -SimplPlace tools -SimplTool balance -SimplBalance "Na + Cl2 -> NaBr"
+  MODE=light shoot light-54l-pin-balance 14 -SimplPinnedTools balance -SimplPinOpen balance -SimplBalance "Fe + O2 -> Fe2O3"
+}
+
 # (1.3.80) how each 3D model was framed, from the consoles ("[Simpl] bio frame <scene>: view W × H, model X% across,
 # Y% up", and the atom's and the molecule's frames): each picture's last framing and its model's share of its view's
 # limiting side (the larger of the two) in frame-check.txt — 75% to 85% is as framed (SceneFill); under 70% is said
@@ -889,6 +901,7 @@ the_set() {
   alta_pages # (1.3.83) Alta's popup: its pop-ups read whole, Light or Dark, Show Browser
   tool_popups # (1.3.79) a tool's popup over the Tools page
   chem_tools # (1.3.80) the Chemistry section and its tools
+  chem_calc_tools # (tools) the chemistry calculators
   # (1.3.78) a PDF-only assignment (1013, made so here) waiting for the phone: Combine photos under the code
   mock_config '{"ext":{"1013":["pdf"]}}'
   MODE=dark shoot dark-12f-hand-in-phone-photos-waiting 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1013 -SimplOpen handin -SimplPhone YES

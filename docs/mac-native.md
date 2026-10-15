@@ -709,7 +709,7 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   Grade needed's three numbers, the element searched for in the Periodic Table's or typed in Atoms & Orbitals', the
   link pasted to cite, the unit converter's kind, units and value (`UnitConverterTool.takeHandOff`), the calculator's
   line, sums, memory and Rad/Deg (`CalcEngine.handOff`), a codon looked up, a cross, a Hardy–Weinberg value, the lab
-  calculator shown; the graph's whole drawing — expressions, sliders, tables, notes and view — by Desmos's own
+  calculator shown, (tools) the Equation Balancer's equation; the graph's whole drawing — expressions, sliders, tables, notes and view — by Desmos's own
   `Calc.getState`/`Calc.setState` from the pin's web view to the whole one's (`GraphWeb.carryOver`; the whole one's graph
   before it is a ⌘Z away). The focus timer, Flashcards' sets and the lab's numbers are the whole tool's already. A panel
   as it opens carries nothing, and the tool opens as from its tile; with something carried, the tool's popup if it is
@@ -949,6 +949,35 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   `light-30c-palette-chemistry`; and the chemistry pictures before them, pointed at the tools (`light-55c-lewis`,
   `light-55d-molecule`, `light-55k-atoms-cloud`, `dark-55l-atoms-cloud`).
 
+- **The chemistry calculators (tools).** After the Periodic Table's four in the Chemistry section (appended to
+  `ChemTools.kinds`, their names, lines, symbols and colours in `ChemTools.info`), each a tile, a pin with a real quick
+  version, a popup, a `/command` in the search field and launch flags for its pictures; what each keeps is in
+  `ChemPrefs` (`SimplChem.<key>.<field>`), and the arithmetic of each needs no window — it is in
+  `Tools/Chemistry/Model/` (Foundation only) and the Models job checks the specification's test vectors
+  (`scripts/dev/swift-checks/main.swift`, "the chemistry calculators"). Shared by them all
+  (`Model/ChemFormula.swift`): `ChemFormula.parse` reads a formula — parentheses, hydrates (`CuSO4·5H2O`), charges
+  (`Fe^3+`, `Fe3+`, `SO4^2-`, `MnO4-`, superscripts), subscript digits, a phase label `(s) (l) (g) (aq)` passed over — into
+  its elements and counts, and types it with subscripts (`pretty`); `ChemElements` has each element's mass from
+  `PeriodicData.json`; `ChemMolar.breakdown` a molar mass with its percent composition; `ChemNumber` writes a number
+  to a few significant figures, rounded half up with no float noise (`sig`, `fixed`, `pretty` for "3.343 × 10²³");
+  `ChemLaunchValues` reads the flags' `key=value` lists.
+  - **Equation Balancer** (`balance`, `Tools/Chemistry/EquationBalancer.swift`; `/balance`, words *equation*,
+    *reaction*, *coefficients*): one field for the whole equation (`->`, `→`, `=` or `⟶`; coefficients typed are passed
+    over), balanced as it is typed (150 ms after the last key, or on Return) by `ChemBalancer` (`Model/ChemBalance.swift`):
+    the matrix of each element's — and the charge's — count in each species, its null space found with exact
+    fractions (`ChemFraction`, Int64 with every step checked for overflow), the one solution scaled to the smallest
+    whole numbers. A null space of two dimensions says *More than one way to balance this — split it into separate
+    equations*; an element on one side only *This can't be balanced — check the formulas (an element on only one side?
+    `Cl`, `Br`)*; a token that is no formula *Can't read `XyZ` — is it a real formula?*. The answer is typeset
+    (`EquationText`: coefficients bold, 1 left out, subscripts and charges) over *Balanced*; beside it the atom count
+    table (each element, and *Charge* when ions are in it, on each side, ticked when equal) and the mass check (each
+    side's total from the molar masses). Copy copies `2H2 + O2 → 2H2O`; Clear empties the field; four example chips.
+    Kept: `balance.equation`. Pin: the field and the balanced line (`EquationBalancerCompact`, 400 points wide); Return
+    or a press on the line opens the tool whole on it (carried: `equation`). Launch: `-SimplTool balance -SimplBalance
+    "<equation>"` (the pin reads `-SimplBalance` too). Pictures (`chem_calc_tools`): `light-71-tool-balance`,
+    `dark-71-tool-balance`, `light-71b-tool-balance-narrow` (780 × 700), `light-71a-tool-balance-cant` (Na + Cl2 → NaBr),
+    `light-54l-pin-balance`.
+
 ## Data and encryption
 
 (1.3.76) Simpl for Mac keeps what it holds secret in the Mac's own **Keychain**, which macOS encrypts under the
@@ -1030,7 +1059,8 @@ Settings opens on), `-SimplRolledBackFrom <version>` (1.3.86: Settings ▸ Updat
 hold's row under Version), `-SimplSidebar hidden` (the window opens with its sidebar folded away),
 `-SimplMorphHold <share>` (with `-SimplSheet <counter>`: the counter's tile grows that share of the way into its
 panel, 0.5 half-way, and stays there — the real grow, stopped, so a picture shows it under way, even where the Mac
-reduces motion; `DashMorphHold`). In the pictures' consoles a counter opened says how it came (`[Simpl] counter: next
+reduces motion; `DashMorphHold`), (tools) `-SimplTool balance -SimplBalance "<equation>"` (the Equation Balancer on
+that equation). In the pictures' consoles a counter opened says how it came (`[Simpl] counter: next
 grows`, or `fades in (Reduce Motion)`).
 
 ## Releasing

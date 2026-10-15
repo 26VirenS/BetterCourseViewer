@@ -9,7 +9,9 @@ import SwiftUI
 // popup and heading, and keeps what it was left at (ChemPrefs). Where the table's pages and its element page's 3D view
 // were, they now hand over to one another in the same popup: an element's facts page opens Atoms & Orbitals on it, which
 // goes back to the facts; the Lewis maker's "Open in Molecule Builder" hands its molecule over. Each tool's view is its
-// own file's (PeriodicTable.swift, LewisMaker.swift, MoleculeBuilder.swift, AtomsOrbitals.swift).
+// own file's (PeriodicTable.swift, LewisMaker.swift, MoleculeBuilder.swift, AtomsOrbitals.swift). (tools) After them
+// the chemistry calculators: the Equation Balancer (EquationBalancer.swift), whose arithmetic needs no window and is
+// checked by the Models job (Model/ChemFormula.swift, Model/ChemBalance.swift).
 
 /// What the Tools page, the toolbar and a pin's popover show of a chemistry tool.
 struct ChemToolInfo {
@@ -22,13 +24,15 @@ struct ChemToolInfo {
 }
 
 enum ChemTools {
-    /// The four, in the Tools page's order.
-    static let kinds: [ToolKind] = [.ptable, .lewis, .molecule, .atoms]
+    /// The tools in the Tools page's order: the Periodic Table's four, then (tools) the calculators.
+    static let kinds: [ToolKind] = [.ptable, .lewis, .molecule, .atoms, .balance]
 
-    /// Each tool's name, line, symbol and colour — a palette of their own (red, cyan, green and violet), none of them
-    /// near a biology tile's colour.
+    /// Each tool's name, line, symbol and colour — a palette of their own (red, cyan, green and violet; the
+    /// calculators' orange-red and the rest), none of them near a biology tile's colour.
     static func info(_ k: ToolKind) -> ChemToolInfo {
         switch k {
+        case .balance: return ChemToolInfo(name: "Equation Balancer", shortName: "Balance", note: "Balance any chemical equation.",
+                                           symbol: "equal.square", hex: "#ff6b35")
         case .ptable: return ChemToolInfo(name: "Periodic Table", shortName: "Elements", note: "Every element, its trends and its facts.",
                                           symbol: "square.grid.3x3", hex: "#e5484d")
         case .lewis: return ChemToolInfo(name: "Lewis Structures", shortName: "Lewis", note: "Bonds, lone pairs, formal charges and resonance.",
@@ -41,8 +45,15 @@ enum ChemTools {
         }
     }
 
-    /// The pin popover's width: (tools-34) the Periodic Table's wider, for squares big enough to point at.
-    static func popoverWidth(_ k: ToolKind) -> CGFloat { k == .ptable ? 480 : 330 }
+    /// The pin popover's width: (tools-34) the Periodic Table's wider, for squares big enough to point at; (tools) the
+    /// Equation Balancer's a little, for a whole equation on its line.
+    static func popoverWidth(_ k: ToolKind) -> CGFloat {
+        switch k {
+        case .ptable: return 480
+        case .balance: return 400
+        default: return 330
+        }
+    }
 
     /// The tool key a launch's -SimplTool means: the Periodic Table's old page and view flags read as the tools they are
     /// now (ChemLaunch) — -SimplTool ptable -SimplPTPage lewis is Lewis Structures — so the pictures' flags keep working.
@@ -81,8 +92,9 @@ enum ChemTools {
 /// What the chemistry tools keep from one opening to the next, on this Mac only: UserDefaults
 /// `SimplChem.<key>.<field>` — the Periodic Table's colouring and the last element opened (`ptable.colour`,
 /// `ptable.element`), the Lewis maker's molecule (`lewis.draft`, ChemLewisDraft), the Molecule Builder's and how it is
-/// shown (`molecule.saved`, ChemMoleculeDraft; `.style`, `.lonePairs`, `.labels`), and Atoms & Orbitals' element and
-/// view (`atoms.element`, `atoms.view`). A picture's launch (-SimplShotFile) keeps them in a suite of its own that starts
+/// shown (`molecule.saved`, ChemMoleculeDraft; `.style`, `.lonePairs`, `.labels`), Atoms & Orbitals' element and
+/// view (`atoms.element`, `atoms.view`), and (tools) the calculators' last inputs (`balance.equation`). A picture's
+/// launch (-SimplShotFile) keeps them in a suite of its own that starts
 /// empty, as BioPrefs does, so each picture shows its tool as its launch asks and nothing more.
 enum ChemPrefs {
     private static let store: UserDefaults = {
@@ -131,7 +143,7 @@ struct ChemToolsSection: View {
                 Text("Chemistry")
                     .font(.sTitle3)
                     .accessibilityAddTraits(.isHeader)
-                Text("The periodic table, Lewis structures, molecules in 3D, and each element's atom and orbitals.")
+                Text("The periodic table, Lewis structures, molecules in 3D, each element's atom and orbitals, and the chemistry calculators.")
                     .font(.sCallout)
                     .foregroundStyle(.secondary)
             }
@@ -201,8 +213,8 @@ struct MoleculeBuilderTool: View {
 }
 
 /// A chemistry tool's quickest use in its pin's popover: the Periodic Table small (PeriodicTableCompact), an element to
-/// see in Atoms & Orbitals (AtomsOrbitalsCompact), and for the Lewis maker and the builder, the tool's tile, its line and
-/// Open.
+/// see in Atoms & Orbitals (AtomsOrbitalsCompact), (tools) an equation balanced (EquationBalancerCompact), and for the
+/// Lewis maker and the builder, the tool's tile, its line and Open.
 struct ChemQuick: View {
     let kind: ToolKind
     let openFull: (_ info: [String: String]) -> Void
@@ -211,6 +223,7 @@ struct ChemQuick: View {
         switch kind {
         case .ptable: PeriodicTableCompact(openFull: openFull)
         case .atoms: AtomsOrbitalsCompact(openFull: openFull)
+        case .balance: EquationBalancerCompact(openFull: openFull)
         default: BioQuickOpen(kind: kind) { openFull([:]) }
         }
     }

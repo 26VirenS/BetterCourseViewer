@@ -5,7 +5,8 @@ import simd
 // mac/Simpl/Tools/PeriodicData.swift, PeriodicExtraData.swift (the elements' data), MoleculeShape.swift (VSEPR, the
 // molecule builder's and the Lewis maker's shapes), every file in mac/Simpl/Tools/Biology/Model (the biology toolkit's
 // data and arithmetic, and its self-check), (1.3.80) every file in mac/Simpl/Tools/Chemistry/Model (the chemistry
-// tools' launch flags and what they keep) and mac/Simpl/Engine/LivePlan.swift (1.3.80: the live checks' plan,
+// tools' launch flags and what they keep, and (tools) the chemistry calculators' arithmetic — formulas, molar masses,
+// the balancer) and mac/Simpl/Engine/LivePlan.swift (1.3.80: the live checks' plan,
 // fingerprint and comparison) — and run, in seconds, by the Mac app's workflow (Models). By hand on a Mac: swiftc -o
 // /tmp/model-checks mac/Simpl/Tools/{PeriodicData,PeriodicExtraData,MoleculeShape}.swift
 // mac/Simpl/Tools/Biology/Model/*.swift mac/Simpl/Tools/Chemistry/Model/*.swift mac/Simpl/Engine/LivePlan.swift
@@ -149,6 +150,72 @@ check(ChemMoleculeDraft(text: "title Empty\nfixed 0") == nil, "a molecule with n
 check(ChemMoleculeDraft(text: "atom C 0 0 0\nbond 0 1 1") == nil, "nor one with a bond past its atoms")
 check(ChemMoleculeDraft(text: "atom C 0 0 0\natom O 1 0 0\nbond 0 1 0") == nil && ChemMoleculeDraft(text: "atom C 0 0 0 12") == nil,
       "nor a bond of no order or an atom with twelve lone electrons")
+
+// ---- the chemistry calculators (tools) ----------------------------------------------------------------------------
+// (mac/Simpl/Tools/Chemistry/Model/ChemFormula.swift and ChemBalance.swift: a formula read into its elements, molar
+// masses from the table's own data, numbers written for an answer, and the Equation Balancer's exact solution — the
+// specification's test vectors, the same on Windows)
+print("the chemistry calculators")
+func formula(_ s: String) -> ChemFormula? { try? ChemFormula.parse(s).get() }
+func molar(_ s: String) -> Double { formula(s)?.molarMass ?? -1 }
+check(formula("Ca(OH)2")?.counts == ["Ca": 1, "O": 2, "H": 2] && formula("Ca(OH)2")?.elements == ["Ca", "O", "H"], "Ca(OH)2 read: its elements in order, the group counted twice")
+check(formula("CuSO4·5H2O")?.counts == ["Cu": 1, "S": 1, "O": 9, "H": 10] && formula("CuSO4*5H2O")?.counts["H"] == 10, "a hydrate's water counted, with · or *")
+check(formula("Fe^3+")?.charge == 3 && formula("Fe3+")?.charge == 3 && formula("SO4^2-")?.charge == -2 && formula("Ag+")?.charge == 1 && formula("MnO4-")?.charge == -1
+      && formula("Fe³⁺")?.charge == 3 && formula("SO₄²⁻")?.counts["O"] == 4, "charges read as ^3+, 3+, +, - and in superscripts; subscripts as counts")
+check(formula("Na+(aq)")?.charge == 1 && formula("H2O (l)")?.counts == ["H": 2, "O": 1] && formula("e-")?.charge == -1 && formula("e-")?.atoms == 0,
+      "a phase label passed over, and an electron")
+check(formula("XyZ") == nil && formula("Xx2") == nil && formula("H0") == nil && formula("2H2O") == nil && formula("") == nil && formula("(") == nil,
+      "what is not a formula is none: XyZ, Xx2, H0, a coefficient, nothing, an open bracket")
+check(formula("Ca(OH)2")?.pretty == "Ca(OH)₂" && formula("CuSO4·5H2O")?.pretty == "CuSO₄·5H₂O" && formula("Fe^3+")?.pretty == "Fe³⁺"
+      && formula("SO4^2-")?.pretty == "SO₄²⁻" && formula("C12H22O11")?.pretty == "C₁₂H₂₂O₁₁" && formula("Ag+")?.pretty == "Ag⁺",
+      "typeset with subscripts and a superscript charge (\(formula("CuSO4·5H2O")?.pretty ?? "") \(formula("Fe^3+")?.pretty ?? ""))")
+let molarVectors: [(String, Double)] = [("H2O", 18.015), ("CO2", 44.009), ("Ca(OH)2", 74.093), ("C6H12O6", 180.156), ("CuSO4·5H2O", 249.685), ("NaCl", 58.443)]
+let molarOff = molarVectors.filter { abs(molar($0.0) - $0.1) > 0.01 }.map { "\($0.0) \(molar($0.0)) not \($0.1)" }
+check(molarOff.isEmpty, "molar masses to ±0.01: H2O 18.015, CO2 44.009, Ca(OH)2 74.093, C6H12O6 180.156, CuSO4·5H2O 249.685, NaCl 58.443\(molarOff.isEmpty ? "" : ": \(molarOff)")")
+let glucose = ChemMolar.breakdown(formula("C6H12O6")!)
+check(glucose.rows.map(\.symbol) == ["C", "H", "O"] && glucose.rows[0].count == 6 && abs(glucose.rows[0].percent - 40.0) < 0.05 && abs(glucose.rows[1].percent - 6.71) < 0.01
+      && abs(glucose.rows.map(\.percent).reduce(0, +) - 100) < 1e-9, "glucose's breakdown: C 40.0 %, H 6.71 %, adding to 100 (\(glucose.rows.map { String(format: "%.2f", $0.percent) }))")
+check(ChemNumber.sig(18.015, 4) == "18.02" && ChemNumber.sig(0.555062, 4) == "0.5551" && ChemNumber.sig(1.0, 4) == "1" && ChemNumber.sig(3.3428e23, 4) == "3.343e23"
+      && ChemNumber.sig(1e-11, 4) == "1e-11" && ChemNumber.sig(0.1 + 0.2, 6) == "0.3" && ChemNumber.sig(-4.92342, 3) == "-4.92" && ChemNumber.sig(101325, 4) == "101300"
+      && ChemNumber.sig(9.9996, 4) == "10" && ChemNumber.sig(0, 4) == "0" && ChemNumber.sig(2.875, 3) == "2.88",
+      "numbers to their figures, half up, no noise (\(ChemNumber.sig(0.1 + 0.2, 6)), \(ChemNumber.sig(3.3428e23, 4)), \(ChemNumber.sig(9.9996, 4)))")
+check(ChemNumber.fixed(2.876, 2) == "2.88" && ChemNumber.fixed(7, 2) == "7.00" && ChemNumber.fixed(-0.001, 2) == "0.00" && ChemNumber.fixed(18.0153, 3) == "18.015",
+      "and at fixed decimals: a pH is 7.00")
+check(ChemNumber.pretty("3.343e23") == "3.343 × 10²³" && ChemNumber.pretty("1e-11") == "10⁻¹¹" && ChemNumber.pretty("18.02") == "18.02", "a power of ten written out")
+check(ChemNumber.number("1.8 × 10^-5") == 1.8e-5 && ChemNumber.number("1,000") == 1000 && ChemNumber.number("−3") == -3 && ChemNumber.number("1.8e-5") == 1.8e-5
+      && ChemNumber.number("abc") == nil, "a number typed with a power of ten, a comma, a minus")
+check(ChemLaunchValues.parse("P=1 atm,V=22.4 L, T=273.15 K") == ["P": "1 atm", "V": "22.4 L", "T": "273.15 K"] && ChemLaunchValues.split("22.4 L").unit == "L"
+      && ChemLaunchValues.split("22.4").unit == nil, "the launch flags' key=value lists, each value's unit apart")
+
+// (the balancer: the specification's vectors, the coefficients in order of appearance)
+func balanced(_ s: String) -> [Int]? { try? ChemBalancer.balance(s).get().coefficients }
+func balanceError(_ s: String) -> ChemBalanceError? {
+    if case .failure(let e) = ChemBalancer.balance(s) { return e }
+    return nil
+}
+let balanceVectors: [(String, [Int])] = [
+    ("H2 + O2 -> H2O", [2, 1, 2]), ("Fe + O2 -> Fe2O3", [4, 3, 2]), ("C3H8 + O2 -> CO2 + H2O", [1, 5, 3, 4]), ("Al + HCl -> AlCl3 + H2", [2, 6, 2, 3]),
+    ("KMnO4 + HCl -> KCl + MnCl2 + H2O + Cl2", [2, 16, 2, 2, 8, 5]), ("Ca(OH)2 + H3PO4 -> Ca3(PO4)2 + H2O", [3, 2, 1, 6]), ("CuSO4·5H2O -> CuSO4 + H2O", [1, 1, 5]),
+    ("Cu + Ag+ -> Cu2+ + Ag", [1, 2, 1, 2]), ("MnO4- + Fe2+ + H+ -> Mn2+ + Fe3+ + H2O", [1, 5, 8, 1, 5, 4]),
+    ("Fe(s) + O2(g) → Fe2O3(s)", [4, 3, 2]), ("2H2 + O2 = 2H2O", [2, 1, 2]), ("H₂ + O₂ ⟶ H₂O", [2, 1, 2]), ("Cu + Ag^+ -> Cu^2+ + Ag", [1, 2, 1, 2]),
+]
+let balanceOff = balanceVectors.filter { balanced($0.0) != $0.1 }.map { "\($0.0): \(balanced($0.0).map { "\($0)" } ?? balanceError($0.0)?.message ?? "?")" }
+check(balanceOff.isEmpty, "every equation of the specification balanced to its coefficients\(balanceOff.isEmpty ? "" : ": \(balanceOff)")")
+check(balanceError("H2 + O2 -> H2O2 + H2O") == .manyWays, "two equations in one: more than one way")
+check(balanceError("Na + Cl2 -> NaBr") == .oneSide(["Cl", "Br"]), "an element on one side only, named (\(balanceError("Na + Cl2 -> NaBr")?.message ?? ""))")
+check(balanceError("H2 + XyZ -> H2O") == .unreadable("XyZ") && balanceError("H2 + O2") == .noArrow && balanceError("") == .empty && balanceError("H2 + O2 ->") == .emptySide,
+      "a token that is no formula named, no arrow, nothing, an empty side")
+check(balanceError("H2O -> H2 + O2 + H2O2")?.message.hasPrefix("This can't be balanced") == true || balanceError("H2O -> H2 + O2 + H2O2") == .manyWays, "an equation with no positive answer says so")
+let waterEq = try? ChemBalancer.balance("H2 + O2 -> H2O").get()
+check(waterEq?.text() == "2H2 + O2 -> 2H2O" && waterEq?.text(arrow: "→") == "2H2 + O2 → 2H2O" && waterEq?.changed == true, "written out plainly, a coefficient of 1 left out; balanced for you")
+check((try? ChemBalancer.balance("2H2 + O2 -> 2H2O").get())?.changed == false && (try? ChemBalancer.balance("2H2 + O2 -> H2O").get())?.changed == true,
+      "coefficients typed right are not changed; wrong ones are")
+check(waterEq?.counts == [ChemCountRow(label: "H", left: 4, right: 4), ChemCountRow(label: "O", left: 2, right: 2)] && waterEq.map { abs($0.massLeft - $0.massRight) < 1e-9 } == true
+      && waterEq.map { abs($0.massLeft - 36.03) < 0.01 } == true, "the atom count table equal on both sides, and the mass check (\(waterEq.map { ChemNumber.sig($0.massLeft, 5) } ?? ""))")
+let redox = try? ChemBalancer.balance("MnO4- + Fe2+ + H+ -> Mn2+ + Fe3+ + H2O").get()
+check(redox?.counts.last == ChemCountRow(label: "Charge", left: 17, right: 17), "a charge row when ions are in it, equal once balanced")
+check(ChemBalancer.split("Cu + Ag+") == ["Cu", "Ag+"] && ChemBalancer.split("H2+O2") == ["H2", "O2"] && ChemBalancer.split("Fe^3+ + e-") == ["Fe^3+", "e-"]
+      && ChemBalancer.split("Ag+(aq) + Cl-(aq)") == ["Ag+(aq)", "Cl-(aq)"], "a side split at its pluses, not at its charges")
 
 // ---- live checks ----------------------------------------------------------------------------------------------
 // (mac/Simpl/Engine/LivePlan.swift, 1.3.80: when the screen on show is checked again, the fingerprint the page gives an
