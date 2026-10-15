@@ -358,9 +358,10 @@ enum AltaHook {
             });
           });
         };
-        // (1.3.70) the small graphs: a graph in what a question asks (not one to answer on), larger than 300 × 220, drawn
+        // (1.3.70) the small graphs: a graph in what a question asks (not one to answer on), larger than 600 × 440, drawn
+        // (1.3.98: twice 1.3.70's 300 × 220 — the owner found the graphs too small to read; Enlarge is still beside them)
         // at a zoom that brings it down to that
-        var MINI_W = 300, MINI_H = 220, picEls = [];
+        var MINI_W = 600, MINI_H = 440, picEls = [];
         var minis = function () {
           picEls = all('[data-simpl-keep] [data-simpl-mini]');
           all('[data-simpl-keep] [data-simpl-pic]').forEach(function (el) {
