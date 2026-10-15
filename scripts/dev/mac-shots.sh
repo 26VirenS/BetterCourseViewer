@@ -522,6 +522,27 @@ live_check() {
   cat "$out"
 }
 
+# (1.3.82) tool_list_check: what the External Tools lists' consoles say, as tool-list-check.txt (a FAIL line is said as
+# a warning of the run): each list reckoned its room once as it opened ("[Simpl] tool list room: 303 (…)"), the list
+# read again under it was still open after the read, and no copy of the app crashed (a crash report is kept beside the
+# pictures by keep_crashes: 1.3.81's was a popover sized again and again until AppKit stopped the app)
+tool_list_check() {
+  local out="$OUT_ABS/tool-list-check.txt" r="$OUT_ABS/console-light-36d-external-tools-list-reread.txt" f
+  : > "$out"
+  say() { if [ "$1" = 0 ]; then echo "ok   $2" >> "$out"; else echo "FAIL $2" >> "$out"; fi; }
+  for f in "$OUT_ABS"/console-*-36[bcd]-external-tools-*.txt; do
+    [ -f "$f" ] || continue
+    grep -q '\[Simpl\] tool list room: ' "$f"
+    say $? "$(basename "$f" .txt | sed 's/^console-//'): $(grep -o 'tool list room: .*' "$f" | head -1)"
+  done
+  grep -q "read again; Knewton Alta's list still open" "$r" 2>/dev/null
+  say $? "the list was still open after the tools were read again under it: $(grep -o 'read again; .*' "$r" 2>/dev/null | head -1)"
+  ! ls "$HOME"/Library/Logs/DiagnosticReports/*Simpl* >/dev/null 2>&1
+  say $? "no copy of the app crashed: $(ls "$HOME"/Library/Logs/DiagnosticReports/ 2>/dev/null | grep -c Simpl) crash reports"
+  if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::warning::tool list: /'; fi
+  cat "$out"
+}
+
 # (1.2.1) SHOTS=quick, a push's set: the main screens once each, a few minutes — every screen in light and dark is
 # SHOTS=full (the workflow's own choice, or a commit's message saying [full shots])
 if [ "${SHOTS:-full}" = quick ]; then
@@ -554,6 +575,10 @@ if [ "${SHOTS:-full}" = quick ]; then
   shoot light-36-external-tools 16 -SimplPlace externaltools # (1.3.67: every external tool in the courses)
   shoot light-36b-external-tools-list 12 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77: every place Knewton Alta is used, to choose from)
   shoot light-36c-external-tools-macmillan 12 -SimplPlace externaltools -SimplExternalToolList macmillan # (1.3.79: CHEM's week-titled Macmillan assignments and module item, one tool)
+  # (1.3.82) Knewton Alta's list open while the tools are read again and put in place under it (-SimplExternalToolReread):
+  # in 1.3.81 the tools' answer coming in a second time under the open list had its popover sized and sized again
+  # until AppKit stopped the app; its console says the list is still open after the read (tool_list_check)
+  shoot light-36d-external-tools-list-reread 16 -SimplPlace externaltools -SimplExternalToolList knewton -SimplExternalToolReread YES
   # More from Canvas: the sidebar's last section (History, the school's My Materials on its own icon, Help), scrolled
   # to; its History and Help popups over the window; My Materials in the tool window, on Canvas's launch page for it.
   # (Each taken as soon as it has settled; at most 20 and 24 seconds — on a loaded runner the Dashboard took 15 seconds
@@ -684,6 +709,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   richtext_check
   frame_check
   live_check
+  tool_list_check # (1.3.82)
   keep_crashes
   exit 0
 fi

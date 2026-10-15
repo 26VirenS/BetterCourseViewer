@@ -817,6 +817,22 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   tool.dna=760x520`: a launch's own sizes, `key=WxH` joined by commas, never kept). In a picture's run (or with the
   Developer menu unlocked) the console says where each large popup went (`[Simpl] popup tool: 984 × 668, 20 in from
   the window (sidebar out)`) and each size kept (`resized to … kept for tool.dna`).
+- **Windows that size themselves (1.3.82).** SwiftUI sizes a window to the SwiftUI view in it — a popover's, or any
+  window whose content view is a hosting view — each time it lays the window out; a window kept at another size (by
+  the screen, or by what it shows asking more the more it is given) is sized back, pass after pass, until AppKit stops
+  the app ("more Update Constraints in Window passes than there are views"). Mac 1.3.81 stopped so under External
+  Tools' list: the list's room was reckoned each time its card was drawn, from the key window — the list's own once it
+  had the keys — so a card drawn again under its open list (the tools' answer coming in a second time) asked 460
+  points of a screen with some 330 over and under the card. Now the room is reckoned once as the list opens, from the
+  card's own window and screen (`ToolCard.reckonRoom`: under the card as far as the window and the screen go, else
+  over its foot, 460 at most), the list's measured height is taken up a turn of the run loop later and only past half
+  a point, and the list may be shorter than it asks (`minHeight`), so a popover AppKit keeps shorter on the screen is
+  left so. The Calendars, quiz instructions and Alta error-log popovers may be shorter too. A pulled-out quick panel
+  (`ToolFloatPanel`) holds its SwiftUI view in a plain view of its own, as a popup does, and is sized by what it shows
+  measuring itself, on the run loop's next turn (`ToolFloatRoot`, `ToolFloatPanel.fit`). The picture
+  `light-36d-external-tools-list-reread` (`-SimplExternalToolReread YES`) reads the tools again under Knewton Alta's
+  open list; `tool_list_check` writes `tool-list-check.txt` from the consoles (`[Simpl] tool list room: …`, `read
+  again; … still open`).
 - **The Chemistry section (1.3.80).** The Periodic Table is split into four tools under a *Chemistry* heading on the
   Tools page, just before Biology and built as its section is (`Tools/Chemistry/ChemTools.swift`: `ChemTools.kinds`,
   `info` — names, lines, symbols and a palette of their own — and `ChemToolsSection`, which `-SimplToolsScroll

@@ -125,7 +125,9 @@ struct AltaQuizScreen: View {
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(height: 280)
+            // (1.3.82: shorter where the screen has less room for the popover — a popover of one height only, kept
+            // shorter by AppKit, is sized back up by SwiftUI pass after pass: ExternalToolsView's list)
+            .frame(minHeight: 120, idealHeight: 280, maxHeight: 280)
             .padding(8)
             .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.primary.opacity(0.05)))
             HStack {

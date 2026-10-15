@@ -1105,7 +1105,9 @@ private struct CalendarsPopover: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(height: listHeight)
+                // (1.3.82: shorter where the screen has less room for the popover — a popover of one height only, kept
+                // shorter by AppKit, is sized back up by SwiftUI pass after pass: ExternalToolsView's list)
+                .frame(minHeight: min(84, listHeight), idealHeight: listHeight, maxHeight: listHeight)
             }
             Divider()
             Text(full ? "Ten calendars at most: turn one off to show another." : (engine.onBrightspace ? "At most 10 calendars show at once." : "Canvas shows at most 10 calendars at once."))

@@ -439,7 +439,10 @@ private struct QuizInstructionsPopover: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .frame(width: 500, height: 460)
+        .frame(width: 500)
+        // (1.3.82: shorter where the screen has less room for the popover — a popover of one height only, kept shorter
+        // by AppKit, is sized back up by SwiftUI pass after pass: ExternalToolsView's list)
+        .frame(minHeight: 220, idealHeight: 460, maxHeight: 460)
     }
 }
 

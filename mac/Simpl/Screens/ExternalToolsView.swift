@@ -161,6 +161,25 @@ struct ExternalToolsView: View {
         if UserDefaults.standard.string(forKey: "SimplShotFile") == nil { try? await Task.sleep(nanoseconds: 600_000_000) }
         if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { keptOpen = t.id }
         listed = t.id
+        // (a task of its own: the page's is cancelled as the engine's data changes, which would cut its wait short)
+        Task { await readAgainAsked(t) }
+    }
+
+    /// (1.3.82) The screenshot suite's `-SimplExternalToolReread YES`: a moment after the list is open, the tools read
+    /// again and put in place under it, the card under the list drawn again — as the tools' answer coming in a second
+    /// time did in 1.3.81, when the list's popover was sized and sized again until AppKit stopped the app. The console
+    /// says whether the list is still open after it; the picture waits for it.
+    private func readAgainAsked(_ t: ExternalToolsData.Tool) async {
+        guard UserDefaults.standard.bool(forKey: "SimplExternalToolReread") else { return }
+        Shot.began()
+        defer { Shot.ended() }
+        try? await Task.sleep(nanoseconds: 1_500_000_000)
+        NSLog("[Simpl] tool list: the tools read again with %@'s list open", t.name)
+        if let d = try? await engine.fetch("externalTools", as: ExternalToolsData.self, quiet: false) {
+            withAnimation(Motion.gentle) { model.data = d }
+        }
+        try? await Task.sleep(nanoseconds: 600_000_000)
+        NSLog("[Simpl] tool list: read again; %@'s list %@", t.name, listed == t.id ? "still open" : "closed")
     }
 
     private func filtered(_ rows: [ExternalToolsData.Tool]) -> [ExternalToolsData.Tool] {
@@ -323,8 +342,11 @@ private struct ToolCard: View {
     /// Whether this card's list is showing — the card's own, as a pinned tool keeps its popover's, kept in step with the
     /// page's `listed` (which card's list is open) both ways.
     @State private var shown = false
-    /// (courses-27) Where the card's foot is in its window, for the list under it to be no taller than the room left.
-    @State private var footY: CGFloat = 0
+    /// (1.3.82) The card as AppKit has it — its window, and where its foot is on the screen — for the room its list has.
+    @State private var spot = PreviewAnchor()
+    /// (courses-27) The most the list's popover may be tall: (1.3.82) reckoned as the list opens (`reckonRoom`), and
+    /// kept while it is open.
+    @State private var room: CGFloat = 460
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var tint: Color { Color(hex: tool.courses.first?.color ?? "#8e8e93") }
@@ -361,14 +383,8 @@ private struct ToolCard: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background { revealButton }
-        .background {
-            // (courses-27: where its foot is, read as its list opens — not on every frame of a scroll)
-            GeometryReader { g in
-                Color.clear
-                    .onAppear { footY = g.frame(in: .global).maxY }
-                    .onChange(of: shown) { _, on in if on { footY = g.frame(in: .global).maxY } }
-            }
-        }
+        // (courses-27: where its foot is, read as its list opens — not on every frame of a scroll)
+        .background { PreviewProbe(anchor: spot) }
         .modifier(ListCardSurface(lit: hover || listed))
         .scaleEffect(pressed && !reduceMotion ? 0.98 : 1)
         .animation(.easeOut(duration: 0.1), value: pressed)
@@ -376,10 +392,20 @@ private struct ToolCard: View {
         .onHover { hover = $0 }
         .onChange(of: listed) { _, on in
             if !on { closedAt = Date() }
+            if on && !shown { reckonRoom() }
             if shown != on { shown = on }
         }
         .onChange(of: shown) { _, on in if listed != on { listed = on } }
-        .onAppear { if listed && !shown { shown = true } }
+        .onAppear {
+            // (a card made again while its list is open — moved to another column by a new answer: its list opened again
+            // a turn of the run loop later, once the card is in its window, for the room round it to be reckoned there)
+            guard listed, !shown else { return }
+            DispatchQueue.main.async {
+                guard listed, !shown else { return }
+                reckonRoom()
+                shown = true
+            }
+        }
     }
 
     /// The card's own button, the whole card under what it says: it tells the card when it is held, for the card to give.
@@ -389,7 +415,9 @@ private struct ToolCard: View {
         var next = ""
         if let n = tool.nextShown { next = "Next: \(n.title), \(n.line)" }
         return Button {
-            if Date().timeIntervalSince(closedAt) > 0.3 { shown = true }
+            guard Date().timeIntervalSince(closedAt) > 0.3 else { return }
+            reckonRoom()
+            shown = true
         } label: {
             shape.fill(Color.clear).contentShape(shape)
         }
@@ -402,7 +430,7 @@ private struct ToolCard: View {
         // it, from which a popover did not show. courses-27: from the card's foot, under it, its arrow at "5 assignments"
         // — beside the card it covered the page's heading and the card itself; with no room below, it goes above)
         .popover(isPresented: $shown, attachmentAnchor: .point(.bottom), arrowEdge: .bottom) {
-            ToolPlacesList(tool: tool, tint: tint, room: roomBelow, choose: choose, close: { shown = false })
+            ToolPlacesList(tool: tool, tint: tint, room: room, choose: choose, close: { shown = false })
                 // (the screenshot suite's console: when a list shows and goes)
                 .onAppear { if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] tool list shown: %@", tool.name) } }
                 .onDisappear { if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] tool list closed: %@", tool.name) } }
@@ -411,11 +439,24 @@ private struct ToolCard: View {
 
     /// (courses-27) The room between the card's foot and the window's, less a margin: the list under the card is no
     /// taller than that. With too little room the list goes above the card, as tall as it likes (460 points at most).
-    private var roomBelow: CGFloat {
-        let window = NSApp.keyWindow?.contentView?.bounds.height ?? 0
-        guard window > 0, footY > 0 else { return 460 }
-        let room = window - footY - 24
-        return room >= 240 ? min(460, room) : 460
+    /// (1.3.82) Reckoned as the list opens, from the card's own window and its screen, and kept while the list is open —
+    /// and never more than the screen has room for on the side the list goes. 1.3.81 reckoned it each time the card
+    /// was drawn, from the key window, which once the list had the keys was the list's own: a card drawn again under its
+    /// open list (the tools' answer coming in a second time) asked 460 points of a screen with some 330 over and under
+    /// the card, AppKit kept the popover on the screen, SwiftUI made its window as tall as the list again, and the two
+    /// went on until AppKit stopped the app (more passes laying a window out than it has views).
+    private func reckonRoom() {
+        guard let v = spot.view, let window = v.window else { return }
+        let card = window.convertToScreen(v.convert(v.bounds, to: nil))
+        let screen = (window.screen ?? NSScreen.main)?.visibleFrame ?? window.frame
+        // (the popover's arrow and its gap from the card take some 40 points of the screen's room on its side)
+        let under = min(card.minY - window.frame.minY - 24, card.minY - screen.minY - 40)
+        let over = screen.maxY - card.minY - 40
+        let fits = under >= 240 ? min(460, under) : min(460, max(under, over))
+        room = max(160, fits.rounded(.down))
+        if UserDefaults.standard.string(forKey: "SimplShotFile") != nil {
+            NSLog("[Simpl] tool list room: %.0f (%.0f under the card, %.0f over its foot)", room, under, over)
+        }
     }
 
     private var header: some View {
@@ -567,7 +608,8 @@ private struct NextTag: View {
 private struct ToolPlacesList: View {
     let tool: ExternalToolsData.Tool
     let tint: Color
-    /// (courses-27) The most the whole popover may be tall: the room under its card.
+    /// (courses-27) The most the whole popover may be tall: the room under its card — (1.3.82) or over it, on the screen;
+    /// reckoned once as the list opened.
     let room: CGFloat
     let choose: (ExternalToolsData.Course, ExternalToolsData.Item) -> Void
     let close: () -> Void
@@ -579,6 +621,9 @@ private struct ToolPlacesList: View {
     /// Raised by an arrow key: the highlighted place scrolled into view (a place under the pointer already is).
     @State private var keyMoves = 0
     @State private var listHeight: CGFloat
+    /// (1.3.82) The list's height as last measured, in whole points: taken up as `listHeight` a turn of the run loop
+    /// later, never while the popover is being laid out.
+    @State private var measured: CGFloat = 0
     @FocusState private var focus: Focus?
 
     private enum Focus: Hashable { case filter, list }
@@ -610,6 +655,9 @@ private struct ToolPlacesList: View {
         let head: CGFloat = hasFilter ? 108 : 64
         return max(120, min(460, room) - head)
     }
+
+    /// The list's height: as tall as it is, up to its most.
+    private var listFrame: CGFloat { min(max(listHeight, 40), listMax) }
 
     private var shown: [ToolPlace] {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
@@ -707,10 +755,19 @@ private struct ToolPlacesList: View {
                 }
             }
             .scrollBounceBehavior(.basedOnSize)
-            .frame(height: min(max(listHeight, 40), listMax))
+            // (1.3.82: as tall as the list, up to its most — and shorter where AppKit has less room for the popover on
+            // the screen: SwiftUI sizes a popover's window to what it shows each time it lays it out, and a list of one
+            // height only, in a popover the screen kept shorter, had it sized back up, pass after pass)
+            .frame(minHeight: min(120, listFrame), idealHeight: listFrame, maxHeight: listFrame)
             .onPreferenceChange(PlacesListHeightKey.self) { h in
                 // (measured whole, unfiltered: a filter narrowing the list leaves the popover its size)
-                if query.isEmpty, abs(h - listHeight) > 0.5 { listHeight = h }
+                let whole = h.rounded(.up)
+                if query.isEmpty, abs(whole - measured) > 0.5 { measured = whole }
+            }
+            .task(id: measured) {
+                // (1.3.82: the measure taken up on a later turn of the run loop — the popover sized again while it was
+                // being laid out was laid out again, and measured again — and only when it is another by half a point)
+                if measured > 0, abs(measured - listHeight) > 0.5 { listHeight = measured }
             }
             .onChange(of: keyMoves) { _, _ in
                 if shown.indices.contains(lit) { proxy.scrollTo(shown[lit].id) }

@@ -67,13 +67,26 @@ final class ToolFloats: ObservableObject {
         panel.makeKey()
     }
 
+    /// (1.3.82) The panel's SwiftUI view sits in a plain view of the panel's own, never as its window's content view (as
+    /// a popup's does, Shell/FloatingPopup.swift): a hosting view that is its window's content view sizes the window to
+    /// what it shows each time the window is laid out, and a window kept at another size — by the screen, or by what it
+    /// shows asking for more the more it is given — is sized again, pass after pass, until AppKit stops the app. It is
+    /// sized once from what it shows, then by what it shows measuring itself (`ToolFloatRoot`), on the run loop's next
+    /// turn.
     private func make(_ kind: ToolKind, engine: Engine) -> ToolFloatPanel {
         let panel = ToolFloatPanel(kind: kind)
-        let host = NSHostingController(rootView: ToolFloatView(kind: kind, engine: engine).environmentObject(engine))
-        host.sizingOptions = [.intrinsicContentSize, .preferredContentSize]
-        panel.contentViewController = host
-        host.view.layoutSubtreeIfNeeded()
-        panel.setContentSize(host.view.fittingSize)
+        let host = NSHostingView(rootView: ToolFloatRoot(kind: kind, engine: engine, panel: panel))
+        let holder = NSView(frame: NSRect(origin: .zero, size: panel.frame.size))
+        host.frame = holder.bounds
+        host.autoresizingMask = [.width, .height]
+        holder.addSubview(host)
+        panel.contentView = holder
+        // (its first size, as large as what it shows asks; then it is never sized by the hosting view itself)
+        host.sizingOptions = [.intrinsicContentSize]
+        host.layoutSubtreeIfNeeded()
+        let size = host.fittingSize
+        host.sizingOptions = []
+        if size.width > 1, size.height > 1 { panel.setContentSize(size) }
         return panel
     }
 
@@ -156,6 +169,44 @@ final class ToolFloatPanel: NSPanel {
 
     /// Escape: back into the tray.
     override func cancelOperation(_ sender: Any?) { ToolFloats.shared.dock(kind) }
+
+    /// (1.3.82) What it shows has measured itself: the panel made that size, its top left where it is — only when the
+    /// size is another by more than half a point, and never a size no window can take.
+    func fit(_ s: CGSize) {
+        guard s.width > 1, s.height > 1, s.width.isFinite, s.height.isFinite, s.width < 20_000, s.height < 20_000 else { return }
+        let w = s.width.rounded(.up), h = s.height.rounded(.up)
+        guard abs(w - frame.width) > 0.5 || abs(h - frame.height) > 0.5 else { return }
+        setFrame(NSRect(x: frame.minX, y: frame.maxY - h, width: w, height: h), display: true)
+        invalidateShadow()
+    }
+}
+
+/// (1.3.82) A pulled-out panel's SwiftUI view: what it shows at its own size, at the panel's top, measured as it appears
+/// and as it changes — the panel made that size on the run loop's next turn (`ToolFloatPanel.fit`), never while it is
+/// being laid out.
+private struct ToolFloatRoot: View {
+    let kind: ToolKind
+    let engine: Engine
+    weak var panel: ToolFloatPanel?
+
+    var body: some View {
+        ToolFloatView(kind: kind, engine: engine)
+            .environmentObject(engine)
+            .fixedSize()
+            .background {
+                GeometryReader { g in
+                    Color.clear
+                        .onAppear { measured(g.size) }
+                        .onChange(of: g.size) { _, s in measured(s) }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func measured(_ s: CGSize) {
+        let target = self.panel
+        DispatchQueue.main.async { target?.fit(s) }
+    }
 }
 
 /// What a pulled-out panel shows: (tools-20) its ✕ and the tool's name at its head, as the popover's — no window lights,
