@@ -916,6 +916,13 @@ jobs:
           Shot 'chem-solution-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'solution', '--tool-state', 'ph', '--solution-values', 'kind=weak acid,conc=0.10,K=1.8e-5'))
           Shot 'chem-solution-780' '780x683' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'solution', '--tool-state', 'molarity', '--solution-values', 'amount=58.44 g,formula=NaCl,volume=1 L'))
           Shot 'pin-solution' '1366x778' 45 ($mock + @('--appearance', 'dark', '--pin', 'solution', '--pin-open', 'solution', '--solution-values', 'H=1e-3'))
+          # (the Circuit Builder, at the end so the pictures before keep their parts) the series build light and dark
+          # (its log says every part's reading, checked below), the voltage divider, and its pin's flyout (the
+          # calculator strip)
+          Shot 'phys-circuit' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'circuit', '--tool-state', 'series'))
+          Shot 'phys-circuit-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'circuit', '--tool-state', 'series'))
+          Shot 'phys-circuit-divider' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'circuit', '--tool-state', 'divider'))
+          Shot 'pin-circuit' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'circuit', '--pin-open', 'circuit'))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
@@ -1106,6 +1113,18 @@ jobs:
             $l = PhoneLog 'phys-vectors'
             Write-Host "phys-vectors: $((@($l -split "`n" | Where-Object { $_ -match 'vectors: ' }) -join ' | '))"
             if (-not $l.Contains('vectors: shows 2 vectors, resultant (4, 6) |R|=7.211')) { Write-Host "::error::phys-vectors: the two vectors were not added as expected (shots/profile-phys-vectors.log)"; exit 1 }
+          }
+          # the Circuit Builder's series build: 9 V across 100 Ω and 200 Ω, 0.03 A round the loop and 6 V across the 200 Ω
+          # (the tool writes "circuit: shows …"); the voltage divider's voltmeter reading 8 V
+          if ($script:mine -contains 'phys-circuit') {
+            $l = PhoneLog 'phys-circuit'
+            Write-Host "phys-circuit: $((@($l -split "`n" | Where-Object { $_ -match 'circuit: ' }) -join ' | '))"
+            if (-not $l.Contains('circuit: shows series: Battery 1 9 V 0.03 A, Resistor 1 3 V 0.03 A, Resistor 2 6 V 0.03 A, Ammeter 1 0 V 0.03 A')) { Write-Host "::error::phys-circuit: the series circuit was not solved as expected (shots/profile-phys-circuit.log)"; exit 1 }
+          }
+          if ($script:mine -contains 'phys-circuit-divider') {
+            $l = PhoneLog 'phys-circuit-divider'
+            Write-Host "phys-circuit-divider: $((@($l -split "`n" | Where-Object { $_ -match 'circuit: ' }) -join ' | '))"
+            if (-not $l.Contains('Voltmeter 1 8 V')) { Write-Host "::error::phys-circuit-divider: the divider's voltmeter did not read 8 V (shots/profile-phys-circuit-divider.log)"; exit 1 }
           }
           # Cell Explorer opened under a still pointer: nothing pointed at before its picture (the 3D view writes "bio scene:
           # pointed at …" in a picture run when what is under the pointer changes)
