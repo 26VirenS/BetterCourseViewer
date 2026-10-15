@@ -202,6 +202,7 @@ internal sealed class ReactionPage : ContentControl
     private readonly List<(ChemFormula Formula, TextBlock Words, TextBlock Mark)> reactantRows = new();
     private readonly List<(ChemFormula Formula, TextBlock Words)> productRows = new();
     private string built = "";
+    private bool building;
     private string said = "";
     private string? plain;
 
@@ -242,6 +243,9 @@ internal sealed class ReactionPage : ContentControl
 
     private void Update()
     {
+        // (Build chooses the product weighed, and the box's SelectionChanged asks for this very update: the one under
+        // way finishes with its rows instead)
+        if (building) return;
         plain = null;
         var r = ChemBalancer.Balance(equation.Text);
         if (!r.Ok)
@@ -267,7 +271,7 @@ internal sealed class ReactionPage : ContentControl
         var result = ChemStoich.React(r, amounts, actualIndex >= 0 ? actualIndex : null, ChemNum.Read(actual.Text));
         foreach (var (f, words, mark) in reactantRows)
         {
-            var row = result.Rows.First(x => x.Reactant && x.Formula == f);
+            var row = result.Rows.First(x => x.Reactant && x.Formula.Text == f.Text);
             if (row.GivenMoles is { } gm)
             {
                 words.Text = ChemCalc.Shown($"{ChemNum.Sig(gm)} mol given ({ChemNum.Sig(row.GivenGrams!.Value)} g) · uses {ChemNum.Sig(row.UsedOrMadeMoles)} mol · {ChemNum.Sig(row.LeftMoles!.Value)} mol ({ChemNum.Sig(row.LeftGrams!.Value)} g) left");
@@ -282,7 +286,7 @@ internal sealed class ReactionPage : ContentControl
         }
         foreach (var (f, words) in productRows)
         {
-            var row = result.Rows.First(x => !x.Reactant && x.Formula == f);
+            var row = result.Rows.First(x => !x.Reactant && x.Formula.Text == f.Text);
             words.Text = result.Limiting == null ? "—" : ChemCalc.Shown($"{ChemNum.Sig(row.UsedOrMadeMoles)} mol · {ChemNum.Sig(row.UsedOrMadeGrams)} g");
         }
         var lines = new List<(string, string, System.Windows.Media.Color?)>();
@@ -303,6 +307,12 @@ internal sealed class ReactionPage : ContentControl
     /// <summary>The rows for this equation's species: a reactant's formula, its given box and unit, and the line under
     /// them; a product's formula and its yield line.</summary>
     private void Build(BalanceResult r)
+    {
+        building = true;
+        try { BuildRows(r); } finally { building = false; }
+    }
+
+    private void BuildRows(BalanceResult r)
     {
         built = string.Join("|", r.Species.Select((f, i) => f.Text + "×" + r.Coefficients[i]));
         reactantRows.Clear();
