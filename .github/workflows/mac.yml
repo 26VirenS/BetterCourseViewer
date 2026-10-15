@@ -79,7 +79,8 @@ jobs:
   #
   # The models that need no window, checked on their own — the elements' data, VSEPR's shapes, the biology toolkit's
   # models and self-check (every Foundation-only file in mac/Simpl/Tools/Biology/Model, so a tool's builder adds files
-  # there without touching this), (1.3.80) the chemistry tools' (every file in mac/Simpl/Tools/Chemistry/Model) and the
+  # there without touching this), (1.3.80) the chemistry tools' (every file in mac/Simpl/Tools/Chemistry/Model), (tools)
+  # the Study Planner's planner (mac/Simpl/Tools/Planner/Model) and the
   # live checks' plan, fingerprint and comparison (mac/Simpl/Engine/LivePlan.swift): scripts/dev/swift-checks/main.swift
   # compiled with the files it checks and run. Compiling takes four minutes and running them under a second, so what
   # was compiled is kept (a cache keyed by every file it is compiled from, this workflow and the compiler's version)
@@ -138,7 +139,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: model-checks
-          key: mac-models-${{ steps.swift.outputs.version }}-${{ hashFiles('mac/Simpl/Tools/PeriodicData.swift', 'mac/Simpl/Tools/PeriodicExtraData.swift', 'mac/Simpl/Tools/MoleculeShape.swift', 'mac/Simpl/Tools/Biology/Model/*.swift', 'mac/Simpl/Tools/Chemistry/Model/*.swift', 'mac/Simpl/Tools/Physics/Model/*.swift', 'mac/Simpl/Tools/Model/*.swift', 'mac/Simpl/Engine/LivePlan.swift', 'scripts/dev/swift-checks/**', '.github/workflows/mac.yml') }}
+          key: mac-models-${{ steps.swift.outputs.version }}-${{ hashFiles('mac/Simpl/Tools/PeriodicData.swift', 'mac/Simpl/Tools/PeriodicExtraData.swift', 'mac/Simpl/Tools/MoleculeShape.swift', 'mac/Simpl/Tools/Biology/Model/*.swift', 'mac/Simpl/Tools/Chemistry/Model/*.swift', 'mac/Simpl/Tools/Physics/Model/*.swift', 'mac/Simpl/Tools/Model/*.swift', 'mac/Simpl/Tools/Planner/Model/*.swift', 'mac/Simpl/Engine/LivePlan.swift', 'scripts/dev/swift-checks/**', '.github/workflows/mac.yml') }}
       - name: The models' checks
         id: models
         if: ${{ !cancelled() }}
@@ -147,7 +148,7 @@ jobs:
             mkdir -p model-checks
             swiftc -O -o model-checks/run mac/Simpl/Tools/PeriodicData.swift mac/Simpl/Tools/PeriodicExtraData.swift \
               mac/Simpl/Tools/MoleculeShape.swift mac/Simpl/Tools/Biology/Model/*.swift mac/Simpl/Tools/Chemistry/Model/*.swift \
-              mac/Simpl/Tools/Physics/Model/*.swift mac/Simpl/Tools/Model/*.swift mac/Simpl/Engine/LivePlan.swift \
+              mac/Simpl/Tools/Physics/Model/*.swift mac/Simpl/Tools/Model/*.swift mac/Simpl/Tools/Planner/Model/*.swift mac/Simpl/Engine/LivePlan.swift \
               scripts/dev/swift-checks/main.swift scripts/dev/swift-checks/StudyChecks.swift
           fi
           model-checks/run
