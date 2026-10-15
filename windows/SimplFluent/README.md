@@ -426,7 +426,7 @@ never fails a run, and nothing waits for it but the pictures' merge.
 show checked against the school while the window shows `LiveCheck`), the popups floating over the window (`FloatPopup`, Popups below), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once, the third time Simpl is opened, at a calm moment, and from Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, a place or a page in a window of its own (`PlaceWindow`: a pane row's or a list row's Open in new window, Shift+click on a pane row, a page's ⋯ ▸ Open in new window, or Ctrl+Shift+O for what shows), the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
 | `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In and its Send from Phone, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
-| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed, Word Counter, Statistics, Matrix Calculator; `Model/` holds their counting and sums with no window in them, tested in `SimplFluent.Tests`), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Compress files, Graphing calculator), `Elements/` (the Periodic Table, Atoms & Orbitals), `Chemistry/` (the Chemistry section's tools: `ChemTools.cs`, Lewis Structures, the Molecule Builder, and the calculators — the Equation Balancer, Molar Mass & Stoichiometry, Gas Laws — with their sums in `Chemistry/Model/`, plain .NET), `Physics/` (the Physics section's tools: `PhysTools.cs`, Kinematics & Projectiles, Vectors; their maths in `Model/`, free of WPF), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
+| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed, Word Counter, Statistics, Matrix Calculator; `Model/` holds their counting and sums with no window in them, tested in `SimplFluent.Tests`), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Compress files, Graphing calculator), `Elements/` (the Periodic Table, Atoms & Orbitals), `Chemistry/` (the Chemistry section's tools: `ChemTools.cs`, Lewis Structures, the Molecule Builder, and the calculators — the Equation Balancer, Molar Mass & Stoichiometry, Gas Laws, Solutions & pH — with their sums in `Chemistry/Model/`, plain .NET), `Physics/` (the Physics section's tools: `PhysTools.cs`, Kinematics & Projectiles, Vectors; their maths in `Model/`, free of WPF), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
 
 ## A screen
 
@@ -957,6 +957,25 @@ cube). What each keeps for next time is the Mac's too (`ChemPrefs`, `SimplChem.<
   combined law) and `--gas-constant T|P|V` open it for pictures; a picture run logs `gas: shows ideal` and `gas ideal:
   shows n=0.9994 mol`. The search box opens it with `/gas`, `ideal gas`, `pv=nrt`, `boyle`, `charles`, `pressure` or
   `volume`.
+- **Solutions & pH** (`solution`, `Tools/Chemistry/SolutionTool.cs`; the sums in `Model/ChemSolution.cs`): four tabs.
+  **Molarity**: any two of the amount (mol, or g of a formula), the volume (L or mL) and the molarity, the third
+  solved; with grams and a density (1.00 g/mL unless changed), the mass % and ppm. **Dilution**: M1V1 = M2V2 with
+  one blank solved, said as "How much stock?" ("Take 50 mL of the 2 M stock and make it up to 200 mL"), and a stock
+  weaker than what is wanted is said so. **pH**: any one of pH, pOH, [H⁺] and [OH⁻] gives the other three (Kw =
+  1.0×10⁻¹⁴ at 25 °C, the only temperature here, and said so); a strong or weak acid or base from its concentration
+  (a weak one by the exact quadratic, with the percent ionised; a strong one counting water's own ions, so 10⁻⁸ M
+  HCl stays under 7); a colour strip 0–14 (`PhStrip`) with its marker at the pH last worked out, moved over 200 ms.
+  **Titration**: strong acid + strong base, weak acid + strong base or weak base + strong acid, from the analyte's
+  concentration and volume and the titrant's concentration (and Ka or Kb) → the equivalence volume, the pH at the
+  start, at half-equivalence (= pKa), at equivalence and at twice the equivalence volume, and the curve (200 points,
+  each from the charge balance solved by bisection) drawn with `LabPlot`, the equivalence point marked; under it a
+  buffer by Henderson–Hasselbalch (pKa, [A⁻], [HA] → pH). Every tab keeps its fields (`solution.*`); Ctrl+C copies the
+  tab's result. Its pin's flyout is the pH tab compact (one value → the other three). `--tool solution --tool-state
+  molarity|dilution|ph|titration` (or `--solution …`) with `--solution-values "…"` (`H=1e-3`, `kind=weak
+  acid,conc=0.10,K=1.8e-5`, `M1=2 M,V1=50 mL,M2=0.5 M`, `amount=58.44 g,formula=NaCl,volume=1 L`, `titration=weak
+  acid,analyte=0.1,volume=25,titrant=0.1,K=1.8e-5`, `pKa=4.74,base=0.2,acid=0.1`) open it for pictures; a picture run
+  logs `solution: shows ph` and `solution ph: shows pH 2.88`. The search box opens it with `/ph`, `molarity`,
+  `dilution`, `titration`, `buffer`, `acid` or `base`.
 
 The builders and Atoms & Orbitals share one layout (`ChemLayout`): the controls and the facts in sight at every size,
 the drawing's own heading holding what to show when the drawing is over the rest, and the drawing held to the page less

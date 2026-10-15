@@ -31,6 +31,7 @@ public static class ChemTools
         new("balance", "Equation Balancer", "Balance any chemical equation.", SymbolRegular.ArrowSwap24, "#ff6b35"),
         new("moles", "Molar Mass & Stoichiometry", "Molar mass, moles and yields.", SymbolRegular.Scales24, "#2fb37a"),
         new("gas", "Gas Laws", "PV = nRT and the combined law.", SymbolRegular.Balloon24, "#3f8ef7"),
+        new("solution", "Solutions & pH", "Molarity, dilution, pH, titration.", SymbolRegular.Drop24, "#a259ff"),
     };
 
     public static ToolsScreen.Kind? Kind(string key) => Kinds.FirstOrDefault(k => k.Key == key);
@@ -40,7 +41,7 @@ public static class ChemTools
     /// <c>--tool-state</c> as it was given — a molecule for the builders ("NO3-", "Ethanol"), an element, its view and its
     /// subshell for Atoms &amp; Orbitals ("Fe:cloud:3d"), an equation for the Equation Balancer ("Fe + O2 -> Fe2O3"), a tab
     /// for Molar Mass &amp; Stoichiometry ("reaction", with --moles-equation and the like for what it holds) and for Gas Laws
-    /// ("ideal", with --gas-values).
+    /// ("ideal", with --gas-values) and Solutions &amp; pH ("titration", with --solution-values).
     /// </summary>
     public static string? LaunchState(string key)
     {
@@ -59,7 +60,9 @@ public static class ChemTools
 /// (<c>atoms.element</c>, <c>atoms.view</c>), the Equation Balancer's equation (<c>balance.equation</c>), and Molar Mass
 /// &amp; Stoichiometry's tab and each tab's fields (<c>moles.tab</c>, <c>.formula</c>, <c>.convert.*</c>, <c>.equation</c>,
 /// <c>.given</c>, <c>.actual</c>, <c>.empirical</c>, <c>.empirical.mass</c>), Gas Laws' tab, fields and units
-/// (<c>gas.tab</c>, <c>gas.P</c>, <c>gas.P.unit</c> … <c>gas.T2.unit</c>, <c>gas.formula</c>, <c>gas.constant</c>). Written as they change (Prefs writes the
+/// (<c>gas.tab</c>, <c>gas.P</c>, <c>gas.P.unit</c> … <c>gas.T2.unit</c>, <c>gas.formula</c>, <c>gas.constant</c>), and Solutions
+/// &amp; pH's tab and each tab's fields (<c>solution.tab</c>, <c>.amount</c> … <c>.density</c>, <c>.M1</c> … <c>.V2</c>,
+/// <c>.ph.*</c>, <c>.titration.*</c>, <c>.buffer.*</c>). Written as they change (Prefs writes the
 /// file a moment after the last change); a picture's run has a profile of its own that starts empty, so each picture
 /// shows its tool as its launch asks.
 /// </summary>

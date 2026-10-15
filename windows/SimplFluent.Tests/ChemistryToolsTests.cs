@@ -25,6 +25,7 @@ public class ChemistryToolsTests
         ("balance", "Equation Balancer", "Balance", "#ff6b35"),
         ("moles", "Molar Mass & Stoichiometry", "Moles", "#2fb37a"),
         ("gas", "Gas Laws", "Gas", "#3f8ef7"),
+        ("solution", "Solutions & pH", "pH", "#a259ff"),
     };
 
     [Fact]
@@ -33,8 +34,9 @@ public class ChemistryToolsTests
         Assert.Equal(Expected.Select(e => e.Key), ChemTools.Kinds.Select(k => k.Key));
         Assert.Equal(Expected.Select(e => e.Name), ChemTools.Kinds.Select(k => k.Name));
         Assert.All(ChemTools.Kinds, k => Assert.False(string.IsNullOrWhiteSpace(k.Note)));
-        // (a note fits a tile's one line; the spec's help line is at most 32 characters for the calculators)
-        Assert.All(ChemTools.Kinds.Skip(4), k => Assert.True(k.Note.Length <= 32, k.Note));
+        // (a note fits a tile's one line; the spec's own help lines for the calculators run to 34 characters —
+        //  "Molarity, dilution, pH, titration." — and both apps keep the spec's words)
+        Assert.All(ChemTools.Kinds.Skip(4), k => Assert.True(k.Note.Length <= 34, k.Note));
         // (every symbol's code is at most U+FFFF, or WPF-UI 4.3 draws a stray character: README, Icons)
         Assert.All(ChemTools.Kinds, k => Assert.True((int)k.Symbol <= 0xFFFF, k.Key));
     }
@@ -74,6 +76,7 @@ public class ChemistryToolsTests
         Assert.Equal("Balance any chemical equation.", ChemTools.Kind("balance")!.Note);
         Assert.Equal("Molar mass, moles and yields.", ChemTools.Kind("moles")!.Note);
         Assert.Equal("PV = nRT and the combined law.", ChemTools.Kind("gas")!.Note);
+        Assert.Equal("Molarity, dilution, pH, titration.", ChemTools.Kind("solution")!.Note);
         Assert.Equal(Expected.Select(e => e.Short), ChemTools.Kinds.Select(k => ToolsCenter.ShortName(k.Key)));
     }
 
@@ -96,6 +99,10 @@ public class ChemistryToolsTests
     [InlineData("ideal gas", "gas")]
     [InlineData("pv=nrt", "gas")]
     [InlineData("boyle", "gas")]
+    [InlineData("ph", "solution")]
+    [InlineData("molarity", "solution")]
+    [InlineData("titration", "solution")]
+    [InlineData("buffer", "solution")]
     public void TheSearchBoxOpensEachByItsWords(string typed, string key)
     {
         var command = PaletteCommand.Named(PaletteCommand.ChemistryTools().ToList(), typed);
