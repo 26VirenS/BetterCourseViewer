@@ -103,6 +103,7 @@ public sealed class ToolsScreen : Screen
         new("stats", "Statistics", "Mean, SD, regression, z and t.", SymbolRegular.DataHistogram24, "#ff2d55"),
         // (a table of cells, not the Grid24 the biology Crosses tile wears a few rows below)
         new("matrix", "Matrix Calculator", "Determinant, inverse, solve, RREF.", SymbolRegular.TableSimple24, "#5e5ce6"),
+        new("shrink", "Compress files", "Shrink images and PDFs to fit.", SymbolRegular.ArrowMinimize24, "#ff9500"),
     };
 
     /// <summary>The Tools page's sections in its order (the Mac's ToolGroup): what each set of tools is for, the study
@@ -112,7 +113,7 @@ public sealed class ToolsScreen : Screen
     {
         ("Study", new[] { "fc", "cite", "pomo", "need", "words" }),
         ("Math & science", new[] { "calc", "graph", "units", "stats", "matrix" }),
-        ("Files", new[] { "mark", "pdfx", "conv", "ocr" }),
+        ("Files", new[] { "mark", "pdfx", "conv", "ocr", "shrink" }),
     };
 
     /// <summary>Where the graphing calculator is (the Mac's GraphWeb.desmos), while it has no view of its own here.</summary>

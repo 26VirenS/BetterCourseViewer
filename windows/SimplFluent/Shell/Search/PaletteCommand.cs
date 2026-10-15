@@ -170,8 +170,26 @@ internal sealed class PaletteCommand
         c.Add(C("setup", ["goals"], "Guided setup", "Choose your courses and goals again", SymbolRegular.CheckmarkCircle24, PaletteAction.Of(PaletteDo.Setup)));
         c.Add(C("tour", ["welcome", "guide", "intro", "onboarding"], "Take the tour", "A quick look round the app", SymbolRegular.Map24, PaletteAction.Of(PaletteDo.Tour)));
         c.Add(C("browser", ["web", "site", "canvas", "brightspace"], $"Open {lms} in browser", "The school’s own site", SymbolRegular.Globe24, PaletteAction.Of(PaletteDo.Browser)));
+        // (tools) the tools added since, after every place's own command: a typed "fil" still means Files first
+        c.AddRange(NewTools());
         c.Add(C("help", ["?", "commands"], "Commands", "Every command", SymbolRegular.AppsList24, lists: PaletteLists.Commands));
         return c;
+    }
+
+    /// <summary>
+    /// (tools) The tools added since the Chemistry section, each opened in its popup by its command or a word a student
+    /// would type for it (the Mac's words, SPECS: "/compress", "shrink", "upload limit"). Their titles, lines and symbols
+    /// are their tiles' (Screens/More/ToolsScreen.cs, Everyday).
+    /// </summary>
+    internal static IEnumerable<PaletteCommand> NewTools()
+    {
+        (string Key, string Name, string[] Aliases)[] words =
+        {
+            ("shrink", "compress", ["shrink", "smaller", "file size", "upload limit", "compress files"]),
+        };
+        foreach (var (key, name, aliases) in words)
+            if (Simpl.Tools.ToolsCenter.KindOf(key) is { } kind)
+                yield return C(name, aliases, kind.Name, kind.Note.TrimEnd('.'), kind.Symbol, PaletteAction.Tool(key));
     }
 
     /// <summary>

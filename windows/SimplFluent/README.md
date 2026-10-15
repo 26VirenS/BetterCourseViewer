@@ -426,7 +426,7 @@ never fails a run, and nothing waits for it but the pictures' merge.
 show checked against the school while the window shows `LiveCheck`), the popups floating over the window (`FloatPopup`, Popups below), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once, the third time Simpl is opened, at a calm moment, and from Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, a place or a page in a window of its own (`PlaceWindow`: a pane row's or a list row's Open in new window, Shift+click on a pane row, a page's ⋯ ▸ Open in new window, or Ctrl+Shift+O for what shows), the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
 | `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In and its Send from Phone, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
-| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed, Word Counter, Statistics, Matrix Calculator; `Model/` holds their counting and sums with no window in them, tested in `SimplFluent.Tests`), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table, Atoms & Orbitals), `Chemistry/` (the Chemistry section's tools: `ChemTools.cs`, Lewis Structures, the Molecule Builder, and the calculators — the Equation Balancer — with their sums in `Chemistry/Model/`, plain .NET), `Physics/` (the Physics section's tools: `PhysTools.cs`, Kinematics & Projectiles, Vectors; their maths in `Model/`, free of WPF), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
+| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed, Word Counter, Statistics, Matrix Calculator; `Model/` holds their counting and sums with no window in them, tested in `SimplFluent.Tests`), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Compress files, Graphing calculator), `Elements/` (the Periodic Table, Atoms & Orbitals), `Chemistry/` (the Chemistry section's tools: `ChemTools.cs`, Lewis Structures, the Molecule Builder, and the calculators — the Equation Balancer — with their sums in `Chemistry/Model/`, plain .NET), `Physics/` (the Physics section's tools: `PhysTools.cs`, Kinematics & Projectiles, Vectors; their maths in `Model/`, free of WPF), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
 
 ## A screen
 
@@ -1023,6 +1023,26 @@ The biology toolkit's ten (`Tools/Biology/`, a "Biology" section of their own on
 `BioTools.Register`, which adds their pages in the header and what a launch asks of them (`--tool cell --tool-state
 plant:cutaway`); their shared data, 3D view, labels with leader lines, step-through and self-check (`--bio-check`) are
 described in `Tools/Biology/README.md`.
+
+The tools added since (each the Mac's too: the same key, name, line, colour and words) sit at the end of their section's
+list in `ToolsScreen.Everyday` and `Groups`, and the search box opens each by its command (`PaletteCommand.NewTools`):
+
+- **Compress files** (`shrink`, Files; `Tools/Files/CompressFiles.cs`, its sums in `Tools/Files/Shrink.cs`; `/compress`,
+  `shrink`, `smaller`, `file size`, `upload limit`): pictures and PDFs dropped in and made small enough to upload, at Max
+  quality, Balanced (up to 2048 px), Smallest (up to 1280 px, see-through parts flattened) or Fit under a size in MB
+  (the quality searched, then the size). A picture is read with Windows' own codecs (WPF's imaging: JPEG, PNG, BMP,
+  TIFF, GIF, and HEIC or WebP where the extension is installed), turned the way the camera held it, and written as a
+  JPEG — or a PNG again while it has see-through parts. A PDF's embedded pictures (JPEGs and plain 8-bit RGB or grey
+  ones in its pages' and forms' resources) are written again smaller inside it with PDFsharp, its pages, words and links
+  untouched — never drawn again as pictures; pictures of other kinds (masks, indexed, CMYK, 16-bit) are left as they are
+  and the row says so. Each smaller copy goes to Downloads as `name-smaller.ext`, never over the original; the row says
+  "1.9 MB → 540 KB · −72%", or that it was left as it was, or the smallest Fit under could reach; the first picture made
+  smaller is shown before and after. The preset and the limit are remembered (`SimplShrink.preset`, `SimplShrink.fit`).
+  Its pin is a small drop zone: files dropped open the whole tool on them at Balanced. For pictures: `--shrink-files
+  sample` (a photo, a diagram with see-through parts and a PDF of both, made on the spot in the profile) or paths joined
+  by `|`, `--shrink-preset balanced|smallest|max|fit`, `--shrink-fit 0.5`, and `--shrink-go` to compress at once; the log
+  says `shrink: shows N files at <preset>` and `shrink: done at <preset>, … (N% saved)`. Tested in
+  `SimplFluent.Tests/ShrinkTests.cs`.
 
 ## Popups
 

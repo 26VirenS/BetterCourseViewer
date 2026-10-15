@@ -71,7 +71,7 @@ public sealed class ToolContext
 
 /// <summary>
 /// The tools' views by key (the web's keys: cite, pomo, calc, graph, ptable, need, conv, units, pdfx, mark, ocr, fc; the
-/// tools program's words, stats and matrix (Tools/Everyday); the
+/// tools program's words, stats and matrix (Tools/Everyday) and shrink (Tools/Files); the
 /// Chemistry section's lewis, molecule and atoms beside ptable, and its calculators (balance), ChemTools; the Physics
 /// section's motion and vectors, PhysTools; and the biology toolkit's cell, dna, gene, biomol, cross, divide, popgen, biolab, enzyme,
 /// energy, through BioTools.Register). Each tool's file registers its own from a module initializer, so a tool added is
@@ -226,7 +226,7 @@ public static class ToolsCenter
         "balance" => "Balance",
         "cell" => "Cells", "dna" => "DNA", "gene" => "Genes", "biomol" => "Biomolecules", "cross" => "Crosses", "divide" => "Division",
         "popgen" => "Hardy–Weinberg", "biolab" => "Lab maths", "enzyme" => "Enzymes", "energy" => "Energy",
-        "motion" => "Motion", "vectors" => "Vectors", _ => key,
+        "motion" => "Motion", "vectors" => "Vectors", "shrink" => "Compress", _ => key,
     };
 
     /// <summary>The width of its pin's flyout (the Mac's popoverWidth).</summary>
