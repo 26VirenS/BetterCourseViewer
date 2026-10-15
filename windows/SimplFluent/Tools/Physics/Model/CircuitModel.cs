@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace Simpl.Tools;
 
-// The Circuit Builder's maths (tools), the Mac's CircuitModel line for line: a circuit as its parts on a grid and the
+// The Circuit Builder's maths (0.3.14), the Mac's CircuitModel line for line: a circuit as its parts on a grid and the
 // wires between their terminals, saved as JSON; the nodes the terminals make; the DC solver (modified nodal analysis:
 // node voltages and the current through every voltage source, resistors by their conductance, an ammeter, a wire and a
 // closed switch as 0 V sources so their current is read, a voltmeter as a gigaohm) with what it reads on every part;

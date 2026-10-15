@@ -1,3 +1,7 @@
+**What's new in 0.3.14** (beta)
+
+- **Circuit Builder** — the Physics section's third tool: place batteries, resistors, wires, switches, lamps, meters and a ground on a grid, join their terminals, and the circuit is solved as you build it — current arrows, lamps lit by their power, every part's V, I and P in a readout, and plain words when it can't be solved; quick builds (series, parallel, a voltage divider), save and load, Export PNG, and an Ohm's law and series/parallel strip; `/circuit` in the search box, and the strip as a pin.
+
 **What's new in 0.3.13** (beta)
 
 - **Solutions & pH** — a new Chemistry tool with four tabs: Molarity (any two of amount, volume and molarity give the third, with mass % and ppm), Dilution (M1V1 = M2V2, "How much stock?"), pH (any one of pH, pOH, [H⁺] and [OH⁻] gives the others; strong and weak acids and bases from a concentration, the weak ones solved exactly with the % ionized, on a 0–14 colour strip) and Titration (the equivalence volume, the pH at the start, half-way, at equivalence and after, the curve drawn, and a Henderson–Hasselbalch buffer); `/ph` in the search box, and a pin.
