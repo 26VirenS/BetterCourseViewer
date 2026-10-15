@@ -867,6 +867,16 @@ jobs:
           Shot 'tool-words-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'words', '--words-text', $wordsText, '--words-target', '120'))
           Shot 'tool-words-780' '780x683' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'words', '--words-text', $wordsText, '--words-target', '500'))
           Shot 'pin-words' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'words', '--pin-open', 'words', '--words-text', 'Photosynthesis turns light, water and carbon dioxide into sugar and oxygen. It happens in the chloroplasts of every leaf.'))
+          # (Statistics, at the end so the pictures before keep their parts) each of its four pages in light with numbers
+          # of its own — Describe on a class's marks, Regression on hours against marks, Distributions on the normal
+          # (μ 100, σ 15, x 115) and t (df 10, t 2.228), Tests on two samples, Welch's way —, Describe in dark on a sample
+          # with an outlier (its page in the log, checked below), and its pin on the spec's own sample
+          Shot 'tool-stats-describe' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'stats', '--tool-state', 'describe', '--stats-data', '72, 85, 90, 66, 78, 88, 95, 81, 74, 69, 92, 84, 77, 58, 99, 83'))
+          Shot 'tool-stats-regression' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'stats', '--tool-state', 'regression', '--stats-x', '1, 2, 3, 4, 5, 6, 7, 8', '--stats-y', '52, 58, 61, 70, 68, 79, 85, 88'))
+          Shot 'tool-stats-dist' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'stats', '--tool-state', 'dist', '--stats-normal', '100,15,115,85,115,0.9', '--stats-t', '10,2.228,0.05'))
+          Shot 'tool-stats-tests' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'stats', '--tool-state', 'tests', '--stats-test', 'two', '--stats-data', '20, 22, 19, 24, 25', '--stats-b', '18, 17, 21, 19, 16'))
+          Shot 'tool-stats-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'stats', '--tool-state', 'describe', '--stats-data', '12, 15, 11, 14, 13, 15, 16, 12, 14, 30'))
+          Shot 'pin-stats' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'stats', '--pin-open', 'stats', '--stats-data', '2, 4, 4, 4, 5, 5, 7, 9'))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
@@ -996,6 +1006,13 @@ jobs:
             $l = PhoneLog 'tool-words-dark'
             Write-Host "tool-words-dark: $((@($l -split "`n" | Where-Object { $_ -match 'words: ' }) -join ' | '))"
             if ($l -notmatch 'words: shows [1-9]\d* words') { Write-Host "::error::tool-words-dark: the Word Counter did not count the text its launch gave it (shots/profile-tool-words-dark.log)"; exit 1 }
+          }
+          # (Statistics) it opened on the page its launch named
+          foreach ($st in @(@('tool-stats-dark', 'describe'), @('tool-stats-tests', 'tests'))) {
+            if ($script:mine -notcontains $st[0]) { continue }
+            $l = PhoneLog $st[0]
+            Write-Host "$($st[0]): $((@($l -split "`n" | Where-Object { $_ -match 'stats: ' }) -join ' | '))"
+            if (-not $l.Contains("stats: shows $($st[1])")) { Write-Host "::error::$($st[0]): Statistics did not open on its $($st[1]) page (shots/profile-$($st[0]).log)"; exit 1 }
           }
           # the periodic table's top showed Fe when ptable-hover was pictured (--ptable-hover Fe): the last card its log
           # names before "picture at" (PTGrid.Show writes "ptable hover card: …" in a picture run)
