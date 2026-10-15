@@ -854,6 +854,11 @@ jobs:
           Shot 'phys-motion-projectile-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'motion', '--tool-state', 'projectile:v0=20,angle=45,h=0'))
           Shot 'phys-motion-780' '780x683' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'motion', '--tool-state', 'projectile:v0=25,angle=60,h=2'))
           Shot 'pin-motion' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'motion', '--pin-open', 'motion'))
+          # (Vectors, at the end so the pictures before keep their parts) two 2D vectors light (the log says their
+          # resultant, checked below), three in 3D dark, and its pin's flyout
+          Shot 'phys-vectors' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'vectors', '--tool-state', '3,4;1,2'))
+          Shot 'phys-vectors-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'vectors', '--tool-state', '3d:1,2,3;4,5,6;-2,3,1'))
+          Shot 'pin-vectors' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'vectors', '--pin-open', 'vectors'))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
@@ -1019,6 +1024,12 @@ jobs:
             $l = PhoneLog 'phys-motion'
             Write-Host "phys-motion: $((@($l -split "`n" | Where-Object { $_ -match 'motion: ' }) -join ' | '))"
             if (-not $l.Contains('motion: shows 1d v=10 x=25')) { Write-Host "::error::phys-motion: the 1D motion was not solved as expected (shots/profile-phys-motion.log)"; exit 1 }
+          }
+          # Vectors opened on (3,4) and (1,2): their resultant (4, 6), 7.211 long (the tool writes "vectors: shows …")
+          if ($script:mine -contains 'phys-vectors') {
+            $l = PhoneLog 'phys-vectors'
+            Write-Host "phys-vectors: $((@($l -split "`n" | Where-Object { $_ -match 'vectors: ' }) -join ' | '))"
+            if (-not $l.Contains('vectors: shows 2 vectors, resultant (4, 6) |R|=7.211')) { Write-Host "::error::phys-vectors: the two vectors were not added as expected (shots/profile-phys-vectors.log)"; exit 1 }
           }
           # Cell Explorer opened under a still pointer: nothing pointed at before its picture (the 3D view writes "bio scene:
           # pointed at …" in a picture run when what is under the pointer changes)
