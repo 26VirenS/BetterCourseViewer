@@ -632,8 +632,9 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   ground. The tool window's Dark Page moon shows only in Dark Mode, where it does something.
 
 - **The tools after the UI review (1.3.78).** The Tools page is in sections by what a tool is for — *Study* (Flashcards,
-  Focus timer, Citation generator, Grade needed), *Math & science* (Calculator, Graphing calculator, Unit converter,
-  Periodic table), *Files* (File converter, Merge & split PDFs, PDF annotator, Image to text) and *Biology*, as on
+  Focus timer, Citation generator, Grade needed; since the tools of their own, the Word Counter), *Math & science*
+  (Calculator, Graphing calculator, Unit converter; the Periodic table until 1.3.80 moved it to *Chemistry*), *Files*
+  (File converter, Merge & split PDFs, PDF annotator, Image to text) and *Biology*, as on
   Windows — each tile's line one short line, three tiles across from about 900 points of page (`ToolGroup`, `ToolGroupSection`,
   `ToolTile.columns`). An open tool has one pin control, in its heading, named for what a press does (*Unpin* / *Pin to
   Toolbar*); the window's toolbar no longer adds a second. The pins past the toolbar's room go into a *Tools*
@@ -711,7 +712,7 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   speed and angle from Kinematics & Projectiles' pin (`MotionCompact`), two vectors from Vectors' (`VectorsCompact`),
   the Circuit Builder's Ohm's law and list (`CircuitCompact`), the calculator's
   line, sums, memory and Rad/Deg (`CalcEngine.handOff`), a codon looked up, a cross, a Hardy–Weinberg value, the lab
-  calculator shown, (tools) the Equation Balancer's equation; the graph's whole drawing — expressions, sliders, tables, notes and view — by Desmos's own
+  calculator shown, (tools) the Equation Balancer's equation, the Word Counter's text; the graph's whole drawing — expressions, sliders, tables, notes and view — by Desmos's own
   `Calc.getState`/`Calc.setState` from the pin's web view to the whole one's (`GraphWeb.carryOver`; the whole one's graph
   before it is a ⌘Z away). The focus timer, Flashcards' sets and the lab's numbers are the whole tool's already. A panel
   as it opens carries nothing, and the tool opens as from its tile; with something carried, the tool's popup if it is
@@ -1034,6 +1035,25 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
     "<equation>"` (the pin reads `-SimplBalance` too). Pictures (`chem_calc_tools`): `light-71-tool-balance`,
     `dark-71-tool-balance`, `light-71b-tool-balance-narrow` (780 × 700), `light-71a-tool-balance-cant` (Na + Cl2 → NaBr),
     `light-54l-pin-balance`.
+
+- **The study and maths tools.** Tools of the Mac's own after the chemistry ones, each a `ToolKind` case with its
+  name, line, symbol and colour inline (as the first tools have them), a tile at the end of its section's row, a popup,
+  a pin with a quick version, a command in the search field, and its arithmetic in `Tools/Model` — Foundation only,
+  compiled and checked by the Models job (`scripts/dev/swift-checks/StudyChecks.swift`) against the shared
+  specification's test vectors, the same the Windows app is checked against. What they keep is `StudyPrefs`
+  (UserDefaults `SimplStudy.<key>.<field>`, a picture's in a suite of its own); the Developer window's Interface page
+  opens each and forgets what they keep. Every number shown is `StudyMath.text`: six significant figures at most,
+  rounded half up, no float noise, a minus as "−".
+  - **Word Counter** (`words`, *Study*; `Tools/WordCounter.swift`, `Model/WordCountModel.swift`): a text area, and
+    beside it, live, the words, characters with and without spaces, sentences and paragraphs, the reading time (238
+    words a minute) and speaking time (150), the average and the longest word; a target length with a bar and "12 to
+    go" / "40 over"; the ten words used most as chips, the stop words left out (`WordCount`). Paste, Copy Counts (one
+    line), Clear (⇧⌘⌫). A word is a run of letters and digits — an apostrophe or hyphen inside it keeps it one; a
+    sentence ends at a run of `. ! ?` or an ellipsis; paragraphs are set apart by blank lines. The text (up to 200,000
+    characters) and the target are kept. Pin: a small area and "5 words · 28 characters"; Open Full Screen carries the
+    text (`takeInfo("text")`). Command `/words` (words such as "word count", "characters", "reading time", "essay").
+    Launch flags: `-SimplTool words -SimplWordsText "…" -SimplWordsTarget 150`; a pin's `-SimplWordsText`. Pictures
+    (`study_tools`): `light-73-tool-words`, `dark-73-tool-words`, `light-73b-tool-words-narrow`, `light-54m-pin-words`.
 
 ## Data and encryption
 

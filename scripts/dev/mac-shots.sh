@@ -631,6 +631,20 @@ phys_tools() {
   MODE=light shoot light-54u-pin-circuit 14 -SimplPinnedTools circuit -SimplPinOpen circuit
 }
 
+# (tools) the study and maths tools, each its popup over the Tools page in light and in dark, narrow, and its pin
+# opened: the Word Counter on an essay's opening (-SimplWordsText) with a target of 150 words
+study_tools() {
+  local m
+  local essay="The printing press changed Europe faster than any invention before it. Within fifty years of Gutenberg's first Bible, presses in two hundred towns had printed some twenty million books — more than every scribe of the previous thousand years. Ideas that once travelled at the pace of a copyist's hand now crossed the continent in a season.
+
+This essay argues that the press did not simply spread ideas; it changed which ideas could survive. A pamphlet printed in Wittenberg could be read in Zurich before its author's opponents had drafted a reply, and the reply itself would be printed."
+  for m in light dark; do
+    MODE="$m" SIZE=1440x920 shoot "$m-73-tool-words" 14 -SimplPlace tools -SimplTool words -SimplWordsText "$essay" -SimplWordsTarget 150
+  done
+  MODE=light SIZE=780x700 shoot light-73b-tool-words-narrow 14 -SimplPlace tools -SimplTool words -SimplWordsText "$essay" -SimplWordsTarget 150
+  MODE=light shoot light-54m-pin-words 14 -SimplPinnedTools words -SimplPinOpen words -SimplWordsText "Hello, world! This is Simpl."
+}
+
 # (1.3.80) how each 3D model was framed, from the consoles ("[Simpl] bio frame <scene>: view W × H, model X% across,
 # Y% up", and the atom's and the molecule's frames): each picture's last framing and its model's share of its view's
 # limiting side (the larger of the two) in frame-check.txt — 75% to 85% is as framed (SceneFill); under 70% is said
@@ -929,6 +943,7 @@ the_set() {
   chem_tools # (1.3.80) the Chemistry section and its tools
   chem_calc_tools # (tools) the chemistry calculators
   phys_tools # (tools) the Physics section and its tools
+  study_tools # (tools) the study and maths tools
   # (1.3.78) a PDF-only assignment (1013, made so here) waiting for the phone: Combine photos under the code
   mock_config '{"ext":{"1013":["pdf"]}}'
   MODE=dark shoot dark-12f-hand-in-phone-photos-waiting 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1013 -SimplOpen handin -SimplPhone YES

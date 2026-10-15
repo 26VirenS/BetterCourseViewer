@@ -427,6 +427,17 @@ private struct DevInterface: View {
                 }
                 .disabled(engine == nil)
             }
+            // (tools) the study and maths tools: each opened over the main window, and what they keep (StudyPrefs) forgotten
+            Section("Study and maths tools") {
+                HStack {
+                    ForEach([ToolKind.words]) { k in
+                        Button(k.name) { if let engine { ToolsCenter.shared.popUp(k, engine: engine) } }
+                    }
+                }
+                .disabled(engine == nil)
+                Button("Forget What They Keep") { StudyPrefs.forgetAll() }
+                    .help("The Word Counter's text and target")
+            }
             Section("Look") {
                 Picker("Appearance (this run)", selection: $look) {
                     Text("System").tag(0)

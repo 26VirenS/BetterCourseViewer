@@ -340,6 +340,7 @@ struct PinnedToolQuick: View {
         case .fc: FlashcardsCompact { openFull($0, []) }
         case .graph: GraphCompact()
         case .units: UnitConverterCompact()
+        case .words: WordCounterCompact() // (tools) a small text area and its counts
         case .conv:
             fileDrop(title: "Click to add files", sub: "Documents, PDFs, pictures and data, turned into one another.", multiple: true)
         case .pdfx:

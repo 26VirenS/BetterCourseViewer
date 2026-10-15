@@ -7,9 +7,10 @@ import UniformTypeIdentifiers
 // annotator, Image to text and flashcards — drawn natively, with a unit converter of the Mac's own beside them,
 // (1.3.78) the biology toolkit's ten under a heading of their own (Biology/BioTools.swift) and (1.3.80) the periodic
 // table split into the chemistry tools' four, under theirs (Chemistry/ChemTools.swift), (tools) the chemistry
-// calculators — the Equation Balancer — beside them, and (tools) the physics tools under a "Physics" heading between
-// them (Physics/PhysTools.swift). One row in the sidebar opens a page of tiles, (tools-32) in sections by what they
-// are for: Study, Math & science, Files, Chemistry, Physics and Biology;
+// calculators — the Equation Balancer — beside them, (tools) the physics tools under a "Physics" heading between
+// them (Physics/PhysTools.swift), and (tools) the study and maths tools after them — the Word Counter under Study
+// (WordCounter.swift; their arithmetic in Model/, checked by the Models job). One row in the sidebar opens a page of
+// tiles, (tools-32) in sections by what they are for: Study, Math & science, Files, Chemistry, Physics and Biology;
 // (1.3.79) a tile opens its tool in a popup over the window — the Tools page staying behind it, and the whole window
 // usable round it (Shell/FloatingPopup.swift) — as its pin, a hand-off from another tool and a launch do. Any tool can be
 // pinned: it then sits in the toolbar on every screen and opens a compact version of itself in a popover
@@ -28,6 +29,9 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
     case motion, vectors, circuit
     // (1.3.78) the biology toolkit: its names, lines, symbols and colours are BioTools.info's
     case cell, dna, gene, biomol, cross, divide, popgen, biolab, enzyme, energy
+    // (tools) the study and maths tools of the Mac's own, each with its name, line, symbol and colour below as the
+    // first tools have them: the Word Counter (WordCounter.swift)
+    case words
 
     var id: String { rawValue }
 
@@ -46,6 +50,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .mark: return "PDF annotator"
         case .ocr: return "Image to text"
         case .fc: return "Flashcards"
+        case .words: return "Word Counter"
         default: return BioTools.info(self).name
         }
     }
@@ -67,6 +72,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .mark: return "Mark up"
         case .ocr: return "Image to text"
         case .fc: return "Flashcards"
+        case .words: return "Words"
         default: return BioTools.info(self).shortName
         }
     }
@@ -87,6 +93,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .mark: return "Highlight and add notes."
         case .ocr: return "Copy the words in a picture."
         case .fc: return "Flip, learn, test and match."
+        case .words: return "Words, characters, reading time."
         default: return BioTools.info(self).note
         }
     }
@@ -106,6 +113,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .mark: return "highlighter"
         case .ocr: return "text.viewfinder"
         case .fc: return "rectangle.on.rectangle.angled"
+        case .words: return "text.word.spacing"
         default: return BioTools.symbol(self)
         }
     }
@@ -125,6 +133,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .mark: return "#e5a500"
         case .ocr: return "#00b3a4"
         case .fc: return "#0a84ff"
+        case .words: return "#8e8e93"
         default: return BioTools.info(self).hex
         }
     }
@@ -357,7 +366,7 @@ enum ToolGroup: CaseIterable {
 
     var kinds: [ToolKind] {
         switch self {
-        case .study: return [.fc, .pomo, .cite, .need]
+        case .study: return [.fc, .pomo, .cite, .need, .words]
         case .science: return [.calc, .graph, .units]
         case .files: return [.conv, .pdfx, .mark, .ocr]
         case .chemistry: return ChemTools.kinds
@@ -526,6 +535,7 @@ struct ToolScreen: View {
         case .mark: PDFAnnotatorTool()
         case .ocr: ImageToTextTool()
         case .fc: FlashcardsTool()
+        case .words: WordCounterTool()
         case .cell, .dna, .gene, .biomol, .cross, .divide, .popgen, .biolab, .enzyme, .energy: BioToolScreen(kind: kind)
         }
     }

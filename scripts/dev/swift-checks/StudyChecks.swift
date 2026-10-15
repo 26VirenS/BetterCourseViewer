@@ -22,4 +22,30 @@ func studyChecks(_ check: (Bool, String) -> Void) {
           "numbers read apart by spaces, commas, tabs, semicolons and new lines")
     check(StudyMath.duration(seconds: 135) == "2 min 15 s" && StudyMath.duration(seconds: 45.4) == "45 s" && StudyMath.duration(seconds: 3780) == "1 h 3 min",
           "a reading time as words")
+
+    // ---- the Word Counter ---------------------------------------------------------------------------------------------
+    print("the Word Counter")
+    let hello = WordCount.count("Hello, world! This is Simpl.")
+    // (the specification says 23 without spaces, but the text's 28 characters hold four spaces: 24)
+    check(hello.words == 5 && hello.characters == 28 && hello.charactersNoSpaces == 24 && hello.sentences == 2,
+          "\"Hello, world! This is Simpl.\": 5 words, 28 characters, 24 without its four spaces, 2 sentences (\(hello.words), \(hello.characters), \(hello.charactersNoSpaces), \(hello.sentences))")
+    check(hello.paragraphs == 1 && hello.longestWord == "Hello" && abs(hello.averageWordLength - 4.2) < 1e-9,
+          "one paragraph, the longest word Hello, 4.2 letters a word on average")
+    check(WordCount.words(in: "don't well-read O'Brien 3.5 e-mail — end-") == ["don't", "well-read", "O'Brien", "3", "5", "e-mail", "end"],
+          "an apostrophe or a hyphen inside a word keeps it one; a dash alone, or one at a word's end, does not")
+    check(WordCount.count("").words == 0 && WordCount.count("").sentences == 0 && WordCount.count("").paragraphs == 0 && WordCount.count("   \n\n").words == 0,
+          "an empty text counts nothing")
+    check(WordCount.sentences(in: "Wait... what?! Really") == 3 && WordCount.sentences(in: "No marks at all") == 1,
+          "an ellipsis or a ?! is one sentence's end; a text without any is one sentence")
+    check(WordCount.paragraphs(in: "One\ntwo\n\nThree\n   \n\nFour\n") == 3, "paragraphs are set apart by blank lines, not by every new line")
+    let essay = WordCount.count("The cell is the unit of life. Every cell has a membrane, and the membrane of a cell keeps the cell whole. Cells divide.")
+    check(essay.frequent.first?.word == "cell" && essay.frequent.first?.count == 4 && !essay.frequent.contains { $0.word == "the" }
+          && essay.frequent.prefix(2).map(\.word) == ["cell", "membrane"],
+          "the words used most, without case and without the stop words (\(essay.frequent.prefix(3).map { "\($0.word) \($0.count)" }))")
+    check(abs(WordCount.count(String(repeating: "word ", count: 476)).readingSeconds - 120) < 1e-9
+          && abs(WordCount.count(String(repeating: "word ", count: 150)).speakingSeconds - 60) < 1e-9,
+          "476 words read in 2 minutes at 238 a minute, 150 said in one at 150")
+    let goal = WordCount.Target(target: 500, words: 488), over = WordCount.Target(target: 500, words: 540), on = WordCount.Target(target: 500, words: 500)
+    check(goal.text == "12 to go" && over.text == "40 over" && on.text == "On target" && abs(goal.progress - 0.976) < 1e-9 && over.progress == 1,
+          "a target: 12 to go, 40 over, on target, and the bar's share")
 }
