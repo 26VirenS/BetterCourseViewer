@@ -458,10 +458,12 @@ struct RingGeometry {
         return foot - (foot - top) * (p - lo) / (hi - lo)
     }
 
-    /// The levels' ticks at the height of their points, and (planning-20) their rows stacked one under the next from
-    /// the top — a leader joins each row to its tick — so the room goes to the words, not to gaps between the rows; at
-    /// the foot they are pushed back up. `heights` are the rows' own, in the stage's units; `top` is where the first
-    /// row may start (under the criterion's whole description, where it is shown).
+    /// The levels' ticks at the height of their points, and (1.3.97) their rows beside their ticks, each at the height
+    /// of its points — moved down only as far as the row above it needs (and up, at the foot), a leader joining a row
+    /// that had to move to its tick. (planning-20 had stacked the rows from the top whatever their points, the room
+    /// going to the words; the owner wanted each level where its points put it, the bar read as a scale.) `heights` are
+    /// the rows' own, in the stage's units; `top` is where the first row may start (under the criterion's whole
+    /// description, where it is shown).
     func places(_ k: Int, foot: Double, heights: [Double], top: Double? = nil) -> [BarPlace] {
         let ls = levels(k)
         guard !ls.isEmpty else { return [] }
@@ -470,7 +472,7 @@ struct RingGeometry {
         var ys = want
         if let top { ys[0] = max(ys[0], top + hs[0] / 2) }
         for i in ys.indices.dropFirst() {
-            ys[i] = ys[i - 1] + hs[i - 1] / 2 + 8 + hs[i] / 2
+            ys[i] = max(ys[i], ys[i - 1] + hs[i - 1] / 2 + 8 + hs[i] / 2)
         }
         let last = ys.count - 1
         if ys[last] + hs[last] / 2 > foot + 30 {
@@ -543,8 +545,6 @@ struct RingPainter {
     /// A bar's unearned stretch.
     private static let track = RingRGB(r: 72, g: 72, b: 74)
     private static let tickFill = Color(red: 28 / 255, green: 28 / 255, blue: 30 / 255)
-    /// The dark ground round the ring, for the gaps between its slices.
-    private static let seamFill = Color(red: 18 / 255, green: 18 / 255, blue: 20 / 255)
 
     func paint(_ ctx: inout GraphicsContext, scale: CGFloat) {
         guard geo.n > 0, pose.sel >= 0, pose.sel < geo.n else { return }
@@ -649,31 +649,9 @@ struct RingPainter {
             dc.opacity = groupA * dotA * span(local, 0.5, 1)
             dc.fill(disc(d, r), with: .color(tones[k].color))
         }
-        // (planning-19) a gap where one criterion's slice meets the next, once the ring has bloomed: each reads as a
-        // piece of its own to pick, not one band of colour
-        let seamA = span(bloom, 0.85, 1)
-        if n > 1 && seamA > 0 {
-            var sc = ctx
-            sc.opacity = groupA * seamA
-            for k in 0..<n where !(moving && (k == pose.sel || k == (pose.sel + 1) % n)) { seam(sc, k) }
-        }
-    }
-
-    /// The ring's ground showing through where slice `k` starts, across the band.
-    private func seam(_ ctx: GraphicsContext, _ k: Int) {
-        let m = geo.model
-        let th = m.starts[k]
-        let b = m.between(th)
-        let thick = m.blend(m.thick, b)
-        let rad = RingUnits.radius + m.blend(go, b) - (thick - 10) / 2
-        let sn = sin(th)
-        let cs = cos(th)
-        let r0 = rad - thick / 2 - 3
-        let r1 = rad + thick / 2 + 3
-        var line = Path()
-        line.move(to: CGPoint(x: RingUnits.cx + r0 * sn, y: RingUnits.cy - r0 * cs))
-        line.addLine(to: CGPoint(x: RingUnits.cx + r1 * sn, y: RingUnits.cy - r1 * cs))
-        ctx.stroke(line, with: .color(RingPainter.seamFill), lineWidth: 3)
+        // (1.3.97) no gap where one criterion's slice meets the next: the ring is one band of colour, the slices told
+        // apart by their colours, their dots and their names (planning-19's dark seams across the band, the owner found,
+        // cut it up)
     }
 
     private func restSlice(_ ctx: GraphicsContext, _ k: Int, sweep: Double, grow: Double) {
@@ -1181,7 +1159,7 @@ private struct RingCentre: View {
 // MARK: - The bar's side
 
 /// Beside the open criterion's bar: the way back (a little ring on top of the bar), which criterion this is with its
-/// name, description and ‹ › to switch, its levels stacked with a leader to the height of their points (the one given
+/// name, description and ‹ › to switch, its levels beside the bar at the height of their points (a leader to one that had to move) (the one given
 /// marked), and the marker's note under them. It comes out from the bar once the bar is nearly straight, row by row.
 private struct BarSide: View {
     let geo: RingGeometry
