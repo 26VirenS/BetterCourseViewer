@@ -12,6 +12,22 @@ import SwiftUI
 /// (1.3.76) The three views of the atom (1.3.80: Atoms & Orbitals').
 enum PTModel: String { case atom, orbitals, cloud }
 
+/// (1.3.80) The element's 3D view: telling its framing when it is sized again, and when its camera is moved by hand.
+final class Atom3DSCNView: SCNView {
+    var resized: (() -> Void)?
+    var moved: (() -> Void)?
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        resized?()
+    }
+
+    override func mouseDragged(with event: NSEvent) { moved?(); super.mouseDragged(with: event) }
+    override func rightMouseDragged(with event: NSEvent) { moved?(); super.rightMouseDragged(with: event) }
+    override func scrollWheel(with event: NSEvent) { moved?(); super.scrollWheel(with: event) }
+    override func magnify(with event: NSEvent) { moved?(); super.magnify(with: event) }
+}
+
 struct Atom3DView: NSViewRepresentable {
     let element: PTElement
     let model: PTModel
@@ -22,23 +38,84 @@ struct Atom3DView: NSViewRepresentable {
     /// The appearance: the cloud's colours are its own in light and in dark.
     let dark: Bool
 
-    final class Coordinator { var key = "" }
+    /// What is shown, and (1.3.80) how its camera frames it: the model filling 84% of the view's height or width,
+    /// whichever runs out first (`SceneFill`) — the cloud's 95% sphere 80%, its thinning edge round it — as it comes and
+    /// each time the view is sized again; turned or zoomed by hand, kept as large in its view as it was. Before, the
+    /// camera stood at a set distance whatever the view's shape: a row of p orbitals took half a wide view's width, and
+    /// a narrow view cut it off.
+    final class Coordinator {
+        var key = ""
+        weak var view: SCNView?
+        /// Points on the outside of the model, in its scene's own space (the camera's too); the share they fill.
+        var points: [BioVec] = []
+        var share = SceneFill.share
+        /// The camera moved by hand since the model was framed.
+        var touched = false
+        /// The view's size when it was last framed (or kept as large).
+        var framedSize = CGSize.zero
+
+        /// How far from the middle of the model the camera stands for it to fill its share of a view of `size`.
+        func distance(_ size: CGSize) -> Double {
+            let limits = SceneFill.limits(fov: AtomScene.fieldOfView, width: Double(size.width), height: Double(size.height), share: share)
+            return SceneFill.distance(points, aim: SceneFill.middle(points) ?? BioVec(0, 0, 0), limits: limits)
+        }
+
+        /// The camera put in front of the model, looking along −z at its middle, as far back as it fills its share.
+        func frame() {
+            guard let v = view, let cam = v.pointOfView, !points.isEmpty else { return }
+            let s = v.bounds.size
+            guard s.width > 1, s.height > 1 else { return }
+            let aim = SceneFill.middle(points) ?? BioVec(0, 0, 0)
+            let d = distance(s)
+            cam.simdPosition = SIMD3<Float>(Float(aim.x), Float(aim.y), Float(aim.z + d))
+            cam.simdOrientation = simd_quatf(angle: 0, axis: SIMD3<Float>(0, 1, 0))
+            v.defaultCameraController.target = SCNVector3(CGFloat(aim.x), CGFloat(aim.y), CGFloat(aim.z))
+            touched = false
+            framedSize = s
+            if OpenClock.verbose {
+                let f = SceneFill.filled(points, aim: aim, distance: d, fov: AtomScene.fieldOfView, width: Double(s.width), height: Double(s.height))
+                NSLog("[Simpl] atom frame %@: view %.0f × %.0f, model %.0f%% across, %.0f%% up", key, s.width, s.height, f.across * 100, f.up * 100)
+            }
+        }
+
+        /// The view sized again: framed afresh — or, the camera moved by hand, brought nearer or further back by as much
+        /// as the framing would be, so the model stays as large in its view as it was.
+        func resized() {
+            guard let v = view, !points.isEmpty else { return }
+            let s = v.bounds.size
+            guard s.width > 1, s.height > 1, abs(s.width - framedSize.width) > 1 || abs(s.height - framedSize.height) > 1 else { return }
+            guard touched, framedSize.width > 1, framedSize.height > 1, let cam = v.pointOfView else {
+                frame()
+                return
+            }
+            let k = distance(s) / max(distance(framedSize), 1e-6)
+            framedSize = s
+            guard k.isFinite, k > 0, abs(k - 1) > 0.005 else { return }
+            let t = v.defaultCameraController.target
+            let target = SIMD3<Float>(Float(t.x), Float(t.y), Float(t.z))
+            cam.simdPosition = target + (cam.simdPosition - target) * Float(k)
+        }
+    }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    func makeNSView(context: Context) -> SCNView {
-        let v = SCNView(frame: .zero)
+    func makeNSView(context: Context) -> Atom3DSCNView {
+        let v = Atom3DSCNView(frame: .zero)
         v.allowsCameraControl = true
         v.autoenablesDefaultLighting = true
         v.antialiasingMode = .multisampling4X
         v.backgroundColor = .clear
         v.isPlaying = true
         v.loops = true
-        apply(v, context.coordinator)
+        let c = context.coordinator
+        c.view = v
+        v.resized = { [weak c] in c?.resized() }
+        v.moved = { [weak c] in c?.touched = true }
+        apply(v, c)
         return v
     }
 
-    func updateNSView(_ v: SCNView, context: Context) { apply(v, context.coordinator) }
+    func updateNSView(_ v: Atom3DSCNView, context: Context) { apply(v, context.coordinator) }
 
     private func apply(_ v: SCNView, _ c: Coordinator) {
         // (1.3.76) the cloud made again for its chosen subshell and for light or dark; the atom and the orbitals only as
@@ -58,6 +135,18 @@ struct Atom3DView: NSViewRepresentable {
         }
         v.scene = scene
         v.pointOfView = scene.rootNode.childNode(withName: "camera", recursively: false)
+        // (1.3.80) framed for the view's size: the atom's rings and nucleus, the orbitals' lobes as they are drawn; the
+        // cloud by its chosen 95% sphere, a unit across, at 80% (its last dots thin out past it)
+        if model == .cloud {
+            c.points = AtomScene.ball(radius: 1)
+            c.share = 0.8
+        } else {
+            c.points = AtomScene.outline(scene.rootNode)
+            c.share = SceneFill.share
+        }
+        c.touched = false
+        c.framedSize = .zero
+        c.frame()
     }
 }
 
@@ -65,6 +154,45 @@ enum AtomScene {
     static let protonColor = NSColor(ptHex: "ff5a4f")
     static let neutronColor = NSColor(ptHex: "c7c7cc")
     static let electronColor = NSColor(ptHex: "64d2ff")
+    /// The camera's field of view, up and down (degrees).
+    static let fieldOfView = 38.0
+
+    /// (1.3.80) Points on a ball of `radius` about the middle (the 26 directions a biology scene's outline is taken
+    /// along), for a camera to frame it by.
+    static func ball(radius: Double) -> [BioVec] {
+        BioSceneContent.directions.map { BioVec(Double($0.x), Double($0.y), Double($0.z)) * radius }
+    }
+
+    /// (1.3.80) Points on the outside of what a scene draws, in its root's space: each ball's surface along the 26
+    /// directions, each ring round its whole circle (and its tube), anything else its box's corners — for the camera to
+    /// frame the model by as it is drawn (a shell's ring tilted, a row of orbitals) rather than a ball round it.
+    static func outline(_ root: SCNNode) -> [BioVec] {
+        var out: [BioVec] = []
+        root.enumerateChildNodes { n, _ in
+            guard let g = n.geometry else { return }
+            var local: [SIMD3<Float>] = []
+            if let s = g as? SCNSphere {
+                local = BioSceneContent.directions.map { $0 * Float(s.radius) }
+            } else if let t = g as? SCNTorus {
+                let r = Float(t.ringRadius + t.pipeRadius)
+                local = (0..<48).map { k in
+                    let a = Float(k) / 48 * 2 * .pi
+                    return SIMD3<Float>(r * cos(a), 0, r * sin(a))
+                }
+                local += [SIMD3<Float>(0, Float(t.pipeRadius), 0), SIMD3<Float>(0, -Float(t.pipeRadius), 0)]
+            } else {
+                let (lo, hi) = n.boundingBox
+                for x in [lo.x, hi.x] { for y in [lo.y, hi.y] { for z in [lo.z, hi.z] {
+                    local.append(SIMD3<Float>(Float(x), Float(y), Float(z)))
+                } } }
+            }
+            for p in local {
+                let w = n.simdConvertPosition(p, to: root)
+                out.append(BioVec(Double(w.x), Double(w.y), Double(w.z)))
+            }
+        }
+        return out
+    }
 
     static func material(_ color: NSColor, alpha: CGFloat = 1, glow: Bool = false) -> SCNMaterial {
         let m = SCNMaterial()
@@ -88,7 +216,7 @@ enum AtomScene {
         let cam = SCNNode()
         cam.name = "camera"
         cam.camera = SCNCamera()
-        cam.camera?.fieldOfView = 38
+        cam.camera?.fieldOfView = CGFloat(fieldOfView)
         cam.camera?.zNear = 0.05
         cam.camera?.zFar = 200
         cam.position = SCNVector3(0, 0, CGFloat(distance))
