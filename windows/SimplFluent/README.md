@@ -426,7 +426,7 @@ never fails a run, and nothing waits for it but the pictures' merge.
 show checked against the school while the window shows `LiveCheck`), the popups floating over the window (`FloatPopup`, Popups below), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once, the third time Simpl is opened, at a calm moment, and from Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, a place or a page in a window of its own (`PlaceWindow`: a pane row's or a list row's Open in new window, Shift+click on a pane row, a page's ⋯ ▸ Open in new window, or Ctrl+Shift+O for what shows), the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
 | `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In and its Send from Phone, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
-| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed, Word Counter, Statistics, Matrix Calculator; `Model/` holds their counting and sums with no window in them, tested in `SimplFluent.Tests`), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Compress files, Graphing calculator), `Elements/` (the Periodic Table, Atoms & Orbitals), `Chemistry/` (the Chemistry section's tools: `ChemTools.cs`, Lewis Structures, the Molecule Builder, and the calculators — the Equation Balancer, Molar Mass & Stoichiometry, Gas Laws, Solutions & pH — with their sums in `Chemistry/Model/`, plain .NET), `Physics/` (the Physics section's tools: `PhysTools.cs`, Kinematics & Projectiles, Vectors; their maths in `Model/`, free of WPF), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
+| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed, Word Counter, Statistics, Matrix Calculator; `Model/` holds their counting and sums with no window in them, tested in `SimplFluent.Tests`), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Compress files, Graphing calculator), `Elements/` (the Periodic Table, Atoms & Orbitals), `Chemistry/` (the Chemistry section's tools: `ChemTools.cs`, Lewis Structures, the Molecule Builder, and the calculators — the Equation Balancer, Molar Mass & Stoichiometry, Gas Laws, Solutions & pH — with their sums in `Chemistry/Model/`, plain .NET), `Physics/` (the Physics section's tools: `PhysTools.cs`, Kinematics & Projectiles, Vectors, the Circuit Builder; their maths in `Model/`, free of WPF), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
 
 ## A screen
 
@@ -987,8 +987,8 @@ cloud`, `bohr`). A tool handing over to another in its popup gives the other the
 
 The physics tools (`Tools/Physics/PhysTools.cs`, a "Physics" section of their own between Chemistry and Biology) are
 the Mac's too: keys, names, lines, short names, search words and colours (a family of blues). Their maths lives in
-`Tools/Physics/Model/` with no WPF in it, so the unit tests (`MotionTests`, `VectorsTests`) check every worked example on
-any machine;
+`Tools/Physics/Model/` with no WPF in it, so the unit tests (`MotionTests`, `VectorsTests`, `CircuitTests`) check every
+worked example on any machine;
 numbers are written to four significant figures with no float noise (`PhysMath.Text`: "40.77 m", "2.883 s"), the minus
 the typeset "−", and a result's menu (or Ctrl+C while it has the keyboard) copies it in plain ASCII. What each keeps for
 next time is in the preferences as `SimplPhys.<tool>.<field>` (`PhysPrefs`):
@@ -1020,6 +1020,26 @@ next time is in the preferences as `SimplPhys.<tool>.<field>` (`PhysPrefs`):
   `--tool vectors --tool-state 3,4;1,2` (`3d:1,2,3;4,5,6` for 3D; `--vectors-mode 2d|3d`) opens it on those, and in a
   picture run the log says what it shows ("vectors: shows 2 vectors, resultant (4, 6) |R|=7.211"). The search box opens
   it by `/vectors`, `vector`, `components`, `dot product`, `cross product`, `resultant` or `magnitude`.
+- **Circuit Builder** (`circuit`, `Tools/Physics/CircuitTool.cs`): a grid of 24-px cells (`CircuitCanvas`) and a palette
+  — battery, resistor, wire, switch, lamp, ammeter, voltmeter, ground — a part pressed goes where there is room, one
+  dragged goes where it lands; a part dragged snaps to the grid, R (or Rotate) turns it a quarter turn, Delete removes it
+  (and its wires), the arrow keys nudge it, a double-click flips a switch; a wire is drawn from one terminal to another
+  (across first, then down, or down first where a part is in the way), and a wire clicked can be deleted too.
+  Terminals on one cell are joined without a wire. The circuit is solved as it changes (`CircuitSolver`: modified
+  nodal analysis — a battery, an ammeter, a wire and a closed switch as voltage sources so their current is read, a
+  voltmeter as a gigaohm, each separate circuit on its own, voltages from the ground or else the battery's −): the
+  current drawn as arrows along every part (moving with Windows' animations on, still otherwise), a lamp lit by its
+  share of half a watt, each part's value and reading under it, a readout of every part's V, I and P (a row picks the
+  part), and the trouble when there is one — a battery shorted or two against each other ("Can't solve …"), parts in
+  no circuit with a battery, no battery at all. The part picked has its volts or ohms, or a switch's Closed, in the
+  side panel. Quick builds: Series (9 V, 100 Ω, 200 Ω, an ammeter: 0.03 A, 6 V across the 200 Ω), Parallel (9 V, 100 Ω
+  ∥ 200 Ω: 0.135 A), Voltage divider (12 V, 1 kΩ and 2 kΩ with a voltmeter across the 2 kΩ: 8 V, grounded). The
+  circuit is kept as JSON (`circuit.doc`), saved and opened as a .json file (Save…, Open…), and Export PNG writes a
+  picture of the grid to Downloads. Under it, the calculator strip (`CircuitCalc`): Ohm's law from any two of V, I
+  and R, and a list of resistances ("100, 200", "1k, 2.2k") in series and in parallel — which is also its pin's
+  flyout. A launch's `--tool circuit --tool-state series|parallel|divider` opens it on that build, and in a picture
+  run the log says every part's reading ("circuit: shows series: Battery 1 9 V 0.03 A, Resistor 1 3 V 0.03 A, …"). The
+  search box opens it by `/circuit`, `ohm`, `ohm's law`, `resistor`, `voltage`, `current`, `series` or `parallel`.
 
 The tools program's everyday tools (`Tools/Everyday/`, each at the end of its group on the Tools page; their sums in
 `Tools/Everyday/Model/`, plain C# with no window in it, tested in `SimplFluent.Tests` on the specs' vectors; the search

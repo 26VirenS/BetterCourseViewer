@@ -73,7 +73,7 @@ public sealed class ToolContext
 /// The tools' views by key (the web's keys: cite, pomo, calc, graph, ptable, need, conv, units, pdfx, mark, ocr, fc; the
 /// tools program's words, stats and matrix (Tools/Everyday), shrink (Tools/Files) and plan (Tools/Planner); the
 /// Chemistry section's lewis, molecule and atoms beside ptable, and its calculators (balance, moles, gas, solution), ChemTools; the Physics
-/// section's motion and vectors, PhysTools; and the biology toolkit's cell, dna, gene, biomol, cross, divide, popgen, biolab, enzyme,
+/// section's motion, vectors and circuit, PhysTools; and the biology toolkit's cell, dna, gene, biomol, cross, divide, popgen, biolab, enzyme,
 /// energy, through BioTools.Register). Each tool's file registers its own from a module initializer, so a tool added is
 /// a file added.
 /// </summary>
@@ -226,14 +226,14 @@ public static class ToolsCenter
         "balance" => "Balance", "moles" => "Moles", "gas" => "Gas", "solution" => "pH",
         "cell" => "Cells", "dna" => "DNA", "gene" => "Genes", "biomol" => "Biomolecules", "cross" => "Crosses", "divide" => "Division",
         "popgen" => "Hardy–Weinberg", "biolab" => "Lab maths", "enzyme" => "Enzymes", "energy" => "Energy",
-        "motion" => "Motion", "vectors" => "Vectors", "shrink" => "Compress", "plan" => "Plan", _ => key,
+        "motion" => "Motion", "vectors" => "Vectors", "circuit" => "Circuit", "shrink" => "Compress", "plan" => "Plan", _ => key,
     };
 
     /// <summary>The width of its pin's flyout (the Mac's popoverWidth).</summary>
     public static double FlyoutWidth(string key) => key switch
     {
         // (the periodic table's a little wider, and its padding less: squares big enough to point at)
-        "ptable" => 460, "calc" or "gene" => 420, "cite" or "cross" => 400, "biolab" or "matrix" or "gas" => 380, "graph" or "popgen" or "balance" or "words" or "stats" or "plan" => 360, "fc" or "motion" or "vectors" or "moles" or "solution" => 340, _ => 330,
+        "ptable" => 460, "calc" or "gene" => 420, "cite" or "cross" => 400, "biolab" or "matrix" or "gas" => 380, "graph" or "popgen" or "balance" or "words" or "stats" or "plan" or "circuit" => 360, "fc" or "motion" or "vectors" or "moles" or "solution" => 340, _ => 330,
     };
 
     /// <summary>The room inside its pin's flyout round its content.</summary>

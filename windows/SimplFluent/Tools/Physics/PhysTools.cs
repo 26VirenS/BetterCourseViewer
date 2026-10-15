@@ -15,13 +15,15 @@ public static class PhysTools
 {
     /// <summary>
     /// The section's tools, in the Tools page's order, as the Mac has them: their keys, names in the chemistry tools'
-    /// Title Case, lines and colours — a family of blues. Every symbol's code is at most U+FFFF (README, Icons), and
-    /// none is worn by a chemistry or biology tool.
+    /// Title Case, lines and colours — a family of blues with the circuit's yellow. Every symbol's code is at most U+FFFF
+    /// (README, Icons), and none is worn by a chemistry or biology tool: the circuit's is FlashFlow24, a bolt in flow, the
+    /// Enzyme Lab having Flash24.
     /// </summary>
     public static readonly ToolsScreen.Kind[] Kinds =
     {
         new("motion", "Kinematics & Projectiles", "1D motion and projectile paths.", SymbolRegular.Rocket24, "#0a84ff"),
         new("vectors", "Vectors", "Add, dot, cross, components.", SymbolRegular.ArrowTrending24, "#5ac8fa"),
+        new("circuit", "Circuit Builder", "Build a DC circuit, read V, I, R.", SymbolRegular.FlashFlow24, "#ffd60a"),
     };
 
     public static ToolsScreen.Kind? Kind(string key) => Kinds.FirstOrDefault(k => k.Key == key);
@@ -32,7 +34,8 @@ public static class PhysTools
     /// <summary>
     /// What a launch asked of a physics tool, once, and only of the tool the launch opened (--tool &lt;key&gt;):
     /// <c>--tool-state</c> as it was given — a tab and its values for Kinematics &amp; Projectiles
-    /// ("projectile:v0=20,angle=45,h=0"), vectors for Vectors ("3,4;1,2", "3d:1,2,3;4,5,6").
+    /// ("projectile:v0=20,angle=45,h=0"), vectors for Vectors ("3,4;1,2", "3d:1,2,3;4,5,6"), a quick build for the
+    /// Circuit Builder ("series", "parallel", "divider").
     /// </summary>
     public static string? LaunchState(string key)
     {
@@ -47,9 +50,10 @@ public static class PhysTools
 /// What the physics tools keep from one opening to the next, on this PC (Prefs <c>SimplPhys.&lt;tool&gt;.&lt;field&gt;</c>,
 /// the Mac's PhysPrefs keys): Kinematics &amp; Projectiles' tab, numbers and units (<c>motion.tab</c>, <c>motion.oneD</c>,
 /// <c>motion.projectile</c>, <c>motion.quick</c>, <c>motion.imperial</c>), Vectors' vectors and settings
-/// (<c>vectors.list</c>, <c>.polar</c>, <c>.threeD</c>, <c>.radians</c>, <c>.tipToTail</c>, <c>.quick</c>). Written as
-/// they change; a picture's run has a profile of its own that starts empty, so each picture shows its tool as its launch
-/// asks.
+/// (<c>vectors.list</c>, <c>.polar</c>, <c>.threeD</c>, <c>.radians</c>, <c>.tipToTail</c>, <c>.quick</c>), and the
+/// Circuit Builder's circuit as JSON and its calculator strips' numbers (<c>circuit.doc</c>, <c>.calc</c>,
+/// <c>.quickCalc</c>). Written as they change; a picture's run has a profile of its own that starts empty, so each
+/// picture shows its tool as its launch asks.
 /// </summary>
 internal static class PhysPrefs
 {

@@ -17,8 +17,8 @@ public class PhysicsToolsTests
     [Fact]
     public void ThePhysicsSectionHasItsToolsInOrder()
     {
-        Assert.Equal(new[] { "motion", "vectors" }, PhysTools.Kinds.Select(k => k.Key));
-        Assert.Equal(new[] { "Kinematics & Projectiles", "Vectors" }, PhysTools.Kinds.Select(k => k.Name));
+        Assert.Equal(new[] { "motion", "vectors", "circuit" }, PhysTools.Kinds.Select(k => k.Key));
+        Assert.Equal(new[] { "Kinematics & Projectiles", "Vectors", "Circuit Builder" }, PhysTools.Kinds.Select(k => k.Name));
         Assert.All(PhysTools.Kinds, k => Assert.False(string.IsNullOrWhiteSpace(k.Note)));
         Assert.All(PhysTools.Kinds, k => Assert.True(k.Note.Length <= 32 && k.Note.EndsWith('.')));
     }
@@ -58,10 +58,11 @@ public class PhysicsToolsTests
     public void BothAppsTheSame()
     {
         // (the Mac's PhysTools.swift: its keys, lines, colours and short names)
-        Assert.Equal(new[] { "#0a84ff", "#5ac8fa" }, PhysTools.Kinds.Select(k => k.Hex.ToLowerInvariant()));
+        Assert.Equal(new[] { "#0a84ff", "#5ac8fa", "#ffd60a" }, PhysTools.Kinds.Select(k => k.Hex.ToLowerInvariant()));
         Assert.Equal("1D motion and projectile paths.", PhysTools.Kind("motion")!.Note);
         Assert.Equal("Add, dot, cross, components.", PhysTools.Kind("vectors")!.Note);
-        Assert.Equal(new[] { "Motion", "Vectors" }, PhysTools.Kinds.Select(k => ToolsCenter.ShortName(k.Key)));
+        Assert.Equal("Build a DC circuit, read V, I, R.", PhysTools.Kind("circuit")!.Note);
+        Assert.Equal(new[] { "Motion", "Vectors", "Circuit" }, PhysTools.Kinds.Select(k => ToolsCenter.ShortName(k.Key)));
     }
 
     [Theory]
@@ -75,6 +76,11 @@ public class PhysicsToolsTests
     [InlineData("dot product", "vectors")]
     [InlineData("cross product", "vectors")]
     [InlineData("resultant", "vectors")]
+    [InlineData("circuit", "circuit")]
+    [InlineData("ohm", "circuit")]
+    [InlineData("ohm's law", "circuit")]
+    [InlineData("resistor", "circuit")]
+    [InlineData("parallel", "circuit")]
     public void TheSearchBoxOpensEachByItsWords(string typed, string key)
     {
         var command = PaletteCommand.Named(PaletteCommand.PhysicsTools().ToList(), typed);
