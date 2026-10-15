@@ -884,6 +884,14 @@ jobs:
           Shot 'tool-matrix-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'matrix', '--matrix-a', '1 2 3; 4 5 6; 7 8 9', '--matrix-b', '6; 15; 24', '--tool-state', 'rref'))
           Shot 'tool-matrix-780' '780x683' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'matrix', '--matrix-a', '2 1; 1 3', '--matrix-b', '3; 5', '--matrix-op', 'solve'))
           Shot 'pin-matrix' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'matrix', '--pin-open', 'matrix', '--matrix-a', '1 2; 3 4'))
+          # (tools: Compress files, at the end so the pictures before keep their parts) three sample files made on the spot
+          # — a photo, a diagram with see-through parts and a PDF of both — compressed at Balanced in light, Smallest in
+          # dark and Fit under 0.5 MB on the narrow window (the log must say what was saved: checked below); and its
+          # pin's drop zone
+          Shot 'tool-shrink' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'shrink', '--shrink-files', 'sample', '--shrink-preset', 'balanced', '--shrink-go'))
+          Shot 'tool-shrink-dark' '1366x778' 50 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'shrink', '--shrink-files', 'sample', '--shrink-preset', 'smallest', '--shrink-go'))
+          Shot 'tool-shrink-780' '780x683' 50 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'shrink', '--shrink-files', 'sample', '--shrink-preset', 'fit', '--shrink-fit', '0.5', '--shrink-go'))
+          Shot 'pin-shrink' '1366x778' 45 ($mock + @('--appearance', 'dark', '--pin', 'shrink', '--pin-open', 'shrink'))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
@@ -1268,6 +1276,14 @@ jobs:
             }
             if ($shown -ne $hw[1]) { Write-Host "::error::$($hw[0]): its chart showed '$shown' when it was pictured, not '$($hw[1])' ($hwLog)"; exit 1 }
             Write-Host "$($hw[0]): its chart showed $shown"
+          }
+          # (tools) Compress files: its three sample files were compressed before each picture (--shrink-go), and the log
+          # says what was saved (Tools/Files/CompressFiles.cs, ShrinkState.Compress)
+          foreach ($sh in @('tool-shrink', 'tool-shrink-dark', 'tool-shrink-780')) {
+            if ($script:mine -notcontains $sh) { continue }
+            $l = PhoneLog $sh
+            Write-Host "${sh}: $((@($l -split "`n" | Where-Object { $_ -match 'shrink: ' }) -join ' | '))"
+            if ($l -notmatch 'shrink: done at \w+, .+ \(\d+% saved\) across 3 files') { Write-Host "::error::${sh}: the sample files were not compressed before the picture (shots/profile-$sh.log)"; exit 1 }
           }
           Get-ChildItem shots
       # (what Simpl keeps is encrypted — windows/SimplFluent/Support/Vault.cs — checked in this part's profiles as the
