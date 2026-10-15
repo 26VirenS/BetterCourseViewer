@@ -1,3 +1,7 @@
+**What's new in 0.3.13** (beta)
+
+- **Solutions & pH** — a new Chemistry tool with four tabs: Molarity (any two of amount, volume and molarity give the third, with mass % and ppm), Dilution (M1V1 = M2V2, "How much stock?"), pH (any one of pH, pOH, [H⁺] and [OH⁻] gives the others; strong and weak acids and bases from a concentration, the weak ones solved exactly with the % ionized, on a 0–14 colour strip) and Titration (the equivalence volume, the pH at the start, half-way, at equivalence and after, the curve drawn, and a Henderson–Hasselbalch buffer); `/ph` in the search box, and a pin.
+
 **What's new in 0.3.12** (beta)
 
 - **Molar Mass & Stoichiometry** — a new Chemistry tool with four tabs: Molar mass (a formula's mass with each element's count, mass and percent), Convert (grams, moles, molecules and litres at STP from any one), Reaction (a balanced equation with what you have of each reactant gives the limiting reagent, every product's yield, what is left over and the percent yield) and Empirical (mass percents to an empirical and molecular formula); `/moles` in the search box, and a pin.

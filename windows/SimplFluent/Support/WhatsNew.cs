@@ -26,6 +26,8 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.13", "2026-10-15",
+            ("new", "Solutions & pH", "Molarity, dilution, pH and titration curves.")),
         R("0.3.12", "2026-10-15",
             ("new", "Moles & stoichiometry", "Molar mass, conversions, limiting reagent and yields."),
             ("new", "Gas laws", "PV = nRT and the combined law, with a piston drawing.")),
