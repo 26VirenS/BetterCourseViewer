@@ -426,7 +426,7 @@ never fails a run, and nothing waits for it but the pictures' merge.
 show checked against the school while the window shows `LiveCheck`), the popups floating over the window (`FloatPopup`, Popups below), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once, the third time Simpl is opened, at a calm moment, and from Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, a place or a page in a window of its own (`PlaceWindow`: a pane row's or a list row's Open in new window, Shift+click on a pane row, a page's ⋯ ▸ Open in new window, or Ctrl+Shift+O for what shows), the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
 | `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In and its Send from Phone, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
-| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table, Atoms & Orbitals), `Chemistry/` (the Chemistry section's tools: `ChemTools.cs`, Lewis Structures, the Molecule Builder, and the calculators — the Equation Balancer — with their sums in `Chemistry/Model/`, plain .NET), `Physics/` (the Physics section's tools: `PhysTools.cs`, Kinematics & Projectiles; their maths in `Model/`, free of WPF), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
+| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table, Atoms & Orbitals), `Chemistry/` (the Chemistry section's tools: `ChemTools.cs`, Lewis Structures, the Molecule Builder, and the calculators — the Equation Balancer — with their sums in `Chemistry/Model/`, plain .NET), `Physics/` (the Physics section's tools: `PhysTools.cs`, Kinematics & Projectiles, Vectors; their maths in `Model/`, free of WPF), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
 
 ## A screen
 
@@ -938,7 +938,8 @@ cloud`, `bohr`). A tool handing over to another in its popup gives the other the
 
 The physics tools (`Tools/Physics/PhysTools.cs`, a "Physics" section of their own between Chemistry and Biology) are
 the Mac's too: keys, names, lines, short names, search words and colours (a family of blues). Their maths lives in
-`Tools/Physics/Model/` with no WPF in it, so the unit tests (`MotionTests`) check every worked example on any machine;
+`Tools/Physics/Model/` with no WPF in it, so the unit tests (`MotionTests`, `VectorsTests`) check every worked example on
+any machine;
 numbers are written to four significant figures with no float noise (`PhysMath.Text`: "40.77 m", "2.883 s"), the minus
 the typeset "−", and a result's menu (or Ctrl+C while it has the keyboard) copies it in plain ASCII. What each keeps for
 next time is in the preferences as `SimplPhys.<tool>.<field>` (`PhysPrefs`):
@@ -958,6 +959,18 @@ next time is in the preferences as `SimplPhys.<tool>.<field>` (`PhysPrefs`):
   `--motion-values`) opens it in that state, and in a picture run the log says what it shows ("motion: shows projectile
   range=40.77 height=10.19 time=2.883"). The search box opens it by `/motion`, `kinematics`, `projectile`, `velocity`,
   `acceleration` or `free fall`.
+- **Vectors** (`vectors`, `Tools/Physics/VectorsTool.cs`): up to six vectors, A to F, each given as components or as a
+  magnitude and an angle from +x, counter-clockwise (a row switched from one to the other keeps its vector), in 2D or
+  3D, degrees or radians. Each one's magnitude and direction (a unit vector in 3D), the resultant with its magnitude
+  and angle, and for a chosen pair the dot product, the angle between, the cross product (in 2D its z-component, out of
+  or into the page), the projection of one onto the other and their unit vectors; Copy takes it all as plain text. The
+  drawing (`VectorDiagram`): arrows from the origin, or each from the tip of the one before ("Tip to tail"), the
+  resultant dashed, over axes scaled to fit; 3D as an isometric view with its three axes. It keeps its vectors and
+  settings (`vectors.list`, `.polar`, `.threeD`, `.radians`, `.tipToTail`). Its pin's flyout takes two 2D vectors and
+  gives their sum, its magnitude and angle, and their dot product; Open full screen hands the two over. A launch's
+  `--tool vectors --tool-state 3,4;1,2` (`3d:1,2,3;4,5,6` for 3D; `--vectors-mode 2d|3d`) opens it on those, and in a
+  picture run the log says what it shows ("vectors: shows 2 vectors, resultant (4, 6) |R|=7.211"). The search box opens
+  it by `/vectors`, `vector`, `components`, `dot product`, `cross product`, `resultant` or `magnitude`.
 
 The biology toolkit's ten (`Tools/Biology/`, a "Biology" section of their own on the Tools page) register through
 `BioTools.Register`, which adds their pages in the header and what a launch asks of them (`--tool cell --tool-state

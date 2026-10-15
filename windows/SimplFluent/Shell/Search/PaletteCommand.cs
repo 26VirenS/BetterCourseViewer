@@ -197,14 +197,15 @@ internal sealed class PaletteCommand
 
     /// <summary>
     /// The Physics section's tools (tools), each opened in its popup by its name or a word a student would type for it
-    /// ("kinematics", "projectile"), by the Mac's names and words. Their titles, lines and symbols are their tiles'
-    /// (Tools/Physics/PhysTools.cs). No word here is another command's ("light" is the appearance's).
+    /// ("kinematics", "projectile", "dot product"), by the Mac's names and words. Their titles, lines and symbols are
+    /// their tiles' (Tools/Physics/PhysTools.cs). No word here is another command's ("light" is the appearance's).
     /// </summary>
     internal static IEnumerable<PaletteCommand> PhysicsTools()
     {
         (string Key, string Name, string[] Aliases)[] words =
         {
             ("motion", "motion", ["kinematics", "projectile", "projectiles", "velocity", "acceleration", "free fall"]),
+            ("vectors", "vectors", ["vector", "components", "dot product", "cross product", "resultant", "magnitude"]),
         };
         foreach (var (key, name, aliases) in words)
             if (Simpl.Tools.PhysTools.Kind(key) is { } kind)

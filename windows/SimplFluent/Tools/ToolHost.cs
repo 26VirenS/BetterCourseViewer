@@ -72,7 +72,7 @@ public sealed class ToolContext
 /// <summary>
 /// The tools' views by key (the web's keys: cite, pomo, calc, graph, ptable, need, conv, units, pdfx, mark, ocr, fc; the
 /// Chemistry section's lewis, molecule and atoms beside ptable, and its calculators (balance), ChemTools; the Physics
-/// section's motion, PhysTools; and the biology toolkit's cell, dna, gene, biomol, cross, divide, popgen, biolab, enzyme,
+/// section's motion and vectors, PhysTools; and the biology toolkit's cell, dna, gene, biomol, cross, divide, popgen, biolab, enzyme,
 /// energy, through BioTools.Register). Each tool's file registers its own from a module initializer, so a tool added is
 /// a file added.
 /// </summary>
@@ -225,14 +225,14 @@ public static class ToolsCenter
         "balance" => "Balance",
         "cell" => "Cells", "dna" => "DNA", "gene" => "Genes", "biomol" => "Biomolecules", "cross" => "Crosses", "divide" => "Division",
         "popgen" => "Hardy–Weinberg", "biolab" => "Lab maths", "enzyme" => "Enzymes", "energy" => "Energy",
-        "motion" => "Motion", _ => key,
+        "motion" => "Motion", "vectors" => "Vectors", _ => key,
     };
 
     /// <summary>The width of its pin's flyout (the Mac's popoverWidth).</summary>
     public static double FlyoutWidth(string key) => key switch
     {
         // (the periodic table's a little wider, and its padding less: squares big enough to point at)
-        "ptable" => 460, "calc" or "gene" => 420, "cite" or "cross" => 400, "biolab" => 380, "graph" or "popgen" or "balance" => 360, "fc" or "motion" => 340, _ => 330,
+        "ptable" => 460, "calc" or "gene" => 420, "cite" or "cross" => 400, "biolab" => 380, "graph" or "popgen" or "balance" => 360, "fc" or "motion" or "vectors" => 340, _ => 330,
     };
 
     /// <summary>The room inside its pin's flyout round its content.</summary>

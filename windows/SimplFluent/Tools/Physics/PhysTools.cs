@@ -21,6 +21,7 @@ public static class PhysTools
     public static readonly ToolsScreen.Kind[] Kinds =
     {
         new("motion", "Kinematics & Projectiles", "1D motion and projectile paths.", SymbolRegular.Rocket24, "#0a84ff"),
+        new("vectors", "Vectors", "Add, dot, cross, components.", SymbolRegular.ArrowTrending24, "#5ac8fa"),
     };
 
     public static ToolsScreen.Kind? Kind(string key) => Kinds.FirstOrDefault(k => k.Key == key);
@@ -31,7 +32,7 @@ public static class PhysTools
     /// <summary>
     /// What a launch asked of a physics tool, once, and only of the tool the launch opened (--tool &lt;key&gt;):
     /// <c>--tool-state</c> as it was given — a tab and its values for Kinematics &amp; Projectiles
-    /// ("projectile:v0=20,angle=45,h=0").
+    /// ("projectile:v0=20,angle=45,h=0"), vectors for Vectors ("3,4;1,2", "3d:1,2,3;4,5,6").
     /// </summary>
     public static string? LaunchState(string key)
     {
@@ -45,8 +46,10 @@ public static class PhysTools
 /// <summary>
 /// What the physics tools keep from one opening to the next, on this PC (Prefs <c>SimplPhys.&lt;tool&gt;.&lt;field&gt;</c>,
 /// the Mac's PhysPrefs keys): Kinematics &amp; Projectiles' tab, numbers and units (<c>motion.tab</c>, <c>motion.oneD</c>,
-/// <c>motion.projectile</c>, <c>motion.quick</c>, <c>motion.imperial</c>). Written as they change; a picture's run has a
-/// profile of its own that starts empty, so each picture shows its tool as its launch asks.
+/// <c>motion.projectile</c>, <c>motion.quick</c>, <c>motion.imperial</c>), Vectors' vectors and settings
+/// (<c>vectors.list</c>, <c>.polar</c>, <c>.threeD</c>, <c>.radians</c>, <c>.tipToTail</c>, <c>.quick</c>). Written as
+/// they change; a picture's run has a profile of its own that starts empty, so each picture shows its tool as its launch
+/// asks.
 /// </summary>
 internal static class PhysPrefs
 {

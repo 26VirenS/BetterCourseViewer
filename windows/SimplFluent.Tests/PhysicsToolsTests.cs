@@ -17,8 +17,8 @@ public class PhysicsToolsTests
     [Fact]
     public void ThePhysicsSectionHasItsToolsInOrder()
     {
-        Assert.Equal(new[] { "motion" }, PhysTools.Kinds.Select(k => k.Key));
-        Assert.Equal(new[] { "Kinematics & Projectiles" }, PhysTools.Kinds.Select(k => k.Name));
+        Assert.Equal(new[] { "motion", "vectors" }, PhysTools.Kinds.Select(k => k.Key));
+        Assert.Equal(new[] { "Kinematics & Projectiles", "Vectors" }, PhysTools.Kinds.Select(k => k.Name));
         Assert.All(PhysTools.Kinds, k => Assert.False(string.IsNullOrWhiteSpace(k.Note)));
         Assert.All(PhysTools.Kinds, k => Assert.True(k.Note.Length <= 32 && k.Note.EndsWith('.')));
     }
@@ -58,9 +58,10 @@ public class PhysicsToolsTests
     public void BothAppsTheSame()
     {
         // (the Mac's PhysTools.swift: its keys, lines, colours and short names)
-        Assert.Equal("#0a84ff", PhysTools.Kind("motion")!.Hex.ToLowerInvariant());
+        Assert.Equal(new[] { "#0a84ff", "#5ac8fa" }, PhysTools.Kinds.Select(k => k.Hex.ToLowerInvariant()));
         Assert.Equal("1D motion and projectile paths.", PhysTools.Kind("motion")!.Note);
-        Assert.Equal("Motion", ToolsCenter.ShortName("motion"));
+        Assert.Equal("Add, dot, cross, components.", PhysTools.Kind("vectors")!.Note);
+        Assert.Equal(new[] { "Motion", "Vectors" }, PhysTools.Kinds.Select(k => ToolsCenter.ShortName(k.Key)));
     }
 
     [Theory]
@@ -69,6 +70,11 @@ public class PhysicsToolsTests
     [InlineData("projectile", "motion")]
     [InlineData("free fall", "motion")]
     [InlineData("acceleration", "motion")]
+    [InlineData("vectors", "vectors")]
+    [InlineData("vector", "vectors")]
+    [InlineData("dot product", "vectors")]
+    [InlineData("cross product", "vectors")]
+    [InlineData("resultant", "vectors")]
     public void TheSearchBoxOpensEachByItsWords(string typed, string key)
     {
         var command = PaletteCommand.Named(PaletteCommand.PhysicsTools().ToList(), typed);
@@ -106,5 +112,20 @@ public class PhysicsToolsTests
         var none = MotionLaunch.Parse(null);
         Assert.Null(none.Tab);
         Assert.False(none.Any);
+    }
+
+    [Fact]
+    public void ALaunchStateListsTheVectors()
+    {
+        var (threeD, vs) = VectorWords.Launch("3,4;1,2");
+        Assert.Null(threeD);
+        Assert.Equal(new[] { new Vec(3, 4), new Vec(1, 2) }, vs);
+        var (three, v3) = VectorWords.Launch("3d:1,2,3;4,5,6");
+        Assert.True(three);
+        Assert.Equal(new Vec(4, 5, 6), v3[1]);
+        // (a z in the list asks for 3D by itself; 2d: keeps it flat)
+        Assert.True(VectorWords.Launch("1,2,3").ThreeD);
+        Assert.False(VectorWords.Launch("2d:1,2").ThreeD);
+        Assert.Empty(VectorWords.Launch(null).Vectors);
     }
 }

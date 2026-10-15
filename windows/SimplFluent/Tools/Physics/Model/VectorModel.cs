@@ -61,20 +61,20 @@ public static class VectorMath
 
     public static Vec Cross(Vec a, Vec b) => new(a.Y * b.Z - a.Z * b.Y, a.Z * b.X - a.X * b.Z, a.X * b.Y - a.Y * b.X);
 
-    /// <summary>The angle between two vectors in degrees (0 to 180); null when either is zero.</summary>
+    /// <summary>The angle between two vectors in degrees (0 to 180); null when either is zero. From atan2(|a×b|, a·b),
+    /// which keeps its precision where acos of the cosine loses it, at 0° and 180°.</summary>
     public static double? AngleBetween(Vec a, Vec b)
     {
         double la = a.Magnitude, lb = b.Magnitude;
         if (la < 1e-12 || lb < 1e-12) return null;
-        var c = Dot(a, b) / (la * lb);
-        return Math.Acos(Math.Clamp(c, -1, 1)) * PhysMath.RadToDeg;
+        return Math.Atan2(Cross(a, b).Magnitude, Dot(a, b)) * PhysMath.RadToDeg;
     }
 
     /// <summary>The vector made one long (a zero vector stays zero).</summary>
     public static Vec Unit(Vec a)
     {
         var l = a.Magnitude;
-        return l < 1e-12 ? Vec.Zero : a * (1 / l);
+        return l < 1e-12 ? Vec.Zero : new Vec(a.X / l, a.Y / l, a.Z / l);
     }
 
     /// <summary>The projection of a onto b: (a·b̂)b̂; null when b is zero.</summary>
