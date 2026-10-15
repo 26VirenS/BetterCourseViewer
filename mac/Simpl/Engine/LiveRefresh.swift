@@ -7,7 +7,8 @@ import SwiftUI
 // minute, a course's pages every ten — and puts in place only what changed: a counter's number, one card, one row. A
 // check that finds nothing new changes nothing, so nothing is drawn. The engine's side (native-app.js) reads again only
 // what is older than the check's age and says "unchanged" by the answer's fingerprint; the plan of when is LivePlan
-// (LivePlan.swift); what holds a check back is LiveHolds; each screen says how it checks with `liveChecks`.
+// (LivePlan.swift); what holds a check back is LiveHolds; each screen says how it checks with `liveChecks`. (1.3.85) A
+// check marks nothing read on Canvas unless the student is at the window (LiveHolds.seen, sent as `seen`).
 
 /// What a live check found on a screen: the parts of it that changed — none when nothing is new — and how to put them in
 /// place, all in one go (the screen is drawn once).
@@ -341,11 +342,12 @@ final class LiveRefresh {
 }
 
 /// (1.3.80) What holds a live check back, and the check resumes when it ends: the window put away (minimized, covered,
-/// the app not in front), no network, the page not ready or a screen's own read under way; a quiz, an Alta or a
-/// Macmillan assignment open; the student typing (a text field being edited, or a key pressed in the last 5 seconds);
-/// What-If on; any sheet, dialog, popover, popup (Hand In and Send from Phone among them — a tool's own popup aside),
-/// menu or the tour up; the mouse held down (a drag); a counter's panel or a row's preview open. The screens say their
-/// own (`set`): What-If, a counter's panel.
+/// the app not in front), nobody at the Mac (1.3.85: its screen locked, its displays or itself asleep, another user's
+/// session in front), no network, the page not ready or a screen's own read under way; a quiz, an Alta or a Macmillan
+/// assignment open; the student typing (a text field being edited, or a key pressed in the last 5 seconds); What-If on;
+/// any sheet, dialog, popover, popup (Hand In and Send from Phone among them — a tool's own popup aside, and (1.3.85)
+/// History's and Help's, only there to be read), menu or the tour up; the mouse held down (a drag); a counter's panel or
+/// a row's preview open. The screens say their own (`set`): What-If, a counter's panel.
 @MainActor
 final class LiveHolds {
     static let shared = LiveHolds()
@@ -355,10 +357,35 @@ final class LiveHolds {
     private var watching = false
     private var keyWatch: Any?
     private var menuWatch: [NSObjectProtocol] = []
+    private var awayWatch: [NSObjectProtocol] = []
     private let network = NWPathMonitor()
     nonisolated(unsafe) private static var lastKey = Date.distantPast
     nonisolated(unsafe) private static var menuOpen = false
     nonisolated(unsafe) private static var online = true
+    /// (1.3.85) The screen locked, the displays asleep, the Mac asleep, another user's session in front: each as macOS
+    /// last said (the app is opened by someone at the Mac, so none to begin with).
+    nonisolated(unsafe) private static var locked = false
+    nonisolated(unsafe) private static var screensAsleep = false
+    nonisolated(unsafe) private static var macAsleep = false
+    nonisolated(unsafe) private static var switchedOut = false
+
+    /// (1.3.85) Nobody is at the Mac: its screen locked, its displays or itself asleep, or another user's session in front.
+    private static var away: Bool { locked || screensAsleep || macAsleep || switchedOut }
+
+    /// (1.3.85) The student is at the window as a live check is asked: the app in front with one of its windows key or
+    /// main and in sight, the screen unlocked and the Mac awake. Only then does a check say `seen` to the engine
+    /// (Engine.liveAnswer), and only then may it mark what came in an open conversation or discussion read on Canvas
+    /// (native-app.js `conversation`, `topic`); without it a check marks nothing read, so a message or a reply that comes
+    /// while nobody is looking — the window behind another app, the Mac locked or asleep — stays unread on the student's
+    /// Canvas and counts on the Inbox's badge. Opened, a conversation or a topic is marked read as before. (The Windows
+    /// app's LiveCheck says the same, as Engine.LiveSeen.)
+    var seen: Bool {
+        watch()
+        guard NSApp.isActive, !Self.away else { return false }
+        return NSApp.windows.contains { w in
+            (w.isKeyWindow || w.isMainWindow) && w.isVisible && !w.isMiniaturized && w.occlusionState.contains(.visible)
+        }
+    }
 
     /// A screen's own hold (`why`), put on or taken off by `token`.
     func set(_ why: String, _ token: UUID, _ isOn: Bool) {
@@ -377,6 +404,7 @@ final class LiveHolds {
         if window.isMiniaturized { out.append("minimized") }
         if !window.occlusionState.contains(.visible) { out.append("covered") }
         if !NSApp.isActive { out.append("inactive") }
+        if Self.away { out.append("away") } // (1.3.85: locked or asleep — no reads of the school while nobody is there)
         if !Self.online { out.append("offline") }
         if engine.phase != .native || !engine.pageReady { out.append("page") }
         if (engine.primary ?? engine).waiting > 0 { out.append("loading") } // (a screen's own read under way goes first)
@@ -412,17 +440,20 @@ final class LiveHolds {
     }
 
     /// A sheet or a dialog over the window, a popover (a pinned tool's quick version, a picker's), a popup of its own (a
-    /// tool's popup aside: the screen beside a tool is checked), the Settings window, the setup, What's New, a new task or
-    /// message.
+    /// tool's popup aside: the screen beside a tool is checked; (1.3.85) History's and Help's too), the Settings window,
+    /// the setup, What's New, a new task or message.
     private func dialog(_ engine: Engine, _ window: NSWindow) -> Bool {
         if window.attachedSheet != nil || NSApp.modalWindow != nil { return true }
         if NSApp.windows.contains(where: { $0.isVisible && String(describing: type(of: $0)).contains("Popover") }) { return true }
         if engine.setup || engine.whatsNew != nil || engine.newTask || engine.newMessage || engine.settingsOpen { return true }
-        // (a row's preview card is a popup too, "preview": it holds checks as the preview it is)
-        return engine.popups.openKeys.contains { $0 != ToolsCenter.popupKey && $0 != "preview" }
+        // (a row's preview card is a popup too, "preview": it holds checks as the preview it is. (1.3.85) History's and
+        // Help's popup, "more", holds none, as in the Windows app: a list only there to be read, which nothing a check
+        // puts in place moves — left up, it kept the screen under it from ever being checked)
+        return engine.popups.openKeys.contains { $0 != ToolsCenter.popupKey && $0 != "preview" && $0 != Engine.morePopup }
     }
 
-    /// The keys pressed, the menus open and the network watched, from the first time it is asked.
+    /// The keys pressed, the menus open, the network and (1.3.85) whether anyone is at the Mac watched, from the first
+    /// time it is asked.
     private func watch() {
         guard !watching else { return }
         watching = true
@@ -437,6 +468,20 @@ final class LiveHolds {
         ]
         network.pathUpdateHandler = { path in LiveHolds.online = path.status == .satisfied }
         network.start(queue: .main)
+        // (1.3.85) nobody at the Mac: the screen locked (the system's own word for it, sent to every app), the displays or
+        // the Mac asleep, another user's session switched to
+        let workspace = NSWorkspace.shared.notificationCenter
+        let system = DistributedNotificationCenter.default()
+        awayWatch = [
+            system.addObserver(forName: Notification.Name("com.apple.screenIsLocked"), object: nil, queue: .main) { _ in LiveHolds.locked = true },
+            system.addObserver(forName: Notification.Name("com.apple.screenIsUnlocked"), object: nil, queue: .main) { _ in LiveHolds.locked = false },
+            workspace.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { _ in LiveHolds.screensAsleep = true },
+            workspace.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { _ in LiveHolds.screensAsleep = false },
+            workspace.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { _ in LiveHolds.macAsleep = true },
+            workspace.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { _ in LiveHolds.macAsleep = false },
+            workspace.addObserver(forName: NSWorkspace.sessionDidResignActiveNotification, object: nil, queue: .main) { _ in LiveHolds.switchedOut = true },
+            workspace.addObserver(forName: NSWorkspace.sessionDidBecomeActiveNotification, object: nil, queue: .main) { _ in LiveHolds.switchedOut = false },
+        ]
     }
 }
 

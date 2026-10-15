@@ -800,14 +800,21 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
     the Dashboard come back to — on what was read longer ago than its interval is checked at once; so is a window
     brought back after longer than that.
   - *Held back* (`LiveHolds`), and run as soon as it ends: the window minimized, covered or not in front, the app not
-    active, no network (`NWPathMonitor`), the page loading or a screen's own read under way; a quiz, an Alta or a
-    Macmillan assignment open; the student typing (a field of the screen's being edited — the toolbar's search field
-    only while keys are pressed in it, as it keeps them after a search — or a key in the last 5 seconds); What-If on;
-    any sheet, dialog, popover, popup (Hand In and Send from Phone among them; a tool's own popup aside, so a screen
-    beside a tool is still checked), menu or the tour; the mouse held down (a drag); a counter's panel or a row's
-    preview open.
+    active, (1.3.85) nobody at the Mac (`away`: the screen locked — `com.apple.screenIsLocked` / `…Unlocked` — the
+    displays or the Mac asleep, another user's session in front), no network (`NWPathMonitor`), the page loading or a
+    screen's own read under way; a quiz, an Alta or a Macmillan assignment open; the student typing (a field of the
+    screen's being edited — the toolbar's search field only while keys are pressed in it, as it keeps them after a
+    search — or a key in the last 5 seconds); What-If on; any sheet, dialog, popover, popup (Hand In and Send from Phone
+    among them; a tool's own popup aside, so a screen beside a tool is still checked, and (1.3.85) History's and Help's,
+    only there to be read, as in the Windows app), menu or the tour; the mouse held down (a drag); a counter's panel or a
+    row's preview open.
     Something that comes up while a check is asked also keeps what it found from being put in place: it is checked
     again as soon as that ends.
+  - *Marks nothing read unless the student is there* (1.3.85): each read a check asks carries `seen` only while the app
+    is in front with one of its windows key or main and in sight, the screen unlocked and the Mac awake
+    (`LiveHolds.seen`, asked in `Engine.liveAnswer`, as the Windows app's `Engine.LiveSeen`). Only then may a check of an
+    open conversation or discussion mark what came in it read on Canvas; a message that comes while nobody is looking
+    stays unread there and on the Inbox's badge until the student is back at the window.
   - *Only what changed*: a check asks each of the screen's reads again with the check's age as `maxAge` (60, or 600 for
     a course's pages) and the fingerprint of the answer on screen as `known` (`Engine.liveAnswer`). The fingerprint of
     every answer a screen reads is worked out as it arrives (`LiveFingerprint`, the page's own cyrb53 of the same JSON,

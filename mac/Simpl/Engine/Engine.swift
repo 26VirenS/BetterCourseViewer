@@ -720,6 +720,9 @@ final class Engine: ObservableObject, ShellListener {
         var asked = args
         asked["maxAge"] = maxAge
         asked["known"] = known ?? ""
+        // (1.3.85) whether the student is at the window as it is asked (LiveHolds.seen): only then may the check mark an
+        // open conversation's or discussion's news read on Canvas
+        if LiveHolds.shared.seen { asked["seen"] = true } else { asked.removeValue(forKey: "seen") }
         let generation = memo.generation
         let raw = try await web.webView.callAsyncJavaScript(Engine.liveScript, arguments: ["name": name, "args": asked], in: nil, contentWorld: .defaultClient)
         guard let text = raw as? String else { throw EngineError.unreadable }
