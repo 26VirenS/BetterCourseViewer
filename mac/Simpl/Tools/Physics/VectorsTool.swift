@@ -93,7 +93,7 @@ struct VectorsTool: View {
                     VStack(spacing: 10) {
                         ForEach(rows.indices, id: \.self) { i in
                             VectorRowView(index: i, row: $rows[i], threeD: threeD, unit: unit, vector: vectors[i], canRemove: rows.count > 1) {
-                                withAnimation(Motion.gentle) { rows.remove(at: i) }
+                                withAnimation(Motion.gentle) { _ = rows.remove(at: i) } // (the removed row dropped: a closure that gives it back is ambiguous to the compiler)
                             }
                         }
                     }
