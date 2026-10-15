@@ -226,6 +226,8 @@ internal sealed class CourseModulesPart : CourseListPart<ModulesData>
     {
         if (it.Locked == true && it.Type is "File" or "ExternalTool" && !string.IsNullOrEmpty(it.Url)) engine.OpenWebScreen(PageOf(it.Url!), it.Title);
         else if (it.Type == "ExternalTool" && ctx.StartsWith("courses/", StringComparison.Ordinal)) engine.OpenTool(ToolLaunch.ModuleItem(CourseKit.IdOf(ctx), it.Id, it.Title));
+        // (modules-file) a file as the Files screen opens one: by its id, under the module's name for it
+        else if (it.Type == "File" && !string.IsNullOrEmpty(it.Url)) engine.OpenModuleFile(it.Url!, it.Title);
         else engine.GoTo(it.Url, it.Title);
     }
 

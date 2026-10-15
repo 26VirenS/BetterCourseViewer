@@ -1,4 +1,5 @@
 using System.Web;
+using Simpl.Models;
 
 namespace Simpl.Engine;
 
@@ -146,6 +147,37 @@ public sealed partial class Engine
         if (OnBrightspace && i == 2 && p[0] == "courses" && Numeric(p[1]))
             return Absolute($"/d2l/le/content/{p[1]}/topics/files/download/{p[i + 1]}/DirectFileTopicDownload");
         return Absolute("/" + string.Join("/", p[..(i + 2)]) + "/download?download_frd=1");
+    }
+
+    /// <summary>(modules-file) A module's file, opened as the Files screen opens one: the file as the school's API has it — its
+    /// own download address, with the one-time key Canvas puts on it — fetched and opened under the name the module gives
+    /// it. The module's own address for it (…/files/12/download, which needs the session and Canvas's redirect to its file
+    /// host) is kept for when the school will not say, as it was; a Brightspace content file goes that way always, from
+    /// its topic.</summary>
+    public async void OpenModuleFile(string url, string title)
+    {
+        if (!OnBrightspace && FileIdIn(url) is { } id)
+        {
+            FileRow? f = null;
+            try { f = await Call<FileRow>("fileInfo", new { id }); } catch { }
+            if (f is { Url: { Length: > 0 } u, Locked: not true } && Absolute(u) is { } a)
+            {
+                FilePreview.Open(a, string.IsNullOrEmpty(title) ? f.Name : title, Web);
+                return;
+            }
+        }
+        GoTo(url, title);
+    }
+
+    /// <summary>A file's id in one of its addresses (…/courses/1/files/12/download?download_frd=1, …/files/12).</summary>
+    private string? FileIdIn(string url)
+    {
+        if (Absolute(url) is not { } u) return null;
+        var p = Parts(u);
+        var i = Array.IndexOf(p, "files");
+        if (i < 0 || i + 1 >= p.Length) return null;
+        var id = p[i + 1];
+        return id.Length > 0 && id.All(char.IsAsciiLetterOrDigit) ? id : null;
     }
 
     /// <summary>Brightspace's own viewer for a content file it will not hand over.</summary>
