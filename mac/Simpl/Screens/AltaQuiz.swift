@@ -74,11 +74,17 @@ struct AltaQuizScreen: View {
         }
         .task { dueLine = await CanvasDue.line(engine, course: session.launch.course, assignment: session.launch.assignment) }
         .onDisappear { session.closePic() } // (1.3.70: the popup closed, its graph's window with it)
-        // (1.3.51) Alta's pop-ups as the Mac's own sheet, its buttons the Mac's — (1.3.83) its body read whole and drawn
-        // as the app's own words
-        .sheet(item: Binding(get: { session.dialog }, set: { if $0 == nil && session.dialog != nil { session.dialogDismissed() } })) { d in
-            AltaDialogSheet(dialog: d, press: { i in session.pressDialog(i) }, link: { i in session.followDialogLink(i) }, giveBack: { session.dialogDismissed() })
+        // (1.3.51) Alta's pop-ups as the Mac's own, their buttons the Mac's — (1.3.83) their body read whole and drawn as
+        // the app's own words — (1.3.84) on a card of the popup's own, over its content: never a sheet, which, begun from
+        // this popup (a borderless child panel over the window), dimmed the main window and took the popup from sight.
+        // Held open meanwhile: Escape and ⌘W answer the pop-up, never close the popup under it.
+        .overlay {
+            if let d = session.dialog {
+                AltaDialogLayer(dialog: d, press: { i in session.pressDialog(i) }, link: { i in session.followDialogLink(i) }, giveBack: { session.dialogDismissed() })
+            }
         }
+        .animation(Motion.gentle, value: session.dialog?.id)
+        .popupCloseHeld(session.dialog != nil)
         .alert("Page code saved", isPresented: Binding(get: { saved != nil }, set: { if !$0 { saved = nil } })) {
             Button("Show in Finder") { if let saved { NSWorkspace.shared.activateFileViewerSelecting([saved]) } }
             Button("OK", role: .cancel) {}
@@ -121,7 +127,7 @@ struct AltaQuizScreen: View {
                 // (1.3.72: Save Page Code is in the Developer menu now)
                 Button("Close") { dismiss() }
                     .glassButton()
-                    .keyboardShortcut(.cancelAction)
+                    .keyboardShortcut(session.dialog == nil ? KeyboardShortcut.cancelAction : nil) // (1.3.84: Escape the pop-up's while one is up)
                     .help("Close — your progress is kept by Alta")
             }
         }
@@ -840,15 +846,50 @@ private struct AltaMasteryBar: View {
     }
 }
 
-/// (1.3.51) A pop-up of Alta's as a sheet of the Mac's, its buttons as the Mac's — each pressing Alta's. (1.3.83) Its body
-/// drawn as the app's own words, read whole from Alta's page once it has settled — its paragraphs, lists, tables and
-/// links, its formulas typeset with the KaTeX the app carries, its pictures — no longer a picture of it taken in the
-/// page, which came out empty while Alta's page was out of sight. Its words show at once as plain text, the drawn body
-/// taking their place once it has measured itself; a long one scrolls. A next step updates it in place, its buttons
-/// resting from a press until it comes. Return presses Alta's main button (else the last); Escape its Close, Cancel, Got
-/// it or OK, else Show in Alta's Page, which gives the pop-up back to the page.
-private struct AltaDialogSheet: View {
+/// (1.3.84) Alta's pop-up over the popup, inside it: the popup's content dimmed under it and resting — a click round the
+/// card lands on nothing — and the card in the middle, its body as tall as the popup leaves room for. (1.3.51–1.3.83 put
+/// the pop-up up as a sheet: begun from a view in this popup, a borderless child panel over the window rather than a
+/// window of its own, it dimmed the main window, and the popup with its pop-up went from sight.) Nothing outside the
+/// popup is dimmed or held.
+private struct AltaDialogLayer: View {
     let dialog: AltaDialog
+    let press: (Int) -> Void
+    let link: (Int) -> Void
+    let giveBack: () -> Void
+
+    var body: some View {
+        GeometryReader { g in
+            ZStack {
+                Color.black.opacity(0.22)
+                    .contentShape(Rectangle())
+                    .onTapGesture {}
+                    .accessibilityHidden(true)
+                AltaDialogCard(dialog: dialog, tallest: max(120, g.size.height - 240), press: press, link: link, giveBack: giveBack)
+                    .background {
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .fill(Theme.card)
+                            .shadow(color: .black.opacity(0.28), radius: 28, y: 10)
+                    }
+                    .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Theme.edge, lineWidth: 1))
+                    .accessibilityAddTraits(.isModal)
+            }
+            .frame(width: g.size.width, height: g.size.height)
+        }
+        .transition(.opacity)
+    }
+}
+
+/// (1.3.51) A pop-up of Alta's as the Mac's own, its buttons as the Mac's — each pressing Alta's. (1.3.83) Its body drawn
+/// as the app's own words, read whole from Alta's page once it has settled — its paragraphs, lists, tables and links, its
+/// formulas typeset with the KaTeX the app carries, its pictures — no longer a picture of it taken in the page, which came
+/// out empty while Alta's page was out of sight. Its words show at once as plain text, the drawn body taking their place
+/// once it has measured itself; a long one scrolls. A next step updates it in place, its buttons resting from a press
+/// until it comes. Return presses Alta's main button (else the last); Escape its Close, Cancel, Got it or OK, else Show
+/// in Alta's Page, which gives the pop-up back to the page.
+private struct AltaDialogCard: View {
+    let dialog: AltaDialog
+    /// (1.3.84) Taller than this, its body scrolls: the room the popup leaves it.
+    let tallest: CGFloat
     let press: (Int) -> Void
     let link: (Int) -> Void
     let giveBack: () -> Void
@@ -857,8 +898,6 @@ private struct AltaDialogSheet: View {
     /// A button pressed and Alta not yet moved on: the buttons rest (two seconds at most).
     @State private var pressed = false
 
-    /// Taller than this, its body scrolls.
-    private static let tallest: CGFloat = 440
     private static let cancelWords: Set<String> = ["close", "cancel", "got it", "ok", "okay", "dismiss", "no thanks", "not now", "done"]
 
     /// Return: Alta's main button, else the last that is not a close button.
@@ -902,8 +941,8 @@ private struct AltaDialogSheet: View {
                 }
                 .frame(height: height)
             }
-            .scrollIndicators(height > Self.tallest ? .automatic : .never)
-            .frame(height: measured ? min(height, Self.tallest) : 1)
+            .scrollIndicators(height > tallest ? .automatic : .never)
+            .frame(height: measured ? min(height, tallest) : 1)
             .opacity(measured ? 1 : 0)
             if !measured {
                 Text(RichText.plainText(dialog.html))

@@ -224,8 +224,9 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   heading it opens with), its body as plain HTML (paragraphs, headings, lists, tables, bold and italic as Alta's styles
   make them, links as `simpl-link:N`; each formula as TeX — MathJax 2's script, MathJax 3's record, KaTeX's or MathML's
   annotation, `data-latex` — else as MathML; a picture by its address, a drawing as SVG with the symbols it uses, a
-  canvas as its picture) and every button (`label`, `primary`, `enabled`, `close` for an ×). The sheet draws the body
-  with `HTMLBlock` (KaTeX on; its plain words until it has measured itself; a scroll past 440 points), presses Alta's
+  canvas as its picture) and every button (`label`, `primary`, `enabled`, `close` for an ×). The card (1.3.84: inside
+  the popup, below) draws the body with `HTMLBlock` (KaTeX on; its plain words until it has measured itself; a scroll
+  once it is as tall as the popup leaves room for), presses Alta's
   buttons and follows its links in Alta's page (another site's, or a new window's, in the browser), and hides Alta's
   own only once it is up (`__simplDialog.hide`). A pop-up holding a video, a form, another site's frame, or a picture
   or formula that cannot be read, one with nothing to read, or one still loading after three seconds is never an empty
@@ -235,6 +236,11 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   the page is doing (`keepDialogs`: one that came between parts was hidden with the page). In the mock's learn page
   `mockRichDialog(ms)` opens a slow, rich, two-step one (`?dialog=rich` opens it by itself: the pictures'
   `21m-alta-dialog`), and `mockVideoDialog`, `mockFrameDialog` and `mockBareDialog` ones the page keeps.
+  (1.3.84) The pop-up is a card of the popup's own over its content (`AltaDialogLayer`): the popup dimmed under it and
+  resting, held open (Escape and ⌘W answer the pop-up, the bar's Close gives up Escape meanwhile), nothing outside the
+  popup dimmed. Through 1.3.83 it was a SwiftUI `.sheet` begun from a view in the popup — a borderless child panel over
+  the window (`PopupPanel`), no window a sheet hangs from as it should — and the 1.3.84 pictures showed the main window
+  dimmed as under a sheet, with neither the popup nor its pop-up in sight.
   (1.3.83) *Light or Dark* above the objectives (`AltaLookPicker`: two glass chips at the rail's head, the one picked
   filled): Alta's side of the popup light — 1.3.79's, the default — or dark,
   remembered for every Alta assignment (`SimplAltaPageDark`; `-SimplAltaPageDark YES` for the pictures). Dark is 1.3.78's
