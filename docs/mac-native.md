@@ -709,7 +709,7 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   Grade needed's three numbers, the element searched for in the Periodic Table's or typed in Atoms & Orbitals', the
   link pasted to cite, the unit converter's kind, units and value (`UnitConverterTool.takeHandOff`), a projectile's
   speed and angle from Kinematics & Projectiles' pin (`MotionCompact`), two vectors from Vectors' (`VectorsCompact`),
-  the calculator's
+  the Circuit Builder's Ohm's law and list (`CircuitCompact`), the calculator's
   line, sums, memory and Rad/Deg (`CalcEngine.handOff`), a codon looked up, a cross, a Hardy–Weinberg value, the lab
   calculator shown, (tools) the Equation Balancer's equation; the graph's whole drawing — expressions, sliders, tables, notes and view — by Desmos's own
   `Calc.getState`/`Calc.setState` from the pin's web view to the whole one's (`GraphWeb.carryOver`; the whole one's graph
@@ -985,6 +985,26 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   opening the tool on them (`vectors` handed over as "3,4;1,2"). Launch flags: `-SimplTool vectors -SimplVectors
   "3,4;1,2"` (components by commas, vectors by semicolons) `-SimplVectorsMode 2d|3d`. Pictures: `light-77c-vectors`,
   `dark-77c-vectors`, `light-54t-pin-vectors`.
+  **Circuit Builder** (`circuit`, `Tools/Physics/CircuitTool.swift`; `/circuit`, or "ohm", "resistor", "series",
+  "parallel"): a grid canvas (24 points a cell, `CircuitGeometry`) laid out as the builders are (`PTWorkLayout`): the
+  palette at the left — battery, resistor, wire, switch, lamp, ammeter, voltmeter, ground — each dragged onto the grid
+  (`draggable`/`dropDestination`) or added with a click; a part dragged to move it, clicked to choose it (a switch is
+  thrown too), turned with R and removed with ⌫ (the canvas is focusable), and wired by dragging from one terminal to
+  another; parts set end to end join as well. The circuit is solved as it changes by modified nodal analysis
+  (`CircuitSolver`, Model/PhysCircuit.swift: nodes by union-find over links, wires, closed switches and grounds; a
+  conductance for each resistor, lamp and ammeter (10⁻⁶ Ω); a current unknown for each battery; each circuit with a
+  battery solved on its own, its ground or its first battery's − at 0 V; a wire's current told from its one
+  neighbour in a series path). Every part's V, I and P are listed at the right (a row chooses the part; the part
+  chosen has its value, Rotate, Delete and for a switch Closed), arrows run along each part with the current
+  (`TimelineView`; still under Reduce Motion), a lamp glows with its power, and a shorted battery, batteries face to
+  face or parts off on their own are said in plain words. Quick-build chips (*Series: 9 V + 100 Ω + 200 Ω*, *Parallel:
+  9 V, 100 Ω ∥ 200 Ω*, *Voltage divider*: 12 V over 1 kΩ + 2 kΩ with a voltmeter reading 8 V), Clear, Save… and Open…
+  as JSON (`CircuitDoc`), Export PNG… (`ImageRenderer` of `CircuitPicture`, black on white). Under the palette a
+  calculator strip: Ohm's law from two of V, I and R (`OhmStrip`) and a list of resistances in series and in parallel
+  (`SeriesParallelStrip`, k and M read). The pin is the strip (`CircuitCompact`), Return or Open Full Screen opening the
+  tool with it (`ohmV`, `ohmI`, `ohmR`, `list`). The circuit and the strip are kept (`circuit.doc` as JSON). Launch
+  flag: `-SimplTool circuit -SimplCircuit series|parallel|divider`. Pictures: `light-78-circuit-series`,
+  `dark-78-circuit-series`, `light-78b-circuit-divider`, `light-54u-pin-circuit`.
 
 - **The chemistry calculators (tools).** After the Periodic Table's four in the Chemistry section (appended to
   `ChemTools.kinds`, their names, lines, symbols and colours in `ChemTools.info`), each a tile, a pin with a real quick

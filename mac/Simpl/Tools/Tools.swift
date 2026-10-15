@@ -25,7 +25,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
     // (tools) the chemistry calculators after them — the Equation Balancer and the rest, ChemTools.info's too
     case balance
     // (tools) the physics tools: their names, lines, symbols and colours are PhysTools.info's
-    case motion, vectors
+    case motion, vectors, circuit
     // (1.3.78) the biology toolkit: its names, lines, symbols and colours are BioTools.info's
     case cell, dna, gene, biomol, cross, divide, popgen, biolab, enzyme, energy
 
@@ -38,7 +38,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .calc: return "Calculator"
         case .graph: return "Graphing calculator"
         case .ptable, .lewis, .molecule, .atoms, .balance: return ChemTools.info(self).name
-        case .motion, .vectors: return PhysTools.info(self).name
+        case .motion, .vectors, .circuit: return PhysTools.info(self).name
         case .need: return "Grade needed"
         case .conv: return "File converter"
         case .units: return "Unit converter"
@@ -59,7 +59,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .calc: return "Calculator"
         case .graph: return "Graphing"
         case .ptable, .lewis, .molecule, .atoms, .balance: return ChemTools.info(self).shortName
-        case .motion, .vectors: return PhysTools.info(self).shortName
+        case .motion, .vectors, .circuit: return PhysTools.info(self).shortName
         case .need: return "Grade needed"
         case .conv: return "Convert"
         case .units: return "Units"
@@ -79,7 +79,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .calc: return "Scientific, from your keyboard."
         case .graph: return "Desmos, right here."
         case .ptable, .lewis, .molecule, .atoms, .balance: return ChemTools.info(self).note
-        case .motion, .vectors: return PhysTools.info(self).note
+        case .motion, .vectors, .circuit: return PhysTools.info(self).note
         case .need: return "What you need on the final."
         case .conv: return "Convert Word, PDF and images."
         case .units: return "Lengths, weights, temperatures."
@@ -98,7 +98,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .calc: return "plus.forwardslash.minus"
         case .graph: return "chart.xyaxis.line"
         case .ptable, .lewis, .molecule, .atoms, .balance: return ChemTools.info(self).symbol
-        case .motion, .vectors: return PhysTools.info(self).symbol
+        case .motion, .vectors, .circuit: return PhysTools.info(self).symbol
         case .need: return "percent"
         case .conv: return "arrow.triangle.2.circlepath"
         case .units: return "ruler"
@@ -117,7 +117,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .calc: return "#ff9f0a"
         case .graph: return "#5856d6"
         case .ptable, .lewis, .molecule, .atoms, .balance: return ChemTools.info(self).hex
-        case .motion, .vectors: return PhysTools.info(self).hex
+        case .motion, .vectors, .circuit: return PhysTools.info(self).hex
         case .need: return "#ff375f"
         case .conv: return "#34c759"
         case .units: return "#64d2ff"
@@ -135,7 +135,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
     var popoverWidth: CGFloat {
         switch self {
         case .ptable, .lewis, .molecule, .atoms, .balance: return ChemTools.popoverWidth(self)
-        case .motion, .vectors: return PhysTools.popoverWidth(self)
+        case .motion, .vectors, .circuit: return PhysTools.popoverWidth(self)
         case .calc: return 420
         case .cite: return 400
         case .graph: return 360
@@ -518,6 +518,7 @@ struct ToolScreen: View {
         case .balance: EquationBalancerTool()
         case .motion: KinematicsTool()
         case .vectors: VectorsTool()
+        case .circuit: CircuitTool()
         case .need: GradeNeededTool()
         case .conv: FileConverterTool()
         case .units: UnitConverterTool()

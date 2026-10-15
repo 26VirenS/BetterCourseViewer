@@ -3,10 +3,11 @@ import SwiftUI
 
 // (tools) The physics tools' place among the tools, as the chemistry tools' is (Chemistry/ChemTools.swift): a
 // "Physics" heading of their own on the Tools page, after Chemistry and before Biology — Kinematics & Projectiles
-// (motion in a line from any three of its five quantities, and a projectile's flight drawn) and Vectors (up to six
-// added, dotted, crossed and drawn). Each has its own tile, pin, popup and heading, keeps what it was left at (PhysPrefs), and does its arithmetic in Physics/Model, Foundation only,
-// where the Models job checks it against the specification's test vectors. Each tool's view is its own file's
-// (Kinematics.swift, VectorsTool.swift).
+// (motion in a line from any three of its five quantities, and a projectile's flight drawn), Vectors (up to six added,
+// dotted, crossed and drawn) and the Circuit Builder (a DC circuit built on a grid and solved as it changes). Each has
+// its own tile, pin, popup and heading, keeps what it was left at (PhysPrefs), and does its arithmetic in
+// Physics/Model, Foundation only, where the Models job checks it against the specification's test vectors. Each tool's
+// view is its own file's (Kinematics.swift, VectorsTool.swift, CircuitTool.swift).
 
 /// What the Tools page, the toolbar and a pin's popover show of a physics tool.
 struct PhysToolInfo {
@@ -20,7 +21,7 @@ struct PhysToolInfo {
 
 enum PhysTools {
     /// The tools, in the Tools page's order.
-    static let kinds: [ToolKind] = [.motion, .vectors]
+    static let kinds: [ToolKind] = [.motion, .vectors, .circuit]
 
     /// Each tool's name, line, symbol and colour — a family of blues, none of them a chemistry or biology tile's.
     static func info(_ k: ToolKind) -> PhysToolInfo {
@@ -29,13 +30,15 @@ enum PhysTools {
                                           symbol: "figure.run", hex: "#0a84ff")
         case .vectors: return PhysToolInfo(name: "Vectors", shortName: "Vectors", note: "Add, dot, cross, components.",
                                            symbol: "arrow.up.right", hex: "#5ac8fa")
+        case .circuit: return PhysToolInfo(name: "Circuit Builder", shortName: "Circuit", note: "Build a DC circuit, read V, I, R.",
+                                           symbol: "bolt.circle", hex: "#ffd60a")
         default: return PhysToolInfo(name: k.rawValue, shortName: k.rawValue, note: "", symbol: "questionmark", hex: "#8e8e93")
         }
     }
 
     /// The pin popover's width: a little wider than most, for two numbers side by side and the answer under them;
-    /// Vectors' for two vectors' four.
-    static func popoverWidth(_ k: ToolKind) -> CGFloat { k == .vectors ? 380 : 360 }
+    /// Vectors' for two vectors' four, the Circuit Builder's for Ohm's law's three.
+    static func popoverWidth(_ k: ToolKind) -> CGFloat { k == .motion ? 360 : 380 }
 
     /// The tool the launch opened (the screenshot suite's -SimplTool): each physics tool takes the launch's own flags
     /// (-SimplMotion, -SimplMotionValues …) only when it is the one the launch opened.
@@ -51,7 +54,8 @@ extension ToolKind {
 
 /// What the physics tools keep from one opening to the next, on this Mac only: UserDefaults `SimplPhys.<key>.<field>` —
 /// Kinematics & Projectiles' page and every field on it (`motion.tab`, `motion.x` … `motion.target`, `motion.imperial`),
-/// Vectors' rows and settings (`vectors.rows`, `.threeD`, `.unit`, `.tipToTail`).
+/// Vectors' rows and settings (`vectors.rows`, `.threeD`, `.unit`, `.tipToTail`), the Circuit Builder's circuit as JSON
+/// and its strip (`circuit.doc`, `.ohmV`, `.ohmI`, `.ohmR`, `.list`).
 /// A picture's launch (-SimplShotFile) keeps them in a suite of its own that starts empty, as ChemPrefs and BioPrefs do,
 /// so each picture shows its tool as its launch asks and nothing more.
 enum PhysPrefs {
@@ -101,7 +105,7 @@ struct PhysToolsSection: View {
                 Text("Physics")
                     .font(.sTitle3)
                     .accessibilityAddTraits(.isHeader)
-                Text("Motion in a line and projectiles, and vectors added, dotted and crossed — solved and drawn.")
+                Text("Motion and projectiles, vectors, and DC circuits you build — solved and drawn.")
                     .font(.sCallout)
                     .foregroundStyle(.secondary)
             }
@@ -114,7 +118,8 @@ struct PhysToolsSection: View {
 }
 
 /// A physics tool's quickest use in its pin's popover: a projectile's speed and angle to its range and height
-/// (MotionCompact), two vectors to their resultant (VectorsCompact); for any other, the tool's tile, its line and Open.
+/// (MotionCompact), two vectors to their resultant (VectorsCompact), Ohm's law and a series/parallel list
+/// (CircuitCompact); for any other, the tool's tile, its line and Open.
 struct PhysQuick: View {
     let kind: ToolKind
     let openFull: (_ info: [String: String]) -> Void
@@ -123,6 +128,7 @@ struct PhysQuick: View {
         switch kind {
         case .motion: MotionCompact(openFull: openFull)
         case .vectors: VectorsCompact(openFull: openFull)
+        case .circuit: CircuitCompact(openFull: openFull)
         default: BioQuickOpen(kind: kind) { openFull([:]) }
         }
     }

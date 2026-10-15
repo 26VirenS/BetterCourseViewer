@@ -608,7 +608,10 @@ chem_calc_tools() {
 # (tools) the Tools page's Physics section in light and in dark; Kinematics & Projectiles' 1D page (a fall of 20 m:
 # Δx, v₀ and a given, t and v found, the graphs beside) in light, its Projectile page (20 m/s at 45°, the path flown,
 # a target 30 m off) in light and in dark; and its pin opened (20 m/s at 45° to its range and height). Vectors on
-# (3, 4) and (1, 2) tip to tail in light and in dark, and its pin opened on the same two
+# (3, 4) and (1, 2) tip to tail in light and in dark, and its pin opened on the same two. The Circuit Builder on its
+# series preset (9 V, 100 Ω and 200 Ω: 0.03 A, the arrows running) in light and in dark, on the voltage divider (a
+# voltmeter reading 8 V across the 2 kΩ) in light, and its pin opened (Ohm's law 9 V over 300 Ω, 100 and 200 in
+# series and in parallel)
 phys_tools() {
   local m
   for m in light dark; do
@@ -621,6 +624,11 @@ phys_tools() {
     MODE="$m" SIZE=1440x920 shoot "$m-77c-vectors" 14 -SimplPlace tools -SimplTool vectors -SimplVectors "3,4;1,2" -SimplVectorsMode 2d
   done
   MODE=light shoot light-54t-pin-vectors 14 -SimplPinnedTools vectors -SimplPinOpen vectors
+  for m in light dark; do
+    MODE="$m" SIZE=1440x920 shoot "$m-78-circuit-series" 14 -SimplPlace tools -SimplTool circuit -SimplCircuit series
+  done
+  MODE=light SIZE=1440x920 shoot light-78b-circuit-divider 14 -SimplPlace tools -SimplTool circuit -SimplCircuit divider
+  MODE=light shoot light-54u-pin-circuit 14 -SimplPinnedTools circuit -SimplPinOpen circuit
 }
 
 # (1.3.80) how each 3D model was framed, from the consoles ("[Simpl] bio frame <scene>: view W × H, model X% across,

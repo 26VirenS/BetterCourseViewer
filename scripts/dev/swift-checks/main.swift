@@ -293,6 +293,98 @@ check(VectorEntry.rows(VectorEntry.text(rows)) == rows && rows[0].vector(threeD:
       && close(rows[1].vector(threeD: false, unit: .degrees)?.y ?? 0, 5, 1e-9) && rows[1].vector(threeD: true, unit: .degrees) == nil
       && rows[2].vector(threeD: true, unit: .degrees) == nil && VectorEntry(x: "1", y: "2").vector(threeD: true, unit: .degrees) == Vec3(1, 2, 0),
       "the rows kept and read back as typed; a row not whole is no vector yet, a blank z is 0")
+// (Circuit Builder: the presets solved by modified nodal analysis, what cannot be solved, the document kept as JSON,
+// and the calculator strip)
+func solvedPreset(_ id: String) -> (doc: CircuitDoc, s: CircuitSolution) {
+    let d = CircuitDoc.preset(id) ?? CircuitDoc()
+    return (d, CircuitSolver.solve(d))
+}
+let series = solvedPreset("series")
+let seriesNames = series.doc.names
+func part(_ named: String, in doc: CircuitDoc) -> Int { doc.names.first { $0.value == named }?.key ?? -1 }
+check(seriesNames.values.sorted() == ["B1", "R1", "R2"], "the series preset is B1, R1 and R2 (\(seriesNames.values.sorted()))")
+check(close(series.s.reading(part("B1", in: series.doc)).current ?? 0, 0.03, 1e-9) && close(series.s.reading(part("R2", in: series.doc)).voltage ?? 0, 6, 1e-9)
+      && close(series.s.reading(part("R1", in: series.doc)).voltage ?? 0, 3, 1e-9) && series.s.problems.isEmpty,
+      "9 V with 100 Ω and 200 Ω in series: 0.03 A, 6 V across the 200 Ω (\(CircuitMath.amps(series.s.reading(part("B1", in: series.doc)).current ?? 0)), \(CircuitMath.volts(series.s.reading(part("R2", in: series.doc)).voltage ?? 0)))")
+check(close(series.s.reading(part("B1", in: series.doc)).power ?? 0, 0.27, 1e-9) && close(series.s.reading(part("R2", in: series.doc)).power ?? 0, 0.18, 1e-9),
+      "and the battery gives 0.27 W, the 200 Ω takes 0.18 W")
+let parallel = solvedPreset("parallel")
+check(close(parallel.s.reading(part("A1", in: parallel.doc)).current ?? 0, 0.135, 1e-6) && close(CircuitMath.parallel([100, 200]) ?? 0, 66.67, 0.005)
+      && close(parallel.s.reading(part("R1", in: parallel.doc)).current ?? 0, 0.09, 1e-6) && parallel.s.problems.isEmpty,
+      "9 V across 100 Ω ∥ 200 Ω: 66.67 Ω, 0.135 A through the ammeter, 0.09 A through the 100 Ω")
+let divider = solvedPreset("divider")
+check(close(divider.s.reading(part("V1", in: divider.doc)).voltage ?? 0, 8, 1e-9) && divider.s.reading(part("V1", in: divider.doc)).current == 0
+      && close(divider.s.reading(part("B1", in: divider.doc)).current ?? 0, 0.004, 1e-9) && divider.s.problems.isEmpty
+      && close(divider.s.reading(part("G1", in: divider.doc)).current ?? 1, 0, 1e-9) == false,
+      "12 V over 1 kΩ + 2 kΩ: the voltmeter across the 2 kΩ reads 8 V and takes no current, 4 mA flows (\(CircuitMath.volts(divider.s.reading(part("V1", in: divider.doc)).voltage ?? 0)))")
+// (the current through a wire in a series path is told from its neighbour; a wire on its own is not in a circuit)
+var withWire = CircuitDoc.preset("series") ?? CircuitDoc()
+let w = withWire.add(.wire, x: 8, y: 10)
+var wireDoc = CircuitDoc.preset("series") ?? CircuitDoc()
+let wireB = part("B1", in: wireDoc), wireR2 = part("R2", in: wireDoc)
+wireDoc.links.removeAll { l in l.a.part == wireR2 && l.b.part == wireB }
+let wire = wireDoc.add(.wire, x: 8, y: 8)
+wireDoc.link(TerminalRef(part: wireR2, index: 1), TerminalRef(part: wire, index: 1))
+wireDoc.link(TerminalRef(part: wire, index: 0), TerminalRef(part: wireB, index: 0))
+let wireSolved = CircuitSolver.solve(wireDoc)
+check(close(wireSolved.reading(wire).current ?? 0, -0.03, 1e-9) && wireSolved.reading(wire).voltage == 0 && wireSolved.problems.isEmpty,
+      "a wire closing the series loop carries its 0.03 A (from its right end to its left) and drops nothing (\(wireSolved.reading(wire).current ?? .nan))")
+let loneSolved = CircuitSolver.solve(withWire)
+check(loneSolved.reading(w).connected == false && loneSolved.problems.contains { $0.hasPrefix("Some parts aren't in a circuit") },
+      "a wire on its own is not in a circuit, and the solver says so")
+// (an open switch stops the current; closed, it carries it; a shorted battery is refused; two batteries face to face too)
+var switched = CircuitDoc()
+let sb = switched.add(.battery, x: 3, y: 6, rotation: 270, value: 9), sw = switched.add(.switch, x: 8, y: 4), sr = switched.add(.resistor, x: 13, y: 6, rotation: 90, value: 100)
+switched.link(TerminalRef(part: sb, index: 1), TerminalRef(part: sw, index: 0))
+switched.link(TerminalRef(part: sw, index: 1), TerminalRef(part: sr, index: 0))
+switched.link(TerminalRef(part: sr, index: 1), TerminalRef(part: sb, index: 0))
+let closedSolved = CircuitSolver.solve(switched)
+switched.toggle(sw)
+let openSolved = CircuitSolver.solve(switched)
+check(close(closedSolved.reading(sr).current ?? 0, 0.09, 1e-9) && close(closedSolved.reading(sw).current ?? 0, 0.09, 1e-9)
+      && closedSolved.reading(sw).voltage == 0 && closedSolved.problems.isEmpty,
+      "a closed switch carries the loop's 0.09 A and drops nothing")
+check(openSolved.reading(sr).current == 0 && openSolved.reading(sr).voltage == 0 && close(openSolved.reading(sw).voltage ?? 0, 9, 1e-9)
+      && openSolved.reading(sw).current == 0 && close(openSolved.reading(sb).current ?? 1, 0, 1e-9) && openSolved.problems.isEmpty,
+      "opened, nothing flows: the resistor reads 0 V and 0 A, the switch's gap the battery's 9 V")
+var shorted = CircuitDoc()
+let shb = shorted.add(.battery, x: 3, y: 6, rotation: 270, value: 9)
+shorted.link(TerminalRef(part: shb, index: 0), TerminalRef(part: shb, index: 1))
+check(CircuitSolver.solve(shorted).problems.first?.hasPrefix("B1 is shorted") == true, "a battery wired end to end is said to be shorted")
+var facing = CircuitDoc()
+let f1 = facing.add(.battery, x: 3, y: 6, rotation: 270, value: 9), f2 = facing.add(.battery, x: 8, y: 6, rotation: 270, value: 12)
+facing.link(TerminalRef(part: f1, index: 1), TerminalRef(part: f2, index: 1))
+facing.link(TerminalRef(part: f1, index: 0), TerminalRef(part: f2, index: 0))
+check(CircuitSolver.solve(facing).problems.first?.contains("fight each other") == true, "two batteries of different volts side by side cannot be solved")
+// (parts placed end to end are joined; the document kept as JSON comes back whole; a turned part's terminals)
+var touching = CircuitDoc()
+let tb = touching.add(.battery, x: 3, y: 6, rotation: 270, value: 9), tr = touching.add(.resistor, x: 5, y: 4, value: 300)
+touching.link(TerminalRef(part: tr, index: 1), TerminalRef(part: tb, index: 0))
+check(close(CircuitSolver.solve(touching).reading(tr).current ?? 0, 0.03, 1e-9), "a resistor whose end sits on the battery's + is joined to it (\(touching.part(tb)!.terminals.map { "\($0.x),\($0.y)" }), \(touching.part(tr)!.terminals.map { "\($0.x),\($0.y)" }))")
+check(CircuitPart(id: 1, kind: .battery, x: 3, y: 6, rotation: 270).terminals.map { [$0.x, $0.y] } == [[3, 8], [3, 4]]
+      && CircuitPart(id: 1, kind: .resistor, x: 8, y: 4).terminals.map { [$0.x, $0.y] } == [[6, 4], [10, 4]]
+      && CircuitPart(id: 1, kind: .ground, x: 3, y: 10).terminals.map { [$0.x, $0.y] } == [[3, 9]],
+      "a battery turned 270° has its + at the top, a resistor its ends two units either side, a ground its one above")
+let circuitBack = CircuitDoc(json: divider.doc.json)
+check(circuitBack == divider.doc && circuitBack?.nextID == divider.doc.nextID && CircuitDoc(json: "nonsense") == nil, "the divider kept as JSON comes back whole, nonsense does not")
+var edited = divider.doc
+edited.rotate(part("R1", in: edited)); edited.set(part("R1", in: edited), value: 500); edited.remove(part("V1", in: edited))
+check(edited.part(part("R1", in: edited))?.rotation == 90 && edited.part(part("R1", in: edited))?.value == 500 && edited.parts.count == 4
+      && edited.links.count == 4 && edited.names[part("R2", in: edited)] == "R2",
+      "a part turned, its value set, another removed with its wires, the names kept")
+// (the calculator strip)
+check(CircuitMath.ohm(v: 9, i: nil, r: 300).map { close($0.i, 0.03, 1e-9) && $0.found == "I" } == true
+      && CircuitMath.ohm(v: nil, i: 0.03, r: 300).map { $0.v == 9 } == true && CircuitMath.ohm(v: 9, i: 0.03, r: nil).map { $0.r == 300 } == true
+      && CircuitMath.ohm(v: 9, i: nil, r: nil) == nil && CircuitMath.ohm(v: 9, i: 0, r: nil) == nil,
+      "Ohm's law from any two of V, I and R")
+check(CircuitMath.resistances("100, 200") == [100, 200] && CircuitMath.resistances("1k 2.2k 1M") == [1000, 2200, 1_000_000]
+      && CircuitMath.series([100, 200]) == 300 && close(CircuitMath.parallel([100, 200]) ?? 0, 66.6667, 1e-3) && CircuitMath.parallel([]) == nil,
+      "a list of resistances read with k and M, in series and in parallel")
+check(CircuitMath.ohms(66.6667) == "66.67 Ω" && CircuitMath.ohms(1000) == "1 kΩ" && CircuitMath.ohms(2.2e6) == "2.2 MΩ"
+      && CircuitMath.amps(0.03) == "0.03 A" && CircuitMath.amps(0.0015) == "1.5 mA" && CircuitMath.watts(0.27) == "0.27 W",
+      "ohms, amps and watts written short")
+check(CircuitSolution.brightness(power: nil) == 0 && CircuitSolution.brightness(power: 0.81) > 0.9 && CircuitSolution.brightness(power: 0.01) < 0.1,
+      "a lamp's brightness follows its power")
 
 // ---- live checks ----------------------------------------------------------------------------------------------
 // (mac/Simpl/Engine/LivePlan.swift, 1.3.80: when the screen on show is checked again, the fingerprint the page gives an
