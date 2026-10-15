@@ -1,3 +1,9 @@
+**What's new in 0.3.10** (beta)
+
+- **Word counter** — a new Study tool: paste or type an essay and it is counted as it changes — words, characters with and without spaces, sentences, paragraphs, reading and speaking time, the longest word, a word target with "to go" and the ten words used most; `/words` in the search box, and a pin.
+- **Statistics** — a new Math & science tool with four pages: Describe (mean, median, modes, quartiles, SD and variance, outliers, a histogram and a box plot), Regression (slope, intercept, r and r², a scatter with the line, predict y), Distributions (normal and t, with the curve shaded) and Tests (one-sample, two-sample and paired t-tests with a 95 % interval); `/stats` in the search box, and a pin.
+- **Matrix calculator** — a new Math & science tool: A and B up to 6×6, with A + B, A − B, A × B, kA, the transpose, determinant, inverse, rank, RREF with its steps, trace, A·x = b, eigenvalues (real and complex) and Aⁿ, as exact fractions when the cells are; `/matrix` in the search box, and a pin.
+
 **What's new in 0.3.9** (beta)
 
 - **Physics** — a new section on the Tools page, between Chemistry and Biology.

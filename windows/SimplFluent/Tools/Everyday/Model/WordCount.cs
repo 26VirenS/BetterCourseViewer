@@ -3,7 +3,7 @@ using System.Text;
 
 namespace Simpl.Tools;
 
-// The Word Counter's counting (tools): what a text comes to — its words, characters, sentences and paragraphs, how long
+// The Word Counter's counting (0.3.10): what a text comes to — its words, characters, sentences and paragraphs, how long
 // it takes to read or say, and the words it uses most — with no window in it, so the tests can run it as it is. Both
 // apps count the same way (the Mac's WordCount): a word is a run of non-spaces with a letter or a figure in it, a
 // sentence ends at . ! or ? before a space or the end, a paragraph is a block between blank lines.
