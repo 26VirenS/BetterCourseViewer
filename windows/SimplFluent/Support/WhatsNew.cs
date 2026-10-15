@@ -26,6 +26,8 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.8", "2026-10-15",
+            ("new", "Equation balancer", "Balance any chemical equation, with an atom count.")),
         R("0.3.7", "2026-10-15",
             ("improved", "Always up to date", "Updates now always install automatically."),
             ("improved", "Earlier versions stay", "Go back a version and Simpl stays on it until you update.")),

@@ -1,3 +1,7 @@
+**What's new in 0.3.8** (beta)
+
+- **Equation balancer** — a new Chemistry tool: type any chemical equation (phases, charges, brackets, hydrates) and it is balanced as you type, with each element's count on both sides, a mass check and plain words when it can't be balanced; `/balance` in the search box, and a pin.
+
 **What's new in 0.3.7** (beta)
 
 - **Always up to date** — updates always install by themselves, at a quiet moment (never during a quiz, a tool or a dialog); the Install updates automatically switch is gone, and anyone who had it off gets updates by themselves again.
