@@ -1528,11 +1528,11 @@ window.mockRichDialog = function (slow) {
   no.onclick = function () { if (step === 1) first(); else d.remove(); };
   setTimeout(first, slow || 0);
 };
-// (?demo=1, a picture run's: the rail's objectives and mastery from the player's own answer, as Alta's page reads it;
-// ?demo=dialog also opens the rich pop-up, its body a second and a half late)
-var demo = new URLSearchParams(location.search).get('demo');
-if (demo) fetch('/mock-alta/api/content?assignmentId=a1');
-if (demo === 'dialog') setTimeout(function () { window.mockRichDialog(1500); }, 900);
+// (?sample=1, a picture run's: the rail's objectives and mastery from the player's own answer, as Alta's page reads it;
+// ?sample=dialog also opens the rich pop-up, its body a second and a half late)
+var sample = new URLSearchParams(location.search).get('sample'); // (not 'demo': the mock's password, which no log may name)
+if (sample) fetch('/mock-alta/api/content?assignmentId=a1');
+if (sample === 'dialog') setTimeout(function () { window.mockRichDialog(1500); }, 900);
 </script></body></html>`);
     }
     // (1.3.19) an overview as a school's Alta may draw it: its objectives only as words on the page (no answer of Alta's

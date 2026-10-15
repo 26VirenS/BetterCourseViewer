@@ -323,7 +323,7 @@ try {
     const full = (p) => p.kind === 'dialog' && p.open === true && !p.pending;
     const hiddenIn = (sel) => wp.$eval(sel, (e) => getComputedStyle(e).visibility === 'hidden').catch(() => null);
     const pngSize = (src) => { const b = Buffer.from(String(src).split(',')[1] || '', 'base64'); return b.length > 24 && b.toString('ascii', 1, 4) === 'PNG' ? [b.readUInt32BE(16), b.readUInt32BE(20)] : null; };
-    await wp.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a3?demo=dialog`);
+    await wp.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a3?sample=dialog`);
     // a pop-up as Alta's (Material's, its Next and Not now in capitals by a style), a spinner in its body for a second
     // and a half before its words come
     await wwait((p) => p.kind === 'dialog' && p.pending, 'word of a pop-up');

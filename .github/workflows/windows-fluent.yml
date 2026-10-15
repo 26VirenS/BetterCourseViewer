@@ -825,8 +825,8 @@ jobs:
           # checked below to prefer light) —, in Dark, on a narrow window (Show browser said "Browser"), and with Show
           # browser on (Alta's own page as it is); and a pop-up of Alta's whose rich body comes in a second and a half after
           # it opens, shown whole as the app's own dialog, light and dark (checked below)
-          $altaPage = 'alta:104:4003:/mock-alta/learn/course/c1/assignment/a3?demo=1'
-          $altaDialog = 'alta:104:4003:/mock-alta/learn/course/c1/assignment/a3?demo=dialog'
+          $altaPage = 'alta:104:4003:/mock-alta/learn/course/c1/assignment/a3?sample=1'
+          $altaDialog = 'alta:104:4003:/mock-alta/learn/course/c1/assignment/a3?sample=dialog'
           Shot 'alta-question-light' '1366x778' 50 ($mock + @('--appearance', 'dark', '--web-scheme', 'dark', '--open', $altaPage))
           Shot 'alta-question-dark' '1366x778' 50 ($mock + @('--appearance', 'dark', '--alta-look', 'dark', '--open', $altaPage))
           Shot 'alta-question-narrow' '780x683' 50 ($mock + @('--appearance', 'light', '--open', $altaPage))

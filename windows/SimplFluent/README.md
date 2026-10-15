@@ -971,8 +971,8 @@ their mastery down the left, Alta's own page in the rest, in a web view of the p
 the app is, which a script in each of its frames reads (`AltaHook`, the Mac's copy): its question laid out alone on
 panels, its buttons as the popup's own, its cover as the popup's start screen, its pop-ups as the popup's dialogs.
 `--open alta:104:4003` opens one at launch, by the assignment's launch through Canvas; `--open
-alta:104:4003:/mock-alta/learn/course/c1/assignment/a3?demo=1` opens it on a page of the mock's own instead — Alta's
-learn page with a question, the rail filled from the player's own answer — and `?demo=dialog` there also opens a pop-up
+alta:104:4003:/mock-alta/learn/course/c1/assignment/a3?sample=1` opens it on a page of the mock's own instead — Alta's
+learn page with a question, the rail filled from the player's own answer — and `?sample=dialog` there also opens a pop-up
 built as Alta's are, its rich body coming in a second and a half after it (`window.mockRichDialog`), for the pictures.
 
 A pop-up of Alta's (0.3.5) is hidden in the page as soon as the page script sees it and read once it has settled —
