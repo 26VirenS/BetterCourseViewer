@@ -19,8 +19,10 @@
   },
   "windows": {
     "sign-in-working": {
-      "max_dominant": 0.995,
-      "reason": "\"Logging you in\": a spinner, a line and two buttons in the middle of an empty window, as it is meant to be while the school's page signs in behind it"
+      "max_dominant": 0.998,
+      "min_spread": 4.0,
+      "min_colours": 1,
+      "reason": "\"Logging you in\": a spinner and a line in the middle of an empty window, as it is meant to be while the school's page signs in behind it; two buttons and the reason it may take a while come under them 2.5 seconds in (SignIn/SignInCard.cs), so a picture taken before then is the spinner and the line alone"
     }
   }
 }
