@@ -214,9 +214,11 @@ struct DashboardView: View {
         }
         let tile = (width - Self.counterSpacing * CGFloat(cols - 1)) / CGFloat(cols)
         let (style, full) = Self.wording(list, tileWidth: tile)
+        // (a tile's line on one line in a row of six — the row as low as 1.3.77's; on two at most in a row of three or two)
+        let lines = cols == 6 ? 1 : 2
         return VStack(alignment: .leading, spacing: Self.counterSpacing) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                counterRow(row, cols: cols, style: style, full: full, tile: tile)
+                counterRow(row, cols: cols, style: style, full: full, tile: tile, lines: lines)
             }
         }
         .tourSpot(.counters) // (the tour's first step: everything due, at a glance)
@@ -263,10 +265,10 @@ struct DashboardView: View {
     static let counterSpacing: CGFloat = 14
 
     /// A row of tiles: each as tall as the row's tallest, which is as tall as what is on it.
-    private func counterRow(_ row: [Counter], cols: Int, style: DashCounterTile.Style, full: Bool, tile: CGFloat) -> some View {
+    private func counterRow(_ row: [Counter], cols: Int, style: DashCounterTile.Style, full: Bool, tile: CGFloat, lines: Int) -> some View {
         HStack(alignment: .top, spacing: Self.counterSpacing) {
             ForEach(row) { c in
-                counterSlot(c, style: style, full: full, tile: tile).frame(maxWidth: .infinity, maxHeight: .infinity)
+                counterSlot(c, style: style, full: full, tile: tile, lines: lines).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             ForEach(0..<max(cols - row.count, 0), id: \.self) { _ in
                 Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
@@ -289,20 +291,24 @@ struct DashboardView: View {
     }
 
     /// A counter's place in its row: the tile, or — while it has grown into its panel — the same tile unseen, so the row
-    /// keeps its shape. (Under Reduce Motion nothing grows: the tile stays, and the panel fades in under its row.)
+    /// keeps its shape. (Under Reduce Motion nothing grows: the panel fades in over its tile as the tile fades out under
+    /// it, and back — 1.3.80: the tile no longer stays under it, its coloured edge showing round the panel's rounder
+    /// corners.)
     @ViewBuilder
-    private func counterSlot(_ c: Counter, style: DashCounterTile.Style, full: Bool, tile: CGFloat) -> some View {
+    private func counterSlot(_ c: Counter, style: DashCounterTile.Style, full: Bool, tile: CGFloat, lines: Int) -> some View {
         let name = full ? (c.fullLabel ?? c.label) : c.label
         let line = full ? fullNote(c) : note(c)
+        // (1.3.80: with its short name, its full name's line — "19 / 49 points" — where only that one fits)
+        let spare = full ? nil : fullNote(c)
         Group {
-            if open == c.key && grows {
+            if open == c.key {
                 DashCounterTile(counter: c, name: name, value: value(c), note: line, stale: stale(c), style: style,
-                                width: tile, tip: fullNote(c)) {}
+                                width: tile, lines: lines, spare: spare, tip: fullNote(c)) {}
                     .hidden()
                     .accessibilityHidden(true)
             } else {
                 DashCounterTile(counter: c, name: name, value: value(c), note: line, stale: stale(c), style: style,
-                                width: tile, tip: fullNote(c)) { setOpen(open == c.key ? nil : c.key) }
+                                width: tile, lines: lines, spare: spare, tip: fullNote(c)) { setOpen(open == c.key ? nil : c.key) }
                     .tourSpot(c.key == "next" ? .counterNext : nil)
                     .dashMorph(c.key, in: morph, enabled: grows)
                     .transition(.opacity)
@@ -400,9 +406,11 @@ struct DashboardView: View {
     }
 
     /// How the open panel takes the height of what it shows, as that is measured: on the same spring (held with the grow
-    /// in the screenshot suite's picture of it part-way, so the panel's height stays part-way too).
-    private var heightMotion: Animation {
-        DashMorphHold.asked.map { Animation($0) } ?? Motion.gentle
+    /// in the screenshot suite's picture of it part-way, so the panel's height stays part-way too); (1.3.80) under Reduce
+    /// Motion at once — nothing grows there, its height either.
+    private var heightMotion: Animation? {
+        if let hold = DashMorphHold.asked { return Animation(hold) }
+        return reduceMotion ? nil : Motion.gentle
     }
 
     /// (1.3.62) While a counter is open, a click anywhere in the app but its panel — the sidebar, the toolbar, the page —

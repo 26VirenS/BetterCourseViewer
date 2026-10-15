@@ -150,6 +150,11 @@ struct DashCounterTile: View {
     var style: Style = .beside
     /// (1.3.79) How wide the row lays the tile out: its line is shown only where it fits whole at that width.
     var width: CGFloat = 0
+    /// (1.3.80) How many lines its line may take: two; one in a row of six, so the row stays as low as 1.3.77's.
+    var lines = 2
+    /// (1.3.80) The line that goes with its other name ("19 / 49 points", said with "Graded this week"), shown in place
+    /// of its own where only this one fits whole in `lines`.
+    var spare: String? = nil
     /// (1.3.79) What it counts, in full words, for its tooltip with its count: a line left out stays said there.
     var tip: String? = nil
     let action: () -> Void
@@ -259,12 +264,21 @@ struct DashCounterTile: View {
         }
     }
 
-    /// (1.3.79) The line under the number, whole in up to two lines at the tile's width; else left out (its words stay
-    /// in the tooltip) — never cut in the middle of a word.
+    /// (1.3.79) The line under the number, whole in up to two lines at the tile's width (1.3.80: in one, in a row of six
+    /// — its other name's line where only that one fits); else left out (its words stay in the tooltip) — never cut in
+    /// the middle of a word.
     private var shownNote: String? {
-        guard let note, !note.isEmpty else { return nil }
-        guard width > 0 else { return note }
-        return Self.noteFits(note, room: width - Self.padding(style) * 2) ? note : nil
+        let candidates = [note, spare == note ? nil : spare].compactMap { $0 }.filter { !$0.isEmpty }.map(Self.bound)
+        guard let first = candidates.first else { return nil }
+        guard width > 0 else { return first }
+        let room = width - Self.padding(style) * 2
+        return candidates.first { Self.noteFits($0, room: room, lines: lines) }
+    }
+
+    /// (1.3.80) A line with its sum held together — "19 / 49 points" never breaks after "19 /" — by no-break spaces
+    /// round its slash: it wraps, and is measured, as one word there.
+    static func bound(_ note: String) -> String {
+        note.replacingOccurrences(of: " / ", with: "\u{00A0}/\u{00A0}")
     }
 
     // MARK: - Measuring
@@ -281,9 +295,9 @@ struct DashCounterTile: View {
         return padding(style) * 2 + beside + widest + 2 <= tileWidth
     }
 
-    /// (1.3.79) Whether a line fits whole in two lines `room` wide, wrapped as the tile wraps it (12 points, a word never
-    /// broken): no word wider than the line, and no third line.
-    static func noteFits(_ note: String, room: CGFloat) -> Bool {
+    /// (1.3.79) Whether a line fits whole in two lines `room` wide (1.3.80: or in as many as `lines`), wrapped as the
+    /// tile wraps it (12 points, a word never broken): no word wider than the line, and no line more.
+    static func noteFits(_ note: String, room: CGFloat, lines: Int = 2) -> Bool {
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineBreakStrategy = .standard // (as a SwiftUI Text wraps: no word left alone on the last line)
         let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 12), .paragraphStyle: paragraph]
@@ -295,7 +309,7 @@ struct DashCounterTile: View {
         let options: NSString.DrawingOptions = [.usesLineFragmentOrigin, .usesFontLeading]
         let line = ("Ag" as NSString).boundingRect(with: box, options: options, attributes: attrs).height
         let all = (note as NSString).boundingRect(with: box, options: options, attributes: attrs).height
-        return all <= line * 2 + 0.5
+        return all <= line * CGFloat(max(lines, 1)) + 0.5
     }
 }
 
@@ -331,6 +345,10 @@ struct DashCounterPanel: View {
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
         content
+            // (1.3.80) laid out, and measured, at its own height — never at the height the page gives the panel, which is
+            // the last one measured: squeezed into that, its header's line was cut to one and its list's growth never
+            // reached the page, and the panel stood cut off under its list
+            .fixedSize(horizontal: false, vertical: true)
             .frame(width: max(width, 280), alignment: .topLeading)
             .background {
                 GeometryReader { p in
@@ -344,7 +362,7 @@ struct DashCounterPanel: View {
             .glass(shape, tint: DashCounterLook.color(counter.key).opacity(0.10))
             .contentShape(shape)
             .onTapGesture {} // (1.2.2: a click on the panel is the panel's — one anywhere else folds it back)
-            .onExitCommand { close() }
+            .onExitCommand { dismiss() }
             .task { await load() }
             // (1.3.79) a row's card folds back with the panel it came from: it never stays over a panel that is gone
             .onDisappear {
@@ -395,7 +413,7 @@ struct DashCounterPanel: View {
                 }
             }
             Spacer(minLength: 8)
-            Button(action: close) {
+            Button(action: dismiss) {
                 Image(systemName: "xmark")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(.secondary)
@@ -408,6 +426,19 @@ struct DashCounterPanel: View {
         // (1.2.11) the card pressed again — its head, where the tile was — closes it (the ✕ keeps its own press)
         .contentShape(Rectangle())
         .onTapGesture(perform: close)
+    }
+
+    /// (1.3.80) Its ✕, or Escape. Escape steps back one at a time: with one of its rows' cards up — in this window now,
+    /// over the page, where in 1.3.79 it was a popup of its own — the card folds back first and the panel stays, whichever
+    /// of the two hears the key first; the next Escape closes the panel. The ✕ pressed closes both (the card goes with the
+    /// panel it came from).
+    private func dismiss() {
+        let preview = WorkPreview.shared
+        if NSApp.currentEvent?.type == .keyDown, preview.shown, preview.item?.id.hasPrefix("sheet:\(counter.key):") == true {
+            preview.close()
+        } else {
+            close()
+        }
     }
 
     @ViewBuilder
