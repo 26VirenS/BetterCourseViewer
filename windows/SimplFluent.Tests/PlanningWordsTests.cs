@@ -112,13 +112,27 @@ public class PlanningWordsTests
     }
 
     [Fact]
-    public void TheLevelsStandOneUnderTheNext()
+    public void TheLevelsStandAtTheirPoints()
     {
+        // (0.3.17) 6, 3 and 0 points on a bar from 158 to 500: each row at its tick, since the rows have the room
         var model = new RubricModel(new[] { Adjusted() });
         var places = new RubricGeometry(model).Places(0, 500, new double[] { 40, 40, 40 });
         Assert.Equal(3, places.Count);
+        Assert.Equal(158, places[0].Tick, 6);
+        Assert.Equal(329, places[1].Tick, 6);
+        Assert.Equal(500, places[2].Tick, 6);
+        for (var i = 0; i < 3; i++) Assert.Equal(places[i].Tick, places[i].Row, 6);
+        Assert.True(places[1].Picked);
+    }
+
+    [Fact]
+    public void TheLevelsMoveOnlyAsFarAsTheRowAboveNeeds()
+    {
+        // (0.3.17) a short bar: 6, 3 and 0 points from 158 to 200 would overlap, so each row goes under the one before
+        var model = new RubricModel(new[] { Adjusted() });
+        var places = new RubricGeometry(model).Places(0, 200, new double[] { 40, 40, 40 });
         Assert.Equal(places[0].Row + 48, places[1].Row, 6);
         Assert.Equal(places[1].Row + 48, places[2].Row, 6);
-        Assert.True(places[1].Picked);
+        Assert.True(places[2].Row + 20 <= 230 + 1e-6); // (pushed back up from the foot's 30 of grace)
     }
 }

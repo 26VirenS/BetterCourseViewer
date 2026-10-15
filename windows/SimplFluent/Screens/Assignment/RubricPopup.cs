@@ -62,7 +62,7 @@ internal static class RubricPopup
 /// The rubric as a ring (the Mac's RubricPopupView over RubricStage.swift): one slice per criterion, as long as its share
 /// of the points, blooming in and — marked — bending to its marks and turning to its grades' colours; the total in the
 /// middle, or the criterion under the pointer. A slice, its name (a chip beside it), or Enter opens that criterion into
-/// its bar: its levels stacked beside it, each joined to the height of its points, the one given marked, the marker's
+/// its bar: its levels beside it at the height of their points (a leader to one that had to move), the one given marked, the marker's
 /// note under them, ‹ 1 of 2 › to switch, and "Ring" beside × to go back (the little ring on top only pictures where the bar came from). ← → walk the
 /// criteria; Escape steps back, then closes; a press beside the ring closes it too. Ring or Grid at the top right
 /// (RubricGrid.cs).
@@ -529,7 +529,7 @@ internal sealed class RubricView : Grid
 
     // ---- the bar's side ----
 
-    /// <summary>The open criterion: its bar, its levels stacked beside it, each joined to the height of its points (the one
+    /// <summary>The open criterion: its bar, its levels beside it at the height of their points (a leader to one that had to move) (the one
     /// given marked — and the points given, where they are not that level's), which criterion this is with ‹ 1 of 2 ›
     /// to switch, the whole of its description when the levels still fit under it, the marker's note, and the little
     /// ring to go back.</summary>

@@ -191,8 +191,9 @@ internal sealed class RubricRingVisual : FrameworkElement
         t.Freeze();
         dc.PushTransform(t);
         var lead = n > 1 ? 0.42 / (n - 1) : 0;
-        // (the gaps between slices, as the bloom ends: about 4 of the stage's units wide)
-        var seam = n > 1 ? 4 / RubricRing.Radius * RubricRing.Span(bloom, 0.85, 1) : 0;
+        // (0.3.17) no gap where one criterion's slice meets the next: the ring is one band of colour, the slices told
+        // apart by their colours, their dots and their names (the dark seams across the band, the owner found, cut it up)
+        const double seam = 0;
         for (var k = 0; k < n; k++)
         {
             var local = RubricRing.Clamp01((bloom - lead * k) / 0.58);

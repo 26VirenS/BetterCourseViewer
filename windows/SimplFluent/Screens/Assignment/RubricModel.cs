@@ -368,8 +368,8 @@ internal sealed class RubricModel
     }
 }
 
-/// <summary>A level's place on the open criterion's bar: its tick (at the height of its points) and its row (stacked under
-/// the one before it, a leader joining it to its tick), in the stage's units.</summary>
+/// <summary>A level's place on the open criterion's bar: its tick (at the height of its points) and its row (beside the
+/// tick, or under the row before it when there is no room, a leader joining it to its tick), in the stage's units.</summary>
 internal readonly record struct RubricBarPlace(double Tick, double Row, bool Picked);
 
 /// <summary>The rubric's ring as it stands still (the Mac's RubricGeometry): what does not change from frame to frame.</summary>
@@ -457,10 +457,12 @@ internal sealed class RubricGeometry
     }
 
     /// <summary>
-    /// The levels' ticks at the height of their points, and their rows stacked one under the next from the first one's
-    /// tick (or from <paramref name="top"/>, under the criterion's whole description) — a leader joins each row to its
-    /// tick — so the room goes to the words, not to gaps between rows; at the foot they are pushed back up. Heights are
-    /// the rows' own, in the stage's units.
+    /// The levels' ticks at the height of their points, and (0.3.17) their rows beside their ticks, each at the height
+    /// of its points — moved down only as far as the row above it needs (and up, at the foot), a leader joining a row
+    /// that had to move to its tick. (The rows had been stacked from the top whatever their points, the room going to
+    /// the words; the owner wanted each level where its points put it, the bar read as a scale.) Heights are the rows'
+    /// own, in the stage's units; <paramref name="top"/> is where the first row may start (under the criterion's whole
+    /// description, where it is shown).
     /// </summary>
     public List<RubricBarPlace> Places(int k, double foot, IReadOnlyList<double> heights, double? top = null)
     {
@@ -470,7 +472,7 @@ internal sealed class RubricGeometry
         var hs = ls.Select((_, i) => i < heights.Count ? heights[i] : 46).ToArray();
         var ys = (double[])want.Clone();
         if (top is { } t) ys[0] = Math.Max(ys[0], t + hs[0] / 2);
-        for (var i = 1; i < ys.Length; i++) ys[i] = ys[i - 1] + hs[i - 1] / 2 + 8 + hs[i] / 2;
+        for (var i = 1; i < ys.Length; i++) ys[i] = Math.Max(ys[i], ys[i - 1] + hs[i - 1] / 2 + 8 + hs[i] / 2);
         var last = ys.Length - 1;
         if (ys[last] + hs[last] / 2 > foot + 30)
         {
