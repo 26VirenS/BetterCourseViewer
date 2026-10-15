@@ -47,6 +47,14 @@ struct MolarMassTool: View {
     @State private var empiricalMass = MolarMassTool.launched(.empirical, "SimplMolesMass") ?? ChemPrefs.string(.moles, "empiricalMass") ?? ""
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    // the fields kept between openings, watched as one list (eleven .onChange modifiers in a row were more than the
+    // compiler could type-check in reasonable time); the one Bool, inGrams, keeps its own
+    private static let rememberedFields = ["tab", "formula", "convertFormula", "convertValue", "convertUnit", "equation", "given", "actual", "actualOf", "shares", "empiricalMass"]
+    private var remembered: [String] {
+        [tab.rawValue, formula, convertFormula, convertValue, convertUnit.rawValue, equation, Self.givenText(given) ?? "", actual, actualOf,
+         shares.map { "\($0.symbol)=\($0.amount)" }.joined(separator: ","), empiricalMass]
+    }
+
     static let molarExamples = ["Ca(OH)2", "C6H12O6", "CuSO4·5H2O"]
 
     // MARK: Opening
@@ -108,18 +116,8 @@ struct MolarMassTool: View {
             }
         }
         .onAppear(perform: takeHandOff)
-        .onChange(of: tab) { _, t in ChemPrefs.set(.moles, "tab", t.rawValue) }
-        .onChange(of: formula) { _, v in ChemPrefs.set(.moles, "formula", v) }
-        .onChange(of: convertFormula) { _, v in ChemPrefs.set(.moles, "convertFormula", v) }
-        .onChange(of: convertValue) { _, v in ChemPrefs.set(.moles, "convertValue", v) }
-        .onChange(of: convertUnit) { _, u in ChemPrefs.set(.moles, "convertUnit", u.rawValue) }
-        .onChange(of: equation) { _, v in ChemPrefs.set(.moles, "equation", v) }
-        .onChange(of: given) { _, g in ChemPrefs.set(.moles, "given", Self.givenText(g)) }
-        .onChange(of: actual) { _, v in ChemPrefs.set(.moles, "actual", v) }
-        .onChange(of: actualOf) { _, v in ChemPrefs.set(.moles, "actualOf", v) }
-        .onChange(of: shares) { _, s in ChemPrefs.set(.moles, "shares", s.map { "\($0.symbol)=\($0.amount)" }.joined(separator: ",")) }
+        .onChange(of: remembered) { _, values in ChemPrefs.remember(.moles, Self.rememberedFields, values) }
         .onChange(of: inGrams) { _, on in ChemPrefs.set(.moles, "sharesInGrams", on) }
-        .onChange(of: empiricalMass) { _, v in ChemPrefs.set(.moles, "empiricalMass", v) }
     }
 
     /// (1.3.83) What the pin's field had, its panel opened full screen: a formula, on the Molar mass tab.

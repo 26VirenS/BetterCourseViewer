@@ -118,6 +118,12 @@ enum ChemPrefs {
         store.set(value, forKey: key(k, field))
     }
 
+    /// Several fields at once, each kept only when it has changed: a view watches them as one list (a run of ten or
+    /// more .onChange modifiers is more than the compiler type-checks in reasonable time).
+    static func remember(_ k: ToolKind, _ fields: [String], _ values: [String]) {
+        for (field, value) in zip(fields, values) { set(k, field, value) }
+    }
+
     static func bool(_ k: ToolKind, _ field: String, default d: Bool) -> Bool {
         store.object(forKey: key(k, field)) == nil ? d : store.bool(forKey: key(k, field))
     }
