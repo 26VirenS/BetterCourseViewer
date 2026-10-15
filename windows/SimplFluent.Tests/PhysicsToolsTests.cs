@@ -61,7 +61,7 @@ public class PhysicsToolsTests
         Assert.Equal(new[] { "#0a84ff", "#5ac8fa", "#ffd60a" }, PhysTools.Kinds.Select(k => k.Hex.ToLowerInvariant()));
         Assert.Equal("1D motion and projectile paths.", PhysTools.Kind("motion")!.Note);
         Assert.Equal("Add, dot, cross, components.", PhysTools.Kind("vectors")!.Note);
-        Assert.Equal("Build a DC circuit, read V, I, R.", PhysTools.Kind("circuit")!.Note);
+        Assert.Equal("Build a DC circuit and read it.", PhysTools.Kind("circuit")!.Note);
         Assert.Equal(new[] { "Motion", "Vectors", "Circuit" }, PhysTools.Kinds.Select(k => ToolsCenter.ShortName(k.Key)));
     }
 

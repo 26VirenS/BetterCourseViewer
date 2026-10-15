@@ -23,7 +23,7 @@ public static class PhysTools
     {
         new("motion", "Kinematics & Projectiles", "1D motion and projectile paths.", SymbolRegular.Rocket24, "#0a84ff"),
         new("vectors", "Vectors", "Add, dot, cross, components.", SymbolRegular.ArrowTrending24, "#5ac8fa"),
-        new("circuit", "Circuit Builder", "Build a DC circuit, read V, I, R.", SymbolRegular.FlashFlow24, "#ffd60a"),
+        new("circuit", "Circuit Builder", "Build a DC circuit and read it.", SymbolRegular.FlashFlow24, "#ffd60a"),
     };
 
     public static ToolsScreen.Kind? Kind(string key) => Kinds.FirstOrDefault(k => k.Key == key);
