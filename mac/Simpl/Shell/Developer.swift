@@ -430,13 +430,13 @@ private struct DevInterface: View {
             // (tools) the study and maths tools: each opened over the main window, and what they keep (StudyPrefs) forgotten
             Section("Study and maths tools") {
                 HStack {
-                    ForEach([ToolKind.words]) { k in
+                    ForEach([ToolKind.words, .stats]) { k in
                         Button(k.name) { if let engine { ToolsCenter.shared.popUp(k, engine: engine) } }
                     }
                 }
                 .disabled(engine == nil)
                 Button("Forget What They Keep") { StudyPrefs.forgetAll() }
-                    .help("The Word Counter's text and target")
+                    .help("The Word Counter's text and target, Statistics' page and what is typed on each")
             }
             Section("Look") {
                 Picker("Appearance (this run)", selection: $look) {

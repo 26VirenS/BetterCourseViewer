@@ -633,7 +633,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
 
 - **The tools after the UI review (1.3.78).** The Tools page is in sections by what a tool is for — *Study* (Flashcards,
   Focus timer, Citation generator, Grade needed; since the tools of their own, the Word Counter), *Math & science*
-  (Calculator, Graphing calculator, Unit converter; the Periodic table until 1.3.80 moved it to *Chemistry*), *Files*
+  (Calculator, Graphing calculator, Unit converter, since then Statistics; the Periodic table until 1.3.80 moved it to
+  *Chemistry*), *Files*
   (File converter, Merge & split PDFs, PDF annotator, Image to text) and *Biology*, as on
   Windows — each tile's line one short line, three tiles across from about 900 points of page (`ToolGroup`, `ToolGroupSection`,
   `ToolTile.columns`). An open tool has one pin control, in its heading, named for what a press does (*Unpin* / *Pin to
@@ -712,7 +713,7 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   speed and angle from Kinematics & Projectiles' pin (`MotionCompact`), two vectors from Vectors' (`VectorsCompact`),
   the Circuit Builder's Ohm's law and list (`CircuitCompact`), the calculator's
   line, sums, memory and Rad/Deg (`CalcEngine.handOff`), a codon looked up, a cross, a Hardy–Weinberg value, the lab
-  calculator shown, (tools) the Equation Balancer's equation, the Word Counter's text; the graph's whole drawing — expressions, sliders, tables, notes and view — by Desmos's own
+  calculator shown, (tools) the Equation Balancer's equation, the Word Counter's text, Statistics' line of data (to its Describe page); the graph's whole drawing — expressions, sliders, tables, notes and view — by Desmos's own
   `Calc.getState`/`Calc.setState` from the pin's web view to the whole one's (`GraphWeb.carryOver`; the whole one's graph
   before it is a ⌘Z away). The focus timer, Flashcards' sets and the lab's numbers are the whole tool's already. A panel
   as it opens carries nothing, and the tool opens as from its tile; with something carried, the tool's popup if it is
@@ -1054,6 +1055,24 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
     text (`takeInfo("text")`). Command `/words` (words such as "word count", "characters", "reading time", "essay").
     Launch flags: `-SimplTool words -SimplWordsText "…" -SimplWordsTarget 150`; a pin's `-SimplWordsText`. Pictures
     (`study_tools`): `light-73-tool-words`, `dark-73-tool-words`, `light-73b-tool-words-narrow`, `light-54m-pin-words`.
+  - **Statistics** (`stats`, *Math & science*; `Tools/Statistics.swift`, `Model/StatsModel.swift`): four pages under
+    a segmented control, the page kept (`StatsTab`). *Describe*: a data field (spaces, commas or new lines; a
+    column pasted from a spreadsheet) → n, mean, median, modes, min, max, range, Q1, Q3, IQR (the quartiles the medians
+    of the lower and upper halves, the median left out when n is odd — said under the results), sample and population
+    SD and variance, SE, sum, sum of squares, the outliers past 1.5 IQR; a histogram (Sturges' bins) and a box plot
+    (`Canvas`). *Regression*: x and y columns → slope, intercept, r, r², the equation, a scatter with the line, and
+    ŷ from an x. *Distributions*: the normal's P(X < x), P(X > x), P(a < X < b), z and the inverse, the curve with
+    P(X < x) shaded; Student's t's two- and one-tailed p and the critical t, both tails shaded. *Tests*: one-sample
+    (data or n, mean, SD), two-sample Welch and paired t-tests → t, df, p (two- and one-tailed), the estimate, SE and
+    the 95% CI. The arithmetic (`Stats`): erf by a power series to 2.5 and a continued fraction past it (within 1e-12
+    of the C library's), the inverse normal by Acklam's approximation refined once, the t distribution by the
+    regularized incomplete beta (Numerical Recipes' `betacf`) and its inverse by bisection. Every field is kept.
+    Pin: a line of data → mean, median, sample SD; Open Full Screen carries it to Describe (`takeInfo("data")`).
+    Command `/stats` ("statistics", "mean", "standard deviation", "regression", "z-score", "t-test"). Launch flags:
+    `-SimplTool stats -SimplStats describe|regression|dist|tests -SimplStatsData "…"` (Regression and Tests take two
+    columns set apart by `;`); a pin's `-SimplStatsData`. Pictures: `light-73c-stats-describe`,
+    `dark-73c-stats-describe`, `light-73d-stats-regression`, `light-73e-stats-dist`, `light-73f-stats-tests`,
+    `light-73g-stats-describe-narrow`, `light-54n-pin-stats`.
 
 ## Data and encryption
 

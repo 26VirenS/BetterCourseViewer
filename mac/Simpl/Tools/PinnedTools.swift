@@ -341,6 +341,7 @@ struct PinnedToolQuick: View {
         case .graph: GraphCompact()
         case .units: UnitConverterCompact()
         case .words: WordCounterCompact() // (tools) a small text area and its counts
+        case .stats: StatisticsCompact() // (tools) a line of data: its mean, median and SD
         case .conv:
             fileDrop(title: "Click to add files", sub: "Documents, PDFs, pictures and data, turned into one another.", multiple: true)
         case .pdfx:

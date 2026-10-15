@@ -632,7 +632,9 @@ phys_tools() {
 }
 
 # (tools) the study and maths tools, each its popup over the Tools page in light and in dark, narrow, and its pin
-# opened: the Word Counter on an essay's opening (-SimplWordsText) with a target of 150 words
+# opened: the Word Counter on an essay's opening (-SimplWordsText) with a target of 150 words; Statistics on each of
+# its pages (-SimplStats <page> -SimplStatsData "…": a class's exam scores described, hours of revision against marks,
+# the normal curve and Student's t, a one-sample t-test), the Describe page in dark and narrow too
 study_tools() {
   local m
   local essay="The printing press changed Europe faster than any invention before it. Within fifty years of Gutenberg's first Bible, presses in two hundred towns had printed some twenty million books — more than every scribe of the previous thousand years. Ideas that once travelled at the pace of a copyist's hand now crossed the continent in a season.
@@ -643,6 +645,15 @@ This essay argues that the press did not simply spread ideas; it changed which i
   done
   MODE=light SIZE=780x700 shoot light-73b-tool-words-narrow 14 -SimplPlace tools -SimplTool words -SimplWordsText "$essay" -SimplWordsTarget 150
   MODE=light shoot light-54m-pin-words 14 -SimplPinnedTools words -SimplPinOpen words -SimplWordsText "Hello, world! This is Simpl."
+  local scores="72 85 90 66 78 95 88 70 81 77 84 69 91 73 86 79 83 58 88 76"
+  for m in light dark; do
+    MODE="$m" SIZE=1440x920 shoot "$m-73c-stats-describe" 14 -SimplPlace tools -SimplTool stats -SimplStats describe -SimplStatsData "$scores"
+  done
+  MODE=light SIZE=1440x920 shoot light-73d-stats-regression 14 -SimplPlace tools -SimplTool stats -SimplStats regression -SimplStatsData "1 2 3 4 5 6 7 8; 52 55 61 64 70 73 78 85"
+  MODE=light SIZE=1440x920 shoot light-73e-stats-dist 14 -SimplPlace tools -SimplTool stats -SimplStats dist
+  MODE=light SIZE=1440x920 shoot light-73f-stats-tests 14 -SimplPlace tools -SimplTool stats -SimplStats tests -SimplStatsData "$scores"
+  MODE=light SIZE=780x700 shoot light-73g-stats-describe-narrow 14 -SimplPlace tools -SimplTool stats -SimplStats describe -SimplStatsData "$scores"
+  MODE=light shoot light-54n-pin-stats 14 -SimplPinnedTools stats -SimplPinOpen stats -SimplStatsData "2, 4, 4, 4, 5, 5, 7, 9"
 }
 
 # (1.3.80) how each 3D model was framed, from the consoles ("[Simpl] bio frame <scene>: view W × H, model X% across,
