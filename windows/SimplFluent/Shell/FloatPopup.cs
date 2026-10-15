@@ -22,7 +22,7 @@ namespace Simpl.Shell;
 /// takes the window's clicks while it is up — no dimming, only the shadow Windows draws round a window — so the pane,
 /// the title bar, the search and the page behind it all go on working, and a place opened under it leaves it where it
 /// was. It is moved by its heading (a press there that is not on a control), closed by its × (or its own Close), by
-/// Escape while it has the keyboard, or by Alt+F4. It opens centred over the page beside the pane, and moves with the
+/// Escape while it has the keyboard, or by Alt+F4. It opens in the middle of the window (0.3.4), and moves with the
 /// window, keeping the place it was moved to. A large one (a tool, Knewton Alta, Macmillan, feedback, a rubric) spans the
 /// window under its title bar less a margin all round — over the pane too, the owner's choice — sized again with the
 /// window, one over another a step down and along (and that much smaller, inside the window); it is sized by its edges
@@ -40,7 +40,7 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
     private readonly SheetHost sheets = new();
     private readonly Border card = new();
     private readonly Grid root = new();
-    /// <summary>Where it was moved to, from where it opens (centred over the page).</summary>
+    /// <summary>Where it was moved to, from where it opens (the middle of the window).</summary>
     private Vector offset;
     /// <summary>A large one's step down and along from the large ones already open over its window (none: the first).</summary>
     private Vector cascade;
@@ -226,13 +226,13 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
 
     // ---- where it is, and how large ----
 
-    /// <summary>Where it is centred, in screen units: the page beside the pane in Simpl's window (MainWindow.PopupRoom) —
-    /// a large one everything under its title bar, over the pane too (MainWindow.LargePopupRoom) — else everything under
-    /// the title bar of the window it is over.</summary>
+    /// <summary>Where it is centred, in screen units: in Simpl's window everything under its title bar, over the pane too
+    /// (MainWindow.LargePopupRoom) — 0.3.4: every popup, not only a large one, in the middle of the whole window (the
+    /// owner: "popups dont show up in the middle") — else everything under the title bar of the window it is over.</summary>
     private Rect Room()
     {
         if (over.Content is not FrameworkElement content || PresentationSource.FromVisual(content) is not { CompositionTarget: { } target }) return Rect.Empty;
-        var r = over is MainWindow m ? (sheet.Large ? m.LargePopupRoom : m.PopupRoom) : new Rect(0, 32, content.ActualWidth, Math.Max(0, content.ActualHeight - 32));
+        var r = over is MainWindow m ? m.LargePopupRoom : new Rect(0, 32, content.ActualWidth, Math.Max(0, content.ActualHeight - 32));
         if (r.IsEmpty || r.Width <= 0 || r.Height <= 0) return Rect.Empty;
         try
         {
@@ -385,8 +385,7 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
         finally { placing = false; }
     }
 
-    /// <summary>Where it opens: centred over the page; a popup wider than the page moved over the pane as far as it must
-    /// to keep inside the window.</summary>
+    /// <summary>Where it opens: centred in the window, kept inside it.</summary>
     private Point Centre(Rect room, Rect whole, Size size)
     {
         var m = Gap(room);

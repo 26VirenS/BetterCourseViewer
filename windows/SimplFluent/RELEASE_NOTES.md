@@ -1,3 +1,7 @@
+**What's new in 0.3.4** (beta)
+
+- **Popups in the middle** — What's New, Hand In, a new message and every other popup open in the middle of the window, not of the page beside the pane.
+
 **What's new in 0.3.3** (beta)
 
 - **Cleaner counter cards** — the Dashboard's counter cards lose their coloured border; each keeps its own soft colour.
