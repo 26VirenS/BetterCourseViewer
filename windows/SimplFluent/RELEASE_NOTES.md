@@ -1,3 +1,8 @@
+**What's new in 0.3.17** (beta)
+
+- **Module files open** — a file in a module opens as one from the Files screen does (by the file's own record, in the preview), where before the module's own address was fetched and could come back with nothing.
+- **Rubric ring** — one band of colour, without the dark seams between criteria; and on an open criterion each level sits beside the bar at the height of its points, moved only where two would overlap.
+
 **What's new in 0.3.16** (beta)
 
 - **Study planner order** — when two pieces of work share a deadline day (finishing a day early put one due tonight and one due tomorrow night on the same day), the one due sooner now takes the day's first blocks; before, the heavier one took the whole day and the one due tonight was said not to fit.
