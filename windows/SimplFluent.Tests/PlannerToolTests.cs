@@ -19,7 +19,8 @@ public class PlannerToolTests
         Assert.Equal("Study blocks from your due dates.", kind!.Note);
         Assert.Equal("#34c759", kind.Hex);
         Assert.Equal("Plan", ToolsCenter.ShortName("plan"));
-        Assert.Equal("plan", ToolsScreen.Groups.First(g => g.Title == "Study").Keys.Last());
+        // (Verb conjugations, shipped after it, is the one after it)
+        Assert.Equal("plan", ToolsScreen.Groups.First(g => g.Title == "Study").Keys[^2]);
         Assert.True((int)kind.Symbol <= 0xFFFF);
         foreach (var word in new[] { "plan", "study plan", "exam prep" })
         {

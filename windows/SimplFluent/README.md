@@ -1129,6 +1129,23 @@ list in `ToolsScreen.Everyday` and `Groups`, and the search box opens each by it
   `--plan-hours 2`, `--plan-block 45`, `--plan-time evening`, `--plan-view list`, `--plan-done assignment_1015:2`; the
   log says `plan: shows N blocks for M items over D days (week|list)`. Tested in `SimplFluent.Tests/PlannerTests.cs`
   (the sums) and `PlannerToolTests.cs`.
+- **Verb conjugations** (`verbs`, Study; `Tools/Study/Verbs/VerbsTool.cs`, its engine in `VerbEngine.cs`, free of
+  WPF; `/verbs`, `conjugate`, `spanish`, `french`, `german`, `italian`, `portuguese`, `tense`): a verb in Spanish,
+  French, German, Italian or Portuguese in every main tense of its language. The five languages' data files
+  (`Tools/Study/Verbs/Data/<code>.json`, embedded as `Simpl.Verbs.<code>.json`; the Mac carries the same files) hold
+  each language's tenses, pronouns, regular classes and their endings, stem specs, spelling and stem changes, an
+  irregular table of its most common verbs (60 and more; the 15 most common given in full) and some 300–450 common
+  verbs. The engine is a port, line for line, of the reference that comes with the data (`check.mjs`): an irregular
+  entry wins; else the class's endings on the stem, a stem change, a spelling change (every rule tested against the stem
+  as it was, so rules never cascade) and an accent applied; compound tenses of an auxiliary and a participle (the
+  German perfect's sein or haben, the French passé composé's être or avoir); a tense composed of other tenses' persons
+  (the imperative); a separable German prefix split off and put back after. Pronouns beside the forms; irregular cells
+  (those that differ from the purely regular reading) tinted while "Highlight irregular forms" is on; verbs the language
+  knows suggested as one is typed; a tense's table or every table copied as plain text. The language, the verb and the
+  toggle are remembered (`SimplVerbs.lang`, `.verb`, `.tint`). Its pin is the language, a verb and its present tense;
+  Enter or Open full screen carries them. For pictures: `--verbs fr --verb manger`; the log says `verbs: shows fr
+  manger`. Tested in `SimplFluent.Tests/VerbsTests.cs` (the data's own test vectors, every known verb in every tense)
+  and `VerbsToolTests.cs`.
 
 ## Popups
 

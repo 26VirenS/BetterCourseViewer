@@ -63,6 +63,8 @@
     <Resource Include="Assets\Themes\*.png" />
     <!-- the page Send from Phone serves to the phone (the Mac app carries the same file) -->
     <EmbeddedResource Include="Assets\PhoneHandIn.html" LogicalName="PhoneHandIn.html" />
+    <!-- Verb Conjugations' five languages (the Mac app carries the same files): Simpl.Verbs.es.json and so on -->
+    <EmbeddedResource Include="Tools\Study\Verbs\Data\*.json" LogicalName="Simpl.Verbs.%(Filename).json" />
   </ItemGroup>
 
   <!-- The extension the engine runs (the same files the Mac and iPhone apps carry), and the bridge and sign-in reader

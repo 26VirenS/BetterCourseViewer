@@ -188,6 +188,7 @@ internal sealed class PaletteCommand
             ("shrink", "compress", ["shrink", "smaller", "file size", "upload limit", "compress files"]),
             // ("planner" and "schedule" are To Do's and the Calendar's own words: the planner answers to its longer ones)
             ("plan", "plan", ["study plan", "study planner", "study time", "exam prep", "study blocks"]),
+            ("verbs", "verbs", ["conjugate", "verb", "conjugation", "spanish", "french", "german", "italian", "portuguese", "tense"]),
         };
         foreach (var (key, name, aliases) in words)
             if (Simpl.Tools.ToolsCenter.KindOf(key) is { } kind)
