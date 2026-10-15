@@ -9,6 +9,11 @@ import Foundation
 /// seen); a first run sees none (its setup comes instead). Help ▸ What's New shows them all.
 enum MacWhatsNew {
     static let releases: [Release] = [
+        Release(version: "1.3.85", date: "2026-10-15", notes: [
+            ReleaseNote(kind: "fixed", title: "Unread Stays Unread", body: "Messages that arrive while you are away stay unread."),
+            ReleaseNote(kind: "improved", title: "Live Behind History", body: "Screens keep updating while History or Help is open."),
+            ReleaseNote(kind: "improved", title: "Quieter Live Updates", body: "No checks while your Mac is locked or asleep."),
+        ]),
         Release(version: "1.3.84", date: "2026-10-15", notes: [
             ReleaseNote(kind: "new", title: "Dark Mode for Alta", body: "Pick Light or Dark for Knewton Alta, above Objectives."),
             ReleaseNote(kind: "new", title: "Alta in the Browser", body: "Show Browser puts Knewton Alta's own page on the right."),
