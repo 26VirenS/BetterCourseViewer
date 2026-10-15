@@ -1,3 +1,8 @@
+**What's new in 0.3.5** (beta)
+
+- **Open pins full screen** — the button at the top of a pinned tool's flyout opens the tool full screen (its popup across the window), not in a floating window.
+- **Pins keep your work** — what you began in the flyout (a graph, numbers, a search) carries over to the full tool.
+
 **What's new in 0.3.4** (beta)
 
 - **Popups in the middle** — What's New, Hand In, a new message and every other popup open in the middle of the window, not of the page beside the pane.

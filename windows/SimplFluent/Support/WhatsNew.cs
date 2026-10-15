@@ -26,6 +26,9 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.5", "2026-10-15",
+            ("improved", "Open pins full screen", "A pin's flyout button now opens its tool full screen."),
+            ("improved", "Pins keep your work", "Your graph, numbers or search carry over to the full tool.")),
         R("0.3.4", "2026-10-15",
             ("fixed", "Popups in the middle", "Every popup opens in the middle of the window.")),
         R("0.3.3", "2026-10-15",
