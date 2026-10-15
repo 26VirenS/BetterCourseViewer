@@ -30,7 +30,7 @@ enum PhysTools {
                                           symbol: "figure.run", hex: "#0a84ff")
         case .vectors: return PhysToolInfo(name: "Vectors", shortName: "Vectors", note: "Add, dot, cross, components.",
                                            symbol: "arrow.up.right", hex: "#5ac8fa")
-        case .circuit: return PhysToolInfo(name: "Circuit Builder", shortName: "Circuit", note: "Build a DC circuit, read V, I, R.",
+        case .circuit: return PhysToolInfo(name: "Circuit Builder", shortName: "Circuit", note: "Build a DC circuit and read it.",
                                            symbol: "bolt.circle", hex: "#ffd60a")
         default: return PhysToolInfo(name: k.rawValue, shortName: k.rawValue, note: "", symbol: "questionmark", hex: "#8e8e93")
         }
