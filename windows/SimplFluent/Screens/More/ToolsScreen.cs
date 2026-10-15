@@ -66,9 +66,9 @@ public static class ToolsPins
 /// colour, its name and a one-line note, and its pin — under a heading for what they are for: Study (flashcards, the focus
 /// timer, citations, Grade needed), Math &amp; science (the calculators, the unit converter), Files (the file converter,
 /// Merge &amp; split PDFs, the PDF annotator, Image to text), Chemistry (the Periodic Table, Lewis Structures, the Molecule
-/// Builder, Atoms &amp; Orbitals and the calculators: Tools/Chemistry/ChemTools.cs) and Biology (the biology toolkit's ten, Tools/Biology). A
-/// tile opens its tool in a popup over this page (Tools/ToolHost.cs, ToolPopup), the page and the rest of the window still
-/// at hand under it.
+/// Builder, Atoms &amp; Orbitals and the calculators: Tools/Chemistry/ChemTools.cs), Physics (Kinematics &amp; Projectiles and
+/// the rest: Tools/Physics/PhysTools.cs) and Biology (the biology toolkit's ten, Tools/Biology). A tile opens its tool in a
+/// popup over this page (Tools/ToolHost.cs, ToolPopup), the page and the rest of the window still at hand under it.
 /// </summary>
 public sealed class ToolsScreen : Screen
 {
@@ -79,8 +79,9 @@ public sealed class ToolsScreen : Screen
     }
 
     /// <summary>Every tool: the eleven of Study, Math &amp; science and Files, the Chemistry section's
-    /// (Tools/Chemistry/ChemTools.cs), then the biology toolkit's ten (Tools/Biology/BioTools.cs).</summary>
-    public static readonly Kind[] Kinds = Everyday.Concat(Simpl.Tools.ChemTools.Kinds).Concat(Simpl.Tools.BioTools.Kinds).ToArray();
+    /// (Tools/Chemistry/ChemTools.cs), the Physics section's (Tools/Physics/PhysTools.cs), then the biology toolkit's ten
+    /// (Tools/Biology/BioTools.cs).</summary>
+    public static readonly Kind[] Kinds = Everyday.Concat(Simpl.Tools.ChemTools.Kinds).Concat(Simpl.Tools.PhysTools.Kinds).Concat(Simpl.Tools.BioTools.Kinds).ToArray();
 
     /// <summary>The eleven (the Mac's ToolKind), each note short enough for one line on its tile. (The Periodic Table,
     /// once among them, leads the Chemistry section.)</summary>
@@ -100,8 +101,8 @@ public sealed class ToolsScreen : Screen
     };
 
     /// <summary>The Tools page's sections in its order (the Mac's ToolGroup): what each set of tools is for, the study
-    /// tools first (the chemistry tools come after, under "Chemistry", then the biology toolkit's ten under
-    /// "Biology").</summary>
+    /// tools first (the chemistry tools come after, under "Chemistry", the physics tools under "Physics", then the
+    /// biology toolkit's ten under "Biology").</summary>
     public static readonly (string Title, string[] Keys)[] Groups =
     {
         ("Study", new[] { "fc", "cite", "pomo", "need" }),
@@ -199,15 +200,19 @@ public sealed class ToolsScreen : Screen
         var chemistry = Heading("Chemistry", "The periodic table, Lewis structures, molecules and atoms in 3D, and the balancer.");
         page.Children.Add(chemistry);
         page.Children.Add(new MoreGrid(TileWidth, 16, Simpl.Tools.ChemTools.Kinds.Select(k2 => (UIElement)Tile(k2)), stretch: true) { Even = Simpl.Tools.ChemTools.Kinds.Length % 2 == 0 });
+        // (the physics tools between them, as the Mac's Tools page has them: in full rows where their count is even)
+        var physics = Heading("Physics", "Motion and projectiles, vectors, and DC circuits built and read.");
+        page.Children.Add(physics);
+        page.Children.Add(new MoreGrid(TileWidth, 16, Simpl.Tools.PhysTools.Kinds.Select(k2 => (UIElement)Tile(k2)), stretch: true) { Even = Simpl.Tools.PhysTools.Kinds.Length % 2 == 0 });
         var biology = Heading("Biology", "Cells, DNA, genes and biomolecules in 3D, and the maths of crosses, populations and the lab.");
         page.Children.Add(biology);
         page.Children.Add(new MoreGrid(TileWidth, 16, Simpl.Tools.BioTools.Kinds.Select(k2 => (UIElement)Tile(k2)), stretch: true));
         var sv = new ScrollViewer { Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false };
         sv.SizeChanged += (_, _) => sv.Padding = sv.ActualWidth < 560 ? new Thickness(20, 0, 20, 32) : new Thickness(40, 0, 40, 40);
         sv.Padding = new Thickness(40, 0, 40, 40);
-        // (the screenshot suite: --tools-scroll chemistry or biology, the page scrolled to that section, as the Mac's
-        //  -SimplToolsScroll)
-        var scrollTo = Launch.Take("", "tools-scroll")?.Trim().ToLowerInvariant() switch { "chemistry" => chemistry, "biology" => biology, _ => null };
+        // (the screenshot suite: --tools-scroll chemistry, physics or biology, the page scrolled to that section, as the
+        //  Mac's -SimplToolsScroll)
+        var scrollTo = Launch.Take("", "tools-scroll")?.Trim().ToLowerInvariant() switch { "chemistry" => chemistry, "physics" => physics, "biology" => biology, _ => null };
         if (scrollTo != null)
             sv.Loaded += (_, _) => sv.Dispatcher.BeginInvoke(() => sv.ScrollToVerticalOffset(Math.Max(0, scrollTo.TranslatePoint(new Point(0, 0), page).Y - 8)),
                 System.Windows.Threading.DispatcherPriority.Loaded);

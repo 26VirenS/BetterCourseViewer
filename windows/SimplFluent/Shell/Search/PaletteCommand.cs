@@ -143,6 +143,7 @@ internal sealed class PaletteCommand
         }
         c.Add(C("tools", ["tool", "widgets", "timer", "calculator"], "Tools", "Timer, calculator, flashcards and more", SymbolRegular.Toolbox24, PaletteAction.Go(Place.Tools), "Ctrl+7"));
         c.AddRange(ChemistryTools());
+        c.AddRange(PhysicsTools());
         c.Add(C("external", ["external tools", "lti", "apps"], "External tools", "Every tool your courses use", SymbolRegular.PuzzlePiece24, PaletteAction.Go(Place.ExternalTools)));
         c.Add(C("due", ["upcoming", "soon", "week"], "Due", "What is due: today, tomorrow, this week, or by name", SymbolRegular.Clock24,
             takes: "‹when or name›", lists: PaletteLists.Due));
@@ -191,6 +192,22 @@ internal sealed class PaletteCommand
         };
         foreach (var (key, name, aliases) in words)
             if (Simpl.Tools.ChemTools.Kind(key) is { } kind)
+                yield return C(name, aliases, kind.Name, kind.Note.TrimEnd('.'), kind.Symbol, PaletteAction.Tool(key));
+    }
+
+    /// <summary>
+    /// The Physics section's tools (tools), each opened in its popup by its name or a word a student would type for it
+    /// ("kinematics", "projectile"), by the Mac's names and words. Their titles, lines and symbols are their tiles'
+    /// (Tools/Physics/PhysTools.cs). No word here is another command's ("light" is the appearance's).
+    /// </summary>
+    internal static IEnumerable<PaletteCommand> PhysicsTools()
+    {
+        (string Key, string Name, string[] Aliases)[] words =
+        {
+            ("motion", "motion", ["kinematics", "projectile", "projectiles", "velocity", "acceleration", "free fall"]),
+        };
+        foreach (var (key, name, aliases) in words)
+            if (Simpl.Tools.PhysTools.Kind(key) is { } kind)
                 yield return C(name, aliases, kind.Name, kind.Note.TrimEnd('.'), kind.Symbol, PaletteAction.Tool(key));
     }
 

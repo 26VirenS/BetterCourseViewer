@@ -6,7 +6,9 @@ namespace Simpl.Support;
 /// it), --place grades (where the window opens), --push /courses/101/assignments/1001, --open quiz:101:9011,
 /// --appearance dark, --shot file.png --shot-after 12 (a picture of the window, then quit), --window-size 1280x820,
 /// --place tools --tool cell --tool-state plant:cutaway (a tool opened, a biology tool in that state; --bio-seq ATGC and
-/// any --bio-&lt;name&gt; too: Tools/Biology/README.md), --bio-check (the biology toolkit's self-check in the log).
+/// any --bio-&lt;name&gt; too: Tools/Biology/README.md), --bio-check (the biology toolkit's self-check in the log),
+/// --tools-scroll physics (the Tools page scrolled to a section), --tool motion --tool-state projectile:v0=20,angle=45
+/// and --motion-values (a physics tool in that state: Tools/Physics/PhysTools.cs).
 /// </summary>
 public static class Launch
 {

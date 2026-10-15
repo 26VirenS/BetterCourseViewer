@@ -426,7 +426,7 @@ never fails a run, and nothing waits for it but the pictures' merge.
 show checked against the school while the window shows `LiveCheck`), the popups floating over the window (`FloatPopup`, Popups below), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once, the third time Simpl is opened, at a calm moment, and from Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, a place or a page in a window of its own (`PlaceWindow`: a pane row's or a list row's Open in new window, Shift+click on a pane row, a page's ⋯ ▸ Open in new window, or Ctrl+Shift+O for what shows), the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
 | `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In and its Send from Phone, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
-| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table, Atoms & Orbitals), `Chemistry/` (the Chemistry section's tools: `ChemTools.cs`, Lewis Structures, the Molecule Builder, and the calculators — the Equation Balancer — with their sums in `Chemistry/Model/`, plain .NET), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
+| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table, Atoms & Orbitals), `Chemistry/` (the Chemistry section's tools: `ChemTools.cs`, Lewis Structures, the Molecule Builder, and the calculators — the Equation Balancer — with their sums in `Chemistry/Model/`, plain .NET), `Physics/` (the Physics section's tools: `PhysTools.cs`, Kinematics & Projectiles; their maths in `Model/`, free of WPF), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
 
 ## A screen
 
@@ -887,10 +887,10 @@ biology views' own share to 70% or more.
 (`TakeFiles`, `TakeInfo`), `OpenFull` / `Close`, and `ShowPage` / `ShowNote`. `ToolKit` has the page, two columns,
 fields, notes, the drop zone and the scroll edge; `Files` has Windows' file dialogs.
 
-The Tools page lists the tools under what they are for — Study, Math & science, Files, then Chemistry and Biology — a
-one-line note on each tile, three across from about 900 wide (a section's four in full rows); a tile opens its tool's
-popup over the page. Windows' sentence case on every button and menu ("Pin to title bar", "Copy result", "Skip tour").
-`--tools-scroll chemistry` (or `biology`) opens the page scrolled to that section.
+The Tools page lists the tools under what they are for — Study, Math & science, Files, then Chemistry, Physics and
+Biology — a one-line note on each tile, three across from about 900 wide (a section's four in full rows); a tile opens
+its tool's popup over the page. Windows' sentence case on every button and menu ("Pin to title bar", "Copy result",
+"Skip tour"). `--tools-scroll chemistry` (or `physics`, `biology`) opens the page scrolled to that section.
 
 The chemistry tools (`Tools/Chemistry/ChemTools.cs`, a "Chemistry" section of their own just before Biology) were one
 tool until 0.3.2, the Periodic Table with its Lewis structures and Molecule builder pages and its element pages' atom in
@@ -935,6 +935,29 @@ the drawing's own heading holding what to show when the drawing is over the rest
 element, then atom, orbitals or cloud, then the subshell; `all` for the whole cloud). The search box opens each by the
 Mac's words (`/ptable` or `periodic`, `/lewis` or `resonance`, `/molecule` or `vsepr`, `/atom` or `orbitals`, `electron
 cloud`, `bohr`). A tool handing over to another in its popup gives the other the keyboard (`ToolPopup.Change`).
+
+The physics tools (`Tools/Physics/PhysTools.cs`, a "Physics" section of their own between Chemistry and Biology) are
+the Mac's too: keys, names, lines, short names, search words and colours (a family of blues). Their maths lives in
+`Tools/Physics/Model/` with no WPF in it, so the unit tests (`MotionTests`) check every worked example on any machine;
+numbers are written to four significant figures with no float noise (`PhysMath.Text`: "40.77 m", "2.883 s"), the minus
+the typeset "−", and a result's menu (or Ctrl+C while it has the keyboard) copies it in plain ASCII. What each keeps for
+next time is in the preferences as `SimplPhys.<tool>.<field>` (`PhysPrefs`):
+
+- **Kinematics & Projectiles** (`motion`, `Tools/Physics/MotionTool.cs`): two tabs. *1D motion* — Δx, v₀, v, a and t,
+  any three filled in, the other two solved and shown with the equation each came from (v = v₀ + at, Δx = v₀t + ½at²,
+  v² = v₀² + 2aΔx, Δx = ½(v₀ + v)t; a root is picked so the time is not negative, the earlier of two), a g preset
+  (a = −9.81), and the motion's position–time and velocity–time graphs (`MotionGraph`). *Projectile* — launch speed,
+  angle, height and g → time of flight, range, highest point (and when), impact speed and angle; the path drawn
+  (`TrajectoryView`) with the apex and landing marked and a dot flying along it over a second and a half (still, at the
+  landing, with Windows' animations off or in a picture; Launch again flies it once more); and "Hit a target at" a
+  distance → the two angles that land on it, or that it is out of reach. SI in; the "ft and mph" switch shows the
+  answers in feet and miles per hour beside the metres. It keeps its tab, numbers and switch (`motion.tab`,
+  `motion.oneD`, `motion.projectile`, `motion.imperial`). Its pin's flyout takes a speed and an angle and gives the
+  range and the highest point from the ground; Open full screen hands those to the whole tool. A launch's
+  `--tool motion --tool-state 1d:v0=0,a=2,t=5` or `--tool-state projectile:v0=20,angle=45,h=0` (the values alone in
+  `--motion-values`) opens it in that state, and in a picture run the log says what it shows ("motion: shows projectile
+  range=40.77 height=10.19 time=2.883"). The search box opens it by `/motion`, `kinematics`, `projectile`, `velocity`,
+  `acceleration` or `free fall`.
 
 The biology toolkit's ten (`Tools/Biology/`, a "Biology" section of their own on the Tools page) register through
 `BioTools.Register`, which adds their pages in the header and what a launch asks of them (`--tool cell --tool-state
