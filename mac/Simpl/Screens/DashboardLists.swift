@@ -146,6 +146,9 @@ struct DashWorkText: View {
                 .font(.sBody)
                 .lineLimit(2)
                 .foregroundStyle(done || quiet ? .secondary : .primary)
+                // (1.3.80) struck through at once, not drawn from one look to the other: ticked by a live check, the
+                // title's change was left half-way — its letters gone, a line where they stood (light-48a-live-dashboard)
+                .contentTransition(.identity)
         }
     }
 }
