@@ -708,6 +708,9 @@ internal sealed class BioLabCompact : ContentControl
         // (an accent button across the flyout, as every biology pin's is)
         var open = BioUI.OpenButton("Open Bio Lab Calculator", Open, "The whole calculator, with these numbers (Enter)");
         Content = K.V(12, pick, body, answer, open);
+        // (0.3.5) Open full screen opens the whole tool at this calculator, as Open does (its numbers are the whole
+        //  tool's already)
+        c.Carry = () => new Dictionary<string, string> { ["calc"] = calc };
         Build();
         void Changed(string which) { if (which == calc || which.Length == 0) Refresh(); }
         Loaded += (_, _) => { BioLabModel.Changed -= Changed; BioLabModel.Changed += Changed; Refresh(); };

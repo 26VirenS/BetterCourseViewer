@@ -171,6 +171,20 @@ internal sealed class UnitsState
         Changed?.Invoke();
     }
 
+    /// <summary>(0.3.5) As it starts: the first kind, its starting pair, 1.</summary>
+    public bool Untouched => Category == UnitCategory.All[0] && From == Category.Units[Category.From] && To == Category.Units[Category.To] && Value == "1";
+
+    /// <summary>(0.3.5) Another's kind, units and value taken on — the whole converter's taking the pin's, its flyout
+    /// opened full screen.</summary>
+    public void Take(UnitsState from)
+    {
+        Category = from.Category;
+        From = from.From;
+        To = from.To;
+        Value = from.Value;
+        Changed?.Invoke();
+    }
+
     /// <summary>The screenshot suite's start (--units-kind temperature --units-value 100), for the converter first opened.</summary>
     public void FromLaunch()
     {
@@ -201,6 +215,8 @@ internal sealed class UnitConverterTool
 
     public UnitConverterTool(ToolContext c)
     {
+        // (0.3.5) opened full screen from its pin: the pin's kind, units and value
+        if (c.TakeInfo("carry") == "pin") s.Take(UnitsState.Quick);
         s.FromLaunch();
         value = ToolKit.Box(s.Value, "1", t => { if (!syncing) s.SetValue(t); });
         from.SelectionChanged += (_, _) => { if (!syncing && UnitsParts.Unit(from) is { } u) s.SetFrom(u); };
@@ -315,6 +331,8 @@ internal sealed class UnitConverterCompact
         var row = K.Columns("90, 8, *, auto, *", value.Col(0), from.Col(2), K.Icon(SymbolRegular.ArrowRight24, 14, B.Text2).Margin(8, 0, 8, 0).Col(3), to.Col(4));
         result.ContextMenu = MoreKit.Menu(("Copy", SymbolRegular.Copy24, () => { if (s.Result is { } r) Everyday.Copy(UnitMath.Text(r).Replace("−", "-")); }));
         View = K.V(10, kind, row, Everyday.Shrinks(result));
+        // (0.3.5) Open full screen hands the whole converter this kind, these units and this value, once changed
+        c.Carry = () => s.Untouched ? null : new Dictionary<string, string> { ["carry"] = "pin" };
         Update();
         Everyday.Follow(View, () => { s.Changed += Update; Update(); }, () => s.Changed -= Update);
     }

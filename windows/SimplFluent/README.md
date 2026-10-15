@@ -798,8 +798,8 @@ internal static class CalculatorRegistration
 ```
 
 A tool opens whole in a popup over where you are (`ToolPopup`, a popup floating over the window: Popups, below) —
-from its tile on the Tools page (or the tile's menu), a pin's menu or its flyout's name, a pulled-out pin's name, a
-command, a link, or another tool handing it something (`ToolsCenter.Show`) — as large as the window under its title
+from its tile on the Tools page (or the tile's menu), a pin's menu, a pin's flyout's or pulled-out window's Open full
+screen (0.3.5), a command, a link, or another tool handing it something (`ToolsCenter.Show`) — as large as the window under its title
 bar less a margin, over the pane too, and resized with the window; sized by its edges and corners, the size kept for
 that tool the next time (Popups, below); the Tools page (or whatever shows) behind it and the title bar and its search
 still at hand. Its heading, which moves it: the tool's tile and name, its line, its own controls (a biology
@@ -812,9 +812,25 @@ element's See it in 3D, Lewis Structures' Open in Molecule Builder, the Biomolec
 Builder) turns that popup into the other tool in place (`ToolsCenter.PopUp`), the other taking what it was handed once
 (`TakeInfo`). `--tool calc` opens one over the Tools page for a picture.
 
-A pin's flyout is the tool's quick version, under its whole name (with ›, the one way to the whole tool) and Pop out,
-which pulls the quick version into a small window of its own kept above Simpl and its popups (`ToolFloat`; pictured
-over a quiz with `--pin-popout calc`); unpinning is in the pin's menu, not in the flyout. The flyout folds back on a
+A pin's flyout is the tool's quick version, under its whole name and (0.3.5) *Open full screen* at its top right (the
+Fluent FullScreenMaximize icon, its tooltip and screen-reader name "Open full screen"; `PinBar.QuickHead`), where Pop
+out was — the owner, of the Mac's: "it should be full screen". It closes the flyout (a pulled-out window, whose heading
+has it too, closes: kept on top, it would sit over the tool) and opens the tool whole, as its tile does
+(`ToolsCenter.FullScreen` → `Show`), with what was begun in the quick version: each quick version says what it carries
+(`ToolContext.Carry`) — Grade needed's three numbers, the element searched for in the Periodic Table's flyout or typed
+in Atoms & Orbitals', the link pasted to cite, a codon looked up, a cross, a Hardy–Weinberg value, the lab calculator
+shown, and `"carry": "pin"` for the calculator (its line, sums, memory and Rad/Deg: `CalcEngine.Take`) and the unit
+converter (its kind, units and value: `UnitsState.Take`), whose whole tool then goes on from the pin's; the graph's
+whole drawing goes by Desmos's own `Calc.getState`/`Calc.setState` from the pin's web view to the whole one's
+(`GraphWeb.CarryOver`; the whole graph before it is a Ctrl+Z away). The focus timer, Flashcards' sets and the lab's
+numbers are the whole tool's already. A quick version as it opens carries nothing, and the tool opens as from its tile;
+with something carried, the tool's popup, if it is open already, is made again to take it. The name is the heading's
+title alone — its ›, which opened the whole tool too, is gone — so Open full screen is the one way from a flyout to its
+tool. Pop out, which pulls the quick version into a small window of its own kept above Simpl and its popups
+(`ToolFloat`; pictured over a quiz with `--pin-popout calc`), is in the pin's menu; unpinning is in the pin's menu, not
+in the flyout. For pictures, `--pin-full need` opens that pin's flyout and presses Open full screen (`--need-numbers
+85,30,90` types Grade needed's numbers; `--pin-graph "y=x^2"` draws in the pin's Desmos), and the log says what was
+carried ("pin full screen: need (carried: goal, now, worth)", "graph: the pin's graph put in the whole one"). The flyout folds back on a
 press elsewhere in the window, the window left (not for a part of the flyout that is a window of its own), moved or
 resized, Escape, or its pin pressed again (its opening and closing go to the log in picture runs; CI's `--pin-try
 graph|fc` opens one as a press does, clicks and types in it, and checks it is still open five seconds on). The same

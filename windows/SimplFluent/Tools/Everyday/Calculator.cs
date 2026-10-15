@@ -92,6 +92,27 @@ internal sealed class CalcEngine
     /// <summary>A key pressed, a value put in, the history cleared.</summary>
     public event Action? Changed;
 
+    /// <summary>(0.3.5) As it starts: nothing typed, no sums, no memory, in degrees — the pin's then carries nothing to
+    /// the whole tool.</summary>
+    public bool Untouched => Toks.Count == 0 && History.Count == 0 && Mem == 0 && Deg && !Second && !Fresh;
+
+    /// <summary>(0.3.5) Another's line, sums, memory and Rad/Deg taken on — the whole tool's taking the pin's, its flyout
+    /// opened full screen — so the whole calculator goes on from where the pin's was.</summary>
+    public void Take(CalcEngine from)
+    {
+        Toks = from.Toks.ToList();
+        Fresh = from.Fresh;
+        FreshValue = from.FreshValue;
+        Sub = from.Sub;
+        Mem = from.Mem;
+        Deg = from.Deg;
+        Second = from.Second;
+        Err = from.Err;
+        History.Clear();
+        History.AddRange(from.History);
+        Changed?.Invoke();
+    }
+
     // ---- keys ----
 
     public void Press(string key)

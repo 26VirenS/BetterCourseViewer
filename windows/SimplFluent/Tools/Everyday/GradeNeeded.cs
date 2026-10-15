@@ -524,6 +524,11 @@ internal sealed class GradeNeededCompact
         Row(1, "Still to come", worth, "% of grade");
         Row(2, "Goal", goal, "%");
         View = K.V(12, fields, K.V(2, Everyday.Shrinks(big), sub));
+        // (0.3.5) Open full screen carries the numbers typed, as Enter does (none typed: nothing — the tool opens on a
+        //  course's own)
+        c.Carry = () => new[] { keptNow, keptWorth, keptGoal }.Any(t => t.Trim().Length > 0)
+            ? new Dictionary<string, string> { ["now"] = keptNow, ["worth"] = keptWorth, ["goal"] = keptGoal }
+            : null;
         Update();
     }
 

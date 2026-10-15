@@ -33,6 +33,8 @@ internal sealed class CalculatorTool
 
     public CalculatorTool(ToolContext c)
     {
+        // (0.3.5) opened full screen from its pin: on from the pin's line and sums
+        if (c.TakeInfo("carry") == "pin") eng.Take(CalcEngine.Quick);
         CalcEngine.FeedLaunch(eng);
         surface = new CalcSurface(eng, quick: false);
         display = new CalcDisplay(eng, 60);
@@ -118,6 +120,8 @@ internal sealed class CalculatorCompact
         keypad = new CalcKeypad(eng, CalcKey.Basic, 38, 6, surface.Refocus);
         surface.Children.Add(K.V(12, display.View.Margin(6, 0, 6, 0), keypad.View));
         View = surface;
+        // (0.3.5) Open full screen hands the whole calculator this line and its sums, once something is typed
+        c.Carry = () => eng.Untouched ? null : new Dictionary<string, string> { ["carry"] = "pin" };
         Update();
         Everyday.Follow(View, () => { eng.Changed += Update; Update(); }, () => eng.Changed -= Update);
     }

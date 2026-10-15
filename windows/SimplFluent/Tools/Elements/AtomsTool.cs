@@ -623,6 +623,11 @@ internal sealed class AtomsQuick : ContentControl
             a.Handled = true;
         };
         var open = BioUI.OpenButton($"Open {name}", Go, $"Open {name} full size on this element (Enter)");
+        // (0.3.5) Open full screen opens the tool on the element typed, the one Enter opens (nothing typed: nothing — the
+        //  tool opens on its own, the one it showed last)
+        c.Carry = () => field.Text.Trim().Length > 0 && Wanted() is { } e
+            ? new Dictionary<string, string> { ["element"] = e.Number.ToString(CultureInfo.InvariantCulture) }
+            : null;
         Note();
         Content = K.V(12, top, K.V(6, field, note), open);
     }

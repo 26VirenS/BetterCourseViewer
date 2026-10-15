@@ -994,6 +994,10 @@ internal static class PeriodicTableCompact
         };
         grid.Hover = e => { over = e; Line(); };
         grid.Pick = (e, _) => Open(e);
+        // (0.3.5) Open full screen opens the table on the element searched for, the one Enter opens
+        c.Carry = () => box.Text.Trim().Length > 0 && Found().FirstOrDefault() is { } f
+            ? new Dictionary<string, string> { ["element"] = f.Number.ToString(CultureInfo.InvariantCulture) }
+            : null;
         // (the screenshot suite: --ptable-pin-element 25 shows that element's card)
         if (PeriodicTable.Named(Launch.Take("", "ptable-pin-element")) is { } shown) { over = shown; Line(); }
         var head = K.Columns("auto, *", box.Col(0), line.Margin(10, 0, 0, 0).Col(1));

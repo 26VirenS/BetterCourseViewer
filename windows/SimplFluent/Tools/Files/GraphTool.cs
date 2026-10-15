@@ -14,7 +14,8 @@ namespace Simpl.Tools;
 // The graphing calculator, as the web's and the Mac's (GraphTool.swift): Desmos, embedded, not reimplemented — their
 // calculator page in a web view of its own. Each web view is kept for as long as the app runs, so a graph survives the
 // tool closing or its pin's flyout folding. Where Desmos cannot load, a plain message and the way out to desmos.com
-// instead of a blank pane.
+// instead of a blank pane. (0.3.5) The pin's graph goes on in the whole one when its flyout is opened full screen
+// (GraphWeb.CarryOver).
 
 #pragma warning disable CA2255
 internal static class GraphRegistration
@@ -42,6 +43,9 @@ internal sealed class GraphWeb
     private FrameworkElement? view;
     private CoreWebView2? core;
     private bool starting;
+    /// <summary>(0.3.5) What is to be done to the graph once its page has loaded (<see cref="WhenReady"/>): a script,
+    /// the text it is given (<c>s</c>), and what it does, for the log.</summary>
+    private readonly List<(string Script, string S, string Said)> pending = new();
 
     private GraphWeb(bool compact) => this.compact = compact;
 
@@ -126,6 +130,7 @@ internal sealed class GraphWeb
     {
         Failed = false;
         Loading = true;
+        pending.Clear(); // (an empty graph asked for: nothing put into it)
         Changed?.Invoke();
         if (core != null) core.Navigate(Desmos.ToString());
         else if (view is WebView2 w) Start(e => w.EnsureCoreWebView2Async(e), () => w.CoreWebView2);
@@ -138,6 +143,79 @@ internal sealed class GraphWeb
         Failed = false;
         Changed?.Invoke();
         Shot.Moved();
+        var waiting = pending.ToList();
+        pending.Clear();
+        foreach (var p in waiting) Run(p);
+    }
+
+    // ---- (0.3.5) the pin's graph, carried to the whole one ----
+
+    /// <summary>
+    /// The pin's graph — its expressions, sliders, tables, notes and view — put into the whole one as the pin's flyout
+    /// opens full screen (ToolsCenter.FullScreen), by Desmos's own Calc.getState and Calc.setState on its page: the graph
+    /// begun small goes on large; the whole one's graph before it is a Ctrl+Z away (allowUndo). Nothing is carried while
+    /// the pin's Desmos has not loaded, or its graph is empty — the whole one is left as it was.
+    /// </summary>
+    public static async void CarryOver()
+    {
+        if (Mini.core is not { } from || Mini.Loading || Mini.Failed) return;
+        try
+        {
+            // (the script's answer as JSON: a string — the graph's state as JSON, or "" when there is nothing to carry)
+            var state = System.Text.Json.JsonSerializer.Deserialize<string>(await from.ExecuteScriptAsync(ReadState));
+            if (string.IsNullOrEmpty(state)) { Said("graph: the pin's graph is empty; nothing carried"); return; }
+            Said($"graph: the pin's graph read ({state.Length} characters)");
+            Full.WhenReady("Calc.setState(JSON.parse(s), { allowUndo: true })", state, "the pin's graph put in the whole one");
+        }
+        catch (Exception e)
+        {
+            Log.Write("graph: " + e.Message);
+        }
+    }
+
+    /// <summary>The graph's state as JSON, or "" when it has nothing in it (one empty expression line, as Desmos starts)
+    /// or Desmos's calculator is not there.</summary>
+    private const string ReadState =
+        "(() => {" +
+        " if (!(window.Calc && Calc.getState)) return '';" +
+        " const state = Calc.getState();" +
+        " const list = (state.expressions && state.expressions.list) || [];" +
+        " return list.some(e => e.type !== 'expression' || (e.latex || '').trim() !== '') ? JSON.stringify(state) : '';" +
+        " })()";
+
+    /// <summary>(the screenshot suite: --pin-graph "y=x^2" draws that in the pin's graph once Desmos is up, for the
+    /// picture of the graph opened full screen from its pin to carry)</summary>
+    public void SeedForPicture(string latex) => WhenReady("Calc.setExpression({ id: 'simpl-pin', latex: s })", latex, $"drew {latex} for the picture");
+
+    /// <summary>A script for Desmos's page, given <c>s</c>: run once the page has loaded (now, if it has) and Desmos's
+    /// calculator is up on it — it comes a moment after the page — looked for every tenth of a second, ten seconds at
+    /// most.</summary>
+    private void WhenReady(string script, string s, string said)
+    {
+        if (core != null && !Loading && !Failed) Run((script, s, said));
+        else pending.Add((script, s, said));
+    }
+
+    private async void Run((string Script, string S, string Said) p)
+    {
+        if (core is not { } w) return;
+        try
+        {
+            for (var i = 0; i < 100 && await w.ExecuteScriptAsync("!!(window.Calc && Calc.setState)") != "true"; i++) await Task.Delay(100);
+            var js = $"(() => {{ if (!(window.Calc && Calc.setState)) return false; const s = {System.Text.Json.JsonSerializer.Serialize(p.S)}; {p.Script}; return true; }})()";
+            var done = await w.ExecuteScriptAsync(js) == "true";
+            Said($"graph: {p.Said}{(done ? "" : " — not done: Desmos's calculator was not there")}");
+        }
+        catch (Exception e)
+        {
+            Log.Write("graph: " + e.Message);
+        }
+    }
+
+    /// <summary>A line in the log in a picture's run, for CI to read what was carried.</summary>
+    private static void Said(string line)
+    {
+        if (Shot.Asked || Launch.IsDevelopment) Log.Write(line);
     }
 
     private void CouldNotLoad()
@@ -327,6 +405,8 @@ internal sealed class GraphCompact : Border
     {
         Height = 460;
         Child = new GraphPane(GraphWeb.Mini);
+        // (the screenshot suite: --pin-graph "y=x^2" draws that in it once Desmos is up)
+        if (Launch.Take("", "pin-graph") is { Length: > 0 } latex) GraphWeb.Mini.SeedForPicture(latex);
         CornerRadius = new CornerRadius(6);
         Background = Brushes.White;
         SizeChanged += (_, e) => Clip = new RectangleGeometry(new Rect(0, 0, e.NewSize.Width, e.NewSize.Height), 6, 6);

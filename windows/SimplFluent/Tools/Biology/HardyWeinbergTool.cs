@@ -418,6 +418,9 @@ internal sealed class HardyWeinbergCompact : ContentControl
         };
         var open = BioUI.OpenButton("Open in Hardy–Weinberg", Open, "The steps, the 100 people, the test and the simulation (Enter)");
         Content = K.V(12, K.Columns("190, 8, *", menu.Col(0), box.Col(2)), result, open);
+        // (0.3.5) Open full screen carries the value, as Open in Hardy–Weinberg does — once it is not the flyout's own
+        //  q² = 0.16
+        c.Carry = () => kept == HWGiven.Q2 && box.Text == "0.16" ? null : new Dictionary<string, string> { ["given"] = kept.Key(), ["value"] = box.Text };
         Draw();
     }
 

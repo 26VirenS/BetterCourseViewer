@@ -38,6 +38,16 @@ public sealed class ToolContext
     /// <summary>From the quick version: the whole tool over the window, with details or files for it.</summary>
     public Action<Dictionary<string, string>?, IReadOnlyList<string>?> OpenFull { get; init; } = (_, _) => { };
 
+    /// <summary>
+    /// (0.3.5) Set by the quick version as it is made: what was begun in it, for the whole tool its flyout's (or its
+    /// pulled-out window's) Open full screen opens — the details the tool takes as it is made (TakeInfo: Grade needed's
+    /// numbers, the element searched for, a link to cite, a codon…; "carry": "pin" for the calculator and the unit
+    /// converter, whose whole tool then goes on from the pin's own state). Null, nothing begun: the tool opens as its tile
+    /// opens it. The focus timer, Flashcards' sets and the lab's numbers are the whole tool's already; the graph's drawing
+    /// goes by Desmos itself (GraphWeb.CarryOver).
+    /// </summary>
+    public Func<Dictionary<string, string>?> Carry { get; set; } = () => null;
+
     /// <summary>The flyout (the quick version) or the popup (the whole tool) it is in, closed — a popup's a moment later,
     /// so another tool handed something (BioTools.Open) takes its place instead.</summary>
     public Action Close { get; init; } = () => { };
@@ -143,6 +153,20 @@ public static class ToolsCenter
         if (KindOf(key) == null) return;
         Hand(key, files, info);
         ToolPopup.Show(key, engine, Application.Current?.MainWindow);
+    }
+
+    /// <summary>
+    /// (0.3.5) A pin's flyout's (or its pulled-out window's) Open full screen: the tool whole in its popup over the window,
+    /// as its tile opens it (<see cref="Show"/>: as large as the window, over the pane, or the size last given it), taking
+    /// what was begun in the quick version (ToolContext.Carry) — its popup, if it is open already, made again to take it
+    /// (ToolPopup.Show). The graph's drawing goes by Desmos itself (GraphWeb.CarryOver).
+    /// </summary>
+    public static void FullScreen(string key, Engine.Engine engine, Dictionary<string, string>? carried)
+    {
+        if (key == "graph") GraphWeb.CarryOver();
+        if (Shot.Asked || Launch.IsDevelopment)
+            Log.Write($"pin full screen: {key} (carried: {(carried is { Count: > 0 } ? string.Join(", ", carried.Keys.Order(StringComparer.Ordinal)) : "nothing")})");
+        Show(key, engine, null, carried);
     }
 
     /// <summary>A tool opened whole by a tool (BioTools.Open, the Biomolecule Builder's molecule for the Molecule
@@ -838,11 +862,11 @@ public static class ToolHeader
 
 /// <summary>
 /// The tools pinned to the title bar, on every screen: a button each in its tool's colour; a press opens a flyout with
-/// the tool's quickest use — its name (with ›) opens the whole tool, Pop out pulls the quick version into a small window of
-/// its own (ToolFloat). A running focus timer is live in its pin (it borrows a pin while it runs if the timer is not
-/// pinned). A pin's menu opens it, pops it out, moves or unpins it. The same pins sit in the heading of a popup (a quiz,
-/// which covers the title bar, Knewton Alta, Macmillan: inPopup), their flyouts over it; the whole tool opens in its
-/// popup over the window either way, above them (ToolPopup).
+/// the tool's quickest use under its name — (0.3.5) Open full screen at its top right opens the whole tool with what was
+/// begun in it. A running focus timer is live in its pin (it borrows a pin while it runs if the timer is not pinned). A
+/// pin's menu opens it, pops it out — the quick version in a small window of its own (ToolFloat) — moves or unpins it.
+/// The same pins sit in the heading of a popup (a quiz, which covers the title bar, Knewton Alta, Macmillan: inPopup),
+/// their flyouts over it; the whole tool opens in its popup over the window either way, above them (ToolPopup).
 /// </summary>
 public sealed class PinBar : StackPanel
 {
@@ -856,6 +880,8 @@ public sealed class PinBar : StackPanel
     /// window coming forward would otherwise fold it away before its picture).</summary>
     private bool flyoutKept;
     private Window? flyoutWindow;
+    /// <summary>(0.3.5) The open flyout's Open full screen, as its button presses it (the screenshot suite's --pin-full).</summary>
+    private Action? flyoutFull;
 
     public PinBar(Engine.Engine engine, bool inPopup = false)
     {
@@ -902,6 +928,26 @@ public sealed class PinBar : StackPanel
                 t.Stop();
                 OpenFlyout(tk, kept: false);
                 PinTry(tk);
+            };
+            t.Start();
+        }
+        // (the screenshot suite: --pin-full need opens that pin's flyout — kept, as --pin-open's — and presses its Open full
+        //  screen two seconds on; the graph's four seconds after its Desmos has loaded, and had --pin-graph drawn in it)
+        if (!inPopup && Launch.Take("", "pin-full") is { Length: > 0 } fk)
+        {
+            var t = new DispatcherTimer { Interval = TimeSpan.FromSeconds(0.5) };
+            var ticks = 0;
+            var loaded = -1;
+            t.Tick += (_, _) =>
+            {
+                ticks++;
+                if (ticks == 5) OpenFlyout(fk, kept: true);
+                if (ticks <= 5) return;
+                if (loaded < 0 && (fk != "graph" || !GraphWeb.Mini.Loading || ticks > 65)) loaded = ticks;
+                if (loaded < 0 || ticks - loaded < (fk == "graph" ? 8 : 4)) return;
+                t.Stop();
+                if (flyoutKey == fk && flyoutFull is { } press) press();
+                else Log.Write($"pin full screen: no flyout for {fk}");
             };
             t.Start();
         }
@@ -1193,7 +1239,8 @@ public sealed class PinBar : StackPanel
         ToolsCenter.Show(key, engine, files, info);
     }
 
-    /// <summary>The quick version pulled out of the flyout into a small window of its own (ToolFloat).</summary>
+    /// <summary>The quick version pulled out of the flyout into a small window of its own (ToolFloat) — (0.3.5) from the
+    /// pin's menu, since Open full screen took Pop out's place in the flyout's heading.</summary>
     private void PopOut(string key)
     {
         CloseFlyout("popped out");
@@ -1201,9 +1248,9 @@ public sealed class PinBar : StackPanel
     }
 
     /// <summary>
-    /// A pin's flyout: the tool's whole name (with ›, a press opens the whole tool), Pop out, and its quickest use — under
-    /// its pin, over whatever is up (a flyout is a window of its own). It folds back on a press anywhere else in the window,
-    /// the window left, moved or resized, Escape, or its pin pressed again; never while the keyboard moves inside it.
+    /// A pin's flyout: the tool's whole name, (0.3.5) Open full screen at its right, and its quickest use — under its pin,
+    /// over whatever is up (a flyout is a window of its own). It folds back on a press anywhere else in the window, the
+    /// window left, moved or resized, Escape, or its pin pressed again; never while the keyboard moves inside it.
     /// </summary>
     public void OpenFlyout(string key) => OpenFlyout(key, kept: false);
 
@@ -1216,7 +1263,13 @@ public sealed class PinBar : StackPanel
         void Full(Dictionary<string, string>? info, IReadOnlyList<string>? files) => OpenWhole(key, info, files);
         var c = new ToolContext { Engine = engine, Key = key, Quick = true, Owner = owner, OpenFull = Full, Close = () => CloseFlyout("closed by the tool") };
 
-        var head = QuickHead(kind, () => Full(null, null), ToolRegistry.Has(key) && ToolsCenter.Accepts(key) == null ? () => PopOut(key) : null);
+        void FullScreen()
+        {
+            var carried = c.Carry();
+            CloseFlyout("opened full screen");
+            ToolsCenter.FullScreen(key, engine, carried);
+        }
+        var head = QuickHead(kind, FullScreen);
 
         FrameworkElement body;
         if (ToolsCenter.Accepts(key) is { } filter)
@@ -1260,6 +1313,7 @@ public sealed class PinBar : StackPanel
         };
         flyoutKey = key;
         flyoutKept = kept;
+        flyoutFull = FullScreen;
         flyout.IsOpen = true;
         Watch(owner);
         if (Shot.Asked || Launch.IsDevelopment) Log.Write($"pin flyout open: {key}");
@@ -1275,18 +1329,23 @@ public sealed class PinBar : StackPanel
         Shot.Moved();
     }
 
-    /// <summary>A flyout's (or a pulled-out window's) heading: the tool's tile and whole name — the name (with ›) opening
-    /// the whole tool, the one way to it — and Pop out at its right.</summary>
-    internal static FrameworkElement QuickHead(ToolsScreen.Kind kind, Action openWhole, Action? popOut)
+    /// <summary>
+    /// A flyout's (or a pulled-out window's) heading: the tool's tile and whole name, and (0.3.5) Open full screen at its
+    /// right — the tool whole in its popup over the window, as its tile opens it, with what was begun in the quick version
+    /// (ToolsCenter.FullScreen) — where Pop out was (the owner, of the Mac's: "it should be full screen"; Pop out is in the
+    /// pin's menu). The name is the heading's title alone: its ›, which opened the whole tool too, is gone, so Open full
+    /// screen is the one way from here to the whole tool.
+    /// </summary>
+    internal static FrameworkElement QuickHead(ToolsScreen.Kind kind, Action fullScreen)
     {
-        var words = K.Text(kind.Name, Ty.BodyStrong);
-        var name = K.Subtle(K.H(4, words, K.Icon(SymbolRegular.ChevronRight20, 12, B.Text2)), openWhole, new Thickness(4, 2, 4, 2));
-        name.HorizontalAlignment = HorizontalAlignment.Left;
-        name.ToolTip = $"Open {kind.Name}";
-        System.Windows.Automation.AutomationProperties.SetName(name, $"Open {kind.Name}");
-        var head = K.Columns("auto, *, auto", K.IconTile(kind.Symbol, kind.Color, 28).Margin(0, 0, 10, 0).Col(0), name.Col(1));
-        if (popOut != null) head.Children.Add(K.IconButton(SymbolRegular.WindowArrowUp24, popOut, "Pop out into a window of its own", 16, 30).Col(2));
-        return head;
+        var name = K.Text(kind.Name, Ty.BodyStrong);
+        name.VerticalAlignment = VerticalAlignment.Center;
+        name.TextTrimming = TextTrimming.CharacterEllipsis;
+        name.Margin = new Thickness(4, 0, 8, 0);
+        System.Windows.Automation.AutomationProperties.SetHeadingLevel(name, System.Windows.Automation.AutomationHeadingLevel.Level1);
+        var full = K.IconButton(SymbolRegular.FullScreenMaximize24, fullScreen, "Open full screen", 16, 30);
+        System.Windows.Automation.AutomationProperties.SetHelpText(full, $"Opens {kind.Name} whole, over the window, with what you began here");
+        return K.Columns("auto, *, auto", K.IconTile(kind.Symbol, kind.Color, 28).Margin(0, 0, 10, 0).Col(0), name.Col(1), full.Col(2));
     }
 
     /// <summary>What folds the flyout back while it is open: a press in the window outside it (not on its own pin, which
@@ -1356,6 +1415,7 @@ public sealed class PinBar : StackPanel
         flyout = null;
         flyoutKey = null;
         flyoutKept = false;
+        flyoutFull = null;
         f.IsOpen = false;
         if (Shot.Asked || Launch.IsDevelopment) Log.Write($"pin flyout closed: {key} ({why})");
     }
@@ -1364,8 +1424,9 @@ public sealed class PinBar : StackPanel
 /// <summary>
 /// A pin's quick version pulled out of its flyout (the Mac's ToolFloat): a small window of its own that stays above
 /// Simpl's window and its popups — and above other apps, as Windows' Calculator does kept on top — wherever it is moved,
-/// until its × closes it. Its heading's name opens the whole tool. One a tool: pulled out again, the one there comes
-/// forward. Where it was is remembered for next time.
+/// until its × closes it. (0.3.5) Its heading's Open full screen, as the flyout's, opens the whole tool with what was
+/// begun in it, and closes the window (kept on top, it would sit over the tool). One a tool: pulled out again, the one
+/// there comes forward. Where it was is remembered for next time.
 /// </summary>
 public sealed class ToolFloat : FluentWindow
 {
@@ -1390,7 +1451,12 @@ public sealed class ToolFloat : FluentWindow
         var c = new ToolContext { Engine = engine, Key = kind.Key, Quick = true, Owner = this, OpenFull = (info, files) => ToolsCenter.Show(kind.Key, engine, files, info), Close = Close };
         var body = ToolRegistry.Quick(c) ?? K.Wrapped($"Open {kind.Name} to use it.", Ty.Body, B.Text2);
         var bar = new TitleBar { Title = "", ShowMinimize = false, ShowMaximize = false, Height = 32 };
-        var head = PinBar.QuickHead(kind, () => ToolsCenter.Show(kind.Key, engine), null);
+        var head = PinBar.QuickHead(kind, () =>
+        {
+            var carried = c.Carry();
+            Close();
+            ToolsCenter.FullScreen(kind.Key, engine, carried);
+        });
         var content = K.V(14, head, body);
         content.Margin = new Thickness(16, 0, 16, 16);
         Content = K.Rows("auto, auto", bar.Row(0), content.Row(1));

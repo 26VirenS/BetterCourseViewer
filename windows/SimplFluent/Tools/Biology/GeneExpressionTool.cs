@@ -125,6 +125,8 @@ internal sealed class GeneExpressionCompact : ContentControl
         var note = K.Text("AUG starts translation and codes Met.", Ty.Caption, B.Text2);
         Content = K.V(12, top, gridHost, note, open);
         Loaded += (_, _) => Dispatcher.BeginInvoke(() => { field.Focus(); field.CaretIndex = field.Text.Length; }, DispatcherPriority.Input);
+        // (0.3.5) Open full screen carries the lookup to the codon table, as Open in the codon table does
+        c.Carry = () => field.Text.Trim().Length > 0 ? new Dictionary<string, string> { ["codon"] = field.Text, ["page"] = "codons" } : null;
         Draw();
     }
 

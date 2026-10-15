@@ -429,6 +429,8 @@ internal sealed class CitationCompact : ContentControl
         };
         styleBar.Changed += i => CitationStore.Style = CiteBuilder.Styles[i].Key;
         Content = K.V(12, K.Columns("*, auto", link.Col(0), cite.Col(1)), styleBar, saved);
+        // (0.3.5) Open full screen carries the link pasted, as Cite hands it (the style is the generator's own already)
+        c.Carry = () => link.Text.Trim() is { Length: > 0 } v ? new Dictionary<string, string> { ["link"] = v, ["style"] = CitationStore.Style } : null;
         Saved();
         StudyKit.Watch(this, h => CitationStore.Changed += h, h => CitationStore.Changed -= h, () =>
         {

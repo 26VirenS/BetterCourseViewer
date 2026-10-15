@@ -459,6 +459,11 @@ internal sealed class CrossesCompact : ContentControl
             kept1 = one.Parent1[0];
             kept2 = one.Parent2[0];
         }
+        // (0.3.5) Open full screen carries the cross, as Open in Genetics Crosses does — once it is not the flyout's own
+        //  Aa × Aa
+        c.Carry = () => kept1.SequenceEqual(new[] { 0, 1 }) && kept2.SequenceEqual(new[] { 0, 1 })
+            ? null
+            : new Dictionary<string, string> { ["cross"] = new CrossSetup(new[] { new BioGene('A') }, new[] { kept1 }, new[] { kept2 }).Text };
         Draw();
     }
 
