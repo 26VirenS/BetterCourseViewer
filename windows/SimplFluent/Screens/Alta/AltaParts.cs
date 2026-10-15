@@ -301,31 +301,37 @@ internal static class AltaParts
 
 /// <summary>
 /// (0.3.5) Above the objectives, a small bar for Alta's page: Light or Dark — Windows 11's pair of buttons, the one chosen
-/// the accent's — under its label. Alta's page is light at first, as it is made (the owner's choice for every outside
-/// tool, 0.3.1); Dark brings back how it was before in dark mode, its question's colours turned over on the dark ground.
-/// The choice is the student's, kept for every assignment (AltaSession.Dark). The header and the objectives keep the
-/// app's appearance; what is shown in the page's place takes the page's.
+/// the accent's — and beside them Show browser, a toggle, the accent's while on; under their label. Alta's page is light at
+/// first, as it is made (the owner's choice for every outside tool, 0.3.1); Dark brings back how it was before in dark
+/// mode, its question's colours turned over on the dark ground. Show browser shows Alta's own page as it is, as in a
+/// browser, in place of the question laid out (Light and Dark wait meanwhile: the page is as Alta draws it). Each choice is
+/// the student's, kept for every assignment (AltaSession.Dark, .Browser). The header and the objectives keep the app's
+/// appearance; what is shown in the page's place takes the page's.
 /// </summary>
 internal sealed class AltaPageBar : StackPanel
 {
-    private readonly Wpf.Ui.Controls.Button light, dark;
+    private readonly Wpf.Ui.Controls.Button light, dark, browser;
 
-    public AltaPageBar(bool isDark, Action<bool> choose)
+    public AltaPageBar(bool isDark, bool isBrowser, Action<bool> choose, Action<bool> show)
     {
         light = Choice(SymbolRegular.WeatherSunny24, "Light", () => choose(false));
         dark = Choice(SymbolRegular.WeatherMoon24, "Dark", () => choose(true));
         dark.Margin = new Thickness(4, 0, 0, 0);
         var pair = new StackPanel { Orientation = Orientation.Horizontal, Children = { light, dark } };
         System.Windows.Automation.AutomationProperties.SetName(pair, "Alta’s page");
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Children = { pair } };
+        ToolTipService.SetShowOnDisabled(light, true);
+        ToolTipService.SetShowOnDisabled(dark, true);
+        browser = new Wpf.Ui.Controls.Button { Icon = new SymbolIcon { Symbol = SymbolRegular.Globe24 }, Content = "Show browser", MinWidth = 0, Margin = new Thickness(8, 0, 0, 0) };
+        browser.Click += (_, e) => { e.Handled = true; show(!on); };
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Children = { pair, browser } };
         Children.Add(K.Text("Alta’s page", Ty.Caption, B.Text2).Margin(1, 0, 0, 6));
         Children.Add(row);
-        Row = row;
-        Show(isDark);
+        // ("Show browser" where the column has room for it beside the pair — a wide popup's — else "Browser")
+        SizeChanged += (_, e) => browser.Content = e.NewSize.Width >= 230 ? "Show browser" : "Browser";
+        Show(isDark, isBrowser);
     }
 
-    /// <summary>The row the pair sits in (what goes beside it is put here).</summary>
-    public StackPanel Row { get; }
+    private bool on;
 
     private static Wpf.Ui.Controls.Button Choice(SymbolRegular icon, string name, Action click)
     {
@@ -335,11 +341,19 @@ internal sealed class AltaPageBar : StackPanel
         return b;
     }
 
-    /// <summary>The look chosen, shown: its button the accent's, its name said as chosen.</summary>
-    public void Show(bool isDark)
+    /// <summary>The look chosen, shown — its button the accent's, its name said as chosen — and the browser, on or off.</summary>
+    public void Show(bool isDark, bool isBrowser)
     {
+        on = isBrowser;
         Mark(light, !isDark, "Light");
         Mark(dark, isDark, "Dark");
+        light.IsEnabled = dark.IsEnabled = !isBrowser;
+        if (isBrowser) light.ToolTip = dark.ToolTip = "Alta’s own page is shown as Alta draws it: Light and Dark come back with the question laid out";
+        else { light.ToolTip = "Alta’s page in light"; dark.ToolTip = "Alta’s page in dark"; }
+        browser.Appearance = isBrowser ? ControlAppearance.Primary : ControlAppearance.Secondary;
+        browser.ToolTip = isBrowser ? "Back to the question laid out by Simpl" : "Show Alta’s own page, as in a browser — the objectives stay";
+        System.Windows.Automation.AutomationProperties.SetName(browser, "Show browser");
+        System.Windows.Automation.AutomationProperties.SetItemStatus(browser, isBrowser ? "On" : "Off");
     }
 
     private static void Mark(Wpf.Ui.Controls.Button b, bool on, string name)

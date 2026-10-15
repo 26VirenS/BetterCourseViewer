@@ -19,12 +19,13 @@ namespace Simpl.Screens;
 
 /// <summary>
 /// (Mac 1.3.17) A Knewton Alta assignment in a popup over the window, as a quiz is taken (the Mac's AltaQuizScreen): the
-/// assignment's name and Close across the top; down the left, (0.3.5) Light or Dark for Alta's page, then its objectives
+/// assignment's name and Close across the top; down the left, (0.3.5) Light or Dark for Alta's page and Show browser, then its objectives
 /// as the quiz's question tiles — the one being worked on filled, a mastered one ticked, the others filling as they are
 /// mastered — each by name, and the total mastery bar. In the rest, Alta's own page, the student working on it there: its
 /// question alone on panels, its buttons as the popup's own at its foot, its cover as the popup's start screen, its
 /// pop-ups as the popup's dialogs, and the popup's skeleton while it loads — all of it in the page's look, light unless
-/// the student chose dark. AltaSession reads it all from the page.
+/// the student chose dark; or, with Show browser on, Alta's own page as it is, as in a browser. AltaSession reads it all
+/// from the page.
 /// </summary>
 public static class AltaPopup
 {
@@ -86,7 +87,7 @@ internal sealed class AltaPopupView
         var body = new Grid();
         body.ColumnDefinitions.Add(railColumn);
         body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        pageBar = new AltaPageBar(session.Dark, SetDark) { Margin = new Thickness(20, 4, 16, 14) };
+        pageBar = new AltaPageBar(session.Dark, session.Browser, SetDark, SetBrowser) { Margin = new Thickness(20, 4, 16, 14) };
         body.Children.Add(K.Rows("auto, *", pageBar.Row(0), rail.Row(1)).Col(0));
         webHolder.Child = session.Web;
         // (clear of the popup's right edge, which sizes it: FloatPopup.EdgeRoom)
@@ -185,9 +186,20 @@ internal sealed class AltaPopupView
         if (closed || dark == session.Dark) return;
         Dress(dark);
         session.SetDark(dark);
-        pageBar.Show(dark);
+        pageBar.Show(dark, session.Browser);
         startSig = footerSig = stateSig = "";
         ground = null;
+        Update();
+    }
+
+    /// <summary>(0.3.5) Show browser, on or off: Alta's own page as it is in place of the question laid out — its buttons,
+    /// pop-ups and cover its own, on white — or the question laid out again; the objectives stay.</summary>
+    private void SetBrowser(bool on)
+    {
+        if (closed || on == session.Browser) return;
+        session.SetBrowser(on);
+        pageBar.Show(session.Dark, on);
+        startSig = footerSig = stateSig = "";
         Update();
     }
 
@@ -219,9 +231,9 @@ internal sealed class AltaPopupView
         UpdateLogs();
         UpdateRail();
         // (1.3.59) the cover as the start screen; (1.3.60) the skeleton while Alta's page is out of sight; (0.3.5) Alta's
-        // own page while a pop-up of Alta's is shown in it
-        var showStart = s.Cover != null && !s.Focused && s.Dialog == null && !s.DialogInPage && s.Failure == null && !s.Opening;
-        var showSkeleton = !s.PageShown && s.Cover == null && !s.Opening && s.Failure == null;
+        // own page while a pop-up of Alta's is shown in it, and all the while the browser is shown
+        var showStart = !s.Browser && s.Cover != null && !s.Focused && s.Dialog == null && !s.DialogInPage && s.Failure == null && !s.Opening;
+        var showSkeleton = !s.Browser && !s.PageShown && s.Cover == null && !s.Opening && s.Failure == null;
         UpdateStart(showStart);
         Reveal(skeleton, showSkeleton);
         UpdateState();
@@ -229,7 +241,7 @@ internal sealed class AltaPopupView
         UpdateFooter();
         // Alta's page in sight only while nothing of the popup's own is in its place — on white when it is shown as it
         // is, else on the popup's ground (its parts' panels drawn on it)
-        var asItIs = !s.Focused && s.PageShown && (s.Cover == null || s.DialogInPage);
+        var asItIs = s.Browser || (!s.Focused && s.PageShown && (s.Cover == null || s.DialogInPage));
         var want = AltaLook.Drawing(asItIs ? Colors.White : AltaLook.Ground(region));
         if (ground != want) { ground = want; s.Web.DefaultBackgroundColor = want; }
         var covered = showStart || showSkeleton || s.Failure != null || s.Opening || layer.Covers;
@@ -346,7 +358,7 @@ internal sealed class AltaPopupView
     private void UpdateFooter()
     {
         var s = session;
-        var buttons = s.Focused ? s.Buttons : new List<AltaButton>();
+        var buttons = s.Focused && !s.Browser ? s.Buttons : new List<AltaButton>();
         var pics = s.Split && s.PageShown ? s.Pics : new List<AltaPic>();
         // (the graphs' Light or Dark while Alta's page is dark — 0.3.5: as chosen for the page, not the app's appearance)
         var dark = s.Dark;
@@ -527,7 +539,7 @@ internal sealed class AltaPopupView
         if (e.Key != Key.Enter) return;
         if (ctrl)
         {
-            if (!layer.IsUp && footer.Visibility == Visibility.Visible && session.Focused && session.Buttons.FirstOrDefault(b => b.Primary && b.Enabled) is { } main)
+            if (!layer.IsUp && footer.Visibility == Visibility.Visible && session.Focused && !session.Browser && session.Buttons.FirstOrDefault(b => b.Primary && b.Enabled) is { } main)
             {
                 session.PressButton(main.Id);
                 e.Handled = true;

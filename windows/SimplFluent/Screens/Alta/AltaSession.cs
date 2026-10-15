@@ -183,6 +183,7 @@ internal sealed class AltaSession
     private const string NamesKey = "altaObjectiveNames";
     private const string PicsLightKey = "altaGraphsLight";
     private const string DarkKey = "altaDark";
+    private const string BrowserKey = "altaBrowser";
 
     private readonly Engine.Engine engine;
     private Window owner;
@@ -234,6 +235,11 @@ internal sealed class AltaSession
     /// <summary>(0.3.5) The part of the popup Alta's page is shown in, dressed in the page's look: its panels take their
     /// colours from it.</summary>
     public FrameworkElement? Region { get; set; }
+    /// <summary>(0.3.5) Show browser: Alta's own page as it is, as in a browser — the same page, signed in, nothing of it
+    /// laid out or hidden, its buttons and pop-ups its own — in place of the question laid out by the app; the objectives
+    /// stay. The student's choice beside Light and Dark, kept for every assignment. (--alta-browser starts a development
+    /// run with it.)</summary>
+    public bool Browser { get; private set; } = Support.Launch.Flag("alta-browser") || Prefs.Bool(BrowserKey);
     /// <summary>(1.3.60) Whether Alta's page is laid out and in sight (kept out of sight while it loads).</summary>
     public bool PageShown { get; private set; }
     /// <summary>(1.3.59) The assignment's cover, while Alta's page shows it: the popup's start screen.</summary>
@@ -265,8 +271,8 @@ internal sealed class AltaSession
     /// <summary>(1.3.49) Alta's question (or lesson) is shown alone.</summary>
     public bool Focused => FocusState is "question" or "lesson";
 
-    /// <summary>The question laid out on panels, one behind each part.</summary>
-    public bool Split => Focused && Panels.Count > 0 && PageHeight > 0;
+    /// <summary>The question laid out on panels, one behind each part (never while the browser is shown).</summary>
+    public bool Split => Focused && !Browser && Panels.Count > 0 && PageHeight > 0;
 
     private void Notify()
     {
@@ -392,7 +398,7 @@ internal sealed class AltaSession
 
     // ---- (1.3.50) light or dark, told to the page; (0.3.5) as the student chooses, not as the app is ----
 
-    private string DarkScript() => $"window.__simplDark = {Js(Dark)}; window.__simplPicsLight = {Js(PicsLight)};";
+    private string DarkScript() => $"window.__simplDark = {Js(Dark)}; window.__simplPicsLight = {Js(PicsLight)}; window.__simplBrowser = {Js(Browser)};";
 
     private static string Js(bool b) => b ? "true" : "false";
 
@@ -406,6 +412,25 @@ internal sealed class AltaSession
         Appearance();
         Notify();
         if (picOpen is { } i) _ = Reopen(i);
+    }
+
+    /// <summary>(0.3.5) Show browser, or the question laid out again: kept for every assignment, and told to the page at
+    /// once — the page as it is, or laid out again; a pop-up of Alta's the app was showing given back to the page, or
+    /// taken up again; the question's graph window put away.</summary>
+    public void SetBrowser(bool on)
+    {
+        if (on == Browser) return;
+        Browser = on;
+        Prefs.Set(BrowserKey, on);
+        if (on)
+        {
+            ClosePic();
+            HoldForDialog(false);
+            if (Dialog != null || DialogInPage) { Dialog = null; DialogInPage = false; DialogVersion++; }
+        }
+        Appearance();
+        _ = Run($"window.__simplBrowser = {Js(on)}; window.__simplBrowserNow ? window.__simplBrowserNow() : null");
+        Notify();
     }
 
     /// <summary>Light or dark as chosen (<see cref="Dark"/>): before each page (a script ahead of the page script) and at
@@ -514,7 +539,9 @@ internal sealed class AltaSession
                     if (Dialog != null || DialogInPage) { Dialog = null; DialogInPage = false; DialogVersion++; Notify(); }
                     return;
                 }
-                // (0.3.5) one seen, out of sight in the page until it has settled: a picture waits for it
+                // (0.3.5) one seen, out of sight in the page until it has settled: a picture waits for it — never while
+                // the browser is shown, where Alta's pop-ups are its own (one said just before it was asked for)
+                if (Browser) return;
                 if (Bool(head["pending"]) == true) { HoldForDialog(true); return; }
                 HoldForDialog(false);
                 var d = new AltaDialog

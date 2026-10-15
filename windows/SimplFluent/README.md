@@ -1002,6 +1002,14 @@ solid as the app's, and the accent's shades for it written as WPF-UI writes them
 when the look is the app's). The header, the objectives and the popup's own dialogs keep the app's appearance; a
 graph's window takes the page's look.
 
+Beside Light and Dark, Show browser (0.3.5; "Browser" where the column is narrow) shows Alta's own page as it is, as in
+a browser — the same web view, signed in, on white: its header, title and mastery, its own buttons, its cover, its
+pop-ups in it — in place of the question laid out; the objectives stay and keep reading the page. Off, the question is
+laid out again (a pop-up open in the page taken up as the app's again). The page script is told before each page and
+at once (`window.__simplBrowser`, `__simplBrowserNow`): it lays nothing out, hides nothing, gives the app no buttons or
+panels and never veils the page; Light and Dark wait meanwhile. Kept for every assignment (`altaBrowser`;
+`--alta-browser` starts a development run with it).
+
 ## Icons
 
 WPF-UI 4.3 draws only the Fluent icons whose code is at most U+FFFF; the rest show as a stray character. Check a new

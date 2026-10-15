@@ -388,6 +388,39 @@ try {
     check(d4.title === 'Tip' && d4.html === '<p>Words kept in its own tree.</p>' && d4.buttons.map((b) => b.label).join() === 'OK', 'a pop-up in a web component’s own tree is read whole too');
     await wp.evaluate(() => document.querySelector('alta-tip').remove());
     await wwait((p, k) => k >= n6 && p.kind === 'dialog' && p.open === false, 'the web component’s pop-up gone');
+    // (0.3.5) Show browser: Alta's page as it is, as in a browser — nothing laid out or hidden, its pop-ups its own — and
+    // laid out again when it is put away
+    const n8 = (await wposts()).length;
+    await wp.evaluate(() => { window.__simplBrowser = true; window.__simplBrowserNow(); });
+    await wp.waitForTimeout(800);
+    const wvis = async (sel) => wp.$eval(sel, (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== 'hidden'; }).catch(() => false);
+    const asItIs = await wp.evaluate(() => !document.documentElement.hasAttribute('data-simpl-q') && document.documentElement.hasAttribute('data-simpl-shown'));
+    const lastOf = (kind) => wposts().then((ps) => ps.slice(n8).filter((p) => p.kind === kind).pop());
+    check(asItIs && (await wvis('h1')) && (await wvis('.jss179')) && (await wvis('#submit')) && (await lastOf('buttons'))?.items.length === 0 && (await lastOf('panels'))?.panels.length === 0,
+      'with the browser asked for, Alta’s page is shown as it is — its title, objective card and its own buttons — and the app is given no buttons or panels');
+    await wp.evaluate(() => window.mockRichDialog(0));
+    await wp.waitForTimeout(1500);
+    check((await wvis('#rich .MuiDialog-paper')) && !(await wposts()).slice(n8).some((p) => p.kind === 'dialog'), 'and a pop-up of Alta’s stays Alta’s own, in its page, never passed to the app');
+    const n9 = (await wposts()).length;
+    await wp.evaluate(() => { window.__simplBrowser = false; window.__simplBrowserNow(); });
+    const back = await wwait((p, k) => k >= n9 && full(p), 'the pop-up taken up again once the browser is put away', 60);
+    check(back.title === 'Knewton Alta' && (await hiddenIn('#rich .MuiDialog-paper')) && !(await wvis('h1')) && (await wp.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))),
+      'put away, the question is laid out alone again and the open pop-up is the app’s again');
+    await wp.evaluate(() => { window.__simplBrowser = true; window.__simplBrowserNow(); });
+    await wwait((p, k) => k >= n9 && p.kind === 'dialog' && p.open === false, 'the pop-up given back when the browser is asked for again', 30);
+    check((await wvis('#rich .MuiDialog-paper')) && !(await wp.evaluate(() => document.documentElement.hasAttribute('data-simpl-native-dialog'))),
+      'and asked for again with a pop-up up, the pop-up is given back to the page and the app told it is gone from it');
+    await wp.evaluate(() => { document.getElementById('rich').remove(); window.__simplBrowser = false; window.__simplBrowserNow(); });
+    // (a page opened while the browser is asked for: in sight at once, never veiled)
+    const bp = await browser.newPage();
+    await bp.addInitScript(() => { window.__posted = []; window.chrome = window.chrome || {}; window.chrome.webview = { postMessage: (s) => window.__posted.push(s) }; window.__simplBrowser = true; });
+    await bp.addInitScript({ content: winSource });
+    await bp.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a3`);
+    await bp.waitForTimeout(1500);
+    const bposts = (await bp.evaluate(() => window.__posted.slice())).map((s) => JSON.parse(s));
+    check(bposts.some((p) => p.kind === 'shown' && p.how === 'browser') && !bposts.some((p) => p.kind === 'hidden' || p.kind === 'focus') && (await bp.evaluate(() => getComputedStyle(document.body).opacity)) === '1',
+      'a page opened while the browser is asked for is in sight at once, as it is, never veiled');
+    await bp.close();
     // a pop-up with nothing in its body that can be read: waited for longer, then passed empty — the app gives it back
     // rather than show an empty dialog
     const n7 = (await wposts()).length;

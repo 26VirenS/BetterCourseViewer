@@ -3,12 +3,12 @@ namespace Simpl.Screens;
 /// <summary>
 /// The Knewton Alta popup's page script (the Mac's AltaHook, mac/Simpl/Engine/AltaSession.swift — the one to change; this
 /// is its copy, word for word but for how it speaks to the app — WebView2's <c>chrome.webview.postMessage</c> where WebKit
-/// has its message handler — and, since 0.3.5, for how it reads Alta's pop-ups: whole, once they have settled, here first
-/// until the Mac's takes it up). In every frame of the popup's own web view, which holds nothing but Alta's launch: it reads
-/// a copy of Alta's own answers as its page receives them and passes the app the assignment, its objectives and their
-/// mastery and the objective on screen — never the question, its answer key or who the student is; it lays Alta's
-/// question out alone (its parts, their panels and buttons told to the app), keeps the page out of sight until it is laid
-/// out, and passes on Alta's pop-ups and its cover.
+/// has its message handler — and, since 0.3.5, for how it reads Alta's pop-ups (whole, once they have settled) and Show
+/// browser (Alta's page left as it is), here first until the Mac's takes them up). In every frame of the popup's own web
+/// view, which holds nothing but Alta's launch: it reads a copy of Alta's own answers as its page receives them and
+/// passes the app the assignment, its objectives and their mastery and the objective on screen — never the question, its
+/// answer key or who the student is; it lays Alta's question out alone (its parts, their panels and buttons told to the
+/// app), keeps the page out of sight until it is laid out, and passes on Alta's pop-ups and its cover.
 /// </summary>
 internal static class AltaHook
 {
@@ -37,8 +37,9 @@ internal static class AltaHook
               if (!showing) { showing = true; post({ kind: 'shown', how: how || '' }); }
             };
             // (1.3.62) out of sight again — Alta between one part and the next, taking its time — until the next is laid out
+            // (0.3.5: never while the student has asked for the browser)
             veilAgain = function () {
-              if (!veils || !showing || dialogInPage) return;
+              if (!veils || !showing || dialogInPage || window.__simplBrowser) return;
               if (document.documentElement) document.documentElement.removeAttribute('data-simpl-shown');
               showing = false;
               post({ kind: 'hidden' });
@@ -63,10 +64,12 @@ internal static class AltaHook
               }
               // (never longer than this, whatever happens)
               setTimeout(function () { reveal('timeout'); }, 9000);
-            } else {
-              var revealSoon = function () { if (document.documentElement) reveal('not alta'); else setTimeout(revealSoon, 10); };
-              revealSoon();
             }
+            var revealSoon = function (how) { if (document.documentElement) reveal(how); else setTimeout(function () { revealSoon(how); }, 10); };
+            // (0.3.5: and at once while the student has asked for the browser — the app sets window.__simplBrowser before
+            // the page, as __simplDark)
+            if (!veils) revealSoon('not alta');
+            else if (window.__simplBrowser) revealSoon('browser');
           }
           var num = function (v) { if (v === null || v === undefined || v === '') return null; var n = Number(v); return isFinite(n) ? n : null; };
           var str = function (v) { return typeof v === 'string' && v ? v.slice(0, 600) : (typeof v === 'number' ? String(v) : null); };
@@ -811,6 +814,16 @@ internal static class AltaHook
               if (st.textContent !== DIALOG_CSS) st.textContent = DIALOG_CSS;
             };
             var dialogTick = function () {
+              // (0.3.5) the browser asked for: Alta's pop-ups are its own, in its page — one the app was showing given back
+              if (window.__simplBrowser) {
+                if (dialogEl || dialogSaid || dialogInPage) {
+                  dialogEl = null; dialogSaid = ''; dialogRead = ''; dialogWaiting = 0; dialogInPage = false; dialogGen++;
+                  dialogBtns = []; dialogLinks = []; dialogPics = [];
+                  document.documentElement.removeAttribute('data-simpl-native-dialog');
+                  post({ kind: 'dialog', open: false });
+                }
+                return;
+              }
               var d = unhidden(dialogNow);
               if (!d) {
                 if (dialogEl || dialogSaid || dialogInPage) {
@@ -894,6 +907,16 @@ internal static class AltaHook
             var tick = function () {
               timer = null;
               dialogTick();
+              // (0.3.5) the browser asked for: Alta's page as it is, as in a browser — nothing of it laid out or hidden, no
+              // buttons or panels for the app — until the student goes back to the question laid out
+              if (window.__simplBrowser) {
+                badSince = 0; loadingSince = 0; steadySince = 0;
+                if (steadyTimer) { clearTimeout(steadyTimer); steadyTimer = null; }
+                unmark();
+                publish();
+                reveal('browser');
+                return;
+              }
               var r = read();
               // (1.3.70) a loading page, or parts that are all still loading: out of sight, waited for (twenty seconds at
               // most, then shown as it is)
@@ -951,6 +974,8 @@ internal static class AltaHook
               reveal('as it is');
             };
             var schedule = function (ms) { if (timer) clearTimeout(timer); timer = setTimeout(tick, typeof ms === 'number' ? ms : 120); };
+            // (0.3.5) the browser asked for, or put away: the page as it is, or laid out again, at once
+            window.__simplBrowserNow = function () { dialogTick(); schedule(0); return true; };
             // (1.3.68) the question shown once Alta has finished drawing it — nothing changed for a moment (its maths set, its
             // answer box built, its pictures in) — or after two and a half seconds at most: the app's skeleton meanwhile
             var lastChange = Date.now(), steadyTimer = null, steadySince = 0;
