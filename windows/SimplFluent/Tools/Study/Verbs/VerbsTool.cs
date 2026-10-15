@@ -13,7 +13,7 @@ using TextBox = Wpf.Ui.Controls.TextBox;
 
 namespace Simpl.Tools;
 
-// Verb Conjugations (tools), as the Mac's: a verb in Spanish, French, German, Italian or Portuguese conjugated in
+// Verb Conjugations (0.3.15), as the Mac's: a verb in Spanish, French, German, Italian or Portuguese conjugated in
 // every main tense of its language — regular verbs by their class's rules, stem and spelling changes applied, the
 // most common irregular verbs from the language's own table (Tools/Study/Verbs/VerbEngine.cs, the same data files as
 // the Mac's). Pronouns beside the forms, irregular cells tinted while the toggle is on, a list of verbs suggested as

@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 
 namespace Simpl.Tools.Verbs;
 
-// Verb Conjugations' rules engine (tools), free of any window: a port, line for line, of the reference engine that comes
+// Verb Conjugations' rules engine (0.3.15), free of any window: a port, line for line, of the reference engine that comes
 // with the language data (scratchpad tools/verbs/check.mjs, the normative reading of the JSON schema: the Mac runs the
 // same). A verb's forms in a tense come from its irregular entry where it has one, else from its class's endings on its
 // stem — a stem change, a spelling change and an accent applied — or are composed of other forms (a compound tense of

@@ -1,3 +1,7 @@
+**What's new in 0.3.15** (beta)
+
+- **Verb conjugations** — a new Study tool: type a verb in Spanish, French, German, Italian or Portuguese and every main tense is laid out with its pronouns — regular verbs by rule, the most common irregular ones from a table, stem and spelling changes included — with a switch that tints the irregular forms, suggestions as you type, and Copy for a table; `/verbs` in the search box, and the present tense as a pin.
+
 **What's new in 0.3.14** (beta)
 
 - **Circuit Builder** — the Physics section's third tool: place batteries, resistors, wires, switches, lamps, meters and a ground on a grid, join their terminals, and the circuit is solved as you build it — current arrows, lamps lit by their power, every part's V, I and P in a readout, and plain words when it can't be solved; quick builds (series, parallel, a voltage divider), save and load, Export PNG, and an Ohm's law and series/parallel strip; `/circuit` in the search box, and the strip as a pin.
