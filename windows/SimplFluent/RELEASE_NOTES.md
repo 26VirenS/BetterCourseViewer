@@ -1,3 +1,7 @@
+**What's new in 0.3.18** (beta)
+
+- **Larger Alta graphs** — a graph in what a question asks is drawn twice as large as before (up to 600 × 440 instead of 300 × 220); Enlarge beside it still opens it large.
+
 **What's new in 0.3.17** (beta)
 
 - **Module files open** — a file in a module opens as one from the Files screen does (by the file's own record, in the preview), where before the module's own address was fetched and could come back with nothing.

@@ -26,6 +26,8 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.18", "2026-10-15",
+            ("improved", "Larger Alta graphs", "A question's graph is drawn twice as large.")),
         R("0.3.17", "2026-10-15",
             ("fixed", "Module files open", "A module's file opens as one from Files does."),
             ("improved", "Rubric ring", "One band of colour; each level sits at its points.")),
