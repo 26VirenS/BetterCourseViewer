@@ -910,6 +910,12 @@ jobs:
           Shot 'chem-gas-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'gas', '--tool-state', 'combined', '--gas-values', 'P1=1 atm,V1=2 L,T1=300 K,P2=2 atm,T2=600 K'))
           Shot 'chem-gas-780' '780x683' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'gas', '--tool-state', 'ideal', '--gas-values', 'P=101.325 kPa,V=10 L,n=44.01 g,formula=CO2'))
           Shot 'pin-gas' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'gas', '--pin-open', 'gas', '--gas-values', 'V=10 L,n=2 mol,T=300 K'))
+          # (Solutions & pH, at the end) acetic acid titrated with sodium hydroxide, its curve and its buffer (light),
+          # the pH tab on acetic acid with the strip (dark), the Molarity tab in the narrow window, and its pin's flyout
+          Shot 'chem-solution' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'solution', '--tool-state', 'titration', '--solution-values', 'titration=weak acid,analyte=0.1,volume=25,titrant=0.1,K=1.8e-5,pKa=4.74,base=0.2,acid=0.1'))
+          Shot 'chem-solution-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'solution', '--tool-state', 'ph', '--solution-values', 'kind=weak acid,conc=0.10,K=1.8e-5'))
+          Shot 'chem-solution-780' '780x683' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'solution', '--tool-state', 'molarity', '--solution-values', 'amount=58.44 g,formula=NaCl,volume=1 L'))
+          Shot 'pin-solution' '1366x778' 45 ($mock + @('--appearance', 'dark', '--pin', 'solution', '--pin-open', 'solution', '--solution-values', 'H=1e-3'))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
