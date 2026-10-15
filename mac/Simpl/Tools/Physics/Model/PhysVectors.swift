@@ -1,6 +1,6 @@
 import Foundation
 
-// (tools) Vectors' arithmetic, Foundation only, so the Models job checks it (scripts/dev/swift-checks/main.swift): a
+// (1.3.90) Vectors' arithmetic, Foundation only, so the Models job checks it (scripts/dev/swift-checks/main.swift): a
 // vector of two or three components, its length and direction, sums, dot and cross products, the angle between two,
 // unit vectors and projections; a vector from a magnitude and an angle; and the list the launch and the pin write
 // ("3,4;1,2"), read back. The tool itself is Physics/VectorsTool.swift.

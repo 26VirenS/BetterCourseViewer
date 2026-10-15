@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-// (tools) The physics tools' place among the tools, as the chemistry tools' is (Chemistry/ChemTools.swift): a
+// (1.3.90) The physics tools' place among the tools, as the chemistry tools' is (Chemistry/ChemTools.swift): a
 // "Physics" heading of their own on the Tools page, after Chemistry and before Biology — Kinematics & Projectiles
 // (motion in a line from any three of its five quantities, and a projectile's flight drawn), Vectors (up to six added,
 // dotted, crossed and drawn) and the Circuit Builder (a DC circuit built on a grid and solved as it changes). Each has

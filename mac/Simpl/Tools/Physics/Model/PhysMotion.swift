@@ -1,6 +1,6 @@
 import Foundation
 
-// (tools) Kinematics & Projectiles' arithmetic, Foundation only, so the Models job checks it (scripts/dev/swift-checks/
+// (1.3.90) Kinematics & Projectiles' arithmetic, Foundation only, so the Models job checks it (scripts/dev/swift-checks/
 // main.swift): the five quantities of motion in a line with any three given, which pair of the four equations finds
 // the other two; a projectile's flight from its launch; the two angles that hit a target; and the way every physics
 // tool writes a number (PhysMath). The tool itself is Physics/Kinematics.swift.

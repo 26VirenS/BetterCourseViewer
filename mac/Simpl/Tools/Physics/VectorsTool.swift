@@ -1,6 +1,6 @@
 import SwiftUI
 
-// (tools) Vectors: up to six vectors, each typed as components (x, y, and z in 3D) or as a magnitude and an angle from
+// (1.3.90) Vectors: up to six vectors, each typed as components (x, y, and z in 3D) or as a magnitude and an angle from
 // +x (2D), each's length and direction listed, their resultant with its length and angle, and for any pair the dot
 // product and the angle between, the cross product (in 2D its z component), the unit vectors and the projection of one
 // onto the other. A drawing beside: in 2D the arrows from the origin, or tip to tail, with the resultant dashed; in 3D

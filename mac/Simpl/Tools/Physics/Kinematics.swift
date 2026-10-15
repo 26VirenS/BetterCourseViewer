@@ -1,6 +1,6 @@
 import SwiftUI
 
-// (tools) Kinematics & Projectiles: two pages. 1D motion — the five quantities of motion in a line (Δx, v₀, v, a, t),
+// (1.3.90) Kinematics & Projectiles: two pages. 1D motion — the five quantities of motion in a line (Δx, v₀, v, a, t),
 // any three filled in, the other two found as you type, with the two equations that found them, and a position–time
 // and a velocity–time graph drawn. Projectile — a launch's speed, angle, height and g to its time of flight, range,
 // greatest height and how it lands, the path drawn with its apex and landing marked and a dot flown along it (1.5 s;

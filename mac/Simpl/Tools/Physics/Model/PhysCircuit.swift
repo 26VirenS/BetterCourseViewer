@@ -1,6 +1,6 @@
 import Foundation
 
-// (tools) The Circuit Builder's model and solver, Foundation only, so the Models job checks it
+// (1.3.90) The Circuit Builder's model and solver, Foundation only, so the Models job checks it
 // (scripts/dev/swift-checks/main.swift): the parts on the grid with their terminals and the links between them
 // (CircuitDoc, kept as JSON); modified nodal analysis of the DC circuit they make (CircuitSolver: node voltages and
 // branch currents, every part's V, I and P, and what cannot be solved — a shorted battery, parts off on their own);

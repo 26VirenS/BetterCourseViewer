@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-// (tools) Circuit Builder: a grid canvas (24 points a cell) with a palette of parts — battery, resistor, wire,
+// (1.3.90) Circuit Builder: a grid canvas (24 points a cell) with a palette of parts — battery, resistor, wire,
 // switch, lamp, ammeter, voltmeter, ground — dragged onto it or added with a press, moved by dragging, turned with
 // R, removed with ⌫, and wired by dragging from one terminal to another (parts set end to end join too). The circuit
 // is solved as it changes by modified nodal analysis (Model/PhysCircuit.swift, checked by the Models job): every
