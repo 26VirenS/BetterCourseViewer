@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-// (tools) The Equation Balancer: one field for a whole chemical equation — arrows as ->, →, = or ⟶, phase labels,
+// (1.3.89) The Equation Balancer: one field for a whole chemical equation — arrows as ->, →, = or ⟶, phase labels,
 // charges (Fe3+, SO4^2-), parentheses, hydrates, coefficients already typed (passed over) — balanced as it is typed
 // (a moment after the last key, or on Return) with exact fractions (Model/ChemBalance.swift). The balanced equation
 // is typeset with its coefficients bold; beside it the atom count table (each element, and the charge, on each side,

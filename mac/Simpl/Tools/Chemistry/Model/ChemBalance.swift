@@ -1,6 +1,6 @@
 import Foundation
 
-// (tools) The Equation Balancer's arithmetic — Foundation only, checked by the Models job: an equation read into its
+// (1.3.89) The Equation Balancer's arithmetic — Foundation only, checked by the Models job: an equation read into its
 // species (either side of the arrow, split at the pluses that are not charges, coefficients and phase labels passed
 // over), the matrix of each element's and the charge's count in each species, its null space found exactly with
 // fractions (Gaussian elimination over Int64 numerators and denominators, every step checked for overflow), and the
