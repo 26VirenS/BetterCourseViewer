@@ -240,7 +240,9 @@
   const coursesMemo = { false: null, true: null }; // per `past`: { list, done, cols, dark, out }
   async function courses({ force = false, refresh = false, maxAge = 0, past = false } = {}) {
     past = !!past;
-    const [list, done, cols, dark] = await Promise.all([rawCourses({ force, refresh, maxAge }), past ? doneCourses({ force, refresh, maxAge }) : null, colors({ force, refresh }), Promise.resolve(BCV.early?.isDark?.() ?? false)]);
+    // (2.99.35) the concluded courses at ten minutes' age at least: they do not change, and an app's live check of All
+    // Courses (an age of a minute) read every one of them again — up to 50 requests — each minute
+    const [list, done, cols, dark] = await Promise.all([rawCourses({ force, refresh, maxAge }), past ? doneCourses({ force, refresh, maxAge: maxAge > 0 ? Math.max(maxAge, 10 * MIN) : 0 }) : null, colors({ force, refresh }), Promise.resolve(BCV.early?.isDark?.() ?? false)]);
     const memo = coursesMemo[past];
     if (memo && memo.list === list && memo.done === done && memo.cols === cols && memo.dark === dark) return memo.out;
     const seen = new Set();
@@ -932,8 +934,10 @@
       return Array.isArray(r) ? r : (r?.conversations || []);
     }, { force, refresh });
   }
-  function conversation(id, { force = true, refresh = false } = {}) {
-    return C.cached(`conv:${id}`, MIN, () => C.get(`/api/v1/conversations/${id}`), { force, refresh });
+  /** One conversation. `keepUnread`: read without Canvas marking it read (it does for a plain read) — an app's live
+   *  check, which marks it read itself only while the student is there (native-app.js conversation). */
+  function conversation(id, { force = true, refresh = false, keepUnread = false } = {}) {
+    return C.cached(`conv:${id}`, MIN, () => C.get(`/api/v1/conversations/${id}`, keepUnread ? { params: { auto_mark_as_read: false } } : undefined), { force, refresh });
   }
   async function invalidateInbox() {
     await C.invalidatePrefix('conv:');

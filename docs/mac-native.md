@@ -777,7 +777,11 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   the same data always makes the same answer. `BCVNative.stats().reads` counts the Canvas reads the page has made, for a
   check's log line. What a course holds (its record, tabs, sections, people, groups, folders; modules, pages, files,
   quizzes, the front page and the syllabus already) is kept 10 minutes at most. Against the mock school only,
-  `liveDevChange` (`done`, `grade`, `task`) changes the school behind the engine's back, for CI to see a check find it.
+  `liveDevChange` (`done`, `grade`, `task`) changes the school behind the engine's back, for CI to see a check find it
+  (its grade change moves a total half a point, inside its letter's band). A check (an age) reads an open conversation
+  with `auto_mark_as_read=false` and marks a conversation or a discussion read only when the app passes `seen` (the
+  student is at the window); without it a check writes nothing to Canvas, and opened, a conversation or a topic is
+  marked read as before. The concluded courses All Courses lists are read at ten minutes' age at least.
 
 - **Live checks (1.3.80).** A screen left open no longer shows what it was opened on until something is done: the
   screen on show is checked against Canvas while the window is in front of the student, and only what changed is put
