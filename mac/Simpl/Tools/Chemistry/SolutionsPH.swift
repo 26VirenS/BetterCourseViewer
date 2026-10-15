@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-// (tools) Solutions & pH: four tabs. Molarity — any two of an amount (moles, or grams of a formula), a volume and a
+// (1.3.94) Solutions & pH: four tabs. Molarity — any two of an amount (moles, or grams of a formula), a volume and a
 // molarity to the third, with the mass % and ppm of a water-like solution. Dilution — M₁V₁ = M₂V₂, "How much stock?",
 // one blank solved. pH — any one of pH, pOH, [H⁺] and [OH⁻] to the other three on a 0–14 strip (Kw = 1.0 × 10⁻¹⁴ at
 // 25 °C, the only temperature here), and the pH of a strong or weak acid or base from its concentration (a weak one's

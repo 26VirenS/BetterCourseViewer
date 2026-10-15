@@ -1,6 +1,6 @@
 import Foundation
 
-// (tools) Solutions & pH's arithmetic — Foundation only, checked by the Models job: molarity from any two of moles,
+// (1.3.94) Solutions & pH's arithmetic — Foundation only, checked by the Models job: molarity from any two of moles,
 // volume and concentration (with mass % and ppm); a dilution, M₁V₁ = M₂V₂; pH, pOH, [H⁺] and [OH⁻] from any one of them
 // (Kw = 1.0 × 10⁻¹⁴, 25 °C); the pH of a strong or weak acid or base from its concentration (a weak one's quadratic
 // solved exactly, with its percent ionised); a titration's equivalence volume, its pH at the points that matter and
