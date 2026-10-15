@@ -147,12 +147,18 @@ extension MainShell {
     /// crosses the line, so the sidebar's own button still opens and closes it at any width.
     static let narrow: CGFloat = 880
 
+    /// (1.3.80) The screenshot suite's -SimplSidebar hidden: the picture is of the window with its sidebar folded away.
+    private static let launchFolded = UserDefaults.standard.string(forKey: "SimplSidebar") == "hidden"
+
     fileprivate func fit(_ width: CGFloat) {
         let wide = width >= Self.narrow
         guard wide != wasWide else { return }
         let first = wasWide == nil
         wasWide = wide
         if first && wide { return } // (a wide window opens as it was)
+        // (a window laid out first at its default size, under the line, and only then given its picture's size, over it,
+        // kept its sidebar folded: brought out by the crossing, it was pictured out — dark-58z-dna-plain-1024-folded)
+        if wide && Self.launchFolded { return }
         withAnimation(Motion.gentle) { columns = wide ? .all : .detailOnly }
     }
 }
