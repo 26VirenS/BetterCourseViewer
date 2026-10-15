@@ -240,7 +240,7 @@ try {
   await page.waitForSelector('#dev:not([hidden])', { timeout: 5000 });
   await page.waitForFunction(() => document.querySelectorAll('#devVersions option').length === 3, null, { timeout: 5000 });
   const roll = await page.evaluate(() => ({ card: !document.getElementById('devRoll').hidden, options: [...document.querySelectorAll('#devVersions option')].map((o) => o.textContent).join(','), sub: document.getElementById('devRollSub').textContent }));
-  check(roll.card && roll.options === '9.9.9 (this one),9.9.8,9.9.7' && roll.sub === 'Another version, put in this one’s place. It stays until a version newer than 9.10.1 comes out, or Update now.', `the Developer section lists the versions published, this one marked, and says how long a version put back stays (2.99.35: held back to 9.10.1, the one put back from already): ${JSON.stringify(roll)}`);
+  check(roll.card && roll.options === '9.9.9 (this one),9.9.8,9.9.7' && roll.sub === 'Another version, put in this one’s place. It stays until Update now, or (2.99.35 and later) a version newer than 9.10.1.', `the Developer section lists the versions published, this one marked, and says how long a version put back stays (2.99.35: held back to 9.10.1, the one put back from already): ${JSON.stringify(roll)}`);
   await page.selectOption('#devVersions', '9.9.8');
   await page.click('#devRollback');
   await page.waitForTimeout(300);

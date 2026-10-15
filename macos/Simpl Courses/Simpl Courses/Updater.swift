@@ -123,6 +123,9 @@ final class Updater {
                 guard let self = self else { return }
                 self.lastCheck = Date()
                 UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: self.lastKey)
+                // (2.99.35) a version put back meanwhile is under way (rollback, started while this check was out): not
+                // undone by what the check found — the newest downloaded beside it, or the window saying up to date
+                guard case .checking = self.state else { return }
                 guard error == nil, let data = data,
                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                       let version = json["version"] as? String,

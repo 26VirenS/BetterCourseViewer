@@ -271,7 +271,7 @@
           ? `You put this version back. Update now installs ${u.available}; a version newer than ${from} installs by itself.`
           : `You put this version back, so versions up to ${from} wait for Update now; a newer one installs by itself.`;
       }
-      $('devRollSub').textContent = `Another version, put in this one’s place. It stays until a version newer than ${u.hold || st.version} comes out, or Update now.`;
+      $('devRollSub').textContent = `Another version, put in this one’s place. It stays until Update now, or (2.99.35 and later) a version newer than ${u.hold || st.version}.`;
       setSwitch($('loginItem'), !!st.loginItem);
       if (document.querySelector('.section.is-active')?.id === 'data') renderStats();
     };
@@ -1025,7 +1025,14 @@
       // (2.99.35) the version it replaces (or one held already, if newer) is held back: said when the one chosen is older
       const st = self.SimplApp.state() || {};
       const hold = (st.update && st.update.hold) || st.version || '';
-      const stays = hold && newer(hold, r.version) ? `\n\nIt stays on ${r.version} until a version newer than ${hold} comes out, or you choose Update now.` : '';
+      // (a version before 2.99.35 knows no hold: Install updates by themselves is turned off for it instead, so it stays
+      // until Update now or that switch is turned back on in its window — never by itself)
+      const knowsHold = !newer('2.99.35', r.version);
+      const stays = hold && newer(hold, r.version)
+        ? (knowsHold
+          ? `\n\nIt stays on ${r.version} until a version newer than ${hold} comes out, or you choose Update now.`
+          : `\n\nIt stays on ${r.version} until you choose Update now, or turn Install updates by themselves back on in its window.`)
+        : '';
       if (!confirm(`Install Simpl Courses ${r.version} in place of this one?${stays}`)) return;
       const res = await self.SimplApp.rollback(r).catch(() => null);
       say(res && res.ok ? `Installing ${r.version}: the app relaunches once it is in place.` : (res && res.message) || 'The rollback could not start.');
