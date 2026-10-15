@@ -1,3 +1,7 @@
+**What's new in 0.3.19** (beta)
+
+- **Alta verdict** — when Knewton Alta says a question was right or wrong, the popup shows Correct (green) or Incorrect (red) beside its own buttons, until the next question.
+
 **What's new in 0.3.18** (beta)
 
 - **Larger Alta graphs** — a graph in what a question asks is drawn twice as large as before (up to 600 × 440 instead of 300 × 220); Enlarge beside it still opens it large.

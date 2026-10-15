@@ -26,6 +26,8 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.19", "2026-10-15",
+            ("new", "Alta verdict", "Correct or Incorrect shows beside Continue.")),
         R("0.3.18", "2026-10-15",
             ("improved", "Larger Alta graphs", "A question's graph is drawn twice as large.")),
         R("0.3.17", "2026-10-15",
