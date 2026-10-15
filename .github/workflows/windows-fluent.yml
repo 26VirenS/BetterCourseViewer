@@ -877,6 +877,13 @@ jobs:
           Shot 'tool-stats-tests' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'stats', '--tool-state', 'tests', '--stats-test', 'two', '--stats-data', '20, 22, 19, 24, 25', '--stats-b', '18, 17, 21, 19, 16'))
           Shot 'tool-stats-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'stats', '--tool-state', 'describe', '--stats-data', '12, 15, 11, 14, 13, 15, 16, 12, 14, 30'))
           Shot 'pin-stats' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'stats', '--pin-open', 'stats', '--stats-data', '2, 4, 4, 4, 5, 5, 7, 9'))
+          # (the Matrix Calculator, at the end so the pictures before keep their parts) the inverse of a 2×2 as fractions,
+          # light; a 3×3 reduced in dark with its row operations listed (its operation in the log, checked below); a
+          # system solved on a 780 window; and its pin with a 2×2's determinant and inverse
+          Shot 'tool-matrix' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'matrix', '--matrix-a', '1 2; 3 4', '--matrix-b', '3; 5', '--matrix-op', 'inverse'))
+          Shot 'tool-matrix-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'matrix', '--matrix-a', '1 2 3; 4 5 6; 7 8 9', '--matrix-b', '6; 15; 24', '--tool-state', 'rref'))
+          Shot 'tool-matrix-780' '780x683' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'matrix', '--matrix-a', '2 1; 1 3', '--matrix-b', '3; 5', '--matrix-op', 'solve'))
+          Shot 'pin-matrix' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'matrix', '--pin-open', 'matrix', '--matrix-a', '1 2; 3 4'))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
@@ -1013,6 +1020,12 @@ jobs:
             $l = PhoneLog $st[0]
             Write-Host "$($st[0]): $((@($l -split "`n" | Where-Object { $_ -match 'stats: ' }) -join ' | '))"
             if (-not $l.Contains("stats: shows $($st[1])")) { Write-Host "::error::$($st[0]): Statistics did not open on its $($st[1]) page (shots/profile-$($st[0]).log)"; exit 1 }
+          }
+          # (the Matrix Calculator) it opened on the operation its launch named
+          if ($script:mine -contains 'tool-matrix-dark') {
+            $l = PhoneLog 'tool-matrix-dark'
+            Write-Host "tool-matrix-dark: $((@($l -split "`n" | Where-Object { $_ -match 'matrix: ' }) -join ' | '))"
+            if (-not $l.Contains('matrix: shows rref')) { Write-Host "::error::tool-matrix-dark: the Matrix Calculator did not open on the reduction its launch named (shots/profile-tool-matrix-dark.log)"; exit 1 }
           }
           # the periodic table's top showed Fe when ptable-hover was pictured (--ptable-hover Fe): the last card its log
           # names before "picture at" (PTGrid.Show writes "ptable hover card: …" in a picture run)
