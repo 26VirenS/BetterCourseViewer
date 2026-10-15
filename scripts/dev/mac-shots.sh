@@ -605,6 +605,19 @@ chem_calc_tools() {
   MODE=light shoot light-54l-pin-balance 14 -SimplPinnedTools balance -SimplPinOpen balance -SimplBalance "Fe + O2 -> Fe2O3"
 }
 
+# (tools) the Tools page's Physics section in light and in dark; Kinematics & Projectiles' 1D page (a fall of 20 m:
+# Δx, v₀ and a given, t and v found, the graphs beside) in light, its Projectile page (20 m/s at 45°, the path flown,
+# a target 30 m off) in light and in dark; and its pin opened (20 m/s at 45° to its range and height)
+phys_tools() {
+  local m
+  for m in light dark; do
+    MODE="$m" SIZE=1280x900 shoot "$m-35d-tools-physics" 12 -SimplPlace tools -SimplToolsScroll physics
+    MODE="$m" SIZE=1440x920 shoot "$m-77b-motion-projectile" 14 -SimplPlace tools -SimplTool motion -SimplMotion projectile -SimplMotionValues "v0=20,angle=45,h=0,target=30"
+  done
+  MODE=light SIZE=1440x920 shoot light-77-motion-1d 14 -SimplPlace tools -SimplTool motion -SimplMotion 1d -SimplMotionValues "x=-20,v0=0,a=-9.81"
+  MODE=light shoot light-54s-pin-motion 14 -SimplPinnedTools motion -SimplPinOpen motion
+}
+
 # (1.3.80) how each 3D model was framed, from the consoles ("[Simpl] bio frame <scene>: view W × H, model X% across,
 # Y% up", and the atom's and the molecule's frames): each picture's last framing and its model's share of its view's
 # limiting side (the larger of the two) in frame-check.txt — 75% to 85% is as framed (SceneFill); under 70% is said
@@ -902,6 +915,7 @@ the_set() {
   tool_popups # (1.3.79) a tool's popup over the Tools page
   chem_tools # (1.3.80) the Chemistry section and its tools
   chem_calc_tools # (tools) the chemistry calculators
+  phys_tools # (tools) the Physics section and its tools
   # (1.3.78) a PDF-only assignment (1013, made so here) waiting for the phone: Combine photos under the code
   mock_config '{"ext":{"1013":["pdf"]}}'
   MODE=dark shoot dark-12f-hand-in-phone-photos-waiting 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1013 -SimplOpen handin -SimplPhone YES

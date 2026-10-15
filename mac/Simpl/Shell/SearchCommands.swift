@@ -294,6 +294,8 @@ final class SearchPalette: ObservableObject {
         c.append(PaletteCommand(name: "atom", aliases: ["atoms", "orbitals", "orbital", "electron cloud", "shells", "bohr"], title: ToolKind.atoms.name, hint: "Any element's shells, orbitals and electron cloud in 3D", symbol: ToolKind.atoms.symbol, action: .tool(.atoms)))
         // (tools) the chemistry calculators
         c.append(PaletteCommand(name: "balance", aliases: ["equation", "reaction", "coefficients", "balancer", "balance equation"], title: ToolKind.balance.name, hint: "Balance any chemical equation", symbol: ToolKind.balance.symbol, action: .tool(.balance)))
+        // (tools) the physics tools
+        c.append(PaletteCommand(name: "motion", aliases: ["kinematics", "projectile", "projectiles", "velocity", "acceleration", "free fall"], title: ToolKind.motion.name, hint: "1D motion from any three of its five, and a projectile's path", symbol: ToolKind.motion.symbol, action: .tool(.motion)))
         c.append(PaletteCommand(name: "external", aliases: ["external tools", "lti", "apps"], title: "External Tools", hint: "Every tool your courses use", symbol: "puzzlepiece.extension", action: .go(.externalTools)))
         c.append(PaletteCommand(name: "due", aliases: ["upcoming", "soon", "week"], title: "Due", hint: "What is due: today, tomorrow, this week, or by name", symbol: "clock", takes: "today, tomorrow, week or a name", lists: .due))
         c.append(PaletteCommand(name: "overdue", aliases: ["late", "missing"], title: "Overdue", hint: "Past its date and not handed in", symbol: "exclamationmark.circle", takes: "a name (or nothing)", lists: .overdue))

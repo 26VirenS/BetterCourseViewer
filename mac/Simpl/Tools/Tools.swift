@@ -7,8 +7,9 @@ import UniformTypeIdentifiers
 // annotator, Image to text and flashcards — drawn natively, with a unit converter of the Mac's own beside them,
 // (1.3.78) the biology toolkit's ten under a heading of their own (Biology/BioTools.swift) and (1.3.80) the periodic
 // table split into the chemistry tools' four, under theirs (Chemistry/ChemTools.swift), (tools) the chemistry
-// calculators — the Equation Balancer — beside them. One row in the sidebar opens a
-// page of tiles, (tools-32) in sections by what they are for: Study, Math & science, Files, Chemistry and Biology;
+// calculators — the Equation Balancer — beside them, and (tools) the physics tools under a "Physics" heading between
+// them (Physics/PhysTools.swift). One row in the sidebar opens a page of tiles, (tools-32) in sections by what they
+// are for: Study, Math & science, Files, Chemistry, Physics and Biology;
 // (1.3.79) a tile opens its tool in a popup over the window — the Tools page staying behind it, and the whole window
 // usable round it (Shell/FloatingPopup.swift) — as its pin, a hand-off from another tool and a launch do. Any tool can be
 // pinned: it then sits in the toolbar on every screen and opens a compact version of itself in a popover
@@ -23,6 +24,8 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
     case lewis, molecule, atoms
     // (tools) the chemistry calculators after them — the Equation Balancer and the rest, ChemTools.info's too
     case balance
+    // (tools) the physics tools: their names, lines, symbols and colours are PhysTools.info's
+    case motion
     // (1.3.78) the biology toolkit: its names, lines, symbols and colours are BioTools.info's
     case cell, dna, gene, biomol, cross, divide, popgen, biolab, enzyme, energy
 
@@ -35,6 +38,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .calc: return "Calculator"
         case .graph: return "Graphing calculator"
         case .ptable, .lewis, .molecule, .atoms, .balance: return ChemTools.info(self).name
+        case .motion: return PhysTools.info(self).name
         case .need: return "Grade needed"
         case .conv: return "File converter"
         case .units: return "Unit converter"
@@ -55,6 +59,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .calc: return "Calculator"
         case .graph: return "Graphing"
         case .ptable, .lewis, .molecule, .atoms, .balance: return ChemTools.info(self).shortName
+        case .motion: return PhysTools.info(self).shortName
         case .need: return "Grade needed"
         case .conv: return "Convert"
         case .units: return "Units"
@@ -74,6 +79,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .calc: return "Scientific, from your keyboard."
         case .graph: return "Desmos, right here."
         case .ptable, .lewis, .molecule, .atoms, .balance: return ChemTools.info(self).note
+        case .motion: return PhysTools.info(self).note
         case .need: return "What you need on the final."
         case .conv: return "Convert Word, PDF and images."
         case .units: return "Lengths, weights, temperatures."
@@ -92,6 +98,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .calc: return "plus.forwardslash.minus"
         case .graph: return "chart.xyaxis.line"
         case .ptable, .lewis, .molecule, .atoms, .balance: return ChemTools.info(self).symbol
+        case .motion: return PhysTools.info(self).symbol
         case .need: return "percent"
         case .conv: return "arrow.triangle.2.circlepath"
         case .units: return "ruler"
@@ -110,6 +117,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .calc: return "#ff9f0a"
         case .graph: return "#5856d6"
         case .ptable, .lewis, .molecule, .atoms, .balance: return ChemTools.info(self).hex
+        case .motion: return PhysTools.info(self).hex
         case .need: return "#ff375f"
         case .conv: return "#34c759"
         case .units: return "#64d2ff"
@@ -127,6 +135,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
     var popoverWidth: CGFloat {
         switch self {
         case .ptable, .lewis, .molecule, .atoms, .balance: return ChemTools.popoverWidth(self)
+        case .motion: return PhysTools.popoverWidth(self)
         case .calc: return 420
         case .cite: return 400
         case .graph: return 360
@@ -331,9 +340,9 @@ struct ToolsView: View {
 
 /// (tools-32) The Tools page's sections, in order — what each tool is for, so a tool is found by its kind rather than by
 /// reading every tile; the study tools first. (1.3.80) The Periodic Table moved out of Math & science into Chemistry,
-/// with the three tools that were its pages.
+/// with the three tools that were its pages. (tools) Physics, between Chemistry and Biology.
 enum ToolGroup: CaseIterable {
-    case study, science, files, chemistry, biology
+    case study, science, files, chemistry, physics, biology
 
     var title: String {
         switch self {
@@ -341,6 +350,7 @@ enum ToolGroup: CaseIterable {
         case .science: return "Math & science"
         case .files: return "Files"
         case .chemistry: return "Chemistry"
+        case .physics: return "Physics"
         case .biology: return "Biology"
         }
     }
@@ -351,13 +361,15 @@ enum ToolGroup: CaseIterable {
         case .science: return [.calc, .graph, .units]
         case .files: return [.conv, .pdfx, .mark, .ocr]
         case .chemistry: return ChemTools.kinds
+        case .physics: return PhysTools.kinds
         case .biology: return BioTools.kinds
         }
     }
 }
 
 /// The page of tiles: every tool, a press opening it, its pin at its corner — (tools-32) in sections by what they are
-/// for, (1.3.80) the chemistry tools' and (1.3.78) the biology toolkit's last, each under a heading of its own.
+/// for, (1.3.80) the chemistry tools', (tools) the physics tools' and (1.3.78) the biology toolkit's last, each under a
+/// heading of its own.
 struct ToolsGrid: View {
     var body: some View {
         ScrollViewReader { proxy in
@@ -367,11 +379,12 @@ struct ToolsGrid: View {
                     ToolGroupSection(title: g.title, kinds: g.kinds)
                 }
                 ChemToolsSection()
+                PhysToolsSection()
                 BioToolsSection()
             }
             .task {
-                // (the screenshot suite: -SimplToolsScroll chemistry or biology, the page scrolled to that section)
-                guard let to = UserDefaults.standard.string(forKey: "SimplToolsScroll"), ["chemistry", "biology"].contains(to) else { return }
+                // (the screenshot suite: -SimplToolsScroll chemistry, physics or biology, the page scrolled to that section)
+                guard let to = UserDefaults.standard.string(forKey: "SimplToolsScroll"), ["chemistry", "physics", "biology"].contains(to) else { return }
                 try? await Task.sleep(nanoseconds: 400_000_000)
                 proxy.scrollTo(to, anchor: .top)
             }
@@ -503,6 +516,7 @@ struct ToolScreen: View {
         case .molecule: MoleculeBuilderTool()
         case .atoms: AtomsOrbitalsTool()
         case .balance: EquationBalancerTool()
+        case .motion: KinematicsTool()
         case .need: GradeNeededTool()
         case .conv: FileConverterTool()
         case .units: UnitConverterTool()

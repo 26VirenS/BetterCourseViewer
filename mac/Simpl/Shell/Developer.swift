@@ -416,6 +416,17 @@ private struct DevInterface: View {
                         .help("The Periodic Table's colouring and last element, the Lewis maker's and the Molecule Builder's molecules, Atoms & Orbitals' element and view, the calculators' last inputs")
                 }
             }
+            // (tools) the physics tools: each opened over the main window, and what they keep (PhysPrefs) forgotten
+            Section("Physics tools") {
+                HStack {
+                    ForEach(PhysTools.kinds) { k in
+                        Button(k.name) { if let engine { ToolsCenter.shared.popUp(k, engine: engine) } }
+                    }
+                    Button("Forget What They Keep") { PhysPrefs.forgetAll() }
+                        .help("Each physics tool's page and the numbers in its fields")
+                }
+                .disabled(engine == nil)
+            }
             Section("Look") {
                 Picker("Appearance (this run)", selection: $look) {
                     Text("System").tag(0)

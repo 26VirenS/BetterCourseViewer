@@ -707,7 +707,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   sidebar, or at the size last given it (`ToolsCenter.openFullScreen`, `popUp`) — with what was begun in the panel
   carried over (`QuickCarry`, said by each quick version as it changes with `quickCarry(_:)` and read by the panel):
   Grade needed's three numbers, the element searched for in the Periodic Table's or typed in Atoms & Orbitals', the
-  link pasted to cite, the unit converter's kind, units and value (`UnitConverterTool.takeHandOff`), the calculator's
+  link pasted to cite, the unit converter's kind, units and value (`UnitConverterTool.takeHandOff`), a projectile's
+  speed and angle from Kinematics & Projectiles' pin (`MotionCompact`), the calculator's
   line, sums, memory and Rad/Deg (`CalcEngine.handOff`), a codon looked up, a cross, a Hardy–Weinberg value, the lab
   calculator shown, (tools) the Equation Balancer's equation; the graph's whole drawing — expressions, sliders, tables, notes and view — by Desmos's own
   `Calc.getState`/`Calc.setState` from the pin's web view to the whole one's (`GraphWeb.carryOver`; the whole one's graph
@@ -948,6 +949,30 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   `light-55p-atoms-narrow`, `light-55q-atoms-from-facts`, `dark-55r-lewis`, `light-54h-pin-atoms`,
   `light-30c-palette-chemistry`; and the chemistry pictures before them, pointed at the tools (`light-55c-lewis`,
   `light-55d-molecule`, `light-55k-atoms-cloud`, `dark-55l-atoms-cloud`).
+- **The Physics section (tools).** A *Physics* heading of its own on the Tools page, after Chemistry and before
+  Biology, built as the Chemistry section is (`Tools/Physics/PhysTools.swift`: `PhysTools.kinds`, `info` — names,
+  lines, symbols and a family of blues — `PhysToolsSection`, which `-SimplToolsScroll physics` scrolls to, `PhysQuick`
+  for the pins, and `PhysPrefs`: UserDefaults `SimplPhys.<key>.<field>`, a picture's in a suite of its own). Each
+  tool's arithmetic is Foundation only, in `Tools/Physics/Model`, where the Models job checks it against the
+  specification's test vectors (`scripts/dev/swift-checks/main.swift`, "the physics tools"); every number is written
+  to four significant figures, rounded half up, without float noise (`PhysMath.text`). The Developer window's
+  Interface page opens each tool and forgets what they keep.
+  **Kinematics & Projectiles** (`motion`, `Tools/Physics/Kinematics.swift`; `/motion` in the search field, or
+  "kinematics", "projectile", "velocity", "free fall"): two pages. *1D motion* — the five quantities of motion in a
+  line (Δx, v₀, v, a, t) in a grid; any three filled in, the other two found as you type with the two equations that
+  found them (`Kinematics.solve`, Model/PhysMotion.swift: a velocity from v² = v₀² + 2aΔx takes the root whose time is
+  not negative), a *g* button (a = −9.81 m/s²), Clear, Copy, and a position–time and a velocity–time graph beside
+  (`MotionGraph`, a Canvas); fewer or more than three, or three no motion fits, say so inline. *Projectile* — speed,
+  angle, launch height and g to the time of flight, range, greatest height (and when), impact speed and angle
+  (`Projectile`), the path drawn to fit its card with the apex and landing marked and a dot flown along it in 1.5 s
+  each time the launch changes (`TrajectoryView`; still at the landing under Reduce Motion), and *Hit a target*: the
+  low and high angles that land it a distance off at this speed, or how far it can reach. SI in the fields; a
+  *ft · mph* toggle shows the answers in feet and mph beside the metres. The pin: speed and angle to range and
+  greatest height (`MotionCompact`), Return or Open Full Screen opening the tool on them (`tab`, `speed`, `angle`,
+  `height` handed over). Launch flags: `-SimplTool motion -SimplMotion 1d|projectile -SimplMotionValues
+  "v0=20,angle=45,h=0"` (also `x`, `v`, `a`, `t`, `g`, `target`, `units=imperial`), read only when the launch opened
+  it. Pictures (`phys_tools`): `light-35d-tools-physics`, `dark-35d-tools-physics`, `light-77-motion-1d`,
+  `light-77b-motion-projectile`, `dark-77b-motion-projectile`, `light-54s-pin-motion`.
 
 - **The chemistry calculators (tools).** After the Periodic Table's four in the Chemistry section (appended to
   `ChemTools.kinds`, their names, lines, symbols and colours in `ChemTools.info`), each a tile, a pin with a real quick

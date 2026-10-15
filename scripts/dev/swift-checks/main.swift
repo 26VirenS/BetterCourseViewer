@@ -6,12 +6,13 @@ import simd
 // molecule builder's and the Lewis maker's shapes), every file in mac/Simpl/Tools/Biology/Model (the biology toolkit's
 // data and arithmetic, and its self-check), (1.3.80) every file in mac/Simpl/Tools/Chemistry/Model (the chemistry
 // tools' launch flags and what they keep, and (tools) the chemistry calculators' arithmetic — formulas, molar masses,
-// the balancer) and mac/Simpl/Engine/LivePlan.swift (1.3.80: the live checks' plan,
+// the balancer), (tools) every file in mac/Simpl/Tools/Physics/Model (the physics tools' arithmetic: kinematics,
+// projectiles, vectors, the circuit solver) and mac/Simpl/Engine/LivePlan.swift (1.3.80: the live checks' plan,
 // fingerprint and comparison) — and run, in seconds, by the Mac app's workflow (Models). By hand on a Mac: swiftc -o
 // /tmp/model-checks mac/Simpl/Tools/{PeriodicData,PeriodicExtraData,MoleculeShape}.swift
-// mac/Simpl/Tools/Biology/Model/*.swift mac/Simpl/Tools/Chemistry/Model/*.swift mac/Simpl/Engine/LivePlan.swift
-// scripts/dev/swift-checks/main.swift && /tmp/model-checks. A failed check is printed with what was found, and the exit
-// code is the number that failed.
+// mac/Simpl/Tools/Biology/Model/*.swift mac/Simpl/Tools/Chemistry/Model/*.swift mac/Simpl/Tools/Physics/Model/*.swift
+// mac/Simpl/Engine/LivePlan.swift scripts/dev/swift-checks/main.swift && /tmp/model-checks. A failed check is printed
+// with what was found, and the exit code is the number that failed.
 
 var passed = 0, failed = 0
 func check(_ ok: Bool, _ what: String) {
@@ -216,6 +217,57 @@ let redox = try? ChemBalancer.balance("MnO4- + Fe2+ + H+ -> Mn2+ + Fe3+ + H2O").
 check(redox?.counts.last == ChemCountRow(label: "Charge", left: 17, right: 17), "a charge row when ions are in it, equal once balanced")
 check(ChemBalancer.split("Cu + Ag+") == ["Cu", "Ag+"] && ChemBalancer.split("H2+O2") == ["H2", "O2"] && ChemBalancer.split("Fe^3+ + e-") == ["Fe^3+", "e-"]
       && ChemBalancer.split("Ag+(aq) + Cl-(aq)") == ["Ag+(aq)", "Cl-(aq)"], "a side split at its pluses, not at its charges")
+
+// ---- the physics tools (tools) ------------------------------------------------------------------------------------
+// (mac/Simpl/Tools/Physics/Model: the specification's test vectors for each tool's arithmetic)
+print("the physics tools")
+let close = { (a: Double, b: Double, tol: Double) in abs(a - b) <= tol }
+// (Kinematics & Projectiles: how a number is written, motion in a line, a projectile's flight, the angles to a target)
+check(PhysMath.text(40.7747) == "40.77" && PhysMath.text(25.0) == "25" && PhysMath.text(0.1 + 0.2) == "0.3" && PhysMath.text(-19.809) == "−19.81"
+      && PhysMath.text(2.0191) == "2.019" && PhysMath.text(0) == "0" && PhysMath.text(123456) == "123456" && PhysMath.text(0.00001234) == "1.234e−05",
+      "a number written to four figures, half up, without float noise (\(PhysMath.text(40.7747)), \(PhysMath.text(0.1 + 0.2)), \(PhysMath.text(123456)))")
+check(PhysMath.number(" 1,000 ") == 1000 && PhysMath.number("−9.81") == -9.81 && PhysMath.number("") == nil && PhysMath.number("x") == nil,
+      "a field's number read with commas and the typographic minus, a blank as none")
+check(PhysMath.pairs("v0=20, angle=45,h=0,=1,bad") == ["v0": "20", "angle": "45", "h": "0"], "a launch's values read as pairs")
+if case .success(let r) = Kinematics.solve([.v0: 0, .a: 2, .t: 5]) {
+    check(close(r[.x], 25, 1e-9) && close(r[.v], 10, 1e-9) && r.solved == [.x, .v] && r.equations == [Kinematics.eqV, Kinematics.eqX],
+          "v₀ = 0, a = 2, t = 5: Δx = 25 and v = 10 by v = v₀ + at and Δx = v₀t + ½at² (\(PhysMath.text(r[.x])), \(PhysMath.text(r[.v])))")
+} else { check(false, "v₀ = 0, a = 2, t = 5 solved") }
+if case .success(let r) = Kinematics.solve([.x: -20, .v0: 0, .a: -9.81]) {
+    check(close(r[.t], 2.019, 5e-4) && close(abs(r[.v]), 19.81, 5e-3) && r[.v] < 0,
+          "a fall of 20 m takes 2.019 s and lands at 19.81 m/s, downwards (\(PhysMath.text(r[.t])) s, \(PhysMath.text(r[.v])) m/s)")
+} else { check(false, "a fall of 20 m solved") }
+if case .success(let r) = Kinematics.solve([.v0: 10, .v: 0, .a: -2]) {
+    check(close(r[.t], 5, 1e-9) && close(r[.x], 25, 1e-9), "braking from 10 m/s at 2 m/s²: 5 s and 25 m")
+} else { check(false, "braking solved") }
+let combos: [[KinematicQuantity: Double]] = [[.v0: 3, .v: 13, .t: 5], [.v0: 3, .v: 13, .x: 40], [.v0: 3, .t: 5, .x: 40], [.v: 13, .a: 2, .t: 5],
+                                             [.v: 13, .a: 2, .x: 40], [.v: 13, .t: 5, .x: 40], [.a: 2, .t: 5, .x: 40], [.v0: 3, .a: 2, .x: 40]]
+let combosOK = combos.allSatisfy { given in
+    if case .success(let r) = Kinematics.solve(given) {
+        return close(r[.v0], 3, 1e-9) && close(r[.v], 13, 1e-9) && close(r[.a], 2, 1e-9) && close(r[.t], 5, 1e-9) && close(r[.x], 40, 1e-9)
+    }
+    return false
+}
+check(combosOK, "every three of v₀ = 3, v = 13, a = 2, t = 5, Δx = 40 give back the other two")
+check(Kinematics.solve([.v0: 1, .v: 2]) == .failure(.tooFew(2)) && Kinematics.solve([.v0: 1, .v: 2, .a: 1, .t: 1]) == .failure(.tooMany(4)),
+      "two given is too few, four too many")
+if case .failure(.impossible) = Kinematics.solve([.v0: 0, .a: 2, .x: -5]) { check(true, "a negative v² is said to be impossible") } else { check(false, "a negative v² refused") }
+let shot = Projectile(speed: 20, angle: 45, height: 0)
+check(close(shot.range, 40.77, 5e-3) && close(shot.maxHeight, 10.19, 5e-3) && close(shot.flightTime, 2.883, 5e-4),
+      "20 m/s at 45°: range 40.77 m, 10.19 m high, 2.883 s in the air (\(PhysMath.text(shot.range)), \(PhysMath.text(shot.maxHeight)), \(PhysMath.text(shot.flightTime)))")
+check(close(shot.impactSpeed, 20, 1e-6) && close(shot.impactAngle, 45, 1e-6), "and it lands as fast as it left, at 45° below the horizontal")
+let drop = Projectile(speed: 0, angle: 0, height: 20)
+check(close(drop.flightTime, 2.019, 5e-4) && close(drop.impactSpeed, 19.81, 5e-3) && drop.range == 0 && close(drop.impactAngle, 90, 1e-6),
+      "dropped from 20 m: 2.019 s, 19.81 m/s, straight down")
+let aim = Projectile(speed: 20, angle: 0, height: 0).angles(toReach: 20) ?? []
+check(aim.count == 2 && close(aim[0], 14.69, 0.01) && close(aim[1], 75.31, 0.01) && Projectile(speed: 20, angle: 0, height: 0).angles(toReach: 50) == nil,
+      "a target 20 m off at 20 m/s is hit at 14.69° or 75.31°; one at 50 m is out of reach (\(aim.map { PhysMath.text($0) }))")
+check(Projectile(speed: 20, angle: 45, height: 0).angles(toReach: 40.77) != nil && close(Projectile(speed: 20, angle: 0, height: 0).farthest, 40.77, 5e-3),
+      "the farthest at 20 m/s is 40.77 m, at 45°")
+check(ImperialDisplay.convert(1, unit: "m").value == 3.28084 && ImperialDisplay.convert(1, unit: "m/s").unit == "mph" && ImperialDisplay.convert(2, unit: "s") == (2, "s"),
+      "the ft/mph display converts lengths and speeds and leaves seconds")
+let line = Kinematics.samples(v0: 0, a: 2, t: 5, n: 10)
+check(line.count == 11 && close(line[10].x, 25, 1e-9) && close(line[10].v, 10, 1e-9) && line[0].t == 0, "the graphs' points run from 0 to t")
 
 // ---- live checks ----------------------------------------------------------------------------------------------
 // (mac/Simpl/Engine/LivePlan.swift, 1.3.80: when the screen on show is checked again, the fingerprint the page gives an
