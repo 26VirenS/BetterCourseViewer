@@ -330,7 +330,7 @@ struct PinnedToolQuick: View {
         case .pomo: FocusTimerCompact()
         case .calc: CalculatorCompact()
         case .need: GradeNeededCompact { openFull($0, []) }
-        case .ptable, .lewis, .molecule, .atoms, .balance, .moles:
+        case .ptable, .lewis, .molecule, .atoms, .balance, .moles, .gas:
             // (1.3.80) the chemistry tools': Chemistry/ChemTools.swift
             ChemQuick(kind: kind) { openFull($0, []) }
         case .motion, .vectors, .circuit:

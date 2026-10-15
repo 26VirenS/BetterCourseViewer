@@ -713,7 +713,7 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   speed and angle from Kinematics & Projectiles' pin (`MotionCompact`), two vectors from Vectors' (`VectorsCompact`),
   the Circuit Builder's Ohm's law and list (`CircuitCompact`), the calculator's
   line, sums, memory and Rad/Deg (`CalcEngine.handOff`), a codon looked up, a cross, a Hardy–Weinberg value, the lab
-  calculator shown, (tools) the Equation Balancer's equation, a formula for its molar mass, the Word Counter's text, Statistics' line of data (to its Describe page), the Matrix Calculator's A;
+  calculator shown, (tools) the Equation Balancer's equation, a formula for its molar mass, the gas law's four fields, the Word Counter's text, Statistics' line of data (to its Describe page), the Matrix Calculator's A;
   the graph's whole drawing — expressions, sliders, tables, notes and view — by Desmos's own
   `Calc.getState`/`Calc.setState` from the pin's web view to the whole one's (`GraphWeb.carryOver`; the whole one's graph
   before it is a ⌘Z away). The focus timer, Flashcards' sets and the lab's numbers are the whole tool's already. A panel
@@ -1056,6 +1056,23 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
     "H2=4g,O2=16g"`, `-SimplMolesEmpirical "C=40,H=6.71,O=53.3"`, `-SimplMolesMass 180` (the pin reads
     `-SimplMolesFormula`). Pictures: `light-71c-tool-moles`, `dark-71c-tool-moles`, `light-71d-tool-moles-reaction`,
     `light-71f-tool-moles-narrow` (the Empirical tab, 780 × 700), `light-54v-pin-moles`.
+  - **Gas Laws** (`gas`, `Tools/Chemistry/GasLaws.swift`; `/gas`, words *gas law*, *ideal gas*, *pv=nrt*, *boyle*,
+    *charles*, *pressure*, *volume*): two tabs, kept with their values and units (`gas.tab`, `.ideal`, `.idealUnits`,
+    `.combined`, `.combinedUnits`, `.constant`). *Ideal gas*: P, V, n and T, each with its own unit (atm, kPa, mmHg (Torr),
+    bar, psi; L, mL, m³; mol or *g of…* a formula; K, °C, °F); the one left blank is solved in its field's unit
+    (`ChemGas.ideal`, R = 0.082057 L·atm/(mol·K), the fields converted to atm, L, mol and K), the formula *PV = nRT*
+    shown with the solved letter lit; two blanks say *Fill in all but one*, none *Leave one field blank*, a word
+    which field, a temperature at or under 0 K why. *Combined*: P₁V₁/T₁ = P₂V₂/T₂ as two State cards with one unit
+    picker per quantity, one blank solved (`ChemGas.combined`); chips *Boyle (T constant)*, *Charles (P constant)*
+    and *Gay-Lussac (V constant)* leave that pair out and write the reduced law. Beside both, the piston
+    (`GasPistonView`): a cylinder whose piston rises with the volume (a log scale, `ChemGas.pistonHeight`), dots as
+    dense as the gas (n/V, or P/RT on the Combined tab; `pistonDots`) and a colour from cold blue to hot red
+    (`pistonWarmth`), moving over 200 ms as a value changes (still with Reduce Motion). Copy copies the solved value.
+    Pin: the Ideal gas tab small (`GasLawsCompact`, 360 points wide; carried: `values` as "P=1 atm,V=22.4 L,…"). Launch:
+    `-SimplTool gas -SimplGas ideal|combined -SimplGasValues "P=1 atm,V=22.4 L,T=273.15 K"` (a value's unit sets its
+    field's; `n=4 g H2` grams of a formula; the Combined tab's `P1 V1 T1 P2 V2 T2`), `-SimplGasConstant T|P|V` (a chip
+    pressed); the pin reads `-SimplGasValues`. Pictures: `light-72-tool-gas`, `dark-72-tool-gas`,
+    `light-72b-tool-gas-combined`, `light-72e-tool-gas-boyle`, `light-72a-tool-gas-narrow` (780 × 700), `light-54w-pin-gas`.
 
 - **The study and maths tools.** Tools of the Mac's own after the chemistry ones, each a `ToolKind` case with its
   name, line, symbol and colour inline (as the first tools have them), a tile at the end of its section's row, a popup,
@@ -1246,7 +1263,9 @@ hold's row under Version), `-SimplSidebar hidden` (the window opens with its sid
 panel, 0.5 half-way, and stays there — the real grow, stopped, so a picture shows it under way, even where the Mac
 reduces motion; `DashMorphHold`), (tools) `-SimplTool balance -SimplBalance "<equation>"` (the Equation Balancer on
 that equation), `-SimplTool moles -SimplMoles <tab> -SimplMolesFormula|-SimplMolesEquation|-SimplMolesGiven|
--SimplMolesEmpirical|-SimplMolesMass …` (Molar Mass & Stoichiometry on a tab with its inputs). In the pictures' consoles a counter opened says how it came (`[Simpl] counter: next
+-SimplMolesEmpirical|-SimplMolesMass …` (Molar Mass & Stoichiometry on a tab with its inputs), `-SimplTool gas
+-SimplGas ideal|combined -SimplGasValues "P=1 atm,V=22.4 L,T=273.15 K" [-SimplGasConstant T|P|V]` (Gas Laws on a tab
+with its fields, one blank to solve). In the pictures' consoles a counter opened says how it came (`[Simpl] counter: next
 grows`, or `fades in (Reduce Motion)`).
 
 ## Releasing

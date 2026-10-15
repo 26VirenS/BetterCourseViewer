@@ -252,6 +252,41 @@ check(ChemStoich.empirical([("Xx", 50), ("O", 50)], molarMass: nil) == .failure(
       "an element it does not know, named; nothing given")
 check(ChemStoich.shares("C=40,H=6.71, O=53.3").map(\.symbol) == ["C", "H", "O"] && ChemStoich.shares("C=40,H=6.71, O=53.3")[2].amount == 53.3, "each element's share read from the launch's list")
 
+// (Gas Laws, Model/ChemGas.swift: PV = nRT for the one blank, the combined law, the units)
+func gasField(_ name: String, _ text: String, unit: Double = 1) -> ChemGas.Field { ChemGas.Field(name: name, text: text, value: ChemNumber.number(text).map { $0 * unit }) }
+let stp = try? ChemGas.ideal(P: gasField("P", "1"), V: gasField("V", "22.4"), n: gasField("n", ""), T: gasField("T", "273.15")).get()
+check(stp?.0 == .n && stp.map { abs($0.1 - 1.00) < 0.002 } == true, "1 atm, 22.4 L at 273.15 K: n ≈ 1.00 mol (\(stp.map { ChemNumber.sig($0.1) } ?? ""))")
+let twoMoles = try? ChemGas.ideal(P: gasField("P", ""), V: gasField("V", "10"), n: gasField("n", "2"), T: gasField("T", "300")).get()
+check(twoMoles?.0 == .P && twoMoles.map { abs($0.1 - 4.92) < 0.005 } == true, "2 mol in 10 L at 300 K: P = 4.92 atm (\(twoMoles.map { ChemNumber.sig($0.1) } ?? ""))")
+let solvedT = try? ChemGas.ideal(P: gasField("P", "1"), V: gasField("V", "22.4"), n: gasField("n", "1"), T: gasField("T", "")).get()
+let solvedV = try? ChemGas.ideal(P: gasField("P", "1"), V: gasField("V", ""), n: gasField("n", "1"), T: gasField("T", "273.15")).get()
+check(solvedT?.0 == .T && solvedT.map { abs($0.1 - 272.98) < 0.1 } == true && solvedV?.0 == .V && solvedV.map { abs($0.1 - 22.41) < 0.01 } == true, "and T or V solved alike")
+func idealError(_ p: String, _ v: String, _ n: String, _ t: String) -> ChemGas.SolveError? {
+    if case .failure(let e) = ChemGas.ideal(P: gasField("P", p), V: gasField("V", v), n: gasField("n", n), T: gasField("T", t)) { return e }
+    return nil
+}
+check(idealError("1", "22.4", "", "") == .tooManyBlank && idealError("1", "22.4", "1", "273") == .nothingBlank && idealError("1", "abc", "", "273") == .unreadable("V")
+      && idealError("1", "22.4", "", "-5") == .impossible("The temperature must be above absolute zero (0 K).") && idealError("0", "22.4", "", "273") == .impossible("P must be more than 0."),
+      "two blanks say fill in all but one; none, leave one; a word, which; a temperature under 0 K or a pressure of nothing, why")
+check(abs(101.325 * ChemGas.PressureUnit.kPa.atm - 1) < 1e-9 && abs(760 * ChemGas.PressureUnit.mmHg.atm - 1) < 1e-9 && abs(14.696 * ChemGas.PressureUnit.psi.atm - 1) < 1e-4
+      && abs(1.01325 * ChemGas.PressureUnit.bar.atm - 1) < 1e-9 && ChemGas.VolumeUnit.mL.litres == 0.001 && ChemGas.VolumeUnit.m3.litres == 1000,
+      "101.325 kPa = 1 atm = 760 mmHg = 14.696 psi = 1.01325 bar; mL and m³")
+check(ChemGas.TemperatureUnit.C.kelvin(25) == 298.15 && abs(ChemGas.TemperatureUnit.F.kelvin(212) - 373.15) < 1e-9 && abs(ChemGas.TemperatureUnit.F.from(kelvin: 273.15) - 32) < 1e-9
+      && ChemGas.PressureUnit.named("Torr") == .mmHg && ChemGas.VolumeUnit.named("m³") == .m3 && ChemGas.TemperatureUnit.named("°C") == .C && ChemGas.PressureUnit.named("psig") == nil,
+      "°C and °F to kelvin and back; units by name")
+let combinedFields = ["P1": gasField("P1", "1"), "V1": gasField("V1", "2"), "T1": gasField("T1", "300"), "P2": gasField("P2", "2"), "V2": gasField("V2", ""), "T2": gasField("T2", "600")]
+let v2 = try? ChemGas.combined(combinedFields, constant: nil).get()
+check(v2?.0 == "V2" && v2.map { abs($0.1 - 2) < 1e-9 } == true, "P1 = 1 atm, V1 = 2 L, T1 = 300 K, P2 = 2 atm, T2 = 600 K: V2 = 2 L")
+let boyle = try? ChemGas.combined(["P1": gasField("P1", "1"), "V1": gasField("V1", "2"), "P2": gasField("P2", ""), "V2": gasField("V2", "4")], constant: .T).get()
+check(boyle?.0 == "P2" && boyle.map { abs($0.1 - 0.5) < 1e-9 } == true, "Boyle: 1 atm at 2 L is 0.5 atm at 4 L, T left out")
+let charles = try? ChemGas.combined(["V1": gasField("V1", "2"), "T1": gasField("T1", "300"), "V2": gasField("V2", ""), "T2": gasField("T2", "600")], constant: .P).get()
+check(charles?.0 == "V2" && charles.map { abs($0.1 - 4) < 1e-9 } == true, "Charles: 2 L at 300 K is 4 L at 600 K, P left out")
+check({ if case .failure(let e) = ChemGas.combined(combinedFields.merging(["P2": gasField("P2", "")]) { $1 }, constant: nil) { return e == .tooManyBlank }; return false }(),
+      "two blanks in the combined law say fill in all but one")
+check(ChemGas.pistonHeight(litres: 1) > 0.3 && ChemGas.pistonHeight(litres: 1) < 0.36 && ChemGas.pistonHeight(litres: 100) == 0.95 && ChemGas.pistonHeight(litres: 0.001) == 0.12
+      && ChemGas.pistonDots(moles: 1, litres: 22.4) == 4 && ChemGas.pistonDots(moles: 2, litres: 1) == 60 && ChemGas.pistonWarmth(kelvin: 273.15) > 0.27 && ChemGas.pistonWarmth(kelvin: 700) == 1,
+      "the piston drawn: a litre a third of the way up, dots by density, warmth by temperature")
+
 // ---- the physics tools (tools) ------------------------------------------------------------------------------------
 // (mac/Simpl/Tools/Physics/Model: the specification's test vectors for each tool's arithmetic)
 print("the physics tools")

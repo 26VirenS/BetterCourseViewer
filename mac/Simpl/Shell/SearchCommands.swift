@@ -295,6 +295,7 @@ final class SearchPalette: ObservableObject {
         // (tools) the chemistry calculators
         c.append(PaletteCommand(name: "balance", aliases: ["equation", "reaction", "coefficients", "balancer", "balance equation"], title: ToolKind.balance.name, hint: "Balance any chemical equation", symbol: ToolKind.balance.symbol, action: .tool(.balance)))
         c.append(PaletteCommand(name: "moles", aliases: ["molar mass", "molar", "mole", "grams", "stoichiometry", "limiting reagent", "percent yield", "empirical"], title: ToolKind.moles.name, hint: "Molar mass, moles, limiting reagent and yields", symbol: ToolKind.moles.symbol, action: .tool(.moles)))
+        c.append(PaletteCommand(name: "gas", aliases: ["gas law", "gas laws", "ideal gas", "pv=nrt", "boyle", "charles", "pressure", "volume"], title: ToolKind.gas.name, hint: "PV = nRT and the combined law, one blank solved", symbol: ToolKind.gas.symbol, action: .tool(.gas)))
         // (tools) the physics tools
         c.append(PaletteCommand(name: "motion", aliases: ["kinematics", "projectile", "projectiles", "velocity", "acceleration", "free fall"], title: ToolKind.motion.name, hint: "1D motion from any three of its five, and a projectile's path", symbol: ToolKind.motion.symbol, action: .tool(.motion)))
         c.append(PaletteCommand(name: "vectors", aliases: ["vector", "dot product", "cross product", "resultant", "components", "magnitude"], title: ToolKind.vectors.name, hint: "Add, dot and cross up to six vectors, drawn in 2D or 3D", symbol: ToolKind.vectors.symbol, action: .tool(.vectors)))

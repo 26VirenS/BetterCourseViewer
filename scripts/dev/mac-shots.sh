@@ -611,6 +611,15 @@ chem_calc_tools() {
   MODE=light SIZE=1440x920 shoot light-71d-tool-moles-reaction 14 -SimplPlace tools -SimplTool moles -SimplMoles reaction -SimplMolesEquation "2H2 + O2 → 2H2O" -SimplMolesGiven "H2=4g,O2=16g"
   MODE=light SIZE=780x700 shoot light-71f-tool-moles-narrow 14 -SimplPlace tools -SimplTool moles -SimplMoles empirical -SimplMolesEmpirical "C=40,H=6.71,O=53.3" -SimplMolesMass 180
   MODE=light shoot light-54v-pin-moles 14 -SimplPinnedTools moles -SimplPinOpen moles -SimplMolesFormula "Ca(OH)2"
+  # Gas Laws: a mole at STP solved for n in light and dark, the Combined tab (V2 solved) and Boyle's chip, narrow
+  # with V solved from mixed units, and its pin
+  for m in light dark; do
+    MODE="$m" SIZE=1440x920 shoot "$m-72-tool-gas" 14 -SimplPlace tools -SimplTool gas -SimplGas ideal -SimplGasValues "P=1 atm,V=22.4 L,T=273.15 K"
+  done
+  MODE=light SIZE=1440x920 shoot light-72b-tool-gas-combined 14 -SimplPlace tools -SimplTool gas -SimplGas combined -SimplGasValues "P1=1 atm,V1=2 L,T1=300 K,P2=2 atm,T2=600 K"
+  MODE=light SIZE=1440x920 shoot light-72e-tool-gas-boyle 14 -SimplPlace tools -SimplTool gas -SimplGas combined -SimplGasConstant T -SimplGasValues "P1=1 atm,V1=2 L,V2=4 L"
+  MODE=light SIZE=780x700 shoot light-72a-tool-gas-narrow 14 -SimplPlace tools -SimplTool gas -SimplGas ideal -SimplGasValues "P=2 atm,n=0.5 mol,T=25 C"
+  MODE=light shoot light-54w-pin-gas 14 -SimplPinnedTools gas -SimplPinOpen gas -SimplGasValues "P=1 atm,V=22.4 L,T=273.15 K"
 }
 
 # (tools) the Tools page's Physics section in light and in dark; Kinematics & Projectiles' 1D page (a fall of 20 m:
