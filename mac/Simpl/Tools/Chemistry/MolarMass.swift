@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-// (tools) Molar Mass & Stoichiometry: four tabs. Molar mass — a formula's molar mass with its breakdown (each element,
+// (1.3.93) Molar Mass & Stoichiometry: four tabs. Molar mass — a formula's molar mass with its breakdown (each element,
 // its count, atomic mass, subtotal and mass %, the percent composition). Convert — one amount of a formula in grams,
 // moles, particles or litres of gas at STP, and the other three. Reaction — a balanced equation (balanced for you by
 // the Equation Balancer's arithmetic if it needs it) with what is given of each reactant: the limiting reagent, each

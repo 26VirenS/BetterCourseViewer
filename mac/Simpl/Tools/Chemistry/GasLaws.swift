@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-// (tools) Gas Laws: two tabs. Ideal gas — P, V, n and T each with its own units (atm, kPa, mmHg, bar, psi; L, mL,
+// (1.3.93) Gas Laws: two tabs. Ideal gas — P, V, n and T each with its own units (atm, kPa, mmHg, bar, psi; L, mL,
 // m³; mol or grams of a formula; K, °C, °F); leave one blank and it is solved, the formula shown with that letter lit.
 // Combined — P₁V₁/T₁ = P₂V₂/T₂, six fields, one blank solved; a chip holds a pair constant (Boyle, Charles,
 // Gay-Lussac) and hides it. Beside them a piston: a cylinder whose piston rises with the volume, with dots as dense

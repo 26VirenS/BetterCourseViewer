@@ -1,6 +1,6 @@
 import Foundation
 
-// (tools) Gas Laws' arithmetic — Foundation only, checked by the Models job: pressure, volume, amount and
+// (1.3.93) Gas Laws' arithmetic — Foundation only, checked by the Models job: pressure, volume, amount and
 // temperature in their units and in the ones PV = nRT is solved in (atm, L, mol, K; R = 0.082057 L·atm/(mol·K)); the
 // ideal gas law solved for whichever one of the four is left blank; and the combined law P₁V₁/T₁ = P₂V₂/T₂ solved for
 // the one of six left blank, with a pair held constant by Boyle's, Charles's or Gay-Lussac's law.

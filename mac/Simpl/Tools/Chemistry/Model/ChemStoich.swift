@@ -1,6 +1,6 @@
 import Foundation
 
-// (tools) Molar Mass & Stoichiometry's arithmetic — Foundation only, checked by the Models job: an amount of a
+// (1.3.93) Molar Mass & Stoichiometry's arithmetic — Foundation only, checked by the Models job: an amount of a
 // substance in grams, moles, particles or litres of gas at STP turned into the other three; a balanced reaction
 // (ChemBalance.swift) with what is given of each reactant — the limiting reagent, each product's theoretical yield,
 // what is left of the reactants in excess, and a percent yield; and an empirical formula from each element's share,
