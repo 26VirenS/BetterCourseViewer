@@ -819,6 +819,20 @@ jobs:
           Shot 'pin-full-need' '1366x778' 30 ($mock + @('--appearance', 'light', '--pin', 'need', '--pin-full', 'need', '--need-numbers', '85,30,90', '--shot-settle', 'no'))
           Shot 'pin-full-graph' '1366x778' 60 ($mock + @('--appearance', 'light', '--pin', 'graph', '--pin-full', 'graph', '--pin-graph', 'y=x^2', '--shot-settle', 'no'))
           Shot 'pin-graph-drawn' '1366x778' 40 ($mock + @('--appearance', 'light', '--pin', 'graph', '--pin-open', 'graph', '--pin-graph', 'y=x^2', '--shot-settle', 'no'))
+          # (Knewton Alta, after them so the pictures before keep their parts) its question on the mock's learn page, the
+          # rail filled from the player's answer (alta:<course>:<assignment>:<page>): in light in a dark app whose web
+          # profile prefers dark — the page's look at first, Light and Dark and Show browser above the objectives (its page
+          # checked below to prefer light) —, in Dark, on a narrow window (Show browser said "Browser"), and with Show
+          # browser on (Alta's own page as it is); and a pop-up of Alta's whose rich body comes in a second and a half after
+          # it opens, shown whole as the app's own dialog, light and dark (checked below)
+          $altaPage = 'alta:104:4003:/mock-alta/learn/course/c1/assignment/a3?demo=1'
+          $altaDialog = 'alta:104:4003:/mock-alta/learn/course/c1/assignment/a3?demo=dialog'
+          Shot 'alta-question-light' '1366x778' 50 ($mock + @('--appearance', 'dark', '--web-scheme', 'dark', '--open', $altaPage))
+          Shot 'alta-question-dark' '1366x778' 50 ($mock + @('--appearance', 'dark', '--alta-look', 'dark', '--open', $altaPage))
+          Shot 'alta-question-narrow' '780x683' 50 ($mock + @('--appearance', 'light', '--open', $altaPage))
+          Shot 'alta-browser' '1366x778' 50 ($mock + @('--appearance', 'dark', '--alta-browser', '--open', $altaPage))
+          Shot 'alta-dialog' '1366x778' 50 ($mock + @('--appearance', 'light', '--open', $altaDialog))
+          Shot 'alta-dialog-dark' '1366x778' 50 ($mock + @('--appearance', 'dark', '--open', $altaDialog))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
@@ -993,6 +1007,23 @@ jobs:
             $frames = @(Select-String -Path $framedLog -Pattern 'web window: a frame prefers (\w+)' -ErrorAction SilentlyContinue | ForEach-Object { $_.Matches[0].Groups[1].Value })
             if ($page.Count -eq 0 -or $page -contains 'dark' -or $frames.Count -eq 0 -or $frames -contains 'dark') { Write-Host "::error::tool-window-framed: the tool's page ($($page -join ', ')) or its frame ($($frames -join ', ')) did not prefer light ($framedLog)"; exit 1 }
             Write-Host "tool-window-framed: the page prefers $($page -join ', '); its frames $($frames -join ', ')"
+          }
+          # Knewton Alta's page in light in a dark app whose web profile prefers dark (Shell/WebWindow.cs, LightPages: the
+          # popup writes "alta: the page prefers …" in a picture run as each page comes in)
+          if ($script:mine -contains 'alta-question-light') {
+            $said = @(Select-String -Path 'shots/profile-alta-question-light.log' -Pattern 'alta: the page prefers (\w+)' -ErrorAction SilentlyContinue | ForEach-Object { $_.Matches[0].Groups[1].Value })
+            if ($said.Count -eq 0 -or $said -contains 'dark') { Write-Host "::error::alta-question-light: Alta's page did not prefer light ($($said -join ', ')) (shots/profile-alta-question-light.log)"; exit 1 }
+            Write-Host "alta-question-light: the page prefers $($said -join ', ')"
+          }
+          # a pop-up of Alta's whose body comes in after it opens, shown whole as the app's own dialog: its words, both its
+          # formulas and both its pictures (Screens/Alta/AltaSession.cs writes "alta: a pop-up shown as the app's own: …"
+          # in a picture run; before 0.3.5 such a pop-up came up with its title and buttons round an empty body)
+          foreach ($name in @('alta-dialog', 'alta-dialog-dark')) {
+            if ($script:mine -notcontains $name) { continue }
+            $said = @(Select-String -Path "shots/profile-$name.log" -Pattern 'alta: a pop-up shown as the app''s own: (.+)$' -ErrorAction SilentlyContinue | ForEach-Object { $_.Matches[0].Groups[1].Value }) | Select-Object -First 1
+            $whole = [regex]::Match("$said", '(\d+) words, (\d+) formulas, (\d+) pictures')
+            if (-not $whole.Success -or [int]$whole.Groups[1].Value -lt 40 -or [int]$whole.Groups[2].Value -lt 2 -or [int]$whole.Groups[3].Value -lt 2) { Write-Host "::error::${name}: Alta's pop-up was not shown whole as the app's own ('$said') (shots/profile-$name.log)"; exit 1 }
+            Write-Host "${name}: $said"
           }
           # More from Canvas read from the mock's own menu, in its order, My Materials with the picture the page drew of its
           # icon; History's and Help's popups listing rows (Shell/MoreFromCanvas.cs writes "more from canvas: …" and "more
