@@ -675,6 +675,14 @@ check(quizDay.count == 2 && quizDay.allSatisfy { utc.isDate($0.start, inSameDayA
 check(tight.blocks.filter { utc.isDate($0.start, inSameDayAs: planNow) }.map { utc.component(.hour, from: $0.start) } == [14, 14]
       && tight.blocks.filter { utc.isDate($0.start, inSameDayAs: planNow) }.map { utc.component(.minute, from: $0.start) } == [0, 55],
       "an afternoon's blocks start at two, ten minutes apart")
+// finishing a day early, a discussion due tonight and an assignment due tomorrow night (10 points each) share today as
+// the day to finish by, and today holds two blocks: the one due tonight gets today's first block, and is not short
+let tonight = StudyItem(id: "d1", title: "Dis01", course: "MATH 021", color: "#ff2d55", kind: "Discussion", points: 10, due: due(0, 23, 59))
+let tomorrowNight = StudyItem(id: "a1", title: "Composition of Functions", course: "MATH 021", color: "#ff2d55", kind: "Assignment", points: 10, due: due(1, 23, 59))
+let shared = StudyPlanner.plan([tomorrowNight, tonight], settings: two, done: [:], now: planNow, calendar: utc)
+let sharedToday = shared.blocks.filter { utc.isDate($0.start, inSameDayAs: planNow) }.map(\.itemId)
+check(sharedToday == ["d1", "a1"] && shared.progress.first { $0.id == "d1" }?.unplanned == 0 && shared.progress.first { $0.id == "d1" }?.planned == 1,
+      "on a shared day to finish by, the piece due sooner goes first and is not left short (today: \(sharedToday))")
 let halfDone = StudyPlanner.plan(work, settings: roomyPlan, done: ["2003": 1, "1011": 5], now: planNow, calendar: utc)
 let labLeft = halfDone.progress.first { $0.id == "2003" }, quizLeft = halfDone.progress.first { $0.id == "1011" }
 check(labLeft?.planned == 1 && labLeft?.done == 1 && labLeft?.line == "1 of 2 blocks done · 1 planned" && halfDone.blocks.first { $0.itemId == "2003" }?.id == "2003:2"

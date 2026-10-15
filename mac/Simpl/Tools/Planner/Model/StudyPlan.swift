@@ -186,12 +186,22 @@ struct StudyPlan {
 
 enum StudyPlanner {
     /// The plan: each piece of work's blocks spread over the days from today to the day it should be finished by, filling
-    /// each day's hours by priority — the earliest due first, then the heaviest — and never past a due date. A block done
+    /// each day's hours by priority — the earliest day to finish by first, then the soonest due, then the heaviest — and
+    /// never past a due date. A block done
     /// (`done`: blocks done per work) is taken off that work's need first.
     static func plan(_ items: [StudyItem], settings: StudySettings, done: [String: Int], now: Date, calendar: Calendar) -> StudyPlan {
         let today = calendar.startOfDay(for: now)
+        /// The day a piece of work should be finished by: `finishDaysBefore` days before it is due — today at least.
+        func finishDay(_ it: StudyItem) -> Date {
+            let end = calendar.date(byAdding: .day, value: -settings.finishDaysBefore, to: calendar.startOfDay(for: it.due)) ?? today
+            return end < today ? today : end
+        }
+        // by the day to finish by, then — work due tonight and tomorrow night share it when finishing a day early — the
+        // one due sooner, then the heavier, so a piece due today is never left short by one due later with the same day
         let open = items.filter { $0.due > now && (($0.course.isEmpty) || !settings.excludedCourses.contains($0.course)) }
             .sorted { a, b in
+                let fa = finishDay(a), fb = finishDay(b)
+                if fa != fb { return fa < fb }
                 if a.due != b.due { return a.due < b.due }
                 if a.weight != b.weight { return a.weight > b.weight }
                 return a.id < b.id
@@ -226,8 +236,7 @@ enum StudyPlanner {
             let had = min(blocks, max(0, done[it.id] ?? 0))
             // the days it may be studied on: from today to `finishDaysBefore` days before it is due — today at least,
             // while it is still ahead — and only days a block can end before it is due
-            var end = calendar.date(byAdding: .day, value: -settings.finishDaysBefore, to: calendar.startOfDay(for: it.due)) ?? today
-            if end < today { end = today }
+            let end = finishDay(it)
             var window: [Date] = []
             var d = today
             while d <= end {

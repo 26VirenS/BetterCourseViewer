@@ -1186,7 +1186,7 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   (a midterm, a final, a test or an exam by name counts as one whatever Canvas calls it), a quiz 1.5, an assignment 1,
   a discussion 0.5 — at 4½ minutes a point, rounded up to whole blocks (one at least, 24 at most); the blocks are spread
   evenly over the days from today to the due date less the days-before setting, never past the due time, each day's
-  hours filled by priority (the earliest due first, then the heaviest), a day's blocks ten minutes apart from the time of
+  hours filled by priority (the earliest day to finish by first, then the soonest due, then the heaviest), a day's blocks ten minutes apart from the time of
   day chosen (morning 9, afternoon 2, evening 7; today no earlier than now, to the quarter hour). What will not fit is
   said ("2 won't fit"). Settings, kept (`PlanPrefs`: `SimplPlan.settings`, `.done`, `.view`; a picture's in a suite of
   its own): hours for each weekday (2 on a weekday, 3 at the weekend), the block (25/45/60/90 min, 45), the time of day,
