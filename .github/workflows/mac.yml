@@ -1,9 +1,16 @@
-# Simpl for Mac (mac/): built with Xcode 26 for macOS, signed to run locally, and run against the mock Canvas: the
-# main screens pictured (scripts/dev/mac-shots.sh), the pictures, the build's errors and the app itself pushed to the
-# mac-shots branch to be looked at. Nothing is published here. A push takes the quick set (a dozen pictures, a few
-# minutes) and a newer push cancels the run before it; every screen in light and dark ("full") is taken when a commit's
-# message says [full shots], or by hand: Actions → Mac app → Run workflow → full. (1.3.1: built without an index; the
-# pictures taken by four copies of the app at once, each as soon as it has settled — mac-shots.sh.)
+# Simpl for Mac (mac/): built with Xcode 26 for macOS, signed to run locally, and run against the mock Canvas: every
+# screen pictured in light and dark (scripts/dev/mac-shots.sh), the pictures, the build's errors and the app itself
+# pushed to the mac-shots branch to be looked at. Nothing is published here. (1.3.1: built without an index; the
+# pictures taken by several copies of the app at once, each as soon as it has settled — mac-shots.sh.) (1.3.80) Every
+# run — a push's and Run workflow's alike — takes the whole set, what a push took and what "full" took (423 pictures;
+# "quick" is the same set now), in four parts at once: each part on a Mac of its own that builds the app itself from
+# the last build (the same incremental build in each, so no part waits for another's) and takes its share of the
+# pictures, shared out by the time each took in a run (scripts/dev/baselines/mac-shot-times.txt) so that the four end
+# together; then one Linux job puts the parts together, checks them as one and pushes them to mac-shots, and the Models
+# job runs beside it. A newer push cancels the run before it. Run workflow → none builds without pictures; "Build from
+# clean" compiles every file. Why four: the account runs five Macs at once, and the owner asked for the push to a
+# beta in half the time — four parts leave one Mac for a release; the Models job takes its Mac once the parts are done
+# with theirs (docs/CI.md). The number of parts is the matrix's list below alone.
 name: Mac app
 
 on:
@@ -34,10 +41,10 @@ on:
   workflow_dispatch:
     inputs:
       shots:
-        description: 'Which pictures: quick (a dozen), full (every screen, light and dark), none (the build alone)'
-        default: quick
+        description: 'Which pictures: full (every screen, light and dark: what every run takes; quick is the same), none (the build alone)'
+        default: full
         type: choice
-        options: [quick, full, none]
+        options: [full, quick, none]
       clean:
         description: 'Build from clean (every file compiled, so every warning is seen: the baseline of scripts/dev/check-warnings.py)'
         type: boolean
@@ -51,44 +58,76 @@ concurrency:
   cancel-in-progress: true # (a newer push cancels the run before it: only the newest is worth waiting for)
 
 jobs:
-  # (the models that need no window, checked on their own beside the build — the elements' data, VSEPR's shapes, the
-  #  biology toolkit's models and self-check (every Foundation-only file in mac/Simpl/Tools/Biology/Model, so a tool's
-  #  builder adds files there without touching this), (1.3.80) the chemistry tools' (every file in
-  #  mac/Simpl/Tools/Chemistry/Model) and the live checks' plan, fingerprint and comparison
-  #  (mac/Simpl/Engine/LivePlan.swift): scripts/dev/swift-checks/main.swift compiled with the files it checks and run, in
-  #  about a minute)
+  # (the models that need no window, checked on their own — the elements' data, VSEPR's shapes, the biology toolkit's
+  #  models and self-check (every Foundation-only file in mac/Simpl/Tools/Biology/Model, so a tool's builder adds files
+  #  there without touching this), (1.3.80) the chemistry tools' (every file in mac/Simpl/Tools/Chemistry/Model) and the
+  #  live checks' plan, fingerprint and comparison (mac/Simpl/Engine/LivePlan.swift): scripts/dev/swift-checks/main.swift
+  #  compiled with the files it checks and run. (1.3.80) Once the parts are done, beside the job that puts them
+  #  together: a Mac of its own beside the four parts would leave none for a release. Compiling takes four minutes and
+  #  running them under a second, so what was compiled is kept (a cache keyed by every file it is compiled from, this
+  #  workflow and the compiler's version) and only run again while none of those has changed — most runs, in seconds.)
   models:
     name: Models
+    needs: mac
+    if: ${{ !cancelled() }}
     runs-on: macos-26
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
           sparse-checkout: |
+            .github/workflows
             mac/Simpl/Tools
             mac/Simpl/Engine
             scripts/dev/swift-checks
+      - name: The compiler
+        id: swift
+        run: echo "version=$(swiftc --version 2>&1 | shasum -a 256 | cut -c1-16)" >> "$GITHUB_OUTPUT"
+      - name: The checks as compiled before from the same files
+        uses: actions/cache@v4
+        with:
+          path: model-checks
+          key: mac-models-${{ steps.swift.outputs.version }}-${{ hashFiles('mac/Simpl/Tools/PeriodicData.swift', 'mac/Simpl/Tools/PeriodicExtraData.swift', 'mac/Simpl/Tools/MoleculeShape.swift', 'mac/Simpl/Tools/Biology/Model/*.swift', 'mac/Simpl/Tools/Chemistry/Model/*.swift', 'mac/Simpl/Engine/LivePlan.swift', 'scripts/dev/swift-checks/**', '.github/workflows/mac.yml') }}
       - name: The models' checks
         run: |
-          swiftc -O -o "$RUNNER_TEMP/model-checks" mac/Simpl/Tools/PeriodicData.swift mac/Simpl/Tools/PeriodicExtraData.swift \
-            mac/Simpl/Tools/MoleculeShape.swift mac/Simpl/Tools/Biology/Model/*.swift mac/Simpl/Tools/Chemistry/Model/*.swift \
-            mac/Simpl/Engine/LivePlan.swift \
-            scripts/dev/swift-checks/main.swift
-          "$RUNNER_TEMP/model-checks"
+          if [ ! -x model-checks/run ]; then
+            mkdir -p model-checks
+            swiftc -O -o model-checks/run mac/Simpl/Tools/PeriodicData.swift mac/Simpl/Tools/PeriodicExtraData.swift \
+              mac/Simpl/Tools/MoleculeShape.swift mac/Simpl/Tools/Biology/Model/*.swift mac/Simpl/Tools/Chemistry/Model/*.swift \
+              mac/Simpl/Engine/LivePlan.swift \
+              scripts/dev/swift-checks/main.swift
+          fi
+          model-checks/run
 
+  # (1.3.80) The app built and pictured, in four parts at once (one, the build alone, for Run workflow → none): each
+  # part builds the app as the run before left it, and takes the pictures mac-shots.sh shares out to it (SHARD of
+  # SHARDS: every part first walks the whole list to share it out alike, then takes its own). Part 0 also keeps the
+  # build for the next run and zips the app for mac-shots. Each part's files — its pictures, consoles, shot-times.txt,
+  # the plan of every part's pictures, its Mac's load — are an artifact of the run (mac-part-<n>) for the job after,
+  # sent whether the part passed or failed (a cancelled run sends nothing, and pushes nothing).
   mac:
+    name: Mac (part ${{ matrix.part }})
     runs-on: macos-26
-    timeout-minutes: 50
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false # (a part that fails leaves the others to finish: every picture that can be taken is)
+      matrix:
+        part: ${{ fromJSON(inputs.shots == 'none' && '[0]' || '[0, 1, 2, 3]') }}
+    env:
+      SHOTS: ${{ inputs.shots || 'full' }}
     steps:
       - uses: actions/checkout@v4
+      # (a project or a What's New that fails here is said in FAILED too, as a build that failed is: nothing more is
+      #  run, and mac-shots says why)
       - name: The project is what the generator writes
         run: |
+          mkdir -p shots
           python3 scripts/dev/make-mac-project.py
-          git diff --exit-code -- mac/Simpl.xcodeproj || { echo "::error::mac/Simpl.xcodeproj differs from scripts/dev/make-mac-project.py's"; exit 1; }
+          git diff --exit-code -- mac/Simpl.xcodeproj || { echo "mac/Simpl.xcodeproj differs from scripts/dev/make-mac-project.py's" | tee shots/FAILED | sed 's/^/::error::/'; exit 1; }
           # (1.3.3) the Mac's own What's New has an entry for this version, first
           v=$(sed -n "s/^MARKETING_VERSION = '\([^']*\)'.*/\1/p" scripts/dev/make-mac-project.py)
           n=$(grep -m1 -o 'Release(version: "[^"]*"' mac/Simpl/Support/MacWhatsNew.swift | sed 's/.*"\(.*\)"/\1/')
-          [ "$v" = "$n" ] || { echo "::error::mac/Simpl/Support/MacWhatsNew.swift's newest entry is $n, the app is $v"; exit 1; }
+          [ "$v" = "$n" ] || { echo "mac/Simpl/Support/MacWhatsNew.swift's newest entry is $n, the app is $v" | tee shots/FAILED | sed 's/^/::error::/'; exit 1; }
       # (1.3.1) the last build's intermediates, and every file not changed since dated as it was then: only what changed
       # is compiled again (scripts/dev/mtime-cache.py)
       - name: The last build
@@ -122,39 +161,59 @@ jobs:
           grep -E "warning:.*mac/Simpl/" build.log | sort -u | head -300 > shots/build-warnings.txt || true
           sed -n '/Build Timing Summary/,$p' build.log | head -80 > shots/build-timing.txt || true
           grep -q "BUILD SUCCEEDED" build.log || { echo "build failed" > shots/FAILED; cat shots/build-errors.txt | head -300; }
+      # (part 0: the build kept for the next run, and the app zipped for mac-shots while the pictures are taken)
       - name: Keep this build for the next
-        if: hashFiles('shots/FAILED') == ''
-        run: python3 scripts/dev/mtime-cache.py save build
+        if: matrix.part == 0 && hashFiles('shots/FAILED') == ''
+        run: |
+          python3 scripts/dev/mtime-cache.py save build
+          touch "$RUNNER_TEMP/zipping"
+          (cd build/Build/Products/Debug && ditto -c -k --keepParent Simpl.app "$RUNNER_TEMP/Simpl.app.zip.part" && mv "$RUNNER_TEMP/Simpl.app.zip.part" "$RUNNER_TEMP/Simpl.app.zip") > /dev/null 2>&1 &
       - name: Save the build
-        if: hashFiles('shots/FAILED') == ''
+        if: matrix.part == 0 && hashFiles('shots/FAILED') == ''
         uses: actions/cache/save@v4
         with:
           path: build
           key: mac-debug-${{ github.sha }}
       - name: Mock Canvas
-        if: hashFiles('shots/FAILED') == ''
+        if: hashFiles('shots/FAILED') == '' && env.SHOTS != 'none'
         run: |
           node scripts/dev/mock-canvas.mjs 8800 8801 > mock.log 2>&1 &
           node scripts/dev/mock-canvas.mjs 8802 8803 --login > mock-login.log 2>&1 & # (one that asks for a sign-in first: the sign-in picture)
           node scripts/dev/mock-brightspace.mjs 8860 --open > mock-d2l.log 2>&1 &
-          sleep 2
+          # (each up once it answers)
+          for _ in $(seq 1 50); do
+            curl -s -o /dev/null http://localhost:8800/ && curl -s -o /dev/null http://localhost:8802/login/canvas && curl -s -o /dev/null http://localhost:8860/d2l/home && break
+            sleep 0.2
+          done
           curl -s -o /dev/null -w "mock %{http_code}\n" http://localhost:8800/
           curl -s -o /dev/null -w "mock sign-in %{http_code}\n" http://localhost:8802/login/canvas
           curl -s -o /dev/null -w "mock brightspace %{http_code}\n" http://localhost:8860/d2l/home
-          system_profiler SPDisplaysDataType | grep -E "Resolution|Display Type" || true
+          if [ "${{ matrix.part }}" = 0 ]; then system_profiler SPDisplaysDataType | grep -E "Resolution|Display Type" || true; fi
+      # (this part's share of the pictures, five copies of the app at once as on one Mac before; its own time limit, well
+      #  past a part's ten minutes or so, so a part held up still sends what it took and the run says what is missing)
       - name: Screens
-        if: hashFiles('shots/FAILED') == '' && (github.event.inputs.shots || 'quick') != 'none'
+        if: hashFiles('shots/FAILED') == '' && env.SHOTS != 'none'
+        timeout-minutes: 25
         env:
-          SHOTS: ${{ github.event.inputs.shots || (contains(github.event.head_commit.message, '[full shots]') && 'full' || 'quick') }}
-        run: bash scripts/dev/mac-shots.sh
+          SHARD: ${{ matrix.part }}
+          SHARDS: ${{ strategy.job-total }}
+          JOBS: 5
+        run: |
+          # (the Mac's cores and memory every ten seconds or so beside the pictures — load-part<n>.txt on mac-shots: what
+          #  a part is held by, for choosing JOBS and the number of parts)
+          (while :; do echo "$(date +%T) $(top -l 2 -n 0 -s 1 | grep -E '^(CPU usage|PhysMem)' | tail -2 | tr '\n' ' ')"; sleep 8; done) > "shots/load-part$SHARD.txt" 2>&1 &
+          echo $! > "$RUNNER_TEMP/load.pid"
+          bash scripts/dev/mac-shots.sh
+          kill "$(cat "$RUNNER_TEMP/load.pid")" 2>/dev/null || true
       # (1.3.76) what the app kept while it was pictured is sealed by its vault (mac/Simpl/Support/Vault.swift), whose key
       # is kept in the login Keychain: the extension's storage, the kept answers and the flashcards each start "SIMPLENC".
       # The sign-in and the cookies are Keychain items of their own, so no login.bin or cookies.bin may be found (an
       # early 1.3.76 build's files). Each worker of mac-shots.sh has a home of its own (/tmp/simpl-shots.*/home*); this
       # Mac's own home is looked in too. Where the vault's key is (vault.key's mode) is printed: "keychain", or "file"
-      # when the runner's Keychain would not take it (a notice, not a failure); "se" (the Secure Enclave) fails.
+      # when the runner's Keychain would not take it (a notice, not a failure); "se" (the Secure Enclave) fails. (1.3.80:
+      # in every part, on the homes of its own pictures — after pictures cut short too.)
       - name: Kept data is encrypted
-        if: hashFiles('shots/FAILED') == '' && (github.event.inputs.shots || 'quick') != 'none'
+        if: ${{ !cancelled() && hashFiles('shots/FAILED') == '' && env.SHOTS != 'none' }}
         run: |
           dirs=()
           enclave=0
@@ -185,11 +244,119 @@ jobs:
           echo "$checked kept files checked, $plain not encrypted; $outside sign-in or cookie files outside the Keychain"
           if [ "$checked" -eq 0 ]; then echo "::warning::no kept data found to check"; fi
           [ "$plain" -eq 0 ] && [ "$outside" -eq 0 ] && [ "$enclave" -eq 0 ]
+      # (part 0 sends the build's files — its log for the warnings, its tail, the app zipped; the others built the same,
+      #  and send theirs only when their build failed. A part whose pictures were cut short — its time limit — has its
+      #  apps and its load log stopped, the warm-ups' files dropped and this Mac's crash reports kept, as mac-shots.sh
+      #  does at its end. Not when the run is cancelled: a newer push's run waits for these Macs.)
+      - name: This part's files
+        if: ${{ !cancelled() }}
+        run: |
+          mkdir -p shots
+          kill "$(cat "$RUNNER_TEMP/load.pid" 2>/dev/null)" 2>/dev/null || true
+          pkill -x Simpl 2>/dev/null || true
+          rm -f shots/warmup* shots/console-warmup*
+          for f in "$HOME"/Library/Logs/DiagnosticReports/*Simpl*; do
+            if [ -f "$f" ]; then head -c 600000 "$f" > "shots/crash-$(basename "$f" | tr ' ' '-').txt"; fi
+          done
+          if [ "${{ matrix.part }}" = 0 ]; then
+            tail -c 900000 build.log > shots/build-tail.log 2>/dev/null || true
+            cp build.log shots/build.log 2>/dev/null || true
+            # (the zip begun beside the pictures, waited for; else made now)
+            if [ -f "$RUNNER_TEMP/zipping" ]; then
+              for _ in $(seq 1 120); do [ -f "$RUNNER_TEMP/Simpl.app.zip" ] && break; sleep 0.5; done
+            fi
+            if [ -f "$RUNNER_TEMP/Simpl.app.zip" ]; then mv "$RUNNER_TEMP/Simpl.app.zip" shots/Simpl.app.zip
+            elif [ -d build/Build/Products/Debug/Simpl.app ]; then (cd build/Build/Products/Debug && ditto -c -k --keepParent Simpl.app "$GITHUB_WORKSPACE/shots/Simpl.app.zip") || true; fi
+          elif [ ! -f shots/FAILED ]; then
+            rm -f shots/build-errors.txt shots/build-warnings.txt shots/build-timing.txt
+          fi
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: mac-part-${{ matrix.part }}
+          path: shots
+          retention-days: 3
+          compression-level: 1 # (the pictures and the zip are compressed already)
+          overwrite: true # (a part run again replaces its files)
+      - name: The build passed
+        run: test ! -f shots/FAILED
+
+  # (1.3.80) The parts put together (each part's files side by side as one run's: the lists each kept, shot-times.txt
+  # and phone-test.txt, joined; the plan of every part's pictures, the same in each — and held to be — kept once; a
+  # name two parts sent, a crash report of the same second, is kept from both), checked as one, and pushed to mac-shots
+  # as one run's — on Linux, which needs no Mac and starts in seconds. What the apps said is read here (mac-shots.sh
+  # with SHOTS=check: Send from Phone, the live checks, a post's web view that never measured), every picture of the
+  # plan must be there and show something, the consoles must be clean and the build must add no warning (docs/CI.md:
+  # their lists of what is plain or harmless on purpose are shot-checks.json, log-checks.json and baselines/, each
+  # entry with its reason). A part that failed or sent nothing still has the others' pictures and its own failure's
+  # files pushed, and the run fails: what is missing is named. A cancelled run (a newer push) pushes nothing.
+  shots:
+    name: The pictures, checked and pushed
+    needs: mac
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SHOTS: ${{ inputs.shots || 'full' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/dev
+      - name: Pillow, for the pictures' check (installed beside the parts' download)
+        run: (python3 -m venv "$RUNNER_TEMP/py" && "$RUNNER_TEMP/py/bin/pip" install -q pillow && touch "$RUNNER_TEMP/py/ready") > "$RUNNER_TEMP/pip.log" 2>&1 &
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mac-part-*
+          path: parts
+      - name: The parts put together
+        run: |
+          mkdir -p shots
+          bad=""
+          for p in parts/mac-part-*; do
+            [ -d "$p" ] || continue
+            k="${p##*-}"
+            echo "part $k: $(find "$p" -name '*-app.png' | wc -l | tr -d ' ') pictures"
+            # (each part shared the whole set out before it took its own, from the same files: the plans are one)
+            if [ -f "$p/shot-plan.txt" ]; then
+              if [ ! -f shots/shot-plan.txt ]; then cp "$p/shot-plan.txt" shots/shot-plan.txt
+              elif ! cmp -s "$p/shot-plan.txt" shots/shot-plan.txt; then
+                echo "::error::part $k shared the pictures out otherwise than the part before it (shot-plan.txt): pictures may be missing or taken twice"; bad=yes
+              fi
+            fi
+            for f in "$p"/*; do
+              b="${f##*/}"
+              case "$b" in
+                shot-plan.txt) ;;
+                shot-times.txt|phone-test.txt|FAILED) cat "$f" >> "shots/$b" ;;
+                build.log) mv "$f" build.log ;;
+                build-errors.txt|build-warnings.txt|build-timing.txt) [ -s "shots/$b" ] || mv -f "$f" "shots/$b" ;;
+                *)
+                  if [ ! -e "shots/$b" ]; then mv "$f" shots/
+                  elif [ "${b%.*}" != "$b" ]; then mv "$f" "shots/${b%.*}-part$k.${b##*.}"
+                  else mv "$f" "shots/$b-part$k"; fi ;;
+              esac
+            done
+          done
+          # (every part the plan names sent its files, and part 0 the build's; no picture planned twice)
+          if [ -s shots/shot-plan.txt ]; then
+            while read -r k; do
+              [ -d "parts/mac-part-$k" ] || { echo "::error::no files from part $k: its pictures are missing"; bad=yes; }
+            done < <(awk '{ print $2 }' shots/shot-plan.txt | sort -u | sed 's/^part//')
+            twice="$(awk '{ print $1 }' shots/shot-plan.txt | sort | uniq -d | tr '\n' ' ')"
+            [ -z "$twice" ] || { echo "::error::pictures in mac-shots.sh's list twice: $twice"; bad=yes; }
+          elif [ "$SHOTS" != none ] && [ ! -f shots/FAILED ]; then
+            echo "::error::no part sent its plan of the pictures (shot-plan.txt)"; bad=yes
+          fi
+          [ -f build.log ] || { echo "::error::part 0 sent no build log"; bad=yes; }
+          [ -z "$bad" ]
+      - name: What the apps said
+        if: ${{ !cancelled() && hashFiles('shots/FAILED') == '' && env.SHOTS != 'none' }}
+        run: OUT=shots SHOTS=check bash scripts/dev/mac-shots.sh
       # (1.3.78) Send from Phone: mac-shots.sh sent files to Hand In's own server as a phone's page does — the page
       # opened, a wrong key refused, a photo and a text file taken, a PDF-only assignment's photos made into one PDF and
       # an mp3 refused — and read the app's consoles for them in the hand-in (shots/phone-check.txt)
       - name: Send from Phone took the files
-        if: hashFiles('shots/FAILED') == '' && (github.event.inputs.shots || (contains(github.event.head_commit.message, '[full shots]') && 'full' || 'quick')) == 'quick'
+        if: ${{ !cancelled() && hashFiles('shots/FAILED') == '' && env.SHOTS != 'none' }}
         run: |
           cat shots/phone-test.txt 2>/dev/null || true
           test -s shots/phone-check.txt || { echo "::error::mac-shots.sh wrote no phone-check.txt"; exit 1; }
@@ -200,35 +367,33 @@ jobs:
       # and only its parts put in place (the counters and the List's row, one course's card, To Do's new row), the next
       # check found nothing new, a course's page was checked at its own pace, and no check went unanswered
       - name: Live checks find what changed
-        if: ${{ !cancelled() && hashFiles('shots/FAILED') == '' && (github.event.inputs.shots || 'quick') != 'none' }}
+        if: ${{ !cancelled() && hashFiles('shots/FAILED') == '' && env.SHOTS != 'none' }}
         run: |
           test -s shots/live-check.txt || { echo "::error::mac-shots.sh wrote no live-check.txt"; exit 1; }
           cat shots/live-check.txt
           grep -h 'live: ' shots/console-light-48*.txt 2>/dev/null | sed 's/^.*\[Simpl\] //' | head -60 || true
           if grep -q '^FAIL' shots/live-check.txt; then grep '^FAIL' shots/live-check.txt | sed 's/^/::error::/'; exit 1; fi
-      # (what the run made, read before anyone has to, each check whatever the others found — docs/CI.md: every picture
-      #  there and showing something, scripts/dev/check-shots.py; the app's consoles free of exceptions, crashes and
-      #  errors, scan-logs.py; no compiler warning that is not already known, check-warnings.py. Their lists of what is
-      #  plain or harmless on purpose are shot-checks.json, log-checks.json and baselines/, each entry with its reason.)
       - name: Every picture shows something
-        if: ${{ !cancelled() && hashFiles('shots/FAILED') == '' && (github.event.inputs.shots || 'quick') != 'none' }}
+        if: ${{ !cancelled() && hashFiles('shots/FAILED') == '' && env.SHOTS != 'none' }}
         run: |
-          python3 -m venv "$RUNNER_TEMP/py" && "$RUNNER_TEMP/py/bin/pip" install -q pillow
-          "$RUNNER_TEMP/py/bin/python" scripts/dev/check-shots.py shots --app mac --pattern '*-app.png' --expect shots/shot-times.txt --report shots/shot-checks.txt
+          for _ in $(seq 1 240); do [ -f "$RUNNER_TEMP/py/ready" ] && break; sleep 0.5; done
+          [ -f "$RUNNER_TEMP/py/ready" ] || { cat "$RUNNER_TEMP/pip.log"; echo "::error::Pillow did not install"; exit 1; }
+          # (held to the plan when a part sent it — the step before fails when none did — else to what is there)
+          expect=()
+          if [ -f shots/shot-plan.txt ]; then expect=(--expect shots/shot-plan.txt); fi
+          "$RUNNER_TEMP/py/bin/python" scripts/dev/check-shots.py shots --app mac --pattern '*-app.png' "${expect[@]}" --report shots/shot-checks.txt
       - name: The consoles are clean
-        if: ${{ !cancelled() && hashFiles('shots/FAILED') == '' && (github.event.inputs.shots || 'quick') != 'none' }}
+        if: ${{ !cancelled() && hashFiles('shots/FAILED') == '' && env.SHOTS != 'none' }}
         run: python3 scripts/dev/scan-logs.py --app mac 'shots/console-*.txt' 'shots/crash-*.txt'
       - name: No new compiler warnings
         if: ${{ !cancelled() && hashFiles('shots/FAILED') == '' && hashFiles('build.log') != '' }}
         run: python3 scripts/dev/check-warnings.py build.log --baseline scripts/dev/baselines/mac-warnings.txt
       - name: Push the pictures to the mac-shots branch
-        if: always()
+        if: ${{ !cancelled() }}
         env:
           TOKEN: ${{ github.token }}
         run: |
           mkdir -p shots
-          tail -c 900000 build.log > shots/build-tail.log 2>/dev/null || true
-          [ -d build/Build/Products/Debug/Simpl.app ] && (cd build/Build/Products/Debug && ditto -c -k --keepParent Simpl.app "$GITHUB_WORKSPACE/shots/Simpl.app.zip") || true
           echo "${GITHUB_SHA}" > shots/COMMIT
           cd shots
           git init -q
