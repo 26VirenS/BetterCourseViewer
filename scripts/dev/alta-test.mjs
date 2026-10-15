@@ -176,6 +176,9 @@ try {
     `in dark mode the question’s colours are turned over and its pictures turned back (${dk.sec} · picture ${dk.pic})`);
   await page.evaluate(() => { window.__simplDark = false; window.__simplFocusDark(); document.getElementById('pic').remove(); });
   check(await page.evaluate(() => !document.documentElement.hasAttribute('data-simpl-dark') && getComputedStyle(document.getElementById('qsec')).filter === 'none'), 'and in light mode, left as Alta draws them');
+  // (1.3.83) Dark picked, the question shown alone: only its parts are turned over, never the page as a whole
+  check(await page.evaluate(() => { window.__simplDark = true; window.__simplFocusDark(); const f = getComputedStyle(document.documentElement).filter, w = document.documentElement.hasAttribute('data-simpl-whole-dark'); window.__simplDark = false; window.__simplFocusDark(); return f === 'none' && !w; }),
+    'in Dark, the question shown alone has only its parts turned over, never the page whole');
   // typing and scrolling are left alone
   await page.setViewportSize({ width: 900, height: 200 });
   await page.evaluate(() => window.scrollTo(0, 120));
@@ -328,6 +331,17 @@ try {
   check(await page.evaluate(() => window.__simplAlta === undefined && !document.getElementById('simpl-theme')), 'it gives the app no hands in the page and no style of its own');
   const fo = await waitFor((p) => p.kind === 'focus', 'how the overview is shown');
   check(fo.state === 'overview' && !(await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))), 'the overview is recognised and shown as it is (no Error Logs for it)');
+  // (1.3.83) Dark picked: Alta's page as it is (here its overview) drawn dark — its colours turned round, its pictures kept
+  // — unless it has a dark look of its own; and light again on Light
+  await waitFor((p) => p.kind === 'shown', 'the overview in sight');
+  await page.evaluate(() => { document.body.style.background = '#16181c'; window.__simplDark = true; window.__simplFocusDark(); });
+  const own = await page.evaluate(() => ({ whole: document.documentElement.hasAttribute('data-simpl-whole-dark'), f: getComputedStyle(document.documentElement).filter }));
+  await page.evaluate(() => { document.body.style.background = ''; window.__simplFocusDark(); document.body.insertAdjacentHTML('beforeend', '<img id="dkimg" width="8" height="8" src="data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs=">'); });
+  const wdk = await page.evaluate(() => ({ whole: document.documentElement.hasAttribute('data-simpl-whole-dark'), f: getComputedStyle(document.documentElement).filter, img: getComputedStyle(document.getElementById('dkimg')).filter }));
+  await page.evaluate(() => { window.__simplDark = false; window.__simplFocusDark(); document.getElementById('dkimg').remove(); });
+  const lt = await page.evaluate(() => getComputedStyle(document.documentElement).filter);
+  check(!own.whole && own.f === 'none' && wdk.whole && /invert\(0\.92\)/.test(wdk.f) && /invert\(1\)/.test(wdk.img) && lt === 'none',
+    `in Dark, Alta's page as it is is drawn dark, its pictures kept (${wdk.f} · ${wdk.img}), not a page dark of its own, and light again on Light`);
 
   // the student starts it on Alta's own page
   await page.click('#start');

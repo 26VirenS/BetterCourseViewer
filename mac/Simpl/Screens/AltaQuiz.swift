@@ -20,6 +20,11 @@ struct AltaQuizScreen: View {
     @ObservedObject private var dev = DevMode.shared
     /// (1.3.78) The Canvas assignment's own due line ("Due Oct 12 at 11:59 PM"), as every other screen writes it.
     @State private var dueLine: String?
+    /// (1.3.83) Alta's side of the popup light or dark, as the student picks it above the objectives: light unless Dark is
+    /// picked (1.3.79 showed it light whatever the app's appearance), remembered for every Alta assignment. (Read with
+    /// `bool(forKey:)`, so the pictures' -SimplAltaPageDark YES is read as the setting.)
+    @State private var pageDark = UserDefaults.standard.bool(forKey: AltaQuizScreen.pageDarkKey)
+    static let pageDarkKey = "SimplAltaPageDark"
 
     init(launch: AltaLaunch) {
         _session = StateObject(wrappedValue: AltaSession(launch: launch))
@@ -32,24 +37,30 @@ struct AltaQuizScreen: View {
         VStack(spacing: 0) {
             topBar
             HStack(spacing: 0) {
-                AltaRail(session: session)
+                AltaRail(session: session, dark: $pageDark)
                     .frame(width: ideal.width >= 960 ? 290 : 240)
                 Divider()
                 // (1.3.79) Alta's page in light whatever the app's appearance — on light glass, over a light ground —
                 // as every tool's page is: its question is made for a white page, and drawn dark (1.3.50: its colours
-                // turned over on dark glass) it read badly. The bar and the rail keep the app's appearance.
+                // turned over on dark glass) it read badly. The bar and the rail keep the app's appearance. (1.3.83) Dark
+                // again when the student picks it above the objectives: dark glass and ground, the question turned over
+                // as 1.3.50 drew it, Alta's page as it is drawn dark.
                 page
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(PageGround())
-                    .environment(\.colorScheme, .light)
+                    .environment(\.colorScheme, pageDark ? .dark : .light)
             }
         }
         .frame(width: ideal.width, height: ideal.height)
         .background(PageGround())
         .tint(Theme.accent)
         .task {
-            session.appearance(dark: false) // (1.3.79: the page is light, in dark mode too)
+            session.appearance(dark: pageDark) // (1.3.79: the page light, in dark mode too — 1.3.83: unless Dark is picked)
             await session.start(engine: engine)
+        }
+        .onChange(of: pageDark) { _, dark in
+            UserDefaults.standard.set(dark, forKey: Self.pageDarkKey)
+            session.appearance(dark: dark)
         }
         .task { dueLine = await CanvasDue.line(engine, course: session.launch.course, assignment: session.launch.assignment) }
         .onDisappear { session.closePic() } // (1.3.70: the popup closed, its graph's window with it)
@@ -212,7 +223,7 @@ struct AltaQuizScreen: View {
                                 let right: CGFloat = session.panels.map(\.rect.maxX).max() ?? 0
                                 ForEach(session.panels) { p in
                                     Rectangle().fill(Color.clear)
-                                        .glassCard(radius: 22, tint: Color.white.opacity(0.3))
+                                        .glassCard(radius: 22, tint: pageDark ? Color.black.opacity(0.18) : Color.white.opacity(0.3))
                                         .frame(width: right - left + 32, height: p.rect.height + 32)
                                         .offset(x: left - 16, y: p.rect.minY - 16)
                                         .transition(.opacity)
@@ -220,12 +231,13 @@ struct AltaQuizScreen: View {
                             }
                             AltaPageHost(web: session.web, forwardScroll: split)
                                 .frame(width: g.size.width, height: split ? max(session.pageHeight, g.size.height) : g.size.height)
-                                .background { if session.asIs || (!session.focused && session.pageShown && session.cover == nil) { Color.white } }
+                                .background { if session.asIs || (!session.focused && session.pageShown && session.cover == nil) { pageDark ? Color(white: 0.08) : Color.white } }
                             // (1.3.70) by each small graph: open it large in a window of its own — (1.3.79) the graphs
-                            // as Alta draws them, the page being light: no Light or Dark for them
+                            // as Alta draws them, the page being light: no Light or Dark for them (1.3.83: but in Dark,
+                            // Light or Dark for the graphs' colours, as 1.3.70 had)
                             if split && session.pageShown {
                                 ForEach(session.pics) { pic in
-                                    AltaPicControls(session: session, index: pic.id, dark: false)
+                                    AltaPicControls(session: session, index: pic.id, dark: pageDark)
                                         .offset(x: pic.rect.maxX + 10, y: pic.rect.minY)
                                         .transition(.opacity)
                                 }
@@ -583,12 +595,25 @@ private struct AltaPageHost: NSViewRepresentable {
 
 // MARK: - The rail
 
-/// Down the left: the objectives as the quiz's question tiles, each by name with its own bar, and the total mastery.
+/// Down the left: the objectives as the quiz's question tiles, each by name with its own bar, and the total mastery;
+/// (1.3.83) above them, how Alta's side is shown — Light or Dark.
 private struct AltaRail: View {
     @ObservedObject var session: AltaSession
+    @Binding var dark: Bool
 
     var body: some View {
         let list = session.objectives
+        VStack(spacing: 0) {
+            AltaLookPicker(dark: $dark)
+                .controlSize(.small)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
+            rail(list)
+        }
+    }
+
+    private func rail(_ list: [AltaObjective]) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 objectivesCard(list)
@@ -647,6 +672,41 @@ private struct AltaRail: View {
                 .foregroundStyle(.secondary)
         }
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// (1.3.83) Above the objectives: Alta's side of the popup Light or Dark — two glass chips that blend into one control,
+/// the one picked filled in the accent; with `words`, each says its name beside its sun or moon. Light (the default
+/// since 1.3.79) shows Alta's page as Alta draws it; Dark lays the question on dark glass, its colours turned over, and
+/// Alta's page as it is drawn dark.
+private struct AltaLookPicker: View {
+    @Binding var dark: Bool
+    var words = true
+
+    var body: some View {
+        GlassGroup(spacing: 4) {
+            HStack(spacing: 4) {
+                choice(dark: false)
+                choice(dark: true)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Knewton Alta's page")
+    }
+
+    private func choice(dark d: Bool) -> some View {
+        let on = dark == d
+        let name = d ? "Dark" : "Light"
+        let symbol = d ? "moon.fill" : "sun.max.fill"
+        return Button {
+            withAnimation(Motion.gentle) { dark = d }
+        } label: {
+            if words { Label(name, systemImage: symbol).labelStyle(.titleAndIcon) } else { Label(name, systemImage: symbol).labelStyle(.iconOnly) }
+        }
+        .glassChip(Theme.accent, on: on)
+        .fixedSize()
+        .help(d ? "Show Knewton Alta's page dark" : "Show Knewton Alta's page light, as Alta draws it")
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 }
 

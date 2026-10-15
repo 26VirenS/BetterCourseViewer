@@ -235,6 +235,16 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   the page is doing (`keepDialogs`: one that came between parts was hidden with the page). In the mock's learn page
   `mockRichDialog(ms)` opens a slow, rich, two-step one (`?dialog=rich` opens it by itself: the pictures'
   `21m-alta-dialog`), and `mockVideoDialog`, `mockFrameDialog` and `mockBareDialog` ones the page keeps.
+  (1.3.83) *Light or Dark* above the objectives (`AltaLookPicker`: two glass chips at the rail's head, the one picked
+  filled): Alta's side of the popup light — 1.3.79's, the default — or dark,
+  remembered for every Alta assignment (`SimplAltaPageDark`; `-SimplAltaPageDark YES` for the pictures). Dark is 1.3.78's
+  look again: the page region in a dark environment (dark glass panels, the start screen, the skeleton), the web view's
+  appearance dark, `__simplDark` told to the page so each kept part is turned over (1.3.50), the graphs' own Light or
+  Dark beside them and the graph window dark (1.3.70); and Alta's page as it is — not recognised, its overview, or
+  under a pop-up given back to it — drawn dark as a tool's page is (`html[data-simpl-whole-dark]`: `invert(.92)
+  hue-rotate(180deg)`, its pictures, videos and frames turned back), unless it has a dark look of its own (a dark ground,
+  or a `color-scheme` meta naming dark), which the hook tells once the page is in sight and out of the focus. The bar
+  and the rail keep the app's appearance.
   (1.3.53) Two glass panels, the question's words and its answer (a lesson: one): the hook tells the app each kept
   part's question and answer boxes (the card's children before and from the one holding Learnosity's box, which gets a
   gap above it — `data-simpl-answer`) in the page's own coordinates, and the page's height. The app sizes the page to

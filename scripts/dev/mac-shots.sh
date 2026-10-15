@@ -398,11 +398,19 @@ pins_pages() {
 # (1.3.83) in both sets: Alta's pop-ups read whole — the mock's "Knewton Alta" pop-up over its learn page, its body
 # coming 1.2 s after its box (a spinner first) with a list, a link, two formulas, a picture and a drawing, as the Mac's
 # own sheet in light and in dark; and one holding a video, given back to Alta's page, shown as it is
+# (1.3.83) and Light or Dark above the objectives (-SimplAltaPageDark YES: Dark picked): the cover's start screen in Dark
+# Mode with Dark picked and with Light (the default, 1.3.79's), a question in Dark in both modes, and Alta's page as it
+# is (the overview) drawn dark
 alta_pages() {
   local page="alta:104:4003:/mock-alta/learn/course/c1/assignment/a3"
   MODE=light shoot light-21m-alta-dialog 24 -SimplOpen "$page?dialog=rich"
   MODE=dark shoot dark-21m-alta-dialog 24 -SimplOpen "$page?dialog=rich"
   MODE=light shoot light-21n-alta-dialog-in-page 22 -SimplOpen "$page?dialog=video"
+  MODE=dark shoot dark-21o-alta-dark 20 -SimplOpen alta:104:4004 -SimplAltaPageDark YES
+  MODE=dark shoot dark-21p-alta-light 20 -SimplOpen alta:104:4004
+  MODE=dark shoot dark-21q-alta-question-dark 22 -SimplOpen "$page" -SimplAltaPageDark YES
+  MODE=light shoot light-21q-alta-question-dark 22 -SimplOpen "$page" -SimplAltaPageDark YES
+  MODE=dark shoot dark-21r-alta-page-dark 20 -SimplOpen alta:104:4003 -SimplAltaPageDark YES
 }
 
 # (1.3.79) a tool opened whole is a popup over the window, never in its place (Shell/FloatingPopup.swift): the Periodic
@@ -757,7 +765,7 @@ bio_full # (1.3.78) the biology toolkit, every tool's pages
 bio_plain_all # (1.3.79) three of them opened plainly, in dark, at two window sizes, the sidebar out and folded
 ui_review # (1.3.78) the UI review's new states
 pins_pages # (1.3.79) the pins' room, a panel pulled out, external tools' pages light
-alta_pages # (1.3.83) Alta's popup: its pop-ups read whole
+alta_pages # (1.3.83) Alta's popup: its pop-ups read whole, Light or Dark
 tool_popups # (1.3.79) a tool's popup over the Tools page
 chem_tools # (1.3.80) the Chemistry section and its tools
 # (1.3.78) a PDF-only assignment (as the push's set makes 1013) waiting for the phone: Combine photos under the code

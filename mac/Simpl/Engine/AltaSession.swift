@@ -33,6 +33,8 @@ enum AltaHook {
       // shows its own Loading meanwhile. A page that is not Alta's (the launch on the way to it) is shown at once.
       var reveal = function () {};
       var veilAgain = function () {};
+      // (1.3.83) the page's look told again — light or dark, as the student picks it — once it is in sight
+      var lookNow = function () {};
       // (1.3.83) a pop-up of Alta's given back to its page — what it holds the app cannot draw as its own, or the student
       // asked — shown there as Alta draws it: Alta's page as it is, in sight under it, until it closes
       var dialogInPage = false;
@@ -42,6 +44,7 @@ enum AltaHook {
         reveal = function (how) {
           if (firstVeil) { clearTimeout(firstVeil); firstVeil = 0; }
           if (document.documentElement) document.documentElement.setAttribute('data-simpl-shown', '');
+          lookNow();
           if (!showing) { showing = true; post({ kind: 'shown', how: how || '' }); }
         };
         // (1.3.62) out of sight again — Alta between one part and the next, taking its time — until the next is laid out
@@ -337,6 +340,7 @@ enum AltaHook {
           marked.forEach(function (m) { m[0].removeAttribute(m[1]); });
           marked = []; keptNow = [];
           document.documentElement.removeAttribute('data-simpl-q');
+          lookNow(); // (1.3.83: Alta's page as it is, dark too when Dark is picked, from the moment it is)
         };
         var mark = function (el, a) { if (!el.hasAttribute(a)) { el.setAttribute(a, ''); marked.push([el, a]); } };
         // (1.3.62) a graph or drawing in a part: a graph's box by its name, or an SVG at least 140 × 100 — the outermost
@@ -418,12 +422,34 @@ enum AltaHook {
           dark();
         };
         // (1.3.50) light or dark as the app is: the app sets window.__simplDark (before the page, and again when it changes)
+        // (1.3.83) as the student picks it above the objectives: light unless Dark is picked. Dark lays the parts kept on
+        // dark glass, turned over, as 1.3.50 did; and draws Alta's page as it is (not recognised, or under a pop-up of
+        // Alta's given back to it) dark as a tool's page is drawn dark (ToolDarkPage) — its colours turned round, its
+        // pictures, videos and frames kept as they are — unless it has a dark look of its own (a dark ground, or a colour
+        // scheme it says can be dark), which is told once the page is in sight and out of the focus, its own ground then
+        // reading as it is
+        var LOOK = 'html[data-simpl-dark][data-simpl-whole-dark]:not([data-simpl-q]) { filter: invert(.92) hue-rotate(180deg) !important; background: #fff !important; }\n'
+          + 'html[data-simpl-dark][data-simpl-whole-dark]:not([data-simpl-q]) :is(img, video, canvas, embed, object, iframe, svg image, [style*="background-image"]) { filter: invert(1) hue-rotate(180deg) !important; }\n';
+        var lum = function (c) { var m = String(c || '').match(/\d+(\.\d+)?/g); if (!m || m.length < 3 || (m.length > 3 && +m[3] === 0)) return null; return (0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2]) / 255; };
+        var lightPage = function () {
+          var meta = document.querySelector('meta[name="color-scheme"]');
+          if (meta && /dark/i.test(meta.content || '')) return false;
+          var b = document.body ? lum(getComputedStyle(document.body).backgroundColor) : null;
+          var h = lum(getComputedStyle(document.documentElement).backgroundColor);
+          var v = b !== null ? b : (h !== null ? h : 1);
+          return v > 0.55;
+        };
         var dark = function () {
-          if (!document.documentElement) return;
-          document.documentElement.toggleAttribute('data-simpl-dark', !!window.__simplDark);
-          document.documentElement.toggleAttribute('data-simpl-pics-light', !!window.__simplPicsLight); // (1.3.70)
+          var de = document.documentElement;
+          if (!de) return;
+          de.toggleAttribute('data-simpl-dark', !!window.__simplDark);
+          de.toggleAttribute('data-simpl-pics-light', !!window.__simplPicsLight); // (1.3.70)
+          if (!window.__simplDark) { de.removeAttribute('data-simpl-whole-dark'); return; }
+          if (!document.getElementById('simpl-look')) { var st = document.createElement('style'); st.id = 'simpl-look'; st.textContent = LOOK; (document.head || de).appendChild(st); }
+          if (!de.hasAttribute('data-simpl-whole-dark') && de.hasAttribute('data-simpl-shown') && !de.hasAttribute('data-simpl-q') && lightPage()) de.setAttribute('data-simpl-whole-dark', '');
         };
         window.__simplFocusDark = dark;
+        lookNow = dark;
         // ---- (1.3.53) the parts' panels and their buttons, for the app ----
         // Each part kept is a card: what a question asks (its heading and words) and its answer (Learnosity's box and
         // what follows) are told to the app as two panels — a lesson as one — in the page's own coordinates, with the
@@ -1143,7 +1169,8 @@ struct AltaPic: Identifiable, Equatable {
 
 /// (1.3.70) A question's graph, large, in a window of its own over the popup: moved and sized as the student likes,
 /// its colours dark or as Alta draws them (the same choice as the question's) — (1.3.79) as Alta draws them, on white,
-/// the question being light — and put away when the question is answered or gone, or the popup closed.
+/// the question being light; (1.3.83) dark again, with its Light, when the student picks Dark for Alta's side — and put
+/// away when the question is answered or gone, or the popup closed.
 @MainActor
 final class AltaGraphWindow: NSObject, NSWindowDelegate {
     static let shared = AltaGraphWindow()
@@ -1153,6 +1180,8 @@ final class AltaGraphWindow: NSObject, NSWindowDelegate {
     final class Model: ObservableObject {
         @Published var image: NSImage?
         @Published var light = false
+        /// (1.3.83) Alta's side of the popup dark (the student's Dark): the window dark with it.
+        @Published var dark = false
         weak var session: AltaSession?
     }
 
@@ -1160,6 +1189,7 @@ final class AltaGraphWindow: NSObject, NSWindowDelegate {
         model.image = image
         model.session = session
         model.light = session.picsLight
+        model.dark = session.pageDark
         if let panel {
             panel.title = title
             panel.orderFront(nil)
@@ -1179,14 +1209,16 @@ final class AltaGraphWindow: NSObject, NSWindowDelegate {
         p.isReleasedWhenClosed = false
         p.delegate = self
         // (1.3.79) the graph as Alta draws it, on white, the question's page being light whatever the app's appearance
-        // (its window's bar keeps the app's)
-        p.contentView = NSHostingView(rootView: AltaGraphView(model: model).environment(\.colorScheme, .light))
+        // (its window's bar keeps the app's) — (1.3.83) or dark with it, when the student picks Dark
+        p.contentView = NSHostingView(rootView: AltaGraphRoot(model: model))
         p.center()
         p.orderFront(nil)
         panel = p
     }
 
     func light(_ on: Bool) { model.light = on }
+
+    func dark(_ on: Bool) { model.dark = on }
 
     func close() {
         guard let p = panel else { return }
@@ -1199,6 +1231,15 @@ final class AltaGraphWindow: NSObject, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         panel = nil
         model.session?.picWindowClosed()
+    }
+}
+
+/// (1.3.83) The graph's window in the look of Alta's side of the popup: light (1.3.79), or dark when Dark is picked.
+private struct AltaGraphRoot: View {
+    @ObservedObject var model: AltaGraphWindow.Model
+
+    var body: some View {
+        AltaGraphView(model: model).environment(\.colorScheme, model.dark ? .dark : .light)
     }
 }
 
@@ -1306,16 +1347,21 @@ final class AltaSession: ObservableObject {
     @Published private(set) var focusState = ""
     /// (1.3.50) Light or dark as the app is, told to the page: before each page (a script ahead of the page script) and
     /// at once to the page shown; in dark mode the question's colours are turned over, for dark glass. (1.3.79) The popup
-    /// tells it light, always: Alta's page is shown light whatever the app's appearance.
+    /// tells it light, always: Alta's page is shown light whatever the app's appearance. (1.3.83) Light or dark as the
+    /// student picks it above the objectives (light unless Dark is picked): the web view's own appearance with it (the
+    /// page's colour scheme, its fields), and the graph window's.
     func appearance(dark: Bool) {
         let ucc = web.configuration.userContentController
         ucc.removeAllUserScripts()
         ucc.addUserScript(WKUserScript(source: "window.__simplDark = \(dark); window.__simplPicsLight = \(picsLight);", injectionTime: .atDocumentStart, forMainFrameOnly: true))
         ucc.addUserScript(AltaHook.script)
         web.evaluateJavaScript("window.__simplDark = \(dark); window.__simplPicsLight = \(picsLight); if (window.__simplFocusDark) window.__simplFocusDark();", completionHandler: nil)
-        isDark = dark
+        web.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        pageDark = dark
+        AltaGraphWindow.shared.dark(dark)
     }
-    private var isDark = false
+    /// (1.3.83) Alta's side of the popup dark: the student's Dark, above the objectives.
+    private(set) var pageDark = false
 
     // MARK: (1.3.70) The question's graphs: small, opened large in a window of their own
 
@@ -1332,7 +1378,7 @@ final class AltaSession: ObservableObject {
         picsLight = on
         UserDefaults.standard.set(on, forKey: Self.picsLightKey)
         AltaGraphWindow.shared.light(on)
-        appearance(dark: isDark)
+        appearance(dark: pageDark)
         if let i = picOpen { Task { try? await Task.sleep(nanoseconds: 120_000_000); await openPic(i) } }
     }
 
@@ -1461,7 +1507,7 @@ final class AltaSession: ObservableObject {
         web.isInspectable = true
         web.setValue(false, forKey: "drawsBackground") // (1.3.49: the question laid on the popup's glass; see AltaQuiz)
         // (1.3.79) Alta's page in light whatever the app's appearance (its own colour scheme, its fields), as every
-        // tool's is: AltaQuiz lays it on light glass
+        // tool's is: AltaQuiz lays it on light glass — (1.3.83) until the student picks Dark (`appearance(dark:)`)
         web.appearance = NSAppearance(named: .aqua)
         r.session = self
         loading = web.observe(\.isLoading, options: [.new]) { [weak self] w, _ in
