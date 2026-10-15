@@ -859,6 +859,14 @@ jobs:
           Shot 'phys-vectors' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'vectors', '--tool-state', '3,4;1,2'))
           Shot 'phys-vectors-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'vectors', '--tool-state', '3d:1,2,3;4,5,6;-2,3,1'))
           Shot 'pin-vectors' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'vectors', '--pin-open', 'vectors'))
+          # (the Word Counter, at the end so the pictures before keep their parts) an essay counted as its launch gave it
+          # (--words-text, \n a line break), light, dark with a target of 120 words (its count in the log, checked
+          # below), on a 780 window with a target of 500, and its pin's flyout on a shorter text
+          $wordsText = 'The mitochondrion is the powerhouse of the cell. It makes most of the ATP a cell uses through cellular respiration, which runs in three stages: glycolysis, the citric acid cycle and the electron transport chain. Each stage hands what it makes to the next, and oxygen takes the last electrons to make water.\n\nPlants run much of this in reverse inside their chloroplasts, storing the energy of sunlight as sugar. Both processes turn on the same carrier molecules, so a cell can be read as one long exchange of electrons.'
+          Shot 'tool-words' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'words', '--words-text', $wordsText))
+          Shot 'tool-words-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'words', '--words-text', $wordsText, '--words-target', '120'))
+          Shot 'tool-words-780' '780x683' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'words', '--words-text', $wordsText, '--words-target', '500'))
+          Shot 'pin-words' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'words', '--pin-open', 'words', '--words-text', 'Photosynthesis turns light, water and carbon dioxide into sugar and oxygen. It happens in the chloroplasts of every leaf.'))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
@@ -982,6 +990,12 @@ jobs:
             Write-Host "settings-updates-staying: $((@($l -split "`n" | Where-Object { $_ -match 'update' }) -join ' | '))"
             if ($l -notmatch 'update: v\d+ found, kept back: staying back from v\d+') { Write-Host "::error::settings-updates-staying: the version found was not kept back for the earlier version put back (shots/profile-settings-updates-staying.log)"; exit 1 }
             if ($l.Contains("installer downloaded and checked")) { Write-Host "::error::settings-updates-staying: the version kept back was downloaded by itself (shots/profile-settings-updates-staying.log)"; exit 1 }
+          }
+          # (the Word Counter) it counted the essay its launch gave it
+          if ($script:mine -contains 'tool-words-dark') {
+            $l = PhoneLog 'tool-words-dark'
+            Write-Host "tool-words-dark: $((@($l -split "`n" | Where-Object { $_ -match 'words: ' }) -join ' | '))"
+            if ($l -notmatch 'words: shows [1-9]\d* words') { Write-Host "::error::tool-words-dark: the Word Counter did not count the text its launch gave it (shots/profile-tool-words-dark.log)"; exit 1 }
           }
           # the periodic table's top showed Fe when ptable-hover was pictured (--ptable-hover Fe): the last card its log
           # names before "picture at" (PTGrid.Show writes "ptable hover card: …" in a picture run)
