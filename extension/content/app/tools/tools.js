@@ -1412,7 +1412,9 @@
       if (frame) return frame;
       frame = h('iframe', { class: 'bcv-qgraph__frame', title: 'Desmos graphing calculator', allow: 'fullscreen', referrerpolicy: 'no-referrer' });
       frame.addEventListener('error', fail);
-      frame.addEventListener('load', () => { if (loaded) frame.classList.add('is-in'); });
+      // (2.99.35: shown on Desmos's own load, not the blank page it is made with — see-through until then, as the
+      //  popup's is, so a press into it is never one keepKeys hands back: only Desmos starting takes the keyboard then)
+      frame.addEventListener('load', () => { if (loaded && frame.src.startsWith(DESMOS)) frame.classList.add('is-in'); });
       body.append(frame);
       keys = keepKeys(frame); // (a hover is not a press: what was being typed on the page stays there, and the pin's Escape is heard)
       return frame;
