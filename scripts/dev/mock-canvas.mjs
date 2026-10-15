@@ -1571,10 +1571,24 @@ window.mockRichDialog = function (slow) {
 // ?sample=welcome opens the welcome pop-up by itself, ?sample=video the video one — the Mac's pictures, which asked
 // with ?dialog=rich and ?dialog=video before; the same parameter in both apps' runs.)
 var sample = new URLSearchParams(location.search).get('sample'); // (not 'demo': the mock's password, which no log may name)
-if (sample === '1' || sample === 'dialog') fetch('/mock-alta/api/content?assignmentId=a1');
+if (sample === '1' || sample === 'dialog' || sample === 'right' || sample === 'wrong') fetch('/mock-alta/api/content?assignmentId=a1');
 if (sample === 'dialog') setTimeout(function () { window.mockRichDialog(1500); }, 900);
 if (sample === 'welcome') setTimeout(function () { window.mockWelcomeDialog(1200); }, 800);
 if (sample === 'video') setTimeout(function () { window.mockVideoDialog(); }, 800);
+// (1.3.99) ?sample=right / ?sample=wrong: the question answered, as Alta leaves it after Check Answer — its verdict
+// strip under the answer box, the green "Yes that's right. Keep it up!" or the red "Not quite…", and Next Question in
+// Submit's place — for the apps' pictures of their verdict pill
+window.mockVerdict = function (ok) {
+  var old = document.getElementById('verdict'); if (old) old.remove();
+  var bar = document.querySelector('.button-bar__container___H_Vc_'), strip = document.createElement('div');
+  strip.id = 'verdict'; strip.className = 'feedback__banner___2Kq1x ' + (ok ? 'feedback__correct___1aZ3r' : 'feedback__incorrect___3bY7t'); strip.setAttribute('role', 'alert');
+  strip.style.cssText = 'margin:16px 0 0;padding:12px 16px;border-radius:6px;font-weight:600;color:#fff;background:' + (ok ? '#2e7d32' : '#c62828');
+  strip.textContent = ok ? "Yes that’s right. Keep it up!" : "Not quite. Try the next one.";
+  bar.parentNode.insertBefore(strip, bar);
+  var sub = document.getElementById('submit'); sub.hidden = true;
+  if (!document.getElementById('nextq')) { var n = document.createElement('button'); n.id = 'nextq'; n.className = 'theme__button___eBgiZ button__button-primary___3wyIF'; n.textContent = 'Next Question'; bar.appendChild(n); }
+};
+if (sample === 'right' || sample === 'wrong') window.mockVerdict(sample === 'right');
 </script></body></html>`);
     }
     // (1.3.19) an overview as a school's Alta may draw it: its objectives only as words on the page (no answer of Alta's

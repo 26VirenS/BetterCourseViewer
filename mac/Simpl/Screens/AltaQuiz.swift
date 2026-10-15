@@ -271,10 +271,12 @@ struct AltaQuizScreen: View {
                 .animation(Motion.gentle, value: split)
             }
             // (1.3.53) the parts' buttons, whatever they say, as the app's own — Alta's main one prominent, a greyed-out
-            // one greyed out — each pressing Alta's
+            // one greyed out — each pressing Alta's; (1.3.99) Alta's verdict on the question, Correct or Incorrect, as
+            // a pill at their left while Alta shows it
             .overlay(alignment: .bottomTrailing) {
                 if session.focused && !session.asIs && !session.buttons.isEmpty && session.dialog == nil {
                     QuizFloatingBar {
+                        if !session.verdict.isEmpty { AltaVerdictPill(right: session.verdict == "right") }
                         ForEach(session.buttons) { b in
                             Button { session.pressButton(b.id) } label: { Text(b.label).frame(minWidth: 70) }
                                 .glassButton(prominent: b.primary)
@@ -387,6 +389,27 @@ enum CanvasDue {
 }
 
 /// (1.3.70) Beside a small graph: Enlarge (its own window) and, in dark mode, Light or Dark for the graphs' colours.
+/// (1.3.99) Alta's verdict on the question as the popup's own pill, at the left of its buttons: a green capsule with a
+/// tick and "Correct", or a red one with a cross and "Incorrect" — glass on macOS 26 — there while Alta shows its strip,
+/// gone with the next question.
+private struct AltaVerdictPill: View {
+    var right: Bool
+
+    private var tone: Color { right ? Color.green : Color.red }
+
+    var body: some View {
+        Label(right ? "Correct" : "Incorrect", systemImage: right ? "checkmark.circle.fill" : "xmark.circle.fill")
+            .font(.sCallout.weight(.semibold))
+            .foregroundStyle(tone)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
+            .glassCapsule(tint: tone.opacity(0.28))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(right ? "Correct" : "Incorrect")
+            .transition(.opacity.combined(with: .scale(scale: 0.9)))
+    }
+}
+
 private struct AltaPicControls: View {
     @ObservedObject var session: AltaSession
     let index: Int

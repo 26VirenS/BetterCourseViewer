@@ -271,6 +271,10 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   whether it can be pressed — and the bars are put away (`data-simpl-bar`): the app shows them as its own glass buttons
   (the main one prominent, ⌘↩) and presses Alta's (`__simplButtons.press`). A sprite sheet kept for its symbols makes
   the parts round it that hold nothing else kept take no room (`data-simpl-thin`): Alta's banner held one.
+  (1.3.99) Alta's verdict on the question — its green "Yes that's right. Keep it up!" strip, its red "Not quite…" — is
+  read from the kept parts (`verdict` in the panels message: a banner, an alert or a box marked by its class, told by
+  its words first, else by its class) and shown as the popup's own pill at the left of its buttons, Correct in green or
+  Incorrect in red (`AltaVerdictPill`), until the strip goes with the next question.
   `scripts/dev/alta-test.mjs` drives the mock's Alta player (`/mock-alta/…`) through it in Chromium; the popup is shot
   as `21a-alta`.
 - **Quizzes (1.3.32).** The quiz's start screen lists every finished attempt, newest first, with its score (when Canvas

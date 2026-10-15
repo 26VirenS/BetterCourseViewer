@@ -553,6 +553,10 @@ alta_pages() {
   MODE=light shoot light-21s-alta-browser 20 -SimplOpen alta:104:4004 -SimplAltaShowBrowser YES
   MODE=dark shoot dark-21s-alta-browser-dark 22 -SimplOpen "$page" -SimplAltaShowBrowser YES -SimplAltaPageDark YES
   MODE=light SIZE=1024x768 shoot light-21t-alta-browser-narrow 22 -SimplOpen "$page" -SimplAltaShowBrowser YES
+  # (1.3.99) the question answered (?sample=right / ?sample=wrong: the mock's verdict strip and Next Question): Alta's
+  # verdict as the popup's own pill at the left of its buttons — Correct in green, light; Incorrect in red, dark
+  MODE=light shoot light-21u-alta-right 22 -SimplOpen "$page?sample=right"
+  MODE=dark shoot dark-21v-alta-wrong 22 -SimplOpen "$page?sample=wrong"
 }
 
 # (1.3.79) a tool opened whole is a popup over the window, never in its place (Shell/FloatingPopup.swift): the Periodic

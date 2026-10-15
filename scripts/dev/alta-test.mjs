@@ -121,6 +121,25 @@ try {
   const [pq, pa] = pn.panels;
   check(pq.kind === 'question' && pa.kind === 'answer' && pq.y < pa.y && pa.y - (pq.y + pq.h) >= 40 && pn.height >= pa.y + pa.h && pq.w > 200,
     `what the question asks and its answer are two panels with a gap between, and the page's height is told (${JSON.stringify(pn)})`);
+  // (1.3.99) Alta's verdict on the question — its strip under the answer box — is told with the panels, for the app's
+  // pill beside its buttons: wrong or right by its words, else by its class; nothing while none is shown; gone with it
+  check(pn.verdict === '', 'with no verdict shown, none is told');
+  const nv = (await posts()).length;
+  await page.evaluate(() => window.mockVerdict(false));
+  const vd = await waitFor((p, k) => k >= nv && p.kind === 'panels' && p.verdict === 'wrong', 'the verdict (wrong)');
+  check(!!vd && !(await vis('#submit')) && vd.panels.length === 2, 'Alta’s “Not quite” strip is read as a wrong answer, and told with the panels');
+  const bv = await waitFor((p, k) => k >= nv && p.kind === 'buttons' && p.items.some((b) => b.label === 'Next Question' && b.primary), 'Next Question');
+  check(!!bv && !bv.items.some((b) => b.label === 'Submit'), 'and Next Question takes Submit’s place in the app’s bar');
+  const nv2 = (await posts()).length;
+  await page.evaluate(() => { document.getElementById('verdict').textContent = 'Yes that’s right. Keep it up!'; });
+  check(!!(await waitFor((p, k) => k >= nv2 && p.kind === 'panels' && p.verdict === 'right', 'the verdict (right)')), 'Alta’s “Yes that’s right” strip is read as a right answer');
+  const nv3 = (await posts()).length;
+  await page.evaluate(() => { document.getElementById('verdict').textContent = 'Your work is saved as you go.'; document.getElementById('verdict').className = 'feedback__banner___2Kq1x feedback__incorrect___3bY7t'; });
+  check(!!(await waitFor((p, k) => k >= nv3 && p.kind === 'panels' && p.verdict === 'wrong', 'the verdict by class')), 'a strip whose words decide nothing is read by its class');
+  const nv4 = (await posts()).length;
+  await page.evaluate(() => { document.getElementById('verdict').remove(); document.getElementById('nextq').remove(); document.getElementById('submit').hidden = false; });
+  check(!!(await waitFor((p, k) => k >= nv4 && p.kind === 'panels' && p.verdict === '', 'the verdict gone')), 'and when the strip goes, so does the verdict');
+  await waitFor((p, k) => k >= nv4 && p.kind === 'buttons' && p.items.some((b) => b.label === 'Submit'), 'Submit back');
   // (1.3.62) a graph drawn into a part (Learnosity's JSXGraph box, its labels in it) and a large SVG are marked to be
   // turned back whole in dark mode; a small icon is not
   await page.evaluate(() => { document.querySelector('section[data-simpl-keep]').insertAdjacentHTML('beforeend', '<div class="lrn_graphplotting"><div class="jxgbox" style="width:300px;height:200px"><svg width="300" height="200"></svg><div class="JXGtext">(2, 0)</div></div></div><svg id="plot" width="240" height="160"></svg><svg id="icon" width="16" height="16"></svg><img id="gimg" alt="" style="display:block;width:220px;height:150px"><svg id="big" width="640" height="420"></svg>'); });
@@ -305,6 +324,10 @@ try {
   // (the learn page opened afresh for what follows: the page script before 1.3.83 showed a page nine seconds after it
   // opened whatever happened, and by now that time had often come in the middle of the check of the page out of sight
   // between parts — the Windows branch's copy of the Mac's script is older)
+  // (1.3.99: and first, the page opened answered — ?sample=right, the pictures' — its verdict told as soon as it is laid out)
+  await page.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a3?sample=right`);
+  const sv = await waitFor((p) => p.kind === 'panels' && p.panels.length === 2, 'the answered page’s panels');
+  check(sv.verdict === 'right', `a page opened answered tells its verdict with its first panels (${sv.verdict})`);
   await page.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a3`);
   await waitFor((p) => p.kind === 'focus' && p.state === 'question', 'the question recognised again');
   // (1.3.48) a lesson (More Instruction) above the question: both kept, Alta's header and the rest still hidden
@@ -550,6 +573,17 @@ try {
       `a pop-up the page script cannot read is given back to the page at once, never left out of sight (${d6.live})`);
     await wp.evaluate(() => document.getElementById('baddlg').remove());
     await wwait((p, k) => k >= n10 && p.kind === 'dialog' && p.open === false, 'the unreadable pop-up gone');
+    // (0.3.19) Alta's verdict on the question, told with the panels for the popup's pill: the page opened answered
+    // (?sample=wrong), then the strip's words changed, then the strip gone
+    await wp.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a3?sample=wrong`);
+    const wv = await wwait((p) => p.kind === 'panels' && p.panels.length === 2, 'the answered page’s panels');
+    check(wv.verdict === 'wrong', `a page opened answered tells its verdict with its first panels (${wv.verdict})`);
+    const nwv = (await wposts()).length;
+    await wp.evaluate(() => { document.getElementById('verdict').textContent = 'Yes that’s right. Keep it up!'; });
+    check(!!(await wwait((p, k) => k >= nwv && p.kind === 'panels' && p.verdict === 'right', 'the verdict (right)')), 'Alta’s “Yes that’s right” strip is read as a right answer');
+    const nwv2 = (await wposts()).length;
+    await wp.evaluate(() => document.getElementById('verdict').remove());
+    check(!!(await wwait((p, k) => k >= nwv2 && p.kind === 'panels' && p.verdict === '', 'the verdict gone')), 'and when the strip goes, so does the verdict');
     await wp.close();
   }
 } finally {
