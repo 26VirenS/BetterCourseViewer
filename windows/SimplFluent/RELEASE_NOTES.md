@@ -1,3 +1,8 @@
+**What's new in 0.3.7** (beta)
+
+- **Always up to date** — updates always install by themselves, at a quiet moment (never during a quiz, a tool or a dialog); the Install updates automatically switch is gone, and anyone who had it off gets updates by themselves again.
+- **Earlier versions stay** — after you install an earlier version in **Settings ▸ Updates ▸ Earlier versions**, Simpl stays on it: the version you left doesn't come back by itself, a newer one does, and **Update now** installs the newest whenever you choose.
+
 **What's new in 0.3.6** (beta)
 
 - **Dark mode for Alta** — a Light/Dark choice above the objectives in Knewton Alta's popup, remembered.

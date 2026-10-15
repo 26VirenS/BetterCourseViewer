@@ -26,6 +26,9 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.7", "2026-10-15",
+            ("improved", "Always up to date", "Updates now always install automatically."),
+            ("improved", "Earlier versions stay", "Go back a version and Simpl stays on it until you update.")),
         R("0.3.6", "2026-10-15",
             ("new", "Dark mode for Alta", "Switch Alta's page between light and dark."),
             ("new", "Show browser", "See Alta's own page beside your objectives."),
