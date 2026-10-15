@@ -484,6 +484,10 @@ struct PeriodicTableTool: View {
     private func disappeared() {
         // (tools-3: the tool left mid-tour — the tour closed with it, and seen)
         if tourStep != nil { endTour() }
+        // (1.3.88) an empty search left open goes with the tool, so it opens closed next time — here, not as the
+        // heading's controls go: the heading trading its one row for two (ViewThatFits) takes them away and back
+        let search = PTSearch.shared
+        if search.searching && search.query.isEmpty { search.searching = false }
     }
 
     /// (tools-3) The offered tour turned down: not offered again (the heading's Tour runs it any time).
@@ -1033,9 +1037,6 @@ struct PTHeaderBar: View {
         .onChange(of: focused) { _, f in
             if !f && search.query.isEmpty { searching = false }
         }
-        // (1.3.87: the field's being open is kept with the search now — an empty one left open goes with the tool, so it
-        // opens closed next time, as it did)
-        .onDisappear { if search.query.isEmpty { searching = false } }
         .onAppear {
             // (the screenshot suite: -SimplPTSearch ne, the search open with its results)
             if let q = UserDefaults.standard.string(forKey: "SimplPTSearch"), !q.isEmpty {

@@ -615,7 +615,9 @@ struct ToolHeader: View {
             Spacer(minLength: 12)
             // (1.3.78) a biology tool's pages
             if kind.isBiology { BioHeaderControls(kind: kind, squished: squished) }
-            if ptControls { PTHeaderBar().frame(minWidth: Self.ptRoom, alignment: .trailing) }
+            // (a width of its own, not a least: the button growing into the field, both drawn a moment as it opens, never
+            // widens the row, or the heading would go to its two rows as the search opened)
+            if ptControls { PTHeaderBar().frame(width: Self.ptRoom, alignment: .trailing) }
             // (tools-31) the button says what a press does: Unpin while it is pinned, Pin to Toolbar while it is not
             Button {
                 tools.togglePin(kind)
