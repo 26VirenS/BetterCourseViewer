@@ -396,8 +396,9 @@ pins_pages() {
 }
 
 # (1.3.79) a tool opened whole is a popup over the window, never in its place (Shell/FloatingPopup.swift): the Periodic
-# Table, Cell Explorer and Flashcards, each over the Tools page, in light and in dark, at 1024 points wide and at the
-# narrow size (the sidebar folded away)
+# Table, Cell Explorer, (1.3.80) DNA & RNA and Flashcards, each over the Tools page, in light and in dark, at 1024 points
+# wide and at the narrow size — (1.3.80) spanning the window over the sidebar, each 3D model filling its view; and DNA &
+# RNA reopened at the size it was left at (-SimplPopupSize: 760 × 520, centred over the window)
 tool_popups() {
   local m
   for m in light dark; do
@@ -405,9 +406,12 @@ tool_popups() {
     MODE="$m" SIZE=780x700 shoot "$m-35p-popup-ptable-narrow" 14 -SimplPlace tools -SimplTool ptable -SimplPTColour category
     HEAVY_SHOT=yes MODE="$m" SIZE=1024x768 shoot "$m-35q-popup-cell" 45 -SimplPlace tools -SimplTool cell -SimplToolState animal
     HEAVY_SHOT=yes MODE="$m" SIZE=780x700 shoot "$m-35q-popup-cell-narrow" 45 -SimplPlace tools -SimplTool cell -SimplToolState animal
+    HEAVY_SHOT=yes MODE="$m" SIZE=1024x768 shoot "$m-35s-popup-dna" 30 -SimplPlace tools -SimplTool dna
+    HEAVY_SHOT=yes MODE="$m" SIZE=780x700 shoot "$m-35s-popup-dna-narrow" 30 -SimplPlace tools -SimplTool dna
     MODE="$m" SIZE=1024x768 shoot "$m-35r-popup-flashcards" 12 -SimplPlace tools -SimplTool fc
     MODE="$m" SIZE=780x700 shoot "$m-35r-popup-flashcards-narrow" 12 -SimplPlace tools -SimplTool fc
   done
+  HEAVY_SHOT=yes MODE=light SIZE=1280x820 shoot light-35t-popup-dna-kept-size 30 -SimplPlace tools -SimplTool dna -SimplPopupSize tool.dna=760x520
 }
 
 # (1.3.80) in both sets: the Tools page's Chemistry section — the Periodic Table split into four tools — in light and in
@@ -427,6 +431,27 @@ chem_tools() {
   MODE=dark SIZE=1440x920 shoot dark-55r-lewis 14 -SimplPlace tools -SimplTool lewis -SimplLewisPreset "NO₃⁻"
   MODE=light shoot light-54h-pin-atoms 14 -SimplPinnedTools atoms -SimplPinOpen atoms
   MODE=light shoot light-30c-palette-chemistry 14 -SimplOpen "palette:orbitals"
+}
+
+# (1.3.80) how each 3D model was framed, from the consoles ("[Simpl] bio frame <scene>: view W × H, model X% across,
+# Y% up", and the atom's and the molecule's frames): each picture's last framing and its model's share of its view's
+# limiting side (the larger of the two) in frame-check.txt — 75% to 85% is as framed (SceneFill); under 70% is said
+# as a warning of the run
+frame_check() {
+  local out="$OUT_ABS/frame-check.txt" f name line small=""
+  : > "$out"
+  for f in "$OUT_ABS"/console-*.txt; do
+    [ -f "$f" ] || continue
+    line="$(grep -E '\[Simpl\] (bio|atom|molecule) frame' "$f" | tail -1)"
+    [ -n "$line" ] || continue
+    name="$(basename "$f" .txt)"
+    name="${name#console-}"
+    echo "$name: ${line#*\] }" >> "$out"
+    if echo "$line" | awk '{ for (i = 1; i <= NF; i++) if ($i ~ /%,?$/) { v = $i + 0; if (v > m) m = v } } END { exit !(m < 70) }'; then
+      small="$small $name"
+    fi
+  done
+  if [ -n "$small" ]; then echo "::warning::a 3D model framed under 70% of its view:$small (frame-check.txt)"; fi
 }
 
 # (1.3.78) a discussion's post that never measured in its web view says so on the console (Components/RichText.swift,
@@ -592,6 +617,8 @@ if [ "${SHOTS:-full}" = quick ]; then
   # (1.3.76) the Cloud view — (1.3.80) Atoms & Orbitals': carbon's whole atom, and the cloud model's test vectors on its
   # console
   SIZE=1440x920 shoot light-55k-atoms-cloud 16 -SimplPlace tools -SimplTool atoms -SimplPTElement 6 -SimplPTModel cloud -SimplCloudCheck YES
+  # (1.3.80) iron's five 3d orbitals in a row in Atoms & Orbitals, framed to fill their view's width
+  SIZE=1440x920 shoot light-55s-atoms-orbitals 16 -SimplPlace tools -SimplTool atoms -SimplPTElement 26 -SimplPTModel orbitals -SimplPTSubshell 3d
   SIZE=1440x920 shoot light-55c-lewis 14 -SimplPlace tools -SimplTool lewis -SimplLewisPreset "NO₃⁻"
   SIZE=1440x920 shoot light-55f-lewis-benzene 14 -SimplPlace tools -SimplTool lewis -SimplLewisPreset Benzene
   SIZE=1440x920 shoot light-55g-lewis-ionic 14 -SimplPlace tools -SimplTool lewis -SimplLewisPreset "NaNO₃"
@@ -651,6 +678,7 @@ if [ "${SHOTS:-full}" = quick ]; then
   live_shots # (1.3.80: alone, last)
   phone_check
   richtext_check
+  frame_check
   live_check
   keep_crashes
   exit 0
@@ -765,6 +793,7 @@ wait
 bio_pins
 live_shots # (1.3.80: alone, last)
 richtext_check
+frame_check
 live_check
 keep_crashes
 exit 0
