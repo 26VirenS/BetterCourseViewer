@@ -119,21 +119,21 @@ try {
     `what the question asks and its answer are two panels with a gap between, and the page's height is told (${JSON.stringify(pn)})`);
   // (1.3.62) a graph drawn into a part (Learnosity's JSXGraph box, its labels in it) and a large SVG are marked to be
   // turned back whole in dark mode; a small icon is not
-  await page.evaluate(() => { document.querySelector('section[data-simpl-keep]').insertAdjacentHTML('beforeend', '<div class="lrn_graphplotting"><div class="jxgbox" style="width:300px;height:200px"><svg width="300" height="200"></svg><div class="JXGtext">(2, 0)</div></div></div><svg id="plot" width="240" height="160"></svg><svg id="icon" width="16" height="16"></svg><img id="gimg" alt="" style="display:block;width:220px;height:150px"><svg id="big" width="640" height="420"></svg>'); });
+  await page.evaluate(() => { document.querySelector('section[data-simpl-keep]').insertAdjacentHTML('beforeend', '<div class="lrn_graphplotting"><div class="jxgbox" style="width:300px;height:200px"><svg width="300" height="200"></svg><div class="JXGtext">(2, 0)</div></div></div><svg id="plot" width="240" height="160"></svg><svg id="icon" width="16" height="16"></svg><img id="gimg" alt="" style="display:block;width:220px;height:150px"><svg id="big" width="1280" height="840"></svg>'); });
   await page.waitForTimeout(600);
   check(await page.evaluate(() => { const g = document.querySelector('.lrn_graphplotting'); return g.hasAttribute('data-simpl-pic') && !g.querySelector('[data-simpl-pic]') && document.getElementById('plot').hasAttribute('data-simpl-pic') && document.getElementById('gimg').hasAttribute('data-simpl-pic') && !document.getElementById('icon').hasAttribute('data-simpl-pic'); }),
     'a graph’s box (with its labels) and a large drawing are marked to keep their own colours in dark mode; an icon is not');
-  // (1.3.70) a large graph in what the question asks is drawn small (300 × 220 at most), its place told to the app for the
+  // (1.3.70) a large graph in what the question asks is drawn small (600 × 440 at most since 1.3.98/0.3.18; 300 × 220 before), its place told to the app for the
   // button by it, and a click on it asks the app to open it large; its rect and zoom are there for the picture
   const nm = (await posts()).length;
   const mini = await page.evaluate(() => { const b = document.getElementById('big'); const r = b.getBoundingClientRect(); return { on: b.hasAttribute('data-simpl-mini'), w: r.width, h: r.height, z: b.style.getPropertyValue('--simpl-zoom') }; });
   const pm = await waitFor((p, k) => k >= nm && p.kind === 'panels' && Array.isArray(p.pics) && p.pics.length === 1, 'the small graph’s place', 30).catch(() => null) || (await posts()).filter((p) => p.kind === 'panels').pop();
-  check(mini.on && mini.w <= 302 && mini.h <= 222 && +mini.z < 1 && pm?.pics?.length === 1 && Math.abs(pm.pics[0].w - mini.w) < 2,
+  check(mini.on && mini.w <= 602 && mini.h <= 442 && +mini.z < 1 && pm?.pics?.length === 1 && Math.abs(pm.pics[0].w - mini.w) < 2,
     `a large graph is drawn small, its place told to the app (${JSON.stringify({ mini, pics: pm?.pics })})`);
   await page.click('#big');
   const po = await waitFor((p) => p.kind === 'picOpen', 'the graph asked open', 20);
   const pr = await page.evaluate(() => window.__simplPic.rect(0));
-  check(po.i === 0 && pr && pr.w <= 302 && pr.z < 1, `a click on it asks the app to open it large, with where it is and its zoom (${JSON.stringify(pr)})`);
+  check(po.i === 0 && pr && pr.w <= 602 && pr.z < 1, `a click on it asks the app to open it large, with where it is and its zoom (${JSON.stringify(pr)})`);
   // (1.3.70) dark mode: graphs dark by default (turned over with the question), as Alta draws them on Light
   await page.evaluate(() => { window.__simplDark = true; window.__simplPicsLight = false; window.__simplFocusDark(); });
   const gDark = await page.evaluate(() => getComputedStyle(document.getElementById('gimg')).filter);
