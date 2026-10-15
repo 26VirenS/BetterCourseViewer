@@ -367,7 +367,8 @@ final class Engine: ObservableObject, ShellListener {
             if parts.count == 2 { tool = .courseTool(course: parts[0], id: parts[1], title: "Tool") }
         } else if let a = LaunchOpen.take("alta:") {
             let parts = a.split(separator: ":").map(String.init) // (1.3.17: -SimplOpen alta:104:4003, an Alta assignment's popup)
-            if parts.count == 2 { alta = AltaLaunch(course: parts[0], assignment: parts[1], title: "Knewton Alta") }
+            // (1.3.83: alta:104:4003:/mock-alta/… — opened on that page of the mock's Alta, as the pop-up's pictures need)
+            if parts.count >= 2 { alta = AltaLaunch(course: parts[0], assignment: parts[1], title: "Knewton Alta", page: parts.count > 2 ? parts[2...].joined(separator: ":") : nil) }
         } else if let a = LaunchOpen.take("macmillan:") {
             let parts = a.split(separator: ":").map(String.init) // (1.3.66: -SimplOpen macmillan:104:4005)
             if parts.count == 2 { macmillan = AltaLaunch(course: parts[0], assignment: parts[1], title: "Macmillan Learning") }
