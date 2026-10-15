@@ -928,6 +928,13 @@ jobs:
           Shot 'tool-verbs' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'verbs', '--verbs', 'es', '--verb', 'tener'))
           Shot 'tool-verbs-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'verbs', '--verbs', 'fr', '--verb', 'manger'))
           Shot 'pin-verbs' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'verbs', '--pin-open', 'verbs', '--verbs', 'es', '--verb', 'ser'))
+          # (0.3.19, at the end so the pictures before keep their parts) Knewton Alta's question answered (?sample=right /
+          # ?sample=wrong: the mock's verdict strip and Next Question): Alta's verdict as the popup's own pill at the left
+          # of its buttons — Correct in green, light; Incorrect in red, dark
+          $altaRight = 'alta:104:4003:/mock-alta/learn/course/c1/assignment/a3?sample=right'
+          $altaWrong = 'alta:104:4003:/mock-alta/learn/course/c1/assignment/a3?sample=wrong'
+          Shot 'alta-right' '1366x778' 50 ($mock + @('--appearance', 'light', '--open', $altaRight))
+          Shot 'alta-wrong' '1366x778' 50 ($mock + @('--appearance', 'dark', '--open', $altaWrong))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
