@@ -970,6 +970,9 @@ final class PTSearch: ObservableObject {
     /// (1.3.64) An element picked from the field's results: the table opens it.
     @Published private(set) var picked: Int?
     @Published private(set) var pickedCount = 0
+    /// (1.3.87) The search open as a field: kept here, not in the header's controls, so the heading drawn on one row or
+    /// on two (ToolHeader, as the window's width allows) has it open alike.
+    @Published var searching = false
 
     func pick(_ number: Int) {
         picked = number
@@ -995,14 +998,20 @@ final class PTNav: ObservableObject {
     func closeElement() { closeAsked += 1 }
 }
 
-/// (tools-4) The Periodic Table's second row, under its heading: the search — (1.3.54) a glass button that opens into a
-/// field — and Tour, which draws in to its symbol while the field is open; at the row's right, under the pin, in sight
-/// on the table and on an element's page alike. (1.3.80: the table's pages — Table, Lewis structures, Molecule builder —
-/// are gone from its left: the two builders are tools of their own.)
+/// (tools-4) The Periodic Table's search — (1.3.54) a glass button that opens into a field — and Tour, which draws in to
+/// its symbol while the field is open; in sight on the table and on an element's page alike. (1.3.87) In the heading's
+/// own row, left of the pin, where the window has room — the owner: "push these buttons up" — else (`alone`) on a row
+/// of their own under it, at its right, as before. (1.3.80: the table's pages — Table, Lewis structures, Molecule
+/// builder — are gone from its left: the two builders are tools of their own.)
 struct PTHeaderBar: View {
+    /// On a row of its own (the heading too narrow for it beside the pin): pushed to the row's right.
+    var alone = false
     @ObservedObject private var nav = PTNav.shared
     @ObservedObject private var search = PTSearch.shared
-    @State private var searching = false
+    private var searching: Bool {
+        get { search.searching }
+        nonmutating set { search.searching = newValue }
+    }
     @FocusState private var focused: Bool
     /// (1.3.64) the result the arrow keys are on
     @State private var lit = 0
@@ -1011,7 +1020,7 @@ struct PTHeaderBar: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Spacer(minLength: 8)
+            if alone { Spacer(minLength: 8) }
             searchControl.tourTarget("ptSearch")
             Button { nav.tourAsked += 1 } label: {
                 Label("Tour", systemImage: "questionmark.circle").labelStyle(SquishLabel(squished: searching))
@@ -1024,6 +1033,9 @@ struct PTHeaderBar: View {
         .onChange(of: focused) { _, f in
             if !f && search.query.isEmpty { searching = false }
         }
+        // (1.3.87: the field's being open is kept with the search now — an empty one left open goes with the tool, so it
+        // opens closed next time, as it did)
+        .onDisappear { if search.query.isEmpty { searching = false } }
         .onAppear {
             // (the screenshot suite: -SimplPTSearch ne, the search open with its results)
             if let q = UserDefaults.standard.string(forKey: "SimplPTSearch"), !q.isEmpty {

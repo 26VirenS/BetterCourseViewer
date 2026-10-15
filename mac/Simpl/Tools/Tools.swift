@@ -512,9 +512,10 @@ struct ToolScreen: View {
 }
 
 /// A tool's heading: the tool's tile, its name and line, its pin and — (1.3.79) at its right end, where every full popup
-/// has its Close — its popup's ×. (tools-4) The Periodic Table's has its search and Tour on a row of their own under it
-/// (1.3.80: no longer its pages — Lewis Structures and the Molecule Builder are tools of their own, with headings of
-/// their own); (tools-29) while one of its elements is open, "‹ Table" leads it, back to the table.
+/// has its Close — its popup's ×. (tools-4) The Periodic Table's has its search and Tour left of its pin — (1.3.87) on
+/// the heading's own row, where the window has room for them with the search open; else on a row of their own under it,
+/// as before (1.3.80: no longer its pages — Lewis Structures and the Molecule Builder are tools of their own, with
+/// headings of their own); (tools-29) while one of its elements is open, "‹ Table" leads it, back to the table.
 struct ToolHeader: View {
     let kind: ToolKind
     @ObservedObject private var tools = ToolsCenter.shared
@@ -534,9 +535,14 @@ struct ToolHeader: View {
                 stacked
             }
         } else if kind == .ptable {
-            VStack(alignment: .leading, spacing: 12) {
-                row(pages: nil, pinWords: true)
-                PTHeaderBar()
+            // (1.3.87) the search and Tour up on the heading's row, left of the pin — the owner: "push these buttons up"
+            // — measured with the search open (`ptRoom`), so opening it never moves them to a row of their own
+            ViewThatFits(in: .horizontal) {
+                row(pages: nil, pinWords: true, ptControls: true)
+                VStack(alignment: .leading, spacing: 12) {
+                    row(pages: nil, pinWords: true)
+                    PTHeaderBar(alone: true)
+                }
             }
         } else {
             row(pages: nil, pinWords: true)
@@ -579,8 +585,13 @@ struct ToolHeader: View {
         .accessibilityLabel("Close \(kind.name)")
     }
 
-    /// The heading's row: `pages` squishes a biology tool's page buttons to their symbols (nil: as they fit).
-    private func row(pages squished: Bool?, pinWords: Bool) -> some View {
+    /// (1.3.87) What the Periodic Table's search and Tour take beside the pin with the search open (its field, its
+    /// symbol and its ×, and Tour drawn in to its symbol): kept for them on the heading's row whether it is open or not.
+    private static let ptRoom: CGFloat = 340
+
+    /// The heading's row: `pages` squishes a biology tool's page buttons to their symbols (nil: as they fit);
+    /// (1.3.87) `ptControls`, the Periodic Table's search and Tour left of the pin.
+    private func row(pages squished: Bool?, pinWords: Bool, ptControls: Bool = false) -> some View {
         HStack(alignment: .center, spacing: 14) {
             leading
             IconTile(symbol: kind.symbol, color: kind.color, size: 44)
@@ -601,6 +612,7 @@ struct ToolHeader: View {
             Spacer(minLength: 12)
             // (1.3.78) a biology tool's pages
             if kind.isBiology { BioHeaderControls(kind: kind, squished: squished) }
+            if ptControls { PTHeaderBar().frame(minWidth: Self.ptRoom, alignment: .trailing) }
             // (tools-31) the button says what a press does: Unpin while it is pinned, Pin to Toolbar while it is not
             Button {
                 tools.togglePin(kind)

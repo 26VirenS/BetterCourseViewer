@@ -925,8 +925,9 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   were on each element's page, for any element — typed by symbol, name or number, stepped with ‹ › or ↑ ↓ in the field —
   laid out as the builders are, `PTWorkLayout`). *Math & science* keeps the calculators and the unit converter. Each
   tool has its own tile, pin (its quick version: the table small; Atoms & Orbitals an element to open; the builders
-  their tile and Open), popup, heading — the Periodic Table's without its pages, its search and Tour on the row under
-  it (`PTHeaderBar`) — and command in the search field (`/ptable`, `/lewis`, `/molecule`, `/atom`; words such as
+  their tile and Open), popup, heading — the Periodic Table's without its pages, its search and Tour left of its pin
+  (`PTHeaderBar`; 1.3.87: on the heading's own row where the window has room for them with the search open, else on a
+  row under it) — and command in the search field (`/ptable`, `/lewis`, `/molecule`, `/atom`; words such as
   "periodic", "orbitals" or "vsepr" bring them up among the suggestions; `PaletteAction.tool`). They hand over in the
   same popup rather than being one tool's pages: an element's facts page has its shells drawn flat (`PTBohrSketch`) and
   *Open in Atoms & Orbitals* where its 3D view was, and Atoms & Orbitals has *Open in Periodic Table* back to the facts;
