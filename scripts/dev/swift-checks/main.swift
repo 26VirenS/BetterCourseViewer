@@ -7,12 +7,14 @@ import simd
 // data and arithmetic, and its self-check), (1.3.80) every file in mac/Simpl/Tools/Chemistry/Model (the chemistry
 // tools' launch flags and what they keep, and (tools) the chemistry calculators' arithmetic — formulas, molar masses,
 // the balancer), (tools) every file in mac/Simpl/Tools/Physics/Model (the physics tools' arithmetic: kinematics,
-// projectiles, vectors, the circuit solver) and mac/Simpl/Engine/LivePlan.swift (1.3.80: the live checks' plan,
-// fingerprint and comparison) — and run, in seconds, by the Mac app's workflow (Models). By hand on a Mac: swiftc -o
-// /tmp/model-checks mac/Simpl/Tools/{PeriodicData,PeriodicExtraData,MoleculeShape}.swift
-// mac/Simpl/Tools/Biology/Model/*.swift mac/Simpl/Tools/Chemistry/Model/*.swift mac/Simpl/Tools/Physics/Model/*.swift
-// mac/Simpl/Engine/LivePlan.swift scripts/dev/swift-checks/main.swift && /tmp/model-checks. A failed check is printed
-// with what was found, and the exit code is the number that failed.
+// projectiles, vectors, the circuit solver), (tools) every file in mac/Simpl/Tools/Model (the study and maths tools'
+// arithmetic: the Word Counter's, Statistics' and the Matrix Calculator's, checked by StudyChecks.swift beside this
+// file) and mac/Simpl/Engine/LivePlan.swift (1.3.80: the live checks' plan, fingerprint and comparison) — and run, in
+// seconds, by the Mac app's workflow (Models). By hand on a Mac: swiftc -o /tmp/model-checks
+// mac/Simpl/Tools/{PeriodicData,PeriodicExtraData,MoleculeShape}.swift mac/Simpl/Tools/Biology/Model/*.swift
+// mac/Simpl/Tools/Chemistry/Model/*.swift mac/Simpl/Tools/Physics/Model/*.swift mac/Simpl/Tools/Model/*.swift
+// mac/Simpl/Engine/LivePlan.swift scripts/dev/swift-checks/main.swift scripts/dev/swift-checks/StudyChecks.swift
+// && /tmp/model-checks. A failed check is printed with what was found, and the exit code is the number that failed.
 
 var passed = 0, failed = 0
 func check(_ ok: Bool, _ what: String) {
@@ -500,6 +502,11 @@ check(abs(midEdge - (250 - 24)) < 0.5 && topEdge > midEdge + 40 && topEdge < 400
 // a molecule turning by itself: at most 84% of the limiting side over a whole turn, and that side's 84% reached
 let spin = framed(corners(5, 3, 2, at: BioVec(1, 0, 0)), w: 600, h: 400, turning: true)
 check(max(spin.across, spin.up) < 0.845 && max(spin.across, spin.up) > 0.83, "a turning molecule fills 84% of its view over a whole turn (\(Int((max(spin.across, spin.up) * 100).rounded()))%)")
+
+// ---- the study and maths tools (tools) -----------------------------------------------------------------------------
+// (mac/Simpl/Tools/Model, checked in StudyChecks.swift: the numbers shown and read, and each tool's arithmetic against
+// the specification's test vectors)
+studyChecks(check)
 
 print("\(passed) passed, \(failed) failed")
 exit(Int32(failed))

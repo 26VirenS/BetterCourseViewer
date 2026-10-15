@@ -138,7 +138,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: model-checks
-          key: mac-models-${{ steps.swift.outputs.version }}-${{ hashFiles('mac/Simpl/Tools/PeriodicData.swift', 'mac/Simpl/Tools/PeriodicExtraData.swift', 'mac/Simpl/Tools/MoleculeShape.swift', 'mac/Simpl/Tools/Biology/Model/*.swift', 'mac/Simpl/Tools/Chemistry/Model/*.swift', 'mac/Simpl/Tools/Physics/Model/*.swift', 'mac/Simpl/Engine/LivePlan.swift', 'scripts/dev/swift-checks/**', '.github/workflows/mac.yml') }}
+          key: mac-models-${{ steps.swift.outputs.version }}-${{ hashFiles('mac/Simpl/Tools/PeriodicData.swift', 'mac/Simpl/Tools/PeriodicExtraData.swift', 'mac/Simpl/Tools/MoleculeShape.swift', 'mac/Simpl/Tools/Biology/Model/*.swift', 'mac/Simpl/Tools/Chemistry/Model/*.swift', 'mac/Simpl/Tools/Physics/Model/*.swift', 'mac/Simpl/Tools/Model/*.swift', 'mac/Simpl/Engine/LivePlan.swift', 'scripts/dev/swift-checks/**', '.github/workflows/mac.yml') }}
       - name: The models' checks
         id: models
         if: ${{ !cancelled() }}
@@ -147,8 +147,8 @@ jobs:
             mkdir -p model-checks
             swiftc -O -o model-checks/run mac/Simpl/Tools/PeriodicData.swift mac/Simpl/Tools/PeriodicExtraData.swift \
               mac/Simpl/Tools/MoleculeShape.swift mac/Simpl/Tools/Biology/Model/*.swift mac/Simpl/Tools/Chemistry/Model/*.swift \
-              mac/Simpl/Tools/Physics/Model/*.swift mac/Simpl/Engine/LivePlan.swift \
-              scripts/dev/swift-checks/main.swift
+              mac/Simpl/Tools/Physics/Model/*.swift mac/Simpl/Tools/Model/*.swift mac/Simpl/Engine/LivePlan.swift \
+              scripts/dev/swift-checks/main.swift scripts/dev/swift-checks/StudyChecks.swift
           fi
           model-checks/run
       # (kept once they have passed, whatever the release app's build did)
