@@ -416,23 +416,29 @@ struct PopupPins: View {
         }
     }
 
+    // (1.3.97) One small glass pill with the pins in it, as the window's toolbar groups them — each pin had been a
+    // glass button of its own, a row of large capsules beside the popup's name. The pins are accessory-bar buttons
+    // (plain, lit under the pointer), the pull-down the same, in a capsule of their own.
     private func bar(_ pins: (shown: [ToolKind], more: [ToolKind])) -> some View {
-        GlassGroup(spacing: 8) {
-            HStack(spacing: 8) {
-                ForEach(pins.shown) { kind in
-                    PinnedToolButton(kind: kind, engine: engine)
-                        .labelStyle(.iconOnly)
-                        .glassButton()
-                }
-                if !pins.more.isEmpty {
-                    MorePinsMenu(kinds: pins.more, engine: engine)
-                        .labelStyle(.iconOnly)
-                        .menuStyle(.button)
-                        .glassButton()
-                        .fixedSize()
-                }
+        HStack(spacing: 2) {
+            ForEach(pins.shown) { kind in
+                PinnedToolButton(kind: kind, engine: engine)
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.accessoryBar)
+                    .frame(minWidth: 30, minHeight: 24)
+            }
+            if !pins.more.isEmpty {
+                MorePinsMenu(kinds: pins.more, engine: engine)
+                    .labelStyle(.iconOnly)
+                    .menuStyle(.button)
+                    .buttonStyle(.accessoryBar)
+                    .fixedSize()
             }
         }
+        .controlSize(.regular)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+        .glassCapsule()
     }
 }
 
