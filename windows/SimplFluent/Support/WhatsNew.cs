@@ -26,6 +26,8 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.3", "2026-10-15",
+            ("improved", "Cleaner counter cards", "No coloured border; just each card's own colour.")),
         R("0.3.2", "2026-10-14",
             ("new", "Chemistry tools", "Periodic Table, Lewis, Molecule Builder, Atoms & Orbitals."),
             ("new", "Live updates", "Open screens check for new work every minute."),

@@ -1,3 +1,7 @@
+**What's new in 0.3.3** (beta)
+
+- **Cleaner counter cards** — the Dashboard's counter cards lose their coloured border; each keeps its own soft colour.
+
 **What's new in 0.3.2** (beta)
 
 - **Chemistry tools** — the Periodic Table, Lewis Structures, Molecule Builder and Atoms & Orbitals, each its own tool in a new Chemistry section.

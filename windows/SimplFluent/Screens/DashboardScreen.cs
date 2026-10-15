@@ -434,18 +434,18 @@ public sealed partial class DashboardScreen : Screen
     }
 
     /// <summary>
-    /// A counter's card round its words: its colour washed across it, inside it, with a faint edge of the colour — over
+    /// A counter's card round its words: its colour washed across it, inside it, ringed as every card is (0.3.3: no coloured
+    /// edge — the owner: "remove the unnecessary border") — over
     /// its theme's picture too, which still shows through — opening its panel when pressed, what it counts with its number
     /// (and the line about it, whole, wherever the card had no room for it) its tooltip and what a screen reader says.
-    /// Overdue with something in it wears the alert instead — a stronger red wash than its own, ringed in red, its number
-    /// red — so late work is never only a tint.
+    /// Overdue with something in it wears the alert instead — a stronger red wash than its own, its number red — so late
+    /// work is never only a tint.
     /// </summary>
     private Button TileButton(Counter c, FrameworkElement content, (int? Value, string? Note, bool Kept) n, bool alert, Color color)
     {
         var face = Face(c.Key, alert, color);
         face.Children.Add(content);
         var b = K.CardButton(face, () => SetOpen(openKey == c.Key ? null : c.Key), 8, new Thickness(0));
-        b.BorderBrush = Edge(color);
         var spoken = Spoken(c.Key, c.Label, n.Value);
         b.ToolTip = string.IsNullOrEmpty(n.Note) ? spoken : $"{spoken}\n{n.Note}";
         System.Windows.Automation.AutomationProperties.SetName(b, spoken);
@@ -472,8 +472,6 @@ public sealed partial class DashboardScreen : Screen
         return face;
     }
 
-    /// <summary>A counter's card's faint edge in its colour.</summary>
-    private static SolidColorBrush Edge(Color color) => new(K.WithAlpha(color, Appearance.Dark ? 0.34 : 0.3));
 
     /// <summary>
     /// The line about a count, whole: on as many lines as it takes, up to two — its parts ("announcements · 2 courses" is
@@ -543,7 +541,7 @@ public sealed partial class DashboardScreen : Screen
 
     /// <summary>
     /// The alert's face, Overdue's while something is late: a stronger red wash than the one it wears with nothing late
-    /// (<see cref="Wash"/>), ringed in the alert's red. In light Overdue's own red, more of it; in dark a deeper red laid on
+    /// (<see cref="Wash"/>). In light Overdue's own red, more of it; in dark a deeper red laid on
     /// thicker, redder than its own wash without lifting the card towards the red number on it — which reads on it at
     /// about 4:1 in both (34 px semibold).
     /// </summary>
@@ -553,7 +551,7 @@ public sealed partial class DashboardScreen : Screen
         return new Border
         {
             Background = new LinearGradientBrush(K.WithAlpha(c, near), K.WithAlpha(c, far), new Point(0, 0), new Point(1, 1)),
-            CornerRadius = new CornerRadius(7), BorderThickness = new Thickness(1.5), BorderBrush = new SolidColorBrush(AlertRed), IsHitTestVisible = false,
+            CornerRadius = new CornerRadius(7), IsHitTestVisible = false,
         };
     }
 
@@ -795,7 +793,7 @@ public sealed partial class DashboardScreen : Screen
     }
 
     /// <summary>
-    /// A counter's card's own face — its background, its scene, its wash (or the alert's) and its coloured edge, without
+    /// A counter's card's own face — its background, its scene, its wash (or the alert's) and the edge every card has, without
     /// its words — laid in its panel's surface over the panel's own: there as the card starts to grow, gone by the time
     /// the panel's words are in, and back as the panel folds into the card, so the surface is the card's at the first
     /// frame of the grow and at the last of the fold, never jumping from one look to the other.
@@ -804,8 +802,9 @@ public sealed partial class DashboardScreen : Screen
     {
         var alert = c.Tone == "red" && (Count(c).Value ?? 0) > 0;
         var color = CounterColor(c.Key);
-        var look = new Border { Child = Face(c.Key, alert, color), CornerRadius = new CornerRadius(7), BorderThickness = new Thickness(1), BorderBrush = Edge(color), IsHitTestVisible = false };
+        var look = new Border { Child = Face(c.Key, alert, color), CornerRadius = new CornerRadius(7), BorderThickness = new Thickness(1), IsHitTestVisible = false };
         look.SetResourceReference(Border.BackgroundProperty, "CardBackground");
+        look.SetResourceReference(Border.BorderBrushProperty, "CardStrokeColorDefaultBrush"); // (the card's own edge, as its button wears it)
         return look;
     }
 
