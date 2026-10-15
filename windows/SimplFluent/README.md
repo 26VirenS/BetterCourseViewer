@@ -426,7 +426,7 @@ never fails a run, and nothing waits for it but the pictures' merge.
 show checked against the school while the window shows `LiveCheck`), the popups floating over the window (`FloatPopup`, Popups below), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once, the third time Simpl is opened, at a calm moment, and from Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, a place or a page in a window of its own (`PlaceWindow`: a pane row's or a list row's Open in new window, Shift+click on a pane row, a page's ⋯ ▸ Open in new window, or Ctrl+Shift+O for what shows), the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
 | `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In and its Send from Phone, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
-| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed, Word Counter; `Model/` holds their counting and sums with no window in them, tested in `SimplFluent.Tests`), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table, Atoms & Orbitals), `Chemistry/` (the Chemistry section's tools: `ChemTools.cs`, Lewis Structures, the Molecule Builder, and the calculators — the Equation Balancer — with their sums in `Chemistry/Model/`, plain .NET), `Physics/` (the Physics section's tools: `PhysTools.cs`, Kinematics & Projectiles, Vectors; their maths in `Model/`, free of WPF), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
+| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed, Word Counter, Statistics; `Model/` holds their counting and sums with no window in them, tested in `SimplFluent.Tests`), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table, Atoms & Orbitals), `Chemistry/` (the Chemistry section's tools: `ChemTools.cs`, Lewis Structures, the Molecule Builder, and the calculators — the Equation Balancer — with their sums in `Chemistry/Model/`, plain .NET), `Physics/` (the Physics section's tools: `PhysTools.cs`, Kinematics & Projectiles, Vectors; their maths in `Model/`, free of WPF), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
 
 ## A screen
 
@@ -986,6 +986,22 @@ box opens each by its name and words, `PaletteCommand.EverydayTools`; `--tool <k
   with the counts under them. `--words-text "…"` (`\n` for a line break) and `--words-target 500` fill it for a
   picture; the log says `words: shows N words`. The search box: `/words`, `word count`, `characters`, `reading time`,
   `essay`.
+- **Statistics** (`stats`, Math & science; `Tools/Everyday/Statistics.cs`, `StatisticsPages.cs`, `Model/Statistics.cs`):
+  four pages under a selector bar, kept with every field (`SimplStats.<field>`). **Describe**: numbers (spaces, commas
+  or line breaks; a spreadsheet column pastes) → n, mean, median, mode(s), min, max, range, Q1, Q3 and IQR (the
+  medians of the lower and upper halves, the median left out when n is odd — said on the page), sample and population
+  SD and variance, the SE of the mean, sum and sum of squares, outliers past 1.5 IQR as red chips, and a histogram
+  (Sturges' bins) with the box plot under it. **Regression**: x and y columns → slope, intercept, r, r² and the
+  equation, a scatter with the line, and y for an x. **Distributions**: the normal's P(X < x), P(X > x), P(a < X < b),
+  the z-score and the x for a p (erf to full precision — its series near zero, the continued fraction for erfc beyond
+  — and Acklam's inverse with a Halley step), the curve with the area below x shaded; the t's two- and one-tailed p and
+  the critical t for a p (the regularized incomplete beta by Numerical Recipes' continued fraction). **Tests**:
+  one-sample (from numbers or mean, SD and n), two-sample (Welch) and paired t-tests → t, df, p, the 95% interval, in
+  a plain sentence. The pin shows a sample's mean, median and sample SD (its numbers are Describe's; Enter opens the
+  whole tool). `--tool-state describe|regression|dist|tests` picks the page, `--stats-data`, `--stats-x`, `--stats-y`,
+  `--stats-b`, `--stats-mu0`, `--stats-test one|two|paired`, `--stats-normal "μ,σ,x,a,b,p"` and `--stats-t "df,t,p"` fill
+  the fields for a picture; the log says `stats: shows <page>`. The search box: `/stats`, `statistics`, `mean`,
+  `standard deviation`, `regression`, `normal`, `z-score`, `t-test`.
 
 The biology toolkit's ten (`Tools/Biology/`, a "Biology" section of their own on the Tools page) register through
 `BioTools.Register`, which adds their pages in the header and what a launch asks of them (`--tool cell --tool-state

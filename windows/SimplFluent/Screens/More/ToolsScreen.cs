@@ -64,7 +64,7 @@ public static class ToolsPins
 /// <summary>
 /// Tools (the Mac's ToolsView and ToolsGrid): the things Simpl does on its own, a tile each — its symbol on a wash of its
 /// colour, its name and a one-line note, and its pin — under a heading for what they are for: Study (flashcards, the focus
-/// timer, citations, Grade needed, the Word Counter), Math &amp; science (the calculators, the unit converter), Files (the file converter,
+/// timer, citations, Grade needed, the Word Counter), Math &amp; science (the calculators, the unit converter, Statistics), Files (the file converter,
 /// Merge &amp; split PDFs, the PDF annotator, Image to text), Chemistry (the Periodic Table, Lewis Structures, the Molecule
 /// Builder, Atoms &amp; Orbitals and the calculators: Tools/Chemistry/ChemTools.cs), Physics (Kinematics &amp; Projectiles and
 /// the rest: Tools/Physics/PhysTools.cs) and Biology (the biology toolkit's ten, Tools/Biology). A tile opens its tool in a
@@ -100,6 +100,7 @@ public sealed class ToolsScreen : Screen
         new("fc", "Flashcards", "Flip, learn, test, match.", SymbolRegular.SquareMultiple24, "#0a84ff"),
         // (tools) the tools program's: each at the end of its group below
         new("words", "Word Counter", "Words, characters, reading time.", SymbolRegular.TextWordCount24, "#8e8e93"),
+        new("stats", "Statistics", "Mean, SD, regression, z and t.", SymbolRegular.DataHistogram24, "#ff2d55"),
     };
 
     /// <summary>The Tools page's sections in its order (the Mac's ToolGroup): what each set of tools is for, the study
@@ -108,7 +109,7 @@ public sealed class ToolsScreen : Screen
     public static readonly (string Title, string[] Keys)[] Groups =
     {
         ("Study", new[] { "fc", "cite", "pomo", "need", "words" }),
-        ("Math & science", new[] { "calc", "graph", "units" }),
+        ("Math & science", new[] { "calc", "graph", "units", "stats" }),
         ("Files", new[] { "mark", "pdfx", "conv", "ocr" }),
     };
 

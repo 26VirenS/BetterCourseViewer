@@ -9,7 +9,8 @@ namespace Simpl.Support;
 /// any --bio-&lt;name&gt; too: Tools/Biology/README.md), --bio-check (the biology toolkit's self-check in the log),
 /// --tools-scroll physics (the Tools page scrolled to a section), --tool motion --tool-state projectile:v0=20,angle=45
 /// and --motion-values (a physics tool in that state: Tools/Physics/PhysTools.cs).
-/// --tool words --words-text "…" --words-target 500 (the Word Counter's text and target).
+/// --tool words --words-text "…" --words-target 500 (the Word Counter's text and target), --tool stats --tool-state
+/// describe --stats-data "2, 4, 4" (Statistics' page and numbers: StatsState.FromLaunch).
 /// </summary>
 public static class Launch
 {

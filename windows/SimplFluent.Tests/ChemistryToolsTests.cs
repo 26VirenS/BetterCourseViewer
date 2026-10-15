@@ -40,9 +40,10 @@ public class ChemistryToolsTests
     [Fact]
     public void ThePeriodicTableLivesUnderChemistryAndKeepsItsKey()
     {
-        // (not in Math & science any more; every tool once on the page, the Periodic Table by the key a pin keeps)
+        // (not in Math & science any more — the tools program's Statistics took its place at the end of the group; every
+        //  tool once on the page, the Periodic Table by the key a pin keeps)
         Assert.DoesNotContain(ToolsScreen.Groups, g => g.Keys.Contains("ptable"));
-        Assert.Equal(new[] { "calc", "graph", "units" }, ToolsScreen.Groups.First(g => g.Title == "Math & science").Keys);
+        Assert.Equal(new[] { "calc", "graph", "units", "stats" }, ToolsScreen.Groups.First(g => g.Title == "Math & science").Keys);
         Assert.Equal(ToolsScreen.Kinds.Length, ToolsScreen.Kinds.Select(k => k.Key).Distinct().Count());
         foreach (var k in ChemTools.Kinds) Assert.Same(k, ToolsCenter.KindOf(k.Key));
         Assert.NotNull(ChemTools.Kind("ptable"));

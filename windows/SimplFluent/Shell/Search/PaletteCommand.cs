@@ -223,6 +223,7 @@ internal sealed class PaletteCommand
         (string Key, string Name, string[] Aliases)[] words =
         {
             ("words", "words", ["word count", "word counter", "characters", "reading time", "essay"]),
+            ("stats", "stats", ["statistics", "mean", "standard deviation", "regression", "normal", "z-score", "t-test"]),
         };
         foreach (var (key, name, aliases) in words)
             if (Simpl.Tools.ToolsCenter.KindOf(key) is { } kind)

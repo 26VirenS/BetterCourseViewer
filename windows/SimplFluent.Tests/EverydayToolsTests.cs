@@ -29,6 +29,28 @@ public class EverydayToolsTests
     }
 
     [Fact]
+    public void StatisticsEndsTheMathAndScienceGroup()
+    {
+        var maths = ToolsScreen.Groups.First(g => g.Title == "Math & science").Keys;
+        Assert.Equal("stats", maths[^1]);
+        var kind = ToolsCenter.KindOf("stats");
+        Assert.NotNull(kind);
+        Assert.Equal("Statistics", kind!.Name);
+        Assert.Equal("Mean, SD, regression, z and t.", kind.Note);
+        Assert.Equal("#ff2d55", kind.Hex);
+        Assert.Equal("Stats", ToolsCenter.ShortName("stats"));
+        Assert.Equal(new[] { "Describe", "Regression", "Distributions", "Tests" }, StatsState.Tabs);
+    }
+
+    [Theory]
+    [InlineData("describe", 0)]
+    [InlineData("regression", 1)]
+    [InlineData("dist", 2)]
+    [InlineData("Tests", 3)]
+    [InlineData("histogram", null)]
+    public void ALaunchNamesStatisticsPage(string word, int? tab) => Assert.Equal(tab, StatsState.TabOf(word));
+
+    [Fact]
     public void EveryKeyIsItsOwnAndEverySymbolDrawable()
     {
         Assert.Equal(ToolsScreen.Kinds.Length, ToolsScreen.Kinds.Select(k => k.Key).Distinct().Count());
@@ -41,6 +63,11 @@ public class EverydayToolsTests
     [InlineData("word count", "words")]
     [InlineData("essay", "words")]
     [InlineData("reading time", "words")]
+    [InlineData("stats", "stats")]
+    [InlineData("statistics", "stats")]
+    [InlineData("standard deviation", "stats")]
+    [InlineData("t-test", "stats")]
+    [InlineData("regression", "stats")]
     public void TheSearchBoxOpensEachByItsWords(string typed, string key)
     {
         var command = PaletteCommand.Named(PaletteCommand.EverydayTools().ToList(), typed);
