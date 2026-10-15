@@ -1043,6 +1043,23 @@ list in `ToolsScreen.Everyday` and `Groups`, and the search box opens each by it
   by `|`, `--shrink-preset balanced|smallest|max|fit`, `--shrink-fit 0.5`, and `--shrink-go` to compress at once; the log
   says `shrink: shows N files at <preset>` and `shrink: done at <preset>, … (N% saved)`. Tested in
   `SimplFluent.Tests/ShrinkTests.cs`.
+- **Study planner** (`plan`, Study; `Tools/Planner/StudyPlanner.cs`, its sums in `Tools/Planner/Model/StudyPlan.cs`,
+  free of WPF; `/plan`, `study plan`, `study time`, `exam prep`): the work due in the next six weeks — the assignments,
+  quizzes and discussions the Calendar shows, read with the engine's `calendar` call — shared out as study blocks over
+  the days before each is due. A piece's weight is its points (equal shares when none has any) times its kind: an exam,
+  midterm, final or test by name three, a quiz one and a half, an assignment one, a discussion half; its need is its
+  share of the hours between now and the last deadline, in whole blocks. Each day is filled earliest deadline first,
+  then heaviest — first what keeps every piece on pace for its deadline, then the room left — and a block never ends
+  past its work's due moment, nor sits before now. A week view (today first, the days flowing on a narrow page) and a
+  list view; beside them how every piece stands (done of needed, and what won't fit before it's due), the settings
+  (hours a day by weekday, 2 on weekdays and 3 at the weekend; the block, 25/45/60/90 min; morning, afternoon or
+  evening; days to finish early; the courses included) — all remembered (`SimplPlan.hours`, `.block`, `.time`,
+  `.finish`, `.courses`, `.view`) — Regenerate and Add to Calendar (an `.ics` of the blocks saved to Downloads). A
+  block ticked is done (`SimplPlan.done`): it stays where it was and comes off what its work needs, and the rest is
+  planned round it. Nothing is written to Canvas. Its pin is today's blocks as a checklist. For pictures:
+  `--plan-hours 2`, `--plan-block 45`, `--plan-time evening`, `--plan-view list`, `--plan-done assignment_1015:2`; the
+  log says `plan: shows N blocks for M items over D days (week|list)`. Tested in `SimplFluent.Tests/PlannerTests.cs`
+  (the sums) and `PlannerToolTests.cs`.
 
 ## Popups
 

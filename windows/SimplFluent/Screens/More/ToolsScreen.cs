@@ -104,6 +104,7 @@ public sealed class ToolsScreen : Screen
         // (a table of cells, not the Grid24 the biology Crosses tile wears a few rows below)
         new("matrix", "Matrix Calculator", "Determinant, inverse, solve, RREF.", SymbolRegular.TableSimple24, "#5e5ce6"),
         new("shrink", "Compress files", "Shrink images and PDFs to fit.", SymbolRegular.ArrowMinimize24, "#ff9500"),
+        new("plan", "Study planner", "Study blocks from your due dates.", SymbolRegular.CalendarClock24, "#34c759"),
     };
 
     /// <summary>The Tools page's sections in its order (the Mac's ToolGroup): what each set of tools is for, the study
@@ -111,7 +112,7 @@ public sealed class ToolsScreen : Screen
     /// biology toolkit's ten under "Biology").</summary>
     public static readonly (string Title, string[] Keys)[] Groups =
     {
-        ("Study", new[] { "fc", "cite", "pomo", "need", "words" }),
+        ("Study", new[] { "fc", "cite", "pomo", "need", "words", "plan" }),
         ("Math & science", new[] { "calc", "graph", "units", "stats", "matrix" }),
         ("Files", new[] { "mark", "pdfx", "conv", "ocr", "shrink" }),
     };

@@ -17,8 +17,9 @@ public class EverydayToolsTests
     [Fact]
     public void TheWordCounterEndsTheStudyGroup()
     {
+        // (the Study planner, shipped after it, is the one after it)
         var study = ToolsScreen.Groups.First(g => g.Title == "Study").Keys;
-        Assert.Equal("words", study[^1]);
+        Assert.Equal("words", study[^2]);
         var kind = ToolsCenter.KindOf("words");
         Assert.NotNull(kind);
         Assert.Same(kind, ToolsScreen.Kinds.First(k => k.Key == "words"));

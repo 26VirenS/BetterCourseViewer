@@ -186,6 +186,8 @@ internal sealed class PaletteCommand
         (string Key, string Name, string[] Aliases)[] words =
         {
             ("shrink", "compress", ["shrink", "smaller", "file size", "upload limit", "compress files"]),
+            // ("planner" and "schedule" are To Do's and the Calendar's own words: the planner answers to its longer ones)
+            ("plan", "plan", ["study plan", "study planner", "study time", "exam prep", "study blocks"]),
         };
         foreach (var (key, name, aliases) in words)
             if (Simpl.Tools.ToolsCenter.KindOf(key) is { } kind)
