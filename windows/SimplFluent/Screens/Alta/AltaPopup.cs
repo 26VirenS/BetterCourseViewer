@@ -19,11 +19,12 @@ namespace Simpl.Screens;
 
 /// <summary>
 /// (Mac 1.3.17) A Knewton Alta assignment in a popup over the window, as a quiz is taken (the Mac's AltaQuizScreen): the
-/// assignment's name and Close across the top; down the left, its objectives as the quiz's question tiles — the one
-/// being worked on filled, a mastered one ticked, the others filling as they are mastered — each by name, and the total
-/// mastery bar. In the rest, Alta's own page, the student working on it there: its question alone on panels, its buttons
-/// as the popup's own at its foot, its cover as the popup's start screen, its pop-ups as the popup's dialogs, and the
-/// popup's skeleton while it loads. AltaSession reads it all from the page.
+/// assignment's name and Close across the top; down the left, (0.3.5) Light or Dark for Alta's page, then its objectives
+/// as the quiz's question tiles — the one being worked on filled, a mastered one ticked, the others filling as they are
+/// mastered — each by name, and the total mastery bar. In the rest, Alta's own page, the student working on it there: its
+/// question alone on panels, its buttons as the popup's own at its foot, its cover as the popup's start screen, its
+/// pop-ups as the popup's dialogs, and the popup's skeleton while it loads — all of it in the page's look, light unless
+/// the student chose dark. AltaSession reads it all from the page.
 /// </summary>
 public static class AltaPopup
 {
@@ -46,6 +47,10 @@ internal sealed class AltaPopupView
     private readonly ContentControl logsSlot = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
     private readonly ScrollViewer rail = new() { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false };
     private readonly Border webHolder = new();
+    /// <summary>(0.3.5) Where Alta's page and what the popup shows in its place are, dressed in the page's look
+    /// (AltaLook.Look): an opaque ground of the look's own under the frame, its corner rounded as the frame's.</summary>
+    private readonly Border region = new() { CornerRadius = new CornerRadius(8, 0, 0, 0) };
+    private readonly AltaPageBar pageBar;
     private readonly ContentControl startSlot = new() { Focusable = false, Visibility = Visibility.Collapsed };
     private readonly FrameworkElement skeleton = AltaParts.Skeleton();
     private readonly ContentControl stateSlot = new() { Focusable = false, Visibility = Visibility.Collapsed };
@@ -76,11 +81,13 @@ internal sealed class AltaPopupView
         header = AltaLook.Header(engine, tileSlot, title, subtitle, logsSlot, Close, "Close — your progress is kept by Alta");
         root.Children.Add(header.Row(0));
 
-        // the rail, and Alta's page in its frame (the popup's own in its place while it loads, and its buttons under it)
+        // the rail under Light or Dark for the page, and Alta's page in its frame (the popup's own in its place while it
+        // loads, and its buttons under it)
         var body = new Grid();
         body.ColumnDefinitions.Add(railColumn);
         body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        body.Children.Add(rail.Col(0));
+        pageBar = new AltaPageBar(session.Dark, SetDark) { Margin = new Thickness(20, 4, 16, 14) };
+        body.Children.Add(K.Rows("auto, *", pageBar.Row(0), rail.Row(1)).Col(0));
         webHolder.Child = session.Web;
         // (clear of the popup's right edge, which sizes it: FloatPopup.EdgeRoom)
         webHolder.Margin = new Thickness(0, 0, FloatPopup.EdgeRoom, 8);
@@ -88,7 +95,11 @@ internal sealed class AltaPopupView
         skeleton.Visibility = Visibility.Collapsed;
         footer.SetResourceReference(Border.BorderBrushProperty, B.Divider);
         var page = K.Rows("*, auto", area.Row(0), footer.Row(1));
-        body.Children.Add(AltaLook.Frame(page).Col(1));
+        region.Child = AltaLook.Frame(page);
+        region.Bg(B.Solid);
+        session.Region = region;
+        Dress(session.Dark);
+        body.Children.Add(region.Col(1));
         root.Children.Add(body.Row(1));
         Grid.SetRowSpan(layer, 2);
         root.Children.Add(layer);
@@ -114,7 +125,7 @@ internal sealed class AltaPopupView
         {
             root.Loaded -= loaded;
             AltaLook.Settle(root);
-            session.Start(Support.Appearance.Dark);
+            session.Start();
         };
         root.Loaded += loaded;
         Update();
@@ -158,13 +169,31 @@ internal sealed class AltaPopupView
     private void OnAppearance()
     {
         if (closed) return;
-        session.Appearance(Support.Appearance.Dark);
+        Dress(session.Dark);
+        session.Appearance();
         tileSlot.Content = Tile(32);
         railSig = startSig = footerSig = stateSig = "";
         if (layer.Kind == "alta") dialogShown = -1;
         ground = null;
         Update();
     }
+
+    /// <summary>(0.3.5) Alta's page in light or dark, as the student chose it above the objectives: the page told, and
+    /// what the popup shows in its place dressed again.</summary>
+    private void SetDark(bool dark)
+    {
+        if (closed || dark == session.Dark) return;
+        Dress(dark);
+        session.SetDark(dark);
+        pageBar.Show(dark);
+        startSig = footerSig = stateSig = "";
+        ground = null;
+        Update();
+    }
+
+    /// <summary>(0.3.5) The page's part of the popup dressed in the page's look — nothing of its own when that is the
+    /// app's (AltaLook.Look) — before the page's panels are drawn again in it.</summary>
+    private void Dress(bool dark) => region.Resources = AltaLook.Look(dark) ?? new ResourceDictionary();
 
     // ---- what shows, as the session says ----
 
@@ -201,7 +230,7 @@ internal sealed class AltaPopupView
         // Alta's page in sight only while nothing of the popup's own is in its place — on white when it is shown as it
         // is, else on the popup's ground (its parts' panels drawn on it)
         var asItIs = !s.Focused && s.PageShown && (s.Cover == null || s.DialogInPage);
-        var want = AltaLook.Drawing(asItIs ? Colors.White : AltaLook.Ground());
+        var want = AltaLook.Drawing(asItIs ? Colors.White : AltaLook.Ground(region));
         if (ground != want) { ground = want; s.Web.DefaultBackgroundColor = want; }
         var covered = showStart || showSkeleton || s.Failure != null || s.Opening || layer.Covers;
         var vis = covered ? Visibility.Hidden : Visibility.Visible;
@@ -269,7 +298,7 @@ internal sealed class AltaPopupView
             if (sig != startSig)
             {
                 startSig = sig;
-                startSlot.Content = AltaParts.StartScreen(c, going, StartCover, session.ReviewCover);
+                startSlot.Content = AltaParts.StartScreen(c, going, StartCover, session.ReviewCover, session.Dark);
             }
         }
         Reveal(startSlot, show);
@@ -319,7 +348,8 @@ internal sealed class AltaPopupView
         var s = session;
         var buttons = s.Focused ? s.Buttons : new List<AltaButton>();
         var pics = s.Split && s.PageShown ? s.Pics : new List<AltaPic>();
-        var dark = Support.Appearance.Dark;
+        // (the graphs' Light or Dark while Alta's page is dark — 0.3.5: as chosen for the page, not the app's appearance)
+        var dark = s.Dark;
         var sig = string.Join("|", buttons) + "#" + pics.Count + "#" + (dark ? s.PicsLight.ToString() : "");
         if (sig == footerSig) return;
         footerSig = sig;

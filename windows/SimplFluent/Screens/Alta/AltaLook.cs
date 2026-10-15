@@ -138,7 +138,9 @@ internal static class AltaLook
 
     // ---- colours read from the theme (the web view's ground, the page's panels) ----
 
-    public static Color? Resolve(string key) => Application.Current?.TryFindResource(key) switch
+    /// <summary>A theme colour as it is where <paramref name="scope"/> is (a part of the popup dressed in a look of its own,
+    /// <see cref="Look"/>), else as the app has it.</summary>
+    public static Color? Resolve(string key, FrameworkElement? scope = null) => (scope?.TryFindResource(key) ?? Application.Current?.TryFindResource(key)) switch
     {
         SolidColorBrush b => b.Color,
         Color c => c,
@@ -146,22 +148,84 @@ internal static class AltaLook
     };
 
     /// <summary>The popup's page ground as one opaque colour: the layer over the base, as they show (a web view's own
-    /// ground must be opaque, and match what is round it).</summary>
-    public static Color Ground()
+    /// ground must be opaque, and match what is round it) — where <paramref name="scope"/> is, in its look.</summary>
+    public static Color Ground(FrameworkElement? scope = null)
     {
-        var bottom = Resolve(B.Solid) ?? (Support.Appearance.Dark ? Color.FromRgb(0x20, 0x20, 0x20) : Color.FromRgb(0xf3, 0xf3, 0xf3));
-        if (Resolve(B.Layer) is not { } top) return bottom;
+        var bottom = Resolve(B.Solid, scope) ?? (Support.Appearance.Dark ? Color.FromRgb(0x20, 0x20, 0x20) : Color.FromRgb(0xf3, 0xf3, 0xf3));
+        if (Resolve(B.Layer, scope) is not { } top) return bottom;
         var a = top.A / 255.0;
         return Color.FromRgb((byte)(top.R * a + bottom.R * (1 - a)), (byte)(top.G * a + bottom.G * (1 - a)), (byte)(top.B * a + bottom.B * (1 - a)));
     }
 
     public static System.Drawing.Color Drawing(Color c) => System.Drawing.Color.FromArgb(255, c.R, c.G, c.B);
 
-    /// <summary>A theme brush as CSS (for what the page draws in the theme's colours).</summary>
-    public static string Css(string key)
+    /// <summary>A theme brush as CSS (for what the page draws in the theme's colours), as it is where <paramref name="scope"/> is.</summary>
+    public static string Css(string key, FrameworkElement? scope = null)
     {
-        var c = Resolve(key) ?? Colors.Transparent;
+        var c = Resolve(key, scope) ?? Colors.Transparent;
         return $"rgba({c.R},{c.G},{c.B},{(c.A / 255.0).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)})";
+    }
+
+    // ---- (0.3.5) a part of the popup in light or dark, whatever the app's appearance ----
+
+    /// <summary>
+    /// The resources that dress a part of the popup in light or dark whatever the app's appearance — Alta's page and what
+    /// the popup draws in its place: its panels, its buttons, the start screen, the skeleton, Loading — or null when that is
+    /// the app's own look (the part then takes the app's). Everything in the part takes its colours by name, so it is
+    /// dressed by putting there WPF-UI's own theme for that look, the light theme's secondary text solid as the app has it
+    /// (<see cref="Support.Appearance.ReadableText"/>), and the accent's colours for that look over them — written as WPF-UI
+    /// writes them for the app (ApplicationAccentColorManager: Windows' own shades of its accent, or the shades WPF-UI
+    /// makes of a colour of the student's).
+    /// </summary>
+    public static ResourceDictionary? Look(bool dark)
+    {
+        if (dark == Support.Appearance.Dark) return null;
+        var d = new ResourceDictionary();
+        try { d.MergedDictionaries.Add(new Wpf.Ui.Markup.ThemesDictionary { Theme = dark ? Wpf.Ui.Appearance.ApplicationTheme.Dark : Wpf.Ui.Appearance.ApplicationTheme.Light }); }
+        catch (Exception e) { Support.Log.Write("alta look: " + e.Message); return null; }
+        Support.Appearance.ReadableText(d, dark);
+        var accent = Support.Appearance.Accent;
+        var own = Support.Appearance.AccentHex == null;
+        Color Shade(Windows.UI.ViewManagement.UIColorType kind, float brightness, float saturation = 0)
+        {
+            if (own)
+                try { var c = new Windows.UI.ViewManagement.UISettings().GetColorValue(kind); return Color.FromArgb(c.A, c.R, c.G, c.B); }
+                catch { /* (an older Windows: WPF-UI's own shades of it) */ }
+            return Wpf.Ui.Extensions.ColorExtensions.Update(accent, brightness, saturation);
+        }
+        var primary = dark ? Shade(Windows.UI.ViewManagement.UIColorType.AccentLight1, 17, -30) : Shade(Windows.UI.ViewManagement.UIColorType.AccentDark1, -10);
+        var secondary = dark ? Shade(Windows.UI.ViewManagement.UIColorType.AccentLight2, 17, -45) : Shade(Windows.UI.ViewManagement.UIColorType.AccentDark2, -25);
+        var tertiary = dark ? Shade(Windows.UI.ViewManagement.UIColorType.AccentLight3, 17, -65) : Shade(Windows.UI.ViewManagement.UIColorType.AccentDark3, -40);
+        static SolidColorBrush Paint(Color c, double opacity = 1)
+        {
+            var b = new SolidColorBrush(c) { Opacity = opacity };
+            b.Freeze();
+            return b;
+        }
+        var ink = Wpf.Ui.Extensions.ColorExtensions.GetBrightness(secondary) > 80 ? (byte)0 : (byte)255;
+        d["TextOnAccentFillColorPrimary"] = Color.FromArgb(255, ink, ink, ink);
+        d["TextOnAccentFillColorSecondary"] = Color.FromArgb(128, ink, ink, ink);
+        d["TextOnAccentFillColorDisabled"] = Color.FromArgb(ink == 0 ? (byte)119 : (byte)135, ink, ink, ink);
+        d["TextOnAccentFillColorSelectedText"] = Color.FromArgb(ink == 0 ? (byte)0 : (byte)255, ink, ink, ink);
+        d["AccentTextFillColorDisabled"] = Color.FromArgb(93, ink, ink, ink);
+        d["SystemAccentColor"] = accent;
+        d["SystemAccentColorPrimary"] = primary;
+        d["SystemAccentColorSecondary"] = secondary;
+        d["SystemAccentColorTertiary"] = tertiary;
+        d["SystemAccentBrush"] = Paint(accent);
+        d["SystemFillColorAttentionBrush"] = Paint(secondary);
+        d["AccentTextFillColorPrimaryBrush"] = Paint(secondary);
+        d["AccentTextFillColorSecondaryBrush"] = Paint(tertiary);
+        d["AccentTextFillColorTertiaryBrush"] = Paint(primary);
+        d["AccentFillColorSelectedTextBackgroundBrush"] = Paint(accent);
+        var fill = dark ? secondary : primary;
+        d["AccentFillColorDefault"] = fill;
+        d["AccentFillColorDefaultBrush"] = Paint(fill);
+        d["AccentFillColorSecondary"] = Color.FromArgb(229, fill.R, fill.G, fill.B);
+        d["AccentFillColorSecondaryBrush"] = Paint(fill, 0.9);
+        d["AccentFillColorTertiary"] = Color.FromArgb(204, fill.R, fill.G, fill.B);
+        d["AccentFillColorTertiaryBrush"] = Paint(fill, 0.8);
+        return d;
     }
 
     /// <summary>The accent as the theme draws it (its fill), for tints of it.</summary>

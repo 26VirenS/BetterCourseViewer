@@ -10,6 +10,7 @@ using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 using Simpl.Engine;
+using Simpl.Shell;
 using Simpl.Support;
 
 namespace Simpl.Screens;
@@ -181,6 +182,7 @@ internal sealed class AltaSession
 
     private const string NamesKey = "altaObjectiveNames";
     private const string PicsLightKey = "altaGraphsLight";
+    private const string DarkKey = "altaDark";
 
     private readonly Engine.Engine engine;
     private Window owner;
@@ -190,7 +192,7 @@ internal sealed class AltaSession
     private DispatcherTimer? dialogHoldLimit;
     private bool dialogHeld;
     private string? darkScript;
-    private bool started, closed, isDark, notifyQueued;
+    private bool started, closed, notifyQueued;
     private string lastPaint = "";
     private int? picOpen;
 
@@ -224,6 +226,14 @@ internal sealed class AltaSession
     /// <summary>In dark mode a graph's colours are turned over with the question's unless the student asks for them as
     /// Alta draws them (on a white card): kept for every assignment.</summary>
     public bool PicsLight { get; private set; } = Prefs.Bool(PicsLightKey);
+    /// <summary>(0.3.5) Alta's page in dark — its question's colours turned over on the dark ground, as it was in dark mode
+    /// before 0.3.5 — rather than in light, as it is made (the owner's choice for every outside tool): the student's choice
+    /// above the objectives, kept for every assignment, light at first, whatever the app's appearance. (--alta-look dark or
+    /// light, in a development run, starts it so.)</summary>
+    public bool Dark { get; private set; } = Support.Launch.Get("alta-look") is { } look ? look == "dark" : Prefs.Bool(DarkKey);
+    /// <summary>(0.3.5) The part of the popup Alta's page is shown in, dressed in the page's look: its panels take their
+    /// colours from it.</summary>
+    public FrameworkElement? Region { get; set; }
     /// <summary>(1.3.60) Whether Alta's page is laid out and in sight (kept out of sight while it loads).</summary>
     public bool PageShown { get; private set; }
     /// <summary>(1.3.59) The assignment's cover, while Alta's page shows it: the popup's start screen.</summary>
@@ -274,11 +284,10 @@ internal sealed class AltaSession
 
     /// <summary>Alta opened: the web view made with the engine's web data, the page script in it, then the assignment's
     /// launch through Canvas (or the page asked for).</summary>
-    public async void Start(bool dark)
+    public async void Start()
     {
         if (started) return;
         started = true;
-        isDark = dark;
         Hold(true); // (the screenshot suite waits for Alta's page, not only for the app's own calls)
         if (ReadJson<List<AltaKnown>>(KnownKey) is { } kept) Known = kept;
         try
@@ -298,6 +307,10 @@ internal sealed class AltaSession
         core.Settings.IsStatusBarEnabled = false;
         core.Settings.IsPasswordAutosaveEnabled = false;
         core.Settings.IsGeneralAutofillEnabled = false;
+        // (0.3.5: Alta's page told the student prefers light, as an outside tool's is — Shell's LightPages — so a look of
+        //  its own for dark never comes in; the app turns its question's colours over itself when it is to be dark)
+        await LightPages.Apply(core, "alta");
+        if (closed) return;
         try
         {
             darkScript = await core.AddScriptToExecuteOnDocumentCreatedAsync(DarkScript());
@@ -308,6 +321,7 @@ internal sealed class AltaSession
         core.FrameCreated += (_, e) => WatchFrame(e.Frame);
         core.NavigationCompleted += (_, _) =>
         {
+            LightPages.Tell(core, "alta");
             if (!Opening) return;
             Opening = false;
             Hold(false);
@@ -376,18 +390,29 @@ internal sealed class AltaSession
         try { Web.Dispose(); } catch { }
     }
 
-    // ---- (1.3.50) light or dark, told to the page ----
+    // ---- (1.3.50) light or dark, told to the page; (0.3.5) as the student chooses, not as the app is ----
 
-    private string DarkScript() => $"window.__simplDark = {Js(isDark)}; window.__simplPicsLight = {Js(PicsLight)};";
+    private string DarkScript() => $"window.__simplDark = {Js(Dark)}; window.__simplPicsLight = {Js(PicsLight)};";
 
     private static string Js(bool b) => b ? "true" : "false";
 
-    /// <summary>Light or dark as the app is: before each page (a script ahead of the page script) and at once to the page
-    /// shown; in dark mode the question's colours are turned over, for the dark ground. The panels are drawn again in
-    /// the theme's card colours.</summary>
-    public async void Appearance(bool dark)
+    /// <summary>(0.3.5) Alta's page in light or dark, as the student chooses: kept for every assignment, and told to the
+    /// page at once (its graph's window drawn again in it).</summary>
+    public void SetDark(bool dark)
     {
-        isDark = dark;
+        if (dark == Dark) return;
+        Dark = dark;
+        Prefs.Set(DarkKey, dark);
+        Appearance();
+        Notify();
+        if (picOpen is { } i) _ = Reopen(i);
+    }
+
+    /// <summary>Light or dark as chosen (<see cref="Dark"/>): before each page (a script ahead of the page script) and at
+    /// once to the page shown; in dark the question's colours are turned over, for the dark ground. The panels are drawn
+    /// again in the look's card colours (the app's appearance changed, or the look chosen).</summary>
+    public async void Appearance()
+    {
         lastPaint = "";
         if (Web.CoreWebView2 is not { } core || closed) return;
         try
@@ -903,7 +928,7 @@ internal sealed class AltaSession
         PicsLight = on;
         Prefs.Set(PicsLightKey, on);
         AltaGraphWindow.Light(on);
-        Appearance(isDark);
+        Appearance();
         Notify();
         if (picOpen is { } i) _ = Reopen(i);
     }
@@ -974,7 +999,7 @@ internal sealed class AltaSession
             var right = list.Max(p => p.Rect.Right);
             at = Json.Write(list.Select(p => new { x = Math.Round(left - 16), y = Math.Round(p.Rect.Top - 16), w = Math.Round(right - left + 32), h = Math.Round(p.Rect.Height + 32) }).ToList());
         }
-        var js = $"({PanelsScript})({at}, {Json.Str(AltaLook.Css(Kit.B.Card))}, {Json.Str(AltaLook.Css(Kit.B.CardStroke))})";
+        var js = $"({PanelsScript})({at}, {Json.Str(AltaLook.Css(Kit.B.Card, Region))}, {Json.Str(AltaLook.Css(Kit.B.CardStroke, Region))})";
         if (js == lastPaint) return;
         lastPaint = js;
         _ = Run(js);

@@ -990,6 +990,18 @@ draws it until it closes (`DialogInPage`), and why goes in the Error Logs. A pic
 shown, and writes "alta: a pop-up shown as the app's own: …" with its words, formulas and pictures
 (`scripts/dev/alta-test.mjs` reads the page script's side of it in Chromium).
 
+Alta's page is light (0.3.5), as it is made — the owner's choice for every outside tool (0.3.1) — whatever the app's
+appearance; until then Alta's popup followed the app, its question's colours turned over on a dark ground in dark mode.
+Above the objectives, Light and Dark (`AltaPageBar`, under the words "Alta's page") choose, and the choice is kept for
+every assignment (`altaDark`; `--alta-look dark` starts a development run in Dark). Dark is the old dark look. The
+page is told the student prefers light (`LightPages`, as an outside tool's), and turned over by the page script when
+Dark is chosen. What the popup shows in the page's place — the page's ground, the panels behind its question, its
+buttons and the graphs' Light or Dark at the foot, the start screen, the skeleton, Loading — is in the page's look:
+that part of the popup (`region`) is dressed with WPF-UI's own theme for the look, the light theme's secondary text
+solid as the app's, and the accent's shades for it written as WPF-UI writes them (`AltaLook.Look`; nothing of its own
+when the look is the app's). The header, the objectives and the popup's own dialogs keep the app's appearance; a
+graph's window takes the page's look.
+
 ## Icons
 
 WPF-UI 4.3 draws only the Fluent icons whose code is at most U+FFFF; the rest show as a stray character. Check a new

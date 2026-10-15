@@ -11,7 +11,7 @@ namespace Simpl.Screens;
 /// <summary>
 /// (Mac 1.3.70) A question's graph, large, in a window of its own over the popup (the Mac's AltaGraphWindow): moved and
 /// sized as the student likes, its colours dark or as Alta draws them (the same choice as the question's, Light or Dark
-/// in its title bar in dark mode), and put away when the question is answered or gone, or the popup closed.
+/// in its title bar while Alta's page is dark), and put away when the question is answered or gone, or the popup closed.
 /// </summary>
 internal sealed class AltaGraphWindow : FluentWindow
 {
@@ -94,10 +94,11 @@ internal sealed class AltaGraphWindow : FluentWindow
         w.Close();
     }
 
-    /// <summary>Dark by default in dark mode (the question's own colours turned over); Light brings back Alta's own on white.</summary>
+    /// <summary>Dark by default when Alta's page is (the question's own colours turned over: 0.3.5, as the student chooses
+    /// for the page, no longer as the app is); Light brings back Alta's own on white.</summary>
     private void Paint()
     {
-        var dark = Support.Appearance.Dark;
+        var dark = session?.Dark ?? Support.Appearance.Dark;
         ground.Background = K.Brush(dark && !light ? Color.FromRgb(0x1c, 0x1c, 0x1c) : Colors.White);
         if (!dark || session == null) { trailing.Content = null; return; }
         var s = session;

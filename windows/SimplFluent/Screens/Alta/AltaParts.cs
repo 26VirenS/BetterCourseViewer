@@ -159,9 +159,9 @@ internal static class AltaParts
     /// Review instruction; under it what the work covers — each topic with Alta's estimate of its questions and its
     /// objectives by name. The name and the due date are the header's; each objective's mastery is the rail's.
     /// </summary>
-    public static FrameworkElement StartScreen(AltaCover cover, bool going, Action start, Action review)
+    public static FrameworkElement StartScreen(AltaCover cover, bool going, Action start, Action review, bool dark)
     {
-        var v = K.V(18, StartHeader(cover, going, start, review));
+        var v = K.V(18, StartHeader(cover, going, start, review, dark));
         if (cover.Topics.Count > 0) v.Children.Add(StartObjectives(cover));
         v.MaxWidth = 780;
         v.Margin = new Thickness(32, 28, 32, 28);
@@ -185,7 +185,11 @@ internal static class AltaParts
         return char.ToUpper(lower[0], CultureInfo.CurrentCulture) + lower[1..];
     }
 
-    private static FrameworkElement StartHeader(AltaCover cover, bool going, Action start, Action review)
+    /// <summary>(0.3.5) A colour made to read as words on its own tint in the page's look, light or dark — which need not be
+    /// the app's (<see cref="K.Darkened"/> reads the app's).</summary>
+    public static Color Deep(Color c, bool dark) => dark ? K.Mix(c, Colors.White, 0.25) : K.Mix(c, Colors.Black, 0.28);
+
+    private static FrameworkElement StartHeader(AltaCover cover, bool going, Action start, Action review, bool dark)
     {
         var v = K.V(16);
         // (its status and grade: its due date is the header's, already)
@@ -207,7 +211,7 @@ internal static class AltaParts
         }
         if (!string.IsNullOrEmpty(cover.Note))
         {
-            var orange = K.Darkened(K.Tone("orange"));
+            var orange = Deep(K.Tone("orange"), dark);
             var note = K.Wrapped(AltaLook.Times(cover.Note), Ty.Body);
             note.Foreground = K.Brush(orange);
             v.Children.Add(K.Columns("auto, *", K.Icon(SymbolRegular.Sparkle24, 16, orange).Margin(0, 2, 8, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Top).Col(0), note.Col(1)));
@@ -292,5 +296,55 @@ internal static class AltaParts
             else v.BeginAnimation(UIElement.OpacityProperty, null);
         };
         return g;
+    }
+}
+
+/// <summary>
+/// (0.3.5) Above the objectives, a small bar for Alta's page: Light or Dark — Windows 11's pair of buttons, the one chosen
+/// the accent's — under its label. Alta's page is light at first, as it is made (the owner's choice for every outside
+/// tool, 0.3.1); Dark brings back how it was before in dark mode, its question's colours turned over on the dark ground.
+/// The choice is the student's, kept for every assignment (AltaSession.Dark). The header and the objectives keep the
+/// app's appearance; what is shown in the page's place takes the page's.
+/// </summary>
+internal sealed class AltaPageBar : StackPanel
+{
+    private readonly Wpf.Ui.Controls.Button light, dark;
+
+    public AltaPageBar(bool isDark, Action<bool> choose)
+    {
+        light = Choice(SymbolRegular.WeatherSunny24, "Light", () => choose(false));
+        dark = Choice(SymbolRegular.WeatherMoon24, "Dark", () => choose(true));
+        dark.Margin = new Thickness(4, 0, 0, 0);
+        var pair = new StackPanel { Orientation = Orientation.Horizontal, Children = { light, dark } };
+        System.Windows.Automation.AutomationProperties.SetName(pair, "Alta’s page");
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Children = { pair } };
+        Children.Add(K.Text("Alta’s page", Ty.Caption, B.Text2).Margin(1, 0, 0, 6));
+        Children.Add(row);
+        Row = row;
+        Show(isDark);
+    }
+
+    /// <summary>The row the pair sits in (what goes beside it is put here).</summary>
+    public StackPanel Row { get; }
+
+    private static Wpf.Ui.Controls.Button Choice(SymbolRegular icon, string name, Action click)
+    {
+        var b = new Wpf.Ui.Controls.Button { Icon = new SymbolIcon { Symbol = icon }, MinWidth = 0, Padding = new Thickness(10, 6, 10, 6) };
+        b.ToolTip = $"Alta’s page in {name.ToLowerInvariant()}";
+        b.Click += (_, e) => { e.Handled = true; click(); };
+        return b;
+    }
+
+    /// <summary>The look chosen, shown: its button the accent's, its name said as chosen.</summary>
+    public void Show(bool isDark)
+    {
+        Mark(light, !isDark, "Light");
+        Mark(dark, isDark, "Dark");
+    }
+
+    private static void Mark(Wpf.Ui.Controls.Button b, bool on, string name)
+    {
+        b.Appearance = on ? ControlAppearance.Primary : ControlAppearance.Secondary;
+        System.Windows.Automation.AutomationProperties.SetName(b, on ? $"{name}, chosen" : name);
     }
 }
