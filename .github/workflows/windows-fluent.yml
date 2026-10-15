@@ -923,6 +923,11 @@ jobs:
           Shot 'phys-circuit-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'circuit', '--tool-state', 'series'))
           Shot 'phys-circuit-divider' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'circuit', '--tool-state', 'divider'))
           Shot 'pin-circuit' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'circuit', '--pin-open', 'circuit'))
+          # (tools: Verb conjugations, at the end so the pictures before keep their parts) Spanish tener in light, French
+          # manger in dark (each log must name the verb shown: checked below), and the pin with the present of ser
+          Shot 'tool-verbs' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'verbs', '--verbs', 'es', '--verb', 'tener'))
+          Shot 'tool-verbs-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'verbs', '--verbs', 'fr', '--verb', 'manger'))
+          Shot 'pin-verbs' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'verbs', '--pin-open', 'verbs', '--verbs', 'es', '--verb', 'ser'))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
@@ -1335,6 +1340,13 @@ jobs:
             $l = PhoneLog $pl
             Write-Host "${pl}: $((@($l -split "`n" | Where-Object { $_ -match 'plan: ' }) -join ' | '))"
             if ($l -notmatch 'plan: shows [1-9]\d* blocks for [1-9]\d* items over \d+ days') { Write-Host "::error::${pl}: no study blocks were planned before the picture (shots/profile-$pl.log)"; exit 1 }
+          }
+          # (tools) Verb conjugations: the verb the launch asked for was conjugated and shown (Tools/Study/Verbs/VerbsTool.cs)
+          foreach ($vb in @(@('tool-verbs', 'verbs: shows es tener'), @('tool-verbs-dark', 'verbs: shows fr manger'), @('pin-verbs', 'verbs: shows es ser'))) {
+            if ($script:mine -notcontains $vb[0]) { continue }
+            $l = PhoneLog $vb[0]
+            Write-Host "$($vb[0]): $((@($l -split "`n" | Where-Object { $_ -match 'verbs: ' }) -join ' | '))"
+            if (-not $l.Contains($vb[1])) { Write-Host "::error::$($vb[0]): the verb was not conjugated before the picture (shots/profile-$($vb[0]).log)"; exit 1 }
           }
           Get-ChildItem shots
       # (what Simpl keeps is encrypted — windows/SimplFluent/Support/Vault.cs — checked in this part's profiles as the
