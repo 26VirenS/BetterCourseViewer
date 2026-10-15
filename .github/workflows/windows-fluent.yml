@@ -904,6 +904,12 @@ jobs:
           Shot 'chem-moles-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'moles', '--tool-state', 'molar', '--moles-formula', 'CuSO4*5H2O'))
           Shot 'chem-moles-780' '780x683' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'moles', '--tool-state', 'convert', '--moles-formula', 'H2O', '--moles-amount', '10 grams'))
           Shot 'pin-moles' '1366x778' 45 ($mock + @('--appearance', 'dark', '--pin', 'moles', '--pin-open', 'moles', '--moles-formula', 'C6H12O6'))
+          # (Gas Laws, at the end) the ideal gas law solved for n at STP (light), the combined law solved for V2 (dark),
+          # the ideal gas law in grams of CO2 in the narrow window, and its pin's flyout
+          Shot 'chem-gas' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'gas', '--tool-state', 'ideal', '--gas-values', 'P=1 atm,V=22.4 L,T=273.15 K'))
+          Shot 'chem-gas-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'gas', '--tool-state', 'combined', '--gas-values', 'P1=1 atm,V1=2 L,T1=300 K,P2=2 atm,T2=600 K'))
+          Shot 'chem-gas-780' '780x683' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'gas', '--tool-state', 'ideal', '--gas-values', 'P=101.325 kPa,V=10 L,n=44.01 g,formula=CO2'))
+          Shot 'pin-gas' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'gas', '--pin-open', 'gas', '--gas-values', 'V=10 L,n=2 mol,T=300 K'))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
