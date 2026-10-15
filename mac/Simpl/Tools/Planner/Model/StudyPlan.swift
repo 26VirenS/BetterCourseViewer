@@ -1,6 +1,6 @@
 import Foundation
 
-// (tools) The Study Planner's planner, Foundation only so it can be checked on its own (scripts/dev/swift-checks):
+// (1.3.92) The Study Planner's planner, Foundation only so it can be checked on its own (scripts/dev/swift-checks):
 // the student's upcoming work (assignments, quizzes, exams, discussions, their own tasks, each with its due date, its
 // points and its course), their settings (hours a day, the block's length, the time of day, how many days before the
 // due date to finish, which courses) and today in; study blocks out — "45 min · PHYS 008 · Quiz 3" — each on a day,

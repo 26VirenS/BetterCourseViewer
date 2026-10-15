@@ -5,7 +5,7 @@ import Quartz
 import SwiftUI
 import UniformTypeIdentifiers
 
-// (tools) Compress Files, in the Files group: pictures and PDFs made small enough for an upload box, on this Mac with
+// (1.3.92) Compress Files, in the Files group: pictures and PDFs made small enough for an upload box, on this Mac with
 // macOS's own engines (nothing is uploaded). Drop files or a folder, pick a target — Max quality, Balanced, Smallest, or
 // Fit under a size in MB — and each file is written again, smaller, to Downloads as `<name>-smaller.<ext>`, never over
 // the original. Pictures (JPEG, PNG, HEIC, TIFF, WebP…) are decoded by ImageIO and written as JPEG at the target's

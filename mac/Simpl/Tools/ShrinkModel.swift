@@ -1,6 +1,6 @@
 import Foundation
 
-// (tools) Compress Files' arithmetic, Foundation only so it can be checked on its own: the four targets and what each
+// (1.3.92) Compress Files' arithmetic, Foundation only so it can be checked on its own: the four targets and what each
 // asks of a picture (JPEG quality, the longest edge), the name a smaller copy is saved under, how much was saved, and
 // the search "Fit under … MB" makes through quality and size for the best copy under the limit. The engines that
 // re-encode the files — ImageIO for pictures, PDFKit and a Quartz filter for PDFs — are CompressFiles.swift's.

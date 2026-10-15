@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-// (tools) The Study Planner, in the Study group: study blocks from the student's due dates. It reads the upcoming work
+// (1.3.92) The Study Planner, in the Study group: study blocks from the student's due dates. It reads the upcoming work
 // the Dashboard, To Do and the Calendar read — the engine's `reminders` (three weeks of open work with its due dates, a
 // task of the student's own among it), with each piece's points and colour from the Dashboard's list and, past that
 // list's eight days, from the Calendar's events — and plans blocks of study for it (Model/StudyPlan.swift: each
