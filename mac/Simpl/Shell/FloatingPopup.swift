@@ -21,8 +21,8 @@ enum PopupLayout {
     /// next time under its size key (a tool's own): a whole tool, an Alta or Macmillan assignment, the feedback, the
     /// rubric. (1.3.79 kept it clear of the sidebar while the sidebar was out: a tool had 740 points of a window 970 wide.)
     case large
-    /// As large as what it shows asks (as a sheet is), centred across the screen's side of the window a little above
-    /// its middle: What's New, Hand In, a new task or message, a short form.
+    /// As large as what it shows asks (as a sheet is), (1.3.82) in the middle of the whole window: What's New, Hand In, a
+    /// new task or message, a short form.
     case fitted
     /// As large as what it shows asks, its top left at a point on the screen (AppKit's coordinates): a counter's list,
     /// over its tile.
@@ -632,8 +632,10 @@ final class PopupPanel: NSPanel {
             if placed {
                 f = NSRect(x: (frame.midX - s.width / 2).rounded(), y: frame.maxY - s.height, width: s.width, height: s.height)
             } else {
-                let a = FloatingPopups.area(of: over, sidebar: owner?.sidebarShown ?? true, guessed: owner?.sidebarSaid ?? false)
-                let top = max(m, (a.height - s.height) * 0.3)
+                // (1.3.82) in the middle of the whole window, across and down — the owner: "popups dont show up in the
+                // middle" — not of the page beside the sidebar, nor a little above the middle
+                let a = FloatingPopups.area(of: over, sidebar: false)
+                let top = max(m, (a.height - s.height) / 2)
                 f = NSRect(x: (a.midX - s.width / 2).rounded(), y: (a.maxY - top - s.height).rounded(), width: s.width, height: s.height)
             }
             f = FloatingPopups.within(f, on: over.screen)
