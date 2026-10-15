@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.35', date: '2026-10-15', notes: [
+      { kind: 'improved', title: 'Always up to date', body: 'The Mac app now always installs updates by itself.', icon: P.arrows },
+      { kind: 'improved', title: 'Earlier versions stay', body: 'In the Mac app, a version put back stays until a newer one.', icon: P.pin },
+    ] },
     { version: '2.99.34', date: '2026-10-14', notes: [
       { kind: 'fixed', title: 'No Canvas banners', body: "Canvas's own notices no longer cover Simpl.", icon: P.eye },
       { kind: 'improved', title: 'Tools by provider', body: 'External tools grouped by their site, like Macmillan.', icon: P.layers },
