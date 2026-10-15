@@ -12,7 +12,7 @@ using TextBox = Wpf.Ui.Controls.TextBox;
 namespace Simpl.Tools;
 
 /// <summary>
-/// What the everyday tools — the focus timer, the calculator, the unit converter and Grade needed — share beside
+/// What the everyday tools — the focus timer, the calculator, the unit converter, Grade needed, the Word Counter — share beside
 /// <see cref="ToolKit"/>: their page as wide as the window allows, a section with its heading (the Mac's PageSection),
 /// the clipboard, menus' items, and following a model while the view is on screen.
 /// </summary>
@@ -105,6 +105,19 @@ internal static class Everyday
     {
         t.Text = text ?? "";
         t.Visibility = string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    /// <summary>
+    /// (tools) What a launch asked of an everyday tool, once, and only of the tool the launch opened (--tool &lt;key&gt;
+    /// --tool-state …), as ChemTools.LaunchState: the Word Counter's text, the Statistics tab, the Matrix Calculator's
+    /// operation. Logged for the pictures' checks.
+    /// </summary>
+    public static string? LaunchState(string key)
+    {
+        if (Launch.Get("tool") != key) return null;
+        var state = Launch.Take("", "tool-state");
+        if (state is { Length: > 0 }) Log.Write($"{key}: launched with state \"{state}\"");
+        return state is { Length: > 0 } ? state : null;
     }
 
     /// <summary>

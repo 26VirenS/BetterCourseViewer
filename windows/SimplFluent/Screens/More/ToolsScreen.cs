@@ -64,7 +64,7 @@ public static class ToolsPins
 /// <summary>
 /// Tools (the Mac's ToolsView and ToolsGrid): the things Simpl does on its own, a tile each — its symbol on a wash of its
 /// colour, its name and a one-line note, and its pin — under a heading for what they are for: Study (flashcards, the focus
-/// timer, citations, Grade needed), Math &amp; science (the calculators, the unit converter), Files (the file converter,
+/// timer, citations, Grade needed, the Word Counter), Math &amp; science (the calculators, the unit converter), Files (the file converter,
 /// Merge &amp; split PDFs, the PDF annotator, Image to text), Chemistry (the Periodic Table, Lewis Structures, the Molecule
 /// Builder, Atoms &amp; Orbitals and the calculators: Tools/Chemistry/ChemTools.cs), Physics (Kinematics &amp; Projectiles and
 /// the rest: Tools/Physics/PhysTools.cs) and Biology (the biology toolkit's ten, Tools/Biology). A tile opens its tool in a
@@ -78,13 +78,13 @@ public sealed class ToolsScreen : Screen
         public Color Color => K.Hex(Hex);
     }
 
-    /// <summary>Every tool: the eleven of Study, Math &amp; science and Files, the Chemistry section's
+    /// <summary>Every tool: the everyday tools of Study, Math &amp; science and Files, the Chemistry section's
     /// (Tools/Chemistry/ChemTools.cs), the Physics section's (Tools/Physics/PhysTools.cs), then the biology toolkit's ten
     /// (Tools/Biology/BioTools.cs).</summary>
     public static readonly Kind[] Kinds = Everyday.Concat(Simpl.Tools.ChemTools.Kinds).Concat(Simpl.Tools.PhysTools.Kinds).Concat(Simpl.Tools.BioTools.Kinds).ToArray();
 
-    /// <summary>The eleven (the Mac's ToolKind), each note short enough for one line on its tile. (The Periodic Table,
-    /// once among them, leads the Chemistry section.)</summary>
+    /// <summary>The everyday tools (the Mac's ToolKind), each note short enough for one line on its tile. (The Periodic
+    /// Table, once among them, leads the Chemistry section.)</summary>
     private static Kind[] Everyday => new Kind[]
     {
         new("cite", "Citation generator", "MLA, APA and Chicago.", SymbolRegular.TextQuote24, "#30b0c7"),
@@ -98,6 +98,8 @@ public sealed class ToolsScreen : Screen
         new("mark", "PDF annotator", "Highlight and add notes.", SymbolRegular.Highlight24, "#e5a500"),
         new("ocr", "Image to text", "Copy the words in a picture.", SymbolRegular.ScanText24, "#00b3a4"),
         new("fc", "Flashcards", "Flip, learn, test, match.", SymbolRegular.SquareMultiple24, "#0a84ff"),
+        // (tools) the tools program's: each at the end of its group below
+        new("words", "Word Counter", "Words, characters, reading time.", SymbolRegular.TextWordCount24, "#8e8e93"),
     };
 
     /// <summary>The Tools page's sections in its order (the Mac's ToolGroup): what each set of tools is for, the study
@@ -105,7 +107,7 @@ public sealed class ToolsScreen : Screen
     /// biology toolkit's ten under "Biology").</summary>
     public static readonly (string Title, string[] Keys)[] Groups =
     {
-        ("Study", new[] { "fc", "cite", "pomo", "need" }),
+        ("Study", new[] { "fc", "cite", "pomo", "need", "words" }),
         ("Math & science", new[] { "calc", "graph", "units" }),
         ("Files", new[] { "mark", "pdfx", "conv", "ocr" }),
     };

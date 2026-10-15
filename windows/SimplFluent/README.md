@@ -426,7 +426,7 @@ never fails a run, and nothing waits for it but the pictures' merge.
 show checked against the school while the window shows `LiveCheck`), the popups floating over the window (`FloatPopup`, Popups below), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once, the third time Simpl is opened, at a calm moment, and from Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, a place or a page in a window of its own (`PlaceWindow`: a pane row's or a list row's Open in new window, Shift+click on a pane row, a page's ⋯ ▸ Open in new window, or Ctrl+Shift+O for what shows), the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
 | `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In and its Send from Phone, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
-| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table, Atoms & Orbitals), `Chemistry/` (the Chemistry section's tools: `ChemTools.cs`, Lewis Structures, the Molecule Builder, and the calculators — the Equation Balancer — with their sums in `Chemistry/Model/`, plain .NET), `Physics/` (the Physics section's tools: `PhysTools.cs`, Kinematics & Projectiles, Vectors; their maths in `Model/`, free of WPF), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
+| `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed, Word Counter; `Model/` holds their counting and sums with no window in them, tested in `SimplFluent.Tests`), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Graphing calculator), `Elements/` (the Periodic Table, Atoms & Orbitals), `Chemistry/` (the Chemistry section's tools: `ChemTools.cs`, Lewis Structures, the Molecule Builder, and the calculators — the Equation Balancer — with their sums in `Chemistry/Model/`, plain .NET), `Physics/` (the Physics section's tools: `PhysTools.cs`, Kinematics & Projectiles, Vectors; their maths in `Model/`, free of WPF), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
 
 ## A screen
 
@@ -971,6 +971,21 @@ next time is in the preferences as `SimplPhys.<tool>.<field>` (`PhysPrefs`):
   `--tool vectors --tool-state 3,4;1,2` (`3d:1,2,3;4,5,6` for 3D; `--vectors-mode 2d|3d`) opens it on those, and in a
   picture run the log says what it shows ("vectors: shows 2 vectors, resultant (4, 6) |R|=7.211"). The search box opens
   it by `/vectors`, `vector`, `components`, `dot product`, `cross product`, `resultant` or `magnitude`.
+
+The tools program's everyday tools (`Tools/Everyday/`, each at the end of its group on the Tools page; their sums in
+`Tools/Everyday/Model/`, plain C# with no window in it, tested in `SimplFluent.Tests` on the specs' vectors; the search
+box opens each by its name and words, `PaletteCommand.EverydayTools`; `--tool <key> --tool-state …` for the pictures,
+`Everyday.LaunchState`):
+
+- **Word Counter** (`words`, Study; `Tools/Everyday/WordCounter.cs`, `Model/WordCount.cs`): an essay pasted or typed,
+  counted as it changes — words (a run of non-spaces with a letter or a figure in it), characters with and without
+  spaces, sentences (ending at . ! or ? before a space or the end), paragraphs (blocks between blank lines), reading
+  time at 238 words a minute and speaking time at 150, the average and the longest word — a target of so many words
+  with a bar and "120 to go" / "15 over", and the ten words used most as chips, the stop words left out. The text and
+  the target are kept (`SimplWords.text`, `.target`) and are the pin's too: its flyout is a few lines of the same text
+  with the counts under them. `--words-text "…"` (`\n` for a line break) and `--words-target 500` fill it for a
+  picture; the log says `words: shows N words`. The search box: `/words`, `word count`, `characters`, `reading time`,
+  `essay`.
 
 The biology toolkit's ten (`Tools/Biology/`, a "Biology" section of their own on the Tools page) register through
 `BioTools.Register`, which adds their pages in the header and what a launch asks of them (`--tool cell --tool-state
