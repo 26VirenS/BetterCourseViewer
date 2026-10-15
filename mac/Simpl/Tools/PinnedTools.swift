@@ -354,6 +354,9 @@ struct PinnedToolQuick: View {
         case .cell, .dna, .gene, .biomol, .cross, .divide, .popgen, .biolab, .enzyme, .energy:
             // (1.3.78) the biology tools': Biology/BioTools.swift
             BioQuick(kind: kind) { openFull($0, []) }
+        case .shrink:
+            // (tools) a small drop zone and the target: the whole tool opens with the files
+            CompressFilesCompact { openFull($0, $1) }
         }
     }
 

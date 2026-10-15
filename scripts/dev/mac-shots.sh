@@ -666,6 +666,19 @@ This essay argues that the press did not simply spread ideas; it changed which i
   MODE=light shoot light-54o-pin-matrix 14 -SimplPinnedTools matrix -SimplPinOpen matrix -SimplMatrixA "1 2;3 4"
 }
 
+# (tools) the Files group's Compress Files: its before/after table over the converter's sample files (the hand-in's
+# photo, the annotator's reading and a screenshot of the calendar) made smaller at Balanced as the tool opens
+# (-SimplShrinkFiles, -SimplShrinkPreset; the console says what each came to: "[Simpl] shrink photo.jpg: 104 KB → …"),
+# in light and in dark; narrow, at Smallest; and its pin
+files_tools() {
+  local m samples="$PWD/scripts/dev/fixtures/photo.jpg,$PWD/scripts/dev/fixtures/reading.pdf,$PWD/docs/screenshots/calendar.png"
+  for m in light dark; do
+    MODE="$m" SIZE=1440x920 shoot "$m-75-tool-shrink" 16 -SimplPlace tools -SimplTool shrink -SimplShrinkFiles "$samples" -SimplShrinkPreset balanced
+  done
+  MODE=light SIZE=780x700 shoot light-75b-tool-shrink-narrow 16 -SimplPlace tools -SimplTool shrink -SimplShrinkFiles "$samples" -SimplShrinkPreset smallest
+  MODE=light shoot light-54p-pin-shrink 14 -SimplPinnedTools shrink -SimplPinOpen shrink
+}
+
 # (1.3.80) how each 3D model was framed, from the consoles ("[Simpl] bio frame <scene>: view W × H, model X% across,
 # Y% up", and the atom's and the molecule's frames): each picture's last framing and its model's share of its view's
 # limiting side (the larger of the two) in frame-check.txt — 75% to 85% is as framed (SceneFill); under 70% is said
@@ -965,6 +978,7 @@ the_set() {
   chem_calc_tools # (tools) the chemistry calculators
   phys_tools # (tools) the Physics section and its tools
   study_tools # (tools) the study and maths tools
+  files_tools # (tools) Compress Files
   # (1.3.78) a PDF-only assignment (1013, made so here) waiting for the phone: Combine photos under the code
   mock_config '{"ext":{"1013":["pdf"]}}'
   MODE=dark shoot dark-12f-hand-in-phone-photos-waiting 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1013 -SimplOpen handin -SimplPhone YES

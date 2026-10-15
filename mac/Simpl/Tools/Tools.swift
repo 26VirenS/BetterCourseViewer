@@ -5,13 +5,14 @@ import UniformTypeIdentifiers
 // Tools (1.2): the things Simpl does on its own, as the web's Tools page has them — a citation generator, a focus timer,
 // a calculator, a graphing calculator, the periodic table, Grade needed, a file converter, Merge & split PDFs, a PDF
 // annotator, Image to text and flashcards — drawn natively, with a unit converter of the Mac's own beside them,
-// (1.3.78) the biology toolkit's ten under a heading of their own (Biology/BioTools.swift) and (1.3.80) the periodic
+// (1.3.78) the biology toolkit's ten under a heading of their own (Biology/BioTools.swift), (1.3.80) the periodic
 // table split into the chemistry tools' four, under theirs (Chemistry/ChemTools.swift), (tools) the chemistry
 // calculators — the Equation Balancer — beside them, (tools) the physics tools under a "Physics" heading between
-// them (Physics/PhysTools.swift), and (tools) the study and maths tools after them — the Word Counter under Study
+// them (Physics/PhysTools.swift), (tools) the study and maths tools after them — the Word Counter under Study
 // (WordCounter.swift), Statistics and the Matrix Calculator under Math & science (Statistics.swift,
-// MatrixCalculator.swift); their arithmetic in Model/, checked by the Models job. One row in the sidebar opens a page
-// of tiles, (tools-32) in sections by what they are for: Study, Math & science, Files, Chemistry, Physics and Biology;
+// MatrixCalculator.swift); their arithmetic in Model/, checked by the Models job — and (tools) Compress Files among
+// the file tools (CompressFiles.swift). One row in the sidebar opens a page of tiles, (tools-32) in sections by what
+// they are for: Study, Math & science, Files, Chemistry, Physics and Biology;
 // (1.3.79) a tile opens its tool in a popup over the window — the Tools page staying behind it, and the whole window
 // usable round it (Shell/FloatingPopup.swift) — as its pin, a hand-off from another tool and a launch do. Any tool can be
 // pinned: it then sits in the toolbar on every screen and opens a compact version of itself in a popover
@@ -34,6 +35,8 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
     // first tools have them: the Word Counter (WordCounter.swift), Statistics (Statistics.swift), the Matrix Calculator
     // (MatrixCalculator.swift)
     case words, stats, matrix
+    // (tools) Compress Files, in the Files group (CompressFiles.swift)
+    case shrink
 
     var id: String { rawValue }
 
@@ -55,6 +58,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .words: return "Word Counter"
         case .stats: return "Statistics"
         case .matrix: return "Matrix Calculator"
+        case .shrink: return "Compress Files"
         default: return BioTools.info(self).name
         }
     }
@@ -79,6 +83,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .words: return "Words"
         case .stats: return "Stats"
         case .matrix: return "Matrix"
+        case .shrink: return "Compress"
         default: return BioTools.info(self).shortName
         }
     }
@@ -102,6 +107,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .words: return "Words, characters, reading time."
         case .stats: return "Mean, SD, regression, z and t."
         case .matrix: return "Determinant, inverse, solve, RREF."
+        case .shrink: return "Shrink images and PDFs to fit."
         default: return BioTools.info(self).note
         }
     }
@@ -124,6 +130,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .words: return "text.word.spacing"
         case .stats: return "chart.bar.xaxis"
         case .matrix: return "square.grid.3x3"
+        case .shrink: return "arrow.down.right.and.arrow.up.left"
         default: return BioTools.symbol(self)
         }
     }
@@ -146,6 +153,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .words: return "#8e8e93"
         case .stats: return "#ff2d55"
         case .matrix: return "#5e5ce6"
+        case .shrink: return "#ff9500"
         default: return BioTools.info(self).hex
         }
     }
@@ -173,6 +181,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .conv: return [.item]
         case .pdfx, .mark: return [.pdf]
         case .ocr: return [.image, .pdf]
+        case .shrink: return [.image, .pdf] // (tools: pictures and PDFs made smaller)
         default: return nil
         }
     }
@@ -381,7 +390,7 @@ enum ToolGroup: CaseIterable {
         switch self {
         case .study: return [.fc, .pomo, .cite, .need, .words]
         case .science: return [.calc, .graph, .units, .stats, .matrix]
-        case .files: return [.conv, .pdfx, .mark, .ocr]
+        case .files: return [.conv, .pdfx, .mark, .ocr, .shrink]
         case .chemistry: return ChemTools.kinds
         case .physics: return PhysTools.kinds
         case .biology: return BioTools.kinds
@@ -552,6 +561,7 @@ struct ToolScreen: View {
         case .stats: StatisticsTool()
         case .matrix: MatrixCalculatorTool()
         case .cell, .dna, .gene, .biomol, .cross, .divide, .popgen, .biolab, .enzyme, .energy: BioToolScreen(kind: kind)
+        case .shrink: CompressFilesTool()
         }
     }
 }

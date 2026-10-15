@@ -635,7 +635,7 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   Focus timer, Citation generator, Grade needed; since the tools of their own, the Word Counter), *Math & science*
   (Calculator, Graphing calculator, Unit converter, since then Statistics and the Matrix Calculator; the Periodic table
   until 1.3.80 moved it to *Chemistry*), *Files*
-  (File converter, Merge & split PDFs, PDF annotator, Image to text) and *Biology*, as on
+  (File converter, Merge & split PDFs, PDF annotator, Image to text; (tools) Compress Files) and *Biology*, as on
   Windows — each tile's line one short line, three tiles across from about 900 points of page (`ToolGroup`, `ToolGroupSection`,
   `ToolTile.columns`). An open tool has one pin control, in its heading, named for what a press does (*Unpin* / *Pin to
   Toolbar*); the window's toolbar no longer adds a second. The pins past the toolbar's room go into a *Tools*
@@ -1094,6 +1094,30 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
     transpose|det|inverse|rank|rref|trace|solve|eigen|power -SimplMatrixSteps YES` (the RREF's steps open); a pin's
     `-SimplMatrixA`. Pictures: `light-74-tool-matrix`, `dark-74-tool-matrix`, `light-74b-tool-matrix-rref`,
     `light-74c-tool-matrix-solve`, `light-74d-tool-matrix-narrow`, `light-54o-pin-matrix`.
+
+- **Compress Files (tools).** The Files group's fifth tool (`shrink`, `Tools/CompressFiles.swift`; `/compress` in the
+  search field, or "shrink", "smaller", "file size", "upload limit"): pictures and PDFs made small enough for an upload
+  box, on this Mac. Drop files or a folder (or Choose…), pick a target — *Max quality* (JPEG at 92%, pictures at their
+  size), *Balanced* (80%, at most 2048 px on the long edge), *Smallest* (60%, 1280 px, PNGs to JPEG) or *Fit under … MB*
+  — and Compress (Return) writes each file again to Downloads as `<name>-smaller.<ext>`, a free name, never over the
+  original; the copies are shown in the Finder. Pictures (JPEG, PNG, HEIC, TIFF, WebP…) go through ImageIO: decoded,
+  turned upright, scaled to the target's long edge and written as JPEG at its quality (a PNG with transparency stays a
+  PNG, its transparency kept, unless the target is Smallest). PDFs keep their pages, text, links and notes and have their
+  pictures re-encoded by PDFKit (`saveImagesAsJPEGOption`; at Balanced `optimizeImagesForScreenOption` too); at Smallest
+  the pages are drawn into a new PDF through macOS's own *Reduce File Size* Quartz filter (`QuartzFilter`, each page's
+  content and then its annotations; links do not survive the drawing). *Fit under* searches the quality down from
+  Balanced's by halving, then smaller sizes (`ShrinkFit`, `Tools/ShrinkModel.swift`: Foundation only, checked by
+  `scripts/dev/shrink-checks` by hand), and for a PDF tries Max, Balanced, Smallest in turn; when nothing lands under
+  the limit the smallest reached is saved and the row says so. A copy that would be no smaller is not saved ("Already as
+  small as it gets"). The table says each file's size before and after and the share saved (half up), a line under it the
+  total, Copy copies it as text, and the first picture is shown before and after. A locked PDF, an unreadable picture
+  and a file of another kind are said in their rows; nothing stops the rest. The pin: a small drop zone and the target
+  (Balanced to begin with), opening the whole tool with the files (`CompressFilesCompact`; the target carried by
+  `QuickCarry`, taken as `preset`). What it keeps (`ShrinkPrefs`: `SimplShrink.preset`, `.fit`; a picture's in a suite of
+  its own). Launch flags: `-SimplTool shrink -SimplShrinkFiles "<path>,<path>" -SimplShrinkPreset max|balanced|smallest|fit`
+  compresses the files as the tool opens (in a picture run the Finder is not brought up, and the console says what each
+  came to: `[Simpl] shrink photo.jpg: 104 KB → 61 KB, 41% smaller`). Pictures (`files_tools`): `light-75-tool-shrink`,
+  `dark-75-tool-shrink`, `light-75b-tool-shrink-narrow`, `light-54p-pin-shrink`.
 
 ## Data and encryption
 
