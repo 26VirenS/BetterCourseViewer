@@ -1118,7 +1118,7 @@ list in `ToolsScreen.Everyday` and `Groups`, and the search box opens each by it
   the days before each is due. A piece's weight is its points (equal shares when none has any) times its kind: an exam,
   midterm, final or test by name three, a quiz one and a half, an assignment one, a discussion half; its need is its
   share of the hours between now and the last deadline, in whole blocks. Each day is filled earliest deadline first,
-  then heaviest — first what keeps every piece on pace for its deadline, then the room left — and a block never ends
+  then soonest due, then heaviest — first what keeps every piece on pace for its deadline, then the room left — and a block never ends
   past its work's due moment, nor sits before now. A week view (today first, the days flowing on a narrow page) and a
   list view; beside them how every piece stands (done of needed, and what won't fit before it's due), the settings
   (hours a day by weekday, 2 on weekdays and 3 at the weekend; the block, 25/45/60/90 min; morning, afternoon or

@@ -124,6 +124,29 @@ public class PlannerTests
     }
 
     [Fact]
+    public void APieceDueSoonerGoesFirstOnASharedDeadlineDay()
+    {
+        // finishing a day early, a discussion due tonight and an assignment due tomorrow night (10 points each) both
+        // have today as their deadline, and today holds two blocks; a piece due later makes the assignment's need more
+        // than a block (its weight sorted it first, and it took both of today's blocks: the discussion, which had room,
+        // was said to be short). The one due tonight gets today's first block, and is not short.
+        var items = new[]
+        {
+            Item("fri", "Composition of Functions", "MATH 021", PlanKind.Assignment, 10, Now.Date.AddDays(1).AddHours(23).AddMinutes(59)),
+            Item("thu", "Dis01", "MATH 021", PlanKind.Discussion, 10, Now.Date.AddHours(23).AddMinutes(59)),
+            Item("later", "Problem set 4", "MATH 021", PlanKind.Assignment, 25, Now.Date.AddDays(5).AddHours(23).AddMinutes(59)),
+        };
+        var plan = StudyPlan.Make(items, Settings(hours: 1.5, finish: 1), Now);
+        var today = plan.On(Now.Date).ToList();
+        Assert.Equal(2, today.Count);
+        Assert.Equal("thu", today[0].ItemId);
+        Assert.Equal("fri", today[1].ItemId);
+        var thu = plan.Progress.Single(p => p.Item.Id == "thu");
+        Assert.Equal(45, thu.PlannedMinutes);
+        Assert.Equal(0, thu.ShortMinutes);
+    }
+
+    [Fact]
     public void WorkDoneOrPastOrInACourseLeftOutIsNotPlanned()
     {
         var items = new[]

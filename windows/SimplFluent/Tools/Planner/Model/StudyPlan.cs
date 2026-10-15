@@ -114,7 +114,7 @@ internal static class StudyPlan
     /// The plan: the work due after <paramref name="now"/> in the courses kept, each weighted by its points (equal when
     /// none has any; the average of the others' for one without) times its kind, given its share of the hours between now
     /// and the last deadline, in whole blocks — never fewer than one. Each day is filled earliest deadline first, then
-    /// heaviest: first what keeps every piece on pace for its deadline (its blocks left over the days left), then whatever
+    /// soonest due, then heaviest: first what keeps every piece on pace for its deadline (its blocks left over the days left), then whatever
     /// room is left, in the same order. A block never ends past its work's due moment, nor sits before now. Blocks done
     /// (<paramref name="done"/>) stay where they are and come off what their work needs. The same input gives the same plan.
     /// </summary>
@@ -163,8 +163,10 @@ internal static class StudyPlan
             if (slots == 0) continue;
             var cursor = day.AddHours(StartHour(s.Time));
             if (d == 0 && cursor < now) cursor = Quarter(now);
+            // (the deadline is a day, so a piece due tonight and one due tomorrow night share it when finishing a day
+            // early: the one due sooner goes first, or the other would take the whole day and leave it short)
             var candidates = active.Where(it => deadline[it.Id] >= day && remaining[it.Id] > 0)
-                .OrderBy(it => deadline[it.Id]).ThenByDescending(it => weight[it.Id]).ThenBy(it => it.Id, StringComparer.Ordinal).ToList();
+                .OrderBy(it => deadline[it.Id]).ThenBy(it => it.Due).ThenByDescending(it => weight[it.Id]).ThenBy(it => it.Id, StringComparer.Ordinal).ToList();
             bool Place(PlanItem it)
             {
                 var start = Free(cursor, block, kept);
