@@ -609,6 +609,11 @@ const htmlPages = {
   // a widget's file at an address (the importer's "An address" pane fetches it through the background)
   '/dev/widget.html': () => `<!doctype html>\n<meta name="simpl-widget" content='{"name":"Fetched widget","note":"Came from an address.","icon":"globe","size":"S"}'>\n<p id="hi">Hello from an address.</p>\n<script>simpl.ready(function (t) { document.getElementById('hi').textContent = 'Hello from an address, ' + (t.dark ? 'dark' : 'light') + '.'; });</script>`,
   '/profile': () => page({ title: 'User Profile', body: '<h1>Sam Student</h1><p class="profile">Profile page rendered by Canvas.</p>' }),
+  // (Windows 0.3.1) a tool whose page has a dark look of its own and frames another site's page with one too (127.0.0.1
+  // is another site to the web view: a frame in a process of its own), its script reading the colour scheme once as it
+  // starts — opened by a sessionless launch of tool 19, for Windows' picture that both come out in light in a dark app
+  '/mock-tool-framed': () => `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Framed tool</title><style>:root{color-scheme:light dark}body{font-family:sans-serif;padding:24px;background:#fff;color:#111}@media (prefers-color-scheme: dark){body{background:#111;color:#eee}}</style></head><body><h2 id="mock-tool-framed">Framed tool (its page dark in dark mode)</h2><iframe id="tool_frame" title="The tool's frame" src="http://127.0.0.1:${port}/mock-tool-frame" width="640" height="200" style="border:1px solid #888"></iframe></body></html>`,
+  '/mock-tool-frame': () => `<!DOCTYPE html><html><head><meta charset="utf-8"><title>The tool's frame</title><style>:root{color-scheme:light dark}body{font-family:sans-serif;padding:16px;background:#fff;color:#111}@media (prefers-color-scheme: dark){body{background:#111;color:#eee}}</style></head><body><h3>The tool's frame, on another site (dark in dark mode)</h3><p id="start"></p><script>document.getElementById('start').textContent = 'As it started, this frame read the colour scheme: ' + (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');</script></body></html>`,
   // the tool a sessionless launch opens: its own page, at the top level
   '/mock-tool': () => `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Resources & Policy</title></head><body style="font-family:-apple-system,sans-serif;padding:24px"><h2 id="mock-tool">Resources &amp; Policy (the tool's own page)</h2><p>Opened by a sessionless launch, at the top level: no Canvas frame around it.</p><button onclick="alert('The tool says hello')">Say hello</button></body></html>`,
   '/accounts/1/external_tools/77': () => page({ title: 'My Materials', body: '<h2 id="account-tool">My Materials (an account-level tool, launched by Canvas)</h2><iframe id="tool_content" title="My Materials" src="/courses/104/external_tools/t1/resource_selection"></iframe>' }),
@@ -1319,6 +1324,8 @@ on('GET', /^\/api\/v1\/courses\/(\w+)\/external_tools\/sessionless_launch$/, (ur
   if (q.get('assignment_id') === '4005') return { id: '9', name: 'Macmillan Learning', url: `http://localhost:${port}/mock-macmillan/assignment/a1` };
   // (Mac 1.3.59) an Alta assignment that opens on its cover, for the popup's start screen
   if (q.get('assignment_id') === '4004') return { id: '9', name: 'Knewton Alta', url: `http://localhost:${port}/mock-alta/learn/course/c1/assignment/a4/cover` };
+  // (Windows 0.3.1) a tool whose page frames another site's, both with a dark look of their own
+  if (q.get('id') === '19') return { id: '19', name: 'Framed tool', url: `http://localhost:${port}/mock-tool-framed` };
   return { id: q.get('id') || '9', name: 'Resources & Policy', url: `http://localhost:${port}/mock-tool?for=${encodeURIComponent(what)}&course=${m[1]}` };
 });
 on('GET', /^\/api\/v1\/courses\/(\w+)\/external_tools$/, (url, m) => (url.searchParams.get('placement') === 'homework_submission' ? homeworkTools[m[1]] || [] : []));
@@ -1487,12 +1494,13 @@ const server = http.createServer((req, res) => {
     // `section.compound__compound` — a card headed "Question" with what it asks, Learnosity's answer box and Alta's
     // Feedback / More Instruction / Submit — then Content attribution; MathJax's helpers and the chat at the foot.
     // window.mockLesson() puts a part headed "Instruction" above the question; window.mockDialog() opens a pop-up.
-    // (Mac 1.3.83) window.mockRichDialog(ms) opens Alta's "Knewton Alta" pop-up as Material draws one — fading in, a
-    // spinner until its body comes ms later: words in bold and italic, a list with a link, a formula as MathJax 2 sets
-    // one and one as KaTeX does, a picture that takes a moment to load and a drawing from the page's sprite sheet; an ×,
-    // Back (greyed) and Next, whose second step says "You are all set" with Got it. mockVideoDialog(), mockFrameDialog()
-    // and mockBareDialog() open pop-ups the app cannot draw as its own: a video, another site's frame, nothing but a
-    // title. With ?dialog=rich the rich one opens by itself, with ?dialog=video the video one (the Mac's pictures).
+    // (Mac 1.3.83) window.mockWelcomeDialog(ms) opens Alta's "Knewton Alta" welcome pop-up as Material draws one — fading
+    // in, a spinner until its body comes ms later: words in bold and italic, a list with a link, a formula as MathJax 2
+    // sets one and one as KaTeX does, a picture that takes a moment to load and a drawing from the page's sprite sheet; an
+    // ×, Back (greyed) and Next, whose second step says "You are all set" with Got it. mockVideoDialog(),
+    // mockFrameDialog() and mockBareDialog() open pop-ups the app cannot draw as its own: a video, another site's frame,
+    // nothing but a title. (Windows 0.3.5) window.mockRichDialog(ms) opens another, below. The page's ?sample= opens
+    // them by itself for the apps' pictures (at the script's foot).
     if (path === '/mock-alta/tangent.svg') {
       await new Promise((r) => setTimeout(r, 400));
       res.writeHead(200, { 'content-type': 'image/svg+xml' });
@@ -1534,8 +1542,8 @@ body{margin:0;font-family:Helvetica,Arial,sans-serif;background:#eef1f4}
 <div id="embedded-messaging"><button id="embeddedMessagingConversationButton">Chat</button></div>
 <div class="back-to-top-mount"><a href="#main">Back to Top</a></div>
 <svg style="position:absolute;width:0;height:0" aria-hidden="true"><defs><symbol id="alta-bulb" viewBox="0 0 24 24"><circle cx="12" cy="10" r="6" fill="#f5b400"/><rect x="9" y="17" width="6" height="4" fill="#888"/></symbol></defs></svg>
-<template id="rich-1"><p>Alta picks each question for <i>you</i>, from what you have <b>mastered</b> so far.</p><ul><li>Answer the question on screen.</li><li>Stuck? <a href="#more-instruction">More Instruction</a> explains it.</li></ul><p>For example, <span class="MathJax_Preview">d/dx x^2</span><span class="MathJax" id="MathJax-Element-9-Frame" tabindex="0"><nobr><span class="math">d/dx x² = 2x</span></nobr></span><script type="math/tex" id="MathJax-Element-9">\\frac{d}{dx}x^2 = 2x</script> and <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>f</mi></mrow><annotation encoding="application/x-tex">f'(x) = 2x</annotation></semantics></math></span><span class="katex-html" aria-hidden="true">f′(x) = 2x</span></span>.</p><p><img src="/mock-alta/tangent.svg" alt="A tangent line touching a curve" width="220" height="120"> <svg width="48" height="48" viewBox="0 0 24 24"><use href="#alta-bulb"></use></svg></p></template>
-<template id="rich-2"><h3>You are all set</h3><p>Your mastery fills as you answer questions correctly. It is saved as you go.</p></template>
+<template id="welcome-1"><p>Alta picks each question for <i>you</i>, from what you have <b>mastered</b> so far.</p><ul><li>Answer the question on screen.</li><li>Stuck? <a href="#more-instruction">More Instruction</a> explains it.</li></ul><p>For example, <span class="MathJax_Preview">d/dx x^2</span><span class="MathJax" id="MathJax-Element-9-Frame" tabindex="0"><nobr><span class="math">d/dx x² = 2x</span></nobr></span><script type="math/tex" id="MathJax-Element-9">\\frac{d}{dx}x^2 = 2x</script> and <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>f</mi></mrow><annotation encoding="application/x-tex">f'(x) = 2x</annotation></semantics></math></span><span class="katex-html" aria-hidden="true">f′(x) = 2x</span></span>.</p><p><img src="/mock-alta/tangent.svg" alt="A tangent line touching a curve" width="220" height="120"> <svg width="48" height="48" viewBox="0 0 24 24"><use href="#alta-bulb"></use></svg></p></template>
+<template id="welcome-2"><h3>You are all set</h3><p>Your mastery fills as you answer questions correctly. It is saved as you go.</p></template>
 <script>
 window.mockLesson = function () { var q = document.getElementById('qsec'); var l = document.createElement('section'); l.className = 'compound compound__compound___Z4A7e'; l.id = 'lsec';
   l.innerHTML = '<div class="theme__card___3E6YM"><div class="compound-header__header___Plj5Q"><h2 class="content-title__heading___1PTj4">Instruction</h2></div><div class="compound-body__content___3FE-v"><p>' + 'The derivative of ln(x) is 1/x. '.repeat(20) + '</p></div></div>';
@@ -1543,14 +1551,14 @@ window.mockLesson = function () { var q = document.getElementById('qsec'); var l
 window.mockUnlesson = function () { var l = document.getElementById('lsec'); if (l) l.remove(); };
 window.mockDialog = function () { var d = document.createElement('div'); d.className = 'MuiModal-root MuiDialog-root'; d.id = 'dlg'; d.setAttribute('role', 'presentation');
   d.innerHTML = '<div role="dialog" style="position:fixed;top:30%;left:30%;background:#fff;padding:20px">Having trouble?<button id="vi">VIEW INSTRUCTION</button></div>'; document.body.appendChild(d); };
-window.mockRichDialog = function (slow) {
+window.mockWelcomeDialog = function (slow) {
   var d = document.createElement('div'); d.className = 'MuiModal-root MuiDialog-root'; d.id = 'rdlg'; d.setAttribute('role', 'presentation');
   d.innerHTML = '<div class="MuiBackdrop-root" aria-hidden="true" style="position:fixed;inset:0;background:rgba(0,0,0,.5)"></div><div class="MuiDialog-container" role="presentation" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .225s"><div class="MuiPaper-root MuiDialog-paper" role="dialog" aria-labelledby="rtitle" style="position:relative;background:#fff;border-radius:6px;width:560px;max-width:90vw"><h2 id="rtitle" style="margin:0;padding:18px 24px 8px;font-size:20px">Knewton Alta</h2><button id="rx" class="MuiIconButton-root" aria-label="close" style="position:absolute;top:10px;right:10px;border:0;background:none;font-size:20px">×</button><div id="rbody" class="MuiDialogContent-root" style="padding:0 24px 8px;min-height:60px"><div class="MuiCircularProgress-root" role="progressbar" style="width:28px;height:28px;border-radius:50%;border:3px solid #1b8a9c"></div></div><div class="MuiDialogActions-root" style="display:flex;justify-content:flex-end;gap:8px;padding:8px 16px 16px"><button id="rback" class="MuiButton-root MuiButton-text" disabled>Back</button><button id="rnext" class="MuiButton-root MuiButton-contained MuiButton-containedPrimary">Next</button></div></div></div>';
   document.body.appendChild(d);
   setTimeout(function () { d.querySelector('.MuiDialog-container').style.opacity = '1'; }, 30);
   var body = d.querySelector('#rbody'), next = d.querySelector('#rnext'), back = d.querySelector('#rback');
   var show = function (k) {
-    body.innerHTML = ''; body.appendChild(document.getElementById('rich-' + k).content.cloneNode(true));
+    body.innerHTML = ''; body.appendChild(document.getElementById('welcome-' + k).content.cloneNode(true));
     back.disabled = k === 1; next.textContent = k === 1 ? 'Next' : 'Got it';
     next.onclick = k === 1 ? function () { show(2); } : function () { d.remove(); };
   };
@@ -1564,7 +1572,52 @@ var plainDialog = function (id, label, inner) { var d = document.createElement('
 window.mockVideoDialog = function () { plainDialog('vdlg', 'Watch this first', '<p>A short video on the chain rule.</p><video width="400" height="220" controls></video>'); };
 window.mockFrameDialog = function () { plainDialog('fdlg', 'Chat with us', '<iframe src="http://127.0.0.1:${port}/mock-alta/chat" width="400" height="160" style="border:0"></iframe>'); };
 window.mockBareDialog = function () { plainDialog('bdlg', '', '<h2>Are you still there?</h2>'); };
-</script>${{ rich: '<script>setTimeout(function () { window.mockRichDialog(1200); }, 800);</script>', video: '<script>setTimeout(function () { window.mockVideoDialog(); }, 800);</script>' }[url.searchParams.get('dialog')] || ''}</body></html>`);
+// (Windows 0.3.5) window.mockRichDialog(ms) opens a pop-up built as Alta's own are (Material's dialog: titled by its
+// heading, its buttons in a row at its foot, put in capitals by a style), its body coming in that long after it opens —
+// a spinner first — and rich: words in bold, a list, a formula of KaTeX's and one of MathJax's not drawn yet, a drawing,
+// a picture and a link. Next shows its second step, Back the first; Not now and Got it close it.
+window.mockRichDialog = function (slow) {
+  var B = String.fromCharCode(92);
+  var d = document.createElement('div'); d.className = 'MuiDialog-root MuiModal-root'; d.setAttribute('role', 'presentation'); d.id = 'rich';
+  d.innerHTML = '<div class="MuiBackdrop-root" style="position:fixed;inset:0;background:rgba(0,0,0,.5)"></div>'
+    + '<div class="MuiDialog-container" role="presentation" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center">'
+    + '<div class="MuiPaper-root MuiDialog-paper" role="dialog" aria-labelledby="rich-title" style="background:#fff;border-radius:4px;width:560px;max-width:90vw;font:16px Helvetica,Arial,sans-serif;color:#1d2a36">'
+    + '<h2 id="rich-title" class="MuiDialogTitle-root" style="margin:0;padding:16px 24px;font-size:20px;font-weight:500">Knewton Alta</h2>'
+    + '<div id="rich-body" class="MuiDialogContent-root" style="padding:0 24px 8px"><span class="MuiCircularProgress-root" role="progressbar" style="display:inline-block;width:28px;height:28px;border-radius:50%;border:3px solid #1b8a9c"></span></div>'
+    + '<div class="MuiDialogActions-root" style="display:flex;justify-content:flex-end;gap:8px;padding:8px 16px 16px"><button id="rich-no" class="MuiButton-root MuiButton-text" style="text-transform:uppercase">Not now</button>'
+    + '<button id="rich-go" class="MuiButton-root MuiButton-contained MuiButton-containedPrimary" style="text-transform:uppercase;background:#1b8a9c;color:#fff;border:0;padding:6px 16px">Next</button></div></div></div>';
+  document.body.appendChild(d);
+  var body = document.getElementById('rich-body'), go = document.getElementById('rich-go'), no = document.getElementById('rich-no'), step = 0;
+  var chart = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="80"><rect width="200" height="80" fill="#eef6f7"/><rect x="20" y="40" width="30" height="30" fill="#1b8a9c"/><rect x="85" y="25" width="30" height="45" fill="#1b8a9c"/><rect x="150" y="10" width="30" height="60" fill="#1b8a9c"/></svg>';
+  var first = function () {
+    step = 0; go.textContent = 'Next'; no.textContent = 'Not now';
+    body.innerHTML = '<p>Your instructor turned on <b>adaptive practice</b> for this assignment. Here is what changes:</p>'
+      + '<ul><li>Each question is chosen for you from what you have answered so far.</li>'
+      + '<li>An objective is mastered once <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>p</mi><mo>≥</mo><mn>0.9</mn></mrow><annotation encoding="application/x-tex">p ' + B + 'geq 0.9</annotation></semantics></math></span><span class="katex-html" aria-hidden="true">p ≥ 0.9</span></span> for it.</li>'
+      + '<li>A wrong answer brings another way in, never a penalty.</li></ul>'
+      + '<p><script type="math/tex; mode=display">' + B + 'frac{d}{dx}' + B + 'ln x = ' + B + 'frac{1}{x}</scr' + 'ipt></p>'
+      + '<p><svg width="240" height="90" role="img" aria-label="Mastery rising over five questions"><rect width="240" height="90" fill="#f4f6f8"/><polyline points="10,80 60,66 110,50 160,34 230,12" fill="none" stroke="#1b8a9c" stroke-width="4"/></svg></p>'
+      + '<p><img alt="Mastery by objective" width="200" height="80" src="data:image/svg+xml,' + encodeURIComponent(chart) + '"></p>'
+      + '<p>Read <a href="/mock-alta/help/mastery">how mastery works</a> for more.</p>';
+  };
+  var second = function () {
+    step = 1; go.textContent = 'Got it'; no.textContent = 'Back';
+    body.innerHTML = '<p>That is all. Your mastery of each objective shows beside the question at any time.</p>';
+  };
+  go.onclick = function () { if (step === 0) second(); else d.remove(); };
+  no.onclick = function () { if (step === 1) first(); else d.remove(); };
+  setTimeout(first, slow || 0);
+};
+// (?sample=1, a picture run's: the rail's objectives and mastery from the player's own answer, as Alta's page reads it;
+// ?sample=dialog also opens the rich pop-up, its body a second and a half late — Windows' pictures. (Mac 1.3.85)
+// ?sample=welcome opens the welcome pop-up by itself, ?sample=video the video one — the Mac's pictures, which asked
+// with ?dialog=rich and ?dialog=video before; the same parameter in both apps' runs.)
+var sample = new URLSearchParams(location.search).get('sample'); // (not 'demo': the mock's password, which no log may name)
+if (sample === '1' || sample === 'dialog') fetch('/mock-alta/api/content?assignmentId=a1');
+if (sample === 'dialog') setTimeout(function () { window.mockRichDialog(1500); }, 900);
+if (sample === 'welcome') setTimeout(function () { window.mockWelcomeDialog(1200); }, 800);
+if (sample === 'video') setTimeout(function () { window.mockVideoDialog(); }, 800);
+</script></body></html>`);
     }
     // (1.3.19) an overview as a school's Alta may draw it: its objectives only as words on the page (no answer of Alta's
     // naming them), and START a link inside a web component of its own

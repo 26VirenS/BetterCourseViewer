@@ -234,8 +234,10 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   sends there (Show in Alta's Page, Escape with no Close): the popup shows Alta's page as it is — revealed, the focus
   lifted, edge to edge (`AltaSession.asIs`) — until it closes. Alta's pop-ups are kept in sight by the focus whatever
   the page is doing (`keepDialogs`: one that came between parts was hidden with the page). In the mock's learn page
-  `mockRichDialog(ms)` opens a slow, rich, two-step one (`?dialog=rich` opens it by itself: the pictures'
-  `21m-alta-dialog`), and `mockVideoDialog`, `mockFrameDialog` and `mockBareDialog` ones the page keeps.
+  `mockWelcomeDialog(ms)` opens a slow, rich, two-step one (`?sample=welcome` opens it by itself: the pictures'
+  `21m-alta-dialog`; `?sample=video` the video one, `21n-alta-dialog-in-page` — (1.3.85) the Windows app's pictures
+  ask with `?sample=` too, `1` and `dialog`, for the rich pop-up of its own, `mockRichDialog`), and `mockVideoDialog`,
+  `mockFrameDialog` and `mockBareDialog` ones the page keeps.
   (1.3.84) The pop-up is a card of the popup's own over its content (`AltaDialogLayer`): the popup dimmed under it and
   resting, held open (Escape and ⌘W answer the pop-up, the bar's Close gives up Escape meanwhile), nothing outside the
   popup dimmed. Through 1.3.83 it was a SwiftUI `.sheet` begun from a view in the popup — a borderless child panel over

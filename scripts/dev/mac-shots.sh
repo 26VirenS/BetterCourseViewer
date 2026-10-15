@@ -535,11 +535,13 @@ pins_pages() {
 # (1.3.83) and Light or Dark above the objectives (-SimplAltaPageDark YES: Dark picked): the cover's start screen in Dark
 # Mode with Dark picked and with Light (the default, 1.3.79's), a question in Dark in both modes, and Alta's page as it
 # is (the overview) drawn dark
+# (1.3.85: the mock's pop-ups asked for with ?sample=, as the Windows app's pictures ask for theirs — one mock page, one
+# way to ask; ?dialog=rich and ?dialog=video before)
 alta_pages() {
   local page="alta:104:4003:/mock-alta/learn/course/c1/assignment/a3"
-  MODE=light shoot light-21m-alta-dialog 24 -SimplOpen "$page?dialog=rich"
-  MODE=dark shoot dark-21m-alta-dialog 24 -SimplOpen "$page?dialog=rich"
-  MODE=light shoot light-21n-alta-dialog-in-page 22 -SimplOpen "$page?dialog=video"
+  MODE=light shoot light-21m-alta-dialog 24 -SimplOpen "$page?sample=welcome"
+  MODE=dark shoot dark-21m-alta-dialog 24 -SimplOpen "$page?sample=welcome"
+  MODE=light shoot light-21n-alta-dialog-in-page 22 -SimplOpen "$page?sample=video"
   MODE=dark shoot dark-21o-alta-dark 20 -SimplOpen alta:104:4004 -SimplAltaPageDark YES
   MODE=dark shoot dark-21p-alta-light 20 -SimplOpen alta:104:4004
   MODE=dark shoot dark-21q-alta-question-dark 22 -SimplOpen "$page" -SimplAltaPageDark YES

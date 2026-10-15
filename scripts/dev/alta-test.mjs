@@ -4,7 +4,7 @@
 // from Alta's own answers, the overview's words and Alta's mastery bars — never the question, the answer key or who
 // the student is. (1.3.45) It only reads: the page is worked by the student, never answered, pressed or restyled.
 //   node scripts/dev/alta-test.mjs
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { spawn, execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
@@ -214,7 +214,7 @@ try {
   // moment, a drawing from the page's sprite sheet — an ×, Back (greyed) and Next. Passed once it has settled, whole.
   const nr0 = (await posts()).length;
   const t0 = Date.now();
-  await page.evaluate(() => window.mockRichDialog(1200));
+  await page.evaluate(() => window.mockWelcomeDialog(1200));
   const rd = await waitFor((p, k) => k >= nr0 && p.kind === 'dialog' && p.open, 'the rich pop-up', 80);
   const waited = Date.now() - t0;
   check(waited >= 1500 && (await posts()).slice(nr0).filter((p) => p.kind === 'dialog').length === 1, `passed once, only when its body is in and its picture loaded (${waited} ms after it opened, its spinner first)`);
@@ -302,6 +302,11 @@ try {
   await page.waitForTimeout(500);
   check(await page.evaluate(() => getComputedStyle(document.getElementById('sprite')).display !== 'none' && getComputedStyle(document.getElementById('sprite').parentElement).display !== 'none'), 'the page’s sprite sheet is kept, so its pictures draw');
   await page.evaluate(() => document.getElementById('sprite').parentElement.remove());
+  // (the learn page opened afresh for what follows: the page script before 1.3.83 showed a page nine seconds after it
+  // opened whatever happened, and by now that time had often come in the middle of the check of the page out of sight
+  // between parts — the Windows branch's copy of the Mac's script is older)
+  await page.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a3`);
+  await waitFor((p) => p.kind === 'focus' && p.state === 'question', 'the question recognised again');
   // (1.3.48) a lesson (More Instruction) above the question: both kept, Alta's header and the rest still hidden
   const nl = (await posts()).length;
   await page.evaluate(() => window.mockLesson());
@@ -406,6 +411,147 @@ try {
   const all = JSON.stringify(await posts());
   const leaked = SECRETS.filter((s) => all.includes(s));
   check(!leaked.length, `never the answer key, the student’s ids or the school’s launch data (${leaked.join(', ') || 'none'})`);
+
+  // (Windows 0.3.5) Simpl for Windows' copy of the page script (windows/SimplFluent/Screens/Alta/AltaHook.cs), where it is
+  // in this checkout: Alta's pop-ups read whole once they have settled — the body that comes in after the pop-up opens,
+  // its lists, formulas and pictures, all its buttons, each step — and given back to the page when they cannot be
+  // read. Before, the body was read the moment the pop-up was seen and pictured 380 ms later, often still empty.
+  const winHook = join(ROOT, 'windows/SimplFluent/Screens/Alta/AltaHook.cs');
+  if (existsSync(winHook)) {
+    console.log('\nSimpl for Windows’ copy of the page script, on the mock’s pop-ups');
+    const cs = readFileSync(winHook, 'utf8');
+    const w = /public const string Source = """\n([\s\S]*?)\n\s*""";/.exec(cs);
+    check(!!w, 'the Windows page script is found in AltaHook.cs');
+    const winSource = w ? w[1].split('\n').map((l) => l.replace(/^ {8}/, '')).join('\n') : '';
+    const wp = await browser.newPage();
+    await wp.addInitScript(() => { window.__posted = []; window.chrome = window.chrome || {}; window.chrome.webview = { postMessage: (s) => window.__posted.push(s) }; });
+    await wp.addInitScript({ content: winSource });
+    const wposts = async () => (await wp.evaluate(() => window.__posted.slice())).map((s) => JSON.parse(s));
+    const wwait = async (test, what, tries = 80) => {
+      for (let i = 0; i < tries; i++) { const p = (await wposts()).filter(test); if (p.length) return p[p.length - 1]; await wp.waitForTimeout(100); }
+      throw new Error(`no ${what} came`);
+    };
+    const full = (p) => p.kind === 'dialog' && p.open === true && !p.pending;
+    const hiddenIn = (sel) => wp.$eval(sel, (e) => getComputedStyle(e).visibility === 'hidden').catch(() => null);
+    const pngSize = (src) => { const b = Buffer.from(String(src).split(',')[1] || '', 'base64'); return b.length > 24 && b.toString('ascii', 1, 4) === 'PNG' ? [b.readUInt32BE(16), b.readUInt32BE(20)] : null; };
+    await wp.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a3?sample=dialog`);
+    // a pop-up as Alta's (Material's, its Next and Not now in capitals by a style), a spinner in its body for a second
+    // and a half before its words come
+    await wwait((p) => p.kind === 'dialog' && p.pending, 'word of a pop-up');
+    const seenAt = Date.now();
+    check(await hiddenIn('#rich .MuiDialog-paper'), 'a pop-up of Alta’s is out of sight in the page as soon as it is seen (the app shows it as its own, or gives it back)');
+    await wp.waitForTimeout(900);
+    check(!(await wposts()).some(full), 'and it is not passed while its body is still loading (a spinner in it)');
+    const d1 = await wwait(full, 'the pop-up, read whole', 60);
+    const heldFor = Date.now() - seenAt;
+    const imgs = [...d1.html.matchAll(/<img src="(data:image\/png;base64,[^"]+)"[^>]*>/g)].map((m) => m[1]);
+    check(d1.title === 'Knewton Alta' && !d1.html.includes('Knewton Alta') && heldFor >= 900,
+      `it is passed once its body is in and has settled (${heldFor} ms after it was seen, ${d1.ready}), titled by its heading, which is not repeated in its body`);
+    check(d1.html.includes('<b>adaptive practice</b>') && /<ul>(?:<li>[\s\S]*?<\/li>){3}<\/ul>/.test(d1.html) && d1.words >= 40 && !/spinner|progressbar/i.test(d1.html),
+      `its body whole as plain HTML for the app to draw: its words (${d1.words}), bold as Alta has it, its list of three`);
+    check(d1.maths === 2 && d1.html.includes('data-equation-content="p \\geq 0.9"') && d1.html.includes('<p style="text-align:center"><img class="equation_image" data-equation-content="\\frac{d}{dx}\\ln x = \\frac{1}{x}">'),
+      `its formulas as their TeX — KaTeX's from its annotation, MathJax's not drawn yet from its script, set on a line of its own (${d1.maths})`);
+    const sizes = imgs.map(pngSize);
+    check(d1.pics === 2 && d1.missed === 0 && imgs.length === 2 && JSON.stringify(sizes) === JSON.stringify([[480, 180], [400, 160]]) && /alt="Mastery by objective"/.test(d1.html),
+      `its drawing and its picture made into pictures here, at twice their size (${JSON.stringify(sizes)})`);
+    check(d1.html.includes(`<a href="${BASE}/mock-alta/help/mastery">how mastery works</a>`), 'its link, by its whole address');
+    check(JSON.stringify(d1.buttons) === JSON.stringify([{ label: 'Not now', primary: false, enabled: true, close: false }, { label: 'Next', primary: true, enabled: true, close: false }]) && !/Not now|NEXT|>Next</.test(d1.html),
+      `every button, in its order, in Alta's own words (not a style's capitals), Alta's main one told (${JSON.stringify(d1.buttons.map((b) => b.label))}), none in its body`);
+    // (the app shows it as its own: hidden in the page; a change to it read with its words' breaks — before, a pop-up read
+    // while hidden lost them, "Knewton AltaGOT IT")
+    await wp.evaluate(() => window.__simplDialog.hide());
+    const n1 = (await wposts()).length;
+    await wp.evaluate(() => document.getElementById('rich-body').insertAdjacentHTML('beforeend', '<p>One more line of it.</p>'));
+    const d1b = await wwait((p, k) => k >= n1 && full(p), 'the pop-up changed while the app shows it', 40).catch(() => null) || (await wposts()).slice(n1).filter(full).pop();
+    check(!!d1b && d1b.html.includes('<p>One more line of it.</p>') && d1b.words === d1.words + 5 && (await hiddenIn('#rich .MuiDialog-paper')),
+      'a change to it while the app shows it is read whole, its words apart, the pop-up still out of sight in the page');
+    await wp.evaluate(() => { document.querySelector('#rich a').addEventListener('click', (e) => { e.preventDefault(); window.__followed = e.currentTarget.getAttribute('href'); }); });
+    check((await wp.evaluate((h) => window.__simplDialog.link(h), `${BASE}/mock-alta/help/mastery`)) && (await wp.evaluate(() => window.__followed)) === '/mock-alta/help/mastery',
+      'a link in its body is followed as Alta’s page follows it (its own link pressed)');
+    // its next step: Next pressed from the app
+    const n2 = (await wposts()).length;
+    check(await wp.evaluate(() => window.__simplDialog.press(1)), 'the app’s Next presses Alta’s');
+    const d2 = await wwait((p, k) => k >= n2 && full(p) && /That is all/.test(p.html), 'the pop-up’s second step', 40);
+    check(JSON.stringify(d2.buttons.map((b) => [b.label, b.primary])) === JSON.stringify([['Back', false], ['Got it', true]]) && d2.html === '<div><p>That is all. Your mastery of each objective shows beside the question at any time.</p></div>',
+      `its next step is passed whole, with its own buttons (${JSON.stringify(d2.buttons.map((b) => b.label))})`);
+    const n3 = (await wposts()).length;
+    check(await wp.evaluate(() => window.__simplDialog.press(1)), 'the app’s Got it presses Alta’s');
+    await wwait((p, k) => k >= n3 && p.kind === 'dialog' && p.open === false, 'the pop-up gone');
+    check(!(await wp.$('#rich')) && !(await wp.evaluate(() => document.documentElement.hasAttribute('data-simpl-native-dialog'))), 'when it closes, the app is told and the page left as it was');
+    // a pop-up with what the app cannot draw (a form): passed at once, said so — the app gives it back, shown in the page
+    const n4 = (await wposts()).length;
+    await wp.evaluate(() => { const d = document.createElement('div'); d.id = 'formdlg'; d.innerHTML = '<div role="dialog" aria-label="Report a problem" style="position:fixed;top:20%;left:30%;width:380px;background:#fff;padding:20px"><p>What went wrong?</p><textarea></textarea><button>Send</button></div>'; document.body.appendChild(d); });
+    const d3 = await wwait((p, k) => k >= n4 && full(p), 'the pop-up with a form', 40);
+    check(d3.live === 'a form' && d3.title === 'Report a problem', `a pop-up the app cannot draw is said to be one (${d3.live}): the app gives it back`);
+    await wp.evaluate(() => window.__simplDialog.giveBack());
+    check((await hiddenIn('#formdlg [role=dialog]')) === false && (await wp.evaluate(() => document.documentElement.hasAttribute('data-simpl-shown'))),
+      'given back, it is shown in the page as Alta draws it, the page in sight under it');
+    const n5 = (await wposts()).length;
+    await wp.evaluate(() => { document.querySelector('#formdlg p').textContent = 'What went wrong, exactly?'; });
+    await wp.waitForTimeout(1200);
+    check(!(await wposts()).slice(n5).some(full), 'and left to the page until it closes, whatever it says next');
+    await wp.evaluate(() => document.getElementById('formdlg').remove());
+    await wwait((p, k) => k >= n5 && p.kind === 'dialog' && p.open === false, 'the form’s pop-up gone');
+    // a pop-up in a web component's own tree
+    const n6 = (await wposts()).length;
+    await wp.evaluate(() => { customElements.define('alta-tip', class extends HTMLElement { connectedCallback() { const r = this.attachShadow({ mode: 'open' }); r.innerHTML = '<div role="dialog" aria-label="Tip" style="position:fixed;top:25%;left:30%;width:360px;background:#fff;padding:20px"><p>Words kept in its own tree.</p><button>OK</button></div>'; } }); document.body.appendChild(document.createElement('alta-tip')); });
+    const d4 = await wwait((p, k) => k >= n6 && full(p), 'the pop-up in a web component', 60);
+    check(d4.title === 'Tip' && d4.html === '<p>Words kept in its own tree.</p>' && d4.buttons.map((b) => b.label).join() === 'OK', 'a pop-up in a web component’s own tree is read whole too');
+    await wp.evaluate(() => document.querySelector('alta-tip').remove());
+    await wwait((p, k) => k >= n6 && p.kind === 'dialog' && p.open === false, 'the web component’s pop-up gone');
+    // (0.3.5) Show browser: Alta's page as it is, as in a browser — nothing laid out or hidden, its pop-ups its own — and
+    // laid out again when it is put away
+    const n8 = (await wposts()).length;
+    await wp.evaluate(() => { window.__simplBrowser = true; window.__simplBrowserNow(); });
+    await wp.waitForTimeout(800);
+    const wvis = async (sel) => wp.$eval(sel, (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== 'hidden'; }).catch(() => false);
+    const asItIs = await wp.evaluate(() => !document.documentElement.hasAttribute('data-simpl-q') && document.documentElement.hasAttribute('data-simpl-shown'));
+    const lastOf = (kind) => wposts().then((ps) => ps.slice(n8).filter((p) => p.kind === kind).pop());
+    check(asItIs && (await wvis('h1')) && (await wvis('.jss179')) && (await wvis('#submit')) && (await lastOf('buttons'))?.items.length === 0 && (await lastOf('panels'))?.panels.length === 0,
+      'with the browser asked for, Alta’s page is shown as it is — its title, objective card and its own buttons — and the app is given no buttons or panels');
+    await wp.evaluate(() => window.mockRichDialog(0));
+    await wp.waitForTimeout(1500);
+    check((await wvis('#rich .MuiDialog-paper')) && !(await wposts()).slice(n8).some((p) => p.kind === 'dialog'), 'and a pop-up of Alta’s stays Alta’s own, in its page, never passed to the app');
+    const n9 = (await wposts()).length;
+    await wp.evaluate(() => { window.__simplBrowser = false; window.__simplBrowserNow(); });
+    const back = await wwait((p, k) => k >= n9 && full(p), 'the pop-up taken up again once the browser is put away', 60);
+    check(back.title === 'Knewton Alta' && (await hiddenIn('#rich .MuiDialog-paper')) && !(await wvis('h1')) && (await wp.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))),
+      'put away, the question is laid out alone again and the open pop-up is the app’s again');
+    await wp.evaluate(() => { window.__simplBrowser = true; window.__simplBrowserNow(); });
+    await wwait((p, k) => k >= n9 && p.kind === 'dialog' && p.open === false, 'the pop-up given back when the browser is asked for again', 30);
+    check((await wvis('#rich .MuiDialog-paper')) && !(await wp.evaluate(() => document.documentElement.hasAttribute('data-simpl-native-dialog'))),
+      'and asked for again with a pop-up up, the pop-up is given back to the page and the app told it is gone from it');
+    await wp.evaluate(() => { document.getElementById('rich').remove(); window.__simplBrowser = false; window.__simplBrowserNow(); });
+    // (a page opened while the browser is asked for: in sight at once, never veiled)
+    const bp = await browser.newPage();
+    await bp.addInitScript(() => { window.__posted = []; window.chrome = window.chrome || {}; window.chrome.webview = { postMessage: (s) => window.__posted.push(s) }; window.__simplBrowser = true; });
+    await bp.addInitScript({ content: winSource });
+    await bp.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a3`);
+    await bp.waitForTimeout(1500);
+    const bposts = (await bp.evaluate(() => window.__posted.slice())).map((s) => JSON.parse(s));
+    check(bposts.some((p) => p.kind === 'shown' && p.how === 'browser') && !bposts.some((p) => p.kind === 'hidden' || p.kind === 'focus') && (await bp.evaluate(() => getComputedStyle(document.body).opacity)) === '1',
+      'a page opened while the browser is asked for is in sight at once, as it is, never veiled');
+    await bp.close();
+    // a pop-up with nothing in its body that can be read: waited for longer, then passed empty — the app gives it back
+    // rather than show an empty dialog
+    const n7 = (await wposts()).length;
+    const t7 = Date.now();
+    await wp.evaluate(() => { const d = document.createElement('div'); d.id = 'emptydlg'; d.innerHTML = '<div role="dialog" aria-label="Knewton Alta" style="position:fixed;top:20%;left:30%;width:380px;height:160px;background:#fff"><button>Got it</button></div>'; document.body.appendChild(d); });
+    const d5 = await wwait((p, k) => k >= n7 && full(p), 'the empty pop-up', 90);
+    check(d5.words === 0 && d5.maths === 0 && d5.pics === 0 && Date.now() - t7 >= 4500,
+      `a pop-up whose body says nothing is waited for (${Date.now() - t7} ms), then passed as empty, for the app to give back to the page`);
+    await wp.evaluate(() => document.getElementById('emptydlg').remove());
+    // a pop-up the page script cannot read (here, a part of it that throws as it is read): given back to the page at once,
+    // never left out of sight, the app told why
+    const n10 = (await wposts()).length;
+    await wp.evaluate(() => { const d = document.createElement('div'); d.id = 'baddlg'; d.innerHTML = '<div role="dialog" aria-label="Odd" style="position:fixed;top:20%;left:30%;width:380px;background:#fff;padding:20px"><p id="odd">Some words.</p><button>OK</button></div>'; document.body.appendChild(d); document.getElementById('odd').matches = () => { throw new Error('unreadable'); }; });
+    const d6 = await wwait((p, k) => k >= n10 && full(p), 'the pop-up that cannot be read', 40);
+    check(/could not read \(unreadable\)/.test(d6.live) && (await hiddenIn('#baddlg [role=dialog]')) === false,
+      `a pop-up the page script cannot read is given back to the page at once, never left out of sight (${d6.live})`);
+    await wp.evaluate(() => document.getElementById('baddlg').remove());
+    await wwait((p, k) => k >= n10 && p.kind === 'dialog' && p.open === false, 'the unreadable pop-up gone');
+    await wp.close();
+  }
 } finally {
   await browser.close();
   stop();
