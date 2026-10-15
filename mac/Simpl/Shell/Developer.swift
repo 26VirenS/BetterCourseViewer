@@ -77,7 +77,7 @@ final class DevMode: ObservableObject {
             "App: \(AppPlacement.runningURL.path)\(AppPlacement.isTranslocated ? " (translocated from \(AppPlacement.originalURL.path))" : "")",
             "Development run: \(Updater.isDevelopmentRun)",
             "Data: encrypted (AES-256), its key \(Vault.protection == .keychain ? "in the login Keychain" : "in vault.key itself (the Keychain would not take it)"); sign-in and cookies in the login Keychain", // (1.3.76, Support/Vault.swift)
-            "Updates: feed \(u.feedURL.absoluteString), beta \(u.beta), automatic \(u.automatic), paused \(u.paused), state \(Self.describe(u.state)), last check \(u.lastCheck.map { $0.formatted(date: .abbreviated, time: .standard) } ?? "never")",
+            "Updates: feed \(u.feedURL.absoluteString), beta \(u.beta), paused \(u.paused), put back from \(u.rolledBackFrom ?? "none"), state \(Self.describe(u.state)), last check \(u.lastCheck.map { $0.formatted(date: .abbreviated, time: .standard) } ?? "never")",
         ]
         if let e {
             lines.append("School: \(e.host) (\(e.lmsName)), phase \(e.phase), data version \(e.dataVersion), counts live \(e.countsLive), courses \(e.courses.count), groups \(e.groups.count)")
@@ -222,13 +222,14 @@ private struct DevUpdates: View {
                 LabeledContent("Last check", value: u.lastCheck.map { $0.formatted(date: .abbreviated, time: .standard) } ?? "never")
                 LabeledContent("Feed", value: u.feedURL.absoluteString)
                 if let held = u.heldBack { LabeledContent("Held back", value: held) }
+                // (1.3.86) a version put back: the version it replaced, and any up to it, wait for Install Now
+                if let from = u.rolledBackFrom { LabeledContent("Put back from", value: from) }
             }
             Section {
                 Toggle("Get beta updates", isOn: $u.beta)
-                Toggle("Install updates automatically", isOn: $u.automatic)
                 Toggle("Pause updates", isOn: $u.paused)
             } footer: {
-                Text("Paused: no hourly check acts and nothing installs by itself. A Critical Update still installs at once — nothing here, nor anywhere else, holds one back.")
+                Text("Paused: no hourly check acts and nothing installs by itself — for testing; otherwise updates always install by themselves. A Critical Update still installs at once — nothing here, nor anywhere else, holds one back.")
             }
             Section {
                 TextField("Feed address (empty: the site's)", text: $feed)

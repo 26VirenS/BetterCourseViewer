@@ -552,17 +552,17 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   in Settings ▸ About, or Control-Option-Shift-Command-D anywhere (again to leave). Unlocked, the Simpl menu has a
   Developer menu (the Developer window, Save Alta / Macmillan Page Code — no longer in the popups — Refresh, Reload,
   Check for Updates Now, Copy Diagnostics, Leave Developer Mode) and the Developer window (no Window-menu item of its
-  own): Overview (versions, where the app runs, live diagnostics), Updates (state, feed, beta / automatic / pause, a
-  feed address of its own, Check and Install Now), Engine (its state, Refresh, Reload, Forget Kept Answers, and a
-  console: any `BCVNative.call` with JSON arguments, its answer pretty-printed), Alta & Macmillan (state, Save Page
-  Code, Error Logs — Alta's Error Logs button shows only in developer mode now — and the graphs' light colours),
-  Interface (What's New, the tour, the setup, their resets, the look for this run, the main window's size) and
-  Preferences (every one the app keeps, filtered, removed one by one; its folders). Critical Updates: the release
-  workflow's `critical` switch publishes a release proper titled "Critical Update" with a mark in its notes;
-  publish-site.sh names the newest one in both feeds (`criticalVersion`), and a Mac on an older version installs the
-  feed's newest at its next check (Updater.swift) — automatic updates off, paused, a version put back, a quiz open:
-  nothing holds it back — with a notice over the window while it installs, tried again every ten minutes if it fails.
-  Only copies from 1.3.72 on know to do this.
+  own): Overview (versions, where the app runs, live diagnostics), Updates (state, feed, beta / pause — (1.3.86) no
+  automatic switch any more — the version put back from, a feed address of its own, Check and Install Now), Engine
+  (its state, Refresh, Reload, Forget Kept Answers, and a console: any `BCVNative.call` with JSON arguments, its
+  answer pretty-printed), Alta & Macmillan (state, Save Page Code, Error Logs — Alta's Error Logs button shows only in
+  developer mode now — and the graphs' light colours), Interface (What's New, the tour, the setup, their resets, the
+  look for this run, the main window's size) and Preferences (every one the app keeps, filtered, removed one by one;
+  its folders). Critical Updates: the release workflow's `critical` switch publishes a release proper titled "Critical
+  Update" with a mark in its notes; publish-site.sh names the newest one in both feeds (`criticalVersion`), and a Mac
+  on an older version installs the feed's newest at its next check (Updater.swift) — paused, a version put back, a
+  quiz open: nothing holds it back — with a notice over the window while it installs, tried again every ten minutes if
+  it fails. Only copies from 1.3.72 on know to do this.
   (1.3.74) The 3D builder's shapes are laid out by VSEPR, not found by forces (`Tools/MoleculeShape.swift`, `VSEPR`):
   round each atom its bonds, lone pairs and an odd electron take the directions their number gives (a line, a
   triangle, a tetrahedron, a trigonal bipyramid with lone pairs round its middle, an octahedron with lone pairs
@@ -1025,11 +1025,12 @@ and Set Up Later), `-SimplShowLoggingIn YES` ("Logging you in" over the window, 
 `-SimplCalView week|list` (the Calendar opened on that view), `-SimplWhatIf YES` (a course's grades with What-If on,
 nothing typed), `-SimplAttach <file>` (with `-SimplOpen compose`: New Message with that file attached, uploaded to the
 mock), `-SimplAppearance light|dark`, `-SimplSettingsTab notifications|grades|data|updates|about` (the tab
-Settings opens on), `-SimplSidebar hidden` (the window opens with its sidebar folded away), `-SimplMorphHold <share>`
-(with `-SimplSheet <counter>`: the counter's tile grows that share of the way into its panel, 0.5 half-way, and stays
-there — the real grow, stopped, so a picture shows it under way, even where the Mac reduces motion; `DashMorphHold`).
-In the pictures' consoles a counter opened says how it came (`[Simpl] counter: next grows`, or `fades in (Reduce
-Motion)`).
+Settings opens on), `-SimplRolledBackFrom <version>` (1.3.86: Settings ▸ Updates as after a version was put back, the
+hold's row under Version), `-SimplSidebar hidden` (the window opens with its sidebar folded away),
+`-SimplMorphHold <share>` (with `-SimplSheet <counter>`: the counter's tile grows that share of the way into its
+panel, 0.5 half-way, and stays there — the real grow, stopped, so a picture shows it under way, even where the Mac
+reduces motion; `DashMorphHold`). In the pictures' consoles a counter opened says how it came (`[Simpl] counter: next
+grows`, or `fades in (Reduce Motion)`).
 
 ## Releasing
 
@@ -1073,9 +1074,10 @@ Simpl for Mac keeps itself up to date (`Support/Updater.swift`, a port of the Sa
   minutes and whenever the app comes to the front, so a Mac asleep does not stretch the wait), and on **Simpl ▸ Check
   for Updates…** or *Check Now* in **Settings ▸ Updates**. The menu opens Settings on Updates when there is a version
   to install or the check failed, and says *up to date* otherwise.
-- **Installing.** *Update Now* installs at once. With *Install updates automatically* on (the default) an update
-  installs itself at a quiet moment only: the app not in front and no sheet open, so a quiz or a message is never cut
-  off by the relaunch.
+- **Installing.** *Update Now* installs at once. Otherwise an update installs itself — always: (1.3.86) there is no
+  *Install updates automatically* switch any more, and a Mac that had it off has it on again (its old `autoUpdate`
+  key is removed at launch) — at a quiet moment only: no quiz, external tool, sheet, popup or modal panel open, so a
+  quiz or a message is never cut off by the relaunch.
 - **Checks.** The download must answer 200, start with `PK` (a zip, not a web page) and match the feed's SHA-256; it
   is unpacked with `ditto -x -k`; the app inside must have this app's bundle id and pass `codesign --verify --deep
   --strict`, against this copy's own designated requirement when this copy is Developer ID signed (so only the same
@@ -1083,8 +1085,14 @@ Simpl for Mac keeps itself up to date (`Support/Updater.swift`, a port of the Sa
   folder when this copy cannot be replaced where it is (App Translocation, a folder that cannot be written); the
   quarantine mark is removed, LaunchServices is told, and the new copy opens as this one quits.
 - **Earlier versions.** Settings ▸ Updates lists the `mac-v*` GitHub Releases (`Simpl-Mac-<version>.zip`, with the
-  SHA-256 GitHub keeps as the asset's `digest`); *Install…* puts one back through the same checks, turning automatic
-  updates off first so the next check does not bring the newest straight back.
+  SHA-256 GitHub keeps as the asset's `digest`); *Install…* puts one back through the same checks. (1.3.86) So that
+  the next check does not bring the newest straight back, it keeps a hold first: the version it replaces (or one held
+  already, if newer) as `SimplRolledBackFrom` in the app's defaults. The version put back reads it as it opens and
+  stays: a version found up to the one held is offered (*Update Now*) but never installs itself; one newer than it
+  installs itself as usual, *Update Now* ends the hold, and a Critical Update goes in all the same. Settings ▸ Updates
+  says so under Version ("Staying on 1.3.84 — You put this version back. Update Now installs 1.3.85; …"), and the
+  hold is forgotten once the app is that version or newer. A version from before 1.3.86 knows no hold: for it the
+  old `autoUpdate` switch is also written off, as before.
 - **Never in a development run**: launched with `-SimplBaseURL`, `-SimplDemo` or `-SimplShotFile`, run from
   DerivedData or a `Build/Products` folder, or a Debug build. The app neither checks nor installs then.
 

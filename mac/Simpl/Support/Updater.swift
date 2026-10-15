@@ -29,10 +29,11 @@ private struct UpdateFailure: LocalizedError {
 /// Simpl for Mac keeps itself up to date (1.2), as the Safari extension's app does (`macos/…/Updater.swift`). At launch
 /// when the last look is older than an hour, and every hour after (1.2.19), it reads the feed on simplcourses.com — one
 /// small JSON file naming the newest version, where its zip is and the zip's SHA-256 — and when that version is newer
-/// than this one and runs on this Mac's macOS, Settings ▸ Updates offers it (Update Now). When updates install
-/// themselves (on unless turned off) one goes in at once (1.2.19), unless a quiz is open, or an external tool's window
-/// (any window of Canvas's own pages), or a sheet or a modal panel — then it waits until they are closed, so nothing
-/// is ever cut off by a relaunch. An install downloads the zip, checks it is a zip and matches the published
+/// than this one and runs on this Mac's macOS, Settings ▸ Updates offers it (Update Now). It also installs itself
+/// (1.3.86: always — there is no setting to turn that off) at once (1.2.19), unless a quiz is open, or an external
+/// tool's window (any window of Canvas's own pages), or a sheet or a modal panel — then it waits until they are closed,
+/// so nothing is ever cut off by a relaunch — or unless it is no newer than a version put back replaced
+/// (`rolledBackFrom`). An install downloads the zip, checks it is a zip and matches the published
 /// checksum, unpacks it with ditto, checks the app inside is Simpl, signed, and signed by the same team as this copy,
 /// puts it in this copy's place (this copy goes to the Bin; into the Applications folder when this copy cannot be
 /// replaced where it is) and opens it as this one quits. A development run never checks or installs anything.
@@ -81,13 +82,15 @@ final class Updater: ObservableObject {
     @Published private(set) var lastCheck: Date? = nil
     /// A newer version this Mac's macOS cannot run, in words ("Simpl 1.4 needs macOS 15.0 or later."); nil otherwise.
     @Published private(set) var heldBack: String? = nil
-    /// Updates install themselves when they arrive, at a quiet moment (Settings ▸ Updates; on unless turned off).
-    @Published var automatic: Bool = true {
-        didSet {
-            UserDefaults.standard.set(automatic, forKey: "autoUpdate")
-            if automatic { installIfQuiet() }
-        }
-    }
+    /// (1.3.86) The version a version put back (Earlier Versions) replaced, while this copy is older than it: Simpl stays
+    /// on this one, and a version found up to that one is offered (Update Now) but never installed by itself — or the
+    /// next check would bring it straight back. A version newer than it installs by itself as usual, Update Now ends
+    /// the hold, and a Critical Update goes in all the same. Nil when nothing is held.
+    @Published private(set) var rolledBackFrom: String? = nil
+    private static let rolledBackKey = "SimplRolledBackFrom"
+    /// (before 1.3.86) Install updates automatically's switch, gone: only written now for a version from before 1.3.86
+    /// put back, which still reads it (`rollback`).
+    private static let oldAutomaticKey = "autoUpdate"
     /// Asks Settings to show its Updates pane (Check for Updates… found something to show there).
     @Published var revealPane = false
 
@@ -101,7 +104,17 @@ final class Updater: ObservableObject {
     private var ready: (release: AppRelease, unpacked: UpdateInstall.Unpacked)?
 
     private init() {
-        automatic = UserDefaults.standard.object(forKey: "autoUpdate") as? Bool ?? true
+        let defaults = UserDefaults.standard
+        // (1.3.86) updates always install themselves: a Mac that had Install updates automatically off has it on again,
+        // its old switch forgotten
+        if !Self.isDevelopmentRun { defaults.removeObject(forKey: Self.oldAutomaticKey) }
+        if let from = defaults.string(forKey: Self.rolledBackKey) {
+            if Self.isNewer(from, than: currentVersion) {
+                rolledBackFrom = from
+            } else {
+                defaults.removeObject(forKey: Self.rolledBackKey) // (this copy is that version or newer: nothing left to hold)
+            }
+        }
         let last = UserDefaults.standard.double(forKey: Self.lastKey)
         lastCheck = last > 0 ? Date(timeIntervalSince1970: last) : nil
     }
@@ -231,8 +244,7 @@ final class Updater: ObservableObject {
         UserDefaults.standard.set(now.timeIntervalSince1970, forKey: Self.lastKey)
         guard case .checking = state else { return } // (a version put back meanwhile is under way: not undone by this)
         state = outcome
-        // (1.3.72) a Critical Update: in now — automatic updates off, paused, a version put back, a quiz open, none of it
-        // holds it back
+        // (1.3.72) a Critical Update: in now — paused, a version put back, a quiz open, none of it holds it back
         if case .available(let release) = outcome, release.critical {
             if let kept = ready, !Self.same(kept.release, release) { UpdateInstall.discard(kept.unpacked); ready = nil }
             criticalNotice = release.version
@@ -294,19 +306,41 @@ final class Updater: ObservableObject {
 
     // MARK: - Installing
 
-    /// Update Now: the version found, installed now (the student asked; Simpl quits and opens again on it).
+    /// Update Now: the version found, installed now (the student asked; Simpl quits and opens again on it). (1.3.86) It
+    /// ends a version put back's hold, too: updates install themselves again from here on.
     func install() {
         guard case .available = state else { return }
+        endHold()
         begin(asked: true)
     }
 
-    /// An update that came by itself goes in only when updates are automatic and nothing holds it back.
+    /// (1.3.86) A version found that a version put back holds back: no newer than the one it replaced. A Critical
+    /// Update never is.
+    func waitsForUpdateNow(_ release: AppRelease) -> Bool {
+        guard !release.critical, let from = rolledBackFrom else { return false }
+        return !Self.isNewer(release.version, than: from)
+    }
+
+    /// (1.3.86) The version a version put back now would hold back to: the one this copy replaces, or the one held
+    /// already when that is newer (two steps back still keep the newest away).
+    var holdAfterRollback: String {
+        if let from = rolledBackFrom, Self.isNewer(from, than: currentVersion) { return from }
+        return currentVersion
+    }
+
+    private func endHold() {
+        rolledBackFrom = nil
+        UserDefaults.standard.removeObject(forKey: Self.rolledBackKey)
+    }
+
     /// (1.3.72) A Critical Update under way: its version, for the notice over the window.
     @Published private(set) var criticalNotice: String?
 
+    /// An update that came by itself goes in when nothing holds it back: no quiz or tool open (`quiet`), updates not
+    /// paused, and (1.3.86) newer than any version put back replaced. A Critical Update goes in whatever holds it.
     func installIfQuiet() {
         if started, case .available(let r) = state, r.critical { begin(asked: true); return }
-        guard started, automatic, !paused, case .available = state, quiet else { return }
+        guard started, !paused, case .available(let r) = state, !waitsForUpdateNow(r), quiet else { return }
         begin(asked: false)
     }
 
@@ -459,14 +493,20 @@ final class Updater: ObservableObject {
     }
 
     /// Earlier Versions' Install: the version named, put in this copy's place — the same download, checks and relaunch
-    /// as an update — with automatic updates turned off first, or the next check would put the newest straight back.
+    /// as an update. (1.3.86) The hold is kept first (`rolledBackFrom`, read by the version put back as it opens), or
+    /// the next check would put the newest straight back: Simpl stays on the version put back until a version newer
+    /// than the one it replaced comes out or the student chooses Update Now.
     func rollback(to version: String, url: URL, sha256: String?) {
         guard !Self.isDevelopmentRun else { return }
         switch state {
         case .downloading, .installing: return
         default: break
         }
-        automatic = false
+        let defaults = UserDefaults.standard
+        defaults.set(holdAfterRollback, forKey: Self.rolledBackKey)
+        // (a version from before 1.3.86 knows no hold, only the old switch: off, it stays too; this version and later
+        // ones forget it as they open)
+        defaults.set(false, forKey: Self.oldAutomaticKey)
         let sum = sha256?.trimmingCharacters(in: .whitespacesAndNewlines)
         state = .available(AppRelease(version: version, url: url, sha256: (sum ?? "").isEmpty ? nil : sum))
         begin(asked: true)

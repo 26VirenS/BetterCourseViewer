@@ -831,9 +831,10 @@ private struct DataPane: View {
 
 // MARK: - Updates
 
-/// Settings ▸ Updates (1.2): this version, whether updates install themselves, Check Now and what it found — a newer
-/// version with Update Now and its notes, the download's progress, why a check or an install failed — and, folded
-/// away, the versions published before, any of which can be put back in this one's place.
+/// Settings ▸ Updates (1.2): this version — (1.3.86) and, when a version was put back, that Simpl stays on it — Check
+/// Now and what it found — a newer version with Update Now and its notes, the download's progress, why a check or an
+/// install failed — and, folded away, the versions published before, any of which can be put back in this one's place.
+/// (1.3.86) Updates always install themselves: there is no switch for it any more.
 private struct UpdatesPane: View {
     @ObservedObject private var updater = Updater.shared
 
@@ -845,13 +846,9 @@ private struct UpdatesPane: View {
                 } label: {
                     Text("Version").font(.sBody)
                 }
-                Toggle(isOn: $updater.automatic) {
-                    Text("Install updates automatically").font(.sBody)
-                    Text("A new version goes in when it arrives, and Simpl opens again on it — never while a quiz or a tool is open.")
-                        .font(.sCallout)
-                        .foregroundStyle(.secondary)
+                if let from = holdFrom {
+                    RollbackHoldRow(updater: updater, from: from)
                 }
-                .disabled(Updater.isDevelopmentRun)
                 Toggle(isOn: $updater.beta) {
                     Text("Get beta updates").font(.sBody)
                     Text("Try new features before everyone else. A beta may have rough edges; turn this off to go back to the usual releases when the next one comes out.")
@@ -885,15 +882,52 @@ private struct UpdatesPane: View {
         return n
     }
 
+    /// (1.3.86) The version put back from, while Simpl stays on this one — not once a version newer than it is found
+    /// (that one installs itself) or an install is under way.
+    private var holdFrom: String? {
+        guard let from = updater.rolledBackFrom else { return nil }
+        switch updater.state {
+        case .available(let r): return updater.waitsForUpdateNow(r) ? from : nil
+        case .downloading, .installing: return nil
+        default: return from
+        }
+    }
+
     private var footer: String {
         if Updater.isDevelopmentRun {
             return "This is a development run of Simpl (a build from Xcode, the mock Canvas or the screenshot suite): it never looks for updates or replaces itself."
         }
-        var s = "Simpl looks for a new version every hour. Each one is checked against its published checksum and its signature before it takes this copy’s place, and this copy goes to the Bin."
+        var s = "Simpl looks for a new version every hour and installs it by itself, opening again on it — never while a quiz or a tool is open. Each one is checked against its published checksum and its signature before it takes this copy’s place, and this copy goes to the Bin."
         if AppPlacement.isTranslocated {
             s += " This copy is running from a temporary place macOS made for the download, so an update goes into the Applications folder."
         }
         return s
+    }
+}
+
+/// (1.3.86) A version put back, said plainly where Install updates automatically used to be: Simpl stays on this one,
+/// the version it replaced (or one up to it) waits for Update Now just below, and a newer one installs itself.
+private struct RollbackHoldRow: View {
+    @ObservedObject var updater: Updater
+    let from: String
+
+    var body: some View {
+        LabeledContent {
+            Image(systemName: "pin.fill")
+                .foregroundStyle(.secondary)
+        } label: {
+            Text("Staying on \(updater.currentVersion)").font(.sBody)
+            Text(note)
+                .font(.sCallout)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var note: String {
+        if case .available(let r) = updater.state {
+            return "You put this version back. Update Now installs \(r.version); a version newer than \(from) installs by itself."
+        }
+        return "You put this version back, so versions up to \(from) wait for Update Now; a newer one installs by itself."
     }
 }
 
@@ -983,7 +1017,8 @@ private struct UpdateStatusRow: View {
 }
 
 /// The versions published (newest first), folded away until asked for: each can be put back in this one's place —
-/// with Install updates automatically turned off first, or the next check would bring the newest straight back.
+/// (1.3.86) and stays, the version it replaced held back (`Updater.rolledBackFrom`), or the next check would bring
+/// the newest straight back.
 private struct EarlierVersions: View {
     @ObservedObject var updater: Updater
     @State private var open = false
@@ -1007,13 +1042,24 @@ private struct EarlierVersions: View {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: { r in
-                Text("Simpl \(r.version) takes the place of this version (\(updater.currentVersion)), and Simpl quits and opens again on it. Install updates automatically is turned off first, so Simpl stays on \(r.version) until you turn it back on or choose Update Now.")
+                Text(installNote(r))
             }
         } footer: {
-            Text("Putting another version back turns Install updates automatically off.")
+            Text("A version you put back stays until a version newer than \(updater.holdAfterRollback) comes out, or you choose Update Now.")
                 .font(.sCaption)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    /// (1.3.86) What Install does: the version chosen in this one's place, and — when it is older than the version held
+    /// back to — that Simpl stays on it.
+    private func installNote(_ r: AppRelease) -> String {
+        var s = "Simpl \(r.version) takes the place of this version (\(updater.currentVersion)), and Simpl quits and opens again on it."
+        let from = updater.holdAfterRollback
+        if Updater.isNewer(from, than: r.version) {
+            s += " It stays on \(r.version) until a version newer than \(from) comes out, or you choose Update Now."
+        }
+        return s
     }
 
     private var dialogTitle: String {

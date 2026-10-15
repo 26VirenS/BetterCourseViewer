@@ -899,6 +899,9 @@ the_set() {
   shoot light-02b-courses-past 12 -SimplPlace courses -SimplCoursesFilter past
   shoot light-19b-quiz-matching 18 -SimplOpen quiz:101:9011:take:4
   shoot light-23b-settings-updates 12 -SimplOpen settings -SimplSettingsTab updates
+  # (1.3.86) a version put back: Simpl stays on it, said where Install updates automatically was (the hold's key given
+  # for this run alone; a development run never installs anything)
+  shoot light-23g-settings-updates-held 12 -SimplOpen settings -SimplSettingsTab updates -SimplRolledBackFrom 9.9.9
   shoot light-28-tour-grades 16 -SimplOpen tour:2
   shoot light-29-tour-last 16 -SimplOpen tour:6 # (1.3.78: the tour's last step, Report a Bug at the account menu)
   shoot light-31-command-grades 16 -SimplOpen "palette:/grades "
