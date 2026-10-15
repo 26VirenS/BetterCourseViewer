@@ -1,6 +1,6 @@
 import Foundation
 
-// (tools) Verb Conjugations' rules engine, Foundation only so it can be checked on its own (scripts/dev/swift-checks):
+// (1.3.95) Verb Conjugations' rules engine, Foundation only so it can be checked on its own (scripts/dev/swift-checks):
 // a language's data file (es/fr/de/it/pt.json — the same files the Windows app reads; their schema and the reference
 // engine are the data's README.md and check.mjs, which this follows step for step) read once, and any verb
 // conjugated in any of the language's tenses: an irregular verb's forms from its table, the rest built from the

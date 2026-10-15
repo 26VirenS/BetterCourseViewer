@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-// (tools) Verb Conjugations, in the Study group: a verb in Spanish, French, German, Italian or Portuguese conjugated in
+// (1.3.95) Verb Conjugations, in the Study group: a verb in Spanish, French, German, Italian or Portuguese conjugated in
 // its language's main tenses, from the data files the Windows app reads too (Resources/Verbs/<lang>.json: the rules
 // for the regular classes, the spelling and stem changes, and a table of the irregular verbs) by the engine in
 // Model/VerbEngine.swift. A language picker (remembered), a field for the infinitive with suggestions as it is typed,
