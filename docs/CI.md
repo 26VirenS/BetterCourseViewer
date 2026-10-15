@@ -48,8 +48,9 @@ own Tests workflow on its own copy of the extension and suites.
   baseline in `scripts/dev/baselines/`. One that is not there fails, with an annotation on its line.
 - **Unit tests**: Windows' models (`windows/SimplFluent.Tests`, xUnit: the chemistry, the calculator, the vault's and
   the saved sign-in's seals, the bridge's JSON) and the Mac's (`scripts/dev/swift-checks/main.swift`: the elements'
-  data, VSEPR's shapes, the biology toolkit's self-check over every file in `mac/Simpl/Tools/Biology/Model`, and the
-  chemistry tools' launch flags and what they keep, `mac/Simpl/Tools/Chemistry/Model`).
+  data, VSEPR's shapes, the biology toolkit's self-check over every file in `mac/Simpl/Tools/Biology/Model`, the
+  chemistry tools' launch flags and what they keep, `mac/Simpl/Tools/Chemistry/Model`, and the physics tools' arithmetic
+  — kinematics, projectiles, vectors, the circuit solver — `mac/Simpl/Tools/Physics/Model`).
 - The checks that were already there stay as they were: the Mac's project as the generator writes it and its What's
   New entry, kept data sealed (Mac, Windows), Send from Phone, the installer tried, the test school as the mock makes it.
 
