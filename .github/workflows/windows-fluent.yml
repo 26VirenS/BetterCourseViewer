@@ -811,6 +811,14 @@ jobs:
           Shot 'palette-chemistry' '1366x778' 45 ($mock + @('--appearance', 'dark', '--open', 'palette:/lewis'))
           Shot 'ptable-tour-5' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-tour', '5'))
           Shot 'more-pane-narrow' '780x683' 45 ($mock + @('--appearance', 'dark', '--pane-open', '--open', 'more'))
+          # (0.3.5, at the end so the pictures before keep their parts) a pin's flyout opened full screen (--pin-full: its
+          # Open full screen pressed, where Pop out was), what was begun in it carried over — Grade needed with the
+          # flyout's three numbers, and the graph with the flyout's drawing (--pin-graph; the logs say what was carried,
+          # checked below) — and the graph's flyout with a drawing in it, Open full screen at its top right; each its whole
+          # wait, the press coming a few seconds in
+          Shot 'pin-full-need' '1366x778' 30 ($mock + @('--appearance', 'light', '--pin', 'need', '--pin-full', 'need', '--need-numbers', '85,30,90', '--shot-settle', 'no'))
+          Shot 'pin-full-graph' '1366x778' 60 ($mock + @('--appearance', 'light', '--pin', 'graph', '--pin-full', 'graph', '--pin-graph', 'y=x^2', '--shot-settle', 'no'))
+          Shot 'pin-graph-drawn' '1366x778' 40 ($mock + @('--appearance', 'light', '--pin', 'graph', '--pin-open', 'graph', '--pin-graph', 'y=x^2', '--shot-settle', 'no'))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
@@ -915,6 +923,18 @@ jobs:
             $l = PhoneLog $try[0]
             Write-Host "$($try[0]): $((@($l -split "`n" | Where-Object { $_ -match 'pin (flyout|try)' }) -join ' | '))"
             if (-not $l.Contains("pin flyout still open: $($try[1])")) { Write-Host "::error::$($try[0]): the $($try[1]) pin's flyout did not stay open while it was used (shots/profile-$($try[0]).log)"; exit 1 }
+          }
+          # (0.3.5) a pin's Open full screen carried what was begun in its flyout: Grade needed's three numbers; the graph's
+          # drawing too when Desmos loaded (a warning if not: the runner may not have reached desmos.com)
+          if ($script:mine -contains 'pin-full-need') {
+            $l = PhoneLog 'pin-full-need'
+            Write-Host "pin-full-need: $((@($l -split "`n" | Where-Object { $_ -match 'pin full screen|tool popup' }) -join ' | '))"
+            if (-not $l.Contains('pin full screen: need (carried: goal, now, worth)')) { Write-Host "::error::pin-full-need: Open full screen did not carry Grade needed's numbers to the whole tool (shots/profile-pin-full-need.log)"; exit 1 }
+          }
+          if ($script:mine -contains 'pin-full-graph') {
+            $l = PhoneLog 'pin-full-graph'
+            Write-Host "pin-full-graph: $((@($l -split "`n" | Where-Object { $_ -match 'pin full screen|graph: ' }) -join ' | '))"
+            if (-not $l.Contains("graph: the pin's graph put in the whole one") -or $l.Contains('not done')) { Write-Host "::warning::pin-full-graph: the pin's graph was not seen put in the whole one (Desmos may not have loaded; shots/profile-pin-full-graph.log)" }
           }
           # the periodic table's top showed Fe when ptable-hover was pictured (--ptable-hover Fe): the last card its log
           # names before "picture at" (PTGrid.Show writes "ptable hover card: …" in a picture run)
