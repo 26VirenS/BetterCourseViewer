@@ -11,8 +11,9 @@ import SwiftUI
 // goes back to the facts; the Lewis maker's "Open in Molecule Builder" hands its molecule over. Each tool's view is its
 // own file's (PeriodicTable.swift, LewisMaker.swift, MoleculeBuilder.swift, AtomsOrbitals.swift). (tools) After them
 // the chemistry calculators: the Equation Balancer (EquationBalancer.swift), Molar Mass & Stoichiometry
-// (MolarMass.swift) and Gas Laws (GasLaws.swift), whose arithmetic needs no window and is checked by the Models job
-// (Model/ChemFormula.swift, Model/ChemBalance.swift, Model/ChemStoich.swift, Model/ChemGas.swift).
+// (MolarMass.swift), Gas Laws (GasLaws.swift) and Solutions & pH (SolutionsPH.swift), whose arithmetic needs no
+// window and is checked by the Models job (Model/ChemFormula.swift, Model/ChemBalance.swift, Model/ChemStoich.swift,
+// Model/ChemGas.swift, Model/ChemSolution.swift).
 
 /// What the Tools page, the toolbar and a pin's popover show of a chemistry tool.
 struct ChemToolInfo {
@@ -26,7 +27,7 @@ struct ChemToolInfo {
 
 enum ChemTools {
     /// The tools in the Tools page's order: the Periodic Table's four, then (tools) the calculators.
-    static let kinds: [ToolKind] = [.ptable, .lewis, .molecule, .atoms, .balance, .moles, .gas]
+    static let kinds: [ToolKind] = [.ptable, .lewis, .molecule, .atoms, .balance, .moles, .gas, .solution]
 
     /// Each tool's name, line, symbol and colour — a palette of their own (red, cyan, green and violet; the
     /// calculators' orange-red and the rest), none of them near a biology tile's colour.
@@ -38,6 +39,8 @@ enum ChemTools {
                                          symbol: "scalemass", hex: "#2fb37a")
         case .gas: return ChemToolInfo(name: "Gas Laws", shortName: "Gas", note: "PV = nRT and the combined law.",
                                        symbol: "wind", hex: "#3f8ef7")
+        case .solution: return ChemToolInfo(name: "Solutions & pH", shortName: "pH", note: "Molarity, dilution, pH, titration.",
+                                            symbol: "drop.fill", hex: "#a259ff")
         case .ptable: return ChemToolInfo(name: "Periodic Table", shortName: "Elements", note: "Every element, its trends and its facts.",
                                           symbol: "square.grid.3x3", hex: "#e5484d")
         case .lewis: return ChemToolInfo(name: "Lewis Structures", shortName: "Lewis", note: "Bonds, lone pairs, formal charges and resonance.",
@@ -57,6 +60,7 @@ enum ChemTools {
         case .ptable: return 480
         case .balance: return 400
         case .gas: return 360
+        case .solution: return 340
         default: return 330
         }
     }
@@ -99,7 +103,7 @@ enum ChemTools {
 /// `SimplChem.<key>.<field>` — the Periodic Table's colouring and the last element opened (`ptable.colour`,
 /// `ptable.element`), the Lewis maker's molecule (`lewis.draft`, ChemLewisDraft), the Molecule Builder's and how it is
 /// shown (`molecule.saved`, ChemMoleculeDraft; `.style`, `.lonePairs`, `.labels`), Atoms & Orbitals' element and
-/// view (`atoms.element`, `atoms.view`), and (tools) the calculators' last inputs (`balance.equation`, `moles.*`, `gas.*`). A picture's
+/// view (`atoms.element`, `atoms.view`), and (tools) the calculators' last inputs (`balance.equation`, `moles.*`, `gas.*`, `solution.*`). A picture's
 /// launch (-SimplShotFile) keeps them in a suite of its own that starts
 /// empty, as BioPrefs does, so each picture shows its tool as its launch asks and nothing more.
 enum ChemPrefs {
@@ -226,8 +230,8 @@ struct MoleculeBuilderTool: View {
 
 /// A chemistry tool's quickest use in its pin's popover: the Periodic Table small (PeriodicTableCompact), an element to
 /// see in Atoms & Orbitals (AtomsOrbitalsCompact), (tools) an equation balanced (EquationBalancerCompact), a formula's
-/// molar mass (MolarMassCompact), the ideal gas law small (GasLawsCompact), and for the Lewis maker and the builder, the
-/// tool's tile, its line and Open.
+/// molar mass (MolarMassCompact), the ideal gas law small (GasLawsCompact), a pH from any one of its four
+/// (SolutionsPHCompact), and for the Lewis maker and the builder, the tool's tile, its line and Open.
 struct ChemQuick: View {
     let kind: ToolKind
     let openFull: (_ info: [String: String]) -> Void
@@ -239,6 +243,7 @@ struct ChemQuick: View {
         case .balance: EquationBalancerCompact(openFull: openFull)
         case .moles: MolarMassCompact(openFull: openFull)
         case .gas: GasLawsCompact(openFull: openFull)
+        case .solution: SolutionsPHCompact(openFull: openFull)
         default: BioQuickOpen(kind: kind) { openFull([:]) }
         }
     }

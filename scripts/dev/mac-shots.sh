@@ -620,6 +620,15 @@ chem_calc_tools() {
   MODE=light SIZE=1440x920 shoot light-72e-tool-gas-boyle 14 -SimplPlace tools -SimplTool gas -SimplGas combined -SimplGasConstant T -SimplGasValues "P1=1 atm,V1=2 L,V2=4 L"
   MODE=light SIZE=780x700 shoot light-72a-tool-gas-narrow 14 -SimplPlace tools -SimplTool gas -SimplGas ideal -SimplGasValues "P=2 atm,n=0.5 mol,T=25 C"
   MODE=light shoot light-54w-pin-gas 14 -SimplPinnedTools gas -SimplPinOpen gas -SimplGasValues "P=1 atm,V=22.4 L,T=273.15 K"
+  # Solutions & pH: the pH tab on [H+] = 1e-3 with acetic acid from its concentration in light and dark, a weak
+  # acid's titration curve, a dilution ("how much stock?"), the Molarity tab narrow, and its pin on pH 3
+  for m in light dark; do
+    MODE="$m" SIZE=1440x920 shoot "$m-72c-tool-solution" 14 -SimplPlace tools -SimplTool solution -SimplSolution ph -SimplSolutionValues "H=1e-3,kind=weak acid,c=0.10,K=1.8e-5"
+  done
+  MODE=light SIZE=1440x920 shoot light-72d-tool-solution-titration 14 -SimplPlace tools -SimplTool solution -SimplSolution titration -SimplSolutionValues "kind=wa-sb,Ca=0.1,Va=25,Ct=0.1,K=1.8e-5"
+  MODE=light SIZE=1440x920 shoot light-72f-tool-solution-dilution 14 -SimplPlace tools -SimplTool solution -SimplSolution dilution -SimplSolutionValues "M1=2,V1=50 mL,M2=0.5"
+  MODE=light SIZE=780x700 shoot light-72g-tool-solution-narrow 14 -SimplPlace tools -SimplTool solution -SimplSolution molarity -SimplSolutionValues "formula=NaCl,amount=5.844 g,volume=100 mL"
+  MODE=light shoot light-54x-pin-solution 14 -SimplPinnedTools solution -SimplPinOpen solution -SimplSolutionValues "pH=3"
 }
 
 # (tools) the Tools page's Physics section in light and in dark; Kinematics & Projectiles' 1D page (a fall of 20 m:

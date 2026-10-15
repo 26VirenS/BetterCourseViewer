@@ -287,6 +287,49 @@ check(ChemGas.pistonHeight(litres: 1) > 0.3 && ChemGas.pistonHeight(litres: 1) <
       && ChemGas.pistonDots(moles: 1, litres: 22.4) == 4 && ChemGas.pistonDots(moles: 2, litres: 1) == 60 && ChemGas.pistonWarmth(kelvin: 273.15) > 0.27 && ChemGas.pistonWarmth(kelvin: 700) == 1,
       "the piston drawn: a litre a third of the way up, dots by density, warmth by temperature")
 
+// (Solutions & pH, Model/ChemSolution.swift: molarity, a dilution, pH from any one quantity or a concentration, a
+// titration's points and curve from the charge balance, a buffer)
+let molarityOut = try? ChemSolution.molarity([gasField("moles", "0.5"), gasField("volume", "2"), gasField("molarity", "")]).get()
+let litresOut = try? ChemSolution.molarity([gasField("moles", "1"), gasField("volume", ""), gasField("molarity", "4")]).get()
+check(molarityOut?.0 == "molarity" && molarityOut?.1 == 0.25 && litresOut?.0 == "volume" && litresOut?.1 == 0.25, "0.5 mol in 2 L is 0.25 M; 1 mol at 4 M takes 0.25 L")
+check(ChemSolution.massPercent(grams: 5, litres: 0.1) == 5 && ChemSolution.ppm(grams: 0.002, litres: 1) == 2 && ChemSolution.ppm(grams: 1, litres: 0) == nil,
+      "5 g in 100 mL of a water-like solution is 5 % by mass; 2 mg in a litre is 2 ppm")
+let stock = try? ChemSolution.dilution([gasField("M1", "2"), gasField("V1", "50"), gasField("M2", "0.5"), gasField("V2", "")]).get()
+let howMuch = try? ChemSolution.dilution([gasField("M1", "2"), gasField("V1", ""), gasField("M2", "0.5"), gasField("V2", "200")]).get()
+check(stock?.0 == "V2" && stock?.1 == 200 && howMuch?.0 == "V1" && howMuch?.1 == 50, "2 M × 50 mL to 0.5 M needs 200 mL; and 50 mL of stock makes it")
+check({ if case .failure(let e) = ChemSolution.dilution([gasField("M1", "0.5"), gasField("V1", "50"), gasField("M2", "2"), gasField("V2", "")]) { return e == .impossible("The final concentration can't be more than the stock's.") }; return false }(),
+      "a dilution that would end stronger than its stock says so")
+let milli = ChemSolution.acidity(.h, 1e-3)
+check(milli.map { abs($0.pH - 3) < 1e-9 && abs($0.pOH - 11) < 1e-9 && abs($0.oh - 1e-11) < 1e-20 } == true, "[H+] = 1e-3: pH 3.00, pOH 11.00, [OH-] 1e-11")
+check(ChemSolution.acidity(.pH, 3).map { abs($0.h - 1e-3) < 1e-12 } == true && ChemSolution.acidity(.pOH, 11).map { abs($0.pH - 3) < 1e-9 } == true
+      && ChemSolution.acidity(.oh, 1e-11).map { abs($0.pH - 3) < 1e-9 } == true && ChemSolution.acidity(.h, 0) == nil && ChemSolution.acidity(.pH, 7)?.word == "neutral",
+      "and the same from pH, pOH or [OH-]; nothing from no ions; 7 is neutral")
+let acetic = ChemSolution.fromConcentration(.weakAcid, c: 0.10, k: 1.8e-5)
+check(acetic.map { abs($0.acidity.pH - 2.876) < 0.002 && abs(($0.ionised ?? 0) - 1.33) < 0.01 } == true,
+      "0.10 M acetic acid, Ka 1.8e-5: pH 2.88 (2.876 exactly), 1.33 % ionised (\(acetic.map { "\(ChemNumber.fixed($0.acidity.pH, 3)) \(ChemNumber.fixed($0.ionised ?? 0, 2))" } ?? ""))")
+check(ChemSolution.fromConcentration(.strongAcid, c: 0.1, k: nil).map { abs($0.acidity.pH - 1.00) < 1e-6 } == true
+      && ChemSolution.fromConcentration(.strongBase, c: 0.05, k: nil).map { abs($0.acidity.pH - 12.699) < 0.001 } == true,
+      "0.1 M HCl: pH 1.00; 0.05 M NaOH: pH 12.70")
+check(ChemSolution.fromConcentration(.strongAcid, c: 1e-8, k: nil).map { $0.acidity.pH < 7 && $0.acidity.pH > 6.9 } == true, "a very dilute strong acid stays just under 7, water's own ions counted")
+check(ChemSolution.fromConcentration(.weakBase, c: 0.1, k: 1.8e-5).map { abs($0.acidity.pH - 11.124) < 0.002 } == true && ChemSolution.fromConcentration(.weakAcid, c: 0.1, k: nil) == nil,
+      "0.1 M ammonia, Kb 1.8e-5: pH 11.12; a weak one without its constant has no pH")
+let hcl = ChemSolution.titration(.strongAcidStrongBase, analyte: 0.1, analyteVolume: 25, titrant: 0.1, k: nil)
+check(hcl?.equivalence == 25 && hcl.map { abs($0.atEquivalence - 7.00) < 0.005 && abs($0.start - 1.00) < 0.005 && $0.after > 12.5 && $0.after < 12.6 } == true,
+      "25 mL of 0.1 M HCl with 0.1 M NaOH: equivalence at 25 mL, pH 7.00 there, 1.00 at the start, 12.52 at twice the volume (\(hcl.map { "\(ChemNumber.fixed($0.atEquivalence, 2)) \(ChemNumber.fixed($0.after, 2))" } ?? ""))")
+let aceticTitration = ChemSolution.titration(.weakAcidStrongBase, analyte: 0.1, analyteVolume: 25, titrant: 0.1, k: 1.8e-5)
+check(aceticTitration.map { abs($0.half - 4.74) < 0.01 && abs($0.atEquivalence - 8.72) < 0.01 && abs($0.start - 2.88) < 0.01 } == true,
+      "25 mL of 0.1 M acetic acid with 0.1 M NaOH: half-equivalence pH 4.74 (= pKa), equivalence 8.72 (\(aceticTitration.map { "\(ChemNumber.fixed($0.half, 2)) \(ChemNumber.fixed($0.atEquivalence, 2))" } ?? ""))")
+check(aceticTitration?.curve.count == 200 && aceticTitration?.curve.first?.volume == 0 && aceticTitration?.curve.last?.volume == 50
+      && aceticTitration.map { zip($0.curve, $0.curve.dropFirst()).allSatisfy { $0.pH <= $1.pH } } == true, "its curve: 200 points to twice the equivalence volume, rising all the way")
+let ammoniaTitration = ChemSolution.titration(.weakBaseStrongAcid, analyte: 0.1, analyteVolume: 25, titrant: 0.1, k: 1.8e-5)
+check(ammoniaTitration.map { abs($0.half - 9.26) < 0.01 && abs($0.atEquivalence - 5.28) < 0.01 && zip($0.curve, $0.curve.dropFirst()).allSatisfy { $0.pH >= $1.pH } } == true,
+      "0.1 M ammonia with 0.1 M HCl: half-equivalence 9.26 (= pKa of NH4+), equivalence 5.28, the curve falling (\(ammoniaTitration.map { "\(ChemNumber.fixed($0.half, 2)) \(ChemNumber.fixed($0.atEquivalence, 2))" } ?? ""))")
+check(ChemSolution.titration(.weakAcidStrongBase, analyte: 0.1, analyteVolume: 25, titrant: 0.1, k: nil) == nil && ChemSolution.titration(.strongAcidStrongBase, analyte: 0, analyteVolume: 25, titrant: 0.1, k: nil) == nil,
+      "no titration without the weak one's constant, or of nothing")
+check(ChemSolution.pKa(1.8e-5).map { abs($0 - 4.745) < 0.001 } == true && ChemSolution.bufferPH(pKa: 4.74, base: 0.1, acid: 0.1) == 4.74
+      && ChemSolution.bufferPH(pKa: 4.74, base: 0.2, acid: 0.1).map { abs($0 - 5.041) < 0.001 } == true && ChemSolution.bufferPH(pKa: 4.74, base: 0, acid: 0.1) == nil,
+      "a buffer by Henderson–Hasselbalch: equal parts give pKa, twice the base 0.30 more")
+
 // ---- the physics tools (tools) ------------------------------------------------------------------------------------
 // (mac/Simpl/Tools/Physics/Model: the specification's test vectors for each tool's arithmetic)
 print("the physics tools")

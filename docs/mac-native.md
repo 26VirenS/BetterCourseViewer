@@ -713,7 +713,7 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   speed and angle from Kinematics & Projectiles' pin (`MotionCompact`), two vectors from Vectors' (`VectorsCompact`),
   the Circuit Builder's Ohm's law and list (`CircuitCompact`), the calculator's
   line, sums, memory and Rad/Deg (`CalcEngine.handOff`), a codon looked up, a cross, a Hardy–Weinberg value, the lab
-  calculator shown, (tools) the Equation Balancer's equation, a formula for its molar mass, the gas law's four fields, the Word Counter's text, Statistics' line of data (to its Describe page), the Matrix Calculator's A;
+  calculator shown, (tools) the Equation Balancer's equation, a formula for its molar mass, the gas law's four fields, a pH (or pOH, [H⁺], [OH⁻]) typed, the Word Counter's text, Statistics' line of data (to its Describe page), the Matrix Calculator's A;
   the graph's whole drawing — expressions, sliders, tables, notes and view — by Desmos's own
   `Calc.getState`/`Calc.setState` from the pin's web view to the whole one's (`GraphWeb.carryOver`; the whole one's graph
   before it is a ⌘Z away). The focus timer, Flashcards' sets and the lab's numbers are the whole tool's already. A panel
@@ -1073,6 +1073,28 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
     field's; `n=4 g H2` grams of a formula; the Combined tab's `P1 V1 T1 P2 V2 T2`), `-SimplGasConstant T|P|V` (a chip
     pressed); the pin reads `-SimplGasValues`. Pictures: `light-72-tool-gas`, `dark-72-tool-gas`,
     `light-72b-tool-gas-combined`, `light-72e-tool-gas-boyle`, `light-72a-tool-gas-narrow` (780 × 700), `light-54w-pin-gas`.
+  - **Solutions & pH** (`solution`, `Tools/Chemistry/SolutionsPH.swift`; `/ph`, words *molarity*, *dilution*,
+    *titration*, *buffer*, *acid*, *base*): four tabs, each keeping its inputs (`solution.tab`, `.molarity`, `.dilution`,
+    `.ph`, `.titration`). *Molarity*: a solute's formula, an amount (mol, or g of the formula), a volume (mL or L) and a
+    molarity, any two to the third (`ChemSolution.molarity`); beside it the mass % and ppm of a water-like solution
+    (1.00 g/mL; `massPercent`, `ppm`). *Dilution*: M₁V₁ = M₂V₂ as Stock and Final cards, "How much stock? Leave the one
+    you want blank", one blank solved and said in words (`dilution`; a final concentration above the stock's is
+    refused). *pH*: one of pH, pOH, [H⁺] and [OH⁻] to the other three (`acidity`, Kw = 1.0 × 10⁻¹⁴ at 25 °C, said to be
+    the only temperature here) on a 0–14 strip with a marker (`PHStrip`); beside it *From a concentration* — strong
+    acid, strong base, weak acid (Ka) or weak base (Kb): water's own ions counted for a strong one, the weak one's
+    quadratic solved exactly with its percent ionised (`fromConcentration`). *Titration*: strong acid–strong base,
+    weak acid–strong base or weak base–strong acid; the analyte's concentration and volume, the titrant's
+    concentration and the weak one's constant → the equivalence volume and the pH at the start, half-way (= pKa for a
+    weak acid), at equivalence and at twice the volume, and the curve (`TitrationCurve`: 200 points to twice the
+    equivalence volume, each the [H⁺] that balances the charges, found by bisection — `titrationPH`; the equivalence
+    point marked); under it a *Buffer* card, pH = pKa + log([A⁻]/[HA]) (`bufferPH`). Copy on each tab. Pin: the pH tab
+    small (`SolutionsPHCompact`, 340 points wide: one quantity to the other three on a strip; carried: `given`, `value`).
+    Launch: `-SimplTool solution -SimplSolution molarity|dilution|ph|titration -SimplSolutionValues "…"` — the tab's
+    fields as `key=value`: `formula=NaCl,amount=5.844 g,volume=100 mL[,molarity=]`; `M1=2,V1=50 mL,M2=0.5[,V2=]`;
+    `pH=3` or `pOH=`, `H=`, `OH=`, with `kind=strong acid|strong base|weak acid|weak base,c=0.10,K=1.8e-5`;
+    `kind=sa-sb|wa-sb|wb-sa,Ca=0.1,Va=25,Ct=0.1,K=1.8e-5[,pKa=,base=,acid=]` (the pin reads `pH=`/`pOH=`/`H=`/`OH=`).
+    Pictures: `light-72c-tool-solution`, `dark-72c-tool-solution`, `light-72d-tool-solution-titration`,
+    `light-72f-tool-solution-dilution`, `light-72g-tool-solution-narrow` (the Molarity tab, 780 × 700), `light-54x-pin-solution`.
 
 - **The study and maths tools.** Tools of the Mac's own after the chemistry ones, each a `ToolKind` case with its
   name, line, symbol and colour inline (as the first tools have them), a tile at the end of its section's row, a popup,
@@ -1265,7 +1287,8 @@ reduces motion; `DashMorphHold`), (tools) `-SimplTool balance -SimplBalance "<eq
 that equation), `-SimplTool moles -SimplMoles <tab> -SimplMolesFormula|-SimplMolesEquation|-SimplMolesGiven|
 -SimplMolesEmpirical|-SimplMolesMass …` (Molar Mass & Stoichiometry on a tab with its inputs), `-SimplTool gas
 -SimplGas ideal|combined -SimplGasValues "P=1 atm,V=22.4 L,T=273.15 K" [-SimplGasConstant T|P|V]` (Gas Laws on a tab
-with its fields, one blank to solve). In the pictures' consoles a counter opened says how it came (`[Simpl] counter: next
+with its fields, one blank to solve), `-SimplTool solution -SimplSolution molarity|dilution|ph|titration
+-SimplSolutionValues "pH=3"` (Solutions & pH on a tab with its fields; the forms are in its section). In the pictures' consoles a counter opened says how it came (`[Simpl] counter: next
 grows`, or `fades in (Reduce Motion)`).
 
 ## Releasing
