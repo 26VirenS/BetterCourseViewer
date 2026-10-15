@@ -1,6 +1,12 @@
 # Simpl for Mac (the native app in mac/), released by hand: Actions → Simpl for Mac release → Run workflow. It is
 # built with Xcode 26, signed with the team's Developer ID, notarized and published as a GitHub Release of its own
-# (mac-v<version>) by scripts/release-mac-native.sh. A version already released is never published again.
+# (mac-v<version>) by scripts/release-mac-native.sh. A version already released is never published again. (1.3.82) A
+# beta of a commit the Mac app workflow (mac.yml) has run on is not compiled here: that run built and signed its app
+# ahead, and the release takes it — once the script has checked it is this commit's, version's, build's and kind's, signed
+# with the team's Developer ID with the hardened runtime and a secure timestamp, for both kinds of Mac — and only
+# notarizes, staples and publishes it (a minute or two, not nine). Run it once that run's "Models, and the release app
+# built ahead" job is done; before then, for a release proper, or when the app built ahead fails a check, it is
+# compiled here as before, from the newest build kept (each push's now, so only one push's changes are compiled).
 name: Simpl for Mac release
 
 on:
@@ -26,19 +32,33 @@ jobs:
   release:
     runs-on: macos-26
     timeout-minutes: 60
+    env:
+      # (the kind of build: a beta's compiled a file at a time, a release proper's — a Critical Update's too — whole;
+      #  1.3.82: a Critical Update asked for as a beta as well is a release proper's, and its cache is now named so)
+      KIND: ${{ (inputs.beta && !inputs.critical) && 'beta' || 'stable' }}
     steps:
       - uses: actions/checkout@v4
+      # (1.3.82) the app the Mac app workflow built ahead for this very commit and kind (mac.yml: a beta's), a cache
+      # keyed by the commit, taken only when it is there whole: no restore-keys, no other commit's
+      - name: The app built ahead for this commit
+        id: ahead
+        uses: actions/cache/restore@v4
+        with:
+          path: prebuilt
+          key: mac-release-app-${{ env.KIND }}-${{ github.sha }}
       # (1.3.1) the last release's intermediates, unchanged files dated as they were: only what changed is compiled.
       # (1.3.31) A beta's kept apart from a release proper's: a beta is compiled a file at a time, a release whole.
+      # (1.3.82: the newest of either is now a push's, mac.yml's; restored even with an app built ahead, in case that
+      #  app fails its checks and is built here after all)
       - name: The last release build
         uses: actions/cache/restore@v4
         with:
           path: build/mac-native
-          key: mac-release-${{ inputs.beta && 'beta' || 'stable' }}-${{ github.sha }}
-          restore-keys: mac-release-${{ inputs.beta && 'beta' || 'stable' }}-
+          key: mac-release-${{ env.KIND }}-${{ github.sha }}
+          restore-keys: mac-release-${{ env.KIND }}-
       - name: Unchanged files keep their dates
         run: python3 scripts/dev/mtime-cache.py restore build/mac-native
-      - name: Build, sign, notarize and publish Simpl for Mac
+      - name: Build (or take the app built ahead), sign, notarize and publish Simpl for Mac
         env:
           MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
           MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
@@ -48,13 +68,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           MAC_BETA: ${{ (inputs.beta && !inputs.critical) && '1' || '' }}
           MAC_CRITICAL: ${{ inputs.critical && '1' || '' }}
+          MAC_PREBUILT: ${{ steps.ahead.outputs.cache-hit == 'true' && 'prebuilt' || '' }}
         run: bash scripts/release-mac-native.sh
+      # (kept only when the app was compiled here: build-mac-native.log is the build's)
       - name: Keep this build for the next
-        if: success()
+        if: success() && hashFiles('build-mac-native.log') != ''
         run: python3 scripts/dev/mtime-cache.py save build/mac-native
       - name: Save the build
-        if: success()
+        if: success() && hashFiles('build-mac-native.log') != ''
         uses: actions/cache/save@v4
         with:
           path: build/mac-native
-          key: mac-release-${{ inputs.beta && 'beta' || 'stable' }}-${{ github.sha }}
+          key: mac-release-${{ env.KIND }}-${{ github.sha }}

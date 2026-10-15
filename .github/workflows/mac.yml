@@ -6,11 +6,14 @@
 # "quick" is the same set now), in four parts at once: each part on a Mac of its own that builds the app itself from
 # the last build (the same incremental build in each, so no part waits for another's) and takes its share of the
 # pictures, shared out by the time each took in a run (scripts/dev/baselines/mac-shot-times.txt) so that the four end
-# together; then one Linux job puts the parts together, checks them as one and pushes them to mac-shots, and the Models
-# job runs beside it. A newer push cancels the run before it. Run workflow → none builds without pictures; "Build from
-# clean" compiles every file. Why four: the account runs five Macs at once, and the owner asked for the push to a
-# beta in half the time — four parts leave one Mac for a release; the Models job takes its Mac once the parts are done
-# with theirs (docs/CI.md). The number of parts is the matrix's list below alone.
+# together; then one Linux job puts the parts together, checks them as one and pushes them to mac-shots. Beside the
+# parts, a fifth Mac builds the release's app ahead (a beta's, signed, for mac-native-release.yml to notarize and
+# publish without compiling) and runs the models' checks, for the first few minutes. A newer push cancels the run
+# before it. Run workflow → none builds without pictures; "Build from clean" compiles every file. Why four parts: the
+# account runs five Macs at once, and the owner asked for the push to a beta in half the time; once the fifth is done
+# (minutes in), a release (now a minute or two) has a Mac of its own — one started in those first minutes waits for
+# it, and a release with Package's Mac job has one of them wait for a part to finish (docs/CI.md). The number of parts
+# is the matrix's list below alone.
 name: Mac app
 
 on:
@@ -37,6 +40,7 @@ on:
       - 'scripts/dev/*-checks.json'
       - 'scripts/dev/baselines/mac-*'
       - 'scripts/dev/swift-checks/**'
+      - 'scripts/release-mac-native.sh'
       - '.github/workflows/mac.yml'
   workflow_dispatch:
     inputs:
@@ -58,37 +62,86 @@ concurrency:
   cancel-in-progress: true # (a newer push cancels the run before it: only the newest is worth waiting for)
 
 jobs:
-  # (the models that need no window, checked on their own — the elements' data, VSEPR's shapes, the biology toolkit's
-  #  models and self-check (every Foundation-only file in mac/Simpl/Tools/Biology/Model, so a tool's builder adds files
-  #  there without touching this), (1.3.80) the chemistry tools' (every file in mac/Simpl/Tools/Chemistry/Model) and the
-  #  live checks' plan, fingerprint and comparison (mac/Simpl/Engine/LivePlan.swift): scripts/dev/swift-checks/main.swift
-  #  compiled with the files it checks and run. (1.3.80) Once the parts are done, beside the job that puts them
-  #  together: a Mac of its own beside the four parts would leave none for a release. Compiling takes four minutes and
-  #  running them under a second, so what was compiled is kept (a cache keyed by every file it is compiled from, this
-  #  workflow and the compiler's version) and only run again while none of those has changed — most runs, in seconds.)
+  # (1.3.82) Beside the parts, on a Mac of its own: Simpl for Mac's release app built ahead, then the models' checks.
+  #
+  # The release app: built and signed with the team's Developer ID exactly as a beta's release builds it
+  # (scripts/release-mac-native.sh with MAC_RELEASE_STEP=build: compiled a file at a time, optimized, for Apple silicon
+  # and Intel, the hardened runtime and a secure timestamp — only the certificate's two secrets and the team are given
+  # here, never the notary's), checked as the release checks it, and kept with a stamp of this commit, its version and
+  # build by a cache keyed by the commit (mac-release-app-beta-<sha>: a cache, not an artifact, so an app not yet
+  # notarized is never downloadable). mac-native-release.yml, run on this commit, finds it, checks it again and only
+  # notarizes, staples and publishes it — a minute or two instead of nine; a release proper (compiled whole-module), a
+  # commit this did not run on or an app that fails its checks is built by the release as before. Each push's release
+  # build is also kept (mac-release-beta-<sha>) for the next to compile from: the releases' own builds were kept only
+  # by the releases, so a release compiled every change since the last (68 and 78 files, 8 and 10 minutes, for 1.3.80
+  # and 1.3.79), most of the module for both kinds of Mac; now it is one push's. A version already released is still
+  # built, for that, but not kept. The certificate's keychain is removed as soon as the app is built.
+  #
+  # The models that need no window, checked on their own — the elements' data, VSEPR's shapes, the biology toolkit's
+  # models and self-check (every Foundation-only file in mac/Simpl/Tools/Biology/Model, so a tool's builder adds files
+  # there without touching this), (1.3.80) the chemistry tools' (every file in mac/Simpl/Tools/Chemistry/Model) and the
+  # live checks' plan, fingerprint and comparison (mac/Simpl/Engine/LivePlan.swift): scripts/dev/swift-checks/main.swift
+  # compiled with the files it checks and run. Compiling takes four minutes and running them under a second, so what
+  # was compiled is kept (a cache keyed by every file it is compiled from, this workflow and the compiler's version)
+  # and only run again while none of those has changed — most runs, in seconds.
   models:
-    name: Models
-    needs: mac
-    if: ${{ !cancelled() }}
+    name: Models, and the release app built ahead
     runs-on: macos-26
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: The last release build
+        uses: actions/cache/restore@v4
         with:
-          sparse-checkout: |
-            .github/workflows
-            mac/Simpl/Tools
-            mac/Simpl/Engine
-            scripts/dev/swift-checks
+          path: build/mac-native
+          key: mac-release-beta-${{ github.sha }}
+          restore-keys: mac-release-beta-
+      - name: Unchanged files keep their dates
+        run: python3 scripts/dev/mtime-cache.py restore build/mac-native
+      - name: The release app, built and signed as a beta's release builds it
+        id: ahead
+        env:
+          MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
+          MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          GH_TOKEN: ${{ github.token }}
+          MAC_BETA: '1'
+          MAC_RELEASE_STEP: build
+        run: |
+          if [ -z "$MAC_CERT_P12" ] || [ -z "$APPLE_TEAM_ID" ]; then echo "::notice::no signing certificate in this repository's secrets: no release app built ahead"; exit 0; fi
+          bash scripts/release-mac-native.sh
+      - name: The certificate's keychain removed
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/simpl-native.keychain-db" 2>/dev/null || true
+      - name: Keep this release build for the next
+        if: ${{ !cancelled() && steps.ahead.outcome == 'success' && hashFiles('build-mac-native.log') != '' }}
+        run: python3 scripts/dev/mtime-cache.py save build/mac-native
+      - name: Save the release build
+        if: ${{ !cancelled() && steps.ahead.outcome == 'success' && hashFiles('build-mac-native.log') != '' }}
+        uses: actions/cache/save@v4
+        with:
+          path: build/mac-native
+          key: mac-release-beta-${{ github.sha }}
+      - name: Keep the app for the release
+        if: ${{ !cancelled() && steps.ahead.outcome == 'success' && hashFiles('prebuilt/stamp.txt') != '' }}
+        uses: actions/cache/save@v4
+        with:
+          path: prebuilt
+          key: mac-release-app-beta-${{ github.sha }}
       - name: The compiler
+        if: ${{ !cancelled() }}
         id: swift
         run: echo "version=$(swiftc --version 2>&1 | shasum -a 256 | cut -c1-16)" >> "$GITHUB_OUTPUT"
-      - name: The checks as compiled before from the same files
-        uses: actions/cache@v4
+      - name: The models' checks as compiled before from the same files
+        id: models-kept
+        if: ${{ !cancelled() }}
+        uses: actions/cache/restore@v4
         with:
           path: model-checks
           key: mac-models-${{ steps.swift.outputs.version }}-${{ hashFiles('mac/Simpl/Tools/PeriodicData.swift', 'mac/Simpl/Tools/PeriodicExtraData.swift', 'mac/Simpl/Tools/MoleculeShape.swift', 'mac/Simpl/Tools/Biology/Model/*.swift', 'mac/Simpl/Tools/Chemistry/Model/*.swift', 'mac/Simpl/Engine/LivePlan.swift', 'scripts/dev/swift-checks/**', '.github/workflows/mac.yml') }}
       - name: The models' checks
+        id: models
+        if: ${{ !cancelled() }}
         run: |
           if [ ! -x model-checks/run ]; then
             mkdir -p model-checks
@@ -98,6 +151,13 @@ jobs:
               scripts/dev/swift-checks/main.swift
           fi
           model-checks/run
+      # (kept once they have passed, whatever the release app's build did)
+      - name: Keep the models' checks as compiled
+        if: ${{ !cancelled() && steps.models.outcome == 'success' && steps.models-kept.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: model-checks
+          key: ${{ steps.models-kept.outputs.cache-primary-key }}
 
   # (1.3.80) The app built and pictured, in four parts at once (one, the build alone, for Run workflow → none): each
   # part builds the app as the run before left it, and takes the pictures mac-shots.sh shares out to it (SHARD of
