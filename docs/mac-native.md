@@ -296,6 +296,21 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   before the launch is answered never loads it. Each open writes one line on the console — `[Simpl] alta: asked 2 ms · launch 410 ms · page 655 ms ·
   question 790 ms · shown 905 ms (question, quiet 120 ms, 118 ms after DOMContentLoaded)` — from the hook's own clock
   (`t`, `nav` on its posts; `quiet`, `capped`, `dcl` on `shown`).
+  (Maths drawn whole.) A part of Alta's is never hidden while it is drawn. The focus hid everything not yet marked with
+  `display: none`, the next question too, from the moment Alta put it in until the hook next looked at the page
+  (120–420 ms), and Learnosity's answer box (MathQuill) sizes its brackets and √ once, as it draws them, from what they
+  hold: drawn hidden, they came out flat (`scale(0.8, 0)`, `scale(1, -0.1)`) — no brackets, no √, only the bar over
+  the radicand — and stayed so, Light, Dark and Show Browser alike, until a relaunch. Now a part not kept yet is laid
+  out and only see-through (`opacity: 0`) until it is kept, and what holds a part put in is marked `data-simpl-path` in
+  the same moment (`layOut`, from the MutationObserver). A bracket or √ found flat anyway (Alta's own hiding) is sized
+  again as MathQuill sizes it (its `reflow` where the page has MathQuill to hand; `remeasure`, every 350 ms and before
+  the page is shown, in Show Browser too), said in the Error Logs. The page is never left out of sight either: a part
+  shown or put away by its class or style alone has the page looked at again (an attribute observer on the learn flow,
+  its parts and what holds it), between parts it is looked at every 300 ms (it waited out the 8 s grace before), and a
+  kept part gone or out of sight, or the page out of sight with nothing due, has it looked at again at once (`watch`) —
+  what Light then Dark did by hand, through `tellPage`'s `__simplBrowserNow`. The popup's own last resort
+  (`watchSkeleton`): its skeleton still up over Alta's page asks the page to look again every 4 s from 6 s, and shows it
+  as it is after 26 s, said in the Error Logs.
   `scripts/dev/alta-test.mjs` drives the mock's Alta player (`/mock-alta/…`) through it in Chromium; the popup is shot
   as `21a-alta`.
 - **Quizzes (1.3.32).** The quiz's start screen lists every finished attempt, newest first, with its score (when Canvas
