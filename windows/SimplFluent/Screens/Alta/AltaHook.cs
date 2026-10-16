@@ -36,11 +36,12 @@ internal static class AltaHook
           // sight under it until it closes
           var dialogInPage = false;
           if (window.top === window) {
-            var showing = false;
+            var showing = false, firstVeil = 0;
             var veils = altaHere;
             // (1.3.101) `steady`: how long the part shown had been quiet, and whether a cap showed it before it was — with
             // when the page's DOMContentLoaded came, for the app's line
             reveal = function (how, steady) {
+              if (firstVeil) { clearTimeout(firstVeil); firstVeil = 0; }
               if (document.documentElement) document.documentElement.setAttribute('data-simpl-shown', '');
               if (!showing) {
                 showing = true;
@@ -76,8 +77,9 @@ internal static class AltaHook
                 };
                 putVeil();
               }
-              // (never longer than this, whatever happens)
-              setTimeout(function () { reveal('timeout'); }, 9000);
+              // (never longer than this, whatever happens — the first veil's: once the page has been shown it stands down,
+              // and a veil put back between Alta's parts keeps its own time, never cut short by this one going off later)
+              firstVeil = setTimeout(function () { firstVeil = 0; reveal('timeout'); }, 9000);
             }
             var revealSoon = function (how) { if (document.documentElement) reveal(how); else setTimeout(function () { revealSoon(how); }, 10); };
             // (0.3.5: and at once while the student has asked for the browser — the app sets window.__simplBrowser before
@@ -1037,8 +1039,10 @@ internal static class AltaHook
             // 1.3.68–1.3.100 waited 350 ms — Alta's own round it (its header's bars, the chat button, a celebration) no longer
             // counted once a part is kept (`keptChange`; `lastChange` is every change, which a pop-up's next step is read by).
             // At most a second and a half when only that quiet is missing, two and a half while something in it is still
-            // being drawn, four while it says it is loading (1.3.70).
-            var lastChange = Date.now(), keptChange = Date.now(), steadyTimer = null, steadySince = 0;
+            // being drawn, four while it says it is loading (1.3.70) — counted from the first look, and never lowered by a later
+            // one (`steadyCap`, 1.3.101): a box, formula or picture that comes in after the first second and a half is still
+            // given its 100 ms of quiet, never shown at once, half drawn.
+            var lastChange = Date.now(), keptChange = Date.now(), steadyTimer = null, steadySince = 0, steadyCap = 0;
             // (1.3.101) MathJax 3's typesetting watched: its startup promise (each typeset chains a new one onto it) settled
             var mj3 = null, mj3Done = true;
             var watchMathJax = function () {
@@ -1063,14 +1067,15 @@ internal static class AltaHook
               return [].some.call(document.querySelectorAll('section[data-simpl-keep] .lrn_widget, section[data-simpl-keep] .lrn_qr, section[data-simpl-keep] [class*="lrn_response"]'), function (w) { var b = w.getBoundingClientRect(); return b.width > 0 && b.height > 0; });
             };
             var revealSteady = function (state) {
-              if (!steadySince) steadySince = Date.now();
+              if (!steadySince) { steadySince = Date.now(); steadyCap = 0; }
               var quiet = Date.now() - keptChange;
               var spinning = state === 'overview' ? busy(document.body) : [].some.call(document.querySelectorAll('[data-simpl-keep]'), busy);
               var pending = spinning || !!document.querySelector('.MathJax_Processing, .lrn_loading, [class*="lrn-loading"]')
                 || [].some.call(document.querySelectorAll('[data-simpl-keep] img'), function (i) { return !i.complete; })
                 || (state === 'question' && !answerBox()) || (state !== 'overview' && mathsPending());
               var ready = quiet >= 100 && !pending;
-              if (ready || Date.now() - steadySince > (spinning ? 4000 : pending ? 2500 : 1500)) {
+              steadyCap = Math.max(steadyCap, spinning ? 4000 : pending ? 2500 : 1500);
+              if (ready || Date.now() - steadySince > steadyCap) {
                 steadySince = 0;
                 reveal(state, { quiet: quiet, capped: !ready });
                 return;

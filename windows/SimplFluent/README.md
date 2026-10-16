@@ -1218,7 +1218,8 @@ Assignment screen or a tool's row (`AltaLaunch.Due`); only without one is the Ca
 launch is on its way. The page script shows the question once its part has been still a tenth of a second (350 ms of the
 whole page before), what says it is still being drawn — MathJax, Learnosity's box not yet in a part headed Question, a
 picture not in — still waited for: a second and a half at most when only that tenth is missing, two and a half while
-something is still being drawn, four while something in it spins (as the Mac's copy); only a change in the part kept, in
+something is still being drawn, four while something in it spins (as the Mac's copy), from its first look and never
+lowered by a later one, so a box or picture that comes in after a second and a half still gets its tenth; only a change in the part kept, in
 Alta's learn flow round it, or a kept part taken away, counts, and such changes put off the next look for 300 ms at most.
 Each open writes its timeline to the app's log — "alta: launch asked +N ms · launch answered … · web view … · page …
 (host) · alta page … · question … · shown +N ms (question, N ms into its page, quiet N ms[, capped])" ("page given" for a
