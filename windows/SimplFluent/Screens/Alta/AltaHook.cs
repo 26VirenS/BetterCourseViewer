@@ -275,9 +275,12 @@ internal static class AltaHook
             // goes, before the page is looked at again — is laid out as it is and only made see-through until it is kept.
             // Learnosity's answer box (MathQuill) sizes its brackets and its √ to what they hold as it draws them, and one
             // drawn hidden (nothing in it has a size) had them flat — no brackets, no √, the bar over what it held alone —
-            // until the page was loaded again.
+            // until the page was loaded again. It is kept out of the flow, though, as wide as the flow it is in, so one Alta
+            // puts in above the question (a lesson, More Instruction) never pushes the question down under its glass, a gap
+            // over it, while it is still see-through: the two move together once it is kept, as they did when it was hidden.
             var FOCUS = 'html[data-simpl-q] body *:not([data-simpl-path]):not([data-simpl-keep]):not([data-simpl-keep] *):not(section[class*="compound__compound"]):not(section[class*="compound__compound"] *) { display: none !important; }\n'
-              + 'html[data-simpl-q] section[class*="compound__compound"]:not([data-simpl-keep]) { opacity: 0 !important; pointer-events: none !important; }\n'
+              + 'html[data-simpl-q] section[class*="compound__compound"]:not([data-simpl-keep]) { opacity: 0 !important; pointer-events: none !important; position: absolute !important; left: 0 !important; right: 0 !important; max-width: 860px !important; margin-left: auto !important; margin-right: auto !important; box-sizing: border-box !important; }\n'
+              + 'html[data-simpl-q] [data-simpl-path]:has(> section[class*="compound__compound"]:not([data-simpl-keep])) { position: relative !important; }\n'
               + 'html[data-simpl-q] [data-simpl-hide] { display: none !important; }\n'
               + 'html[data-simpl-q] [data-simpl-path]:not(html):not(body) { padding-top: 0 !important; margin-top: 0 !important; }\n'
               + 'html[data-simpl-q] body { padding: 18px 28px 40px !important; }\n'
@@ -1029,8 +1032,10 @@ internal static class AltaHook
               // (a part about to be shown, gone again: not shown after all)
               if (steadyTimer) { clearTimeout(steadyTimer); steadyTimer = null; }
               steadySince = 0;
-              if (between) veilAgain();
               var wait = between ? 8000 : (wasQuestion ? 1500 : 8000);
+              // (maths drawn whole: and only while that grace lasts — once it is over and the page shown as it is, by its own end
+              // or the app's last resort, it is not put out of sight again, then shown again, at each look until a part comes)
+              if (between && Date.now() - badSince < wait) veilAgain();
               // (maths drawn whole: looked at again every 300 ms meanwhile — a part Alta shows by its class or its style alone is
               // seen as it comes, where before it waited out the grace)
               if (Date.now() - badSince < wait) { schedule(Math.min(wait - (Date.now() - badSince) + 20, 300)); return; }
@@ -1042,6 +1047,22 @@ internal static class AltaHook
             var schedule = function (ms) { if (timer) clearTimeout(timer); var d = typeof ms === 'number' ? ms : 120; dueAt = Date.now() + d; timer = setTimeout(tick, d); };
             // (0.3.5) the browser asked for, or put away: the page as it is, or laid out again, at once
             window.__simplBrowserNow = function () { dialogTick(); schedule(0); return true; };
+            // (maths drawn whole) the app's last resort, its skeleton still over the page 26 seconds on (the page script's own
+            // waits, between parts and then loading, can run back to back): Alta's page shown as it is by the page script
+            // itself, as its own waits end — those waits counted as over, the focus lifted, the app told why — so that what
+            // the page script knows (`showing`, the focus, the page's look) stays in step, and the page can still be put out
+            // of sight between parts after
+            window.__simplAsIsNow = function () {
+              var past = Date.now() - 60000;
+              badSince = past; loadingSince = past; steadySince = 0;
+              if (steadyTimer) { clearTimeout(steadyTimer); steadyTimer = null; }
+              unmark();
+              told = ''; // (said again, whatever was said last: why it is shown as it is, and what it holds)
+              report('unknown', { reason: 'still out of sight after 26 seconds' });
+              publish();
+              reveal('as it is');
+              return true;
+            };
             // (1.3.68) the question shown once Alta has finished drawing it — nothing changed for a moment (its maths set, its
             // answer box built, its pictures in) — or after two and a half seconds at most: the app's skeleton meanwhile.
             // (1.3.101) Shown on readiness rather than on a long silence: nothing in it still loading (its maths, its

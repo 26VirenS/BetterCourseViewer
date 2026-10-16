@@ -495,10 +495,16 @@ internal sealed class AltaSession
             await Task.Delay(k == 1 ? 6000 : 4000);
             if (mine != skeletonWatch || closed || Opening || PageShown || Browser || DialogInPage || Cover != null || Failure != null) return;
             if (k < 6) { _ = Run("window.__simplBrowserNow ? window.__simplBrowserNow() : null"); continue; }
-            _ = Run("document.documentElement ? document.documentElement.setAttribute('data-simpl-shown', '') : null");
+            // (shown as it is by the page script itself, so its focus is lifted and what it knows stays in step — it
+            // says why in the Error Logs, with what the page held; a page without it only has its veil lifted)
+            var byPage = Bool(await Run("window.__simplAsIsNow ? window.__simplAsIsNow() : (document.documentElement ? document.documentElement.setAttribute('data-simpl-shown', '') : null)")) == true;
+            if (mine != skeletonWatch || closed) return;
             PageShown = true;
-            ErrorLogs.Add($"{DateTime.Now.ToString("MMM d, yyyy, h:mm:ss tt", CultureInfo.CurrentCulture)} — Alta’s page shown as it is: it was still out of sight after 26 seconds");
-            if (ErrorLogs.Count > 50) ErrorLogs.RemoveAt(0);
+            if (!byPage)
+            {
+                ErrorLogs.Add($"{DateTime.Now.ToString("MMM d, yyyy, h:mm:ss tt", CultureInfo.CurrentCulture)} — Alta’s page shown as it is: it was still out of sight after 26 seconds");
+                if (ErrorLogs.Count > 50) ErrorLogs.RemoveAt(0);
+            }
             Notify();
         }
     }

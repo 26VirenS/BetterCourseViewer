@@ -1250,13 +1250,17 @@ everything not yet marked with `display: none`, the next question too, from the 
 script next looked (120–420 ms), and Learnosity's answer box (MathQuill) sizes its brackets and √ once, as it draws
 them, from what they hold: drawn hidden they came out flat — no brackets, no √, only the bar over the radicand — and
 stayed so, in Light, Dark and Show browser, until the popup was opened again. Now a part not kept yet is laid out and
-only see-through until it is kept, and what holds a part put in is marked at once (`layOut`). A bracket or √ found flat
+only see-through until it is kept — out of the flow, as wide as the flow it is in, so a lesson Alta puts in above the
+question never pushes the question down under its glass meanwhile — and what holds a part put in is marked at once
+(`layOut`). A bracket or √ found flat
 anyway is sized again as MathQuill sizes it (`remeasure`, MathQuill's own `reflow` where the page has it), said in the
 Error Logs. The page is never left out of sight: a part shown or put away by its class or style alone has the page looked
 at again, between parts it is looked at every 300 ms (it waited out the 8 s grace before), and a kept part gone, or the
 page out of sight with nothing due, has it looked at again at once (`watch`). The popup's own last resort
-(`WatchSkeleton`): its skeleton still up over Alta's page asks the page to look again every 4 s from 6 s, and shows it as
-it is after 26 s, said in the Error Logs. `alta-test.mjs` draws a box as MathQuill does on the mock, in dark and light.
+(`WatchSkeleton`): its skeleton still up over Alta's page asks the page to look again every 4 s from 6 s, and after 26 s
+has the page script show it as it is (`__simplAsIsNow`: its waits counted as over, the focus lifted, why said in the Error
+Logs with what the page held), so the page script's `showing` stays in step and the page can still be put out of sight
+between parts after. Once a grace between parts has run out, the page is no longer put out of sight again at each look. `alta-test.mjs` draws a box as MathQuill does on the mock, in dark and light.
 
 A pop-up of Alta's (0.3.5) is hidden in the page as soon as the page script sees it and read once it has settled —
 nothing it says changed for a moment, nothing in it loading, its fade done; three seconds at most, five while its body
