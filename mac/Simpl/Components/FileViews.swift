@@ -53,15 +53,24 @@ extension Engine {
         }
     }
 
-    /// (1.3.103) A Canvas file's link (…/courses/1/files/12, ?wrap=1, …/files/12/download?download_frd=1, …/preview): the
-    /// file's id, and the address that fetches it with the session (…/files/12/download?download_frd=1). Nil for anything
-    /// else — a folder, another site, Brightspace (whose files are its content topics).
+    /// (1.3.103) A Canvas file's link (…/courses/1/files/12, ?wrap=1, …/files/12/download?download_frd=1, …/preview, and
+    /// the Files page's own address for one, …/files?preview=12 or …/files/folder/Week 3?preview=12): the file's id, and
+    /// the address that fetches it with the session (…/files/12/download?download_frd=1). Nil for anything else — a
+    /// folder, another site, Brightspace (whose files are its content topics).
     func linkedFile(_ url: String) -> (id: String, download: URL)? {
         guard !onBrightspace, let u = absolute(interfaceAddress(url)), u.host?.lowercased() == web.baseURL.host?.lowercased() else { return nil }
         let p = u.path.split(separator: "/").map(String.init)
-        guard let i = p.firstIndex(of: "files"), i + 1 < p.count else { return nil }
+        let isID = { (id: String) in !id.isEmpty && id.contains(where: \.isNumber) && id.allSatisfy({ $0.isLetter || $0.isNumber }) }
+        guard let i = p.firstIndex(of: "files") else { return nil }
+        // the Files page with a file previewed over it, the link a teacher copies from there: the file is the one
+        // previewed (the folder only says where it sits)
+        if i + 1 == p.count || p[i + 1] == "folder" {
+            guard let id = URLComponents(url: u, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "preview" })?.value,
+                  isID(id), let download = absolute("/\((p[...i] + [id]).joined(separator: "/"))/download?download_frd=1") else { return nil }
+            return (id, download)
+        }
         let id = p[i + 1]
-        guard !id.isEmpty, id != "folder", id.contains(where: \.isNumber), id.allSatisfy({ $0.isLetter || $0.isNumber }) else { return nil }
+        guard isID(id) else { return nil }
         let rest = p.dropFirst(i + 2)
         guard rest.count <= 1, rest.allSatisfy({ ["download", "preview", "file_preview"].contains($0) }) else { return nil }
         guard let download = fileDownload(for: url) ?? absolute("/\(p[...(i + 1)].joined(separator: "/"))/download?download_frd=1") else { return nil }

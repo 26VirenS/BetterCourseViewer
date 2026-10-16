@@ -651,10 +651,11 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   address, with its one-time key — into Quick Look under the module's name for it; the module's own address (which needs
   the session and Canvas's redirect to its file host) only when Canvas will not say. (1.3.103) So does a Canvas file's
   link anywhere else — in an assignment's instructions, an announcement, a discussion, a page (`openLinkedFile`,
-  through `openWeb`), the address made from the link keeping its own key (`verifier`). Quick Look's panel finds its
-  controller along the chain of responders of the key window, or the main window once the panel has the keys, and
-  looks again whenever either changes: a hook to `FilePreview`'s controller sits in the chain of each window it may look
-  in, the file is kept and handed back whenever it looks again, a web view that answers the panel itself (the
+  through `openWeb`) — the Files page's own address for one too (…/files?preview=12, …/files/folder/Week 3?preview=12),
+  the link a teacher copies from there — the address made from the link keeping its own key (`verifier`). Quick Look's
+  panel finds its controller along the chain of responders of the key window, or the main window once the panel has the
+  keys, and looks again whenever either changes: a hook to `FilePreview`'s controller sits in the chain of each window
+  it may look in, the file is kept and handed back whenever it looks again, a web view that answers the panel itself (the
   instructions', after a link in them was clicked) lets go of the keys, and a moment after the panel comes up it is
   checked — the file in it, or the panel put away and the file opened in its app; never "No items selected". The
   screenshot suite clicks the instructions' file link (`-SimplWalk filelink`, light-14e) and fails on a panel left empty
