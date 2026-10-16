@@ -32,6 +32,8 @@ public sealed class WebWindow : FluentWindow
     {
         public string Url { get; set; } = "";
         public string? Name { get; set; }
+        /// <summary>False when the school would not give the tool's one-time launch and the address is its own page for it.</summary>
+        public bool Sessionless { get; set; } = true;
     }
 
     /// <summary>
@@ -53,6 +55,11 @@ public sealed class WebWindow : FluentWindow
     /// <summary>The address the window opens (known at once for a page; the launch's answer for a tool).</summary>
     private Uri? start;
     private bool ready, opening;
+    /// <summary>(0.3.24) The school's own page for a tool, opened because its one-time launch could not be had: once it
+    /// has loaded, the tool's launch on it is sent here, in this window, rather than left behind Canvas's "Load … in a new
+    /// window" button. Null once done (or for anything else).</summary>
+    private Uri? loadOnPage;
+    private int loadTries;
     /// <summary>A window a page asked for, still to be given this one's web view (<see cref="Opened"/>).</summary>
     private (CoreWebView2NewWindowRequestedEventArgs Asked, CoreWebView2Deferral Deferral)? asked;
 
@@ -153,7 +160,13 @@ public sealed class WebWindow : FluentWindow
                 };
                 web.CoreWebView2.DownloadStarting += (_, e) => { e.Handled = true; FilePreview.Downloading(e); };
                 web.CoreWebView2.NavigationStarting += (_, _) => { loading.Visibility = Visibility.Visible; Paint(); };
-                web.CoreWebView2.NavigationCompleted += (_, _) => { loading.Visibility = Visibility.Collapsed; Paint(); LightPages.Tell(web.CoreWebView2, "web window"); };
+                web.CoreWebView2.NavigationCompleted += (_, e) =>
+                {
+                    loading.Visibility = Visibility.Collapsed;
+                    Paint();
+                    LightPages.Tell(web.CoreWebView2, "web window");
+                    if (e.IsSuccess) LoadToolOnPage();
+                };
                 web.CoreWebView2.HistoryChanged += (_, _) => Paint();
                 // (a window the page opens — "Open in a new window", a sign-in's popup — is another of these, in light: left
                 //  to the web view, it was a bare window of the browser's, dark when Windows is)
@@ -236,12 +249,60 @@ public sealed class WebWindow : FluentWindow
                 if (Uri.TryCreate(a.Url, UriKind.Absolute, out var u))
                 {
                     if (a.Name is { Length: > 0 } n && Title == name) { Title = n; bar.Title = n; }
+                    // (the school's own page for the tool, the one-time launch refused: its launch sent on from it)
+                    if (!a.Sessionless) { loadOnPage = u; loadTries = 0; }
                     return u;
                 }
             }
             catch (Exception e) { Log.Write($"WebWindow: toolLaunch {e.Message}"); }
+            // (the school's own page for the tool: its launch sent on from it once it loads, LoadToolOnPage)
+            var page = Address(engine.BaseUrl, launch);
+            loadOnPage = page;
+            loadTries = 0;
+            return page;
         }
         return Address(engine.BaseUrl, launch);
+    }
+
+    /// <summary>
+    /// (0.3.24) Canvas's form that launches a tool, on the school's page for it: a tool Canvas opens "in a new window"
+    /// waits there behind a "Load … in a new window" button, its form aimed at a new window. That form is sent here
+    /// instead, in this window — a page of its own already, framed by nothing — so the tool opens at once, as its one-time
+    /// launch would have opened it. Sent with the form's own fields, as the button sends them; only on the page this
+    /// window opened for the tool (not one the student moves to after), and once.
+    /// </summary>
+    private const string SendToolForm = """
+        (function () {
+          var f = document.getElementById('tool_form');
+          if (!f || !f.action) return 'none';
+          if (f.getAttribute('data-simpl-sent')) return 'sent';
+          var target = (f.getAttribute('target') || '').toLowerCase();
+          if (target && target !== '_blank') return 'framed';
+          f.setAttribute('data-simpl-sent', '1');
+          f.setAttribute('target', '_self');
+          HTMLFormElement.prototype.submit.call(f);
+          return 'sent';
+        })()
+        """;
+
+    private async void LoadToolOnPage()
+    {
+        if (loadOnPage is not { } page || web.CoreWebView2 is not { } core) return;
+        if (!Uri.TryCreate(core.Source, UriKind.Absolute, out var here) || here.Host != page.Host || here.AbsolutePath.TrimEnd('/') != page.AbsolutePath.TrimEnd('/'))
+        {
+            // (the page went elsewhere first — the school's sign-in: tried again when it comes back, a few times at most)
+            if (++loadTries > 4) loadOnPage = null;
+            return;
+        }
+        try
+        {
+            var said = (await core.ExecuteScriptAsync(SendToolForm)).Trim('"');
+            // (no form on the page yet: Canvas may still be drawing it; a second look a moment on, then left as it is)
+            if (said == "none" && ++loadTries <= 4) { await Task.Delay(700); if (loadOnPage != null) LoadToolOnPage(); return; }
+            loadOnPage = null;
+            Log.Write($"web window: the school's page for the tool, its launch {said switch { "sent" => "sent on in this window", "framed" => "framed in the page as it is", _ => "not found" }}");
+        }
+        catch (Exception x) { loadOnPage = null; Log.Write("web window: sending the tool's launch: " + x.Message); }
     }
 
     private void Refresh()

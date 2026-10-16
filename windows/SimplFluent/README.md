@@ -522,7 +522,8 @@ public sealed class TodoScreen : Screen
   a web view in the text would float over the page as it scrolls, so none is played in place.
 - A tool, or a page of the school's or another site's, opens in a window of its own (`Shell/WebWindow.cs`, the Mac's
   ToolWindow): a course's tool, a tool assignment or a module's tool by the school's one-time launch (the engine's
-  `toolLaunch`) — the tool alone, its school page only as the fallback —; Back, Forward and Refresh at the title bar's
+  `toolLaunch`) — the tool alone, its school page only as the fallback, and on that page (0.3.24) Canvas's launch form,
+  aimed at a new window behind "Load … in a new window", sent on in the window itself so the tool opens at once —; Back, Forward and Refresh at the title bar's
   left (Alt+←, Alt+→, F5), More at its right (Open in browser, Copy link), a thin line under the title bar while a page
   loads, and why it could not open in the window with Try again. The page is in light, whatever Simpl's appearance or
   Windows' (`LightPages`: the page and its frames are told the student prefers light, through the browser's DevTools
