@@ -202,30 +202,43 @@ struct ExternalToolsView: View {
     private func choose(_ t: ExternalToolsData.Tool, _ c: ExternalToolsData.Course, _ item: ExternalToolsData.Item) {
         keptOpen = nil
         listed = nil
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { open(t, in: c, item: item) }
+        // (1.3.100) a Knewton Alta assignment's launch asked of Canvas at once, while the list closes: only its popup waits
+        let alta = altaLaunch(t, in: c, item: item)
+        if let alta { engine.askAlta(alta) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { open(t, in: c, item: item, alta: alta) }
+    }
+
+    /// Where a tool opens in a course: the Canvas arguments it opens with, and its title.
+    private func place(_ t: ExternalToolsData.Tool, in c: ExternalToolsData.Course, item: ExternalToolsData.Item?) -> (course: String, args: [String: String], title: String) {
+        let course = c.open["course"] ?? c.id
+        guard let item else { return (course, c.open, t.name) }
+        let args = item.kind == "moduleItem" ? ["course": course, "moduleItem": item.id] : ["course": course, "assignment": item.id]
+        return (course, args, item.title)
+    }
+
+    /// The Knewton Alta assignment this opens in its popup, if it is one.
+    private func altaLaunch(_ t: ExternalToolsData.Tool, in c: ExternalToolsData.Course, item: ExternalToolsData.Item?) -> AltaLaunch? {
+        let p = place(t, in: c, item: item)
+        guard let a = p.args["assignment"], (t.name + " " + t.host).lowercased().contains("knewton") else { return nil }
+        // (1.3.100) with the assignment's due line, as its row says it ("Due Oct 12 at 11:59 PM · 10 pts"; "" for "No due
+        // date"), for the popup's header
+        let first = item?.sub?.components(separatedBy: " · ").first
+        let due = first.map { $0.hasPrefix("Due ") ? $0 : "" }
+        return AltaLaunch(course: p.course, assignment: a, title: p.title, dueLine: due)
     }
 
     /// Opened in that course: Knewton Alta's and Macmillan's assignments in their own popups, the rest in the tool window.
     /// Without `item`, as the course's chip opens it (its tab, else its first assignment or module item there); (1.3.77)
     /// with one, that assignment or module item itself, under its own title.
-    private func open(_ t: ExternalToolsData.Tool, in c: ExternalToolsData.Course, item: ExternalToolsData.Item? = nil) {
-        let course = c.open["course"] ?? c.id
-        var args = c.open
-        var title = t.name
-        if let item {
-            args = item.kind == "moduleItem" ? ["course": course, "moduleItem": item.id] : ["course": course, "assignment": item.id]
-            title = item.title
+    /// (1.3.100) `alta`: the Alta launch already asked for as the place was chosen.
+    private func open(_ t: ExternalToolsData.Tool, in c: ExternalToolsData.Course, item: ExternalToolsData.Item? = nil, alta: AltaLaunch? = nil) {
+        if let a = alta ?? altaLaunch(t, in: c, item: item) {
+            engine.alta = a
+            return
         }
+        let (course, args, title) = place(t, in: c, item: item)
         let label = (t.name + " " + t.host).lowercased()
         if let a = args["assignment"] {
-            if label.contains("knewton") {
-                // (1.3.100) with the assignment's due line, as its row says it ("Due Oct 12 at 11:59 PM · 10 pts"; "" for
-                // "No due date"), for the popup's header
-                let first = item?.sub?.components(separatedBy: " · ").first
-                let due = first.map { $0.hasPrefix("Due ") ? $0 : "" }
-                engine.alta = AltaLaunch(course: course, assignment: a, title: title, dueLine: due)
-                return
-            }
             if label.contains("macmillan") || label.contains("sapling") || label.contains("achieve.") {
                 engine.macmillan = AltaLaunch(course: course, assignment: a, title: title)
                 return

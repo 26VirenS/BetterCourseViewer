@@ -64,7 +64,10 @@ struct AltaQuizScreen: View {
         .tint(Theme.accent)
         .task {
             session.setBrowser(showBrowser) // (1.3.83)
-            session.appearance(dark: pageDark) // (1.3.79: the page light, in dark mode too — 1.3.83: unless Dark is picked)
+            // (1.3.79: the page light, in dark mode too — 1.3.83: unless Dark is picked) — (1.3.100) told the page by the
+            // session as it was made, before its launch: told again only if it differs, so the page's scripts are not
+            // taken away and put back while its first page may be on its way; the graph window told either way
+            if pageDark != session.pageDark { session.appearance(dark: pageDark) } else { AltaGraphWindow.shared.dark(pageDark) }
             session.start(engine: engine) // (1.3.100: asked already, by the engine, as the popup was asked for)
             // (1.3.78) the Canvas assignment's due line for the header — (1.3.100) the one the launch came with; else asked
             // once the launch is answered, never beside it

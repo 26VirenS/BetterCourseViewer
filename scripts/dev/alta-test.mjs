@@ -127,6 +127,31 @@ try {
     check(!!sn && sn.after < 700 && sn.post.how === 'question' && sn.post.capped === false, `with Alta’s header changing every 40 ms, the question is still shown ${sn && sn.after} ms after DOMContentLoaded (under 700 ms), no cap`);
     await np.close();
   }
+  {
+    // (1.3.100) but never before it is drawn: Learnosity's answer box put in 300 ms after the stem (its empty embed there
+    // meanwhile), and a formula of MathJax 2's not drawn until then — the question shown only once both are in, not capped
+    const lp = await browser.newPage();
+    await lp.addInitScript(() => { window.__posted = []; window.__postedAt = []; window.__inAtShown = null; window.webkit = { messageHandlers: { simplAlta: { postMessage: (s) => { window.__posted.push(s); window.__postedAt.push(performance.now()); if (JSON.parse(s).kind === 'shown') window.__inAtShown = !!document.querySelector('.lrn_widget') && !!document.getElementById('MathJax-Element-1-Frame'); } } } }; });
+    await lp.addInitScript({ content: source });
+    await lp.addInitScript(() => { document.addEventListener('DOMContentLoaded', () => {
+      const w = document.querySelector('.lrn_widget'), box = w && w.parentNode, asks = document.getElementById('asks');
+      if (w) w.remove();
+      const s = document.createElement('script'); s.type = 'math/tex'; s.textContent = 'x^2'; if (asks) asks.appendChild(s);
+      setTimeout(() => {
+        if (box && w) box.appendChild(w);
+        s.id = 'MathJax-Element-1';
+        const f = document.createElement('span'); f.id = 'MathJax-Element-1-Frame'; f.className = 'MathJax'; f.textContent = 'x²';
+        if (asks) asks.insertBefore(f, s);
+      }, 300);
+    }); });
+    await lp.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a3`);
+    let sl = null;
+    for (let i = 0; i < 40 && !sl; i++) { sl = await shownAt(lp); if (!sl) await lp.waitForTimeout(100); }
+    const inAtShown = await lp.evaluate(() => window.__inAtShown);
+    check(!!sl && sl.after >= 300 && sl.after < 900 && sl.post.how === 'question' && sl.post.capped === false && inAtShown === true,
+      `with Learnosity’s box and a MathJax formula drawn 300 ms after the stem, the question waits for them: shown ${sl && sl.after} ms after DOMContentLoaded, both in, no cap`);
+    await lp.close();
+  }
   const hiddenAll = !(await vis('header')) && !(await vis('h1')) && !(await vis('.jss179')) && !(await vis('.knewcons__knewcons___e3wUn')) && !(await vis('#embedded-messaging')) && !(await vis('.back-to-top-mount')) && !(await vis('#skip-to-main'));
   check(hiddenAll, 'the app bar, title and mastery, Current objective card, banner, chat and Back to Top are hidden');
   check((await vis('#asks')) && (await vis('#answer')) && (await vis('.lrn-formula-keyboard')) && (await vis('.content-title__heading___1PTj4')),

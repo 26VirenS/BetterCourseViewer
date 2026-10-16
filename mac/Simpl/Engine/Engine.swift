@@ -102,8 +102,14 @@ final class Engine: ObservableObject, ShellListener {
     private var pendingAlta: AltaSession?
 
     private func altaAsked() {
-        pendingAlta = nil
-        guard let a = alta else { return }
+        guard let a = alta else { pendingAlta = nil; return }
+        if pendingAlta?.launch.id == a.id { return } // (asked ahead, `askAlta`)
+        askAlta(a)
+    }
+
+    /// (1.3.100) An Alta assignment's session made and its launch asked of Canvas now, ahead of its popup — the Tools
+    /// list's, which puts the popup up only once the list has closed — taken by `alta` set to the same launch.
+    func askAlta(_ a: AltaLaunch) {
         let s = AltaSession(launch: a)
         pendingAlta = s
         s.start(engine: self)
