@@ -938,6 +938,10 @@ jobs:
           $altaWrong = 'alta:104:4003:/mock-alta/learn/course/c1/assignment/a3?sample=wrong'
           Shot 'alta-right' '1366x778' 50 ($mock + @('--appearance', 'light', '--open', $altaRight))
           Shot 'alta-wrong' '1366x778' 50 ($mock + @('--appearance', 'dark', '--open', $altaWrong))
+          # (0.3.22, at the end so the pictures before keep their parts) Knewton Alta's overview opened in a web view made
+          # ahead, as an account that uses Alta has one (--alta-spare: one made just before; picture runs make none
+          # otherwise): its timeline must say "web view spare" (checked below)
+          Shot 'alta-spare' '1366x778' 50 ($mock + @('--appearance', 'light', '--alta-spare', '--open', 'alta:104:4003'))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
@@ -1188,20 +1192,24 @@ jobs:
           # (Alta speed, 0.3.20) each Alta open's timeline in the app's log (Screens/Alta/AltaSession.cs writes "alta: launch
           # asked +N ms · launch answered … · web view … · page … · shown +N ms (how, …)", "page given" in place of the launch
           # for a page asked for): the launch asked at once, before the popup is up (not after the web view is made), and
-          # Alta's page shown — a question with how long its part was still
-          foreach ($name in @('alta-overview', 'alta-start', 'alta-question-light', 'alta-question-dark')) {
+          # Alta's page shown — a question with how long its part was still. (0.3.22) The web view is "made" as the popup
+          # opens, or the "spare" made ahead (alta-spare's must be)
+          foreach ($name in @('alta-overview', 'alta-start', 'alta-question-light', 'alta-question-dark', 'alta-spare')) {
             if ($script:mine -notcontains $name) { continue }
             $line = @(Select-String -Path "shots/profile-$name.log" -Pattern 'alta: ((?:launch asked|page given) .+)$' -ErrorAction SilentlyContinue | ForEach-Object { $_.Matches[0].Groups[1].Value }) | Select-Object -First 1
             if ("$line" -notmatch ' . shown \+\d+ ms \(') { Write-Host "::error::${name}: no timeline of the open with Alta's page shown ('$line') (shots/profile-$name.log)"; exit 1 }
-            if ($name -in @('alta-overview', 'alta-start')) {
+            $made = [regex]::Match("$line", ' . web view (made|spare) \+(\d+) ms')
+            if (-not $made.Success) { Write-Host "::error::${name}: the timeline does not say how the web view was had ('$line') (shots/profile-$name.log)"; exit 1 }
+            $spare = $made.Groups[1].Value -eq 'spare'
+            if (($name -eq 'alta-spare') -ne $spare) { Write-Host "::error::${name}: the web view was $($made.Groups[1].Value), not $(if ($name -eq 'alta-spare') { 'the spare made ahead' } else { 'made as the popup opened' }) ('$line') (shots/profile-$name.log)"; exit 1 }
+            if ($name -in @('alta-overview', 'alta-start', 'alta-spare')) {
               $asked = [regex]::Match("$line", '^launch asked \+(\d+) ms')
               if (-not $asked.Success -or [int]$asked.Groups[1].Value -gt 1500) { Write-Host "::error::${name}: the launch was not asked at once ('$line') (shots/profile-$name.log)"; exit 1 }
               # (asked before the web view was made, not after it as before 0.3.20 — and whether the launch or the web view
-              # was the longer wait, for the run's record)
-              $made = [regex]::Match("$line", ' . web view \+(\d+) ms')
-              if (-not $made.Success -or [int]$asked.Groups[1].Value -ge [int]$made.Groups[1].Value) { Write-Host "::error::${name}: the launch was not asked before the web view was made ('$line') (shots/profile-$name.log)"; exit 1 }
+              # was the longer wait, for the run's record; a spare made ahead is ready as soon as the popup takes it)
+              if (-not $spare -and [int]$asked.Groups[1].Value -ge [int]$made.Groups[2].Value) { Write-Host "::error::${name}: the launch was not asked before the web view was made ('$line') (shots/profile-$name.log)"; exit 1 }
               $answered = [regex]::Match("$line", ' . launch answered \+(\d+) ms')
-              if ($answered.Success -and [int]$answered.Groups[1].Value -gt [int]$made.Groups[1].Value) { Write-Host "::warning::${name}: the launch came after the web view was made — the launch held the open back ('$line')" }
+              if ($answered.Success -and [int]$answered.Groups[1].Value -gt [int]$made.Groups[2].Value) { Write-Host "::warning::${name}: the launch came after the web view was ready — the launch held the open back ('$line')" }
             } elseif ("$line" -notmatch ' . shown \+\d+ ms \(question, .*quiet \d+ ms') { Write-Host "::error::${name}: the question was not shown with how long its part was still ('$line') (shots/profile-$name.log)"; exit 1 }
             if ("$line" -match 'capped\)') { Write-Host "::warning::${name}: Alta's page was shown only because the wait ran out ('$line')" }
             Write-Host "${name}: $line"
