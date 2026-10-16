@@ -1309,7 +1309,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         beta.Unchecked += (_, _) => Updates.Beta = false;
         v.Children.Add(K.Group(
             K.Row(SymbolRegular.Info24, "Version", Updates.Installed ? "Installed with Simpl-Setup.exe" : null, K.Text(Updates.Version, Ty.Body, B.Text2)),
-            K.Row(SymbolRegular.ArrowSync24, "Check for updates automatically", "Simpl looks for a new version when it opens and every hour, and says so here when there is one.", auto),
+            K.Row(SymbolRegular.ArrowSync24, "Check for updates automatically", "Simpl looks for a new version when it opens and every hour, for a critical update every five minutes, and says so here when there is one.", auto),
             // (0.3.7: where Install updates automatically was — an update always installs itself now: an earlier version
             //  put back says it stays, and until when; a copy run from its zip says why it can't put a version in)
             StayingRow(found) ?? (Updates.Installed || dev ? null

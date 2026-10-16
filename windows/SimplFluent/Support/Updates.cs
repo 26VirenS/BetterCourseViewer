@@ -19,7 +19,8 @@ namespace Simpl.Support;
 /// hour old, and every hour after (Check for updates automatically, on unless turned off), it reads the versions
 /// published — GitHub's releases of this repository, the Windows ones (Support/UpdatesChoice.cs: a beta only with Get
 /// beta updates on) — and a newer one is offered in Settings ▸ Updates, with the versions published before and whether
-/// betas are wanted. A copy Simpl-Setup.exe installed always installs its updates itself (0.3.7: Install updates
+/// betas are wanted. In between, every five minutes, it looks quietly for a Critical Update alone
+/// (<see cref="LookForCritical"/>). A copy Simpl-Setup.exe installed always installs its updates itself (0.3.7: Install updates
 /// automatically is no longer a setting): it downloads the new version's installer by itself (picked up where it
 /// stopped, tried again a while later when it fails; checked against the size and SHA-256 published, and — when this
 /// copy is signed — signed by the same publisher) and puts it in at once, unless
@@ -116,7 +117,8 @@ public static partial class Updates
     public static bool HeldForMetered { get; private set; }
     private static string? downloaded;
 
-    /// <summary>Check for updates automatically: at launch and every hour (Settings ▸ Updates; on unless turned off).</summary>
+    /// <summary>Check for updates automatically: at launch and every hour, and for a Critical Update every five minutes
+    /// (Settings ▸ Updates; on unless turned off).</summary>
     public static bool Automatic { get => Prefs.Bool("updates:auto", true); set { Prefs.Set("updates:auto", value); Changed?.Invoke(); if (value) CheckIfDue(); } }
     /// <summary>
     /// Where 0.3.6 and earlier kept Install updates automatically (0.3.7: an update always installs itself in a copy the
@@ -228,6 +230,8 @@ public static partial class Updates
     // ---- the schedule ----
 
     private const double Hour = 60;
+    /// <summary>How often Simpl looks for a Critical Update between the hourly looks (0.3.22), in minutes.</summary>
+    private const double CriticalEvery = 5;
     private static bool started;
     private static DispatcherTimer? ticker, waiter;
     /// <summary>When a download that failed by itself is tried again, and how many have failed in a row.</summary>
@@ -237,9 +241,10 @@ public static partial class Updates
 
     /// <summary>
     /// From the window's first showing: the versions read now when the last look is over an hour old (or never made, or
-    /// the clock went back), and looked at again every ten minutes (and whenever Simpl comes to the front) for the hour
-    /// being up — a PC asleep does not count its hours. An update waiting to go in is looked at every couple of seconds
-    /// for what holds it back (much of it is only seen by looking), and as Simpl leaves the front.
+    /// the clock went back), and looked at again every five minutes (and whenever Simpl comes to the front, or the PC
+    /// wakes) for the hour being up — a PC asleep does not count its hours — and for a Critical Update in between
+    /// (<see cref="LookForCritical"/>). An update waiting to go in is looked at every couple of seconds for what holds it
+    /// back (much of it is only seen by looking), and as Simpl leaves the front.
     /// </summary>
     public static void Start()
     {
@@ -249,13 +254,18 @@ public static partial class Updates
         // not an update played through, whose pictures are taken sooner)
         if (!Testing) lastInput = Environment.TickCount64;
         InputManager.Current.PreProcessInput += OnInput;
-        ticker = new DispatcherTimer { Interval = TimeSpan.FromMinutes(10) };
+        // (the one timer for the looks: every five minutes, as the critical look's)
+        ticker = new DispatcherTimer { Interval = TimeSpan.FromMinutes(CriticalEvery) };
         ticker.Tick += (_, _) => Tick();
         ticker.Start();
         waiter = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
         waiter.Tick += (_, _) => Proceed();
-        app.Activated += (_, _) => CheckIfDue();
+        app.Activated += (_, _) => { CheckIfDue(); LookForCritical(); };
         app.Deactivated += (_, _) => Proceed();
+        // (the PC woken from sleep or hibernation: looked at once the network is back, a quarter of a minute on, when the
+        //  last look is five minutes old — the ticker's own tick may be up to five minutes off)
+        try { Microsoft.Win32.SystemEvents.PowerModeChanged += OnPower; }
+        catch (Exception e) { Log.Write("update: waking from sleep is not watched: " + e.Message); }
         Settle();
         if (Testing)
         {
@@ -265,6 +275,8 @@ public static partial class Updates
             return;
         }
         CheckIfDue();
+        // (the hourly look not due: a look for a Critical Update at once, then every five minutes)
+        LookForCritical();
     }
 
     /// <summary>
@@ -293,19 +305,69 @@ public static partial class Updates
             _ = Download(asked: false);
         }
         CheckIfDue();
+        LookForCritical();
         Proceed();
     }
 
-    /// <summary>The versions read when the last look is an hour old (or was never made, or the clock went back).</summary>
+    /// <summary>Windows' power events come on a thread of their own: the wake handed to the window's.</summary>
+    private static void OnPower(object sender, Microsoft.Win32.PowerModeChangedEventArgs e)
+    {
+        if (e.Mode != Microsoft.Win32.PowerModes.Resume) return;
+        _ = Task.Delay(TimeSpan.FromSeconds(15)).ContinueWith(_ => Application.Current?.Dispatcher.BeginInvoke(() => { CheckIfDue(); LookForCritical(); }));
+    }
+
+    /// <summary>The versions read when the last look is an hour old (or was never made, or the clock went back) — not
+    /// while GitHub has asked Simpl to wait (<see cref="Refused"/>).</summary>
     public static void CheckIfDue()
     {
-        if (!started || Testing || !Automatic) return;
+        if (!started || Testing || !Automatic || Waited) return;
         if (LastCheck is { } last)
         {
             var since = (DateTime.UtcNow - last.ToUniversalTime()).TotalMinutes;
             if (since >= 0 && since < Hour) return;
         }
         _ = Check();
+    }
+
+    // ---- the look for a Critical Update ----
+
+    /// <summary>When the versions were last asked of GitHub, by either look (this run's; null before the first).</summary>
+    private static DateTime? lastLook;
+    private static bool looking;
+
+    /// <summary>
+    /// The five-minute look (0.3.22): between the hourly looks, the versions read again for a Critical Update alone, so
+    /// one reaches every copy within minutes rather than within the hour. Cheap — the same one request, asked with the
+    /// last list's ETag, so a list unchanged since costs GitHub nothing (<see cref="Read"/>) — and silent: nothing is
+    /// shown, logged or changed unless a Critical Update this copy may take is found; then the versions are read as Check
+    /// for updates reads them, and the Critical Update goes in as ever. A version that is not one waits for the hourly
+    /// look. Not while a look, a download or an install is under way, nor once a Critical Update is found (it is on its
+    /// way in), nor with Check for updates automatically off (the student asked Simpl not to look), nor while GitHub has
+    /// asked Simpl to wait; and not within five minutes of the last look (half a minute's slack, so the ticker's own
+    /// tick is never just short).
+    /// </summary>
+    public static void LookForCritical()
+    {
+        if (!started || Testing || !Automatic || Waited || looking || checking || restarting) return;
+        if (State is Mode.Downloading or Mode.Installing || (Critical && Found != null)) return;
+        if (lastLook is { } last && (DateTime.UtcNow - last).TotalMinutes is >= 0 and < CriticalEvery - 0.5) return;
+        _ = Look();
+    }
+
+    private static async Task Look()
+    {
+        looking = true;
+        try
+        {
+            var (newest, critical) = Choose(await Read(), CurrentRun, Beta);
+            if (!critical || newest == null || restarting || checking) return;
+            Log.Write($"update: a Critical Update ({newest.Version}) found in the five-minute look");
+            looking = false;
+            // (read again as Check for updates reads them — the list unchanged, so it comes back as 304 — and on from there)
+            await Check();
+        }
+        catch { /* (no network, GitHub refusing: the next look, or the hourly one, says so) */ }
+        finally { looking = false; }
     }
 
     // ---- checking ----
@@ -387,16 +449,71 @@ public static partial class Updates
             Changed?.Invoke();
             return Known;
         }
-        using var req = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/repos/26VirenS/BetterCourseViewer/releases?per_page=100");
-        req.Headers.TryAddWithoutValidation("User-Agent", "Simpl-for-Windows");
-        req.Headers.TryAddWithoutValidation("Accept", "application/vnd.github+json");
-        using var res = await Http.SendAsync(req);
-        if (!res.IsSuccessStatusCode) throw new Exception($"GitHub answered {(int)res.StatusCode}.");
-        using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
-        var list = Parse(doc.RootElement);
+        var list = await Read();
         Known = list;
         Changed?.Invoke();
         return list;
+    }
+
+    /// <summary>The list read last and GitHub's ETag for it: asked with it, a list unchanged since comes back as 304.</summary>
+    private static (string Tag, List<Release> List)? lastRead;
+    /// <summary>GitHub asked Simpl to wait (403, 429): the automatic looks wait until then, and how many refusals in a row.</summary>
+    private static DateTime? waitUntil;
+    private static int refusals;
+    private static bool Waited => waitUntil is { } until && DateTime.UtcNow < until;
+
+    /// <summary>
+    /// The Windows versions as GitHub lists them now, and nothing else changed: asked with the ETag of the list read
+    /// last (If-None-Match), so a list unchanged since comes back empty as 304 — the one read then — and does not count
+    /// against the sixty requests an hour GitHub allows a network without signing in (the five-minute look is twelve).
+    /// GitHub refusing (<see cref="Refused"/>) is thrown as any other answer is.
+    /// </summary>
+    private static async Task<List<Release>> Read()
+    {
+        using var req = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/repos/26VirenS/BetterCourseViewer/releases?per_page=100");
+        req.Headers.TryAddWithoutValidation("User-Agent", "Simpl-for-Windows");
+        req.Headers.TryAddWithoutValidation("Accept", "application/vnd.github+json");
+        if (lastRead is { } had) req.Headers.TryAddWithoutValidation("If-None-Match", had.Tag);
+        // (when it was asked, answered or not: no network is not asked again for five minutes)
+        lastLook = DateTime.UtcNow;
+        using var res = await Http.SendAsync(req);
+        if (res.StatusCode == HttpStatusCode.NotModified && lastRead is { } same) { Answered(); return same.List; }
+        if (res.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests) Refused(res);
+        if (!res.IsSuccessStatusCode) throw new Exception($"GitHub answered {(int)res.StatusCode}.");
+        using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
+        var list = Parse(doc.RootElement);
+        lastRead = res.Headers.ETag?.ToString() is { Length: > 0 } tag ? (tag, list) : null;
+        Answered();
+        return list;
+    }
+
+    private static void Answered()
+    {
+        refusals = 0;
+        waitUntil = null;
+    }
+
+    /// <summary>
+    /// GitHub refused (403, 429 — too many requests from this network, which may be a school's, shared by many): the
+    /// automatic looks wait as long as it says (Retry-After, or its limit's reset when none is left), else ten minutes,
+    /// then twenty, forty and an hour as refusals come in a row; a minute at least, two hours at most. Check for updates
+    /// pressed still asks.
+    /// </summary>
+    private static void Refused(HttpResponseMessage res)
+    {
+        refusals++;
+        var wait = TimeSpan.FromMinutes(Math.Min(Hour, 10 * Math.Pow(2, refusals - 1)));
+        if (res.Headers.RetryAfter is { } after)
+        {
+            if (after.Delta is { } delta) wait = delta;
+            else if (after.Date is { } date) wait = date - DateTimeOffset.UtcNow;
+        }
+        else if (res.Headers.TryGetValues("x-ratelimit-remaining", out var left) && left.FirstOrDefault() == "0"
+                 && res.Headers.TryGetValues("x-ratelimit-reset", out var reset) && long.TryParse(reset.FirstOrDefault(), out var epoch))
+            wait = DateTimeOffset.FromUnixTimeSeconds(epoch) - DateTimeOffset.UtcNow;
+        wait = TimeSpan.FromMinutes(Math.Clamp(wait.TotalMinutes, 1, 2 * Hour));
+        waitUntil = DateTime.UtcNow + wait;
+        Log.Write($"update: GitHub answered {(int)res.StatusCode}; the automatic looks wait {wait.TotalMinutes:0} minutes");
     }
 
     /// <summary>The version an update played through finds: the next run, its installer the file given (its SHA-256
