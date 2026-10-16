@@ -319,8 +319,9 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   made ahead (`AltaSpare`): at a quiet moment once the Dashboard is up, when an Alta assignment's page is read, and
   after each Alta popup closes — never while one opens. It holds only an empty page (about:blank), so WebKit's process
   for it is running when the popup takes it (`take`, by school); one that has shown anything is never handed on, and it
-  is let go after ten minutes unused and on sign-out. The console's line says which: `alta: view spare · …` or
-  `alta: view made 38 ms · …`; `-SimplAltaSpare YES` opens a picture's popup in one (`21w-alta-spare`).
+  is let go after ten minutes unused, on sign-out and when another school is chosen (Change School…). The console's
+  line says which: `alta: view spare · …` or `alta: view made 38 ms · …`; `-SimplAltaSpare YES` opens a picture's
+  popup in one (`21w-alta-spare`).
   (1.3.102) A lighter page script, saying what it said before. The panels, buttons and verdict are told when something
   may have moved them — a change in the parts kept (their elements and words; a class, a style, a button greyed or not;
   a fade ending; in the answer box itself only a verdict or the buttons' bar, never the caret blinking in a math box),

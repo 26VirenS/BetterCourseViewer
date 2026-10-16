@@ -467,7 +467,9 @@ final class Engine: ObservableObject, ShellListener {
         await loadSidebar()
         if moreTool, let t = more?.items.first(where: { $0.kind == "tool" }) { openMore(t) }
         readAheadAfterLaunch() // (1.3.78: once the window is quiet, the places most opened next, read ahead)
-        // (1.3.102) an account that uses Knewton Alta: its popup's web view made ahead, once the window has been quiet a while
+        // (1.3.102) an account that uses Knewton Alta: its popup's web view made ahead, once the window has been quiet a while;
+        // one made ahead for the school chosen before (Change School…) let go, whether this one uses Alta or not
+        AltaSpare.shared.drop(unlessFor: host)
         if hasAlta { AltaSpare.shared.prepare(self, quiet: 3) }
         Task { await Reminders.shared.reschedule(self) } // (each launch: the reminders set again from what Canvas says now)
         Task { await Activity.shared.sync(self) }

@@ -1755,7 +1755,8 @@ struct AltaTimeline {
 /// It only ever holds that empty page: a web view that has shown anything is never handed on, so no page, script or
 /// state of one open (or one account) reaches the next — each open has a web view nobody has used. Its cookies are the
 /// app's own web data's, as every Alta popup's always were. It is let go after ten minutes unused, and when the student
-/// signs out (the next account makes its own, if it uses Alta); and it is for one school (`host`) only.
+/// signs out (the next account makes its own, if it uses Alta); and it is for one school (`host`) only — let go too when
+/// another school is chosen (Change School…, which does not sign out), so the new school's is made in its place.
 @MainActor
 final class AltaSpare {
     /// A web view for Alta's page and the relay its messages come by.
@@ -1797,6 +1798,7 @@ final class AltaSpare {
     /// Made at the next quiet moment — no screen waiting on the school for `quiet` seconds (half a minute at most) and no
     /// Alta popup open — for an account that uses Alta; nothing when one is up or on its way already.
     func prepare(_ engine: Engine, quiet: Double = 1.5) {
+        drop(unlessFor: engine.host)
         guard spare == nil, making == nil, Self.allowed else { return }
         making = Task { [weak self, weak engine] in
             var still = 0.0, waited = 0.0
@@ -1818,11 +1820,19 @@ final class AltaSpare {
     func makeNow(host: String) async {
         making?.cancel()
         making = nil
+        drop(unlessFor: host)
         if spare == nil { make(host: host) }
         for _ in 0..<30 where !warm { try? await Task.sleep(nanoseconds: 100_000_000) }
     }
 
-    /// Let go: signed out, or ten minutes unused.
+    /// Let go when it is another school's: the student chose another (Change School…), which does not sign out, so its
+    /// Engine never says signed out and the old school's web view would be kept, the new school's never made, for ten
+    /// minutes.
+    func drop(unlessFor host: String) {
+        if let s = spare, s.host != host { drop("another school") }
+    }
+
+    /// Let go: signed out, another school, or ten minutes unused.
     func drop(_ why: String) {
         making?.cancel()
         making = nil
