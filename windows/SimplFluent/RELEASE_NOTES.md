@@ -1,3 +1,7 @@
+**What's new in 0.3.22** (beta)
+
+- **Critical updates** — Simpl now looks for a critical update every five minutes while it runs (and as the PC wakes from sleep), not only once an hour, so one reaches you within minutes; the look reads one small file from simplcourses.com rather than asking GitHub, so it never uses up a shared school network's allowance of GitHub requests, shows nothing unless a critical update is found, and other updates still come with the hourly look.
+
 **What's new in 0.3.21** (beta)
 
 - **Faster Alta** — a Knewton Alta assignment opens noticeably faster: its launch is asked of your school at once, while the popup and its page are still being made (before, only once they were ready), its due date comes from the screen you opened it from instead of a second request, and its question shows as soon as it has finished drawing — its answer box and its maths in, then a tenth of a second still, where it waited 350 ms — however much the rest of Alta's page is still moving.
