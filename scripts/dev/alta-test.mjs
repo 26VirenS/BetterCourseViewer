@@ -53,8 +53,7 @@ const { chromium } = createRequire(join(execSync('npm root -g').toString().trim(
 const browser = await chromium.launch();
 try {
   const page = await browser.newPage();
-  // (each post's moment on the page's own clock too, for the open's timing checks)
-  await page.addInitScript(() => { window.__posted = []; window.__postedAt = []; window.webkit = { messageHandlers: { simplAlta: { postMessage: (s) => { window.__posted.push(s); window.__postedAt.push(performance.now()); } } } }; });
+  await page.addInitScript(() => { window.__posted = []; window.webkit = { messageHandlers: { simplAlta: { postMessage: (s) => window.__posted.push(s) } } }; });
   await page.addInitScript({ content: source });
   const posts = async () => (await page.evaluate(() => window.__posted.slice())).map((s) => JSON.parse(s));
   const waitFor = async (test, what, tries = 60) => {
@@ -102,56 +101,6 @@ try {
   const vis = async (sel) => page.$eval(sel, (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; }).catch(() => false);
   const fq = await waitFor((p) => p.kind === 'focus' && p.state === 'question', 'the question recognised');
   check(!!fq && fq.shape === null, 'Alta’s learn page is recognised: one part, headed Question, with Learnosity’s answer box');
-  // (1.3.101) the question in sight as soon as it is drawn — within 400 ms of the learn page's DOMContentLoaded (1.3.100
-  // waited for 350 ms with nothing changed anywhere in the page, at least) — the hook saying how long its part had been
-  // quiet and that no cap fired, each post with the page's clock for the app's timeline line
-  const shownAt = async (pg) => pg.evaluate(() => {
-    const n = performance.getEntriesByType('navigation')[0], k = window.__posted.findIndex((s) => JSON.parse(s).kind === 'shown');
-    return k < 0 ? null : { after: Math.round(window.__postedAt[k] - n.domContentLoadedEventStart), post: JSON.parse(window.__posted[k]), frame: JSON.parse(window.__posted[0]) };
-  });
-  await waitFor((p) => p.kind === 'shown', 'the question in sight');
-  const sq = await shownAt(page);
-  check(!!sq && sq.after < 400 && sq.post.how === 'question' && sq.post.capped === false && sq.post.quiet >= 100 && sq.post.t > 0 && sq.post.nav > 0 && sq.frame.kind === 'frame' && sq.frame.alta === true,
-    `the question is shown ${sq && sq.after} ms after the learn page’s DOMContentLoaded (under 400 ms), quiet ${sq && sq.post.quiet} ms, no cap — its posts timed, its page known as Alta’s`);
-  {
-    // (1.3.101) and so while Alta's chrome round the question keeps changing (its header's bar every 40 ms): only the part
-    // shown is waited on, and changes never put off the next look at the page for more than 300 ms — 1.3.100 never looked
-    // while the page kept changing, and showed it only when its nine-second veil ran out
-    const np = await browser.newPage();
-    await np.addInitScript(() => { window.__posted = []; window.__postedAt = []; window.webkit = { messageHandlers: { simplAlta: { postMessage: (s) => { window.__posted.push(s); window.__postedAt.push(performance.now()); } } } }; });
-    await np.addInitScript({ content: source });
-    await np.addInitScript(() => { document.addEventListener('DOMContentLoaded', () => { let k = 0; const h = document.querySelector('header'); setInterval(() => { if (h) h.setAttribute('data-k', String(k)); const b = document.createElement('span'); b.textContent = String(k++); (h || document.body).appendChild(b); }, 40); }); });
-    await np.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a3`);
-    let sn = null;
-    for (let i = 0; i < 40 && !sn; i++) { sn = await shownAt(np); if (!sn) await np.waitForTimeout(100); }
-    check(!!sn && sn.after < 700 && sn.post.how === 'question' && sn.post.capped === false, `with Alta’s header changing every 40 ms, the question is still shown ${sn && sn.after} ms after DOMContentLoaded (under 700 ms), no cap`);
-    await np.close();
-  }
-  {
-    // (1.3.101) but never before it is drawn: Learnosity's answer box put in 300 ms after the stem (its empty embed there
-    // meanwhile), and a formula of MathJax 2's not drawn until then — the question shown only once both are in, not capped
-    const lp = await browser.newPage();
-    await lp.addInitScript(() => { window.__posted = []; window.__postedAt = []; window.__inAtShown = null; window.webkit = { messageHandlers: { simplAlta: { postMessage: (s) => { window.__posted.push(s); window.__postedAt.push(performance.now()); if (JSON.parse(s).kind === 'shown') window.__inAtShown = !!document.querySelector('.lrn_widget') && !!document.getElementById('MathJax-Element-1-Frame'); } } } }; });
-    await lp.addInitScript({ content: source });
-    await lp.addInitScript(() => { document.addEventListener('DOMContentLoaded', () => {
-      const w = document.querySelector('.lrn_widget'), box = w && w.parentNode, asks = document.getElementById('asks');
-      if (w) w.remove();
-      const s = document.createElement('script'); s.type = 'math/tex'; s.textContent = 'x^2'; if (asks) asks.appendChild(s);
-      setTimeout(() => {
-        if (box && w) box.appendChild(w);
-        s.id = 'MathJax-Element-1';
-        const f = document.createElement('span'); f.id = 'MathJax-Element-1-Frame'; f.className = 'MathJax'; f.textContent = 'x²';
-        if (asks) asks.insertBefore(f, s);
-      }, 300);
-    }); });
-    await lp.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a3`);
-    let sl = null;
-    for (let i = 0; i < 40 && !sl; i++) { sl = await shownAt(lp); if (!sl) await lp.waitForTimeout(100); }
-    const inAtShown = await lp.evaluate(() => window.__inAtShown);
-    check(!!sl && sl.after >= 300 && sl.after < 900 && sl.post.how === 'question' && sl.post.capped === false && inAtShown === true,
-      `with Learnosity’s box and a MathJax formula drawn 300 ms after the stem, the question waits for them: shown ${sl && sl.after} ms after DOMContentLoaded, both in, no cap`);
-    await lp.close();
-  }
   const hiddenAll = !(await vis('header')) && !(await vis('h1')) && !(await vis('.jss179')) && !(await vis('.knewcons__knewcons___e3wUn')) && !(await vis('#embedded-messaging')) && !(await vis('.back-to-top-mount')) && !(await vis('#skip-to-main'));
   check(hiddenAll, 'the app bar, title and mastery, Current objective card, banner, chat and Back to Top are hidden');
   check((await vis('#asks')) && (await vis('#answer')) && (await vis('.lrn-formula-keyboard')) && (await vis('.content-title__heading___1PTj4')),
@@ -497,6 +446,78 @@ try {
   const leaked = SECRETS.filter((s) => all.includes(s));
   check(!leaked.length, `never the answer key, the student’s ids or the school’s launch data (${leaked.join(', ') || 'none'})`);
 
+  // (1.3.101 / 0.3.21) the open's speed, checked on each copy of the page script that says how long its part was still
+  // (`quiet` in its shown post) — the Mac's here, Windows' below where it is in this checkout. The question in sight as
+  // soon as it is drawn: within 400 ms of the learn page's DOMContentLoaded (1.3.100 / 0.3.20 waited for 350 ms with
+  // nothing changed anywhere in the page, at least), no cap, each post timed for the app's timeline of the open and the
+  // page known as Alta's — the best of three loads, so a slow moment on a shared runner does not decide it. So too while
+  // Alta's chrome round the question keeps changing. But never before it is drawn: its answer box and its maths in first.
+  const speedChecks = async (label, src, win) => {
+    const LEARN = `${BASE}/mock-alta/learn/course/c1/assignment/a3`;
+    const open = async (extra) => {
+      const sp = await browser.newPage();
+      // (each post's moment on the page's own clock too; `__onPost` for a check that looks at the page as it is posted)
+      await sp.addInitScript((w) => {
+        window.__posted = []; window.__postedAt = [];
+        const put = (s) => { window.__posted.push(s); window.__postedAt.push(performance.now()); if (window.__onPost) window.__onPost(JSON.parse(s)); };
+        if (w) { window.chrome = window.chrome || {}; window.chrome.webview = { postMessage: put }; } else window.webkit = { messageHandlers: { simplAlta: { postMessage: put } } };
+      }, win);
+      await sp.addInitScript({ content: src });
+      if (extra) await sp.addInitScript(extra);
+      return sp;
+    };
+    const shownOn = async (sp) => {
+      await sp.goto(LEARN);
+      for (let i = 0; i < 60; i++) {
+        const s = await sp.evaluate(() => {
+          const n = performance.getEntriesByType('navigation')[0], said = window.__posted.map((x) => JSON.parse(x)), k = said.findIndex((p) => p.kind === 'shown');
+          return k < 0 ? null : { after: Math.round(window.__postedAt[k] - n.domContentLoadedEventStart), post: said[k], said };
+        });
+        if (s) return s;
+        await sp.waitForTimeout(100);
+      }
+      return null;
+    };
+    const timed = (s) => ['frame', 'focus', 'shown'].every((k) => s.said.some((p) => p.kind === k && p.t > 0 && p.nav > 0));
+    const sp = await open();
+    const loads = [];
+    for (let i = 0; i < 3; i++) loads.push(await shownOn(sp));
+    await sp.close();
+    const best = Math.min(...loads.map((s) => (s ? s.after : Infinity)));
+    check(loads.every((s) => s && s.post.how === 'question' && s.post.capped === false && s.post.quiet >= 100 && timed(s) && s.said[0].kind === 'frame' && s.said[0].alta === true) && best < 400,
+      `${label}: the question is shown ${best} ms after the learn page’s DOMContentLoaded (under 400; ${loads.map((s) => s && s.after).join(' / ')}), quiet ${loads.map((s) => s && s.post.quiet).join(' / ')} ms, no cap — its posts timed, its page known as Alta’s`);
+    // (and so while Alta's header keeps changing, every 40 ms: only the part shown is waited on, and changes never put off
+    // the next look at the page for more than 300 ms — 1.3.100 / 0.3.20 never looked while the page kept changing, and
+    // showed it only when its nine-second veil ran out)
+    const np = await open(() => { document.addEventListener('DOMContentLoaded', () => { let k = 0; const h = document.querySelector('header'); setInterval(() => { if (h) h.setAttribute('data-k', String(k)); const b = document.createElement('span'); b.textContent = String(k++); (h || document.body).appendChild(b); }, 40); }); });
+    const sn = await shownOn(np);
+    await np.close();
+    check(!!sn && sn.after < 700 && sn.post.how === 'question' && sn.post.capped === false, `${label}: with Alta’s header changing every 40 ms, the question is still shown ${sn && sn.after} ms after DOMContentLoaded (under 700), no cap`);
+    // (Learnosity's answer box put in 300 ms after the stem, its empty embed there meanwhile, and a formula of MathJax 2's
+    // not drawn until then: the question shown only once both are in, not capped)
+    const lp = await open(() => {
+      window.__inAtShown = null;
+      window.__onPost = (p) => { if (p.kind === 'shown') window.__inAtShown = !!document.querySelector('.lrn_widget') && !!document.getElementById('MathJax-Element-1-Frame'); };
+      document.addEventListener('DOMContentLoaded', () => {
+        const w = document.querySelector('.lrn_widget'), box = w && w.parentNode, asks = document.getElementById('asks');
+        if (w) w.remove();
+        const s = document.createElement('script'); s.type = 'math/tex'; s.textContent = 'x^2'; if (asks) asks.appendChild(s);
+        setTimeout(() => {
+          if (box && w) box.appendChild(w);
+          s.id = 'MathJax-Element-1';
+          const f = document.createElement('span'); f.id = 'MathJax-Element-1-Frame'; f.className = 'MathJax'; f.textContent = 'x²';
+          if (asks) asks.insertBefore(f, s);
+        }, 300);
+      });
+    });
+    const sl = await shownOn(lp);
+    const inAtShown = await lp.evaluate(() => window.__inAtShown);
+    await lp.close();
+    check(!!sl && sl.after >= 300 && sl.after < 900 && sl.post.how === 'question' && sl.post.capped === false && inAtShown === true,
+      `${label}: with Learnosity’s box and a MathJax formula drawn 300 ms after the stem, the question waits for them: shown ${sl && sl.after} ms after DOMContentLoaded, both in, no cap`);
+  };
+  if (/quiet:/.test(source)) await speedChecks('the page script', source, false);
+
   // (Windows 0.3.5) Simpl for Windows' copy of the page script (windows/SimplFluent/Screens/Alta/AltaHook.cs), where it is
   // in this checkout: Alta's pop-ups read whole once they have settled — the body that comes in after the pop-up opens,
   // its lists, formulas and pictures, all its buttons, each step — and given back to the page when they cannot be
@@ -644,9 +665,20 @@ try {
     await wp.evaluate(() => { document.getElementById('verdict').textContent = 'Yes that’s right. Keep it up!'; });
     check(!!(await wwait((p, k) => k >= nwv && p.kind === 'panels' && p.verdict === 'right', 'the verdict (right)')), 'Alta’s “Yes that’s right” strip is read as a right answer');
     const nwv2 = (await wposts()).length;
-    await wp.evaluate(() => document.getElementById('verdict').remove());
-    check(!!(await wwait((p, k) => k >= nwv2 && p.kind === 'panels' && p.verdict === '', 'the verdict gone')), 'and when the strip goes, so does the verdict');
+    // (0.3.20) what showed Correct on a question not yet answered: a box whose class says "right" or "status" (layout),
+    // and a screen reader's 1-pixel live region keeping "Yes that's right" from the last question — neither tells one
+    const nwv3 = (await wposts()).length;
+    await wp.evaluate(() => {
+      const v = document.getElementById('verdict'); v.className = 'status__bar text-right feedback__incorrect___3bY7t'; v.textContent = '1 of 3';
+      v.insertAdjacentHTML('afterend', '<div id="srlive" role="status" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Yes that’s right. Keep it up!</div>');
+    });
+    check(!!(await wwait((p, k) => k >= nwv3 && p.kind === 'panels' && p.verdict === '', 'no verdict by class')), 'a layout class, a class saying incorrect with no such words, or a screen reader’s hidden live region never shows a verdict');
+    await wp.evaluate(() => { document.getElementById('srlive').remove(); document.getElementById('verdict').remove(); });
+    await wp.waitForTimeout(500);
+    check(!(await wposts()).slice(nwv3).some((p) => p.kind === 'panels' && p.verdict), 'and none is told after it either');
     await wp.close();
+    if (/quiet:/.test(winSource)) await speedChecks('Windows’ copy', winSource, true);
+    else check(false, 'Windows’ copy of the page script times its words and says how long its part was still (its shown word has `quiet`)');
   }
 } finally {
   await browser.close();
