@@ -218,8 +218,11 @@ final class Updater: ObservableObject {
         return true
     }
 
-    /// (1.3.102) When the feed was last read for a Critical Update alone (`scanForCritical`), and whether it is being.
-    private var lastCriticalScan: Date?
+    /// (1.3.102) When the feed was last asked, by a check or a look for a Critical Update alone (`scanForCritical`),
+    /// answered or not: from when the asking began, so a slow answer does not push the next look a tick on, and no
+    /// answer at all (no network, the feed failing) is not asked again each time Simpl comes to the front. Nil before
+    /// this run's first; `lastCheck` (kept across launches) stands in for it till then.
+    private var lastAsked: Date?
     private var scanning = false
 
     /// (1.3.102) A look for a Critical Update alone, when the feed was last read — by a check or a look — five minutes
@@ -235,19 +238,18 @@ final class Updater: ObservableObject {
         case .available(let r) where r.critical: return
         default: break
         }
-        // (a few seconds' slack: the timer's ticks five minutes apart are never skipped for the time a look took)
-        let last = [lastCheck, lastCriticalScan].compactMap { $0 }.max()
-        if let last {
+        // (a minute's slack: the timer's ticks, five minutes apart give or take its half-minute tolerance, can come 270 s
+        // apart, and never one is skipped for that)
+        if let last = lastAsked ?? lastCheck {
             let since = Date().timeIntervalSince(last)
-            if since >= 0 && since < criticalInterval - 30 { return }
+            if since >= 0 && since < criticalInterval - 60 { return }
         }
         scanning = true
-        let began = Date()
+        lastAsked = Date()
         Task {
             let critical = await self.readForCritical()
             self.scanning = false
-            guard let critical else { return } // (no answer: looked for again at the next tick, or as Simpl comes to the front)
-            self.lastCriticalScan = began
+            guard let critical else { return } // (no answer: looked for again at the next tick five minutes on)
             if critical { NSLog("[Simpl] update: the feed names a Critical Update; checking"); self.check() }
         }
     }
@@ -305,6 +307,7 @@ final class Updater: ObservableObject {
     }
 
     private func read() async {
+        lastAsked = Date()
         let outcome: State
         do {
             var (data, response) = try await Self.ask(feedURL, timeout: 20)

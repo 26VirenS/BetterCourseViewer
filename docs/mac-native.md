@@ -1385,8 +1385,9 @@ Simpl for Mac keeps itself up to date (`Support/Updater.swift`, a port of the Sa
 - **When.** At launch when the last check is more than an hour old, then every hour (looked at every five minutes and
   whenever the app comes to the front, so a Mac asleep does not stretch the wait), and on **Simpl ▸ Check for
   Updates…** or *Check Now* in **Settings ▸ Updates**. (1.3.102) **Critical Updates every five minutes**: each time
-  the hour is not up, and a few seconds after the Mac wakes, when the feed was last read five minutes ago or more, the
-  app reads the feed it follows (the beta feed on the beta channel, which names `criticalVersion` as the usual one
+  the hour is not up, and a few seconds after the Mac wakes, when the feed was last asked four minutes ago or more
+  (timed from when the asking began, answered or not, so a slow answer never skips a tick and a feed that fails is
+  not asked again at every return to the app), the app reads the feed it follows (the beta feed on the beta channel, which names `criticalVersion` as the usual one
   does) for a Critical Update alone (`Updater.scanForCritical`): without the cache, a ten-second timeout, nothing
   shown. Only when it names one newer than this copy, that this Mac runs, does the usual check run, and the Critical
   Update goes in at once with its notice. None while a check, a download or an install is under way or a Critical
