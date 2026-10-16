@@ -31,8 +31,11 @@ struct AltaQuizScreen: View {
     @State private var showBrowser = UserDefaults.standard.bool(forKey: AltaQuizScreen.showBrowserKey)
     static let showBrowserKey = "SimplAltaShowBrowser"
 
-    init(launch: AltaLaunch) {
-        _session = StateObject(wrappedValue: AltaSession(launch: launch))
+    /// (1.3.100) The session the engine made the moment the popup was asked for (its launch already asked of Canvas),
+    /// else one of its own; the due line the launch came with, if it did.
+    init(launch: AltaLaunch, engine: Engine) {
+        _session = StateObject(wrappedValue: engine.altaSession(for: launch))
+        _dueLine = State(initialValue: launch.dueLine)
     }
 
     /// Most of the window it is over: the large popup's size.
@@ -62,7 +65,13 @@ struct AltaQuizScreen: View {
         .task {
             session.setBrowser(showBrowser) // (1.3.83)
             session.appearance(dark: pageDark) // (1.3.79: the page light, in dark mode too — 1.3.83: unless Dark is picked)
-            await session.start(engine: engine)
+            session.start(engine: engine) // (1.3.100: asked already, by the engine, as the popup was asked for)
+            // (1.3.78) the Canvas assignment's due line for the header — (1.3.100) the one the launch came with; else asked
+            // once the launch is answered, never beside it
+            guard dueLine == nil else { return }
+            await session.launched()
+            guard !Task.isCancelled else { return }
+            dueLine = await CanvasDue.line(engine, course: session.launch.course, assignment: session.launch.assignment)
         }
         .onChange(of: pageDark) { _, dark in
             UserDefaults.standard.set(dark, forKey: Self.pageDarkKey)
@@ -72,8 +81,7 @@ struct AltaQuizScreen: View {
             UserDefaults.standard.set(on, forKey: Self.showBrowserKey)
             session.setBrowser(on)
         }
-        .task { dueLine = await CanvasDue.line(engine, course: session.launch.course, assignment: session.launch.assignment) }
-        .onDisappear { session.closePic() } // (1.3.70: the popup closed, its graph's window with it)
+        .onDisappear { session.popupClosed() } // (1.3.70: the popup closed, its graph's window with it)
         // (1.3.51) Alta's pop-ups as the Mac's own, their buttons the Mac's — (1.3.83) their body read whole and drawn as
         // the app's own words — (1.3.84) on a card of the popup's own, over its content: never a sheet, which, begun from
         // this popup (a borderless child panel over the window), dimmed the main window and took the popup from sight.
@@ -294,8 +302,9 @@ struct AltaQuizScreen: View {
                 AltaStartScreen(cover: c, dueShown: headerDue != nil, start: { session.startCover() }, review: { session.reviewCover() })
                     .transition(.opacity)
             }
-            // (1.3.60) while Alta's page loads, out of sight, the popup's own Loading in its place
-            if !session.pageShown && !session.asIs && session.cover == nil && !session.opening && session.failure == nil {
+            // (1.3.60) while Alta's page loads, out of sight, the popup's own Loading in its place — (1.3.100) from the
+            // moment the popup opens, while the launch goes through Canvas too (1.3.99 showed a spinner first, then this)
+            if session.failure == nil && (session.opening || (!session.pageShown && !session.asIs && session.cover == nil)) {
                 ZStack {
                     PageGround()
                     AltaSkeleton()
@@ -307,12 +316,6 @@ struct AltaQuizScreen: View {
                     PageGround()
                     ContentUnavailableView("Knewton Alta could not be opened", systemImage: "exclamationmark.triangle", description: Text(why))
                 }
-            } else if session.opening {
-                ZStack {
-                    PageGround()
-                    ProgressView("Opening Knewton Alta…").font(.sBody)
-                }
-                .transition(.opacity)
             }
         }
     }

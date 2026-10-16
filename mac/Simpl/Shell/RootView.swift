@@ -94,7 +94,7 @@ struct EngineSheets: ViewModifier {
                     .modifier(UpdateHold()) // (1.2.19: nor while a quiz is open)
             }
             .floatingPopup("alta", title: "Knewton Alta", item: $engine.alta, layout: .large, engine: engine) { a in
-                AltaQuizScreen(launch: a)
+                AltaQuizScreen(launch: a, engine: engine)
                     .modifier(UpdateHold()) // (nor while an Alta assignment is open)
             }
             .floatingPopup("macmillan", title: "Macmillan Learning", item: $engine.macmillan, layout: .large, engine: engine) { a in

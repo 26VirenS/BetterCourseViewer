@@ -53,7 +53,8 @@ const { chromium } = createRequire(join(execSync('npm root -g').toString().trim(
 const browser = await chromium.launch();
 try {
   const page = await browser.newPage();
-  await page.addInitScript(() => { window.__posted = []; window.webkit = { messageHandlers: { simplAlta: { postMessage: (s) => window.__posted.push(s) } } }; });
+  // (each post's moment on the page's own clock too, for the open's timing checks)
+  await page.addInitScript(() => { window.__posted = []; window.__postedAt = []; window.webkit = { messageHandlers: { simplAlta: { postMessage: (s) => { window.__posted.push(s); window.__postedAt.push(performance.now()); } } } }; });
   await page.addInitScript({ content: source });
   const posts = async () => (await page.evaluate(() => window.__posted.slice())).map((s) => JSON.parse(s));
   const waitFor = async (test, what, tries = 60) => {
@@ -101,6 +102,31 @@ try {
   const vis = async (sel) => page.$eval(sel, (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; }).catch(() => false);
   const fq = await waitFor((p) => p.kind === 'focus' && p.state === 'question', 'the question recognised');
   check(!!fq && fq.shape === null, 'Alta’s learn page is recognised: one part, headed Question, with Learnosity’s answer box');
+  // (1.3.100) the question in sight as soon as it is drawn — within 400 ms of the learn page's DOMContentLoaded (1.3.99
+  // waited for 350 ms with nothing changed anywhere in the page, at least) — the hook saying how long its part had been
+  // quiet and that no cap fired, each post with the page's clock for the app's timeline line
+  const shownAt = async (pg) => pg.evaluate(() => {
+    const n = performance.getEntriesByType('navigation')[0], k = window.__posted.findIndex((s) => JSON.parse(s).kind === 'shown');
+    return k < 0 ? null : { after: Math.round(window.__postedAt[k] - n.domContentLoadedEventStart), post: JSON.parse(window.__posted[k]), frame: JSON.parse(window.__posted[0]) };
+  });
+  await waitFor((p) => p.kind === 'shown', 'the question in sight');
+  const sq = await shownAt(page);
+  check(!!sq && sq.after < 400 && sq.post.how === 'question' && sq.post.capped === false && sq.post.quiet >= 100 && sq.post.t > 0 && sq.post.nav > 0 && sq.frame.kind === 'frame' && sq.frame.alta === true,
+    `the question is shown ${sq && sq.after} ms after the learn page’s DOMContentLoaded (under 400 ms), quiet ${sq && sq.post.quiet} ms, no cap — its posts timed, its page known as Alta’s`);
+  {
+    // (1.3.100) and so while Alta's chrome round the question keeps changing (its header's bar every 40 ms): only the part
+    // shown is waited on, and changes never put off the next look at the page for more than 300 ms — 1.3.99 never looked
+    // while the page kept changing, and showed it only when its nine-second veil ran out
+    const np = await browser.newPage();
+    await np.addInitScript(() => { window.__posted = []; window.__postedAt = []; window.webkit = { messageHandlers: { simplAlta: { postMessage: (s) => { window.__posted.push(s); window.__postedAt.push(performance.now()); } } } }; });
+    await np.addInitScript({ content: source });
+    await np.addInitScript(() => { document.addEventListener('DOMContentLoaded', () => { let k = 0; const h = document.querySelector('header'); setInterval(() => { if (h) h.setAttribute('data-k', String(k)); const b = document.createElement('span'); b.textContent = String(k++); (h || document.body).appendChild(b); }, 40); }); });
+    await np.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a3`);
+    let sn = null;
+    for (let i = 0; i < 40 && !sn; i++) { sn = await shownAt(np); if (!sn) await np.waitForTimeout(100); }
+    check(!!sn && sn.after < 700 && sn.post.how === 'question' && sn.post.capped === false, `with Alta’s header changing every 40 ms, the question is still shown ${sn && sn.after} ms after DOMContentLoaded (under 700 ms), no cap`);
+    await np.close();
+  }
   const hiddenAll = !(await vis('header')) && !(await vis('h1')) && !(await vis('.jss179')) && !(await vis('.knewcons__knewcons___e3wUn')) && !(await vis('#embedded-messaging')) && !(await vis('.back-to-top-mount')) && !(await vis('#skip-to-main'));
   check(hiddenAll, 'the app bar, title and mastery, Current objective card, banner, chat and Back to Top are hidden');
   check((await vis('#asks')) && (await vis('#answer')) && (await vis('.lrn-formula-keyboard')) && (await vis('.content-title__heading___1PTj4')),

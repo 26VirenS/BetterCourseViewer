@@ -838,7 +838,8 @@ struct AssignmentView: View {
             engine.go(u, title: d.title)
         } else if d.toolUrl != nil {
             if d.alta == true {
-                engine.alta = AltaLaunch(course: course, assignment: id, title: d.title) // (1.3.17: Knewton Alta, as a quiz)
+                // (1.3.17: Knewton Alta, as a quiz — 1.3.100: with its due line, for the popup's header)
+                engine.alta = AltaLaunch(course: course, assignment: id, title: d.title, dueLine: d.dueLine)
             } else if d.macmillan == true {
                 engine.macmillan = AltaLaunch(course: course, assignment: id, title: d.title) // (1.3.66: Macmillan Learning)
             } else {

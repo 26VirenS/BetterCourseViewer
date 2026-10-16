@@ -275,6 +275,17 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   read from the kept parts (`verdict` in the panels message: a banner, an alert or a box marked by its class, told by
   its words first, else by its class) and shown as the popup's own pill at the left of its buttons, Correct in green or
   Incorrect in red (`AltaVerdictPill`), until the strip goes with the next question.
+  (1.3.100) Faster to open. The launch is asked of Canvas the moment the popup is asked for (`Engine.alta`'s `didSet`
+  makes the `AltaSession` and starts it; the popup takes it with `altaSession(for:)`), not once its view is built; the
+  header's due line comes with the launch (`AltaLaunch.dueLine`, from the Assignment page or the Tools row), the
+  `assignment` call only when it did not, after the launch. The skeleton is up from the first moment and stays until the
+  first page of Alta's own (the hook's `frame` says `alta`) — no spinner first, no Canvas launch page in sight. The hook
+  shows a part once nothing in it is loading and nothing in it changed for 100 ms (350 ms of a page with nothing
+  changed anywhere, before); changes in Alta's chrome round it no longer count, and never put off the next look at the
+  page for more than 300 ms; capped at 1.5 s (2.5 s while something in it is still drawn, 4 s while it says it is
+  loading). Each open writes one line on the console — `[Simpl] alta: asked 2 ms · launch 410 ms · page 655 ms ·
+  question 790 ms · shown 905 ms (question, quiet 120 ms, 118 ms after DOMContentLoaded)` — from the hook's own clock
+  (`t`, `nav` on its posts; `quiet`, `capped`, `dcl` on `shown`).
   `scripts/dev/alta-test.mjs` drives the mock's Alta player (`/mock-alta/…`) through it in Chromium; the popup is shot
   as `21a-alta`.
 - **Quizzes (1.3.32).** The quiz's start screen lists every finished attempt, newest first, with its score (when Canvas

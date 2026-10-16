@@ -219,7 +219,11 @@ struct ExternalToolsView: View {
         let label = (t.name + " " + t.host).lowercased()
         if let a = args["assignment"] {
             if label.contains("knewton") {
-                engine.alta = AltaLaunch(course: course, assignment: a, title: title)
+                // (1.3.100) with the assignment's due line, as its row says it ("Due Oct 12 at 11:59 PM · 10 pts"; "" for
+                // "No due date"), for the popup's header
+                let first = item?.sub?.components(separatedBy: " · ").first
+                let due = first.map { $0.hasPrefix("Due ") ? $0 : "" }
+                engine.alta = AltaLaunch(course: course, assignment: a, title: title, dueLine: due)
                 return
             }
             if label.contains("macmillan") || label.contains("sapling") || label.contains("achieve.") {
