@@ -135,6 +135,35 @@ print("/app/mac-beta.json → " + version + (" (beta)" if feed["beta"] else ""))
     mv "$REDIRECTS.new" "$REDIRECTS"
     echo "/download/windows → $WIN_EXE"
   fi
+  # Simpl for Windows' Critical Update feed, /app/windows-latest.json, which the app reads every five minutes between
+  # its hourly looks at GitHub's releases (windows/SimplFluent/Support/Updates.cs, LookForCritical) — a file here, so
+  # those looks never count against the sixty requests an hour GitHub's API allows a network without signing in: the
+  # newest windows-fluent run, a beta's too, and the newest Critical Update's (a release whose notes carry the mark) of
+  # the usual releases and of all. The releases read as the app reads them (UpdatesChoice.cs): a beta by its tag or its
+  # title, a run published both as a beta and as a usual release counted once, as the usual one.
+  WIN_RELS="$(gh api "repos/$REPO/releases?per_page=100" 2>/dev/null || true)"
+  if [ -n "$WIN_RELS" ]; then
+    mkdir -p build/site-sync/public/app
+    printf '%s' "$WIN_RELS" | python3 -c '
+import json, re, sys
+tags = re.compile(r"^windows-fluent-(beta-)?v(\d+)$")
+runs = {}
+for r in json.loads(sys.stdin.read() or "[]"):
+    m = tags.match(r.get("tag_name") or "")
+    if r.get("draft") or not m: continue
+    run = int(m.group(2))
+    beta = bool(m.group(1)) or re.search(r"\bbeta\b", r.get("name") or "", re.I) is not None
+    if run in runs and not runs[run][0]: continue
+    runs[run] = (beta, "<!-- simpl-critical -->" in (r.get("body") or ""))
+if not runs: sys.exit("no Simpl for Windows release")
+def newest(usual, critical):
+    found = [run for run, (beta, crit) in runs.items() if (not usual or not beta) and (not critical or crit)]
+    return max(found) if found else None
+feed = {"newest": newest(True, False), "newestBeta": newest(False, False), "critical": newest(True, True), "criticalBeta": newest(False, True)}
+json.dump(feed, open("build/site-sync/public/app/windows-latest.json", "w"), indent=2)
+print("/app/windows-latest.json → " + json.dumps(feed))
+' || echo "no Simpl for Windows feed written"
+  fi
 fi
 (
   cd build/site-sync

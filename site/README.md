@@ -69,6 +69,12 @@ update feed the app reads every hour (its version, the download's address and SH
 release workflow on the development branch (`scripts/release-mac-app.sh`) rewrites both and pushes
 here after every release, so neither needs editing by hand.
 
+`/app/windows-latest.json` is Simpl for Windows' Critical Update feed: the newest Windows run, a
+beta's too, and the newest Critical Update's of each, which the app reads every five minutes so
+that those looks never count against GitHub's API limit for a network. `scripts/publish-site.sh`
+writes it at every run of the Site workflow (a release published, edited or deleted, and every
+hour).
+
 ## Report a bug
 
 The page at `/report/` takes a kind (Bug, Error, Crash, Reason to disable, Missing feature,
