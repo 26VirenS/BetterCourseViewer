@@ -323,7 +323,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   `alta: view made 38 ms · …`; `-SimplAltaSpare YES` opens a picture's popup in one (`21w-alta-spare`).
   (1.3.102) A lighter page script, saying what it said before. The panels, buttons and verdict are told when something
   may have moved them — a change in the parts kept (their elements and words; a class, a style, a button greyed or not;
-  a fade ending), a part's size or the window's — at the next frame, no oftener than every 200 ms, again 450 ms after a
+  a fade ending; in the answer box itself only a verdict or the buttons' bar, never the caret blinking in a math box),
+  a part's size or the window's — at the next frame, no oftener than every 200 ms, again 450 ms after a
   change in the parts, and every second whatever happens (1.3.53–1.3.101: every 350 ms always); the verdict is read
   again only after a change in the parts. The page is read afresh (its marks lifted) only for a change in the parts or
   Alta's learn flow, or every 2 s; web components are listed once and looked for again only when the page gains an

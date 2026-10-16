@@ -795,6 +795,19 @@ try {
     const looks = (await dp.evaluate(() => window.__barLooks)) - looks0;
     check(looks <= 5 && !(await said()).slice(n0).some((p) => p.kind === 'panels' || p.kind === 'buttons'),
       `${label}: with the question up and nothing changing, its buttons are looked for ${looks} times in 3 s (1.3.101: every 350 ms, 8 or more), and nothing is told again`);
+    // (the caret blinking in the math box — MathQuill's `mq-blink`, a class put on and off every half second while it has
+    // the focus — for 3 s: looked for no more often than with nothing changing, and nothing told)
+    await dp.evaluate(() => { const c = document.createElement('span'); c.id = 'caret'; c.className = 'mq-cursor'; document.getElementById('answer').closest('.lrn_widget').querySelector('.mq-root-block').appendChild(c); });
+    await dp.waitForTimeout(1200);
+    const blink0 = await dp.evaluate(() => window.__barLooks);
+    const nb = (await said()).length;
+    await dp.evaluate(() => { window.__blink = setInterval(() => document.getElementById('caret').classList.toggle('mq-blink'), 500); });
+    await dp.waitForTimeout(3000);
+    const blinks = (await dp.evaluate(() => window.__barLooks)) - blink0;
+    const blinkTold = (await said()).slice(nb).some((p) => p.kind === 'panels' || p.kind === 'buttons');
+    await dp.evaluate(() => { clearInterval(window.__blink); document.getElementById('caret').remove(); });
+    await dp.waitForTimeout(400);
+    check(blinks <= 5 && !blinkTold, `${label}: with the caret blinking in the math box, its buttons are looked for ${blinks} times in 3 s (at most 5, as with nothing changing), and nothing is told again`);
     // (Submit made pressable: told at once, by the change to the button itself)
     const en = await timedChange(() => { document.getElementById('submit').disabled = false; return performance.now(); }, (p) => p.kind === 'buttons' && p.items.some((b) => b.label === 'Submit' && b.enabled));
     check(en !== null && en < 300, `${label}: Submit made pressable is told ${en} ms later (under 300)`);
