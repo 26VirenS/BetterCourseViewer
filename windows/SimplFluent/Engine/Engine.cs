@@ -384,6 +384,10 @@ public sealed partial class Engine : Observable, IShellListener
     public void SignedOut()
     {
         Answers.Clear();
+        // (0.3.22) nothing of this account's Alta kept for the next: its web view made ahead let go, and whether it used
+        // Alta forgotten
+        Prefs.Remove(AltaAccountKey);
+        Simpl.Screens.AltaSpare.Drop("signed out");
         ready = false;
         openedOnKept = false;
         shownNative = false;
@@ -450,7 +454,18 @@ public sealed partial class Engine : Observable, IShellListener
             // (0.3.5: alta:104:4003:/mock-alta/… opens the popup on that page of the mock's, not the assignment's launch —
             //  its learn page with a question, a pop-up of Alta's, for the pictures)
             var parts = a.Split(':', 3);
-            if (parts.Length >= 2) AltaRequested?.Invoke(new AltaLaunch(parts[0], parts[1], "Knewton Alta", parts.Length == 3 && parts[2].StartsWith('/') ? parts[2] : null));
+            if (parts.Length >= 2)
+            {
+                var launch = new AltaLaunch(parts[0], parts[1], "Knewton Alta", parts.Length == 3 && parts[2].StartsWith('/') ? parts[2] : null);
+                // (0.3.22: --alta-spare — opened in a web view made just before, as an account that uses Alta opens it)
+                if (Launch.Flag("alta-spare"))
+                {
+                    Shot.Began();
+                    try { await Simpl.Screens.AltaSpare.MakeNow(this); }
+                    finally { Shot.Ended(); }
+                }
+                AltaRequested?.Invoke(launch);
+            }
         }
         else if (Launch.Take("macmillan:") is { } mm)
         {
@@ -461,6 +476,8 @@ public sealed partial class Engine : Observable, IShellListener
         else if (Launch.Take("compose") != null) NewMessageRequested?.Invoke();
         await RefreshSnapshot();
         await LoadSidebar();
+        // (0.3.22) an account that uses Knewton Alta: its popup's web view made ahead, once the window has been quiet a while
+        if (HasAlta) Simpl.Screens.AltaSpare.Prepare(this, 3);
         // (a first setup quit halfway, or whose save failed, is asked again — the page may have kept some of it — unless
         //  it was put off with Set up later, when it waits for Settings ▸ General ▸ Courses shown and goals)
         var later = Prefs.Bool(SetupLaterKey);
@@ -591,7 +608,63 @@ public sealed partial class Engine : Observable, IShellListener
         // (decoded off the window's thread: a long answer holds up nothing on screen)
         var answer = await Task.Run(() => Decode<T>(name, text));
         Answers.Keep(text, name, a, asked);
+        NoteAlta(name, answer, text); // (0.3.22)
         return (answer, text);
+    }
+
+    // MARK: - (0.3.22) An account that uses Knewton Alta
+
+    /// <summary>
+    /// Whether this account uses Knewton Alta, as far as the app has seen it — the External Tools list naming it, an
+    /// assignment that opens it, an Alta assignment opened — remembered for the account at this school, and forgotten when
+    /// the student signs out. Only such an account has a web view made ahead for Alta's popup (Screens/Alta/AltaSpare).
+    /// </summary>
+    public bool HasAlta => Prefs.Bool(AltaAccountKey);
+
+    private string AltaAccountKey => $"altaAccount:{Host}";
+
+    /// <summary>This account known to use Alta from now on (an Alta assignment opened).</summary>
+    public void KnowAlta()
+    {
+        if (!HasAlta) Prefs.Set(AltaAccountKey, true);
+    }
+
+    /// <summary>An answer that says this account uses Alta — the External Tools list naming Knewton Alta, an assignment
+    /// that opens it (the student on its page, about to open it): known from now on, and a web view made ahead for its
+    /// popup at the next quiet moment.</summary>
+    private void NoteAlta(string name, object? answer, string text)
+    {
+        var says = name switch
+        {
+            "externalTools" => NamesKnewton(text),
+            "assignment" => answer is AssignmentData { Alta: true },
+            _ => false,
+        };
+        if (!says) return;
+        KnowAlta();
+        // (on the window's thread, where its timers run, whichever thread the answer came in on)
+        if (Application.Current?.Dispatcher is not { } ui) return;
+        if (ui.CheckAccess()) Simpl.Screens.AltaSpare.Prepare(this, 0.6);
+        else ui.BeginInvoke(() => Simpl.Screens.AltaSpare.Prepare(this, 0.6));
+    }
+
+    /// <summary>Whether the External Tools list's answer has a tool named for Knewton (its name or its site).</summary>
+    private static bool NamesKnewton(string text)
+    {
+        if (!text.Contains("knewton", StringComparison.OrdinalIgnoreCase)) return false;
+        try
+        {
+            using var doc = JsonDocument.Parse(text);
+            if (!doc.RootElement.TryGetProperty("rows", out var rows) || rows.ValueKind != JsonValueKind.Array) return false;
+            foreach (var r in rows.EnumerateArray())
+            {
+                if (r.ValueKind != JsonValueKind.Object) continue;
+                var label = (r.TryGetProperty("name", out var n) ? n.ToString() : "") + " " + (r.TryGetProperty("host", out var h) ? h.ToString() : "");
+                if (label.Contains("knewton", StringComparison.OrdinalIgnoreCase)) return true;
+            }
+        }
+        catch (JsonException) { }
+        return false;
     }
 
     /// <summary>

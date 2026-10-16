@@ -30,7 +30,12 @@ namespace Simpl.Screens;
 public static class AltaPopup
 {
     // (0.3.21: the moment it was asked for, where the open's timeline starts)
-    public static void Show(Engine.Engine engine, AltaLaunch launch, Window over) => new AltaPopupView(engine, launch, over, Stopwatch.GetTimestamp()).Open();
+    public static void Show(Engine.Engine engine, AltaLaunch launch, Window over)
+    {
+        var asked = Stopwatch.GetTimestamp();
+        engine.KnowAlta(); // (0.3.22: an account that opens Alta has its next popup's web view made ahead)
+        new AltaPopupView(engine, launch, over, asked).Open();
+    }
 }
 
 internal sealed class AltaPopupView
@@ -74,7 +79,8 @@ internal sealed class AltaPopupView
     {
         this.over = over;
         this.engine = engine;
-        session = new AltaSession(engine, launch, over, asked);
+        // (0.3.22: in the web view made ahead for it, when there is one)
+        session = new AltaSession(engine, launch, over, asked, AltaSpare.Take(engine));
         dueLine = launch.Due;
         root.Bg(B.Solid);
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });

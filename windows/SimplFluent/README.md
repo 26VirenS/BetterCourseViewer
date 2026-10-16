@@ -1233,7 +1233,7 @@ Opening one (0.3.21) asks Canvas for the assignment's launch first — the momen
 built (`AltaSession`'s constructor) — and waits for it only to send the page there, while the popup is laid out and its
 web view made and dressed (`LightPages`, the page script); it was asked once all of that was done, and only once the
 popup was up. `Start()` is begun before the popup shows too, though WebView2 makes the web view itself only once the
-popup's window is there — the floor of an open until a web view is kept ready ahead. The header's due line comes with the launch from the
+popup's window is there — the floor of an open, unless a web view was made ahead (0.3.22, below). The header's due line comes with the launch from the
 Assignment screen or a tool's row (`AltaLaunch.Due`); only without one is the Canvas assignment read for it, once the
 launch is on its way. The page script shows the question once its part has been still a tenth of a second (350 ms of the
 whole page before), what says it is still being drawn — MathJax, Learnosity's box not yet in a part headed Question, a
@@ -1241,7 +1241,7 @@ picture not in — still waited for: a second and a half at most when only that 
 something is still being drawn, four while something in it spins (as the Mac's copy), from its first look and never
 lowered by a later one, so a box or picture that comes in after a second and a half still gets its tenth; only a change in the part kept, in
 Alta's learn flow round it, or a kept part taken away, counts, and such changes put off the next look for 300 ms at most.
-Each open writes its timeline to the app's log — "alta: launch asked +N ms · launch answered … · web view … · page …
+Each open writes its timeline to the app's log — "alta: launch asked +N ms · launch answered … · web view made|spare … · page …
 (host) · alta page … · question … · shown +N ms (question, N ms into its page, quiet N ms[, capped])" ("page given" for a
 page asked for) — which the Windows workflow checks for the Alta pictures, and `scripts/dev/alta-test.mjs` checks the
 question is shown under 400 ms after its page has loaded on the mock. (0.3.22) The mock's Alta launch can go as
@@ -1274,6 +1274,20 @@ the parts or Alta's learn flow, or every 2 s; web components are listed once and
 gains an element or a tree; keyword tests read `textContent` before `innerText`; and the mastery bars, the overview's
 words and the cover are read only once the page has been shown, its cover read, or 3 s have passed — while the
 question is shown alone and nothing changed, only every third time. `alta-test.mjs` checks it on Windows' copy.
+
+(0.3.22, the Mac's 1.3.102) A web view made ahead. For an account that uses Alta (`Engine.HasAlta`: the External Tools
+list named Knewton Alta, an assignment opens it, or one was opened — kept per school, forgotten on sign-out) one web view
+for the popup is made ahead (`Screens/Alta/AltaSpare`): at a quiet moment — no call to the school in flight for a while,
+no Alta popup open — three seconds after the Dashboard is up, 0.6 s after an Alta assignment or the External Tools list
+says so, and 1.5 s after each Alta popup closes, never while one opens. It is made and dressed as the popup's own is
+(`AltaSession.Dress`: on Simpl's one browser, its settings, `LightPages`, the look's flags and the page script before
+every page) and holds only an empty page (about:blank), so its page's process is running when the popup takes it
+(`AltaSpare.Take`, by engine: one school, one sign-in); it waits, out of sight, in the main window (WebView2 makes a web
+view only in a window) and the popup's takes it over. One that has shown anything is never handed on, the look's flags
+are put in again if the student changed them since, and it is let go after ten minutes unused, on sign-out and when
+another school is chosen. The timeline says which: `web view spare +N ms` or `web view made +N ms`, and simpl.log
+"alta: a spare web view made ahead (N ms)" as it is made. Picture runs make none unless asked: `--alta-spare` opens
+the popup in one made just before (the `alta-spare` picture).
 
 A pop-up of Alta's (0.3.5) is hidden in the page as soon as the page script sees it and read once it has settled —
 nothing it says changed for a moment, nothing in it loading, its fade done; three seconds at most, five while its body

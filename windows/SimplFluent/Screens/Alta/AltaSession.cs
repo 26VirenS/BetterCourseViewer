@@ -202,8 +202,12 @@ internal sealed class AltaSession
     public event Action? Changed;
 
     public AltaLaunch Launch { get; }
-    /// <summary>Alta's page: the popup places it, shown only while nothing of the popup's own is in its place.</summary>
-    public WebView2 Web { get; } = new() { Visibility = Visibility.Hidden };
+    /// <summary>Alta's page: the popup places it, shown only while nothing of the popup's own is in its place. (0.3.22) The
+    /// web view made ahead for it (AltaSpare), when there was one; else one made with the session.</summary>
+    public WebView2 Web { get; private set; }
+    /// <summary>(0.3.22) The web view made ahead that this open took, dressed already (its scripts in, its empty page
+    /// loaded) — null once Start has taken it up, or when there was none.</summary>
+    private AltaSpare.View? spare;
 
     public AltaReport? Report { get; private set; }
     /// <summary>(1.3.17) The overview Alta opens on: the assignment and its objectives, before a question is asked.</summary>
@@ -259,12 +263,16 @@ internal sealed class AltaSession
     /// <summary>(1.3.23) The assignment's objectives as its overview lists them, kept for this assignment.</summary>
     public List<AltaKnown> Known { get; private set; } = new();
 
-    public AltaSession(Engine.Engine engine, AltaLaunch launch, Window owner, long? asked = null)
+    public AltaSession(Engine.Engine engine, AltaLaunch launch, Window owner, long? asked = null, AltaSpare.View? spare = null)
     {
         this.engine = engine;
         this.owner = owner;
         Launch = launch;
         since = asked ?? Stopwatch.GetTimestamp();
+        this.spare = spare;
+        webHow = spare != null ? "spare" : "made";
+        Web = spare?.Web ?? new WebView2 { Visibility = Visibility.Hidden };
+        AltaSpare.Opened();
         names = ReadJson<Dictionary<string, string>>(NamesKey) ?? new();
         // (0.3.21) the launch asked of Canvas the moment the popup is asked for, before any of it is built — the
         // page sent there once the web view is made (Start)
@@ -307,8 +315,8 @@ internal sealed class AltaSession
     private readonly Task<(Uri? Url, string? Why)>? launching;
 
     /// <summary>Alta opened: the web view made with the engine's web data and the page script put in it while the launch,
-    /// asked as the session was made, is on its way; the page sent to the launch (or to the page asked for) once both are
-    /// done.</summary>
+    /// asked as the session was made, is on its way — (0.3.22) or the one made ahead taken up, all of that done already;
+    /// the page sent to the launch (or to the page asked for) once both are done.</summary>
     public async void Start()
     {
         if (started) return;
@@ -317,38 +325,47 @@ internal sealed class AltaSession
         // (0.3.21) the launch, asked already, waited for only when the page is to go to it — while the web view
         // is made and dressed; it was asked only once all of that was done, its whole time on top of it
         if (ReadJson<List<AltaKnown>>(KnownKey) is { } kept) Known = kept;
-        try
+        if (spare is { } ahead && Web.CoreWebView2 is { } readyCore)
         {
-            var env = await Simpl.Engine.Engine.WebEnvironment();
-            await Web.EnsureCoreWebView2Async(env);
+            spare = null;
+            webReady = Now();
+            darkScript = ahead.FlagsId;
+            // (the look chosen since it was made: its flags put in again, ahead of the page script as they must be)
+            if (ahead.Flags != DarkScript() || ahead.HookId == null)
+            {
+                try
+                {
+                    if (ahead.FlagsId != null) readyCore.RemoveScriptToExecuteOnDocumentCreated(ahead.FlagsId);
+                    if (ahead.HookId != null) readyCore.RemoveScriptToExecuteOnDocumentCreated(ahead.HookId);
+                    darkScript = await readyCore.AddScriptToExecuteOnDocumentCreatedAsync(DarkScript());
+                    await readyCore.AddScriptToExecuteOnDocumentCreatedAsync(AltaHook.Source);
+                }
+                catch (Exception e) { Log.Write("alta script: " + e.Message); }
+                if (closed) return;
+            }
         }
-        catch (Exception e)
+        else
         {
-            Log.Write("alta: " + e.Message);
-            Fail(e.Message);
-            return;
+            try
+            {
+                var made = await Dress(Web, DarkScript(), () => closed, () => webReady = Now());
+                if (made is not { } ids) return;
+                darkScript = ids.Flags;
+            }
+            catch (Exception e)
+            {
+                Log.Write("alta: " + e.Message);
+                Fail(e.Message);
+                return;
+            }
         }
-        if (closed) return;
-        webReady = Now();
         var core = Web.CoreWebView2;
-        core.Settings.AreDevToolsEnabled = true;
-        core.Settings.IsStatusBarEnabled = false;
-        core.Settings.IsPasswordAutosaveEnabled = false;
-        core.Settings.IsGeneralAutofillEnabled = false;
-        // (0.3.5: Alta's page told the student prefers light, as an outside tool's is — Shell's LightPages — so a look of
-        //  its own for dark never comes in; the app turns its question's colours over itself when it is to be dark)
-        await LightPages.Apply(core, "alta");
-        if (closed) return;
-        try
-        {
-            darkScript = await core.AddScriptToExecuteOnDocumentCreatedAsync(DarkScript());
-            await core.AddScriptToExecuteOnDocumentCreatedAsync(AltaHook.Source);
-        }
-        catch (Exception e) { Log.Write("alta script: " + e.Message); }
         core.WebMessageReceived += (_, e) => { if (Said(e) is { } s) Take(s, null); };
         core.FrameCreated += (_, e) => WatchFrame(e.Frame);
         core.NavigationCompleted += (_, _) =>
         {
+            // (0.3.22: never a spare's empty page, which is all it had held before it was taken)
+            if (core.Source.StartsWith("about:", StringComparison.OrdinalIgnoreCase)) return;
             LightPages.Tell(core, "alta");
             if (pageAt == null) { pageAt = Now(); pageHost = HostOf(core); }
             if (!Opening) return;
@@ -368,6 +385,37 @@ internal sealed class AltaSession
         if (url == null) Fail(why ?? "");
         else if (!closed) core.Navigate(url.ToString());
         launched.TrySetResult();
+    }
+
+    /// <summary>
+    /// (0.3.22) A web view for Alta's page, made on Simpl's one browser (the engine's web data: Alta's launch finds the
+    /// student signed in) and dressed: its settings, Alta's page told the student prefers light (0.3.5: as an outside
+    /// tool's is — Shell's LightPages — so a look of its own for dark never comes in; the app turns its question's colours
+    /// over itself when it is to be dark), and before every page the look's flags, then the page script. Made as the popup
+    /// opens, or ahead (AltaSpare). The ids of the two scripts, or null when <paramref name="gone"/> says the web view
+    /// is no longer wanted; <paramref name="made"/> is told the moment the web view itself is made.
+    /// </summary>
+    internal static async Task<(string? Flags, string? Hook)?> Dress(WebView2 web, string flags, Func<bool> gone, Action? made = null)
+    {
+        var env = await Simpl.Engine.Engine.WebEnvironment();
+        await web.EnsureCoreWebView2Async(env);
+        if (gone()) return null;
+        made?.Invoke();
+        var core = web.CoreWebView2;
+        core.Settings.AreDevToolsEnabled = true;
+        core.Settings.IsStatusBarEnabled = false;
+        core.Settings.IsPasswordAutosaveEnabled = false;
+        core.Settings.IsGeneralAutofillEnabled = false;
+        await LightPages.Apply(core, "alta");
+        if (gone()) return null;
+        string? flagsId = null, hookId = null;
+        try
+        {
+            flagsId = await core.AddScriptToExecuteOnDocumentCreatedAsync(flags);
+            hookId = await core.AddScriptToExecuteOnDocumentCreatedAsync(AltaHook.Source);
+        }
+        catch (Exception e) { Log.Write("alta script: " + e.Message); }
+        return gone() ? null : (flagsId, hookId);
     }
 
     /// <summary>(0.3.21) The assignment's launch through Canvas, asked at once: its address, or why there is
@@ -393,6 +441,8 @@ internal sealed class AltaSession
     private readonly long since;
     private long? launchAsked, launchAnswered, webReady, pageAt, altaPageAt, partAt, shownAt;
     private string pageHost = "", partKind = "", shownHow = "";
+    /// <summary>(0.3.22) The web view: "spare", made ahead and taken, or "made" as the popup opened.</summary>
+    private readonly string webHow;
     private double? shownOwn, shownQuiet;
     private bool shownCapped, timelineSaid;
 
@@ -417,9 +467,9 @@ internal sealed class AltaSession
     }
 
     /// <summary>The line, written once: when Alta's page is shown, or else when the open ends without it (it failed, or the
-    /// popup closed first). "alta: launch asked +2 ms · launch answered +240 ms · web view +410 ms · page +620 ms
+    /// popup closed first). "alta: launch asked +2 ms · launch answered +240 ms · web view made +410 ms · page +620 ms
     /// (school.instructure.com) · alta page +1300 ms · question +1700 ms · shown +1820 ms (question, 520 ms into its page,
-    /// quiet 110 ms)".</summary>
+    /// quiet 110 ms)" — (0.3.22) "web view spare +3 ms" for one made ahead.</summary>
     private void SayTimeline(string? end = null)
     {
         if (timelineSaid) return;
@@ -428,7 +478,7 @@ internal sealed class AltaSession
         var parts = new List<string>();
         if (Launch.Page != null && launchAsked == null) parts.Add("page given");
         else { parts.Add("launch asked " + At(launchAsked)); parts.Add("launch answered " + At(launchAnswered)); }
-        parts.Add("web view " + At(webReady));
+        parts.Add($"web view {webHow} " + At(webReady));
         parts.Add($"page {At(pageAt)}" + (pageHost.Length > 0 ? $" ({pageHost})" : ""));
         if (altaPageAt != null) parts.Add("alta page " + At(altaPageAt));
         if (partAt != null) parts.Add($"{partKind} {At(partAt)}");
@@ -522,11 +572,21 @@ internal sealed class AltaSession
         ClosePic();
         foreach (var t in codeAsked.Values) t.TrySetResult(null);
         try { Web.Dispose(); } catch { }
+        AltaSpare.Closed(engine); // (0.3.22: the next popup's web view made ahead, at a quiet moment)
     }
 
     // ---- (1.3.50) light or dark, told to the page; (0.3.5) as the student chooses, not as the app is ----
 
-    private string DarkScript() => $"window.__simplDark = {Js(Dark)}; window.__simplPicsLight = {Js(PicsLight)}; window.__simplBrowser = {Js(Browser)};";
+    private string DarkScript() => Flags(Dark, PicsLight, Browser);
+
+    private static string Flags(bool dark, bool picsLight, bool browser) => $"window.__simplDark = {Js(dark)}; window.__simplPicsLight = {Js(picsLight)}; window.__simplBrowser = {Js(browser)};";
+
+    /// <summary>(0.3.22) The flags a popup opened now starts with (as <see cref="Dark"/>, <see cref="PicsLight"/> and
+    /// <see cref="Browser"/> are first read): the ones a web view made ahead is given.</summary>
+    internal static string FlagsAsKept() => Flags(
+        Support.Launch.Get("alta-look") is { } look ? look == "dark" : Prefs.Bool(DarkKey),
+        Prefs.Bool(PicsLightKey),
+        Support.Launch.Flag("alta-browser") || Prefs.Bool(BrowserKey));
 
     private static string Js(bool b) => b ? "true" : "false";
 

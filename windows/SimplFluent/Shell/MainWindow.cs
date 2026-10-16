@@ -160,6 +160,12 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         pageArea.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         pageArea.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         pageArea.Children.Add(handoff);
+        // (0.3.22) where a web view made ahead for Knewton Alta's popup waits, out of sight, until the popup takes it
+        // (Screens/Alta/AltaSpare: WebView2 makes a web view only in a window)
+        var altaSpares = new Grid { IsHitTestVisible = false };
+        Grid.SetRow(altaSpares, 1);
+        pageArea.Children.Add(altaSpares);
+        Simpl.Screens.AltaSpare.Host = altaSpares;
         pageArea.Visibility = Visibility.Collapsed;
         stage.Children.Add(pageArea);
         stage.Children.Add(cover);
@@ -261,6 +267,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         Prefs.Remove("school");
         SchoolName.Forget(engine.Host);
         Prefs.Remove(Engine.Engine.SetupLaterKey); // (another school's first setup is put up as any first setup is)
+        Simpl.Screens.AltaSpare.Drop("another school"); // (0.3.22: its web view made ahead was for this school)
         var old = engine;
         engine = null;
         old.PropertyChanged -= OnEngine;
