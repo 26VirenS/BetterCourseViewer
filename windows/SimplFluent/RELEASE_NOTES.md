@@ -1,3 +1,8 @@
+**What's new in 0.3.23** (beta)
+
+- **Files open again** — a file linked in an assignment's instructions (or in an announcement, a discussion or a page) now opens the way a module's file does: Simpl asks your school for that file by its id and opens it under its real name, rather than fetching an address made from the link, which at some schools gave nothing or a file named "download"; when the school will not say, the link's own key is kept on the address it fetches.
+- **Alta's maths drawn whole** — between questions, Simpl no longer hides Alta's next question so completely that its answer box measures its brackets and root signs at zero size; they now show right away, with no need to switch to Light and back to Dark. A question whose page changes without Simpl noticing is now shown anyway, and if a question is ever still out of sight after a while, Simpl shows Alta's page as it is.
+
 **What's new in 0.3.22** (beta)
 
 - **Critical updates** — Simpl now looks for a critical update every five minutes while it runs (and as the PC wakes from sleep), not only once an hour, so one reaches you within minutes; the look reads one small file from simplcourses.com rather than asking GitHub, so it never uses up a shared school network's allowance of GitHub requests, shows nothing unless a critical update is found, and other updates still come with the hourly look.
