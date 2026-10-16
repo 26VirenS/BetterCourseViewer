@@ -301,7 +301,7 @@ try {
   const leaked = SECRETS.filter((s) => all.includes(s));
   check(!leaked.length, `never the answer key, the student’s ids or the school’s launch data (${leaked.join(', ') || 'none'})`);
 
-  // (Alta speed) the question shown soon after its page has loaded — a tenth of a second with its part still, where it
+  // (0.3.21) the question shown soon after its page has loaded — a tenth of a second with its part still, where it
   // was 350 ms of the whole page still (and a tick before that) — each word of the page's timed for the app's timeline of
   // the open, and the shown one saying how long the part had been still and whether the wait ran out. Run on each copy of
   // the page script that times its words (`quiet` in its shown word); the best of three loads, so a slow moment on a

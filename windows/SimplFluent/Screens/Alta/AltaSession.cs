@@ -266,7 +266,7 @@ internal sealed class AltaSession
         Launch = launch;
         since = asked ?? Stopwatch.GetTimestamp();
         names = ReadJson<Dictionary<string, string>>(NamesKey) ?? new();
-        // (Alta speed, 0.3.20) the launch asked of Canvas the moment the popup is asked for, before any of it is built — the
+        // (0.3.21) the launch asked of Canvas the moment the popup is asked for, before any of it is built — the
         // page sent there once the web view is made (Start)
         given = Launch.Page is { } p ? engine.Absolute(p) : null;
         if (given == null) launching = AskLaunch();
@@ -297,11 +297,11 @@ internal sealed class AltaSession
 
     // ---- starting ----
 
-    /// <summary>(Alta speed, 0.3.20) Done once the page has been sent on its way — to the launch, or to the page asked for —
+    /// <summary>(0.3.21) Done once the page has been sent on its way — to the launch, or to the page asked for —
     /// or could not be: the popup asks Canvas for the assignment's due line only then, never in the launch's way.</summary>
     public Task Launched => launched.Task;
     private readonly TaskCompletionSource launched = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    /// <summary>(Alta speed, 0.3.20) The page asked for (a page of the mock's, for the pictures), or else the launch,
+    /// <summary>(0.3.21) The page asked for (a page of the mock's, for the pictures), or else the launch,
     /// asked of Canvas as the session is made.</summary>
     private readonly Uri? given;
     private readonly Task<(Uri? Url, string? Why)>? launching;
@@ -314,7 +314,7 @@ internal sealed class AltaSession
         if (started) return;
         started = true;
         Hold(true); // (the screenshot suite waits for Alta's page, not only for the app's own calls)
-        // (Alta speed, 0.3.20) the launch, asked already, waited for only when the page is to go to it — while the web view
+        // (0.3.21) the launch, asked already, waited for only when the page is to go to it — while the web view
         // is made and dressed; it was asked only once all of that was done, its whole time on top of it
         if (ReadJson<List<AltaKnown>>(KnownKey) is { } kept) Known = kept;
         try
@@ -370,7 +370,7 @@ internal sealed class AltaSession
         launched.TrySetResult();
     }
 
-    /// <summary>(Alta speed, 0.3.20) The assignment's launch through Canvas, asked at once: its address, or why there is
+    /// <summary>(0.3.21) The assignment's launch through Canvas, asked at once: its address, or why there is
     /// none (never thrown — the web view may still be being made when it comes).</summary>
     private async Task<(Uri? Url, string? Why)> AskLaunch()
     {
@@ -384,7 +384,7 @@ internal sealed class AltaSession
         finally { launchAnswered = Now(); }
     }
 
-    // ---- (Alta speed, 0.3.20) the open's timeline: one line in the app's log for each open ----
+    // ---- (0.3.21) the open's timeline: one line in the app's log for each open ----
 
     /// <summary>When the popup was asked for (Stopwatch ticks), and since then, in milliseconds: the launch asked of Canvas
     /// and answered, the web view ready, the first page in (its site), the first of Alta's own pages, the part Alta's page
@@ -566,7 +566,7 @@ internal sealed class AltaSession
             case "frame":
                 if (main)
                 {
-                    // (Alta speed: the first of Alta's own pages in — not the school's launch page on the way to it)
+                    // (0.3.21: the first of Alta's own pages in — not the school's launch page on the way to it)
                     if (altaPageAt == null && OnAlta()) altaPageAt = Now();
                     // (1.3.60) a new page: kept out of sight in it until it is laid out — (1.3.62) and the last page's
                     // panels and buttons put away with it
@@ -690,7 +690,7 @@ internal sealed class AltaSession
             case "shown":
                 if (!main) return;
                 PageShown = true;
-                // (Alta speed: Alta's page shown — not the school's launch page on the way to it, shown as it is)
+                // (0.3.21: Alta's page shown — not the school's launch page on the way to it, shown as it is)
                 if (shownAt == null && Str(head["how"]) is { } how && how != "not alta")
                 {
                     shownAt = Now();
@@ -720,7 +720,7 @@ internal sealed class AltaSession
                     return;
                 }
                 if (Read<AltaCover>(head) is not { } c) return;
-                // (Alta speed: an overview that is the assignment's cover is told as the cover, when it was first read)
+                // (0.3.21: an overview that is the assignment's cover is told as the cover, when it was first read)
                 if (partAt == null || partKind == "overview") { partAt ??= Now(); partKind = "cover"; }
                 Cover = c;
                 // (1.3.60) the cover's list is the whole of the assignment's objectives, every one named

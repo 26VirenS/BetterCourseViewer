@@ -29,7 +29,7 @@ namespace Simpl.Screens;
 /// </summary>
 public static class AltaPopup
 {
-    // (Alta speed, 0.3.20: the moment it was asked for, where the open's timeline starts)
+    // (0.3.21: the moment it was asked for, where the open's timeline starts)
     public static void Show(Engine.Engine engine, AltaLaunch launch, Window over) => new AltaPopupView(engine, launch, over, Stopwatch.GetTimestamp()).Open();
 }
 
@@ -129,7 +129,7 @@ internal sealed class AltaPopupView
             AltaLook.Settle(root);
         };
         root.Loaded += loaded;
-        // (Alta speed, 0.3.20: begun before the popup shows, where it was begun only once the popup was up — the web view's
+        // (0.3.21: begun before the popup shows, where it was begun only once the popup was up — the web view's
         //  environment asked for while the popup is laid out; the web view itself is made only once the popup's window is
         //  there, which WebView2 waits for. The launch was asked already, as the session was made.)
         session.Start();
@@ -140,7 +140,7 @@ internal sealed class AltaPopupView
     }
 
     /// <summary>When it is due, from the Canvas assignment (the same words as its page and every list), for the header —
-    /// (Alta speed, 0.3.20) only when the screen it was opened from did not say, and only once the launch is on its way, so
+    /// (0.3.21) only when the screen it was opened from did not say, and only once the launch is on its way, so
     /// the engine answers the launch first.</summary>
     private async void ReadDue()
     {

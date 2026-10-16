@@ -391,7 +391,7 @@ public sealed partial class ExternalToolsScreen : Screen
         engine.OpenTool(ToolLaunch.Assignment(course, it.Id, it.Title));
     }
 
-    /// <summary>(Alta speed, 0.3.20) An assignment's due line as its row has it, for the popup's header — the engine writes
+    /// <summary>(0.3.21) An assignment's due line as its row has it, for the popup's header — the engine writes
     /// the row's line from the same words as the assignment's ("Due Oct 18 at 11:59 PM · 20 pts"); "" with no due date,
     /// null where the row does not say.</summary>
     private static string? DueOf(Item it)

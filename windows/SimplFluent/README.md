@@ -1209,7 +1209,7 @@ the question — its green "Yes that's right. Keep it up!" strip, its red "Not q
 else by its class) and shown as the popup's own pill at the left of its buttons, Correct in green or Incorrect in red
 (`VerdictPill`), until the strip goes with the next question.
 
-Opening one (0.3.20) asks Canvas for the assignment's launch first — the moment it is asked for, before the popup is
+Opening one (0.3.21) asks Canvas for the assignment's launch first — the moment it is asked for, before the popup is
 built (`AltaSession`'s constructor) — and waits for it only to send the page there, while the popup is laid out and its
 web view made and dressed (`LightPages`, the page script); it was asked once all of that was done, and only once the
 popup was up. `Start()` is begun before the popup shows too, though WebView2 makes the web view itself only once the
