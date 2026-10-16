@@ -1184,6 +1184,12 @@ jobs:
             if ($name -in @('alta-overview', 'alta-start')) {
               $asked = [regex]::Match("$line", '^launch asked \+(\d+) ms')
               if (-not $asked.Success -or [int]$asked.Groups[1].Value -gt 1500) { Write-Host "::error::${name}: the launch was not asked at once ('$line') (shots/profile-$name.log)"; exit 1 }
+              # (asked before the web view was made, not after it as before 0.3.20 — and whether the launch or the web view
+              # was the longer wait, for the run's record)
+              $made = [regex]::Match("$line", ' . web view \+(\d+) ms')
+              if (-not $made.Success -or [int]$asked.Groups[1].Value -ge [int]$made.Groups[1].Value) { Write-Host "::error::${name}: the launch was not asked before the web view was made ('$line') (shots/profile-$name.log)"; exit 1 }
+              $answered = [regex]::Match("$line", ' . launch answered \+(\d+) ms')
+              if ($answered.Success -and [int]$answered.Groups[1].Value -gt [int]$made.Groups[1].Value) { Write-Host "::warning::${name}: the launch came after the web view was made — the launch held the open back ('$line')" }
             } elseif ("$line" -notmatch ' . shown \+\d+ ms \(question, .*quiet \d+ ms') { Write-Host "::error::${name}: the question was not shown with how long its part was still ('$line') (shots/profile-$name.log)"; exit 1 }
             if ("$line" -match 'capped\)') { Write-Host "::warning::${name}: Alta's page was shown only because the wait ran out ('$line')" }
             Write-Host "${name}: $line"
