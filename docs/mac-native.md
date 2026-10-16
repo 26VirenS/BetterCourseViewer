@@ -587,7 +587,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   Update" with a mark in its notes; publish-site.sh names the newest one in both feeds (`criticalVersion`), and a Mac
   on an older version installs the feed's newest at its next check (Updater.swift) — paused, a version put back, a
   quiz open: nothing holds it back — with a notice over the window while it installs, tried again every ten minutes if
-  it fails. Only copies from 1.3.72 on know to do this.
+  it fails (1.3.102: every five). Only copies from 1.3.72 on know to do this. (1.3.102) A running copy looks for one
+  every five minutes between its checks (Updates, below), so a Critical Update reaches a Mac in use within minutes.
   (1.3.74) The 3D builder's shapes are laid out by VSEPR, not found by forces (`Tools/MoleculeShape.swift`, `VSEPR`):
   round each atom its bonds, lone pairs and an odd electron take the directions their number gives (a line, a
   triangle, a tetrahedron, a trigonal bipyramid with lone pairs round its middle, an octahedron with lone pairs
@@ -1381,9 +1382,15 @@ Simpl for Mac keeps itself up to date (`Support/Updater.swift`, a port of the Sa
   ID, the hardened runtime, a secure timestamp, both kinds of Mac — and is only notarized, stapled and published,
   about a minute and a half. Dispatched sooner, it compiles the app itself from the newest push's intermediates, as
   before but with one push's changes to compile.
-- **When.** At launch when the last check is more than four hours old, then every four hours (looked at every ten
-  minutes and whenever the app comes to the front, so a Mac asleep does not stretch the wait), and on **Simpl ▸ Check
-  for Updates…** or *Check Now* in **Settings ▸ Updates**. The menu opens Settings on Updates when there is a version
+- **When.** At launch when the last check is more than an hour old, then every hour (looked at every five minutes and
+  whenever the app comes to the front, so a Mac asleep does not stretch the wait), and on **Simpl ▸ Check for
+  Updates…** or *Check Now* in **Settings ▸ Updates**. (1.3.102) **Critical Updates every five minutes**: each time
+  the hour is not up, and a few seconds after the Mac wakes, when the feed was last read five minutes ago or more, the
+  app reads the feed it follows (the beta feed on the beta channel, which names `criticalVersion` as the usual one
+  does) for a Critical Update alone (`Updater.scanForCritical`): without the cache, a ten-second timeout, nothing
+  shown. Only when it names one newer than this copy, that this Mac runs, does the usual check run, and the Critical
+  Update goes in at once with its notice. None while a check, a download or an install is under way or a Critical
+  Update's notice is up; one timer does it all. The menu opens Settings on Updates when there is a version
   to install or the check failed, and says *up to date* otherwise.
 - **Installing.** *Update Now* installs at once. Otherwise an update installs itself — always: (1.3.86) there is no
   *Install updates automatically* switch any more, and a Mac that had it off has it on again (its old `autoUpdate`
