@@ -122,7 +122,8 @@ try {
   check(pq.kind === 'question' && pa.kind === 'answer' && pq.y < pa.y && pa.y - (pq.y + pq.h) >= 40 && pn.height >= pa.y + pa.h && pq.w > 200,
     `what the question asks and its answer are two panels with a gap between, and the page's height is told (${JSON.stringify(pn)})`);
   // (1.3.99) Alta's verdict on the question — its strip under the answer box — is told with the panels, for the app's
-  // pill beside its buttons: wrong or right by its words, else by its class; nothing while none is shown; gone with it
+  // pill beside its buttons: wrong or right by its words only (1.3.100: never by a class); nothing while none is shown;
+  // gone with it
   check(pn.verdict === '', 'with no verdict shown, none is told');
   const nv = (await posts()).length;
   await page.evaluate(() => window.mockVerdict(false));
@@ -135,7 +136,17 @@ try {
   check(!!(await waitFor((p, k) => k >= nv2 && p.kind === 'panels' && p.verdict === 'right', 'the verdict (right)')), 'Alta’s “Yes that’s right” strip is read as a right answer');
   const nv3 = (await posts()).length;
   await page.evaluate(() => { document.getElementById('verdict').textContent = 'Your work is saved as you go.'; document.getElementById('verdict').className = 'feedback__banner___2Kq1x feedback__incorrect___3bY7t'; });
-  check(!!(await waitFor((p, k) => k >= nv3 && p.kind === 'panels' && p.verdict === 'wrong', 'the verdict by class')), 'a strip whose words decide nothing is read by its class');
+  check(!!(await waitFor((p, k) => k >= nv3 && p.kind === 'panels' && p.verdict === '', 'no verdict by class')), 'a strip whose words decide nothing tells no verdict, whatever its class (1.3.100)');
+  // (1.3.100) what showed Correct on a question not yet answered: a box whose class says "right" or "status" (layout),
+  // and a screen reader's 1-pixel live region keeping "Yes that's right" from the last question — neither tells one
+  const nv3b = (await posts()).length;
+  await page.evaluate(() => {
+    const v = document.getElementById('verdict'); v.className = 'status__bar text-right result__row'; v.textContent = '1 of 3';
+    v.insertAdjacentHTML('afterend', '<div id="srlive" role="status" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Yes that’s right. Keep it up!</div>');
+  });
+  await page.waitForTimeout(900);
+  check(!(await posts()).slice(nv3b).some((p) => p.kind === 'panels' && p.verdict), 'a layout class with "right" or "status" in it, or a screen reader’s hidden live region, never shows a verdict');
+  await page.evaluate(() => document.getElementById('srlive').remove());
   const nv4 = (await posts()).length;
   await page.evaluate(() => { document.getElementById('verdict').remove(); document.getElementById('nextq').remove(); document.getElementById('submit').hidden = false; });
   check(!!(await waitFor((p, k) => k >= nv4 && p.kind === 'panels' && p.verdict === '', 'the verdict gone')), 'and when the strip goes, so does the verdict');
