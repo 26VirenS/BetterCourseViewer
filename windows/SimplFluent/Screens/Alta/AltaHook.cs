@@ -19,11 +19,14 @@ internal static class AltaHook
           if (window.__simplAltaOn || !/^https?:$/.test(location.protocol)) return;
           window.__simplAltaOn = true;
           var post = function (m) { try { window.chrome.webview.postMessage(JSON.stringify(m)); } catch (e) {} };
-          // (Alta speed) a word timed for the app's timeline of the open: milliseconds since this page began to load (t), and
-          // when that was (nav)
+          // (1.3.101) a post timed for the app's line on how long the open took: when this page began (`nav`, the clock's
+          // time) and how long after that it was posted (`t`)
           var stamp = function (m) { try { m.t = Math.round(performance.now()); m.nav = Math.round(performance.timeOrigin); } catch (e) {} return m; };
-          // (1.3.46) this page made known to the app, for Save Page Code (each frame's code is asked of it there)
-          post(stamp({ kind: 'frame' }));
+          // (Alta's page, by its address — not the launch on the way to it)
+          var altaHere = /knewton|alta/i.test(location.hostname + location.pathname);
+          // (1.3.46) this page made known to the app, for Save Page Code (each frame's code is asked of it there) — (1.3.101)
+          // and whether it is Alta's: the app's skeleton stays up until the first of Alta's own
+          post(stamp({ kind: 'frame', alta: altaHere }));
           // (1.3.60) Alta's page kept out of sight from its first moment until it is laid out — its question on glass, its
           // cover as the start screen, or (not recognised) as it is — so it never flashes in before its question; the app
           // shows its own Loading meanwhile. A page that is not Alta's (the launch on the way to it) is shown at once.
@@ -34,11 +37,18 @@ internal static class AltaHook
           var dialogInPage = false;
           if (window.top === window) {
             var showing = false;
-            var veils = /knewton|alta/i.test(location.hostname + location.pathname);
-            // (Alta speed: with how long the part had been still, and whether it was shown only because the wait ran out)
+            var veils = altaHere;
+            // (1.3.101) `steady`: how long the part shown had been quiet, and whether a cap showed it before it was — with
+            // when the page's DOMContentLoaded came, for the app's line
             reveal = function (how, steady) {
               if (document.documentElement) document.documentElement.setAttribute('data-simpl-shown', '');
-              if (!showing) { showing = true; post(stamp({ kind: 'shown', how: how || '', quiet: steady ? steady.quiet : null, capped: !!(steady && steady.capped) })); }
+              if (!showing) {
+                showing = true;
+                var nt = null;
+                try { nt = performance.getEntriesByType('navigation')[0] || null; } catch (e) {}
+                post(stamp({ kind: 'shown', how: how || '', quiet: steady ? steady.quiet : null, capped: !!(steady && steady.capped),
+                  dcl: nt && nt.domContentLoadedEventStart ? Math.round(nt.domContentLoadedEventStart) : null }));
+              }
             };
             // (1.3.62) out of sight again — Alta between one part and the next, taking its time — until the next is laid out
             // (0.3.5: never while the student has asked for the browser)
@@ -1022,22 +1032,43 @@ internal static class AltaHook
             window.__simplBrowserNow = function () { dialogTick(); schedule(0); return true; };
             // (1.3.68) the question shown once Alta has finished drawing it — nothing changed for a moment (its maths set, its
             // answer box built, its pictures in) — or after two and a half seconds at most: the app's skeleton meanwhile.
-            // (1.3.100) Shown on readiness rather than on a long silence: nothing in it still loading (its maths, its
+            // (1.3.101) Shown on readiness rather than on a long silence: nothing in it still loading (its maths, its
             // pictures, Learnosity's box) and nothing in the part shown changed for 100 ms — a layout and two frames, where
-            // 1.3.68–1.3.99 waited 350 ms — Alta's own round it (its header's bars, the chat button, a celebration) no longer
+            // 1.3.68–1.3.100 waited 350 ms — Alta's own round it (its header's bars, the chat button, a celebration) no longer
             // counted once a part is kept (`keptChange`; `lastChange` is every change, which a pop-up's next step is read by).
             // At most a second and a half when only that quiet is missing, two and a half while something in it is still
             // being drawn, four while it says it is loading (1.3.70).
             var lastChange = Date.now(), keptChange = Date.now(), steadyTimer = null, steadySince = 0;
-            // (a part headed Question whose Learnosity box is not drawn in it yet — only the place Alta keeps for it — is still
-            // being drawn: its words would show without the box to answer in)
-            var undrawn = function () { return cards().some(function (k) { return /^question$/i.test(title(k)) && !k.querySelector('.lrn_widget, .lrn_qr'); }); };
+            // (1.3.101) MathJax 3's typesetting watched: its startup promise (each typeset chains a new one onto it) settled
+            var mj3 = null, mj3Done = true;
+            var watchMathJax = function () {
+              var p = window.MathJax && window.MathJax.startup && window.MathJax.startup.promise;
+              if (!p || p === mj3 || typeof p.then !== 'function') return;
+              mj3 = p; mj3Done = false;
+              var done = function () { if (mj3 === p) mj3Done = true; };
+              try { p.then(done, done); } catch (e) { mj3Done = true; }
+            };
+            // (1.3.101) the maths in the parts kept not set yet: a formula of MathJax 2's with nothing drawn beside its script
+            // (not queued yet — it adds no MathJax_Processing until it is), MathJax 3 typesetting, or its TeX still in the words
+            var mathsPending = function () {
+              if ([].some.call(document.querySelectorAll('section[data-simpl-keep] script[type^="math/tex"]'), function (s) { return !(s.id && document.getElementById(s.id + '-Frame')); })) return true;
+              if (!(window.MathJax && window.MathJax.startup)) return false;
+              watchMathJax();
+              if (!mj3Done) return true;
+              return [].some.call(document.querySelectorAll('section[data-simpl-keep]'), function (k) { return /\\\(|\\\[/.test(k.textContent || ''); });
+            };
+            // (1.3.101) a question's answer box drawn: Learnosity's own widget in it, with a size — its embed alone
+            // (`.learnosity-item`, an empty learnosity__ box) is there before Learnosity has fetched or drawn anything
+            var answerBox = function () {
+              return [].some.call(document.querySelectorAll('section[data-simpl-keep] .lrn_widget, section[data-simpl-keep] .lrn_qr, section[data-simpl-keep] [class*="lrn_response"]'), function (w) { var b = w.getBoundingClientRect(); return b.width > 0 && b.height > 0; });
+            };
             var revealSteady = function (state) {
               if (!steadySince) steadySince = Date.now();
               var quiet = Date.now() - keptChange;
               var spinning = state === 'overview' ? busy(document.body) : [].some.call(document.querySelectorAll('[data-simpl-keep]'), busy);
               var pending = spinning || !!document.querySelector('.MathJax_Processing, .lrn_loading, [class*="lrn-loading"]')
-                || [].some.call(document.querySelectorAll('[data-simpl-keep] img'), function (i) { return !i.complete; }) || undrawn();
+                || [].some.call(document.querySelectorAll('[data-simpl-keep] img'), function (i) { return !i.complete; })
+                || (state === 'question' && !answerBox()) || (state !== 'overview' && mathsPending());
               var ready = quiet >= 100 && !pending;
               if (ready || Date.now() - steadySince > (spinning ? 4000 : pending ? 2500 : 1500)) {
                 steadySince = 0;
@@ -1047,7 +1078,7 @@ internal static class AltaHook
               if (steadyTimer) clearTimeout(steadyTimer);
               steadyTimer = setTimeout(function () { steadyTimer = null; revealSteady(state); }, pending ? 120 : Math.max(20, 100 - quiet));
             };
-            // (1.3.100) a change in the part kept (or in Alta's learn flow round it, where the next part comes), or a kept
+            // (1.3.101) a change in the part kept (or in Alta's learn flow round it, where the next part comes), or a kept
             // part taken away — the page itself, before a part is kept
             var inKept = function (list) {
               if (!keptNow.length || keptNow.some(function (k) { return !k.isConnected; })) return true;
@@ -1063,10 +1094,13 @@ internal static class AltaHook
                 lastChange = now;
                 if (mine) keptChange = now;
                 if (!changeSince) changeSince = now;
+                watchMathJax();
                 // (the page looked at again 120 ms after the last change, as before — put off by later changes in the part
                 // shown for 300 ms at most, so a page that never stops changing is still looked at; a change elsewhere never
-                // puts it off, only brings a later one sooner)
-                if (!timer || dueAt - now > 120 || (mine && now - changeSince < 300)) schedule();
+                // puts it off, and once a part is kept is looked at no oftener than every 400 ms — Alta's chrome changing
+                // all the time never has the page read over and over while Alta draws its next part)
+                if (mine) { if (!timer || dueAt - now > 120 || now - changeSince < 300) schedule(); }
+                else if (!timer || dueAt - now > 400) schedule(400);
               }).observe(document, { childList: true, subtree: true, characterData: true });
             } catch (e) {}
             schedule();
