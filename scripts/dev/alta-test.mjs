@@ -393,6 +393,170 @@ try {
   };
   if (/quiet:/.test(source)) await speedChecks('the page script', source, false);
 
+  // (maths drawn whole) Alta's maths drawn whole the first time, and the question never left out of sight — checked on
+  // each copy of the page script. Learnosity's answer box (MathQuill) sizes its brackets and its √ to what they hold as
+  // it draws them, from their height then, and never again until the student types: the next question, put in as the
+  // last went and drawn before the page script had looked at the page again, was drawn hidden (display: none — nothing
+  // has a size), its brackets and √ flat, and stayed so, in dark and light and in the browser, until the page was loaded
+  // again. Here a box is drawn as MathQuill draws one, from what it measures as it is drawn: in the next question put in
+  // at once and a moment later, in dark and light; in a box Alta itself drew out of sight (sized again once it shows,
+  // in the browser too); and a question Alta shows by its class alone, a page that never settles, and a look at the page
+  // that goes wrong are never left out of sight.
+  const renderChecks = async (label, src, win) => {
+    const LEARN = `${BASE}/mock-alta/learn/course/c1/assignment/a3`;
+    const open = async (dark, extra) => {
+      const rp = await browser.newPage();
+      await rp.addInitScript(({ w, dark }) => {
+        window.__posted = []; window.__postedAt = [];
+        const put = (s) => { window.__posted.push(s); window.__postedAt.push(performance.now()); };
+        if (w) { window.chrome = window.chrome || {}; window.chrome.webview = { postMessage: put }; } else window.webkit = { messageHandlers: { simplAlta: { postMessage: put } } };
+        window.__simplDark = dark; window.__simplPicsLight = false; window.__simplBrowser = false;
+        // (MathQuill's own makeup: each bracket and the √ a .mq-scaled, sized by a transform from what it holds, in ems,
+        // as it is drawn — its Bracket and SquareRoot reflow)
+        window.__drawBox = (into) => {
+          into.innerHTML = '<span class="mq-math-mode" style="font-size:20px"><span class="mq-root-block">d/dx <span class="mq-non-leaf"><span class="mq-scaled mq-paren" style="display:inline-block">(</span><span class="mq-non-leaf" style="display:inline-block"><span class="mq-non-leaf"><span class="mq-scaled mq-sqrt-prefix" style="display:inline-block">√</span><span class="mq-non-leaf mq-sqrt-stem" style="display:inline-block;border-top:1px solid;padding-top:2px">64x<sup>-3</sup></span></span></span><span class="mq-scaled mq-paren" style="display:inline-block">)</span></span> = <span class="mq-editable-field" style="display:inline-block;width:80px;height:24px;border:1px solid"></span></span></span>';
+          const em = (e, h) => h / parseFloat(getComputedStyle(e).fontSize);
+          const stem = into.querySelector('.mq-sqrt-stem'), inner = into.querySelector('.mq-paren').nextElementSibling;
+          const hs = em(stem, stem.clientHeight), hb = em(inner, inner.offsetHeight);
+          into.querySelector('.mq-sqrt-prefix').style.transform = `scale(1, ${hs - 0.1})`;
+          into.querySelectorAll('.mq-paren').forEach((p) => { p.style.transform = `scale(${Math.min(1 + 0.2 * (hb - 1), 1.2)}, ${1.2 * hb})`; });
+          const sec = into.closest('section');
+          return { h: Math.round(hb * 100) / 100, display: sec ? getComputedStyle(sec).display : '', opacity: sec ? getComputedStyle(sec).opacity : '' };
+        };
+        // (each bracket's and the √'s height, as drawn now: 0 or less is flat)
+        window.__boxScales = (root) => [...(root || document).querySelectorAll('.mq-scaled')].map((e) => { const m = /scale\(([^,]+),\s*([^)]+)\)/.exec(e.style.transform); return m ? Math.round(+m[2] * 100) / 100 : null; });
+      }, { w: win, dark });
+      await rp.addInitScript({ content: src });
+      if (extra) await rp.addInitScript(extra);
+      return rp;
+    };
+    const said = (rp) => rp.evaluate(() => window.__posted.map((s, i) => Object.assign(JSON.parse(s), { at: window.__postedAt[i] })));
+    const shownBy = async (rp, after, ms) => {
+      for (let i = 0; i < ms / 50; i++) { const s = (await said(rp)).filter((p) => p.kind === 'shown' && p.at >= after); if (s.length) return s[0]; await rp.waitForTimeout(50); }
+      return null;
+    };
+    const ready = async (rp) => { await rp.goto(LEARN); const s = await shownBy(rp, 0, 6000); await rp.waitForTimeout(400); return s; };
+    const whole = (sc) => sc.length === 3 && sc.every((v) => v > 0.8);
+
+    // the next question as Alta's React puts it in: a new part where the last was, Learnosity's box drawn into it in the
+    // same moment or 60 ms later (before the page script has looked at the page again) — in dark and in light
+    for (const dark of [true, false]) {
+      for (const D of [-1, 60]) {
+        const rp = await open(dark);
+        await ready(rp);
+        const t0 = await rp.evaluate((D) => {
+          const old = document.getElementById('qsec'), sec = old.cloneNode(true);
+          sec.id = 'qsec2';
+          [sec, ...sec.querySelectorAll('*')].forEach((e) => [...e.attributes].forEach((a) => { if (/^data-simpl/.test(a.name)) e.removeAttribute(a.name); }));
+          const w = sec.querySelector('.lrn_widget'), holder = w.parentNode;
+          w.remove();
+          old.replaceWith(sec);
+          window.__drawn = null;
+          const draw = () => { const w2 = document.createElement('div'); w2.className = 'lrn lrn_widget lrn_qr lrn_clozeformula'; holder.appendChild(w2); window.__drawn = window.__drawBox(w2); };
+          if (D < 0) draw(); else setTimeout(draw, D);
+          return performance.now();
+        }, D);
+        await rp.waitForTimeout(1200);
+        const r = await rp.evaluate(() => {
+          const s = document.getElementById('qsec2'), cs = getComputedStyle(s);
+          return { drawn: window.__drawn, scales: window.__boxScales(s), kept: s.hasAttribute('data-simpl-keep'), opacity: cs.opacity, display: cs.display, filter: cs.filter, q: document.documentElement.hasAttribute('data-simpl-q') };
+        });
+        const fixed = (await said(rp)).some((p) => p.kind === 'remeasured' && p.at >= t0);
+        await rp.close();
+        check(!!r.drawn && r.drawn.h > 1 && r.drawn.display !== 'none' && r.drawn.opacity === '0' && whole(r.scales) && r.kept && r.q && r.opacity === '1' && r.display !== 'none' && /invert/.test(r.filter) === dark && !fixed,
+          `${label}, ${dark ? 'dark' : 'light'}: the next question’s answer box drawn ${D < 0 ? 'in the moment' : D + ' ms after'} its part is put in is drawn whole — laid out as it was drawn, out of sight but never hidden (${r.drawn && r.drawn.h} em tall, opacity ${r.drawn && r.drawn.opacity}, display ${r.drawn && r.drawn.display}), its brackets and √ ${JSON.stringify(r.scales)}, the part kept and in sight after`);
+      }
+    }
+
+    // a box Alta itself drew out of sight (its own display: none), flat, then shown: sized again by the page script as
+    // MathQuill sizes it, and the app told — on the question shown alone, and in the browser (Alta's page as it is)
+    for (const inBrowser of [false, true]) {
+      const rp = await open(true);
+      await ready(rp);
+      if (inBrowser) { await rp.evaluate(() => { window.__simplBrowser = true; window.__simplBrowserNow(); }); await rp.waitForTimeout(400); }
+      const t0 = await rp.evaluate(() => {
+        const box = document.createElement('div'); box.id = 'altaHid'; box.style.display = 'none';
+        document.querySelector('#qsec .lrn_widget').appendChild(box);
+        window.__flat = window.__drawBox(box);
+        window.__flatScales = window.__boxScales(box);
+        box.style.display = '';
+        return performance.now();
+      });
+      await rp.waitForTimeout(900);
+      const r = await rp.evaluate(() => ({ before: window.__flatScales, after: window.__boxScales(document.getElementById('altaHid')), q: document.documentElement.hasAttribute('data-simpl-q') }));
+      const told = (await said(rp)).find((p) => p.kind === 'remeasured' && p.at >= t0);
+      await rp.close();
+      check(r.before.every((v) => v <= 0) && whole(r.after) && !!told && told.count === 3 && r.q === !inBrowser,
+        `${label}${inBrowser ? ', in the browser' : ''}: a box Alta drew out of sight, its brackets and √ flat (${JSON.stringify(r.before)}), is sized again once it shows (${JSON.stringify(r.after)}), and the app told (${told && told.count})`);
+    }
+
+    // the next question shown by its class alone (no part put in or taken out): seen as it comes — before, it waited out
+    // the eight seconds' grace between parts, or for good while the last one was still kept
+    {
+      const rp = await open(true);
+      await ready(rp);
+      await rp.evaluate(() => {
+        const st = document.createElement('style'); st.textContent = '.alta-gone { display: none; }'; document.head.appendChild(st);
+        const old = document.getElementById('qsec'), sec = old.cloneNode(true);
+        sec.id = 'qsec2'; sec.classList.add('alta-gone');
+        [sec, ...sec.querySelectorAll('*')].forEach((e) => [...e.attributes].forEach((a) => { if (/^data-simpl/.test(a.name)) e.removeAttribute(a.name); }));
+        old.after(sec);
+      });
+      await rp.waitForTimeout(800);
+      const t0 = await rp.evaluate(() => { document.getElementById('qsec').classList.add('alta-gone'); setTimeout(() => document.getElementById('qsec2').classList.remove('alta-gone'), 300); return performance.now(); });
+      const s = await shownBy(rp, t0, 4000);
+      const r = await rp.evaluate(() => { const q2 = document.getElementById('qsec2'); return { kept: q2.hasAttribute('data-simpl-keep'), opacity: getComputedStyle(q2).opacity }; });
+      await rp.close();
+      check(!!s && s.at - t0 < 1200 && s.how === 'question' && r.kept && r.opacity === '1',
+        `${label}: the next question, shown by its class alone, is in sight ${s ? Math.round(s.at - t0) : '—'} ms after the last went (under 1200)`);
+    }
+
+    // the first question of a page, shown by its class alone 300 ms in
+    {
+      const rp = await open(true, () => { document.addEventListener('DOMContentLoaded', () => { const st = document.createElement('style'); st.textContent = '.alta-gone { display: none; }'; document.head.appendChild(st); const q = document.getElementById('qsec'); q.classList.add('alta-gone'); setTimeout(() => q.classList.remove('alta-gone'), 300); }); });
+      await rp.goto(LEARN);
+      const s = await shownBy(rp, 0, 9500);
+      const dcl = await rp.evaluate(() => performance.getEntriesByType('navigation')[0].domContentLoadedEventStart);
+      await rp.close();
+      check(!!s && s.how === 'question' && s.at - dcl < 1500, `${label}: a first question shown by its class alone, 300 ms in, is in sight ${s ? Math.round(s.at - dcl) : '—'} ms after DOMContentLoaded (under 1500; it waited eight seconds before)`);
+    }
+
+    // a page that never settles — its answer box never drawn (Learnosity's empty embed only), the part changing all the
+    // time — is still shown, at its cap, never left behind the skeleton
+    {
+      const rp = await open(true, () => { document.addEventListener('DOMContentLoaded', () => { const w = document.querySelector('.lrn_widget'); const holder = w.parentNode; w.remove(); holder.insertAdjacentHTML('beforeend', '<div class="learnosity-item"></div>'); const a = document.getElementById('asks'); let k = 0; setInterval(() => { a.setAttribute('data-k', String(k)); a.lastChild.textContent = 'Find the derivative. ' + (k++ % 2 ? ' ' : ''); }, 30); }); });
+      await rp.goto(LEARN);
+      const s = await shownBy(rp, 0, 6000);
+      const dcl = await rp.evaluate(() => performance.getEntriesByType('navigation')[0].domContentLoadedEventStart);
+      await rp.close();
+      check(!!s && s.how === 'question' && s.capped === true && s.at - dcl < 3500, `${label}: a page that never settles (no answer box, changing all the time) is still shown at its cap, ${s ? Math.round(s.at - dcl) : '—'} ms after DOMContentLoaded (under 3500)`);
+    }
+
+    // a look at the page that goes wrong (here, Alta's page throwing as it is read, twice) as the next question is shown by
+    // its class: the page is looked at again on its own and the question shown — what Light then Dark did by hand
+    {
+      const rp = await open(true);
+      await ready(rp);
+      await rp.evaluate(() => {
+        const st = document.createElement('style'); st.textContent = '.alta-gone { display: none; }'; document.head.appendChild(st);
+        const old = document.getElementById('qsec'), sec = old.cloneNode(true);
+        sec.id = 'qsec2'; sec.classList.add('alta-gone');
+        [sec, ...sec.querySelectorAll('*')].forEach((e) => [...e.attributes].forEach((a) => { if (/^data-simpl/.test(a.name)) e.removeAttribute(a.name); }));
+        old.after(sec);
+        const qsa = Document.prototype.querySelectorAll;
+        window.__throwReads = 0;
+        document.querySelectorAll = function (sel) { if (window.__throwReads > 0 && sel === '[class*="learn-flow-body"]') { window.__throwReads--; throw new Error('unreadable'); } return qsa.call(this, sel); };
+      });
+      await rp.waitForTimeout(800);
+      const t0 = await rp.evaluate(() => { window.__throwReads = 2; document.getElementById('qsec').classList.add('alta-gone'); setTimeout(() => document.getElementById('qsec2').classList.remove('alta-gone'), 50); return performance.now(); });
+      let keptAt = null;
+      for (let i = 0; i < 60 && keptAt === null; i++) { keptAt = await rp.evaluate((t0) => (document.getElementById('qsec2').hasAttribute('data-simpl-keep') ? Math.round(performance.now() - t0) : null), t0); if (keptAt === null) await rp.waitForTimeout(50); }
+      const r = await rp.evaluate(() => { const q2 = document.getElementById('qsec2'); return { left: window.__throwReads, opacity: getComputedStyle(q2).opacity, shown: document.documentElement.hasAttribute('data-simpl-shown') }; });
+      await rp.close();
+      check(r.left === 0 && keptAt !== null && keptAt < 2000 && r.opacity === '1' && r.shown, `${label}: a look at the page that goes wrong (twice) never leaves the next question out of sight: it is looked at again on its own and shown, ${keptAt} ms after the last went (under 2000)`);
+    }
+  };
+
   // (Windows 0.3.5) Simpl for Windows' copy of the page script (windows/SimplFluent/Screens/Alta/AltaHook.cs), where it is
   // in this checkout: Alta's pop-ups read whole once they have settled — the body that comes in after the pop-up opens,
   // its lists, formulas and pictures, all its buttons, each step — and given back to the page when they cannot be
@@ -560,6 +724,7 @@ try {
     await wp.close();
     if (/quiet:/.test(winSource)) await speedChecks('Windows’ copy', winSource, true);
     else check(false, 'Windows’ copy of the page script times its words and says how long its part was still (its shown word has `quiet`)');
+    await renderChecks('Windows’ copy', winSource, true);
   }
 } finally {
   await browser.close();
