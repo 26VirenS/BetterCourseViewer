@@ -26,6 +26,8 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.20", "2026-10-16",
+            ("fixed", "Alta verdict", "Correct shows only once Alta says so.")),
         R("0.3.19", "2026-10-15",
             ("new", "Alta verdict", "Correct or Incorrect shows beside Continue.")),
         R("0.3.18", "2026-10-15",

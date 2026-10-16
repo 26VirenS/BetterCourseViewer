@@ -1,3 +1,7 @@
+**What's new in 0.3.20** (beta)
+
+- **Alta verdict** — Correct or Incorrect beside Continue shows only once Alta has said so in its own words; 0.3.19 could show Correct on a question not yet answered.
+
 **What's new in 0.3.19** (beta)
 
 - **Alta verdict** — when Knewton Alta says a question was right or wrong, the popup shows Correct (green) or Incorrect (red) beside its own buttons, until the next question.
