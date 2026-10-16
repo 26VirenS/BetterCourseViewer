@@ -1,3 +1,7 @@
+**What's new in 0.3.24** (beta)
+
+- **Tools open straight away** — some tools (Smartwork among them) can't be opened by Canvas's one-time launch, so Open Tool showed Canvas's own page for the tool with a "Load … in a new window" button. Simpl now presses on with that launch itself, in the same window, so the tool opens without the extra click.
+
 **What's new in 0.3.23** (beta)
 
 - **Files open again** — a file linked in an assignment's instructions (or in an announcement, a discussion or a page) now opens the way a module's file does: Simpl asks your school for that file by its id and opens it under its real name, rather than fetching an address made from the link, which at some schools gave nothing or a file named "download"; when the school will not say, the link's own key is kept on the address it fetches.

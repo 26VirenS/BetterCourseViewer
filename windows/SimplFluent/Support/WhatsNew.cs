@@ -26,6 +26,8 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.24", "2026-10-16",
+            ("fixed", "Tools Open at Once", "Open Tool loads the tool, not Canvas's Load button.")),
         R("0.3.23", "2026-10-16",
             ("fixed", "Files Open Again", "Files linked in instructions open properly again."),
             ("fixed", "Alta Maths Drawn Whole", "Brackets and roots show right away, no Light or Dark needed.")),
