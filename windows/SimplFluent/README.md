@@ -1267,7 +1267,8 @@ between parts after. Once a grace between parts has run out, the page is no long
 
 (0.3.22) A lighter page script, saying what it said before (the Mac's 1.3.102, word for word). The panels, buttons and
 verdict are told when something may have moved them — a change in the parts kept (their elements and words; a class, a
-style, a button greyed or not; a fade ending), a part's size or the window's — at the next frame, no oftener than every
+style, a button greyed or not; a fade ending; in the answer box itself only a verdict or the buttons' bar, never the
+caret blinking in a math box), a part's size or the window's — at the next frame, no oftener than every
 200 ms, again 450 ms after a change in the parts, and every second whatever happens (every 350 ms always before); the
 verdict is read again only after a change in the parts. The page is read afresh (its marks lifted) only for a change in
 the parts or Alta's learn flow, or every 2 s; web components are listed once and looked for again only when the page

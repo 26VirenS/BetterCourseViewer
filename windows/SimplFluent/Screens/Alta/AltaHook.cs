@@ -640,20 +640,30 @@ internal static class AltaHook
               }
               queuePublish();
             };
+            // (but nothing told for a change in the answer box itself, which moves nothing that is told: the caret blinking in
+            // a math box — MathQuill's `mq-blink`, every half second while it has the focus — or a choice lit as the pointer
+            // passes. Only for a verdict in it, shown, hidden or no longer one by its class, or the buttons' bar; a size the
+            // box changes is `keptSize`'s.)
+            var ANSWER_SEL = '.lrn_widget, .lrn_qr, [class*="lrn_response"]';
+            var matters = function (t, was) {
+              if (!t || t.nodeType !== 1 || !t.closest(ANSWER_SEL)) return true;
+              if (t.closest('[class*="button-bar"], ' + VERDICT_SEL) || t.querySelector('[class*="button-bar"], ' + VERDICT_SEL)) return true;
+              return !!was && /feedback|alert|notice|banner/i.test(was);
+            };
             var keptWatch = null, keptSize = null;
-            try { keptWatch = new MutationObserver(function () { publishSoon(true); }); } catch (e) {}
+            try { keptWatch = new MutationObserver(function (rs) { if (rs.some(function (r) { return matters(r.target, r.attributeName === 'class' && r.oldValue); })) publishSoon(true); }); } catch (e) {}
             try { keptSize = new ResizeObserver(function () { publishSoon(false); }); } catch (e) {}
             // (the parts kept now watched, and no others)
             var watchKept = function () {
               if (keptWatch) keptWatch.disconnect();
               if (keptSize) keptSize.disconnect();
               cards().forEach(function (sec) {
-                try { if (keptWatch) keptWatch.observe(sec, { attributes: true, subtree: true, attributeFilter: ['class', 'style', 'hidden', 'disabled', 'aria-disabled', 'aria-hidden', 'open'] }); } catch (e) {}
+                try { if (keptWatch) keptWatch.observe(sec, { attributes: true, subtree: true, attributeOldValue: true, attributeFilter: ['class', 'style', 'hidden', 'disabled', 'aria-disabled', 'aria-hidden', 'open'] }); } catch (e) {}
                 try { if (keptSize) keptSize.observe(sec); } catch (e) {}
               });
             };
             // (and a fade or a movement in the parts kept come to its end: a strip faded in, a box slid open)
-            var settledIn = function (e) { var t = e.target; if (t && t.closest && t.closest('[data-simpl-keep]')) publishSoon(true); };
+            var settledIn = function (e) { var t = e.target; if (t && t.closest && t.closest('[data-simpl-keep]') && matters(t)) publishSoon(true); };
             document.addEventListener('transitionend', settledIn, true);
             document.addEventListener('animationend', settledIn, true);
             setInterval(function () { publish(); }, 1000);
