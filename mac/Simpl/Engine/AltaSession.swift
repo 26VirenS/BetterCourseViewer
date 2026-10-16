@@ -1,4 +1,5 @@
 import AppKit
+import QuartzCore
 import SwiftUI
 import WebKit
 
@@ -1682,11 +1683,15 @@ struct AltaLaunch: Identifiable, Equatable {
 
 /// (1.3.101) An Alta open, timed from the moment the popup was asked for: the launch asked of Canvas and answered,
 /// Alta's first page begun, what it shows first, and the page in sight — one line on the console for every open
-/// (`[Simpl] alta: asked 2 ms · launch 410 ms · page 655 ms · question 790 ms · shown 905 ms (question, quiet 120 ms)`),
+/// (`[Simpl] alta: view spare · asked 2 ms · launch 410 ms · page 655 ms · question 790 ms · shown 905 ms (question, quiet
+/// 120 ms)`; 1.3.102: the web view's word first),
 /// in the screenshot suite's consoles and the Mac's own log alike. The page's moments are its own clock's (`nav`, when
 /// it began, and `t`, as the page script posts them), so the time the message takes to come is not counted.
 struct AltaTimeline {
     let start = Date()
+    /// (1.3.102) The popup's web view: the spare made ahead ("spare"), or made as the popup was asked for, and how long
+    /// that took ("made 41 ms").
+    var view: String?
     var asked: Double?
     var launch: Double?
     var given = false
@@ -1705,6 +1710,7 @@ struct AltaTimeline {
     /// What is known so far, in the line's order.
     var parts: [String] {
         var out: [String] = []
+        if let view { out.append("view \(view)") }
         if let asked { out.append("asked \(Int(asked.rounded())) ms") }
         if given { out.append("page given") } else if let launch { out.append("launch \(Int(launch.rounded())) ms") }
         if let page { out.append("page \(Int(page.rounded())) ms") }
@@ -1724,6 +1730,124 @@ struct AltaTimeline {
             detail.append("\(Int((t - dcl).rounded())) ms after DOMContentLoaded")
         }
         return (parts + ["shown \(Int(ms(head).rounded())) ms (\(detail.joined(separator: ", ")))"]).joined(separator: " · ")
+    }
+}
+
+// MARK: - (1.3.102) A web view made ahead
+
+/// (1.3.102) One web view for Alta's popup made ahead, at a quiet moment once the Dashboard is up (or once an Alta
+/// assignment's page or the Tools list has said so), for an account that uses Knewton Alta (Engine `hasAlta`): its
+/// configuration, its page script and its relay in, and an empty page (about:blank) loaded, so WebKit's process for it is
+/// already running when the student opens an assignment. The popup takes it (`take`) instead of making one then — a web
+/// view made cold took 150–400 ms, much of it on the main thread as the popup went up — and the next is made only after
+/// that popup has closed, at a quiet moment again, never while one is opening.
+///
+/// It only ever holds that empty page: a web view that has shown anything is never handed on, so no page, script or
+/// state of one open (or one account) reaches the next — each open has a web view nobody has used. Its cookies are the
+/// app's own web data's, as every Alta popup's always were. It is let go after ten minutes unused, and when the student
+/// signs out (the next account makes its own, if it uses Alta); and it is for one school (`host`) only.
+@MainActor
+final class AltaSpare {
+    /// A web view for Alta's page and the relay its messages come by.
+    struct View {
+        let web: AltaWebView
+        let relay: AltaRelay
+    }
+
+    static let shared = AltaSpare()
+    /// How long one is kept unused.
+    private static let keepFor: UInt64 = 600_000_000_000
+
+    private var spare: (view: View, host: String)?
+    /// Its empty page loaded: WebKit's process for it up.
+    private var warm = false
+    private var watch: NSKeyValueObservation?
+    private var making: Task<Void, Never>?
+    private var expiry: Task<Void, Never>?
+
+    /// Made ahead at all: always, but in the screenshot suite only when a picture asks (-SimplAltaSpare YES), so the rest
+    /// are taken as they were.
+    private static var allowed: Bool {
+        let d = UserDefaults.standard
+        return d.string(forKey: "SimplShotFile") == nil || d.bool(forKey: "SimplAltaSpare")
+    }
+
+    /// The spare for an Alta popup about to open at this school, taken — nil when there is none (the popup makes its own).
+    func take(host: String) -> View? {
+        guard let s = spare, s.host == host else { return nil }
+        spare = nil
+        watch = nil
+        expiry?.cancel()
+        expiry = nil
+        if OpenClock.verbose { NSLog("[Simpl] alta: the spare web view taken%@", warm ? "" : ", its empty page still loading") }
+        warm = false
+        return s.view
+    }
+
+    /// Made at the next quiet moment — no screen waiting on the school for `quiet` seconds (half a minute at most) and no
+    /// Alta popup open — for an account that uses Alta; nothing when one is up or on its way already.
+    func prepare(_ engine: Engine, quiet: Double = 1.5) {
+        guard spare == nil, making == nil, Self.allowed else { return }
+        making = Task { [weak self, weak engine] in
+            var still = 0.0, waited = 0.0
+            while still < quiet && waited < 30 {
+                try? await Task.sleep(nanoseconds: 250_000_000)
+                waited += 0.25
+                guard let engine else { break }
+                still = engine.waiting == 0 && !AltaSpare.popupOpen(engine) ? still + 0.25 : 0
+            }
+            guard let self else { return }
+            self.making = nil
+            guard !Task.isCancelled, let engine, engine.hasAlta, !AltaSpare.popupOpen(engine) else { return }
+            self.make(host: engine.host)
+        }
+    }
+
+    /// (the screenshot suite's -SimplAltaSpare YES) Made now, and waited for until its empty page is loaded (three
+    /// seconds at most), before the popup it is for is asked for.
+    func makeNow(host: String) async {
+        making?.cancel()
+        making = nil
+        if spare == nil { make(host: host) }
+        for _ in 0..<30 where !warm { try? await Task.sleep(nanoseconds: 100_000_000) }
+    }
+
+    /// Let go: signed out, or ten minutes unused.
+    func drop(_ why: String) {
+        making?.cancel()
+        making = nil
+        expiry?.cancel()
+        expiry = nil
+        watch = nil
+        guard let s = spare else { return }
+        spare = nil
+        warm = false
+        s.view.web.stopLoading()
+        if OpenClock.verbose { NSLog("[Simpl] alta: the spare web view let go (%@)", why) }
+    }
+
+    /// An Alta popup up (or on its way) in any window: its session not yet closed.
+    private static func popupOpen(_ engine: Engine) -> Bool {
+        engine.alta != nil || AltaSession.current?.isOpen == true
+    }
+
+    private func make(host: String) {
+        let started = CACurrentMediaTime()
+        let view = AltaSession.makeWeb()
+        spare = (view, host)
+        warm = false
+        watch = view.web.observe(\.isLoading, options: [.new]) { [weak self] w, _ in
+            let done = !w.isLoading && w.url != nil
+            Task { @MainActor in if done { self?.warm = true } }
+        }
+        view.web.loadHTMLString("", baseURL: nil)
+        expiry?.cancel()
+        expiry = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: AltaSpare.keepFor)
+            guard !Task.isCancelled else { return }
+            self?.drop("unused for ten minutes")
+        }
+        if OpenClock.verbose { NSLog("[Simpl] alta: a spare web view made ahead (%d ms)", Int(((CACurrentMediaTime() - started) * 1000).rounded())) }
     }
 }
 
@@ -1749,6 +1873,8 @@ final class AltaSession: ObservableObject {
     private var launching: Task<Void, Never>?
     /// (1.3.101) The popup closed (`popupClosed`): a launch answered after it is not loaded.
     private var closed = false
+    /// (1.3.102) Its popup up, or on its way: no spare web view is made meanwhile.
+    var isOpen: Bool { !closed }
     /// (1.3.101) The launch answered with Canvas's own page for the assignment, Alta in it (`go`).
     private var direct = false
     /// (1.3.101) Pages begun in the main frame (each `frame` from it): a page still the one `landed` saw, by this.
@@ -1968,24 +2094,16 @@ final class AltaSession: ObservableObject {
     /// (1.3.47) Each time Alta's page was not recognised and shown as it is: when, why, and what the page held.
     @Published private(set) var errorLogs: [String] = []
 
-    init(launch: AltaLaunch) {
+    /// (1.3.102) `spare`: the web view made ahead for Alta's popup (AltaSpare), taken by this open; else one is made now.
+    init(launch: AltaLaunch, spare: AltaSpare.View? = nil) {
         self.launch = launch
-        CrossSiteCookies.apply()
-        let config = WKWebViewConfiguration()
-        config.websiteDataStore = .default() // (the Canvas session: Alta's launch finds the student signed in)
-        config.mediaTypesRequiringUserActionForPlayback = []
-        config.applicationNameForUserAgent = "Version/18.4 Safari/605.1.15"
-        config.userContentController.addUserScript(AltaHook.script)
-        let r = AltaRelay()
-        config.userContentController.add(r, name: AltaHook.handler)
-        relay = r
-        web = AltaWebView(frame: NSRect(x: 0, y: 0, width: 1000, height: 800), configuration: config)
-        web.isInspectable = true
-        web.setValue(false, forKey: "drawsBackground") // (1.3.49: the question laid on the popup's glass; see AltaQuiz)
-        // (1.3.79) Alta's page in light whatever the app's appearance (its own colour scheme, its fields), as every
-        // tool's is: AltaQuiz lays it on light glass — (1.3.83) until the student picks Dark (`appearance(dark:)`)
-        web.appearance = NSAppearance(named: .aqua)
-        r.session = self
+        let began = CACurrentMediaTime()
+        let made: AltaSpare.View
+        if let spare { made = spare } else { made = Self.makeWeb() }
+        relay = made.relay
+        web = made.web
+        timeline.view = spare != nil ? "spare" : "made \(Int(((CACurrentMediaTime() - began) * 1000).rounded())) ms"
+        made.relay.session = self
         loading = web.observe(\.isLoading, options: [.new]) { [weak self] w, _ in
             let done = !w.isLoading && w.url != nil
             Task { @MainActor in if done { self?.landed() } }
@@ -1999,10 +2117,31 @@ final class AltaSession: ObservableObject {
         AltaSession.current = self
     }
 
+    /// A web view for Alta's page, with the page script in every frame and the relay its messages come by: signed in to
+    /// the school as the app's own pages are, Alta's sounds and videos allowed, laid on the popup's glass (1.3.49), and
+    /// (1.3.79) light whatever the app's appearance (its own colour scheme, its fields), as every tool's is — (1.3.83)
+    /// until the student picks Dark (`appearance(dark:)`). (1.3.102) Made as the popup is asked for, or ahead (AltaSpare).
+    static func makeWeb() -> AltaSpare.View {
+        CrossSiteCookies.apply()
+        let config = WKWebViewConfiguration()
+        config.websiteDataStore = .default() // (the Canvas session: Alta's launch finds the student signed in)
+        config.mediaTypesRequiringUserActionForPlayback = []
+        config.applicationNameForUserAgent = "Version/18.4 Safari/605.1.15"
+        config.userContentController.addUserScript(AltaHook.script)
+        let r = AltaRelay()
+        config.userContentController.add(r, name: AltaHook.handler)
+        let web = AltaWebView(frame: NSRect(x: 0, y: 0, width: 1000, height: 800), configuration: config)
+        web.isInspectable = true
+        web.setValue(false, forKey: "drawsBackground") // (1.3.49: the question laid on the popup's glass; see AltaQuiz)
+        web.appearance = NSAppearance(named: .aqua)
+        return AltaSpare.View(web: web, relay: r)
+    }
+
     /// Alta opened: the assignment's launch through Canvas (or the page asked for). (1.3.101) Asked at once, by the
-    /// engine the moment the popup is asked for; asked again by the popup's view, it does nothing.
+    /// engine the moment the popup is asked for; asked again by the popup's view, it does nothing. (1.3.102: whatever
+    /// address its web view has — a spare's is about:blank — it is the launch that says whether it was asked.)
     func start(engine: Engine) {
-        guard launching == nil, web.url == nil else { return }
+        guard launching == nil else { return }
         if let data = UserDefaults.standard.data(forKey: knownKey), let list = try? JSONDecoder().decode([AltaOverview.Objective].self, from: data) { known = list }
         if let p = launch.page, let u = engine.absolute(p) {
             timeline.asked = timeline.ms()
@@ -2055,7 +2194,8 @@ final class AltaSession: ObservableObject {
     /// own page for the assignment (`direct`: no launch of its own was had) is where the launch ends: shown at once, as
     /// 1.3.100 showed it. Still there means no new page begun since (`documents`), whatever its address did meanwhile.
     private func landed() {
-        guard opening, web.url != nil else { return }
+        // (1.3.102: never a spare web view's empty page, which it may still be finishing as the popup takes it)
+        guard opening, let url = web.url, url.scheme != "about" else { return }
         let page = documents, wait: UInt64 = direct ? 0 : 2_500_000_000
         Task { [weak self] in
             if wait > 0 { try? await Task.sleep(nanoseconds: wait) }

@@ -102,15 +102,22 @@ final class Engine: ObservableObject, ShellListener {
     private var pendingAlta: AltaSession?
 
     private func altaAsked() {
-        guard let a = alta else { pendingAlta = nil; return }
+        guard let a = alta else {
+            pendingAlta = nil
+            // (1.3.102) the popup closed: the next one's web view made ahead, at a quiet moment
+            if hasAlta { AltaSpare.shared.prepare(primary ?? self) }
+            return
+        }
         if pendingAlta?.launch.id == a.id { return } // (asked ahead, `askAlta`)
         askAlta(a)
     }
 
     /// (1.3.101) An Alta assignment's session made and its launch asked of Canvas now, ahead of its popup — the Tools
     /// list's, which puts the popup up only once the list has closed — taken by `alta` set to the same launch.
+    /// (1.3.102) In the web view made ahead for it, when there is one; and the account known to use Alta from now on.
     func askAlta(_ a: AltaLaunch) {
-        let s = AltaSession(launch: a)
+        knowAlta()
+        let s = AltaSession(launch: a, spare: AltaSpare.shared.take(host: host))
         pendingAlta = s
         s.start(engine: self)
     }
@@ -121,7 +128,35 @@ final class Engine: ObservableObject, ShellListener {
             pendingAlta = nil
             return s
         }
-        return AltaSession(launch: launch)
+        return AltaSession(launch: launch, spare: AltaSpare.shared.take(host: host))
+    }
+
+    /// (1.3.102) Whether this account uses Knewton Alta, as far as the app has seen it — the Tools list naming it, an
+    /// assignment that opens it, an Alta assignment opened — remembered for the account at this school, and forgotten
+    /// when the student signs out. Only such an account has a web view made ahead for Alta's popup (AltaSpare).
+    var hasAlta: Bool { UserDefaults.standard.bool(forKey: altaAccountKey) }
+    private var altaAccountKey: String { "SimplAltaAccount.\(host)" }
+
+    private func knowAlta() {
+        if !hasAlta { UserDefaults.standard.set(true, forKey: altaAccountKey) }
+    }
+
+    /// (1.3.102) An answer that says this account uses Alta — the Tools list naming Knewton Alta, an assignment that opens
+    /// it (the student on its page, about to open it): known from now on, and a web view made ahead for its popup at the
+    /// next quiet moment.
+    private func noteAlta(in name: String, _ value: Any) {
+        let says: Bool
+        switch name {
+        case "externalTools":
+            says = (value as? ExternalToolsData)?.rows.contains { ($0.name + " " + $0.host).lowercased().contains("knewton") } == true
+        case "assignment":
+            says = (value as? AssignmentData)?.alta == true
+        default:
+            says = false
+        }
+        guard says else { return }
+        knowAlta()
+        AltaSpare.shared.prepare(self, quiet: 0.6)
     }
     /// (1.3.66) A Macmillan Learning assignment open in its popup.
     @Published var macmillan: AltaLaunch?
@@ -352,6 +387,10 @@ final class Engine: ObservableObject, ShellListener {
         answers.clear()
         memo.clear()
         liveMarks.forget()
+        // (1.3.102) nothing of this account's Alta kept for the next: its web view made ahead let go, and whether it used
+        // Alta forgotten
+        UserDefaults.standard.removeObject(forKey: altaAccountKey)
+        AltaSpare.shared.drop("signed out")
         ready = false
         openedOnKept = false
         shownNative = false
@@ -396,7 +435,15 @@ final class Engine: ObservableObject, ShellListener {
         } else if let a = LaunchOpen.take("alta:") {
             let parts = a.split(separator: ":").map(String.init) // (1.3.17: -SimplOpen alta:104:4003, an Alta assignment's popup)
             // (1.3.83: alta:104:4003:/mock-alta/… — opened on that page of the mock's Alta, as the pop-up's pictures need)
-            if parts.count >= 2 { alta = AltaLaunch(course: parts[0], assignment: parts[1], title: "Knewton Alta", page: parts.count > 2 ? parts[2...].joined(separator: ":") : nil) }
+            if parts.count >= 2 {
+                let launch = AltaLaunch(course: parts[0], assignment: parts[1], title: "Knewton Alta", page: parts.count > 2 ? parts[2...].joined(separator: ":") : nil)
+                // (1.3.102: -SimplAltaSpare YES — opened in a web view made ahead, as an account that uses Alta opens it)
+                if UserDefaults.standard.bool(forKey: "SimplAltaSpare") {
+                    Task { await AltaSpare.shared.makeNow(host: self.host); self.alta = launch }
+                } else {
+                    alta = launch
+                }
+            }
         } else if let a = LaunchOpen.take("macmillan:") {
             let parts = a.split(separator: ":").map(String.init) // (1.3.66: -SimplOpen macmillan:104:4005)
             if parts.count == 2 { macmillan = AltaLaunch(course: parts[0], assignment: parts[1], title: "Macmillan Learning") }
@@ -420,6 +467,8 @@ final class Engine: ObservableObject, ShellListener {
         await loadSidebar()
         if moreTool, let t = more?.items.first(where: { $0.kind == "tool" }) { openMore(t) }
         readAheadAfterLaunch() // (1.3.78: once the window is quiet, the places most opened next, read ahead)
+        // (1.3.102) an account that uses Knewton Alta: its popup's web view made ahead, once the window has been quiet a while
+        if hasAlta { AltaSpare.shared.prepare(self, quiet: 3) }
         Task { await Reminders.shared.reschedule(self) } // (each launch: the reminders set again from what Canvas says now)
         Task { await Activity.shared.sync(self) }
         // (the screenshot suite: -SimplActivityProbe YES — one read of the school as the new-activity check makes it, on the console)
@@ -638,6 +687,7 @@ final class Engine: ObservableObject, ShellListener {
             throw EngineError.unreadable
         }
         let decoded = got.value
+        noteAlta(in: name, decoded) // (1.3.102)
         if held {
             answers.keep(data, name, args) // (a read: kept for next time, AnswerCache)
             if let key = AnswerMemo.key(name, args) { memo.put(key, decoded, generation: generation, fingerprint: got.fingerprint) }
