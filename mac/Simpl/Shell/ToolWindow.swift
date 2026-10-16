@@ -26,6 +26,9 @@ struct ToolWindow: View {
     /// The window's own appearance: the moon shows only in Dark Mode, where it does something.
     @Environment(\.colorScheme) private var scheme
     @State private var url: URL?
+    /// (1.3.104) The school's own page for the tool, opened because its one-time launch could not be had: its launch
+    /// form sent on in the window once it loads (ToolWebView.sendToolForm).
+    @State private var sendForm: URL?
     @State private var name = ""
     @State private var error: String?
 
@@ -41,7 +44,7 @@ struct ToolWindow: View {
     var body: some View {
         ZStack(alignment: .top) {
             if let url {
-                ToolWebView(url: url, browser: browser, externalTool: true)
+                ToolWebView(url: url, browser: browser, externalTool: true, sendToolForm: sendForm)
                     .transition(.opacity)
             } else if let error {
                 ContentUnavailableView {
@@ -146,6 +149,7 @@ struct ToolWindow: View {
             let a = try await engine.call("toolLaunch", launch.args, as: LaunchAnswer.self)
             guard let u = URL(string: a.url) else { throw EngineError.unreadable }
             if let n = a.name, !n.isEmpty { name = n }
+            if a.sessionless == false { sendForm = u }
             url = u
         } catch {
             self.error = error.localizedDescription
@@ -273,8 +277,32 @@ struct ToolWebView: NSViewRepresentable {
     /// (1.3.79) A tool's page (the tool window's), not Canvas's own: light whatever the app's appearance, until the moon
     /// turns Dark Page on (ToolDarkPage.look).
     var externalTool = false
+    /// (1.3.104) The school's own page for a tool whose one-time launch could not be had (an LTI 1.3 tool such as
+    /// Smartwork): once it has loaded, Canvas's launch form on it — aimed at a new window, behind "Load … in a new window"
+    /// for a tool Canvas opens that way — is sent on in this window, so the tool opens without the extra click.
+    var sendToolForm: URL? = nil
 
-    func makeCoordinator() -> Coordinator { Coordinator() }
+    /// The form sent, in the page: "sent", "framed" (the tool framed in the page, left as it is) or "none" (no form yet).
+    /// The same script as the Windows app's (windows/SimplFluent/Shell/WebWindow.cs, SendToolForm).
+    static let sendToolFormScript = """
+        (function () {
+          var f = document.getElementById('tool_form');
+          if (!f || !f.action) return 'none';
+          if (f.getAttribute('data-simpl-sent')) return 'sent';
+          var target = (f.getAttribute('target') || '').toLowerCase();
+          if (target && target !== '_blank') return 'framed';
+          f.setAttribute('data-simpl-sent', '1');
+          f.setAttribute('target', '_self');
+          HTMLFormElement.prototype.submit.call(f);
+          return 'sent';
+        })()
+        """
+
+    func makeCoordinator() -> Coordinator {
+        let c = Coordinator()
+        c.sendToolForm = sendToolForm
+        return c
+    }
 
     func makeNSView(context: Context) -> WKWebView {
         CrossSiteCookies.apply() // (1.2.1: allowed once with the Cookies button — gone in 1.3.15 — and kept from then on)
@@ -307,6 +335,40 @@ struct ToolWebView: NSViewRepresentable {
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+        /// (1.3.104) The school's page for the tool whose launch form is still to be sent (nil once sent, or for any other).
+        var sendToolForm: URL?
+        private var formTries = 0
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            guard let page = sendToolForm, let here = webView.url else { return }
+            let trim = CharacterSet(charactersIn: "/")
+            guard here.host == page.host, here.path.trimmingCharacters(in: trim) == page.path.trimmingCharacters(in: trim) else {
+                // (the page went elsewhere first — the school's sign-in: tried again when it comes back, a few times at most)
+                formTries += 1
+                if formTries > 4 { sendToolForm = nil }
+                return
+            }
+            sendForm(in: webView)
+        }
+
+        private func sendForm(in webView: WKWebView) {
+            webView.evaluateJavaScript(ToolWebView.sendToolFormScript) { [weak self, weak webView] result, _ in
+                guard let self else { return }
+                let said = result as? String ?? "none"
+                // (no form on the page yet: Canvas may still be drawing it; looked for again a moment on, a few times)
+                if said == "none", self.formTries < 4, let webView {
+                    self.formTries += 1
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self, weak webView] in
+                        guard let self, let webView, self.sendToolForm != nil else { return }
+                        self.sendForm(in: webView)
+                    }
+                    return
+                }
+                self.sendToolForm = nil
+                NSLog("[Simpl] tool window: the school's page for the tool, its launch %@", said == "sent" ? "sent on in this window" : said == "framed" ? "framed in the page as it is" : "not found")
+            }
+        }
+
         // a window the tool opens (a sign-in, a resource): shown in place, as a tab would be
         func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
             if navigationAction.targetFrame == nil { webView.load(navigationAction.request) }

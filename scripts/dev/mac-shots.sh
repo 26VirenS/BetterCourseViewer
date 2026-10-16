@@ -843,6 +843,20 @@ again_check() {
   if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::sidebar: /'; return 1; fi
 }
 
+# (1.3.104) newwin_check: what light-21k-tool-new-window's tool window said (Shell/ToolWindow.swift), as newwin-check.txt
+# — Canvas's page for a tool it opens in a new window, its launch form sent on in the window. A FAIL fails the check.
+newwin_check() {
+  local out="$OUT_ABS/newwin-check.txt" f="$OUT_ABS/console-light-21k-tool-new-window.txt"
+  : > "$out"
+  if grep -q "tool window: the school's page for the tool, its launch sent on in this window" "$f" 2>/dev/null; then
+    echo "ok   Canvas's page for a tool it opens in a new window: its launch sent on in the tool window" >> "$out"
+  else
+    echo "FAIL Canvas's page for a tool it opens in a new window: its launch was not sent on ($(grep -o 'tool window: .*' "$f" 2>/dev/null | tr '\n' ';'))" >> "$out"
+  fi
+  cat "$out"
+  if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::tool window: /'; return 1; fi
+}
+
 # (1.3.103) quicklook_check: what light-14e-instructions-file-open's walk and its Quick Look said (Support/OpenClock.swift,
 # Engine/FilePreview.swift), as quicklook-check.txt — the file link in the assignment's instructions found and clicked,
 # and the panel up with the file in it ("[files] Quick Look: 1 item, …"), not empty; and no picture's app saying its
@@ -934,6 +948,9 @@ push_set() {
   # (1.3.102) an assignment pushed on the Dashboard (as Hand In or See Feedback pushes one), then the Dashboard's row in
   # the sidebar pressed again: the Dashboard at its root, nothing pushed (again_check)
   shoot light-01x-sidebar-again 30 -SimplWalk "on:/courses/101/assignments/1001,again" -SimplWalkWait 2
+  # (1.3.104) a tool Canvas opens in a new window, its one-time launch refused by the mock (as Smartwork's is at the
+  # owner's school): Canvas's page for it, its launch sent on in the tool window (newwin_check)
+  shoot light-21k-tool-new-window 24 -SimplOpen tool:101:20
   shoot light-05p-calendar-preview 16 -SimplPlace calendar -SimplOpen preview
   shoot light-10b-grades-assignment 12 -SimplPlace grades -SimplPush /courses/101/assignments/1001
   shoot light-10c-feedback 18 -SimplPlace course:101 -SimplPush /courses/101/assignments/1008 -SimplOpen feedback
@@ -1017,6 +1034,7 @@ if [ "${SHOTS:-full}" = check ]; then
   tool_list_check # (1.3.82)
   again_check || exit 1 # (1.3.102)
   quicklook_check || exit 1 # (1.3.103)
+  newwin_check || exit 1 # (1.3.104)
   exit 0
 fi
 
@@ -1183,6 +1201,7 @@ if [ "$SHARDS" = 1 ]; then
   tool_list_check # (1.3.82)
   again_check || true # (1.3.102)
   quicklook_check || true # (1.3.103)
+  newwin_check || true # (1.3.104)
 fi
 keep_crashes
 exit 0
