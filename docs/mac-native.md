@@ -314,6 +314,15 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   26 s has the hook show it as it is (`__simplAsIsNow`: its waits counted as over, the focus lifted, why said in the
   Error Logs with what the page held), so the hook's `showing` stays in step and the page can still be put out of sight
   between parts after. Once a grace between parts has run out, the page is no longer put out of sight again at each look.
+  (1.3.102) A lighter page script, saying what it said before. The panels, buttons and verdict are told when something
+  may have moved them — a change in the parts kept (their elements and words; a class, a style, a button greyed or not;
+  a fade ending), a part's size or the window's — at the next frame, no oftener than every 200 ms, again 450 ms after a
+  change in the parts, and every second whatever happens (1.3.53–1.3.101: every 350 ms always); the verdict is read
+  again only after a change in the parts. The page is read afresh (its marks lifted) only for a change in the parts or
+  Alta's learn flow, or every 2 s; web components are listed once and looked for again only when the page gains an
+  element or a tree; keyword tests read `textContent` before `innerText`; and the mastery bars, the overview's words and
+  the cover are read only once the page has been shown, its cover read, or 3 s have passed — while the question is
+  shown alone and nothing changed, only every third time.
   (1.3.102) The mock's Alta launch can go as Canvas's does (`--alta-launch`, as `alta-test.mjs` runs it): Canvas's own
   page, whose form sends itself on to Alta (POSTed), then Alta's page; and its Alta content answer comes 500 ms late.
   `scripts/dev/alta-test.mjs` drives the mock's Alta player (`/mock-alta/…`) through it in Chromium; the popup is shot

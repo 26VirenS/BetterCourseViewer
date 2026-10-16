@@ -453,20 +453,22 @@ try {
   // nothing changed anywhere in the page, at least), no cap, each post timed for the app's timeline of the open and the
   // page known as Alta's — the best of three loads, so a slow moment on a shared runner does not decide it. So too while
   // Alta's chrome round the question keeps changing. But never before it is drawn: its answer box and its maths in first.
+  const LEARN = `${BASE}/mock-alta/learn/course/c1/assignment/a3`;
+  // (a page of its own with a copy of the page script in it — each post's moment on the page's own clock too; `__onPost`
+  // for a check that looks at the page as it is posted)
+  const openWith = async (src, win, extra) => {
+    const sp = await browser.newPage();
+    await sp.addInitScript((w) => {
+      window.__posted = []; window.__postedAt = [];
+      const put = (s) => { window.__posted.push(s); window.__postedAt.push(performance.now()); if (window.__onPost) window.__onPost(JSON.parse(s)); };
+      if (w) { window.chrome = window.chrome || {}; window.chrome.webview = { postMessage: put }; } else window.webkit = { messageHandlers: { simplAlta: { postMessage: put } } };
+    }, win);
+    await sp.addInitScript({ content: src });
+    if (extra) await sp.addInitScript(extra);
+    return sp;
+  };
   const speedChecks = async (label, src, win) => {
-    const LEARN = `${BASE}/mock-alta/learn/course/c1/assignment/a3`;
-    const open = async (extra) => {
-      const sp = await browser.newPage();
-      // (each post's moment on the page's own clock too; `__onPost` for a check that looks at the page as it is posted)
-      await sp.addInitScript((w) => {
-        window.__posted = []; window.__postedAt = [];
-        const put = (s) => { window.__posted.push(s); window.__postedAt.push(performance.now()); if (window.__onPost) window.__onPost(JSON.parse(s)); };
-        if (w) { window.chrome = window.chrome || {}; window.chrome.webview = { postMessage: put }; } else window.webkit = { messageHandlers: { simplAlta: { postMessage: put } } };
-      }, win);
-      await sp.addInitScript({ content: src });
-      if (extra) await sp.addInitScript(extra);
-      return sp;
-    };
+    const open = (extra) => openWith(src, win, extra);
     const shownOn = async (sp) => {
       await sp.goto(LEARN);
       for (let i = 0; i < 60; i++) {
@@ -756,6 +758,100 @@ try {
     }
   };
   await renderChecks('the page script', source, false);
+  // (1.3.102) what the page script costs while the question is up: the panels, buttons and verdict told when something
+  // may have moved them — a change in the parts shown, a part's size, the window's — never on a timer every 350 ms
+  // (once a second at most while nothing happens); the page not read afresh for a change outside the parts shown (Alta's
+  // header); its web components looked for again when one is made. Its posts as before: a button greyed or not, a
+  // verdict that comes by its style alone, or fades in, and goes again, the panels after a resize.
+  const demandChecks = async (label, src, win) => {
+    const dp = await openWith(src, win, () => {
+      window.__barLooks = 0; window.__lifts = 0;
+      const qsa = Element.prototype.querySelectorAll;
+      Element.prototype.querySelectorAll = function (sel) { if (sel === '[class*="button-bar"]') window.__barLooks++; return qsa.call(this, sel); };
+      const rm = Element.prototype.removeAttribute;
+      Element.prototype.removeAttribute = function (a) { if (a === 'data-simpl-q' && this === document.documentElement) window.__lifts++; return rm.call(this, a); };
+    });
+    const said = async () => (await dp.evaluate(() => window.__posted.slice())).map((x) => JSON.parse(x));
+    const after = async (n, test, ms = 3000) => {
+      for (let t = 0; t < ms; t += 50) { const p = (await said()).slice(n).find(test); if (p) return p; await dp.waitForTimeout(50); }
+      return null;
+    };
+    // (how long after a change made in the page a post came: the page's own clock both ways)
+    const timedChange = async (fn, test, ms = 3000) => {
+      const n = (await said()).length;
+      const at = await dp.evaluate(fn);
+      const p = await after(n, test, ms);
+      if (!p) return null;
+      const k = (await said()).findIndex((x, i) => i >= n && test(x));
+      return Math.round((await dp.evaluate((i) => window.__postedAt[i], k)) - at);
+    };
+    await dp.goto(LEARN);
+    await after(0, (p) => p.kind === 'shown', 6000);
+    await after(0, (p) => p.kind === 'panels' && p.panels.length === 2, 3000);
+    await dp.waitForTimeout(1200);
+    const looks0 = await dp.evaluate(() => window.__barLooks);
+    const n0 = (await said()).length;
+    await dp.waitForTimeout(3000);
+    const looks = (await dp.evaluate(() => window.__barLooks)) - looks0;
+    check(looks <= 5 && !(await said()).slice(n0).some((p) => p.kind === 'panels' || p.kind === 'buttons'),
+      `${label}: with the question up and nothing changing, its buttons are looked for ${looks} times in 3 s (1.3.101: every 350 ms, 8 or more), and nothing is told again`);
+    // (Submit made pressable: told at once, by the change to the button itself)
+    const en = await timedChange(() => { document.getElementById('submit').disabled = false; return performance.now(); }, (p) => p.kind === 'buttons' && p.items.some((b) => b.label === 'Submit' && b.enabled));
+    check(en !== null && en < 300, `${label}: Submit made pressable is told ${en} ms later (under 300)`);
+    await dp.evaluate(() => { document.getElementById('submit').disabled = true; });
+    await dp.waitForTimeout(400);
+    // (a part grown by a style sheet outside it, nothing in it changed: its panels told by its size)
+    const grown = await timedChange(() => { const st = document.createElement('style'); st.id = 'grow'; st.textContent = '#asks { padding-bottom: 240px !important; }'; document.head.appendChild(st); return performance.now(); },
+      (p) => p.kind === 'panels' && p.panels.length === 2 && p.panels[0].h > 300);
+    check(grown !== null && grown < 600, `${label}: a part that grows with nothing in it changed has its panels told by its size, ${grown} ms later`);
+    await dp.evaluate(() => document.getElementById('grow').remove());
+    await dp.waitForTimeout(400);
+    // (the window resized: the panels told again)
+    const wide = (await said()).filter((p) => p.kind === 'panels').pop();
+    const nr = (await said()).length;
+    await dp.setViewportSize({ width: 820, height: 720 });
+    const narrow = await after(nr, (p) => p.kind === 'panels' && p.panels.length === 2 && p.panels[0].w !== wide.panels[0].w, 1500);
+    await dp.setViewportSize({ width: 1280, height: 720 });
+    const back = await after(nr, (p) => p.kind === 'panels' && p.panels.length === 2 && p.panels[0].w === wide.panels[0].w && p !== narrow, 1500);
+    check(!!narrow && !!back, `${label}: the window resized, the panels are told again (${wide.panels[0].w} → ${narrow && narrow.panels[0].w} → ${back && back.panels[0].w} wide)`);
+    // (a verdict strip there all along, shown by its style alone — then hidden by a class: told as it comes and goes)
+    await dp.evaluate(() => {
+      const st = document.createElement('style'); st.textContent = '.simpl-test-off { display: none !important; } @keyframes simpl-test-in { from { opacity: 0; } to { opacity: 1; } } .simpl-test-fade { animation: simpl-test-in .3s linear .6s both; }'; document.head.appendChild(st);
+      document.getElementById('answer').closest('.learnosity__container___BA5bj').insertAdjacentHTML('afterend', '<div id="v2" class="feedback__banner___q" role="alert" style="display:none">Not quite. Try again.</div>');
+    });
+    await dp.waitForTimeout(1500);
+    const vOn = await timedChange(() => { document.getElementById('v2').style.display = ''; return performance.now(); }, (p) => p.kind === 'panels' && p.verdict === 'wrong');
+    const vOff = await timedChange(() => { document.getElementById('v2').classList.add('simpl-test-off'); return performance.now(); }, (p) => p.kind === 'panels' && p.verdict === '');
+    check(vOn !== null && vOn < 400 && vOff !== null && vOff < 400, `${label}: a verdict strip shown by its style alone is told ${vOn} ms later, and gone ${vOff} ms after a class hides it (under 400)`);
+    await dp.evaluate(() => document.getElementById('v2').remove());
+    await dp.waitForTimeout(1200);
+    // (a strip that fades in from 0.6 s, nothing changed after it is put in: told once it can be seen, as its fade ends)
+    const fade = await timedChange(() => { document.getElementById('answer').closest('.learnosity__container___BA5bj').insertAdjacentHTML('afterend', '<div id="v3" class="feedback__banner___q simpl-test-fade" role="alert">Yes that’s right. Keep it up!</div>'); return performance.now(); },
+      (p) => p.kind === 'panels' && p.verdict === 'right');
+    const fadeOut = await timedChange(() => { document.getElementById('v3').remove(); return performance.now(); }, (p) => p.kind === 'panels' && p.verdict === '');
+    check(fade !== null && fade < 1100 && fadeOut !== null && fadeOut < 400, `${label}: a verdict strip that fades in from 0.6 s is told ${fade} ms after it is put in, and gone ${fadeOut} ms after it is taken away`);
+    // (Alta's header changing every 40 ms for two seconds, the question up: the page read afresh — its marks lifted — at
+    // most twice for it, where 1.3.101 read it at every look, every 400 ms)
+    const lifts0 = await dp.evaluate(() => window.__lifts);
+    await dp.evaluate(() => { let k = 0; const h = document.querySelector('header'); window.__churn = setInterval(() => { const b = document.createElement('span'); b.textContent = String(k++); h.appendChild(b); }, 40); });
+    await dp.waitForTimeout(2000);
+    await dp.evaluate(() => clearInterval(window.__churn));
+    const lifts = (await dp.evaluate(() => window.__lifts)) - lifts0;
+    check(lifts <= 2 && (await dp.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))), `${label}: with Alta's header changing every 40 ms, the page is read afresh ${lifts} times in 2 s (at most 2), the question still shown alone`);
+    // (a web component in the part shown, made after it is in the page — its own tree, with a pop-up in it, put in as its
+    // definition comes a second and a half later, nothing added to the page for it: still found, its tree looked in)
+    const nt = (await said()).length;
+    await dp.evaluate(() => {
+      document.querySelector('#qsec .theme__card___3E6YM').appendChild(document.createElement('simpl-late-tip'));
+      setTimeout(() => customElements.define('simpl-late-tip', class extends HTMLElement { constructor() { super(); this.attachShadow({ mode: 'open' }).innerHTML = '<div role="dialog" aria-label="Tip" style="position:fixed;top:25%;left:30%;width:360px;background:#fff;padding:20px"><p>Words kept in its own tree.</p><button>OK</button></div>'; } }), 1500);
+    });
+    const tip = await after(nt, (p) => p.kind === 'dialog' && p.open && p.title === 'Tip', 6000);
+    check(!!tip && /Words kept in its own tree/.test(tip.html || ''), `${label}: a pop-up in a web component made after it was put in the page is found and passed (${tip ? 'passed' : 'not found'})`);
+    await dp.close();
+  };
+  if (/publishSoon/.test(source)) await demandChecks('the page script', source, false);
+  else check(false, 'the page script tells its panels on demand (publishSoon)');
+
   // (1.3.102) the launch as Canvas makes it: the address Canvas hands over is a page of its own, whose form sends itself
   // on to Alta (POSTed), which sends the browser on to the assignment's page. On the way, the page script says the first
   // page is not Alta's (the app keeps its skeleton up over it); then Alta's page is known as Alta's, kept out of sight,
@@ -951,6 +1047,8 @@ try {
     if (/quiet:/.test(winSource)) await speedChecks('Windows’ copy', winSource, true);
     else check(false, 'Windows’ copy of the page script times its words and says how long its part was still (its shown word has `quiet`)');
     await renderChecks('Windows’ copy', winSource, true);
+    if (/publishSoon/.test(winSource)) await demandChecks('Windows’ copy', winSource, true);
+    else check(false, 'Windows’ copy of the page script tells its panels on demand (publishSoon, Mac 1.3.102)');
   }
 } finally {
   await browser.close();
