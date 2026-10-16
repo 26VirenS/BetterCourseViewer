@@ -827,6 +827,22 @@ live_check() {
 
 # (1.3.92: the lists' pictures wait 16 s like 36d's — at 12 s, with the app grown by the tools of 1.3.89–1.3.91, a list
 # had not always reckoned its room before its picture on GitHub's Macs, and this check failed three runs out of four)
+# (1.3.102) again_check: what light-01x-sidebar-again's walk said (Support/OpenClock.swift), as again-check.txt — the
+# assignment pushed on the Dashboard ("walk: at dashboard, 1 pushed"), then the Dashboard's row pressed again and the
+# Dashboard at its root with nothing pushed ("walk: at dashboard, 0 pushed"). A FAIL fails the check (SHOTS=check: the
+# workflow's "What the apps said").
+again_check() {
+  local out="$OUT_ABS/again-check.txt" f="$OUT_ABS/console-light-01x-sidebar-again.txt"
+  : > "$out"
+  if awk 'index($0, "walk: at dashboard, 1 pushed") { seen = 1 } seen && index($0, "walk: at dashboard, 0 pushed") { found = 1 } END { exit !found }' "$f" 2>/dev/null; then
+    echo "ok   the Dashboard's row pressed again with an assignment on it: back to the Dashboard, nothing pushed" >> "$out"
+  else
+    echo "FAIL the Dashboard's row pressed again with an assignment on it did not go back to the Dashboard: $(grep -o 'walk: at .*' "$f" 2>/dev/null | tr '\n' ';')" >> "$out"
+  fi
+  cat "$out"
+  if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::sidebar: /'; return 1; fi
+}
+
 # (1.3.82) tool_list_check: what the External Tools lists' consoles say, as tool-list-check.txt (a FAIL line is said as
 # a warning of the run): each list reckoned its room once as it opened ("[Simpl] tool list room: 303 (…)"), the list
 # read again under it was still open after the read, and no copy of the app crashed (a crash report is kept beside the
@@ -881,6 +897,9 @@ push_set() {
   shoot light-36d-external-tools-list-reread 16 -SimplPlace externaltools -SimplExternalToolList knewton -SimplExternalToolReread YES
   shoot light-37-developer 16 -SimplOpen developer # (1.3.72: the Developer window)
   shoot light-01p-dashboard-preview 16 -SimplOpen preview
+  # (1.3.102) an assignment pushed on the Dashboard (as Hand In or See Feedback pushes one), then the Dashboard's row in
+  # the sidebar pressed again: the Dashboard at its root, nothing pushed (again_check)
+  shoot light-01x-sidebar-again 30 -SimplWalk "on:/courses/101/assignments/1001,again" -SimplWalkWait 2
   shoot light-05p-calendar-preview 16 -SimplPlace calendar -SimplOpen preview
   shoot light-10b-grades-assignment 12 -SimplPlace grades -SimplPush /courses/101/assignments/1001
   shoot light-10c-feedback 18 -SimplPlace course:101 -SimplPush /courses/101/assignments/1008 -SimplOpen feedback
@@ -962,6 +981,7 @@ if [ "${SHOTS:-full}" = check ]; then
   frame_check
   live_check
   tool_list_check # (1.3.82)
+  again_check || exit 1 # (1.3.102)
   exit 0
 fi
 
@@ -1122,6 +1142,7 @@ if [ "$SHARDS" = 1 ]; then
   frame_check
   live_check
   tool_list_check # (1.3.82)
+  again_check || true # (1.3.102)
 fi
 keep_crashes
 exit 0

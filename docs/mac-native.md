@@ -72,7 +72,11 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
 - **The Simpl layout in the Mac's own controls.** A quiet page with cards lifted off it (`Theme`), small-capital card
   headings, the course colours, grade rings that fill once — drawn with native buttons, toggles, pickers, menus, steppers,
   date pickers, popovers, sheets and context menus. The sidebar is the Mac's (vibrancy, selection, badges); each course in
-  it opens to its sections.
+  it opens to its sections. (1.3.102) A row pressed again while its place shows a screen pushed on it — an assignment
+  opened on the Dashboard, a conversation on the Inbox — goes back to that place's root, as Back goes and one step in
+  the history (`Engine.rowPressed`, from a click on the row seen beside the list's own: `PressedAgain` in
+  Shell/MainShell.swift; the list saying its selection again as its rows change, or the arrow keys, never do it; a
+  course's chevron only folds its sections).
 - **Motion.** Springs only, critically damped (`Motion.snappy`, `gentle`, `hover`, `fill`, `page`): they start from what
   is on screen, so anything can be interrupted and turned around. Cards lift under the pointer and give under a click; a
   place cross-fades in; a page opened deeper comes in from the trailing edge a short way and Back
@@ -1435,7 +1439,10 @@ session's answer in memory; `kept`, an answer kept from before, its counts held 
 `light-01w-walk`: the app walks through its places as a student's clicks would (`-SimplWalk`, Support/OpenClock.swift),
 each root place, a course and an assignment and then each again, so its console has the time of every first visit and
 every visit again; last, the assignment opened from the Dashboard (its course's place, made with it on top) and Back,
-where the console must say `open Assignment`, not the course's list. `light-01v-walk-plain` walks the same way beside
+where the console must say `open Assignment`, not the course's list. (1.3.102) `light-01x-sidebar-again` walks
+`on:/courses/101/assignments/1001,again` — the assignment pushed on the Dashboard, as Hand In pushes one, then the
+Dashboard's row pressed again — and `again_check` (mac-shots.sh, SHOTS=check) fails the run unless its console says
+`walk: at dashboard, 1 pushed` and then `walk: at dashboard, 0 pushed`. `light-01v-walk-plain` walks the same way beside
 it, last in their part and by themselves (the copies picturing the rest would slow them, and unevenly), with the screens loading as they did before 1.3.78 (`-SimplPlain`: nothing
 held or read ahead, the Dashboard not kept), so the two consoles compare like for like — both against a Canvas a
 quarter of a second away, as a school's is (its assignment lists 0.6 s; the mock's `apiDelay`, as the web's fluid suite

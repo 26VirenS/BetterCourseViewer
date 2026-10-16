@@ -347,7 +347,8 @@ struct Sidebar: View {
     private var selection: Binding<Place?> {
         Binding(get: { engine.nav.current.place }, set: { p in
             // (the list says its selection again as its rows change — a course's sections arriving: the place showing,
-            // said again, is not a new step, and must not take away what is pushed on it)
+            // said again, is not a new step, and must not take away what is pushed on it. 1.3.102: its row pressed
+            // again does, as a click of its own — PressedAgain)
             guard let p, p != engine.nav.current.place else { return }
             engine.go(p)
         })
@@ -467,6 +468,7 @@ struct Sidebar: View {
     private var groupsRow: some View {
         HStack(spacing: 8) {
             Label("Groups", systemImage: "person.2")
+                .pressedAgain(Place.groups) // (1.3.102: all but the chevron)
             Spacer(minLength: 4)
             Button {
                 withAnimation(Motion.gentle) {
@@ -484,28 +486,32 @@ struct Sidebar: View {
             .help(open.contains("groups") ? "Hide groups" : "Show groups")
         }
         .tag(Place.groups)
-        .windowMenu(Place.groups)
+        .modifier(WindowMenu(place: Place.groups))
+        .sidebarRow(Place.groups)
     }
 
     private func courseRow(_ c: CourseRow) -> some View {
         let ctx = "courses/\(c.id)"
         let expanded = isOpen(ctx)
         return HStack(spacing: 8) {
-            RoundedRectangle(cornerRadius: 3.5, style: .continuous)
-                .fill(Color(hex: c.color))
-                .frame(width: 13, height: 13)
-            Text(c.code)
-                .lineLimit(1)
-            Spacer(minLength: 4)
-            if engine.coursesLive, let n = c.unread, n > 0 {
-                // (home-14) a count, as the Notifications row's, that says what it counts when the pointer rests on it
-                let said = PreviewFormat.text(c.unreadLabel) ?? "\(n) unread \(n == 1 ? "announcement" : "announcements")"
-                Text("\(n)")
-                    .font(.sCaption2.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .help(said)
-                    .accessibilityLabel(said)
+            HStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 3.5, style: .continuous)
+                    .fill(Color(hex: c.color))
+                    .frame(width: 13, height: 13)
+                Text(c.code)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                if engine.coursesLive, let n = c.unread, n > 0 {
+                    // (home-14) a count, as the Notifications row's, that says what it counts when the pointer rests on it
+                    let said = PreviewFormat.text(c.unreadLabel) ?? "\(n) unread \(n == 1 ? "announcement" : "announcements")"
+                    Text("\(n)")
+                        .font(.sCaption2.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .help(said)
+                        .accessibilityLabel(said)
+                }
             }
+            .pressedAgain(Place.home(ctx)) // (1.3.102: all but the chevron, which only folds the sections)
             Button {
                 withAnimation(Motion.gentle) {
                     if open.contains(ctx) { open.remove(ctx) } else { open.insert(ctx) }
@@ -561,9 +567,33 @@ private struct WindowMenu: ViewModifier {
     }
 }
 
+/// (1.3.102) A sidebar row pressed, told to the engine (`Engine.rowPressed`): the place showing, its row pressed again
+/// with a screen pushed on it — an assignment opened on the Dashboard — goes back to its root. Seen beside the list's
+/// own click (a simultaneous tap), so the row is still chosen as before, its menu still opens on a right-click and the
+/// arrow keys still only move the selection; and only ever a click — the list saying its selection again as its rows
+/// change never comes here. The row's whole width takes it, the space past its words too.
+private struct PressedAgain: ViewModifier {
+    let place: Place
+    @EnvironmentObject private var engine: Engine
+
+    func body(content: Content) -> some View {
+        content
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .simultaneousGesture(TapGesture().onEnded {
+                guard !NSEvent.modifierFlags.contains(.control) else { return } // (a Control-click opens the row's menu)
+                engine.rowPressed(place)
+            })
+    }
+}
+
 private extension View {
-    /// A sidebar row's menu and read-ahead, and (home-16) whether it is the row chosen, for its glyph's colour.
-    func windowMenu(_ place: Place) -> some View { modifier(WindowMenu(place: place)).sidebarRow(place) }
+    /// A sidebar row's menu and read-ahead, and (home-16) whether it is the row chosen, for its glyph's colour; (1.3.102)
+    /// and its press again (`PressedAgain`).
+    func windowMenu(_ place: Place) -> some View { pressedAgain(place).modifier(WindowMenu(place: place)).sidebarRow(place) }
+
+    /// (1.3.102) The row's place, pressed again, back to its root.
+    func pressedAgain(_ place: Place) -> some View { modifier(PressedAgain(place: place)) }
 }
 
 /// Who is signed in, at the sidebar's foot — (home-31) their name and the address they sign in with (the school is named

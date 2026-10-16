@@ -90,8 +90,10 @@ extension View {
 /// screen is up and a few seconds more have passed (`-SimplWalkWait`, 5 by default — a student reading it), each step
 /// in turn, as a student's clicks would make it, the next once the one before has shown its content (15 seconds at
 /// most) and stood for a moment. A step is a place as `-SimplPlace` names it, `back` (the toolbar's Back) or
-/// `push:<address>` (a link to it). The console then has each screen's first open and its opens again; the picture waits
-/// for the walk's end.
+/// `push:<address>` (a link to it); (1.3.102) or `on:<address>`, its screen pushed on the place showing as a piece of
+/// work's own action pushes it (Hand In, See Feedback: the Dashboard stays the place), and `again`, the sidebar's row of
+/// the place showing pressed again (`Engine.rowPressed`), each said after as "walk: at <place>, <n> pushed". The
+/// console then has each screen's first open and its opens again; the picture waits for the walk's end.
 @MainActor
 enum Walk {
     private static var started = false
@@ -113,14 +115,22 @@ enum Walk {
                     engine.goBack()
                 } else if step.hasPrefix("push:") {
                     engine.openWeb(String(step.dropFirst(5)), title: "")
+                } else if step.hasPrefix("on:"), let route = engine.nativeRoute(for: String(step.dropFirst(3)), title: "") {
+                    engine.push(route)
+                } else if step == "again" {
+                    engine.rowPressed(engine.nav.current.place)
                 } else if let place = Engine.place(named: step) {
                     engine.go(place)
                 } else {
                     continue
                 }
-                // (Back within a place uncovers a screen that was never put away: it may say nothing of its open)
-                await until(step == "back" ? 3 : 15) { OpenClock.shown > before }
+                // (Back within a place uncovers a screen that was never put away: it may say nothing of its open, and
+                // nor may the place's root that its row pressed again uncovers)
+                await until(step == "back" || step == "again" ? 3 : 15) { OpenClock.shown > before }
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
+                if step == "again" || step.hasPrefix("on:") {
+                    NSLog("[Simpl] walk: at %@, %ld pushed", Engine.name(of: engine.nav.current.place), engine.nav.current.path.count)
+                }
             }
             NSLog("[Simpl] walk: done")
             Shot.ended()

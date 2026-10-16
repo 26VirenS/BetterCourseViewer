@@ -851,6 +851,15 @@ final class Engine: ObservableObject, ShellListener {
         moving(.deeper) { $0.goForward() }
     }
 
+    /// (1.3.102) A sidebar row pressed — a click on it, never the list saying its selection again as its rows change:
+    /// the place it names, showing with a screen pushed on it (an assignment opened on the Dashboard, a conversation on
+    /// the Inbox, a page on a course's home), goes back to its root as Back goes, one step in the history. Any other
+    /// row is the list's selection's to go to (`Sidebar.selection`).
+    func rowPressed(_ place: Place) {
+        guard nav.current.place == place, !nav.current.path.isEmpty else { return }
+        moving(.back) { $0.popToRoot() }
+    }
+
     /// (1.3.78) How the window last moved (PageMove): each screen arrives by it, and the one leaving goes by it.
     var move: PageMove { whereabouts.move }
 
