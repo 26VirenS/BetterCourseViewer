@@ -448,8 +448,17 @@ try {
     await wp.evaluate(() => { document.getElementById('verdict').textContent = 'Yes that’s right. Keep it up!'; });
     check(!!(await wwait((p, k) => k >= nwv && p.kind === 'panels' && p.verdict === 'right', 'the verdict (right)')), 'Alta’s “Yes that’s right” strip is read as a right answer');
     const nwv2 = (await wposts()).length;
-    await wp.evaluate(() => document.getElementById('verdict').remove());
-    check(!!(await wwait((p, k) => k >= nwv2 && p.kind === 'panels' && p.verdict === '', 'the verdict gone')), 'and when the strip goes, so does the verdict');
+    // (0.3.20) what showed Correct on a question not yet answered: a box whose class says "right" or "status" (layout),
+    // and a screen reader's 1-pixel live region keeping "Yes that's right" from the last question — neither tells one
+    const nwv3 = (await wposts()).length;
+    await wp.evaluate(() => {
+      const v = document.getElementById('verdict'); v.className = 'status__bar text-right feedback__incorrect___3bY7t'; v.textContent = '1 of 3';
+      v.insertAdjacentHTML('afterend', '<div id="srlive" role="status" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Yes that’s right. Keep it up!</div>');
+    });
+    check(!!(await wwait((p, k) => k >= nwv3 && p.kind === 'panels' && p.verdict === '', 'no verdict by class')), 'a layout class, a class saying incorrect with no such words, or a screen reader’s hidden live region never shows a verdict');
+    await wp.evaluate(() => { document.getElementById('srlive').remove(); document.getElementById('verdict').remove(); });
+    await wp.waitForTimeout(500);
+    check(!(await wposts()).slice(nwv3).some((p) => p.kind === 'panels' && p.verdict), 'and none is told after it either');
     await wp.close();
   }
 } finally {

@@ -479,19 +479,26 @@ internal static class AltaHook
             // Only a banner, an alert or a box marked by its class is looked at (this runs every 350 ms), never the bars put
             // away; each is told by its words first — short ones, Alta's own phrases — else by its class, the first that
             // decides. It is said with the panels, so the app hears it as it comes and as it goes with the next question.
-            var VERDICT_SEL = '[role="alert"], [role="status"], [class*="feedback" i], [class*="alert" i], [class*="notice" i], [class*="banner" i], [class*="result" i], [class*="status" i], [class*="correct" i], [class*="success" i], [class*="wrong" i], [class*="error" i], [class*="fail" i]';
-            var RIGHT_WORDS = /yes that's right|that's right|that is right|correct!|correct\.|well done|keep it up|nice work|great job/;
-            var WRONG_WORDS = /not quite|incorrect|that's not right|that is not right|not correct|try again|wrong/;
+            // (1.3.100 / 0.3.20) told by Alta's words only, never by a class — a class with "right" or "status" in it is
+            // as often layout ("text-right", "progress-status") as a verdict, and showed Correct on a question not yet answered —
+            // and only from a strip a student can see: a box at least 40 × 14, not a screen reader's 1-pixel live region (which
+            // keeps the last thing it announced into the next question)
+            var VERDICT_SEL = '[role="alert"], [role="status"], [aria-live], [class*="feedback" i], [class*="alert" i], [class*="notice" i], [class*="banner" i]';
+            var RIGHT_WORDS = /^(yes,? )?(that's|that is) (right|correct)|^correct\b|keep it up|well done|nicely done|nice work|great job/;
+            var WRONG_WORDS = /^not quite|^incorrect\b|(that's|that is) not (right|correct)|^not correct|^try again|^(that's|that is) wrong/;
             var verdictOf = function (el) {
               var t = String(el.textContent || '').replace(/[‘’]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
-              if (t && t.length < 160) {
-                if (WRONG_WORDS.test(t)) return 'wrong';
-                if (RIGHT_WORDS.test(t)) return 'right';
-              }
-              var c = el.getAttribute('class') || '';
-              if (/incorrect|error|wrong|fail/i.test(c)) return 'wrong';
-              if (/correct|success|right/i.test(c)) return 'right';
+              if (!t || t.length >= 160) return '';
+              if (WRONG_WORDS.test(t)) return 'wrong';
+              if (RIGHT_WORDS.test(t)) return 'right';
               return '';
+            };
+            var onScreen = function (el) {
+              if (!visible(el)) return false;
+              var b = el.getBoundingClientRect();
+              if (b.width < 40 || b.height < 14) return false;
+              var cs = getComputedStyle(el);
+              return Number(cs.opacity) > 0.05 && !/rect\(0/.test(cs.clip || '');
             };
             var verdict = function () {
               var secs = cards();
@@ -499,7 +506,7 @@ internal static class AltaHook
                 var els = secs[i].querySelectorAll(VERDICT_SEL);
                 for (var j = 0; j < els.length; j++) {
                   var el = els[j];
-                  if (el.closest('[data-simpl-bar], [data-simpl-hide]') || !visible(el)) continue;
+                  if (el.closest('[data-simpl-bar], [data-simpl-hide]') || !onScreen(el)) continue;
                   var v = verdictOf(el);
                   if (v) return v;
                 }
