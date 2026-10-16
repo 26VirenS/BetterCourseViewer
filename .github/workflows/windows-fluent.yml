@@ -706,6 +706,9 @@ jobs:
           Shot 'bio-open-cell-720' '720x520' 50 ($mock + @('--place', 'tools', '--appearance', 'dark', '--tool', 'cell'))
           Shot 'bio-biomol-amino-phe' '1366x778' 50 ($mock + @('--place', 'tools', '--appearance', 'light', '--tool', 'biomol', '--tool-state', 'amino:aa=F'))
           Shot 'tool-window-framed' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'course:101', '--open', 'tool:101:19', '--web-scheme', 'dark'))
+          # a tool Canvas will not launch on its own (the mock refuses its one-time launch, as Canvas does Smartwork's at the
+          # owner's school): Canvas's page for it, whose launch waits behind "Load … in a new window", sends it on in the window
+          Shot 'tool-window-newwindow' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'course:101', '--open', 'tool:101:20'))
           # a counter's panel caught as it grows out of its tile (--open sheetmorph: drawn as it is a quarter of the way
           # through its time — the surface most of the way from the tile to its place, its words only starting to come
           # in), light in a 1024 window and dark in a 1366 one; and the narrow window's counters in dark
@@ -1165,6 +1168,15 @@ jobs:
             $frames = @(Select-String -Path $framedLog -Pattern 'web window: a frame prefers (\w+)' -ErrorAction SilentlyContinue | ForEach-Object { $_.Matches[0].Groups[1].Value })
             if ($page.Count -eq 0 -or $page -contains 'dark' -or $frames.Count -eq 0 -or $frames -contains 'dark') { Write-Host "::error::tool-window-framed: the tool's page ($($page -join ', ')) or its frame ($($frames -join ', ')) did not prefer light ($framedLog)"; exit 1 }
             Write-Host "tool-window-framed: the page prefers $($page -join ', '); its frames $($frames -join ', ')"
+          }
+          # a tool Canvas opens in a new window, its one-time launch refused: the window opens Canvas's page for it and sends
+          # the launch on from it, in the window (Shell/WebWindow.cs, LoadToolOnPage, says so in a picture run)
+          if ($script:mine -contains 'tool-window-newwindow') {
+            $nwLog = 'shots/profile-tool-window-newwindow.log'
+            $l = Get-Content $nwLog -Raw -ErrorAction SilentlyContinue
+            if (-not "$l".Contains('web window: opens /courses/101/external_tools/20')) { Write-Host "::error::tool-window-newwindow: the window did not open Canvas's page for the tool ($nwLog)"; exit 1 }
+            if (-not "$l".Contains("its launch sent on in this window")) { Write-Host "::error::tool-window-newwindow: the tool's launch was not sent on from Canvas's page ($nwLog)"; exit 1 }
+            Write-Host "tool-window-newwindow: the launch was sent on from Canvas's page, in the window"
           }
           # Knewton Alta's page in light in a dark app whose web profile prefers dark (Shell/WebWindow.cs, LightPages: the
           # popup writes "alta: the page prefers …" in a picture run as each page comes in)
