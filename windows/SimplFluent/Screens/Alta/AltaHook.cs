@@ -35,12 +35,23 @@ internal static class AltaHook
           // (Windows 0.3.5) a pop-up of Alta's given back to the page, shown there as Alta draws it: the page stays in
           // sight under it until it closes
           var dialogInPage = false;
+          // (1.3.102) the page's own reads of itself — its mastery bars, the overview's words, the cover — begun only once the
+          // page has been shown or its cover read (`begun`), so they never take the page's time while Alta is still drawing
+          // it; a frame inside the page reads from the start, as before
+          var begun = window.top !== window;
+          // (and three seconds in, whatever the page is doing: a page out of sight for longer — not recognised, kept back
+          // for its grace — still has its mastery read for the popup's rail)
+          if (!begun) setTimeout(function () { begun = true; }, 3000);
+          // (1.3.102) changes to the page (elements, words) counted, for the reads that need not look again while nothing
+          // has changed
+          var pageChanges = 0;
           if (window.top === window) {
             var showing = false, firstVeil = 0;
             var veils = altaHere;
             // (1.3.101) `steady`: how long the part shown had been quiet, and whether a cap showed it before it was — with
             // when the page's DOMContentLoaded came, for the app's line
             reveal = function (how, steady) {
+              begun = true;
               if (firstVeil) { clearTimeout(firstVeil); firstVeil = 0; }
               if (document.documentElement) document.documentElement.setAttribute('data-simpl-shown', '');
               if (!showing) {
@@ -197,17 +208,50 @@ internal static class AltaHook
           // ---- what Alta's page itself shows: its overview's words, its mastery bars ----
           var norm = function (s) { return String(s || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;| /g, ' ').replace(/\s+/g, ' ').trim().toLowerCase(); };
           var shown = function (el) { var r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+          // (1.3.102) the page's web components — each element with a tree of its own — listed once, and looked for again
+          // only after the page has had an element put in or a tree made: before, every look in them (the mastery bars every
+          // second and a half, the overview's words, the pop-ups every 1.2 s) walked every element of the page for them
+          var hosts = [], hostsDirty = true;
+          var shadowHosts = function () {
+            if (hostsDirty) {
+              hostsDirty = false;
+              hosts = [];
+              var walk = function (root) {
+                try { [].forEach.call(root.querySelectorAll('*'), function (el) { if (el.shadowRoot) { hosts.push(el); walk(el.shadowRoot); } }); } catch (e) {}
+              };
+              walk(document);
+            }
+            return hosts;
+          };
+          try {
+            new MutationObserver(function (list) {
+              pageChanges++;
+              if (hostsDirty) return;
+              for (var i = 0; i < list.length; i++) {
+                var added = list[i].addedNodes;
+                for (var j = 0; j < added.length; j++) if (added[j].nodeType === 1) { hostsDirty = true; return; }
+              }
+            }).observe(document, { childList: true, subtree: true, characterData: true });
+          } catch (e) {}
+          try {
+            var attach0 = Element.prototype.attachShadow;
+            if (attach0) Element.prototype.attachShadow = function () { hostsDirty = true; return attach0.apply(this, arguments); };
+          } catch (e) {}
+          // (what matches in the page and in each of its web components' trees, in the page's order)
           var deep = function (sel) {
             var out = [];
-            var walk = function (root) {
-              try {
-                out.push.apply(out, [].slice.call(root.querySelectorAll(sel)));
-                [].slice.call(root.querySelectorAll('*')).forEach(function (el) { if (el.shadowRoot) walk(el.shadowRoot); });
-              } catch (e) {}
-            };
-            walk(document);
+            try { out.push.apply(out, [].slice.call(document.querySelectorAll(sel))); } catch (e) {}
+            shadowHosts().forEach(function (h) {
+              try { if (h.isConnected && h.shadowRoot) out.push.apply(out, [].slice.call(h.shadowRoot.querySelectorAll(sel))); } catch (e) {}
+            });
             return out;
           };
+          // (1.3.102) a keyword looked for in the page's words as they stand, with no layout — before the words as they show
+          // (innerText, which lays the page out) are read for it; what shows is always among them
+          var mentions = function (el, re) { return !!el && re.test(el.textContent || ''); };
+          // (1.3.102) the question shown alone (the page script's own focus): the reads below need not look again while
+          // nothing in the page has changed — every third time all the same
+          var focusOn = function () { return !!document.documentElement && document.documentElement.hasAttribute('data-simpl-q'); };
           // (the overview as it reads on the page, when no answer of Alta's named it: its title, DUE DATE, STATUS, and each
           // "Estimated 4 - 9 questions" with the objective under it)
           var scrape = function () {
@@ -235,7 +279,7 @@ internal static class AltaHook
               var label = norm(b.getAttribute('aria-label') || (named && named.innerText) || b.title || '');
               return { label: label.slice(0, 160), value: Math.max(0, Math.min(1, now / max)) };
             }).filter(Boolean).slice(0, 30);
-            var lines = String((document.body && document.body.innerText) || '').split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+            var lines = mentions(document.body, /mastery/i) ? String((document.body && document.body.innerText) || '').split('\n').map(function (l) { return l.trim(); }).filter(Boolean) : [];
             var percent = null;
             lines.forEach(function (l, i) {
               if (percent !== null || !/^(total |overall |assignment )?mastery\b/i.test(l)) return;
@@ -245,16 +289,26 @@ internal static class AltaHook
             if (percent === null) bars.forEach(function (b) { if (percent === null && /mastery/.test(b.label)) percent = Math.round(b.value * 1000) / 10; });
             return { percent: percent, bars: bars };
           };
-          var lastMeter = '';
+          // (1.3.102) whether a read every so often need not look this time: not begun yet, or the question shown alone and
+          // nothing changed in the page since it last looked (`at`: its own record; every third time it looks all the same)
+          var idleRead = function (at) {
+            if (!begun) return true;
+            if (focusOn() && at.changes === pageChanges && ++at.skipped < 3) return true;
+            at.changes = pageChanges; at.skipped = 0;
+            return false;
+          };
+          var lastMeter = '', meterAt = { changes: -1, skipped: 0 };
           setInterval(function () {
+            if (idleRead(meterAt)) return;
             var m = meter();
             if (m.percent === null && !m.bars.length) return;
             var s = JSON.stringify(m);
             if (s !== lastMeter) { lastMeter = s; post({ kind: 'meter', percent: m.percent, bars: m.bars }); }
           }, 1500);
           // (1.3.45) the overview as its words read, when it lists objectives with their estimates: passed when it changes
-          var lastScrape = '';
+          var lastScrape = '', scrapeAt = { changes: -1, skipped: 0 };
           setInterval(function () {
+            if (idleRead(scrapeAt) || !mentions(document.body, /estimated/i)) return;
             var o = scrape();
             if (!o.objectives.length) return;
             var s = JSON.stringify(o);
@@ -328,7 +382,7 @@ internal static class AltaHook
               var flows = all('[class*="learn-flow-body"]'); // (there, even empty: Alta's learn page with no part)
               var parts = all('section[class*="compound__compound"]').filter(shown);
               if (!flows.length && !parts.length) {
-                var overview = /estimated\s+\d+\s*[-–]\s*\d+\s+questions?/i.test(txt(document.body))
+                var overview = (mentions(document.body, /estimated/i) && /estimated\s+\d+\s*[-–]\s*\d+\s+questions?/i.test(txt(document.body)))
                   || all('button, a, [role="button"]').some(function (b) { return shown(b) && START.test(norm(b.innerText || b.textContent)); });
                 return { state: overview ? 'overview' : 'none', reason: 'nothing on the page is a part of Alta\'s learn page' };
               }
@@ -355,6 +409,7 @@ internal static class AltaHook
             var unmark = function () {
               marked.forEach(function (m) { m[0].removeAttribute(m[1]); });
               marked = []; keptNow = [];
+              watchKept(); // (1.3.102: no part watched)
               document.documentElement.removeAttribute('data-simpl-q');
             };
             var mark = function (el, a) { if (!el.hasAttribute(a)) { el.setAttribute(a, ''); marked.push([el, a]); } };
@@ -413,6 +468,8 @@ internal static class AltaHook
             var busy = function (root) {
               if (!root) return false;
               if ([].some.call(root.querySelectorAll(BUSY), function (b) { return shown(b) && !b.closest('[data-simpl-pic]'); })) return true;
+              // (1.3.102: its words as they show read only when its words as they stand say any of these)
+              if (!mentions(root, /loading|please\s*wait|one\s*moment|just\s*a\s*moment|preparing/i)) return false;
               var t = norm(root.innerText || '');
               return t.length < 120 && /^(loading|please wait|one moment|just a moment|preparing)\b/.test(t);
             };
@@ -431,6 +488,8 @@ internal static class AltaHook
               keep.forEach(function (k) { if (sprite(k)) for (var x = k; x && !real.has(x); x = x.parentElement) mark(x, 'data-simpl-thin'); });
               keptNow = keep;
               gen++;
+              watchKept(); // (1.3.102: the parts kept now told as they change)
+              verdictDirty = true;
               var st = document.getElementById('simpl-focus');
               if (!st) { st = document.createElement('style'); st.id = 'simpl-focus'; (document.head || document.documentElement).appendChild(st); }
               if (st.textContent !== FOCUS) st.textContent = FOCUS;
@@ -538,7 +597,11 @@ internal static class AltaHook
               }
               return '';
             };
-            var publish = function () {
+            // (1.3.102) `lazy`: told on demand (publishSoon) — the verdict read again only when something in the parts kept
+            // has changed since it was last read (`verdictDirty`), else as it was last read
+            var verdictDirty = true, verdictSaid = '', pubAt = 0;
+            var publish = function (lazy) {
+              pubAt = Date.now();
               var on = document.documentElement.hasAttribute('data-simpl-q');
               var bs = on ? bars() : [];
               buttonEls = bs.map(function (b) { return b.el; });
@@ -546,16 +609,58 @@ internal static class AltaHook
               if (bsSaid !== lastButtons) { lastButtons = bsSaid; post({ kind: 'buttons', items: JSON.parse(bsSaid) }); }
               var ps = on ? panels() : [];
               if (on) minis(); else picEls = [];
+              if (!on) { verdictSaid = ''; verdictDirty = true; }
+              else if (!lazy || verdictDirty) { verdictSaid = verdict(); verdictDirty = false; }
               var bottom = ps.reduce(function (m, p) { return Math.max(m, p.y + p.h); }, 0);
               var sx0 = window.scrollX || 0, sy0 = window.scrollY || 0;
               var pr = picEls.map(function (el) { var r = el.getBoundingClientRect(); return { x: Math.round(r.left + sx0), y: Math.round(r.top + sy0), w: Math.round(r.width), h: Math.round(r.height) }; });
-              var psSaid = JSON.stringify({ panels: ps, height: ps.length ? bottom + 48 : 0, gen: gen, pics: pr, verdict: on ? verdict() : '' });
+              var psSaid = JSON.stringify({ panels: ps, height: ps.length ? bottom + 48 : 0, gen: gen, pics: pr, verdict: on ? verdictSaid : '' });
               if (psSaid !== lastPanels) { lastPanels = psSaid; var m = JSON.parse(psSaid); m.kind = 'panels'; post(m); }
             };
-            // (maths drawn whole: and each time, a part kept gone or out of sight looked at again, and Alta's maths drawn
-            // flat sized again — see `watch` and `remeasure`)
-            setInterval(function () { publish(); watch(); remeasure(); }, 350);
-            window.addEventListener('resize', function () { publish(); });
+            // (1.3.102) The panels, the buttons and the verdict told when something may have moved them, not every 350 ms
+            // whatever the page did (1.3.53–1.3.101): a change in the parts kept (their elements and words, or a class, a
+            // style, a button greyed or not — `keptWatch`), a part's size (`keptSize`) or the window's, at the next frame and
+            // no oftener than every 200 ms however fast the page changes; once more 450 ms after a change in the parts (a
+            // strip that fades in, a box sized after it is put in) and when a fade in them ends; and every second whatever
+            // happens, as a last resort.
+            var pubTimer = 0, pubLater = 0;
+            var queuePublish = function () {
+              if (pubTimer) return;
+              pubTimer = setTimeout(function () {
+                var done = false;
+                var run = function () { if (done) return; done = true; pubTimer = 0; publish(true); };
+                try { requestAnimationFrame(run); } catch (e) {}
+                setTimeout(run, 100); // (no frame comes while the view is out of sight)
+              }, Math.max(0, 200 - (Date.now() - pubAt)));
+            };
+            var publishSoon = function (inParts) {
+              if (inParts) {
+                verdictDirty = true;
+                if (!pubLater) pubLater = setTimeout(function () { pubLater = 0; verdictDirty = true; queuePublish(); }, 450);
+              }
+              queuePublish();
+            };
+            var keptWatch = null, keptSize = null;
+            try { keptWatch = new MutationObserver(function () { publishSoon(true); }); } catch (e) {}
+            try { keptSize = new ResizeObserver(function () { publishSoon(false); }); } catch (e) {}
+            // (the parts kept now watched, and no others)
+            var watchKept = function () {
+              if (keptWatch) keptWatch.disconnect();
+              if (keptSize) keptSize.disconnect();
+              cards().forEach(function (sec) {
+                try { if (keptWatch) keptWatch.observe(sec, { attributes: true, subtree: true, attributeFilter: ['class', 'style', 'hidden', 'disabled', 'aria-disabled', 'aria-hidden', 'open'] }); } catch (e) {}
+                try { if (keptSize) keptSize.observe(sec); } catch (e) {}
+              });
+            };
+            // (and a fade or a movement in the parts kept come to its end: a strip faded in, a box slid open)
+            var settledIn = function (e) { var t = e.target; if (t && t.closest && t.closest('[data-simpl-keep]')) publishSoon(true); };
+            document.addEventListener('transitionend', settledIn, true);
+            document.addEventListener('animationend', settledIn, true);
+            setInterval(function () { publish(); }, 1000);
+            // (maths drawn whole: a part kept gone or out of sight looked at again, and Alta's maths drawn flat sized again — see
+            // `watch` and `remeasure` — still every 350 ms)
+            setInterval(function () { watch(); remeasure(); }, 350);
+            window.addEventListener('resize', function () { publishSoon(false); });
             window.__simplButtons = {
               press: function (i) { var b = buttonEls[i]; if (!b || b.disabled || b.getAttribute('aria-disabled') === 'true') return false; b.click(); setTimeout(publish, 60); return true; }
             };
@@ -984,7 +1089,14 @@ internal static class AltaHook
                 reveal('browser');
                 return;
               }
-              var r = read();
+              // (1.3.102) the page read afresh — its marks lifted for the moment, a style pass over the whole page each way —
+              // only when something may have changed what it holds: anything but a change outside the parts shown alone (Alta's
+              // header, its chat), after which the last reading still stands; and every two seconds all the same
+              var fresh = readAgain || !lastRead || !document.documentElement.hasAttribute('data-simpl-q') || Date.now() - readAt > 2000
+                || keptNow.some(function (k) { return !k.isConnected; });
+              readAgain = false;
+              var r = fresh ? read() : lastRead;
+              if (fresh) { lastRead = r; readAt = Date.now(); }
               // (1.3.70) a loading page, or parts that are all still loading: out of sight, waited for (twenty seconds at
               // most, then shown as it is)
               var loadingNow = r.keep ? r.keep.every(function (k) { return busy(k) && !k.querySelector('.lrn_widget, .lrn_qr, .learnosity-item') && norm(k.innerText || '').length < 200; })
@@ -1013,7 +1125,7 @@ internal static class AltaHook
                 pics(r.keep);
                 r.keep.forEach(function (k) { [].forEach.call(k.querySelectorAll('button'), function (b) { if (/^(feedback|content attribution\b.*)$/.test(norm(b.innerText || b.textContent || b.getAttribute('aria-label')))) mark(b, 'data-simpl-hide'); }); });
                 report(r.state, r);
-                publish();
+                publish(!fresh);
                 revealSteady(r.state);
                 return;
               }
@@ -1044,7 +1156,14 @@ internal static class AltaHook
               publish();
               reveal('as it is');
             };
-            var schedule = function (ms) { if (timer) clearTimeout(timer); var d = typeof ms === 'number' ? ms : 120; dueAt = Date.now() + d; timer = setTimeout(tick, d); };
+            // (1.3.102) `outside`: for a change outside the parts shown alone — the page need not be read afresh for it
+            var lastRead = null, readAt = 0, readAgain = true;
+            var schedule = function (ms, outside) {
+              if (!outside) readAgain = true;
+              if (timer) clearTimeout(timer);
+              var d = typeof ms === 'number' ? ms : 120;
+              dueAt = Date.now() + d; timer = setTimeout(tick, d);
+            };
             // (0.3.5) the browser asked for, or put away: the page as it is, or laid out again, at once
             window.__simplBrowserNow = function () { dialogTick(); schedule(0); return true; };
             // (maths drawn whole) the app's last resort, its skeleton still over the page 26 seconds on (the page script's own
@@ -1135,8 +1254,10 @@ internal static class AltaHook
               if (mine) keptChange = now;
               if (!changeSince) changeSince = now;
               watchMathJax();
-              if (mine) { if (!timer || dueAt - now > 120 || now - changeSince < 300) schedule(); }
-              else if (!timer || dueAt - now > 400) schedule(400);
+              if (mine) { if (!timer || dueAt - now > 120 || now - changeSince < 300) schedule(); else readAgain = true; }
+              else if (!timer || dueAt - now > 400) schedule(400, true);
+              // (1.3.102) the panels and buttons told again for a change in the parts shown alone
+              if (mine && keptNow.length) publishSoon(true);
             };
             // (maths drawn whole) a part of Alta's put in while the question is shown alone — the next one, before the page is
             // looked at again — laid out at once where it is (one Alta itself hides left as it is): what holds it marked as the
@@ -1237,10 +1358,12 @@ internal static class AltaHook
               return [].slice.call(document.querySelectorAll('a, button')).filter(function (b) { return vis(b) && /^review instruction$/i.test(cs(b.innerText || b.textContent)); })[0] || null;
             };
             var coverRead = function () {
-              var head = document.querySelector('[data-test="cover-header"]');
-              var go = startEl();
-              // (a cover: its header, or a Start beside the objectives' estimates — never Alta's learn page)
+              // (a cover: its header, or a Start beside the objectives' estimates — never Alta's learn page; 1.3.102: looked
+              // for in that order, the cheapest first — the learn page, the header, the words, and only then a Start)
               if (document.querySelector('[class*="learn-flow-body"], section[class*="compound__compound"]')) return null;
+              var head = document.querySelector('[data-test="cover-header"]');
+              if (!head && !mentions(document.body, /estimated/i)) return null;
+              var go = startEl();
               if (!head && !(go && /estimated\s+\d+/i.test(cs(document.body && document.body.innerText)))) return null;
               var o = { kind: 'cover', name: '', details: [], note: '', start: go ? cs(go.innerText || go.textContent) : '', review: !!reviewEl(), topics: [] };
               var h1 = (head && head.querySelector('h1')) || document.querySelector('h1');
@@ -1289,9 +1412,12 @@ internal static class AltaHook
               var s = o ? JSON.stringify(o) : 'none';
               if (s === lastCover) return;
               lastCover = s;
+              if (o) begun = true;
               post(stamp(o || { kind: 'cover', none: true }));
             };
-            setInterval(coverTick, 700);
+            // (1.3.102) looked for every 0.7 s once the page has been shown or its cover read — while it loads, only when
+            // Alta's cover header is there (the overview the page script recognises reads the cover itself, at once)
+            setInterval(function () { if (begun || document.querySelector('[data-test="cover-header"]')) coverTick(); }, 700);
             window.__simplCoverNow = coverTick;
             window.__simplCover = {
               start: function () { var a = startEl(); if (!a) return false; a.click(); return true; },

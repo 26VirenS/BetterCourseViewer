@@ -1265,6 +1265,16 @@ has the page script show it as it is (`__simplAsIsNow`: its waits counted as ove
 Logs with what the page held), so the page script's `showing` stays in step and the page can still be put out of sight
 between parts after. Once a grace between parts has run out, the page is no longer put out of sight again at each look. `alta-test.mjs` draws a box as MathQuill does on the mock, in dark and light.
 
+(0.3.22) A lighter page script, saying what it said before (the Mac's 1.3.102, word for word). The panels, buttons and
+verdict are told when something may have moved them — a change in the parts kept (their elements and words; a class, a
+style, a button greyed or not; a fade ending), a part's size or the window's — at the next frame, no oftener than every
+200 ms, again 450 ms after a change in the parts, and every second whatever happens (every 350 ms always before); the
+verdict is read again only after a change in the parts. The page is read afresh (its marks lifted) only for a change in
+the parts or Alta's learn flow, or every 2 s; web components are listed once and looked for again only when the page
+gains an element or a tree; keyword tests read `textContent` before `innerText`; and the mastery bars, the overview's
+words and the cover are read only once the page has been shown, its cover read, or 3 s have passed — while the
+question is shown alone and nothing changed, only every third time. `alta-test.mjs` checks it on Windows' copy.
+
 A pop-up of Alta's (0.3.5) is hidden in the page as soon as the page script sees it and read once it has settled —
 nothing it says changed for a moment, nothing in it loading, its fade done; three seconds at most, five while its body
 says nothing — and again at each change (a next step): its title, its body as plain HTML (its formulas as their TeX,
