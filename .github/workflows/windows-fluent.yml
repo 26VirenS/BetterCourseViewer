@@ -1173,6 +1173,21 @@ jobs:
             if ($said.Count -eq 0 -or $said -contains 'dark') { Write-Host "::error::alta-question-light: Alta's page did not prefer light ($($said -join ', ')) (shots/profile-alta-question-light.log)"; exit 1 }
             Write-Host "alta-question-light: the page prefers $($said -join ', ')"
           }
+          # (Alta speed, 0.3.20) each Alta open's timeline in the app's log (Screens/Alta/AltaSession.cs writes "alta: launch
+          # asked +N ms · launch answered … · web view … · page … · shown +N ms (how, …)", "page given" in place of the launch
+          # for a page asked for): the launch asked at once, before the popup is up (not after the web view is made), and
+          # Alta's page shown — a question with how long its part was still
+          foreach ($name in @('alta-overview', 'alta-start', 'alta-question-light', 'alta-question-dark')) {
+            if ($script:mine -notcontains $name) { continue }
+            $line = @(Select-String -Path "shots/profile-$name.log" -Pattern 'alta: ((?:launch asked|page given) .+)$' -ErrorAction SilentlyContinue | ForEach-Object { $_.Matches[0].Groups[1].Value }) | Select-Object -First 1
+            if ("$line" -notmatch ' . shown \+\d+ ms \(') { Write-Host "::error::${name}: no timeline of the open with Alta's page shown ('$line') (shots/profile-$name.log)"; exit 1 }
+            if ($name -in @('alta-overview', 'alta-start')) {
+              $asked = [regex]::Match("$line", '^launch asked \+(\d+) ms')
+              if (-not $asked.Success -or [int]$asked.Groups[1].Value -gt 1500) { Write-Host "::error::${name}: the launch was not asked at once ('$line') (shots/profile-$name.log)"; exit 1 }
+            } elseif ("$line" -notmatch ' . shown \+\d+ ms \(question, .*quiet \d+ ms') { Write-Host "::error::${name}: the question was not shown with how long its part was still ('$line') (shots/profile-$name.log)"; exit 1 }
+            if ("$line" -match 'capped\)') { Write-Host "::warning::${name}: Alta's page was shown only because the wait ran out ('$line')" }
+            Write-Host "${name}: $line"
+          }
           # a pop-up of Alta's whose body comes in after it opens, shown whole as the app's own dialog: its words, both its
           # formulas and both its pictures (Screens/Alta/AltaSession.cs writes "alta: a pop-up shown as the app's own: …"
           # in a picture run; before 0.3.5 such a pop-up came up with its title and buttons round an empty body)
