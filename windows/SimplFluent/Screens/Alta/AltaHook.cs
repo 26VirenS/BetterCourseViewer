@@ -536,7 +536,7 @@ internal static class AltaHook
             window.__simplButtons = {
               press: function (i) { var b = buttonEls[i]; if (!b || b.disabled || b.getAttribute('aria-disabled') === 'true') return false; b.click(); setTimeout(publish, 60); return true; }
             };
-            var told = '', badSince = 0, timer = null, wasQuestion = false, loadingSince = 0;
+            var told = '', badSince = 0, timer = null, dueAt = 0, changeSince = 0, wasQuestion = false, loadingSince = 0;
             var report = function (state, r) {
               if (state === told) return;
               told = state;
@@ -949,7 +949,7 @@ internal static class AltaHook
               link: function (href) { var a = dialogLinks.filter(function (x) { return x.href === href; })[0]; if (!a) return false; a.click(); return true; }
             };
             var tick = function () {
-              timer = null;
+              timer = null; changeSince = 0;
               dialogTick();
               // (0.3.5) the browser asked for: Alta's page as it is, as in a browser — nothing of it laid out or hidden, no
               // buttons or panels for the app — until the student goes back to the question laid out
@@ -1017,39 +1017,56 @@ internal static class AltaHook
               publish();
               reveal('as it is');
             };
-            var schedule = function (ms) { if (timer) clearTimeout(timer); timer = setTimeout(tick, typeof ms === 'number' ? ms : 120); };
+            var schedule = function (ms) { if (timer) clearTimeout(timer); var d = typeof ms === 'number' ? ms : 120; dueAt = Date.now() + d; timer = setTimeout(tick, d); };
             // (0.3.5) the browser asked for, or put away: the page as it is, or laid out again, at once
             window.__simplBrowserNow = function () { dialogTick(); schedule(0); return true; };
             // (1.3.68) the question shown once Alta has finished drawing it — nothing changed for a moment (its maths set, its
-            // answer box built, its pictures in) — or after a second and a half at most: the app's skeleton meanwhile
-            // (Alta speed: a tenth of a second with nothing changed in the part kept — a couple of frames, its maths, answer
-            // box and pictures still waited for by what says they are loading — where it was 350 ms of the whole page still,
-            // and a second and a half at most where it was two and a half)
-            var lastChange = Date.now(), steadyTimer = null, steadySince = 0;
+            // answer box built, its pictures in) — or after two and a half seconds at most: the app's skeleton meanwhile.
+            // (1.3.100) Shown on readiness rather than on a long silence: nothing in it still loading (its maths, its
+            // pictures, Learnosity's box) and nothing in the part shown changed for 100 ms — a layout and two frames, where
+            // 1.3.68–1.3.99 waited 350 ms — Alta's own round it (its header's bars, the chat button, a celebration) no longer
+            // counted once a part is kept (`keptChange`; `lastChange` is every change, which a pop-up's next step is read by).
+            // At most a second and a half when only that quiet is missing, two and a half while something in it is still
+            // being drawn, four while it says it is loading (1.3.70).
+            var lastChange = Date.now(), keptChange = Date.now(), steadyTimer = null, steadySince = 0;
+            // (a part headed Question whose Learnosity box is not drawn in it yet — only the place Alta keeps for it — is still
+            // being drawn: its words would show without the box to answer in)
+            var undrawn = function () { return cards().some(function (k) { return /^question$/i.test(title(k)) && !k.querySelector('.lrn_widget, .lrn_qr'); }); };
             var revealSteady = function (state) {
               if (!steadySince) steadySince = Date.now();
-              var quiet = Date.now() - lastChange;
+              var quiet = Date.now() - keptChange;
               var spinning = state === 'overview' ? busy(document.body) : [].some.call(document.querySelectorAll('[data-simpl-keep]'), busy);
               var pending = spinning || !!document.querySelector('.MathJax_Processing, .lrn_loading, [class*="lrn-loading"]')
-                || [].some.call(document.querySelectorAll('[data-simpl-keep] img'), function (i) { return !i.complete; });
+                || [].some.call(document.querySelectorAll('[data-simpl-keep] img'), function (i) { return !i.complete; }) || undrawn();
               var ready = quiet >= 100 && !pending;
-              // (1.3.70: as long as four seconds while something in it still says it is loading)
-              if (ready || Date.now() - steadySince > (spinning ? 4000 : 1500)) {
+              if (ready || Date.now() - steadySince > (spinning ? 4000 : pending ? 2500 : 1500)) {
                 steadySince = 0;
                 reveal(state, { quiet: quiet, capped: !ready });
                 return;
               }
               if (steadyTimer) clearTimeout(steadyTimer);
-              steadyTimer = setTimeout(function () { steadyTimer = null; revealSteady(state); }, 50);
+              steadyTimer = setTimeout(function () { steadyTimer = null; revealSteady(state); }, pending ? 120 : Math.max(20, 100 - quiet));
             };
-            // (Alta speed) once a part is kept, only a change in it — or in Alta's learn flow round it — counts against its
-            // being still: Alta's chrome changing (a confetti canvas, its chat, the header's bars) neither holds the part
-            // back nor puts off the next look at the page, which it still asks for if none is on the way
-            var inKept = function (n) { var e = n && (n.nodeType === 1 ? n : n.parentElement); return !!e && !!e.closest('[data-simpl-keep], [class*="learn-flow-body"]'); };
+            // (1.3.100) a change in the part kept (or in Alta's learn flow round it, where the next part comes), or a kept
+            // part taken away — the page itself, before a part is kept
+            var inKept = function (list) {
+              if (!keptNow.length || keptNow.some(function (k) { return !k.isConnected; })) return true;
+              return list.some(function (m) {
+                var n = m.target;
+                if (n && n.nodeType !== 1) n = n.parentNode;
+                return !!(n && n.closest && n.closest('[data-simpl-keep], [class*="learn-flow-body"]'));
+              });
+            };
             try {
               new MutationObserver(function (list) {
-                if (!document.querySelector('[data-simpl-keep]') || list.some(function (m) { return inKept(m.target); })) { lastChange = Date.now(); schedule(); }
-                else if (!timer) schedule();
+                var now = Date.now(), mine = inKept(list);
+                lastChange = now;
+                if (mine) keptChange = now;
+                if (!changeSince) changeSince = now;
+                // (the page looked at again 120 ms after the last change, as before — put off by later changes in the part
+                // shown for 300 ms at most, so a page that never stops changing is still looked at; a change elsewhere never
+                // puts it off, only brings a later one sooner)
+                if (!timer || dueAt - now > 120 || (mine && now - changeSince < 300)) schedule();
               }).observe(document, { childList: true, subtree: true, characterData: true });
             } catch (e) {}
             schedule();

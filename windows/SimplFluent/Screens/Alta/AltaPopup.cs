@@ -129,8 +129,9 @@ internal sealed class AltaPopupView
             AltaLook.Settle(root);
         };
         root.Loaded += loaded;
-        // (Alta speed, 0.3.20: begun before the popup shows — its launch asked of Canvas and its web view made while the
-        //  popup is laid out and fades in — where it was begun only once the popup was up)
+        // (Alta speed, 0.3.20: begun before the popup shows, where it was begun only once the popup was up — the web view's
+        //  environment asked for while the popup is laid out; the web view itself is made only once the popup's window is
+        //  there, which WebView2 waits for. The launch was asked already, as the session was made.)
         session.Start();
         Update();
         Dialogs.Show(sheet, over);

@@ -1209,13 +1209,17 @@ the question — its green "Yes that's right. Keep it up!" strip, its red "Not q
 else by its class) and shown as the popup's own pill at the left of its buttons, Correct in green or Incorrect in red
 (`VerdictPill`), until the strip goes with the next question.
 
-Opening one (0.3.20) asks Canvas for the assignment's launch first — as the popup is laid out, before it shows, while its
-web view is made and dressed (`LightPages`, the page script) — and waits for it only to send the page there; it was asked
-once all of that was done, and only once the popup was up. The header's due line comes with the launch from the
+Opening one (0.3.20) asks Canvas for the assignment's launch first — the moment it is asked for, before the popup is
+built (`AltaSession`'s constructor) — and waits for it only to send the page there, while the popup is laid out and its
+web view made and dressed (`LightPages`, the page script); it was asked once all of that was done, and only once the
+popup was up. `Start()` is begun before the popup shows too, though WebView2 makes the web view itself only once the
+popup's window is there — the floor of an open until a web view is kept ready ahead. The header's due line comes with the launch from the
 Assignment screen or a tool's row (`AltaLaunch.Due`); only without one is the Canvas assignment read for it, once the
 launch is on its way. The page script shows the question once its part has been still a tenth of a second (350 ms of the
-whole page before), what says it is loading — MathJax, Learnosity, a picture not in — still waited for, a second and a
-half at most (four while something in it spins); only a change in the part kept, or in Alta's learn flow round it, counts.
+whole page before), what says it is still being drawn — MathJax, Learnosity's box not yet in a part headed Question, a
+picture not in — still waited for: a second and a half at most when only that tenth is missing, two and a half while
+something is still being drawn, four while something in it spins (as the Mac's copy); only a change in the part kept, in
+Alta's learn flow round it, or a kept part taken away, counts, and such changes put off the next look for 300 ms at most.
 Each open writes its timeline to the app's log — "alta: launch asked +N ms · launch answered … · web view … · page …
 (host) · alta page … · question … · shown +N ms (question, N ms into its page, quiet N ms[, capped])" ("page given" for a
 page asked for) — which the Windows workflow checks for the Alta pictures, and `scripts/dev/alta-test.mjs` checks the

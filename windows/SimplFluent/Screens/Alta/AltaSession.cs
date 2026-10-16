@@ -266,6 +266,10 @@ internal sealed class AltaSession
         Launch = launch;
         since = asked ?? Stopwatch.GetTimestamp();
         names = ReadJson<Dictionary<string, string>>(NamesKey) ?? new();
+        // (Alta speed, 0.3.20) the launch asked of Canvas the moment the popup is asked for, before any of it is built — the
+        // page sent there once the web view is made (Start)
+        given = Launch.Page is { } p ? engine.Absolute(p) : null;
+        if (given == null) launching = AskLaunch();
     }
 
     /// <summary>The popup's own window, once it shows: a graph opened from the page keeps above it (AltaGraphWindow).</summary>
@@ -297,19 +301,21 @@ internal sealed class AltaSession
     /// or could not be: the popup asks Canvas for the assignment's due line only then, never in the launch's way.</summary>
     public Task Launched => launched.Task;
     private readonly TaskCompletionSource launched = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    /// <summary>(Alta speed, 0.3.20) The page asked for (a page of the mock's, for the pictures), or else the launch,
+    /// asked of Canvas as the session is made.</summary>
+    private readonly Uri? given;
+    private readonly Task<(Uri? Url, string? Why)>? launching;
 
-    /// <summary>Alta opened: the assignment's launch asked of Canvas at once (or the page asked for), and meanwhile the web
-    /// view made with the engine's web data and the page script put in it; the page sent to the launch once both are
+    /// <summary>Alta opened: the web view made with the engine's web data and the page script put in it while the launch,
+    /// asked as the session was made, is on its way; the page sent to the launch (or to the page asked for) once both are
     /// done.</summary>
     public async void Start()
     {
         if (started) return;
         started = true;
         Hold(true); // (the screenshot suite waits for Alta's page, not only for the app's own calls)
-        // (Alta speed, 0.3.20) the launch asked first, while the web view is made and dressed — it was asked only once all
-        // of that was done, its whole time on top of it — and waited for only when the page is to go to it
-        var given = Launch.Page is { } p ? engine.Absolute(p) : null;
-        var launching = given == null ? AskLaunch() : null;
+        // (Alta speed, 0.3.20) the launch, asked already, waited for only when the page is to go to it — while the web view
+        // is made and dressed; it was asked only once all of that was done, its whole time on top of it
         if (ReadJson<List<AltaKnown>>(KnownKey) is { } kept) Known = kept;
         try
         {
