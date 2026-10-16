@@ -1244,7 +1244,9 @@ Alta's learn flow round it, or a kept part taken away, counts, and such changes 
 Each open writes its timeline to the app's log — "alta: launch asked +N ms · launch answered … · web view … · page …
 (host) · alta page … · question … · shown +N ms (question, N ms into its page, quiet N ms[, capped])" ("page given" for a
 page asked for) — which the Windows workflow checks for the Alta pictures, and `scripts/dev/alta-test.mjs` checks the
-question is shown under 400 ms after its page has loaded on the mock.
+question is shown under 400 ms after its page has loaded on the mock. (0.3.22) The mock's Alta launch can go as
+Canvas's does (`--alta-launch`, as `alta-test.mjs` runs it): Canvas's own page, whose form sends itself on to Alta
+(POSTed), then Alta's page; and its Alta content answer comes 500 ms late, as Alta's own comes over the network.
 
 (Maths drawn whole, as the Mac's copy.) A part of Alta's is never hidden while it is drawn. The question shown alone hid
 everything not yet marked with `display: none`, the next question too, from the moment Alta put it in until the page

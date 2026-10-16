@@ -9,6 +9,7 @@ import { spawn, execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import vm from 'node:vm';
+import net from 'node:net';
 
 const ROOT = new URL('../../', import.meta.url).pathname;
 const swift = readFileSync(join(ROOT, 'mac/Simpl/Engine/AltaSession.swift'), 'utf8');
@@ -37,8 +38,12 @@ console.log('the Alta popup’s page script, off the web');
 }
 
 console.log('\nin Chromium, on the mock’s Alta player');
-const PORT = 8881;
-const mock = spawn(process.execPath, [join(ROOT, 'scripts/dev/mock-canvas.mjs'), String(PORT)], { stdio: 'ignore' });
+// (1.3.83) ports of its own, free now: another checkout's copy of this suite may be running beside it on 8881, and its
+// mock answered this one's questions
+const freePort = () => new Promise((done) => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => done(p)); }); });
+const PORT = await freePort(), SIM = await freePort();
+// (1.3.102: with the launch as Canvas makes it — its own page first, whose form sends itself on to Alta)
+const mock = spawn(process.execPath, [join(ROOT, 'scripts/dev/mock-canvas.mjs'), String(PORT), String(SIM), '--alta-launch'], { stdio: 'ignore' });
 const stop = () => { try { mock.kill(); } catch { /* gone */ } };
 process.on('exit', stop);
 const BASE = `http://localhost:${PORT}`;
@@ -778,6 +783,33 @@ try {
     if (/quiet:/.test(winSource)) await speedChecks('Windows’ copy', winSource, true);
     else check(false, 'Windows’ copy of the page script times its words and says how long its part was still (its shown word has `quiet`)');
     await renderChecks('Windows’ copy', winSource, true);
+    // (1.3.102 / 0.3.22, on Windows' copy: the Mac's in this checkout is older, and does not say which page is Alta's)
+    // the launch as Canvas makes it: the address Canvas hands over is a page of its own, whose form sends itself on to
+    // Alta (POSTed), which sends the browser on to the assignment's page. On the way, the page script says the first page
+    // is not Alta's (the app keeps its skeleton up over it); then Alta's page is known as Alta's, kept out of sight, and
+    // shown laid out — here its overview
+    {
+      const launch = JSON.parse((await (await fetch(`${BASE}/api/v1/courses/104/external_tools/sessionless_launch?launch_type=assessment&assignment_id=4003`)).text()).replace(/^while\(1\);/, ''));
+      const hp = await browser.newPage();
+      const hops = [], navs = [];
+      await hp.exposeFunction('__simplKeep', (x) => { hops.push(JSON.parse(x)); });
+      await hp.addInitScript(() => { window.chrome = window.chrome || {}; window.chrome.webview = { postMessage: (x) => window.__simplKeep(x) }; });
+      await hp.addInitScript({ content: winSource });
+      hp.on('request', (r) => { if (r.isNavigationRequest() && r.frame() === hp.mainFrame()) navs.push(`${r.method()} ${new URL(r.url()).pathname}`); });
+      await hp.goto(launch.url);
+      for (let i = 0; i < 80 && !hops.some((p) => p.kind === 'shown' && p.how === 'overview'); i++) await hp.waitForTimeout(100);
+      const frames = hops.filter((p) => p.kind === 'frame');
+      const altaAt = hops.findIndex((p) => p.kind === 'frame' && p.alta);
+      const lastShown = hops.filter((p) => p.kind === 'shown').pop();
+      check(/^\/courses\/104\/external_tools\/sessionless_launch$/.test(new URL(launch.url).pathname)
+        && JSON.stringify(navs) === JSON.stringify(['GET /courses/104/external_tools/sessionless_launch', 'POST /mock-alta/lti/launch', 'GET /mock-alta/learn/course/c1/assignment/a1'])
+        && hp.url().endsWith('/mock-alta/learn/course/c1/assignment/a1'),
+        `Windows’ copy: the mock's launch goes as Canvas's does: its own page, its form POSTed to Alta, Alta's page (${navs.join(' → ')})`);
+      // (the first page's own `shown`, posted as its form goes, may be lost with it: only never another before Alta's page)
+      check(frames.length >= 2 && frames[0].alta === false && altaAt > 0 && hops.slice(0, altaAt).every((p) => p.kind !== 'shown' || p.how === 'not alta') && !!lastShown && lastShown.how === 'overview' && hops.indexOf(lastShown) > altaAt,
+        `Windows’ copy: on the way, Canvas's page is said not to be Alta's and Alta's page is, and is shown laid out (${hops.filter((p) => p.kind === 'frame' || p.kind === 'shown').map((p) => p.kind === 'frame' ? `frame${p.alta ? ' alta' : ''}` : `shown ${p.how}`).join(' → ')})`);
+      await hp.close();
+    }
   }
 } finally {
   await browser.close();
