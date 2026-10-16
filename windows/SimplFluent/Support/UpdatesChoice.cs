@@ -90,6 +90,19 @@ public static partial class Updates
     }
 
     /// <summary>
+    /// The Critical Update the site's feed (/app/windows-latest.json, written by scripts/publish-site.sh; read by the
+    /// five-minute look) names for a copy: the newest of the usual releases' (<c>critical</c>), and with Get beta updates
+    /// on (<paramref name="betas"/>) the newest of all, a beta's too (<c>criticalBeta</c>) — as <see cref="Choose"/>
+    /// finds one among the releases a copy may take. 0 when it names none, or the feed is not as it should be.
+    /// </summary>
+    internal static int CriticalRun(JsonElement feed, bool betas)
+    {
+        if (feed.ValueKind != JsonValueKind.Object) return 0;
+        int Run(string name) => feed.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var run) ? run : 0;
+        return betas ? Math.Max(Run("critical"), Run("criticalBeta")) : Run("critical");
+    }
+
+    /// <summary>
     /// The version found waits for Update now (0.3.7, Updates.KeptBack): an earlier version put back from run
     /// <paramref name="stayingFrom"/> stays, so that version and those before it are not put in by themselves — or the
     /// newest would go straight back in — while one newer than it is, as every update is, and a Critical Update

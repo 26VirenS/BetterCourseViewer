@@ -190,4 +190,23 @@ public class UpdatesTests
         Assert.Equal("windows-fluent-beta-v107", beta.Found?.Tag);
         Assert.True(beta.Critical);
     }
+
+    [Fact]
+    public void TheSitesFeedNamesTheCriticalUpdateACopyMayTake()
+    {
+        // (as scripts/publish-site.sh writes /app/windows-latest.json: a usual Critical Update v127, a beta one v130)
+        using var both = JsonDocument.Parse("""{ "newest": 129, "newestBeta": 130, "critical": 127, "criticalBeta": 130 }""");
+        Assert.Equal(127, Updates.CriticalRun(both.RootElement, betas: false));
+        Assert.Equal(130, Updates.CriticalRun(both.RootElement, betas: true));
+        // (none named — null, left out — or a feed that is not one: none)
+        using var none = JsonDocument.Parse("""{ "newest": 129, "newestBeta": 130, "critical": null, "criticalBeta": null }""");
+        Assert.Equal(0, Updates.CriticalRun(none.RootElement, betas: true));
+        using var bare = JsonDocument.Parse("""{ "newest": 129 }""");
+        Assert.Equal(0, Updates.CriticalRun(bare.RootElement, betas: false));
+        using var odd = JsonDocument.Parse("""[ "critical", 127 ]""");
+        Assert.Equal(0, Updates.CriticalRun(odd.RootElement, betas: true));
+        // (only a usual Critical Update: a beta copy takes it too)
+        using var usual = JsonDocument.Parse("""{ "critical": 128, "criticalBeta": 128 }""");
+        Assert.Equal(128, Updates.CriticalRun(usual.RootElement, betas: true));
+    }
 }

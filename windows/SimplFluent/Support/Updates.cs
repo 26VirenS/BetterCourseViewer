@@ -331,20 +331,34 @@ public static partial class Updates
 
     // ---- the look for a Critical Update ----
 
-    /// <summary>When the versions were last asked of GitHub, by either look (this run's; null before the first).</summary>
+    /// <summary>
+    /// The site's Critical Update feed (scripts/publish-site.sh, rewritten at every release published or edited and every
+    /// hour): the newest Windows run, a beta's too, and the newest Critical Update's of each (<see cref="CriticalRun"/>).
+    /// A file on simplcourses.com, as the Mac's feeds are, so the five-minute look never counts against the sixty
+    /// requests an hour GitHub's API allows a network without signing in — a school's, shared by many copies — which
+    /// an ETag does not spare: GitHub counts a 304 too unless the request is signed in.
+    /// </summary>
+    private const string CriticalFeed = "https://simplcourses.com/app/windows-latest.json";
+
+    /// <summary>When the five-minute look, or GitHub's list, was last asked, answered or not (this run's; null before the
+    /// first).</summary>
     private static DateTime? lastLook;
     private static bool looking;
+    /// <summary>The Critical Update the look last handed to Check for updates: not handed again at every look should
+    /// GitHub's list not say so (the feed a step ahead of it, or behind), till GitHub could not be asked.</summary>
+    private static int lookedFor;
 
     /// <summary>
-    /// The five-minute look (0.3.22): between the hourly looks, the versions read again for a Critical Update alone, so
-    /// one reaches every copy within minutes rather than within the hour. Cheap — the same one request, asked with the
-    /// last list's ETag, so a list unchanged since costs GitHub nothing (<see cref="Read"/>) — and silent: nothing is
-    /// shown, logged or changed unless a Critical Update this copy may take is found; then the versions are read as Check
-    /// for updates reads them, and the Critical Update goes in as ever. A version that is not one waits for the hourly
-    /// look. Not while a look, a download or an install is under way, nor once a Critical Update is found (it is on its
-    /// way in), nor with Check for updates automatically off (the student asked Simpl not to look), nor while GitHub has
-    /// asked Simpl to wait; and not within five minutes of the last look (half a minute's slack, so the ticker's own
-    /// tick is never just short).
+    /// The five-minute look (0.3.22): between the hourly looks, the site's small feed read for a Critical Update alone
+    /// (<see cref="CriticalFeed"/>), so one reaches every copy within minutes rather than within the hour, while GitHub
+    /// is still asked only once an hour. Silent: nothing is shown, logged or changed unless the feed names a Critical
+    /// Update newer than this copy that it may take (a beta's only with Get beta updates on); then the versions are read
+    /// as Check for updates reads them, and the Critical Update goes in as ever. A version that is not one waits for the
+    /// hourly look, and so does everything while the feed cannot be read (none yet, no network). Not while a look, a
+    /// download or an install is under way, nor once a Critical Update is found (it is on its way in), nor with Check
+    /// for updates automatically off (the student asked Simpl not to look), nor while GitHub has asked Simpl to wait
+    /// (the list it would need could not be read); and not within five minutes of the last look (half a minute's slack,
+    /// so the ticker's own tick is never just short).
     /// </summary>
     public static void LookForCritical()
     {
@@ -359,14 +373,28 @@ public static partial class Updates
         looking = true;
         try
         {
-            var (newest, critical) = Choose(await Read(), CurrentRun, Beta);
-            if (!critical || newest == null || restarting || checking) return;
-            Log.Write($"update: a Critical Update ({newest.Version}) found in the five-minute look");
+            using var req = new HttpRequestMessage(HttpMethod.Get, CriticalFeed);
+            req.Headers.TryAddWithoutValidation("User-Agent", "Simpl-for-Windows");
+            req.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
+            // (when it was asked, answered or not: no network is not asked again for five minutes)
+            lastLook = DateTime.UtcNow;
+            using var cut = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            using var res = await Http.SendAsync(req, cut.Token);
+            // (no feed — a site from before it — or the site failing: the hourly look is all there is, as before 0.3.22)
+            if (!res.IsSuccessStatusCode) return;
+            using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync(cut.Token));
+            var run = CriticalRun(doc.RootElement, Beta);
+            if (run <= CurrentRun || run == lookedFor || restarting || checking) return;
+            lookedFor = run;
+            Log.Write($"update: a Critical Update (v{run:000}) found in the five-minute look");
             looking = false;
-            // (read again as Check for updates reads them — the list unchanged, so it comes back as 304 — and on from there)
+            // (the versions read as Check for updates reads them, and on from there)
+            var asked = answeredAt;
             await Check();
+            // (GitHub not reached: handed to it again at the next look)
+            if (answeredAt == asked) lookedFor = 0;
         }
-        catch { /* (no network, GitHub refusing: the next look, or the hourly one, says so) */ }
+        catch { /* (no network, the site failing: the next look, or the hourly one) */ }
         finally { looking = false; }
     }
 
@@ -464,9 +492,9 @@ public static partial class Updates
 
     /// <summary>
     /// The Windows versions as GitHub lists them now, and nothing else changed: asked with the ETag of the list read
-    /// last (If-None-Match), so a list unchanged since comes back empty as 304 — the one read then — and does not count
-    /// against the sixty requests an hour GitHub allows a network without signing in (the five-minute look is twelve).
-    /// GitHub refusing (<see cref="Refused"/>) is thrown as any other answer is.
+    /// last (If-None-Match), so a list unchanged since comes back empty as 304 — the one read then. A 304 still counts
+    /// against the sixty requests an hour GitHub allows a network without signing in (only a signed-in one is spared),
+    /// which is why the five-minute look reads the site's feed instead (<see cref="CriticalFeed"/>). GitHub refusing (<see cref="Refused"/>) is thrown as any other answer is.
     /// </summary>
     private static async Task<List<Release>> Read()
     {
@@ -487,8 +515,12 @@ public static partial class Updates
         return list;
     }
 
+    /// <summary>When GitHub last answered the list (200 or 304), for the look to tell a check that reached it.</summary>
+    private static DateTime answeredAt;
+
     private static void Answered()
     {
+        answeredAt = DateTime.UtcNow;
         refusals = 0;
         waitUntil = null;
     }

@@ -108,12 +108,19 @@ window's side of it, `Shell/UpdateWatch.cs`:
   a demo, a picture) never looks.
 - **The five-minute look** (0.3.22, `Updates.LookForCritical`): between the hourly looks, every five minutes while Simpl
   runs (one timer for both; at launch when the hourly look is not due, as Simpl comes to the front, and on waking when
-  the last look is five minutes old) the same request is made for a Critical Update alone. It is cheap — asked with the
-  last list's ETag (`If-None-Match`), so a list unchanged since comes back as 304, empty, and does not count against the
-  60 requests an hour GitHub allows a network that is not signed in (the look is 12) — and silent: nothing is shown,
-  logged or changed unless a Critical Update this copy may take is found (`update: a Critical Update (v132) found in the
-  five-minute look`); then the versions are read as Check for updates reads them and it goes in as below. A newer
-  version that is not one waits for the hourly look. It is skipped while a look, a download or an install is under way,
+  the last look is five minutes old) Simpl reads the site's small Critical Update feed,
+  `https://simplcourses.com/app/windows-latest.json` (`scripts/publish-site.sh` on the development branch writes it at
+  every run of the Site workflow — a release published, edited or deleted, and every hour: the newest run, a beta's too,
+  and the newest Critical Update's of the usual releases, `critical`, and of all, `criticalBeta`). It is a file on the
+  site, not GitHub's API, because every API request counts against the 60 an hour GitHub allows a network that is not
+  signed in — a 304 to an ETag too (only a signed-in request is spared) — and a school's network is shared by many
+  copies: twelve looks an hour each would use it up and hold every copy's updates back. GitHub is still asked once an
+  hour (with the last list's ETag, `If-None-Match`, which saves the download but not the count). The look is silent:
+  nothing is shown, logged or changed unless the feed names a Critical Update newer than this copy that it may take (a
+  beta's only with Get beta updates on; `update: a Critical Update (v132) found in the five-minute look`); then the
+  versions are read from GitHub as Check for updates reads them and it goes in as below (one run handed on once, unless
+  GitHub could not be reached). A newer version that is not one waits for the hourly look, and so does everything while
+  the feed cannot be read (none yet, no network). It is skipped while a look, a download or an install is under way,
   once a Critical Update is found, and with Check for updates automatically off. GitHub refusing (403, 429) holds the
   automatic looks back as long as it says (`Retry-After`, or the limit's reset), else 10, 20, 40 then 60 minutes
   (`update: GitHub answered 403; the automatic looks wait 10 minutes`); Check for updates pressed still asks.
