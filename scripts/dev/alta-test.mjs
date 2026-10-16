@@ -700,6 +700,59 @@ try {
       await rp.close();
       check(r.left === 0 && keptAt !== null && keptAt < 2000 && r.opacity === '1' && r.shown, `${label}: a look at the page that goes wrong (twice) never leaves the next question out of sight: it is looked at again on its own and shown, ${keptAt} ms after the last went (under 2000)`);
     }
+
+    // (maths drawn whole) a part Alta puts in above the question (a lesson — More Instruction): while it is not kept yet,
+    // see-through, it is out of the flow, so the question never moves down under its glass with a gap over it; the two
+    // move together once it is kept, in the same frame the lesson comes into sight (as they did when it was hidden)
+    {
+      const rp = await open(true);
+      await ready(rp);
+      const r = await rp.evaluate(() => new Promise((done) => {
+        const q = document.getElementById('qsec'), top0 = q.getBoundingClientRect().top, t0 = performance.now(), frames = [];
+        window.mockLesson();
+        const l = document.getElementById('lsec');
+        const step = () => {
+          const cs = getComputedStyle(l), kept = l.hasAttribute('data-simpl-keep');
+          frames.push({ kept, top: Math.round(q.getBoundingClientRect().top), opacity: cs.opacity, display: cs.display, h: Math.round(l.getBoundingClientRect().height) });
+          if (kept || performance.now() - t0 > 2000) done({ top0: Math.round(top0), frames }); else requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }));
+      await rp.waitForTimeout(300);
+      const after = await rp.evaluate(() => ({ top: Math.round(document.getElementById('qsec').getBoundingClientRect().top), opacity: getComputedStyle(document.getElementById('lsec')).opacity }));
+      await rp.close();
+      const unkept = r.frames.filter((f) => !f.kept), moved = unkept.filter((f) => Math.abs(f.top - r.top0) > 1);
+      check(unkept.length > 0 && moved.length === 0 && unkept.every((f) => f.display !== 'none' && f.opacity === '0' && f.h > 0) && r.frames[r.frames.length - 1].kept && after.top > r.top0 + 40 && after.opacity === '1',
+        `${label}: a lesson put in above the question never moves it while the lesson is still out of sight (${unkept.length} frames, ${moved.length} with the question moved; the lesson laid out, ${unkept.length ? unkept[0].h : '—'} px tall), and both move together once it is kept (question ${r.top0} → ${after.top} px)`);
+    }
+
+    // (maths drawn whole) the app's last resort, its skeleton still up 26 seconds on: Alta's page shown as it is by the page
+    // script itself — the focus lifted, the app told why and that it is shown — and what the page script knows kept in
+    // step: the next part is laid out again, and the page can still be put out of sight between parts after
+    {
+      const rp = await open(true);
+      await ready(rp);
+      const n0 = (await said(rp)).length;
+      await rp.evaluate(() => { window.__qsec = document.getElementById('qsec'); window.__qsec.remove(); });
+      let hid = false;
+      for (let i = 0; i < 40 && !hid; i++) { hid = (await said(rp)).slice(n0).some((p) => p.kind === 'hidden'); if (!hid) await rp.waitForTimeout(50); }
+      const n1 = (await said(rp)).length;
+      const back = await rp.evaluate(() => (window.__simplAsIsNow ? window.__simplAsIsNow() : null));
+      const st = await rp.evaluate(() => ({ q: document.documentElement.hasAttribute('data-simpl-q'), shown: document.documentElement.hasAttribute('data-simpl-shown'), header: (() => { const h = document.querySelector('header'); const b = h && h.getBoundingClientRect(); return !!b && b.width > 0 && b.height > 0; })() }));
+      const p1 = (await said(rp)).slice(n1);
+      const why = p1.find((p) => p.kind === 'focus' && p.state === 'unknown'), shownAsIs = p1.find((p) => p.kind === 'shown' && p.how === 'as it is');
+      await rp.evaluate(() => document.querySelector('[class*="learn-flow-body"]').appendChild(window.__qsec));
+      let kept = false;
+      for (let i = 0; i < 40 && !kept; i++) { kept = await rp.evaluate(() => window.__qsec.hasAttribute('data-simpl-keep') && document.documentElement.hasAttribute('data-simpl-q')); if (!kept) await rp.waitForTimeout(50); }
+      await rp.waitForTimeout(300);
+      const n2 = (await said(rp)).length;
+      await rp.evaluate(() => window.__qsec.remove());
+      let hidAgain = false;
+      for (let i = 0; i < 40 && !hidAgain; i++) { hidAgain = (await said(rp)).slice(n2).some((p) => p.kind === 'hidden'); if (!hidAgain) await rp.waitForTimeout(50); }
+      await rp.close();
+      check(hid && back === true && !st.q && st.shown && st.header && !!why && /26 seconds/.test(why.reason) && !!why.shape && !!shownAsIs && kept && hidAgain,
+        `${label}: the app’s last resort shows Alta’s page as it is through the page script (${back}): the focus lifted, the app told why (“${why && why.reason}”) and that it is shown; the next part laid out again (${kept}), and put out of sight between parts after (${hidAgain})`);
+    }
   };
   await renderChecks('the page script', source, false);
 
