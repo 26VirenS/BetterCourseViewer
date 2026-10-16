@@ -1,3 +1,7 @@
+**What's new in 0.3.21** (beta)
+
+- **Faster Alta** — a Knewton Alta assignment opens noticeably faster: its launch is asked of your school at once, while the popup and its page are still being made (before, only once they were ready), its due date comes from the screen you opened it from instead of a second request, and its question shows as soon as it has finished drawing — its answer box and its maths in, then a tenth of a second still, where it waited 350 ms — however much the rest of Alta's page is still moving.
+
 **What's new in 0.3.20** (beta)
 
 - **Alta verdict** — Correct or Incorrect beside Continue shows only once Alta has said so in its own words; 0.3.19 could show Correct on a question not yet answered.
