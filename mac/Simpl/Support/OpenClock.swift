@@ -1,6 +1,7 @@
 import AppKit
 import QuartzCore
 import SwiftUI
+import WebKit
 
 /// (1.3.78) How long a screen takes to show what it is for, from the press that opened it: one line on the console for
 /// each screen opened — `[Simpl] open Grades: 14 ms (cached)` — so a slow screen is seen, and so is a change that makes
@@ -92,8 +93,9 @@ extension View {
 /// most) and stood for a moment. A step is a place as `-SimplPlace` names it, `back` (the toolbar's Back) or
 /// `push:<address>` (a link to it); (1.3.102) or `on:<address>`, its screen pushed on the place showing as a piece of
 /// work's own action pushes it (Hand In, See Feedback: the Dashboard stays the place), and `again`, the sidebar's row of
-/// the place showing pressed again (`Engine.rowPressed`), each said after as "walk: at <place>, <n> pushed". The
-/// console then has each screen's first open and its opens again; the picture waits for the walk's end.
+/// the place showing pressed again (`Engine.rowPressed`), each said after as "walk: at <place>, <n> pushed"; (1.3.103) or
+/// `filelink`, the first link to a school file in the screen's text clicked (`clickFileLink`). The console then has each
+/// screen's first open and its opens again; the picture waits for the walk's end.
 @MainActor
 enum Walk {
     private static var started = false
@@ -111,6 +113,10 @@ enum Walk {
             for step in steps {
                 let before = OpenClock.shown
                 NSLog("[Simpl] walk: %@", step)
+                if step == "filelink" {
+                    await clickFileLink(engine)
+                    continue
+                }
                 if step == "back" {
                     engine.goBack()
                 } else if step.hasPrefix("push:") {
@@ -134,6 +140,50 @@ enum Walk {
             }
             NSLog("[Simpl] walk: done")
             Shot.ended()
+        }
+    }
+
+    /// (1.3.103) `filelink`: the first link to a school file in the text on screen (an assignment's instructions, which
+    /// Canvas writes as …/courses/1/files/2?wrap=1) clicked as a student clicks it — its web view given the keys, the link
+    /// pressed in the page, so the app hears it as it hears a click — and Simpl kept in front (the suite's other copies
+    /// take the front now and then) until Quick Look has been checked, 20 seconds at most: said as "walk: file link
+    /// <address>, Quick Look checked" (or "not checked"). FilePreview says what the panel held ("[files] Quick Look: …"),
+    /// which mac-shots.sh's quicklook_check reads.
+    private static func clickFileLink(_ engine: Engine) async {
+        let before = FilePreview.looked
+        let find = "(function(){var a=document.querySelector('a[href*=\"/files/\"]');return a?a.href:'';})()"
+        let press = "(function(){var a=document.querySelector('a[href*=\"/files/\"]');if(!a)return '';a.click();return a.href;})()"
+        var clicked = ""
+        let start = Date()
+        while clicked.isEmpty && Date().timeIntervalSince(start) < 10 {
+            for v in richTexts(in: engine.hostView.window?.contentView) {
+                guard await run(find, in: v) != "" else { continue }
+                NSApp.activate(ignoringOtherApps: true)
+                v.window?.makeKeyAndOrderFront(nil)
+                v.window?.makeFirstResponder(v)
+                clicked = await run(press, in: v)
+                break
+            }
+            if clicked.isEmpty { try? await Task.sleep(nanoseconds: 500_000_000) }
+        }
+        let asked = Date()
+        while !clicked.isEmpty && FilePreview.looked == before && Date().timeIntervalSince(asked) < 20 {
+            if !NSApp.isActive { NSApp.activate(ignoringOtherApps: true) }
+            try? await Task.sleep(nanoseconds: 250_000_000)
+        }
+        NSLog("[Simpl] walk: file link %@, Quick Look %@", clicked.isEmpty ? "not found" : clicked, FilePreview.looked > before ? "checked" : "not checked")
+    }
+
+    /// The rich text's web views in a view (HTMLBlock's), in the order they are laid out.
+    private static func richTexts(in view: NSView?) -> [WKWebView] {
+        guard let view else { return [] }
+        if let w = view as? PassThroughWebView { return [w] }
+        return view.subviews.flatMap { richTexts(in: $0) }
+    }
+
+    private static func run(_ js: String, in v: WKWebView) async -> String {
+        await withCheckedContinuation { (done: CheckedContinuation<String, Never>) in
+            v.evaluateJavaScript(js) { result, _ in done.resume(returning: result as? String ?? "") }
         }
     }
 

@@ -649,7 +649,16 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   only module opens by itself, and a locked one says when it opens under its name, closed. A module's file opens as the
   Files screen opens one (`openModuleFile`): by its id, through the engine's `fileInfo` — the file's own download
   address, with its one-time key — into Quick Look under the module's name for it; the module's own address (which needs
-  the session and Canvas's redirect to its file host) only when Canvas will not say. A tool in a module, a tool's
+  the session and Canvas's redirect to its file host) only when Canvas will not say. (1.3.103) So does a Canvas file's
+  link anywhere else — in an assignment's instructions, an announcement, a discussion, a page (`openLinkedFile`,
+  through `openWeb`), the address made from the link keeping its own key (`verifier`). Quick Look's panel finds its
+  controller along the chain of responders of the key window, or the main window once the panel has the keys, and
+  looks again whenever either changes: a hook to `FilePreview`'s controller sits in the chain of each window it may look
+  in, the file is kept and handed back whenever it looks again, a web view that answers the panel itself (the
+  instructions', after a link in them was clicked) lets go of the keys, and a moment after the panel comes up it is
+  checked — the file in it, or the panel put away and the file opened in its app; never "No items selected". The
+  screenshot suite clicks the instructions' file link (`-SimplWalk filelink`, light-14e) and fails on a panel left empty
+  (`quicklook_check`, "[files] Quick Look: 1 item, …" on the console). A tool in a module, a tool's
   course chip and the home's More rows end in the window's symbol (a Simpl window); ↗ is only for the browser. People:
   a section of one (the teacher) runs across the card with a named Message button. Files: one vocabulary for a file's
   kind (`typeText`: PDF, Image, Spreadsheet, Text…). A discussion's post is drawn as plain text at once and the web

@@ -26,26 +26,56 @@ extension Engine {
     /// its file host) is kept for when Canvas will not say, as it was; a Brightspace content file goes that way always,
     /// fetched from its topic.
     func openModuleFile(_ url: String, title: String) {
-        guard !onBrightspace, let id = fileId(in: url) else {
+        guard linkedFile(url) != nil else {
             go(url, title: title)
             return
         }
+        openLinkedFile(url, title: title)
+    }
+
+    /// (1.3.103) A Canvas file's link anywhere else — in an assignment's instructions, an announcement, a discussion, a
+    /// page, a row — opened as a module's file is: the file by its id as Canvas's API has it (its own download address,
+    /// with the one-time key Canvas puts on it, and its real name), in Quick Look. Only when Canvas will not say is the
+    /// address made from the link fetched, as before — with the link's own key (`verifier`) kept on it, which a file
+    /// shared from another course needs; it used to be dropped.
+    func openLinkedFile(_ url: String, title: String) {
+        guard let file = linkedFile(url) else {
+            go(url, title: title)
+            return
+        }
+        let fallback = keepingKey(of: url, on: file.download)
         Task {
-            if let f = try? await call("fileInfo", ["id": id], as: FileRow.self), let u = f.url, !u.isEmpty, f.locked != true {
+            if let f = try? await call("fileInfo", ["id": file.id], as: FileRow.self), let u = f.url, !u.isEmpty, f.locked != true {
                 openFile(u, name: title.isEmpty ? f.name : title)
             } else {
-                go(url, title: title)
+                FilePreview.shared.open(fallback, name: title.isEmpty ? "File" : title, in: web.webView)
             }
         }
     }
 
-    /// A file's id in one of its addresses (…/courses/1/files/12/download?download_frd=1, …/files/12).
-    private func fileId(in url: String) -> String? {
-        guard let u = absolute(url) else { return nil }
+    /// (1.3.103) A Canvas file's link (…/courses/1/files/12, ?wrap=1, …/files/12/download?download_frd=1, …/preview): the
+    /// file's id, and the address that fetches it with the session (…/files/12/download?download_frd=1). Nil for anything
+    /// else — a folder, another site, Brightspace (whose files are its content topics).
+    func linkedFile(_ url: String) -> (id: String, download: URL)? {
+        guard !onBrightspace, let u = absolute(interfaceAddress(url)), u.host?.lowercased() == web.baseURL.host?.lowercased() else { return nil }
         let p = u.path.split(separator: "/").map(String.init)
         guard let i = p.firstIndex(of: "files"), i + 1 < p.count else { return nil }
         let id = p[i + 1]
-        return !id.isEmpty && id.allSatisfy({ $0.isLetter || $0.isNumber }) ? id : nil
+        guard !id.isEmpty, id != "folder", id.contains(where: \.isNumber), id.allSatisfy({ $0.isLetter || $0.isNumber }) else { return nil }
+        let rest = p.dropFirst(i + 2)
+        guard rest.count <= 1, rest.allSatisfy({ ["download", "preview", "file_preview"].contains($0) }) else { return nil }
+        guard let download = fileDownload(for: url) ?? absolute("/\(p[...(i + 1)].joined(separator: "/"))/download?download_frd=1") else { return nil }
+        return (id, download)
+    }
+
+    /// The address made from a file's link, with the link's own one-time key (`verifier`) on it.
+    private func keepingKey(of link: String, on download: URL) -> URL {
+        guard let from = absolute(link),
+              let key = URLComponents(url: from, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "verifier" }),
+              var c = URLComponents(url: download, resolvingAgainstBaseURL: false),
+              c.queryItems?.contains(where: { $0.name == "verifier" }) != true else { return download }
+        c.queryItems = (c.queryItems ?? []) + [key]
+        return c.url ?? download
     }
 
     /// A file of the school's fetched for a preview in a page (no toast): its copy on this Mac.

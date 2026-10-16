@@ -930,6 +930,12 @@ final class Engine: ObservableObject, ShellListener {
             openQuiz(q)
             return
         }
+        // (1.3.103) a Canvas file's link — one in an assignment's instructions above all — by its id, as a module's file
+        // opens (FileViews.swift): it used to be fetched by the address made from the link alone, its key dropped
+        if linkedFile(url) != nil {
+            openLinkedFile(url, title: title)
+            return
+        }
         if let file = fileDownload(for: url) {
             let name = title.isEmpty ? file.lastPathComponent : title
             // (1.3.12) a Brightspace content file Brightspace will not hand over opens in its own viewer instead

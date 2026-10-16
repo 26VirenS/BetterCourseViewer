@@ -169,6 +169,8 @@ enum Shot {
         var parts = [w] + w.sheets + (w.attachedSheet.map { [$0] } ?? []) + (w.childWindows ?? []).filter(\.isVisible)
         parts += NSApp.windows.filter { $0.isVisible && String(describing: type(of: $0)).contains("Popover") && $0.frame.intersects(w.frame) }
         parts += NSApp.windows.filter { $0 is ToolFloatPanel && $0.isVisible } // (1.3.73: a quick panel pulled out, floating)
+        // (1.3.103: Quick Look's panel up on a file, wherever on the screen it opened)
+        parts += NSApp.windows.filter { $0.isVisible && String(describing: type(of: $0)).contains("QLPreviewPanel") }
         // (1.3.78: the search field's suggestions, in front and over it — after the rest, so they are laid on top)
         let over = lifted.reversed().filter { $0.isVisible && $0.frame.intersects(w.frame) } + above(w).reversed()
         parts += over.filter { s in !parts.contains(where: { $0 === s }) }
