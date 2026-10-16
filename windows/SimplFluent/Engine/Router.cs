@@ -178,17 +178,28 @@ public sealed partial class Engine
         FilePreview.Open(KeepingKey(url, file.Download), string.IsNullOrEmpty(title) ? "File" : title, Web);
     }
 
-    /// <summary>(0.3.23) A Canvas file's link (…/courses/1/files/12, ?wrap=1, …/files/12/download?download_frd=1, …/preview):
-    /// the file's id, and the address that fetches it with the session (…/files/12/download?download_frd=1). Null for
-    /// anything else — a folder, another site, Brightspace (whose files are its content topics).</summary>
+    /// <summary>(0.3.23) A Canvas file's link (…/courses/1/files/12, ?wrap=1, …/files/12/download?download_frd=1, …/preview,
+    /// and the Files page's own address for one, …/files?preview=12 or …/files/folder/Week 3?preview=12): the file's id, and
+    /// the address that fetches it with the session (…/files/12/download?download_frd=1). Null for anything else — a
+    /// folder, another site, Brightspace (whose files are its content topics).</summary>
     public (string Id, Uri Download)? LinkedFile(string raw)
     {
         if (OnBrightspace || Absolute(InterfaceAddress(raw)) is not { } url || !IsSchool(url)) return null;
         var p = Parts(url);
         var i = Array.IndexOf(p, "files");
-        if (i < 0 || i + 1 >= p.Length) return null;
+        if (i < 0) return null;
+        static bool IsId(string? id) => !string.IsNullOrEmpty(id) && id.Any(char.IsAsciiDigit) && id.All(char.IsAsciiLetterOrDigit);
+        // the Files page with a file previewed over it, the link a teacher copies from there: the file is the one
+        // previewed (the folder only says where it sits)
+        if (i + 1 == p.Length || p[i + 1] == "folder")
+        {
+            var previewed = QueryValue(url, "preview");
+            if (!IsId(previewed)) return null;
+            var at = Absolute("/" + string.Join("/", p[..(i + 1)]) + "/" + previewed + "/download?download_frd=1");
+            return at is null ? null : (previewed!, at);
+        }
         var id = p[i + 1];
-        if (id.Length == 0 || id == "folder" || !id.Any(char.IsAsciiDigit) || !id.All(char.IsAsciiLetterOrDigit)) return null;
+        if (!IsId(id)) return null;
         var rest = p[(i + 2)..];
         if (rest.Length > 1 || rest.Any(x => x is not ("download" or "preview" or "file_preview"))) return null;
         var download = FileDownloadFor(raw) ?? Absolute("/" + string.Join("/", p[..(i + 2)]) + "/download?download_frd=1");
