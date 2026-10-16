@@ -42,7 +42,8 @@ console.log('\nin Chromium, on the mock’s Alta player');
 // mock answered this one's questions
 const freePort = () => new Promise((done) => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => done(p)); }); });
 const PORT = await freePort(), SIM = await freePort();
-const mock = spawn(process.execPath, [join(ROOT, 'scripts/dev/mock-canvas.mjs'), String(PORT), String(SIM)], { stdio: 'ignore' });
+// (1.3.102: with the launch as Canvas makes it — its own page first, whose form sends itself on to Alta)
+const mock = spawn(process.execPath, [join(ROOT, 'scripts/dev/mock-canvas.mjs'), String(PORT), String(SIM), '--alta-launch'], { stdio: 'ignore' });
 const stop = () => { try { mock.kill(); } catch { /* gone */ } };
 process.on('exit', stop);
 const BASE = `http://localhost:${PORT}`;
@@ -755,6 +756,32 @@ try {
     }
   };
   await renderChecks('the page script', source, false);
+  // (1.3.102) the launch as Canvas makes it: the address Canvas hands over is a page of its own, whose form sends itself
+  // on to Alta (POSTed), which sends the browser on to the assignment's page. On the way, the page script says the first
+  // page is not Alta's (the app keeps its skeleton up over it); then Alta's page is known as Alta's, kept out of sight,
+  // and shown laid out — here its overview
+  {
+    const launch = JSON.parse((await (await fetch(`${BASE}/api/v1/courses/104/external_tools/sessionless_launch?launch_type=assessment&assignment_id=4003`)).text()).replace(/^while\(1\);/, ''));
+    const hp = await browser.newPage();
+    const hops = [], navs = [];
+    await hp.exposeFunction('__simplKeep', (x) => { hops.push(JSON.parse(x)); });
+    await hp.addInitScript(() => { window.webkit = { messageHandlers: { simplAlta: { postMessage: (x) => window.__simplKeep(x) } } }; });
+    await hp.addInitScript({ content: source });
+    hp.on('request', (r) => { if (r.isNavigationRequest() && r.frame() === hp.mainFrame()) navs.push(`${r.method()} ${new URL(r.url()).pathname}`); });
+    await hp.goto(launch.url);
+    for (let i = 0; i < 80 && !hops.some((p) => p.kind === 'shown' && p.how === 'overview'); i++) await hp.waitForTimeout(100);
+    const frames = hops.filter((p) => p.kind === 'frame');
+    const altaAt = hops.findIndex((p) => p.kind === 'frame' && p.alta);
+    const lastShown = hops.filter((p) => p.kind === 'shown').pop();
+    check(/^\/courses\/104\/external_tools\/sessionless_launch$/.test(new URL(launch.url).pathname)
+      && JSON.stringify(navs) === JSON.stringify(['GET /courses/104/external_tools/sessionless_launch', 'POST /mock-alta/lti/launch', 'GET /mock-alta/learn/course/c1/assignment/a1'])
+      && hp.url().endsWith('/mock-alta/learn/course/c1/assignment/a1'),
+      `the mock's launch goes as Canvas's does: its own page, its form POSTed to Alta, Alta's page (${navs.join(' → ')})`);
+    // (the first page's own `shown`, posted as its form goes, may be lost with it: only never another before Alta's page)
+    check(frames.length >= 2 && frames[0].alta === false && altaAt > 0 && hops.slice(0, altaAt).every((p) => p.kind !== 'shown' || p.how === 'not alta') && !!lastShown && lastShown.how === 'overview' && hops.indexOf(lastShown) > altaAt,
+      `on the way, Canvas's page is said not to be Alta's and Alta's page is, and is shown laid out (${hops.filter((p) => p.kind === 'frame' || p.kind === 'shown').map((p) => p.kind === 'frame' ? `frame${p.alta ? ' alta' : ''}` : `shown ${p.how}`).join(' → ')})`);
+    await hp.close();
+  }
 
   // (Windows 0.3.5) Simpl for Windows' copy of the page script (windows/SimplFluent/Screens/Alta/AltaHook.cs), where it is
   // in this checkout: Alta's pop-ups read whole once they have settled — the body that comes in after the pop-up opens,

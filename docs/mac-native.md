@@ -314,6 +314,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   26 s has the hook show it as it is (`__simplAsIsNow`: its waits counted as over, the focus lifted, why said in the
   Error Logs with what the page held), so the hook's `showing` stays in step and the page can still be put out of sight
   between parts after. Once a grace between parts has run out, the page is no longer put out of sight again at each look.
+  (1.3.102) The mock's Alta launch can go as Canvas's does (`--alta-launch`, as `alta-test.mjs` runs it): Canvas's own
+  page, whose form sends itself on to Alta (POSTed), then Alta's page; and its Alta content answer comes 500 ms late.
   `scripts/dev/alta-test.mjs` drives the mock's Alta player (`/mock-alta/…`) through it in Chromium; the popup is shot
   as `21a-alta`.
 - **Quizzes (1.3.32).** The quiz's start screen lists every finished attempt, newest first, with its score (when Canvas

@@ -1275,16 +1275,24 @@ const homeworkTools = {
     { id: 't2', name: 'Office 365', description: 'Attach a Word or PowerPoint file', homework_submission: { enabled: true, text: 'Office 365', url: 'https://o365.example.com/lti' } },
   ],
 };
+// (Mac 1.3.102) With --alta-launch (or MOCK_ALTA_LAUNCH=1), a Knewton Alta launch goes as a real one does: the address
+// Canvas hands over is a page of Canvas's own (not Alta's) whose form sends itself on to Alta — an LTI launch, POSTed —
+// and Alta answers it by sending the browser on to the assignment's page: two pages on the way to Alta's, the first on
+// Canvas's host. Without it (the apps' pictures, the iPhone app's test school), Alta's page is handed over itself.
+const altaLaunchHops = process.argv.includes('--alta-launch') || process.env.MOCK_ALTA_LAUNCH === '1';
+const altaLaunch = (course, path) => (altaLaunchHops
+  ? `http://localhost:${port}/courses/${course}/external_tools/sessionless_launch?verifier=mock-verifier&to=${encodeURIComponent(path)}`
+  : `http://localhost:${port}${path}`);
 // Canvas's sessionless launch: a one-time address the tool opens at the top level (the iPhone app's tool sheet)
 on('GET', /^\/api\/v1\/courses\/(\w+)\/external_tools\/sessionless_launch$/, (url, m) => {
   const q = url.searchParams;
   const what = q.get('assignment_id') ? `assignment ${q.get('assignment_id')}` : q.get('module_item_id') ? `module item ${q.get('module_item_id')}` : q.get('id') ? `tool ${q.get('id')}` : 'a launch URL';
   // (Mac 1.3.17) Knewton Alta: Unit 2 launches the stand-in for Alta's assignment player
-  if (['4003', '4010', '4011', '4012', '1090'].includes(q.get('assignment_id'))) return { id: '9', name: 'Knewton Alta', url: `http://localhost:${port}/mock-alta/learn/course/c1/assignment/a1` };
+  if (['4003', '4010', '4011', '4012', '1090'].includes(q.get('assignment_id'))) return { id: '9', name: 'Knewton Alta', url: altaLaunch(m[1], '/mock-alta/learn/course/c1/assignment/a1') };
   // (Mac 1.3.66) a Macmillan Learning assignment, for its popup
   if (q.get('assignment_id') === '4005') return { id: '9', name: 'Macmillan Learning', url: `http://localhost:${port}/mock-macmillan/assignment/a1` };
   // (Mac 1.3.59) an Alta assignment that opens on its cover, for the popup's start screen
-  if (q.get('assignment_id') === '4004') return { id: '9', name: 'Knewton Alta', url: `http://localhost:${port}/mock-alta/learn/course/c1/assignment/a4/cover` };
+  if (q.get('assignment_id') === '4004') return { id: '9', name: 'Knewton Alta', url: altaLaunch(m[1], '/mock-alta/learn/course/c1/assignment/a4/cover') };
   // (Mac 1.3.104 / Windows 0.3.24) a tool Canvas will not launch this way (as Smartwork, an LTI 1.3 tool, at the owner's
   // school): the app opens Canvas's own page for it, whose launch waits behind "Load … in a new window"
   if (q.get('id') === '20') return { __status: 400, errors: [{ message: 'A sessionless launch is not supported for this tool' }] };
@@ -1425,7 +1433,21 @@ const server = http.createServer((req, res) => {
     // (Mac 1.3.17) a stand-in for a Knewton Alta assignment's player: Alta's shell (its header, Practice, the Current
     // objective card) round a question drawn as Learnosity draws one, and Alta's content answer — plain JSON, fetched by
     // the page as Alta's own is — with Check Answer and Next Question as Alta has them
+    // (Mac 1.3.102) the launch's first page — Canvas's own, the LTI form sent on to Alta at once — and Alta's answer to it,
+    // which sends the browser on to the assignment's page (only ever one of the mock's own Alta pages)
+    if (altaLaunchHops && req.method === 'GET' && /^\/courses\/\w+\/external_tools\/sessionless_launch$/.test(path)) {
+      const to = url.searchParams.get('to') || '';
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      return res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Canvas</title></head><body><form id="tool_form" action="/mock-alta/lti/launch" method="POST"><input type="hidden" name="lti_message_type" value="basic-lti-launch-request"><input type="hidden" name="target" value="${esc(to)}"><p>Loading Knewton Alta…</p></form><script>document.getElementById('tool_form').submit();</script></body></html>`);
+    }
+    if (path === '/mock-alta/lti/launch' && req.method === 'POST') {
+      const to = new URLSearchParams(raw).get('target') || '';
+      res.writeHead(303, { location: /^\/mock-alta\/[\w/.-]*$/.test(to) ? to : '/mock-alta/learn/course/c1/assignment/a1' });
+      return res.end();
+    }
     if (path === '/mock-alta/api/content') {
+      // (Mac 1.3.102) half a second late, as Alta's own answer comes over the network
+      await new Promise((r) => setTimeout(r, 500));
       // (with lesson=1: the lesson and its question in one answer, the lesson first — as View Instruction has Alta send them)
       const j = altaContent();
       if (url.searchParams.get('lesson') === '1') j.states.unshift({ atom: { id: { atomId: 'lesson1' }, name: 'Combine the product and quotient rules', purpose: 'INSTRUCTS', dataType: 'INSTRUCTIONAL_CONTENT', data: { question: '', content: { type: 'html', html: '<p>A lesson.</p>' } } }, compoundInstance: { id: 'cil', sequenceOrdinal: 1, type: 'INSTRUCT', source: 'ASSIGNMENT' } });
