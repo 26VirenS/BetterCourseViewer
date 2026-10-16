@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -258,11 +259,12 @@ internal sealed class AltaSession
     /// <summary>(1.3.23) The assignment's objectives as its overview lists them, kept for this assignment.</summary>
     public List<AltaKnown> Known { get; private set; } = new();
 
-    public AltaSession(Engine.Engine engine, AltaLaunch launch, Window owner)
+    public AltaSession(Engine.Engine engine, AltaLaunch launch, Window owner, long? asked = null)
     {
         this.engine = engine;
         this.owner = owner;
         Launch = launch;
+        since = asked ?? Stopwatch.GetTimestamp();
         names = ReadJson<Dictionary<string, string>>(NamesKey) ?? new();
     }
 
@@ -291,13 +293,23 @@ internal sealed class AltaSession
 
     // ---- starting ----
 
-    /// <summary>Alta opened: the web view made with the engine's web data, the page script in it, then the assignment's
-    /// launch through Canvas (or the page asked for).</summary>
+    /// <summary>(Alta speed, 0.3.20) Done once the page has been sent on its way — to the launch, or to the page asked for —
+    /// or could not be: the popup asks Canvas for the assignment's due line only then, never in the launch's way.</summary>
+    public Task Launched => launched.Task;
+    private readonly TaskCompletionSource launched = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>Alta opened: the assignment's launch asked of Canvas at once (or the page asked for), and meanwhile the web
+    /// view made with the engine's web data and the page script put in it; the page sent to the launch once both are
+    /// done.</summary>
     public async void Start()
     {
         if (started) return;
         started = true;
         Hold(true); // (the screenshot suite waits for Alta's page, not only for the app's own calls)
+        // (Alta speed, 0.3.20) the launch asked first, while the web view is made and dressed — it was asked only once all
+        // of that was done, its whole time on top of it — and waited for only when the page is to go to it
+        var given = Launch.Page is { } p ? engine.Absolute(p) : null;
+        var launching = given == null ? AskLaunch() : null;
         if (ReadJson<List<AltaKnown>>(KnownKey) is { } kept) Known = kept;
         try
         {
@@ -311,6 +323,7 @@ internal sealed class AltaSession
             return;
         }
         if (closed) return;
+        webReady = Now();
         var core = Web.CoreWebView2;
         core.Settings.AreDevToolsEnabled = true;
         core.Settings.IsStatusBarEnabled = false;
@@ -331,6 +344,7 @@ internal sealed class AltaSession
         core.NavigationCompleted += (_, _) =>
         {
             LightPages.Tell(core, "alta");
+            if (pageAt == null) { pageAt = Now(); pageHost = HostOf(core); }
             if (!Opening) return;
             Opening = false;
             Hold(false);
@@ -338,18 +352,90 @@ internal sealed class AltaSession
         };
         core.NewWindowRequested += (_, e) => { e.Handled = true; engine.GoTo(e.Uri, ""); };
         core.DownloadStarting += (_, e) => { e.Handled = true; FilePreview.Downloading(e); };
-        if (Launch.Page is { } p && engine.Absolute(p) is { } page)
+        if (given != null)
         {
-            core.Navigate(page.ToString());
+            core.Navigate(given.ToString());
+            launched.TrySetResult();
             return;
         }
+        var (url, why) = await launching!;
+        if (url == null) Fail(why ?? "");
+        else if (!closed) core.Navigate(url.ToString());
+        launched.TrySetResult();
+    }
+
+    /// <summary>(Alta speed, 0.3.20) The assignment's launch through Canvas, asked at once: its address, or why there is
+    /// none (never thrown — the web view may still be being made when it comes).</summary>
+    private async Task<(Uri? Url, string? Why)> AskLaunch()
+    {
+        launchAsked = Now();
         try
         {
             var a = await engine.Call<LaunchAnswer>("toolLaunch", new { course = Launch.Course, assignment = Launch.Assignment });
-            if (!Uri.TryCreate(a.Url, UriKind.Absolute, out var u)) throw new EngineException("The answer could not be read.");
-            if (!closed) core.Navigate(u.ToString());
+            return Uri.TryCreate(a.Url, UriKind.Absolute, out var u) ? (u, null) : (null, "The answer could not be read.");
         }
-        catch (Exception e) { Fail(e.Message); }
+        catch (Exception e) { return (null, e.Message); }
+        finally { launchAnswered = Now(); }
+    }
+
+    // ---- (Alta speed, 0.3.20) the open's timeline: one line in the app's log for each open ----
+
+    /// <summary>When the popup was asked for (Stopwatch ticks), and since then, in milliseconds: the launch asked of Canvas
+    /// and answered, the web view ready, the first page in (its site), the first of Alta's own pages, the part Alta's page
+    /// was read as first (question, lesson, overview, cover), and Alta's page shown — how, how far into its own load, how
+    /// long its part had been still, and whether only because the wait ran out.</summary>
+    private readonly long since;
+    private long? launchAsked, launchAnswered, webReady, pageAt, altaPageAt, partAt, shownAt;
+    private string pageHost = "", partKind = "", shownHow = "";
+    private double? shownOwn, shownQuiet;
+    private bool shownCapped, timelineSaid;
+
+    private long Now() => (long)Stopwatch.GetElapsedTime(since).TotalMilliseconds;
+
+    private static string HostOf(CoreWebView2 core)
+    {
+        try { return Uri.TryCreate(core.Source, UriKind.Absolute, out var u) ? u.Host : ""; } catch { return ""; }
+    }
+
+    /// <summary>Whether the page in the web view is one of Alta's own, as the page script tells (its site or its address
+    /// names Knewton or Alta).</summary>
+    private bool OnAlta()
+    {
+        try
+        {
+            if (Web.CoreWebView2 is not { } core || !Uri.TryCreate(core.Source, UriKind.Absolute, out var u)) return false;
+            var where = u.Host + u.AbsolutePath;
+            return where.Contains("knewton", StringComparison.OrdinalIgnoreCase) || where.Contains("alta", StringComparison.OrdinalIgnoreCase);
+        }
+        catch { return false; }
+    }
+
+    /// <summary>The line, written once: when Alta's page is shown, or else when the open ends without it (it failed, or the
+    /// popup closed first). "alta: launch asked +2 ms · launch answered +240 ms · web view +410 ms · page +620 ms
+    /// (school.instructure.com) · alta page +1300 ms · question +1700 ms · shown +1820 ms (question, 520 ms into its page,
+    /// quiet 110 ms)".</summary>
+    private void SayTimeline(string? end = null)
+    {
+        if (timelineSaid) return;
+        timelineSaid = true;
+        static string At(long? ms) => ms is { } v ? $"+{v} ms" : "—";
+        var parts = new List<string>();
+        if (Launch.Page != null && launchAsked == null) parts.Add("page given");
+        else { parts.Add("launch asked " + At(launchAsked)); parts.Add("launch answered " + At(launchAnswered)); }
+        parts.Add("web view " + At(webReady));
+        parts.Add($"page {At(pageAt)}" + (pageHost.Length > 0 ? $" ({pageHost})" : ""));
+        if (altaPageAt != null) parts.Add("alta page " + At(altaPageAt));
+        if (partAt != null) parts.Add($"{partKind} {At(partAt)}");
+        if (shownAt != null)
+        {
+            var how = new List<string> { shownHow.Length > 0 ? shownHow : "shown" };
+            if (shownOwn is { } own) how.Add($"{Math.Round(own)} ms into its page");
+            if (shownQuiet is { } q) how.Add($"quiet {Math.Round(q)} ms");
+            if (shownCapped) how.Add("capped");
+            parts.Add($"shown {At(shownAt)} ({string.Join(", ", how)})");
+        }
+        else parts.Add("not shown: " + (end ?? "closed first") + " " + At(Now()));
+        Log.Write("alta: " + string.Join(" · ", parts));
     }
 
     private bool holding;
@@ -365,6 +451,8 @@ internal sealed class AltaSession
 
     private void Fail(string why)
     {
+        SayTimeline("it could not be opened");
+        launched.TrySetResult();
         Failure = "Knewton Alta could not be opened. " + why;
         Hold(false);
         Opening = false;
@@ -392,6 +480,8 @@ internal sealed class AltaSession
     {
         if (closed) return;
         closed = true;
+        SayTimeline();
+        launched.TrySetResult();
         Hold(false);
         HoldForDialog(false);
         ClosePic();
@@ -470,6 +560,8 @@ internal sealed class AltaSession
             case "frame":
                 if (main)
                 {
+                    // (Alta speed: the first of Alta's own pages in — not the school's launch page on the way to it)
+                    if (altaPageAt == null && OnAlta()) altaPageAt = Now();
                     // (1.3.60) a new page: kept out of sight in it until it is laid out — (1.3.62) and the last page's
                     // panels and buttons put away with it
                     PageShown = false;
@@ -577,6 +669,7 @@ internal sealed class AltaSession
                 if (!main) return;
                 var state = Str(head["state"]) ?? "";
                 FocusState = state;
+                if (partAt == null && state is "question" or "lesson" or "overview") { partAt = Now(); partKind = state; }
                 if (state is not ("question" or "lesson" or "overview"))
                 {
                     var entry = $"{DateTime.Now.ToString("MMM d, yyyy, h:mm:ss tt", CultureInfo.CurrentCulture)} — Alta’s page shown as it is: {Str(head["reason"]) ?? "not recognised"} [{state}]";
@@ -591,6 +684,16 @@ internal sealed class AltaSession
             case "shown":
                 if (!main) return;
                 PageShown = true;
+                // (Alta speed: Alta's page shown — not the school's launch page on the way to it, shown as it is)
+                if (shownAt == null && Str(head["how"]) is { } how && how != "not alta")
+                {
+                    shownAt = Now();
+                    shownHow = how;
+                    shownOwn = Num(head["t"]);
+                    shownQuiet = Num(head["quiet"]);
+                    shownCapped = Bool(head["capped"]) == true;
+                    SayTimeline();
+                }
                 Notify();
                 return;
             case "hidden":
@@ -611,6 +714,8 @@ internal sealed class AltaSession
                     return;
                 }
                 if (Read<AltaCover>(head) is not { } c) return;
+                // (Alta speed: an overview that is the assignment's cover is told as the cover, when it was first read)
+                if (partAt == null || partKind == "overview") { partAt ??= Now(); partKind = "cover"; }
                 Cover = c;
                 // (1.3.60) the cover's list is the whole of the assignment's objectives, every one named
                 Keep(c.List);

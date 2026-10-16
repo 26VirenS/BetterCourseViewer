@@ -19,8 +19,11 @@ internal static class AltaHook
           if (window.__simplAltaOn || !/^https?:$/.test(location.protocol)) return;
           window.__simplAltaOn = true;
           var post = function (m) { try { window.chrome.webview.postMessage(JSON.stringify(m)); } catch (e) {} };
+          // (Alta speed) a word timed for the app's timeline of the open: milliseconds since this page began to load (t), and
+          // when that was (nav)
+          var stamp = function (m) { try { m.t = Math.round(performance.now()); m.nav = Math.round(performance.timeOrigin); } catch (e) {} return m; };
           // (1.3.46) this page made known to the app, for Save Page Code (each frame's code is asked of it there)
-          post({ kind: 'frame' });
+          post(stamp({ kind: 'frame' }));
           // (1.3.60) Alta's page kept out of sight from its first moment until it is laid out — its question on glass, its
           // cover as the start screen, or (not recognised) as it is — so it never flashes in before its question; the app
           // shows its own Loading meanwhile. A page that is not Alta's (the launch on the way to it) is shown at once.
@@ -32,9 +35,10 @@ internal static class AltaHook
           if (window.top === window) {
             var showing = false;
             var veils = /knewton|alta/i.test(location.hostname + location.pathname);
-            reveal = function (how) {
+            // (Alta speed: with how long the part had been still, and whether it was shown only because the wait ran out)
+            reveal = function (how, steady) {
               if (document.documentElement) document.documentElement.setAttribute('data-simpl-shown', '');
-              if (!showing) { showing = true; post({ kind: 'shown', how: how || '' }); }
+              if (!showing) { showing = true; post(stamp({ kind: 'shown', how: how || '', quiet: steady ? steady.quiet : null, capped: !!(steady && steady.capped) })); }
             };
             // (1.3.62) out of sight again — Alta between one part and the next, taking its time — until the next is laid out
             // (0.3.5: never while the student has asked for the browser)
@@ -536,7 +540,7 @@ internal static class AltaHook
             var report = function (state, r) {
               if (state === told) return;
               told = state;
-              post({ kind: 'focus', state: state, reason: (r && r.reason) || '', shape: /^(question|lesson|overview)$/.test(state) ? null : shape(r || {}) });
+              post(stamp({ kind: 'focus', state: state, reason: (r && r.reason) || '', shape: /^(question|lesson|overview)$/.test(state) ? null : shape(r || {}) }));
             };
             // ---- (1.3.51) Alta's pop-ups as the app's own: each one open passed to the app and hidden in the page while
             // the app shows it, the app's buttons pressing Alta's ----
@@ -1017,7 +1021,10 @@ internal static class AltaHook
             // (0.3.5) the browser asked for, or put away: the page as it is, or laid out again, at once
             window.__simplBrowserNow = function () { dialogTick(); schedule(0); return true; };
             // (1.3.68) the question shown once Alta has finished drawing it — nothing changed for a moment (its maths set, its
-            // answer box built, its pictures in) — or after two and a half seconds at most: the app's skeleton meanwhile
+            // answer box built, its pictures in) — or after a second and a half at most: the app's skeleton meanwhile
+            // (Alta speed: a tenth of a second with nothing changed in the part kept — a couple of frames, its maths, answer
+            // box and pictures still waited for by what says they are loading — where it was 350 ms of the whole page still,
+            // and a second and a half at most where it was two and a half)
             var lastChange = Date.now(), steadyTimer = null, steadySince = 0;
             var revealSteady = function (state) {
               if (!steadySince) steadySince = Date.now();
@@ -1025,16 +1032,26 @@ internal static class AltaHook
               var spinning = state === 'overview' ? busy(document.body) : [].some.call(document.querySelectorAll('[data-simpl-keep]'), busy);
               var pending = spinning || !!document.querySelector('.MathJax_Processing, .lrn_loading, [class*="lrn-loading"]')
                 || [].some.call(document.querySelectorAll('[data-simpl-keep] img'), function (i) { return !i.complete; });
+              var ready = quiet >= 100 && !pending;
               // (1.3.70: as long as four seconds while something in it still says it is loading)
-              if ((quiet >= 350 && !pending) || Date.now() - steadySince > (spinning ? 4000 : 2500)) {
+              if (ready || Date.now() - steadySince > (spinning ? 4000 : 1500)) {
                 steadySince = 0;
-                reveal(state);
+                reveal(state, { quiet: quiet, capped: !ready });
                 return;
               }
               if (steadyTimer) clearTimeout(steadyTimer);
-              steadyTimer = setTimeout(function () { steadyTimer = null; revealSteady(state); }, 120);
+              steadyTimer = setTimeout(function () { steadyTimer = null; revealSteady(state); }, 50);
             };
-            try { new MutationObserver(function () { lastChange = Date.now(); schedule(); }).observe(document, { childList: true, subtree: true, characterData: true }); } catch (e) {}
+            // (Alta speed) once a part is kept, only a change in it — or in Alta's learn flow round it — counts against its
+            // being still: Alta's chrome changing (a confetti canvas, its chat, the header's bars) neither holds the part
+            // back nor puts off the next look at the page, which it still asks for if none is on the way
+            var inKept = function (n) { var e = n && (n.nodeType === 1 ? n : n.parentElement); return !!e && !!e.closest('[data-simpl-keep], [class*="learn-flow-body"]'); };
+            try {
+              new MutationObserver(function (list) {
+                if (!document.querySelector('[data-simpl-keep]') || list.some(function (m) { return inKept(m.target); })) { lastChange = Date.now(); schedule(); }
+                else if (!timer) schedule();
+              }).observe(document, { childList: true, subtree: true, characterData: true });
+            } catch (e) {}
             schedule();
           }
 
@@ -1109,7 +1126,7 @@ internal static class AltaHook
               var s = o ? JSON.stringify(o) : 'none';
               if (s === lastCover) return;
               lastCover = s;
-              post(o || { kind: 'cover', none: true });
+              post(stamp(o || { kind: 'cover', none: true }));
             };
             setInterval(coverTick, 700);
             window.__simplCoverNow = coverTick;

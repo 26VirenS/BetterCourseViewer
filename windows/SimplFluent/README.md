@@ -1209,6 +1209,18 @@ the question — its green "Yes that's right. Keep it up!" strip, its red "Not q
 else by its class) and shown as the popup's own pill at the left of its buttons, Correct in green or Incorrect in red
 (`VerdictPill`), until the strip goes with the next question.
 
+Opening one (0.3.20) asks Canvas for the assignment's launch first — as the popup is laid out, before it shows, while its
+web view is made and dressed (`LightPages`, the page script) — and waits for it only to send the page there; it was asked
+once all of that was done, and only once the popup was up. The header's due line comes with the launch from the
+Assignment screen or a tool's row (`AltaLaunch.Due`); only without one is the Canvas assignment read for it, once the
+launch is on its way. The page script shows the question once its part has been still a tenth of a second (350 ms of the
+whole page before), what says it is loading — MathJax, Learnosity, a picture not in — still waited for, a second and a
+half at most (four while something in it spins); only a change in the part kept, or in Alta's learn flow round it, counts.
+Each open writes its timeline to the app's log — "alta: launch asked +N ms · launch answered … · web view … · page …
+(host) · alta page … · question … · shown +N ms (question, N ms into its page, quiet N ms[, capped])" ("page given" for a
+page asked for) — which the Windows workflow checks for the Alta pictures, and `scripts/dev/alta-test.mjs` checks the
+question is shown under 400 ms after its page has loaded on the mock.
+
 A pop-up of Alta's (0.3.5) is hidden in the page as soon as the page script sees it and read once it has settled —
 nothing it says changed for a moment, nothing in it loading, its fade done; three seconds at most, five while its body
 says nothing — and again at each change (a next step): its title, its body as plain HTML (its formulas as their TeX,

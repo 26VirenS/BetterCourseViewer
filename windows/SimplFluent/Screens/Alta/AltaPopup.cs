@@ -29,7 +29,8 @@ namespace Simpl.Screens;
 /// </summary>
 public static class AltaPopup
 {
-    public static void Show(Engine.Engine engine, AltaLaunch launch, Window over) => new AltaPopupView(engine, launch, over).Open();
+    // (Alta speed, 0.3.20: the moment it was asked for, where the open's timeline starts)
+    public static void Show(Engine.Engine engine, AltaLaunch launch, Window over) => new AltaPopupView(engine, launch, over, Stopwatch.GetTimestamp()).Open();
 }
 
 internal sealed class AltaPopupView
@@ -69,11 +70,12 @@ internal sealed class AltaPopupView
     private DispatcherTimer? goingBack;
     private System.Drawing.Color? ground;
 
-    public AltaPopupView(Engine.Engine engine, AltaLaunch launch, Window over)
+    public AltaPopupView(Engine.Engine engine, AltaLaunch launch, Window over, long? asked = null)
     {
         this.over = over;
         this.engine = engine;
-        session = new AltaSession(engine, launch, over);
+        session = new AltaSession(engine, launch, over, asked);
+        dueLine = launch.Due;
         root.Bg(B.Solid);
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -120,24 +122,29 @@ internal sealed class AltaPopupView
         layer.Gone += Update;
         Support.Appearance.Changed += OnAppearance;
         root.PreviewKeyDown += OnKey;
-        // (begun once the popup is up)
         RoutedEventHandler? loaded = null;
         loaded = (_, _) =>
         {
             root.Loaded -= loaded;
             AltaLook.Settle(root);
-            session.Start();
         };
         root.Loaded += loaded;
+        // (Alta speed, 0.3.20: begun before the popup shows — its launch asked of Canvas and its web view made while the
+        //  popup is laid out and fades in — where it was begun only once the popup was up)
+        session.Start();
         Update();
         Dialogs.Show(sheet, over);
         if (sheet.Window is { } w) session.ShowsIn(w);
-        ReadDue();
+        if (dueLine == null) ReadDue();
     }
 
-    /// <summary>When it is due, from the Canvas assignment (the same words as its page and every list), for the header.</summary>
+    /// <summary>When it is due, from the Canvas assignment (the same words as its page and every list), for the header —
+    /// (Alta speed, 0.3.20) only when the screen it was opened from did not say, and only once the launch is on its way, so
+    /// the engine answers the launch first.</summary>
     private async void ReadDue()
     {
+        await session.Launched;
+        if (closed) return;
         if (await AltaLook.Assignment(engine, session.Launch) is not { } a || closed) return;
         dueLine = a.DueLine ?? "";
         Update();

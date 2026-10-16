@@ -24,4 +24,8 @@ public sealed record QuizLaunch(string Course, string Quiz, string Title)
 public sealed record AltaLaunch(string Course, string Assignment, string Title, string? Page = null)
 {
     public Guid Id { get; } = Guid.NewGuid();
+    /// <summary>(Alta speed, 0.3.20) The assignment's due line as the screen it was opened from had it ("Due Oct 12 at
+    /// 11:59 PM", "" when it has none), for the popup's header — null when that screen did not know it, and the popup asks
+    /// Canvas for it once the launch is on its way.</summary>
+    public string? Due { get; init; }
 }

@@ -385,10 +385,21 @@ public sealed partial class ExternalToolsScreen : Screen
         if (it.Kind == "moduleItem") { engine.OpenTool(ToolLaunch.ModuleItem(course, it.Id, it.Title)); return; }
         switch (WindowOf(t))
         {
-            case "alta": engine.OpenAlta(new AltaLaunch(course, it.Id, it.Title)); return;
+            case "alta": engine.OpenAlta(new AltaLaunch(course, it.Id, it.Title) { Due = DueOf(it) }); return;
             case "macmillan": engine.OpenMacmillan(new AltaLaunch(course, it.Id, it.Title)); return;
         }
         engine.OpenTool(ToolLaunch.Assignment(course, it.Id, it.Title));
+    }
+
+    /// <summary>(Alta speed, 0.3.20) An assignment's due line as its row has it, for the popup's header — the engine writes
+    /// the row's line from the same words as the assignment's ("Due Oct 18 at 11:59 PM · 20 pts"); "" with no due date,
+    /// null where the row does not say.</summary>
+    private static string? DueOf(Item it)
+    {
+        if (it.Kind != "assignment") return null;
+        if (string.IsNullOrEmpty(it.Due)) return "";
+        var first = (it.Sub ?? "").Split(" · ")[0];
+        return first.StartsWith("Due ", StringComparison.Ordinal) ? first : null;
     }
 
     /// <summary>

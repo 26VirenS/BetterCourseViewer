@@ -301,6 +301,31 @@ try {
   const leaked = SECRETS.filter((s) => all.includes(s));
   check(!leaked.length, `never the answer key, the student’s ids or the school’s launch data (${leaked.join(', ') || 'none'})`);
 
+  // (Alta speed) the question shown soon after its page has loaded — a tenth of a second with its part still, where it
+  // was 350 ms of the whole page still (and a tick before that) — each word of the page's timed for the app's timeline of
+  // the open, and the shown one saying how long the part had been still and whether the wait ran out. Run on each copy of
+  // the page script that times its words (`quiet` in its shown word); the best of three loads, so a slow moment on a
+  // shared runner does not decide it.
+  const steadyGuard = async (label, src, shim) => {
+    const sp = await browser.newPage();
+    await sp.addInitScript(shim);
+    await sp.addInitScript({ content: src });
+    const loads = [];
+    for (let i = 0; i < 3; i++) {
+      await sp.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a3`);
+      let said = [];
+      for (let k = 0; k < 60 && !said.some((p) => p.kind === 'shown'); k++) { await sp.waitForTimeout(50); said = (await sp.evaluate(() => window.__posted.slice())).map((x) => JSON.parse(x)); }
+      const dcl = await sp.evaluate(() => performance.getEntriesByType('navigation')[0].domContentLoadedEventEnd);
+      const sh = said.find((p) => p.kind === 'shown'), fr = said.find((p) => p.kind === 'frame'), fo = said.find((p) => p.kind === 'focus');
+      loads.push({ how: sh?.how, after: sh ? Math.round(sh.t - dcl) : null, quiet: sh?.quiet, capped: sh?.capped, timed: !!(sh && fr && fo && [sh, fr, fo].every((p) => typeof p.t === 'number' && typeof p.nav === 'number')) });
+    }
+    await sp.close();
+    const best = Math.min(...loads.map((l) => (l.after == null ? Infinity : l.after)));
+    check(loads.every((l) => l.how === 'question' && l.timed && l.capped === false && l.quiet >= 100) && best < 400,
+      `${label}: the question is shown ${best} ms after its page has loaded (under 400), its part still ${loads.map((l) => l.quiet).join(' / ')} ms, never only because the wait ran out; each word timed (${JSON.stringify(loads)})`);
+  };
+  if (/quiet:/.test(source)) await steadyGuard('the page script', source, () => { window.__posted = []; window.webkit = { messageHandlers: { simplAlta: { postMessage: (s) => window.__posted.push(s) } } }; });
+
   // (Windows 0.3.5) Simpl for Windows' copy of the page script (windows/SimplFluent/Screens/Alta/AltaHook.cs), where it is
   // in this checkout: Alta's pop-ups read whole once they have settled — the body that comes in after the pop-up opens,
   // its lists, formulas and pictures, all its buttons, each step — and given back to the page when they cannot be
@@ -460,6 +485,8 @@ try {
     await wp.waitForTimeout(500);
     check(!(await wposts()).slice(nwv3).some((p) => p.kind === 'panels' && p.verdict), 'and none is told after it either');
     await wp.close();
+    if (/quiet:/.test(winSource)) await steadyGuard('Windows’ copy', winSource, () => { window.__posted = []; window.chrome = window.chrome || {}; window.chrome.webview = { postMessage: (s) => window.__posted.push(s) }; });
+    else check(false, 'Windows’ copy of the page script times its words and says how long its part was still (its shown word has `quiet`)');
   }
 } finally {
   await browser.close();
