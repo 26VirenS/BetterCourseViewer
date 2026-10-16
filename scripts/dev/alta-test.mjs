@@ -515,6 +515,26 @@ try {
     await lp.close();
     check(!!sl && sl.after >= 300 && sl.after < 900 && sl.post.how === 'question' && sl.post.capped === false && inAtShown === true,
       `${label}: with Learnosity’s box and a MathJax formula drawn 300 ms after the stem, the question waits for them: shown ${sl && sl.after} ms after DOMContentLoaded, both in, no cap`);
+    // (Learnosity's box put in later still, 1.7 s after the stem — after the second and a half the cap would allow once
+    // the box is no longer missing — and what it holds 60 ms after that: its cap never lowered by the box coming in, so
+    // the question is still shown on 100 ms of quiet with all of it in, never at once, half drawn)
+    const bp = await open(() => {
+      window.__boxAtShown = null;
+      window.__onPost = (p) => { if (p.kind === 'shown') window.__boxAtShown = !!document.querySelector('.lrn_widget') && !!document.getElementById('late-fill'); };
+      document.addEventListener('DOMContentLoaded', () => {
+        const w = document.querySelector('.lrn_widget'), box = w && w.parentNode;
+        if (w) w.remove();
+        setTimeout(() => {
+          if (box && w) box.appendChild(w);
+          setTimeout(() => { const f = document.createElement('div'); f.id = 'late-fill'; f.textContent = 'answer input'; if (w) w.appendChild(f); }, 60);
+        }, 1700);
+      });
+    });
+    const sb = await shownOn(bp);
+    const boxAtShown = await bp.evaluate(() => window.__boxAtShown);
+    await bp.close();
+    check(!!sb && sb.after >= 1700 && sb.after < 2500 && sb.post.how === 'question' && sb.post.capped === false && sb.post.quiet >= 100 && boxAtShown === true,
+      `${label}: with Learnosity’s box drawn 1.7 s after the stem, the question still waits for it: shown ${sb && sb.after} ms after DOMContentLoaded, quiet ${sb && sb.post.quiet} ms, the box and what it holds in, no cap`);
   };
   if (/quiet:/.test(source)) await speedChecks('the page script', source, false);
 
@@ -664,7 +684,13 @@ try {
     const nwv = (await wposts()).length;
     await wp.evaluate(() => { document.getElementById('verdict').textContent = 'Yes that’s right. Keep it up!'; });
     check(!!(await wwait((p, k) => k >= nwv && p.kind === 'panels' && p.verdict === 'right', 'the verdict (right)')), 'Alta’s “Yes that’s right” strip is read as a right answer');
+    // (and when the strip goes, so does the verdict — then the strip put back, still right, for the next step)
     const nwv2 = (await wposts()).length;
+    await wp.evaluate(() => { const v = document.getElementById('verdict'); window.__verdictAt = [v, v.parentNode, v.nextSibling]; v.remove(); });
+    check(!!(await wwait((p, k) => k >= nwv2 && p.kind === 'panels' && p.verdict === '', 'the verdict gone')), 'and when the strip goes, so does the verdict');
+    const nwv2b = (await wposts()).length;
+    await wp.evaluate(() => { const [v, at, next] = window.__verdictAt; at.insertBefore(v, next); });
+    await wwait((p, k) => k >= nwv2b && p.kind === 'panels' && p.verdict === 'right', 'the verdict back');
     // (0.3.20) what showed Correct on a question not yet answered: a box whose class says "right" or "status" (layout),
     // and a screen reader's 1-pixel live region keeping "Yes that's right" from the last question — neither tells one
     const nwv3 = (await wposts()).length;

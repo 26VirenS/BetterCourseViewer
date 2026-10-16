@@ -285,7 +285,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   2: each formula's script has its drawing beside it; MathJax 3: its typeset promise settled, no `\(`/`\[` left);
   changes in Alta's chrome round it no longer count, never put off the next look at the page for more than 300 ms, and
   once a part is kept have the page looked at no oftener than every 400 ms; capped at 1.5 s (2.5 s while something in
-  it is still drawn, 4 s while it says it is loading). The Tools list asks the launch as its row is chosen
+  it is still drawn, 4 s while it says it is loading), from the first look and never lowered by a later one, so a
+  Learnosity box or picture that comes in after 1.5 s is still given its 100 ms rather than shown at once. The Tools list asks the launch as its row is chosen
   (`Engine.askAlta`), while the list closes. A launch answered with Canvas's own assignment page (no sessionless
   launch) is shown as soon as it loads; any other page that is not Alta's after 2.5 s still there; a popup closed
   before the launch is answered never loads it. Each open writes one line on the console — `[Simpl] alta: asked 2 ms · launch 410 ms · page 655 ms ·
