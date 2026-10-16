@@ -916,6 +916,9 @@ public sealed partial class Engine : Observable, IShellListener
     {
         if (ToolLaunchFor(url, title) is { } t) { OpenTool(t); return; }
         if (QuizLaunchFor(url, title) is { } q) { OpenQuiz(q); return; }
+        // (0.3.23) a Canvas file's link — one in an assignment's instructions above all — by its id, as a module's file
+        // opens (Router.cs): it used to be fetched by the address made from the link alone, its key dropped
+        if (LinkedFile(url) is not null) { OpenLinkedFile(url, title); return; }
         if (FileDownloadFor(url) is { } file)
         {
             FilePreview.Open(file, string.IsNullOrEmpty(title) ? System.IO.Path.GetFileName(file.AbsolutePath) : title, Web);

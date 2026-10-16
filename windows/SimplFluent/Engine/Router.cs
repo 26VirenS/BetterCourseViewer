@@ -154,30 +154,55 @@ public sealed partial class Engine
     /// it. The module's own address for it (…/files/12/download, which needs the session and Canvas's redirect to its file
     /// host) is kept for when the school will not say, as it was; a Brightspace content file goes that way always, from
     /// its topic.</summary>
-    public async void OpenModuleFile(string url, string title)
+    public void OpenModuleFile(string url, string title)
     {
-        if (!OnBrightspace && FileIdIn(url) is { } id)
-        {
-            FileRow? f = null;
-            try { f = await Call<FileRow>("fileInfo", new { id }); } catch { }
-            if (f is { Url: { Length: > 0 } u, Locked: not true } && Absolute(u) is { } a)
-            {
-                FilePreview.Open(a, string.IsNullOrEmpty(title) ? f.Name : title, Web);
-                return;
-            }
-        }
-        GoTo(url, title);
+        if (LinkedFile(url) is null) { GoTo(url, title); return; }
+        OpenLinkedFile(url, title);
     }
 
-    /// <summary>A file's id in one of its addresses (…/courses/1/files/12/download?download_frd=1, …/files/12).</summary>
-    private string? FileIdIn(string url)
+    /// <summary>(0.3.23) A school file's link anywhere else — in an assignment's instructions, an announcement, a
+    /// discussion, a page, a row — opened as a module's file is: by its id, the file as the school's API has it (its own
+    /// download address, with the one-time key Canvas puts on it, and its real name, not "download"). Only when the school
+    /// will not say is the address made from the link fetched, as before — with the link's own key (verifier) kept on it,
+    /// which a file shared from another course needs; it used to be dropped.</summary>
+    public async void OpenLinkedFile(string url, string title)
     {
-        if (Absolute(url) is not { } u) return null;
-        var p = Parts(u);
+        if (LinkedFile(url) is not { } file) { GoTo(url, title); return; }
+        FileRow? f = null;
+        try { f = await Call<FileRow>("fileInfo", new { id = file.Id }); } catch { }
+        if (f is { Url: { Length: > 0 } u, Locked: not true } && Absolute(u) is { } a)
+        {
+            FilePreview.Open(a, string.IsNullOrEmpty(title) ? f.Name : title, Web);
+            return;
+        }
+        FilePreview.Open(KeepingKey(url, file.Download), string.IsNullOrEmpty(title) ? "File" : title, Web);
+    }
+
+    /// <summary>(0.3.23) A Canvas file's link (…/courses/1/files/12, ?wrap=1, …/files/12/download?download_frd=1, …/preview):
+    /// the file's id, and the address that fetches it with the session (…/files/12/download?download_frd=1). Null for
+    /// anything else — a folder, another site, Brightspace (whose files are its content topics).</summary>
+    public (string Id, Uri Download)? LinkedFile(string raw)
+    {
+        if (OnBrightspace || Absolute(InterfaceAddress(raw)) is not { } url || !IsSchool(url)) return null;
+        var p = Parts(url);
         var i = Array.IndexOf(p, "files");
         if (i < 0 || i + 1 >= p.Length) return null;
         var id = p[i + 1];
-        return id.Length > 0 && id.All(char.IsAsciiLetterOrDigit) ? id : null;
+        if (id.Length == 0 || id == "folder" || !id.Any(char.IsAsciiDigit) || !id.All(char.IsAsciiLetterOrDigit)) return null;
+        var rest = p[(i + 2)..];
+        if (rest.Length > 1 || rest.Any(x => x is not ("download" or "preview" or "file_preview"))) return null;
+        var download = FileDownloadFor(raw) ?? Absolute("/" + string.Join("/", p[..(i + 2)]) + "/download?download_frd=1");
+        return download is null ? null : (id, download);
+    }
+
+    /// <summary>The address made from a file's link, with the link's own one-time key (verifier) on it.</summary>
+    private Uri KeepingKey(string link, Uri download)
+    {
+        if (Absolute(link) is not { } from || download.Query.Contains("verifier=")) return download;
+        var key = from.Query.TrimStart('?').Split('&').Select(x => x.Split('=', 2)).FirstOrDefault(x => x.Length == 2 && x[0] == "verifier")?[1];
+        if (string.IsNullOrEmpty(key)) return download;
+        var query = download.Query.TrimStart('?');
+        return new UriBuilder(download) { Query = (query.Length > 0 ? query + "&" : "") + "verifier=" + key }.Uri;
     }
 
     /// <summary>Brightspace's own viewer for a content file it will not hand over.</summary>
