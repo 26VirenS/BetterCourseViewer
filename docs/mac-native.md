@@ -275,7 +275,7 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   read from the kept parts (`verdict` in the panels message: a banner, an alert or a box marked by its class, told by
   its words first, else by its class) and shown as the popup's own pill at the left of its buttons, Correct in green or
   Incorrect in red (`AltaVerdictPill`), until the strip goes with the next question.
-  (1.3.100) Faster to open. The launch is asked of Canvas the moment the popup is asked for (`Engine.alta`'s `didSet`
+  (1.3.101) Faster to open. The launch is asked of Canvas the moment the popup is asked for (`Engine.alta`'s `didSet`
   makes the `AltaSession` and starts it; the popup takes it with `altaSession(for:)`), not once its view is built; the
   header's due line comes with the launch (`AltaLaunch.dueLine`, from the Assignment page or the Tools row), the
   `assignment` call only when it did not, after the launch. The skeleton is up from the first moment and stays until the

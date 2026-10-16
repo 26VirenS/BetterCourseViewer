@@ -102,7 +102,7 @@ try {
   const vis = async (sel) => page.$eval(sel, (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; }).catch(() => false);
   const fq = await waitFor((p) => p.kind === 'focus' && p.state === 'question', 'the question recognised');
   check(!!fq && fq.shape === null, 'Alta’s learn page is recognised: one part, headed Question, with Learnosity’s answer box');
-  // (1.3.100) the question in sight as soon as it is drawn — within 400 ms of the learn page's DOMContentLoaded (1.3.99
+  // (1.3.101) the question in sight as soon as it is drawn — within 400 ms of the learn page's DOMContentLoaded (1.3.100
   // waited for 350 ms with nothing changed anywhere in the page, at least) — the hook saying how long its part had been
   // quiet and that no cap fired, each post with the page's clock for the app's timeline line
   const shownAt = async (pg) => pg.evaluate(() => {
@@ -114,8 +114,8 @@ try {
   check(!!sq && sq.after < 400 && sq.post.how === 'question' && sq.post.capped === false && sq.post.quiet >= 100 && sq.post.t > 0 && sq.post.nav > 0 && sq.frame.kind === 'frame' && sq.frame.alta === true,
     `the question is shown ${sq && sq.after} ms after the learn page’s DOMContentLoaded (under 400 ms), quiet ${sq && sq.post.quiet} ms, no cap — its posts timed, its page known as Alta’s`);
   {
-    // (1.3.100) and so while Alta's chrome round the question keeps changing (its header's bar every 40 ms): only the part
-    // shown is waited on, and changes never put off the next look at the page for more than 300 ms — 1.3.99 never looked
+    // (1.3.101) and so while Alta's chrome round the question keeps changing (its header's bar every 40 ms): only the part
+    // shown is waited on, and changes never put off the next look at the page for more than 300 ms — 1.3.100 never looked
     // while the page kept changing, and showed it only when its nine-second veil ran out
     const np = await browser.newPage();
     await np.addInitScript(() => { window.__posted = []; window.__postedAt = []; window.webkit = { messageHandlers: { simplAlta: { postMessage: (s) => { window.__posted.push(s); window.__postedAt.push(performance.now()); } } } }; });
@@ -128,7 +128,7 @@ try {
     await np.close();
   }
   {
-    // (1.3.100) but never before it is drawn: Learnosity's answer box put in 300 ms after the stem (its empty embed there
+    // (1.3.101) but never before it is drawn: Learnosity's answer box put in 300 ms after the stem (its empty embed there
     // meanwhile), and a formula of MathJax 2's not drawn until then — the question shown only once both are in, not capped
     const lp = await browser.newPage();
     await lp.addInitScript(() => { window.__posted = []; window.__postedAt = []; window.__inAtShown = null; window.webkit = { messageHandlers: { simplAlta: { postMessage: (s) => { window.__posted.push(s); window.__postedAt.push(performance.now()); if (JSON.parse(s).kind === 'shown') window.__inAtShown = !!document.querySelector('.lrn_widget') && !!document.getElementById('MathJax-Element-1-Frame'); } } } }; });

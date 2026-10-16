@@ -26,12 +26,12 @@ enum AltaHook {
       if (window.__simplAltaOn || !/^https?:$/.test(location.protocol)) return;
       window.__simplAltaOn = true;
       var post = function (m) { try { window.webkit.messageHandlers.simplAlta.postMessage(JSON.stringify(m)); } catch (e) {} };
-      // (1.3.100) a post timed for the app's line on how long the open took: when this page began (`nav`, the clock's
+      // (1.3.101) a post timed for the app's line on how long the open took: when this page began (`nav`, the clock's
       // time) and how long after that it was posted (`t`)
       var stamp = function (m) { try { m.t = Math.round(performance.now()); m.nav = Math.round(performance.timeOrigin); } catch (e) {} return m; };
       // (Alta's page, by its address — not the launch on the way to it)
       var altaHere = /knewton|alta/i.test(location.hostname + location.pathname);
-      // (1.3.46) this page made known to the app, for Save Page Code (each frame's code is asked of it there) — (1.3.100)
+      // (1.3.46) this page made known to the app, for Save Page Code (each frame's code is asked of it there) — (1.3.101)
       // and whether it is Alta's: the app's skeleton stays up until the first of Alta's own
       post(stamp({ kind: 'frame', alta: altaHere }));
       // (1.3.60) Alta's page kept out of sight from its first moment until it is laid out — its question on glass, its
@@ -47,7 +47,7 @@ enum AltaHook {
       if (window.top === window) {
         var showing = false, firstVeil = 0;
         var veils = altaHere;
-        // (1.3.100) `steady`: how long the part shown had been quiet, and whether a cap showed it before it was — with
+        // (1.3.101) `steady`: how long the part shown had been quiet, and whether a cap showed it before it was — with
         // when the page's DOMContentLoaded came, for the app's line
         reveal = function (how, steady) {
           if (firstVeil) { clearTimeout(firstVeil); firstVeil = 0; }
@@ -1023,14 +1023,14 @@ enum AltaHook {
         var schedule = function (ms) { if (timer) clearTimeout(timer); var d = typeof ms === 'number' ? ms : 120; dueAt = Date.now() + d; timer = setTimeout(tick, d); };
         // (1.3.68) the question shown once Alta has finished drawing it — nothing changed for a moment (its maths set, its
         // answer box built, its pictures in) — or after two and a half seconds at most: the app's skeleton meanwhile.
-        // (1.3.100) Shown on readiness rather than on a long silence: nothing in it still loading (its maths, its
+        // (1.3.101) Shown on readiness rather than on a long silence: nothing in it still loading (its maths, its
         // pictures, Learnosity's box) and nothing in the part shown changed for 100 ms — a layout and two frames, where
-        // 1.3.68–1.3.99 waited 350 ms — Alta's own round it (its header's bars, the chat button, a celebration) no longer
+        // 1.3.68–1.3.100 waited 350 ms — Alta's own round it (its header's bars, the chat button, a celebration) no longer
         // counted once a part is kept (`keptChange`; `lastChange` is every change, which a pop-up's next step is read by).
         // At most a second and a half when only that quiet is missing, two and a half while something in it is still
         // being drawn, four while it says it is loading (1.3.70).
         var lastChange = Date.now(), keptChange = Date.now(), steadyTimer = null, steadySince = 0;
-        // (1.3.100) MathJax 3's typesetting watched: its startup promise (each typeset chains a new one onto it) settled
+        // (1.3.101) MathJax 3's typesetting watched: its startup promise (each typeset chains a new one onto it) settled
         var mj3 = null, mj3Done = true;
         var watchMathJax = function () {
           var p = window.MathJax && window.MathJax.startup && window.MathJax.startup.promise;
@@ -1039,7 +1039,7 @@ enum AltaHook {
           var done = function () { if (mj3 === p) mj3Done = true; };
           try { p.then(done, done); } catch (e) { mj3Done = true; }
         };
-        // (1.3.100) the maths in the parts kept not set yet: a formula of MathJax 2's with nothing drawn beside its script
+        // (1.3.101) the maths in the parts kept not set yet: a formula of MathJax 2's with nothing drawn beside its script
         // (not queued yet — it adds no MathJax_Processing until it is), MathJax 3 typesetting, or its TeX still in the words
         var mathsPending = function () {
           if ([].some.call(document.querySelectorAll('section[data-simpl-keep] script[type^="math/tex"]'), function (s) { return !(s.id && document.getElementById(s.id + '-Frame')); })) return true;
@@ -1048,7 +1048,7 @@ enum AltaHook {
           if (!mj3Done) return true;
           return [].some.call(document.querySelectorAll('section[data-simpl-keep]'), function (k) { return /\\\(|\\\[/.test(k.textContent || ''); });
         };
-        // (1.3.100) a question's answer box drawn: Learnosity's own widget in it, with a size — its embed alone
+        // (1.3.101) a question's answer box drawn: Learnosity's own widget in it, with a size — its embed alone
         // (`.learnosity-item`, an empty learnosity__ box) is there before Learnosity has fetched or drawn anything
         var answerBox = function () {
           return [].some.call(document.querySelectorAll('section[data-simpl-keep] .lrn_widget, section[data-simpl-keep] .lrn_qr, section[data-simpl-keep] [class*="lrn_response"]'), function (w) { var b = w.getBoundingClientRect(); return b.width > 0 && b.height > 0; });
@@ -1069,7 +1069,7 @@ enum AltaHook {
           if (steadyTimer) clearTimeout(steadyTimer);
           steadyTimer = setTimeout(function () { steadyTimer = null; revealSteady(state); }, pending ? 120 : Math.max(20, 100 - quiet));
         };
-        // (1.3.100) a change in the part kept (or in Alta's learn flow round it, where the next part comes), or a kept
+        // (1.3.101) a change in the part kept (or in Alta's learn flow round it, where the next part comes), or a kept
         // part taken away — the page itself, before a part is kept
         var inKept = function (list) {
           if (!keptNow.length || keptNow.some(function (k) { return !k.isConnected; })) return true;
@@ -1438,13 +1438,13 @@ struct AltaLaunch: Identifiable, Equatable {
     let assignment: String
     let title: String
     var page: String? = nil
-    /// (1.3.100) The Canvas assignment's due line ("Due Oct 12 at 11:59 PM"; "" with no due date) when the place that
+    /// (1.3.101) The Canvas assignment's due line ("Due Oct 12 at 11:59 PM"; "" with no due date) when the place that
     /// opened it had it — the Assignment page, the Tools list — so the popup's header asks Canvas for nothing beside the
     /// launch. Nil: asked once the launch is answered (AltaQuiz).
     var dueLine: String? = nil
 }
 
-/// (1.3.100) An Alta open, timed from the moment the popup was asked for: the launch asked of Canvas and answered,
+/// (1.3.101) An Alta open, timed from the moment the popup was asked for: the launch asked of Canvas and answered,
 /// Alta's first page begun, what it shows first, and the page in sight — one line on the console for every open
 /// (`[Simpl] alta: asked 2 ms · launch 410 ms · page 655 ms · question 790 ms · shown 905 ms (question, quiet 120 ms)`),
 /// in the screenshot suite's consoles and the Mac's own log alike. The page's moments are its own clock's (`nav`, when
@@ -1499,23 +1499,23 @@ final class AltaSession: ObservableObject {
     @Published private(set) var report: AltaReport?
     /// (1.3.17) The overview Alta opens on: the assignment and its objectives, before a question is asked.
     @Published private(set) var overview: AltaOverview?
-    /// Alta's page still opening (the launch through Canvas): the popup's skeleton over it meanwhile — (1.3.100) until
+    /// Alta's page still opening (the launch through Canvas): the popup's skeleton over it meanwhile — (1.3.101) until
     /// the first page of Alta's own begins (the page script says which are), so the Canvas page on the way to it is never
-    /// shown, where 1.3.99 showed a spinner until that Canvas page had loaded.
+    /// shown, where 1.3.100 showed a spinner until that Canvas page had loaded.
     @Published private(set) var opening = true
-    /// (1.3.100) A page on the way to Alta's said it was laid out while the skeleton was up: shown if it turns out to be
+    /// (1.3.101) A page on the way to Alta's said it was laid out while the skeleton was up: shown if it turns out to be
     /// where the launch ends (`landed`).
     private var shownEarly = false
-    /// (1.3.100) This open, timed for the console's line.
+    /// (1.3.101) This open, timed for the console's line.
     private var timeline = AltaTimeline()
-    /// (1.3.100) The launch asked of Canvas — from the moment the popup is asked for (Engine's `alta`), not once its view
+    /// (1.3.101) The launch asked of Canvas — from the moment the popup is asked for (Engine's `alta`), not once its view
     /// is built — and the page loaded once it is answered.
     private var launching: Task<Void, Never>?
-    /// (1.3.100) The popup closed (`popupClosed`): a launch answered after it is not loaded.
+    /// (1.3.101) The popup closed (`popupClosed`): a launch answered after it is not loaded.
     private var closed = false
-    /// (1.3.100) The launch answered with Canvas's own page for the assignment, Alta in it (`go`).
+    /// (1.3.101) The launch answered with Canvas's own page for the assignment, Alta in it (`go`).
     private var direct = false
-    /// (1.3.100) Pages begun in the main frame (each `frame` from it): a page still the one `landed` saw, by this.
+    /// (1.3.101) Pages begun in the main frame (each `frame` from it): a page still the one `landed` saw, by this.
     private var documents = 0
     /// The launch could not be had from Canvas.
     @Published private(set) var failure: String?
@@ -1726,7 +1726,7 @@ final class AltaSession: ObservableObject {
             let done = !w.isLoading && w.url != nil
             Task { @MainActor in if done { self?.landed() } }
         }
-        // (1.3.100) the page's look — light or dark, Show Browser — as the popup will tell it, told before its first page:
+        // (1.3.101) the page's look — light or dark, Show Browser — as the popup will tell it, told before its first page:
         // the launch may be answered before the popup's view is up to tell it
         pageDark = UserDefaults.standard.bool(forKey: AltaQuizScreen.pageDarkKey)
         browser = UserDefaults.standard.bool(forKey: AltaQuizScreen.showBrowserKey)
@@ -1735,7 +1735,7 @@ final class AltaSession: ObservableObject {
         AltaSession.current = self
     }
 
-    /// Alta opened: the assignment's launch through Canvas (or the page asked for). (1.3.100) Asked at once, by the
+    /// Alta opened: the assignment's launch through Canvas (or the page asked for). (1.3.101) Asked at once, by the
     /// engine the moment the popup is asked for; asked again by the popup's view, it does nothing.
     func start(engine: Engine) {
         guard launching == nil, web.url == nil else { return }
@@ -1762,7 +1762,7 @@ final class AltaSession: ObservableObject {
         }
     }
 
-    /// (1.3.100) The launch answered — Alta's page, through Canvas, loaded; never once the popup has closed (the launch's
+    /// (1.3.101) The launch answered — Alta's page, through Canvas, loaded; never once the popup has closed (the launch's
     /// one-time address is not spent on a page nobody sees). `direct`: Canvas's own page for the assignment, with Alta in
     /// it, where Canvas would not give a launch of its own.
     private func go(_ url: URL, direct: Bool) {
@@ -1779,17 +1779,17 @@ final class AltaSession: ObservableObject {
         NSLog("[Simpl] alta: %@", (timeline.parts + ["could not be opened after \(Int(timeline.ms().rounded())) ms (\(error.localizedDescription))"]).joined(separator: " · "))
     }
 
-    /// (1.3.100) Until the launch is answered and its page asked for (at once with the page given): the popup's header
+    /// (1.3.101) Until the launch is answered and its page asked for (at once with the page given): the popup's header
     /// asks Canvas for its due line only then, so that call never waits beside the launch.
     func launched() async {
         await launching?.value
     }
 
-    /// (1.3.100) A page finished loading while the skeleton is still up for Alta's first: if it stays where it is — a page
-    /// that is not Alta's and goes nowhere (Canvas's error, the school's sign-in) — it is shown after a moment, as 1.3.99
+    /// (1.3.101) A page finished loading while the skeleton is still up for Alta's first: if it stays where it is — a page
+    /// that is not Alta's and goes nowhere (Canvas's error, the school's sign-in) — it is shown after a moment, as 1.3.100
     /// showed the launch's last page. Canvas's launch page sends its form on to Alta at once, and is never shown. Canvas's
     /// own page for the assignment (`direct`: no launch of its own was had) is where the launch ends: shown at once, as
-    /// 1.3.99 showed it. Still there means no new page begun since (`documents`), whatever its address did meanwhile.
+    /// 1.3.100 showed it. Still there means no new page begun since (`documents`), whatever its address did meanwhile.
     private func landed() {
         guard opening, web.url != nil else { return }
         let page = documents, wait: UInt64 = direct ? 0 : 2_500_000_000
@@ -1804,7 +1804,7 @@ final class AltaSession: ObservableObject {
         }
     }
 
-    /// (1.3.100) The page in sight: this open's line on the console, once; a later page's (Alta's learn page after its
+    /// (1.3.101) The page in sight: this open's line on the console, once; a later page's (Alta's learn page after its
     /// cover, the next part) in the screenshot suite and developer mode.
     private func tellShown(_ head: [String: Any]) {
         if !timeline.told {
@@ -1816,7 +1816,7 @@ final class AltaSession: ObservableObject {
         }
     }
 
-    /// (1.3.100) The popup closed: an open never shown said so on the console, and a launch not yet answered never loaded.
+    /// (1.3.101) The popup closed: an open never shown said so on the console, and a launch not yet answered never loaded.
     func popupClosed() {
         closePic()
         closed = true
@@ -1835,7 +1835,7 @@ final class AltaSession: ObservableObject {
         case "frame":
             // (1.3.60) a new page: kept out of sight in it until it is laid out
             if frame.isMainFrame {
-                // (1.3.100) the first of Alta's own pages: the skeleton is the page's Loading from here
+                // (1.3.101) the first of Alta's own pages: the skeleton is the page's Loading from here
                 shownEarly = false
                 documents += 1
                 if head["alta"] as? Bool == true, opening {
@@ -1940,7 +1940,7 @@ final class AltaSession: ObservableObject {
             }
         case "shown":
             guard frame.isMainFrame else { return }
-            // (1.3.100) a page on the way to Alta's (Canvas's launch, which sends its form on at once): kept behind the
+            // (1.3.101) a page on the way to Alta's (Canvas's launch, which sends its form on at once): kept behind the
             // skeleton, shown only if the launch ends there (`landed`)
             if opening { shownEarly = true; return }
             withAnimation(Motion.gentle) { pageShown = true }

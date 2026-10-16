@@ -31,7 +31,7 @@ struct AltaQuizScreen: View {
     @State private var showBrowser = UserDefaults.standard.bool(forKey: AltaQuizScreen.showBrowserKey)
     static let showBrowserKey = "SimplAltaShowBrowser"
 
-    /// (1.3.100) The session the engine made the moment the popup was asked for (its launch already asked of Canvas),
+    /// (1.3.101) The session the engine made the moment the popup was asked for (its launch already asked of Canvas),
     /// else one of its own; the due line the launch came with, if it did.
     init(launch: AltaLaunch, engine: Engine) {
         _session = StateObject(wrappedValue: engine.altaSession(for: launch))
@@ -64,12 +64,12 @@ struct AltaQuizScreen: View {
         .tint(Theme.accent)
         .task {
             session.setBrowser(showBrowser) // (1.3.83)
-            // (1.3.79: the page light, in dark mode too — 1.3.83: unless Dark is picked) — (1.3.100) told the page by the
+            // (1.3.79: the page light, in dark mode too — 1.3.83: unless Dark is picked) — (1.3.101) told the page by the
             // session as it was made, before its launch: told again only if it differs, so the page's scripts are not
             // taken away and put back while its first page may be on its way; the graph window told either way
             if pageDark != session.pageDark { session.appearance(dark: pageDark) } else { AltaGraphWindow.shared.dark(pageDark) }
-            session.start(engine: engine) // (1.3.100: asked already, by the engine, as the popup was asked for)
-            // (1.3.78) the Canvas assignment's due line for the header — (1.3.100) the one the launch came with; else asked
+            session.start(engine: engine) // (1.3.101: asked already, by the engine, as the popup was asked for)
+            // (1.3.78) the Canvas assignment's due line for the header — (1.3.101) the one the launch came with; else asked
             // once the launch is answered, never beside it
             guard dueLine == nil else { return }
             await session.launched()
@@ -305,8 +305,8 @@ struct AltaQuizScreen: View {
                 AltaStartScreen(cover: c, dueShown: headerDue != nil, start: { session.startCover() }, review: { session.reviewCover() })
                     .transition(.opacity)
             }
-            // (1.3.60) while Alta's page loads, out of sight, the popup's own Loading in its place — (1.3.100) from the
-            // moment the popup opens, while the launch goes through Canvas too (1.3.99 showed a spinner first, then this)
+            // (1.3.60) while Alta's page loads, out of sight, the popup's own Loading in its place — (1.3.101) from the
+            // moment the popup opens, while the launch goes through Canvas too (1.3.100 showed a spinner first, then this)
             if session.failure == nil && (session.opening || (!session.pageShown && !session.asIs && session.cover == nil)) {
                 ZStack {
                     PageGround()

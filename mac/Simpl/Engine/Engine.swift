@@ -93,12 +93,12 @@ final class Engine: ObservableObject, ShellListener {
     @Published var query = ""
     /// A quiz in the app's own quiz screen (a sheet over the window).
     @Published var quiz: QuizLaunch?
-    /// (1.3.17) A Knewton Alta assignment taken in the app's own popup (AltaQuiz.swift). (1.3.100) Set, its session is
+    /// (1.3.17) A Knewton Alta assignment taken in the app's own popup (AltaQuiz.swift). (1.3.101) Set, its session is
     /// made at once and its launch asked of Canvas, while the popup is still being put up.
     @Published var alta: AltaLaunch? {
         didSet { if alta?.id != oldValue?.id { altaAsked() } }
     }
-    /// (1.3.100) The Alta popup's session, made the moment `alta` is set, until the popup takes it (`altaSession(for:)`).
+    /// (1.3.101) The Alta popup's session, made the moment `alta` is set, until the popup takes it (`altaSession(for:)`).
     private var pendingAlta: AltaSession?
 
     private func altaAsked() {
@@ -107,7 +107,7 @@ final class Engine: ObservableObject, ShellListener {
         askAlta(a)
     }
 
-    /// (1.3.100) An Alta assignment's session made and its launch asked of Canvas now, ahead of its popup — the Tools
+    /// (1.3.101) An Alta assignment's session made and its launch asked of Canvas now, ahead of its popup — the Tools
     /// list's, which puts the popup up only once the list has closed — taken by `alta` set to the same launch.
     func askAlta(_ a: AltaLaunch) {
         let s = AltaSession(launch: a)
@@ -115,7 +115,7 @@ final class Engine: ObservableObject, ShellListener {
         s.start(engine: self)
     }
 
-    /// (1.3.100) The session for the Alta popup's launch: the one made as it was asked for, else a new one.
+    /// (1.3.101) The session for the Alta popup's launch: the one made as it was asked for, else a new one.
     func altaSession(for launch: AltaLaunch) -> AltaSession {
         if let s = pendingAlta, s.launch.id == launch.id {
             pendingAlta = nil
