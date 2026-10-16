@@ -362,10 +362,10 @@ internal sealed class AltaSession
         var core = Web.CoreWebView2;
         core.WebMessageReceived += (_, e) => { if (Said(e) is { } s) Take(s, null); };
         core.FrameCreated += (_, e) => WatchFrame(e.Frame);
+        // (0.3.22: a spare's empty page is never seen here — AltaSpare waits for it to load before it is handed over, and
+        // this is listened to only after — so every navigation that ends, an empty one too, ends the skeleton as before)
         core.NavigationCompleted += (_, _) =>
         {
-            // (0.3.22: never a spare's empty page, which is all it had held before it was taken)
-            if (core.Source.StartsWith("about:", StringComparison.OrdinalIgnoreCase)) return;
             LightPages.Tell(core, "alta");
             if (pageAt == null) { pageAt = Now(); pageHost = HostOf(core); }
             if (!Opening) return;
