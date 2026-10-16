@@ -481,11 +481,34 @@ internal sealed class AltaSession
         catch { /* an older runtime: the frame's messages are not heard */ }
     }
 
+    /// <summary>(maths drawn whole) The skeleton never left over Alta's page for good: while it is up once the page has
+    /// begun (not opening, no start screen, not Show browser), the page is asked to look at itself again every few seconds
+    /// — what Light then Dark did by hand on the Mac — and after 26 seconds, longer than any wait of the page script's own,
+    /// it is shown as it is, said in the Error Logs. Begun again with each page and each time Alta goes between parts.</summary>
+    private int skeletonWatch;
+
+    private async void WatchSkeleton()
+    {
+        var mine = ++skeletonWatch;
+        for (var k = 1; k <= 6; k++)
+        {
+            await Task.Delay(k == 1 ? 6000 : 4000);
+            if (mine != skeletonWatch || closed || Opening || PageShown || Browser || DialogInPage || Cover != null || Failure != null) return;
+            if (k < 6) { _ = Run("window.__simplBrowserNow ? window.__simplBrowserNow() : null"); continue; }
+            _ = Run("document.documentElement ? document.documentElement.setAttribute('data-simpl-shown', '') : null");
+            PageShown = true;
+            ErrorLogs.Add($"{DateTime.Now.ToString("MMM d, yyyy, h:mm:ss tt", CultureInfo.CurrentCulture)} — Alta’s page shown as it is: it was still out of sight after 26 seconds");
+            if (ErrorLogs.Count > 50) ErrorLogs.RemoveAt(0);
+            Notify();
+        }
+    }
+
     /// <summary>The popup closed: the page let go, its graph's window with it.</summary>
     public void Close()
     {
         if (closed) return;
         closed = true;
+        skeletonWatch++;
         SayTimeline();
         launched.TrySetResult();
         Hold(false);
@@ -580,6 +603,7 @@ internal sealed class AltaSession
                     // (0.3.5: and the last page's pop-up with them, whether the app showed it or the page)
                     HoldForDialog(false);
                     if (Dialog != null || DialogInPage) { Dialog = null; DialogInPage = false; DialogVersion++; }
+                    WatchSkeleton();
                     Notify();
                     return;
                 }
@@ -706,8 +730,19 @@ internal sealed class AltaSession
                 if (!main) return;
                 PageShown = false;
                 ClosePic(); // (Alta between parts: the question gone)
+                WatchSkeleton();
                 Notify();
                 return;
+            case "remeasured":
+            {
+                // (maths drawn whole) MathQuill's brackets or √ found drawn flat — drawn out of sight — and sized again
+                if (!main) return;
+                var n = (int)(Num(head["count"]) ?? 0);
+                ErrorLogs.Add($"{DateTime.Now.ToString("MMM d, yyyy, h:mm:ss tt", CultureInfo.CurrentCulture)} — Alta’s maths drawn flat ({n} bracket{(n == 1 ? "" : "s")} or roots), sized again{(Bool(head["mathquill"]) == true ? " by MathQuill" : "")}");
+                if (ErrorLogs.Count > 50) ErrorLogs.RemoveAt(0);
+                Notify();
+                return;
+            }
             case "picOpen":
                 if (main && Num(head["i"]) is { } i) _ = OpenPic((int)i);
                 return;

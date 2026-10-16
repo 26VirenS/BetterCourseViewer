@@ -271,7 +271,13 @@ internal static class AltaHook
           // are left alone). Anything not recognised — no part, or not a learn page — gives Alta's page back as it is, after a
           // moment's grace (Alta between parts), and the app is told why, for its Error Logs.
           if (window.top === window) {
-            var FOCUS = 'html[data-simpl-q] body *:not([data-simpl-path]):not([data-simpl-keep]):not([data-simpl-keep] *) { display: none !important; }\n'
+            // (maths drawn whole) never a part of Alta's, though: one not kept yet — the next question, put in as the last
+            // goes, before the page is looked at again — is laid out as it is and only made see-through until it is kept.
+            // Learnosity's answer box (MathQuill) sizes its brackets and its √ to what they hold as it draws them, and one
+            // drawn hidden (nothing in it has a size) had them flat — no brackets, no √, the bar over what it held alone —
+            // until the page was loaded again.
+            var FOCUS = 'html[data-simpl-q] body *:not([data-simpl-path]):not([data-simpl-keep]):not([data-simpl-keep] *):not(section[class*="compound__compound"]):not(section[class*="compound__compound"] *) { display: none !important; }\n'
+              + 'html[data-simpl-q] section[class*="compound__compound"]:not([data-simpl-keep]) { opacity: 0 !important; pointer-events: none !important; }\n'
               + 'html[data-simpl-q] [data-simpl-hide] { display: none !important; }\n'
               + 'html[data-simpl-q] [data-simpl-path]:not(html):not(body) { padding-top: 0 !important; margin-top: 0 !important; }\n'
               + 'html[data-simpl-q] body { padding: 18px 28px 40px !important; }\n'
@@ -543,7 +549,9 @@ internal static class AltaHook
               var psSaid = JSON.stringify({ panels: ps, height: ps.length ? bottom + 48 : 0, gen: gen, pics: pr, verdict: on ? verdict() : '' });
               if (psSaid !== lastPanels) { lastPanels = psSaid; var m = JSON.parse(psSaid); m.kind = 'panels'; post(m); }
             };
-            setInterval(publish, 350);
+            // (maths drawn whole: and each time, a part kept gone or out of sight looked at again, and Alta's maths drawn
+            // flat sized again — see `watch` and `remeasure`)
+            setInterval(function () { publish(); watch(); remeasure(); }, 350);
             window.addEventListener('resize', function () { publish(); });
             window.__simplButtons = {
               press: function (i) { var b = buttonEls[i]; if (!b || b.disabled || b.getAttribute('aria-disabled') === 'true') return false; b.click(); setTimeout(publish, 60); return true; }
@@ -1023,7 +1031,9 @@ internal static class AltaHook
               steadySince = 0;
               if (between) veilAgain();
               var wait = between ? 8000 : (wasQuestion ? 1500 : 8000);
-              if (Date.now() - badSince < wait) { schedule(wait - (Date.now() - badSince) + 20); return; }
+              // (maths drawn whole: looked at again every 300 ms meanwhile — a part Alta shows by its class or its style alone is
+              // seen as it comes, where before it waited out the grace)
+              if (Date.now() - badSince < wait) { schedule(Math.min(wait - (Date.now() - badSince) + 20, 300)); return; }
               unmark();
               report(r.state, r);
               publish();
@@ -1077,6 +1087,7 @@ internal static class AltaHook
               steadyCap = Math.max(steadyCap, spinning ? 4000 : pending ? 2500 : 1500);
               if (ready || Date.now() - steadySince > steadyCap) {
                 steadySince = 0;
+                remeasure(); // (maths drawn whole)
                 reveal(state, { quiet: quiet, capped: !ready });
                 return;
               }
@@ -1093,21 +1104,96 @@ internal static class AltaHook
                 return !!(n && n.closest && n.closest('[data-simpl-keep], [class*="learn-flow-body"]'));
               });
             };
+            // (the page looked at again 120 ms after the last change, as before — put off by later changes in the part shown
+            // for 300 ms at most, so a page that never stops changing is still looked at; a change elsewhere never puts it off,
+            // and once a part is kept is looked at no oftener than every 400 ms — Alta's chrome changing all the time never has
+            // the page read over and over while Alta draws its next part)
+            var changed = function (mine) {
+              var now = Date.now();
+              lastChange = now;
+              if (mine) keptChange = now;
+              if (!changeSince) changeSince = now;
+              watchMathJax();
+              if (mine) { if (!timer || dueAt - now > 120 || now - changeSince < 300) schedule(); }
+              else if (!timer || dueAt - now > 400) schedule(400);
+            };
+            // (maths drawn whole) a part of Alta's put in while the question is shown alone — the next one, before the page is
+            // looked at again — laid out at once where it is (one Alta itself hides left as it is): what holds it marked as the
+            // kept parts' ancestors are, in the same moment it is put in, before Alta or Learnosity can draw in it (the next look
+            // marks the page afresh)
+            var PART_SEL = 'section[class*="compound__compound"]', sections = document.getElementsByTagName('section');
+            var layOut = function () {
+              if (!document.documentElement.hasAttribute('data-simpl-q')) return;
+              for (var i = 0; i < sections.length; i++) {
+                var sec = sections[i];
+                if (sec.hasAttribute('data-simpl-keep') || sec.hidden || !sec.matches(PART_SEL) || getComputedStyle(sec).display === 'none') continue;
+                for (var x = sec.parentElement; x && x !== document.documentElement && !x.hasAttribute('data-simpl-path'); x = x.parentElement) mark(x, 'data-simpl-path');
+              }
+            };
             try {
               new MutationObserver(function (list) {
-                var now = Date.now(), mine = inKept(list);
-                lastChange = now;
-                if (mine) keptChange = now;
-                if (!changeSince) changeSince = now;
-                watchMathJax();
-                // (the page looked at again 120 ms after the last change, as before — put off by later changes in the part
-                // shown for 300 ms at most, so a page that never stops changing is still looked at; a change elsewhere never
-                // puts it off, and once a part is kept is looked at no oftener than every 400 ms — Alta's chrome changing
-                // all the time never has the page read over and over while Alta draws its next part)
-                if (mine) { if (!timer || dueAt - now > 120 || now - changeSince < 300) schedule(); }
-                else if (!timer || dueAt - now > 400) schedule(400);
+                if (list.some(function (m) { return m.addedNodes.length > 0; })) layOut();
+                changed(inKept(list));
               }).observe(document, { childList: true, subtree: true, characterData: true });
             } catch (e) {}
+            // (maths drawn whole) a part shown or put away by its class or its style alone — a part of Alta's, its learn flow,
+            // what holds the flow, or a wrapper in the flow round a part — has the page looked at again 120 ms later (never put
+            // off by more of them): before, only a part put in or taken out did, and a question Alta showed by its class waited
+            // out the grace between parts (eight seconds), or for good while the last one was still kept
+            var flowEl = null;
+            var turned = function (t) {
+              if (!t || t.nodeType !== 1) return false;
+              if (t.matches(PART_SEL)) return true;
+              if (!flowEl || !flowEl.isConnected) flowEl = document.querySelector('[class*="learn-flow-body"]');
+              return !!flowEl && (t.contains(flowEl) || (flowEl.contains(t) && !t.closest(PART_SEL)));
+            };
+            try {
+              new MutationObserver(function (list) {
+                if (!list.some(function (m) { return turned(m.target); })) return;
+                if (!timer || dueAt - Date.now() > 120) schedule();
+              }).observe(document, { attributes: true, subtree: true, attributeFilter: ['class', 'style', 'hidden', 'aria-hidden'] });
+            } catch (e) {}
+            // (maths drawn whole) the page never left waiting: out of sight with nothing due to look at it again, or a part kept
+            // gone or put out of sight by Alta (the next shown in its place by its class), it is looked at again at once — what
+            // the student's Light then Dark did for it before
+            var watch = function () {
+              if (timer || steadyTimer) return;
+              if ((veils && !showing && !dialogInPage && !window.__simplBrowser) || cards().some(function (k) { return !k.isConnected || !shown(k); })) schedule(0);
+            };
+            // (maths drawn whole) MathQuill's brackets and √ — Learnosity's answer box, its formulas — drawn flat: sized to what
+            // they held as they were drawn, which out of sight was nothing (MathQuill sizes them once, as it draws them, and again
+            // only as the student types in them). Each is sized again as MathQuill sizes it once what it holds is laid out — by
+            // MathQuill itself where the page has it to hand (its reflow, for a formula drawn before it was in sight) — and the
+            // app told, for its Error Logs: in the parts kept, and in Alta's page as it is (Show Browser) too.
+            var mqFlat = function (el) {
+              var sc = /scale\(\s*(-?[\d.]+(?:e-?\d+)?)\s*,\s*(-?[\d.]+(?:e-?\d+)?)\s*\)/.exec(el.style.transform || '');
+              return !!sc && (+sc[1] <= 0.05 || +sc[2] <= 0.05);
+            };
+            var emsOf = function (el, h) { var f = parseFloat(getComputedStyle(el).fontSize); return f > 0 ? h / f : 0; };
+            var to3 = function (v) { return Math.round(v * 1000) / 1000; };
+            var remeasure = function () {
+              var flat = [].filter.call(document.querySelectorAll('.mq-scaled'), mqFlat);
+              if (!flat.length) return;
+              var byMQ = 0, byUs = 0;
+              try {
+                var MQ = window.MathQuill && window.MathQuill.getInterface ? window.MathQuill.getInterface(2) : null;
+                if (MQ) flat.forEach(function (sc) { var root = sc.closest('.mq-math-mode'), f = root ? MQ(root) : null; if (f && f.reflow) f.reflow(); });
+              } catch (e) {}
+              flat.forEach(function (sc) {
+                if (!mqFlat(sc)) { byMQ++; return; }
+                if (sc.classList.contains('mq-sqrt-prefix')) {
+                  // (a root's √: as tall as what it holds, less a tenth)
+                  var stem = sc.nextElementSibling, h = stem ? emsOf(stem, stem.clientHeight) : 0;
+                  if (h > 0) { sc.style.transform = 'scale(1, ' + to3(h - 0.1) + ')'; byUs++; }
+                  return;
+                }
+                // (a bracket, either side of what it holds: a fifth taller than it, and wider by a fifth of that, at most)
+                var inner = sc.parentElement ? [].filter.call(sc.parentElement.children, function (k) { return !k.classList.contains('mq-scaled'); })[0] : null;
+                var h2 = inner ? emsOf(inner, inner.offsetHeight) : 0;
+                if (h2 > 0) { sc.style.transform = 'scale(' + to3(Math.min(1 + 0.2 * (h2 - 1), 1.2)) + ', ' + to3(1.2 * h2) + ')'; byUs++; }
+              });
+              if (byMQ + byUs) post({ kind: 'remeasured', count: byMQ + byUs, mathquill: byMQ > 0 });
+            };
             schedule();
           }
 

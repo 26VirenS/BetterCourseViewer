@@ -1245,6 +1245,19 @@ Each open writes its timeline to the app's log — "alta: launch asked +N ms · 
 page asked for) — which the Windows workflow checks for the Alta pictures, and `scripts/dev/alta-test.mjs` checks the
 question is shown under 400 ms after its page has loaded on the mock.
 
+(Maths drawn whole, as the Mac's copy.) A part of Alta's is never hidden while it is drawn. The question shown alone hid
+everything not yet marked with `display: none`, the next question too, from the moment Alta put it in until the page
+script next looked (120–420 ms), and Learnosity's answer box (MathQuill) sizes its brackets and √ once, as it draws
+them, from what they hold: drawn hidden they came out flat — no brackets, no √, only the bar over the radicand — and
+stayed so, in Light, Dark and Show browser, until the popup was opened again. Now a part not kept yet is laid out and
+only see-through until it is kept, and what holds a part put in is marked at once (`layOut`). A bracket or √ found flat
+anyway is sized again as MathQuill sizes it (`remeasure`, MathQuill's own `reflow` where the page has it), said in the
+Error Logs. The page is never left out of sight: a part shown or put away by its class or style alone has the page looked
+at again, between parts it is looked at every 300 ms (it waited out the 8 s grace before), and a kept part gone, or the
+page out of sight with nothing due, has it looked at again at once (`watch`). The popup's own last resort
+(`WatchSkeleton`): its skeleton still up over Alta's page asks the page to look again every 4 s from 6 s, and shows it as
+it is after 26 s, said in the Error Logs. `alta-test.mjs` draws a box as MathQuill does on the mock, in dark and light.
+
 A pop-up of Alta's (0.3.5) is hidden in the page as soon as the page script sees it and read once it has settled —
 nothing it says changed for a moment, nothing in it loading, its fade done; three seconds at most, five while its body
 says nothing — and again at each change (a next step): its title, its body as plain HTML (its formulas as their TeX,
