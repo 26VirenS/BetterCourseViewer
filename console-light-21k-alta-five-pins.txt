@@ -1,0 +1,25 @@
+2026-10-17 20:00:11.921 Simpl[19733:57407] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 20:00:13.626 Simpl[19733:57407] [Simpl] window: the app's screens (no page)
+2026-10-17 20:00:14.568 Simpl[19733:57407] [Simpl] appear Dashboard: 1111 ms
+2026-10-17 20:00:15.261 Simpl[19733:57407] [Simpl] appear Dashboard: 1803 ms
+2026-10-17 20:00:20.932 Simpl[19733:57407] [Simpl] open Dashboard: 7475 ms (kept)
+2026-10-17 20:00:28.235 Simpl[19733:57407] [Simpl] popup alta: 984 × 591, 20 in from the window (sidebar out)
+2026-10-17 20:00:30.407 Simpl[19733:57407] [Simpl] popup alta: 984 × 589, 20 in from the window (sidebar out)
+2026-10-17 20:00:32.854 Simpl[19733:57407] [Simpl] popup alta: 984 × 591, 20 in from the window (sidebar out)
+2026-10-17 20:00:33.211 Simpl[19733:57407] [Simpl] call dashCourses: 15190 ms
+2026-10-17 20:00:33.212 Simpl[19733:57407] [Simpl] call dashCourses: 15190 ms
+2026-10-17 20:00:33.212 Simpl[19733:57407] [Simpl] call today: 15090 ms
+2026-10-17 20:00:33.212 Simpl[19733:57407] [Simpl] call todayCounts: 12328 ms
+2026-10-17 20:00:33.212 Simpl[19733:57407] [Simpl] call todayCounts: 12328 ms
+2026-10-17 20:00:33.212 Simpl[19733:57407] [Simpl] call todayCounts: 12328 ms
+2026-10-17 20:00:33.213 Simpl[19733:57407] [Simpl] call todayCounts: 12328 ms
+2026-10-17 20:00:33.213 Simpl[19733:57407] [Simpl] call today: 15091 ms
+2026-10-17 20:00:33.213 Simpl[19733:57407] [Simpl] call dashList: 15191 ms
+2026-10-17 20:00:33.214 Simpl[19733:57407] [Simpl] call dashSkyline: 15192 ms
+2026-10-17 20:00:33.214 Simpl[19733:57407] [Simpl] call dashSkyline: 15193 ms
+2026-10-17 20:00:33.215 Simpl[19733:57407] [Simpl] call toolLaunch: 2856 ms
+2026-10-17 20:00:33.215 Simpl[19733:57407] [Simpl] call dashList: 15194 ms
+2026-10-17 20:00:33.567 Simpl[19733:57407] [Simpl] call snapshot: 6704 ms
+2026-10-17 20:00:33.791 Simpl[19733:57407] [Simpl] open Dashboard: 20333 ms (live)
+2026-10-17 20:00:34.957 Simpl[19733:57407] [Simpl] alta: view made 6 ms · asked 3745 ms · launch 6602 ms · page 7507 ms · overview 7651 ms · shown 7652 ms (overview, quiet 123 ms, 142 ms after DOMContentLoaded)
+2026-10-17 20:00:44.214 Simpl[19733:57407] [Simpl] popup alta: 984 × 589, 20 in from the window (sidebar out)

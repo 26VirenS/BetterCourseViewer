@@ -1,0 +1,23 @@
+2026-10-17 20:02:05.565 Simpl[28843:80345] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 20:02:06.529 Simpl[28843:80345] [Simpl] window: the app's screens (no page)
+2026-10-17 20:02:06.754 Simpl[28843:80345] [Simpl] appear Dashboard: 379 ms
+2026-10-17 20:02:07.192 Simpl[28843:80345] [Simpl] appear Dashboard: 816 ms
+2026-10-17 20:02:10.846 Simpl[28843:80345] [Simpl] open Dashboard: 4471 ms (kept)
+2026-10-17 20:02:16.769 Simpl[28843:80345] [Simpl] call quizIntro: 4605 ms
+2026-10-17 20:02:16.851 Simpl[28843:80345] [Simpl] call dashCourses: 8092 ms
+2026-10-17 20:02:16.851 Simpl[28843:80345] [Simpl] call dashCourses: 8094 ms
+2026-10-17 20:02:16.852 Simpl[28843:80345] [Simpl] call today: 7864 ms
+2026-10-17 20:02:16.853 Simpl[28843:80345] [Simpl] call today: 7865 ms
+2026-10-17 20:02:16.856 Simpl[28843:80345] [Simpl] call todayCounts: 6046 ms
+2026-10-17 20:02:16.858 Simpl[28843:80345] [Simpl] call todayCounts: 6048 ms
+2026-10-17 20:02:16.858 Simpl[28843:80345] [Simpl] call todayCounts: 6048 ms
+2026-10-17 20:02:16.858 Simpl[28843:80345] [Simpl] call todayCounts: 6048 ms
+2026-10-17 20:02:16.858 Simpl[28843:80345] [Simpl] call dashList: 8099 ms
+2026-10-17 20:02:16.859 Simpl[28843:80345] [Simpl] call dashList: 8101 ms
+2026-10-17 20:02:16.860 Simpl[28843:80345] [Simpl] call dashSkyline: 8101 ms
+2026-10-17 20:02:16.861 Simpl[28843:80345] [Simpl] call dashSkyline: 8103 ms
+2026-10-17 20:02:17.059 Simpl[28843:80345] [Simpl] open Dashboard: 10683 ms (live)
+2026-10-17 20:02:17.132 Simpl[28843:80345] [Simpl] call snapshot: 5923 ms
+2026-10-17 20:02:17.274 Simpl[28843:80345] [Simpl] call quizBegin: 503 ms
+2026-10-17 20:02:27.492 Simpl[28843:80345] SimplQuizClick 4 at {166, 454} (frame {{150, 125}, {32, 32}}): active 0, key 0, sheet 1; hit NSClipView < HostingScrollView < PlatformContainer < SheetHostingView<SheetContent> < NSThemeFrame
+2026-10-17 20:02:30.844 Simpl[28843:80345] SimplQuizClick after: question 4 showing

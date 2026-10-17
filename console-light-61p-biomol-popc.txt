@@ -1,0 +1,11 @@
+2026-10-17 19:57:54.293 Simpl[14256:43553] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 19:57:57.650 Simpl[14256:43553] [Simpl] window: the app's screens (no page)
+2026-10-17 19:57:59.993 Simpl[14256:43553] [Simpl] popup tool: 984 × 607, 20 in from the window (sidebar out)
+2026-10-17 19:58:12.050 Simpl[14256:43553] [Simpl] popup tool: 984 × 591, 20 in from the window (sidebar out)
+2026-10-17 19:58:13.692 Simpl[14256:43553] [Simpl] call snapshot: 317 ms
+2026-10-17 19:58:14.893 Simpl[14256:43553] [Simpl] bio scene: lipid/OLA/ballStick/true/true/element/true/false made in 12844 ms, 108 objects
+2026-10-17 19:58:15.010 Simpl[14256:43553] [Simpl] call courses: 1039 ms
+2026-10-17 19:58:16.058 Simpl[14256:43553] [Simpl] call groups: 1047 ms
+2026-10-17 19:58:16.826 Simpl[14256:43553] [Simpl] bio scene: lipid/POV/ballStick/true/true/part/true/false made in 7862 ms, 274 objects
+2026-10-17 19:58:17.319 Simpl[14256:43553] [Simpl] bio frame lipid/POV/ballStick/true/true/part/true/false: view 570 × 368, model 46% across, 83% up
+2026-10-17 19:58:26.638 Simpl[14256:43553] [Simpl] call moreFromCanvas: 10578 ms

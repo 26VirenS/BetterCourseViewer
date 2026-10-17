@@ -1,0 +1,25 @@
+2026-10-17 19:54:36.079 Simpl[6906:24159] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 19:54:37.480 Simpl[6906:24159] [Simpl] window: the app's screens (no page)
+2026-10-17 19:54:38.071 Simpl[6906:24159] [Simpl] appear Dashboard: 813 ms
+2026-10-17 19:54:38.698 Simpl[6906:24159] [Simpl] appear Dashboard: 1439 ms
+2026-10-17 19:54:42.101 Simpl[6906:24159] [Simpl] open Dashboard: 4843 ms (kept)
+2026-10-17 19:54:42.940 Simpl[6906:24159] [Simpl] call dashCourses: 2212 ms
+2026-10-17 19:54:42.943 Simpl[6906:24159] [Simpl] call dashCourses: 2325 ms
+2026-10-17 19:54:42.950 Simpl[6906:24159] [Simpl] call dashList: 2222 ms
+2026-10-17 19:54:42.950 Simpl[6906:24159] [Simpl] call dashList: 2333 ms
+2026-10-17 19:54:42.960 Simpl[6906:24159] [Simpl] call today: 2059 ms
+2026-10-17 19:54:42.961 Simpl[6906:24159] [Simpl] call todayCounts: 884 ms
+2026-10-17 19:54:42.961 Simpl[6906:24159] [Simpl] call todayCounts: 885 ms
+2026-10-17 19:54:42.961 Simpl[6906:24159] [Simpl] call todayCounts: 885 ms
+2026-10-17 19:54:42.961 Simpl[6906:24159] [Simpl] call todayCounts: 885 ms
+2026-10-17 19:54:42.962 Simpl[6906:24159] [Simpl] call dashSkyline: 2234 ms
+2026-10-17 19:54:42.962 Simpl[6906:24159] [Simpl] call today: 2061 ms
+2026-10-17 19:54:43.176 Simpl[6906:24159] [Simpl] call dashSkyline: 2559 ms
+2026-10-17 19:54:43.177 Simpl[6906:24159] [Simpl] call snapshot: 471 ms
+2026-10-17 19:54:43.314 Simpl[6906:24159] [Simpl] open Dashboard: 6055 ms (live)
+2026-10-17 19:54:44.211 Simpl[6906:24159] [Simpl] call coursesProgress: 1271 ms
+2026-10-17 19:54:44.216 Simpl[6906:24159] [Simpl] call coursesProgress: 1270 ms
+2026-10-17 19:54:44.218 Simpl[6906:24159] [Simpl] call courses: 907 ms
+2026-10-17 19:54:45.962 Simpl[6906:24159] [Simpl] call groups: 1743 ms
+2026-10-17 19:54:47.288 Simpl[6906:24159] [Simpl] call moreFromCanvas: 1326 ms
+2026-10-17 19:54:50.719 Simpl[6906:24159] [Simpl] call setupInfo: 1653 ms

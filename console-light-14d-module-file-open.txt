@@ -1,0 +1,15 @@
+2026-10-17 20:04:06.654 Simpl[29466:82523] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 20:04:07.867 Simpl[29466:82523] [Simpl] window: the app's screens (no page)
+2026-10-17 20:04:08.416 Simpl[29466:82523] [Simpl] appear Section Modules: 815 ms
+2026-10-17 20:04:09.345 Simpl[29466:82523] [Simpl] appear Section Modules: 1744 ms
+2026-10-17 20:04:13.000 Simpl[29466:82523] [Simpl] open Section Modules: 5399 ms (kept)
+2026-10-17 20:04:13.344 Simpl[29466:82523] [Simpl] call snapshot: 122 ms
+2026-10-17 20:04:13.790 Simpl[29466:82523] [Simpl] call fileInfo: 790 ms
+2026-10-17 20:04:13.988 Simpl[29466:82523] [Simpl] call modules: 1668 ms
+2026-10-17 20:04:13.989 Simpl[29466:82523] [Simpl] call modules: 1670 ms
+2026-10-17 20:04:13.990 Simpl[29466:82523] [Simpl] call home: 2104 ms
+2026-10-17 20:04:13.990 Simpl[29466:82523] [Simpl] call courses: 509 ms
+2026-10-17 20:04:14.461 Simpl[29466:82523] [Simpl] open Section Modules: 6860 ms (live)
+2026-10-17 20:04:14.485 Simpl[29466:82523] [Simpl] call groups: 495 ms
+2026-10-17 20:04:14.933 Simpl[29466:82523] [Simpl] call moreFromCanvas: 447 ms
+2026-10-17 20:04:20.135 Simpl[29466:82523] [files] Quick Look: 1 item, download.pdf (its controller Simpl's)

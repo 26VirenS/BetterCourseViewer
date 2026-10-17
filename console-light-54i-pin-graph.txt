@@ -1,0 +1,27 @@
+2026-10-17 19:56:59.706 Simpl[12270:38250] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 19:57:00.551 Simpl[12270:38250] [Simpl] window: the app's screens (no page)
+2026-10-17 19:57:00.997 Simpl[12270:38250] [Simpl] appear Dashboard: 630 ms
+2026-10-17 19:57:01.591 Simpl[12270:38250] [Simpl] appear Dashboard: 1223 ms
+2026-10-17 19:57:04.403 Simpl[12270:38250] [Simpl] open Dashboard: 4034 ms (kept)
+2026-10-17 19:57:06.088 Simpl[12270:38250] [Simpl] call dashCourses: 2977 ms
+2026-10-17 19:57:06.092 Simpl[12270:38250] [Simpl] call dashCourses: 2926 ms
+2026-10-17 19:57:06.095 Simpl[12270:38250] [Simpl] call todayCounts: 1707 ms
+2026-10-17 19:57:06.095 Simpl[12270:38250] [Simpl] call todayCounts: 1707 ms
+2026-10-17 19:57:06.095 Simpl[12270:38250] [Simpl] call todayCounts: 1707 ms
+2026-10-17 19:57:06.095 Simpl[12270:38250] [Simpl] call todayCounts: 1708 ms
+2026-10-17 19:57:06.192 Simpl[12270:38250] [Simpl] call dashList: 3025 ms
+2026-10-17 19:57:06.194 Simpl[12270:38250] [Simpl] call today: 2922 ms
+2026-10-17 19:57:06.195 Simpl[12270:38250] [Simpl] call dashList: 3083 ms
+2026-10-17 19:57:06.195 Simpl[12270:38250] [Simpl] call today: 2932 ms
+2026-10-17 19:57:06.195 Simpl[12270:38250] [Simpl] call dashSkyline: 3029 ms
+2026-10-17 19:57:06.196 Simpl[12270:38250] [Simpl] call dashSkyline: 3085 ms
+2026-10-17 19:57:06.197 Simpl[12270:38250] [Simpl] call snapshot: 448 ms
+2026-10-17 19:57:07.233 Simpl[12270:38250] [Simpl] open Dashboard: 6863 ms (live)
+2026-10-17 19:57:07.844 Simpl[12270:38250] [Simpl] call coursesProgress: 1752 ms
+2026-10-17 19:57:07.850 Simpl[12270:38250] [Simpl] call coursesProgress: 1760 ms
+2026-10-17 19:57:07.853 Simpl[12270:38250] [Simpl] call courses: 1457 ms
+2026-10-17 19:57:08.043 Simpl[12270:38250] [Simpl] call groups: 190 ms
+2026-10-17 19:57:08.689 Simpl[12270:38250] [Simpl] call moreFromCanvas: 645 ms
+2026-10-17 19:57:08.770 Simpl[12270:38250] [Simpl] graph: drew y=x^2 for the picture
+2026-10-17 19:57:26.052 Simpl[12270:38250] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-10-17 19:57:26.922 Simpl[12270:38250] [Simpl] shot: another copy of the app is in front; brought forward again

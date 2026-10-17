@@ -1,0 +1,6 @@
+2026-10-17 19:57:54.292 Simpl[14271:43578] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 19:57:58.291 Simpl[14271:43578] [Simpl] window: the app's screens (no page)
+2026-10-17 19:58:00.917 Simpl[14271:43578] [Simpl] popup tool: 984 × 607, 20 in from the window (sidebar out)
+2026-10-17 19:58:14.363 Simpl[14271:43578] [Simpl] popup tool: 984 × 591, 20 in from the window (sidebar out)
+2026-10-17 19:58:14.759 Simpl[14271:43578] [Simpl] popup cross-why: 560 × 458
+2026-10-17 19:58:16.037 Simpl[14271:43578] [Simpl] shot: another copy of the app is in front; brought forward again

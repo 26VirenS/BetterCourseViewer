@@ -1,0 +1,25 @@
+2026-10-17 19:54:02.907 Simpl[8761:29115] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 19:54:04.587 Simpl[8761:29115] [Simpl] window: the app's screens (no page)
+2026-10-17 19:54:05.189 Simpl[8761:29115] [Simpl] appear Dashboard: 985 ms
+2026-10-17 19:54:05.773 Simpl[8761:29115] [Simpl] appear Dashboard: 1570 ms
+2026-10-17 19:54:09.749 Simpl[8761:29115] NSQuitAlwaysKeepsWindows=NO
+2026-10-17 19:54:09.920 Simpl[8761:29115] [Simpl] open Dashboard: 5716 ms (kept)
+2026-10-17 19:54:12.753 Simpl[8761:29115] [Simpl] call quizIntro: 2076 ms
+2026-10-17 19:54:13.874 Simpl[8761:29115] [Simpl] call todayCounts: 3985 ms
+2026-10-17 19:54:13.874 Simpl[8761:29115] [Simpl] call todayCounts: 3985 ms
+2026-10-17 19:54:13.874 Simpl[8761:29115] [Simpl] call todayCounts: 3985 ms
+2026-10-17 19:54:13.874 Simpl[8761:29115] [Simpl] call todayCounts: 3985 ms
+2026-10-17 19:54:13.875 Simpl[8761:29115] [Simpl] call today: 6034 ms
+2026-10-17 19:54:13.875 Simpl[8761:29115] [Simpl] call today: 6034 ms
+2026-10-17 19:54:13.876 Simpl[8761:29115] [Simpl] call dashCourses: 6265 ms
+2026-10-17 19:54:13.877 Simpl[8761:29115] [Simpl] call dashCourses: 6316 ms
+2026-10-17 19:54:13.877 Simpl[8761:29115] [Simpl] call dashList: 6316 ms
+2026-10-17 19:54:13.877 Simpl[8761:29115] [Simpl] call dashList: 6266 ms
+2026-10-17 19:54:13.878 Simpl[8761:29115] [Simpl] call dashSkyline: 6318 ms
+2026-10-17 19:54:13.879 Simpl[8761:29115] [Simpl] call dashSkyline: 6267 ms
+2026-10-17 19:54:14.224 Simpl[8761:29115] [Simpl] call snapshot: 4056 ms
+2026-10-17 19:54:15.153 Simpl[8761:29115] [Simpl] open Dashboard: 10950 ms (live)
+2026-10-17 19:54:18.235 Simpl[8761:29115] [Simpl] call coursesProgress: 4358 ms
+2026-10-17 19:54:18.237 Simpl[8761:29115] [Simpl] call coursesProgress: 4360 ms
+2026-10-17 19:54:18.238 Simpl[8761:29115] [Simpl] call courses: 3149 ms
+2026-10-17 19:54:21.730 Simpl[8761:29115] [Simpl] call groups: 3491 ms

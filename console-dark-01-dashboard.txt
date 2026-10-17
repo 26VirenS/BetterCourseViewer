@@ -1,0 +1,27 @@
+2026-10-17 19:53:44.772 Simpl[3987:16193] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 19:53:45.631 Simpl[3987:16193] [Simpl] window: the app's screens (no page)
+2026-10-17 19:53:45.772 Simpl[3987:16193] [Simpl] appear Dashboard: 244 ms
+2026-10-17 19:53:45.862 Simpl[3987:16193] [Simpl] appear Dashboard: 334 ms
+2026-10-17 19:53:48.239 Simpl[3987:16193] [Simpl] open Dashboard: 2710 ms (kept)
+2026-10-17 19:53:48.572 Simpl[3987:16193] [Simpl] call snapshot: 128 ms
+2026-10-17 19:53:49.348 Simpl[3987:16193] [Simpl] call dashCourses: 2303 ms
+2026-10-17 19:53:49.348 Simpl[3987:16193] [Simpl] call dashCourses: 2303 ms
+2026-10-17 19:53:49.348 Simpl[3987:16193] [Simpl] call dashList: 2303 ms
+2026-10-17 19:53:49.349 Simpl[3987:16193] [Simpl] call todayCounts: 1122 ms
+2026-10-17 19:53:49.349 Simpl[3987:16193] [Simpl] call todayCounts: 1122 ms
+2026-10-17 19:53:49.349 Simpl[3987:16193] [Simpl] call todayCounts: 1122 ms
+2026-10-17 19:53:49.349 Simpl[3987:16193] [Simpl] call todayCounts: 1122 ms
+2026-10-17 19:53:49.349 Simpl[3987:16193] [Simpl] call dashList: 2304 ms
+2026-10-17 19:53:49.349 Simpl[3987:16193] [Simpl] call today: 2238 ms
+2026-10-17 19:53:49.350 Simpl[3987:16193] [Simpl] call today: 2239 ms
+2026-10-17 19:53:49.428 Simpl[3987:16193] [Simpl] call dashSkyline: 2383 ms
+2026-10-17 19:53:49.429 Simpl[3987:16193] [Simpl] call dashSkyline: 2384 ms
+2026-10-17 19:53:49.429 Simpl[3987:16193] [Simpl] call courses: 562 ms
+2026-10-17 19:53:49.431 Simpl[3987:16193] [Simpl] open Dashboard: 3901 ms (live)
+2026-10-17 19:53:49.709 Simpl[3987:16193] [Simpl] call coursesProgress: 361 ms
+2026-10-17 19:53:49.709 Simpl[3987:16193] [Simpl] call coursesProgress: 361 ms
+2026-10-17 19:53:49.716 Simpl[3987:16193] [Simpl] call groups: 286 ms
+2026-10-17 19:53:50.248 Simpl[3987:16193] [Simpl] call moreFromCanvas: 531 ms
+2026-10-17 19:53:50.254 Simpl[3987:16193] [Simpl] call watchInfo: 2 ms
+activity-probe lms=canvas courses=5 events=6 [discussions] Is there any discussion happening this week? / F26-MATH 021 20 / Last post by Alan Aguilar. -> /courses/101/discussion_topics/7003 | [grades] Lec05-PreQuiz graded / F26-MATH 021 20 / 19 / 19 -> /courses/101/assignments/1007 | [announcements] Field site sign-ups / F26-SPRK 010 103 / Sign up for a field site by Friday. -> /courses/104/announcements/8005 | [comments] Joon commented on Dis00 / F26-MATH 021 20 / “Good use of interval notation here.” -> /courses/101/assignments/1001 | [announcements] Prerequisite Skills Test / F26-MATH 021 20 / Good morning everyone, the results from the Skills_Check test have been posted… -> /courses/101/announcements/8001 | [messages] No submission for Acknowledge the UC Merced Student Attestation / Inbox / Hello Bobcat! You are receiving this message because our records show… -> /conversations?id=c1
+2026-10-17 19:53:52.679 Simpl[3987:16193] [Simpl] shot: another copy of the app is in front; brought forward again

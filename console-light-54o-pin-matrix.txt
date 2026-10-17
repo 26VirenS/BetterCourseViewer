@@ -1,0 +1,24 @@
+2026-10-17 19:58:58.244 Simpl[23258:66950] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 19:59:01.972 Simpl[23258:66950] [Simpl] window: the app's screens (no page)
+2026-10-17 19:59:02.653 Simpl[23258:66950] [Simpl] appear Dashboard: 1636 ms
+2026-10-17 19:59:03.459 Simpl[23258:66950] [Simpl] appear Dashboard: 2442 ms
+2026-10-17 19:59:10.686 Simpl[23258:66950] [Simpl] open Dashboard: 9664 ms (kept)
+2026-10-17 19:59:12.384 Simpl[23258:66950] [Simpl] call snapshot: 212 ms
+2026-10-17 19:59:13.996 Simpl[23258:66950] [Simpl] call todayCounts: 3350 ms
+2026-10-17 19:59:13.996 Simpl[23258:66950] [Simpl] call todayCounts: 3350 ms
+2026-10-17 19:59:13.996 Simpl[23258:66950] [Simpl] call todayCounts: 3350 ms
+2026-10-17 19:59:13.996 Simpl[23258:66950] [Simpl] call todayCounts: 3350 ms
+2026-10-17 19:59:13.996 Simpl[23258:66950] [Simpl] call dashCourses: 7020 ms
+2026-10-17 19:59:13.997 Simpl[23258:66950] [Simpl] call dashCourses: 7021 ms
+2026-10-17 19:59:13.997 Simpl[23258:66950] [Simpl] call today: 5392 ms
+2026-10-17 19:59:13.997 Simpl[23258:66950] [Simpl] call today: 5393 ms
+2026-10-17 19:59:13.998 Simpl[23258:66950] [Simpl] call dashList: 7021 ms
+2026-10-17 19:59:13.998 Simpl[23258:66950] [Simpl] call dashSkyline: 7022 ms
+2026-10-17 19:59:13.998 Simpl[23258:66950] [Simpl] call dashList: 7022 ms
+2026-10-17 19:59:13.998 Simpl[23258:66950] [Simpl] call dashSkyline: 7023 ms
+2026-10-17 19:59:14.985 Simpl[23258:66950] [Simpl] open Dashboard: 13968 ms (live)
+2026-10-17 19:59:16.139 Simpl[23258:66950] [Simpl] call courses: 3489 ms
+2026-10-17 19:59:18.196 Simpl[23258:66950] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-10-17 19:59:21.422 Simpl[23258:66950] [Simpl] call coursesProgress: 7426 ms
+2026-10-17 19:59:21.480 Simpl[23258:66950] [Simpl] call coursesProgress: 7484 ms
+2026-10-17 19:59:21.718 Simpl[23258:66950] [Simpl] call groups: 5578 ms

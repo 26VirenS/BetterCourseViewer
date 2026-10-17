@@ -1,0 +1,29 @@
+2026-10-17 19:57:30.909 Simpl[19432:56894] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 19:57:31.535 Simpl[19432:56894] [Simpl] window: the app's screens (no page)
+2026-10-17 19:57:31.666 Simpl[19432:56894] [Simpl] appear Dashboard: 216 ms
+2026-10-17 19:57:31.869 Simpl[19432:56894] [Simpl] appear Dashboard: 419 ms
+2026-10-17 19:57:33.887 Simpl[19432:56894] [Simpl] open Dashboard: 2437 ms (kept)
+2026-10-17 19:57:34.492 Simpl[19432:56894] [Simpl] call snapshot: 256 ms
+2026-10-17 19:57:34.939 Simpl[19432:56894] [Simpl] call today: 1885 ms
+2026-10-17 19:57:34.944 Simpl[19432:56894] [Simpl] call today: 1891 ms
+2026-10-17 19:57:34.950 Simpl[19432:56894] [Simpl] call dashCourses: 2120 ms
+2026-10-17 19:57:34.950 Simpl[19432:56894] [Simpl] call dashSkyline: 2119 ms
+2026-10-17 19:57:34.952 Simpl[19432:56894] [Simpl] call dashSkyline: 2122 ms
+2026-10-17 19:57:34.952 Simpl[19432:56894] [Simpl] call dashCourses: 2121 ms
+2026-10-17 19:57:35.369 Simpl[19432:56894] [Simpl] call todayCounts: 1504 ms
+2026-10-17 19:57:35.370 Simpl[19432:56894] [Simpl] call dashList: 2540 ms
+2026-10-17 19:57:35.371 Simpl[19432:56894] [Simpl] call dashList: 2540 ms
+2026-10-17 19:57:35.371 Simpl[19432:56894] [Simpl] call todayCounts: 1507 ms
+2026-10-17 19:57:35.371 Simpl[19432:56894] [Simpl] call todayCounts: 1506 ms
+2026-10-17 19:57:35.371 Simpl[19432:56894] [Simpl] call todayCounts: 1507 ms
+2026-10-17 19:57:35.502 Simpl[19432:56894] [Simpl] open Dashboard: 4052 ms (live)
+2026-10-17 19:57:36.089 Simpl[19432:56894] [Simpl] call courses: 1481 ms
+2026-10-17 19:57:37.930 Simpl[19432:56894] [Simpl] call coursesProgress: 2978 ms
+2026-10-17 19:57:37.935 Simpl[19432:56894] [Simpl] call coursesProgress: 2985 ms
+2026-10-17 19:57:38.237 Simpl[19432:56894] [Simpl] call groups: 2138 ms
+2026-10-17 19:57:39.588 Simpl[19432:56894] [Simpl] graph: drew y=x^2 for the picture
+2026-10-17 19:57:39.711 Simpl[19432:56894] [Simpl] call moreFromCanvas: 1474 ms
+2026-10-17 19:57:44.021 Simpl[19432:56894] [Simpl] popup tool: 984 × 589, 20 in from the window (sidebar out)
+2026-10-17 19:57:44.212 Simpl[19432:56894] [Simpl] pin full screen: graph (carried: nothing)
+2026-10-17 19:57:45.293 Simpl[19432:56894] [Simpl] graph: the pin's graph read (463 characters)
+2026-10-17 19:57:49.479 Simpl[19432:56894] [Simpl] graph: the pin's graph put in the whole one

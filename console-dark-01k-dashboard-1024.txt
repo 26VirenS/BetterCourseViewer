@@ -1,0 +1,25 @@
+2026-10-17 19:55:36.053 Simpl[9069:29738] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 19:55:38.129 Simpl[9069:29738] [Simpl] window: the app's screens (no page)
+2026-10-17 19:55:39.219 Simpl[9069:29738] [Simpl] appear Dashboard: 1402 ms
+2026-10-17 19:55:39.538 Simpl[9069:29738] [Simpl] appear Dashboard: 1723 ms
+2026-10-17 19:55:42.550 Simpl[9069:29738] NSQuitAlwaysKeepsWindows=NO
+2026-10-17 19:55:45.612 Simpl[9069:29738] [Simpl] open Dashboard: 7797 ms (kept)
+2026-10-17 19:55:45.981 Simpl[9069:29738] [Simpl] call dashList: 2396 ms
+2026-10-17 19:55:45.981 Simpl[9069:29738] [Simpl] call dashList: 2394 ms
+2026-10-17 19:55:46.011 Simpl[9069:29738] [Simpl] call dashCourses: 2423 ms
+2026-10-17 19:55:46.021 Simpl[9069:29738] [Simpl] call dashCourses: 2439 ms
+2026-10-17 19:55:46.031 Simpl[9069:29738] [Simpl] call today: 2228 ms
+2026-10-17 19:55:46.032 Simpl[9069:29738] [Simpl] call today: 2229 ms
+2026-10-17 19:55:46.032 Simpl[9069:29738] [Simpl] call todayCounts: 438 ms
+2026-10-17 19:55:46.032 Simpl[9069:29738] [Simpl] call todayCounts: 438 ms
+2026-10-17 19:55:46.032 Simpl[9069:29738] [Simpl] call todayCounts: 438 ms
+2026-10-17 19:55:46.033 Simpl[9069:29738] [Simpl] call dashSkyline: 2445 ms
+2026-10-17 19:55:46.033 Simpl[9069:29738] [Simpl] call snapshot: 155 ms
+2026-10-17 19:55:46.369 Simpl[9069:29738] [Simpl] call todayCounts: 774 ms
+2026-10-17 19:55:48.736 Simpl[9069:29738] [Simpl] call dashSkyline: 5154 ms
+2026-10-17 19:55:48.737 Simpl[9069:29738] [Simpl] call coursesProgress: 2724 ms
+2026-10-17 19:55:48.737 Simpl[9069:29738] [Simpl] call coursesProgress: 2716 ms
+2026-10-17 19:55:48.764 Simpl[9069:29738] [Simpl] open Dashboard: 10950 ms (live)
+2026-10-17 19:55:48.952 Simpl[9069:29738] [Simpl] call courses: 2584 ms
+2026-10-17 19:55:49.806 Simpl[9069:29738] [Simpl] call groups: 853 ms
+2026-10-17 19:55:51.905 Simpl[9069:29738] [Simpl] call moreFromCanvas: 2099 ms

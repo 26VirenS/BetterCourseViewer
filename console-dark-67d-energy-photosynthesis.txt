@@ -1,0 +1,9 @@
+2026-10-17 19:58:25.172 Simpl[19658:56994] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 19:58:28.939 Simpl[19658:56994] [Simpl] window: the app's screens (no page)
+2026-10-17 19:58:30.133 Simpl[19658:56994] [Simpl] popup tool: 984 × 609, 20 in from the window (sidebar out)
+2026-10-17 19:58:30.935 Simpl[19658:56994] [Simpl] bio launch: energy photosynthesis:step=6: step 6
+2026-10-17 19:58:34.066 Simpl[19658:56994] [Simpl] popup tool: 984 × 591, 20 in from the window (sidebar out)
+2026-10-17 19:58:34.942 Simpl[19658:56994] [Simpl] call snapshot: 162 ms
+2026-10-17 19:58:35.753 Simpl[19658:56994] [Simpl] call courses: 675 ms
+2026-10-17 19:58:36.380 Simpl[19658:56994] [Simpl] call groups: 627 ms
+2026-10-17 19:58:37.117 Simpl[19658:56994] [Simpl] call moreFromCanvas: 737 ms

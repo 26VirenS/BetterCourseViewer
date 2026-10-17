@@ -1,0 +1,10 @@
+2026-10-17 19:55:07.212 Simpl[7444:25334] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 19:55:07.917 Simpl[7444:25334] [Simpl] window: the app's screens (no page)
+2026-10-17 19:55:08.415 Simpl[7444:25334] [Simpl] popup tool: 984 × 611, 20 in from the window (sidebar out)
+2026-10-17 19:55:08.433 Simpl[7444:25334] [Simpl] bio launch: gene codons:wheel:find=Leu: teaching gene, eukaryote, codons as a wheel, lookup Leu, step 1 of 99
+2026-10-17 19:55:10.588 Simpl[7444:25334] [Simpl] popup tool: 984 × 591, 20 in from the window (sidebar out)
+2026-10-17 19:55:12.651 Simpl[7444:25334] [Simpl] call snapshot: 193 ms
+2026-10-17 19:55:13.369 Simpl[7444:25334] [Simpl] call courses: 645 ms
+2026-10-17 19:55:13.673 Simpl[7444:25334] [Simpl] call groups: 304 ms
+2026-10-17 19:55:14.501 Simpl[7444:25334] [Simpl] call moreFromCanvas: 827 ms
+2026-10-17 19:55:17.427 Simpl[7444:25334] [Simpl] shot: another copy of the app is in front; brought forward again

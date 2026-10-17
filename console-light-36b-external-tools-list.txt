@@ -1,0 +1,12 @@
+2026-10-17 20:01:48.256 Simpl[28152:78556] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 20:01:49.561 Simpl[28152:78556] [Simpl] window: the app's screens (no page)
+2026-10-17 20:01:49.957 Simpl[28152:78556] [Simpl] appear External Tools: 579 ms
+2026-10-17 20:01:50.400 Simpl[28152:78556] [Simpl] appear External Tools: 1023 ms
+2026-10-17 20:01:52.656 Simpl[28152:78556] [Simpl] call snapshot: 155 ms
+2026-10-17 20:01:52.805 Simpl[28152:78556] [Simpl] call externalTools: 2848 ms
+2026-10-17 20:01:52.806 Simpl[28152:78556] [Simpl] tool list: opening Knewton Alta
+2026-10-17 20:01:52.886 Simpl[28152:78556] [Simpl] call externalTools: 2485 ms
+2026-10-17 20:01:53.576 Simpl[28152:78556] [Simpl] open External Tools: 4198 ms (fetched)
+2026-10-17 20:01:53.578 Simpl[28152:78556] [Simpl] call courses: 858 ms
+2026-10-17 20:01:53.831 Simpl[28152:78556] [Simpl] call groups: 253 ms
+2026-10-17 20:01:54.370 Simpl[28152:78556] [Simpl] call moreFromCanvas: 538 ms

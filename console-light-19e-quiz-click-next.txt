@@ -1,0 +1,28 @@
+2026-10-17 19:59:04.177 Simpl[17719:52385] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 19:59:05.610 Simpl[17719:52385] [Simpl] window: the app's screens (no page)
+2026-10-17 19:59:05.881 Simpl[17719:52385] [Simpl] appear Dashboard: 526 ms
+2026-10-17 19:59:06.229 Simpl[17719:52385] [Simpl] appear Dashboard: 877 ms
+2026-10-17 19:59:09.225 Simpl[17719:52385] [Simpl] open Dashboard: 3872 ms (kept)
+2026-10-17 19:59:10.656 Simpl[17719:52385] [Simpl] call quizIntro: 591 ms
+2026-10-17 19:59:10.660 Simpl[17719:52385] [Simpl] call dashCourses: 2840 ms
+2026-10-17 19:59:10.661 Simpl[17719:52385] [Simpl] call dashCourses: 2910 ms
+2026-10-17 19:59:10.699 Simpl[17719:52385] [Simpl] call dashList: 2878 ms
+2026-10-17 19:59:10.699 Simpl[17719:52385] [Simpl] call dashList: 2948 ms
+2026-10-17 19:59:10.700 Simpl[17719:52385] [Simpl] call today: 2765 ms
+2026-10-17 19:59:10.700 Simpl[17719:52385] [Simpl] call today: 2772 ms
+2026-10-17 19:59:10.701 Simpl[17719:52385] [Simpl] call dashSkyline: 2880 ms
+2026-10-17 19:59:10.701 Simpl[17719:52385] [Simpl] call dashSkyline: 2950 ms
+2026-10-17 19:59:10.701 Simpl[17719:52385] [Simpl] call todayCounts: 1498 ms
+2026-10-17 19:59:10.701 Simpl[17719:52385] [Simpl] call todayCounts: 1498 ms
+2026-10-17 19:59:10.701 Simpl[17719:52385] [Simpl] call todayCounts: 1494 ms
+2026-10-17 19:59:10.701 Simpl[17719:52385] [Simpl] call todayCounts: 1498 ms
+2026-10-17 19:59:10.702 Simpl[17719:52385] [Simpl] call snapshot: 1226 ms
+2026-10-17 19:59:11.182 Simpl[17719:52385] [Simpl] open Dashboard: 5828 ms (live)
+2026-10-17 19:59:11.360 Simpl[17719:52385] [Simpl] call coursesProgress: 699 ms
+2026-10-17 19:59:11.361 Simpl[17719:52385] [Simpl] call coursesProgress: 700 ms
+2026-10-17 19:59:11.368 Simpl[17719:52385] [Simpl] call courses: 543 ms
+2026-10-17 19:59:11.368 Simpl[17719:52385] [Simpl] call quizBegin: 708 ms
+2026-10-17 19:59:13.360 Simpl[17719:52385] [Simpl] call groups: 1990 ms
+2026-10-17 19:59:14.020 Simpl[17719:52385] [Simpl] call moreFromCanvas: 660 ms
+2026-10-17 19:59:14.873 Simpl[17719:52385] SimplQuizClick next at {899.5, 36.5} (frame {{863, 544.5}, {73, 28}}): active 0, key 0, sheet 1; hit SheetHostingView<SheetContent> < NSThemeFrame
+2026-10-17 19:59:16.875 Simpl[17719:52385] SimplQuizClick after: question 3 showing

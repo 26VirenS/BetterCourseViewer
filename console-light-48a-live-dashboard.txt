@@ -1,0 +1,31 @@
+2026-10-17 20:01:01.700 Simpl[28503:80276] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 20:01:03.701 Simpl[28503:80276] [Simpl] window: the app's screens (/)
+2026-10-17 20:01:03.818 Simpl[28503:80276] [Simpl] appear Dashboard: 1818 ms
+2026-10-17 20:01:03.838 Simpl[28503:80276] [Simpl] appear Dashboard: 1839 ms
+2026-10-17 20:01:04.269 Simpl[28503:80276] [Simpl] call dashSkyline: 445 ms
+2026-10-17 20:01:04.270 Simpl[28503:80276] [Simpl] call dashList: 116 ms
+2026-10-17 20:01:04.270 Simpl[28503:80276] [Simpl] call dashList: 446 ms
+2026-10-17 20:01:04.270 Simpl[28503:80276] [Simpl] call dashSkyline: 117 ms
+2026-10-17 20:01:04.329 Simpl[28503:80276] [Simpl] call dashCourses: 175 ms
+2026-10-17 20:01:04.330 Simpl[28503:80276] [Simpl] call dashCourses: 506 ms
+2026-10-17 20:01:04.333 Simpl[28503:80276] [Simpl] call snapshot: 511 ms
+2026-10-17 20:01:04.412 Simpl[28503:80276] [Simpl] call todayCounts: 254 ms
+2026-10-17 20:01:04.412 Simpl[28503:80276] [Simpl] call todayCounts: 251 ms
+2026-10-17 20:01:04.412 Simpl[28503:80276] [Simpl] call todayCounts: 255 ms
+2026-10-17 20:01:04.412 Simpl[28503:80276] [Simpl] call todayCounts: 251 ms
+2026-10-17 20:01:04.415 Simpl[28503:80276] [Simpl] call today: 262 ms
+2026-10-17 20:01:04.416 Simpl[28503:80276] [Simpl] call today: 263 ms
+2026-10-17 20:01:04.775 Simpl[28503:80276] [Simpl] open Dashboard: 2775 ms (fetched)
+2026-10-17 20:01:04.801 Simpl[28503:80276] [Simpl] call dashSkyline: 531 ms
+2026-10-17 20:01:04.802 Simpl[28503:80276] [Simpl] call dashSkyline: 533 ms
+2026-10-17 20:01:04.803 Simpl[28503:80276] [Simpl] call coursesProgress: 474 ms
+2026-10-17 20:01:04.804 Simpl[28503:80276] [Simpl] call coursesProgress: 473 ms
+2026-10-17 20:01:04.853 Simpl[28503:80276] [Simpl] call courses: 486 ms
+2026-10-17 20:01:05.045 Simpl[28503:80276] [Simpl] call groups: 192 ms
+2026-10-17 20:01:05.518 Simpl[28503:80276] [Simpl] call moreFromCanvas: 473 ms
+2026-10-17 20:01:08.478 Simpl[28503:80276] [Simpl] live: dashboard unchanged · 0 reads · 0 redraws
+2026-10-17 20:01:10.438 Simpl[28503:80276] [Simpl] live: dev change done made (assignment:1009)
+2026-10-17 20:01:12.548 Simpl[28503:80276] [Simpl] live: dashboard updated counters,day,greeting,list,sidebar · 13 reads · 2 redraws
+2026-10-17 20:01:16.609 Simpl[28503:80276] [Simpl] live: dashboard unchanged · 13 reads · 0 redraws
+2026-10-17 20:01:20.675 Simpl[28503:80276] [Simpl] live: dashboard unchanged · 13 reads · 0 redraws
+2026-10-17 20:01:24.696 Simpl[28503:80276] [Simpl] live: dashboard unchanged · 13 reads · 0 redraws

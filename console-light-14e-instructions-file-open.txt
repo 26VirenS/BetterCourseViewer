@@ -1,0 +1,41 @@
+2026-10-17 19:59:53.161 Simpl[20078:58304] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 19:59:53.974 Simpl[20078:58304] [Simpl] window: the app's screens (no page)
+2026-10-17 19:59:54.156 Simpl[20078:58304] [Simpl] appear Course home: 264 ms
+2026-10-17 19:59:54.310 Simpl[20078:58304] [Simpl] appear Course home: 417 ms
+2026-10-17 19:59:55.593 Simpl[20078:58304] [Simpl] appear Assignment: 73 ms
+2026-10-17 19:59:56.014 Simpl[20078:58304] [Simpl] call home: 758 ms
+2026-10-17 19:59:56.015 Simpl[20078:58304] [Simpl] call home: 759 ms
+2026-10-17 19:59:56.015 Simpl[20078:58304] [Simpl] call neighbours: 336 ms
+2026-10-17 19:59:56.015 Simpl[20078:58304] [Simpl] call home: 827 ms
+2026-10-17 19:59:56.207 Simpl[20078:58304] [Simpl] call snapshot: 687 ms
+2026-10-17 19:59:56.411 Simpl[20078:58304] [Simpl] call assignment: 463 ms
+2026-10-17 19:59:56.412 Simpl[20078:58304] SimplAssignment 4002: files 0, comments 0, steps Hand In, review 0, handIn 0, error -
+2026-10-17 19:59:56.412 Simpl[20078:58304] [Simpl] open Course home: 892 ms (fetched)
+2026-10-17 19:59:56.713 Simpl[20078:58304] [Simpl] open Assignment: 1193 ms (fetched)
+2026-10-17 19:59:56.745 Simpl[20078:58304] [Simpl] call courses: 457 ms
+2026-10-17 19:59:56.746 Simpl[20078:58304] [Simpl] call neighbours: 161 ms
+2026-10-17 19:59:56.896 Simpl[20078:58304] [Simpl] call groups: 150 ms
+2026-10-17 19:59:57.416 Simpl[20078:58304] [Simpl] call moreFromCanvas: 520 ms
+2026-10-17 19:59:58.672 Simpl[20078:58304] [Simpl] read ahead today: 8 ms
+2026-10-17 19:59:58.672 Simpl[20078:58304] [Simpl] read ahead todayCounts: 8 ms
+2026-10-17 19:59:58.716 Simpl[20078:58304] [Simpl] walk: filelink
+2026-10-17 19:59:58.880 Simpl[20078:58304] [Simpl] call fileInfo: 5 ms
+2026-10-17 19:59:59.062 Simpl[20078:58304] [Simpl] read ahead dashSkyline: 18 ms
+2026-10-17 19:59:59.062 Simpl[20078:58304] [Simpl] read ahead dashCourses: 18 ms
+2026-10-17 19:59:59.210 Simpl[20078:58304] [Simpl] read ahead coursesProgress: 22 ms
+2026-10-17 19:59:59.211 Simpl[20078:58304] [Simpl] read ahead dashList: 24 ms
+2026-10-17 19:59:59.734 Simpl[20078:58304] [files] Quick Look: 1 item, download.pdf (its controller Simpl's)
+2026-10-17 19:59:59.998 Simpl[20078:58304] [Simpl] walk: file link http://localhost:8800/courses/101/files/f1?wrap=1, Quick Look checked
+2026-10-17 19:59:59.998 Simpl[20078:58304] [Simpl] walk: done
+2026-10-17 20:00:00.007 Simpl[20078:58304] [Simpl] read ahead calView: 273 ms
+2026-10-17 20:00:00.009 Simpl[20078:58304] [Simpl] read ahead todo: 276 ms
+2026-10-17 20:00:00.028 Simpl[20078:58304] [Simpl] read ahead calendar: 19 ms
+2026-10-17 20:00:00.163 Simpl[20078:58304] [Simpl] read ahead notifications: 13 ms
+2026-10-17 20:00:00.179 Simpl[20078:58304] [Simpl] read ahead grades: 28 ms
+2026-10-17 20:00:00.310 Simpl[20078:58304] [Simpl] read ahead inbox: 9 ms
+2026-10-17 20:00:00.317 Simpl[20078:58304] [Simpl] read ahead allCourses: 15 ms
+2026-10-17 20:00:00.457 Simpl[20078:58304] [Simpl] read ahead coursesProgress: 17 ms
+2026-10-17 20:00:00.458 Simpl[20078:58304] [Simpl] read ahead home: 18 ms
+2026-10-17 20:00:00.593 Simpl[20078:58304] [Simpl] read ahead home: 14 ms
+2026-10-17 20:00:00.593 Simpl[20078:58304] [Simpl] read ahead home: 14 ms
+2026-10-17 20:00:00.729 Simpl[20078:58304] [Simpl] read ahead home: 4 ms

@@ -1,0 +1,26 @@
+2026-10-17 19:59:28.416 Simpl[22341:63606] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 19:59:30.031 Simpl[22341:63606] [Simpl] window: the app's screens (no page)
+2026-10-17 19:59:30.501 Simpl[22341:63606] [Simpl] appear Dashboard: 720 ms
+2026-10-17 19:59:30.885 Simpl[22341:63606] [Simpl] appear Dashboard: 1104 ms
+2026-10-17 19:59:35.243 Simpl[22341:63606] [Simpl] open Dashboard: 5461 ms (kept)
+2026-10-17 19:59:36.790 Simpl[22341:63606] [Simpl] call dashCourses: 4415 ms
+2026-10-17 19:59:36.792 Simpl[22341:63606] [Simpl] call dashCourses: 4457 ms
+2026-10-17 19:59:36.804 Simpl[22341:63606] [Simpl] call dashList: 4429 ms
+2026-10-17 19:59:36.805 Simpl[22341:63606] [Simpl] call dashList: 4470 ms
+2026-10-17 19:59:36.805 Simpl[22341:63606] [Simpl] call todayCounts: 1591 ms
+2026-10-17 19:59:36.806 Simpl[22341:63606] [Simpl] call todayCounts: 1593 ms
+2026-10-17 19:59:36.806 Simpl[22341:63606] [Simpl] call todayCounts: 1591 ms
+2026-10-17 19:59:36.806 Simpl[22341:63606] [Simpl] call todayCounts: 1593 ms
+2026-10-17 19:59:36.806 Simpl[22341:63606] [Simpl] call today: 4299 ms
+2026-10-17 19:59:36.806 Simpl[22341:63606] [Simpl] call today: 4299 ms
+2026-10-17 19:59:36.808 Simpl[22341:63606] [Simpl] call dashSkyline: 4433 ms
+2026-10-17 19:59:36.823 Simpl[22341:63606] [Simpl] call dashSkyline: 4489 ms
+2026-10-17 19:59:37.424 Simpl[22341:63606] [Simpl] open Dashboard: 7643 ms (live)
+2026-10-17 19:59:37.804 Simpl[22341:63606] [Simpl] popup tool: 984 × 591, 20 in from the window (sidebar out)
+2026-10-17 19:59:40.098 Simpl[22341:63606] [Simpl] pin full screen: need (carried: goal, now, worth)
+2026-10-17 19:59:42.942 Simpl[22341:63606] [Simpl] call snapshot: 6466 ms
+2026-10-17 19:59:45.116 Simpl[22341:63606] [Simpl] call coursesProgress: 8324 ms
+2026-10-17 19:59:45.118 Simpl[22341:63606] [Simpl] call coursesProgress: 8327 ms
+2026-10-17 19:59:45.133 Simpl[22341:63606] [Simpl] call courses: 1155 ms
+2026-10-17 19:59:45.408 Simpl[22341:63606] [Simpl] call groups: 274 ms
+2026-10-17 19:59:49.282 Simpl[22341:63606] [Simpl] shot: another copy of the app is in front; brought forward again

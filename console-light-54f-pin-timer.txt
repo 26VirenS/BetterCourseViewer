@@ -1,0 +1,25 @@
+2026-10-17 20:04:34.305 Simpl[30397:85197] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 20:04:35.390 Simpl[30397:85197] [Simpl] window: the app's screens (no page)
+2026-10-17 20:04:35.740 Simpl[30397:85197] [Simpl] appear Dashboard: 597 ms
+2026-10-17 20:04:35.954 Simpl[30397:85197] [Simpl] appear Dashboard: 810 ms
+2026-10-17 20:04:37.991 Simpl[30397:85197] [Simpl] open Dashboard: 2847 ms (kept)
+2026-10-17 20:04:38.799 Simpl[30397:85197] [Simpl] call dashList: 2136 ms
+2026-10-17 20:04:38.800 Simpl[30397:85197] [Simpl] call dashList: 2138 ms
+2026-10-17 20:04:38.999 Simpl[30397:85197] [Simpl] call dashCourses: 2336 ms
+2026-10-17 20:04:39.000 Simpl[30397:85197] [Simpl] call dashCourses: 2338 ms
+2026-10-17 20:04:39.114 Simpl[30397:85197] [Simpl] call today: 2338 ms
+2026-10-17 20:04:39.119 Simpl[30397:85197] [Simpl] call todayCounts: 1140 ms
+2026-10-17 20:04:39.119 Simpl[30397:85197] [Simpl] call todayCounts: 1140 ms
+2026-10-17 20:04:39.120 Simpl[30397:85197] [Simpl] call today: 2344 ms
+2026-10-17 20:04:39.196 Simpl[30397:85197] [Simpl] call snapshot: 501 ms
+2026-10-17 20:04:40.317 Simpl[30397:85197] [Simpl] open Dashboard: 5173 ms (live)
+2026-10-17 20:04:40.693 Simpl[30397:85197] [Simpl] call todayCounts: 2714 ms
+2026-10-17 20:04:40.693 Simpl[30397:85197] [Simpl] call todayCounts: 2714 ms
+2026-10-17 20:04:40.693 Simpl[30397:85197] [Simpl] call dashSkyline: 4031 ms
+2026-10-17 20:04:40.694 Simpl[30397:85197] [Simpl] call dashSkyline: 4031 ms
+2026-10-17 20:04:40.694 Simpl[30397:85197] [Simpl] call coursesProgress: 1693 ms
+2026-10-17 20:04:40.694 Simpl[30397:85197] [Simpl] call coursesProgress: 1694 ms
+2026-10-17 20:04:40.737 Simpl[30397:85197] [Simpl] call courses: 1060 ms
+2026-10-17 20:04:41.018 Simpl[30397:85197] [Simpl] call groups: 280 ms
+2026-10-17 20:04:41.733 Simpl[30397:85197] [Simpl] call moreFromCanvas: 715 ms
+2026-10-17 20:04:44.403 Simpl[30397:85197] [Simpl] shot: another copy of the app is in front; brought forward again

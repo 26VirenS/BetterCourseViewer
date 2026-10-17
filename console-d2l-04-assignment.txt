@@ -1,0 +1,28 @@
+2026-10-17 20:03:11.948 Simpl[31492:87291] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 20:03:14.728 Simpl[31492:87291] [Simpl] window: the app's screens (/d2l/home)
+2026-10-17 20:03:15.025 Simpl[31492:87291] [Simpl] appear Dashboard: 1316 ms
+2026-10-17 20:03:15.083 Simpl[31492:87291] [Simpl] appear Course home: 50 ms
+2026-10-17 20:03:15.181 Simpl[31492:87291] [Simpl] appear Dashboard: 148 ms
+2026-10-17 20:03:15.181 Simpl[31492:87291] [Simpl] appear Course home: 148 ms
+2026-10-17 20:03:17.204 Simpl[31492:87291] [Simpl] appear Assignment: 2171 ms
+2026-10-17 20:03:18.591 Simpl[31492:87291] [Simpl] call dashCourses: 3507 ms
+2026-10-17 20:03:18.591 Simpl[31492:87291] [Simpl] call dashSkyline: 3507 ms
+2026-10-17 20:03:18.600 Simpl[31492:87291] [Simpl] call dashList: 3516 ms
+2026-10-17 20:03:18.605 Simpl[31492:87291] [Simpl] call today: 3521 ms
+2026-10-17 20:03:18.609 Simpl[31492:87291] [Simpl] call snapshot: 3525 ms
+2026-10-17 20:03:18.872 Simpl[31492:87291] [Simpl] call home: 2029 ms
+2026-10-17 20:03:18.873 Simpl[31492:87291] [Simpl] call home: 2030 ms
+2026-10-17 20:03:18.873 Simpl[31492:87291] [Simpl] call neighbours: 1478 ms
+2026-10-17 20:03:18.873 Simpl[31492:87291] [Simpl] call home: 2031 ms
+2026-10-17 20:03:19.484 Simpl[31492:87291] [Simpl] open Course home: 4451 ms (fetched)
+2026-10-17 20:03:19.493 Simpl[31492:87291] [Simpl] call todayCounts: 938 ms
+2026-10-17 20:03:19.493 Simpl[31492:87291] [Simpl] call todayCounts: 938 ms
+2026-10-17 20:03:19.496 Simpl[31492:87291] [Simpl] call assignment: 932 ms
+2026-10-17 20:03:19.497 Simpl[31492:87291] SimplAssignment 702: files 0, comments 0, steps Hand In, review 0, handIn 0, error -
+2026-10-17 20:03:19.497 Simpl[31492:87291] [Simpl] call coursesProgress: 906 ms
+2026-10-17 20:03:19.498 Simpl[31492:87291] [Simpl] call dashSkyline: 907 ms
+2026-10-17 20:03:20.489 Simpl[31492:87291] [Simpl] call courses: 1745 ms
+2026-10-17 20:03:20.490 Simpl[31492:87291] [Simpl] open Assignment: 5457 ms (fetched)
+2026-10-17 20:03:20.715 Simpl[31492:87291] [Simpl] call neighbours: 548 ms
+2026-10-17 20:03:20.751 Simpl[31492:87291] [Simpl] call groups: 262 ms
+2026-10-17 20:03:21.141 Simpl[31492:87291] [Simpl] call moreFromCanvas: 390 ms

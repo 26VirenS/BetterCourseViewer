@@ -1,0 +1,29 @@
+2026-10-17 19:58:49.842 Simpl[16841:50254] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 19:58:51.492 Simpl[16841:50254] [Simpl] window: the app's screens (no page)
+2026-10-17 19:58:51.777 Simpl[16841:50254] [Simpl] appear Dashboard: 837 ms
+2026-10-17 19:58:52.123 Simpl[16841:50254] [Simpl] appear Dashboard: 1184 ms
+2026-10-17 19:58:59.499 Simpl[16841:50254] [Simpl] open Dashboard: 8556 ms (kept)
+2026-10-17 19:59:00.127 Simpl[16841:50254] [Simpl] appear Course grades: 9183 ms
+2026-10-17 19:59:00.164 Simpl[16841:50254] [Simpl] appear Course grades: 9221 ms
+2026-10-17 19:59:03.032 Simpl[16841:50254] [Simpl] call dashCourses: 8557 ms
+2026-10-17 19:59:03.034 Simpl[16841:50254] [Simpl] call dashCourses: 8598 ms
+2026-10-17 19:59:03.036 Simpl[16841:50254] [Simpl] call dashSkyline: 8599 ms
+2026-10-17 19:59:03.036 Simpl[16841:50254] [Simpl] call dashSkyline: 8561 ms
+2026-10-17 19:59:03.036 Simpl[16841:50254] [Simpl] call todayCounts: 3653 ms
+2026-10-17 19:59:03.036 Simpl[16841:50254] [Simpl] call todayCounts: 3653 ms
+2026-10-17 19:59:03.036 Simpl[16841:50254] [Simpl] call today: 8355 ms
+2026-10-17 19:59:03.037 Simpl[16841:50254] [Simpl] call today: 8355 ms
+2026-10-17 19:59:03.037 Simpl[16841:50254] [Simpl] call todayCounts: 3654 ms
+2026-10-17 19:59:03.037 Simpl[16841:50254] [Simpl] call todayCounts: 3654 ms
+2026-10-17 19:59:03.037 Simpl[16841:50254] [Simpl] call dashList: 8562 ms
+2026-10-17 19:59:03.038 Simpl[16841:50254] [Simpl] call courseGrades: 2872 ms
+2026-10-17 19:59:03.039 Simpl[16841:50254] [Simpl] call dashList: 8602 ms
+2026-10-17 19:59:03.039 Simpl[16841:50254] [Simpl] call courseGrades: 2910 ms
+2026-10-17 19:59:03.039 Simpl[16841:50254] [Simpl] call snapshot: 3302 ms
+2026-10-17 19:59:07.384 Simpl[16841:50254] [Simpl] open Course grades: 16437 ms (fetched)
+2026-10-17 19:59:07.405 Simpl[16841:50254] [Simpl] open Dashboard: 16458 ms (live)
+2026-10-17 19:59:07.531 Simpl[16841:50254] [Simpl] call coursesProgress: 4496 ms
+2026-10-17 19:59:07.531 Simpl[16841:50254] [Simpl] call coursesProgress: 4494 ms
+2026-10-17 19:59:07.532 Simpl[16841:50254] [Simpl] call courses: 3251 ms
+2026-10-17 19:59:08.436 Simpl[16841:50254] [Simpl] call groups: 904 ms
+2026-10-17 19:59:11.037 Simpl[16841:50254] [Simpl] call moreFromCanvas: 2599 ms

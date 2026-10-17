@@ -1,0 +1,14 @@
+2026-10-17 19:53:50.191 Simpl[9945:32297] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 19:53:51.392 Simpl[9945:32297] [Simpl] window: the app's screens (no page)
+2026-10-17 19:53:51.928 Simpl[9945:32297] [Simpl] appear Course grades: 677 ms
+2026-10-17 19:53:52.381 Simpl[9945:32297] [Simpl] appear Course grades: 1130 ms
+2026-10-17 19:53:56.259 Simpl[9945:32297] [Simpl] call snapshot: 161 ms
+2026-10-17 19:53:56.971 Simpl[9945:32297] [Simpl] call courseGrades: 4590 ms
+2026-10-17 19:53:56.972 Simpl[9945:32297] [Simpl] call home: 1543 ms
+2026-10-17 19:53:57.872 Simpl[9945:32297] [Simpl] call courseGrades: 5931 ms
+2026-10-17 19:53:59.828 Simpl[9945:32297] [Simpl] call courses: 3196 ms
+2026-10-17 19:53:59.831 Simpl[9945:32297] [Simpl] open Course grades: 8580 ms (fetched)
+2026-10-17 19:54:00.258 Simpl[9945:32297] [Simpl] call groups: 429 ms
+2026-10-17 19:54:01.337 Simpl[9945:32297] [Simpl] call moreFromCanvas: 1078 ms
+2026-10-17 19:54:01.485 Simpl[9945:32297] WARNING: Application performed a reentrant operation in its NSTableView delegate. This warning will become an assert in the future.
+2026-10-17 19:54:03.761 Simpl[9945:32297] [Simpl] shot: another copy of the app is in front; brought forward again

@@ -1,0 +1,25 @@
+2026-10-17 19:59:50.726 Simpl[25519:72583] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 19:59:53.382 Simpl[25519:72583] [Simpl] window: the app's screens (no page)
+2026-10-17 19:59:54.088 Simpl[25519:72583] [Simpl] appear Dashboard: 937 ms
+2026-10-17 19:59:54.680 Simpl[25519:72583] [Simpl] appear Dashboard: 1529 ms
+2026-10-17 20:00:01.889 Simpl[25519:72583] [Simpl] open Dashboard: 8739 ms (kept)
+2026-10-17 20:00:04.759 Simpl[25519:72583] [Simpl] call dashCourses: 7691 ms
+2026-10-17 20:00:04.761 Simpl[25519:72583] [Simpl] call dashCourses: 7697 ms
+2026-10-17 20:00:04.761 Simpl[25519:72583] [Simpl] call todayCounts: 2898 ms
+2026-10-17 20:00:04.761 Simpl[25519:72583] [Simpl] call todayCounts: 2897 ms
+2026-10-17 20:00:04.762 Simpl[25519:72583] [Simpl] call todayCounts: 2898 ms
+2026-10-17 20:00:04.762 Simpl[25519:72583] [Simpl] call todayCounts: 2898 ms
+2026-10-17 20:00:04.762 Simpl[25519:72583] [Simpl] call today: 7553 ms
+2026-10-17 20:00:04.763 Simpl[25519:72583] [Simpl] call today: 7553 ms
+2026-10-17 20:00:04.763 Simpl[25519:72583] [Simpl] call dashList: 7699 ms
+2026-10-17 20:00:04.764 Simpl[25519:72583] [Simpl] call dashList: 7696 ms
+2026-10-17 20:00:04.764 Simpl[25519:72583] [Simpl] call dashSkyline: 7699 ms
+2026-10-17 20:00:05.204 Simpl[25519:72583] [Simpl] call dashSkyline: 8137 ms
+2026-10-17 20:00:05.214 Simpl[25519:72583] [Simpl] call snapshot: 2847 ms
+2026-10-17 20:00:06.179 Simpl[25519:72583] [Simpl] open Dashboard: 13028 ms (live)
+2026-10-17 20:00:08.130 Simpl[25519:72583] [Simpl] call coursesProgress: 3370 ms
+2026-10-17 20:00:08.198 Simpl[25519:72583] [Simpl] call coursesProgress: 3437 ms
+2026-10-17 20:00:08.199 Simpl[25519:72583] [Simpl] call courses: 2036 ms
+2026-10-17 20:00:09.733 Simpl[25519:72583] [Simpl] call groups: 1534 ms
+2026-10-17 20:00:11.496 Simpl[25519:72583] [Simpl] call moreFromCanvas: 1763 ms
+2026-10-17 20:00:14.220 Simpl[25519:72583] [Simpl] popup whatsnew: 500 × 560

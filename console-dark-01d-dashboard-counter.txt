@@ -1,0 +1,28 @@
+2026-10-17 19:54:06.140 Simpl[4910:18712] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 19:54:06.837 Simpl[4910:18712] [Simpl] window: the app's screens (no page)
+2026-10-17 19:54:06.951 Simpl[4910:18712] [Simpl] appear Dashboard: 192 ms
+2026-10-17 19:54:07.136 Simpl[4910:18712] [Simpl] appear Dashboard: 377 ms
+2026-10-17 19:54:07.839 Simpl[4910:18712] NSQuitAlwaysKeepsWindows=NO
+2026-10-17 19:54:12.659 Simpl[4910:18712] [Simpl] open Dashboard: 5898 ms (kept)
+2026-10-17 19:54:13.395 Simpl[4910:18712] [Simpl] call todayCounts: 753 ms
+2026-10-17 19:54:13.395 Simpl[4910:18712] [Simpl] call todayCounts: 753 ms
+2026-10-17 19:54:13.397 Simpl[4910:18712] [Simpl] call todayCounts: 754 ms
+2026-10-17 19:54:13.397 Simpl[4910:18712] [Simpl] call todayCounts: 754 ms
+2026-10-17 19:54:13.398 Simpl[4910:18712] [Simpl] call today: 4337 ms
+2026-10-17 19:54:13.398 Simpl[4910:18712] [Simpl] call today: 4339 ms
+2026-10-17 19:54:13.399 Simpl[4910:18712] [Simpl] call dashList: 4459 ms
+2026-10-17 19:54:13.404 Simpl[4910:18712] [Simpl] call dashList: 4463 ms
+2026-10-17 19:54:13.409 Simpl[4910:18712] [Simpl] call dashCourses: 4468 ms
+2026-10-17 19:54:13.409 Simpl[4910:18712] [Simpl] call dashCourses: 4469 ms
+2026-10-17 19:54:13.409 Simpl[4910:18712] [Simpl] call dashSkyline: 4469 ms
+2026-10-17 19:54:13.410 Simpl[4910:18712] [Simpl] call dashSkyline: 4470 ms
+2026-10-17 19:54:13.410 Simpl[4910:18712] [Simpl] call snapshot: 123 ms
+2026-10-17 19:54:18.440 Simpl[4910:18712] [Simpl] counter: next fades in (Reduce Motion)
+2026-10-17 19:54:18.444 Simpl[4910:18712] [Simpl] open Dashboard: 11679 ms (live)
+2026-10-17 19:54:18.445 Simpl[4910:18712] [Simpl] counter: next fades in (Reduce Motion)
+2026-10-17 19:54:18.946 Simpl[4910:18712] [Simpl] call coursesProgress: 5534 ms
+2026-10-17 19:54:18.946 Simpl[4910:18712] [Simpl] call coursesProgress: 5535 ms
+2026-10-17 19:54:18.947 Simpl[4910:18712] [Simpl] call courses: 5248 ms
+2026-10-17 19:54:19.386 Simpl[4910:18712] [Simpl] call todaySheet: 625 ms
+2026-10-17 19:54:19.897 Simpl[4910:18712] [Simpl] call groups: 949 ms
+2026-10-17 19:54:20.781 Simpl[4910:18712] [Simpl] call moreFromCanvas: 880 ms

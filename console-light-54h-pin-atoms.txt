@@ -1,0 +1,24 @@
+2026-10-17 19:57:45.304 Simpl[14129:43179] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 19:57:47.129 Simpl[14129:43179] [Simpl] window: the app's screens (no page)
+2026-10-17 19:57:48.330 Simpl[14129:43179] [Simpl] appear Dashboard: 1333 ms
+2026-10-17 19:57:49.067 Simpl[14129:43179] [Simpl] appear Dashboard: 2070 ms
+2026-10-17 19:57:58.759 Simpl[14129:43179] [Simpl] open Dashboard: 11758 ms (kept)
+2026-10-17 19:57:59.107 Simpl[14129:43179] [Simpl] call dashList: 6113 ms
+2026-10-17 19:57:59.109 Simpl[14129:43179] [Simpl] call dashList: 6114 ms
+2026-10-17 19:57:59.110 Simpl[14129:43179] [Simpl] call dashCourses: 6116 ms
+2026-10-17 19:57:59.112 Simpl[14129:43179] [Simpl] call dashCourses: 6117 ms
+2026-10-17 19:57:59.135 Simpl[14129:43179] [Simpl] call today: 5154 ms
+2026-10-17 19:57:59.137 Simpl[14129:43179] [Simpl] call today: 5156 ms
+2026-10-17 19:57:59.335 Simpl[14129:43179] [Simpl] call todayCounts: 601 ms
+2026-10-17 19:57:59.340 Simpl[14129:43179] [Simpl] call todayCounts: 607 ms
+2026-10-17 19:57:59.341 Simpl[14129:43179] [Simpl] call snapshot: 336 ms
+2026-10-17 19:57:59.750 Simpl[14129:43179] [Simpl] open Dashboard: 12748 ms (live)
+2026-10-17 19:58:05.165 Simpl[14129:43179] [Simpl] call todayCounts: 6429 ms
+2026-10-17 19:58:05.166 Simpl[14129:43179] [Simpl] call todayCounts: 6429 ms
+2026-10-17 19:58:05.507 Simpl[14129:43179] [Simpl] call dashSkyline: 12509 ms
+2026-10-17 19:58:05.508 Simpl[14129:43179] [Simpl] call coursesProgress: 6393 ms
+2026-10-17 19:58:05.508 Simpl[14129:43179] [Simpl] call dashSkyline: 12512 ms
+2026-10-17 19:58:05.509 Simpl[14129:43179] [Simpl] call coursesProgress: 6396 ms
+2026-10-17 19:58:05.681 Simpl[14129:43179] [Simpl] call courses: 5931 ms
+2026-10-17 19:58:06.368 Simpl[14129:43179] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-10-17 19:58:07.709 Simpl[14129:43179] [Simpl] call groups: 2026 ms

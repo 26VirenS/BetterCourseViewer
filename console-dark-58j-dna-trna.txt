@@ -1,0 +1,9 @@
+2026-10-17 19:56:29.233 Simpl[14811:44791] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 19:56:30.153 Simpl[14811:44791] [Simpl] window: the app's screens (no page)
+2026-10-17 19:56:30.908 Simpl[14811:44791] [Simpl] popup tool: 984 × 609, 20 in from the window (sidebar out)
+2026-10-17 19:56:30.987 Simpl[14811:44791] [Simpl] bio launch: dna rna:view=cloverleaf:modified:base=35: style cartoon, grooves off, measure off, unzip 0.00, nucleotide DA (model3D), rna cloverleaf, step 1
+2026-10-17 19:56:37.074 Simpl[14811:44791] [Simpl] popup tool: 984 × 591, 20 in from the window (sidebar out)
+2026-10-17 19:56:38.043 Simpl[14811:44791] [Simpl] call snapshot: 166 ms
+2026-10-17 19:56:38.722 Simpl[14811:44791] [Simpl] call courses: 612 ms
+2026-10-17 19:56:39.246 Simpl[14811:44791] [Simpl] call groups: 523 ms
+2026-10-17 19:56:40.235 Simpl[14811:44791] [Simpl] call moreFromCanvas: 988 ms

@@ -1,0 +1,25 @@
+2026-10-17 19:55:22.140 Simpl[8542:28369] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 19:55:23.831 Simpl[8542:28369] [Simpl] window: the app's screens (no page)
+2026-10-17 19:55:24.039 Simpl[8542:28369] [Simpl] appear Dashboard: 335 ms
+2026-10-17 19:55:24.191 Simpl[8542:28369] [Simpl] appear Dashboard: 487 ms
+2026-10-17 19:55:34.050 Simpl[8542:28369] [Simpl] open Dashboard: 10346 ms (kept)
+2026-10-17 19:55:40.057 Simpl[8542:28369] [Simpl] call todayCounts: 6113 ms
+2026-10-17 19:55:40.058 Simpl[8542:28369] [Simpl] call todayCounts: 6113 ms
+2026-10-17 19:55:40.058 Simpl[8542:28369] [Simpl] call todayCounts: 6113 ms
+2026-10-17 19:55:40.058 Simpl[8542:28369] [Simpl] call todayCounts: 6113 ms
+2026-10-17 19:55:40.058 Simpl[8542:28369] [Simpl] call dashCourses: 12624 ms
+2026-10-17 19:55:40.059 Simpl[8542:28369] [Simpl] call today: 11957 ms
+2026-10-17 19:55:40.060 Simpl[8542:28369] [Simpl] call dashCourses: 12630 ms
+2026-10-17 19:55:40.061 Simpl[8542:28369] [Simpl] call dashList: 12629 ms
+2026-10-17 19:55:40.062 Simpl[8542:28369] [Simpl] call dashList: 12628 ms
+2026-10-17 19:55:40.063 Simpl[8542:28369] [Simpl] call dashSkyline: 12632 ms
+2026-10-17 19:55:40.064 Simpl[8542:28369] [Simpl] call dashSkyline: 12630 ms
+2026-10-17 19:55:40.404 Simpl[8542:28369] [Simpl] call today: 12302 ms
+2026-10-17 19:55:40.410 Simpl[8542:28369] [Simpl] open Dashboard: 16706 ms (live)
+2026-10-17 19:55:40.820 Simpl[8542:28369] [Simpl] call snapshot: 6118 ms
+2026-10-17 19:55:42.505 Simpl[8542:28369] NSQuitAlwaysKeepsWindows=NO
+2026-10-17 19:55:43.650 Simpl[8542:28369] [Simpl] call coursesProgress: 3589 ms
+2026-10-17 19:55:43.665 Simpl[8542:28369] [Simpl] call coursesProgress: 3606 ms
+2026-10-17 19:55:43.672 Simpl[8542:28369] [Simpl] call courses: 2387 ms
+2026-10-17 19:55:44.897 Simpl[8542:28369] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-10-17 19:55:45.274 Simpl[8542:28369] [Simpl] call groups: 1602 ms

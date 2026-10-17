@@ -1,0 +1,26 @@
+2026-10-17 19:55:17.679 Simpl[8275:27707] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 19:55:19.326 Simpl[8275:27707] [Simpl] window: the app's screens (no page)
+2026-10-17 19:55:19.661 Simpl[8275:27707] [Simpl] appear Dashboard: 528 ms
+2026-10-17 19:55:20.157 Simpl[8275:27707] [Simpl] appear Dashboard: 1024 ms
+2026-10-17 19:55:24.305 Simpl[8275:27707] [Simpl] open Dashboard: 5172 ms (kept)
+2026-10-17 19:55:28.160 Simpl[8275:27707] [Simpl] call quizIntro: 2463 ms
+2026-10-17 19:55:28.276 Simpl[8275:27707] [Simpl] call todayCounts: 4012 ms
+2026-10-17 19:55:28.276 Simpl[8275:27707] [Simpl] call todayCounts: 3995 ms
+2026-10-17 19:55:28.276 Simpl[8275:27707] [Simpl] call todayCounts: 3995 ms
+2026-10-17 19:55:28.276 Simpl[8275:27707] [Simpl] call todayCounts: 4012 ms
+2026-10-17 19:55:28.277 Simpl[8275:27707] [Simpl] call today: 5746 ms
+2026-10-17 19:55:28.278 Simpl[8275:27707] [Simpl] call today: 5760 ms
+2026-10-17 19:55:28.279 Simpl[8275:27707] [Simpl] call dashList: 6279 ms
+2026-10-17 19:55:28.279 Simpl[8275:27707] [Simpl] call dashCourses: 6279 ms
+2026-10-17 19:55:28.279 Simpl[8275:27707] [Simpl] call dashCourses: 6354 ms
+2026-10-17 19:55:28.279 Simpl[8275:27707] [Simpl] call dashList: 6354 ms
+2026-10-17 19:55:28.279 Simpl[8275:27707] [Simpl] call snapshot: 3686 ms
+2026-10-17 19:55:31.609 Simpl[8275:27707] [Simpl] call dashSkyline: 9609 ms
+2026-10-17 19:55:31.610 Simpl[8275:27707] [Simpl] call dashSkyline: 9684 ms
+2026-10-17 19:55:31.622 Simpl[8275:27707] [Simpl] open Dashboard: 12489 ms (live)
+2026-10-17 19:55:32.089 Simpl[8275:27707] [Simpl] call quizBegin: 3928 ms
+2026-10-17 19:55:32.582 Simpl[8275:27707] [Simpl] call coursesProgress: 4303 ms
+2026-10-17 19:55:32.583 Simpl[8275:27707] [Simpl] call coursesProgress: 4304 ms
+2026-10-17 19:55:32.583 Simpl[8275:27707] [Simpl] call courses: 3962 ms
+2026-10-17 19:55:33.952 Simpl[8275:27707] [Simpl] call groups: 1368 ms
+2026-10-17 19:55:42.619 Simpl[8275:27707] NSQuitAlwaysKeepsWindows=NO

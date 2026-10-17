@@ -1,0 +1,25 @@
+2026-10-17 19:59:17.419 Simpl[21848:62362] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-17 19:59:19.655 Simpl[21848:62362] [Simpl] window: the app's screens (no page)
+2026-10-17 19:59:20.126 Simpl[21848:62362] [Simpl] appear Dashboard: 775 ms
+2026-10-17 19:59:20.669 Simpl[21848:62362] [Simpl] appear Dashboard: 1317 ms
+2026-10-17 19:59:27.216 Simpl[21848:62362] [Simpl] open Dashboard: 7865 ms (kept)
+2026-10-17 19:59:29.315 Simpl[21848:62362] [Simpl] call settingsInfo: 577 ms
+2026-10-17 19:59:30.065 Simpl[21848:62362] [Simpl] call settingsInfo: 1012 ms
+2026-10-17 19:59:30.072 Simpl[21848:62362] [Simpl] call todayCounts: 2900 ms
+2026-10-17 19:59:30.075 Simpl[21848:62362] [Simpl] call todayCounts: 2902 ms
+2026-10-17 19:59:30.075 Simpl[21848:62362] [Simpl] call todayCounts: 2903 ms
+2026-10-17 19:59:30.075 Simpl[21848:62362] [Simpl] call todayCounts: 2903 ms
+2026-10-17 19:59:30.075 Simpl[21848:62362] [Simpl] call dashCourses: 6545 ms
+2026-10-17 19:59:30.075 Simpl[21848:62362] [Simpl] call dashCourses: 6610 ms
+2026-10-17 19:59:30.076 Simpl[21848:62362] [Simpl] call today: 5947 ms
+2026-10-17 19:59:30.077 Simpl[21848:62362] [Simpl] call today: 5948 ms
+2026-10-17 19:59:30.079 Simpl[21848:62362] [Simpl] call dashList: 6549 ms
+2026-10-17 19:59:30.080 Simpl[21848:62362] [Simpl] call dashList: 6614 ms
+2026-10-17 19:59:30.080 Simpl[21848:62362] [Simpl] call dashSkyline: 6549 ms
+2026-10-17 19:59:30.080 Simpl[21848:62362] [Simpl] call dashSkyline: 6615 ms
+2026-10-17 19:59:30.465 Simpl[21848:62362] [Simpl] open Dashboard: 11113 ms (live)
+2026-10-17 19:59:30.587 Simpl[21848:62362] [Simpl] call snapshot: 2697 ms
+2026-10-17 19:59:31.702 Simpl[21848:62362] [Simpl] call coursesProgress: 1627 ms
+2026-10-17 19:59:31.710 Simpl[21848:62362] [Simpl] call coursesProgress: 1634 ms
+2026-10-17 19:59:32.021 Simpl[21848:62362] [Simpl] call courses: 1140 ms
+2026-10-17 19:59:32.740 Simpl[21848:62362] [Simpl] call groups: 719 ms

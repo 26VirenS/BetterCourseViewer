@@ -1,0 +1,7 @@
+ok   the page opened (200) and a wrong key did not (404): light-12d-hand-in-phone-connected: page 200, wrong key 404, uploads 200 200
+ok   the page has the assignment's name in it
+ok   the phone was seen to connect
+ok   the photo is in the hand-in
+ok   the notes are in the hand-in
+ok   a PDF-only assignment's photos were taken and an mp3 refused (415): dark-12e-hand-in-phone-photos: page 200, wrong key 404, uploads 200 200 415
+ok   its two photos became one PDF in the hand-in
