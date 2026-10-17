@@ -87,7 +87,14 @@ if [[ "$STATUS" != "Accepted" ]]; then
   echo "The app was not notarized, so it was not published." >&2
   exit 1
 fi
-xcrun stapler staple "$APP"
+# (2.99.39) the ticket is fetched from Apple's CloudKit, which drops the connection now and then ("The network connection
+# was lost", error 68): tried up to five times, a minute apart, before the release gives up
+for try in 1 2 3 4 5; do
+  if xcrun stapler staple "$APP"; then break; fi
+  [ "$try" = 5 ] && { echo "stapling failed five times"; exit 68; }
+  echo "stapling failed (try $try of 5); again in a minute"
+  sleep 60
+done
 rm -f "$ZIP"
 ditto -c -k --keepParent "$APP" "$ZIP" # the zip people download carries the stapled ticket
 SHA="$(shasum -a 256 "$ZIP" | cut -d' ' -f1)"
