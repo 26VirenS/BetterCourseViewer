@@ -212,7 +212,7 @@ try {
   await page.waitForFunction(() => !document.querySelector('.bcv-pv .bcv-skel'), null, { timeout: 10000 });
   const pv = await page.$eval('.bcv-ph-sheet--pv', (e) => ({
     title: e.querySelector('.bcv-pv__title').textContent,
-    meta: e.querySelector('.bcv-pv__meta').textContent,
+    meta: e.querySelector('.bcv-pv__kicker').textContent,
     go: e.querySelector('.bcv-ph-sheet__actions .bcv-ph-bigbtn').textContent,
     has: !!e.querySelector('.bcv-pv__prose, .bcv-pv__none'),
     wide: Math.round(e.getBoundingClientRect().width) === Math.round(window.innerWidth),

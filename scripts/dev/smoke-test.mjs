@@ -218,6 +218,8 @@ try {
   page.on('pageerror', (e) => console.log('  page error:', e.message));
   page.on('console', (m) => { if (m.type() === 'error') console.log('  console:', m.text()); });
   const texts = (sel) => page.$$eval(sel, (els) => els.map((e) => (e.innerText || e.textContent).replace(/\s+/g, ' ').trim()));
+  // (2.99.37) a counter's box says its number and its name apart, the number under the name: read as "3 Unread announcements"
+  const sheetHead = () => page.$eval('.bcv-sheet', (e) => `${e.querySelector('.bcv-sheet__value').textContent} ${e.querySelector('.bcv-sheet__label').textContent}`);
   const visible = (sel) => page.$eval(sel, (el) => getComputedStyle(el).display !== 'none').catch(() => false);
   const waitText = (sel, re) => page.waitForFunction(([s, r]) => [...document.querySelectorAll(s)].some((e) => new RegExp(r).test(e.textContent)), [sel, re.source], { timeout: 10000 });
   // click something that re-renders the main screen, and wait until the old screen element is gone
@@ -559,7 +561,7 @@ try {
   await page.click('.bcv-stats .bcv-stat:nth-child(4)');
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
   const overdueRows = await texts('.bcv-sheet__row');
-  check((await texts('.bcv-sheet__line'))[0] === '1 Overdue' && /^Past due with nothing handed in$/.test((await texts('.bcv-sheet__note'))[0]) && overdueRows.length === 1 && /^W2 HW Assignment · 15 pts · due \w+ \d+ · not submitted F26-PHYS 008 01$/.test(overdueRows[0]), `the Overdue sheet lists exactly what it counted: ${overdueRows.join(' | ')}`);
+  check((await sheetHead()) === '1 Overdue' && /^Past due with nothing handed in$/.test((await texts('.bcv-sheet__note'))[0]) && overdueRows.length === 1 && /^W2 HW F26-PHYS 008 01 · Assignment · 15 pts · due \w+ \d+ · not submitted$/.test(overdueRows[0]), `the Overdue sheet lists exactly what it counted: ${overdueRows.join(' | ')}`);
   // (2.98.28) under it, quieter: past-due work handed in late in the last two weeks — no X, it is not overdue
   const lateRows = await page.$$eval('.bcv-sheet__recent .bcv-sheet__qrow', (els) => els.map((e) => e.innerText.replace(/\s+/g, ' ').trim()));
   check((await page.$$eval('.bcv-sheet__sec', (els) => els.map((e) => e.textContent))).join('|') === 'Not handed in|Handed in late' && lateRows.length >= 1 && lateRows.every((t) => /· handed in \w+ \d+ · (graded|waiting for a grade)/.test(t)) && !(await page.$('.bcv-sheet__recent .bcv-sheet__x')), `the overdue sheet keeps late hand-ins below, set back: ${lateRows.join(' | ')}`);
@@ -569,7 +571,7 @@ try {
   await page.waitForTimeout(450); // the sheet's morph settles before the shot
   await shot(page, '02b-overdue-sheet');
   await page.click('.bcv-sheet__item .bcv-sheet__x');
-  check(await eventually(async () => (await page.$$('.bcv-sheet__row')).length === 0 && (await texts('.bcv-sheet__line'))[0] === '0 Overdue' && (await texts('.bcv-sheet__list .bcv-empty')).join('') === 'Nothing is overdue.' && (await page.$eval('.bcv-sheet__list .bcv-empty', (e) => e.previousElementSibling?.className || '')) === 'bcv-sheet__sec'), 'the X clears the row, the sheet counts down to 0 and says so');
+  check(await eventually(async () => (await page.$$('.bcv-sheet__row')).length === 0 && (await sheetHead()) === '0 Overdue' && (await texts('.bcv-sheet__list .bcv-empty')).join('') === 'Nothing is overdue.' && (await page.$eval('.bcv-sheet__list .bcv-empty', (e) => e.previousElementSibling?.className || '')) === 'bcv-sheet__sec'), 'the X clears the row, the sheet counts down to 0 and says so');
   check(await eventually(async () => /^Overdue\s*0\s*Nothing overdue$/i.test((await texts('.bcv-stat'))[3])), `the card behind the sheet reads 0 too: ${(await texts('.bcv-stat'))[3]}`);
   const dismissedOnCanvas = await page.evaluate(async () => { const r = await fetch(`/api/v1/planner/items?start_date=${new Date(Date.now() - 14 * 864e5).toISOString()}&end_date=${new Date(Date.now() + 21 * 864e5).toISOString()}&per_page=100`); const items = JSON.parse((await r.text()).replace(/^while\(1\);/, '')); const it = items.find((i) => i.plannable_type === 'assignment' && String(i.plannable_id) === '2002'); return it ? { title: it.plannable?.title, dismissed: !!it.planner_override?.dismissed, complete: !!it.planner_override?.marked_complete, ovId: it.planner_override?.id || null } : null; });
   check(dismissedOnCanvas?.title === 'W2 HW' && dismissedOnCanvas.dismissed === true && dismissedOnCanvas.complete === false && !!dismissedOnCanvas.ovId, `Canvas's planner carries the dismissal (not a completion), so the To Do list and every device agree: ${JSON.stringify(dismissedOnCanvas)}`);
@@ -605,7 +607,7 @@ try {
   check(extraRows.length === 1 && /^W2 HW /.test(extraRows[0]) && !extraRows.some((r) => /Journal 3 draft|submitted late/.test(r)), `and the sheet leaves all three off — the late hand-in is not "submitted late · ungraded" on it: ${extraRows.join(' | ')}`);
   // the X on an item that has an override already (the one undone above): Canvas keeps one per item and refuses a second, so the one it has is changed — the row clears, no "Couldn't clear that"
   await page.click('.bcv-sheet__item .bcv-sheet__x');
-  check(await eventually(async () => (await page.$$('.bcv-sheet__row')).length === 0 && (await texts('.bcv-sheet__line'))[0] === '0 Overdue'), 'cleared again after being put back: the override it already had is changed rather than a second one written');
+  check(await eventually(async () => (await page.$$('.bcv-sheet__row')).length === 0 && (await sheetHead()) === '0 Overdue'), 'cleared again after being put back: the override it already had is changed rather than a second one written');
   check(!(await texts('.bcv-toast')).some((t) => /Couldn/.test(t)), 'and nothing says it could not');
   const overrideAgain = await page.evaluate(async () => { const r = await fetch('/api/v1/planner/overrides'); const list = JSON.parse((await r.text()).replace(/^while\(1\);/, '')); return list.filter((o) => o.plannable_type === 'assignment' && String(o.plannable_id) === '2002').map((o) => ({ id: o.id, dismissed: o.dismissed })); });
   check(overrideAgain.length === 1 && overrideAgain[0].dismissed === true && overrideAgain[0].id === dismissedOnCanvas.ovId, `Canvas holds the one override, now dismissed again: ${JSON.stringify(overrideAgain)}`);
@@ -625,7 +627,7 @@ try {
   await page.click('.bcv-stats .bcv-stat:nth-child(6)');
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
   const gradedRows = await texts('.bcv-sheet__row');
-  check(/^\d+ Graded this week$/.test((await texts('.bcv-sheet__line'))[0]) && /week of \w+ \d+$/i.test((await texts('.bcv-sheet__note'))[0]) && gradedRows.length === Number((await texts('.bcv-sheet__value'))[0]) && gradedRows.every((t) => /(\d+(\.\d+)? \/ \d+(\.\d+)?|excused) · posted \w+ \d+/.test(t)), `the Graded sheet: score / possible and the posting day per row: ${gradedRows.slice(0, 2).join(' | ')}`);
+  check(/^\d+ Graded this week$/.test((await sheetHead())) && /week of \w+ \d+$/i.test((await texts('.bcv-sheet__note'))[0]) && gradedRows.length === Number((await texts('.bcv-sheet__value'))[0]) && gradedRows.every((t) => /(\d+(\.\d+)? \/ \d+(\.\d+)?|excused) · posted \w+ \d+/.test(t)), `the Graded sheet: score / possible and the posting day per row: ${gradedRows.slice(0, 2).join(' | ')}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet'), null, { timeout: 3000 });
   // Due tomorrow: the planner's work due on the next calendar day and not yet handed in (the mock:
@@ -634,14 +636,14 @@ try {
   await page.click('.bcv-stats .bcv-stat:nth-child(5)');
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
   const tmRows = await texts('.bcv-sheet__row');
-  check((await texts('.bcv-sheet__line'))[0] === '3 Due tomorrow' && /^\d+(\.\d+)? points across 2 courses · \w+day, \w+ \d+$/.test((await texts('.bcv-sheet__note'))[0]) && tmRows.length === 3 && tmRows.some((t) => /^Lec06-PreQuiz .*F26-MATH 021 20$/.test(t)) && tmRows.some((t) => /^Journal #2 .*F26-WRI 010 20$/.test(t)), `the Due tomorrow sheet names the day and lists exactly what it counted: ${(await texts('.bcv-sheet__note'))[0]} | ${tmRows.join(' | ')}`);
+  check((await sheetHead()) === '3 Due tomorrow' && /^\d+(\.\d+)? points across 2 courses · \w+day, \w+ \d+$/.test((await texts('.bcv-sheet__note'))[0]) && tmRows.length === 3 && tmRows.some((t) => /^Lec06-PreQuiz F26-MATH 021 20 · /.test(t)) && tmRows.some((t) => /^Journal #2 F26-WRI 010 20 · /.test(t)), `the Due tomorrow sheet names the day and lists exactly what it counted: ${(await texts('.bcv-sheet__note'))[0]} | ${tmRows.join(' | ')}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet'), null, { timeout: 3000 });
   // each counter opens a sheet with the items it counted
   await page.click('.bcv-stats .bcv-stat:first-child');
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
   const sheetRows = await texts('.bcv-sheet__row');
-  check((await texts('.bcv-sheet__line'))[0] === '4 Due today' && /^35 points across \d courses? · \w+day, \w+ \d+$/.test((await texts('.bcv-sheet__note'))[0]) && sheetRows.length === 4 && sheetRows.some((t) => /^Dis01 Discussion · graded · 10 pts · due 11:59 PM F26-MATH 021 20$/.test(t) || /^Dis01 Assignment · 10 pts · due 11:59 PM F26-MATH 021 20$/.test(t)), `Due today opens its sheet: ${(await texts('.bcv-sheet__note'))[0]} | ${sheetRows.join(' | ')}`);
+  check((await sheetHead()) === '4 Due today' && /^35 points across \d courses? · \w+day, \w+ \d+$/.test((await texts('.bcv-sheet__note'))[0]) && sheetRows.length === 4 && sheetRows.some((t) => /^Dis01 F26-MATH 021 20 · Discussion · graded · 10 pts · due 11:59 PM$/.test(t) || /^Dis01 F26-MATH 021 20 · Assignment · 10 pts · due 11:59 PM$/.test(t)), `Due today opens its sheet: ${(await texts('.bcv-sheet__note'))[0]} | ${sheetRows.join(' | ')}`);
   await shot(page, '01b-dashboard-sheet');
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet'), null, { timeout: 3000 });
@@ -657,7 +659,8 @@ try {
     let split = null;
     if (nth === 6) {
       await page.click('.bcv-sheet .bcv-sheet__row');
-      split = await eventually(async () => page.evaluate(() => { const sh = document.querySelector('.bcv-sheet'); const pv = sh.querySelector('.bcv-pv--in'); if (!pv || !sh.classList.contains('is-split')) return false; const a = pv.getBoundingClientRect(), l = sh.querySelector('.bcv-sheet__list').getBoundingClientRect(); return a.right <= l.left + 1; }), 4000);
+      // (2.99.37) its preview a card over the list, standing in from the box's right edge (the box at the right of its row)
+      split = await eventually(async () => page.evaluate(() => { const sh = document.querySelector('.bcv-sheet'); const pv = document.querySelector('.bcv-pv--card'); if (!pv || !sh.classList.contains('has-pv')) return false; const a = pv.getBoundingClientRect(), b = sh.getBoundingClientRect(); return a.right <= b.right - 30 && a.left >= 15; }), 4000);
       split = split && Math.abs((await page.$eval('.bcv-sheet', (e) => e.getBoundingClientRect().right)) - c.r) < 3;
       await page.keyboard.press('Escape');
       await page.waitForTimeout(400);
@@ -666,12 +669,12 @@ try {
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => !document.querySelector('.bcv-sheet'), null, { timeout: 3000 });
   }
-  check(anchored.map((a) => a.from).join() === 'start,mid,end' && anchored.every((a) => Math.abs(a.edge) <= 2 && Math.abs(a.top) <= 2) && anchored[2].split === true, `each counter's box hangs from where it stands — the left one's top-left, the middle one's top centre, the right one's top-right (its preview opening on the list's left, the box still ending at the counter's right): ${JSON.stringify(anchored)}`);
+  check(anchored.map((a) => a.from).join() === 'start,mid,end' && anchored.every((a) => Math.abs(a.edge) <= 2 && Math.abs(a.top) <= 2) && anchored[2].split === true, `each counter's box hangs from where it stands — the left one's top-left, the middle one's top centre, the right one's top-right (its preview card standing in from the box's right edge, the box still ending at the counter's right): ${JSON.stringify(anchored)}`);
   await page.click('.bcv-stats .bcv-stat:nth-child(2)');
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
   // the sheet lists exactly what the counter counted (2.98.94: the next 7 days — today and the six after it — not
   // the calendar week); naming one item here would tie the check to the day it runs
-  const weekLine = (await texts('.bcv-sheet__line'))[0];
+  const weekLine = (await sheetHead());
   const weekRows = await texts('.bcv-sheet__row');
   check(/^\d+ Next 7 days$/.test(weekLine) && Number(weekLine.split(' ')[0]) === weekRows.length && /^\w+ \d+ – \w+ \d+ · \d courses?$/.test((await texts('.bcv-sheet__note'))[0]) && weekRows.every((t) => /·/.test(t)) && weekRows.some((t) => /· \d+ pts ·/.test(t)), `Next 7 days sheet, today through six days on: ${weekLine} / ${(await texts('.bcv-sheet__note'))[0]} / ${weekRows.length} rows, e.g. ${weekRows[0] || '(none)'}`);
   // (2.98.28) the list in two: what is still to do under its label, then — set back in grey, a press away all the
@@ -744,7 +747,7 @@ try {
   await page.click('.bcv-stats .bcv-stat:nth-child(3)');
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
   const annRows = await texts('.bcv-sheet__row');
-  check((await texts('.bcv-sheet__line'))[0] === '3 Unread announcements' && annRows.length === 3 && /^Field site sign-ups Posted \w+ \d+ · unread F26-SPRK 010 103$/.test(annRows[0]) && !(await page.$('.bcv-sheet__more')), `the number and the rows come from the same list (Announcements API): ${annRows.join(' | ')}`);
+  check((await sheetHead()) === '3 Unread announcements' && annRows.length === 3 && /^Field site sign-ups F26-SPRK 010 103 · Posted \w+ \d+ · unread$/.test(annRows[0]) && !(await page.$('.bcv-sheet__more')), `the number and the rows come from the same list (Announcements API): ${annRows.join(' | ')}`);
   check((await texts('.bcv-sheet__note'))[0] === 'From 2 courses' && (await page.$eval('.bcv-stats .bcv-stat:nth-child(3) .bcv-stat__note', (e) => e.textContent)) === 'From 2 courses', `the card and its sheet say the same thing about where the unread ones are: ${(await texts('.bcv-sheet__note'))[0]}`);
   // a sheet row previews inside the sheet: the sheet is one steady size from the start (the right
   // side says a press previews there) and the preview takes that side, the list staying
@@ -764,37 +767,45 @@ try {
   const steady0 = await page.evaluate(() => { const e = document.querySelector('.bcv-sheet'); const r = e.getBoundingClientRect(); const c = document.querySelector('.bcv-stats .bcv-stat:nth-child(3)').getBoundingClientRect(); const ov = document.querySelector('.bcv-sheet-ov'); return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), cx: Math.round(c.left), cy: Math.round(c.top), from: e.dataset.from, card: e.classList.contains('bcv-sheet--card'), hint: !!e.querySelector('.bcv-sheet__pvhint'), veil: /^radial-gradient/.test(getComputedStyle(ov.querySelector('.bcv-card-dim')).backgroundImage), vw: innerWidth, vh: innerHeight }; });
   check(steady0.card && !steady0.hint && steady0.veil && steady0.w >= 360 && steady0.w <= 460 && steady0.h === 430 && steady0.y === steady0.cy && steady0.x + steady0.w <= steady0.vw - 15 && steady0.x <= steady0.cx && steady0.x >= steady0.cx - 120, `the counter grows in place into a taller box (430px) with its list (no pane waiting), the page dimmed round it: ${JSON.stringify(steady0)}`);
   await page.click('.bcv-sheet__row');
-  await page.waitForSelector('.bcv-sheet.is-split .bcv-pv--in', { timeout: 10000 });
+  // (2.99.37, the Mac's preview card) a row pressed opens its preview as a glass card of its own over the list — the box
+  // keeping its size, the row lit — its kind and course on top in the course's colour, a Close pill, the title, its facts
+  // one to a line, and Open at the foot
+  await page.waitForSelector('.bcv-sheet-ov > .bcv-pv--card', { timeout: 10000 });
   await page.waitForFunction(() => !document.querySelector('.bcv-pv .bcv-skel'), null, { timeout: 10000 });
-  const pvSheet = await page.$eval('.bcv-sheet', (e) => ({
+  const pvSheet = await page.$eval('.bcv-pv--card', (e) => ({
     kicker: e.querySelector('.bcv-pv__kicker').textContent,
+    kick: getComputedStyle(e.querySelector('.bcv-pv__kicker')).color,
+    close: e.querySelector('.bcv-pv__x').textContent,
     title: e.querySelector('.bcv-pv__title').textContent,
-    meta: e.querySelector('.bcv-pv__meta').textContent,
+    facts: [...e.querySelectorAll('.bcv-pv__fact')].map((f) => f.textContent),
     body: e.querySelector('.bcv-pv__prose')?.textContent.slice(0, 40) || '',
     go: e.querySelector('.bcv-pv__go').textContent,
-    rows: e.querySelectorAll('.bcv-sheet__row').length,
+    goLabel: e.querySelector('.bcv-pv__go').getAttribute('aria-label'),
+    alt: !e.querySelector('.bcv-pv__alt') || e.querySelector('.bcv-pv__alt').hidden,
+    rows: document.querySelectorAll('.bcv-sheet__row').length,
+    lit: document.querySelector('.bcv-sheet__row').classList.contains('is-on'),
   }));
-  check(pvSheet.kicker === 'Preview' && pvSheet.title === 'Field site sign-ups' && /^Announcement · .+/.test(pvSheet.meta) && pvSheet.body.length > 10 && pvSheet.go === 'Open the announcement' && pvSheet.rows === 3, `the preview reads the announcement beside the list it came from: ${JSON.stringify(pvSheet)}`);
-  await page.waitForTimeout(650); // the box takes .46s to make room
+  check(pvSheet.kicker === 'Announcement · F26-SPRK 010 103' && pvSheet.kick !== 'rgba(235, 235, 245, 0.6)' && pvSheet.close === 'Close' && pvSheet.title === 'Field site sign-ups' && pvSheet.facts.length >= 2 && pvSheet.body.length > 10 && pvSheet.go === 'Open' && pvSheet.goLabel === 'Open the announcement' && pvSheet.alt && pvSheet.rows === 3 && pvSheet.lit, `the preview is a card of its own: its kind and course, Close, the title, its facts, Open: ${JSON.stringify(pvSheet)}`);
+  await page.waitForTimeout(400); // (the card's grow settles)
   const split = await page.evaluate(() => {
     const sheet = document.querySelector('.bcv-sheet').getBoundingClientRect();
-    const pv = document.querySelector('.bcv-pv--in').getBoundingClientRect();
-    const list = document.querySelector('.bcv-sheet__list').getBoundingClientRect();
-    const hint = document.querySelector('.bcv-sheet__pvhint');
-    return { w: Math.round(sheet.width), h: Math.round(sheet.height), pvRight: Math.round(pv.right), sheetRight: Math.round(sheet.right), pvLeft: Math.round(pv.left), listRight: Math.round(list.right), shifted: document.documentElement.classList.contains('bcv-preview'), hintShown: !!hint && getComputedStyle(hint).display !== 'none' };
+    const pv = document.querySelector('.bcv-pv--card').getBoundingClientRect();
+    const row = document.querySelector('.bcv-sheet__row').getBoundingClientRect();
+    return { w: Math.round(sheet.width), h: Math.round(sheet.height), x: Math.round(sheet.left), pvL: Math.round(pv.left), pvR: Math.round(pv.right), pvT: Math.round(pv.top), pvB: Math.round(pv.bottom), pvW: Math.round(pv.width), rowB: Math.round(row.bottom), vw: innerWidth, vh: innerHeight, shifted: document.documentElement.classList.contains('bcv-preview'), split: document.querySelector('.bcv-sheet').classList.contains('is-split') };
   });
-  const splitAt = await page.evaluate(() => { const r = document.querySelector('.bcv-sheet').getBoundingClientRect(); const l = document.querySelector('.bcv-sheet__list').getBoundingClientRect(); const p = document.querySelector('.bcv-pv--in').getBoundingClientRect(); return { x: Math.round(r.left), right: Math.round(r.right), listX: Math.round(l.left), listW: Math.round(l.width), pvW: Math.round(p.width) }; });
-  // (2.99.29) Unread stands at the right of its row in the 2×3 grid, in the middle of the row of six (the box then keeps its list
-  // at its left, the preview opening on the list's right, the whole sliding left to stay on screen)
-  if (steady0.from === 'end') check(split.w > steady0.w + 300 && split.h === steady0.h && Math.abs(split.pvLeft - splitAt.x) <= 2 && split.pvRight <= splitAt.listX + 2 && !split.shifted && Math.abs(splitAt.right - (steady0.x + steady0.w)) <= 2 && Math.abs(splitAt.listX - steady0.x) <= 2 && Math.abs(splitAt.listW - steady0.w) <= 2 && splitAt.pvW >= 420 && splitAt.pvW <= 560, `a row pressed in a counter at the right of its row widens the box to the left for a smaller preview — the box's right edge and the list where they were, the preview on the list's left — the page itself never moving: ${JSON.stringify({ ...split, ...splitAt, steady0 })}`);
-  else check(split.w > steady0.w + 300 && split.h === steady0.h && Math.abs(split.pvLeft - split.listRight) <= 2 && Math.abs(splitAt.listW - steady0.w) <= 2 && splitAt.right <= steady0.vw - 14 && splitAt.x >= 14 && splitAt.pvW >= 420 && splitAt.pvW <= 560, `a row pressed in a counter in the middle of its row widens the box for a smaller preview on the list's right, the box kept on screen: ${JSON.stringify({ ...split, ...splitAt, steady0 })}`);
+  check(split.w === steady0.w && split.h === steady0.h && split.x === steady0.x && !split.split && !split.shifted && split.pvW >= 380 && split.pvW <= 460 && split.pvL >= 15 && split.pvR <= split.vw - 15 && split.pvT >= 15 && split.pvB <= split.vh - 15 && (split.pvT >= split.rowB || split.pvB >= split.vh - 17), `the card stands over the box, under the row pressed and inside the window, the box itself not moving or growing: ${JSON.stringify({ ...split, steady0 })}`);
   await shot(page, '01c-dashboard-preview');
-  // pressing another row swaps what the panel shows, the sheet staying put
-  await (await page.$$('.bcv-sheet__row'))[1].click();
+  // pressing another row swaps what the card shows, the box staying put (the row pressed in the page: the card is over it)
+  await (await page.$$('.bcv-sheet__row'))[1].evaluate((e) => e.click());
   await page.waitForFunction(() => document.querySelector('.bcv-pv__title')?.textContent === 'Prerequisite Skills Test', null, { timeout: 10000 });
-  check((await page.$$('.bcv-pv')).length === 1 && (await page.$('.bcv-sheet.is-split')) !== null, 'another row swaps the preview inside the sheet');
+  check((await page.$$('.bcv-pv')).length === 1 && (await page.$('.bcv-sheet.has-pv')) !== null && (await page.$$eval('.bcv-sheet__row.is-on', (els) => els.length)) === 1 && (await page.$$eval('.bcv-sheet__row', (els) => els[1].classList.contains('is-on'))), 'another row swaps the card, that row lit in its place');
   await page.keyboard.press('Escape');
-  check(await eventually(async () => !(await page.$('.bcv-sheet.is-split')) && !(await page.$('.bcv-pv')) && !!(await page.$('.bcv-sheet')), 2000), 'Escape puts the preview away first, the box staying with its list');
+  check(await eventually(async () => !(await page.$('.bcv-sheet.has-pv')) && !(await page.$('.bcv-pv')) && !!(await page.$('.bcv-sheet')) && !(await page.$('.bcv-sheet__row.is-on')), 2000), 'Escape puts the card away first, the box staying with its list');
+  // a press in the box away from its rows puts the card away too
+  await (await page.$$('.bcv-sheet__row'))[0].click();
+  await page.waitForSelector('.bcv-pv--card .bcv-pv__title', { timeout: 10000 });
+  await page.click('.bcv-sheet__head');
+  check(await eventually(async () => !(await page.$('.bcv-pv')) && !!(await page.$('.bcv-sheet')), 2000), 'a press on the box away from its rows puts the card away, the box staying');
   // the button at the bottom is the way through to the item's own screen, and it takes the sheet with it
   await (await page.$$('.bcv-sheet__row'))[0].click();
   await page.waitForFunction(() => document.querySelector('.bcv-pv__title')?.textContent === 'Field site sign-ups', null, { timeout: 10000 });
@@ -886,12 +897,13 @@ try {
   await assignRow.click({ position: { x: 220, y: 22 } }); // past the tick circle, on the row body
   await page.waitForFunction(() => document.querySelector('.bcv-pv') && !document.querySelector('.bcv-pv .bcv-skel'), null, { timeout: 10000 });
   const pvRow = await page.$eval('.bcv-pv', (e) => ({
-    meta: e.querySelector('.bcv-pv__meta').textContent,
+    meta: e.querySelector('.bcv-pv__kicker').textContent,
+    facts: [...e.querySelectorAll('.bcv-pv__fact')].map((f) => f.textContent).join(' | '),
     chips: [...e.querySelectorAll('.bcv-pv__chips .bcv-badge')].map((b) => b.textContent),
     has: !!e.querySelector('.bcv-pv__prose, .bcv-pv__none'),
-    go: e.querySelector('.bcv-pv__go').textContent,
+    go: e.querySelector('.bcv-pv__go').getAttribute('aria-label'),
   }));
-  check(page.url().endsWith('/') && /^Assignment · (due .+|no due date)( · \d+(\.\d+)? pts)?$/.test(pvRow.meta) && pvRow.chips.length >= 1 && /^(Graded|Submitted|Submitted late|Missing|Not submitted|Excused)$/.test(pvRow.chips[0]) && pvRow.has && pvRow.go === 'Open the assignment', `a list row previews the assignment without navigating: ${JSON.stringify(pvRow)}`);
+  check(page.url().endsWith('/') && /^(Assignment|Tool) · F26-/.test(pvRow.meta) && /^(Due .+|No due date)( \| \d+(\.\d+)? pts)?$/.test(pvRow.facts) && pvRow.chips.length >= 1 && /^(Graded|Submitted|Submitted late|Missing|Not submitted|Excused)$/.test(pvRow.chips[0]) && pvRow.has && pvRow.go === 'Open the assignment', `a list row previews the assignment without navigating: ${JSON.stringify(pvRow)}`);
   check(!/null|NaN|undefined/.test(await page.$eval('.bcv-pv', (e) => e.textContent)), 'the preview never shows a raw null');
   // nothing is covered or dimmed: the interface stays live beside the panel, so pressing another
   // item we can read swaps what the panel shows rather than putting it away
@@ -899,7 +911,7 @@ try {
   const nextRow = (await page.$$(`.bcv-day a.bcv-row[href*="/assignments/"]:not([href="${assignHref}"])`))[0];
   await nextRow.click({ position: { x: 220, y: 22 } });
   await page.waitForFunction((was) => document.querySelector('.bcv-pv__title')?.textContent !== was && !document.querySelector('.bcv-pv .bcv-skel'), wasTitle, { timeout: 10000 });
-  const pvSwap = await page.$eval('.bcv-pv__meta', (e) => e.textContent);
+  const pvSwap = await page.$eval('.bcv-pv__kicker', (e) => e.textContent);
   check((await page.$$('.bcv-pv')).length === 1 && /^Assignment · /.test(pvSwap) && (await page.$eval('html', (e) => e.classList.contains('bcv-preview'))), `pressing another row swaps the preview in place, the interface never moving back: ${pvSwap}`);
   // a press anywhere else puts it away, and goes through to what was pressed
   await page.click('.bcv-head .bcv-h1');
@@ -987,7 +999,7 @@ try {
   // an activity row previews too; reading it there counts as opening it, so its dot clears
   await (await page.$$('.bcv-body .bcv-row--top'))[1].click();
   await page.waitForFunction(() => document.querySelector('.bcv-pv') && !document.querySelector('.bcv-pv .bcv-skel'), null, { timeout: 10000 });
-  const pvAct = await page.$eval('.bcv-pv', (e) => `${e.querySelector('.bcv-pv__title').textContent} | ${e.querySelector('.bcv-pv__meta').textContent} | ${e.querySelector('.bcv-pv__go').textContent}`);
+  const pvAct = await page.$eval('.bcv-pv', (e) => `${e.querySelector('.bcv-pv__title').textContent} | ${e.querySelector('.bcv-pv__kicker').textContent} | ${e.querySelector('.bcv-pv__go').getAttribute('aria-label')}`);
   check(/ \| Discussion · .+ \| Open the discussion$/.test(pvAct) && (await dots()) === 2, `an activity row previews the discussion and loses its dot: ${pvAct}`);
   await page.click('.bcv-pv__go');
   await page.waitForSelector('.bcv-entry', { timeout: 10000 });
@@ -1485,7 +1497,7 @@ try {
   await page.click('.bcv-ev[href*="/assignments/"]');
   await page.waitForSelector('.bcv-pv', { timeout: 10000 }); // (the panel stands beside the page here, the way the To Do list's does)
   await page.waitForFunction(() => !document.querySelector('.bcv-pv .bcv-skel'), null, { timeout: 10000 });
-  check(/\/calendar/.test(page.url()) && (await page.$eval('html', (e) => e.classList.contains('bcv-preview'))) && /^preview$/i.test((await texts('.bcv-pv__kicker'))[0]) && (await texts('.bcv-pv__title'))[0] === chipTitle && /assignment/i.test((await texts('.bcv-pv__meta'))[0]) && (await texts('.bcv-pv__go'))[0] === 'Open the assignment' && (await page.$('.bcv-cal__grid')) !== null, `pressing an assignment on the calendar previews it beside the month: ${JSON.stringify({ chip: chipTitle, url: page.url(), html: await page.$eval('html', (e) => e.className), kicker: (await texts('.bcv-pv__kicker'))[0], title: (await texts('.bcv-pv__title'))[0], meta: (await texts('.bcv-pv__meta'))[0], go: (await texts('.bcv-pv__go'))[0], grid: !!(await page.$('.bcv-cal__grid')) })}`);
+  check(/\/calendar/.test(page.url()) && (await page.$eval('html', (e) => e.classList.contains('bcv-preview'))) && /^Assignment · /.test((await texts('.bcv-pv__kicker'))[0]) && (await texts('.bcv-pv__title'))[0] === chipTitle && /^Due /.test((await texts('.bcv-pv__fact'))[0]) && (await page.$eval('.bcv-pv__go', (e) => e.getAttribute('aria-label'))) === 'Open the assignment' && (await page.$('.bcv-cal__grid')) !== null, `pressing an assignment on the calendar previews it beside the month: ${JSON.stringify({ chip: chipTitle, url: page.url(), html: await page.$eval('html', (e) => e.className), kicker: (await texts('.bcv-pv__kicker'))[0], title: (await texts('.bcv-pv__title'))[0], meta: (await texts('.bcv-pv__meta'))[0], go: (await texts('.bcv-pv__go'))[0], grid: !!(await page.$('.bcv-cal__grid')) })}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-pv'), null, { timeout: 5000 });
   await page.click('.bcv-seg__btn[data-value="week"]');
@@ -5119,7 +5131,7 @@ try {
   await motionAt(page, WATCH);
   await page.click('.bcv-stat');
   const glideAt = await page.$eval('.bcv-sheet-ov > .bcv-sheet', (sh) => { const m = (sel) => new DOMMatrix(getComputedStyle(sh.querySelector(sel)).transform); const v = m('.bcv-sheet__value'), l = m('.bcv-sheet__label'), i = m('.bcv-sheet__tile > svg'); return { vx: Math.round(v.e), vs: +v.a.toFixed(2), lx: Math.round(l.e), is: +i.a.toFixed(2), headShown: getComputedStyle(sh.querySelector('.bcv-sheet__head')).opacity, noteFades: +getComputedStyle(sh.querySelector('.bcv-sheet__note')).opacity < 1 }; });
-  check(Math.abs(glideAt.vx) > 40 && glideAt.vs > 1.2 && glideAt.lx < 0 && glideAt.is < 1 && glideAt.headShown === '1' && glideAt.noteFades, `as the box opens, the header's number is out where the counter's stands (right of the label in the grid, under it in a square card) and bigger, the label to the left, the icon smaller — the header itself shown while its note comes in: ${JSON.stringify(glideAt)}`);
+  check(Math.abs(glideAt.vx) > 4 && glideAt.vs < 0.9 && glideAt.lx < 0 && glideAt.is < 1 && glideAt.headShown === '1' && glideAt.noteFades, `as the box opens, the header's number is out where the counter's stands and at the counter's size (2.99.37: smaller than the header's own, under its name), the label to the left, the icon smaller — the header itself shown while its note comes in: ${JSON.stringify(glideAt)}`);
   await motionAt(page, MOTION_RATE);
   await page.waitForTimeout(300);
   const glideDone = await page.$eval('.bcv-sheet-ov > .bcv-sheet', (sh) => ['.bcv-sheet__value', '.bcv-sheet__label', '.bcv-sheet__tile > svg'].map((s) => getComputedStyle(sh.querySelector(s)).transform).join(','));

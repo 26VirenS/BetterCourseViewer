@@ -32,6 +32,11 @@
     chevron: 'M9 6l6 6-6 6',
     back: 'M15 6l-6 6 6 6',
     close: 'M6 6l12 12M18 6L6 18',
+    // (2.99.37) the preview card's facts and its Close, as the Mac's draws them
+    hash: 'M9.6 4.5L8 19.5M16 4.5l-1.6 15M5 9.2h14.5M4.5 14.8H19',
+    xcircle: 'M20 12a8 8 0 11-16 0 8 8 0 0116 0zM9.4 9.4l5.2 5.2M14.6 9.4l-5.2 5.2',
+    okcircle: 'M20 12a8 8 0 11-16 0 8 8 0 0116 0zM8.6 12.3l2.3 2.3 4.6-4.9',
+    person: 'M12 11.6a3.4 3.4 0 100-6.8 3.4 3.4 0 000 6.8zM5.4 19.4c.9-3.1 3.5-5 6.6-5s5.7 1.9 6.6 5',
     dots: 'M12 6h.01M12 12h.01M12 18h.01',
     compose: 'M4 20h4l11-11-4-4L4 16zM14 5l4 4',
     download: 'M12 4v11M8 11l4 4 4-4M5 19h14',

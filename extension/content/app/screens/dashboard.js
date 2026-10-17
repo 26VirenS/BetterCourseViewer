@@ -502,6 +502,7 @@
         if (!card) { BCV.ui.dismiss(ov); return; }
         if (folding || !ov.isConnected) return;
         folding = true;
+        if (sheet.classList.contains('has-pv')) BCV.preview?.close({ gently: true }); // (its preview card goes first)
         U.hoverCool(card, lastPt); // (a pointer still over the counter as the box folds into it does not open it again until it has left)
         ov.classList.add('is-folding', 'is-far'); // (the focus lets go outward as the box folds)
         box.fold(); // (from wherever it is drawn — mid-growth too — back into the counter, its words back to the counter's)
@@ -522,17 +523,19 @@
       ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
       ov.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
-        if (card && sheet.classList.contains('is-split')) { BCV.preview?.close(); ov.focus(); return; } // (the preview first, then the box)
+        if (card && sheet.classList.contains('has-pv')) { BCV.preview?.close(); ov.focus(); return; } // (the preview first, then the box)
         close();
       });
       const sheet = U.el(`bcv-sheet ${card ? 'bcv-sheet--card bcv-sheet--stat is-at-card' : 'bcv-sheet--steady'}`, [
-        U.el('bcv-sheet__head', [
-          h('span', { class: 'bcv-sheet__tile' }, U.svg(def.icon, { size: 19, stroke: def.color, width: 1.9 })),
-          U.el('bcv-sheet__titles', [
-            U.el('bcv-sheet__line', [U.text('bcv-sheet__value', def.value, 'span'), U.text('bcv-sheet__label', def.label, 'span')]),
-            U.text('bcv-sheet__note bcv-pretty', def.note),
+        // (2.99.37, the Mac's box) what it counts on a line of its own — its glyph, its name, the ✕ — then the number,
+        // large, with what it means beside it
+        U.el('bcv-sheet__head bcv-sheet__head--big', [
+          U.el('bcv-sheet__top', [
+            h('span', { class: 'bcv-sheet__tile' }, U.svg(def.icon, { size: 19, stroke: def.color, width: 1.9 })),
+            U.text('bcv-sheet__label', def.label, 'span'),
+            h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 15, stroke: 'var(--bcv-ink3)', width: 2.2 })),
           ]),
-          h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
+          U.el('bcv-sheet__line', [U.text('bcv-sheet__value', def.value, 'span'), U.text('bcv-sheet__note bcv-pretty', def.note, 'span')]),
         ]),
         // (2.98.28) the list in two: what wants attention (not done, unread) under its own label, then —
         // quieter, set back in grey but still a press away — what else there is from the same span
@@ -545,6 +548,8 @@
         card ? null : U.el('bcv-sheet__pvhint', [U.svg(IC.doc, { size: 22, stroke: 'var(--bcv-ink3)', width: 1.7 }), U.text('bcv-sheet__pvhint-t', 'Press an item to preview it here', 'span')]),
       ]);
       ov.append(sheet);
+      // (2.99.37) a press in the box away from its rows puts its preview card away, the box staying
+      sheet.addEventListener('pointerdown', (e) => { if (sheet.classList.contains('has-pv') && !e.target.closest('.bcv-sheet__row, .bcv-sheet__qrow, .bcv-sheet__x')) BCV.preview?.close({ gently: true }); });
       if (card) ov.append(U.el('bcv-card-blur', null, { 'aria-hidden': 'true' })); // (the page blurred round the box: a layer of its own, after the box, which stays the overlay's first child)
       // where the box goes: the counter's own corner, as wide as a list wants (the list and the preview
       // side by side once a row is pressed), 430px tall (2.98.50: a third shorter than it was) or as
@@ -581,10 +586,12 @@
       /** A row, and — where the item can be cleared (the Overdue list) — an X beside it: the item goes
        *  one press at a time, the header counts down with it, and a failure leaves the row and says so. */
       function rowFor(i, quiet = false) {
-        const row = h('a', { class: quiet ? 'bcv-sheet__qrow' : 'bcv-sheet__row', href: i.url, onclick: (e) => { e.preventDefault(); if (!BCV.preview?.open(i.url, { host: ov.firstElementChild })) { close(); app.go(i.url); } } }, [
-          h('span', { class: 'bcv-sheet__dot', style: { background: i.color } }),
-          U.el('bcv-sheet__body', [U.text('bcv-sheet__title bcv-pretty', i.title), U.text('bcv-sheet__meta', i.meta)]),
-          h('span', { class: 'bcv-sheet__course bcv-ellip', style: { background: i.tint, color: i.color, '--bcv-course': i.color }, text: i.course }),
+        // (2.99.37, the Mac's rows) the course's colour as a bar down the row's edge, its title, the course and the facts
+        // under it in grey, a chevron at the end; pressed, it stays lit while its preview card is up
+        const row = h('a', { class: quiet ? 'bcv-sheet__qrow' : 'bcv-sheet__row', href: i.url, onclick: (e) => { e.preventDefault(); if (!BCV.preview?.open(i.url, { host: ov.firstElementChild, anchor: e.currentTarget, course: i.course !== '—' ? i.course : null, color: i.color })) { close(); app.go(i.url); } } }, [
+          h('span', { class: 'bcv-sheet__bar', style: { background: i.color } }),
+          U.el('bcv-sheet__body', [U.text('bcv-sheet__title bcv-pretty', i.title), U.el('bcv-sheet__meta', [i.course && i.course !== '—' ? U.text('bcv-sheet__course', `${i.course} · `, 'span') : null, i.meta])]),
+          U.svg(IC.chevron, { size: 13, stroke: 'var(--bcv-ink3)', width: 2.2, cls: 'bcv-sheet__chev' }),
         ]);
         if (!i.clear || quiet) return row;
         const x = U.iconbtn(IC.close, { size: 24, title: 'Clear', onClick: async (e) => {

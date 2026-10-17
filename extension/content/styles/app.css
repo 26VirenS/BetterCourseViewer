@@ -5157,3 +5157,75 @@ html.bcv-phone .bcv-wfadd .bcv-input, html.bcv-phone .bcv-wfadd .bcv-select { fo
   .bcv-omni__panel, .bcv-picker__list, .bcv-todo__composer, .bcv-mark__bubble, .bcv-pdfx__pane.is-in > *, .bcv-pdfx__tile--tray.is-new, .bcv-quicknav, .bcv-check--draw { animation-name: bcv-fade-in; }
   .bcv-check--draw path { animation: none; }
 }
+
+/* ---- (2.99.37) the counter's box and its preview card, as the Mac's draws them -------------------------------------- */
+/* the head: its glyph, its name and the ✕ on a line of their own; under them the number, large, what it means beside it */
+.bcv-sheet__head--big { flex-direction: column; align-items: stretch; gap: 6px; padding: 22px 24px 10px; border-bottom: 0; }
+.bcv-sheet__top { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.bcv-sheet__head--big .bcv-sheet__tile { width: 26px; height: 26px; border-radius: 8px; background: transparent; }
+.bcv-sheet__head--big .bcv-sheet__label { flex: 1; min-width: 0; font: 700 19px/1.2 var(--bcv-display); letter-spacing: -.015em; }
+.bcv-sheet__head--big .bcv-sheet__close { width: 30px; height: 30px; background: transparent; margin-right: -6px; transition: background-color .15s ease; }
+@media (hover: hover) and (pointer: fine) { .bcv-sheet__head--big .bcv-sheet__close:hover { background: var(--bcv-fill); } }
+.bcv-sheet__head--big .bcv-sheet__line { align-items: center; gap: 16px; }
+.bcv-sheet--card .bcv-sheet__head--big .bcv-sheet__line { flex-wrap: nowrap; }
+.bcv-sheet__head--big .bcv-sheet__value { flex: none; font: 700 54px/1 var(--bcv-display); letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+.bcv-sheet__head--big .bcv-sheet__note { flex: 1; min-width: 0; margin: 0; font: 400 14.5px/1.35 var(--bcv-font); color: var(--bcv-ink3); }
+/* the rows: no rules between them; the course's colour a bar down the edge; lit on a rounded ground, held lit while their card is up */
+.bcv-sheet__head--big + .bcv-sheet__list { padding: 6px 10px 12px; }
+.bcv-sheet__head--big ~ .bcv-sheet__list :is(.bcv-sheet__row, .bcv-sheet__qrow, .bcv-sheet__item) { border-top: 0; }
+.bcv-sheet__head--big ~ .bcv-sheet__list :is(.bcv-sheet__row, .bcv-sheet__qrow) { display: flex; align-items: center; gap: 14px; padding: 11px 12px 11px 14px; border-radius: 14px; transition: background-color .15s ease, opacity .18s ease, filter .18s ease; }
+.bcv-sheet__head--big ~ .bcv-sheet__list .bcv-sheet__item { border-radius: 14px; padding-right: 6px; }
+.bcv-sheet__bar { flex: none; align-self: stretch; width: 4px; min-height: 34px; border-radius: 2px; }
+.bcv-sheet__head--big ~ .bcv-sheet__list .bcv-sheet__title { font: 500 15.5px/1.3 var(--bcv-font); letter-spacing: -.01em; }
+.bcv-sheet__head--big ~ .bcv-sheet__list .bcv-sheet__meta { margin-top: 3px; font: 400 13.5px/1.3 var(--bcv-font); color: var(--bcv-ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bcv-sheet__head--big ~ .bcv-sheet__list .bcv-sheet__course { all: unset; color: inherit; font: inherit; } /* (the course leads the grey line, as words, not a chip) */
+.bcv-sheet-ov:not(.is-folding) > .bcv-sheet--stat:not(.is-at-card) .bcv-sheet__head--big ~ .bcv-sheet__list .bcv-sheet__course { color: inherit !important; background: none !important; }
+.bcv-sheet__chev { flex: none; opacity: .8; }
+.bcv-sheet__item .bcv-sheet__chev { display: none; } /* (its ✕ stands where the chevron would) */
+.bcv-sheet__head--big ~ .bcv-sheet__list .bcv-sheet__row:hover, .bcv-sheet__head--big ~ .bcv-sheet__list .bcv-sheet__item:hover { background: var(--bcv-hover); }
+.bcv-sheet__head--big ~ .bcv-sheet__list .bcv-sheet__item:hover > .bcv-sheet__row { background: transparent; }
+.bcv-sheet__head--big ~ .bcv-sheet__list .bcv-sheet__row.is-on, .bcv-sheet__head--big ~ .bcv-sheet__list .bcv-sheet__qrow.is-on { background: var(--bcv-fill); opacity: 1; filter: none; }
+.bcv-sheet__head--big ~ .bcv-sheet__list .bcv-sheet__sec { padding: 12px 14px 4px; }
+.bcv-sheet__head--big ~ .bcv-sheet__list .bcv-sheet__recent { margin: 12px -10px 0; padding: 4px 10px 0; }
+.bcv-sheet--steady .bcv-sheet__head--big { border-bottom: 1px solid var(--bcv-sep); padding-bottom: 14px; }
+
+/* the preview card: a glass card of its own over the box's list, grown out of the row pressed */
+.bcv-pv.bcv-pv--card { position: fixed; z-index: 2; right: auto; bottom: auto; height: auto; max-width: none; border: 1px solid transparent; border-radius: var(--bcv-r-sheet); background: linear-gradient(180deg, rgba(48,47,53,.8), rgba(30,29,34,.86)) padding-box, var(--bcv-glass-rim) border-box; -webkit-backdrop-filter: blur(22px) saturate(1.8) brightness(.8); backdrop-filter: blur(22px) saturate(1.8) brightness(.8); box-shadow: 0 24px 60px rgba(0,0,0,.42), 0 2px 8px rgba(0,0,0,.2); color: #fff; animation: bcv-pvcard-in .26s cubic-bezier(.23,1,.32,1) both; }
+html.bcv-noblur .bcv-pv.bcv-pv--card { background: rgb(40,40,44); -webkit-backdrop-filter: none; backdrop-filter: none; }
+@keyframes bcv-pvcard-in { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
+@keyframes bcv-pvcard-out { to { opacity: 0; transform: scale(.96); } }
+.bcv-pv.bcv-pv--card.is-leaving { animation: bcv-pvcard-out .15s cubic-bezier(.23,1,.32,1) both; }
+.bcv-pv.bcv-pv--card.is-swap { animation: none; }
+/* its head (every preview): the kind's glyph on the course's tint, "Kind · Course" in the course's colour, a Close pill */
+.bcv-pv__head { padding: 16px 16px 4px 20px; border-bottom: 0; gap: 10px; }
+.bcv-pv__tile { flex: none; width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--bcv-ink3); background: var(--bcv-fill); }
+.bcv-pv__kicker { font: 600 14px/1.25 var(--bcv-font); letter-spacing: -.005em; text-transform: none; color: var(--bcv-ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bcv-pv__x { width: auto; height: 30px; border-radius: 9px; padding: 0 12px 0 9px; gap: 6px; color: var(--bcv-blue); background: var(--bcv-blue-soft); font: 600 14px/1 var(--bcv-font); }
+.bcv-pv__x:hover { background: color-mix(in srgb, var(--bcv-blue) 24%, transparent); }
+.bcv-pv__body { padding: 8px 22px 14px; }
+.bcv-pv__title { font: 700 22px/1.25 var(--bcv-display); letter-spacing: -.02em; margin: 0 0 12px; }
+.bcv-pv__facts { display: flex; flex-direction: column; gap: 9px; }
+.bcv-pv__fact { display: flex; align-items: center; gap: 12px; font: 400 15px/1.3 var(--bcv-font); color: var(--bcv-ink2); }
+.bcv-pv__fact > svg { flex: none; color: var(--bcv-ink3); }
+.bcv-pv__fact.is-strong { font-weight: 600; color: var(--bcv-ink); }
+.bcv-pv__chips { margin-top: 12px; }
+.bcv-pv__prose, .bcv-pv__none { margin-top: 14px; padding-top: 0; border-top: 0; color: var(--bcv-ink2); }
+/* its foot: Open Tool (where the work is in an outside tool) and Open, at the right, as pills */
+.bcv-pv__foot { display: flex; justify-content: flex-end; align-items: center; gap: 10px; padding: 10px 16px 16px; border-top: 0; }
+.bcv-pv__go { width: auto; min-width: 92px; height: 38px; padding: 0 22px; border-radius: 19px; font: 600 15px/1 var(--bcv-font); }
+.bcv-pv__alt { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 18px 0 14px; border: 1px solid var(--bcv-edge); border-radius: 19px; background: var(--bcv-fill2); color: var(--bcv-ink); font: 500 15px/1 var(--bcv-font); cursor: pointer; transition: background-color .15s ease, scale .16s var(--bcv-spring-snappy); }
+.bcv-pv__alt:hover { background: var(--bcv-fill); }
+.bcv-pv__alt:active { scale: .96; }
+.bcv-pv__alt[hidden] { display: none; }
+/* the card's words white on its dark glass, whatever the page's look */
+.bcv-pv--card :is(.bcv-pv__title, .bcv-pv__fact.is-strong, .bcv-pv__alt) { color: #fff; }
+.bcv-pv--card :is(.bcv-pv__fact, .bcv-pv__prose, .bcv-pv__none) { color: rgba(235,235,245,.62); }
+.bcv-pv--card .bcv-pv__fact > svg { color: rgba(235,235,245,.5); }
+.bcv-pv--card .bcv-pv__alt { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.16); }
+.bcv-pv--card .bcv-pv__x { color: #3d9bff; background: rgba(10,132,255,.2); }
+.bcv-pv--card .bcv-pv__body { overflow: auto; }
+.bcv-pv__head--sheet { padding: 0 18px 10px; }
+@media (prefers-reduced-motion: reduce) {
+  .bcv-pv.bcv-pv--card { animation: bcv-fade-in .15s ease both; }
+  .bcv-pv.bcv-pv--card.is-leaving { animation: bcv-leave .12s ease both; }
+}
