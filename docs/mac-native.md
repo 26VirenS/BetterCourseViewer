@@ -314,7 +314,7 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   26 s has the hook show it as it is (`__simplAsIsNow`: its waits counted as over, the focus lifted, why said in the
   Error Logs with what the page held), so the hook's `showing` stays in step and the page can still be put out of sight
   between parts after. Once a grace between parts has run out, the page is no longer put out of sight again at each look.
-  (1.3.102) A web view made ahead. For an account that uses Alta (`Engine.hasAlta`: the Tools list named Knewton Alta,
+  (1.3.106) A web view made ahead. For an account that uses Alta (`Engine.hasAlta`: the Tools list named Knewton Alta,
   an assignment opened it, or one was opened — kept per school, forgotten on sign-out) one web view for the popup is
   made ahead (`AltaSpare`): at a quiet moment once the Dashboard is up, when an Alta assignment's page is read, and
   after each Alta popup closes — never while one opens. It holds only an empty page (about:blank), so WebKit's process
@@ -322,7 +322,7 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   is let go after ten minutes unused, on sign-out and when another school is chosen (Change School…). The console's
   line says which: `alta: view spare · …` or `alta: view made 38 ms · …`; `-SimplAltaSpare YES` opens a picture's
   popup in one (`21w-alta-spare`).
-  (1.3.102) A lighter page script, saying what it said before. The panels, buttons and verdict are told when something
+  (1.3.106) A lighter page script, saying what it said before. The panels, buttons and verdict are told when something
   may have moved them — a change in the parts kept (their elements and words; a class, a style, a button greyed or not;
   a fade ending; in the answer box itself only a verdict or the buttons' bar, never the caret blinking in a math box),
   a part's size or the window's — at the next frame, no oftener than every 200 ms, again 450 ms after a
@@ -332,7 +332,7 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   element or a tree; keyword tests read `textContent` before `innerText`; and the mastery bars, the overview's words and
   the cover are read only once the page has been shown, its cover read, or 3 s have passed — while the question is
   shown alone and nothing changed, only every third time.
-  (1.3.102) The mock's Alta launch can go as Canvas's does (`--alta-launch`, as `alta-test.mjs` runs it): Canvas's own
+  (1.3.106) The mock's Alta launch can go as Canvas's does (`--alta-launch`, as `alta-test.mjs` runs it): Canvas's own
   page, whose form sends itself on to Alta (POSTed), then Alta's page; and its Alta content answer comes 500 ms late.
   `scripts/dev/alta-test.mjs` drives the mock's Alta player (`/mock-alta/…`) through it in Chromium; the popup is shot
   as `21a-alta`.

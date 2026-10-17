@@ -1319,7 +1319,7 @@ const homeworkTools = {
     { id: 't2', name: 'Office 365', description: 'Attach a Word or PowerPoint file', homework_submission: { enabled: true, text: 'Office 365', url: 'https://o365.example.com/lti' } },
   ],
 };
-// (Mac 1.3.102) With --alta-launch (or MOCK_ALTA_LAUNCH=1), a Knewton Alta launch goes as a real one does: the address
+// (Mac 1.3.106) With --alta-launch (or MOCK_ALTA_LAUNCH=1), a Knewton Alta launch goes as a real one does: the address
 // Canvas hands over is a page of Canvas's own (not Alta's) whose form sends itself on to Alta — an LTI launch, POSTed —
 // and Alta answers it by sending the browser on to the assignment's page: two pages on the way to Alta's, the first on
 // Canvas's host. Without it (the apps' pictures, the iPhone app's test school), Alta's page is handed over itself.
@@ -1477,7 +1477,7 @@ const server = http.createServer((req, res) => {
     // (Mac 1.3.17) a stand-in for a Knewton Alta assignment's player: Alta's shell (its header, Practice, the Current
     // objective card) round a question drawn as Learnosity draws one, and Alta's content answer — plain JSON, fetched by
     // the page as Alta's own is — with Check Answer and Next Question as Alta has them
-    // (Mac 1.3.102) the launch's first page — Canvas's own, the LTI form sent on to Alta at once — and Alta's answer to it,
+    // (Mac 1.3.106) the launch's first page — Canvas's own, the LTI form sent on to Alta at once — and Alta's answer to it,
     // which sends the browser on to the assignment's page (only ever one of the mock's own Alta pages)
     if (altaLaunchHops && req.method === 'GET' && /^\/courses\/\w+\/external_tools\/sessionless_launch$/.test(path)) {
       const to = url.searchParams.get('to') || '';
@@ -1490,7 +1490,7 @@ const server = http.createServer((req, res) => {
       return res.end();
     }
     if (path === '/mock-alta/api/content') {
-      // (Mac 1.3.102) half a second late, as Alta's own answer comes over the network
+      // (Mac 1.3.106) half a second late, as Alta's own answer comes over the network
       await new Promise((r) => setTimeout(r, 500));
       // (with lesson=1: the lesson and its question in one answer, the lesson first — as View Instruction has Alta send them)
       const j = altaContent();

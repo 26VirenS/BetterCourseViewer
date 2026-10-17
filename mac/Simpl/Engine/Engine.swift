@@ -104,7 +104,7 @@ final class Engine: ObservableObject, ShellListener {
     private func altaAsked() {
         guard let a = alta else {
             pendingAlta = nil
-            // (1.3.102) the popup closed: the next one's web view made ahead, at a quiet moment
+            // (1.3.106) the popup closed: the next one's web view made ahead, at a quiet moment
             if hasAlta { AltaSpare.shared.prepare(primary ?? self) }
             return
         }
@@ -114,7 +114,7 @@ final class Engine: ObservableObject, ShellListener {
 
     /// (1.3.101) An Alta assignment's session made and its launch asked of Canvas now, ahead of its popup — the Tools
     /// list's, which puts the popup up only once the list has closed — taken by `alta` set to the same launch.
-    /// (1.3.102) In the web view made ahead for it, when there is one; and the account known to use Alta from now on.
+    /// (1.3.106) In the web view made ahead for it, when there is one; and the account known to use Alta from now on.
     func askAlta(_ a: AltaLaunch) {
         knowAlta()
         let s = AltaSession(launch: a, spare: AltaSpare.shared.take(host: host))
@@ -131,7 +131,7 @@ final class Engine: ObservableObject, ShellListener {
         return AltaSession(launch: launch, spare: AltaSpare.shared.take(host: host))
     }
 
-    /// (1.3.102) Whether this account uses Knewton Alta, as far as the app has seen it — the Tools list naming it, an
+    /// (1.3.106) Whether this account uses Knewton Alta, as far as the app has seen it — the Tools list naming it, an
     /// assignment that opens it, an Alta assignment opened — remembered for the account at this school, and forgotten
     /// when the student signs out. Only such an account has a web view made ahead for Alta's popup (AltaSpare).
     var hasAlta: Bool { UserDefaults.standard.bool(forKey: altaAccountKey) }
@@ -141,7 +141,7 @@ final class Engine: ObservableObject, ShellListener {
         if !hasAlta { UserDefaults.standard.set(true, forKey: altaAccountKey) }
     }
 
-    /// (1.3.102) An answer that says this account uses Alta — the Tools list naming Knewton Alta, an assignment that opens
+    /// (1.3.106) An answer that says this account uses Alta — the Tools list naming Knewton Alta, an assignment that opens
     /// it (the student on its page, about to open it): known from now on, and a web view made ahead for its popup at the
     /// next quiet moment.
     private func noteAlta(in name: String, _ value: Any) {
@@ -387,7 +387,7 @@ final class Engine: ObservableObject, ShellListener {
         answers.clear()
         memo.clear()
         liveMarks.forget()
-        // (1.3.102) nothing of this account's Alta kept for the next: its web view made ahead let go, and whether it used
+        // (1.3.106) nothing of this account's Alta kept for the next: its web view made ahead let go, and whether it used
         // Alta forgotten
         UserDefaults.standard.removeObject(forKey: altaAccountKey)
         AltaSpare.shared.drop("signed out")
@@ -437,7 +437,7 @@ final class Engine: ObservableObject, ShellListener {
             // (1.3.83: alta:104:4003:/mock-alta/… — opened on that page of the mock's Alta, as the pop-up's pictures need)
             if parts.count >= 2 {
                 let launch = AltaLaunch(course: parts[0], assignment: parts[1], title: "Knewton Alta", page: parts.count > 2 ? parts[2...].joined(separator: ":") : nil)
-                // (1.3.102: -SimplAltaSpare YES — opened in a web view made ahead, as an account that uses Alta opens it)
+                // (1.3.106: -SimplAltaSpare YES — opened in a web view made ahead, as an account that uses Alta opens it)
                 if UserDefaults.standard.bool(forKey: "SimplAltaSpare") {
                     Task { await AltaSpare.shared.makeNow(host: self.host); self.alta = launch }
                 } else {
@@ -467,7 +467,7 @@ final class Engine: ObservableObject, ShellListener {
         await loadSidebar()
         if moreTool, let t = more?.items.first(where: { $0.kind == "tool" }) { openMore(t) }
         readAheadAfterLaunch() // (1.3.78: once the window is quiet, the places most opened next, read ahead)
-        // (1.3.102) an account that uses Knewton Alta: its popup's web view made ahead, once the window has been quiet a while;
+        // (1.3.106) an account that uses Knewton Alta: its popup's web view made ahead, once the window has been quiet a while;
         // one made ahead for the school chosen before (Change School…) let go, whether this one uses Alta or not
         AltaSpare.shared.drop(unlessFor: host)
         if hasAlta { AltaSpare.shared.prepare(self, quiet: 3) }
@@ -689,7 +689,7 @@ final class Engine: ObservableObject, ShellListener {
             throw EngineError.unreadable
         }
         let decoded = got.value
-        noteAlta(in: name, decoded) // (1.3.102)
+        noteAlta(in: name, decoded) // (1.3.106)
         if held {
             answers.keep(data, name, args) // (a read: kept for next time, AnswerCache)
             if let key = AnswerMemo.key(name, args) { memo.put(key, decoded, generation: generation, fingerprint: got.fingerprint) }

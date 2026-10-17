@@ -45,14 +45,14 @@ enum AltaHook {
       // (1.3.83) a pop-up of Alta's given back to its page — what it holds the app cannot draw as its own, or the student
       // asked — shown there as Alta draws it: Alta's page as it is, in sight under it, until it closes
       var dialogInPage = false;
-      // (1.3.102) the page's own reads of itself — its mastery bars, the overview's words, the cover — begun only once the
+      // (1.3.106) the page's own reads of itself — its mastery bars, the overview's words, the cover — begun only once the
       // page has been shown or its cover read (`begun`), so they never take the page's time while Alta is still drawing
       // it; a frame inside the page reads from the start, as before
       var begun = window.top !== window;
       // (and three seconds in, whatever the page is doing: a page out of sight for longer — not recognised, kept back
       // for its grace — still has its mastery read for the popup's rail)
       if (!begun) setTimeout(function () { begun = true; }, 3000);
-      // (1.3.102) changes to the page (elements, words) counted, for the reads that need not look again while nothing
+      // (1.3.106) changes to the page (elements, words) counted, for the reads that need not look again while nothing
       // has changed
       var pageChanges = 0;
       if (window.top === window) {
@@ -216,7 +216,7 @@ enum AltaHook {
       // ---- what Alta's page itself shows: its overview's words, its mastery bars ----
       var norm = function (s) { return String(s || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;| /g, ' ').replace(/\s+/g, ' ').trim().toLowerCase(); };
       var shown = function (el) { var r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
-      // (1.3.102) the page's web components — each element with a tree of its own — listed once, and looked for again
+      // (1.3.106) the page's web components — each element with a tree of its own — listed once, and looked for again
       // only after the page has had an element put in or a tree made: before, every look in them (the mastery bars every
       // second and a half, the overview's words, the pop-ups every 1.2 s) walked every element of the page for them
       var hosts = [], hostsDirty = true;
@@ -254,10 +254,10 @@ enum AltaHook {
         });
         return out;
       };
-      // (1.3.102) a keyword looked for in the page's words as they stand, with no layout — before the words as they show
+      // (1.3.106) a keyword looked for in the page's words as they stand, with no layout — before the words as they show
       // (innerText, which lays the page out) are read for it; what shows is always among them
       var mentions = function (el, re) { return !!el && re.test(el.textContent || ''); };
-      // (1.3.102) the question shown alone (the page script's own focus): the reads below need not look again while
+      // (1.3.106) the question shown alone (the page script's own focus): the reads below need not look again while
       // nothing in the page has changed — every third time all the same
       var focusOn = function () { return !!document.documentElement && document.documentElement.hasAttribute('data-simpl-q'); };
       // (the overview as it reads on the page, when no answer of Alta's named it: its title, DUE DATE, STATUS, and each
@@ -297,7 +297,7 @@ enum AltaHook {
         if (percent === null) bars.forEach(function (b) { if (percent === null && /mastery/.test(b.label)) percent = Math.round(b.value * 1000) / 10; });
         return { percent: percent, bars: bars };
       };
-      // (1.3.102) whether a read every so often need not look this time: not begun yet, or the question shown alone and
+      // (1.3.106) whether a read every so often need not look this time: not begun yet, or the question shown alone and
       // nothing changed in the page since it last looked (`at`: its own record; every third time it looks all the same)
       var idleRead = function (at) {
         if (!begun) return true;
@@ -417,7 +417,7 @@ enum AltaHook {
         var unmark = function () {
           marked.forEach(function (m) { m[0].removeAttribute(m[1]); });
           marked = []; keptNow = [];
-          watchKept(); // (1.3.102: no part watched)
+          watchKept(); // (1.3.106: no part watched)
           document.documentElement.removeAttribute('data-simpl-q');
           lookNow(); // (1.3.83: Alta's page as it is, dark too when Dark is picked, from the moment it is)
         };
@@ -477,7 +477,7 @@ enum AltaHook {
         var busy = function (root) {
           if (!root) return false;
           if ([].some.call(root.querySelectorAll(BUSY), function (b) { return shown(b) && !b.closest('[data-simpl-pic]'); })) return true;
-          // (1.3.102: its words as they show read only when its words as they stand say any of these)
+          // (1.3.106: its words as they show read only when its words as they stand say any of these)
           if (!mentions(root, /loading|please\s*wait|one\s*moment|just\s*a\s*moment|preparing/i)) return false;
           var t = norm(root.innerText || '');
           return t.length < 120 && /^(loading|please wait|one moment|just a moment|preparing)\b/.test(t);
@@ -497,7 +497,7 @@ enum AltaHook {
           keep.forEach(function (k) { if (sprite(k)) for (var x = k; x && !real.has(x); x = x.parentElement) mark(x, 'data-simpl-thin'); });
           keptNow = keep;
           gen++;
-          watchKept(); // (1.3.102: the parts kept now told as they change)
+          watchKept(); // (1.3.106: the parts kept now told as they change)
           verdictDirty = true;
           var st = document.getElementById('simpl-focus');
           if (!st) { st = document.createElement('style'); st.id = 'simpl-focus'; (document.head || document.documentElement).appendChild(st); }
@@ -628,7 +628,7 @@ enum AltaHook {
           }
           return '';
         };
-        // (1.3.102) `lazy`: told on demand (publishSoon) — the verdict read again only when something in the parts kept
+        // (1.3.106) `lazy`: told on demand (publishSoon) — the verdict read again only when something in the parts kept
         // has changed since it was last read (`verdictDirty`), else as it was last read
         var verdictDirty = true, verdictSaid = '', pubAt = 0;
         var publish = function (lazy) {
@@ -648,7 +648,7 @@ enum AltaHook {
           var psSaid = JSON.stringify({ panels: ps, height: ps.length ? bottom + 48 : 0, gen: gen, pics: pr, verdict: on ? verdictSaid : '' });
           if (psSaid !== lastPanels) { lastPanels = psSaid; var m = JSON.parse(psSaid); m.kind = 'panels'; post(m); }
         };
-        // (1.3.102) The panels, the buttons and the verdict told when something may have moved them, not every 350 ms
+        // (1.3.106) The panels, the buttons and the verdict told when something may have moved them, not every 350 ms
         // whatever the page did (1.3.53–1.3.101): a change in the parts kept (their elements and words, or a class, a
         // style, a button greyed or not — `keptWatch`), a part's size (`keptSize`) or the window's, at the next frame and
         // no oftener than every 200 ms however fast the page changes; once more 450 ms after a change in the parts (a
@@ -1092,7 +1092,7 @@ enum AltaHook {
             return;
           }
           keepDialogs();
-          // (1.3.102) the page read afresh — its marks lifted for the moment, a style pass over the whole page each way —
+          // (1.3.106) the page read afresh — its marks lifted for the moment, a style pass over the whole page each way —
           // only when something may have changed what it holds: anything but a change outside the parts shown alone (Alta's
           // header, its chat), after which the last reading still stands; and every two seconds all the same
           var fresh = readAgain || !lastRead || !document.documentElement.hasAttribute('data-simpl-q') || Date.now() - readAt > 2000
@@ -1158,7 +1158,7 @@ enum AltaHook {
           publish();
           reveal('as it is');
         };
-        // (1.3.102) `outside`: for a change outside the parts shown alone — the page need not be read afresh for it
+        // (1.3.106) `outside`: for a change outside the parts shown alone — the page need not be read afresh for it
         var lastRead = null, readAt = 0, readAgain = true;
         var schedule = function (ms, outside) {
           if (!outside) readAgain = true;
@@ -1360,7 +1360,7 @@ enum AltaHook {
           return [].slice.call(document.querySelectorAll('a, button')).filter(function (b) { return vis(b) && /^review instruction$/i.test(cs(b.innerText || b.textContent)); })[0] || null;
         };
         var coverRead = function () {
-          // (a cover: its header, or a Start beside the objectives' estimates — never Alta's learn page; 1.3.102: looked
+          // (a cover: its header, or a Start beside the objectives' estimates — never Alta's learn page; 1.3.106: looked
           // for in that order, the cheapest first — the learn page, the header, the words, and only then a Start)
           if (document.querySelector('[class*="learn-flow-body"], section[class*="compound__compound"]')) return null;
           var head = document.querySelector('[data-test="cover-header"]');
@@ -1417,7 +1417,7 @@ enum AltaHook {
           if (o) begun = true;
           post(stamp(o || { kind: 'cover', none: true }));
         };
-        // (1.3.102) looked for every 0.7 s once the page has been shown or its cover read — while it loads, only when
+        // (1.3.106) looked for every 0.7 s once the page has been shown or its cover read — while it loads, only when
         // Alta's cover header is there (the overview the page script recognises reads the cover itself, at once)
         setInterval(function () { if (begun || document.querySelector('[data-test="cover-header"]')) coverTick(); }, 700);
         window.__simplCoverNow = coverTick;
@@ -1694,12 +1694,12 @@ struct AltaLaunch: Identifiable, Equatable {
 /// (1.3.101) An Alta open, timed from the moment the popup was asked for: the launch asked of Canvas and answered,
 /// Alta's first page begun, what it shows first, and the page in sight — one line on the console for every open
 /// (`[Simpl] alta: view spare · asked 2 ms · launch 410 ms · page 655 ms · question 790 ms · shown 905 ms (question, quiet
-/// 120 ms)`; 1.3.102: the web view's word first),
+/// 120 ms)`; 1.3.106: the web view's word first),
 /// in the screenshot suite's consoles and the Mac's own log alike. The page's moments are its own clock's (`nav`, when
 /// it began, and `t`, as the page script posts them), so the time the message takes to come is not counted.
 struct AltaTimeline {
     let start = Date()
-    /// (1.3.102) The popup's web view: the spare made ahead ("spare"), or made as the popup was asked for, and how long
+    /// (1.3.106) The popup's web view: the spare made ahead ("spare"), or made as the popup was asked for, and how long
     /// that took ("made 41 ms").
     var view: String?
     var asked: Double?
@@ -1743,9 +1743,9 @@ struct AltaTimeline {
     }
 }
 
-// MARK: - (1.3.102) A web view made ahead
+// MARK: - (1.3.106) A web view made ahead
 
-/// (1.3.102) One web view for Alta's popup made ahead, at a quiet moment once the Dashboard is up (or once an Alta
+/// (1.3.106) One web view for Alta's popup made ahead, at a quiet moment once the Dashboard is up (or once an Alta
 /// assignment's page or the Tools list has said so), for an account that uses Knewton Alta (Engine `hasAlta`): its
 /// configuration, its page script and its relay in, and an empty page (about:blank) loaded, so WebKit's process for it is
 /// already running when the student opens an assignment. The popup takes it (`take`) instead of making one then — a web
@@ -1893,7 +1893,7 @@ final class AltaSession: ObservableObject {
     private var launching: Task<Void, Never>?
     /// (1.3.101) The popup closed (`popupClosed`): a launch answered after it is not loaded.
     private var closed = false
-    /// (1.3.102) Its popup up, or on its way: no spare web view is made meanwhile.
+    /// (1.3.106) Its popup up, or on its way: no spare web view is made meanwhile.
     var isOpen: Bool { !closed }
     /// (1.3.101) The launch answered with Canvas's own page for the assignment, Alta in it (`go`).
     private var direct = false
@@ -2114,7 +2114,7 @@ final class AltaSession: ObservableObject {
     /// (1.3.47) Each time Alta's page was not recognised and shown as it is: when, why, and what the page held.
     @Published private(set) var errorLogs: [String] = []
 
-    /// (1.3.102) `spare`: the web view made ahead for Alta's popup (AltaSpare), taken by this open; else one is made now.
+    /// (1.3.106) `spare`: the web view made ahead for Alta's popup (AltaSpare), taken by this open; else one is made now.
     init(launch: AltaLaunch, spare: AltaSpare.View? = nil) {
         self.launch = launch
         let began = CACurrentMediaTime()
@@ -2140,7 +2140,7 @@ final class AltaSession: ObservableObject {
     /// A web view for Alta's page, with the page script in every frame and the relay its messages come by: signed in to
     /// the school as the app's own pages are, Alta's sounds and videos allowed, laid on the popup's glass (1.3.49), and
     /// (1.3.79) light whatever the app's appearance (its own colour scheme, its fields), as every tool's is — (1.3.83)
-    /// until the student picks Dark (`appearance(dark:)`). (1.3.102) Made as the popup is asked for, or ahead (AltaSpare).
+    /// until the student picks Dark (`appearance(dark:)`). (1.3.106) Made as the popup is asked for, or ahead (AltaSpare).
     static func makeWeb() -> AltaSpare.View {
         CrossSiteCookies.apply()
         let config = WKWebViewConfiguration()
@@ -2158,7 +2158,7 @@ final class AltaSession: ObservableObject {
     }
 
     /// Alta opened: the assignment's launch through Canvas (or the page asked for). (1.3.101) Asked at once, by the
-    /// engine the moment the popup is asked for; asked again by the popup's view, it does nothing. (1.3.102: whatever
+    /// engine the moment the popup is asked for; asked again by the popup's view, it does nothing. (1.3.106: whatever
     /// address its web view has — a spare's is about:blank — it is the launch that says whether it was asked.)
     func start(engine: Engine) {
         guard launching == nil else { return }
@@ -2214,7 +2214,7 @@ final class AltaSession: ObservableObject {
     /// own page for the assignment (`direct`: no launch of its own was had) is where the launch ends: shown at once, as
     /// 1.3.100 showed it. Still there means no new page begun since (`documents`), whatever its address did meanwhile.
     private func landed() {
-        // (1.3.102: never a spare web view's empty page, which it may still be finishing as the popup takes it)
+        // (1.3.106: never a spare web view's empty page, which it may still be finishing as the popup takes it)
         guard opening, let url = web.url, url.scheme != "about" else { return }
         let page = documents, wait: UInt64 = direct ? 0 : 2_500_000_000
         Task { [weak self] in

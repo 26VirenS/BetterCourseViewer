@@ -557,7 +557,7 @@ alta_pages() {
   # verdict as the popup's own pill at the left of its buttons — Correct in green, light; Incorrect in red, dark
   MODE=light shoot light-21u-alta-right 22 -SimplOpen "$page?sample=right"
   MODE=dark shoot dark-21v-alta-wrong 22 -SimplOpen "$page?sample=wrong"
-  # (1.3.102) the popup opened in the web view made ahead for an account that uses Alta (-SimplAltaSpare YES): the same
+  # (1.3.106) the popup opened in the web view made ahead for an account that uses Alta (-SimplAltaSpare YES): the same
   # overview as 21a, its console's line saying `alta: view spare`
   MODE=light shoot light-21w-alta-spare 20 -SimplOpen alta:104:4003 -SimplAltaSpare YES
 }
