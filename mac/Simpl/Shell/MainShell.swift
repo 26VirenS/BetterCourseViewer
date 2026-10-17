@@ -366,7 +366,19 @@ struct Sidebar: View {
                         try? await Task.sleep(nanoseconds: 250_000_000) // (once the course's sections are in the list)
                         proxy.scrollTo(whereabouts.nav.current.place)
                     }
-                    .onChange(of: whereabouts.nav.current.place) { _, p in proxy.scrollTo(p) }
+                    .onChange(of: whereabouts.nav.current.place) { was, p in
+                        // (1.3.107) a course chosen — its home or a section of another course than before — has its row
+                        // scrolled to the top of the list, its sections opening under it in sight; elsewhere, the row
+                        // of the place only kept in sight, as before
+                        if let ctx = p.ctx, ctx.hasPrefix("courses/"), ctx != was.ctx {
+                            // (once its sections are in the list under it, so the scroll ends where they show)
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                                withAnimation(Motion.gentle) { proxy.scrollTo(Place.home(ctx), anchor: .top) }
+                            }
+                        } else {
+                            proxy.scrollTo(p)
+                        }
+                    }
                     .task(id: "\(engine.more?.items.last?.id ?? "")|\(engine.courses.count)|\(engine.groups.count)") {
                         // (the screenshot suite: -SimplSidebarScroll more — the list scrolled to its last section, once
                         // that is in, and again as the rows above it change, for the section's picture)

@@ -56,8 +56,9 @@ struct ContextHome: View {
     private func content(_ d: HomeData) -> some View {
         let color = Color(hex: d.color)
         let tiles = d.sections.filter { $0.kind != "home" } // (the home is where this is)
+        let more = d.more ?? []
         header(d, color)
-        if !tiles.isEmpty { sectionPills(tiles, color) }
+        if !tiles.isEmpty || !more.isEmpty { sectionPills(tiles, more, d, color) }
         lower(d, color)
     }
 
@@ -129,7 +130,9 @@ struct ContextHome: View {
     }
 
     /// (1.2) The sections as glass pills that run along a line and wrap: a click opens one, its menu has Canvas's page.
-    private func sectionPills(_ sections: [SectionLink], _ color: Color) -> some View {
+    /// (1.3.107) The course's other links — its tools, Canvas's pages that have no place of their own — are pills of their
+    /// own after them (they were a "More" card in the side column), a tool's with the puzzle piece, opening its window.
+    private func sectionPills(_ sections: [SectionLink], _ more: [MoreLink], _ d: HomeData, _ color: Color) -> some View {
         GlassGroup(spacing: 4) {
             let flow = PillFlow(spacing: 10, lineSpacing: 10)
             flow {
@@ -155,18 +158,40 @@ struct ContextHome: View {
                     }
                     .readsAhead { engine.readAhead(.section(ctx, s.kind)) } // (1.3.78: the section, read ahead)
                 }
+                ForEach(more) { m in
+                    Button {
+                        openMore(m, d)
+                    } label: {
+                        Label {
+                            Text(m.label)
+                                .font(.sBody.weight(.medium))
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                        } icon: {
+                            Image(systemName: m.tool != nil || m.external == true ? "puzzlepiece.extension" : "link")
+                                .foregroundStyle(color)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                    }
+                    .buttonStyle(GlassPillStyle())
+                    .help(m.tool != nil || m.external == true ? "Opens in a window of its own" : m.label)
+                    .canvasRowMenu(m.label, url: m.url, engine: engine) { openMore(m, d) }
+                }
             }
         }
     }
 
     // MARK: - The two columns
 
-    /// The work, the news and what it says about itself in the main column; the front page, what was handed in and the
-    /// other links in the side column — under the main on a narrow window, or the only one when the other is empty.
+    /// (1.3.107) The front page in the main column — the latest announcements, at most three and a line each, just above
+    /// it, or, with no front page, the announcements in its place — and what it says about itself; the work still to do
+    /// and what was handed in in the side column — under the main on a narrow window, or the only one when the other is
+    /// empty. (Before, the work was the main column and the front page the side's.)
     @ViewBuilder
     private func lower(_ d: HomeData, _ color: Color) -> some View {
-        let main = d.kind == "courses" || !d.announcements.isEmpty || !(d.html ?? "").isEmpty
-        let side = d.front != nil || !(d.done ?? []).isEmpty || !(d.more ?? []).isEmpty
+        let main = d.front != nil || !d.announcements.isEmpty || !(d.html ?? "").isEmpty
+        let side = d.kind == "courses" || !(d.done ?? []).isEmpty
         if main && side {
             let columns = SideSplit(side: 360, from: 860, gap: 26, spacing: 24)
             columns {
@@ -182,8 +207,12 @@ struct ContextHome: View {
 
     @ViewBuilder
     private func mainColumn(_ d: HomeData, _ color: Color) -> some View {
-        if d.kind == "courses" { stillToDo(d, color) }
-        if !d.announcements.isEmpty { announcements(d, color) }
+        if let f = d.front {
+            if !d.announcements.isEmpty { compactAnnouncements(d, color) }
+            frontPage(f)
+        } else if !d.announcements.isEmpty {
+            announcements(d, color)
+        }
         if let html = d.html, !html.isEmpty {
             CardSection(title: "About", padding: 18) {
                 RichText(html: html)
@@ -193,13 +222,12 @@ struct ContextHome: View {
 
     @ViewBuilder
     private func sideColumn(_ d: HomeData, _ color: Color) -> some View {
-        if let f = d.front { frontPage(f) }
+        if d.kind == "courses" { stillToDo(d, color) }
         if let done = d.done, !done.isEmpty {
             CardSection(title: "Handed In Lately") {
                 DividedRows(data: done) { r in workRow(r, color) }
             }
         }
-        if let more = d.more, !more.isEmpty { moreLinks(more, d, color) }
     }
 
     private func stillToDo(_ d: HomeData, _ color: Color) -> some View {
@@ -237,6 +265,43 @@ struct ContextHome: View {
         }
     }
 
+    /// (1.3.107) Over the front page: the latest announcements squeezed to a line each, three at most — unread ones marked
+    /// and in bold, who and when at the end of the line.
+    private func compactAnnouncements(_ d: HomeData, _ color: Color) -> some View {
+        CardSection(title: "Announcements", accessory: {
+            if d.sections.contains(where: { $0.kind == "announcements" }) {
+                Button(d.announcements.count > 3 ? "All \(d.announcements.count)" : "All Announcements") { engine.go(.section(ctx, "announcements")) }
+                    .buttonStyle(.link)
+                    .font(.sCallout)
+            }
+        }) {
+            DividedRows(data: Array(d.announcements.prefix(3)), inset: 40) { a in
+                RowLink {
+                    engine.openWeb(a.url, title: a.title)
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "megaphone")
+                            .font(.sCallout)
+                            .foregroundStyle(color)
+                            .frame(width: 20)
+                        if a.unread == true {
+                            Circle().fill(Theme.accent).frame(width: 7, height: 7).accessibilityLabel("Unread")
+                        }
+                        Text(a.title)
+                            .font(a.unread == true ? .sBody.weight(.semibold) : .sBody)
+                            .lineLimit(1)
+                        Spacer(minLength: 8)
+                        Text([a.author, a.when].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
+                            .font(.sFootnote)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                .canvasRowMenu(a.title, url: a.url, engine: engine) { engine.openWeb(a.url, title: a.title) }
+            }
+        }
+    }
+
     private func frontPage(_ f: FrontPage) -> some View {
         let slug = f.slug ?? ""
         return CardSection(title: "Front Page") {
@@ -246,30 +311,12 @@ struct ContextHome: View {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(f.title).font(.sHeadline)
                     if let x = f.excerpt, !x.isEmpty {
-                        Text(x).font(.sCallout).foregroundStyle(.secondary).lineLimit(6)
+                        Text(x).font(.sCallout).foregroundStyle(.secondary).lineLimit(14) // (1.3.107: the wide column's, so more of it)
                     }
                 }
             }
             .canvasRowMenu(f.title, url: slug.isEmpty ? "/\(ctx)/wiki" : "/\(ctx)/pages/\(slug)", engine: engine) {
                 engine.push(.page(ctx: ctx, slug: slug))
-            }
-        }
-    }
-
-    private func moreLinks(_ more: [MoreLink], _ d: HomeData, _ color: Color) -> some View {
-        CardSection(title: "More") {
-            DividedRows(data: more) { m in
-                let window = m.tool != nil || m.external == true // (a tool opens in a window of its own)
-                RowLink {
-                    openMore(m, d)
-                } label: {
-                    InfoRow(title: m.label, symbol: m.external == true ? "puzzlepiece.extension" : "link", tint: color) {
-                        Image(systemName: window ? "macwindow" : "chevron.right")
-                            .font(.sFootnote.weight(.semibold))
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-                .canvasRowMenu(m.label, url: m.url, engine: engine) { openMore(m, d) }
             }
         }
     }
