@@ -5798,7 +5798,10 @@ try {
   check(picked.on === '#e91e63' && picked.dot === 'rgb(233, 30, 99)' && picked.crow === 'rgb(233, 30, 99)' && picked.reset === 'Use the Canvas colour' && picked.note === '1 changed' && (await colourNow()) === colourWas, `a swatch pressed colours the course everywhere on the preview, the note counts it, and Canvas is not told yet: ${JSON.stringify(picked)}`);
   await page.click(pz('#pzAny'));
   await page.waitForSelector(pz('[data-pk].pz__pk--course'), { timeout: 5000 });
-  check((await page.$eval(pz('[data-pk]'), (e) => e.dataset.hex)) === '#e91e63' && (await pzVar('--A')) === pinkA, 'Any colour opens the same picker for the course, seeded with its colour, and the theme does not move');
+  // (read once it has settled: on a slower machine the picker's seed and the page's colour land a moment after it opens)
+  let anyPk = null;
+  const anyOk = await eventually(async () => { anyPk = { hex: await page.$eval(pz('[data-pk]'), (e) => e.dataset.hex).catch(() => null), A: await pzVar('--A').catch(() => null) }; return anyPk.hex === '#e91e63' && anyPk.A === pinkA; }, 2000);
+  check(anyOk, `Any colour opens the same picker for the course, seeded with its colour, and the theme does not move: ${JSON.stringify(anyPk)}`);
   await page.click(pz('.pz__pkdone'));
   await eventually(async () => (await page.$(pz('[data-pk]'))) === null, 3000);
   await shot(page, '32e4-personalize-courses');
