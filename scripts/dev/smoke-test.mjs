@@ -2635,6 +2635,67 @@ try {
   const settled = (await texts('.bcv-body > div > .bcv-label')).join(',').toLowerCase();
   check(settled === 'current groups,previous groups', `the courses fold in behind them, and Previous groups appears once a group's course can be called past: ${settled}`);
   } // groups
+  if (on('one sidebar')) {
+
+  // ---- (2.99.39) one sidebar, and the chooser that offers it -------------------------------------------------------
+  console.log('one sidebar');
+  // someone who had Simpl before 2.99.39, no choice made: the chooser, a black screen, the two side by side — two on the
+  // left, one on the right and picked — before anything else (What's New waits for the next page)
+  await setSettings({ appearance: { sidebar: '' } });
+  await sw.evaluate(async () => { await self.BCV.api.storage.local.set({ 'whatsnew:seen': '2.99.38' }); await self.BCV.api.storage.local.remove('sidebar:ask'); });
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-choose', { timeout: 15000 });
+  await page.waitForTimeout(450);
+  const chooser = await page.evaluate(() => { const el = document.querySelector('.bcv-choose'); return { bg: getComputedStyle(el).backgroundColor, cards: [...el.querySelectorAll('.bcv-choose__card')].map((c) => `${c.dataset.kind}${c.classList.contains('is-on') ? '*' : ''}`).join(','), labels: [...el.querySelectorAll('.bcv-choose__label')].map((l) => l.textContent).join('|'), left: el.querySelector('.bcv-choose__card[data-kind="two"]').getBoundingClientRect().left < el.querySelector('.bcv-choose__card[data-kind="one"]').getBoundingClientRect().left, whatsnew: !!document.querySelector('.bcv-wn, .bcv-whatsnew'), focus: document.activeElement?.className }; });
+  check(chooser.bg === 'rgb(0, 0, 0)' && chooser.cards === 'two,one*' && chooser.labels === 'Two sidebars|One sidebarNew' && chooser.left && !chooser.whatsnew && /bcv-choose__go/.test(chooser.focus), `an update asks once, on a black screen: two sidebars on the left, one (new) on the right and picked, Continue in focus: ${JSON.stringify(chooser)}`);
+  await shot(page, '10h-sidebar-chooser');
+  await page.keyboard.press('ArrowLeft');
+  check((await page.$eval('.bcv-choose__card.is-on', (e) => e.dataset.kind)) === 'two', 'the left arrow picks two sidebars');
+  await page.keyboard.press('ArrowRight');
+  check((await page.$eval('.bcv-choose__card.is-on', (e) => e.dataset.kind)) === 'one', 'the right arrow picks one again');
+  await page.click('.bcv-choose__go');
+  await page.waitForFunction(() => !document.querySelector('.bcv-choose'), null, { timeout: 5000 });
+  const chosen = await sw.evaluate(async () => ({ sidebar: (await self.BCV.settings.get()).appearance.sidebar, ask: (await self.BCV.api.storage.local.get('sidebar:ask'))['sidebar:ask'] }));
+  check(chosen.sidebar === 'one' && chosen.ask === undefined && (await page.$eval('html', (e) => e.classList.contains('bcv-onebar'))), `Continue keeps one sidebar, and the question is not asked again: ${JSON.stringify(chosen)}`);
+  // (What's New, which waited for the chooser, comes on the next page: seen here, so it does not cover what follows)
+  await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'whatsnew:seen': v }), manifest.version);
+  // one sidebar: a course's own rail is gone; its sections open under its row in the sidebar, the one on show lit
+  await page.goto(`${BASE}/courses/101/assignments`);
+  await page.waitForSelector('.bcv-side .bcv-ctabs .bcv-ctab', { timeout: 15000 });
+  await page.waitForTimeout(400);
+  const oneBar = await page.evaluate(() => {
+    const rail = document.querySelector('.bcv-rail');
+    const tabs = document.querySelector('.bcv-side .bcv-ctabs');
+    const row = tabs?.previousElementSibling;
+    return { rail: rail ? getComputedStyle(rail).display : 'none', under: row?.classList.contains('bcv-fav') && row.classList.contains('is-active'), course: row?.textContent, tabs: [...tabs.querySelectorAll('.bcv-ctab')].map((t) => t.textContent.trim()), on: tabs.querySelector('.bcv-ctab.is-active')?.textContent.trim(), choose: !!document.querySelector('.bcv-choose') };
+  });
+  check(oneBar.rail === 'none' && oneBar.under && /MATH/.test(oneBar.course) && oneBar.tabs[0] === 'Home' && oneBar.tabs.includes('Assignments') && oneBar.tabs.some((t) => /^Grades/.test(t)) && /^Assignments/.test(oneBar.on) && !oneBar.choose, `one sidebar: the course's sections under its row, Assignments lit, no rail beside the page, no chooser again: ${JSON.stringify(oneBar)}`);
+  await shot(page, '10i-one-sidebar');
+  // a section pressed there goes to it, and is the one lit then
+  await page.click('.bcv-side .bcv-ctab[data-tab="grades"]');
+  await page.waitForFunction(() => /\/grades/.test(location.pathname) && document.querySelector('.bcv-side .bcv-ctab.is-active')?.dataset.tab === 'grades', null, { timeout: 15000 });
+  check(true, 'a section pressed in the sidebar opens it, and it is lit there');
+  // out of the course, its sections fold away
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-stat', { timeout: 15000 });
+  check(!(await page.$('.bcv-side .bcv-ctabs')), 'on the Dashboard no course has its sections open');
+  // Settings ▸ Appearance switches it back (two sidebars: the rail again)
+  const opts = await context.newPage();
+  await opts.goto(`chrome-extension://${extId}/options/options.html`);
+  await opts.waitForSelector('.navlink[data-section="appearance"]', { timeout: 10000 });
+  await opts.click('.navlink[data-section="appearance"]');
+  await opts.waitForSelector('#sidebarLayout button.is-on', { state: 'visible', timeout: 10000 });
+  check((await opts.$eval('#sidebarLayout button.is-on', (e) => e.dataset.value)) === 'one', 'Settings ▸ Appearance shows one sidebar chosen');
+  await opts.click('#sidebarLayout [data-value="two"]');
+  check(await eventually(async () => (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.sidebar)) === 'two', 3000), 'Settings switches back to two sidebars');
+  await opts.close();
+  await page.goto(`${BASE}/courses/101/assignments`);
+  await page.waitForSelector('.bcv-rail__item', { timeout: 15000 });
+  check((await page.$eval('.bcv-rail', (e) => getComputedStyle(e).display)) !== 'none' && !(await page.$('.bcv-side .bcv-ctabs')), 'two sidebars: the rail beside the page again, nothing under the course row');
+  // as the rest of the suite was written: nothing chosen, the version seen
+  await setSettings({ appearance: { sidebar: '' } });
+  await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'whatsnew:seen': v }), manifest.version);
+  } // one sidebar
   if (on('course')) {
 
   // ---- course home ---------------------------------------------------------------------------

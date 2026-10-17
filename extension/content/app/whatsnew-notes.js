@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.39', date: '2026-10-17', notes: [
+      { kind: 'new', title: 'One sidebar', body: 'A course opens its sections under it, as in the Mac app.', icon: P.list },
+    ] },
     { version: '2.99.38', date: '2026-10-17', notes: [
       { kind: 'new', title: 'Beta updates', body: 'The Mac app can get new versions early, as betas.', icon: P.arrows },
     ] },

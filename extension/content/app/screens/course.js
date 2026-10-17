@@ -653,6 +653,7 @@
     rail.append(toggle);
     railCounts(shell).then((counts) => {
       if (!ctx.alive()) return;
+      if (shell.kind === 'courses') ctx.app.setCourseNav?.({ id: shell.course.id, counts }); // (2.99.39: the sidebar's rows count as the rail's)
       for (const [id, n] of Object.entries(counts)) {
         const el = countEls[id];
         if (!el || !n) continue;
@@ -721,6 +722,7 @@
     shell.tabs = tabs;
     shell.activeId = activeId;
     shell.reader = null;
+    app.setCourseNav?.({ id, course, tabs, activeId }); // (2.99.39: one sidebar — the course's sections under its row there)
     let content;
     if (kept) {
       syncShell(ctx, kept, shell, activeId);
@@ -804,6 +806,7 @@
     for (const b of screen.querySelectorAll('.bcv-rail__item, .bcv-rail__ext')) b.classList.toggle('is-active', b.dataset.tab === activeId);
     railCounts(shell).then((counts) => {
       if (!ctx.alive()) return;
+      if (shell.kind === 'courses') ctx.app.setCourseNav?.({ id: shell.course.id, counts }); // (2.99.39: the sidebar's rows count as the rail's)
       for (const b of screen.querySelectorAll('.bcv-rail__item')) {
         const n = counts[b.dataset.tab];
         const el = b.querySelector('.bcv-rail__count');

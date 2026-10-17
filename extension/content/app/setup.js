@@ -97,6 +97,7 @@
       tracking: true, goal: 4, targets: {}, letters: {},
       dashView: 'list', // the list to start with, whatever Canvas has: the pick here is the student's
       sideCourses: settings.appearance?.sideCourses === 'always' ? 'always' : 'hover', // the panel off the Courses row is the default
+      sidebar: settings.appearance?.sidebar || 'one', // (2.99.39) one sidebar, unless two was chosen before
       closing: false,
     };
     settleSteps();
@@ -532,7 +533,7 @@
         store.setPref('gpaGoal', st.goal),
         store.setPref('gpaTracking', st.tracking ? { priorGpa: null, priorCourses: 0, since: new Date().toISOString().slice(0, 10) } : null),
         store.setPref('gradeTargets', targets),
-        S.update({ appearance: { sideCourses: st.sideCourses } }).catch(() => {}),
+        S.update({ appearance: { sideCourses: st.sideCourses, sidebar: st.sidebar } }).catch(() => {}), // (2.99.39: a new install has one sidebar, never the chooser)
         STEPS.some((s) => s.key === 'dashboard') ? store.setDashboardView(st.dashView).catch(() => {}) : Promise.resolve(),
       ]);
       const changes = st.courses.filter((c) => c.favorite !== st.favs.has(c.id));

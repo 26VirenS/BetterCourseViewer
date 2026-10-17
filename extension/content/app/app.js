@@ -665,6 +665,45 @@
   // opens them in a panel beside it instead. The pointer has to cross the gap between the row and
   // the panel, so closing waits a moment and any of the two staying under the pointer cancels it.
   const hoverCourses = () => state.settings?.appearance?.sideCourses === 'hover';
+  // (2.99.39) One sidebar, as the Mac's: the course on show opens under its row here, with its sections, and the course's
+  // own rail beside the page is gone. 'two' keeps the rail, as before — and so does a choice not made yet (''), until the
+  // chooser has asked (sidebarChoice); a new install has one from its setup.
+  const oneBar = () => !phone() && state.settings?.appearance?.sidebar === 'one';
+
+  /** (2.99.39) The course on show, as its screen read it (course.js): { id, course, tabs, activeId, counts }. Its tabs
+   *  are the sidebar's rows under the course's own, in one-sidebar mode; the counts come later and are kept with it. */
+  function setCourseNav(nav) {
+    const same = state.courseNav && String(state.courseNav.id) === String(nav.id);
+    state.courseNav = same ? { ...state.courseNav, ...nav } : { counts: {}, ...nav };
+    if (oneBar()) renderSide();
+  }
+  /** (2.99.39) The rows under a course's own in one-sidebar mode: each of its sections, its glyph in the course's colour,
+   *  a count where there is one (unread announcements, grades posted this week); a campus tool opens in a tab of its own. */
+  function courseNavRows(c) {
+    const nav = state.courseNav;
+    const r = state.route || parseRoute();
+    if (r.screen !== 'course') state.courseNavOpen = null; // (out of the course: back in, its rows slide in again)
+    if (!oneBar() || !nav || String(nav.id) !== String(c.id) || r.screen !== 'course' || String(r.courseId) !== String(c.id)) return null;
+    const color = nav.course?.color || c.color;
+    const fresh = state.courseNavOpen !== String(nav.id); // (the rows slide in when the course opens, not at every redraw after)
+    state.courseNavOpen = String(nav.id);
+    return U.el(`bcv-ctabs ${fresh ? 'is-new' : ''}`, nav.tabs.map((t) => h('button', {
+      type: 'button',
+      class: `bcv-ctab ${t.id === nav.activeId ? 'is-active' : ''} ${t.external ? 'bcv-ctab--ext' : ''}`,
+      dataset: { load: `tab:${t.id}`, loadColor: color, tab: t.id, href: t.href },
+      title: t.label,
+      onclick: (e) => {
+        if (t.external) { if (BCV.exttool) BCV.exttool.openLink({ title: t.label, href: t.href, from: e.currentTarget }); else go(t.href); return; }
+        if (state.loadKey === `tab:${t.id}` && !loadStuck()) return;
+        progress(true, `tab:${t.id}`);
+        go(t.href);
+      },
+    }, [
+      h('span', { class: 'bcv-ctab__ic', style: { color } }, U.svg(t.icon, { size: 17, width: 1.8 })),
+      h('span', { class: 'bcv-ellip', text: t.label }),
+      nav.counts?.[t.id] ? h('span', { class: 'bcv-nav__count', text: String(nav.counts[t.id]) }) : null,
+    ].filter(Boolean))), { role: 'group', 'aria-label': `${c.shortName || c.name} sections` });
+  }
   let quickNav = null; // { el, key, anchor, closeTimer }
   let quickNavDismissed = false; // Escape was pressed: hold it shut until the pointer or focus leaves the row
 
@@ -785,6 +824,7 @@
     closeQuickNav(); // the panel is anchored to a row this rebuild is about to replace
     const r = state.route || parseRoute();
     const name = siteName();
+    html.classList.toggle('bcv-onebar', oneBar()); // (2.99.39: the course's rail goes, app.css)
     const focus = inQuiz() && !state.quizOpen; // our own quiz flow hides the sidebar entirely
     root?.classList.toggle('bcv-focus', focus);
     if (focus) {
@@ -835,9 +875,18 @@
       // the last step of the guided setup). Either way it is the same list in the same order.
       hoverCourses() ? null : U.el('bcv-side__group', [
         U.text('bcv-side__label', 'Favorite courses'),
-        ...state.favs.map((c) => favRow(c)), // (not `.map(favRow)`: the index would land in favRow's second argument)
+        ...state.favs.flatMap((c) => [favRow(c), courseNavRows(c)]), // (2.99.39: the course on show opens under its row, one sidebar)
         state.favs.length ? null : U.text('bcv-hint', 'Star a course under Courses to pin it here.'),
-      ]),
+      ].filter(Boolean)),
+      // (2.99.39) one sidebar: a course on show that is not listed above (not a favourite, or the favourites in the
+      // Courses row's panel) has its row and its sections here
+      (() => {
+        const nav = state.courseNav;
+        if (!oneBar() || !nav?.course || r.screen !== 'course' || String(r.courseId) !== String(nav.id)) return null;
+        if (!hoverCourses() && state.favs.some((c) => String(c.id) === String(nav.id))) return null;
+        const c = { ...nav.course, url: nav.course.url || `/courses/${nav.id}` };
+        return U.el('bcv-side__group', [U.text('bcv-side__label', 'This course'), favRow(c), courseNavRows(c)]);
+      })(),
       BCV.extras?.sideGroup?.(BCV.app), // what the school added to Canvas's own nav (tools, History, Help)
       U.el('bcv-side__bottom', [
         // Appearance expands into a menu above itself: Light, Dark, and Personalize (the editor)
@@ -2025,6 +2074,80 @@
     }
   }
 
+  /** (2.99.39) The sidebar chooser, once, for anyone who had Simpl before one sidebar came (the setup picks one for a new
+   *  install): a black screen with the two side by side — the two sidebars they know on the left, the one sidebar on the
+   *  right, picked already — and Continue. Arrows move between them, Enter continues. Resolves once it is chosen. */
+  function sidebarChoice() {
+    return new Promise((resolve) => {
+      let pick = 'one';
+      const mini = (kind) => h('span', { class: `bcv-choose__mini bcv-choose__mini--${kind}`, 'aria-hidden': 'true' }, [
+        h('i', { class: 'bcv-choose__side' }, kind === 'one'
+          ? [h('b'), h('b'), h('b'), h('b', { class: 'is-course' }), h('b', { class: 'is-sub' }), h('b', { class: 'is-sub is-on' }), h('b', { class: 'is-sub' }), h('b')]
+          : [h('b'), h('b'), h('b'), h('b', { class: 'is-course' }), h('b'), h('b')]),
+        kind === 'two' ? h('i', { class: 'bcv-choose__rail' }, [h('b'), h('b', { class: 'is-on' }), h('b'), h('b')]) : null,
+        h('i', { class: 'bcv-choose__page' }, [h('b', { class: 'is-title' }), h('b'), h('b'), h('b', { class: 'is-short' })]),
+      ].filter(Boolean));
+      const card = (kind, title, sub, isNew) => h('button', { type: 'button', class: 'bcv-choose__card', role: 'radio', dataset: { kind }, onclick: () => set(kind) }, [
+        mini(kind),
+        h('span', { class: 'bcv-choose__label' }, [h('span', { text: title }), isNew ? h('span', { class: 'bcv-choose__new', text: 'New' }) : null].filter(Boolean)),
+        h('span', { class: 'bcv-choose__sub', text: sub }),
+        h('span', { class: 'bcv-choose__tick', 'aria-hidden': 'true' }, U.svg('M5.5 12.5l4 4L18.5 7.5', { size: 13, stroke: '#fff', width: 2.6 })),
+      ]);
+      const cards = h('div', { class: 'bcv-choose__cards', role: 'radiogroup', 'aria-label': 'Sidebar' }, [
+        card('two', 'Two sidebars', 'As it has been: a course’s sections in a column of their own beside the page.', false),
+        card('one', 'One sidebar', 'Everything in one place, as in the Mac app: a course opens its sections under it.', true),
+      ]);
+      const set = (kind) => {
+        pick = kind;
+        for (const c of cards.children) { const on = c.dataset.kind === kind; c.classList.toggle('is-on', on); c.setAttribute('aria-checked', String(on)); }
+      };
+      set('one');
+      const done = async () => {
+        if (el.classList.contains('is-leaving')) return;
+        el.classList.add('is-leaving');
+        await S.update({ appearance: { sidebar: pick } }).catch(() => {});
+        await BCV.api.storage.local.remove('sidebar:ask').catch(() => {});
+        state.settings = S.deepMerge(state.settings || {}, { appearance: { sidebar: pick } });
+        renderSide();
+        setTimeout(() => { el.remove(); resolve(pick); }, U.reducedMotion() ? 0 : 320);
+      };
+      const el = h('div', { class: 'bcv-choose', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Choose your sidebar', tabindex: '-1' }, [
+        h('div', { class: 'bcv-choose__in' }, [
+          U.text('bcv-choose__kicker', 'New in Simpl Courses'),
+          h('h1', { class: 'bcv-choose__title', text: 'Choose your sidebar' }),
+          U.text('bcv-choose__lede', 'One sidebar holds everything, as the Mac app does. Or keep the two you know.'),
+          cards,
+          h('button', { type: 'button', class: 'bcv-choose__go', text: 'Continue', onclick: done }),
+          U.text('bcv-choose__note', 'You can change this any time in Settings → Appearance.'),
+        ]),
+      ]);
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); set(e.key === 'ArrowLeft' ? 'two' : 'one'); cards.querySelector('.is-on')?.focus(); }
+        else if (e.key === 'Enter' && !e.target.closest?.('.bcv-choose__card')) { e.preventDefault(); done(); }
+        else if (e.key === 'Escape') e.preventDefault(); // (a choice is asked for: Continue keeps the one picked)
+      });
+      document.body.append(el);
+      el.querySelector('.bcv-choose__go').focus();
+    });
+  }
+  /** (2.99.39) Whether the sidebar chooser is owed: no choice made yet, by someone who had Simpl before 2.99.39 — the
+   *  version last seen older than that, noted once as `sidebar:ask` (so What's New, seen first on a phone, cannot lose it);
+   *  a new install's setup chooses one sidebar and marks its version seen — and on a desktop page, not in a quiz. */
+  async function sidebarChoiceDue() {
+    if ((state.settings?.appearance?.sidebar || '') !== '' || phone() || inQuiz()) return false;
+    try {
+      const got = await BCV.api.storage.local.get(['sidebar:ask', 'whatsnew:seen']);
+      if (got['sidebar:ask']) return true;
+      const seen = String(got['whatsnew:seen'] || '');
+      const older = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); return false; };
+      if (!seen || !older(seen, '2.99.39')) return false;
+      await BCV.api.storage.local.set({ 'sidebar:ask': true });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   /** True until the guided setup has been finished — in a browser and in the app alike. The card
    *  cannot be skipped, and closing the tab does not get past it either: every signed-in Canvas
    *  page with the interface on opens it again until its steps are done (a quiz attempt under
@@ -2100,7 +2223,10 @@
     // setup, the welcome or a quiz attempt, and never on a fresh install (the setup marks its version seen).
     // (a release can put an invitation in the notes' place — whatsnew.js — which opens the same way)
     const busy = () => BCV.setup?.active() || BCV.welcome?.active();
-    if (state.lookOn && BCV.whatsnew && !inQuiz() && !busy() && !nativeShell && !html.classList.contains('bcv-native-shell')) { // (the iPhone app shows its own sheet for it)
+    // (2.99.39) the sidebar chooser comes first, once; What's New waits for the next page then
+    const chose = state.lookOn && !nativeShell && !html.classList.contains('bcv-native-shell') && !busy() && await sidebarChoiceDue();
+    if (chose) await sidebarChoice();
+    if (!chose && state.lookOn && BCV.whatsnew && !inQuiz() && !busy() && !nativeShell && !html.classList.contains('bcv-native-shell')) { // (the iPhone app shows its own sheet for it)
       const change = await BCV.whatsnew.due();
       if (change && !busy()) BCV.whatsnew.open(BCV.app, change);
     }
@@ -2164,7 +2290,7 @@
   }
 
   BCV.app = {
-    state, go, render, renderSide, parseRoute, navState, refreshCounts, loadShellData, punchIn, punchOut, siteName, schoolLogo, toggleTheme, logout, backTo, nameHere, markBack,
+    state, go, render, renderSide, setCourseNav, oneBar, parseRoute, navState, refreshCounts, loadShellData, punchIn, punchOut, siteName, schoolLogo, toggleTheme, logout, backTo, nameHere, markBack,
     rawQuizUrl, // (the look switch turns the look off mid-quiz by going there, see early.js)
     isDark: () => state.dark,
     holds: () => !!(state.submitOpen || state.quizOpen), // something on the page would be lost by a reload (a hand-in being written, a quiz attempt): the layout tier waits (early.js)
