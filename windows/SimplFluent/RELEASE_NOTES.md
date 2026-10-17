@@ -1,3 +1,7 @@
+**What's new in 0.3.25** (beta)
+
+- **Alta Even Faster** — for an account that uses Knewton Alta, the popup's page is made ready ahead, at a quiet moment, so an assignment opens without waiting for it to be made; and Alta's page script does much less while Alta draws and while you work — it looks again only when something on the page has changed, rather than several times a second — so Alta uses less battery.
+
 **What's new in 0.3.24** (beta)
 
 - **Tools open straight away** — some tools (Smartwork among them) can't be opened by Canvas's one-time launch, so Open Tool showed Canvas's own page for the tool with a "Load … in a new window" button. Simpl now presses on with that launch itself, in the same window, so the tool opens without the extra click.

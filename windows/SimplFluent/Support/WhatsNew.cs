@@ -26,6 +26,8 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.25", "2026-10-17",
+            ("improved", "Alta Even Faster", "Knewton Alta opens faster again, and uses less battery.")),
         R("0.3.24", "2026-10-16",
             ("fixed", "Tools Open at Once", "Open Tool loads the tool, not Canvas's Load button.")),
         R("0.3.23", "2026-10-16",

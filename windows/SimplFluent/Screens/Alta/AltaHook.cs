@@ -35,14 +35,14 @@ internal static class AltaHook
           // (Windows 0.3.5) a pop-up of Alta's given back to the page, shown there as Alta draws it: the page stays in
           // sight under it until it closes
           var dialogInPage = false;
-          // (1.3.102) the page's own reads of itself — its mastery bars, the overview's words, the cover — begun only once the
+          // (1.3.106) the page's own reads of itself — its mastery bars, the overview's words, the cover — begun only once the
           // page has been shown or its cover read (`begun`), so they never take the page's time while Alta is still drawing
           // it; a frame inside the page reads from the start, as before
           var begun = window.top !== window;
           // (and three seconds in, whatever the page is doing: a page out of sight for longer — not recognised, kept back
           // for its grace — still has its mastery read for the popup's rail)
           if (!begun) setTimeout(function () { begun = true; }, 3000);
-          // (1.3.102) changes to the page (elements, words) counted, for the reads that need not look again while nothing
+          // (1.3.106) changes to the page (elements, words) counted, for the reads that need not look again while nothing
           // has changed
           var pageChanges = 0;
           if (window.top === window) {
@@ -208,7 +208,7 @@ internal static class AltaHook
           // ---- what Alta's page itself shows: its overview's words, its mastery bars ----
           var norm = function (s) { return String(s || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;| /g, ' ').replace(/\s+/g, ' ').trim().toLowerCase(); };
           var shown = function (el) { var r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
-          // (1.3.102) the page's web components — each element with a tree of its own — listed once, and looked for again
+          // (1.3.106) the page's web components — each element with a tree of its own — listed once, and looked for again
           // only after the page has had an element put in or a tree made: before, every look in them (the mastery bars every
           // second and a half, the overview's words, the pop-ups every 1.2 s) walked every element of the page for them
           var hosts = [], hostsDirty = true;
@@ -246,10 +246,10 @@ internal static class AltaHook
             });
             return out;
           };
-          // (1.3.102) a keyword looked for in the page's words as they stand, with no layout — before the words as they show
+          // (1.3.106) a keyword looked for in the page's words as they stand, with no layout — before the words as they show
           // (innerText, which lays the page out) are read for it; what shows is always among them
           var mentions = function (el, re) { return !!el && re.test(el.textContent || ''); };
-          // (1.3.102) the question shown alone (the page script's own focus): the reads below need not look again while
+          // (1.3.106) the question shown alone (the page script's own focus): the reads below need not look again while
           // nothing in the page has changed — every third time all the same
           var focusOn = function () { return !!document.documentElement && document.documentElement.hasAttribute('data-simpl-q'); };
           // (the overview as it reads on the page, when no answer of Alta's named it: its title, DUE DATE, STATUS, and each
@@ -289,7 +289,7 @@ internal static class AltaHook
             if (percent === null) bars.forEach(function (b) { if (percent === null && /mastery/.test(b.label)) percent = Math.round(b.value * 1000) / 10; });
             return { percent: percent, bars: bars };
           };
-          // (1.3.102) whether a read every so often need not look this time: not begun yet, or the question shown alone and
+          // (1.3.106) whether a read every so often need not look this time: not begun yet, or the question shown alone and
           // nothing changed in the page since it last looked (`at`: its own record; every third time it looks all the same)
           var idleRead = function (at) {
             if (!begun) return true;
@@ -409,7 +409,7 @@ internal static class AltaHook
             var unmark = function () {
               marked.forEach(function (m) { m[0].removeAttribute(m[1]); });
               marked = []; keptNow = [];
-              watchKept(); // (1.3.102: no part watched)
+              watchKept(); // (1.3.106: no part watched)
               document.documentElement.removeAttribute('data-simpl-q');
             };
             var mark = function (el, a) { if (!el.hasAttribute(a)) { el.setAttribute(a, ''); marked.push([el, a]); } };
@@ -468,7 +468,7 @@ internal static class AltaHook
             var busy = function (root) {
               if (!root) return false;
               if ([].some.call(root.querySelectorAll(BUSY), function (b) { return shown(b) && !b.closest('[data-simpl-pic]'); })) return true;
-              // (1.3.102: its words as they show read only when its words as they stand say any of these)
+              // (1.3.106: its words as they show read only when its words as they stand say any of these)
               if (!mentions(root, /loading|please\s*wait|one\s*moment|just\s*a\s*moment|preparing/i)) return false;
               var t = norm(root.innerText || '');
               return t.length < 120 && /^(loading|please wait|one moment|just a moment|preparing)\b/.test(t);
@@ -488,7 +488,7 @@ internal static class AltaHook
               keep.forEach(function (k) { if (sprite(k)) for (var x = k; x && !real.has(x); x = x.parentElement) mark(x, 'data-simpl-thin'); });
               keptNow = keep;
               gen++;
-              watchKept(); // (1.3.102: the parts kept now told as they change)
+              watchKept(); // (1.3.106: the parts kept now told as they change)
               verdictDirty = true;
               var st = document.getElementById('simpl-focus');
               if (!st) { st = document.createElement('style'); st.id = 'simpl-focus'; (document.head || document.documentElement).appendChild(st); }
@@ -597,7 +597,7 @@ internal static class AltaHook
               }
               return '';
             };
-            // (1.3.102) `lazy`: told on demand (publishSoon) — the verdict read again only when something in the parts kept
+            // (1.3.106) `lazy`: told on demand (publishSoon) — the verdict read again only when something in the parts kept
             // has changed since it was last read (`verdictDirty`), else as it was last read
             var verdictDirty = true, verdictSaid = '', pubAt = 0;
             var publish = function (lazy) {
@@ -617,7 +617,7 @@ internal static class AltaHook
               var psSaid = JSON.stringify({ panels: ps, height: ps.length ? bottom + 48 : 0, gen: gen, pics: pr, verdict: on ? verdictSaid : '' });
               if (psSaid !== lastPanels) { lastPanels = psSaid; var m = JSON.parse(psSaid); m.kind = 'panels'; post(m); }
             };
-            // (1.3.102) The panels, the buttons and the verdict told when something may have moved them, not every 350 ms
+            // (1.3.106) The panels, the buttons and the verdict told when something may have moved them, not every 350 ms
             // whatever the page did (1.3.53–1.3.101): a change in the parts kept (their elements and words, or a class, a
             // style, a button greyed or not — `keptWatch`), a part's size (`keptSize`) or the window's, at the next frame and
             // no oftener than every 200 ms however fast the page changes; once more 450 ms after a change in the parts (a
@@ -1099,7 +1099,7 @@ internal static class AltaHook
                 reveal('browser');
                 return;
               }
-              // (1.3.102) the page read afresh — its marks lifted for the moment, a style pass over the whole page each way —
+              // (1.3.106) the page read afresh — its marks lifted for the moment, a style pass over the whole page each way —
               // only when something may have changed what it holds: anything but a change outside the parts shown alone (Alta's
               // header, its chat), after which the last reading still stands; and every two seconds all the same
               var fresh = readAgain || !lastRead || !document.documentElement.hasAttribute('data-simpl-q') || Date.now() - readAt > 2000
@@ -1166,7 +1166,7 @@ internal static class AltaHook
               publish();
               reveal('as it is');
             };
-            // (1.3.102) `outside`: for a change outside the parts shown alone — the page need not be read afresh for it
+            // (1.3.106) `outside`: for a change outside the parts shown alone — the page need not be read afresh for it
             var lastRead = null, readAt = 0, readAgain = true;
             var schedule = function (ms, outside) {
               if (!outside) readAgain = true;
@@ -1266,7 +1266,7 @@ internal static class AltaHook
               watchMathJax();
               if (mine) { if (!timer || dueAt - now > 120 || now - changeSince < 300) schedule(); else readAgain = true; }
               else if (!timer || dueAt - now > 400) schedule(400, true);
-              // (1.3.102) the panels and buttons told again for a change in the parts shown alone
+              // (1.3.106) the panels and buttons told again for a change in the parts shown alone
               if (mine && keptNow.length) publishSoon(true);
             };
             // (maths drawn whole) a part of Alta's put in while the question is shown alone — the next one, before the page is
@@ -1368,7 +1368,7 @@ internal static class AltaHook
               return [].slice.call(document.querySelectorAll('a, button')).filter(function (b) { return vis(b) && /^review instruction$/i.test(cs(b.innerText || b.textContent)); })[0] || null;
             };
             var coverRead = function () {
-              // (a cover: its header, or a Start beside the objectives' estimates — never Alta's learn page; 1.3.102: looked
+              // (a cover: its header, or a Start beside the objectives' estimates — never Alta's learn page; 1.3.106: looked
               // for in that order, the cheapest first — the learn page, the header, the words, and only then a Start)
               if (document.querySelector('[class*="learn-flow-body"], section[class*="compound__compound"]')) return null;
               var head = document.querySelector('[data-test="cover-header"]');
@@ -1425,7 +1425,7 @@ internal static class AltaHook
               if (o) begun = true;
               post(stamp(o || { kind: 'cover', none: true }));
             };
-            // (1.3.102) looked for every 0.7 s once the page has been shown or its cover read — while it loads, only when
+            // (1.3.106) looked for every 0.7 s once the page has been shown or its cover read — while it loads, only when
             // Alta's cover header is there (the overview the page script recognises reads the cover itself, at once)
             setInterval(function () { if (begun || document.querySelector('[data-test="cover-header"]')) coverTick(); }, 700);
             window.__simplCoverNow = coverTick;

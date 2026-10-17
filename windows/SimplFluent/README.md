@@ -1233,7 +1233,7 @@ Opening one (0.3.21) asks Canvas for the assignment's launch first — the momen
 built (`AltaSession`'s constructor) — and waits for it only to send the page there, while the popup is laid out and its
 web view made and dressed (`LightPages`, the page script); it was asked once all of that was done, and only once the
 popup was up. `Start()` is begun before the popup shows too, though WebView2 makes the web view itself only once the
-popup's window is there — the floor of an open, unless a web view was made ahead (0.3.22, below). The header's due line comes with the launch from the
+popup's window is there — the floor of an open, unless a web view was made ahead (0.3.25, below). The header's due line comes with the launch from the
 Assignment screen or a tool's row (`AltaLaunch.Due`); only without one is the Canvas assignment read for it, once the
 launch is on its way. The page script shows the question once its part has been still a tenth of a second (350 ms of the
 whole page before), what says it is still being drawn — MathJax, Learnosity's box not yet in a part headed Question, a
@@ -1244,7 +1244,7 @@ Alta's learn flow round it, or a kept part taken away, counts, and such changes 
 Each open writes its timeline to the app's log — "alta: launch asked +N ms · launch answered … · web view made|spare … · page …
 (host) · alta page … · question … · shown +N ms (question, N ms into its page, quiet N ms[, capped])" ("page given" for a
 page asked for) — which the Windows workflow checks for the Alta pictures, and `scripts/dev/alta-test.mjs` checks the
-question is shown under 400 ms after its page has loaded on the mock. (0.3.22) The mock's Alta launch can go as
+question is shown under 400 ms after its page has loaded on the mock. (0.3.25) The mock's Alta launch can go as
 Canvas's does (`--alta-launch`, as `alta-test.mjs` runs it): Canvas's own page, whose form sends itself on to Alta
 (POSTed), then Alta's page; and its Alta content answer comes 500 ms late, as Alta's own comes over the network.
 
@@ -1265,7 +1265,7 @@ has the page script show it as it is (`__simplAsIsNow`: its waits counted as ove
 Logs with what the page held), so the page script's `showing` stays in step and the page can still be put out of sight
 between parts after. Once a grace between parts has run out, the page is no longer put out of sight again at each look. `alta-test.mjs` draws a box as MathQuill does on the mock, in dark and light.
 
-(0.3.22) A lighter page script, saying what it said before (the Mac's 1.3.102, word for word). The panels, buttons and
+(0.3.25) A lighter page script, saying what it said before (the Mac's 1.3.106, word for word). The panels, buttons and
 verdict are told when something may have moved them — a change in the parts kept (their elements and words; a class, a
 style, a button greyed or not; a fade ending; in the answer box itself only a verdict or the buttons' bar, never the
 caret blinking in a math box), a part's size or the window's — at the next frame, no oftener than every
@@ -1276,7 +1276,7 @@ gains an element or a tree; keyword tests read `textContent` before `innerText`;
 words and the cover are read only once the page has been shown, its cover read, or 3 s have passed — while the
 question is shown alone and nothing changed, only every third time. `alta-test.mjs` checks it on Windows' copy.
 
-(0.3.22, the Mac's 1.3.102) A web view made ahead. For an account that uses Alta (`Engine.HasAlta`: the External Tools
+(0.3.25, the Mac's 1.3.106) A web view made ahead. For an account that uses Alta (`Engine.HasAlta`: the External Tools
 list named Knewton Alta, an assignment opens it, or one was opened — kept per school, forgotten on sign-out) one web view
 for the popup is made ahead (`Screens/Alta/AltaSpare`): at a quiet moment — no call to the school in flight for a while,
 no Alta popup open — three seconds after the Dashboard is up, 0.6 s after an Alta assignment or the External Tools list

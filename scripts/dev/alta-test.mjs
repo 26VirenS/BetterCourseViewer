@@ -42,7 +42,7 @@ console.log('\nin Chromium, on the mock’s Alta player');
 // mock answered this one's questions
 const freePort = () => new Promise((done) => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => done(p)); }); });
 const PORT = await freePort(), SIM = await freePort();
-// (1.3.102: with the launch as Canvas makes it — its own page first, whose form sends itself on to Alta)
+// (1.3.106: with the launch as Canvas makes it — its own page first, whose form sends itself on to Alta)
 const mock = spawn(process.execPath, [join(ROOT, 'scripts/dev/mock-canvas.mjs'), String(PORT), String(SIM), '--alta-launch'], { stdio: 'ignore' });
 const stop = () => { try { mock.kill(); } catch { /* gone */ } };
 process.on('exit', stop);
@@ -616,7 +616,7 @@ try {
         `${label}: the app’s last resort shows Alta’s page as it is through the page script (${back}): the focus lifted, the app told why (“${why && why.reason}”) and that it is shown; the next part laid out again (${kept}), and put out of sight between parts after (${hidAgain})`);
     }
   };
-  // (1.3.102) what the page script costs while the question is up: the panels, buttons and verdict told when something
+  // (1.3.106) what the page script costs while the question is up: the panels, buttons and verdict told when something
   // may have moved them — a change in the parts shown, a part's size, the window's — never on a timer every 350 ms
   // (once a second at most while nothing happens); the page not read afresh for a change outside the parts shown (Alta's
   // header); its web components looked for again when one is made. Its posts as before: a button greyed or not, a
@@ -892,8 +892,8 @@ try {
     else check(false, 'Windows’ copy of the page script times its words and says how long its part was still (its shown word has `quiet`)');
     await renderChecks('Windows’ copy', winSource, true);
     if (/publishSoon/.test(winSource)) await demandChecks('Windows’ copy', winSource, true);
-    else check(false, 'Windows’ copy of the page script tells its panels on demand (publishSoon, Mac 1.3.102)');
-    // (1.3.102 / 0.3.22, on Windows' copy: the Mac's in this checkout is older, and does not say which page is Alta's)
+    else check(false, 'Windows’ copy of the page script tells its panels on demand (publishSoon, Mac 1.3.106)');
+    // (1.3.106 / 0.3.25, on Windows' copy: the Mac's in this checkout is older, and does not say which page is Alta's)
     // the launch as Canvas makes it: the address Canvas hands over is a page of its own, whose form sends itself on to
     // Alta (POSTed), which sends the browser on to the assignment's page. On the way, the page script says the first page
     // is not Alta's (the app keeps its skeleton up over it); then Alta's page is known as Alta's, kept out of sight, and

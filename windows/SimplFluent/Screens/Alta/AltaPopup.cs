@@ -33,7 +33,7 @@ public static class AltaPopup
     public static void Show(Engine.Engine engine, AltaLaunch launch, Window over)
     {
         var asked = Stopwatch.GetTimestamp();
-        engine.KnowAlta(); // (0.3.22: an account that opens Alta has its next popup's web view made ahead)
+        engine.KnowAlta(); // (0.3.25: an account that opens Alta has its next popup's web view made ahead)
         new AltaPopupView(engine, launch, over, asked).Open();
     }
 }
@@ -79,7 +79,7 @@ internal sealed class AltaPopupView
     {
         this.over = over;
         this.engine = engine;
-        // (0.3.22: in the web view made ahead for it, when there is one)
+        // (0.3.25: in the web view made ahead for it, when there is one)
         session = new AltaSession(engine, launch, over, asked, AltaSpare.Take(engine));
         dueLine = launch.Due;
         root.Bg(B.Solid);

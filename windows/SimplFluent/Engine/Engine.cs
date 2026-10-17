@@ -384,7 +384,7 @@ public sealed partial class Engine : Observable, IShellListener
     public void SignedOut()
     {
         Answers.Clear();
-        // (0.3.22) nothing of this account's Alta kept for the next: its web view made ahead let go, and whether it used
+        // (0.3.25) nothing of this account's Alta kept for the next: its web view made ahead let go, and whether it used
         // Alta forgotten
         Prefs.Remove(AltaAccountKey);
         Simpl.Screens.AltaSpare.Drop("signed out");
@@ -457,7 +457,7 @@ public sealed partial class Engine : Observable, IShellListener
             if (parts.Length >= 2)
             {
                 var launch = new AltaLaunch(parts[0], parts[1], "Knewton Alta", parts.Length == 3 && parts[2].StartsWith('/') ? parts[2] : null);
-                // (0.3.22: --alta-spare — opened in a web view made just before, as an account that uses Alta opens it)
+                // (0.3.25: --alta-spare — opened in a web view made just before, as an account that uses Alta opens it)
                 if (Launch.Flag("alta-spare"))
                 {
                     Shot.Began();
@@ -476,7 +476,7 @@ public sealed partial class Engine : Observable, IShellListener
         else if (Launch.Take("compose") != null) NewMessageRequested?.Invoke();
         await RefreshSnapshot();
         await LoadSidebar();
-        // (0.3.22) an account that uses Knewton Alta: its popup's web view made ahead, once the window has been quiet a while
+        // (0.3.25) an account that uses Knewton Alta: its popup's web view made ahead, once the window has been quiet a while
         if (HasAlta) Simpl.Screens.AltaSpare.Prepare(this, 3);
         // (a first setup quit halfway, or whose save failed, is asked again — the page may have kept some of it — unless
         //  it was put off with Set up later, when it waits for Settings ▸ General ▸ Courses shown and goals)
@@ -608,11 +608,11 @@ public sealed partial class Engine : Observable, IShellListener
         // (decoded off the window's thread: a long answer holds up nothing on screen)
         var answer = await Task.Run(() => Decode<T>(name, text));
         Answers.Keep(text, name, a, asked);
-        NoteAlta(name, answer, text); // (0.3.22)
+        NoteAlta(name, answer, text); // (0.3.25)
         return (answer, text);
     }
 
-    // MARK: - (0.3.22) An account that uses Knewton Alta
+    // MARK: - (0.3.25) An account that uses Knewton Alta
 
     /// <summary>
     /// Whether this account uses Knewton Alta, as far as the app has seen it — the External Tools list naming it, an

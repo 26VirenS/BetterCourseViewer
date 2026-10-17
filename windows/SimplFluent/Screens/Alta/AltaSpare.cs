@@ -9,7 +9,7 @@ using Simpl.Support;
 namespace Simpl.Screens;
 
 /// <summary>
-/// (0.3.22, the Mac's AltaSpare) One web view for Knewton Alta's popup made ahead, at a quiet moment once the Dashboard is
+/// (0.3.25, the Mac's AltaSpare) One web view for Knewton Alta's popup made ahead, at a quiet moment once the Dashboard is
 /// up (or once an Alta assignment's page or the External Tools list has said so), for an account that uses Knewton Alta
 /// (<see cref="Engine.Engine.HasAlta"/>): made on Simpl's one browser, dressed as the popup's own is — its settings, Alta's
 /// page told the student prefers light (<c>LightPages</c>), the look's flags and the page script put in before every page

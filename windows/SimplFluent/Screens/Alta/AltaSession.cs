@@ -202,10 +202,10 @@ internal sealed class AltaSession
     public event Action? Changed;
 
     public AltaLaunch Launch { get; }
-    /// <summary>Alta's page: the popup places it, shown only while nothing of the popup's own is in its place. (0.3.22) The
+    /// <summary>Alta's page: the popup places it, shown only while nothing of the popup's own is in its place. (0.3.25) The
     /// web view made ahead for it (AltaSpare), when there was one; else one made with the session.</summary>
     public WebView2 Web { get; private set; }
-    /// <summary>(0.3.22) The web view made ahead that this open took, dressed already (its scripts in, its empty page
+    /// <summary>(0.3.25) The web view made ahead that this open took, dressed already (its scripts in, its empty page
     /// loaded) — null once Start has taken it up, or when there was none.</summary>
     private AltaSpare.View? spare;
 
@@ -315,7 +315,7 @@ internal sealed class AltaSession
     private readonly Task<(Uri? Url, string? Why)>? launching;
 
     /// <summary>Alta opened: the web view made with the engine's web data and the page script put in it while the launch,
-    /// asked as the session was made, is on its way — (0.3.22) or the one made ahead taken up, all of that done already;
+    /// asked as the session was made, is on its way — (0.3.25) or the one made ahead taken up, all of that done already;
     /// the page sent to the launch (or to the page asked for) once both are done.</summary>
     public async void Start()
     {
@@ -362,7 +362,7 @@ internal sealed class AltaSession
         var core = Web.CoreWebView2;
         core.WebMessageReceived += (_, e) => { if (Said(e) is { } s) Take(s, null); };
         core.FrameCreated += (_, e) => WatchFrame(e.Frame);
-        // (0.3.22: a spare's empty page is never seen here — AltaSpare waits for it to load before it is handed over, and
+        // (0.3.25: a spare's empty page is never seen here — AltaSpare waits for it to load before it is handed over, and
         // this is listened to only after — so every navigation that ends, an empty one too, ends the skeleton as before)
         core.NavigationCompleted += (_, _) =>
         {
@@ -388,7 +388,7 @@ internal sealed class AltaSession
     }
 
     /// <summary>
-    /// (0.3.22) A web view for Alta's page, made on Simpl's one browser (the engine's web data: Alta's launch finds the
+    /// (0.3.25) A web view for Alta's page, made on Simpl's one browser (the engine's web data: Alta's launch finds the
     /// student signed in) and dressed: its settings, Alta's page told the student prefers light (0.3.5: as an outside
     /// tool's is — Shell's LightPages — so a look of its own for dark never comes in; the app turns its question's colours
     /// over itself when it is to be dark), and before every page the look's flags, then the page script. Made as the popup
@@ -441,7 +441,7 @@ internal sealed class AltaSession
     private readonly long since;
     private long? launchAsked, launchAnswered, webReady, pageAt, altaPageAt, partAt, shownAt;
     private string pageHost = "", partKind = "", shownHow = "";
-    /// <summary>(0.3.22) The web view: "spare", made ahead and taken, or "made" as the popup opened.</summary>
+    /// <summary>(0.3.25) The web view: "spare", made ahead and taken, or "made" as the popup opened.</summary>
     private readonly string webHow;
     private double? shownOwn, shownQuiet;
     private bool shownCapped, timelineSaid;
@@ -469,7 +469,7 @@ internal sealed class AltaSession
     /// <summary>The line, written once: when Alta's page is shown, or else when the open ends without it (it failed, or the
     /// popup closed first). "alta: launch asked +2 ms · launch answered +240 ms · web view made +410 ms · page +620 ms
     /// (school.instructure.com) · alta page +1300 ms · question +1700 ms · shown +1820 ms (question, 520 ms into its page,
-    /// quiet 110 ms)" — (0.3.22) "web view spare +3 ms" for one made ahead.</summary>
+    /// quiet 110 ms)" — (0.3.25) "web view spare +3 ms" for one made ahead.</summary>
     private void SayTimeline(string? end = null)
     {
         if (timelineSaid) return;
@@ -572,7 +572,7 @@ internal sealed class AltaSession
         ClosePic();
         foreach (var t in codeAsked.Values) t.TrySetResult(null);
         try { Web.Dispose(); } catch { }
-        AltaSpare.Closed(engine); // (0.3.22: the next popup's web view made ahead, at a quiet moment)
+        AltaSpare.Closed(engine); // (0.3.25: the next popup's web view made ahead, at a quiet moment)
     }
 
     // ---- (1.3.50) light or dark, told to the page; (0.3.5) as the student chooses, not as the app is ----
@@ -581,7 +581,7 @@ internal sealed class AltaSession
 
     private static string Flags(bool dark, bool picsLight, bool browser) => $"window.__simplDark = {Js(dark)}; window.__simplPicsLight = {Js(picsLight)}; window.__simplBrowser = {Js(browser)};";
 
-    /// <summary>(0.3.22) The flags a popup opened now starts with (as <see cref="Dark"/>, <see cref="PicsLight"/> and
+    /// <summary>(0.3.25) The flags a popup opened now starts with (as <see cref="Dark"/>, <see cref="PicsLight"/> and
     /// <see cref="Browser"/> are first read): the ones a web view made ahead is given.</summary>
     internal static string FlagsAsKept() => Flags(
         Support.Launch.Get("alta-look") is { } look ? look == "dark" : Prefs.Bool(DarkKey),
