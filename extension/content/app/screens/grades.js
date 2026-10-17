@@ -48,7 +48,7 @@
       const addSel = b.querySelector('.bcv-wfadd__group');
       if (pick && addSel && addSel.value !== pick && [...addSel.options].some((o) => o.value === pick)) { addSel.value = pick; addSel.dispatchEvent(new Event('change')); }
       const name = pick && gm ? (gm.legend.find((r) => r.id === pick)?.label ?? gm.ungraded.find((u) => u.id === pick)?.name) : null;
-      if (!name) { pickNote.replaceChildren('Arranged by due date'); return; }
+      if (!name) { pickNote.replaceChildren('By group, each by due date'); return; }
       const n = gm.rows.filter((r) => r.groupId === pick).length;
       pickNote.replaceChildren(h('button', { type: 'button', class: 'bcv-gr__pickchip', 'data-pick': '', style: { '--bcv-grp': colorOf(pick) }, 'aria-label': `Showing ${name}; show every assignment` }, [
         h('span', { class: 'bcv-gr__pickdot' }),
@@ -245,7 +245,8 @@
           U.el('bcv-row__body', [
             h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' } }, [U.text('bcv-grade__name bcv-pretty', g.name, 'span'), g.added ? U.badge('What-if', 'red', 'bcv-badge--xs') : g.badge ? U.badge(g.badge, g.badge === 'Late' ? 'orange' : g.badge === 'Missing' ? 'red' : '', 'bcv-badge--xs') : null]),
             // the group, the dates, and — on a marked assignment — how the class did (Canvas's own mean, high and low)
-            U.text('bcv-row__sub', g.added ? `${g.group} · made up to test, not in ${BCV.lms.name}` : [g.group, g.due ? `due ${U.fmtBy(g.due)}` : 'no due date', g.submitted ? `submitted ${U.fmtAt(g.submitted)}` : (g.due && U.parse(g.due) > new Date() ? 'not due yet' : 'not submitted'), g.stats && g.earned !== null ? `class mean ${store.fmtPts(g.stats.mean)} · high ${store.fmtPts(g.stats.max)} · low ${store.fmtPts(g.stats.min)}` : null].filter(Boolean).join(' · ')),
+            // (2.99.36: the group is the section's head now, not said again in each row)
+            U.text('bcv-row__sub', g.added ? `made up to test, not in ${BCV.lms.name}` : [g.due ? `due ${U.fmtBy(g.due)}` : 'no due date', g.submitted ? `submitted ${U.fmtAt(g.submitted)}` : (g.due && U.parse(g.due) > new Date() ? 'not due yet' : 'not submitted'), g.stats && g.earned !== null ? `class mean ${store.fmtPts(g.stats.mean)} · high ${store.fmtPts(g.stats.max)} · low ${store.fmtPts(g.stats.min)}` : null].filter(Boolean).join(' · ')),
           ]),
           dotEl,
           U.bandChip(band, band ? `${store.fmtPts(Math.round((g.effective / g.possible) * 1000) / 10)}% · ${band}` : null),
@@ -263,12 +264,41 @@
       const counts = {};
       for (const r of rows) if (r.dataset.band) counts[r.dataset.band] = (counts[r.dataset.band] || 0) + 1;
       const listHost = h('div');
+      // (2.99.36) the work partitioned by its group (the course's categories, in Canvas's order): each group under a
+      // head of its own — its colour, its name, its weight and its score so far — rather than one list with the
+      // group's name in each row's small print. Pressing a head picks the group out, as its legend row does.
+      const groupSections = (shown) => {
+        const order = groups.map((g) => String(g.id));
+        const byId = new Map();
+        for (const r of shown) {
+          const id = r.dataset.group || '';
+          if (!byId.has(id)) byId.set(id, []);
+          byId.get(id).push(r);
+        }
+        const ids = [...order.filter((id) => byId.has(id)), ...[...byId.keys()].filter((id) => !order.includes(id))];
+        return ids.map((id) => {
+          const g = groups.find((x) => String(x.id) === id);
+          const lg = gm.legend.find((x) => x.id === id);
+          const name = g?.name || lg?.label || 'Other';
+          const n = byId.get(id).length;
+          // (its weight as the grade counts it — the student's own weights where set: the legend's, else the weight bar's)
+          const wb = gm.weightBar.find((w) => w.id === id);
+          const weight = !gm.weighted ? '' : lg?.weightText || (wb ? `${wb.weight}% of grade` : g ? 'not weighted' : '');
+          const head = h('div', { ...U.groupAttrs(id, colorOf(id), { pick: !!g, name }), class: 'bcv-gr__ghead' }, [
+            h('span', { class: 'bcv-gr__gdot', 'aria-hidden': 'true' }),
+            U.text('bcv-gr__gname bcv-pretty', name, 'span'),
+            U.text('bcv-gr__gmeta', [weight, `${n} ${n === 1 ? 'item' : 'items'}`].filter(Boolean).join(' · '), 'span'),
+            U.text('bcv-gr__gscore', lg ? `${lg.detail.split(' · ')[0]} · ${lg.value}` : 'not graded yet', 'span'),
+          ]);
+          return h('section', { class: 'bcv-gr__gsec', 'aria-label': name }, [head, U.card(byId.get(id), 'bcv-card--list')]);
+        });
+      };
       const paintList = () => {
         const band = bandSt.band;
         const shown = band === 'all' ? rows : rows.filter((r) => r.dataset.band === band);
-        listHost.replaceChildren(!rows.length ? U.emptyCard('No assignments in this course.')
-          : shown.length ? U.card(shown, 'bcv-card--list')
-            : U.emptyCard(`No ${band} grades in this course${st.on ? ' with these what-if scores' : ''}.`));
+        listHost.replaceChildren(...(!rows.length ? [U.emptyCard('No assignments in this course.')]
+          : shown.length ? groupSections(shown)
+            : [U.emptyCard(`No ${band} grades in this course${st.on ? ' with these what-if scores' : ''}.`)]));
       };
       paintList();
       // what-if: an assignment made up and put in a group of the student's choosing, counted there like the rest

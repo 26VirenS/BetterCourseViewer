@@ -2825,14 +2825,24 @@ try {
   check((await page.$$('.bcv-wbar__seg')).length === 3 && (await page.$$('.bcv-wbar__seg--ungraded')).length === 2 && wbar.join(' | ') === 'Discussion Quizzes 18% of grade 100% | Midterms 57% of grade ungraded | Final 25% of grade ungraded' && (await texts('.bcv-gr__hsub'))[0] === '100% of final grade', `weight bar: ${wbar.join(' | ')}`);
   check((await texts('.bcv-gr__wnote'))[0] === 'Effort, Collaboration and Coursework (Knewton Alta) carry 0% weight — they show as rings but never move the total.', `0%-weight note: ${(await texts('.bcv-gr__wnote'))[0]}`);
   const gradeRows = await texts('.bcv-grades__main .bcv-row');
-  check(gradeRows.length === 18 && /Lec01-PreQuiz.*Effort · due .* by 10:30am · submitted .*13 \/ 16/.test(gradeRows[0]), `grade rows: ${gradeRows[0]}`);
+  check(gradeRows.length === 18 && gradeRows.some((t) => /^Lec01-PreQuiz.*due .* by 10:30am · submitted .*13 \/ 16/.test(t)) && !gradeRows.some((t) => /^Lec01-PreQuiz.*Effort · due/.test(t)), `grade rows (the group no longer said in each): ${gradeRows.find((t) => /Lec01-PreQuiz/.test(t))}`);
+  // (2.99.36) the work partitioned by group: a head per group with work, in Canvas's order, each over its own card of rows
+  const gheads = await texts('.bcv-gr__ghead .bcv-gr__gname');
+  const gsecRows = await page.$$eval('.bcv-gr__gsec', (els) => els.map((e) => e.querySelectorAll('.bcv-row').length));
+  const gOrder = await page.evaluate(async () => { const r = await fetch('/api/v1/courses/101/assignment_groups').then((x) => x.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, ''))); return r.map((g) => g.name); });
+  check(gheads.length >= 2 && gsecRows.length === gheads.length && gsecRows.reduce((a, b) => a + b, 0) === 18 && gsecRows.every((n) => n > 0) && gheads.every((n, i) => i === 0 || gOrder.indexOf(gheads[i - 1]) < gOrder.indexOf(n)), `the list partitioned by group, in Canvas's order: ${gheads.map((n, i) => `${n} ${gsecRows[i]}`).join(', ')}`);
+  const effortHead = (await texts('.bcv-gr__ghead')).find((t) => /^Effort/.test(t)) || '';
+  check(/^Effort.*not weighted.*items.*43 \/ 82 pts · 52%$/.test(effortHead), `a group's head: its name, weight, count and score — ${effortHead}`);
   check(gradeRows.some((t) => /Skills_Check.*Not counted toward final grade/.test(t)) && gradeRows.some((t) => /Transformation.*Late/.test(t)), 'late / not-counted badges');
   check(!(await page.$('.bcv-grades__side')) && !(await texts('.bcv-label')).some((t) => /assignment group weights/i.test(t)), 'no separate group-weights card: the weights live in the grade card');
   await shot(page, '16-course-grades');
+  await page.evaluate(() => document.querySelector('.bcv-gr__gsec')?.scrollIntoView({ block: 'start' }));
+  await shot(page, '16a-course-grades-by-group'); // (2.99.36: the list partitioned by group)
+  await page.evaluate(() => window.scrollTo(0, 0));
   // a group pressed (2.98.34): its ring, its weight and its assignments stay, the rest steps back; its
   // weight row and its ring pick it the same way; pressed again, Show all, or Escape lets it go
   const pickState = () => page.evaluate(() => ({
-    rows: [...document.querySelectorAll('.bcv-grades__main .bcv-row.is-picked .bcv-row__sub')].map((e) => e.textContent.split(' · ')[0]),
+    rows: [...document.querySelectorAll('.bcv-grades__main .bcv-row.is-picked')].map((e) => e.closest('.bcv-gr__gsec')?.querySelector('.bcv-gr__gname')?.textContent), // (2.99.36: the group its section's head)
     dim: document.querySelectorAll('.bcv-grades__main .bcv-row.is-dim').length,
     rings: document.querySelectorAll('.bcv-rings__svg circle.is-picked').length,
     ringsDim: document.querySelectorAll('.bcv-rings__svg circle.is-dim').length,
@@ -2863,7 +2873,7 @@ try {
   await page.locator('.bcv-legend__row[data-pick]', { hasText: 'Collaboration' }).click();
   await page.click('.bcv-gr__pickchip');
   const pickAll = await pickState();
-  check(!pickAgain.has && pickAgain.note === 'Arranged by due date' && pickKey.has && pickKey.pressed === 'true' && !pickEsc.has && !pickAll.has && pickAll.dim === 0 && pickAll.note === 'Arranged by due date', `pressed again, Show all or Escape lets it go; Enter picks from the keyboard: ${JSON.stringify({ pickAgain: pickAgain.has, pickKey: pickKey.legend, pickEsc: pickEsc.has, pickAll: pickAll.has })}`);
+  check(!pickAgain.has && pickAgain.note === 'By group, each by due date' && pickKey.has && pickKey.pressed === 'true' && !pickEsc.has && !pickAll.has && pickAll.dim === 0 && pickAll.note === 'By group, each by due date', `pressed again, Show all or Escape lets it go; Enter picks from the keyboard: ${JSON.stringify({ pickAgain: pickAgain.has, pickKey: pickKey.legend, pickEsc: pickEsc.has, pickAll: pickAll.has })}`);
   // By letter (2.98.35): every graded row wears its letter (A from 90%, B 80, C 70, D 60, F under), the
   // slider counts them, and a stop — pressed, dragged to, or reached with the keys — lists that letter's work alone
   const letterOf = (pct) => (pct >= 90 ? 'A' : pct >= 80 ? 'B' : pct >= 70 ? 'C' : pct >= 60 ? 'D' : 'F');
@@ -2909,8 +2919,9 @@ try {
   check((await page.$$('.bcv-rings__svg > circle')).length === 10 && (await page.$$eval('.bcv-rings__svg > circle', (els) => els.every((e) => !/#(0a84ff|34c759|ff9500|30b0c7)/i.test(e.getAttribute('stroke') || '')))), 'what-if adds the Midterms ring and greys every ring');
   await shot(page, '17-grades-whatif');
   // a stray "." (or "1.2.3") typed as a score is no score at all, never NaN through the rings and the total
-  await page.locator('.bcv-whatif__input').first().fill('.');
-  await page.locator('.bcv-whatif__input').first().press('Enter');
+  // (2.99.36: the list is by group now, so the row named — Lec01-PreQuiz, an Effort item — not the first)
+  await page.locator('.bcv-grades__main .bcv-row', { hasText: 'Lec01-PreQuiz' }).locator('.bcv-whatif__input').fill('.');
+  await page.locator('.bcv-grades__main .bcv-row', { hasText: 'Lec01-PreQuiz' }).locator('.bcv-whatif__input').press('Enter');
   await page.waitForTimeout(300);
   const wfTexts = [...(await texts('.bcv-gr__total')), ...(await texts('.bcv-legend__row')), ...(await texts('.bcv-gr__note'))].join(' | ');
   check(!/NaN/.test(wfTexts) && (await texts('.bcv-gr__total'))[0] === '84.8%', `a score that is not a number is treated as cleared, not NaN — the Midterms what-if still stands: ${(await texts('.bcv-gr__total'))[0]}`);
@@ -2932,8 +2943,8 @@ try {
   await page.fill('.bcv-wfadd__num >> nth=1', '100');
   await page.press('.bcv-wfadd__num >> nth=1', 'Enter');
   await page.waitForSelector('.bcv-grades__main .bcv-row.is-wfadded', { timeout: 5000 });
-  const added = await page.evaluate(() => { const r = document.querySelector('.bcv-grades__main .bcv-card--list .bcv-row'); return { first: r.classList.contains('is-wfadded'), tag: r.tagName, name: r.querySelector('.bcv-grade__name')?.textContent, badge: r.querySelector('.bcv-badge')?.textContent, sub: r.querySelector('.bcv-row__sub')?.textContent, value: r.querySelector('.bcv-whatif__input')?.value, chip: r.querySelector('.bcv-bandchip')?.textContent, total: document.querySelector('.bcv-gr__total')?.textContent, final: [...document.querySelectorAll('.bcv-legend__row')].map((e) => e.innerText.replace(/\s+/g, ' ')).find((t) => /^Final/.test(t)), focus: document.activeElement?.classList.contains('bcv-wfadd__name') }; });
-  check(noScore.err && noScore.text === 'Give it a score to test.' && added.first && added.tag === 'DIV' && added.name === 'Final exam' && added.badge === 'What-if' && added.sub === 'Final · made up to test, not in Canvas' && added.value === '70' && added.chip === 'C' && added.total === '81.1%' && added.final === 'Final 70 / 100 pts · includes what-if 25% of grade 70%' && added.focus, `a what-if Final exam at 70/100 counts in Final at its 25%: the total ${added.total} (100·18 + 80·57 + 70·25 over 100), the group's ring and row, the row on top with its C (a missing score is said first: "${noScore.text}"): ${JSON.stringify(added)}`);
+  const added = await page.evaluate(() => { const sec = [...document.querySelectorAll('.bcv-gr__gsec')].find((x) => x.querySelector('.bcv-gr__gname')?.textContent === 'Final'); const r = sec?.querySelector('.bcv-card--list .bcv-row'); return { first: r.classList.contains('is-wfadded'), tag: r.tagName, name: r.querySelector('.bcv-grade__name')?.textContent, badge: r.querySelector('.bcv-badge')?.textContent, sub: r.querySelector('.bcv-row__sub')?.textContent, value: r.querySelector('.bcv-whatif__input')?.value, chip: r.querySelector('.bcv-bandchip')?.textContent, total: document.querySelector('.bcv-gr__total')?.textContent, final: [...document.querySelectorAll('.bcv-legend__row')].map((e) => e.innerText.replace(/\s+/g, ' ')).find((t) => /^Final/.test(t)), focus: document.activeElement?.classList.contains('bcv-wfadd__name') }; });
+  check(noScore.err && noScore.text === 'Give it a score to test.' && added.first && added.tag === 'DIV' && added.name === 'Final exam' && added.badge === 'What-if' && added.sub === 'made up to test, not in Canvas' && added.value === '70' && added.chip === 'C' && added.total === '81.1%' && added.final === 'Final 70 / 100 pts · includes what-if 25% of grade 70%' && added.focus, `a what-if Final exam at 70/100 counts in Final at its 25%: the total ${added.total} (100·18 + 80·57 + 70·25 over 100), the group's ring and row, the row on top of Final's section with its C (a missing score is said first: "${noScore.text}"): ${JSON.stringify(added)}`);
   await shot(page, '17c-grades-whatif-added');
   await page.click('.bcv-grades__main .bcv-row.is-wfadded .bcv-wfadd__rm');
   await page.waitForFunction(() => !document.querySelector('.bcv-row.is-wfadded'), null, { timeout: 5000 });
