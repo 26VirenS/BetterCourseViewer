@@ -111,7 +111,7 @@ struct SubmissionReview: View {
     private var viewer: some View {
         if let f = picked {
             if let p = f.preview, let url = engine.absolute(p) {
-                CanvasViewer(url: url)
+                CanvasViewer(url: url, file: f)
                     .id(url)
             } else {
                 QuickLookFile(file: f)
@@ -204,21 +204,77 @@ struct SubmissionReview: View {
     }
 }
 
-/// Canvas's own page for the work, with the Canvas session (its viewer, its marks), in the popup.
+/// Canvas's own page for the work, with the Canvas session (its viewer, its marks), in the popup. (1.3.105) For a file
+/// in DocViewer, watched until a page of it is drawn: DocViewer can sit on its spinner for good (a session that never
+/// answers, a document still being made ready) — so after a while the viewer is opened again from the file's preview
+/// address (a new session, as a fresh open makes), and if that one stalls too, the popup says so, with Try Again and the
+/// file itself in Quick Look (without the teacher's marks), never a spinner for ever.
 private struct CanvasViewer: View {
     let url: URL
+    /// The file shown (DocViewer's), or nil for the submission's own page — which is not watched.
+    var file: Attachment? = nil
     @StateObject private var browser = ToolBrowser()
+    /// How many times the viewer has been opened afresh for this file.
+    @State private var attempt = 0
+    @State private var stuck = false
+    @State private var plain = false
+
+    /// How long DocViewer is given to draw a page before it is opened again, and after that before it is given up on.
+    private static let patience: [Double] = [12, 20]
+
+    /// A page drawn: DocViewer draws a document's pages as pictures (a canvas or an image of a fair size).
+    private static let drawn = """
+    (() => { const big = (e) => { const r = e.getBoundingClientRect(); return r.width > 160 && r.height > 160; };
+      return [...document.querySelectorAll('canvas, img')].some(big); })()
+    """
 
     var body: some View {
-        ToolWebView(url: url, browser: browser, scripts: [DocViewerSkin.script()])
-            .overlay(alignment: .top) {
-                if browser.loading {
-                    ProgressView(value: browser.progress)
-                        .progressViewStyle(.linear)
-                        .tint(Theme.accent)
-                        .frame(height: 2)
+        if plain, let file {
+            QuickLookFile(file: file)
+        } else {
+            ToolWebView(url: url, browser: browser, scripts: [DocViewerSkin.script()])
+                .id(attempt) // (a new web view, the preview address opened again: a new session)
+                .overlay(alignment: .top) {
+                    if browser.loading {
+                        ProgressView(value: browser.progress)
+                            .progressViewStyle(.linear)
+                            .tint(Theme.accent)
+                            .frame(height: 2)
+                    }
                 }
-            }
+                .overlay {
+                    if stuck {
+                        ContentUnavailableView {
+                            Label("The viewer isn\u{2019}t loading", systemImage: "doc.text.magnifyingglass")
+                        } description: {
+                            Text("Canvas\u{2019}s viewer didn\u{2019}t show this file. Try again, or open the file itself (without the marks on it).")
+                        } actions: {
+                            HStack {
+                                Button("Try Again") { stuck = false; attempt += 1 }
+                                    .keyboardShortcut(.defaultAction)
+                                Button("Open the File") { plain = true }
+                            }
+                        }
+                        .background(.regularMaterial)
+                    }
+                }
+                .task(id: attempt) { await watch() }
+        }
+    }
+
+    /// Until a page is drawn: looked at every second and a half; past the patience, opened again once, then given up on.
+    private func watch() async {
+        guard file != nil else { return }
+        let wait = Self.patience[min(attempt, Self.patience.count - 1)]
+        let start = Date()
+        while Date().timeIntervalSince(start) < wait {
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            if Task.isCancelled { return }
+            if let web = browser.webView, (try? await web.evaluateJavaScript(Self.drawn)) as? Bool == true { return }
+        }
+        if Task.isCancelled { return }
+        NSLog("[Simpl] feedback: DocViewer drew no page in %.0f s (try %d)", wait, attempt + 1)
+        if attempt == 0 { attempt = 1 } else { stuck = true }
     }
 }
 
