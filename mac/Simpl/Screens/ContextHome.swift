@@ -55,7 +55,10 @@ struct ContextHome: View {
     @ViewBuilder
     private func content(_ d: HomeData) -> some View {
         let color = Color(hex: d.color)
-        let tiles = d.sections.filter { $0.kind != "home" } // (the home is where this is)
+        // (1.3.108) only what the sidebar does not list under the course already: its sections are there (the home is
+        // where this is), so the pills are the course's other links — its tools and pages — and any section it leaves out
+        let listed = Set((engine.sections[ctx] ?? d.sections).map(\.kind))
+        let tiles = d.sections.filter { $0.kind != "home" && !listed.contains($0.kind) }
         let more = d.more ?? []
         header(d, color)
         if !tiles.isEmpty || !more.isEmpty { sectionPills(tiles, more, d, color) }
