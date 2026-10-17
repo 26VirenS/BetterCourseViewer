@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.36', date: '2026-10-17', notes: [
+      { kind: 'improved', title: 'Grades by category', body: 'A course\u2019s grades are listed under each of its categories.', icon: P.list },
+    ] },
     { version: '2.99.35', date: '2026-10-15', notes: [
       { kind: 'improved', title: 'Always up to date', body: 'The Mac app now always installs updates by itself.', icon: P.arrows },
       { kind: 'improved', title: 'Earlier versions stay', body: 'In the Mac app, a version put back stays until a newer one.', icon: P.pin },
