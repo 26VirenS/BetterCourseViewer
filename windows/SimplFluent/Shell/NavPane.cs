@@ -254,7 +254,25 @@ public sealed class NavList : Grid
             row.SetResourceReference(Control.BackgroundProperty, B.Subtle);
             if (key != shownKey)
             {
+                // (0.3.26) a course chosen — its home, or a section of another course than before — has its row scrolled
+                // to the top of the pane, its sections opening under it in sight
+                static string CtxOf(string? k) => k == null ? "" : k.IndexOf(':') is > 0 and var c ? k[..c] : k;
+                var course = CtxOf(key);
+                var toTop = course.StartsWith("courses/", StringComparison.Ordinal) && course != CtxOf(shownKey);
                 shownKey = key;
+                if (toTop)
+                {
+                    Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle, () =>
+                    {
+                        if (!rows.TryGetValue(course, out var head) || !head.IsVisible) return;
+                        DependencyObject? up = head;
+                        while (up != null && up is not ScrollViewer) up = VisualTreeHelper.GetParent(up);
+                        if (up is not ScrollViewer viewer) return;
+                        try { viewer.ScrollToVerticalOffset(viewer.VerticalOffset + head.TranslatePoint(new Point(0, 0), viewer).Y - 4); } catch { }
+                    });
+                    PlacePill(animate: true);
+                    return;
+                }
                 // (once the pane has settled — its foot and its rows laid out — and with a little room round it, so the row
                 //  is never left half under the foot; only when the choice moved, so a pane scrolled by hand stays put. The
                 //  row is looked up then, not now: the rows may be built again meanwhile, as counts and sections arrive)

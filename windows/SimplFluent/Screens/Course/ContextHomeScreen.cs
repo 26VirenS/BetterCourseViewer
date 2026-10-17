@@ -51,7 +51,8 @@ public sealed class ContextHomeScreen : Screen
         var color = K.Hex(d.Color);
         var page = K.V(24, Head(d, color));
         var tiles = d.Sections.Where(s => s.Kind != "home").ToList(); // (the home is where this is)
-        if (tiles.Count > 0) page.Children.Add(Pills(tiles, color));
+        var more = d.More ?? new List<MoreLink>();
+        if (tiles.Count > 0 || more.Count > 0) page.Children.Add(Pills(tiles, more, d, color));
         if (Lower(d, color) is { } lower) page.Children.Add(lower);
         return page;
     }
@@ -115,8 +116,10 @@ public sealed class ContextHomeScreen : Screen
         return b;
     }
 
-    /// <summary>The sections as pills that run along a line and wrap: a click opens one, its menu has the school's page.</summary>
-    private FrameworkElement Pills(List<SectionLink> sections, Color color)
+    /// <summary>The sections as pills that run along a line and wrap: a click opens one, its menu has the school's page.
+    /// (0.3.26) The course's other links — its tools, the school's pages with no place of their own — are pills of their
+    /// own after them (they were a "More" card in the side column): a tool's with the puzzle piece, opening its window.</summary>
+    private FrameworkElement Pills(List<SectionLink> sections, List<MoreLink> more, HomeData d, Color color)
     {
         var flow = new WrapPanel { Margin = new Thickness(0, 0, -10, -10) };
         foreach (var s in sections)
@@ -131,17 +134,32 @@ public sealed class ContextHomeScreen : Screen
             CourseKit.CanvasRowMenu(pill, engine, s.Label, CourseKit.SectionUrl(engine, ctx, kind), Open);
             flow.Children.Add(pill);
         }
+        foreach (var m in more)
+        {
+            void Open() => OpenMore(m, d);
+            var window = m.Tool != null || m.External == true;
+            var label = K.Text(m.Label, Ty.Body);
+            label.FontWeight = FontWeights.Medium;
+            var pill = K.CardButton(K.H(8, K.Icon(window ? SymbolRegular.PuzzlePiece24 : SymbolRegular.Link24, 16, K.Darkened(color)), label), Open, 18, new Thickness(14, 8, 16, 9));
+            pill.Margin = new Thickness(0, 0, 10, 10);
+            pill.HorizontalAlignment = HorizontalAlignment.Left;
+            pill.ToolTip = window ? "Opens in a window of its own" : m.Label;
+            CourseKit.CanvasRowMenu(pill, engine, m.Label, m.Url, Open);
+            flow.Children.Add(pill);
+        }
         return flow;
     }
 
     // ---- the two columns ----
 
-    /// <summary>The work, the news and what it says about itself in the main column; the front page, what was handed in
-    /// and the other links in the side column — under the main on a narrow page, or the only one when the other is empty.</summary>
+    /// <summary>(0.3.26, as the Mac's) The front page in the main column — the latest announcements, at most three and a
+    /// line each, just above it, or with no front page the announcements in its place — and what it says about itself;
+    /// the work still to do and what was handed in in the side column — under the main on a narrow page, or the only one
+    /// when the other is empty. (Before, the work was the main column and the front page the side's.)</summary>
     private FrameworkElement? Lower(HomeData d, Color color)
     {
-        var main = d.Kind == "courses" || d.Announcements.Count > 0 || !string.IsNullOrEmpty(d.Html);
-        var side = d.Front != null || d.Done is { Count: > 0 } || d.More is { Count: > 0 };
+        var main = d.Front != null || d.Announcements.Count > 0 || !string.IsNullOrEmpty(d.Html);
+        var side = d.Kind == "courses" || d.Done is { Count: > 0 };
         if (main && side) return CourseKit.SideSplit(MainColumn(d, color), SideColumn(d, color), Width, 360, 860, 26, 24);
         if (main) return MainColumn(d, color);
         if (side) return SideColumn(d, color);
@@ -151,8 +169,12 @@ public sealed class ContextHomeScreen : Screen
     private FrameworkElement MainColumn(HomeData d, Color color)
     {
         var v = K.V(24);
-        if (d.Kind == "courses") v.Children.Add(StillToDo(d, color));
-        if (d.Announcements.Count > 0) v.Children.Add(Announcements(d, color));
+        if (d.Front is { } f)
+        {
+            if (d.Announcements.Count > 0) v.Children.Add(CompactAnnouncements(d, color));
+            v.Children.Add(FrontPageCard(f));
+        }
+        else if (d.Announcements.Count > 0) v.Children.Add(Announcements(d, color));
         if (!string.IsNullOrEmpty(d.Html)) v.Children.Add(CourseKit.CardSection("About", null, null, CourseKit.Rich(engine, d.Html!), 18));
         return v;
     }
@@ -160,9 +182,8 @@ public sealed class ContextHomeScreen : Screen
     private FrameworkElement SideColumn(HomeData d, Color color)
     {
         var v = K.V(24);
-        if (d.Front is { } f) v.Children.Add(FrontPageCard(f));
+        if (d.Kind == "courses") v.Children.Add(StillToDo(d, color));
         if (d.Done is { Count: > 0 } done) v.Children.Add(CourseKit.CardSection("Handed in lately", null, null, CourseKit.Divided(done, r => WorkRow(r, color))));
-        if (d.More is { Count: > 0 } more) v.Children.Add(MoreLinks(more, d, color));
         return v;
     }
 
@@ -188,32 +209,39 @@ public sealed class ContextHomeScreen : Screen
         return CourseKit.CardSection("Latest announcements", null, all, rows);
     }
 
+    /// <summary>(0.3.26) Over the front page: the latest announcements squeezed to a line each, three at most — unread ones
+    /// marked and in bold, who and when at the end of the line.</summary>
+    private FrameworkElement CompactAnnouncements(HomeData d, Color color)
+    {
+        var count = d.Announcements.Count;
+        UIElement? all = d.Sections.Any(s => s.Kind == "announcements") ? CourseKit.HeadLink(count > 3 ? $"All {count}" : "All announcements", () => engine.Go(Place.Section(ctx, "announcements"))) : null;
+        var rows = CourseKit.Divided(d.Announcements.Take(3).ToList(), a =>
+        {
+            void Open() => engine.OpenWeb(a.Url, a.Title);
+            var title = K.Text(a.Title, a.Unread == true ? Ty.BodyStrong : Ty.Body);
+            var who = K.Text(string.Join(" · ", new[] { a.Author, a.When }.Where(x => !string.IsNullOrEmpty(x))), Ty.Caption, B.Text2);
+            who.VerticalAlignment = VerticalAlignment.Center;
+            title.VerticalAlignment = VerticalAlignment.Center;
+            var lead = K.H(8, K.Icon(SymbolRegular.Megaphone24, 16, K.Darkened(color)));
+            if (a.Unread == true) lead.Children.Add(K.Dot(K.Hex("#0A84FF"), 7));
+            lead.VerticalAlignment = VerticalAlignment.Center;
+            var line = K.Columns("auto, *, auto", lead.Col(0), title.Margin(10, 0, 12, 0).Col(1), who.Col(2));
+            var row = CourseKit.RowLink(line, Open);
+            CourseKit.CanvasRowMenu(row, engine, a.Title, a.Url, Open);
+            return row;
+        }, 40);
+        return CourseKit.CardSection("Announcements", null, all, rows);
+    }
+
     private FrameworkElement FrontPageCard(FrontPage f)
     {
         var slug = f.Slug ?? "";
         void Open() => engine.Push(Route.Page(ctx, slug));
         var words = K.V(5, K.Wrapped(f.Title, Ty.BodyStrong));
-        if (!string.IsNullOrEmpty(f.Excerpt)) words.Children.Add(K.Wrapped(f.Excerpt!, Ty.Caption, B.Text2, 6));
+        if (!string.IsNullOrEmpty(f.Excerpt)) words.Children.Add(K.Wrapped(f.Excerpt!, Ty.Caption, B.Text2, 14)); // (0.3.26: the wide column's, so more of it)
         var row = CourseKit.RowLink(words, Open);
         CourseKit.CanvasRowMenu(row, engine, f.Title, slug.Length == 0 ? $"/{ctx}/wiki" : $"/{ctx}/pages/{slug}", Open);
         return CourseKit.CardSection("Front page", null, null, row);
-    }
-
-    /// <summary>The course's other links: a tool, or another site, opens in a Simpl window of its own — the window's
-    /// symbol at its end, as External Tools' chips and a module's tool have it —; one of the school's own pages opens
-    /// here, a chevron at its end.</summary>
-    private FrameworkElement MoreLinks(List<MoreLink> more, HomeData d, Color color)
-    {
-        var rows = CourseKit.Divided(more, m =>
-        {
-            void Open() => OpenMore(m, d);
-            var window = m.Tool != null || m.External == true;
-            var end = window ? CourseKit.OwnWindowMark() : K.Icon(SymbolRegular.ChevronRight20, 12, B.Text3);
-            var row = CourseKit.RowLink(CourseKit.InfoRow(m.Label, null, m.External == true ? SymbolRegular.PuzzlePiece24 : SymbolRegular.Link24, color, end), Open);
-            CourseKit.CanvasRowMenu(row, engine, m.Label, m.Url, Open);
-            return row;
-        });
-        return CourseKit.CardSection("More", null, null, rows);
     }
 
     private FrameworkElement WorkRow(ARow r, Color color)
