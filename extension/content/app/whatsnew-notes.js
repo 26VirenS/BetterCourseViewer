@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.37', date: '2026-10-17', notes: [
+      { kind: 'improved', title: 'Cards like the Mac app', body: 'A counter\u2019s list and previews look as they do on the Mac.', icon: P.list },
+    ] },
     { version: '2.99.36', date: '2026-10-17', notes: [
       { kind: 'improved', title: 'Grades by category', body: 'A course\u2019s grades are listed under each of its categories.', icon: P.list },
     ] },
