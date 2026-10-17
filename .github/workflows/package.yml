@@ -14,6 +14,11 @@ on:
       - 'scripts/chrome-manifest.py'
       - '.github/workflows/package.yml'
   workflow_dispatch:
+    inputs:
+      beta:
+        description: 'A beta: the Release is a pre-release, and only the Safari app beta feed (/app/latest-beta.json) names it — /app/latest.json, /download/mac and the Chrome download stay where they are'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -49,11 +54,14 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
+          BETA: ${{ inputs.beta && 'true' || 'false' }}
         run: |
           VERSION="$(python3 -c "import json;print(json.load(open('extension/manifest.json'))['version'])")"
           TAG="v$VERSION"
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/*.zip --clobber
+          elif [ "$BETA" = "true" ]; then
+            gh release create "$TAG" dist/*.zip --target "$GITHUB_SHA" --title "Simpl Courses $VERSION beta" --generate-notes --prerelease
           else
             gh release create "$TAG" dist/*.zip --target "$GITHUB_SHA" --title "Simpl Courses $VERSION" --generate-notes
           fi
@@ -76,6 +84,7 @@ jobs:
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           GH_TOKEN: ${{ github.token }}
+          BETA: ${{ inputs.beta && 'true' || 'false' }} # (2.99.38: a beta names only the beta feed)
         run: ./scripts/release-mac-app.sh
 
   # The website's sources kept here (site/: the Report a bug page and the Worker that answers it)
