@@ -1,3 +1,9 @@
+**What's new in 0.3.26** (beta)
+
+- **Front page first** — a course's home leads with its front page, in the wide column, with its latest announcements (three at most, a line each) just above it; with no front page, the announcements take its place. The work still to do moves to the narrow column beside it.
+- **Every link a button** — a course's tools and other links are buttons beside its sections, instead of a More list.
+- **Course up top** — choosing a course in the side pane brings it to the top of the pane, its sections opening under it.
+
 **What's new in 0.3.25** (beta)
 
 - **Alta Even Faster** — for an account that uses Knewton Alta, the popup's page is made ready ahead, at a quiet moment, so an assignment opens without waiting for it to be made; and Alta's page script does much less while Alta draws and while you work — it looks again only when something on the page has changed, rather than several times a second — so Alta uses less battery.
