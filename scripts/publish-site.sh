@@ -99,6 +99,33 @@ open("build/site-sync/safari-zip", "w").write(asset["browser_download_url"])
       rm -f build/site-sync/safari-zip
     fi
   fi
+  # (2.99.38) the Safari app's beta feed, /app/latest-beta.json, for a Simpl Courses with Get beta updates on: the newest
+  # v* release with the app's zip of all, a beta (a pre-release) or not — so a beta Mac also moves on to a release newer
+  # than its beta. /download/mac and /app/latest.json never name a beta (above).
+  SAFARI_BETA="$(gh api "repos/$REPO/releases?per_page=100" --jq '[.[] | select((.draft | not) and (.tag_name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")) and any(.assets[]; .name | startswith("Simpl-Courses-Mac-")))] | sort_by(.tag_name | ltrimstr("v") | split(".") | map(tonumber? // 0)) | last' 2>/dev/null || true)"
+  if [ -n "$SAFARI_BETA" ] && [ "$SAFARI_BETA" != "null" ]; then
+    mkdir -p build/site-sync/public/app
+    printf '%s' "$SAFARI_BETA" | python3 -c '
+import json, sys
+rel, repo = json.loads(sys.stdin.read()), sys.argv[1]
+tag = rel["tag_name"]; version = tag[1:]
+asset = next((a for a in rel.get("assets", []) if a.get("name") == f"Simpl-Courses-Mac-{version}.zip"), None)
+if not asset: sys.exit("no Safari app zip on " + tag)
+digest = asset.get("digest") or ""
+if not digest.startswith("sha256:"): sys.exit("no checksum for " + asset["name"] + ": /app/latest-beta.json left as it is")
+json.dump({
+    "version": version,
+    "url": asset["browser_download_url"],
+    "sha256": digest[7:],
+    "size": asset.get("size"),
+    "minimumOS": "13.0",
+    "notes": rel.get("html_url") or f"https://github.com/{repo}/releases/tag/{tag}",
+    "published": rel.get("published_at"),
+    "beta": bool(rel.get("prerelease")),
+}, open("build/site-sync/public/app/latest-beta.json", "w"), indent=2)
+print("/app/latest-beta.json → " + version + (" (beta)" if rel.get("prerelease") else ""))
+' "$REPO" || echo "no Safari app beta feed written"
+  fi
   # (1.3.17) the beta feed, /app/mac-beta.json, for Macs with Get beta updates on: the newest mac-v* release of all, a
   # beta (a pre-release) or not — so a beta Mac also moves on to a release newer than its beta
   BETA_REL="$(gh api "repos/$REPO/releases?per_page=100" --jq '[.[] | select((.draft | not) and (.tag_name | startswith("mac-v")))] | sort_by(.tag_name | ltrimstr("mac-v") | split(".") | map(tonumber? // 0)) | last' 2>/dev/null || true)"

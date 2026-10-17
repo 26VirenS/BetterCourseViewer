@@ -341,6 +341,10 @@ class ViewController: NSViewController, WKNavigationDelegate, WKUIDelegate, WKSc
             } else {
                 replyHandler(["ok": false, "message": "No version named."], nil)
             }
+        case "app.setBetaUpdates": // (2.99.38) Get beta updates
+            Updater.shared.beta = body["on"] as? Bool ?? false
+            replyHandler(["ok": true], nil)
+            pushState()
         case "app.setLoginItem":
             let problem = LoginItem.set(body["on"] as? Bool ?? true)
             replyHandler(["ok": problem == nil, "message": problem ?? ""], nil)

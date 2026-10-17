@@ -72,6 +72,7 @@
     checkUpdates: () => call('app.checkUpdates'),
     installUpdate: () => call('app.installUpdate'),
     setLoginItem: (on) => call('app.setLoginItem', { on: !!on }),
+    setBetaUpdates: (on) => call('app.setBetaUpdates', { on: !!on }), // (2.99.38) Get beta updates
     openStore: () => call('app.openStore'),
     releases: () => call('app.releases'), // (the Developer section: the versions published)
     rollback: (r) => call('app.rollback', { version: r.version, url: r.url, sha256: r.sha256 || '' }),

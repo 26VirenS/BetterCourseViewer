@@ -179,14 +179,21 @@ try {
   check((await hold()) === null, 'an install under way: the hold is not said');
   await push({ update: { state: 'available', available: '9.10.0', waits: true, rolledBackFrom: '9.10.1', hold: '9.10.1', checked: 1700000000, version: '9.9.9' } });
 
+  // (2.99.38) Get beta updates: off as the app says, and a beta found named as one
+  check(!(await page.$eval('#betaUpdates', (e) => e.classList.contains('is-on'))), 'Get beta updates is off while the app says so');
+  await push({ update: { state: 'available', available: '9.10.3', availableBeta: true, beta: true, checked: 1700000000, version: '9.9.9' } });
+  check((await text('#updTitle')) === 'Version 9.10.3 beta is ready' && (await page.$eval('#betaUpdates', (e) => e.classList.contains('is-on'))), `with Get beta updates on, a beta found is named a beta and the switch is on: ${await text('#updTitle')}`);
+  await push({ update: { state: 'available', available: '9.10.0', waits: true, rolledBackFrom: '9.10.1', hold: '9.10.1', checked: 1700000000, version: '9.9.9' } });
+
   console.log('the buttons reach the app');
   await page.click('#checkUpdates');
   await page.click('#updAction');
   await page.click('#loginItem');
+  await page.click('#betaUpdates'); // (2.99.38) Get beta updates
   await page.click('#openSafari');
   await page.waitForTimeout(200);
   const sent = await page.evaluate(() => window.__calls.filter((m) => m.cmd.startsWith('app.') && m.cmd !== 'app.state').map((m) => `${m.cmd}${'on' in m ? `:${m.on}` : ''}`));
-  check(sent.join(',') === 'app.moveToApplications,app.checkUpdates,app.installUpdate,app.setLoginItem:false,app.openSafariSettings', `Check now, Update now, Open at login and Open Safari Settings each reach the app: ${sent.join(',')}`);
+  check(sent.join(',') === 'app.moveToApplications,app.checkUpdates,app.installUpdate,app.setLoginItem:false,app.setBetaUpdates:true,app.openSafariSettings', `Check now, Update now, Open at login, Get beta updates and Open Safari Settings each reach the app: ${sent.join(',')}`);
   check(/Safari is not running\. Open Safari, then Safari → Settings → Extensions/.test(await text('#appMsg')) && !(await page.$eval('#appMsg', (e) => e.hidden)), `Safari refusing to open its settings is said under the button: ${await text('#appMsg')}`);
 
   console.log('a setting, both ways');

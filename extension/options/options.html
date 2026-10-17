@@ -59,6 +59,8 @@
           </div>
           <!-- (2.99.35) updates always install themselves: no switch. A version put back (Developer ▸ Roll back the app) says here that the app stays on it -->
           <div class="row row--pad row--line hold" id="updHold" hidden><span class="row__body"><span class="row__t row__t--med" id="updHoldTitle">Staying on this version</span><span class="row__s" id="updHoldSub"></span></span><svg class="hold__pin" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6"/></svg></div>
+          <!-- (2.99.38) the beta channel: the app reads /app/latest-beta.json, the newest version published, beta or not -->
+          <div class="row row--pad row--line"><span class="row__body"><span class="row__t row__t--med">Get beta updates</span><span class="row__s">New versions before everyone else. They can have rough edges; turned off, you stay on your beta until a newer release.</span></span><button class="switch" id="betaUpdates" type="button" role="switch" aria-checked="false" aria-label="Get beta updates"><span class="switch__knob"></span></button></div>
           <div class="row row--pad row--line"><span class="row__body"><span class="row__t row__t--med">Open at login</span><span class="row__s">The app keeps watch from the menu bar. Closing this window leaves it running.</span></span><button class="switch" id="loginItem" type="button" role="switch" aria-checked="true" aria-label="Open at login"><span class="switch__knob"></span></button></div>
           <p class="note note--msg" id="appMsg" hidden></p>
         </div>

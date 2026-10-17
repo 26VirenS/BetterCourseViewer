@@ -98,7 +98,11 @@ echo "✅ $ZIP ($SIZE bytes, sha256 $SHA)"
 if gh release view "$TAG" >/dev/null 2>&1; then
   gh release upload "$TAG" "$ZIP" --clobber
 else
-  gh release create "$TAG" "$ZIP" --target "${GITHUB_SHA:-HEAD}" --title "$APP_NAME $VERSION" --generate-notes
+  if [ "${BETA:-false}" = "true" ]; then
+    gh release create "$TAG" "$ZIP" --target "${GITHUB_SHA:-HEAD}" --title "$APP_NAME $VERSION beta" --generate-notes --prerelease
+  else
+    gh release create "$TAG" "$ZIP" --target "${GITHUB_SHA:-HEAD}" --title "$APP_NAME $VERSION" --generate-notes
+  fi
 fi
 ASSET="https://github.com/${GITHUB_REPOSITORY:-26VirenS/BetterCourseViewer}/releases/download/$TAG/$ZIP_NAME"
 
@@ -107,6 +111,38 @@ git fetch origin site:refs/remotes/origin/site
 rm -rf build/site
 git worktree add build/site origin/site
 mkdir -p build/site/public/app
+# (2.99.38) the beta feed, /app/latest-beta.json (Get beta updates): this version, a beta or not, unless it already names
+# a newer one; a beta names only it — /app/latest.json and /download/mac stay on the release they name
+python3 - "$VERSION" "$ASSET" "$SHA" "$SIZE" "$TAG" "${BETA:-false}" build/site/public/app/latest-beta.json <<'PY'
+import json, sys, datetime
+version, asset, sha, size, tag, beta, path = sys.argv[1:8]
+key = lambda v: [int(x) if x.isdigit() else 0 for x in v.split(".")]
+try: had = json.load(open(path)).get("version") or "0"
+except Exception: had = "0"
+if key(had) > key(version): sys.exit(0)
+json.dump({
+    "version": version,
+    "url": asset,
+    "sha256": sha,
+    "size": int(size),
+    "minimumOS": "13.0",
+    "notes": f"https://github.com/26VirenS/BetterCourseViewer/releases/tag/{tag}",
+    "published": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    "beta": beta == "true",
+}, open(path, "w"), indent=2)
+PY
+if [ "${BETA:-false}" = "true" ]; then
+  (
+    cd build/site
+    git config user.name "github-actions[bot]"
+    git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+    git add -A
+    git commit -q -m "Mac app $VERSION beta: the beta update feed" || echo "the beta feed already says $VERSION"
+    git push origin HEAD:site
+  )
+  echo "✅ $SITE/app/latest-beta.json says $VERSION (beta); $SITE/app/latest.json and /download/mac left as they are"
+  exit 0
+fi
 python3 - "$VERSION" "$ASSET" "$SHA" "$SIZE" "$TAG" > build/site/public/app/latest.json <<'PY'
 import json, sys, datetime
 version, asset, sha, size, tag = sys.argv[1:6]

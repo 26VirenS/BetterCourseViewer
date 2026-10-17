@@ -56,6 +56,7 @@ Both live on the `site` branch, which Cloudflare deploys on every push:
 | Address | What |
 | --- | --- |
 | `/app/latest.json` | `{ version, url, download, sha256, size, minimumOS, notes, published }` — the app compares `version` with its own, downloads `url` (which redirects to `download`) and checks `sha256`. |
+| `/app/latest-beta.json` | (2.99.38) The same, plus `beta`, for a Mac with **Get beta updates** on: the newest `v*` release with the app's zip of all, a pre-release or not, and `url` the zip itself. Run Package by hand with **beta** ticked and the Release is a pre-release that only this feed names — `/app/latest.json`, `/download/mac` and the Chrome download stay on the last release. Turned off, the app stays on its beta until a release newer than it. |
 | `/download/mac` | A 302 to the zip on the GitHub Release (`public/_redirects`). The site's download button points here, so the address never changes. |
 
 `scripts/release-mac-app.sh` writes both after every release. The file committed on the branch

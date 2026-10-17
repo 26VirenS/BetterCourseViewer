@@ -46,15 +46,36 @@ final class Updater {
 
     static let shared = Updater()
 
-    let feedURL: URL = {
+    private let releaseFeedURL: URL = {
         let s = (Bundle.main.object(forInfoDictionaryKey: "SimplUpdateFeed") as? String) ?? ""
         return URL(string: s.isEmpty || s.hasPrefix("$(") ? "https://simplcourses.com/app/latest.json" : s)!
     }()
+    /// (2.99.38) The beta feed, beside the usual one: the newest version published, a beta or not — so a Mac on betas also
+    /// moves on to a release newer than its beta.
+    private var betaFeedURL: URL {
+        releaseFeedURL.deletingLastPathComponent().appendingPathComponent("latest-beta.json")
+    }
+    /// (2.99.38) The feed read: the beta one while Get beta updates is on.
+    var feedURL: URL { beta ? betaFeedURL : releaseFeedURL }
+    private static let betaKey = "SimplBetaUpdates"
+    /// (2.99.38) Get beta updates: the beta feed read from now on, at once. Turned off, the app stays on the beta it has
+    /// until a release newer than it (a version is never taken back by this switch).
+    var beta: Bool {
+        get { UserDefaults.standard.bool(forKey: Self.betaKey) }
+        set {
+            guard newValue != beta else { return }
+            UserDefaults.standard.set(newValue, forKey: Self.betaKey)
+            if case .available = state { state = .idle } // (what the other feed found is not this one's to offer)
+            check()
+        }
+    }
     let interval: TimeInterval = 2 * 3600 // (four times a day: a check is one small request, and an update rarely waits on the hour)
     private let lastKey = "lastUpdateCheck" // when the feed was last read, kept across launches: a relaunch inside the two hours does not read it again
     let currentVersion: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
 
     private(set) var state: State = .idle { didSet { onChange?(state) } }
+    /// (2.99.38) Whether the version the feed last named is a beta (the beta feed says so).
+    private(set) var foundBeta = false
     private(set) var lastCheck: Date?
     var onChange: ((State) -> Void)?
     private var timer: Timer?
@@ -133,6 +154,8 @@ final class Updater {
                     self.state = .failed(error?.localizedDescription ?? "The update feed could not be read.", Date())
                     return
                 }
+                // (2.99.38) what the feed read named, beta or not, as the window says it
+                self.foundBeta = json["beta"] as? Bool ?? false
                 if Updater.isNewer(version, than: self.currentVersion) {
                     let release = Release(version: version, url: url, sha256: json["sha256"] as? String, notes: json["notes"] as? String, size: json["size"] as? Int)
                     self.state = .available(release)
@@ -318,7 +341,7 @@ final class Updater {
     /// The state as the settings window shows it. (2.99.35) `rolledBackFrom` while a version put back is held, `hold`
     /// the version a rollback now would hold back to, and `waits` when the version found waits for Update now.
     var report: [String: Any] {
-        var d: [String: Any] = ["version": currentVersion, "feed": feedURL.absoluteString, "hold": holdAfterRollback, "checked": lastCheck?.timeIntervalSince1970 ?? 0]
+        var d: [String: Any] = ["version": currentVersion, "feed": feedURL.absoluteString, "hold": holdAfterRollback, "checked": lastCheck?.timeIntervalSince1970 ?? 0, "beta": beta]
         if let from = rolledBackFrom { d["rolledBackFrom"] = from }
         switch state {
         case .idle: d["state"] = "idle"
@@ -327,6 +350,7 @@ final class Updater {
         case .available(let r):
             d["state"] = "available"
             d["available"] = r.version
+            d["availableBeta"] = foundBeta
             d["waits"] = waitsForUpdateNow(r)
             if let n = r.notes { d["notes"] = n }
             if let s = r.size { d["size"] = s }

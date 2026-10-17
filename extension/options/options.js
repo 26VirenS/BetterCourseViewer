@@ -251,7 +251,7 @@
       const checked = u.checked ? `Checked at ${when(u.checked)} · checks every 2 hours` : 'Checks every 2 hours.';
       switch (u.state) {
         case 'checking': $('updTitle').textContent = 'Checking for updates…'; $('updSub').textContent = `Version ${st.version}`; break;
-        case 'available': $('updTitle').textContent = `Version ${u.available} is ready`; $('updSub').textContent = `You have ${st.version}.${u.waits ? '' : ' It installs by itself in a moment.'}`; act.hidden = false; break;
+        case 'available': $('updTitle').textContent = `Version ${u.available}${u.availableBeta ? ' beta' : ''} is ready`; $('updSub').textContent = `You have ${st.version}.${u.waits ? '' : ' It installs by itself in a moment.'}`; act.hidden = false; break;
         case 'downloading': $('updTitle').textContent = 'Downloading the update…'; $('updSub').textContent = `${Math.round((u.progress || 0) * 100)}%`; break;
         case 'installing': $('updTitle').textContent = 'Installing…'; $('updSub').textContent = 'The app opens again by itself.'; break;
         case 'failed': $('updTitle').textContent = 'Could not check for updates'; $('updSub').textContent = u.message || ''; break;
@@ -273,6 +273,7 @@
       }
       $('devRollSub').textContent = `Another version, put in this one’s place. It stays until Update now, or (2.99.35 and later) a version newer than ${u.hold || st.version}.`;
       setSwitch($('loginItem'), !!st.loginItem);
+      setSwitch($('betaUpdates'), !!u.beta);
       if (document.querySelector('.section.is-active')?.id === 'data') renderStats();
     };
     self.SimplApp.onState(paintApp);
@@ -290,6 +291,11 @@
     });
     $('checkUpdates').addEventListener('click', () => { self.SimplApp.checkUpdates(); });
     $('updAction').addEventListener('click', () => { self.SimplApp.installUpdate(); });
+    onSwitch($('betaUpdates'), async (on) => {
+      setSwitch($('betaUpdates'), on);
+      const r = await (self.SimplApp.setBetaUpdates?.(on) ?? Promise.resolve(null)).catch(() => null);
+      if (!r || r.ok === false) { setSwitch($('betaUpdates'), !on); flash((r && r.message) || 'Could not change the update channel', true); }
+    });
     onSwitch($('loginItem'), async (on) => {
       setSwitch($('loginItem'), on);
       const r = await self.SimplApp.setLoginItem(on).catch(() => null);
