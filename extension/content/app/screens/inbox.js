@@ -96,18 +96,22 @@
         listCol.replaceChildren(U.emptyCard(query ? 'No messages match your search.' : 'No messages here.'));
         return;
       }
-      const days = new Map();
-      for (const c of list) {
-        const k = U.fmtDateComma(c.last_message_at || c.last_authored_message_at || c.workflow_state);
-        if (!days.has(k)) days.set(k, []);
-        days.get(k).push(c);
-      }
-      listCol.replaceChildren(...[...days].map(([day, items]) => h('div', { style: { marginBottom: '20px' } }, [
-        U.el('bcv-group__head', [U.h2(day), U.text('bcv-group__sub', U.plural(items.length, 'conversation'), 'span')]),
-        U.card(items.map(convRow), 'bcv-card--list'),
-      ])));
+      // (2.99.47) one list, as the Mac's mailbox: each row says its own date, so no day headings between them
+      listCol.replaceChildren(U.card(list.map(convRow), 'bcv-card--list bcv-inbox__mail'));
     }
 
+    /** (2.99.47) The sender's photo, or, where Canvas has none, their initials on a colour of their own (the same name, the
+     *  same colour), as the Mac's mailbox draws them. */
+    function face(url, name) {
+      const real = url && !/avatar-50|no_pic|dotted_pic|messages\/avatar-/.test(url);
+      if (real) return U.avatar(url, name, 38);
+      const words = String(name).split(/[\s,]+/).filter(Boolean);
+      const initials = ((words[0]?.[0] || '') + (words.length > 1 ? words[words.length - 1][0] : '')).toUpperCase() || '?';
+      const HUES = ['#34c759', '#ff3b30', '#0a84ff', '#ff9500', '#af52de', '#30b0c7', '#5856d6', '#ff2d55'];
+      let n = 0;
+      for (const ch of String(name)) n = (n * 31 + ch.charCodeAt(0)) >>> 0;
+      return h('span', { class: 'bcv-tile--38 bcv-msg__face', style: { background: HUES[n % HUES.length] }, 'aria-hidden': 'true', text: initials });
+    }
     function convRow(c) {
       const unread = c.workflow_state === 'unread';
       const starBtn = h('button', { type: 'button', class: 'bcv-ccard__star', style: { flex: 'none' }, title: c.starred ? 'Unstar' : 'Star', onclick: async (e) => {
@@ -121,9 +125,10 @@
         }
       } }, c.starred ? U.svg(IC.star, { size: 16, fill: '#ff9500' }) : U.svg(IC.star, { size: 16, stroke: 'var(--bcv-ink3)', width: 1.7, cap: 'butt' }));
       // who, how many messages, a paperclip when one carries a file or a recording, and when the
-      // last one came (the day is the group's heading: a time today, a weekday this week, else the date)
+      // last one came (a time today, a weekday this week, else the date)
       return U.row([
         U.dot(unread ? '#0a84ff' : 'transparent', 'bcv-dot--9 bcv-msg__dot'),
+        face(c.avatar_url, names(c) || 'Conversation'), // (2.99.47) who it is with, as the Mac's rows show them
         U.el('bcv-row__body', [
           U.el('bcv-row__head', [
             U.text('bcv-msg__from bcv-ellip', names(c) || 'Conversation', 'span'),

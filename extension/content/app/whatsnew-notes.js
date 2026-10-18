@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.47', date: '2026-10-18', notes: [
+      { kind: 'improved', title: 'Mac-style Inbox', body: 'One list of conversations, each with its sender\u2019s picture.', icon: P.list },
+    ] },
     { version: '2.99.46', date: '2026-10-18', notes: [
       { kind: 'improved', title: 'Course card shortcuts', body: 'Grades, Work, Modules, Files and News on each course card.', icon: P.layers },
     ] },

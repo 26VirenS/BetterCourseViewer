@@ -1565,11 +1565,14 @@ try {
   const msgs = await texts('.bcv-inbox__list .bcv-row');
   check(msgs.length === 2 && /Halley Smith.*No submission for Acknowledge/.test(msgs[0]) && !/Sam Student/.test(msgs[0]), `inbox rows name who the conversation is with, never yourself: ${msgs[0].slice(0, 60)}`);
   // the course in its colour, a count once there is more than one message, a paperclip for a file or a
-  // recording, and when the last message came (the day is the group's heading: a date, a weekday, a time today)
+  // recording, its sender's picture, and when the last message came (2.99.47: one list, as the Mac's mailbox)
   const inboxRows = await page.$$eval('.bcv-inbox__list .bcv-row', (els) => els.map((e) => ({ count: e.querySelector('.bcv-msg__count')?.textContent || null, clip: !!e.querySelector('.bcv-msg__clip'), when: e.querySelector('.bcv-row__when')?.textContent, course: e.querySelector('.bcv-msg__course')?.textContent || null })));
   check(inboxRows[0].course === 'Academic Success Resource Site (2026-27)' && inboxRows[0].clip && inboxRows[0].count === null && /^[A-Z][a-z]{2} \d+$/.test(inboxRows[0].when) && inboxRows[1].course === 'F26-MATH 021 20' && inboxRows[1].clip && inboxRows[1].count === '2', `rows carry the course, the message count, an attachment mark and the time: ${JSON.stringify(inboxRows)}`);
   check((await texts('.bcv-inbox__reader'))[0].includes('No conversation selected'), 'empty reader state');
   await shot(page, '09-inbox');
+  // (2.99.47) one list as the Mac's mailbox: no day headings, each row led by who it is with
+  const mail = await page.evaluate(() => ({ heads: document.querySelectorAll('.bcv-inbox__list .bcv-group__head').length, lists: document.querySelectorAll('.bcv-inbox__list .bcv-inbox__mail').length, avatars: document.querySelectorAll('.bcv-inbox__list .bcv-row > .bcv-tile--38').length, rows: document.querySelectorAll('.bcv-inbox__list .bcv-row').length }));
+  check(mail.heads === 0 && mail.lists === 1 && mail.rows > 0 && mail.avatars === mail.rows, `the inbox is one list, each row with its sender's picture, as the Mac's: ${JSON.stringify(mail)}`);
   await page.click('.bcv-inbox__list .bcv-row');
   await page.waitForSelector('.bcv-reader__msg', { timeout: 5000 });
   check((await texts('.bcv-reader__subject'))[0].startsWith('No submission') && (await texts('.bcv-reader__body'))[0].includes('Hello Bobcat'), 'reader shows the conversation');
