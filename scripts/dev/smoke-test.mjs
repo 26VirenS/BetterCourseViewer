@@ -136,8 +136,9 @@ if (on('bundles')) {
   const pbx = readFileSync(join(root, 'macos', 'Simpl Courses', 'Simpl Courses.xcodeproj', 'project.pbxproj'), 'utf8');
   const iosYml = readFileSync(join(root, 'ios', 'project.yml'), 'utf8');
   console.log('\nbundles');
-  // (data/ is the iPhone app's school search, which no browser build ships either: scripts/package.sh)
-  for (const entry of readdirSync(join(root, 'extension')).filter((n) => !n.startsWith('.') && n !== 'data')) {
+  // (data/ is the iPhone app's school search, which no browser build ships either: scripts/package.sh; tools/ the Mac
+  //  and Windows apps' calculator, which the Safari extension has no use for)
+  for (const entry of readdirSync(join(root, 'extension')).filter((n) => !n.startsWith('.') && n !== 'data' && n !== 'tools')) {
     check(pbx.includes(`path = ../../../extension/${entry};`), `Mac app bundles extension/${entry}`);
   }
   check(pbx.split(`MARKETING_VERSION = ${manifest.version};`).length === 5, `Mac app version is ${manifest.version}`);

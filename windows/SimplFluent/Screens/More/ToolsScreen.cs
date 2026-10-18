@@ -89,7 +89,7 @@ public sealed class ToolsScreen : Screen
     {
         new("cite", "Citation generator", "MLA, APA and Chicago.", SymbolRegular.TextQuote24, "#30b0c7"),
         new("pomo", "Focus timer", "Focus, then take a break.", SymbolRegular.Timer24, "#ff9500"),
-        new("calc", "Calculator", "Scientific, with memory.", SymbolRegular.Calculator24, "#ff9f0a"),
+        new("calc", "Calculator", "Solves it, step by step.", SymbolRegular.Calculator24, "#ff9f0a"),
         new("graph", "Graphing calculator", "Desmos, right here.", SymbolRegular.DataLine24, "#5856d6"),
         new("need", "Grade needed", "The score your goal needs.", SymbolRegular.TargetArrow24, "#ff375f"),
         new("conv", "File converter", "Word, PDF and images.", SymbolRegular.ArrowSync24, "#34c759"),

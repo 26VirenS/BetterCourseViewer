@@ -1,3 +1,7 @@
+**What's new in 0.3.29** (beta)
+
+- **A calculator that solves, step by step** — the Calculator is now a solver, as Mathway works: type a problem (or build it on the maths keypad — Basic, Algebra, Trigonometry, Calculus) and send it; it is read back as maths, then offered the ways it can be worked — solve for x, simplify, factor, expand, the derivative, the integral, a limit, graph — and the one picked is worked out with its answer exact and as a decimal, every step of the working, and its graph. It solves linear, quadratic and polynomial equations, ones with fractions, roots, powers, logarithms, absolute values and trig, inequalities and systems; differentiates with every rule named; integrates by the table, substitution, parts and partial fractions (a definite integral exactly, or as a number); and finds limits by substitution, L'Hôpital and at infinity. The pin's is the same, narrow, and carries what was typed to the whole calculator.
+
 **What's new in 0.3.28** (beta)
 
 - **Element at a glance** — pressing an element in the Periodic Table (the whole tool, or its pin) opens a small window beside it: the element's square, name, kind, electrons, state, electronegativity, density, melting and boiling points, valence electrons and a line about it, with ← and → for its neighbours, and Full page or Atom in 3D to go on.

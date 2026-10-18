@@ -30,7 +30,7 @@ public sealed class ToolContext
 {
     public required Engine.Engine Engine { get; init; }
     public required string Key { get; init; }
-    /// <summary>The quick version, in a pin's flyout or pulled out of it (the Mac's FocusTimerCompact, CalculatorCompact …).</summary>
+    /// <summary>The quick version, in a pin's flyout or pulled out of it (the Mac's FocusTimerCompact, the calculator's narrow solver …).</summary>
     public bool Quick { get; init; }
     /// <summary>The window it is in (for its dialogs): the tool's popup, a pin's window or Simpl's.</summary>
     public Window? Owner { get; init; }

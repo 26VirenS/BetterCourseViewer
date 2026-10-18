@@ -16,7 +16,8 @@ namespace Simpl.Tools;
 internal static class CalculatorRegistration
 {
     [System.Runtime.CompilerServices.ModuleInitializer]
-    internal static void Register() => ToolRegistry.Register("calc", c => new CalculatorTool(c).View, c => new CalculatorCompact(c).View);
+    // (0.3.29: the Calculator is the solver, SolverTool.cs; this scientific calculator's engine stays, for its tests)
+    internal static void Register() => ToolRegistry.Register("calc", c => new SolverView(c, compact: false), c => new SolverView(c, compact: true));
 }
 #pragma warning restore CA2255
 

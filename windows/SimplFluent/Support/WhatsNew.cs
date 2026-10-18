@@ -26,6 +26,9 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.29", "2026-10-18",
+            ("new", "Step-by-Step Solver", "Equations, factoring, calculus and more, with every step."),
+            ("new", "Graphs and Keypad", "Graph any answer; build problems on the maths keypad.")),
         R("0.3.28", "2026-10-18",
             ("new", "Element at a Glance", "Press an element for a small window with its key facts."),
             ("improved", "Easier-to-Read Colours", "The table's coloured words and squares read clearly."),
