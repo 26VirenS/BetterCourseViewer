@@ -233,16 +233,18 @@ final class DevLog: ObservableObject {
             } catch {
                 failed = error.localizedDescription
             }
+            // (handed to the main actor as constants: a var captured there is a data race in Swift 6)
+            let found = got, problem = failed
             await MainActor.run {
                 let log = DevLog.shared
                 log.reading = false
-                log.problem = failed
-                guard !got.isEmpty else { return }
-                for g in got {
+                log.problem = problem
+                guard !found.isEmpty else { return }
+                for g in found {
                     log.lines.append(DevLogLine(id: log.next, at: g.0, level: g.1, category: g.2, text: g.3))
                     log.next += 1
                 }
-                log.last = got.last!.0
+                log.last = found.last!.0
                 if log.lines.count > 5000 { log.lines.removeFirst(log.lines.count - 5000) }
             }
         }
