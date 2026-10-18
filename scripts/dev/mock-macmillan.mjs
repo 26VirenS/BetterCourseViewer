@@ -10,7 +10,9 @@ body{margin:0;font-family:Helvetica,Arial,sans-serif;background:#f4f5f7}header{h
 header h1{font-size:20px;margin:0}main{position:absolute;top:65px;left:0;right:0;bottom:0}iframe{width:100%;height:100%;border:0}#rc{position:fixed;right:16px;bottom:16px}
 </style></head><body><a href="#main">Skip to main content</a><header><button aria-label="Back to My Course">&#8592;</button><button aria-label="Go back">&#8592;</button>
 <h1 aria-label="Assessment" data-testid="Assessment">Assessment</h1><span>Due: Mon, Oct 26</span></header>
-<main aria-label="Main content"><iframe title="Assessment" src="/mock-macmillan/sac/12778033"></iframe></main><button id="rc" aria-label="Open Resource Center">?</button></body></html>`;
+<main aria-label="Main content"><iframe title="W8 Homework: Forces in Motion" name="launch-frame" data-test-id="molecule-iframe" width="100%" height="100%"></iframe></main><button id="rc" aria-label="Open Resource Center">?</button>
+<form id="launch" target="launch-frame" method="get" action="/mock-macmillan/launch"><input type="hidden" name="folded"></form>
+<script>(function(){var f=document.getElementById('launch');f.folded.value=/folded=1/.test(location.search)?'1':'';f.submit();})();</script></body></html>`;
 
 const QUESTIONS = [
   { parts: [
@@ -40,19 +42,21 @@ body{margin:0;font-family:Helvetica,Arial,sans-serif;color:#222;background:#fff}
 [data-test-id=btn-sac-main]{background:#1565c0;color:#fff;border:0;border-radius:4px;padding:8px 14px}.raptor-container{flex:1;overflow:auto;padding:12px 20px}
 #question-nav li{padding:10px 14px;border-top:1px solid #eee;cursor:pointer}#question-nav li.on{background:#e8f0fe}.module-container{margin:12px 0}
 .numeric-entry-input{width:120px}.grading-status{font-weight:700}.cover{max-width:640px;margin:40px auto}
-</style></head><body><div id="app"></div><script>
+</style></head><body><div id="root"><main id="sac"><div id="app"></div></main></div><iframe title="widget" src="/mock-macmillan/sac/static/widget.html" style="position:fixed;left:0;bottom:0;width:2px;height:2px;border:0"></iframe><script>
 var Q=${JSON.stringify(QUESTIONS)};
-var S={open:false,at:0,done:{},pts:{},answers:{},attempts:{},view:'question'};
+var S={open:false,at:0,done:{},pts:{},answers:{},attempts:{},view:'question',folded:/folded=1/.test(location.search),policies:!/folded=1/.test(location.search)};
 var TOTAL=Q.length*100;
 function esc(s){return String(s)}
 function score(){var t=0;for(var k in S.pts)t+=S.pts[k];return t}
 function completed(){return Object.keys(S.done).length}
-var POLICIES='<h4>Grading Settings</h4><button data-test-id="show-policy-details-button">Hide</button><ul>'+
+var POLICIES_LIST='<ul>'+
  '<li data-test-id="policy-unlimited-attemps"><p><b>Unlimited attempts</b> per question.</p></li>'+
  '<li data-test-id="policy-partial-credit"><p><b>-5%</b> partial credit for incorrect attempts.</p></li>'+
  '<li data-test-id="policy-late"><p>Submit up to <b>3 days late</b> for a daily penalty of <b>10%</b> off the total score.</p></li>'+
  '<li data-test-id="policy-solutions"><p>View <b>solution explanations</b> after completing each question.</p></li>'+
  '<li data-test-id="policy-ai-tutor"><p>Access to <b>AI Tutor</b> assistance.</p></li></ul>';
+var POLICIES='<h4>Grading Settings</h4><button data-test-id="show-policy-details-button" aria-expanded="true">Hide</button>'+POLICIES_LIST;
+function policies(){return '<h4>Grading Settings</h4><button data-test-id="show-policy-details-button" aria-expanded="'+S.policies+'">'+(S.policies?'Hide':'Show')+'</button>'+(S.policies?POLICIES_LIST:'')}
 function cover(){
  document.getElementById('app').innerHTML='<div class="cover"><h1>W8 Homework: Forces in Motion</h1><p>Due Mon, Oct 26, 11:59 pm</p><p>'+Q.length+' questions</p><button id="open">Open Assignment</button>'+POLICIES+'</div>';
  document.getElementById('open').onclick=function(){S.open=true;draw()};
@@ -71,8 +75,9 @@ function part(p,i,n){
 function draw(){
  if(!S.open)return cover();
  var n=S.at,q=Q[n],done=S.done[n];
- var side='<nav id="side"><button data-test-id="side-nav-menu-button" aria-label="Collapse assignment menu"><span data-test-id="side-nav-button-title">Completed '+completed()+' of '+Q.length+' Questions</span></button>'+POLICIES+
-  '<ul id="question-nav" data-test-id="items">'+Q.map(function(_,k){var d=S.done[k];return '<li role="button" class="'+(k===n?'on':'')+'" data-test-id="item-'+(k+1)+'-'+(d?'success':(S.attempts[k]?'error':'default'))+'-row"><div data-test-id="item-'+(k+1)+'-number">Q'+(k+1)+'</div><div>'+(d?'Solved in '+S.attempts[k]+' attempt'+(S.attempts[k]===1?'':'s'):(S.attempts[k]?S.attempts[k]+' attempt'+(S.attempts[k]===1?'':'s'):'Unlimited attempts'))+'</div>'+(d?'<div data-test-id="item-'+(k+1)+'-success"><div data-test-id="item-'+(k+1)+'-points">+'+S.pts[k]+'</div></div>':'')+'</li>'}).join('')+'</ul></nav>';
+ var title='Completed '+completed()+' of '+Q.length+' Questions';
+ var side='<nav id="side-nav" data-test-id="side-nav"><button data-test-id="side-nav-'+title+'-menu-button" aria-expanded="'+!S.folded+'" aria-label="'+(S.folded?'Expand':'Collapse')+' assignment menu" aria-description="'+title+'"><span data-test-id="side-nav-button-title">'+title+'</span></button>'+(S.folded?'</nav>':policies()+
+  '<ul id="question-nav" data-test-id="items">'+Q.map(function(_,k){var d=S.done[k];return '<li role="button" class="'+(k===n?'on':'')+'" data-test-id="item-'+(k+1)+'-'+(d?'success':(S.attempts[k]?'error':'default'))+'-row"><div data-test-id="item-'+(k+1)+'-number">Q'+(k+1)+'</div><div>'+(d?'Solved in '+S.attempts[k]+' attempt'+(S.attempts[k]===1?'':'s'):(S.attempts[k]?S.attempts[k]+' attempt'+(S.attempts[k]===1?'':'s'):'Unlimited attempts'))+'</div>'+(d?'<div data-test-id="item-'+(k+1)+'-success"><div data-test-id="item-'+(k+1)+'-points">+'+S.pts[k]+'</div></div>':'')+'</li>'}).join('')+'</ul></nav>');
  var bar='<nav id="check-bar" aria-label="Assignment Tools"><div data-test-id="final-score-fraction" aria-label="Assignment Score: '+score()+' out of '+TOTAL+'"><span>+'+score()+'</span> pts <span>/'+TOTAL+'</span></div><button data-test-id="switch-to-new-layout">Switch to New Layout</button><ul>'+
   '<li><button aria-label="Open Resources">Resources</button></li>'+(done?'<li><button data-test-id="checkbar-solution-button" aria-label="Open Solution">Solution</button></li>':'<li><button aria-label="Open AI Tutor">AI Tutor</button></li>')+
   '</ul><button data-test-id="btn-sac-main" aria-label="'+(done?'Next Question':'Submit Answer')+'">'+(done?'Next Question':'Submit Answer')+'</button><div id="toggle-fullscreen" aria-label="Expand to Full Screen Mode"></div></nav>';
@@ -86,6 +91,8 @@ function draw(){
 function wire(){
  var n=S.at;
  document.querySelectorAll('#question-nav li').forEach(function(li,k){li.onclick=function(){S.at=k;S.view='question';draw()}});
+ document.querySelector('#side-nav > button').onclick=function(){S.folded=!S.folded;draw()};
+ var pol=document.querySelector('#side-nav [data-test-id=show-policy-details-button]');if(pol)pol.onclick=function(){S.policies=!S.policies;draw()};
  document.querySelector('[data-test-id=nav-item-back]').onclick=function(){if(S.at>0){S.at--;draw()}};
  document.querySelector('[data-test-id=nav-item-forward]').onclick=function(){if(S.at<Q.length-1){S.at++;draw()}};
  document.querySelectorAll('input[data-i]').forEach(function(el){el.oninput=el.onchange=function(){var a=S.answers[n]=S.answers[n]||{};var i=el.getAttribute('data-i');

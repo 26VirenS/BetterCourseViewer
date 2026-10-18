@@ -1,3 +1,7 @@
+**What's new in 0.3.33** (beta)
+
+- **Macmillan Learning, fixed on the real assignment** — the assessment now takes the whole window (Macmillan's own Assessment bar put away), the list of questions, how many are done and the grading settings fill in even when Macmillan's side menu was left folded, and nothing of Macmillan's inner frames stands in for the question.
+
 **What's new in 0.3.32** (beta)
 
 - **Macmillan Learning, redesigned** — a Macmillan assessment opens as a Knewton Alta one does: its cover as a start screen (its questions, when it is due, its grading settings, Open assignment); then the score and how many questions are done down the left, every question as a tile you can open (the one shown filled, a solved one ticked, one tried and not yet right in orange), and the grading settings; Macmillan's own question in the rest, its parts on cards; and along its foot the arrows, Question or My answer, Resources, AI Tutor, Solution, Switch to new layout and Submit answer or Next question. Show browser puts Macmillan's page back as it draws it.

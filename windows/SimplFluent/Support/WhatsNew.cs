@@ -26,6 +26,8 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.33", "2026-10-18",
+            ("fixed", "Macmillan Fixed", "Its list, score and settings fill in; the page fits.")),
         R("0.3.32", "2026-10-18",
             ("new", "Macmillan Redesigned", "Questions, score and Submit in Simpl's own layout.")),
         R("0.3.31", "2026-10-18",

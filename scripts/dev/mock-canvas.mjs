@@ -1620,6 +1620,16 @@ if (sample === 'right' || sample === 'wrong') window.mockVerdict(sample === 'rig
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       return res.end(MACMILLAN_HUB_HTML);
     }
+    // (Mac 1.3.115) the hub's launch, posted into its frame (a GET here), lands on the player; a widget frame of the
+    // player's own sits under /sac/ too, with nothing of the assessment on it
+    if (path === '/mock-macmillan/launch') {
+      res.writeHead(302, { location: `/mock-macmillan/sac/12778033${url.searchParams.get('folded') === '1' ? '?folded=1' : ''}` });
+      return res.end();
+    }
+    if (path === '/mock-macmillan/sac/static/widget.html') {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      return res.end('<!DOCTYPE html><html><head><title>widget</title></head><body><div class="widget"></div></body></html>');
+    }
     if (path === '/mock-macmillan/sac/12778033') {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       return res.end(MACMILLAN_SAC_HTML);
