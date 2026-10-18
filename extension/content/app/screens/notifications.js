@@ -102,6 +102,8 @@
       };
       const el = h('div', { class: `bcv-nf__row${enterCls()} ${isRead ? 'is-read' : ''}`, dataset: { id: n.id, cat: n.cat, flip: n.id }, role: 'link', tabindex: '0', style: drawn ? null : { animationDelay: `${Math.min(i * 45, 240)}ms` }, onclick: open, onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) open(); } }, [
         h('span', { class: 'bcv-nf__dot', 'aria-hidden': 'true' }),
+        // (2.99.45) each alert led by its kind's tile, as the Mac's rows are: a warning in red, a grade in green…
+        meta[n.cat] ? U.tile(meta[n.cat].icon, { color: meta[n.cat].color, tint: meta[n.cat].tint, size: 30, iconSize: 15, width: 2, cls: 'bcv-nf__tile' }) : null,
         h('span', { class: 'bcv-nf__body' }, [
           h('span', { class: 'bcv-nf__title', text: n.title }),
           h('span', { class: 'bcv-nf__meta', text: [n.whenText || rel(n.when), n.note].filter(Boolean).join(' · ') }),

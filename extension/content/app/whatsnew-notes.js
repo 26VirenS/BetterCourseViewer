@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.45', date: '2026-10-18', notes: [
+      { kind: 'improved', title: 'Notification icons', body: 'Each alert led by its kind\u2019s coloured tile, as on the Mac.', icon: P.sparkle },
+    ] },
     { version: '2.99.44', date: '2026-10-18', notes: [
       { kind: 'improved', title: 'Mac-style calendar', body: 'One ruled month, items by course bars, a missing count.', icon: P.layers },
     ] },
