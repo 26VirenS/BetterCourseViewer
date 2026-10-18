@@ -64,6 +64,15 @@
   // ---------------------------------------------------------------- the conversation
 
   function scrollDown() { requestAnimationFrame(() => { thread.scrollTop = thread.scrollHeight; }); }
+  /** A reply shown from its start: with the problem it answers above it when both fit, else from its own top (a tall
+   *  answer in a short window was shown by its foot, its title and first answer scrolled away). */
+  function reveal(m) {
+    requestAnimationFrame(() => {
+      const prev = m.previousElementSibling;
+      const both = prev && prev.classList.contains('me') && m.offsetTop + m.offsetHeight - prev.offsetTop <= thread.clientHeight;
+      thread.scrollTop = both ? thread.scrollHeight : m.offsetTop - 10;
+    });
+  }
   function me(text, tex) {
     $('hello').hidden = true;
     const m = el('div', 'msg me');
@@ -184,7 +193,7 @@
     b.appendChild(acts);
     // (Graph picked: drawn at once)
     if (option === 'graph' && r.graph && !compact) { plotBox = plotOf(r.graph); b.appendChild(plotBox); plotBox.draw(); }
-    scrollDown();
+    reveal(b.parentNode);
   }
 
   /** What an option still needs: x = …, x → …, from … to … (an integral's limits may stay empty). */
@@ -340,11 +349,21 @@
     calc: [['d/dx ', '\\frac{d}{dx}', 'wide op'], ['integrate ', '\\int', 'wide op'], [' dx', 'dx', 'alt'], [' from 0 to 1', '\\int_a^b', 'wide alt'], ['lim x->0 ', '\\lim_{x\\to a}', 'wide op'], ['inf', '\\infty', 'alt'],
       ['x', 'x'], ['^', 'x^{\\square}', 'alt'], ['e^', 'e^{\\square}', 'alt'], ['ln(', '\\ln'], ['sin('], ['cos('], ['sqrt(', '\\sqrt{\\square}', 'alt'], ['(', '('], [')', ')'], ['/', '\\frac{\\square}{\\square}', 'alt']],
   };
+  // (faces that are words or plain signs in the keypad's own type, as a calculator's are; only the maths in KaTeX's)
+  const PLAIN = { '\\div': '÷', '\\times': '×', '-': '−', '+': '+', '(': '(', ')': ')', '=': '=', '<': '<', '>': '>', ',': ',', '\\%': '%',
+    '\\leftarrow': '⌫', '\\le': '≤', '\\ge': '≥', '\\ln': 'ln', '\\log': 'log', '\\infty': '∞' };
+  function faceOf(k, face) {
+    if (!face) return '<span class="word">' + esc(k.replace(/\($/, '')) + '</span>';
+    if (PLAIN[face]) return '<span class="word">' + esc(PLAIN[face]) + '</span>';
+    const w = face.match(/^\\text\{([^}]*)\}(.*)$/);
+    if (w) return '<span class="word">' + esc(w[1] + w[2]) + '</span>';
+    return math(face);
+  }
   function drawKeys(tab) {
     const box = $('keys');
     box.innerHTML = '';
     for (const [k, face, kind] of KEYS[tab]) {
-      const b = el('button', 'key ' + (kind || ''), face ? math(face) : esc(k.replace(/\($/, '')));
+      const b = el('button', 'key ' + (kind || ''), faceOf(k, face));
       b.title = k === 'GO' ? 'Solve' : k === '<-' ? 'Delete' : k === 'C' ? 'Clear' : k.trim();
       b.onmousedown = (e) => e.preventDefault();
       b.onclick = () => press(k);
@@ -374,7 +393,8 @@
   const tab = localGet('tab', 'basic');
   document.querySelectorAll('.ktab').forEach((u) => u.classList.toggle('on', u.dataset.tab === tab));
   drawKeys(KEYS[tab] ? tab : 'basic');
-  const kbOpen = localGet('keypad', compact ? '0' : '1') === '1';
+  // (folded at first in the pin, and in a window too short for the keypad and an answer both)
+  const kbOpen = localGet('keypad', compact || innerHeight < 560 ? '0' : '1') === '1';
   $('keypad').hidden = !kbOpen;
   $('kbToggle').setAttribute('aria-expanded', String(kbOpen));
   $('kbToggle').onclick = () => {
