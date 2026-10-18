@@ -355,7 +355,7 @@
         return;
       }
       const shown = items.filter((it) => showDone || isOpen(it));
-      const parts = [composer()]; // adding a task comes first
+      const parts = [summary(), composer()]; // (2.99.43) the Mac's summary, then adding a task
       const push = (el) => parts.push(U.enter(el, parts.length, 70, 420)); // groups arrive on a 70ms stagger
       const openIn = (list) => U.plural(list.filter(isOpen).length, 'open item');
       const sorted = (l) => l.sort((a, b) => a.date - b.date);
@@ -408,6 +408,30 @@
       parts.push(U.hint(`Ticking an item marks it done ${BCV.lms.d2l ? 'on this device' : 'in your Canvas planner'}. Dismissing removes it from your To Do list only — neither submits or completes the work. Priority is yours alone and is never sent to ${BCV.lms.name}.`, 'bcv-hint--narrow'));
       body.replaceChildren(...parts);
       drawn = true;
+    }
+
+    /** (2.99.43) The Mac's card over the list: a ring of what is done out of everything in the window, the most pressing
+     *  number beside it (overdue in red, else due today, else still to do, else all done) and "1 of 18 done" under it. */
+    function summary() {
+      const all = items.filter((it) => !it.dismissed && !it.excused);
+      const done = all.filter(isDone).length;
+      const open = all.filter(isOpen);
+      const now = new Date();
+      const over = open.filter((it) => U.dayDiff(it.date, now) < 0).length;
+      const today = open.filter((it) => U.dayDiff(it.date, now) === 0).length;
+      const [head, tone] = over ? [`${over} overdue`, 'is-over'] : today ? [`${today} due today`, ''] : open.length ? [`${open.length} to do`, ''] : ['All done', 'is-done'];
+      const NS = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('viewBox', '0 0 64 64');
+      svg.setAttribute('class', 'bcv-todo__ring');
+      svg.setAttribute('aria-hidden', 'true');
+      const C = 2 * Math.PI * 26;
+      for (const [cls, len] of [['bcv-todo__ringtrack', C], ['bcv-todo__ringfill', all.length ? (C * done) / all.length : 0]]) {
+        const c = document.createElementNS(NS, 'circle');
+        for (const [k, v] of Object.entries({ cx: 32, cy: 32, r: 26, class: cls, 'stroke-dasharray': `${len} ${C}`, transform: 'rotate(-90 32 32)' })) c.setAttribute(k, String(v));
+        svg.append(c);
+      }
+      return U.el('bcv-todo__sum', [svg, U.el('bcv-todo__sumtext', [U.text(`bcv-todo__sumhead ${tone}`, head), U.text('bcv-todo__sumsub', `${done} of ${all.length} done`)])]);
     }
 
     setSeg();

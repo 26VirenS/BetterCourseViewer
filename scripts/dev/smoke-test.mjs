@@ -1373,7 +1373,9 @@ try {
   await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count')?.textContent) === n, badgeBefore, { timeout: 10000 });
   await page.waitForSelector('.bcv-todo__add', { timeout: 10000 });
   check(true, 'ticking the circle marks an item complete');
-  check((await page.$eval('.bcv-body > :first-child', (e) => e.className)).includes('bcv-todo__add') && /^Show completed · \d+$/.test((await texts('.bcv-todo__done'))[0]), `Add your own task leads the page; a small header button shows completed items with their count: ${(await texts('.bcv-todo__done'))[0]}`);
+  // (2.99.43) the Mac's summary first — a ring of what is done, the most pressing number, "n of m done" — then Add your own task
+  const tsum = await page.evaluate(() => ({ first: document.querySelector('.bcv-body > :first-child')?.className, second: document.querySelector('.bcv-body > :nth-child(2)')?.className, head: document.querySelector('.bcv-todo__sumhead')?.textContent, sub: document.querySelector('.bcv-todo__sumsub')?.textContent, ring: document.querySelectorAll('.bcv-todo__ring circle').length }));
+  check(/bcv-todo__sum/.test(tsum.first) && /bcv-todo__add/.test(tsum.second) && /^(\d+ overdue|\d+ due today|\d+ to do|All done)$/.test(tsum.head) && /^\d+ of \d+ done$/.test(tsum.sub) && tsum.ring === 2 && /^Show completed · \d+$/.test((await texts('.bcv-todo__done'))[0]), `the Mac's summary leads To Do, Add your own task under it; a small header button shows completed items with their count: ${JSON.stringify(tsum)} ${(await texts('.bcv-todo__done'))[0]}`);
   await page.click('.bcv-todo__done');
   await page.waitForSelector('.bcv-body .bcv-row--done', { timeout: 5000 });
   check((await texts('.bcv-todo__done'))[0] === 'Hide completed', 'the button flips to Hide completed');
