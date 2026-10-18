@@ -1,7 +1,8 @@
 import AppKit
 import SwiftUI
 
-// The scientific calculator, as the web's: Apple's scientific keys, key for key — the memory keys and brackets, 2nd, the
+// (1.3.111: the Calculator is now the solver, SolverTool.swift; this scientific calculator's engine stays for what a
+// pin carries, QuickCarry.calc.) The scientific calculator, as the web's: Apple's scientific keys, key for key — the memory keys and brackets, 2nd, the
 // powers and roots, the logs, the trig and hyperbolic functions with their inverses under 2nd, e, EE, π, Rand, Rad/Deg,
 // and the number pad with AC, +/−, %, and the four operators — but algebraic: what is typed stays on the line, the whole
 // of it (2 + 3 × 4², sin(30) + √(16), (2 + 3)²), with its result worked out underneath as it grows, and = makes the
@@ -795,128 +796,5 @@ extension CalcEngine {
     static func takeHandOff() -> CalcEngine? {
         defer { handOff = nil }
         return handOff
-    }
-}
-
-/// Calculator: the display over Apple's scientific keys, the keyboard on it; beside it on a wide window, the sums worked
-/// out with = (a press puts a result back on the line), and Copy. (1.3.83) Opened full screen from its pin, it goes on
-/// from the pin's line and sums.
-struct CalculatorTool: View {
-    @State private var eng = CalcEngine()
-    @FocusState private var focused: Bool
-
-    var body: some View {
-        ToolPage {
-            ToolColumns(sideWidth: 360, breakpoint: 1020) {
-                calculator
-            } side: {
-                historyPanel
-            }
-        }
-        .onAppear {
-            if let pin = CalcEngine.takeHandOff() { eng = pin }
-            focused = true
-        }
-    }
-
-    private var calculator: some View {
-        VStack(spacing: 16) {
-            CalcDisplay(eng: eng, big: 60)
-                .padding(.horizontal, 22)
-                .padding(.vertical, 18)
-                .card(radius: 22)
-            CalcKeypad(eng: $eng, keyHeight: 52, spacing: 8) { focused = true }
-            HStack(spacing: 10) {
-                Button {
-                    if let v = eng.value { copyToPasteboard(CalcEngine.ascii(v)) }
-                } label: {
-                    Label("Copy Result", systemImage: "doc.on.doc")
-                }
-                .glassButton()
-                .disabled(eng.value == nil)
-                Spacer()
-                Text("Type on the keyboard too: Return is =, Delete takes the last thing off, Escape clears.")
-                    .font(.sFootnote)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: 820)
-        .focusable()
-        .focused($focused)
-        .focusEffectDisabled()
-        .onKeyPress { press in
-            guard let key = calcKeyFor(press) else { return .ignored }
-            eng.press(key)
-            return .handled
-        }
-    }
-
-    private var historyPanel: some View {
-        PageSection(title: "History", trailing: nil) {
-            if !eng.history.isEmpty {
-                Button("Clear") { withAnimation(Motion.gentle) { eng.history.removeAll() } }
-                    .buttonStyle(.link)
-                    .font(.sCallout)
-            }
-        } content: {
-            if eng.history.isEmpty {
-                Text("Sums worked out with = show here. A press puts the result back on the line.")
-                    .font(.sCallout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(Array(eng.history.enumerated()), id: \.element.id) { i, past in
-                        if i > 0 { RowDivider(inset: 12) }
-                        RowLink {
-                            eng.insert(past.value)
-                            focused = true
-                        } label: {
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text(past.sum + " =")
-                                    .font(.sCallout.monospacedDigit())
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(2)
-                                Text(CalcEngine.format(past.value))
-                                    .font(.sTitle3.monospacedDigit())
-                            }
-                            .frame(maxWidth: .infinity, alignment: .trailing)
-                        }
-                        .contextMenu {
-                            Button("Copy Result") { copyToPasteboard(CalcEngine.ascii(past.value)) }
-                            Button("Copy Sum") { copyToPasteboard(past.sum + " = " + CalcEngine.format(past.value)) }
-                        }
-                    }
-                }
-                .padding(6)
-                .card()
-            }
-        }
-    }
-}
-
-/// The calculator's pin, opened: the display and the basic keys, the keyboard on it — (1.3.83) its line and sums carried
-/// to the whole calculator by Open Full Screen once something is typed.
-struct CalculatorCompact: View {
-    @State private var eng = CalcEngine()
-    @FocusState private var focused: Bool
-
-    var body: some View {
-        VStack(spacing: 12) {
-            CalcDisplay(eng: eng, big: 38)
-                .padding(.horizontal, 6)
-            CalcKeypad(eng: $eng, rows: CalcKey.basic, keyHeight: 38, spacing: 6) { focused = true }
-        }
-        .preference(key: QuickCarryKey.self, value: QuickCarry(calc: eng == CalcEngine() ? nil : eng))
-        .focusable()
-        .focused($focused)
-        .focusEffectDisabled()
-        .onKeyPress { press in
-            guard let key = calcKeyFor(press) else { return .ignored }
-            if key == "ac" { return .ignored } // (Escape closes the popover)
-            eng.press(key)
-            return .handled
-        }
-        .onAppear { focused = true }
     }
 }

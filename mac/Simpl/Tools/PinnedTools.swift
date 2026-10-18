@@ -328,7 +328,7 @@ struct PinnedToolQuick: View {
     var body: some View {
         switch kind {
         case .pomo: FocusTimerCompact()
-        case .calc: CalculatorCompact()
+        case .calc: CalculatorCompact { openFull($0, []) }
         case .need: GradeNeededCompact { openFull($0, []) }
         case .ptable, .lewis, .molecule, .atoms, .balance, .moles, .gas, .solution:
             // (1.3.80) the chemistry tools': Chemistry/ChemTools.swift

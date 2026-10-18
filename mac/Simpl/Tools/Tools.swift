@@ -99,7 +99,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .cite: return "Cite in MLA, APA or Chicago."
         case .pomo: return "Focus, then take a break."
-        case .calc: return "Scientific, from your keyboard."
+        case .calc: return "Solves it, step by step."
         case .graph: return "Desmos, right here."
         case .motion, .vectors, .circuit: return PhysTools.info(self).note
         case .ptable, .lewis, .molecule, .atoms, .balance, .moles, .gas, .solution: return ChemTools.info(self).note

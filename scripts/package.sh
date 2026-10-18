@@ -28,15 +28,16 @@ QUIET="$ROOT/dist/simpl-courses-chrome-quiet-$VERSION.zip"
 rm -f "$GENERIC" "$CHROME" "$QUIET"
 
 # 1. as-is
-# (data/schools.json is the iPhone app's school search — the app bundles extension/ whole — and no browser build's)
-(cd "$ROOT/extension" && zip -qr "$GENERIC" . -x '.DS_Store' '*/.DS_Store' 'data/schools.json')
+# (data/schools.json is the iPhone app's school search — the app bundles extension/ whole — and no browser build's;
+#  tools/ is the Mac and Windows apps' calculator, likewise)
+(cd "$ROOT/extension" && zip -qr "$GENERIC" . -x '.DS_Store' '*/.DS_Store' 'data/schools.json' 'tools/*')
 
 # 2. Chrome: stage a copy, rewrite the manifest, zip it with manifest.json at the root
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 cp -R "$ROOT/extension/." "$STAGE/"
 python3 "$ROOT/scripts/chrome-manifest.py" "$STAGE/manifest.json"
-(cd "$STAGE" && zip -qr "$CHROME" . -x '.DS_Store' '*/.DS_Store' 'data/schools.json')
+(cd "$STAGE" && zip -qr "$CHROME" . -x '.DS_Store' '*/.DS_Store' 'data/schools.json' 'tools/*')
 
 # 3. the quiet Chrome build: Canvas's own domain alone, and no script that looks at other sites
 QSTAGE="$(mktemp -d)"
@@ -44,7 +45,7 @@ trap 'rm -rf "$STAGE" "$QSTAGE"' EXIT
 cp -R "$ROOT/extension/." "$QSTAGE/"
 rm -f "$QSTAGE/content/sniff.js"
 python3 "$ROOT/scripts/chrome-manifest.py" "$QSTAGE/manifest.json" --no-sniffer
-(cd "$QSTAGE" && zip -qr "$QUIET" . -x '.DS_Store' '*/.DS_Store' 'data/schools.json')
+(cd "$QSTAGE" && zip -qr "$QUIET" . -x '.DS_Store' '*/.DS_Store' 'data/schools.json' 'tools/*')
 
 echo "✅ $GENERIC"
 echo "✅ $CHROME  ← the Chrome Web Store build that finds Canvas on its own"
