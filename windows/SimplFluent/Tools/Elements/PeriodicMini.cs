@@ -116,7 +116,7 @@ internal sealed class PTMiniWindow : FluentWindow
         num.HorizontalAlignment = HorizontalAlignment.Left;
         var sym = PTKit.Fit(PTKit.Text(e.Symbol, 34, FontWeights.Bold, ink));
         sym.VerticalAlignment = VerticalAlignment.Center;
-        var mass = PTKit.Text(e.MassText, 10.5, FontWeights.Normal, ink).Tabular();
+        var mass = PTKit.Fit(PTKit.Text(e.MassText, 10.5, FontWeights.Normal, ink).Tabular());
         mass.HorizontalAlignment = HorizontalAlignment.Center;
         var tile = new Border
         {

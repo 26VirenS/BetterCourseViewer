@@ -29,7 +29,7 @@ public static class WhatsNew
         R("0.3.28", "2026-10-18",
             ("new", "Element at a Glance", "Press an element for a small window with its key facts."),
             ("improved", "Easier-to-Read Colours", "The table's coloured words and squares read clearly."),
-            ("improved", "5 Significant Figures", "Every atomic mass in the table to five significant figures.")),
+            ("improved", "Precise Atomic Masses", "Every atomic mass as precisely as it is known.")),
         R("0.3.27", "2026-10-18",
             ("new", "Developer Tools", "Logs, system use and stats, for those who know the way in."),
             ("improved", "Critical Fixes Sooner", "Simpl looks for a critical update every minute.")),

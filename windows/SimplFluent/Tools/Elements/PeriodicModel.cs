@@ -34,16 +34,30 @@ public sealed class PTElement
     public string Summary { get; init; } = "";
 
     /// <summary>A whole number is the longest-lived isotope's mass, the convention for an element with no stable one.</summary>
-    /// <summary>(0.3.28) A whole number is the longest-lived isotope's mass, in brackets; every other to five significant
-    /// figures (1.0080, 55.845, 238.03), as the Mac's.</summary>
-    public string MassText => Mass == Math.Round(Mass)
-        ? $"[{(int)Mass}]"
-        : Mass.ToString("F" + Math.Max(0, 5 - Math.Max(1, (int)Math.Floor(Math.Log10(Mass)) + 1)).ToString(CultureInfo.InvariantCulture), CultureInfo.InvariantCulture);
+    /// <summary>(0.3.28) Its standard atomic weight as precisely as it is known (<see cref="Weights"/>), every digit; a
+    /// whole number is the longest-lived isotope's mass, in brackets, for an element with no stable one (the Mac's).</summary>
+    public string MassText => Weights.TryGetValue(Number, out var w) ? w : Mass == Math.Round(Mass) ? $"[{(int)Mass}]" : Trim(Mass);
 
-    /// <summary>(0.3.28) The standard atomic weights the data gives to fewer than five significant figures, to five.</summary>
-    internal static readonly Dictionary<int, double> Precise = new()
+    /// <summary>(0.3.28) Each element's standard atomic weight, as precisely as it is known, written as it is published
+    /// (its trailing zeros are digits it is known to): the CIAAW's single value where the element's isotopes vary too
+    /// little for a range (Na 22.98976928); where they vary (H, C, O …), the most precise single value published for it
+    /// (C 12.0107). Kept as words, so 24.3050 keeps its last 0. None for an element with no stable isotope.</summary>
+    internal static readonly Dictionary<int, string> Weights = new()
     {
-        [1] = 1.0080, [2] = 4.0026, [3] = 6.9410, [4] = 9.0122, [5] = 10.811, [10] = 20.180, [11] = 22.990, [16] = 32.065, [17] = 35.453, [66] = 162.50,
+        [1] = "1.00794", [2] = "4.002602", [3] = "6.941", [4] = "9.0121831", [5] = "10.811", [6] = "12.0107",
+        [7] = "14.0067", [8] = "15.9994", [9] = "18.998403163", [10] = "20.1797", [11] = "22.98976928", [12] = "24.3050",
+        [13] = "26.9815384", [14] = "28.0855", [15] = "30.973761998", [16] = "32.065", [17] = "35.453", [18] = "39.948",
+        [19] = "39.0983", [20] = "40.078", [21] = "44.955907", [22] = "47.867", [23] = "50.9415", [24] = "51.9961",
+        [25] = "54.938043", [26] = "55.845", [27] = "58.933194", [28] = "58.6934", [29] = "63.546", [30] = "65.38",
+        [31] = "69.723", [32] = "72.630", [33] = "74.921595", [34] = "78.971", [35] = "79.904", [36] = "83.798",
+        [37] = "85.4678", [38] = "87.62", [39] = "88.905838", [40] = "91.224", [41] = "92.90637", [42] = "95.95",
+        [44] = "101.07", [45] = "102.90549", [46] = "106.42", [47] = "107.8682", [48] = "112.414", [49] = "114.818",
+        [50] = "118.710", [51] = "121.760", [52] = "127.60", [53] = "126.90447", [54] = "131.293", [55] = "132.90545196",
+        [56] = "137.327", [57] = "138.90547", [58] = "140.116", [59] = "140.90766", [60] = "144.242", [62] = "150.36",
+        [63] = "151.964", [64] = "157.25", [65] = "158.925354", [66] = "162.500", [67] = "164.930329", [68] = "167.259",
+        [69] = "168.934219", [70] = "173.045", [71] = "174.9668", [72] = "178.486", [73] = "180.94788", [74] = "183.84",
+        [75] = "186.207", [76] = "190.23", [77] = "192.217", [78] = "195.084", [79] = "196.966570", [80] = "200.592",
+        [81] = "204.38", [82] = "207.2", [83] = "208.98040", [90] = "232.0377", [91] = "231.03588", [92] = "238.02891",
     };
 
     public string Line => $"{Name} · {Number} · {MassText}";
@@ -147,7 +161,7 @@ public static class PeriodicTable
         if (Int(0) is not { } n || Str(1) is not { } symbol || Str(2) is not { } name || Int(15) is not { } x || Int(16) is not { } y) return null;
         return new PTElement
         {
-            Number = n, Symbol = symbol, Name = name, Mass = PTElement.Precise.TryGetValue(n, out var precise) ? precise : Num(3) ?? 0, Category = Str(4) ?? "unknown", Group = Int(5),
+            Number = n, Symbol = symbol, Name = name, Mass = PTElement.Weights.TryGetValue(n, out var weight) ? double.Parse(weight, CultureInfo.InvariantCulture) : Num(3) ?? 0, Category = Str(4) ?? "unknown", Group = Int(5),
             Period = Int(6) ?? y, Block = Str(7) ?? "", Phase = Str(8) ?? "", Config = Str(9) ?? "", En = Num(10),
             Melt = Num(11), Boil = Num(12), Density = Num(13), Found = Str(14), X = x, Y = y, Summary = Str(17) ?? "",
         };
