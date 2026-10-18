@@ -21,7 +21,10 @@
   }
   post({ kind: 'frame' });
 
-  var isSac = /\/sac\//.test(location.pathname);
+  // (Mac 1.3.115, Windows 0.3.33) The assessment player is known by what is on it, not only by its address: Macmillan's
+  // frame is posted into (an LTI launch), and frames of its own inside it (its widgets) sit under /sac/ too
+  function isPlayer() { return !!(q('main#sac') || q('#question-nav') || q('#side-nav') || tid('btn-sac-main') || openButton()); }
+  function openButton() { return qa('button').filter(function (b) { return /^\s*open assignment\s*$/i.test(words(b)); })[0] || null; }
   var skinned = window.__simplMacmillanSkinned !== false; // (Show Browser: false, set before the page by the app)
 
   function css(id, text) {
@@ -36,13 +39,15 @@
 
   // ---- the Integration Hub page: the assessment's frame the whole page ----
   function hub() {
-    var f = qa('iframe').filter(function (x) { return /\/sac\//.test(x.getAttribute('src') || x.src || ''); })[0];
+    // (Mac 1.3.115) the Integration Hub's own frame for the assessment: named launch-frame and posted into, with no /sac/
+    // address of its own on the page — that, or one that names /sac/
+    var f = qa('iframe').filter(function (x) { return x.getAttribute('name') === 'launch-frame' || x.getAttribute('data-test-id') === 'molecule-iframe' || /\/sac\/(?!static\/)/.test(x.getAttribute('src') || ''); })[0];
     if (!f) return false;
     if (!skinned) { css('simpl-mm-hub', ''); return true; }
     f.setAttribute('data-simpl-sac', '');
     css('simpl-mm-hub', 'html,body{overflow:hidden!important;background:#f5f6f8!important}' +
       'iframe[data-simpl-sac]{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;border:0!important;z-index:2147483646!important;background:#f5f6f8!important}' +
-      '[id^="_pendo"],[class*="_pendo"]{display:none!important}');
+      '[id^="_pendo"],[class*="_pendo"],[data-test-id="atom-hubbox"]>.hub_molecule_app_header{display:none!important}');
     return true;
   }
 
@@ -60,14 +65,33 @@
 
   function mark() {
     var nav = q('#question-nav');
-    var side = nav && (nav.closest('nav') || nav.parentElement);
+    var side = q('#side-nav') || (nav && (nav.closest('nav') || nav.parentElement));
     if (side) side.setAttribute('data-simpl-hide', '');
+  }
+
+  // (Mac 1.3.115) Macmillan keeps its side panel folded when it was last folded — and folded, it does not draw the list of
+  // questions or the grading settings at all. Skinned, the panel is hidden anyway, so it is unfolded (once each) for the
+  // app to read; Show Browser puts it back as Macmillan left it.
+  var unfolded = { nav: false, policies: false };
+  function unfold() {
+    if (!skinned) return;
+    if (!unfolded.nav && !q('#question-nav')) {
+      var t = q('[data-test-id="side-nav-button-title"]');
+      var btn = (t && t.closest('button')) || q('#side-nav button[aria-expanded="false"]');
+      if (btn && btn.getAttribute('aria-expanded') === 'false') { unfolded.nav = true; btn.click(); }
+    }
+    var pol = tid('show-policy-details-button');
+    if (!unfolded.policies && pol && pol.getAttribute('aria-expanded') === 'false') { unfolded.policies = true; pol.click(); }
+  }
+  function completedOf() {
+    var text = words(q('[data-test-id="side-nav-button-title"]')) || ((q('[aria-description^="Completed"]') || {}).getAttribute ? q('[aria-description^="Completed"]').getAttribute('aria-description') : '');
+    return String(text || '').match(/Completed (\d+) of (\d+)/i) || [];
   }
 
   function cover() {
     // (before Open Assignment: the assignment's name, its due line, how many questions, the grading settings)
-    var open = qa('button').filter(function (b) { return /^\s*open assignment\s*$/i.test(words(b)); })[0];
-    if (!open || q('#question-nav')) return null;
+    var open = openButton();
+    if (!open || q('#question-nav') || tid('btn-sac-main')) return null;
     var name = words(q('h1')) || words(q('h2')) || document.title;
     var due = (words(document.body).match(/Due [A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2}, \d{1,2}:\d{2} ?[ap]m/) || [])[0] || '';
     var count = (words(document.body).match(/(\d+) questions?/i) || [])[1];
@@ -90,7 +114,7 @@
     var header = words(tid('nav-question-header'));
     var m = header.match(/Question (\d+) of (\d+)/i) || [];
     var title = document.title.replace(/^Question \d+ of \d+ - /i, '').trim();
-    var items = qa('#question-nav li[data-test-id$="-row"]').map(function (li) {
+    var items = qa('#question-nav li[data-test-id$="-row"], [data-test-id="items"] li[data-test-id$="-row"]').filter(function (li, i, all) { return all.indexOf(li) === i; }).map(function (li) {
       var t = li.getAttribute('data-test-id') || '';
       var mm = t.match(/^item-(\d+)-(.+)-row$/) || [];
       var parts = qa(':scope > div > div, :scope > div', li).map(words).filter(Boolean);
@@ -100,7 +124,7 @@
     });
     var scoreEl = tid('final-score-fraction');
     var sm = ((scoreEl && scoreEl.getAttribute('aria-label')) || '').match(/(\d+(?:\.\d+)?) out of (\d+(?:\.\d+)?)/);
-    var done = words(q('[data-test-id="side-nav-button-title"]')).match(/Completed (\d+) of (\d+)/i) || [];
+    var done = completedOf();
     var main = tid('btn-sac-main');
     var att = tid('attempts-dropdown-button');
     var choices = qa('[data-test-id="attempts"] button').map(function (b) { return words(b); }).filter(Boolean);
@@ -121,8 +145,10 @@
   function report() {
     clearTimeout(timer);
     timer = setTimeout(function () {
-      if (!isSac) { if (hub()) post({ kind: 'hub' }); return; }
-      if (skinned) { document.documentElement.classList.add('simpl-mm'); css('simpl-mm-skin', SKIN); mark(); }
+      // (Mac 1.3.115) only the player itself says what it shows: a frame of its own inside it (a widget) never does, or
+      // its blank page would stand in for the question; a page that is not the player and holds its frame is the hub
+      if (!isPlayer()) { if (hub()) post({ kind: 'hub' }); return; }
+      if (skinned) { document.documentElement.classList.add('simpl-mm'); css('simpl-mm-skin', SKIN); mark(); unfold(); }
       else { document.documentElement.classList.remove('simpl-mm'); }
       var s = state();
       var text = JSON.stringify(s);
@@ -135,7 +161,7 @@
   // the app's presses
   window.__simplMacmillan = function (cmd, arg) {
     switch (cmd) {
-      case 'open': return click(qa('button').filter(function (b) { return /^\s*open assignment\s*$/i.test(words(b)); })[0]);
+      case 'open': return click(openButton());
       case 'go': return click(q('#question-nav li[data-test-id^="item-' + Number(arg) + '-"]'));
       case 'prev': return click(tid('nav-item-back'));
       case 'next': return click(tid('nav-item-forward'));
@@ -149,7 +175,7 @@
         if (!list.length) { click(tid('attempts-dropdown-button')); list = qa('[data-test-id="attempts"] button'); }
         return click(list[Number(arg) || 0]);
       }
-      case 'skin': skinned = !!arg; window.__simplMacmillanSkinned = skinned; last = ''; report(); if (!skinned && !isSac) css('simpl-mm-hub', ''); return true;
+      case 'skin': skinned = !!arg; window.__simplMacmillanSkinned = skinned; last = ''; report(); if (!skinned && !isPlayer()) css('simpl-mm-hub', ''); return true;
       case 'state': last = ''; report(); return true;
     }
     return false;
