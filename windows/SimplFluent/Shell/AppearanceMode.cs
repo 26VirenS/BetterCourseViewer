@@ -253,7 +253,7 @@ public sealed class AppearanceOverlay : Grid
         var done = K.Button("Done", End, accent: true);
         var head = K.Columns("auto, *, auto, 12, auto", tabs.Col(0), look.Col(2), done.Col(4));
         var body = tab == "theme" ? ThemeRow() : CoursesRow();
-        var holder = new Border { Height = 92, Child = body, Margin = new Thickness(0, 12, 0, 0) };
+        var holder = new Border { MinHeight = 64, Child = body, Margin = new Thickness(0, 12, 0, 0) };
         barBody.Content = K.V(0, head, holder);
     }
 
@@ -291,14 +291,12 @@ public sealed class AppearanceOverlay : Grid
             System.Windows.Automation.AutomationProperties.SetName(b, r.Name + " theme" + (on ? ", worn" : ""));
             themes.Children.Add(b);
         }
-        var scroll = new ScrollViewer { Content = themes, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled };
         var colours = K.H(0);
         colours.Children.Add(ColourDot(null, ColourKit.SystemAccent(), "Windows accent"));
         foreach (var c in Appearance.Colours) colours.Children.Add(ColourDot(c.Hex, K.Hex(c.Hex), c.Name));
         colours.Children.Add(CustomDot());
-        colours.VerticalAlignment = VerticalAlignment.Center;
-        var divider = new Border { Width = 1, Margin = new Thickness(12, 4, 12, 4) }.Bg(B.Divider);
-        return K.Columns("*, auto, auto", scroll.Col(0), divider.Col(1), colours.Col(2));
+        // (the themes on a line of their own, the colours under them: every theme whole, no scroll bar)
+        return K.V(10, themes, colours);
     }
 
     private FrameworkElement ColourDot(string? hex, Color colour, string name) =>
