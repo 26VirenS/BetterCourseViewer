@@ -50,6 +50,8 @@ internal sealed class MacmillanState
     public string Kind { get; set; } = "";
     /// <summary>"cover", "question" or "other".</summary>
     public string Page { get; set; } = "";
+    /// <summary>(0.3.34) Whether the skin draws the page dark (the app's look, told by 'theme').</summary>
+    public bool Dark { get; set; }
     public CoverInfo? Cover { get; set; }
     public string? Title { get; set; }
     public int? Index { get; set; }

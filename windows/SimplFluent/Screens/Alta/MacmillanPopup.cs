@@ -58,6 +58,10 @@ internal sealed class MacmillanPopupView
     private readonly ContentControl railSlot = new() { Focusable = false };
     private readonly ContentControl barSlot = new() { Focusable = false };
     private readonly ContentControl coverSlot = new() { Focusable = false };
+    /// <summary>(0.3.34) What the page sits on: the popup's ground when skinned (the page clear, laid on it), white as
+    /// Macmillan draws it.</summary>
+    private readonly Grid holder = new() { Background = Brushes.White };
+    private System.Drawing.Color pageGround = System.Drawing.Color.White;
     private static readonly System.Text.Json.JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true };
 
     public MacmillanPopupView(Engine.Engine engine, AltaLaunch launch, Window over)
@@ -76,7 +80,9 @@ internal sealed class MacmillanPopupView
         // (the page on white, edge to edge under the header, as Macmillan draws it — clear of the popup's rounded foot;
         // the popup's own ground in its place while it opens)
         stateSlot.Bg(B.Solid);
-        var holder = new Grid { Background = Brushes.White, Children = { web, coverSlot, stateSlot } };
+        holder.Children.Add(web);
+        holder.Children.Add(coverSlot);
+        holder.Children.Add(stateSlot);
         // (clear of the popup's sides, which size it: FloatPopup.EdgeRoom)
         web.Margin = new Thickness(FloatPopup.EdgeRoom, 0, FloatPopup.EdgeRoom, 8);
         // (0.3.32) the rail at the left, the page and the bar at its foot at the right
@@ -99,6 +105,7 @@ internal sealed class MacmillanPopupView
         sheet.Closed += Support.Updates.Hold("Macmillan Learning", "when you close Macmillan Learning").Dispose;
         root.PreviewKeyDown += OnKey;
         DevMode.Changed += OnDevMode;
+        Support.Appearance.Changed += OnLook;
         CodeButton();
         RoutedEventHandler? loaded = null;
         loaded = (_, _) =>
@@ -200,7 +207,8 @@ internal sealed class MacmillanPopupView
         if (closed) return;
         // (0.3.32) the skin, in every page and frame; its reports heard from each
         var skin = ScriptBundle.File("tools/macmillan/skin.js");
-        if (skin.Length > 0) await core.AddScriptToExecuteOnDocumentCreatedAsync($"window.__simplMacmillanSkinned = {(browser ? "false" : "true")};\n" + skin);
+        // (0.3.34) light or dark as the app is, from the page's first moment (told again on a change: OnLook)
+        if (skin.Length > 0) await core.AddScriptToExecuteOnDocumentCreatedAsync($"window.__simplMacmillanSkinned = {(browser ? "false" : "true")};\nwindow.__simplMacmillanDark = {(Support.Appearance.Dark ? "true" : "false")};\n" + skin);
         if (closed) return;
         core.WebMessageReceived += (_, e) => Heard(e, null);
         core.FrameCreated += (_, e) => WatchFrame(e.Frame);
@@ -255,6 +263,8 @@ internal sealed class MacmillanPopupView
         state = s;
         if (opening) { opening = false; Hold(false); Draw(); }
         if (browser) _ = Act("skin", false);
+        // (0.3.34) a player that came up thinking otherwise is told the app's look
+        if (s.Dark != Support.Appearance.Dark) _ = Act("theme", Support.Appearance.Dark);
         if (first) Log.Write($"macmillan: the assessment's {s.Page}");
         // (the screenshot suite's --macmillan-open yes: the cover's Open assignment pressed, once)
         if (s.IsCover && !launchOpened && Launch.Flag("macmillan-open")) { launchOpened = true; _ = OpenSoon(); }
@@ -300,12 +310,32 @@ internal sealed class MacmillanPopupView
         barSlot.Content = s is { IsQuestion: true } && !browser ? MacmillanParts.Bar(s, (c, a) => _ = Act(c, a)) : null;
         coverSlot.Content = s is { IsCover: true, Cover: { } c } && !browser ? MacmillanParts.Start(c, () => _ = Act("open")) : null;
         coverSlot.Visibility = coverSlot.Content == null ? Visibility.Collapsed : Visibility.Visible;
+        Ground();
         Draw();
         if (!named && (s?.Title ?? s?.Cover?.Name) is { Length: > 0 } t) title.Text = t;
         if (subtitle.Text == "Macmillan Learning" && s?.Cover?.Due is { Length: > 0 } due) subtitle.Text = $"Macmillan Learning · {due}";
         Doubled();
         Shot.Moved();
     }
+
+    /// <summary>(0.3.34) Skinned, the page laid on the popup's ground (Alta's way: the web view's own ground that colour,
+    /// the page clear over it); as Macmillan draws it, on white.</summary>
+    private void Ground()
+    {
+        var skinned = !browser && state is { IsQuestion: true } or { IsCover: true };
+        if (skinned) holder.Bg(B.Solid); else holder.Background = Brushes.White;
+        var want = skinned ? AltaLook.Drawing(AltaLook.Ground(holder)) : System.Drawing.Color.White;
+        if (want != pageGround) { pageGround = want; web.DefaultBackgroundColor = want; }
+    }
+
+    /// <summary>(0.3.34) The app gone light or dark: the page and its ground with it.</summary>
+    private void OnLook() => root.Dispatcher.BeginInvoke(() =>
+    {
+        if (closing) return;
+        _ = Act("theme", Support.Appearance.Dark);
+        pageGround = System.Drawing.Color.Empty;
+        Ground();
+    });
 
     private void Fail(string why)
     {
@@ -333,6 +363,7 @@ internal sealed class MacmillanPopupView
         closing = true;
         root.PreviewKeyDown -= OnKey;
         DevMode.Changed -= OnDevMode;
+        Support.Appearance.Changed -= OnLook;
         try { web.Dispose(); } catch { }
     }
 

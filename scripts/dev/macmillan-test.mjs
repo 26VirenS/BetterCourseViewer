@@ -53,6 +53,32 @@ try {
   const hidden = await sac().evaluate(() => ['#check-bar', '#attempts-holder', '#question-nav'].map((s) => { const e = document.querySelector(s); return e ? getComputedStyle(e).display === 'none' || !e.offsetParent : true; }));
   check(hidden.every(Boolean), `Macmillan's own chrome is put away while skinned: ${JSON.stringify(hidden)}`);
 
+  // (Mac 1.3.116) as wide as the popup and never wider — Macmillan's 960-px sheet, set beside a side panel's 300 px kept
+  // with the panel put away, ran under the edge and cut off the two-column question's picture on the right
+  const fit = async () => sac().evaluate(() => {
+    const main = document.querySelector('#main'), sheet = document.querySelector('.content-area');
+    const cards = [...document.querySelectorAll('article.module-container')];
+    const img = document.querySelector('.raw-html img'), text = cards[0].getBoundingClientRect(), pic = img.getBoundingClientRect();
+    return { over: main.scrollWidth - main.clientWidth, sheetRight: sheet.getBoundingClientRect().right, width: innerWidth, sheetWidth: sheet.getBoundingClientRect().width,
+      pic: { left: pic.left, right: pic.right, top: pic.top, w: pic.width, h: pic.height }, text: { left: text.left, right: text.right, top: text.top, bottom: text.bottom },
+      ground: getComputedStyle(document.body).backgroundColor, ink: getComputedStyle(cards[0]).color, plate: getComputedStyle(img).backgroundColor, dark: document.documentElement.classList.contains('simpl-mm-dark') };
+  });
+  await page.setViewportSize({ width: 820, height: 720 }); // (the page's width in the popup, beside the app's rail)
+  const wide = await until(async () => { const f = await fit(); return f.width === 820 && f; });
+  check(wide.over <= 1 && wide.sheetRight <= wide.width + 1 && wide.sheetWidth >= wide.width - 80, `the question fills the width and no more: ${JSON.stringify(wide)}`);
+  check(wide.pic.w > 100 && wide.pic.h > 60 && wide.pic.right <= wide.width && wide.pic.left >= wide.text.right && Math.abs(wide.pic.top - wide.text.top) < 40, `the two-column question's picture in sight, beside the words: ${JSON.stringify({ pic: wide.pic, text: wide.text })}`);
+  check(wide.ground === 'rgba(0, 0, 0, 0)' && !wide.dark && wide.ink === 'rgb(28, 28, 30)', `laid on the popup's glass, light: ${JSON.stringify({ ground: wide.ground, ink: wide.ink })}`);
+  await page.setViewportSize({ width: 560, height: 720 });
+  const narrow = await until(async () => { const f = await fit(); return f.width === 560 && f; });
+  check(narrow && narrow.over <= 1 && narrow.pic.top >= narrow.text.bottom - 1 && narrow.pic.right <= 560, `narrow, one column, the picture under the words: ${JSON.stringify(narrow && { over: narrow.over, pic: narrow.pic, text: narrow.text })}`);
+  await page.setViewportSize({ width: 820, height: 720 });
+  await sac().evaluate(() => window.__simplMacmillan('theme', true));
+  const dk = await until(async () => { const f = await fit(); return f.dark && f; });
+  const dkState = await until(async () => { const s = await last(); return s?.dark === true && s; });
+  check(dk && dk.ink === 'rgb(242, 242, 247)' && dk.plate === 'rgb(255, 255, 255)' && !!dkState, `dark as the app is: light words, the picture on a white plate: ${JSON.stringify(dk && { ink: dk.ink, plate: dk.plate })}`);
+  await sac().evaluate(() => window.__simplMacmillan('theme', false));
+  await page.setViewportSize({ width: 1000, height: 720 });
+
   await sac().fill('input[data-i="2"]', '2.5');
   await sac().fill('input[data-i="3"]', '5');
   await sac().evaluate(() => window.__simplMacmillan('main'));

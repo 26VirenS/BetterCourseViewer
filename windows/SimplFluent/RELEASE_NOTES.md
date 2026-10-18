@@ -1,3 +1,7 @@
+**What's new in 0.3.34** (beta)
+
+- **Macmillan Learning, laid on the window** — the question fills the popup's width (no more scroll bar along the foot), a two-column question keeps its diagram on the right (one column when the popup is narrow), the page sits on the popup's own ground with each part on a card, and it follows the app's light or dark look.
+
 **What's new in 0.3.33** (beta)
 
 - **Macmillan Learning, fixed on the real assignment** — the assessment now takes the whole window (Macmillan's own Assessment bar put away), the list of questions, how many are done and the grading settings fill in even when Macmillan's side menu was left folded, and nothing of Macmillan's inner frames stands in for the question.

@@ -45,23 +45,61 @@
     if (!f) return false;
     if (!skinned) { css('simpl-mm-hub', ''); return true; }
     f.setAttribute('data-simpl-sac', '');
-    css('simpl-mm-hub', 'html,body{overflow:hidden!important;background:#f5f6f8!important}' +
-      'iframe[data-simpl-sac]{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;border:0!important;z-index:2147483646!important;background:#f5f6f8!important}' +
+    // (Mac 1.3.116) laid on the popup's glass: the frame clear, and nothing of the hub's own page left to show through it
+    css('simpl-mm-hub', 'html,body{overflow:hidden!important;background:transparent!important}body *{visibility:hidden!important}' +
+      'iframe[data-simpl-sac]{visibility:visible!important;position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;border:0!important;z-index:2147483646!important;background:transparent!important}' +
       '[id^="_pendo"],[class*="_pendo"],[data-test-id="atom-hubbox"]>.hub_molecule_app_header{display:none!important}');
     return true;
   }
 
   // ---- the assessment player ----
+  // (Mac 1.3.116, Windows 0.3.34) Laid on the popup's glass, light or dark as the app is (window.__simplMacmillanDark, set
+  // before the page and told again by 'theme'): the page's grounds clear, each part a card of the glass, words and fields
+  // in the app's ink, a picture on a white plate of its own in dark (drawn for white paper). And as wide as the popup:
+  // Macmillan's question is a 960-px sheet, set 25 px in, beside the side panel's 300 px kept even with the panel put
+  // away, so it ran under the edge (a scroll bar along the foot) and its right column — the diagram, in a two-column
+  // question — was cut off. The sheet fills the width now; the two columns kept side by side, the picture on the right,
+  // and one column when narrow.
   var SKIN =
-    'html.simpl-mm,html.simpl-mm body{background:#f5f6f8!important;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif!important}' +
-    'html.simpl-mm [data-simpl-hide],html.simpl-mm #check-bar,html.simpl-mm #attempts-holder,html.simpl-mm #toggle-fullscreen,' +
+    'html.simpl-mm{--mm-ink:#1c1c1e;--mm-ink2:rgba(60,60,67,.62);--mm-card:rgba(255,255,255,.74);--mm-line:rgba(0,0,0,.07);--mm-field:rgba(255,255,255,.92);--mm-good:#1a6b30;--mm-good-bg:rgba(52,199,89,.16);--mm-bad:#c01d43;--mm-bad-bg:rgba(255,59,48,.13);color-scheme:light}' +
+    'html.simpl-mm.simpl-mm-dark{--mm-ink:#f2f2f7;--mm-ink2:rgba(235,235,245,.62);--mm-card:rgba(255,255,255,.075);--mm-line:rgba(255,255,255,.11);--mm-field:rgba(255,255,255,.09);--mm-good:#5ddb7d;--mm-good-bg:rgba(52,199,89,.2);--mm-bad:#ff8098;--mm-bad-bg:rgba(255,69,58,.2);color-scheme:dark}' +
+    'html.simpl-mm,html.simpl-mm body{background:transparent!important;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif!important}' +
+    'html.simpl-mm [data-simpl-hide],html.simpl-mm #check-bar,html.simpl-mm #attempts-holder,html.simpl-mm #toggle-fullscreen,html.simpl-mm .nav-scroll-arrow-button,' +
     'html.simpl-mm [aria-label="Scroll to Bottom"],html.simpl-mm [aria-label="Scroll to Top"],html.simpl-mm [id^="_pendo"],html.simpl-mm [class*="_pendo"]{display:none!important}' +
-    'html.simpl-mm #main,html.simpl-mm .raptor-container,html.simpl-mm #raptor-content-container,html.simpl-mm .content-area,html.simpl-mm .authoring-area{background:transparent!important;max-width:none!important}' +
-    'html.simpl-mm .raptor-container{padding:18px 26px 120px!important}' +
-    'html.simpl-mm article.module-container{background:#fff!important;border-radius:16px!important;padding:16px 20px!important;margin:0 0 12px!important;box-shadow:0 1px 2px rgba(0,0,0,.06),0 0 0 1px rgba(0,0,0,.05)!important;line-height:1.5}' +
-    'html.simpl-mm [data-test-id="copyright-box"]{font-size:11px!important;opacity:.55;margin:0 0 8px 4px!important}' +
-    'html.simpl-mm input[type=text],html.simpl-mm .numeric-entry-input{border-radius:8px!important}' +
-    'html.simpl-mm img{max-width:100%;height:auto;border-radius:10px}';
+    'html.simpl-mm #root,html.simpl-mm #sac,html.simpl-mm #main,html.simpl-mm .raptor-container,html.simpl-mm #raptor-content-container,html.simpl-mm .content-area,html.simpl-mm .authoring-area,html.simpl-mm .parent-module-container{background:transparent!important;max-width:none!important;box-shadow:none!important}' +
+    // the width: the whole of it, never wider
+    'html.simpl-mm #main{width:auto!important;flex:1 1 auto!important;min-width:0!important;overflow:hidden!important}' +
+    'html.simpl-mm .raptor-container{padding:18px 26px 0!important;box-sizing:border-box!important;min-width:0!important;margin:0!important}' +
+    'html.simpl-mm #raptor-content-container{overflow-x:hidden!important;overflow-y:auto!important;width:auto!important;padding-bottom:90px!important;box-sizing:border-box!important}' +
+    'html.simpl-mm #raptor-content-container .content-area{position:relative!important;left:auto!important;right:auto!important;top:auto!important;width:auto!important;max-width:1180px!important;height:auto!important;margin:0 auto!important;overflow:visible!important}' +
+    'html.simpl-mm .authoring-area{width:auto!important;height:auto!important;overflow:visible!important;margin:0!important;padding:0!important}' +
+    'html.simpl-mm .parent-module-container{min-height:0!important;height:auto!important;padding:0!important;display:flow-root!important}' +
+    'html.simpl-mm [copyrightmessagestyle]{position:static!important;transform:none!important;left:auto!important;top:auto!important}' +
+    'html.simpl-mm [data-test-id="copyright-box"]{font-size:11px!important;color:var(--mm-ink2)!important;margin:0 0 8px 4px!important}' +
+    // the parts, cards of the glass
+    'html.simpl-mm article.module-container{background:var(--mm-card)!important;border-radius:16px!important;padding:16px 20px!important;margin:0 0 12px!important;min-height:0!important;box-sizing:border-box!important;box-shadow:0 1px 2px rgba(0,0,0,.05),0 0 0 1px var(--mm-line)!important;line-height:1.5;color:var(--mm-ink)!important;-webkit-backdrop-filter:blur(20px) saturate(160%);backdrop-filter:blur(20px) saturate(160%)}' +
+    'html.simpl-mm article.module-container>.sl-module{padding-bottom:0!important;overflow:visible!important;max-width:100%!important}' +
+    // two columns (Macmillan's "single right"): the first part and all after it down the left, the second (the picture) up the right
+    'html.simpl-mm .two_col_single_right .module-container{display:block!important;width:calc(50% - 6px)!important;float:none!important}' +
+    'html.simpl-mm .two_col_single_right .module-container:nth-of-type(1){float:left!important}' +
+    'html.simpl-mm .two_col_single_right .module-container:nth-of-type(2){float:right!important}' +
+    'html.simpl-mm .two_col_single_right .module-container:nth-of-type(n+3){clear:left!important}' +
+    'html.simpl-mm :is(.two_col_one_top,.one_col_two_col_alternate,.two_col_all) .module-container{box-sizing:border-box!important}' +
+    '@media (max-width:640px){html.simpl-mm .authoring-area .module-container{width:auto!important;float:none!important;display:block!important;clear:both!important}}' +
+    'html.simpl-mm .raw-html img,html.simpl-mm article.module-container img{max-width:100%!important;height:auto!important;border-radius:10px}' +
+    'html.simpl-mm.simpl-mm-dark article.module-container :is(.raw-html,figure) img{background:#fff!important;padding:6px!important;box-sizing:border-box!important}' +
+    // words and fields in the app's ink (dark: Macmillan's black put to the light ink)
+    'html.simpl-mm.simpl-mm-dark #raptor-content-container :is(p,span,div,label,li,td,th,h1,h2,h3,h4,h5,h6,b,i,em,strong,sup,sub,a,mjx-container,legend,caption,figcaption){color:var(--mm-ink)!important}' +
+    'html.simpl-mm.simpl-mm-dark #raptor-content-container :is(table,td,th){border-color:var(--mm-line)!important}' +
+    'html.simpl-mm.simpl-mm-dark #raptor-content-container th{background:rgba(255,255,255,.06)!important}' +
+    'html.simpl-mm input[type=text],html.simpl-mm input:not([type]),html.simpl-mm .numeric-entry-input,html.simpl-mm textarea,html.simpl-mm select{border-radius:8px!important;background:var(--mm-field)!important;color:var(--mm-ink)!important;border:1px solid var(--mm-line)!important}' +
+    'html.simpl-mm.simpl-mm-dark .numeric-entry-border{background:transparent!important;border-color:var(--mm-line)!important}' +
+    // Macmillan's Solved / Try Again along the foot, a glass bar of its own
+    'html.simpl-mm #results{left:26px!important;right:26px!important;width:auto!important;bottom:14px!important;height:44px!important;min-height:44px!important;border:0!important;border-radius:14px!important;padding:0 18px!important;box-shadow:0 0 0 1px var(--mm-line),0 4px 16px rgba(0,0,0,.08)!important;font-weight:600!important;color:var(--mm-ink)!important;background:var(--mm-card)!important;-webkit-backdrop-filter:blur(20px) saturate(160%);backdrop-filter:blur(20px) saturate(160%)}' +
+    'html.simpl-mm #results.correct{background:var(--mm-good-bg)!important;color:var(--mm-good)!important}' +
+    'html.simpl-mm #results.incorrect{background:var(--mm-bad-bg)!important;color:var(--mm-bad)!important}' +
+    'html.simpl-mm #results *{color:inherit!important}html.simpl-mm #results svg{fill:currentColor!important}';
+  var dark = !!window.__simplMacmillanDark;
 
   function mark() {
     var nav = q('#question-nav');
@@ -109,8 +147,8 @@
 
   function state() {
     var c = cover();
-    if (c) return { kind: 'state', page: 'cover', cover: c };
-    if (!q('#question-nav') && !tid('btn-sac-main')) return { kind: 'state', page: 'other', title: document.title };
+    if (c) return { kind: 'state', page: 'cover', dark: dark, cover: c };
+    if (!q('#question-nav') && !tid('btn-sac-main')) return { kind: 'state', page: 'other', dark: dark, title: document.title };
     var header = words(tid('nav-question-header'));
     var m = header.match(/Question (\d+) of (\d+)/i) || [];
     var title = document.title.replace(/^Question \d+ of \d+ - /i, '').trim();
@@ -130,7 +168,7 @@
     var choices = qa('[data-test-id="attempts"] button').map(function (b) { return words(b); }).filter(Boolean);
     var results = qa('[data-test-id^="result-frame-"]').map(function (r) { return r.getAttribute('aria-label') || ''; }).filter(Boolean);
     return {
-      kind: 'state', page: 'question', title: title, index: Number(m[1] || 0) - 1, count: Number(m[2] || items.length),
+      kind: 'state', page: 'question', dark: dark, title: title, index: Number(m[1] || 0) - 1, count: Number(m[2] || items.length),
       completed: done[1] ? Number(done[1]) : items.filter(function (i) { return i.state === 'success'; }).length,
       score: sm ? [Number(sm[1]), Number(sm[2])] : null, policies: policies(), items: items,
       main: main ? (main.getAttribute('aria-label') || words(main)) : null, mainOn: !!(main && !main.disabled),
@@ -150,6 +188,7 @@
       if (!isPlayer()) { if (hub()) post({ kind: 'hub' }); return; }
       if (skinned) { document.documentElement.classList.add('simpl-mm'); css('simpl-mm-skin', SKIN); mark(); unfold(); }
       else { document.documentElement.classList.remove('simpl-mm'); }
+      document.documentElement.classList.toggle('simpl-mm-dark', skinned && dark);
       var s = state();
       var text = JSON.stringify(s);
       if (text !== last) { last = text; post(s); }
@@ -177,6 +216,8 @@
       }
       case 'skin': skinned = !!arg; window.__simplMacmillanSkinned = skinned; last = ''; report(); if (!skinned && !isPlayer()) css('simpl-mm-hub', ''); return true;
       case 'state': last = ''; report(); return true;
+      // (Mac 1.3.116) light or dark, as the app is now
+      case 'theme': dark = !!arg; window.__simplMacmillanDark = dark; last = ''; report(); return true;
     }
     return false;
   };
