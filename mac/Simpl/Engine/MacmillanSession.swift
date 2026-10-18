@@ -273,6 +273,8 @@ struct MacmillanState: Decodable, Equatable {
         var choices: [String]
     }
     /// "cover", "question" or "other".
+    /// (1.3.117) Macmillan's verdict on the question shown: "right", "wrong", or none yet.
+    var verdict: String?
     var page: String
     var cover: Cover?
     var title: String?

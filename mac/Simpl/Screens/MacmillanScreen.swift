@@ -295,22 +295,25 @@ private struct MacmillanTile: View {
 }
 
 /// Along the page's foot: the arrows and which question this is, Question or My Answer once it has been answered,
-/// Resources, AI Tutor, Solution and Switch to New Layout, and the main button.
+/// Resources, AI Tutor and Solution, the verdict (1.3.117: Correct or Incorrect, as Alta's), and the main button.
 private struct MacmillanBar: View {
     let state: MacmillanState
     let act: (String, Any?) -> Void
 
     var body: some View {
         HStack(spacing: 10) {
+            // (1.3.117) the arrows side by side, on the line with "Question 1 of 22"
             GlassGroup(spacing: 6) {
-                Button { act("prev", nil) } label: { Image(systemName: "chevron.left") }
-                    .glassButton()
-                    .disabled(state.first == true || (state.index ?? 0) <= 0)
-                    .help("Previous question")
-                Button { act("next", nil) } label: { Image(systemName: "chevron.right") }
-                    .glassButton()
-                    .disabled(state.last == true || (state.index ?? 0) + 1 >= (state.count ?? 0))
-                    .help("Next question")
+                HStack(spacing: 6) {
+                    Button { act("prev", nil) } label: { Image(systemName: "chevron.left") }
+                        .glassButton()
+                        .disabled(state.first == true || (state.index ?? 0) <= 0)
+                        .help("Previous question")
+                    Button { act("next", nil) } label: { Image(systemName: "chevron.right") }
+                        .glassButton()
+                        .disabled(state.last == true || (state.index ?? 0) + 1 >= (state.count ?? 0))
+                        .help("Next question")
+                }
             }
             Text("Question \((state.index ?? 0) + 1) of \(state.count ?? 0)")
                 .font(.sCallout.weight(.semibold).monospacedDigit())
@@ -324,21 +327,13 @@ private struct MacmillanBar: View {
                 .help("The question, or your answer to it")
             }
             Spacer(minLength: 8)
+            // (1.3.117) Macmillan's verdict on the question as Alta's is: the popup's own Correct or Incorrect pill, at the
+            // left of the buttons (Macmillan's Solved bar along the page's foot put away)
+            if let v = state.verdict, !v.isEmpty { AltaVerdictPill(right: v == "right") }
             if let t = state.tools {
                 if t.resources { Button { act("resources", nil) } label: { Label("Resources", systemImage: "book") }.glassButton() }
                 if t.tutor { Button { act("tutor", nil) } label: { Label("AI Tutor", systemImage: "sparkles") }.glassButton() }
                 if t.solution { Button { act("solution", nil) } label: { Label("Solution", systemImage: "lightbulb") }.glassButton() }
-                if t.layout {
-                    Menu {
-                        Button("Switch to New Layout") { act("layout", nil) }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                    }
-                    .menuStyle(.borderlessButton)
-                    .menuIndicator(.hidden)
-                    .fixedSize()
-                    .help("More of Macmillan's")
-                }
             }
             if let main = state.main {
                 Button(main) { act("main", nil) }

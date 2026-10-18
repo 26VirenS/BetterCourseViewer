@@ -67,6 +67,8 @@ try {
   const wide = await until(async () => { const f = await fit(); return f.width === 820 && f; });
   check(wide.over <= 1 && wide.sheetRight <= wide.width + 1 && wide.sheetWidth >= wide.width - 80, `the question fills the width and no more: ${JSON.stringify(wide)}`);
   check(wide.pic.w > 100 && wide.pic.h > 60 && wide.pic.right <= wide.width && wide.pic.left >= wide.text.right && Math.abs(wide.pic.top - wide.text.top) < 40, `the two-column question's picture in sight, beside the words: ${JSON.stringify({ pic: wide.pic, text: wide.text })}`);
+  const panel = await sac().evaluate(() => ({ panel: getComputedStyle(document.querySelector('.parent-module-container')).backgroundColor, part: getComputedStyle(document.querySelector('article.module-container')).backgroundColor }));
+  check(panel.panel !== 'rgba(0, 0, 0, 0)' && panel.part === 'rgba(0, 0, 0, 0)', `the whole question one panel, its parts not cards of their own: ${JSON.stringify(panel)}`);
   check(wide.ground === 'rgba(0, 0, 0, 0)' && !wide.dark && wide.ink === 'rgb(28, 28, 30)', `laid on the popup's glass, light: ${JSON.stringify({ ground: wide.ground, ink: wide.ink })}`);
   await page.setViewportSize({ width: 560, height: 720 });
   const narrow = await until(async () => { const f = await fit(); return f.width === 560 && f; });
@@ -85,9 +87,34 @@ try {
   const solved = await until(async () => { const s = await last(); return s?.completed === 1 && s; });
   check(solved && solved.items[0].state === 'success' && solved.items[0].note === 'Solved in 1 attempt' && solved.items[0].points === '+100' && JSON.stringify(solved.score) === '[100,400]' && solved.main === 'Next Question' && solved.tools.solution && solved.attempts && solved.attempts.choices.join('|') === 'Question|My Answer' && solved.results.join('|') === 'Correct|Correct', `the answer submitted, the question solved: ${JSON.stringify(solved)}`);
 
+  // (Mac 1.3.117) the verdict is the app's pill: Macmillan's Solved bar put away, its word reported; each answer's own
+  // Correct a pill that reads (its ink not the page's)
+  const pill = await sac().evaluate(() => { const g = document.querySelector('.grading-status'), r = document.querySelector('#results'); const cs = getComputedStyle(g); return { bar: r ? getComputedStyle(r).display : 'none', ink: cs.color, bg: cs.backgroundColor, tick: getComputedStyle(g, '::before').content }; });
+  check(solved && solved.verdict === 'right' && pill.bar === 'none' && pill.ink === 'rgb(26, 107, 48)' && pill.tick.includes('✓'), `the verdict reported, Macmillan's bar put away, the answer's Correct a pill: ${JSON.stringify({ verdict: solved && solved.verdict, ...pill })}`);
+  await sac().evaluate(() => window.__simplMacmillan('theme', true));
+  const pillDark = await until(async () => sac().evaluate(() => document.documentElement.classList.contains('simpl-mm-dark') && getComputedStyle(document.querySelector('.grading-status')).color));
+  check(pillDark === 'rgb(93, 219, 125)', `in dark the answer's Correct keeps its green ink: ${pillDark}`);
+  await sac().evaluate(() => window.__simplMacmillan('theme', false));
+
   await sac().evaluate(() => window.__simplMacmillan('go', 3));
   const q3 = await until(async () => { const s = await last(); return s?.index === 2 && s; });
   check(q3 && q3.main === 'Submit Answer' && q3.items[0].state === 'success', 'a question opened from the list');
+
+  // (Mac 1.3.117) Macmillan's two_col_all (each prompt beside its answer): one column, nothing past the edge, the answer a
+  // field's width; its tools menu (×10ʸ) a popover in the app's colours, dark in dark
+  await page.setViewportSize({ width: 820, height: 720 });
+  await sac().evaluate(() => { window.__simplMacmillan('go', 4); window.__simplMacmillan('theme', true); });
+  const all = await until(async () => { const s = await last(); return s?.index === 3 && s.dark && s; });
+  await sac().focus('.numeric-entry-input');
+  const col = await until(async () => sac().evaluate(() => {
+    const cards = [...document.querySelectorAll('article.module-container')].map((c) => c.getBoundingClientRect());
+    const field = document.querySelector('.numeric-entry-border').getBoundingClientRect(), menu = document.querySelector('.numeric-entry-toolmenu');
+    return menu.style.display !== 'none' && { lefts: [...new Set(cards.map((r) => Math.round(r.left)))], right: Math.max(...cards.map((r) => r.right)), width: innerWidth, field: Math.round(field.width), menuBg: getComputedStyle(menu).backgroundColor, menuInk: getComputedStyle(menu.querySelector('button')).color };
+  }));
+  check(!!all && col && col.lefts.length === 1 && col.right <= col.width && col.field <= 260, `two_col_all as one column, inside the page, the field a field's width: ${JSON.stringify(col)}`);
+  check(col && col.menuBg === 'rgb(44, 44, 46)' && col.menuInk === 'rgb(242, 242, 247)', `the tools menu dark in dark, its words light: ${JSON.stringify(col && { bg: col.menuBg, ink: col.menuInk })}`);
+  await sac().evaluate(() => window.__simplMacmillan('theme', false));
+  await page.setViewportSize({ width: 1000, height: 720 });
 
   await sac().evaluate(() => window.__simplMacmillan('skin', false));
   const shown = await until(async () => sac().evaluate(() => !!document.querySelector('#check-bar') && getComputedStyle(document.querySelector('#check-bar')).display !== 'none'));

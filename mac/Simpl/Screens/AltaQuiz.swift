@@ -406,7 +406,7 @@ enum CanvasDue {
 /// (1.3.99) Alta's verdict on the question as the popup's own pill, at the left of its buttons: a green capsule with a
 /// tick and "Correct", or a red one with a cross and "Incorrect" — glass on macOS 26 — there while Alta shows its strip,
 /// gone with the next question.
-private struct AltaVerdictPill: View {
+struct AltaVerdictPill: View {
     var right: Bool
 
     private var tone: Color { right ? Color.green : Color.red }

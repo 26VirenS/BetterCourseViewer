@@ -29,7 +29,7 @@ const QUESTIONS = [
     ['text', 'A ball swings in a vertical circle on a string.'],
     ['select', 'Which forces act on the ball at the top of the circle? Select all that apply.', ['the tension in the string', 'the force of gravity (weight)', 'the normal force'], [0, 1]],
   ] },
-  { parts: [
+  { layout: 'two_col_all', parts: [
     ['text', 'An elevator of mass 800 kg rises at a constant speed.'],
     ['numeric', 'What is the tension <i>T</i> in its cable? Use <i>g</i> = 9.8 m/s<sup>2</sup>.', '<i>T</i> =', 'N', '7840'],
   ] },
@@ -52,7 +52,9 @@ body{margin:0;font-family:Helvetica,Arial,sans-serif;color:#222;background:#fff}
 #check-bar{display:flex;align-items:center;gap:12px;height:54px;padding:0 16px;border-bottom:1px solid #ddd}#check-bar ul{display:flex;gap:6px;list-style:none;margin:0;padding:0}
 [data-test-id=btn-sac-main]{background:#1565c0;color:#fff;border:0;border-radius:4px;padding:8px 14px}
 #question-nav li{padding:10px 14px;border-top:1px solid #eee;cursor:pointer}#question-nav li.on{background:#e8f0fe}
-.numeric-entry-input{width:120px}.grading-status{font-weight:700}.cover{max-width:640px;margin:40px auto}
+.numeric-entry-table{display:table}.graded-equations-td{display:table-cell;vertical-align:middle;padding:.8em .75em 0 0;position:relative}.numeric-entry-border{background:#fff;border:2px solid #888;border-radius:5px;height:3.1em;padding:.35em .25em 0;white-space:nowrap;position:relative}.numeric-entry-border.focused{border-color:#51647a}.numeric-entry-border.disabled{background:#f3f3f3;border-color:#ddd}.numeric-entry-input{background:none;border:none;font-size:18px;width:100%}
+.numeric-entry-toolmenu{background:#fff;border:1px solid #cbcbcb;padding:4px;position:absolute;width:210px;z-index:9}.numeric-entry-toolmenu>span{background:#f3f4f8;display:inline-block;height:2.2em;width:100%;text-transform:uppercase}.numeric-entry-toolmenu>button{background:#fff;border:1px solid #0600b4;color:#0600b4;width:100%}
+.flowable-layout.two_col_all .module-container{display:inline-block;width:50%}.grading-status{display:inline;border-radius:20px;font-weight:600;padding:3px 8px;color:#255719;background:#daf4d4}.grading-status{font-weight:700}.cover{max-width:640px;margin:40px auto}
 </style></head><body><div id="root"><main id="sac"><div id="app"></div></main></div><iframe title="widget" src="/mock-macmillan/sac/static/widget.html" style="position:fixed;left:0;bottom:0;width:2px;height:2px;border:0"></iframe><script>
 var Q=${JSON.stringify(QUESTIONS)};
 var S={open:false,at:0,done:{},pts:{},answers:{},attempts:{},view:'question',folded:/folded=1/.test(location.search),policies:!/folded=1/.test(location.search)};
@@ -77,7 +79,8 @@ function part(p,i,n){
  if(p[0]==='text')return '<article class="module-container" role="group" aria-label="Ungraded Text"><div data-module-type="static_textfield" class="sl-module"><div class="raw-html"><p>'+p[1]+'</p></div></div></article>';
  if(p[0]==='picture')return '<article class="module-container" role="group" aria-label="Ungraded Text"><div data-module-type="static_textfield" class="sl-module"><div class="raw-html"><p><md-never><img alt="'+p[1]+'" style="width:70%" src="data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="320" height="240" fill="#fff"/><rect x="100" y="150" width="90" height="40" fill="#c33"/><line x1="20" y1="195" x2="300" y2="195" stroke="#333"/><line x1="30" y1="170" x2="95" y2="170" stroke="#06c" stroke-width="4"/></svg>')+'"></md-never></p></div></div></article>';
  if(p[0]==='numeric'){var v=a[i]||'';var ok=done?'Correct':(S.attempts[n]&&a['w'+i]?'Incorrect':'');
-  return '<article class="module-container" role="group" aria-label="Ungraded Text"><div class="raw-html"><p>'+p[1]+'</p></div></article><article class="module-container" data-module-id="'+n+i+'" role="group" aria-label="Numeric Entry"><div data-module-type="numeric_entry" class="sl-module"><label><span data-test-id="equation-prefix">'+p[2]+'</span></label>'+(ok?'<div data-test-id="result-frame-'+n+i+'" aria-label="'+ok+'"></div>':'')+'<input class="numeric-entry-input" data-i="'+i+'" value="'+v+'"'+(done?' disabled':'')+'> '+p[3]+(ok?'<div class="grading-status">'+ok+'</div>':'')+'</div></article>';}
+  // (Mac 1.3.117) as Macmillan's number entry is: a table of the prefix, the field in its frame (its tools menu, ×10ʸ, shown while it is focused), the unit
+  return '<article class="module-container" role="group" aria-label="Ungraded Text"><div class="sl-module"><span class="stix-font"><div class="raw-html"><p>'+p[1]+'</p></div></span></div></article><article class="module-container" data-module-id="'+n+i+'" role="group" aria-label="Numeric Entry"><div data-module-type="numeric_entry" class="ne-take-mode sl-module"><div class="numeric-entry-table" style="width:100%"><div class="graded-equations-td"><label><span data-test-id="equation-prefix" class="stix-font">'+p[2]+'</span></label></div><div class="graded-equations-td not-considered-in-grading-module-frame" style="width:100%"><div class="'+(ok?'module-graded-'+(ok==='Correct'?'correct':'incorrect'):'')+'">'+(ok?'<div data-test-id="result-frame-'+n+i+'" aria-label="'+ok+'"></div>':'')+'<div class="numeric-entry-border'+(done?' disabled':'')+'"><input class="numeric-entry-input editable" data-i="'+i+'" value="'+v+'"'+(done?' disabled':'')+'></div>'+(ok?'<div class="grading-status">'+ok+'</div>':'')+'</div><div class="numeric-entry-toolmenu" style="display:none" role="toolbar"><span class="tools">tools</span><button data-test-id="sci-not-button" aria-label="Change answer format to or from scientific notation"><span>×10<sup>y</sup></span></button></div></div><div class="graded-equations-td"><span class="stix-font">'+p[3]+'</span></div></div></div></article>';}
  if(p[0]==='choice'||p[0]==='select'){var t=p[0]==='choice'?'radio':'checkbox';var h='<article class="module-container" role="group" aria-label="'+(t==='radio'?'Multiple Choice':'Multiple Select')+'"><div data-module-type="'+(t==='radio'?'multiple_choice':'multiple_select')+'"><p>'+p[1]+'</p>';
   p[2].forEach(function(o,k){var on=(a[i]||[]).indexOf(k)>=0;h+='<label><input type="'+t+'" name="q'+n+'p'+i+'" data-i="'+i+'" data-k="'+k+'"'+(on?' checked':'')+(done?' disabled':'')+'> '+o+'</label><br>'});
   return h+'</div></article>';}
@@ -107,6 +110,7 @@ function wire(){
  var pol=document.querySelector('#side-nav [data-test-id=show-policy-details-button]');if(pol)pol.onclick=function(){S.policies=!S.policies;draw()};
  document.querySelector('[data-test-id=nav-item-back]').onclick=function(){if(S.at>0){S.at--;draw()}};
  document.querySelector('[data-test-id=nav-item-forward]').onclick=function(){if(S.at<Q.length-1){S.at++;draw()}};
+ document.querySelectorAll('.numeric-entry-input').forEach(function(el){var b=el.closest('.numeric-entry-border'),m=el.closest('.graded-equations-td').querySelector('.numeric-entry-toolmenu');el.addEventListener('focus',function(){b.classList.add('focused');if(m)m.style.display=''});});
  document.querySelectorAll('input[data-i]').forEach(function(el){el.oninput=el.onchange=function(){var a=S.answers[n]=S.answers[n]||{};var i=el.getAttribute('data-i');
   if(el.type==='text')a[i]=el.value;else{var all=[];document.querySelectorAll('input[name=q'+n+'p'+i+']').forEach(function(x,k){if(x.checked)all.push(k)});a[i]=all}}});
  document.querySelector('[data-test-id=btn-sac-main]').onclick=function(){
