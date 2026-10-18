@@ -156,7 +156,9 @@ internal sealed class MacmillanPopupView
         stateSlot.Child = failure is { } why ? AltaLook.Failure("Macmillan Learning could not be opened", why)
             : opening ? AltaLook.Opening("Opening Macmillan Learning…") : null;
         stateSlot.Visibility = stateSlot.Child == null ? Visibility.Collapsed : Visibility.Visible;
-        web.Visibility = failure == null && !opening ? Visibility.Visible : Visibility.Hidden;
+        // (the page is a window of its own, drawn over anything WPF puts on it: hidden while the start screen is up, as
+        //  Alta's popup hides its page under its own — Hidden, not Collapsed, so the page keeps running for Open Assignment)
+        web.Visibility = failure == null && !opening && coverSlot.Content == null ? Visibility.Visible : Visibility.Hidden;
         Shot.Moved();
     }
 
@@ -298,6 +300,7 @@ internal sealed class MacmillanPopupView
         barSlot.Content = s is { IsQuestion: true } && !browser ? MacmillanParts.Bar(s, (c, a) => _ = Act(c, a)) : null;
         coverSlot.Content = s is { IsCover: true, Cover: { } c } && !browser ? MacmillanParts.Start(c, () => _ = Act("open")) : null;
         coverSlot.Visibility = coverSlot.Content == null ? Visibility.Collapsed : Visibility.Visible;
+        Draw();
         if (!named && (s?.Title ?? s?.Cover?.Name) is { Length: > 0 } t) title.Text = t;
         if (subtitle.Text == "Macmillan Learning" && s?.Cover?.Due is { Length: > 0 } due) subtitle.Text = $"Macmillan Learning · {due}";
         Doubled();
