@@ -5,6 +5,7 @@
 // Usage: node scripts/dev/mock-canvas.mjs [port] [sim-port]
 //   (the second port is where a module's external link points: a site of somebody else's, which the
 //   smoke suite serves beside the mock)
+import { MACMILLAN_HUB_HTML, MACMILLAN_SAC_HTML } from './mock-macmillan.mjs';
 import http from 'node:http';
 
 const port = Number(process.argv[2] || process.env.PORT || 8787);
@@ -1613,10 +1614,15 @@ if (sample === 'right' || sample === 'wrong') window.mockVerdict(sample === 'rig
       return res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Knewton Alta</title><style>body{margin:0;font-family:Helvetica,Arial,sans-serif;background:#f4f6f8;color:#1d2a36}.hero{background:#23284a;color:#fff;padding:24px 40px 40px}.hero h1{font-weight:400}button.start{background:#1b8a9c;color:#fff;border:0;padding:14px 26px;letter-spacing:.1em}</style></head><body><div class="hero"><b>Knewton Alta</b><h1 id="t">…</h1><div>STATUS <span>Not started</span></div><p><button class="start" id="start">START</button> <button>REVIEW INSTRUCTION</button></p></div><main style="padding:20px 40px"><h2>Activity</h2><p>No activity</p><h2>Objectives</h2><div id="objs"></div></main><script>fetch('/mock-alta/api/assignment').then(function(r){return r.json()}).then(function(j){document.getElementById('t').textContent=j.enrollment.path.name;document.getElementById('objs').innerHTML=j.enrollment.path.topics.map(function(t){return '<h3>'+t.name+'</h3>'+t.learningObjectives.map(function(o){return '<p>'+o.description+'</p>'}).join('')}).join('');});document.getElementById('start').onclick=function(){location.href=location.pathname+'/practice';};</script></body></html>`);
     }
     // (an inner page of Alta's with no question in it, as its chat widget is)
-    // (Mac 1.3.66) a stand-in for a Macmillan Learning assignment page
+    // (Mac 1.3.66) a stand-in for a Macmillan Learning assignment — (Mac 1.3.114, Windows 0.3.32) laid out as Macmillan's
+    // own is, its assessment player in a frame (scripts/dev/mock-macmillan.mjs)
     if (path === '/mock-macmillan/assignment/a1') {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      return res.end('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Achieve</title><style>body{margin:0;font-family:Helvetica,Arial,sans-serif;background:#f6f7f9;color:#1d2a36}header{height:56px;display:flex;align-items:center;padding:0 24px;background:#b0002a;color:#fff;font-weight:700}main{max-width:820px;margin:28px auto;padding:0 24px}.q{background:#fff;border:1px solid #d7dde3;border-radius:8px;padding:20px;margin-top:16px}</style></head><body><header>Achieve</header><main><h1>Chapter 3 Homework</h1><p>Due Monday, Oct 12 at 11:59 PM · 10 questions</p><div class="q"><b>Question 1 of 10</b><p>What is the derivative of x² at x = 3?</p><input aria-label="Answer"> <button>Check Answer</button></div></main><iframe src="/mock-alta/chat" style="width:0;height:0;border:0"></iframe></body></html>');
+      return res.end(MACMILLAN_HUB_HTML);
+    }
+    if (path === '/mock-macmillan/sac/12778033') {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      return res.end(MACMILLAN_SAC_HTML);
     }
     if (path === '/mock-alta/chat') { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); return res.end('<!DOCTYPE html><html><body><button>Chat</button></body></html>'); }
     if (path.startsWith('/mock-alta/')) {

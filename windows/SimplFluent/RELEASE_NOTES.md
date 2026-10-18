@@ -1,3 +1,7 @@
+**What's new in 0.3.32** (beta)
+
+- **Macmillan Learning, redesigned** — a Macmillan assessment opens as a Knewton Alta one does: its cover as a start screen (its questions, when it is due, its grading settings, Open assignment); then the score and how many questions are done down the left, every question as a tile you can open (the one shown filled, a solved one ticked, one tried and not yet right in orange), and the grading settings; Macmillan's own question in the rest, its parts on cards; and along its foot the arrows, Question or My answer, Resources, AI Tutor, Solution, Switch to new layout and Submit answer or Next question. Show browser puts Macmillan's page back as it draws it.
+
 **What's new in 0.3.31** (beta)
 
 - **Appearance, on the window itself** — the account menu's Appearance… shows the Dashboard and darkens the window but for the navigation pane and the Dashboard's cards, each with a photo button (upload a photo, pick a drawing, zoom it, put it back, remove it); a bar rises at the foot for light or dark, the themes, the accent colour, and each course's colour (Canvas's palette or any colour, saved to your school as your own colour for the course). Done or Escape puts it away. Settings no longer has an Appearance page.

@@ -26,6 +26,8 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.32", "2026-10-18",
+            ("new", "Macmillan Redesigned", "Questions, score and Submit in Simpl's own layout.")),
         R("0.3.31", "2026-10-18",
             ("new", "Appearance Mode", "⋯ > Appearance: style Simpl right on the window."),
             ("new", "Photos in Place", "Add a photo to the pane or any card from its button."),
