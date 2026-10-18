@@ -143,16 +143,17 @@ internal sealed class PTElementPage : Grid
 
     private FrameworkElement Title()
     {
-        var num = PTKit.Text(e.Number.ToString(CultureInfo.InvariantCulture), 15, FontWeights.SemiBold, Colors.White).Tabular();
+        var ink = PTKit.InkOn(e.Kind.Color);
+        var num = PTKit.Text(e.Number.ToString(CultureInfo.InvariantCulture), 15, FontWeights.SemiBold, ink).Tabular();
         num.HorizontalAlignment = HorizontalAlignment.Left;
-        var sym = PTKit.Fit(PTKit.Text(e.Symbol, 46, FontWeights.Bold, Colors.White));
+        var sym = PTKit.Fit(PTKit.Text(e.Symbol, 46, FontWeights.Bold, ink));
         sym.VerticalAlignment = VerticalAlignment.Center;
-        var mass = PTKit.Text(e.MassText, 12.5, FontWeights.Normal, Colors.White).Tabular();
+        var mass = PTKit.Text(e.MassText, 12.5, FontWeights.Normal, ink).Tabular();
         mass.HorizontalAlignment = HorizontalAlignment.Center;
         var tile = new Border
         {
             Width = 112, Height = 112, CornerRadius = new CornerRadius(12), Padding = new Thickness(12),
-            Background = new SolidColorBrush(K.WithAlpha(e.Kind.Color, 0.85)), Child = K.Rows("auto, *, auto", num.Row(0), sym.Row(1), mass.Row(2)),
+            Background = new SolidColorBrush(e.Kind.Color), Child = K.Rows("auto, *, auto", num.Row(0), sym.Row(1), mass.Row(2)),
         };
         var name = PTKit.Fit(PTKit.Text(e.Name, 40, FontWeights.SemiBold, B.Text, K.DisplayFace), HorizontalAlignment.Left);
         var chips = new WrapPanel { Orientation = Orientation.Horizontal };

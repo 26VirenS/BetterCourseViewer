@@ -1,3 +1,8 @@
+**What's new in 0.3.28** (beta)
+
+- **Element at a glance** — pressing an element in the Periodic Table (the whole tool, or its pin) opens a small window beside it: the element's square, name, kind, electrons, state, electronegativity, density, melting and boiling points, valence electrons and a line about it, with ← and → for its neighbours, and Full page or Atom in 3D to go on.
+- **Easier-to-read colours** — the words on the table's coloured squares are near-black where white would not read (the yellows, the pale greens of a scale), the squares are solid, and a kind written in its own colour is deepened by day and lightened by night until it reads.
+
 **What's new in 0.3.27** (beta)
 
 - **Developer tools** — hidden until you click Settings ▸ About ▸ Version seven times (or press Ctrl+Alt+Shift+D): a Developer window with the logs as they are written (search, problems only, follow, copy, save, clear), system use (Simpl's and WebView2's processor and memory over the last two minutes, threads, handles, .NET's heap, stalls, disk), stats for every call into the page (count, failed, mean, middle, 95th, longest), a call console, updates and every preference. Knewton Alta's and Macmillan Learning's popups get Save Page Code.

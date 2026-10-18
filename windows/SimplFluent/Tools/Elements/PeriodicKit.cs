@@ -176,13 +176,13 @@ internal static class PTKit
         return b;
     }
 
-    /// <summary>An element's tile: its symbol in white on its kind's colour.</summary>
+    /// <summary>An element's tile: its symbol on its kind's colour, in ink that reads on it (0.3.28).</summary>
     public static Border Tile(PTElement e, double size, double font, double corner)
     {
-        var sym = Text(e.Symbol, font, FontWeights.Bold, Colors.White);
+        var sym = Text(e.Symbol, font, FontWeights.Bold, InkOn(e.Kind.Color));
         sym.HorizontalAlignment = HorizontalAlignment.Center;
         sym.VerticalAlignment = VerticalAlignment.Center;
-        return new Border { Width = size, Height = size, CornerRadius = new CornerRadius(corner), Background = new SolidColorBrush(K.WithAlpha(e.Kind.Color, 0.85)), Child = sym };
+        return new Border { Width = size, Height = size, CornerRadius = new CornerRadius(corner), Background = new SolidColorBrush(e.Kind.Color), Child = sym };
     }
 
     /// <summary>A button of a set where one is chosen (the Mac's glass buttons, the chosen one prominent): Windows 11's
@@ -244,8 +244,34 @@ internal static class PTKit
         return $"{n}{suffix}";
     }
 
-    /// <summary>White on a deep colour, near-black on a light one (a kind's chip filled in its colour: yellow, cyan).</summary>
-    public static Color InkOn(Color c) => 0.2126 * c.R + 0.7152 * c.G + 0.0722 * c.B > 170 ? Color.FromRgb(0x1b, 0x1b, 0x1b) : Colors.White;
+    /// <summary>White on a deep colour, near-black on a light one (a kind's chip filled in its colour: yellow, cyan) —
+    /// (0.3.28) whichever stands out more, by WCAG's contrast (white kept where it stands 4.5:1), as the Mac's PTInk.on.</summary>
+    public static Color InkOn(Color c)
+    {
+        var l = K.Luminance(c);
+        double white = 1.05 / (l + 0.05), black = (l + 0.05) / 0.05;
+        return white >= 4.5 || white >= black ? Colors.White : Color.FromRgb(0x14, 0x14, 0x14);
+    }
+
+    /// <summary>(0.3.28) Words in a colour that read on the page: stepped towards black by day, white by night, till
+    /// they stand 4.5:1 (the kinds' yellows and pale blues as words were hard to read).</summary>
+    public static Color TextIn(Color c)
+    {
+        var dark = Support.Appearance.Dark;
+        var page = dark ? Color.FromRgb(0x20, 0x20, 0x20) : Color.FromRgb(0xf3, 0xf3, 0xf3);
+        var toward = dark ? Colors.White : Colors.Black;
+        double Contrast(Color a, Color b)
+        {
+            double x = K.Luminance(a), y = K.Luminance(b);
+            return (Math.Max(x, y) + 0.05) / (Math.Min(x, y) + 0.05);
+        }
+        for (var t = 0.0; t <= 1.0001; t += 0.04)
+        {
+            var m = K.Mix(c, toward, t);
+            if (Contrast(m, page) >= 4.5) return m;
+        }
+        return toward;
+    }
 }
 
 /// <summary>

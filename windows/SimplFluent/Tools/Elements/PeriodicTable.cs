@@ -119,7 +119,8 @@ internal sealed class PTCell : Border
         if (changed)
         {
             word.Text = c == PTColouring.Category ? Element.Name : c.Text(Element);
-            if (c != PTColouring.Category) { word.Foreground = Brushes.White; number.Foreground = Brushes.White; symbol.Foreground = Brushes.White; }
+            // (0.3.28: ink that reads on the scale's colour — near-black on its yellows and pale greens)
+            if (c != PTColouring.Category) { var ink = new SolidColorBrush(PTKit.InkOn(c.Color(Element))); word.Foreground = ink; number.Foreground = ink; symbol.Foreground = ink; }
             else { word.Fg(B.Text); number.Fg(B.Text); symbol.Fg(B.Text); }
             TopLine();
         }
@@ -325,9 +326,9 @@ internal static class PTCornerCard
     public static FrameworkElement Make(PTElement e, double cell, PTColouring colouring)
     {
         var color = colouring.Color(e);
-        var num = PTKit.Text(e.Number.ToString(CultureInfo.InvariantCulture), Math.Max(8, cell * 0.3), FontWeights.SemiBold, Colors.White).Tabular();
+        var num = PTKit.Text(e.Number.ToString(CultureInfo.InvariantCulture), Math.Max(8, cell * 0.3), FontWeights.SemiBold, PTKit.InkOn(color)).Tabular();
         num.HorizontalAlignment = HorizontalAlignment.Left;
-        var sym = PTKit.Fit(PTKit.Text(e.Symbol, cell * 1.1, FontWeights.Bold, Colors.White));
+        var sym = PTKit.Fit(PTKit.Text(e.Symbol, cell * 1.1, FontWeights.Bold, PTKit.InkOn(color)));
         sym.VerticalAlignment = VerticalAlignment.Center;
         var tile = new Border
         {
@@ -337,7 +338,7 @@ internal static class PTCornerCard
         // (never smaller than reads: the pin's table is small)
         var words = new Stack { Orientation = Orientation.Vertical, Spacing = cell * 0.06, VerticalAlignment = VerticalAlignment.Center };
         words.Children.Add(PTKit.Fit(PTKit.Text(e.Name, Math.Max(14, cell * 0.5), FontWeights.Bold), HorizontalAlignment.Left));
-        words.Children.Add(PTKit.Fit(PTKit.Text($"{e.Kind.Label} · {e.MassText} u", Math.Max(11, cell * 0.26), FontWeights.Normal, K.Darkened(e.Kind.Color)), HorizontalAlignment.Left));
+        words.Children.Add(PTKit.Fit(PTKit.Text($"{e.Kind.Label} · {e.MassText} u", Math.Max(11, cell * 0.26), FontWeights.Normal, PTKit.TextIn(e.Kind.Color)), HorizontalAlignment.Left));
         words.Children.Add(PTKit.Fit(PTKit.Text(PTConfig.Pretty(e), Math.Max(10.5, cell * 0.24), FontWeights.Normal, B.Text2, PTKit.Mono), HorizontalAlignment.Left));
         if (colouring.Scaled())
         {
@@ -369,7 +370,8 @@ internal static class PTCornerCard
 /// electronegativity (category, electronegativity, radius, ionization, affinity, melting, boiling, density, block, state),
 /// --ptable-category metalloid (a kind lit), --ptable-hover Fe (that element's card in the table's top), --ptable-search ne
 /// (the header's search open with its results), --ptable-tour 4 (the tour at its fourth step), --ptable-offer (the tour
-/// offered, as on a first opening), and --ptable-pin-element 25 for the pin's flyout.
+/// offered, as on a first opening), --ptable-mini Fe (0.3.28: the mini element window) and --ptable-pin-element 25 for
+/// the pin's flyout.
 /// </remarks>
 internal sealed class PeriodicTableTool : Grid
 {
@@ -431,9 +433,12 @@ internal sealed class PeriodicTableTool : Grid
         grid.Pick = (e, rect) =>
         {
             var p = grid.TranslatePoint(new Point(rect.X + rect.Width / 2, rect.Y + rect.Height / 2), this);
-            OpenElement(e, p);
+            // (0.3.28) in the mini element window, its Full page opening it here — the tour, under way, asks for the
+            //  page itself
+            if (tourStep != null) { OpenElement(e, p); return; }
+            PTMiniWindow.Show(e, Window.GetWindow(this), x => OpenElement(x, p), OpenAtoms);
         };
-        hint = K.Wrapped("Point at an element to see it here; press it to open its page. Type a symbol, name or number and press Enter to open it.", Ty.Body, B.Text2);
+        hint = K.Wrapped("Point at an element to see it here; press it to see it in a small window, and its whole page from there. Type a symbol, name or number and press Enter to open its page.", Ty.Body, B.Text2);
         tablePage = ToolKit.Page(K.V(14, offerHost, top, colourRow, trendGrid, hint));
         tablePage.SizeChanged += (_, _) => FitTable();
         foreach (var part in new FrameworkElement[] { offerHost, top, colourRow, across, hint }) part.SizeChanged += (_, _) => FitTable();
@@ -449,6 +454,8 @@ internal sealed class PeriodicTableTool : Grid
         if (Launch.Take("", "ptable-category") is { } cat && PTCategory.All.FirstOrDefault(k => string.Equals(k.Key, cat.Trim(), StringComparison.OrdinalIgnoreCase)) is { } kind) PTState.Category = kind.Key;
         var tourAt = Launch.Take("", "ptable-tour");
         var hover = Launch.Take("", "ptable-hover");
+        // (0.3.28: --ptable-mini Fe, the screenshot suite's picture of the mini element window)
+        var mini = PeriodicTable.Named(Launch.Take("", "ptable-mini"));
         var handed = PeriodicTable.Named(c.TakeInfo("element")) ?? PeriodicTable.Named(Launch.Take("", "ptable-element"));
         atomsAsked = handed != null && Launch.Take("", "ptable-atoms") != null;
 
@@ -459,11 +466,12 @@ internal sealed class PeriodicTableTool : Grid
 
         // the tour: its step for the screenshot suite (--ptable-tour 5, as the app's own --open tour:5), else on the
         // first opening — not in a development run or while the suite pictures the tool
-        var picture = hover != null || handed != null || Launch.Get("ptable-search") != null || Launch.Get("ptable-colour") != null || Launch.IsDevelopment;
+        var picture = hover != null || handed != null || mini != null || Launch.Get("ptable-search") != null || Launch.Get("ptable-colour") != null || Launch.IsDevelopment;
         if (tourAt != null) tourAsked = int.TryParse(tourAt.Trim(':', ' '), out var n) ? Math.Max(0, n - 1) : 0;
         else if (Launch.Take("", "ptable-offer") != null || (!c.Quick && !Prefs.Bool("simpl.ptTourSeen") && !picture)) offerAsked = true;
 
         Loaded += (_, _) => Attach();
+        if (mini != null) Loaded += (_, _) => Dispatcher.BeginInvoke(() => PTMiniWindow.Show(mini, Window.GetWindow(this), x => OpenElement(x, null), OpenAtoms), System.Windows.Threading.DispatcherPriority.Loaded);
         Unloaded += (_, _) => Detach();
     }
 
@@ -544,6 +552,8 @@ internal sealed class PeriodicTableTool : Grid
 
     private void Detach()
     {
+        // (0.3.28) the mini element window goes with the table it came from
+        PTMiniWindow.CloseOpen();
         PTNav.TourAsked -= OnTourAsked;
         PTSearch.Changed -= OnSearch;
         PTSearch.Submitted -= OnSubmitted;
@@ -993,7 +1003,9 @@ internal static class PeriodicTableCompact
             if (Found().FirstOrDefault() is { } f) Open(f);
         };
         grid.Hover = e => { over = e; Line(); };
-        grid.Pick = (e, _) => Open(e);
+        // (0.3.28) in the mini element window: its Full page opens the whole table on it
+        grid.Pick = (e, _) => PTMiniWindow.Show(e, Window.GetWindow(grid), Open,
+            x => ToolsCenter.HandTo(c, "atoms", new Dictionary<string, string> { ["element"] = x.Number.ToString(CultureInfo.InvariantCulture) }));
         // (0.3.5) Open full screen opens the table on the element searched for, the one Enter opens
         c.Carry = () => box.Text.Trim().Length > 0 && Found().FirstOrDefault() is { } f
             ? new Dictionary<string, string> { ["element"] = f.Number.ToString(CultureInfo.InvariantCulture) }
