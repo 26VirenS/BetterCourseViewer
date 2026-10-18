@@ -53,6 +53,11 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
     /// <summary>The account menu's Take the tour.</summary>
     public void StartTour() => tour?.Start();
 
+    /// <summary>(0.3.31) The account menu's Appearance… (Shell/AppearanceMode.cs).</summary>
+    public void StartAppearance() => appearanceMode?.Begin();
+
+    private AppearanceOverlay? appearanceMode;
+
     /// <summary>The tour is up (the live check waits for it).</summary>
     internal bool Touring => tour?.On == true;
 
@@ -277,6 +282,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         shell?.Dispose();
         shell = null;
         if (tour != null) { root.Children.Remove(tour); tour = null; }
+        if (appearanceMode != null) { root.Children.Remove(appearanceMode); appearanceMode = null; }
         card = null;
         working = null;
         pageArea.Children.Remove(old.Web);
@@ -352,7 +358,13 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
                 Grid.SetRow(tour, 0);
                 Grid.SetRowSpan(tour, 2);
                 root.Children.Insert(root.Children.IndexOf(sheets), tour);
-                tour.AutoStart();
+                appearanceMode = new AppearanceOverlay(engine, this);
+                Grid.SetRow(appearanceMode, 0);
+                Grid.SetRowSpan(appearanceMode, 2);
+                root.Children.Insert(root.Children.IndexOf(sheets), appearanceMode);
+                // (the screenshot suite's --appearance-mode: Appearance on once the Dashboard has drawn)
+                if (Launch.Flag("appearance-mode")) { var a = appearanceMode; Dispatcher.BeginInvoke(() => a.Begin(), System.Windows.Threading.DispatcherPriority.ApplicationIdle); }
+                else tour.AutoStart();
                 Taskbar.ShowIfAsked(this);
             }
             shell.WindowWidth(ActualWidth);
@@ -518,6 +530,9 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         if (sheets.IsOpen) return;
         // (Escape ends the tour wherever the keyboard is; it counts as seen)
         if (e.Key == Key.Escape && tour?.On == true) { tour.Skip(); e.Handled = true; return; }
+        // (and Appearance, as its Done does)
+        if (e.Key == Key.Escape && appearanceMode?.On == true) { appearanceMode.End(); e.Handled = true; return; }
+        if (appearanceMode?.On == true) return;
         // (the app's own shortcuts wait while the tour is up, as its veil keeps the pointer off the app: Ctrl+K's palette
         //  would take the keyboard from the tour's card; the card's Enter and arrows are its own)
         if (tour?.On == true) return;

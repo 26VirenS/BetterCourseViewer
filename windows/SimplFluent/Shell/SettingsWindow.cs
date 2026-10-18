@@ -76,7 +76,6 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
     private static readonly (string Key, string Title, SymbolRegular Icon, Color Tint, string Words)[] Tabs =
     {
         ("general", "General", SymbolRegular.Settings24, Color.FromRgb(0x76, 0x76, 0x7c), "school sign out change saved sign-in password credential windows hello face fingerprint lock courses goals set up background notification area close taskbar pin uninstall remove delete"),
-        ("appearance", "Appearance", SymbolRegular.PaintBrush24, Color.FromRgb(0xd1, 0x34, 0x8b), "light dark mode theme colour color accent custom hex photo picture drawing"),
         ("notifications", "Notifications", SymbolRegular.Alert24, Color.FromRgb(0xe3, 0x6c, 0x0a), "reminders due alerts posts activity announcements"),
         ("grades", "Grades", SymbolRegular.DataBarVertical24, Color.FromRgb(0x88, 0x64, 0xd8), "gpa goal history record what-if track"),
         ("data", "Data", SymbolRegular.Database24, Color.FromRgb(0x00, 0x99, 0xbc), "export import reset erase everything backup encryption encrypted security privacy tpm"),
@@ -209,7 +208,6 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         // (--settings-sheet uninstall: the screenshot suite's picture of Uninstall Simpl's question; customcolour: Custom
         //  colour's; --settings-find <words>: Find a setting's list, as if typed)
         if (Launch.Take("uninstall", "settings-sheet") != null) Loaded += (_, _) => AskUninstall();
-        else if (Launch.Take("customcolour", "settings-sheet") != null) Loaded += (_, _) => CustomColour(Appearance.Accent);
         // (the picture's list stays open while other copies of Simpl, started beside it, take the focus: StaysOpen in a
         //  picture run only — a student's closes as Windows' own does, on a click elsewhere)
         if (Launch.Get("settings-find") is { Length: > 0 } words) Loaded += (_, _) => Dispatcher.BeginInvoke(() => { findPopup.StaysOpen = true; find.Focus(); find.Text = words; find.CaretIndex = words.Length; }, System.Windows.Threading.DispatcherPriority.Loaded);
@@ -222,7 +220,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         if (downloadWords != null) downloadWords.Text = DownloadWords();
     });
     private void OnDevMode() => Dispatcher.BeginInvoke(() => { if (open == this && tab == "about") Render(); });
-    private void OnAppearance() => Dispatcher.BeginInvoke(() => { Pane(); if (tab == "appearance") Render(); });
+    private void OnAppearance() => Dispatcher.BeginInvoke(Pane);
     /// <summary>The saved sign-in kept, locked or forgotten, or Windows Hello set up or not: General and Data say it.</summary>
     private void OnSignIn() => Dispatcher.BeginInvoke(() => { if (open == this && tab is "general" or "data") Render(); });
 
@@ -253,10 +251,6 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         new("general", "Keep Simpl running when its window is closed", new[] { "Keep Simpl running when its window is closed" }, "background notification area close tray quit"),
         new("general", "Pin to taskbar", new[] { "Taskbar" }, "taskbar pin"),
         new("general", "Uninstall Simpl", new[] { "Uninstall Simpl" }, "remove delete uninstall"),
-        new("appearance", "Choose your mode", new[] { "Choose your mode" }, "light dark mode system"),
-        new("appearance", "Theme", new[] { "Theme" }, "theme dusk ocean forest sand peaks city default"),
-        new("appearance", "Accent colour", new[] { "Accent colour" }, "colour color accent custom hex"),
-        new("appearance", "Photos", new[] { "Photos" }, "photo picture drawing zoom pane counters"),
         new("notifications", "Due-date reminders", new[] { "Due-date reminders" }, "reminders due alerts notifications"),
         new("notifications", "Remind me", new[] { "Remind me", "Due-date reminders" }, "before hour day reminders"),
         new("notifications", "Alerts for new posts", new[] { "Alerts for new posts" }, "activity announcements grades comments inbox discussions alerts"),
@@ -437,7 +431,6 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         titleHost.Content = K.Text(t.Title, Ty.Title);
         FrameworkElement content = tab switch
         {
-            "appearance" => AppearancePane(),
             "notifications" => NotificationsPane(),
             "grades" => GradesPane(),
             "data" => DataPane(),
@@ -638,347 +631,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         if (tab == "general") Render();
     }
 
-    // ---- Appearance ----
-
-    private FrameworkElement AppearancePane()
-    {
-        // (onboarding-7: Windows' own words for following its setting)
-        var mode = new ComboBox { MinWidth = 200, ItemsSource = new[] { "Light", "Dark", "Use system setting" } };
-        mode.SelectedIndex = Appearance.Look switch { "light" => 0, "dark" => 1, _ => 2 };
-        mode.SelectionChanged += (_, _) => Appearance.Look = mode.SelectedIndex switch { 0 => "light", 1 => "dark", _ => "system" };
-        var v = Column(
-            K.Row(SymbolRegular.DarkTheme24, "Choose your mode", "Light, dark, or the mode Windows uses for apps.", mode));
-
-        // the ready themes: a tile each, its drawing in its colour and its name; the one worn outlined in the accent
-        v.Children.Add(K.SectionHeader("Theme"));
-        var themes = new WrapPanel { Orientation = Orientation.Horizontal };
-        foreach (var r in Appearance.ReadyThemes)
-        {
-            var on = Appearance.ThemeName == r.Name;
-            var color = r.Accent is { } h ? K.Hex(h) : Appearance.Accent;
-            // (its drawing inked in its own colour, as it would show on a counter; Default — onboarding-22 — a small
-            //  page of its own in the neutral colours it wears, not a grey block that reads as switched off)
-            var swatch = new Border
-            {
-                Height = 64, CornerRadius = new CornerRadius(6), ClipToBounds = true,
-                Child = r.Scene is { } sc ? Scenes.Swatch(sc, "Card0", color) : DefaultPage(),
-            };
-            swatch.Loaded += (_, _) => swatch.Clip = new RectangleGeometry(new Rect(0, 0, swatch.ActualWidth, swatch.ActualHeight), 6, 6);
-            var tile = K.V(8, swatch, K.Text(r.Name, Ty.Body).Center());
-            var b = K.CardButton(tile, () => Appearance.Wear(r), 8, new Thickness(8, 8, 8, 10));
-            b.Width = 132;
-            b.Margin = new Thickness(0, 0, 8, 8);
-            if (on) { b.SetResourceReference(Control.BorderBrushProperty, B.Accent); b.BorderThickness = new Thickness(2); }
-            b.ToolTip = r.Accent == null ? "Windows’ own accent colour, no drawing" : $"{r.Name}: its colour and drawing throughout";
-            System.Windows.Automation.AutomationProperties.SetName(b, r.Name + " theme" + (on ? ", worn" : ""));
-            themes.Children.Add(b);
-        }
-        v.Children.Add(themes);
-
-        // the accent: Windows' own, one of Simpl's colours, or one of the student's own (Windows 11's colour swatches,
-        // and its Custom colour); under its header once — onboarding-19: no card titled the same again
-        v.Children.Add(K.SectionHeader("Accent colour"));
-        var swatches = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 10, 0, 0) };
-        swatches.Children.Add(ColourDot(null, ApplicationAccent(), "Windows accent"));
-        foreach (var c in Appearance.Colours) swatches.Children.Add(ColourDot(c.Hex, K.Hex(c.Hex), c.Name));
-        swatches.Children.Add(CustomDot());
-        var accentCard = K.Card(K.V(0,
-            K.Wrapped("The navigation pane’s marks, the buttons, the links and every selection take it.", Ty.Caption, B.Text2),
-            swatches), new Thickness(16, 14, 16, 10), 4);
-        v.Children.Add(accentCard);
-        v.Children.Add(PhotosSection());
-        return v;
-    }
-
-    /// <summary>The Default theme's tile: a small page in the theme's own neutral colours — the pane with its mark in
-    /// the accent, two counters and a line — as the other tiles show their drawings (the Mac's ThemeSwatch).</summary>
-    private static FrameworkElement DefaultPage()
-    {
-        Border Bar(double w, double h, string brush) => new Border { Width = w, Height = h, CornerRadius = new CornerRadius(h / 2), HorizontalAlignment = HorizontalAlignment.Left }.Bg(brush);
-        var mark = new Border { Width = 3, Height = 8, CornerRadius = new CornerRadius(1.5), Margin = new Thickness(0, 0, 3, 0) }.Bg(B.Accent);
-        var pane = K.V(5, K.H(0, mark, Bar(14, 4, B.StrongStroke)).Margin(4, 10, 0, 0), Bar(16, 4, B.Divider).Margin(7, 0, 0, 0), Bar(12, 4, B.Divider).Margin(7, 0, 0, 0));
-        pane.VerticalAlignment = VerticalAlignment.Stretch;
-        var paneHolder = new Border { Child = pane, Width = 32 }.Bg(B.LayerAlt);
-        Border Counter() => new Border { Height = 20, CornerRadius = new CornerRadius(3), BorderThickness = new Thickness(1), Margin = new Thickness(0, 0, 4, 0), Child = Bar(10, 3, B.StrongStroke).Margin(4, 4, 0, 0) }.Bg(B.Card).Stroke(B.CardStroke);
-        var counters = K.Columns("*, *", Counter().Col(0), Counter().Col(1));
-        var page = K.V(6, counters, Bar(44, 4, B.Divider), Bar(30, 4, B.Divider));
-        page.Margin = new Thickness(6, 10, 4, 0);
-        var g = K.Columns("auto, *", paneHolder.Col(0), page.Col(1));
-        return new Border { Child = g }.Bg(B.Solid);
-    }
-
-    // ---- Photos: what each place shows (the Mac's PhotoSlotEditor) ----
-
-    private string photoSlot = Launch.Get("photo-slot") is { } ps && Appearance.Slots.Any(s => s.Key == ps) ? ps : "side";
-
-    /// <summary>
-    /// What each place shows (onboarding-23, the Mac's editor): the seven places side by side, each as it shows now, the
-    /// one picked outlined; the place picked, larger, where its picture can be dragged to move it (zoomed with the slider;
-    /// Reset puts both back); what it shows — the theme's drawing, any theme's drawing, a photo of your own, or nothing —
-    /// and the photo's own buttons.
-    /// </summary>
-    private FrameworkElement PhotosSection()
-    {
-        var v = Column(K.SectionHeader("Photos"));
-        var slot = photoSlot;
-
-        // the places, side by side
-        var places = new WrapPanel { Orientation = Orientation.Horizontal };
-        foreach (var (key, name) in Appearance.Slots)
-        {
-            var k = key;
-            var side = k == "side";
-            var thumb = new Border { Width = side ? 30 : 84, Height = 46, CornerRadius = new CornerRadius(4), ClipToBounds = true, HorizontalAlignment = HorizontalAlignment.Center };
-            thumb.Bg(side ? B.Window : B.Card).Stroke(B.CardStroke);
-            thumb.Child = Scenes.Backdrop(k, frost: false);
-            thumb.Loaded += (_, _) => thumb.Clip = new RectangleGeometry(new Rect(0, 0, thumb.ActualWidth, thumb.ActualHeight), 3, 3);
-            // (two lines for every name, so "Navigation pane" and "Graded this week" show whole and the cards stay one size)
-            var label = K.Wrapped(name, Ty.Caption, B.Text2, 2);
-            label.TextAlignment = TextAlignment.Center;
-            label.HorizontalAlignment = HorizontalAlignment.Stretch;
-            label.Height = 32;
-            var b = K.CardButton(K.V(6, thumb, label), () => { photoSlot = k; Render(); }, 6, new Thickness(6, 6, 6, 6));
-            b.Width = 104;
-            b.Margin = new Thickness(0, 0, 6, 6);
-            if (k == slot) { b.SetResourceReference(Control.BorderBrushProperty, B.Accent); b.BorderThickness = new Thickness(2); }
-            b.ToolTip = name;
-            System.Windows.Automation.AutomationProperties.SetName(b, name + (k == slot ? ", chosen" : ""));
-            places.Children.Add(b);
-        }
-        v.Children.Add(places.Margin(0, 0, 0, 6));
-
-        // the place picked, larger: drag its picture to move it
-        var isSide = slot == "side";
-        var preview = new Border { Width = isSide ? 96 : 200, Height = isSide ? 228 : 114, CornerRadius = new CornerRadius(8), ClipToBounds = true, HorizontalAlignment = HorizontalAlignment.Left };
-        preview.Bg(isSide ? B.Window : B.Card).Stroke(B.CardStroke);
-        FrameworkElement Shown((double X, double Y)? pan = null) =>
-            Scenes.Backdrop(slot, frost: false, pan) ?? (FrameworkElement)K.Text("Nothing here", Ty.Caption, B.Text3).Center().Align(HorizontalAlignment.Center, VerticalAlignment.Center);
-        preview.Child = Shown();
-        preview.Loaded += (_, _) => preview.Clip = new RectangleGeometry(new Rect(0, 0, preview.ActualWidth, preview.ActualHeight), 7, 7);
-        var movable = Scenes.Of(slot) != null;
-        if (movable)
-        {
-            preview.Cursor = Cursors.SizeAll;
-            preview.ToolTip = "Drag to move the picture";
-            Point? grab = null;
-            var start = Appearance.Pan(slot);
-            var now = start;
-            preview.MouseLeftButtonDown += (_, e) => { grab = e.GetPosition(preview); start = Appearance.Pan(slot); now = start; preview.CaptureMouse(); e.Handled = true; };
-            preview.MouseMove += (_, e) =>
-            {
-                if (grab is not { } g0 || preview.ActualWidth < 1) return;
-                var p = e.GetPosition(preview);
-                // (1:1 with the pointer: a share of the place for a share of its size)
-                now = (Math.Clamp(start.X + (p.X - g0.X) / preview.ActualWidth, -0.5, 0.5), Math.Clamp(start.Y + (p.Y - g0.Y) / preview.ActualHeight, -0.5, 0.5));
-                preview.Child = Shown(now);
-            };
-            preview.MouseLeftButtonUp += (_, _) =>
-            {
-                if (grab == null) return;
-                grab = null;
-                preview.ReleaseMouseCapture();
-                if (now != start) Appearance.SetPan(slot, now.X, now.Y);
-            };
-        }
-
-        // what it shows: the theme's drawing (whichever is worn), one theme's drawing for good, a photo, nothing
-        var drawings = Appearance.ReadyThemes.Where(r => r.Scene != null).ToList();
-        var shows = new List<string> { "The theme’s drawing" };
-        shows.AddRange(drawings.Select(r => $"{r.Name} drawing"));
-        shows.Add("My photo");
-        shows.Add("Nothing");
-        var kind = new ComboBox { MinWidth = 200, ItemsSource = shows };
-        var has = Appearance.Photo(slot) != null;
-        kind.SelectedIndex = Appearance.PhotoKind(slot) switch
-        {
-            "photo" => drawings.Count + 1,
-            "none" => drawings.Count + 2,
-            _ => Appearance.PickedScene(slot) is { } picked && drawings.FindIndex(r => r.Scene == picked) is >= 0 and var at ? at + 1 : 0,
-        };
-        kind.SelectionChanged += (_, _) =>
-        {
-            var i = kind.SelectedIndex;
-            if (i == drawings.Count + 1)
-            {
-                if (Appearance.Photo(slot) == null) { ChoosePhoto(slot); return; }
-                Appearance.SetKind(slot, "photo");
-            }
-            else if (i == drawings.Count + 2) Appearance.SetKind(slot, "none");
-            else Appearance.SetScene(slot, i <= 0 ? null : drawings[i - 1].Scene);
-        };
-        var choose = K.Button(has ? "Replace photo…" : "Choose photo…", () => ChoosePhoto(slot), icon: SymbolRegular.FolderOpen24);
-        var remove = K.Button("Remove", () => { Appearance.RemovePhoto(slot); Scenes.Forget(); });
-        remove.IsEnabled = has;
-        var zoom = new Slider { Minimum = 0.5, Maximum = 3, Value = Appearance.Zoom(slot), Width = 200, SmallChange = 0.05, LargeChange = 0.25 };
-        var zoomTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
-        zoomTimer.Tick += (_, _) => { zoomTimer.Stop(); Appearance.SetZoom(slot, Math.Round(zoom.Value, 2)); };
-        zoom.ValueChanged += (_, _) => { zoomTimer.Stop(); zoomTimer.Start(); };
-        var pan = Appearance.Pan(slot);
-        var reset = K.Button("Reset", () => Appearance.ResetPicture(slot), icon: SymbolRegular.ArrowReset24);
-        reset.ToolTip = "Put the picture back where it was, at its own size";
-        reset.IsEnabled = movable && (Math.Abs(Appearance.Zoom(slot) - 1) > 0.001 || pan != (0, 0));
-        var controls = K.V(4,
-            K.Row(SymbolRegular.ImageMultiple24, "Shows", "A theme’s drawing, a photo of your own, or nothing.", kind),
-            K.Row(SymbolRegular.FolderOpen24, "Photo", "Kept in Simpl’s folder on this PC, never sent anywhere.", K.H(8, choose, remove)),
-            K.Row(SymbolRegular.ZoomIn24, "Zoom", "How large it is drawn in its place. Drag the picture to move it.", K.H(8, zoom, reset)));
-        v.Children.Add(K.Columns("auto, 16, *", K.V(6, preview, movable ? K.Text("Drag to move", Ty.Caption, B.Text2) : null).Col(0), controls.Col(2)));
-        return v;
-    }
-
-    private void ChoosePhoto(string slot)
-    {
-        var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "Pictures|*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.heic;*.webp|All files|*.*" };
-        if (dlg.ShowDialog(this) != true) { Render(); return; }
-        Scenes.Forget();
-        if (Appearance.SetPhoto(slot, dlg.FileName)) Say("Photo set."); else Say("The picture could not be read.", true);
-    }
-
-    private static Color ApplicationAccent() => Wpf.Ui.Appearance.ApplicationAccentColorManager.SystemAccent;
-
-    private FrameworkElement ColourDot(string? hex, Color colour, string name) =>
-        Dot(K.Brush(colour), Appearance.AccentHex == hex, name, () => Appearance.SetAccent(hex));
-
-    /// <summary>A swatch (Windows 11's): its colour in a square, the one worn checked and ringed.</summary>
-    private static FrameworkElement Dot(Brush fill, bool on, string name, Action pick, UIElement? inside = null)
-    {
-        var dot = new Border { Width = 40, Height = 40, CornerRadius = new CornerRadius(4), Background = fill };
-        if (on) dot.Child = K.Icon(SymbolRegular.Checkmark24, 18, Colors.White);
-        else if (inside != null) dot.Child = inside;
-        var ring = new Border { Padding = new Thickness(3), CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(2), Child = dot, Margin = new Thickness(0, 0, 6, 6) };
-        if (on) ring.SetResourceReference(Border.BorderBrushProperty, B.Text); else ring.BorderBrush = Brushes.Transparent;
-        var b = K.Subtle(ring, pick, new Thickness(0), 6);
-        b.ToolTip = name;
-        System.Windows.Automation.AutomationProperties.SetName(b, name + (on ? ", chosen" : ""));
-        return b;
-    }
-
-    /// <summary>The ninth swatch (onboarding-7, the Mac's any-colour dot): a colour of the student's own — the one worn
-    /// when it is none of the others, else every hue — opening Custom colour.</summary>
-    private FrameworkElement CustomDot()
-    {
-        var hex = Appearance.AccentHex;
-        var own = hex != null && Appearance.Colours.All(c => !string.Equals(c.Hex, hex, StringComparison.OrdinalIgnoreCase))
-                  && Appearance.ReadyThemes.All(r => !string.Equals(r.Accent, hex, StringComparison.OrdinalIgnoreCase));
-        Brush fill = own && Appearance.Hex(hex) is { } c ? K.Brush(c) : Hues();
-        // (it opens on the accent worn — a preset's too — so Use colour pressed with nothing touched changes nothing)
-        return Dot(fill, own, "Custom colour…", () => CustomColour(Appearance.Accent),
-            own ? null : K.Icon(SymbolRegular.Add24, 18, Colors.White));
-    }
-
-    /// <summary>Every hue, left to right (the custom swatch's face, the spectrum's ground).</summary>
-    private static LinearGradientBrush Hues()
-    {
-        var g = new LinearGradientBrush { StartPoint = new Point(0, 0.5), EndPoint = new Point(1, 0.5) };
-        for (var i = 0; i <= 6; i++) g.GradientStops.Add(new GradientStop(Hsl(i * 60, 1, 0.5), i / 6.0));
-        g.Freeze();
-        return g;
-    }
-
-    /// <summary>
-    /// Custom colour (Windows 11's colour picker, the Mac's wheel): a spectrum — every hue across, light to deep down,
-    /// "Shade" — dragged or clicked 1:1 under the pointer, a sample of the colour picked, and its hex code, which can be
-    /// typed (six digits wear it as they come). Use colour wears it as the accent.
-    /// </summary>
-    private void CustomColour(Color? from)
-    {
-        var (h0, l0) = from is { } f ? HueShade(f) : (210.0, 0.5);
-        double hue = h0, shade = l0;
-        // (the colour as it is — the accent worn, or a code typed — until the spectrum is touched: opened and used as it
-        //  is, it changes nothing)
-        Color? exact = from;
-        Color Picked() => exact ?? Hsl(hue, 0.85, shade);
-        const double W = 320, H = 150;
-        var spectrum = new Grid { Width = W, Height = H, Cursor = Cursors.Cross, ClipToBounds = true };
-        spectrum.Children.Add(new Border { Background = Hues(), CornerRadius = new CornerRadius(6) });
-        var depth = new LinearGradientBrush { StartPoint = new Point(0.5, 0), EndPoint = new Point(0.5, 1) };
-        depth.GradientStops.Add(new GradientStop(Color.FromArgb(220, 255, 255, 255), 0));
-        depth.GradientStops.Add(new GradientStop(Color.FromArgb(0, 255, 255, 255), 0.5));
-        depth.GradientStops.Add(new GradientStop(Color.FromArgb(0, 0, 0, 0), 0.5));
-        depth.GradientStops.Add(new GradientStop(Color.FromArgb(220, 0, 0, 0), 1));
-        spectrum.Children.Add(new Border { Background = depth, CornerRadius = new CornerRadius(6) });
-        var marker = new System.Windows.Shapes.Ellipse { Width = 16, Height = 16, Stroke = Brushes.White, StrokeThickness = 2, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, IsHitTestVisible = false, Effect = K.Shadow(4, 0, 0.5) };
-        spectrum.Children.Add(marker);
-        var sample = new Border { Width = 56, Height = 56, CornerRadius = new CornerRadius(8) }.Stroke(B.CardStroke);
-        var code = new TextBox { Width = 120, MaxLength = 7, PlaceholderText = "#RRGGBB" };
-        var typing = false;
-        void Paint()
-        {
-            var c = Picked();
-            sample.Background = K.Brush(c);
-            // (shade 0.15 at the foot to 0.85 at the top: the spectrum's own light-to-deep)
-            marker.Margin = new Thickness(hue / 360 * W - 8, (0.85 - shade) / 0.7 * H - 8, 0, 0);
-            if (!typing) code.Text = $"#{c.R:X2}{c.G:X2}{c.B:X2}";
-        }
-        void At(Point p)
-        {
-            exact = null;
-            hue = Math.Clamp(p.X / W, 0, 1) * 360;
-            shade = 0.85 - Math.Clamp(p.Y / H, 0, 1) * 0.7;
-            Paint();
-        }
-        spectrum.MouseLeftButtonDown += (_, e) => { spectrum.CaptureMouse(); At(e.GetPosition(spectrum)); };
-        spectrum.MouseMove += (_, e) => { if (spectrum.IsMouseCaptured) At(e.GetPosition(spectrum)); };
-        spectrum.MouseLeftButtonUp += (_, _) => spectrum.ReleaseMouseCapture();
-        code.TextChanged += (_, _) =>
-        {
-            if (Appearance.Hex(code.Text.Trim()) is not { } c || code.Text.Trim().TrimStart('#').Length != 6) return;
-            typing = true;
-            exact = c; // (as typed, not as the spectrum would mix it)
-            (hue, shade) = HueShade(c);
-            Paint();
-            typing = false;
-        };
-        Paint();
-        var s = new Sheet
-        {
-            Title = "Custom colour",
-            Width = 400,
-            Body = K.V(14, spectrum, K.Columns("auto, 16, *, auto", sample.Col(0),
-                K.V(2, K.Wrapped("Drag across for the hue, up and down for the shade.", Ty.Caption, B.Text2, 3)).Align(HorizontalAlignment.Stretch, VerticalAlignment.Center).Col(2),
-                K.V(4, K.Text("Hex", Ty.Caption, B.Text2), code).Col(3))),
-        };
-        s.Add("Use colour", SheetButtonKind.Primary, () =>
-        {
-            var c = Picked();
-            Appearance.SetAccent($"#{c.R:x2}{c.G:x2}{c.B:x2}");
-        });
-        s.Add("Cancel", SheetButtonKind.Close);
-        sheets.Show(s);
-    }
-
-    /// <summary>A colour from hue (0–360), saturation and lightness (0–1).</summary>
-    private static Color Hsl(double h, double s, double l)
-    {
-        var c = (1 - Math.Abs(2 * l - 1)) * s;
-        var x = c * (1 - Math.Abs(h / 60 % 2 - 1));
-        var m = l - c / 2;
-        var (r, g, b) = (h % 360) switch
-        {
-            < 60 => (c, x, 0.0), < 120 => (x, c, 0.0), < 180 => (0.0, c, x), < 240 => (0.0, x, c), < 300 => (x, 0.0, c), _ => (c, 0.0, x),
-        };
-        static byte B8(double v) => (byte)Math.Clamp(Math.Round(v * 255), 0, 255);
-        return Color.FromRgb(B8(r + m), B8(g + m), B8(b + m));
-    }
-
-    /// <summary>A colour's hue and shade, as the spectrum places them (its lightness kept within the spectrum's).</summary>
-    private static (double Hue, double Shade) HueShade(Color c)
-    {
-        double r = c.R / 255.0, g = c.G / 255.0, b = c.B / 255.0;
-        var max = Math.Max(r, Math.Max(g, b));
-        var min = Math.Min(r, Math.Min(g, b));
-        var l = (max + min) / 2;
-        var d = max - min;
-        double h = 0;
-        if (d > 1e-6)
-        {
-            if (max == r) h = 60 * ((g - b) / d % 6);
-            else if (max == g) h = 60 * ((b - r) / d + 2);
-            else h = 60 * ((r - g) / d + 4);
-        }
-        if (h < 0) h += 360;
-        return (h, Math.Clamp(l, 0.15, 0.85));
-    }
-
+    // (0.3.31) Appearance is no longer a page here: the account menu's Appearance… (Shell/AppearanceMode.cs).
 
     // ---- Notifications ----
 

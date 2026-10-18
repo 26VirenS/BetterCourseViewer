@@ -382,6 +382,7 @@ public sealed partial class DashboardScreen : Screen
             Grid.SetRow(tile, (k / cols) * 2);
             grid.Children.Add(tile);
             tiles[c.Key] = tile;
+            Shell.AppearanceMode.Place(tile, c.Key); // (0.3.31: Appearance's photo button on it)
             if (c.Key == "next") Shell.Tour.Mark(tile, Shell.TourSpot.CounterNext);
             if (openKey == c.Key) tile.Opacity = 0;
         }

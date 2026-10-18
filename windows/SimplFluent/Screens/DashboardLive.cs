@@ -298,6 +298,7 @@ public sealed partial class DashboardScreen
                 {
                     var fresh = Tile(c, layout.Cols, layout.Full);
                     if (c.Key == "next") Shell.Tour.Mark(fresh, Shell.TourSpot.CounterNext);
+                    Shell.AppearanceMode.Place(fresh, c.Key);
                     Swap(t.Tile, fresh);
                     tiles[c.Key] = fresh;
                 }

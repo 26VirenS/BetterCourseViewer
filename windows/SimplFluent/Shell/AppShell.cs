@@ -143,6 +143,7 @@ public sealed partial class AppShell : Grid, IDisposable
         foot.SizeChanged += (_, _) => MaskScene();
         paneHolder.SizeChanged += (_, _) => { MaskScene(); FootFits(); };
         pane.Mark(TourSpot.Pane);
+        pane.Place("side"); // (0.3.31: Appearance's photo button on it)
         searchBox.Mark(TourSpot.Search);
         Children.Add(paneHolder.Col(0));
 
@@ -577,6 +578,8 @@ public sealed partial class AppShell : Grid, IDisposable
             return mi;
         }
         menu.Items.Add(Item("Settings…", SymbolRegular.Settings24, window.OpenSettings));
+        // (0.3.31) the theme, the photos and the courses' colours, over the window itself
+        menu.Items.Add(Item("Appearance…", SymbolRegular.PaintBrush24, () => { if (narrow) ClosePane(); window.StartAppearance(); }));
         menu.Items.Add(Item("What’s new", SymbolRegular.Sparkle24, () => engine.ShowWhatsNew(WhatsNew.All)));
         menu.Items.Add(Item("Take the tour", SymbolRegular.Map24, window.StartTour));
         menu.Items.Add(Item($"{engine.LmsName} profile", SymbolRegular.Person24, () => engine.OpenWebScreen("/profile", "Profile")));

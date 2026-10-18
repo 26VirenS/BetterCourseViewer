@@ -26,6 +26,10 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.31", "2026-10-18",
+            ("new", "Appearance Mode", "⋯ > Appearance: style Simpl right on the window."),
+            ("new", "Photos in Place", "Add a photo to the pane or any card from its button."),
+            ("new", "Course Colours", "Pick each course's colour from the Appearance bar.")),
         R("0.3.30", "2026-10-18",
             ("new", "GeoGebra Calculator", "The Calculator is GeoGebra: graphs, CAS, 3D and more."),
             ("improved", "Scientific in the Pin", "The pinned Calculator is GeoGebra's scientific one.")),
