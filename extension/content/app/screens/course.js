@@ -429,9 +429,10 @@
 
   function typeIcon(a) {
     const t = a.submission_types || [];
-    if (a.is_quiz_assignment || a.quiz_id || t.includes('online_quiz')) return { icon: IC.bolt, quiz: true };
-    if (t.includes('discussion_topic') || a.discussion_topic) return { icon: IC.disc, quiz: false };
-    return { icon: IC.doc, quiz: false };
+    // (2.99.41) with the word the Mac's rows lead with: Quiz, Discussion, Tool or Assignment
+    if (a.is_quiz_assignment || a.quiz_id || t.includes('online_quiz')) return { icon: IC.bolt, quiz: true, kind: 'Quiz' };
+    if (t.includes('discussion_topic') || a.discussion_topic) return { icon: IC.disc, quiz: false, kind: 'Discussion' };
+    return { icon: IC.doc, quiz: false, kind: t.includes('external_tool') ? 'Tool' : 'Assignment' };
   }
   /** Whether the assignment already has a grade the student may see (marked, and posted — Canvas
    *  holds a mark back until the teacher posts it): then it is done, whatever its due date says. */
@@ -534,6 +535,22 @@
 
   /** Header (back link, colour, title, pills) plus the
    *  grouped rail of the context's tabs, for courses and groups. */
+  /** (2.99.41) With one sidebar, as the Mac lays a course's section out: the section's own name is the title (Assignments,
+   *  Modules…), the course's name under it, and the term and the course's details left to its Home. Home, a page of
+   *  the course and the two-sidebar layout keep the course's name as the title. */
+  function sectionTitle(app, screen, shell, activeId) {
+    const head = screen.querySelector('.bcv-head--course');
+    const h1 = head?.querySelector('.bcv-course__title-row .bcv-h1');
+    if (!h1) return;
+    const c = shell.course;
+    const tab = (shell.tabs || []).find((t) => t.id === activeId && !t.external);
+    const section = shell.kind === 'courses' && app.oneBar?.() && !BCV.phone?.active() && tab && activeId !== 'home' ? tab.label : null;
+    h1.textContent = section || c.name;
+    head.classList.toggle('is-section', !!section);
+    let of = head.querySelector('.bcv-course__of');
+    if (section && !of) head.querySelector('.bcv-course__title-row').after(of = U.text('bcv-course__of bcv-ellip', ''));
+    if (of) of.textContent = section ? c.name : '';
+  }
   async function contextShell(ctx, shell, { backLabel, backHref, tabs, activeId, pills = [] }) {
     const { app } = ctx;
     const c = shell.course;
@@ -667,6 +684,7 @@
     // the rail starts just below the sticky header, whatever height the title wraps to (ui.watchLayout: measured as it lands and whenever it changes).
     // Set on the screen the head is in when measured: the callers move the children into a screen of their own, so this one is left behind.
     U.watchLayout(head, (r) => (head.parentElement || screen).style.setProperty('--bcv-chead', `${Math.round(r.height)}px`));
+    sectionTitle(app, screen, shell, activeId);
     return { screen, content: cmain, head };
   }
 
@@ -803,6 +821,7 @@
   const heldShell = () => liveShell?.shell || null;
   /** A kept shell follows the route: the active rail item, and counts read again. */
   function syncShell(ctx, screen, shell, activeId) {
+    sectionTitle(ctx.app, screen, shell, activeId);
     for (const b of screen.querySelectorAll('.bcv-rail__item, .bcv-rail__ext')) b.classList.toggle('is-active', b.dataset.tab === activeId);
     railCounts(shell).then((counts) => {
       if (!ctx.alive()) return;
@@ -985,13 +1004,14 @@
     // list never crawls) — on the first draw only; a search or a re-sort just redraws
     let n = 0;
     const row = (a) => {
-      const { icon, quiz } = typeIcon(a);
+      const { icon, quiz, kind } = typeIcon(a);
       const pal = quiz ? U.palette('#5856d6', shell.dark) : c.palette;
       const rowEl = U.row([
         U.tile(icon, { color: pal.text, tint: pal.tint }),
         U.el('bcv-row__body', [
           U.text('bcv-row__title bcv-row__title--145 bcv-ellip', a.name),
-          U.text('bcv-row__sub', `${hasGrade(a) ? 'Graded' : a.due_at ? `Due ${U.fmtAt(a.due_at)}` : 'No due date'} · ${ptsLabel(a)}`), // (a grade ends "due", whatever the date)
+          // (2.99.41) as the Mac's rows read: the kind, the points, then when it is due (a grade ends "due", whatever the date)
+          U.text('bcv-row__sub', `${kind} · ${ptsLabel(a)} · ${hasGrade(a) ? 'Graded' : a.due_at ? `Due ${U.fmtAt(a.due_at)}` : 'No due date'}`),
         ]),
         statusBadge(a),
         U.chev(),
@@ -1019,10 +1039,11 @@
     upcoming.sort(byDue); overdue.sort(byDue); past.sort((x, y) => byDue(y, x));
     const gradedN = past.filter((a) => a.submission?.workflow_state === 'graded').length;
     const parts = [
-      section('Overdue Assignments', U.plural(overdue.length, 'item'), overdue),
-      section('Upcoming Assignments', U.plural(upcoming.length, 'item'), upcoming),
-      section('Undated Assignments', U.plural(undated.length, 'item'), undated),
-      section('Past Assignments', gradedN ? `${gradedN} graded` : U.plural(past.length, 'item'), past),
+      // (2.99.41) the Mac's short heads, each with its count: "Upcoming 10"
+      section('Overdue', String(overdue.length), overdue),
+      section('Upcoming', String(upcoming.length), upcoming),
+      section('Undated', String(undated.length), undated),
+      section('Past', gradedN ? `${past.length} · ${gradedN} graded` : String(past.length), past),
     ].filter(Boolean);
     return U.el('bcv-col', parts.length ? parts : [U.emptyCard(q ? 'No assignments match.' : 'No assignments yet.')], { style: { gap: '22px' } });
   };

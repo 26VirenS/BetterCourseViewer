@@ -2804,19 +2804,19 @@ try {
   await tab('assignments');
   await page.waitForSelector('.bcv-group__head', { timeout: 10000 });
   const agroups = await texts('.bcv-group__head');
-  check(agroups[0].startsWith('Upcoming Assignments') && agroups.some((t) => /Past Assignments \d+ graded/.test(t)), `assignment groups: ${agroups.join(' | ')}`);
+  check(/^Upcoming\s*\d+$/.test(agroups[0]) && agroups.some((t) => /^Past\s*\d+ · \d+ graded$/.test(t)), `assignment groups: ${agroups.join(' | ')}`);
   // (in another course:) an assignment already graded is done, whatever its date says
   await page.goto(`${BASE}/courses/102/assignments`);
   await page.waitForSelector('.bcv-group__head', { timeout: 10000 });
   const safety = await page.$$eval('.bcv-group__head, .bcv-body .bcv-card--list .bcv-row', (els) => { let group = ''; for (const e of els) { if (e.classList.contains('bcv-group__head')) group = e.textContent.replace(/\s+/g, ' ').trim(); else if (/Lab safety check/.test(e.textContent)) return { group, sub: e.querySelector('.bcv-row__sub')?.textContent.replace(/\s+/g, ' ').trim() }; } return null; });
-  check(!!safety && /^Past Assignments/.test(safety.group) && safety.sub === 'Graded · 10/10 pts', `an assignment that already has a grade is done, not upcoming, though its due date is still ahead: ${JSON.stringify(safety)}`);
+  check(!!safety && /^Past/.test(safety.group) && safety.sub === 'Assignment · 10/10 pts · Graded', `an assignment that already has a grade is done, not upcoming, though its due date is still ahead: ${JSON.stringify(safety)}`);
   await page.goto(`${BASE}/courses/101/assignments`);
   await page.waitForSelector('.bcv-group__head', { timeout: 10000 });
   // the rows fade in one after another down the column, 20ms apart, quickly (200ms each)
   const aEnter = await page.$$eval('.bcv-body .bcv-card--list .bcv-row', (els) => els.map((e) => [e.classList.contains('bcv-enter'), e.style.getPropertyValue('--bcv-delay'), e.style.getPropertyValue('--bcv-dur')]));
   check(aEnter.length >= 6 && aEnter.every(([on, , dur], i) => on && dur === '200ms' && aEnter[i][1] === `${Math.min(i * 20, 420)}ms`), `assignment rows fade in one at a time, 20ms apart: ${aEnter.slice(0, 4).map((a) => a[1]).join(',')}…`);
   const arows = await texts('.bcv-body .bcv-row');
-  check(arows.some((t) => /Qz01.*Due .* at 11:59pm · 10 pts.*Not submitted/.test(t)) && arows.some((t) => /Lec05-PreQuiz.*19\/19 pts.*Graded/.test(t)) && !arows.some((t) => /–\//.test(t)), 'assignment rows: due, what it is worth (no dash standing in for a score), status badge');
+  check(arows.some((t) => /Qz01.*Quiz · 10 pts · Due .* at 11:59pm.*Not submitted/.test(t)) && arows.some((t) => /Lec05-PreQuiz.*19\/19 pts.*Graded/.test(t)) && !arows.some((t) => /–\//.test(t)), 'assignment rows, as the Mac reads them: the kind, what it is worth (no dash standing in for a score), when it is due, the status badge');
   await shot(page, '13-course-assignments');
   await page.click('.bcv-seg__btn[data-value="type"]');
   await page.waitForFunction(() => [...document.querySelectorAll('.bcv-group__head')].some((e) => /Discussion Quizzes/.test(e.textContent)), null, { timeout: 5000 });
