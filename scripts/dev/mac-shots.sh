@@ -940,7 +940,8 @@ push_set() {
   shoot light-01s-dashboard-no-sidebar 12 -SimplSidebar hidden
   # (1.3.80) Next 7 days' tile half-way through growing into its panel over the page (held there: -SimplMorphHold)
   shoot light-01m-counter-morph-next 30 -SimplSheet next -SimplMorphHold 0.5 # (its wait the longest: under load the panel came 15 seconds in)
-  shoot light-21d-macmillan 26 -SimplOpen macmillan:104:4005 # (1.3.66: a Macmillan Learning assignment's popup)
+  shoot light-21d-macmillan 26 -SimplOpen macmillan:104:4005 # (1.3.66: a Macmillan Learning assignment's popup — 1.3.114: its cover, the start screen)
+  shoot light-21e-macmillan-question 30 -SimplOpen macmillan:104:4005 -SimplMacmillanOpen YES # (1.3.114: the skin — the rail, the question on cards, the bar)
   shoot light-21e-second-window 18 -SimplOpen window:section:courses/101:grades # (1.3.69: a window more, on a course's grades: its breakdown bar)
   shoot light-36-external-tools 16 -SimplPlace externaltools # (1.3.67: every external tool in the courses)
   shoot light-36b-external-tools-list 16 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77: every place Knewton Alta is used, to choose from)

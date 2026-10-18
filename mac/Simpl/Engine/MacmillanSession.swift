@@ -14,6 +14,16 @@ final class MacmillanSession: ObservableObject {
     /// (1.3.78) The page's own heading (its assignment's name, as Macmillan titles it), read once it has loaded: the
     /// popup's title when Canvas's name for it is not to be had.
     @Published private(set) var heading: String?
+    /// (1.3.114) The assessment as its skin reads it (extension/tools/macmillan/skin.js): its cover, or the question shown
+    /// with the list of questions, the score and the controls; nil until the assessment player has said (an assignment
+    /// of another kind of Macmillan's is shown as it is).
+    @Published private(set) var state: MacmillanState?
+    /// (1.3.114) Show Browser: Macmillan's own page, as Macmillan draws it, in place of the skinned one.
+    @Published private(set) var browser = UserDefaults.standard.bool(forKey: MacmillanSession.browserKey)
+    static let browserKey = "SimplMacmillanShowBrowser"
+    /// The assessment player's frame, which the skin's reports come from and its presses go to.
+    private var player: WKFrameInfo?
+    private var launchOpened = false
 
     let launch: AltaLaunch
     let web: WKWebView
@@ -34,6 +44,14 @@ final class MacmillanSession: ObservableObject {
     })();
     """, injectionTime: .atDocumentStart, forMainFrameOnly: false)
 
+    /// (1.3.114) The skin, from the extension the app carries; and before it, whether it is to skin (Show Browser).
+    private static let skin: WKUserScript? = {
+        guard let dir = Bundle.main.url(forResource: "extension", withExtension: nil),
+              let js = try? String(contentsOf: dir.appendingPathComponent("tools/macmillan/skin.js"), encoding: .utf8) else { return nil }
+        let off = UserDefaults.standard.bool(forKey: browserKey)
+        return WKUserScript(source: "window.__simplMacmillanSkinned = \(off ? "false" : "true");\n" + js, injectionTime: .atDocumentStart, forMainFrameOnly: false)
+    }()
+
     init(launch: AltaLaunch) {
         self.launch = launch
         CrossSiteCookies.apply()
@@ -42,6 +60,8 @@ final class MacmillanSession: ObservableObject {
         config.mediaTypesRequiringUserActionForPlayback = []
         config.applicationNameForUserAgent = "Version/18.4 Safari/605.1.15"
         config.userContentController.addUserScript(Self.script)
+        // (1.3.114) the skin, in every page and frame (it acts in the assessment player and the page that holds it)
+        if let skin = Self.skin { config.userContentController.addUserScript(skin) }
         let r = MacmillanRelay()
         config.userContentController.add(r, name: Self.handler)
         relay = r
@@ -88,8 +108,21 @@ final class MacmillanSession: ObservableObject {
 
     func take(_ text: String, frame: WKFrameInfo) {
         guard let data = text.data(using: .utf8),
-              let head = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              head["kind"] as? String == "frame", !frame.isMainFrame else { return }
+              let head = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+        // (1.3.114) the assessment as the skin reads it: the popup drawn round it
+        if head["kind"] as? String == "state", let s = try? JSONDecoder().decode(MacmillanState.self, from: data) {
+            player = frame
+            if s != state { withAnimation(Motion.gentle) { state = s } }
+            if opening { withAnimation(Motion.gentle) { opening = false } }
+            if browser { Task { await act("skin", false) } }
+            // (the screenshot suite's -SimplMacmillanOpen YES: the cover's Open Assignment pressed, once)
+            if s.isCover, !launchOpened, UserDefaults.standard.bool(forKey: "SimplMacmillanOpen") {
+                launchOpened = true
+                Task { try? await Task.sleep(nanoseconds: 600_000_000); await act("open") }
+            }
+            return
+        }
+        guard head["kind"] as? String == "frame", !frame.isMainFrame else { return }
         let key = frame.request.url?.absoluteString ?? ""
         frames.removeAll { ($0.request.url?.absoluteString ?? "") == key }
         frames.append(frame)
@@ -138,6 +171,33 @@ final class MacmillanSession: ObservableObject {
         return file
     }
 
+    /// (1.3.114) A press of the popup's, done on Macmillan's page: Open Assignment, a question, the arrows, the main
+    /// button, Resources, AI Tutor, Solution, Switch to New Layout, an attempt, the skin on or off.
+    @discardableResult
+    func act(_ command: String, _ argument: Any? = nil) async -> Bool {
+        guard let player else { return false }
+        let arg: String
+        switch argument {
+        case let n as Int: arg = String(n)
+        case let b as Bool: arg = b ? "true" : "false"
+        case nil: arg = "null"
+        default: arg = "null"
+        }
+        let js = "return window.__simplMacmillan ? window.__simplMacmillan(\"\(command)\", \(arg)) : false"
+        return await run(js, in: player) as? Bool ?? false
+    }
+
+    /// (1.3.114) Show Browser on or off, kept for every Macmillan assignment: the page skinned again, or as Macmillan
+    /// draws it — in the player and in the page that holds it.
+    func setBrowser(_ on: Bool) {
+        browser = on
+        UserDefaults.standard.set(on, forKey: Self.browserKey)
+        Task {
+            await act("skin", !on)
+            _ = await run("return window.__simplMacmillan ? window.__simplMacmillan('skin', \(on ? "false" : "true")) : false", in: nil)
+        }
+    }
+
     /// The script run in that frame (nil: the main page); what it gives back, or nil.
     private func run(_ js: String, in frame: WKFrameInfo?) async -> Any? {
         await withCheckedContinuation { (go: CheckedContinuation<Any?, Never>) in
@@ -160,4 +220,56 @@ final class MacmillanRelay: NSObject, WKScriptMessageHandler {
         let frame = message.frameInfo
         MainActor.assumeIsolated { session?.take(text, frame: frame) }
     }
+}
+
+/// (1.3.114) Macmillan's assessment, as its skin reads it (extension/tools/macmillan/skin.js): before it is opened, its
+/// cover; then the question shown, the list of questions with how each stands, the score, and the controls on the page.
+struct MacmillanState: Decodable, Equatable {
+    struct Cover: Decodable, Equatable {
+        var name: String?
+        var due: String?
+        var count: Int?
+        var policies: [String]?
+    }
+    struct Item: Decodable, Equatable, Identifiable {
+        var n: Int
+        var label: String
+        /// "default" (not yet answered), "success" (solved), else Macmillan's own word for it ("error", …).
+        var state: String
+        var note: String
+        var points: String?
+        var id: Int { n }
+        var solved: Bool { state == "success" }
+        var tried: Bool { !solved && state != "default" }
+    }
+    struct Tools: Decodable, Equatable {
+        var resources: Bool
+        var tutor: Bool
+        var solution: Bool
+        var layout: Bool
+    }
+    struct Attempts: Decodable, Equatable {
+        var label: String
+        var choices: [String]
+    }
+    /// "cover", "question" or "other".
+    var page: String
+    var cover: Cover?
+    var title: String?
+    var index: Int?
+    var count: Int?
+    var completed: Int?
+    var score: [Double]?
+    var policies: [String]?
+    var items: [Item]?
+    var main: String?
+    var mainOn: Bool?
+    var tools: Tools?
+    var attempts: Attempts?
+    var results: [String]?
+    var first: Bool?
+    var last: Bool?
+
+    var isQuestion: Bool { page == "question" }
+    var isCover: Bool { page == "cover" }
 }
