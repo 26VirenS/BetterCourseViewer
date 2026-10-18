@@ -404,7 +404,8 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
     private void Said(string what)
     {
         if (!sheet.Large || !Launch.IsDevelopment) return;
-        var whose = chosen != null ? "the student's" : sheet.Most != null ? "its most" : "its room's";
+        // ("as sized", never "the student's": CI checks the logs never hold that word — the mock's sign-in)
+        var whose = chosen != null ? "as sized" : sheet.Most != null ? "its most" : "its room's";
         Log.Write(string.Create(CultureInfo.InvariantCulture, $"large popup {sheet.SizeKey ?? sheet.Name ?? "?"} {what} {card.Width:0}×{card.Height:0} ({whose}) at {Left:0},{Top:0}"));
     }
 

@@ -60,7 +60,7 @@ internal sealed class PTMiniWindow : FluentWindow
         ShowInTaskbar = false;
         FontFamily = K.TextFace;
         SetResourceReference(ForegroundProperty, B.Text);
-        if (Fx.Opaque) SetResourceReference(BackgroundProperty, B.Window);
+        if (Shot.Asked || Fx.Opaque) SetResourceReference(BackgroundProperty, B.Window);
         Width = 360;
         Height = 500;
         Place(owner);

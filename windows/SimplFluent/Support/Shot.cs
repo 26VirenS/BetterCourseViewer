@@ -110,8 +110,9 @@ public static class Shot
     public static void Take(string file)
     {
         // (a small window kept on top of the others — a tool pulled out of its pin, ToolFloat — or a popup floating over
-        //  the window, Shell/FloatPopup.cs, is pictured over the window under it, never on its own)
-        static bool Floating(Window x) => x is Shell.FloatPopup || (x.Topmost && !x.ShowInTaskbar && x.Owner != null);
+        //  the window, Shell/FloatPopup.cs, is pictured over the window under it, never on its own — and the Periodic Table's
+        //  mini element window over it in turn, as it is on the screen)
+        static bool Floating(Window x) => x is Shell.FloatPopup || x is Simpl.Tools.PTMiniWindow || (x.Topmost && !x.ShowInTaskbar && x.Owner != null);
         var visible = Application.Current.Windows.OfType<Window>().Select((x, i) => (Window: x, Order: i)).Where(x => x.Window.IsVisible).ToList();
         var w = visible.Where(x => !Floating(x.Window))
                     .OrderByDescending(x => x.Window.IsActive).ThenByDescending(x => x.Window.Owner != null).ThenByDescending(x => x.Order)
