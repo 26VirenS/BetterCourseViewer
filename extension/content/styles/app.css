@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.39"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.40"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -4697,8 +4697,6 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 .bcv-qcite__none { height: 18px; font: 400 11.5px/18px var(--bcv-font); color: rgba(255,255,255,.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* the calculator as a tool of its own, and the graphing pin's small Desmos (2.39.0) */
-.bcv-tool--calc .bcv-tool__body { padding: 16px; }
-.bcv-calc-tool { background: #1c1c1e; border-radius: 22px; padding: 16px 16px 16px; }
 /* the sum as an equation under the keys: typeset (KaTeX) or, on LaTeX, the source itself; Copy takes the source */
 .bcv-calc__title { font: 600 11px/1 var(--bcv-font); color: rgba(255,255,255,.55); letter-spacing: .02em; }
 .bcv-calc--big .bcv-calc__head { height: 22px; padding: 0 6px; }

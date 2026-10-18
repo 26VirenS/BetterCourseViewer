@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.40', date: '2026-10-18', notes: [
+      { kind: 'new', title: 'GeoGebra Calculator', body: 'The Calculator is GeoGebra: graphs, CAS, 3D and more.', icon: P.tool },
+    ] },
     { version: '2.99.39', date: '2026-10-17', notes: [
       { kind: 'new', title: 'One sidebar', body: 'A course opens its sections under it, as in the Mac app.', icon: P.list },
     ] },

@@ -6657,36 +6657,12 @@ try {
   check(graphIn && (await page.evaluate(() => document.activeElement?.tagName === 'IFRAME')), `a press in Desmos gives it the keyboard, and it keeps it (${(await keyState()).active})`);
   await page.click('.bcv-tool-ov .bcv-tool__title');
   await closeTool();
-  // the calculator: a tool of its own, the same scientific calculator larger, the keyboard on it
+  // (2.99.40) the calculator: GeoGebra's Calculator Suite in a frame, tall, the way out beside it (its pin keeps the
+  // quick scientific calculator, checked with the pins)
   await openTool('calc');
-  await page.waitForFunction(() => { const t = document.querySelector('.bcv-tool[data-tool="calc"]'); return !!t && getComputedStyle(t).transform === 'none' && t.getAnimations({ subtree: true }).every((a) => a.playState !== 'running'); }, null, { timeout: 5000 }); // (the popup grows in from the card on a spring: measured once it is at rest)
-  const calcLine = (sel) => page.$eval(`.bcv-tool[data-tool="calc"] ${sel}`, (e) => e.dataset.line); // (the line as text: the display itself is typeset)
-  await eventually(() => page.$eval('.bcv-tool[data-tool="calc"] .bcv-calc', (e) => document.activeElement === e).catch(() => false), 2000); // (the keys take the focus a moment after the popup lands)
-  check((await toolSub()) === 'Scientific · the keyboard works too' && (await page.$$('.bcv-tool[data-tool="calc"] .bcv-calc__key')).length === 49 && (await page.$eval('.bcv-tool[data-tool="calc"] .bcv-calc', (e) => e.classList.contains('bcv-calc--big') && document.activeElement === e)) && (await calcLine('.bcv-calc__expr')) === '0', 'the calculator is a tool of its own: the scientific keys, larger, with the focus on them');
-  await page.keyboard.type('7*6');
-  await page.keyboard.press('Enter');
-  const calcTyped = { expr: await calcLine('.bcv-calc__expr'), sub: await calcLine('.bcv-calc__sub'), key: await page.$eval('.bcv-tool[data-tool="calc"] .bcv-calc__key[data-key="7"]', (e) => Math.round(e.getBoundingClientRect().height)), width: await page.$eval('.bcv-tool[data-tool="calc"]', (e) => Math.round(e.getBoundingClientRect().width)), active: await page.evaluate(() => document.activeElement?.className || document.activeElement?.tagName) };
-  check(calcTyped.expr === '42' && calcTyped.sub === '7×6 =' && calcTyped.key === 54 && calcTyped.width === 720, `typed on the keyboard, 7 × 6 Enter shows 42, on keys 54 tall in a popup 720 wide: ${JSON.stringify(calcTyped)}`);
-  // the display is the equation itself: both of its lines typeset by KaTeX (vendored, put on the page as the tool opened, its fonts the extension's own files), the text kept in data-line; no strip under the keys; the LaTeX button in the head copies the whole sum
-  await page.waitForFunction(() => !!document.querySelector('.bcv-tool[data-tool="calc"] .bcv-calc__expr .katex'), null, { timeout: 15000 });
-  const texRead = () => page.evaluate(async () => {
-    const root = document.querySelector('.bcv-tool[data-tool="calc"] .bcv-calc');
-    const display = root.querySelector('.bcv-calc__display');
-    const line = root.querySelector('.bcv-calc__expr');
-    const sub = root.querySelector('.bcv-calc__sub');
-    let fonts = 0;
-    try { fonts = (await document.fonts.load('16px KaTeX_Main')).length; } catch { fonts = -1; }
-    const d = display.getBoundingClientRect();
-    return { latex: root.dataset.latex, line: line.dataset.line, sub: sub.dataset.line, katex: !!line.querySelector('.katex'), subKatex: !!sub.querySelector('.katex'), frac: !!line.querySelector('.katex .mfrac'), sqrt: !!line.querySelector('.katex .sqrt'), strip: !!document.querySelector('.bcv-calc__tex'), fonts, fontUrl: [...document.styleSheets].some((s) => { try { return [...s.cssRules].some((r) => r.cssText.includes('KaTeX_Main') && /extension:\/\//.test(r.cssText)); } catch { return false; } }), fits: sub.getBoundingClientRect().top >= d.top - 0.5 && line.getBoundingClientRect().bottom <= d.bottom + 0.5 && line.scrollWidth <= line.clientWidth + 1, size: parseFloat(getComputedStyle(line).fontSize), button: root.querySelector('.bcv-calc__head .bcv-calc__copytex')?.textContent || '' };
-  });
-  const tex1 = await texRead();
-  check(tex1.latex === '7 \\times 6 = 42' && tex1.line === '42' && tex1.sub === '7×6 =' && tex1.katex && tex1.subKatex && !tex1.strip && tex1.fonts > 0 && tex1.fontUrl && tex1.fits && tex1.button === 'LaTeX', `the display is the equation itself: 42 typeset on the line, 7 × 6 = small above it — KaTeX, loaded as the tool opened, its fonts from the extension's own files, no strip under the keys, a LaTeX button in the head: ${JSON.stringify(tex1)}`);
-  await page.click('.bcv-tool[data-tool="calc"] .bcv-calc__copytex');
-  check(await eventually(async () => (await texts('.bcv-toast')).some((t) => /LaTeX copied/.test(t)), 3000) && (await page.evaluate(() => document.activeElement?.classList.contains('bcv-calc'))) && (await texRead()).katex, 'the LaTeX button puts the whole sum on the clipboard and says so, the focus back on the keys, the display still typeset');
-  // a richer sum by the keys — √(16) ÷ 2 — is a fraction over a root on the line itself, its result small above it, at full size: the display is tall enough for a fraction
-  for (const k of ['ac', 'sqrt', '1', '6', ')', '/', '2']) await page.click(`.bcv-tool[data-tool="calc"] .bcv-calc__key[data-key="${k}"]`);
-  const tex3 = await texRead();
-  check(tex3.latex === '\\frac{\\sqrt{16}}{2} = 2' && tex3.line === '√(16)÷2' && tex3.frac && tex3.sqrt && tex3.sub === '= 2' && tex3.subKatex && tex3.fits && tex3.size === 50, `√(16) ÷ 2 is a fraction over a root on the line, = 2 above it, at full size in the display: ${JSON.stringify(tex3)}`);
+  const calcTall = await eventually(() => page.$eval('.bcv-tool[data-tool="calc"]', (e) => e.getBoundingClientRect().height >= 600).catch(() => false), 3000);
+  check((await page.$eval('.bcv-tool[data-tool="calc"] .bcv-graph__frame', (e) => e.getAttribute('src'))) === 'https://www.geogebra.org/calculator' && (await page.$eval('.bcv-tool[data-tool="calc"] .bcv-graph__out', (e) => e.href)) === 'https://www.geogebra.org/calculator' && calcTall && (await toolSub()) === 'Powered by GeoGebra', 'the calculator is GeoGebra in a frame, tall, with the way out to geogebra.org beside it');
+  await page.waitForSelector('.bcv-tool[data-tool="calc"] .bcv-graph__frame[data-started]', { timeout: 20000 }).catch(() => {}); // (geogebra.org itself, over the network)
   await shot(page, '19b-calculator-tool');
   await closeTool();
   // the periodic table: every element in place, a card for the one pressed, search, legend, arrow keys

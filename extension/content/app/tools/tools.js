@@ -36,7 +36,7 @@
   const TOOLS = [
     { key: 'cite', name: 'Citation generator', note: 'Cite a source in MLA, APA or Chicago.', icon: IC.quote, color: '#30b0c7', open: (app, o) => BCV.toolsCite.open(app, o) },
     { key: 'pomo', name: 'Focus timer', note: 'Focus for a while, then take a break.', icon: IC.timer, color: '#ff9500', open: (app, o) => openTimer(app, o) },
-    { key: 'calc', name: 'Calculator', note: 'Scientific, laid out like the Mac\'s.', icon: IC.calc, color: '#ff9f0a', open: (app, o) => openCalc(app, o) },
+    { key: 'calc', name: 'Calculator', note: 'GeoGebra: graphs, CAS, 3D and more.', icon: IC.calc, color: '#ff9f0a', open: (app, o) => openCalc(app, o) },
     { key: 'graph', name: 'Graphing calculator', note: 'Desmos, right here.', icon: IC.graph, color: '#5856d6', open: (app, o) => openGraph(app, o) },
     { key: 'ptable', name: 'Periodic table', note: 'Every element and its facts, in place.', icon: IC.table, color: '#30d158', open: (app, o) => BCV.toolsPtable.open(app, o) },
     { key: 'need', name: 'Grade needed', note: 'What you need on the final to hit your goal.', icon: IC.percent, color: '#ff375f', open: (app, o) => BCV.toolsNeed.open(app, o) },
@@ -811,13 +811,18 @@
    *  data-started from then on. Returns { restart() }, for a frame pointed at Desmos afresh; it stops by itself once
    *  the frame goes. */
   const FADE_MS = 400; // (app.css: .bcv-graph__frame and .bcv-qgraph__frame fade in over .4s once loaded)
-  function keepKeys(frame, home = () => null) {
-    let starting = true; // (Desmos not yet loaded and shown in the frame)
+  // (2.99.40) `untilPointer`: GeoGebra takes the keyboard well after its frame has loaded (its app starts by itself a
+  // second or more later), so for it the keyboard is handed back until the pointer has gone into the frame — before
+  // that, no press in it can have been the student's.
+  function keepKeys(frame, home = () => null, { untilPointer = false } = {}) {
+    let starting = true; // (the site not yet loaded and shown in the frame; with untilPointer, the pointer not yet in it)
     let shown = 0;
     let left = null; // (what lost the keyboard in this turn: the frame took it from there)
     const onOut = (e) => { left = e.target; setTimeout(() => { left = null; }, 0); };
-    // (Desmos's own load: not the blank page a frame is made with, nor the one the pin's is emptied to)
-    const onLoad = () => { if (!frame.src.startsWith(DESMOS)) return; clearTimeout(shown); shown = setTimeout(() => { starting = false; frame.dataset.started = '1'; }, FADE_MS); };
+    // (the site's own load — Desmos's, GeoGebra's: not the blank page a frame is made with, nor the one the pin's is
+    //  emptied to)
+    const onLoad = () => { if (!frame.src.startsWith('https://')) return; clearTimeout(shown); shown = setTimeout(() => { if (!untilPointer) starting = false; frame.dataset.started = '1'; }, FADE_MS); };
+    const onEnter = () => { if (untilPointer && frame.dataset.started) starting = false; };
     const onBlur = () => {
       if (document.activeElement !== frame || !starting) return;
       const from = left;
@@ -834,6 +839,8 @@
       }, 0);
     };
     frame.addEventListener('load', onLoad);
+    frame.addEventListener('pointerenter', onEnter);
+    frame.addEventListener('pointermove', onEnter);
     document.addEventListener('focusout', onOut, true);
     window.addEventListener('blur', onBlur);
     const stop = () => { clearTimeout(shown); document.removeEventListener('focusout', onOut, true); window.removeEventListener('blur', onBlur); forget(); };
@@ -865,16 +872,31 @@
     U.onGone(p.ov, () => document.removeEventListener('securitypolicyviolation', onCsp));
   }
 
-  /** The calculator as a tool of its own: the same scientific calculator, larger, the keyboard on it,
-   *  and under the display the sum as an equation — typeset by KaTeX (vendored, loaded when the tool
-   *  opens; until then, and where it cannot load, the LaTeX itself stands) from the line as it is typed
-   *  (content/app/tools/calc-latex.js), the result after it; LaTeX shows the source, Copy copies it. */
+  /** (2.99.40) The calculator as a tool of its own is GeoGebra's Calculator Suite (graphing, geometry, 3D, CAS,
+   *  probability, scientific), framed from geogebra.org as Desmos is above — the Mac and Windows apps' Calculator is
+   *  the same. Its pin keeps the quick scientific calculator (quickCalc), which needs no network. */
+  const GEOGEBRA = 'https://www.geogebra.org/calculator';
   function openCalc(app, { from = null } = {}) {
     const tool = toolOf('calc');
-    const built = quickCalc({ popup: true });
-    const body = U.el('bcv-calc-tool', built.els);
-    const p = popup({ tool, title: 'Calculator', sub: 'Scientific · the keyboard works too', width: 720, cls: 'bcv-tool--calc', body, from });
-    setTimeout(() => { if (p.alive()) built.els[0].focus({ preventScroll: true }); }, 60);
+    const body = U.el('bcv-graph');
+    const p = popup({ tool, title: 'Calculator', sub: 'Powered by GeoGebra', width: 960, cls: 'bcv-tool--tall', body, from });
+    const fail = () => {
+      if (!p.alive()) return;
+      body.replaceChildren(U.el('bcv-graph__fail', rise([
+        U.svg(IC.warn, { size: 26, stroke: 'var(--bcv-orange)', width: 1.9 }),
+        U.text('bcv-graph__failtitle', 'GeoGebra could not load'),
+        U.text('bcv-graph__failtext bcv-pretty', 'Check your connection, or open geogebra.org in a new tab instead.'),
+        h('a', { class: 'bcv-btn bcv-btn--primary', href: GEOGEBRA, target: '_blank', rel: 'noopener', text: 'Open geogebra.org' }),
+      ])));
+    };
+    const frame = h('iframe', { class: 'bcv-graph__frame', src: GEOGEBRA, title: 'GeoGebra calculator', allow: 'fullscreen; clipboard-write', referrerpolicy: 'no-referrer' });
+    body.append(frame, h('a', { class: 'bcv-graph__out', href: GEOGEBRA, target: '_blank', rel: 'noopener', text: 'Open in a new tab' }));
+    const onCsp = (e) => { if (/geogebra\.org/.test(e.blockedURI || '')) fail(); };
+    document.addEventListener('securitypolicyviolation', onCsp);
+    frame.addEventListener('error', fail);
+    frame.addEventListener('load', () => frame.classList.add('is-in'));
+    keepKeys(frame, () => p.ov, { untilPointer: true }); // (Escape closes it however late GeoGebra takes the keyboard)
+    U.onGone(p.ov, () => document.removeEventListener('securitypolicyviolation', onCsp));
     return p;
   }
 
