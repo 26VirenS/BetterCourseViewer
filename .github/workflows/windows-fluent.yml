@@ -510,10 +510,13 @@ jobs:
           Shot 'alta-start' '1366x778' 50 ($mock + @('--appearance', 'dark', '--open', 'alta:104:4004'))
           Shot 'macmillan' '1366x778' 50 ($mock + @('--appearance', 'light', '--open', 'macmillan:104:4005'))
           # Settings, as Windows 11's own Settings app, on each of its categories
-          foreach ($tab in @('general', 'appearance', 'notifications', 'grades', 'data', 'updates', 'about')) {
+          foreach ($tab in @('general', 'notifications', 'grades', 'data', 'updates', 'about')) {
             Shot "settings-$tab" '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', $tab))
           }
-          Shot 'settings-appearance-dark' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'settings', '--settings-tab', 'appearance'))
+          # (0.3.31) Appearance, from the account menu: the window darkened but the pane and the cards, their photo
+          # buttons, the bar at the foot — the themes in light, the courses' colours in dark
+          Shot 'appearance-mode' '1366x778' 45 ($mock + @('--appearance', 'light', '--theme', 'Ocean', '--appearance-mode', 'yes'))
+          Shot 'appearance-courses-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--appearance-mode', 'yes', '--appearance-tab', 'courses'))
           # (General's foot, below the fold: This PC's Uninstall Simpl, and the question it asks)
           Shot 'settings-general-end' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', 'general', '--settings-scroll', '4000'))
           Shot 'settings-uninstall' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'settings', '--settings-tab', 'general', '--settings-scroll', '4000', '--settings-sheet', 'uninstall'))
@@ -631,12 +634,10 @@ jobs:
           Shot 'tour-report' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'tour:6'))
           Shot 'place-window' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'course:101', '--place-window', 'section:courses/101:grades'))
           # the sign-in card named for its school; the first run's setup (Set up later); Settings' Find a setting, its
-          # Custom colour, its Photos, its earlier versions
+          # earlier versions
           Shot 'sign-in-school' '1024x681' 14 ($login + @('--appearance', 'light', '--school-name', 'University of California, Merced'))
           Shot 'setup-first' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'setup', '--setup-first', 'yes'))
           Shot 'settings-find' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', 'general', '--settings-find', 'beta'))
-          Shot 'settings-custom-colour' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'settings', '--settings-tab', 'appearance', '--settings-sheet', 'customcolour'))
-          Shot 'settings-photos' '1024x681' 45 ($mock + @('--appearance', 'light', '--theme', 'Dusk', '--open', 'settings', '--settings-tab', 'appearance', '--settings-scroll', '4000'))
           Shot 'settings-updates-earlier' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', 'updates', '--settings-earlier', 'yes', '--settings-scroll', '4000'))
           # pins in the Alta and quiz popups' headers; files attached to a new message and to a reply; a rubric's
           # criterion open (the mark where it was given, Ring back, the stepper)
