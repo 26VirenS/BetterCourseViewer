@@ -147,7 +147,7 @@ private struct PTMiniView: View {
                     Text("\(e.number)").font(.system(size: 12, weight: .semibold).monospacedDigit())
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Text(e.symbol).font(.system(size: 34, weight: .bold)).minimumScaleFactor(0.5)
-                    Text(e.massText).font(.system(size: 10.5).monospacedDigit())
+                    Text(e.massText).font(.system(size: 10.5).monospacedDigit()).lineLimit(1).minimumScaleFactor(0.6)
                 }
                 .padding(8)
                 .frame(width: 84, height: 84)

@@ -132,7 +132,7 @@ struct PTElementPage: View {
                 Spacer(minLength: 0)
                 Text(e.symbol).font(.system(size: 46, weight: .bold)).frame(maxWidth: .infinity)
                 Spacer(minLength: 0)
-                Text(e.massText).font(.system(size: 12.5).monospacedDigit()).frame(maxWidth: .infinity)
+                Text(e.massText).font(.system(size: 12.5).monospacedDigit()).lineLimit(1).minimumScaleFactor(0.6).frame(maxWidth: .infinity)
             }
             .padding(12)
             .frame(width: 112, height: 112)

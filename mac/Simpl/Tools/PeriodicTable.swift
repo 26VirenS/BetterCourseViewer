@@ -24,12 +24,11 @@ struct PTElement: Identifiable, Hashable {
 
     var id: Int { number }
 
-    /// A whole number is the longest-lived isotope's mass, the convention for an element with no stable one; (1.3.110)
-    /// every other to five significant figures (1.0080, 55.845, 238.03).
+    /// (1.3.110) Its standard atomic weight as precisely as it is known (PeriodicTable.weights), every digit; a whole
+    /// number is the longest-lived isotope's mass, the convention for an element with no stable one.
     var massText: String {
-        guard mass != mass.rounded() else { return "[\(Int(mass))]" }
-        let whole = max(1, Int(floor(log10(mass))) + 1)
-        return String(format: "%.\(max(0, 5 - whole))f", mass)
+        if let w = PeriodicTable.weights[number] { return w }
+        return mass == mass.rounded() ? "[\(Int(mass))]" : PTElement.trim(mass)
     }
 
     var line: String { "\(name) · \(number) · \(massText)" }
@@ -92,14 +91,30 @@ enum PeriodicTable {
         func int(_ i: Int) -> Int? { (r[i] as? NSNumber)?.intValue }
         func str(_ i: Int) -> String? { r[i] as? String }
         guard let n = int(0), let symbol = str(1), let name = str(2), let x = int(15), let y = int(16) else { return nil }
-        return PTElement(number: n, symbol: symbol, name: name, mass: precise[n] ?? num(3) ?? 0, category: str(4) ?? "unknown", group: int(5),
+        return PTElement(number: n, symbol: symbol, name: name, mass: weights[n].flatMap(Double.init) ?? num(3) ?? 0, category: str(4) ?? "unknown", group: int(5),
                          period: int(6) ?? y, block: str(7) ?? "", phase: str(8) ?? "", config: str(9) ?? "", en: num(10),
                          melt: num(11), boil: num(12), density: num(13), found: str(14), x: x, y: y, summary: str(17) ?? "")
     }
 
-    /// (1.3.110) The standard atomic weights the data gives to fewer than five significant figures, to five.
-    private static let precise: [Int: Double] = [
-        1: 1.0080, 2: 4.0026, 3: 6.9410, 4: 9.0122, 5: 10.811, 10: 20.180, 11: 22.990, 16: 32.065, 17: 35.453, 66: 162.50,
+    /// (1.3.110) Each element's standard atomic weight, as precisely as it is known, written as it is published (its
+    /// trailing zeros are digits it is known to): the CIAAW's single value where the element's isotopes vary too little
+    /// for a range (Na 22.98976928); where they vary (H, C, O …), the most precise single value published for it (C
+    /// 12.0107). Kept as words, so 24.3050 keeps its last 0. None for an element with no stable isotope.
+    static let weights: [Int: String] = [
+        1: "1.00794", 2: "4.002602", 3: "6.941", 4: "9.0121831", 5: "10.811", 6: "12.0107",
+        7: "14.0067", 8: "15.9994", 9: "18.998403163", 10: "20.1797", 11: "22.98976928", 12: "24.3050",
+        13: "26.9815384", 14: "28.0855", 15: "30.973761998", 16: "32.065", 17: "35.453", 18: "39.948",
+        19: "39.0983", 20: "40.078", 21: "44.955907", 22: "47.867", 23: "50.9415", 24: "51.9961",
+        25: "54.938043", 26: "55.845", 27: "58.933194", 28: "58.6934", 29: "63.546", 30: "65.38",
+        31: "69.723", 32: "72.630", 33: "74.921595", 34: "78.971", 35: "79.904", 36: "83.798",
+        37: "85.4678", 38: "87.62", 39: "88.905838", 40: "91.224", 41: "92.90637", 42: "95.95",
+        44: "101.07", 45: "102.90549", 46: "106.42", 47: "107.8682", 48: "112.414", 49: "114.818",
+        50: "118.710", 51: "121.760", 52: "127.60", 53: "126.90447", 54: "131.293", 55: "132.90545196",
+        56: "137.327", 57: "138.90547", 58: "140.116", 59: "140.90766", 60: "144.242", 62: "150.36",
+        63: "151.964", 64: "157.25", 65: "158.925354", 66: "162.500", 67: "164.930329", 68: "167.259",
+        69: "168.934219", 70: "173.045", 71: "174.9668", 72: "178.486", 73: "180.94788", 74: "183.84",
+        75: "186.207", 76: "190.23", 77: "192.217", 78: "195.084", 79: "196.966570", 80: "200.592",
+        81: "204.38", 82: "207.2", 83: "208.98040", 90: "232.0377", 91: "231.03588", 92: "238.02891",
     ]
 
     /// (1.3.65) by number, looked up rather than searched for
