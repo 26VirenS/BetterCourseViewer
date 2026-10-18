@@ -101,6 +101,11 @@
           h('div', {}, [U.text('bcv-ccard__code bcv-ccard__code--term', c.name), U.text('bcv-ccard__section bcv-ccard__section--125', [c.teachers?.[0], c.code && c.code !== c.name ? c.code : null].filter(Boolean).join(' · ') || `Enrolled as ${c.role}`)]),
           progress,
           U.el('bcv-ccard__foot bcv-ccard__foot--term', [U.dot(next.color, 'bcv-dot--7'), U.text('bcv-ccard__next bcv-ellip', next.text, 'span')]),
+          // (2.99.46) the Mac's row of the course's places at the card's foot, each in the course's colour
+          U.el('bcv-ccard__links', [['Grades', IC.chart, 'grades'], ['Work', IC.doc, 'assignments'], ['Modules', IC.modules, 'modules'], ['Files', IC.folder, 'files'], ['News', IC.bell, 'announcements']].map(([label, icon, path]) => h('button', {
+            type: 'button', class: 'bcv-ccard__link', title: `${label} · ${c.name}`, style: { color: c.palette?.text || c.color },
+            onclick: (e) => { e.stopPropagation(); app.go(`${c.url}/${path}`); },
+          }, [U.svg(icon, { size: 17, stroke: 'currentColor', width: 1.8 }), h('span', { text: label })]))),
         ]),
       ]);
       store.progress(c.id).then(({ done, total }) => {

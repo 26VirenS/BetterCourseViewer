@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.45"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.46"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -1191,6 +1191,10 @@ html[data-bcv-theme="dark"] .bcv-mring__track { stroke: rgba(255,255,255,.1); }
 .bcv-dash__tools { display: flex; justify-content: flex-end; }
 /* (2.99.42) a course's section with one sidebar, as the Mac's: its name the title, the course's under it, the rest on Home */
 .bcv-course__of { margin: 4px 0 0 calc(var(--bcv-sq, 12px) + 12px); font: 400 14px/1.25 var(--bcv-font); color: var(--bcv-ink3); }
+/* (2.99.46) a course card's places, as the Mac's foot row: Grades, Work, Modules, Files, News */
+.bcv-ccard__links { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 10px -6px -4px; padding-top: 8px; border-top: var(--bcv-line, 1px) solid var(--bcv-sep); }
+.bcv-ccard__links .bcv-ccard__link, #bcv-app .bcv-ccard__links .bcv-ccard__link { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 2px; border: 0; background: transparent; border-radius: 10px; cursor: pointer; font: 500 11px/1.1 var(--bcv-font); }
+@media (hover: hover) and (pointer: fine) { .bcv-ccard__link:hover { background: var(--bcv-hover); } }
 .bcv-home__ann { margin-bottom: 22px; }
 .bcv-home__ann:empty { display: none; }
 .bcv-home__annhead { align-items: center; }

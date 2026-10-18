@@ -1091,6 +1091,9 @@ try {
   check(!(await coursesJson()).find((c) => String(c.id) === '101').original_name && (await page.$$('.bcv-row .bcv-iconbtn')).length > 0, 'Remove nickname restores the real name in Canvas; the non-favourite rows carry a pencil too');
   check((await page.$$eval('[data-term]', (els) => els.map((e) => e.dataset.term)))[0] === 'Fall 2026', 'the current term (most dashboard courses) is listed first');
   await shot(page, '04-courses');
+  // (2.99.46) each course card's foot holds the Mac's places: Grades, Work, Modules, Files, News
+  const cLinks = await page.evaluate(() => [...document.querySelectorAll('.bcv-ccard')].map((c) => [...c.querySelectorAll('.bcv-ccard__link')].map((b) => b.textContent.trim()).join('|')));
+  check(cLinks.length > 0 && cLinks.every((l) => l === 'Grades|Work|Modules|Files|News'), `each course card carries the Mac's row of places: ${cLinks[0]} (${cLinks.length} cards)`);
   const allRows = await texts('.bcv-body .bcv-row');
   check(!allRows.some((t) => /Course 303|HIST 017|BIO 002/.test(t)) && !(await page.$('[data-term="No term"]')), `All leaves out a course closed by its dates (Canvas sends only its id: no "Course 303" under "No term") and keeps past ones in Past: ${allRows.length} rows`);
   await page.click('.bcv-seg__btn[data-value="past"]');
