@@ -39,7 +39,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 #app { height: 100%; display: flex; flex-direction: column; }
 
 /* -- the conversation -- */
-.thread { flex: 1; overflow-y: auto; padding: 18px 18px 10px; display: flex; flex-direction: column; gap: 12px; scroll-behavior: smooth; }
+.thread { position: relative; flex: 1; overflow-y: auto; padding: 18px 18px 10px; display: flex; flex-direction: column; gap: 12px; scroll-behavior: smooth; }
 .hello { margin: auto; max-width: 560px; text-align: center; padding: 10px 6px 20px; }
 .hello-mark { width: 56px; height: 56px; margin: 0 auto 10px; border-radius: 16px; background: var(--accent); color: var(--accent-ink); font: 600 30px/56px Georgia, serif; }
 .hello h1 { font-size: 20px; margin: 0 0 4px; }
@@ -141,6 +141,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 :root[data-theme="dark"] .key:hover { filter: brightness(1.12); }
 .key:active { transform: scale(0.95); }
 .key .katex { font-size: 0.98em; }
+.key .word { font-size: 15px; font-weight: 500; }
+.key.wide .word { font-size: 13.5px; }
+.round svg { width: 20px; height: 20px; display: block; }
+/* (a short window: the keypad's keys lower, so an answer keeps its room) */
+@media (max-height: 760px) { .keys { gap: 5px; } .key { height: 36px; } .keypad { margin-top: 8px; } .ktabs { margin-bottom: 6px; } }
 
 /* -- the pin: a narrow conversation, the keypad folded away -- */
 :root[data-compact="1"] .thread { padding: 10px 10px 6px; }
