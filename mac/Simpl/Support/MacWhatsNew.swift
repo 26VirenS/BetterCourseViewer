@@ -11,6 +11,7 @@ enum MacWhatsNew {
     static let releases: [Release] = [
         Release(version: "1.3.109", date: "2026-10-18", notes: [
             ReleaseNote(kind: "new", title: "Developer Tools", body: "Logs, system use and stats, for those who know the way in."),
+            ReleaseNote(kind: "improved", title: "Critical Fixes Sooner", body: "Simpl looks for a critical update every minute."),
         ]),
         Release(version: "1.3.108", date: "2026-10-17", notes: [
             ReleaseNote(kind: "improved", title: "No Doubled Buttons", body: "A course's home shows only what its sidebar doesn't."),
