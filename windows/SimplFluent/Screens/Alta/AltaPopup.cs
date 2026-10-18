@@ -429,7 +429,7 @@ internal sealed class AltaPopupView
 
     /// <summary>(0.3.19) Alta's verdict on the question as the popup's own pill: a green one with a tick and "Correct",
     /// or a red one with a cross and "Incorrect" — the kit's tones, the tint behind, the colour itself for the word.</summary>
-    private static Border VerdictPill(bool right)
+    internal static Border VerdictPill(bool right)
     {
         var tint = K.Tone(right ? "good" : "bad");
         var fore = K.Darkened(tint);

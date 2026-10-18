@@ -1,3 +1,7 @@
+**What's new in 0.3.35** (beta)
+
+- **Macmillan Learning, polished** — the whole question sits on one panel; Macmillan's Solved bar is replaced by the same Correct or Incorrect pill Knewton Alta shows, and each answer's own Correct is easy to read in dark too; questions that put each prompt beside its answer are one readable column (the answers no longer run off the edge); a number's answer is a field-sized box and its ×10ʸ tools menu matches the app; the words use the app's font; Switch to new layout is gone.
+
 **What's new in 0.3.34** (beta)
 
 - **Macmillan Learning, laid on the window** — the question fills the popup's width (no more scroll bar along the foot), a two-column question keeps its diagram on the right (one column when the popup is narrow), the page sits on the popup's own ground with each part on a card, and it follows the app's light or dark look.

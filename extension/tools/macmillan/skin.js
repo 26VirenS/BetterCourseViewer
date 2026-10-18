@@ -54,15 +54,15 @@
 
   // ---- the assessment player ----
   // (Mac 1.3.116, Windows 0.3.34) Laid on the popup's glass, light or dark as the app is (window.__simplMacmillanDark, set
-  // before the page and told again by 'theme'): the page's grounds clear, each part a card of the glass, words and fields
+  // before the page and told again by 'theme'): the page's grounds clear, the question one panel of the glass (1.3.117), words and fields
   // in the app's ink, a picture on a white plate of its own in dark (drawn for white paper). And as wide as the popup:
   // Macmillan's question is a 960-px sheet, set 25 px in, beside the side panel's 300 px kept even with the panel put
   // away, so it ran under the edge (a scroll bar along the foot) and its right column — the diagram, in a two-column
   // question — was cut off. The sheet fills the width now; the two columns kept side by side, the picture on the right,
   // and one column when narrow.
   var SKIN =
-    'html.simpl-mm{--mm-ink:#1c1c1e;--mm-ink2:rgba(60,60,67,.62);--mm-card:rgba(255,255,255,.74);--mm-line:rgba(0,0,0,.07);--mm-field:rgba(255,255,255,.92);--mm-good:#1a6b30;--mm-good-bg:rgba(52,199,89,.16);--mm-bad:#c01d43;--mm-bad-bg:rgba(255,59,48,.13);color-scheme:light}' +
-    'html.simpl-mm.simpl-mm-dark{--mm-ink:#f2f2f7;--mm-ink2:rgba(235,235,245,.62);--mm-card:rgba(255,255,255,.075);--mm-line:rgba(255,255,255,.11);--mm-field:rgba(255,255,255,.09);--mm-good:#5ddb7d;--mm-good-bg:rgba(52,199,89,.2);--mm-bad:#ff8098;--mm-bad-bg:rgba(255,69,58,.2);color-scheme:dark}' +
+    'html.simpl-mm{--mm-ink:#1c1c1e;--mm-ink2:rgba(60,60,67,.62);--mm-card:rgba(255,255,255,.74);--mm-line:rgba(0,0,0,.07);--mm-field:rgba(255,255,255,.92);--mm-good:#1a6b30;--mm-good-bg:rgba(52,199,89,.16);--mm-bad:#c01d43;--mm-bad-bg:rgba(255,59,48,.13);--mm-good-line:rgba(52,199,89,.35);--mm-bad-line:rgba(255,59,48,.3);--mm-on:#fff;--mm-accent:#0a84ff;--mm-accent-ring:rgba(10,132,255,.25);--mm-field2:rgba(0,0,0,.04);--mm-pop:#fff;--mm-rim:rgba(255,255,255,.7);color-scheme:light}' +
+    'html.simpl-mm.simpl-mm-dark{--mm-ink:#f2f2f7;--mm-ink2:rgba(235,235,245,.62);--mm-card:rgba(255,255,255,.075);--mm-line:rgba(255,255,255,.11);--mm-field:rgba(255,255,255,.09);--mm-good:#5ddb7d;--mm-good-bg:rgba(52,199,89,.2);--mm-bad:#ff8098;--mm-bad-bg:rgba(255,69,58,.2);--mm-good-line:rgba(93,219,125,.45);--mm-bad-line:rgba(255,128,152,.4);--mm-on:#0b2a14;--mm-accent:#409cff;--mm-accent-ring:rgba(64,156,255,.3);--mm-field2:rgba(255,255,255,.08);--mm-pop:#2c2c2e;--mm-rim:rgba(255,255,255,.08);color-scheme:dark}' +
     'html.simpl-mm,html.simpl-mm body{background:transparent!important;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif!important}' +
     'html.simpl-mm [data-simpl-hide],html.simpl-mm #check-bar,html.simpl-mm #attempts-holder,html.simpl-mm #toggle-fullscreen,html.simpl-mm .nav-scroll-arrow-button,' +
     'html.simpl-mm [aria-label="Scroll to Bottom"],html.simpl-mm [aria-label="Scroll to Top"],html.simpl-mm [id^="_pendo"],html.simpl-mm [class*="_pendo"]{display:none!important}' +
@@ -71,20 +71,26 @@
     'html.simpl-mm #main{width:auto!important;flex:1 1 auto!important;min-width:0!important;overflow:hidden!important}' +
     'html.simpl-mm .raptor-container{padding:18px 26px 0!important;box-sizing:border-box!important;min-width:0!important;margin:0!important}' +
     'html.simpl-mm #raptor-content-container{overflow-x:hidden!important;overflow-y:auto!important;width:auto!important;padding-bottom:90px!important;box-sizing:border-box!important}' +
-    'html.simpl-mm #raptor-content-container .content-area{position:relative!important;left:auto!important;right:auto!important;top:auto!important;width:auto!important;max-width:1180px!important;height:auto!important;margin:0 auto!important;overflow:visible!important}' +
+    'html.simpl-mm #raptor-content-container .content-area{position:relative!important;left:auto!important;right:auto!important;top:auto!important;width:auto!important;max-width:780px!important;height:auto!important;margin:0 auto!important;overflow:visible!important}' +
+    'html.simpl-mm #raptor-content-container .content-area:has(.two_col_single_right){max-width:1080px!important}' +
     'html.simpl-mm .authoring-area{width:auto!important;height:auto!important;overflow:visible!important;margin:0!important;padding:0!important}' +
     'html.simpl-mm .parent-module-container{min-height:0!important;height:auto!important;padding:0!important;display:flow-root!important}' +
     'html.simpl-mm [copyrightmessagestyle]{position:static!important;transform:none!important;left:auto!important;top:auto!important}' +
-    'html.simpl-mm [data-test-id="copyright-box"]{font-size:11px!important;color:var(--mm-ink2)!important;margin:0 0 8px 4px!important}' +
-    // the parts, cards of the glass
-    'html.simpl-mm article.module-container{background:var(--mm-card)!important;border-radius:16px!important;padding:16px 20px!important;margin:0 0 12px!important;min-height:0!important;box-sizing:border-box!important;box-shadow:0 1px 2px rgba(0,0,0,.05),0 0 0 1px var(--mm-line)!important;line-height:1.5;color:var(--mm-ink)!important;-webkit-backdrop-filter:blur(20px) saturate(160%);backdrop-filter:blur(20px) saturate(160%)}' +
+    'html.simpl-mm [data-test-id="copyright-box"]{font-size:11px!important;color:var(--mm-ink2)!important;margin:0 0 6px!important}' +
+    // (Mac 1.3.117) the whole question one panel of the glass (its parts in it, not each a card of its own)
+    'html.simpl-mm .parent-module-container{background:var(--mm-card)!important;border-radius:22px!important;padding:20px 24px 12px!important;box-sizing:border-box!important;box-shadow:0 1px 3px rgba(0,0,0,.06),0 8px 28px rgba(0,0,0,.06),0 0 0 1px var(--mm-line),inset 0 1px 0 var(--mm-rim)!important;-webkit-backdrop-filter:blur(24px) saturate(170%);backdrop-filter:blur(24px) saturate(170%)}' +
+    'html.simpl-mm article.module-container{background:transparent!important;border-radius:0!important;padding:6px 0!important;margin:0 0 10px!important;min-height:0!important;box-sizing:border-box!important;box-shadow:none!important;line-height:1.5;color:var(--mm-ink)!important}' +
+    'html.simpl-mm .two_col_single_right .module-container:nth-of-type(2){padding-left:12px!important}' +
+    'html.simpl-mm article.module-container .raw-html p{margin:0 0 10px!important}html.simpl-mm article.module-container .raw-html p:last-child{margin-bottom:0!important}' +
     'html.simpl-mm article.module-container>.sl-module{padding-bottom:0!important;overflow:visible!important;max-width:100%!important}' +
     // two columns (Macmillan's "single right"): the first part and all after it down the left, the second (the picture) up the right
     'html.simpl-mm .two_col_single_right .module-container{display:block!important;width:calc(50% - 6px)!important;float:none!important}' +
     'html.simpl-mm .two_col_single_right .module-container:nth-of-type(1){float:left!important}' +
     'html.simpl-mm .two_col_single_right .module-container:nth-of-type(2){float:right!important}' +
     'html.simpl-mm .two_col_single_right .module-container:nth-of-type(n+3){clear:left!important}' +
-    'html.simpl-mm :is(.two_col_one_top,.one_col_two_col_alternate,.two_col_all) .module-container{box-sizing:border-box!important}' +
+    // (Mac 1.3.117) Macmillan's other two-column layouts (each prompt beside its answer) one column: the prompt, then its
+    // answer under it — side by side the answers ran off the edge
+    'html.simpl-mm :is(.two_col_one_top,.one_col_two_col_alternate,.two_col_all) .module-container{display:block!important;width:auto!important;float:none!important}' +
     '@media (max-width:640px){html.simpl-mm .authoring-area .module-container{width:auto!important;float:none!important;display:block!important;clear:both!important}}' +
     'html.simpl-mm .raw-html img,html.simpl-mm article.module-container img{max-width:100%!important;height:auto!important;border-radius:10px}' +
     'html.simpl-mm.simpl-mm-dark article.module-container :is(.raw-html,figure) img{background:#fff!important;padding:6px!important;box-sizing:border-box!important}' +
@@ -92,13 +98,32 @@
     'html.simpl-mm.simpl-mm-dark #raptor-content-container :is(p,span,div,label,li,td,th,h1,h2,h3,h4,h5,h6,b,i,em,strong,sup,sub,a,mjx-container,legend,caption,figcaption){color:var(--mm-ink)!important}' +
     'html.simpl-mm.simpl-mm-dark #raptor-content-container :is(table,td,th){border-color:var(--mm-line)!important}' +
     'html.simpl-mm.simpl-mm-dark #raptor-content-container th{background:rgba(255,255,255,.06)!important}' +
-    'html.simpl-mm input[type=text],html.simpl-mm input:not([type]),html.simpl-mm .numeric-entry-input,html.simpl-mm textarea,html.simpl-mm select{border-radius:8px!important;background:var(--mm-field)!important;color:var(--mm-ink)!important;border:1px solid var(--mm-line)!important}' +
-    'html.simpl-mm.simpl-mm-dark .numeric-entry-border{background:transparent!important;border-color:var(--mm-line)!important}' +
-    // Macmillan's Solved / Try Again along the foot, a glass bar of its own
-    'html.simpl-mm #results{left:26px!important;right:26px!important;width:auto!important;bottom:14px!important;height:44px!important;min-height:44px!important;border:0!important;border-radius:14px!important;padding:0 18px!important;box-shadow:0 0 0 1px var(--mm-line),0 4px 16px rgba(0,0,0,.08)!important;font-weight:600!important;color:var(--mm-ink)!important;background:var(--mm-card)!important;-webkit-backdrop-filter:blur(20px) saturate(160%);backdrop-filter:blur(20px) saturate(160%)}' +
-    'html.simpl-mm #results.correct{background:var(--mm-good-bg)!important;color:var(--mm-good)!important}' +
-    'html.simpl-mm #results.incorrect{background:var(--mm-bad-bg)!important;color:var(--mm-bad)!important}' +
-    'html.simpl-mm #results *{color:inherit!important}html.simpl-mm #results svg{fill:currentColor!important}';
+    'html.simpl-mm input[type=text]:not(.numeric-entry-input):not(.numeric-entry-sci-not-coeff),html.simpl-mm input:not([type]):not(.numeric-entry-input):not(.numeric-entry-sci-not-coeff),html.simpl-mm textarea,html.simpl-mm select{border-radius:8px!important;background:var(--mm-field)!important;color:var(--mm-ink)!important;border:1px solid var(--mm-line)!important}' +
+    // (Mac 1.3.117) a number's answer, one field sized as a field (it stretched across the page): its frame the field, the
+    // box inside it clear; ×10 and the power in the app's ink
+    'html.simpl-mm .numeric-entry-table{width:auto!important;max-width:100%!important}' +
+    'html.simpl-mm .numeric-entry-table .graded-equations-td.not-considered-in-grading-module-frame{width:auto!important}' +
+    'html.simpl-mm .numeric-entry-border{width:15em!important;max-width:100%!important;box-sizing:border-box!important;background:var(--mm-field)!important;border:1px solid var(--mm-line)!important;border-radius:10px!important;box-shadow:0 1px 2px rgba(0,0,0,.06)!important}' +
+    'html.simpl-mm .numeric-entry-border.focused{border-color:var(--mm-accent)!important;box-shadow:0 0 0 3px var(--mm-accent-ring)!important}' +
+    'html.simpl-mm .numeric-entry-border.invalid{border-color:var(--mm-bad)!important;background:var(--mm-bad-bg)!important}' +
+    'html.simpl-mm .numeric-entry-border.disabled{opacity:.85}' +
+    'html.simpl-mm .numeric-entry-border :is(.numeric-entry-input,.numeric-entry-sci-not-coeff){background:transparent!important;border:0!important;box-shadow:none!important;color:var(--mm-ink)!important;outline:none!important}' +
+    'html.simpl-mm .numeric-entry-border .numeric-entry-input-exponent{background:var(--mm-field2)!important;border:1px solid var(--mm-line)!important;border-radius:6px!important;color:var(--mm-ink)!important}' +
+    'html.simpl-mm .numeric-entry-times10{color:var(--mm-ink)!important}' +
+    // Macmillan's tools menu for a number (×10ʸ), a popover of the app's: in dark it was a white box with light words
+    'html.simpl-mm .numeric-entry-toolmenu{background:var(--mm-pop)!important;border:1px solid var(--mm-line)!important;border-radius:12px!important;padding:6px!important;box-shadow:0 8px 24px rgba(0,0,0,.18)!important;font-family:inherit!important;width:180px!important}' +
+    'html.simpl-mm .numeric-entry-toolmenu>span{background:transparent!important;color:var(--mm-ink2)!important;font-size:11px!important;font-weight:600!important;letter-spacing:.04em;height:auto!important;padding:2px 6px 4px!important}' +
+    'html.simpl-mm .numeric-entry-toolmenu>button{background:var(--mm-field2)!important;color:var(--mm-ink)!important;border:1px solid var(--mm-line)!important;border-radius:8px!important;margin-top:2px!important;text-transform:none!important}' +
+    'html.simpl-mm .numeric-entry-toolmenu>button *{color:inherit!important}' +
+    // (Mac 1.3.117, Windows 0.3.35) Macmillan's Solved / Try Again along the foot put away: its verdict is the app's own
+    // Correct or Incorrect pill in the bar, as Alta's is
+    'html.simpl-mm #results{display:none!important}' +
+    // (Mac 1.3.117) each answer's own Correct or Incorrect, a pill that reads in light and dark (Alta's: tick or cross,
+    // the tone's ink on its tint) — in dark it was white words on Macmillan's pale green
+    'html.simpl-mm #raptor-content-container div.grading-status.grading-status{display:inline-flex!important;align-items:center;gap:5px;margin-top:6px!important;padding:3px 11px 3px 8px!important;border-radius:999px!important;font:600 13px/20px -apple-system,BlinkMacSystemFont,"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif!important;background:var(--mm-good-bg)!important;color:var(--mm-good)!important;box-shadow:inset 0 0 0 1px var(--mm-good-line)!important}' +
+    'html.simpl-mm #raptor-content-container div.grading-status.grading-status::before{content:"\\2713";display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;background:var(--mm-good)!important;color:var(--mm-on)!important;font-size:10px;font-weight:800}' +
+    'html.simpl-mm #raptor-content-container :is(.module-graded-incorrect,.module-graded-missed) div.grading-status.grading-status{background:var(--mm-bad-bg)!important;color:var(--mm-bad)!important;box-shadow:inset 0 0 0 1px var(--mm-bad-line)!important}' +
+    'html.simpl-mm #raptor-content-container :is(.module-graded-incorrect,.module-graded-missed) div.grading-status.grading-status::before{content:"\\2715";background:var(--mm-bad)!important}';
   var dark = !!window.__simplMacmillanDark;
 
   function mark() {
@@ -166,6 +191,9 @@
     var main = tid('btn-sac-main');
     var att = tid('attempts-dropdown-button');
     var choices = qa('[data-test-id="attempts"] button').map(function (b) { return words(b); }).filter(Boolean);
+    // (Mac 1.3.117) Macmillan's verdict on the question, from its bar along the foot: right, wrong, or none yet
+    var bar = q('footer#results');
+    var verdict = !bar ? '' : bar.classList.contains('correct') ? 'right' : bar.classList.contains('incorrect') ? 'wrong' : '';
     var results = qa('[data-test-id^="result-frame-"]').map(function (r) { return r.getAttribute('aria-label') || ''; }).filter(Boolean);
     return {
       kind: 'state', page: 'question', dark: dark, title: title, index: Number(m[1] || 0) - 1, count: Number(m[2] || items.length),
@@ -173,7 +201,7 @@
       score: sm ? [Number(sm[1]), Number(sm[2])] : null, policies: policies(), items: items,
       main: main ? (main.getAttribute('aria-label') || words(main)) : null, mainOn: !!(main && !main.disabled),
       tools: { resources: !!q('[aria-label="Open Resources"]'), tutor: !!q('[aria-label="Open AI Tutor"]'), solution: !!q('[aria-label="Open Solution"]'), layout: !!tid('switch-to-new-layout') },
-      attempts: att ? { label: words(att), choices: choices } : null, results: results,
+      attempts: att ? { label: words(att), choices: choices } : null, results: results, verdict: verdict,
       first: !!(tid('nav-item-back') && tid('nav-item-back').disabled), last: !!(tid('nav-item-forward') && tid('nav-item-forward').disabled),
     };
   }

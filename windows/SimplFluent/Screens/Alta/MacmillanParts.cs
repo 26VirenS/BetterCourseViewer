@@ -52,6 +52,8 @@ internal sealed class MacmillanState
     public string Page { get; set; } = "";
     /// <summary>(0.3.34) Whether the skin draws the page dark (the app's look, told by 'theme').</summary>
     public bool Dark { get; set; }
+    /// <summary>(0.3.35) Macmillan's verdict on the question shown: "right", "wrong", or none yet.</summary>
+    public string? Verdict { get; set; }
     public CoverInfo? Cover { get; set; }
     public string? Title { get; set; }
     public int? Index { get; set; }
@@ -158,24 +160,14 @@ internal static class MacmillanParts
             left.Children.Add(seg.Margin(12, 0, 0, 0));
         }
         var right = K.H(8);
+        // (0.3.35) Macmillan's verdict on the question as Alta's is: the popup's own Correct or Incorrect pill, at the left of
+        // the buttons (Macmillan's Solved bar along the page's foot put away)
+        if (s.Verdict is { Length: > 0 } v) right.Children.Add(AltaPopupView.VerdictPill(v == "right"));
         if (s.Tools is { } t)
         {
             if (t.Resources) right.Children.Add(K.Button("Resources", () => act("resources", null), icon: SymbolRegular.Book24));
             if (t.Tutor) right.Children.Add(K.Button("AI Tutor", () => act("tutor", null), icon: SymbolRegular.Sparkle24));
             if (t.Solution) right.Children.Add(K.Button("Solution", () => act("solution", null), icon: SymbolRegular.Lightbulb24));
-            if (t.Layout)
-            {
-                Button? more = null;
-                more = K.IconButton(SymbolRegular.MoreHorizontal24, () =>
-                {
-                    var menu = new ContextMenu { PlacementTarget = more, Placement = PlacementMode.Top };
-                    var mi = new System.Windows.Controls.MenuItem { Header = "Switch to new layout" };
-                    mi.Click += (_, _) => act("layout", null);
-                    menu.Items.Add(mi);
-                    menu.IsOpen = true;
-                }, "More of Macmillan’s");
-                right.Children.Add(more);
-            }
         }
         if (s.Main is { Length: > 0 } main)
         {
