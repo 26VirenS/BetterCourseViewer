@@ -2,20 +2,16 @@ import AppKit
 import SwiftUI
 import WebKit
 
-// (1.3.111) The Calculator, as Mathway's: a problem typed (or built on the keypad) and sent; the ways it can be worked
-// offered; the one picked worked out — its answer exact and as a decimal, its steps, its graph. The page and its maths
-// are the extension's (extension/tools/solver: the solver itself, its keypad, KaTeX to write the maths), shown in a
-// web view with the app's look — light or dark, its accent — and the pin's own narrow version, which carries what was
-// typed in it to the whole calculator.
+// (1.3.112) The Calculator is GeoGebra's: its Calculator Suite (graphing, geometry, 3D, CAS, probability, the
+// scientific calculator) in the tool, its scientific calculator in the pin. The page is the extension's
+// (extension/tools/geogebra), which loads GeoGebra from geogebra.org into a web view — so it needs the internet, and
+// says so with Try again without it.
 
-/// The solver's page in a web view: `compact` the pin's; `problem` worked as it opens (a pin's carried over, the
-/// screenshot suite's).
-struct SolverWeb: NSViewRepresentable {
+/// GeoGebra's page in a web view: `compact` the pin's (the scientific calculator); `problem` a command GeoGebra runs as
+/// it opens (the screenshot suite's).
+struct GeoGebraWeb: NSViewRepresentable {
     var compact = false
     var problem: String?
-    var option: String?
-    var onText: (String) -> Void = { _ in }
-    var openFull: (String, String?) -> Void = { _, _ in }
     @Environment(\.colorScheme) private var scheme
     @ObservedObject private var look = AppearanceStore.shared
 
@@ -55,11 +51,10 @@ struct SolverWeb: NSViewRepresentable {
     /// every WebKit).
     private func load(_ w: WKWebView) {
         guard let dir = Bundle.main.url(forResource: "extension", withExtension: nil) else { return }
-        let page = dir.appendingPathComponent("tools/solver/index.html")
+        let page = dir.appendingPathComponent("tools/geogebra/index.html")
         var items = [URLQueryItem(name: "theme", value: dark ? "dark" : "light"), URLQueryItem(name: "accent", value: accent), URLQueryItem(name: "os", value: "mac"), URLQueryItem(name: "clear", value: "1")]
         if compact { items.append(URLQueryItem(name: "compact", value: "1")) }
         if let p = problem, !p.isEmpty { items.append(URLQueryItem(name: "q", value: p)) }
-        if let o = option, !o.isEmpty { items.append(URLQueryItem(name: "option", value: o)) }
         var c = URLComponents()
         c.queryItems = items
         let url = URL(string: page.absoluteString + "#" + (c.percentEncodedQuery ?? "")) ?? page
@@ -67,25 +62,22 @@ struct SolverWeb: NSViewRepresentable {
     }
 
     final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
-        var parent: SolverWeb
+        var parent: GeoGebraWeb
         var look = ""
-        init(_ p: SolverWeb) { parent = p }
+        init(_ p: GeoGebraWeb) { parent = p }
 
         func userContentController(_ u: WKUserContentController, didReceive m: WKScriptMessage) {
             guard let body = m.body as? [String: Any], let kind = body["kind"] as? String else { return }
-            let text = body["text"] as? String ?? ""
             switch kind {
-            case "text": parent.onText(text)
-            case "openFull": parent.openFull(text, body["option"] as? String)
-            case "copy": copyToPasteboard(text)
-            case "ready": if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] calculator: the solver is ready") }
+            case "ready": NSLog("[Simpl] calculator: GeoGebra is ready")
+            case "offline": NSLog("[Simpl] calculator: GeoGebra could not be loaded")
             default: break
             }
         }
 
-        /// A link in an answer (none yet) opens in the browser, never in the calculator.
+        /// A link GeoGebra shows (its help, its sign-in) opens in the browser, never in the calculator.
         func webView(_ w: WKWebView, decidePolicyFor a: WKNavigationAction, decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
-            if a.navigationType == .linkActivated, let u = a.request.url, u.scheme?.hasPrefix("http") == true {
+            if a.navigationType == .linkActivated, a.targetFrame?.isMainFrame != false, let u = a.request.url, u.scheme?.hasPrefix("http") == true {
                 NSWorkspace.shared.open(u)
                 decisionHandler(.cancel)
                 return
@@ -102,31 +94,23 @@ struct SolverWeb: NSViewRepresentable {
     }
 }
 
-/// Calculator: the solver, the whole page.
+/// Calculator: GeoGebra's Calculator Suite, the whole page.
 struct CalculatorTool: View {
-    // (the pin's problem carried over, else the screenshot suite's: -SimplSolver "x^2 - x - 1 = 0" -SimplSolverOption solve:x)
-    @State private var problem: String? = ToolsCenter.shared.takeInfo("problem") ?? UserDefaults.standard.string(forKey: "SimplSolver")
-    @State private var option: String? = ToolsCenter.shared.takeInfo("option") ?? UserDefaults.standard.string(forKey: "SimplSolverOption")
+    // (the screenshot suite's: -SimplSolver "f(x) = x^2 - 2x - 3", a command GeoGebra runs as it opens)
+    @State private var problem: String? = UserDefaults.standard.string(forKey: "SimplSolver")
 
     var body: some View {
-        SolverWeb(problem: problem, option: option)
+        GeoGebraWeb(problem: problem)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
-/// The calculator's pin, opened: the solver narrow, its keypad folded away; what is typed carried to the whole one by
-/// Open Full Screen — (1.3.111) and by the page's own Open full screen and Show steps.
+/// The calculator's pin, opened: GeoGebra's scientific calculator; the whole suite one Open Full Screen away.
 struct CalculatorCompact: View {
     var openFull: ([String: String]) -> Void = { _ in }
-    @State private var typed = ""
 
     var body: some View {
-        SolverWeb(compact: true, onText: { typed = $0 }, openFull: { text, option in
-            var info = ["problem": text]
-            if let option { info["option"] = option }
-            openFull(info)
-        })
-        .frame(height: 460)
-        .quickCarry(typed.isEmpty ? [:] : ["problem": typed])
+        GeoGebraWeb(compact: true)
+            .frame(height: 460)
     }
 }

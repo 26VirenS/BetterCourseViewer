@@ -486,10 +486,8 @@ ui_review() {
   MODE=light SIZE=1440x1200 shoot light-55n-ptable-element-compare 16 -SimplPlace tools -SimplTool ptable -SimplPTElement 26
   MODE=light shoot light-56-tool-cite 12 -SimplPlace tools -SimplTool cite
   MODE=light shoot light-57-tool-units 12 -SimplPlace tools -SimplTool units
-  # (1.3.111) the Calculator, the solver: a quadratic worked (its options, Solve for x picked), and a derivative in dark;
-  # its pin narrow with a problem typed
-  MODE=light SIZE=1280x900 shoot light-57b-tool-solver 16 -SimplPlace tools -SimplTool calc -SimplSolver "x^2 - x - 1 = 0" -SimplSolverOption solve:x
-  MODE=dark SIZE=1280x900 shoot dark-57c-tool-solver-derivative 16 -SimplPlace tools -SimplTool calc -SimplSolver "d/dx x^2 sin(x)"
+  # (1.3.112) the Calculator, GeoGebra's: its suite with a function graphed, and its pin's scientific calculator
+  MODE=light SIZE=1280x900 shoot light-57b-tool-geogebra 20 -SimplPlace tools -SimplTool calc -SimplSolver "f(x) = x^2 - 2x - 3"
   MODE=light shoot light-54f-pin-calc 14 -SimplPinnedTools calc -SimplPinOpen calc
   MODE=light shoot light-54e-pin-need 14 -SimplPinnedTools need -SimplPinOpen need
   # (a two-page reading, for the annotator and Merge & Split: one PDF opens Split)

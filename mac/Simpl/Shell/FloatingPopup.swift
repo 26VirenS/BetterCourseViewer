@@ -878,10 +878,14 @@ enum PopupSizes {
 
     private static let defaultsKey = "SimplPopupSizes"
 
+    /// (1.3.112) The size a tool opens at before its student sizes it, where filling the room would only stretch it: the
+    /// Calculator (GeoGebra's) narrower than the window.
+    private static let opening: [String: Chosen] = ["tool.calc": Chosen(width: 900, height: 860)]
+
     /// The size kept under `key` (nothing chosen: none).
     static func chosen(_ key: String) -> Chosen {
         if let seed = UserDefaults.standard.string(forKey: "SimplPopupSize"), let c = seeded(seed, key) { return c }
-        guard let v = UserDefaults.standard.dictionary(forKey: defaultsKey)?[key] as? [Double], v.count == 2 else { return Chosen() }
+        guard let v = UserDefaults.standard.dictionary(forKey: defaultsKey)?[key] as? [Double], v.count == 2 else { return opening[key] ?? Chosen() }
         return Chosen(width: v[0] > 0 ? CGFloat(v[0]) : nil, height: v[1] > 0 ? CGFloat(v[1]) : nil)
     }
 
