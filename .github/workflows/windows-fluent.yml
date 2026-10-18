@@ -417,8 +417,10 @@ jobs:
           # (0.3.1: CHEM's Macmillan assignments, titled by their week, its module item and its tab — one tool, Macmillan Learning)
           Shot 'external-tools-list-macmillan' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'externaltools', '--tool-list', 'macmillan'))
           Shot 'tools' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--pin', 'calc,ptable,pomo'))
-          Shot 'tools-pin' '1366x778' 45 ($mock + @('--appearance', 'dark', '--pin', 'calc,ptable,pomo', '--pin-open', 'calc', '--calc-expr', '2^10'))
-          Shot 'tool-open' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'calc', '--calc-expr', 'sin(30)+sqrt(16)='))
+          Shot 'tools-pin' '1366x778' 45 ($mock + @('--appearance', 'dark', '--pin', 'calc,ptable,pomo', '--pin-open', 'calc', '--calc-expr', 'factor x^2-5x+6'))
+          # (0.3.29) the Calculator is the solver: a quadratic, Solve for x picked; a derivative in dark
+          Shot 'tool-open' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'calc', '--solver', 'x^2 - x - 1 = 0', '--solver-option', 'solve:x'))
+          Shot 'tool-solver-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'calc', '--solver', 'd/dx x^2 sin(x)'))
           Shot 'tool-timer' '1366x778' 45 ($mock + @('--appearance', 'dark', '--focus-start', '--place', 'tools', '--tool', 'pomo'))
           Shot 'tools-live' '1024x681' 45 ($mock + @('--appearance', 'light', '--focus-start', '--place', 'tools'))
           Shot 'pin-timer' '1366x778' 45 ($mock + @('--appearance', 'light', '--focus-start', '--pin', 'pomo,calc', '--pin-open', 'pomo'))
