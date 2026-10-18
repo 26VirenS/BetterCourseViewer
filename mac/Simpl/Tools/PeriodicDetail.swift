@@ -136,8 +136,8 @@ struct PTElementPage: View {
             }
             .padding(12)
             .frame(width: 112, height: 112)
-            .foregroundStyle(.white)
-            .background(e.kind.color.opacity(0.85), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .foregroundStyle(PTInk.on(e.kind.color))
+            .background(e.kind.color, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             VStack(alignment: .leading, spacing: 10) {
                 Text(e.name).font(.system(size: 44, weight: .bold)).tracking(-0.6)
                 HStack(spacing: 8) {
@@ -422,9 +422,9 @@ struct PTElementPage: View {
             HStack(spacing: 10) {
                 Text(x.symbol)
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(PTInk.on(x.kind.color))
                     .frame(width: 34, height: 34)
-                    .background(x.kind.color.opacity(0.85), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(x.kind.color, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 VStack(alignment: .leading, spacing: 1) {
                     Text(word).font(.sCaption2).foregroundStyle(.secondary)
                     Text(x.name).font(.sCallout.weight(.semibold))

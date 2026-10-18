@@ -162,8 +162,8 @@ struct AtomsOrbitalsTool: View {
                 }
                 .padding(8)
                 .frame(width: 64, height: 64)
-                .foregroundStyle(.white)
-                .background(e.kind.color.opacity(0.85), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .foregroundStyle(PTInk.on(e.kind.color))
+                .background(e.kind.color, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(e.name)
                         .font(.sTitle3)
@@ -171,7 +171,7 @@ struct AtomsOrbitalsTool: View {
                         .minimumScaleFactor(0.7)
                     Text("\(e.kind.label) · \(e.massText) u")
                         .font(.sCaption)
-                        .foregroundStyle(e.kind.color)
+                        .foregroundStyle(PTInk.text(e.kind.color))
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                 }
@@ -488,9 +488,9 @@ struct AtomsOrbitalsCompact: View {
                     HStack(spacing: 12) {
                         Text(e.symbol)
                             .font(.system(size: 17, weight: .bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(PTInk.on(e.kind.color))
                             .frame(width: 40, height: 40)
-                            .background(e.kind.color.opacity(0.85), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                            .background(e.kind.color, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                         VStack(alignment: .leading, spacing: 2) {
                             Text(e.name).font(.sHeadline)
                             Text("Shells \(e.shells.map(String.init).joined(separator: " · "))")

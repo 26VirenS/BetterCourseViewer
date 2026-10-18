@@ -253,7 +253,8 @@ private struct PTCell: View, Equatable {
         .padding(.horizontal, compact ? 0 : cell * 0.08)
         .padding(.vertical, compact ? 0 : cell * 0.05)
         .frame(width: cell, height: cell)
-        .foregroundStyle(solid ? Color.white : Color.primary)
+        // (1.3.110) ink that reads on the scale's colour: near-black on its yellows and pale greens
+        .foregroundStyle(solid ? PTInk.on(color) : Color.primary)
         .background(shape.fill(solid ? color.opacity(hover ? 1 : 0.88) : color.opacity(hover ? 0.42 : (matched ? 0.5 : 0.24))))
         .overlay(shape.strokeBorder(matched ? (solid ? Color.white : color) : Color.clear, lineWidth: 1.5))
         .opacity(dimmed ? 0.22 : 1)
@@ -291,7 +292,7 @@ private struct PTCornerCard: View {
             }
             .padding(cell * 0.12)
             .frame(width: cell * 2.4, height: cell * 2.4)
-            .foregroundStyle(.white)
+            .foregroundStyle(PTInk.on(color))
             .background(color, in: RoundedRectangle(cornerRadius: cell * 0.3, style: .continuous))
             VStack(alignment: .leading, spacing: cell * 0.06) {
                 // (never smaller than reads: the pin's table is small)
@@ -301,7 +302,7 @@ private struct PTCornerCard: View {
                     .minimumScaleFactor(0.5)
                 Text("\(element.kind.label) · \(element.massText) u")
                     .font(.system(size: max(11, cell * 0.26)))
-                    .foregroundStyle(element.kind.color)
+                    .foregroundStyle(PTInk.text(element.kind.color))
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 Text(PTConfig.pretty(element))
@@ -484,6 +485,8 @@ struct PeriodicTableTool: View {
     private func disappeared() {
         // (tools-3: the tool left mid-tour — the tour closed with it, and seen)
         if tourStep != nil { endTour() }
+        // (1.3.110) the mini element window goes with the table it came from
+        PTMini.shared.close()
         // (1.3.88) an empty search left open goes with the tool, so it opens closed next time — here, not as the
         // heading's controls go: the heading trading its one row for two (ViewThatFits) takes them away and back
         let search = PTSearch.shared
@@ -571,15 +574,22 @@ struct PeriodicTableTool: View {
             colourBar
             trendWrap {
                 PTGrid(shown: hovered, matches: matches, category: colouring == .category ? category : nil, colouring: colouring,
-                       pick: { e, rect in openElement(e, from: rect, in: size) },
+                       pick: { e, rect in pickElement(e, from: rect, in: size) },
                        hover: { e in hovered = e })
                 .tourTarget("ptGrid")
             }
             .frame(maxWidth: 1300)
-            Text("Point at an element to see it here; press it to open its page. Type a symbol, name or number and press Return to open it.")
+            Text("Point at an element to see it here; press it to see it in a small window, and its whole page from there. Type a symbol, name or number and press Return to open its page.")
                 .font(.sCallout)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    /// (1.3.110) An element pressed: in the mini element window (PeriodicMini.swift), its Full Page opening it here.
+    /// (The tour, under way: its step asks for the page itself, opened as before.)
+    private func pickElement(_ e: PTElement, from rect: CGRect, in size: CGSize) {
+        if tourStep != nil { openElement(e, from: rect, in: size); return }
+        PTMini.shared.show(e) { x in openElement(x, from: rect, in: size) }
     }
 
     private func openElement(_ e: PTElement, from rect: CGRect, in size: CGSize) {
@@ -681,7 +691,7 @@ struct PeriodicTableTool: View {
                     Rectangle().frame(height: 2)
                     if t.across > 0 { Image(systemName: "arrow.right").font(.system(size: 13, weight: .bold)) }
                 }
-                .foregroundStyle(Color.yellow)
+                .foregroundStyle(PTInk.text(.yellow))
                 .padding(.leading, 24)
                 grid()
                     .padding(.leading, 24)
@@ -698,7 +708,7 @@ struct PeriodicTableTool: View {
                             if t.up < 0 { Image(systemName: "arrow.down").font(.system(size: 13, weight: .bold)) }
                         }
                         .frame(width: 20)
-                        .foregroundStyle(Color.yellow)
+                        .foregroundStyle(PTInk.text(.yellow))
                     }
             }
             .transition(.opacity)
@@ -714,9 +724,12 @@ struct PeriodicTableTool: View {
             withAnimation(Motion.snappy) { category = on ? nil : c.key }
         } label: {
             HStack(spacing: 6) {
-                Circle().fill(on ? Color.white : c.color).frame(width: 9, height: 9)
+                Circle().fill(on ? PTInk.on(c.color) : c.color).frame(width: 9, height: 9)
                 Text(c.label).font(.sCaption.weight(.medium))
             }
+            // (1.3.110) the label in ink that reads: on the kind's colour when lit, the page's own ink when not — never
+            // the kind's own pale colour)
+            .foregroundStyle(on ? PTInk.on(c.color) : Color.primary)
         }
         .glassChip(c.color, on: on)
         .help(on ? "Show every kind" : "Light the \(c.label.lowercased()) elements")
@@ -757,7 +770,7 @@ struct PeriodicTableCompact: View {
                 Spacer(minLength: 0)
             }
             PTGrid(shown: over ?? (typed ? found.first : nil), matches: typed ? Set(found.map(\.number)) : nil, category: nil, compact: true,
-                   pick: { e, _ in openFull(["element": String(e.number)]) }, hover: { e in over = e })
+                   pick: { e, _ in PTMini.shared.show(e) { x in openFull(["element": String(x.number)]) } }, hover: { e in over = e })
         }
         .quickCarry(carried)
         // (the screenshot suite: -SimplPinElement 25 shows that element's card)
@@ -1112,9 +1125,9 @@ struct PTHeaderBar: View {
                     HStack(spacing: 10) {
                         Text(e.symbol)
                             .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(PTInk.on(e.kind.color))
                             .frame(width: 32, height: 32)
-                            .background(e.kind.color.opacity(0.85), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                            .background(e.kind.color, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
                         VStack(alignment: .leading, spacing: 1) {
                             Text(e.name).font(.sBody.weight(.semibold))
                             Text("\(e.number) · \(e.kind.label)").font(.sCaption).foregroundStyle(.secondary)
