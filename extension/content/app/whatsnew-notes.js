@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.44', date: '2026-10-18', notes: [
+      { kind: 'improved', title: 'Mac-style calendar', body: 'One ruled month, items by course bars, a missing count.', icon: P.layers },
+    ] },
     { version: '2.99.43', date: '2026-10-18', notes: [
       { kind: 'improved', title: 'To Do summary', body: 'A ring of what is done and what is overdue, as on the Mac.', icon: P.check },
     ] },

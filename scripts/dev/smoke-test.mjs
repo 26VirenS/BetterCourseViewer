@@ -1397,6 +1397,10 @@ try {
   await nav('calendar');
   await page.waitForSelector('.bcv-cal__grid', { timeout: 10000 });
   check((await page.$$('.bcv-cal__day')).length === 42 && (await page.$('.bcv-cal__day--today')), 'month grid with today highlighted');
+  // (2.99.44) the Mac's month: a ruled grid, items by a bar of their course's colour, "n items · m missing" under the month's name
+  await page.waitForFunction(() => /^\d+ items?( · \d+ missing)?$/.test(document.querySelector('.bcv-cal__sub')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
+  const macMonth = await page.evaluate(() => { const ev = document.querySelector('.bcv-cal--month .bcv-ev'); const day = document.querySelector('.bcv-cal--month .bcv-cal__day'); return { sub: document.querySelector('.bcv-cal__sub')?.textContent, bar: ev ? getComputedStyle(ev).borderLeftWidth : null, gap: getComputedStyle(document.querySelector('.bcv-cal--month .bcv-cal__grid')).rowGap, rule: day ? getComputedStyle(day).borderRightStyle : null, missing: [...document.querySelectorAll('.bcv-cal--month .bcv-ev.is-missing')].map((e) => e.textContent.trim()) }; });
+  check(/^\d+ items?( · \d+ missing)?$/.test(macMonth.sub || '') && macMonth.bar === '3px' && macMonth.gap === '0px' && macMonth.rule === 'solid' && macMonth.missing.includes('W2 HW'), `the month as the Mac draws it: ${JSON.stringify(macMonth)}`);
   await page.waitForSelector('.bcv-ev', { timeout: 10000 });
   const evs = await texts('.bcv-ev');
   check(evs.length >= 10 && evs.some((t) => /Dis01/.test(t)), `month view events: ${evs.length}`);

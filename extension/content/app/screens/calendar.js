@@ -29,6 +29,7 @@
     const wantCourse = ctx.route.params.get('include_contexts');
 
     const titleEl = h('h1', { class: 'bcv-h1' }); // (the same size as every other page's title)
+    const subEl = U.el('bcv-head__sub bcv-cal__sub', ''); // (2.99.44) the Mac's line under the month: "38 items · 1 missing"
     const segWrap = h('div');
     // the calendars (which courses' events show) live in a sheet off this button, counting the ones
     // on, so the month has the width of the page rather than a column beside it
@@ -47,7 +48,7 @@
     body.append(mainCol, sideCol);
     screen.append(
       U.el('bcv-head bcv-head--tight', U.el('bcv-head__in', U.el('bcv-head__row bcv-head__row--center', [
-        titleEl,
+        h('div', {}, [titleEl, subEl]),
         U.el('bcv-cal__nav', [
           U.iconbtn(IC.back, { size: 30, iconSize: 14, stroke: 'var(--bcv-blue)', width: 2.1, title: 'Previous', onClick: () => shift(-1) }),
           U.iconbtn(IC.chevron, { size: 30, iconSize: 14, stroke: 'var(--bcv-blue)', width: 2.1, title: 'Next', onClick: () => shift(1) }),
@@ -245,7 +246,7 @@
     /** What a row says after the course: the points an assignment is worth, where an event is. */
     const facts = (ev) => [ev.points !== null && ev.points !== undefined ? `${store.fmtPts(ev.points)} pts` : '', ev.location || ''].filter(Boolean);
     function chip(ev, small = true) {
-      return h('a', { class: 'bcv-ev', href: ev.url, style: { background: ev.tint, color: ev.color }, title: [ev.title, ev.contextName, ...facts(ev), ev.missing ? 'Missing' : ''].filter(Boolean).join(' · '), onclick: onEvent(ev) }, [
+      return h('a', { class: `bcv-ev ${ev.done ? 'is-done' : ''} ${ev.missing ? 'is-missing' : ''}`, href: ev.url, style: { background: ev.tint, color: ev.color, '--bcv-ev-bar': ev.color }, title: [ev.title, ev.contextName, ...facts(ev), ev.missing ? 'Missing' : ''].filter(Boolean).join(' · '), onclick: onEvent(ev) }, [
         U.svg(ev.icon, { size: 10, stroke: ev.color, width: 2.1, style: { flex: 'none' } }),
         h('span', { class: `bcv-ev__label ${ev.done ? 'bcv-strike' : ''}`, style: { color: ev.color }, text: ev.title }),
       ]);
@@ -266,7 +267,8 @@
           evs.length > 4 ? h('button', { type: 'button', class: 'bcv-cal__more', text: `+${evs.length - 4} more`, style: { border: '0', background: 'transparent', textAlign: 'left', cursor: 'pointer' }, onclick: () => { view = 'agenda'; range = { start: d, end: d, picking: false }; miniMonth = new Date(d.getFullYear(), d.getMonth(), 1); load(); } }) : null,
         ]));
       }
-      return U.el('bcv-cal', [
+      // (2.99.44) as the Mac lays the month out: one ruled grid, each item a line of text by a bar of its course's colour
+      return U.el('bcv-cal bcv-cal--month', [
         U.el('bcv-cal__dows', U.DAYS.map((d) => U.text('bcv-cal__dow', d))),
         U.el('bcv-cal__grid', cells),
       ]);
@@ -733,6 +735,11 @@
       const noticeEl = loading ? U.el('bcv-cal__notice bcv-cal__notice--hint', 'Loading events…')
         : !notice ? null : notice.kind === 'error' ? U.errorBox(notice.text) : U.el(`bcv-cal__notice bcv-cal__notice--${notice.kind}`, notice.text);
       mainCol.replaceChildren(...[noticeEl, view === 'week' ? weekGrid() : view === 'agenda' ? agendaList() : monthGrid()].filter(Boolean));
+      // (2.99.44) what the month holds and how much of it is missing, under its name, as the Mac says it
+      const inMonth = view === 'month' ? events.filter((ev) => ev.date.getMonth() === anchor.getMonth() && ev.date.getFullYear() === anchor.getFullYear()) : [];
+      const missingN = inMonth.filter((ev) => ev.missing).length;
+      subEl.textContent = view === 'month' && !loading ? `${U.plural(inMonth.length, 'item')}${missingN ? ` · ${missingN} missing` : ''}` : '';
+      subEl.hidden = !subEl.textContent;
       sideCol.hidden = view !== 'agenda';
       sideCol.replaceChildren(...[view === 'agenda' ? miniCalendar() : null].filter(Boolean));
       calCount.textContent = String(selected.length);
