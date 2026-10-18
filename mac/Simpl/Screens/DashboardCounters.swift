@@ -160,6 +160,8 @@ struct DashCounterTile: View {
     let action: () -> Void
     /// (1.3.1) Its photo's editor, from its context menu.
     @State private var editing = false
+    /// (1.3.113) Appearance on: its photo button over it, and a press on it opens nothing else.
+    @ObservedObject private var appearanceMode = AppearanceMode.shared
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -167,7 +169,7 @@ struct DashCounterTile: View {
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
-        Button(action: action) {
+        Button(action: { if !appearanceMode.on { action() } }) {
             VStack(alignment: .leading, spacing: 6) {
                 head
                 DashCount(value: value, alert: alert, stale: stale)
@@ -196,6 +198,11 @@ struct DashCounterTile: View {
             }
         }
         .buttonStyle(CardButtonStyle(radius: 18))
+        .overlay {
+            if appearanceMode.on, let slot = PhotoSlot.card(counter.key) {
+                PhotoBadge(slot: slot) { editing = true }
+            }
+        }
         .contextMenu {
             if PhotoSlot.card(counter.key) != nil {
                 Button("Card Photo…") { editing = true }

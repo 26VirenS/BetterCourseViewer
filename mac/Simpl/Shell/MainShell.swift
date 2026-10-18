@@ -21,9 +21,11 @@ struct MainShell: View {
     @ObservedObject private var appearance = AppearanceStore.shared
     /// (home-28) While the tour is on, the toolbar's buttons rest — dimmed with the window, and not to be pressed past it.
     @ObservedObject private var tour = MacTour.shared
+    /// (1.3.113) Appearance on: the toolbar's buttons rest, as for the tour.
+    @ObservedObject private var appearanceMode = AppearanceMode.shared
 
     var body: some View {
-        let touring = tour.step != nil
+        let touring = tour.step != nil || appearanceMode.on
         NavigationSplitView(columnVisibility: $columns) {
             Sidebar()
                 .id(appearance.revision) // (1.3.1: a colour worn, the sidebar drawn again in it — never the whole split view)
@@ -42,6 +44,7 @@ struct MainShell: View {
             }
         }
         .overlay { TourOverlay(columns: $columns) } // (1.2) the Mac tour (Shell/Tour.swift)
+        .overlay { AppearanceOverlay(columns: $columns) } // (1.3.113) Appearance, from the ⋯ menu (Shell/AppearanceMode.swift)
         .overlay { WorkPreviewOverlay() } // (1.2.3) a piece of work's quick look, grown out of its row (Shell/WorkPreviewOverlay.swift)
         // (1.3.79) a tool opened whole, the rubric ring, Hand In and the rest are popups over the window that never block
         // it (Shell/FloatingPopup.swift: ToolsCenter.popUp, RubricPopup.show, EngineSheets)
@@ -329,6 +332,9 @@ struct Sidebar: View {
     @EnvironmentObject private var whereabouts: Whereabouts // (1.3.78: its selection follows the window's moves)
     @Environment(\.openWindow) private var openWindow
     @State private var open: Set<String> = []
+    @ObservedObject private var appearanceMode = AppearanceMode.shared
+    /// (1.3.113) The sidebar's photo moved and zoomed, from its photo button.
+    @State private var adjusting = false
 
     /// A course's sections before its home has said which it has.
     static let defaultSections: [SectionLink] = [
@@ -390,6 +396,15 @@ struct Sidebar: View {
             AccountBar()
         }
         .background { SidebarGround() } // (1.3.1) the sidebar's photo, frosted, behind its rows
+        // (1.3.113) Appearance on: its photo button, in its middle
+        .overlay {
+            if appearanceMode.on {
+                PhotoBadge(slot: .side) { adjusting = true }
+            }
+        }
+        .floatingPopup("card-photo:side", title: "Sidebar Photo", isPresented: $adjusting) {
+            PhotoSlotSheet(slot: .side)
+        }
     }
 
     private var list: some View {
@@ -644,6 +659,8 @@ struct AccountBar: View {
             Spacer(minLength: 4)
             Menu {
                 SettingsLink { Text("Settings…") }
+                // (1.3.113) the theme, the photos and the courses' colours, over the window itself
+                Button("Appearance…") { AppearanceMode.shared.begin(engine) }
                 Button("What’s New") { engine.whatsNew = WhatsNewSheetItem(data: MacWhatsNew.all) }
                 Button("\(engine.lmsName) Profile") { engine.openWebScreen("/profile", title: "Profile") }
                 Divider()

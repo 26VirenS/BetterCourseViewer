@@ -972,8 +972,9 @@ push_set() {
   shoot light-50-theme-dusk 12 -SimplTheme Dusk
   shoot light-50b-theme-ocean-todo 12 -SimplTheme Ocean -SimplPlace todo
   shoot light-50d-theme-photo 12 -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg"
-  shoot light-51-settings-appearance 12 -SimplOpen settings -SimplSettingsTab appearance -SimplTheme Ocean -SimplPhotoSlot today
-  shoot light-51b-settings-picker 14 -SimplOpen settings -SimplSettingsTab appearance -SimplPickerOpen YES
+  # (1.3.113) Appearance, from the ⋯ menu: the window darkened but the sidebar and the cards, their photo buttons, the bar
+  shoot light-51-appearance-mode 16 -SimplAppearanceMode YES -SimplTheme Ocean
+  shoot light-51c-appearance-courses 16 -SimplAppearanceMode YES -SimplAppearanceTab courses
   shoot light-12b-hand-in-preview 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplHandInPreview "$PWD/docs/screenshots/calendar.png"
   # (1.3.78) Send from Phone: the phone connected and two files in (posted by phone_send); a PDF-only assignment's
   # photos made into one PDF, and a kind it does not take refused (1013 made PDF-only above)
@@ -1017,7 +1018,7 @@ push_set() {
   shoot dark-50-theme-forest 12 -SimplTheme Forest
   shoot dark-50c-theme-dusk 12 -SimplTheme Dusk
   shoot dark-50d-theme-photo 12 -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg"
-  shoot dark-51b-settings-picker 14 -SimplOpen settings -SimplSettingsTab appearance -SimplPickerOpen YES
+  shoot dark-51-appearance-mode 16 -SimplAppearanceMode YES
   # (1.3.80) Overdue's panel at 1024 points, the first tile of the second row grown over the page under it; Graded's,
   # the last tile, half-way through growing
   SIZE=1024x820 shoot dark-01n-counter-1024-overdue 30 -SimplSheet overdue

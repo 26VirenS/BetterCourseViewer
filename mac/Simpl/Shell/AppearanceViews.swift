@@ -430,7 +430,7 @@ struct PhotoSlotSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             PhotoSlotEditor(slot: slot)
             HStack {
-                Text("Every place's photo is in Settings ▸ Appearance.")
+                Text("Every place's photo: the account's ⋯ menu ▸ Appearance.")
                     .font(.sCaption)
                     .foregroundStyle(.secondary)
                 Spacer()
