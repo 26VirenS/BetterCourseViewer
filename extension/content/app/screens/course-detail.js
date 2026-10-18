@@ -531,7 +531,10 @@
     const statusEl = (x) => { const st = standingOf(x); return h('div', { class: `bcv-asg__status is-${st.tone}` }, [U.svg(st.icon, { size: 14, stroke: 'currentColor', width: 2.2 }), U.text('bcv-asg__statustext', st.text, 'span')]); };
 
     const GRADING = { points: 'Graded', pass_fail: 'Complete or incomplete', letter_grade: 'Letter grade', gpa_scale: 'GPA scale', percent: 'Percentage', not_graded: 'Not graded' };
+    // (2.99.50) each fact led by its own tile, as the Mac's details are (Due, Points, Handed in as)
+    const FACT_ICON = { Due: IC.cal, Points: IC.star, 'Submit as': 'M12 15V4M8 8l4-4 4 4M5 14v4a2 2 0 002 2h10a2 2 0 002-2v-4', Rubric: IC.check };
     const fact = (k, v, sub, extra = {}) => h(extra.onclick ? 'button' : 'div', { class: `bcv-asg__fact ${extra.cls || ''}`, type: extra.onclick ? 'button' : null, onclick: extra.onclick || null, title: extra.title || null }, [
+      FACT_ICON[k] ? h('span', { class: 'bcv-asg__facttile', 'aria-hidden': 'true' }, U.svg(FACT_ICON[k], { size: 15, stroke: 'currentColor', width: 2 })) : null,
       U.el('bcv-asg__facttext', [U.text('bcv-asg__factk', k, 'span'), U.text('bcv-asg__factv bcv-ellip', v, 'span'), sub ? U.text('bcv-asg__factsub bcv-ellip', sub, 'span') : null]),
       extra.side || null,
     ]);
@@ -692,18 +695,98 @@
     const backEl = h('button', { type: 'button', class: 'bcv-linkbtn bcv-detail__back bcv-asg__back', title: back.label, onclick: () => { app.markBack?.(); app.go(back.href); } }, [U.svg('M15 5l-7 7 7 7', { size: 15, stroke: 'currentColor', width: 2.4 }), h('span', { class: 'bcv-detail__backlabel bcv-ellip', text: back.label })]);
     const top = itemTop(ctx, c, backEl, 'Assignment', a.id);
     const titleEl = h('h1', { class: 'bcv-detail__title bcv-asg__title bcv-pretty', text: a.name });
-    let statusNow = statusEl(s), factsNow = factsEl(s), actionNow = actionEl(s);
-    const headEl = U.el('bcv-detail__head bcv-asg__head', [titleEl, statusNow]);
+    // (2.99.50) The Mac's assignment page: over the title its kind, its course and where it stands as chips; then the
+    // instructions and the comments down the left, and down the right the one big action, the grade (its ring, the
+    // score, how the class did) and the details — Due, Points, Handed in as, the rubric — each led by its tile.
+    const kindOf = isTool ? ['Tool', IC.tool] : typeList.includes('online_quiz') ? ['Quiz', IC.bolt] : typeList.includes('discussion_topic') ? ['Discussion', IC.disc] : ['Assignment', IC.doc];
+    const kindChip = h('span', { class: 'bcv-asg__kind' }, [h('span', { class: 'bcv-asg__kindtile', 'aria-hidden': 'true' }, U.svg(kindOf[1], { size: 14, stroke: 'currentColor', width: 2 })), h('span', { text: kindOf[0] })]);
+    const courseChip = h('span', { class: 'bcv-asg__coursechip bcv-ellip', text: c.shortName || c.name || '' });
+    let statusNow = statusEl(s);
+    const chipsEl = U.el('bcv-asg__chips', [kindChip, courseChip, statusNow]);
+    const headEl = U.el('bcv-detail__head bcv-asg__head', [chipsEl, titleEl]);
+    const section = (title, extra, body) => U.el('bcv-asg__section', [U.el('bcv-asg__sectionhead', [h('h2', { class: 'bcv-asg__h2', text: title }), extra || null]), body]);
     const desc = a.description && htmlToText(a.description, 40).trim() ? CS().prose(a.description, { cls: 'bcv-asg__prose' }) : (isTool ? null : U.text('bcv-asg__quiet', 'No instructions were given.'));
-    const page = U.el('bcv-asg', [top, headEl, factsNow, actionNow, desc].filter(Boolean), { style: { '--bcv-cc': c.color || 'var(--bcv-blue)', '--bcv-cc-ink': c.palette?.text || c.color || 'var(--bcv-blue)' } });
-    /** Drawn again from a fresher submission (a tool's grade landing): the pill, the status and the facts, in place. */
+    const instructions = desc ? section('Instructions', null, U.el('bcv-asg__panel', [desc])) : null;
+
+    // the comments on the submission, and one to add (the thread the teacher's feedback comes back on)
+    const commentsBody = U.el('bcv-asg__panel bcv-asg__comments');
+    const drawComments = (x) => {
+      const list = (x.submission_comments || []).slice().sort((p, q) => String(p.created_at).localeCompare(String(q.created_at)));
+      if (!list.length) { commentsBody.replaceChildren(h('div', { class: 'bcv-asg__nocomments' }, [U.svg(IC.disc, { size: 15, stroke: 'currentColor', width: 2 }), h('span', { text: 'No comments yet.' })])); return; }
+      commentsBody.replaceChildren(...list.map((cm) => U.el('bcv-asg__comment', [
+        U.el('bcv-asg__commenthead', [U.text('bcv-asg__commentwho', cm.author_name || cm.author?.display_name || 'Someone', 'span'), cm.created_at ? U.text('bcv-asg__commentwhen', U.fmtAt(cm.created_at), 'span') : null]),
+        U.text('bcv-asg__commenttext', cm.comment || '', 'div'),
+      ])));
+    };
+    drawComments(s);
+    const composer = U.el('bcv-asg__composer', [], { hidden: '' });
+    const addBtn = h('button', { type: 'button', class: 'bcv-asg__addcomment' }, [U.svg(IC.disc, { size: 14, stroke: 'currentColor', width: 2 }), h('span', { text: 'Add a Comment' })]);
+    addBtn.onclick = () => {
+      if (!composer.hidden) { composer.querySelector('textarea')?.focus(); return; }
+      const box = h('textarea', { class: 'bcv-textarea bcv-asg__composerbox', rows: 3, placeholder: 'Write a comment for your teacher…' });
+      const send = h('button', { type: 'button', class: 'bcv-btn bcv-btn--primary', text: 'Send' });
+      const cancel = h('button', { type: 'button', class: 'bcv-btn', text: 'Cancel', onclick: () => { composer.hidden = true; composer.replaceChildren(); } });
+      send.onclick = async () => {
+        if (!box.value.trim()) { box.focus(); return; }
+        send.disabled = true; send.textContent = 'Sending…';
+        try {
+          await store.commentOnSubmission(c.id, a.id, box.value, current.attempt || null);
+          const fresh = await store.submission(c.id, route.arg, { force: true }).catch(() => null);
+          if (!ctx.alive()) return;
+          if (fresh) { current = fresh; drawComments(fresh); }
+          composer.hidden = true; composer.replaceChildren();
+        } catch (e) { send.disabled = false; send.textContent = 'Send'; U.toast?.(e?.message || 'The comment could not be sent.'); }
+      };
+      composer.replaceChildren(box, U.el('bcv-asg__composerrow', [cancel, send]));
+      composer.hidden = false;
+      box.focus();
+    };
+    const comments = section('Comments', addBtn, U.el('bcv-asg__commentwrap', [composer, commentsBody]));
+
+    // the right-hand side: the big action, the grade, the details
+    const LETTERS = [[93, 'A'], [90, 'A-'], [87, 'B+'], [83, 'B'], [80, 'B-'], [77, 'C+'], [73, 'C'], [70, 'C-'], [67, 'D+'], [60, 'D'], [0, 'F']];
+    const letterOf = (x, p) => (a.grading_type === 'letter_grade' && x.grade ? String(x.grade) : p === null ? '' : LETTERS.find(([m]) => p >= m)[1]);
+    function gradeRing(x) {
+      const p = pct(x), tone = toneOf(p), f = Math.max(0, Math.min(1, (Number(x.score) || 0) / Math.max(1, Number(a.points_possible) || 1)));
+      const R = 34, L = 2 * Math.PI * R;
+      const ring = h('span', { class: `bcv-asg__ring is-${tone}`, 'aria-hidden': 'true' });
+      const NS = 'http://www.w3.org/2000/svg';
+      const el = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+      const svg = el('svg', { viewBox: '0 0 80 80', width: '80', height: '80' });
+      svg.append(el('circle', { cx: '40', cy: '40', r: String(R), class: 'bcv-asg__ringtrack' }), el('circle', { cx: '40', cy: '40', r: String(R), class: 'bcv-asg__ringarc', 'stroke-dasharray': `${(L * f).toFixed(2)} ${L.toFixed(2)}`, transform: 'rotate(-90 40 40)' }));
+      ring.append(svg);
+      ring.append(h('span', { class: 'bcv-asg__ringletter', text: letterOf(x, p) }));
+      return ring;
+    }
+    function classLine() {
+      const st = a.score_statistics;
+      if (!st || st.mean === undefined || st.mean === null) return null;
+      const bits = [`Class mean ${store.fmtPts(Math.round(st.mean * 10) / 10)}`, st.max !== undefined ? `high ${store.fmtPts(st.max)}` : null, st.min !== undefined ? `low ${store.fmtPts(st.min)}` : null].filter(Boolean);
+      return h('div', { class: 'bcv-asg__classline' }, [U.svg(IC.people, { size: 14, stroke: 'currentColor', width: 2 }), h('span', { text: bits.join(' · ') })]);
+    }
+    function railEl(x) {
+      const act = actionEl(x);
+      const parts = [];
+      // a tool's graded page still opens the tool, as the Mac's Open Tool does
+      if (isTool && postedOf(x) && !lockedNow()) parts.push(h('button', { type: 'button', class: 'bcv-asg__primary bcv-detail__tool', onclick: (e) => launchTool(e.currentTarget) }, [U.svg(IC.tool, { size: 16, stroke: 'currentColor', width: 2.2 }), h('span', { text: 'Open Tool' })]));
+      if (postedOf(x)) parts.push(U.el('bcv-asg__panel bcv-asg__gradep', [h('div', { class: 'bcv-asg__panelk', text: 'Grade' }), U.el('bcv-asg__graderow', [gradeRing(x), act]), classLine()]));
+      else parts.push(act);
+      parts.push(factsEl(x));
+      return U.el('bcv-asg__rail', parts);
+    }
+    let railNow = railEl(s);
+    const left = U.el('bcv-asg__left', [instructions, comments]);
+    const colsEl = U.el('bcv-asg__cols', [railNow, left]); // (the grade read before the instructions; drawn on the right when wide)
+    const page = U.el('bcv-asg', [top, headEl, colsEl].filter(Boolean), { style: { '--bcv-cc': c.color || 'var(--bcv-blue)', '--bcv-cc-ink': c.palette?.text || c.color || 'var(--bcv-blue)' } });
+    /** Drawn again from a fresher submission (a tool's grade landing): the status, the action, the grade and the facts, in place. */
     const repaint = (x) => {
       current = x;
-      const st2 = statusEl(x), f2 = factsEl(x), a2 = actionEl(x);
-      statusNow.replaceWith(st2); factsNow.replaceWith(f2); actionNow.replaceWith(a2);
-      statusNow = st2; factsNow = f2; actionNow = a2;
+      const st2 = statusEl(x), r2 = railEl(x);
+      statusNow.replaceWith(st2); railNow.replaceWith(r2);
+      statusNow = st2; railNow = r2;
+      drawComments(x);
     };
-    main.replaceChildren(U.card(page, 'bcv-card--22 bcv-asg__card')); // (the page's one card holds everything: the way back to the instructions)
+    main.replaceChildren(U.card(page, 'bcv-card--22 bcv-asg__card'));
     // opened to hand in (a To Do row's Submit, ?bcv=submit): the panel grows out of the pill once the page is up
     if (handScreen && route.params.get('bcv') === 'submit' && canAgain(s)) {
       const go = (n = 0) => { const pill = page.querySelector('.bcv-asg__pill.is-go, .bcv-asg__again'); if (pill?.isConnected && pill.getBoundingClientRect().width) { if (pill.classList.contains('bcv-asg__again')) openHand(page.querySelector('.bcv-asg__pill')); else openHand(pill); } else if (n < 40 && ctx.alive()) setTimeout(() => go(n + 1), 50); };
