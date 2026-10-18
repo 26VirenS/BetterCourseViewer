@@ -2681,6 +2681,9 @@ try {
   });
   check(oneBar.rail === 'none' && oneBar.under && /MATH/.test(oneBar.course) && oneBar.tabs[0] === 'Home' && oneBar.tabs.includes('Assignments') && oneBar.tabs.some((t) => /^Grades/.test(t)) && /^Assignments/.test(oneBar.on) && !oneBar.choose, `one sidebar: the course's sections under its row, Assignments lit, no rail beside the page, no chooser again: ${JSON.stringify(oneBar)}`);
   await shot(page, '10i-one-sidebar');
+  // (2.99.42) with one sidebar a section's own name is the title, the course's under it, the details left to Home
+  const secHead = await page.evaluate(() => ({ h1: document.querySelector('.bcv-head--course .bcv-h1')?.textContent, of: document.querySelector('.bcv-head--course .bcv-course__of')?.textContent, detail: (() => { const d = document.querySelector('.bcv-head--course .bcv-course__detail'); return d ? getComputedStyle(d).display : 'none'; })() }));
+  check(secHead.h1 === 'Assignments' && /MATH/.test(secHead.of || '') && secHead.detail === 'none', `one sidebar: the section's name is the title, the course's under it, as the Mac lays it out: ${JSON.stringify(secHead)}`);
   // a section pressed there goes to it, and is the one lit then
   await page.click('.bcv-side .bcv-ctab[data-tab="grades"]');
   await page.waitForFunction(() => /\/grades/.test(location.pathname) && document.querySelector('.bcv-side .bcv-ctab.is-active')?.dataset.tab === 'grades', null, { timeout: 15000 });
@@ -2786,6 +2789,10 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.bcv-row--p12-16 .bcv-row__title').length >= 3, null, { timeout: 10000 });
   check((await texts('.bcv-row--p12-16 .bcv-row__title')).some((t) => /Dis01/.test(t)), 'course To Do card');
   await shot(page, '11-course-home');
+  // (2.99.42) as the Mac's Home: the latest three announcements over the front page, unread ones marked, a way to all of them
+  await page.waitForSelector('.bcv-home__ann .bcv-row', { timeout: 5000 }).catch(() => {});
+  const homeAnn = await page.evaluate(() => ({ rows: [...document.querySelectorAll('.bcv-home__ann .bcv-row')].map((r) => r.querySelector('.bcv-home__anntitle')?.textContent), unread: document.querySelectorAll('.bcv-home__ann .bcv-home__anntitle.is-unread').length, all: document.querySelector('.bcv-home__all')?.textContent, first: !!document.querySelector('.bcv-body .bcv-col > .bcv-home__ann:first-child') }));
+  check(homeAnn.rows.length >= 1 && homeAnn.rows.length <= 3 && homeAnn.all === 'All Announcements' && homeAnn.first, `a course's Home leads with its latest announcements, as the Mac's does: ${JSON.stringify(homeAnn)}`);
   check(!(await page.$('.bcv-reader-btn')) && !(await page.$$eval('.bcv-head button', (els) => els.some((e) => /Immersive Reader/.test(e.textContent)))), 'no Immersive Reader in the course header (2.99.20: taken out)');
 
   // announcements

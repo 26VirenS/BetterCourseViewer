@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.42', date: '2026-10-18', notes: [
+      { kind: 'improved', title: 'Mac-style course pages', body: 'Section titles, assignment rows and Home announcements.', icon: P.layers },
+    ] },
     { version: '2.99.41', date: '2026-10-18', notes: [
       { kind: 'improved', title: 'Dashboard like the Mac', body: 'A greeting, coloured counters and Coming up, as on the Mac.', icon: P.layers },
     ] },

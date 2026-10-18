@@ -429,7 +429,7 @@
 
   function typeIcon(a) {
     const t = a.submission_types || [];
-    // (2.99.41) with the word the Mac's rows lead with: Quiz, Discussion, Tool or Assignment
+    // (2.99.42) with the word the Mac's rows lead with: Quiz, Discussion, Tool or Assignment
     if (a.is_quiz_assignment || a.quiz_id || t.includes('online_quiz')) return { icon: IC.bolt, quiz: true, kind: 'Quiz' };
     if (t.includes('discussion_topic') || a.discussion_topic) return { icon: IC.disc, quiz: false, kind: 'Discussion' };
     return { icon: IC.doc, quiz: false, kind: t.includes('external_tool') ? 'Tool' : 'Assignment' };
@@ -535,7 +535,7 @@
 
   /** Header (back link, colour, title, pills) plus the
    *  grouped rail of the context's tabs, for courses and groups. */
-  /** (2.99.41) With one sidebar, as the Mac lays a course's section out: the section's own name is the title (Assignments,
+  /** (2.99.42) With one sidebar, as the Mac lays a course's section out: the section's own name is the title (Assignments,
    *  Modules…), the course's name under it, and the term and the course's details left to its Home. Home, a page of
    *  the course and the two-sidebar layout keep the course's name as the title. */
   function sectionTitle(app, screen, shell, activeId) {
@@ -895,27 +895,44 @@
       }));
     });
 
+    // (2.99.42) as the Mac's Home: the course's latest announcements over what the instructor chose for it, with a way
+    // to all of them; nothing at all where the course has none
+    const annBlock = h('div', { class: 'bcv-home__ann' });
+    const put = (el) => left.replaceChildren(annBlock, el);
+    store.announcements(c.id, { kind: shell.kind }).then((list) => {
+      if (!ctx.alive()) return;
+      if (!list || !list.length) { annBlock.remove(); return; }
+      annBlock.replaceChildren(
+        U.el('bcv-group__head bcv-home__annhead', [U.h2('Announcements'), h('button', { type: 'button', class: 'bcv-linkbtn bcv-home__all', text: 'All Announcements', onclick: () => app.go(`${c.url}/announcements`) })]),
+        U.card(list.slice(0, 3).map((a) => U.row([
+          U.svg(TAB_ICONS.announcements, { size: 15, stroke: c.palette.text, width: 1.9, style: { flex: 'none' } }),
+          U.dot(a.read_state === 'unread' ? '#0a84ff' : 'transparent', 'bcv-dot--7'),
+          U.text(`bcv-row__title bcv-row__title--14 bcv-ellip bcv-home__anntitle ${a.read_state === 'unread' ? 'is-unread' : ''}`, a.title || 'Announcement', 'span'),
+          U.text('bcv-row__when bcv-home__annwhen', [a.author?.display_name || a.user_name || null, U.fmtShort(a.posted_at || a.delayed_post_at)].filter(Boolean).join(' · '), 'span'),
+        ], { mod: 'bcv-row--p12-16', onClick: () => app.go(`${c.url}/announcements/${a.id}`) })), 'bcv-card--list'),
+      );
+    }).catch(() => annBlock.remove());
     // left column: what the instructor chose as the home view
     const view = c.defaultView;
     if (view === 'modules') {
-      left.replaceChildren(await T.modulesBlock(ctx, shell));
+      put(await T.modulesBlock(ctx, shell));
     } else if (view === 'assignments') {
-      left.replaceChildren(await T.assignmentsBlock(ctx, shell));
+      put(await T.assignmentsBlock(ctx, shell));
     } else if (view === 'syllabus') {
       const html = await store.syllabus(c.id).catch(() => '');
       if (!ctx.alive()) return b;
       shell.reader = { title: 'Syllabus', html };
-      left.replaceChildren(U.card(U.el('bcv-front', [frontHead(IC.page, 'Syllabus'), prose(html), chips(html)]), 'bcv-card--22'));
+      put(U.card(U.el('bcv-front', [frontHead(IC.page, 'Syllabus'), prose(html), chips(html)]), 'bcv-card--22'));
     } else if (view === 'feed') {
-      left.replaceChildren(await T.streamBlock(ctx, shell));
+      put(await T.streamBlock(ctx, shell));
     } else {
       const fp = await store.frontPage(c.id, { kind: shell.kind }).catch(() => null);
       if (!ctx.alive()) return b;
       if (fp && fp.body !== undefined) {
         shell.reader = { title: fp.title, html: fp.body };
-        left.replaceChildren(U.card(U.el('bcv-front', [frontHead(IC.doc, `Front page · ${fp.title}`), prose(fp.body || ''), chips(fp.body)]), 'bcv-card--22'));
+        put(U.card(U.el('bcv-front', [frontHead(IC.doc, `Front page · ${fp.title}`), prose(fp.body || ''), chips(fp.body)]), 'bcv-card--22'));
       } else {
-        left.replaceChildren(await T.modulesBlock(ctx, shell));
+        put(await T.modulesBlock(ctx, shell));
       }
     }
     function frontHead(icon, lbl) {
@@ -1010,7 +1027,7 @@
         U.tile(icon, { color: pal.text, tint: pal.tint }),
         U.el('bcv-row__body', [
           U.text('bcv-row__title bcv-row__title--145 bcv-ellip', a.name),
-          // (2.99.41) as the Mac's rows read: the kind, the points, then when it is due (a grade ends "due", whatever the date)
+          // (2.99.42) as the Mac's rows read: the kind, the points, then when it is due (a grade ends "due", whatever the date)
           U.text('bcv-row__sub', `${kind} · ${ptsLabel(a)} · ${hasGrade(a) ? 'Graded' : a.due_at ? `Due ${U.fmtAt(a.due_at)}` : 'No due date'}`),
         ]),
         statusBadge(a),
@@ -1039,7 +1056,7 @@
     upcoming.sort(byDue); overdue.sort(byDue); past.sort((x, y) => byDue(y, x));
     const gradedN = past.filter((a) => a.submission?.workflow_state === 'graded').length;
     const parts = [
-      // (2.99.41) the Mac's short heads, each with its count: "Upcoming 10"
+      // (2.99.42) the Mac's short heads, each with its count: "Upcoming 10"
       section('Overdue', String(overdue.length), overdue),
       section('Upcoming', String(upcoming.length), upcoming),
       section('Undated', String(undated.length), undated),
