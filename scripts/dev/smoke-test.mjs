@@ -658,7 +658,7 @@ try {
   const anchored = [];
   // (Due today on the left, the first row's middle counter, Graded on the right — 2.99.41: the middle one is Tomorrow in the
   // Mac's order a wide column wears, Next 7 days under it)
-  const middle = await page.evaluate(() => { const all = [...document.querySelectorAll('.bcv-stats .bcv-stat')].map((e) => [e.getBoundingClientRect(), e.dataset.stat]); const top = Math.min(...all.map(([r]) => Math.round(r.top))); return all.filter(([r]) => Math.round(r.top) === top).sort(([a], [b]) => a.left - b.left)[1][1]; });
+  const middle = await page.evaluate(() => { const all = [...document.querySelectorAll('.bcv-stats .bcv-stat')].map((e) => [e.getBoundingClientRect(), e.dataset.stat]); const top = Math.min(...all.map(([r]) => r.top)); const row = all.filter(([r]) => r.top - top < r.height / 2).sort(([a], [b]) => a.left - b.left); return (row[1] || row[0])[1]; }); // (the first row, within half a card: the counters may still be settling in)
   for (const key of ['today', middle, 'graded']) {
     const nth = key === 'graded' ? 6 : key === 'today' ? 1 : 2;
     const c = await page.$eval(`.bcv-stats .bcv-stat[data-stat="${key}"]`, (e) => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, m: r.left + r.width / 2, t: r.top }; });
