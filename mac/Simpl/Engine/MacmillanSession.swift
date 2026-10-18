@@ -21,6 +21,8 @@ final class MacmillanSession: ObservableObject {
     /// (1.3.114) Show Browser: Macmillan's own page, as Macmillan draws it, in place of the skinned one.
     @Published private(set) var browser = UserDefaults.standard.bool(forKey: MacmillanSession.browserKey)
     static let browserKey = "SimplMacmillanShowBrowser"
+    /// (1.3.116) The app light or dark: the skinned page laid on the popup's glass in the same (the skin's 'theme').
+    private(set) var dark = false
     /// The assessment player's frame, which the skin's reports come from and its presses go to.
     private var player: WKFrameInfo?
     private var launchOpened = false
@@ -61,7 +63,13 @@ final class MacmillanSession: ObservableObject {
         config.applicationNameForUserAgent = "Version/18.4 Safari/605.1.15"
         config.userContentController.addUserScript(Self.script)
         // (1.3.114) the skin, in every page and frame (it acts in the assessment player and the page that holds it)
-        if let skin = Self.skin { config.userContentController.addUserScript(skin) }
+        if let skin = Self.skin {
+            // (1.3.116) light or dark as the app is, from the page's first moment (told again by setDark)
+            let dark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            self.dark = dark
+            config.userContentController.addUserScript(WKUserScript(source: "window.__simplMacmillanDark = \(dark ? "true" : "false");", injectionTime: .atDocumentStart, forMainFrameOnly: false))
+            config.userContentController.addUserScript(skin)
+        }
         let r = MacmillanRelay()
         config.userContentController.add(r, name: Self.handler)
         relay = r
@@ -70,6 +78,9 @@ final class MacmillanSession: ObservableObject {
         // (1.3.79) Macmillan's page in light whatever the app's appearance, as every tool's is (ToolDarkPage.look): made
         // for light, it read badly in dark; the popup around it keeps the app's
         ToolDarkPage.look(web, dark: false)
+        // (1.3.116) the skinned page clear, laid on the popup's glass (Show Browser puts a white page under it: MacmillanScreen)
+        web.setValue(false, forKey: "drawsBackground")
+        web.underPageBackgroundColor = .clear
         r.session = self
         MacmillanSession.current = self
         loading = web.observe(\.isLoading, options: [.new]) { [weak self] w, _ in
@@ -115,6 +126,8 @@ final class MacmillanSession: ObservableObject {
             if s != state { withAnimation(Motion.gentle) { state = s } }
             if opening { withAnimation(Motion.gentle) { opening = false } }
             if browser { Task { await act("skin", false) } }
+            // (1.3.116) a player that came up thinking otherwise (a frame opened before the app changed) is told
+            if let d = head["dark"] as? Bool, d != dark { Task { await act("theme", dark) } }
             // (the screenshot suite's -SimplMacmillanOpen YES: the cover's Open Assignment pressed, once)
             if s.isCover, !launchOpened, UserDefaults.standard.bool(forKey: "SimplMacmillanOpen") {
                 launchOpened = true
@@ -196,6 +209,13 @@ final class MacmillanSession: ObservableObject {
             await act("skin", !on)
             _ = await run("return window.__simplMacmillan ? window.__simplMacmillan('skin', \(on ? "false" : "true")) : false", in: nil)
         }
+    }
+
+    /// (1.3.116) The app gone light or dark: the skinned page with it.
+    func setDark(_ on: Bool) {
+        guard on != dark else { return }
+        dark = on
+        Task { await act("theme", on) }
     }
 
     /// The script run in that frame (nil: the main page); what it gives back, or nil.

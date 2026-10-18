@@ -22,6 +22,8 @@ struct MacmillanScreen: View {
     @ObservedObject private var dev = DevMode.shared // (1.3.109: Save Page Code in the header, to developers)
     /// (1.3.78) The Canvas assignment's name and due line, for the header as Alta's has it.
     @State private var canvas: CanvasDue.Facts?
+    /// (1.3.116) The app light or dark, told to the skinned page.
+    @Environment(\.colorScheme) private var scheme
 
     init(launch: AltaLaunch) {
         _session = StateObject(wrappedValue: MacmillanSession(launch: launch))
@@ -55,6 +57,7 @@ struct MacmillanScreen: View {
         .background(PageGround())
         .tint(Theme.accent)
         .task { await session.start(engine: engine) }
+        .onChange(of: scheme, initial: true) { _, s in session.setDark(s == .dark) }
         .task { canvas = await CanvasDue.facts(engine, course: session.launch.course, assignment: session.launch.assignment) }
         .alert("Page code saved", isPresented: Binding(get: { saved != nil }, set: { if !$0 { saved = nil } })) {
             Button("Show in Finder") { if let saved { NSWorkspace.shared.activateFileViewerSelecting([saved]) } }
@@ -126,10 +129,14 @@ struct MacmillanScreen: View {
         }
     }
 
+    /// (1.3.116) The page skinned now: the assessment player's cover or question, Show Browser off.
+    private var skinned: Bool { !session.browser && (session.state?.isQuestion == true || session.state?.isCover == true) }
+
     private var page: some View {
         ZStack {
+            // (1.3.116) skinned, laid on the popup's glass; as Macmillan draws it (Show Browser, another kind), on white
             MacmillanPageHost(web: session.web)
-                .background(Color.white)
+                .background(skinned ? Color.clear : Color.white)
             // (1.3.114) the cover as a start screen, over the page, until Open Assignment
             if let s = session.state, s.isCover, let c = s.cover, !session.browser {
                 MacmillanStartScreen(cover: c) { Task { await session.act("open") } }

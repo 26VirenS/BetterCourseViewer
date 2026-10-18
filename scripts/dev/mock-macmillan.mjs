@@ -15,7 +15,7 @@ header h1{font-size:20px;margin:0}main{position:absolute;top:65px;left:0;right:0
 <script>(function(){var f=document.getElementById('launch');f.folded.value=/folded=1/.test(location.search)?'1':'';f.submit();})();</script></body></html>`;
 
 const QUESTIONS = [
-  { parts: [
+  { layout: 'two_col_single_right', parts: [
     ['text', 'A cart of mass <i>m</i> = 4.00 kg is pushed across a level, frictionless track by a steady force of 10.0 N.'],
     ['picture', 'A cart on a level track, pushed to the right by a horizontal arrow labelled F.'],
     ['numeric', 'What is the cart’s acceleration <i>a</i>?', '<i>a</i> =', 'm/s<sup>2</sup>', '2.5'],
@@ -37,10 +37,21 @@ const QUESTIONS = [
 
 export const MACMILLAN_SAC_HTML = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Assessment</title><style>
 body{margin:0;font-family:Helvetica,Arial,sans-serif;color:#222;background:#fff}#app{display:flex;height:100vh}
-#side{width:300px;border-right:1px solid #ddd;overflow:auto;background:#fafafa}#main{flex:1;display:flex;flex-direction:column;min-width:0}
+#side-nav{width:300px;border-right:1px solid #ddd;overflow:auto;background:#fafafa;flex:none}
+/* (Mac 1.3.116) Macmillan's own layout rules, as its style sheet has them (sac/static/css/41.*.chunk.css): the 960-px sheet set 25 px in, #main kept 300 px short of the page for the side panel, the two-column question's picture floated right */
+#main{display:flex;background:#f3f3f3;flex-direction:column;height:100vh;min-width:0;overflow-x:auto;overflow-y:hidden;width:calc(100vw - 54px)}#side-nav.closed.menu-selected~#main{width:calc(100vw - 300px)}
+.raptor-container{background:#f3f3f3;display:flex;flex-direction:column;flex-grow:1;height:100%;position:relative}
+#raptor-content-container{background:#f3f3f3;color:#000;overflow-y:auto;position:relative;width:100%;height:100%}
+#raptor-content-container .content-area{background:#fff;left:0;margin:10px auto 0 25px;overflow-x:visible;position:absolute;right:0;width:960px}
+.content-area .authoring-area{background:#fff;overflow:hidden;width:100%}.authoring-area.flowable-layout{box-sizing:border-box;height:100%;overflow:auto;padding:0}
+#raptor-content-container .authoring-area .parent-module-container{min-height:calc(100vh - 135px)}
+.flowable-layout .module-container{box-sizing:border-box;padding:10px 10px 10px 24px;position:relative;vertical-align:top}.authoring-area .module-container:last-of-type{min-height:170px}
+.flowable-layout.two_col_single_right .module-container{display:inline-block;width:50%}.flowable-layout.two_col_single_right .module-container:nth-of-type(2){float:right}.flowable-layout.two_col_single_right .module-container:nth-of-type(n+3){display:block}
+.raw-html img{display:block;max-width:100%}[copyrightmessagestyle]{position:absolute;transform:rotate(270deg);z-index:2;left:-55px;top:81px}
+#results{align-items:center;bottom:0;display:flex;height:50px;padding-left:20px;position:absolute;width:100%;z-index:21}#results.correct{background:#daf4d4;border:1px solid #3b822e}#results.incorrect{background:#ffe7e5;border:1px solid #da1b2c}
 #check-bar{display:flex;align-items:center;gap:12px;height:54px;padding:0 16px;border-bottom:1px solid #ddd}#check-bar ul{display:flex;gap:6px;list-style:none;margin:0;padding:0}
-[data-test-id=btn-sac-main]{background:#1565c0;color:#fff;border:0;border-radius:4px;padding:8px 14px}.raptor-container{flex:1;overflow:auto;padding:12px 20px}
-#question-nav li{padding:10px 14px;border-top:1px solid #eee;cursor:pointer}#question-nav li.on{background:#e8f0fe}.module-container{margin:12px 0}
+[data-test-id=btn-sac-main]{background:#1565c0;color:#fff;border:0;border-radius:4px;padding:8px 14px}
+#question-nav li{padding:10px 14px;border-top:1px solid #eee;cursor:pointer}#question-nav li.on{background:#e8f0fe}
 .numeric-entry-input{width:120px}.grading-status{font-weight:700}.cover{max-width:640px;margin:40px auto}
 </style></head><body><div id="root"><main id="sac"><div id="app"></div></main></div><iframe title="widget" src="/mock-macmillan/sac/static/widget.html" style="position:fixed;left:0;bottom:0;width:2px;height:2px;border:0"></iframe><script>
 var Q=${JSON.stringify(QUESTIONS)};
@@ -64,7 +75,7 @@ function cover(){
 function part(p,i,n){
  var done=S.done[n],a=(S.answers[n]||{});
  if(p[0]==='text')return '<article class="module-container" role="group" aria-label="Ungraded Text"><div data-module-type="static_textfield" class="sl-module"><div class="raw-html"><p>'+p[1]+'</p></div></div></article>';
- if(p[0]==='picture')return '<article class="module-container" role="group" aria-label="Ungraded Text"><div data-module-type="static_textfield"><img alt="'+p[1]+'" width="320" height="120" src="data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="120"><rect x="100" y="50" width="90" height="40" fill="#c33"/><line x1="20" y1="95" x2="300" y2="95" stroke="#333"/><line x1="30" y1="70" x2="95" y2="70" stroke="#06c" stroke-width="4"/></svg>')+'"></div></article>';
+ if(p[0]==='picture')return '<article class="module-container" role="group" aria-label="Ungraded Text"><div data-module-type="static_textfield" class="sl-module"><div class="raw-html"><p><md-never><img alt="'+p[1]+'" style="width:70%" src="data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="320" height="240" fill="#fff"/><rect x="100" y="150" width="90" height="40" fill="#c33"/><line x1="20" y1="195" x2="300" y2="195" stroke="#333"/><line x1="30" y1="170" x2="95" y2="170" stroke="#06c" stroke-width="4"/></svg>')+'"></md-never></p></div></div></article>';
  if(p[0]==='numeric'){var v=a[i]||'';var ok=done?'Correct':(S.attempts[n]&&a['w'+i]?'Incorrect':'');
   return '<article class="module-container" role="group" aria-label="Ungraded Text"><div class="raw-html"><p>'+p[1]+'</p></div></article><article class="module-container" data-module-id="'+n+i+'" role="group" aria-label="Numeric Entry"><div data-module-type="numeric_entry" class="sl-module"><label><span data-test-id="equation-prefix">'+p[2]+'</span></label>'+(ok?'<div data-test-id="result-frame-'+n+i+'" aria-label="'+ok+'"></div>':'')+'<input class="numeric-entry-input" data-i="'+i+'" value="'+v+'"'+(done?' disabled':'')+'> '+p[3]+(ok?'<div class="grading-status">'+ok+'</div>':'')+'</div></article>';}
  if(p[0]==='choice'||p[0]==='select'){var t=p[0]==='choice'?'radio':'checkbox';var h='<article class="module-container" role="group" aria-label="'+(t==='radio'?'Multiple Choice':'Multiple Select')+'"><div data-module-type="'+(t==='radio'?'multiple_choice':'multiple_select')+'"><p>'+p[1]+'</p>';
@@ -76,15 +87,16 @@ function draw(){
  if(!S.open)return cover();
  var n=S.at,q=Q[n],done=S.done[n];
  var title='Completed '+completed()+' of '+Q.length+' Questions';
- var side='<nav id="side-nav" data-test-id="side-nav"><button data-test-id="side-nav-'+title+'-menu-button" aria-expanded="'+!S.folded+'" aria-label="'+(S.folded?'Expand':'Collapse')+' assignment menu" aria-description="'+title+'"><span data-test-id="side-nav-button-title">'+title+'</span></button>'+(S.folded?'</nav>':policies()+
+ var side='<nav id="side-nav" data-test-id="side-nav" class="closed menu-selected"><button data-test-id="side-nav-'+title+'-menu-button" aria-expanded="'+!S.folded+'" aria-label="'+(S.folded?'Expand':'Collapse')+' assignment menu" aria-description="'+title+'"><span data-test-id="side-nav-button-title">'+title+'</span></button>'+(S.folded?'</nav>':policies()+
   '<ul id="question-nav" data-test-id="items">'+Q.map(function(_,k){var d=S.done[k];return '<li role="button" class="'+(k===n?'on':'')+'" data-test-id="item-'+(k+1)+'-'+(d?'success':(S.attempts[k]?'error':'default'))+'-row"><div data-test-id="item-'+(k+1)+'-number">Q'+(k+1)+'</div><div>'+(d?'Solved in '+S.attempts[k]+' attempt'+(S.attempts[k]===1?'':'s'):(S.attempts[k]?S.attempts[k]+' attempt'+(S.attempts[k]===1?'':'s'):'Unlimited attempts'))+'</div>'+(d?'<div data-test-id="item-'+(k+1)+'-success"><div data-test-id="item-'+(k+1)+'-points">+'+S.pts[k]+'</div></div>':'')+'</li>'}).join('')+'</ul></nav>');
  var bar='<nav id="check-bar" aria-label="Assignment Tools"><div data-test-id="final-score-fraction" aria-label="Assignment Score: '+score()+' out of '+TOTAL+'"><span>+'+score()+'</span> pts <span>/'+TOTAL+'</span></div><button data-test-id="switch-to-new-layout">Switch to New Layout</button><ul>'+
   '<li><button aria-label="Open Resources">Resources</button></li>'+(done?'<li><button data-test-id="checkbar-solution-button" aria-label="Open Solution">Solution</button></li>':'<li><button aria-label="Open AI Tutor">AI Tutor</button></li>')+
   '</ul><button data-test-id="btn-sac-main" aria-label="'+(done?'Next Question':'Submit Answer')+'">'+(done?'Next Question':'Submit Answer')+'</button><div id="toggle-fullscreen" aria-label="Expand to Full Screen Mode"></div></nav>';
  var head='<div id="attempts-holder" data-test-id="attempts-holder-container"><div id="question-name" aria-label="Sequential Question"><button data-test-id="nav-item-back" aria-label="previous question">&lsaquo;</button><h2 data-test-id="nav-question-header">Question '+(n+1)+' of '+Q.length+'</h2><button data-test-id="nav-item-forward" aria-label="next question">&rsaquo;</button></div>'+
   (S.attempts[n]?'<button data-test-id="attempts-dropdown-button" aria-label="Viewing '+(S.view==='question'?'the question':'my answer')+'.">'+(S.view==='question'?'Question':'My Answer')+'</button><ul data-test-id="attempts"><li><button data-test-id="attempt-nav-question-button">Question</button></li><li><button data-test-id="attempt-1-nav-button">My Answer</button></li></ul>':'')+'</div>';
- var body='<div id="raptor-content-container" aria-label="Question content"><p data-test-id="copyright-box">© Macmillan Learning</p>'+q.parts.map(function(p,i){return part(p,i,n)}).join('')+'</div>';
- document.getElementById('app').innerHTML=side+'<section id="main">'+bar+'<div class="raptor-container">'+head+body+'</div></section>';
+ var body='<div id="raptor-content-container" aria-label="Question content"><div><section class="content-area take-mode"><div class="authoring-area '+(q.layout||'')+' flowable-layout"><article class="parent-module-container" role="presentation"><div copyrightmessagestyle="brandName"><p data-test-id="copyright-box">© Macmillan Learning</p></div>'+q.parts.map(function(p,i){return part(p,i,n)}).join('')+'</article></div><div class="nav-scroll-arrow-button"><button aria-label="Scroll to Bottom">v</button></div></section></div></div>';
+ var res=done?'<footer id="results" class="correct"><span data-test-id="results-bar-message">Solved</span></footer>':(S.attempts[n]?'<footer id="results" class="incorrect"><span data-test-id="results-bar-message">Try Again</span></footer>':'');
+ document.getElementById('app').innerHTML=side+'<section id="main">'+bar+'<div class="raptor-container">'+head+body+res+'</div></section>';
  document.title='Question '+(n+1)+' of '+Q.length+' - W8 Homework: Forces in Motion';
  wire();
 }
