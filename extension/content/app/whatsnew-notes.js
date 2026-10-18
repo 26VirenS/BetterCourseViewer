@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.49', date: '2026-10-18', notes: [
+      { kind: 'improved', title: 'Tidier header', body: 'The search box sits under the views; long names fit.', icon: P.layers },
+    ] },
     { version: '2.99.48', date: '2026-10-18', notes: [
       { kind: 'improved', title: 'Wide Dashboard', body: 'Six counters in a row, grades and workload beside the list.', icon: P.layers },
     ] },

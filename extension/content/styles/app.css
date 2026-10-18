@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.48"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.49"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -770,9 +770,13 @@ html[data-bcv-theme="dark"] .bcv-stats > .bcv-stat[data-stat]:not(.bcv-stat--pic
   .bcv-stats .bcv-stat__note { -webkit-line-clamp: 1; }
   .bcv-dash-cols { display: grid; grid-template-columns: minmax(0, 1fr) clamp(340px, 30%, 440px); gap: 28px; align-items: start; }
   .bcv-dash-cols > .bcv-dash-rail { display: flex; flex-direction: column; gap: 22px; }
-  .bcv-head--hello .bcv-head__in { display: flex; align-items: center; gap: 16px; }
-  .bcv-head--hello .bcv-head__row { flex: 1; min-width: 0; }
-  .bcv-head--hello .bcv-dash__bar { margin-top: 0; flex: none; }
+  /* (2.99.49) the greeting has the left to itself (a long name wraps there); at the right the views and New Task, and
+     the search box under them, as wide as they are */
+  .bcv-head--hello .bcv-head__in { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "title bar" "title search"; column-gap: 28px; row-gap: 10px; align-items: center; }
+  .bcv-head--hello .bcv-head__row { display: contents; }
+  .bcv-head--hello .bcv-dash__title { grid-area: title; }
+  .bcv-head--hello .bcv-dash__bar { grid-area: bar; margin-top: 0; flex-wrap: nowrap; justify-self: end; }
+  .bcv-head--hello .bcv-omni { grid-area: search; width: 100%; min-width: 0; max-width: none; margin-left: 0; align-self: start; }
 }
 /* the sheet behind a counter */
 .bcv-sheet-ov { position: fixed; inset: 0; z-index: var(--bcv-z-sheet); background: var(--bcv-scrim); -webkit-backdrop-filter: var(--bcv-blur-scrim); backdrop-filter: var(--bcv-blur-scrim); display: flex; align-items: center; justify-content: center; padding: 28px; box-sizing: border-box; outline: none; font-family: var(--bcv-font); -webkit-font-smoothing: antialiased; }
