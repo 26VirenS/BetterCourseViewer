@@ -438,6 +438,9 @@ jobs:
           Shot 'ptable-hover' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-hover', 'Fe'))
           Shot 'ptable-search' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-search', 'ne'))
           Shot 'ptable-element' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'ptable', '--ptable-element', 'Fe'))
+          # (0.3.28) an element pressed: the mini element window, in light (iron: dark ink on yellow) and in dark (sodium)
+          Shot 'ptable-mini' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'ptable', '--ptable-mini', 'Fe'))
+          Shot 'ptable-mini-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'tools', '--tool', 'ptable', '--ptable-mini', 'Na'))
           # (0.3.2: an element's atom, orbitals and cloud, and the Lewis maker and the molecule builder, are tools of their
           #  own — Atoms & Orbitals, Lewis Structures, Molecule Builder — opened in a launch's state: --tool-state names
           #  the element, the view and the subshell, or the molecule)
