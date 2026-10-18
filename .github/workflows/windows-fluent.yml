@@ -1272,7 +1272,7 @@ jobs:
           foreach ($kept in @(@('wide-dna-least', 'tool:dna', 480, 340), @('wide-cell-kept-small', 'tool:cell', 748, 603))) {
             if ($script:mine -notcontains $kept[0]) { continue }
             $keptLog = "shots/profile-$($kept[0]).log"
-            $m = @(Select-String -Path $keptLog -Pattern "large popup $($kept[1]) opens at (\d+)\D+(\d+) \(the student's\)" -ErrorAction SilentlyContinue) | Select-Object -First 1
+            $m = @(Select-String -Path $keptLog -Pattern "large popup $($kept[1]) opens at (\d+)\D+(\d+) \(as sized\)" -ErrorAction SilentlyContinue) | Select-Object -First 1
             if (-not $m -or [Math]::Abs([int]$m.Matches[0].Groups[1].Value - $kept[2]) -gt 2 -or [Math]::Abs([int]$m.Matches[0].Groups[2].Value - $kept[3]) -gt 2) { Write-Host "::error::$($kept[0]): the popup did not open at $($kept[2]) by $($kept[3]), the student's size held to the room ($($m.Line)) ($keptLog)"; exit 1 }
             Write-Host "$($kept[0]): $($m.Matches[0].Value)"
           }
@@ -1295,8 +1295,8 @@ jobs:
             Write-Host "popup-move: $($mv.Value); then $($md.Value)"
           }
           # a large popup sized by its right edge as a student sizes it, then Simpl opened again: its popup opens at the
-          # size kept (Shell/FloatPopup.cs: "popup drag: tool:dna is …, kept as …", "large popup tool:dna opens at … (the
-          # student's)")
+          # size kept (Shell/FloatPopup.cs: "popup drag: tool:dna is …, kept as …", "large popup tool:dna opens at … (as
+          # sized)" — not "the student's": the logs are checked for that word)
           if ($script:mine -contains 'popup-kept') {
             $dragSaid = if (Test-Path shots/popup-drag.log) { Get-Content shots/popup-drag.log -Raw } else { '' }
             $m = [regex]::Match($dragSaid, 'popup drag: tool:dna is (\d+)\D+(\d+), kept as (\d+),(\d+)')
@@ -1305,7 +1305,7 @@ jobs:
             if ($kw -lt 900 -or $kw -gt 1100 -or [Math]::Abs($kh - 682) -gt 2) { Write-Host "::error::popup-drag: the size kept, $kw by $kh, is not the popup's 1318 by 682 made 300 narrower by its edge (shots/popup-drag.log)"; exit 1 }
             $keptSaid = if (Test-Path shots/popup-kept.log) { Get-Content shots/popup-kept.log -Raw } else { '' }
             $second = $keptSaid.Substring([Math]::Min($keptSaid.Length, $dragSaid.Length))
-            if ($second -notmatch "large popup tool:dna opens at $kw\D+$kh \(the student's\)") { Write-Host "::error::popup-kept: the tool's popup did not open at the size kept, $kw by $kh (shots/popup-kept.log)"; exit 1 }
+            if ($second -notmatch "large popup tool:dna opens at $kw\D+$kh \(as sized\)") { Write-Host "::error::popup-kept: the tool's popup did not open at the size kept, $kw by $kh (shots/popup-kept.log)"; exit 1 }
             Write-Host "popup-drag: sized by its edge to $kw by $kh and kept; popup-kept: opened at it"
           }
           # the live check (Shell/LiveCheck.cs): before the mock changed, a check found nothing new; after, one found the
