@@ -326,7 +326,7 @@ try {
   const home = await state();
   const nav = await page.$$eval('.bcv-nav__item, [data-nav]', (els) => els.map((e) => (e.innerText || '').trim().split('\n')[0]).filter(Boolean)).catch(() => []);
   const dash = await mainText();
-  check(homeDrawn && home.on && home.d2l && home.app && /Dashboard/.test(dash) && /BIO 110/.test(dash), `signed in, Brightspace’s homepage is the Dashboard: ${JSON.stringify(home)}`);
+  check(homeDrawn && home.on && home.d2l && home.app && /Good (morning|afternoon|evening)|Dashboard/.test(dash) && /BIO 110/.test(dash), `signed in, Brightspace’s homepage is the Dashboard: ${JSON.stringify(home)}`);
   const navText = await page.evaluate(() => (document.querySelector('#bcv-side, .bcv-side, nav')?.innerText || '').replace(/\s+/g, ' '));
   check(!/\bInbox\b/.test(navText) && !/\bGroups\b/.test(navText) && /To Do/.test(navText) && /Calendar/.test(navText), `the sidebar has no Inbox and no Groups (Brightspace has neither here): ${navText.slice(0, 160)}${nav.length ? '' : ''}`);
   await shot('dashboard');

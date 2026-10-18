@@ -45,6 +45,12 @@ let src = readFileSync(join(root, 'scripts', 'dev', 'mock-canvas.mjs'), 'utf8').
 const IMPORT = "import http from 'node:http';";
 if (!src.includes(IMPORT)) fail(`the mock no longer starts with ${IMPORT} — look at what it imports now`);
 src = src.replace(/^#!.*\n/, '').replace(IMPORT, '// (node:http: stood in for above)');
+// (Macmillan's stand-in pages, scripts/dev/mock-macmillan.mjs: two strings of HTML, put in where the mock imports them)
+const MM_IMPORT = "import { MACMILLAN_HUB_HTML, MACMILLAN_SAC_HTML } from './mock-macmillan.mjs';";
+if (src.includes(MM_IMPORT)) {
+  const mm = readFileSync(join(root, 'scripts', 'dev', 'mock-macmillan.mjs'), 'utf8').replace(/\r\n/g, '\n').replace(/^export const /gm, 'const ');
+  src = src.replace(MM_IMPORT, () => `// (mock-macmillan.mjs, put in here)\n${mm}`);
+}
 // (the test school is no real school: the mock's few words of the university it was first drawn from — an address, a
 // notice's title, a mascot's greeting — are made the test school's own, here only; CI's mock keeps them)
 src = src.replaceAll('ucmerced.edu', 'test.simpl.com').replaceAll('UC Merced', 'Simpl Test School').replaceAll('Hello Bobcat!', 'Hello!').replaceAll('Bobcat', 'Student');
