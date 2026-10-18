@@ -135,7 +135,15 @@ struct AltaQuizScreen: View {
                     .popover(isPresented: $showLogs, arrowEdge: .bottom) { logs }
                     .transition(.opacity)
                 }
-                // (1.3.72: Save Page Code is in the Developer menu now)
+                // (1.3.109) Save Page Code here too, to developers (and in the Developer menu): the page as it is now
+                if dev.unlocked {
+                    Button { DevMode.saveAltaCode(withLogs: false) } label: {
+                        Label("Save Page Code", systemImage: "chevron.left.forwardslash.chevron.right")
+                    }
+                    .glassButton()
+                    .help("Save every bit of Alta's page code to Downloads (developer mode)")
+                    .transition(.opacity)
+                }
                 Button("Close") { dismiss() }
                     .glassButton()
                     .keyboardShortcut(session.dialog == nil ? KeyboardShortcut.cancelAction : nil) // (1.3.84: Escape the pop-up's while one is up)

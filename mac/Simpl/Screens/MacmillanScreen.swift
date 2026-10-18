@@ -14,6 +14,7 @@ struct MacmillanScreen: View {
     @Environment(\.popupSize) private var popupSize
     @State private var saving = false
     @State private var saved: URL?
+    @ObservedObject private var dev = DevMode.shared // (1.3.109: Save Page Code in the header, to developers)
     /// (1.3.78) The Canvas assignment's name and due line, for the header as Alta's has it.
     @State private var canvas: CanvasDue.Facts?
 
@@ -55,8 +56,17 @@ struct MacmillanScreen: View {
             }
             Spacer(minLength: 8)
             PopupPins() // (1.3.73: the toolbar's pins, here too)
-            // (1.3.72: Save Page Code is in the Developer menu now)
             GlassGroup(spacing: 8) {
+                // (1.3.109) Save Page Code here too, to developers (and in the Developer menu)
+                if dev.unlocked {
+                    Button {
+                        Task { if let f = await session.savePageCode() { saved = f } else { NSSound.beep() } }
+                    } label: {
+                        Label("Save Page Code", systemImage: "chevron.left.forwardslash.chevron.right")
+                    }
+                    .glassButton()
+                    .help("Save every bit of the page's code to Downloads (developer mode)")
+                }
                 Button("Close") { dismiss() }
                     .glassButton()
                     .keyboardShortcut(.cancelAction)

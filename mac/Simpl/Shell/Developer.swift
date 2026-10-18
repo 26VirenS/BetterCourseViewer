@@ -6,6 +6,10 @@ import SwiftUI
 /// menu and the Developer window opens: what the app is running on, its updates, its engine (a console that calls it),
 /// Knewton Alta and Macmillan (Save Page Code lives here now, and Alta's Error Logs), the interface's first-run steps
 /// and its window, and every preference it keeps.
+/// (1.3.109) And its live pages (Shell/DeveloperTools.swift): Logs — the app's own log, filtered, followed, copied or saved;
+/// System — processor, memory and threads charted over two minutes, the Mac's thermal state, the storage the app uses;
+/// Stats — every call the engine made, how often, how long, how many failed. Save Page Code is in Alta's and Macmillan's
+/// popups too while developer mode is on.
 @MainActor
 final class DevMode: ObservableObject {
     static let shared = DevMode()
@@ -134,11 +138,14 @@ struct DeveloperView: View {
     @State private var page: Page? = .overview
 
     enum Page: String, CaseIterable, Identifiable {
-        case overview, updates, engine, popups, interface, preferences
+        case overview, logs, system, stats, updates, engine, popups, interface, preferences // (1.3.109: logs, system, stats)
         var id: String { rawValue }
         var title: String {
             switch self {
             case .overview: return "Overview"
+            case .logs: return "Logs"
+            case .system: return "System"
+            case .stats: return "Stats"
             case .updates: return "Updates"
             case .engine: return "Engine"
             case .popups: return "Alta & Macmillan"
@@ -149,6 +156,9 @@ struct DeveloperView: View {
         var symbol: String {
             switch self {
             case .overview: return "info.circle"
+            case .logs: return "text.alignleft"
+            case .system: return "gauge.with.dots.needle.33percent"
+            case .stats: return "chart.bar.xaxis"
             case .updates: return "arrow.down.circle"
             case .engine: return "terminal"
             case .popups: return "brain.head.profile"
@@ -168,6 +178,9 @@ struct DeveloperView: View {
             Group {
                 switch page ?? .overview {
                 case .overview: DevOverview()
+                case .logs: DevLogsPage()
+                case .system: DevSystemPage()
+                case .stats: DevStatsPage()
                 case .updates: DevUpdates()
                 case .engine: DevEngine(engine: model.engine)
                 case .popups: DevPopups()

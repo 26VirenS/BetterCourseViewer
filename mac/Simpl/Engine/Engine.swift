@@ -679,7 +679,11 @@ final class Engine: ObservableObject, ShellListener {
         let held = AnswerMemo.held.contains(name)
         let generation = memo.generation
         let started = CACurrentMediaTime()
-        let data = try await answer(name, args, shared: held)
+        let data: Data
+        do { data = try await answer(name, args, shared: held) } catch {
+            DevStats.shared.record(name, ms: (CACurrentMediaTime() - started) * 1000, ok: false, quiet: quiet) // (1.3.109: Developer ▸ Stats)
+            throw error
+        }
         let got: (value: T, fingerprint: String?)
         do {
             // (off the main thread: a long answer never holds up the window; a read's fingerprint with it, 1.3.80)
@@ -696,6 +700,7 @@ final class Engine: ObservableObject, ShellListener {
         } else if !AnswerMemo.neutral.contains(name) {
             memo.invalidate() // (something was done: what the screens hold is asked for again as each opens)
         }
+        DevStats.shared.record(name, ms: (CACurrentMediaTime() - started) * 1000, ok: true, quiet: quiet) // (1.3.109: Developer ▸ Stats)
         if OpenClock.verbose {
             NSLog("[Simpl] %@ %@: %d ms", quiet ? "read ahead" : "call", name, Int(((CACurrentMediaTime() - started) * 1000).rounded()))
         }
