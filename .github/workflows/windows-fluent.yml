@@ -509,6 +509,8 @@ jobs:
           Shot 'alta-overview' '1366x778' 50 ($mock + @('--appearance', 'light', '--open', 'alta:104:4003'))
           Shot 'alta-start' '1366x778' 50 ($mock + @('--appearance', 'dark', '--open', 'alta:104:4004'))
           Shot 'macmillan' '1366x778' 50 ($mock + @('--appearance', 'light', '--open', 'macmillan:104:4005'))
+          # (0.3.32) Macmillan skinned as Alta is: the cover as a start screen above, a question with the rail and the bar here
+          Shot 'macmillan-question' '1366x778' 50 ($mock + @('--appearance', 'light', '--open', 'macmillan:104:4005', '--macmillan-open', 'yes'))
           # Settings, as Windows 11's own Settings app, on each of its categories
           foreach ($tab in @('general', 'notifications', 'grades', 'data', 'updates', 'about')) {
             Shot "settings-$tab" '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', $tab))
