@@ -39,7 +39,7 @@ mkdirSync(logs, { recursive: true });
 // every suite; smoke as its shards (smoke-shards.mjs)
 // (on the Windows branch, every suite but test-school: it checks the iPhone app's test school, ios/SimplCourses/
 // Resources/TestSchool, which this branch does not carry — the Mac branch runs it)
-const SUITES = [...Object.keys(SMOKE_SHARDS).map((s) => `smoke:${s}`), 'phone', 'zoom', 'chrome-setup', 'mac-window', 'side-courses', 'app-sync', 'group-late', 'null', 'stale', 'report', 'api', 'ios', 'toolbar', 'd2l', 'alta', 'fluid', 'solver'];
+const SUITES = [...Object.keys(SMOKE_SHARDS).map((s) => `smoke:${s}`), 'phone', 'zoom', 'chrome-setup', 'mac-window', 'side-courses', 'app-sync', 'group-late', 'null', 'stale', 'report', 'api', 'ios', 'toolbar', 'd2l', 'alta', 'fluid'];
 const args = process.argv.slice(2);
 const opt = (name) => { const i = args.indexOf(name); return i >= 0 ? (args[i + 1] || '') : null; };
 const only = opt('--only')?.split(',').map((s) => s.trim()).filter(Boolean);

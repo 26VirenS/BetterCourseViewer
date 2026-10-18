@@ -26,6 +26,9 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.30", "2026-10-18",
+            ("new", "GeoGebra Calculator", "The Calculator is GeoGebra: graphs, CAS, 3D and more."),
+            ("improved", "Scientific in the Pin", "The pinned Calculator is GeoGebra's scientific one.")),
         R("0.3.29", "2026-10-18",
             ("new", "Step-by-Step Solver", "Equations, factoring, calculus and more, with every step."),
             ("new", "Graphs and Keypad", "Graph any answer; build problems on the maths keypad.")),

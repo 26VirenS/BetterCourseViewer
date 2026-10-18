@@ -481,11 +481,16 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
 
     /// <summary>The size the student last gave a large popup of this kind by its edges (Prefs "popup:&lt;key&gt;", its
     /// width and height) — in a development run, --popup-size 900x560 as if they had: null, none.</summary>
+    /// <summary>(0.3.30) The size a tool opens at before its student sizes it, where filling the room would only stretch
+    /// it: the Calculator (GeoGebra's) narrower than the window.</summary>
+    private static readonly Dictionary<string, Size> Opening = new() { ["tool:calc"] = new Size(900, 860) };
+
     private static Size? Remembered(string? key)
     {
         if (key == null) return null;
         var said = (Launch.IsDevelopment ? Launch.Get("popup-size") : null) ?? Prefs.String($"popup:{key}");
-        var p = said?.Split(',', 'x');
+        if (said == null) return Opening.TryGetValue(key, out var o) ? o : null;
+        var p = said.Split(',', 'x');
         if (p is not { Length: 2 }
             || !double.TryParse(p[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var w)
             || !double.TryParse(p[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var h)

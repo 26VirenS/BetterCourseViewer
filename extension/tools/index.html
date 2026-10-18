@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calculator</title>
+<!-- The Mac and Windows apps' Calculator: GeoGebra's own app (geogebra.org's deployggb.js), the whole Calculator Suite
+     in the tool and the scientific calculator in its pin, sized to the web view it is shown in. GeoGebra is loaded
+     from geogebra.org each time, so it needs the internet: without it, a note and Try again. -->
+<style>
+  :root { color-scheme: light; --bg: #ffffff; --ink: #1d1d1f; --ink2: #6e6e73; --accent: #0a84ff; }
+  :root[data-theme="dark"] { color-scheme: dark; --bg: #1c1c1e; --ink: #f5f5f7; --ink2: #a1a1a6; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink);
+    font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+  #ggb { position: absolute; inset: 0; }
+  .state { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; }
+  .state[hidden] { display: none; }
+  .state p { margin: 0 0 12px; color: var(--ink2); max-width: 320px; }
+  .state button { font: inherit; font-weight: 600; border: 0; border-radius: 999px; padding: 8px 18px; background: var(--accent); color: #fff; cursor: pointer; }
+  .spin { width: 22px; height: 22px; border-radius: 50%; border: 2.5px solid color-mix(in srgb, var(--ink2) 30%, transparent); border-top-color: var(--accent); animation: spin 0.8s linear infinite; margin: 0 auto 10px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2.4s; } }
+</style>
+</head>
+<body>
+<div id="ggb"></div>
+<div id="loading" class="state"><div><div class="spin"></div><p>Opening GeoGebra…</p></div></div>
+<div id="offline" class="state" hidden><div><p>GeoGebra needs the internet. Check your connection, then try again.</p><button id="retry">Try again</button></div></div>
+<script>
+(function () {
+  'use strict';
+  // (the page's settings: in its query, or — the Mac's, a file's query not kept by every WebKit — its fragment)
+  const P = new URLSearchParams(location.search || location.hash.slice(1));
+  const root = document.documentElement;
+  root.dataset.theme = P.get('theme') === 'dark' ? 'dark' : 'light';
+  if (/^#[0-9a-f]{6}$/i.test(P.get('accent') || '')) root.style.setProperty('--accent', P.get('accent'));
+  const compact = P.get('compact') === '1';
+  const post = (m) => {
+    try {
+      if (window.webkit && webkit.messageHandlers && webkit.messageHandlers.simplSolver) webkit.messageHandlers.simplSolver.postMessage(m);
+      else if (window.chrome && chrome.webview) chrome.webview.postMessage(JSON.stringify(Object.assign({ solver: true }, m)));
+    } catch (e) { /* (no app around it: a browser) */ }
+  };
+  const $ = (id) => document.getElementById(id);
+  let api = null;
+
+  function start() {
+    $('offline').hidden = true;
+    $('loading').hidden = false;
+    const s = document.createElement('script');
+    s.src = 'https://www.geogebra.org/apps/deployggb.js';
+    s.onload = inject;
+    s.onerror = () => { s.remove(); offline(); };
+    document.head.appendChild(s);
+  }
+  function offline() { $('loading').hidden = true; $('offline').hidden = false; post({ kind: 'offline' }); }
+
+  function inject() {
+    if (typeof GGBApplet !== 'function') { offline(); return; }
+    const applet = new GGBApplet({
+      appName: compact ? 'scientific' : 'suite',
+      width: innerWidth, height: innerHeight,
+      showToolBar: true, showAlgebraInput: true, showMenuBar: !compact,
+      enableRightClick: true, enableShiftDragZoom: true, showZoomButtons: !compact,
+      showResetIcon: false, showFullscreenButton: false, enableUndoRedo: true,
+      language: 'en', borderColor: getComputedStyle(root).getPropertyValue('--bg').trim(), borderRadius: 0,
+      appletOnLoad: (a) => {
+        api = a;
+        $('loading').hidden = true;
+        const first = P.get('q');
+        if (first) { try { a.evalCommand(first); } catch (e) { /* (not a command GeoGebra takes) */ } }
+        post({ kind: 'ready' });
+      },
+    }, true);
+    applet.inject('ggb');
+    // (still not there after 25 s: the internet, or geogebra.org, is not answering)
+    setTimeout(() => { if (!api) offline(); }, 25000);
+  }
+
+  // (the web view sized again: GeoGebra with it)
+  let t = 0;
+  addEventListener('resize', () => {
+    clearTimeout(t);
+    t = setTimeout(() => { try { api && api.setSize(innerWidth, innerHeight); } catch (e) { /* (going away) */ } }, 60);
+  });
+  $('retry').onclick = () => { $('ggb').innerHTML = ''; start(); };
+  window.simplSolverTheme = (theme, acc) => {
+    root.dataset.theme = theme === 'dark' ? 'dark' : 'light';
+    if (/^#[0-9a-f]{6}$/i.test(acc || '')) root.style.setProperty('--accent', acc);
+  };
+  start();
+})();
+</script>
+</body>
+</html>

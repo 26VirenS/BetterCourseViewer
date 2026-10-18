@@ -9,41 +9,29 @@ using Simpl.Support;
 
 namespace Simpl.Tools;
 
-// (0.3.29, the Mac's SolverTool.swift) The Calculator, as Mathway's: a problem typed (or built on the keypad) and sent;
-// the ways it can be worked offered; the one picked worked out — its answer exact and as a decimal, its steps, its graph.
-// The page and its maths are the extension's (extension/tools/solver: the solver, its keypad, KaTeX to write the maths),
-// shown in a web view with the app's look — light or dark, its accent — and the pin's own narrow version, which carries
-// what was typed in it to the whole calculator.
+// (0.3.30, the Mac's GeoGebraTool.swift) The Calculator is GeoGebra's: its Calculator Suite (graphing, geometry, 3D,
+// CAS, probability, the scientific calculator) in the tool, its scientific calculator in the pin. The page is the
+// extension's (extension/tools/geogebra), which loads GeoGebra from geogebra.org into a web view — so it needs the
+// internet, and says so with Try again without it.
 
-/// <summary>The solver's page in a web view (the pin's: WebView2's composition control, the one kind a see-through
-/// flyout shows); made as it is shown, let go when it goes.</summary>
-internal sealed class SolverView : Grid
+/// <summary>GeoGebra's page in a web view (the pin's: WebView2's composition control, the one kind a see-through flyout
+/// shows); made as it is shown, let go when it goes.</summary>
+internal sealed class GeoGebraView : Grid
 {
     private const string Host = "simpl-solver.local";
     private readonly ToolContext ctx;
     private readonly bool compact;
-    private readonly string? problem, option;
+    private readonly string? problem;
     private FrameworkElement? web;
     private CoreWebView2? core;
-    private string typed = "";
 
-    public SolverView(ToolContext c, bool compact)
+    public GeoGebraView(ToolContext c, bool compact)
     {
         ctx = c;
         this.compact = compact;
-        // (the pin's problem carried over, else the screenshot suite's: --solver "x^2 - x - 1 = 0" --solver-option solve:x,
-        //  or the old calculator's --calc-expr)
-        if (!compact)
-        {
-            problem = c.TakeInfo("problem") ?? Launch.Take("", "solver") ?? Launch.Take("", "calc-expr")?.TrimEnd('=');
-            option = c.TakeInfo("option") ?? Launch.Take("", "solver-option");
-        }
-        else
-        {
-            problem = Launch.Take("", "calc-expr")?.TrimEnd('=');
-            c.Carry = () => typed.Length > 0 ? new Dictionary<string, string> { ["problem"] = typed } : null;
-            Height = 460;
-        }
+        // (the screenshot suite's: --geogebra "f(x) = x^2 - 2x - 3", a command GeoGebra runs as it opens)
+        if (!compact) problem = Launch.Take("", "geogebra");
+        else Height = 460;
         Loaded += (_, _) => Start();
         Unloaded += (_, _) => Stop();
     }
@@ -103,8 +91,7 @@ internal sealed class SolverView : Grid
         };
         if (compact) q.Add("compact=1");
         if (!string.IsNullOrWhiteSpace(problem)) q.Add("q=" + Uri.EscapeDataString(problem));
-        if (!string.IsNullOrWhiteSpace(option)) q.Add("option=" + Uri.EscapeDataString(option));
-        return $"https://{Host}/tools/solver/index.html?" + string.Join("&", q);
+        return $"https://{Host}/tools/geogebra/index.html?" + string.Join("&", q);
     }
 
     private static string Hex(System.Windows.Media.Color c) => $"#{c.R:x2}{c.G:x2}{c.B:x2}";
@@ -122,17 +109,10 @@ internal sealed class SolverView : Grid
         JsonObject? o;
         try { o = JsonNode.Parse(json) as JsonObject; } catch { return; }
         if (o == null || o["solver"]?.GetValue<bool>() != true) return;
-        var text = o["text"]?.GetValue<string>() ?? "";
         switch (o["kind"]?.GetValue<string>())
         {
-            case "text": typed = text; break;
-            case "copy": try { Clipboard.SetText(text); } catch { } break;
-            case "openFull":
-                var info = new Dictionary<string, string> { ["problem"] = text };
-                if (o["option"]?.GetValue<string>() is { Length: > 0 } opt) info["option"] = opt;
-                ctx.OpenFull(info, null);
-                break;
-            case "ready": if (Shot.Asked) Log.Write("calculator: the solver is ready"); break;
+            case "ready": Log.Write("calculator: GeoGebra is ready"); break;
+            case "offline": Log.Write("calculator: GeoGebra could not be loaded"); break;
         }
     }
 

@@ -17,7 +17,7 @@ internal static class CalculatorRegistration
 {
     [System.Runtime.CompilerServices.ModuleInitializer]
     // (0.3.29: the Calculator is the solver, SolverTool.cs; this scientific calculator's engine stays, for its tests)
-    internal static void Register() => ToolRegistry.Register("calc", c => new SolverView(c, compact: false), c => new SolverView(c, compact: true));
+    internal static void Register() => ToolRegistry.Register("calc", c => new GeoGebraView(c, compact: false), c => new GeoGebraView(c, compact: true));
 }
 #pragma warning restore CA2255
 
