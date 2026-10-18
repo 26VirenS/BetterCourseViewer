@@ -1,3 +1,7 @@
+**What's new in 0.3.27** (beta)
+
+- **Developer tools** — hidden until you click Settings ▸ About ▸ Version seven times (or press Ctrl+Alt+Shift+D): a Developer window with the logs as they are written (search, problems only, follow, copy, save, clear), system use (Simpl's and WebView2's processor and memory over the last two minutes, threads, handles, .NET's heap, stalls, disk), stats for every call into the page (count, failed, mean, middle, 95th, longest), a call console, updates and every preference. Knewton Alta's and Macmillan Learning's popups get Save Page Code.
+
 **What's new in 0.3.26** (beta)
 
 - **Front page first** — a course's home leads with its front page, in the wide column, with its latest announcements (three at most, a line each) just above it; with no front page, the announcements take its place. The work still to do moves to the narrow column beside it.

@@ -42,7 +42,10 @@ internal sealed class MacmillanPopupView
     private bool opening = true;
     /// <summary>The launch could not be had from Canvas.</summary>
     private string? failure;
-    private bool started, closing, closed;
+    private bool started, closing, closed, saving;
+    /// <summary>(0.3.27) Save Page Code, with the developer tools on; the page's frames kept for it.</summary>
+    private readonly ContentControl codeSlot = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
+    private PageCode? code;
 
     public MacmillanPopupView(Engine.Engine engine, AltaLaunch launch, Window over)
     {
@@ -55,7 +58,7 @@ internal sealed class MacmillanPopupView
         var tile = K.IconTile(SymbolRegular.Library24, K.Tone("red"), 32);
         title = K.Text(launch.Title, Ty.Subtitle);
         subtitle = K.Text("Macmillan Learning", Ty.Body, B.Text2);
-        header = AltaLook.Header(engine, tile, title, subtitle, null, Close, "Close — your work is kept by Macmillan");
+        header = AltaLook.Header(engine, tile, title, subtitle, codeSlot, Close, "Close — your work is kept by Macmillan");
         root.Children.Add(header.Row(0));
         // (the page on white, edge to edge under the header, as Macmillan draws it — clear of the popup's rounded foot;
         // the popup's own ground in its place while it opens)
@@ -75,6 +78,8 @@ internal sealed class MacmillanPopupView
         // (no update goes in while it is open: Support/Updates.cs, the Mac's UpdateHold)
         sheet.Closed += Support.Updates.Hold("Macmillan Learning", "when you close Macmillan Learning").Dispose;
         root.PreviewKeyDown += OnKey;
+        DevMode.Changed += OnDevMode;
+        CodeButton();
         RoutedEventHandler? loaded = null;
         loaded = (_, _) =>
         {
@@ -171,6 +176,7 @@ internal sealed class MacmillanPopupView
         // (Macmillan's page in light, as it is made, whatever the app's appearance: the popup's own header stays as the app is)
         await LightPages.Apply(core, "macmillan");
         if (closed) return;
+        code = new PageCode(core, "Macmillan");
         core.NavigationCompleted += (_, e) =>
         {
             if (e.IsSuccess) NameFromPage(core);
@@ -221,7 +227,32 @@ internal sealed class MacmillanPopupView
         Hold(false);
         closing = true;
         root.PreviewKeyDown -= OnKey;
+        DevMode.Changed -= OnDevMode;
         try { web.Dispose(); } catch { }
+    }
+
+    private void OnDevMode() => root.Dispatcher.BeginInvoke(() => { if (!closing) CodeButton(); });
+
+    private void CodeButton()
+    {
+        if (!DevMode.On) { codeSlot.Content = null; return; }
+        if (codeSlot.Content != null) return;
+        var save = K.Button("Save Page Code", SaveCode, icon: SymbolRegular.Code24);
+        save.ToolTip = "Every bit of Macmillan’s page code, in one text file in Downloads";
+        codeSlot.Content = save;
+    }
+
+    /// <summary>The page's code saved (PageCode), then said where — or a beep when nothing could be read.</summary>
+    private async void SaveCode()
+    {
+        if (saving || code == null || opening || failure != null) { System.Media.SystemSounds.Beep.Play(); return; }
+        saving = true;
+        var file = await code.Save();
+        saving = false;
+        if (closing) return;
+        if (file == null) { System.Media.SystemSounds.Beep.Play(); return; }
+        if (await Dialogs.Ask(Window.GetWindow(root) ?? over, "Page code saved", $"Every bit of Macmillan’s page code — the page, each frame in it, and the scripts and style sheets they load — is in Downloads as “{System.IO.Path.GetFileName(file)}”.", "Show in File Explorer", "OK"))
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{file}\"") { UseShellExecute = true }); } catch { }
     }
 
     /// <summary>Escape closes, unless the page has the keyboard (its own Escape: a menu, a pop-up of Macmillan's).</summary>

@@ -52,6 +52,8 @@ internal sealed class AltaPopupView
     private readonly TextBlock title = K.Text("", Ty.Subtitle);
     private readonly TextBlock subtitle = K.Text("", Ty.Body, B.Text2);
     private readonly ContentControl logsSlot = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
+    /// <summary>(0.3.27) Save Page Code, with the developer tools on.</summary>
+    private readonly ContentControl codeSlot = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
     private readonly ScrollViewer rail = new() { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false };
     private readonly Border webHolder = new();
     /// <summary>(0.3.5) Where Alta's page and what the popup shows in its place are, dressed in the page's look
@@ -87,7 +89,7 @@ internal sealed class AltaPopupView
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         tileSlot.Content = Tile(32);
         title.Text = launch.Title;
-        header = AltaLook.Header(engine, tileSlot, title, subtitle, logsSlot, Close, "Close — your progress is kept by Alta");
+        header = AltaLook.Header(engine, tileSlot, title, subtitle, K.H(8, codeSlot, logsSlot), Close, "Close — your progress is kept by Alta");
         root.Children.Add(header.Row(0));
 
         // the rail under Light or Dark for the page, and Alta's page in its frame (the popup's own in its place while it
@@ -127,6 +129,7 @@ internal sealed class AltaPopupView
         session.Changed += Update;
         layer.Gone += Update;
         Support.Appearance.Changed += OnAppearance;
+        Support.DevMode.Changed += OnDevMode;
         root.PreviewKeyDown += OnKey;
         RoutedEventHandler? loaded = null;
         loaded = (_, _) =>
@@ -175,6 +178,7 @@ internal sealed class AltaPopupView
         closing = true;
         root.PreviewKeyDown -= OnKey;
         Support.Appearance.Changed -= OnAppearance;
+        Support.DevMode.Changed -= OnDevMode;
         session.Changed -= Update;
         layer.Gone -= Update;
         goingBack?.Stop();
@@ -506,9 +510,24 @@ internal sealed class AltaPopupView
 
     // ---- (1.3.47) the Error Logs, to developers ----
 
+    private void OnDevMode() => root.Dispatcher.BeginInvoke(() => { if (!closing) UpdateLogs(); });
+
     private void UpdateLogs()
     {
-        var n = Support.Launch.IsDevelopment ? session.ErrorLogs.Count : 0;
+        // (0.3.27) Save Page Code, and the Error logs, to anyone with the developer tools on too
+        var dev = Support.DevMode.On;
+        if (dev != (codeSlot.Content != null))
+        {
+            if (dev)
+            {
+                var save = K.Button("Save Page Code", () => SaveCode(false), icon: SymbolRegular.Code24);
+                save.ToolTip = "Every bit of Alta’s page code, in one text file in Downloads";
+                codeSlot.Content = save;
+                Motion.FadeIn(save);
+            }
+            else codeSlot.Content = null;
+        }
+        var n = Support.Launch.IsDevelopment || dev ? session.ErrorLogs.Count : 0;
         if (n == logsCount) return;
         logsCount = n;
         if (n == 0) { logsSlot.Content = null; return; }

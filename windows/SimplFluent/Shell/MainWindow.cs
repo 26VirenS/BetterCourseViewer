@@ -186,6 +186,8 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         SizeChanged += (_, _) => { Placement.Save(this, "main"); shell?.WindowWidth(ActualWidth); UpdateTitleButtons(); };
         LocationChanged += (_, _) => Placement.Save(this, "main");
         PreviewKeyDown += OnKey;
+        // (0.3.27) the developer tools' window, asked for (About's Version clicked seven times, Ctrl+Alt+Shift+D)
+        DevMode.OpenAsked += () => Dispatcher.BeginInvoke(() => { if (engine != null) DeveloperWindow.Show(this, engine); });
         PreviewMouseDown += (_, e) =>
         {
             // (a press on the title bar, outside the shell, folds back what the shell has open too)
@@ -521,6 +523,8 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         if (tour?.On == true) return;
         var ctrl = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
         var alt = (Keyboard.Modifiers & ModifierKeys.Alt) != 0;
+        // (0.3.27) Ctrl+Alt+Shift+D: the developer tools, in or out again (Support/DevMode)
+        if (ctrl && alt && (Keyboard.Modifiers & ModifierKeys.Shift) != 0 && (e.Key == Key.System ? e.SystemKey : e.Key) == Key.D) { DevMode.Toggle(); e.Handled = true; return; }
         if (e.Key == Key.Escape && shell != null && shell.Escape()) { e.Handled = true; return; }
         if (alt && e.SystemKey == Key.Left) { engine?.GoBack(); e.Handled = true; return; }
         if (alt && e.SystemKey == Key.Right) { engine?.GoForward(); e.Handled = true; return; }

@@ -182,6 +182,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         Appearance.Changed += OnAppearance;
         LoginVault.Changed += OnSignIn;
         Hello.Changed += OnSignIn;
+        DevMode.Changed += OnDevMode;
         // (coming forward — back from Windows' Settings, perhaps, where Windows Hello was just set up: asked again)
         Activated += (_, _) => _ = Hello.CheckAsync(fresh: true);
         Closed += (_, _) =>
@@ -191,6 +192,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
             Appearance.Changed -= OnAppearance;
             LoginVault.Changed -= OnSignIn;
             Hello.Changed -= OnSignIn;
+            DevMode.Changed -= OnDevMode;
             open = null;
             main.Activate();
         };
@@ -219,6 +221,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         if (downloadBar != null) downloadBar.Value = Updates.Progress * 100;
         if (downloadWords != null) downloadWords.Text = DownloadWords();
     });
+    private void OnDevMode() => Dispatcher.BeginInvoke(() => { if (open == this && tab == "about") Render(); });
     private void OnAppearance() => Dispatcher.BeginInvoke(() => { Pane(); if (tab == "appearance") Render(); });
     /// <summary>The saved sign-in kept, locked or forgotten, or Windows Hello set up or not: General and Data say it.</summary>
     private void OnSignIn() => Dispatcher.BeginInvoke(() => { if (open == this && tab is "general" or "data") Render(); });
@@ -1416,7 +1419,9 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         var v = Column(head, new Border { Height = 4 },
             K.Group(
                 // (onboarding-21: one row, the interface's version said in it — not a row of its own explaining itself)
-                K.Row(SymbolRegular.Info24, "Version", null, K.Text(VersionLine, Ty.Body, B.Text2)),
+                // (0.3.27) seven clicks on it within four seconds: the developer tools (Support/DevMode)
+                K.Row(SymbolRegular.Info24, "Version", null, K.Text(VersionLine, Ty.Body, B.Text2), DevMode.Tap, chevron: false),
+                DevMode.On ? K.Row(SymbolRegular.WindowDevTools24, "Developer tools", "Logs, system use, stats, the engine’s calls and preferences.", null, () => DeveloperWindow.Show(main, engine)) : null,
                 K.Row(SymbolRegular.Bug24, "Report a bug", "Tell us what went wrong, and what you were doing.", null, () => Engine.Engine.OpenExternally(new Uri("https://simplcourses.com/report/")))));
         // (onboarding-29: where the way out is — there is no Sign out on this page — and no folder's path printed)
         v.Children.Add(Foot(Updates.Installed

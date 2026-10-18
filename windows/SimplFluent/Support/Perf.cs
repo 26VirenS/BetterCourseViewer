@@ -132,12 +132,13 @@ public static class Perf
     }
 
     /// <summary>The call answered, failed or went away.</summary>
-    public static void CallEnded(string name, long at)
+    public static void CallEnded(string name, long at, bool ok = true)
     {
         try
         {
             var t = Ticks();
             var ms = Ms(at, t);
+            DevStats.Record(name, ms, ok);
             long seq = 0;
             lock (Gate)
             {

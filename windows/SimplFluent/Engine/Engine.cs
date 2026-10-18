@@ -743,6 +743,7 @@ public sealed partial class Engine : Observable, IShellListener
             callsInFlight++;
             LastCallAt = Environment.TickCount64;
             var perfAt = Perf.CallStarted(name);
+            var answered = false;
             try
             {
                 await Web.CoreWebView2.ExecuteScriptAsync($"window.__simplCall&&window.__simplCall({id},{Json.Str(name)},{Json.Literal(a)})");
@@ -751,7 +752,7 @@ public sealed partial class Engine : Observable, IShellListener
                 wait.Cancel(); // (its timer let go of as soon as the answer is in)
                 if (finished != done.Task) throw new EngineException("The page did not answer.");
                 var (ok, text) = done.Task.Result;
-                if (ok) return text;
+                if (ok) { answered = true; return text; }
                 if (text == "not ready") { last = new EngineException("not ready"); await Task.Delay(400); continue; }
                 throw new EngineException(text);
             }
@@ -766,7 +767,7 @@ public sealed partial class Engine : Observable, IShellListener
                 Shot.Ended();
                 callsInFlight = Math.Max(0, callsInFlight - 1);
                 LastCallAt = Environment.TickCount64;
-                Perf.CallEnded(name, perfAt);
+                Perf.CallEnded(name, perfAt, answered);
             }
         }
         throw last;
