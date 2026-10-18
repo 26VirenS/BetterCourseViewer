@@ -234,6 +234,7 @@
     // lands on, so each can be ticked off alone and every device sees them all.
     const blank = () => ({ open: false, title: '', date: null, pri: 2, busy: false, course: '', repeat: '', until: null, progress: '' });
     const draft = blank();
+    if (BCV.todoAddNext) { BCV.todoAddNext = false; draft.open = true; setTimeout(() => screen.querySelector('.bcv-todo__title')?.focus(), 300); } // (the Dashboard's New Task: here with the composer open, as the Mac's sheet is)
     const draftStart = () => U.startOfDay(draft.date || new Date());
     const draftDates = () => (draft.repeat ? store.repeatDates(draftStart(), draft.until || U.addDays(draftStart(), REPEAT_UNTIL_DAYS), draft.repeat) : [draftStart()]);
     const canAdd = () => !!draft.title.trim() && !draft.busy && draftDates().length > 0;

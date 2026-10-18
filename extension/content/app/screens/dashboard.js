@@ -213,10 +213,20 @@
     const { app } = ctx;
     const dark = app.isDark();
     const screen = U.el('bcv-screen');
-    const segWrap = h('div', { class: 'bcv-ml-auto' });
+    const segWrap = h('div', { class: 'bcv-dash__views' });
     const body = U.el('bcv-body');
+    // (2.99.41) the Mac's head: a greeting with the student's first name, today's date under it, and the views with
+    // New Task on a row of their own beneath (the name lands from the account, kept for the hour, a moment later)
+    const today = new Date();
+    const part = today.getHours() < 12 ? 'morning' : today.getHours() < 17 ? 'afternoon' : 'evening';
+    const hello = h('h1', { class: 'bcv-h1 bcv-dash__hello', text: `Good ${part}` });
+    store.me().then((me) => { const first = String(me?.shortName || me?.name || '').trim().split(/\s+/)[0]; if (first && first !== 'Account') hello.textContent = `Good ${part}, ${first}`; }).catch(() => {});
+    const newTask = U.btn('New Task', { kind: 'xs', icon: IC.plus, cls: 'bcv-dash__new', title: 'Add a task of your own to To Do', onClick: () => { BCV.todoAddNext = true; app.go('/#todo'); } });
     screen.append(
-      U.el('bcv-head', U.el('bcv-head__in', U.el('bcv-head__row', [h('h1', { class: 'bcv-h1', text: 'Dashboard' }), BCV.search?.field?.(app) || null, segWrap]))),
+      U.el('bcv-head bcv-head--hello', U.el('bcv-head__in', [
+        U.el('bcv-head__row', [U.el('bcv-dash__title', [hello, U.text('bcv-dash__date', `${U.DAYS_LONG[today.getDay()]}, ${U.MONTHS_LONG[today.getMonth()]} ${today.getDate()}`, 'div')]), BCV.search?.field?.(app) || null]),
+        U.el('bcv-dash__bar', [segWrap, newTask]),
+      ])),
       body,
     );
     body.append(U.loading('rows', 6)); // list-row skeletons hold the place until the planner lands
@@ -886,11 +896,16 @@
       const doneOf = (it) => !!(it.complete || it.submitted);
       const doneN = upcoming.filter(doneOf).length;
       const kept = hideDone ? upcoming.filter((it) => !doneOf(it)) : upcoming;
-      const tools = doneN || hideDone ? U.el('bcv-dash__tools', U.btn(hideDone ? `Show completed${doneN ? ` · ${doneN}` : ''}` : 'Hide completed', {
-        kind: 'xs', icon: IC.check, cls: `bcv-dash__done ${hideDone ? 'is-on' : ''}`,
-        title: hideDone ? 'Completed and submitted items are hidden' : 'Hide completed and submitted items',
-        onClick: () => { hideDone = !hideDone; store.setPref('dashHideDone', hideDone); renderBody(); },
-      })) : null;
+      // (2.99.41) the Mac's "Coming up" head: the title, how many are left and done, and Hide Completed at its right
+      const tools = U.el('bcv-dash__tools bcv-dash__coming', [
+        U.h2('Coming up', 'bcv-h2--19'),
+        U.text('bcv-dash__count', `${upcoming.length - doneN} to do${doneN ? ` · ${doneN} done` : ''}`, 'span'),
+        doneN || hideDone ? U.btn(hideDone ? `Show completed${doneN ? ` · ${doneN}` : ''}` : 'Hide completed', {
+          kind: 'xs', icon: IC.check, cls: `bcv-dash__done ${hideDone ? 'is-on' : ''}`,
+          title: hideDone ? 'Completed and submitted items are hidden' : 'Hide completed and submitted items',
+          onClick: () => { hideDone = !hideDone; store.setPref('dashHideDone', hideDone); renderBody(); },
+        }) : null,
+      ].filter(Boolean));
       if (!kept.length) return U.el('bcv-col', [tools, U.emptyCard('Everything coming up is done.')].filter(Boolean), { style: { gap: '12px' } });
       const days = new Map();
       for (const it of kept) {
@@ -1029,7 +1044,8 @@
       if (!ctx.alive() || gen !== bodyGen) return;
       // (2.98.90) the grades skyline at the workload's left, the two side by side (stacked when narrow)
       const pair = sky || work ? U.el('bcv-dash-pair', [sky, work].filter(Boolean)) : null;
-      body.replaceChildren(...[stats, pair, viewEl].filter(Boolean));
+      // (2.99.41) as the Mac lays it out: "Coming up" straight under the counters, the grades and the workload after the list
+      body.replaceChildren(...(view === 'list' ? [stats, viewEl, pair] : [stats, pair, viewEl]).filter(Boolean));
       if (!entered) markArrived();
       entered = true;
     }

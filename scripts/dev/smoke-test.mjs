@@ -553,9 +553,14 @@ try {
   check(stats.length === 6 && /Due today\s*4\s*35 points total/i.test(stats[0]) && /^Next 7 days/i.test(stats[1]) && /Unread announcements/i.test(stats[2]) && /^Overdue/i.test(stats[3]) && /^Due tomorrow/i.test(stats[4]) && /^Graded this week/i.test(stats[5]), `six stat cards (mockup 13), Due tomorrow before Graded this week: ${stats.join(' | ')}`);
   const statLabel = await page.$eval('.bcv-stat__head .bcv-label', (e) => ({ size: parseFloat(getComputedStyle(e).fontSize), tt: getComputedStyle(e).textTransform, text: e.textContent }));
   check(statLabel.size >= 13 && statLabel.tt === 'none', `a card is named in sentence case at a readable size, not a small capital label: ${JSON.stringify(statLabel)}`);
-  // (2.99.29) a main column of 860px or more lays the six out as the Mac's square cards, in one row and the Mac's order; under that, a fixed 2×3 grid
-  const grid = await page.evaluate(() => ({ cols: getComputedStyle(document.querySelector('.bcv-stats')).gridTemplateColumns.split(' ').length, rows: new Set([...document.querySelectorAll('.bcv-stat')].map((e) => Math.round(e.getBoundingClientRect().top))).size, main: Math.round(document.querySelector('.bcv-main').getBoundingClientRect().width), order: [...document.querySelectorAll('.bcv-stat')].sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left).map((e) => e.dataset.stat).join() }));
-  check(grid.main >= 860 ? grid.cols === 6 && grid.rows === 1 && grid.order === 'today,tomorrow,week,overdue,unread,graded' : grid.cols === 3 && grid.rows === 2, `the counters' grid: ${grid.main >= 860 ? "six square cards in one row, in the Mac's order" : 'a fixed 2×3 grid: three columns, two rows'}: ${JSON.stringify(grid)}`);
+  // (2.99.41) the six as the Mac draws them now: three across, two rows; a main column of 860px or more puts them in the
+  // Mac's order (Due today, Tomorrow, Next 7 days over Overdue, Unread, Graded), each washed in its own colour
+  const grid = await page.evaluate(() => ({ cols: getComputedStyle(document.querySelector('.bcv-stats')).gridTemplateColumns.split(' ').length, rows: new Set([...document.querySelectorAll('.bcv-stat')].map((e) => Math.round(e.getBoundingClientRect().top))).size, main: Math.round(document.querySelector('.bcv-main').getBoundingClientRect().width), order: [...document.querySelectorAll('.bcv-stat')].map((e) => [e.getBoundingClientRect(), e.dataset.stat]).sort(([a], [b]) => Math.round(a.top) - Math.round(b.top) || a.left - b.left).map(([, k]) => k).join(), tones: new Set([...document.querySelectorAll('.bcv-stat')].map((e) => getComputedStyle(e).backgroundColor)).size }));
+  check(grid.cols === 3 && grid.rows === 2 && grid.tones === 6 && (grid.main < 860 || grid.order === 'today,tomorrow,week,overdue,unread,graded'), `the counters' grid: three across, two rows, each its own colour${grid.main >= 860 ? ", in the Mac's order" : ''}: ${JSON.stringify(grid)}`);
+  // (2.99.41) the Mac's head: a greeting with the first name over today's date, the views and New Task under it; and "Coming up"
+  await page.waitForFunction(() => /, Sam$/.test(document.querySelector('.bcv-dash__hello')?.textContent || ''), null, { timeout: 5000 }).catch(() => {});
+  const hello = await page.evaluate(() => ({ h1: document.querySelector('.bcv-dash__hello')?.textContent, date: document.querySelector('.bcv-dash__date')?.textContent, bar: [...document.querySelectorAll('.bcv-dash__bar .bcv-seg__btn, .bcv-dash__bar .bcv-dash__new')].map((e) => e.textContent.trim()).join('|'), coming: document.querySelector('.bcv-dash__coming')?.textContent }));
+  check(/^Good (morning|afternoon|evening), Sam$/.test(hello.h1 || '') && /^[A-Z][a-z]+day, [A-Z][a-z]+ \d{1,2}$/.test(hello.date || '') && /Cards\|List\|Recent activity\|New Task/.test(hello.bar) && /^Coming up\d+ to do/.test(hello.coming || ''), `the Mac's Dashboard head — a greeting, the date, the views and New Task — and "Coming up" over the list: ${JSON.stringify(hello)}`);
   await waitText('.bcv-stats > :nth-child(3) .bcv-stat__value', /^3$/);
   // Overdue: past due with nothing handed in (Canvas's missing flag); work handed in late, scored or still waiting on a grade, is not overdue; the number matches its sheet
   check(/^Overdue\s*1\s*1 not submitted$/i.test(stats[3]), `Overdue counts work past its due date with nothing handed in (late work, scored or awaiting a grade, is not overdue): ${stats[3]}`);
@@ -651,9 +656,13 @@ try {
   // (2.98.82) a counter's box hangs from where the counter stands in its row: the left one's top-left corner, the middle
   // one's top centre, the right one's top-right — growing away from the row's edge; on the right its preview opens on the list's left
   const anchored = [];
-  for (const nth of [1, 2, 6]) { // (Due today on the left, Next 7 days in the middle, Graded on the right: in the 2×3 grid and the row of six alike)
-    const c = await page.$eval(`.bcv-stats .bcv-stat:nth-child(${nth})`, (e) => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, m: r.left + r.width / 2, t: r.top }; });
-    await page.click(`.bcv-stats .bcv-stat:nth-child(${nth})`);
+  // (Due today on the left, the first row's middle counter, Graded on the right — 2.99.41: the middle one is Tomorrow in the
+  // Mac's order a wide column wears, Next 7 days under it)
+  const middle = await page.evaluate(() => { const all = [...document.querySelectorAll('.bcv-stats .bcv-stat')].map((e) => [e.getBoundingClientRect(), e.dataset.stat]); const top = Math.min(...all.map(([r]) => Math.round(r.top))); return all.filter(([r]) => Math.round(r.top) === top).sort(([a], [b]) => a.left - b.left)[1][1]; });
+  for (const key of ['today', middle, 'graded']) {
+    const nth = key === 'graded' ? 6 : key === 'today' ? 1 : 2;
+    const c = await page.$eval(`.bcv-stats .bcv-stat[data-stat="${key}"]`, (e) => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, m: r.left + r.width / 2, t: r.top }; });
+    await page.click(`.bcv-stats .bcv-stat[data-stat="${key}"]`);
     await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
     await page.waitForTimeout(700);
     const b = await page.$eval('.bcv-sheet', (e) => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, m: r.left + r.width / 2, t: r.top, from: e.dataset.from }; });
