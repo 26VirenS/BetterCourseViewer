@@ -231,7 +231,9 @@ public static partial class Updates
 
     private const double Hour = 60;
     /// <summary>How often Simpl looks for a Critical Update between the hourly looks (0.3.22), in minutes.</summary>
-    private const double CriticalEvery = 5;
+    private const double CriticalEvery = 1;
+    /// <summary>(0.3.27) The critical look on a metered connection: every five minutes, as before.</summary>
+    private const double CriticalEveryMetered = 5;
     private static bool started;
     private static DispatcherTimer? ticker, waiter;
     /// <summary>When a download that failed by itself is tried again, and how many have failed in a row.</summary>
@@ -254,7 +256,7 @@ public static partial class Updates
         // not an update played through, whose pictures are taken sooner)
         if (!Testing) lastInput = Environment.TickCount64;
         InputManager.Current.PreProcessInput += OnInput;
-        // (the one timer for the looks: every five minutes, as the critical look's)
+        // (the one timer for the looks: every minute, as the critical look's)
         ticker = new DispatcherTimer { Interval = TimeSpan.FromMinutes(CriticalEvery) };
         ticker.Tick += (_, _) => Tick();
         ticker.Start();
@@ -344,6 +346,8 @@ public static partial class Updates
     /// first).</summary>
     private static DateTime? lastLook;
     private static bool looking;
+    /// <summary>(0.3.27) The feed as last read, and the site's tag for it (If-None-Match).</summary>
+    private static string? feedTag, feedBody;
     /// <summary>The Critical Update the look last handed to Check for updates: not handed again at every look should
     /// GitHub's list not say so (the feed a step ahead of it, or behind), till GitHub could not be asked.</summary>
     private static int lookedFor;
@@ -364,7 +368,8 @@ public static partial class Updates
     {
         if (!started || Testing || !Automatic || Waited || looking || checking || restarting) return;
         if (State is Mode.Downloading or Mode.Installing || (Critical && Found != null)) return;
-        if (lastLook is { } last && (DateTime.UtcNow - last).TotalMinutes is >= 0 and < CriticalEvery - 0.5) return;
+        var every = Metered ? CriticalEveryMetered : CriticalEvery;
+        if (lastLook is { } last && (DateTime.UtcNow - last).TotalMinutes is var since && since >= 0 && since < every - 0.25) return;
         _ = Look();
     }
 
@@ -376,13 +381,23 @@ public static partial class Updates
             using var req = new HttpRequestMessage(HttpMethod.Get, CriticalFeed);
             req.Headers.TryAddWithoutValidation("User-Agent", "Simpl-for-Windows");
             req.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
+            // (0.3.27: asked only if it changed — the site answers 304, nothing sent, all the minutes it has not)
+            if (feedTag != null) req.Headers.TryAddWithoutValidation("If-None-Match", feedTag);
             // (when it was asked, answered or not: no network is not asked again for five minutes)
             lastLook = DateTime.UtcNow;
             using var cut = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             using var res = await Http.SendAsync(req, cut.Token);
+            string body;
+            if (res.StatusCode == HttpStatusCode.NotModified && feedBody != null) body = feedBody;
             // (no feed — a site from before it — or the site failing: the hourly look is all there is, as before 0.3.22)
-            if (!res.IsSuccessStatusCode) return;
-            using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync(cut.Token));
+            else if (!res.IsSuccessStatusCode) return;
+            else
+            {
+                body = await res.Content.ReadAsStringAsync(cut.Token);
+                feedBody = body;
+                feedTag = res.Headers.ETag?.ToString();
+            }
+            using var doc = JsonDocument.Parse(body);
             var run = CriticalRun(doc.RootElement, Beta);
             if (run <= CurrentRun || run == lookedFor || restarting || checking) return;
             lookedFor = run;

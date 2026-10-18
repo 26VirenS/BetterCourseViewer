@@ -1,6 +1,7 @@
 **What's new in 0.3.27** (beta)
 
 - **Developer tools** — hidden until you click Settings ▸ About ▸ Version seven times (or press Ctrl+Alt+Shift+D): a Developer window with the logs as they are written (search, problems only, follow, copy, save, clear), system use (Simpl's and WebView2's processor and memory over the last two minutes, threads, handles, .NET's heap, stalls, disk), stats for every call into the page (count, failed, mean, middle, 95th, longest), a call console, updates and every preference. Knewton Alta's and Macmillan Learning's popups get Save Page Code.
+- **Critical updates sooner** — Simpl looks for a critical update every minute instead of every five (asking the site only whether its small feed changed; every five minutes still on a metered connection).
 
 **What's new in 0.3.26** (beta)
 
