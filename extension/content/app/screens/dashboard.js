@@ -1044,8 +1044,10 @@
       if (!ctx.alive() || gen !== bodyGen) return;
       // (2.98.90) the grades skyline at the workload's left, the two side by side (stacked when narrow)
       const pair = sky || work ? U.el('bcv-dash-pair', [sky, work].filter(Boolean)) : null;
-      // (2.99.41) as the Mac lays it out: "Coming up" straight under the counters, the grades and the workload after the list
-      body.replaceChildren(...(view === 'list' ? [stats, viewEl, pair] : [stats, pair, viewEl]).filter(Boolean));
+      // (2.99.48) as the Mac lays it out: the view straight under the counters, the grades and the workload in a column of
+      // their own beside it on a wide page (app.css), under it on a narrow one
+      if (pair) pair.classList.add('bcv-dash-rail');
+      body.replaceChildren(...[stats, U.el('bcv-dash-cols', [U.el('bcv-dash-view', [viewEl]), pair].filter(Boolean))].filter(Boolean));
       if (!entered) markArrived();
       entered = true;
     }

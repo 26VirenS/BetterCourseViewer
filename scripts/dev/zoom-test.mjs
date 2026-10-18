@@ -94,7 +94,7 @@ const MEASURE = () => {
 };
 // the Dashboard's counters: three across where three of at least 210px fit (12px gaps), else two, else one — the CSS's own rule
 // (2.99.29) six square cards in a row from a main column of 860px (the counters' own width then 804px or more); else as many of 210px as fit, three at most
-const colsFor = (w) => (w >= 804 ? 3 : Math.max(1, Math.min(3, Math.floor((w + 12) / 222)))); // (2.99.41: a wide column's three across, two rows, as the Mac's)
+const colsFor = (w) => (w >= 900 ? 6 : w >= 804 ? 3 : Math.max(1, Math.min(3, Math.floor((w + 12) / 222)))); // (2.99.48: six in a row on a page with room, as the Mac's wide Dashboard; else three across)
 
 async function withContext(c, fn) {
   const userDataDir = join(tmpdir(), `bcv-zoom-profile-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
