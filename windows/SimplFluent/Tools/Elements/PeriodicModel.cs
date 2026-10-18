@@ -34,7 +34,17 @@ public sealed class PTElement
     public string Summary { get; init; } = "";
 
     /// <summary>A whole number is the longest-lived isotope's mass, the convention for an element with no stable one.</summary>
-    public string MassText => Mass == Math.Round(Mass) ? $"[{(int)Mass}]" : Mass.ToString("F3", CultureInfo.InvariantCulture);
+    /// <summary>(0.3.28) A whole number is the longest-lived isotope's mass, in brackets; every other to five significant
+    /// figures (1.0080, 55.845, 238.03), as the Mac's.</summary>
+    public string MassText => Mass == Math.Round(Mass)
+        ? $"[{(int)Mass}]"
+        : Mass.ToString("F" + Math.Max(0, 5 - Math.Max(1, (int)Math.Floor(Math.Log10(Mass)) + 1)).ToString(CultureInfo.InvariantCulture), CultureInfo.InvariantCulture);
+
+    /// <summary>(0.3.28) The standard atomic weights the data gives to fewer than five significant figures, to five.</summary>
+    internal static readonly Dictionary<int, double> Precise = new()
+    {
+        [1] = 1.0080, [2] = 4.0026, [3] = 6.9410, [4] = 9.0122, [5] = 10.811, [10] = 20.180, [11] = 22.990, [16] = 32.065, [17] = 35.453, [66] = 162.50,
+    };
 
     public string Line => $"{Name} · {Number} · {MassText}";
 
@@ -137,7 +147,7 @@ public static class PeriodicTable
         if (Int(0) is not { } n || Str(1) is not { } symbol || Str(2) is not { } name || Int(15) is not { } x || Int(16) is not { } y) return null;
         return new PTElement
         {
-            Number = n, Symbol = symbol, Name = name, Mass = Num(3) ?? 0, Category = Str(4) ?? "unknown", Group = Int(5),
+            Number = n, Symbol = symbol, Name = name, Mass = PTElement.Precise.TryGetValue(n, out var precise) ? precise : Num(3) ?? 0, Category = Str(4) ?? "unknown", Group = Int(5),
             Period = Int(6) ?? y, Block = Str(7) ?? "", Phase = Str(8) ?? "", Config = Str(9) ?? "", En = Num(10),
             Melt = Num(11), Boil = Num(12), Density = Num(13), Found = Str(14), X = x, Y = y, Summary = Str(17) ?? "",
         };

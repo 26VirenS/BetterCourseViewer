@@ -2,6 +2,7 @@
 
 - **Element at a glance** — pressing an element in the Periodic Table (the whole tool, or its pin) opens a small window beside it: the element's square, name, kind, electrons, state, electronegativity, density, melting and boiling points, valence electrons and a line about it, with ← and → for its neighbours, and Full page or Atom in 3D to go on.
 - **Easier-to-read colours** — the words on the table's coloured squares are near-black where white would not read (the yellows, the pale greens of a scale), the squares are solid, and a kind written in its own colour is deepened by day and lightened by night until it reads.
+- **Five significant figures** — every atomic mass in the Periodic Table to five significant figures (1.0080, 4.0026, 55.845, 238.03), the ones its data gave shorter put in as their standard atomic weights; an element with no stable isotope keeps its longest-lived one's mass number in brackets.
 
 **What's new in 0.3.27** (beta)
 
