@@ -362,7 +362,7 @@ private struct CourseColourPicker: View {
                     Button { save(hex) } label: {
                         ZStack {
                             Circle().fill(Color(hex: hex)).frame(width: 24, height: 24)
-                            if course.color.lowercased() == hex.lowercased() {
+                            if (course.color ?? "").lowercased() == hex.lowercased() {
                                 Circle().strokeBorder(Color.primary.opacity(0.85), lineWidth: 2).frame(width: 30, height: 30)
                             }
                         }
