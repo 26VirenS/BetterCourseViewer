@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.53"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.54"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -5654,3 +5654,49 @@ html[data-bcv-theme="light"] .bcv-asg__worksent { color: #1f9d45; }
 .bcv-asg__gradep > .bcv-asg__fact { order: 4; grid-column: 1 / -1; margin-top: 2px; padding: 8px 12px; border-radius: 12px; background: var(--bcv-fill); }
 .bcv-asg__rail .bcv-asg__factv.bcv-ellip { white-space: normal; overflow: visible; text-overflow: clip; }
 .bcv-asg__extras:empty, .bcv-asg__extras:not(:has(button)) { display: none; }
+
+/* ---- 2.99.54: a pin opens as the Mac's toolbar popover — on a press, under the pin, its arrow at the pin ----
+   The pin stays a pin in the row (lit while open) and nothing beside it moves; the panel comes down from where the
+   arrow points (tools.js popPlace slides it along to keep it on the screen, the arrow staying put). Pulled out by its
+   grip (is-free), a panel is its own floating window, as before. */
+#bcv-pins .bcv-pin.bcv-quick.is-open:not(.is-free), #bcv-pins .bcv-pin.bcv-island.is-open { width: 24px; height: 24px; clip-path: none; }
+#bcv-pins .bcv-pin:is(.bcv-quick, .bcv-island):not(.is-free)::before { display: none; }
+#bcv-pins .bcv-pin:is(.bcv-quick, .bcv-island) > .bcv-pin__btn { position: relative; top: auto; left: auto; opacity: 1; transform: none; pointer-events: auto; background: var(--bcv-pin-color, #8e8e93); box-shadow: 0 2px 10px rgba(0,0,0,.2); }
+#bcv-pins .bcv-pin.bcv-island.is-live > .bcv-pin__btn { background: var(--bcv-live-color); }
+#bcv-pins .bcv-pin.is-open > .bcv-pin__btn { box-shadow: 0 0 0 2px rgba(255,255,255,.75), 0 2px 10px rgba(0,0,0,.2); }
+#bcv-pins .bcv-pin.bcv-quick.is-free > .bcv-pin__btn { display: none; }
+#bcv-pins .bcv-pin:is(.bcv-quick, .bcv-island):not(.is-free) > :is(.bcv-quick__face, .bcv-island__face) {
+  inset: auto; top: calc(100% + 12px); left: 50%; translate: calc(-50% + var(--bcv-pop-shift, 0px)) 0;
+  border: 1px solid rgba(255,255,255,.14); border-radius: 20px; background: rgba(30,30,32,.94); box-shadow: 0 18px 50px rgba(0,0,0,.42); /* (near solid: the blur cannot reach past the pins' capsule, and the page read through it) */
+  transform-origin: calc(50% - var(--bcv-pop-shift, 0px)) -12px;
+  opacity: 0; scale: .96; visibility: hidden; pointer-events: none;
+  transition: opacity .12s var(--bcv-ease-out), scale .12s var(--bcv-ease-out), visibility 0s linear .12s;
+}
+#bcv-pins .bcv-pin.bcv-quick:not(.is-free) > .bcv-quick__face { width: var(--bcv-quick-w); height: calc(var(--bcv-quick-h, 44px) + 8px); }
+#bcv-pins .bcv-pin.bcv-island > .bcv-island__face { width: var(--bcv-island-w); height: var(--bcv-island-h); }
+#bcv-pins .bcv-pin:is(.bcv-quick, .bcv-island).is-open:not(.is-free) > :is(.bcv-quick__face, .bcv-island__face) { opacity: 1; scale: 1; visibility: visible; pointer-events: auto; transition: opacity .16s var(--bcv-ease-out), scale .22s var(--bcv-ease-out), visibility 0s; }
+html.bcv-blink #bcv-pins .bcv-pin:is(.bcv-quick, .bcv-island):not(.is-free) > :is(.bcv-quick__face, .bcv-island__face) { background: rgba(30,30,32,.94); -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7); }
+#bcv-pins .bcv-pin.bcv-island.is-live > .bcv-island__face, html.bcv-blink #bcv-pins .bcv-pin.bcv-island.is-live > .bcv-island__face { background: #000; -webkit-backdrop-filter: none; backdrop-filter: none; }
+#bcv-pins .bcv-pin.bcv-quick:not(.is-free) .bcv-quick__glass { height: calc(var(--bcv-quick-h, 44px) + 8px); }
+#bcv-pins .bcv-pin.bcv-quick--panel:not(.is-free) .bcv-quick__body { height: calc(var(--bcv-quick-h) - 12px); }
+/* the arrow: a notch of the same glass, from the pin to the panel */
+#bcv-pins .bcv-pin:is(.bcv-quick, .bcv-island):not(.is-free)::after { content: ''; position: absolute; left: 50%; top: calc(100% + 4px); width: 20px; height: 9px; margin-left: -10px; background: rgba(30,30,32,.94); clip-path: polygon(50% 0, 100% 100%, 0 100%); opacity: 0; pointer-events: none; transition: opacity .12s var(--bcv-ease-out); }
+#bcv-pins .bcv-pin.bcv-island.is-live::after { background: #000; }
+#bcv-pins .bcv-pin:is(.bcv-quick, .bcv-island).is-open:not(.is-free)::after { opacity: 1; transition-duration: .16s; }
+/* its head: the tool's tile, its name, and Open Full Screen after it (the Mac popover's) */
+.bcv-quick__tile { flex: none; width: 22px; height: 22px; border-radius: 6px; background: var(--bcv-quick-color); color: rgba(0,0,0,.8); display: flex; align-items: center; justify-content: center; }
+.bcv-quick.is-free .bcv-quick__tile { display: none; }
+#bcv-pins .bcv-quick:not(.is-free) .bcv-quick__lights { gap: 8px; }
+#bcv-pins .bcv-quick:not(.is-free) .bcv-quick__name { order: 1; margin: 0; font: 600 13px/1.2 var(--bcv-font); letter-spacing: 0; color: #fff; }
+#bcv-pins .bcv-quick:not(.is-free) .bcv-quick__light--full { order: 2; width: 22px; height: 22px; border-radius: 11px; background: rgba(255,255,255,.12); color: rgba(255,255,255,.85); transition: background .15s ease, color .15s ease; }
+#bcv-pins .bcv-quick:not(.is-free) .bcv-quick__light--full svg { width: 10px; height: 10px; }
+#bcv-pins .bcv-quick:not(.is-free) .bcv-quick__lights:hover .bcv-quick__light--full { color: rgba(255,255,255,.85); }
+@media (hover: hover) and (pointer: fine) { #bcv-pins .bcv-quick:not(.is-free) .bcv-quick__light--full:hover { background: rgba(255,255,255,.22); color: #fff; } }
+/* in the app's toolbar (the pins in their capsule): the open one lit as a pressed toolbar button; a running timer keeps its disc */
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-pins .bcv-pin.is-open > .bcv-pin__btn { background: var(--bcv-hover); box-shadow: none; transform: none; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-pins .bcv-pin.is-open .bcv-pin__ic { color: var(--bcv-pin-color, var(--bcv-ink2)); }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-pins .bcv-pin.is-open .bcv-pin__ic svg { width: 18px; height: 18px; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-pins .bcv-pin.bcv-island.is-live > .bcv-pin__btn { background: var(--bcv-live-color); }
+@media (prefers-reduced-motion: reduce) {
+  #bcv-pins .bcv-pin:is(.bcv-quick, .bcv-island):not(.is-free) > :is(.bcv-quick__face, .bcv-island__face) { scale: none; }
+}

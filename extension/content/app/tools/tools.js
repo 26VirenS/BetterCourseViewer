@@ -355,120 +355,23 @@
   // timer. A timer that is not pinned borrows a pin for as long as it runs. All of it goes with
   // the switch: the phone layout, the setup, the welcome, stock Canvas.
 
-  // ---- hover intent: a pin opens for a pointer that has come to it -----------------------------
-  // Not for one passing over it on its way to the switch (every pin it crossed swelled, pushed the
-  // row along and folded again), and not for one that never moved at all: a pin that slides under
-  // a pointer standing still — the row closing up as a panel folds, a tool rising from a widget's
-  // green light — is not a hover, and used to open the timer's island over the tool. A pointer that
-  // slows on a pin opens it at once; one still on it after INTENT_MS has meant it too.
-  const INTENT_MS = 70;
-  const INTENT_SPEED = 0.5; // px per ms: slower than this, the pointer is arriving, not passing
-  let moveX = NaN, moveY = NaN; // where the pointer last moved to, anywhere on the page
-  let still = null; // where it stood when the row last moved under it: an enter there is the row's doing
-  document.addEventListener('pointermove', (e) => {
-    moveX = e.clientX; moveY = e.clientY;
-    if (still && (moveX !== still.x || moveY !== still.y)) still = null;
-  }, { capture: true, passive: true });
-  /** The row is about to move (a pin swells or folds, one comes or goes): a pointer standing still
-   *  where it is now has not come to whatever slides under it. */
-  const trayMoves = () => { still = Number.isNaN(moveX) ? null : { x: moveX, y: moveY }; };
-  const slidUnder = (e) => !!still && e.clientX === still.x && e.clientY === still.y;
-  /** Calls open() once the pointer means the pin; returns want(e) for the pin's pointerenter. A
-   *  pointer the pin slid under is left alone until it moves on the pin. */
-  function intent(item, open) {
-    let timer = 0, last = null;
-    const stop = () => { clearTimeout(timer); timer = 0; last = null; };
-    const go = () => { stop(); if (item.classList.contains('is-hover')) open(); };
-    const arm = (e) => { last = { x: e.clientX, y: e.clientY, t: e.timeStamp }; clearTimeout(timer); timer = setTimeout(go, INTENT_MS); };
-    item.addEventListener('pointermove', (e) => {
-      if (e.pointerType === 'touch' || item.classList.contains('is-open') || !item.classList.contains('is-hover')) return;
-      if (!last) { if (!slidUnder(e)) arm(e); return; }
-      const dt = e.timeStamp - last.t;
-      if (dt > 0 && Math.hypot(e.clientX - last.x, e.clientY - last.y) / dt < INTENT_SPEED) go();
-      else last = { x: e.clientX, y: e.clientY, t: e.timeStamp };
-    }, { passive: true });
-    item.addEventListener('pointerleave', stop);
-    return (e) => { stop(); if (!slidUnder(e)) arm(e); };
-  }
-
-  // ---- the swell, by transform and clip (2.99.4) ---------------------------------------------------------------
-  // A pin that swells into its island or panel (or folds back) changes its size in the tray's row once, at once — never
-  // a width or height eased, which laid the row out again on every frame and shoved its neighbours a pixel at a time.
-  // What is drawn is moved instead: the neighbours slide from where they stood to where they now are (translate), and
-  // the pin is drawn through a clip that grows from the size it was drawn at to its new one (opening), or shrinks from
-  // there to the pin (folding: its face held at the open size meanwhile, as it is laid out, and cut down by the clip).
-  // Its own class changes are what it answers, so every way a pin opens or folds is covered.
-  const OPEN_R = '26px', PIN_R = '12px';
+  // ---- (2.99.54) a pin opens as the Mac's toolbar popover does: on a press, under the pin with an arrow --------------
+  // The pin stays a pin in the row (lit while it is open); its panel comes down beneath it, its arrow at the pin, from
+  // where the arrow points (app.css). Nothing in the row moves. A press elsewhere, Escape, or the pin again folds it.
   const pinMs = () => { const v = getComputedStyle(document.documentElement).getPropertyValue('--bcv-t-pin').trim(), n = parseFloat(v); return Number.isFinite(n) ? (/ms$/.test(v) ? n : n * 1000) : 370; }; // (motion.js writes ms, the stylesheet's fallback s)
   const pinEase = () => {
     const v = getComputedStyle(document.documentElement).getPropertyValue('--bcv-spring-pin').trim();
     return v && (!/^linear\(/.test(v) || CSS.supports('animation-timing-function', v)) ? v : 'cubic-bezier(.32,.72,0,1)';
   };
-  const OPEN_RE = /(^|\s)is-open(\s|$)/, FREE_RE = /(^|\s)is-free(\s|$)/;
-  /** Where a pin is drawn this instant: its box, less its clip mid-way. */
-  function drawnPin(el) {
-    const b = el.getBoundingClientRect();
-    const m = /inset\(([^)]*)\)/.exec(el.style.clipPath ? getComputedStyle(el).clipPath : '');
-    const [t = 0, r = t, bt = t, l = r] = m ? m[1].split(/\s+round\s+/)[0].trim().split(/\s+/).map((v) => parseFloat(v) || 0) : [];
-    return { left: b.left + l, top: b.top + t, right: b.right - r, bottom: b.bottom - bt };
-  }
-  const insetIn = (b, r, radius) => `inset(${r.top - b.top}px ${b.right - r.right}px ${b.bottom - r.bottom}px ${r.left - b.left}px round ${radius})`;
-  function swellWatch(bar) {
-    let mine = false;
-    const obs = new MutationObserver((records) => {
-      if (mine) return;
-      const changed = new Map(); // pin → its class before this batch
-      for (const r of records) {
-        const el = r.target;
-        if (el.parentElement !== bar || !el.classList.contains('bcv-pin') || changed.has(el)) continue;
-        changed.set(el, r.oldValue || '');
-      }
-      for (const [el, old] of [...changed]) {
-        const was = OPEN_RE.test(old), now = el.classList.contains('is-open');
-        if (was === now || FREE_RE.test(old) || el.classList.contains('is-free')) changed.delete(el); // (pulled out of the row: not the row's to move)
-      }
-      if (!changed.size || U.reducedMotion()) return;
-      mine = true;
-      try {
-        const pins = [...bar.children];
-        for (const p of pins) for (const a of p.getAnimations()) if (a.id === 'bcv-swell') a.cancel();
-        const now = new Map([...changed.keys()].map((el) => [el, el.className]));
-        for (const [el, old] of changed) el.className = old;
-        const before = new Map(pins.map((p) => [p, changed.has(p) ? drawnPin(p) : p.getBoundingClientRect()]));
-        const laid = new Map([...changed.keys()].map((el) => [el, el.getBoundingClientRect()])); // (its box at the old size: the open face's place, folding)
-        for (const [el, cls] of now) el.className = cls;
-        const easing = pinEase(), duration = pinMs();
-        for (const p of pins) {
-          if (changed.has(p)) continue;
-          const a = before.get(p), b = p.getBoundingClientRect(), dx = a.left - b.left, dy = a.top - b.top;
-          if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) Object.assign(p.animate([{ translate: `${dx}px ${dy}px` }, { translate: '0px 0px' }], { duration, easing }), { id: 'bcv-swell' });
-        }
-        for (const el of changed.keys()) {
-          const opening = el.classList.contains('is-open');
-          const box = el.getBoundingClientRect(), from = before.get(el);
-          const face = el.querySelector(':scope > .bcv-island__face, :scope > .bcv-quick__face');
-          clearTimeout(el._bcvSwellT);
-          el.style.transition = 'none';
-          if (face) Object.assign(face.style, { left: '', top: '', right: '', bottom: '', width: '', height: '' });
-          if (!opening && face) { // folding: the face keeps the open size, where it was laid out, while the clip cuts it down
-            const o = laid.get(el);
-            Object.assign(face.style, { left: `${o.left - box.left}px`, top: `${o.top - box.top}px`, right: 'auto', bottom: 'auto', width: `${o.right - o.left}px`, height: `${o.bottom - o.top}px` });
-          }
-          el.style.clipPath = insetIn(box, from, opening ? PIN_R : OPEN_R);
-          void el.offsetWidth;
-          el.style.transition = '';
-          el.style.clipPath = `inset(0px round ${opening ? OPEN_R : PIN_R})`;
-          el._bcvSwellT = setTimeout(() => { // (settled: nothing clipped — the open pin's shadow shows — and the face back in its place)
-            el.style.clipPath = '';
-            if (face) Object.assign(face.style, { left: '', top: '', right: '', bottom: '', width: '', height: '' });
-          }, duration + 40);
-        }
-      } finally {
-        obs.takeRecords();
-        mine = false;
-      }
-    });
-    obs.observe(bar, { subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
+  /** The open panel kept on the screen: slid sideways (its arrow staying at the pin) when centring it under the pin
+   *  would put an edge past the window's. */
+  function popPlace(item) {
+    const face = item.querySelector(':scope > .bcv-quick__face, :scope > .bcv-island__face');
+    if (!face || item.classList.contains('is-free')) return;
+    const r = item.getBoundingClientRect(), w = face.offsetWidth, mid = r.left + r.width / 2;
+    const left = mid - w / 2, room = window.innerWidth - 8;
+    const shift = left < 8 ? 8 - left : left + w > room ? room - (left + w) : 0;
+    face.style.setProperty('--bcv-pop-shift', `${Math.round(shift)}px`);
   }
 
   function mountTray() {
@@ -484,7 +387,6 @@
       } catch { /* the stylesheet's own default, then */ }
       const bar = h('div', { id: 'bcv-pins', class: 'bcv-pins', hidden: true, role: 'toolbar', 'aria-label': 'Pinned tools' });
       tray = h('div', { id: 'bcv-tray', class: 'bcv-tray' }, bar);
-      swellWatch(bar); // (a pin's swell moves what is drawn, never the row's layout frame by frame)
       overlayRoot().append(tray);
       // (nothing reads the tray's width any more: the observer that wrote it onto <html> on every frame of
       // a widget opening — a style recalculation of the whole page each time — is gone)
@@ -613,41 +515,20 @@
   const unfolding = (item) => { clearTimeout(item._bcvFoldT); item.classList.remove('is-folding'); }; // (opened again on its way down: the fold's timer has nothing left to do)
   function islandOpen(item, ms = 6000, focusMain = false) {
     unfolding(item);
-    if (!item.classList.contains('is-open')) trayMoves();
     item.classList.add('is-open');
     item.setAttribute('aria-expanded', 'true');
+    popPlace(item);
     clearTimeout(islandTimer);
-    islandTimer = setTimeout(() => { if (!item.classList.contains('is-hover')) islandClose(item); }, ms); // (under the pointer it stays up: the leave folds it)
+    // (2.99.54) opened by a press it is the Mac's popover: up until a press elsewhere, Escape or the pin again folds it
+    if (!item._bcvStick) islandTimer = setTimeout(() => { if (!item.classList.contains('is-hover') && !item._bcvStick) islandClose(item); }, ms);
     if (focusMain) setTimeout(() => item.querySelector('.bcv-island__main')?.focus(), 200);
-  }
-  /** The pointer over the pin swells it, the way the switch beside it opens under the pointer: the
-   *  live island while a session is going, the setter otherwise; it folds when the pointer leaves.
-   *  A finger does not hover: a tap opens it, as before. */
-  function islandHover(item) {
-    let leave = 0;
-    const want = intent(item, () => {
-      if (item.classList.contains('is-open') || item.classList.contains('is-out')) return;
-      if (item.classList.contains('is-live')) islandOpen(item); else islandSet(item);
-    });
-    item.addEventListener('pointerenter', (e) => {
-      if (e.pointerType === 'touch' || item.classList.contains('is-out')) return;
-      clearTimeout(leave);
-      item.classList.add('is-hover');
-      if (!item.classList.contains('is-open')) want(e);
-    });
-    item.addEventListener('pointerleave', (e) => {
-      if (e.pointerType === 'touch') return;
-      item.classList.remove('is-hover');
-      clearTimeout(leave);
-      leave = setTimeout(() => { if (!item.classList.contains('is-hover') && !item.querySelector(':focus-visible')) islandClose(item); }, 260);
-    });
   }
   function islandClose(item) {
     clearTimeout(islandTimer);
     islandTimer = 0;
+    item._bcvStick = false;
     item.classList.remove('is-set');
     if (!item.classList.contains('is-open')) return;
-    trayMoves();
     item.classList.remove('is-open');
     folding(item);
     item.setAttribute('aria-expanded', 'false');
@@ -973,7 +854,7 @@
     ocr: { w: 300, h: 160 + BAR, panel: true, build: quickOcr },
     fc: { w: 330, h: 190 + BAR, panel: true, build: quickCards },
   };
-  function quickHover(item, t) {
+  function quickPanel(item, t) {
     const q = QUICK[t.key];
     if (!q) return null;
     item.classList.add('bcv-quick');
@@ -985,13 +866,10 @@
     const body = U.el('bcv-quick__body');
     const bar = h('div', { class: 'bcv-quick__bar', title: 'Drag to pull this out' }, h('span', { class: 'bcv-quick__grip' }));
     let panel = null;
-    let leave = 0;
-    let hold = 0; // (a pin that just handed off to its tool stays folded a moment: the popup rising under the pointer is not a hover)
     const pulledOut = () => item.classList.contains('is-free');
     const closeQ = () => {
       if (pulledOut()) return; // pulled out of the tray: it stays where it was put, pointer or no pointer
       if (!item.classList.contains('is-open')) return;
-      trayMoves();
       item.classList.remove('is-open');
       folding(item);
       item.setAttribute('aria-expanded', 'false');
@@ -1005,8 +883,7 @@
     const dock = (keyed = false) => {
       if (docking) return;
       const back = () => {
-        trayMoves();
-        item.classList.remove('is-free', 'is-hover');
+        item.classList.remove('is-free');
         item.style.left = '';
         item.style.top = '';
         item.querySelector(':focus')?.blur();
@@ -1031,17 +908,27 @@
     };
     const build = () => {
       if (panel) return;
-      panel = q.build({ item, go: (o = {}) => { hold = Date.now() + 400; if (pulledOut()) dock(); else closeQ(); open(t.key, { from: item, over: true, ...o }); } });
+      panel = q.build({ item, go: (o = {}) => { if (pulledOut()) dock(); else closeQ(); open(t.key, { from: item, over: true, ...o }); } });
       body.replaceChildren(...panel.els);
+      // (2.99.54) its head as the Mac's popover has it: the tool's tile, its name, and Open Full Screen after it
+      body.querySelector('.bcv-quick__lights')?.prepend(h('span', { class: 'bcv-quick__tile', 'aria-hidden': 'true' }, U.svg(t.icon, { size: 12, stroke: 'currentColor', width: 2.4 })));
       body.querySelector('.bcv-quick__light--close')?.addEventListener('click', (e) => { e.stopPropagation(); dock(e.detail === 0); }); // (e.detail 0: Enter or Space)
     };
     const openQ = () => {
       build();
       panel.onOpen?.();
       unfolding(item);
-      if (!item.classList.contains('is-open')) trayMoves();
       item.classList.add('is-open');
       item.setAttribute('aria-expanded', 'true');
+      popPlace(item);
+    };
+    // (2.99.54) a press on the pin opens it, as the Mac's pins do — not the pointer passing over it — and a press
+    // again folds it; one open at a time (one pulled out of the tray is not in that reckoning: it stays where it was put)
+    item._bcvToggle = () => {
+      if (item.classList.contains('is-out')) return;
+      if (item.classList.contains('is-open')) { if (pulledOut()) dock(); else closeQ(); return; }
+      for (const other of document.querySelectorAll('#bcv-pins .bcv-quick.is-open:not(.is-free)')) if (other !== item) { other.querySelector(':focus')?.blur(); other.classList.remove('is-open'); other.setAttribute('aria-expanded', 'false'); }
+      openQ();
     };
     // drawn ahead while the page is idle (primeSoon), its tool's script first: the swell under the
     // pointer then only shows it
@@ -1058,7 +945,7 @@
     bar.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
       e.preventDefault();
-      const r = item.getBoundingClientRect();
+      const r = (pulledOut() ? item : bar.parentElement).getBoundingClientRect(); // (in the tray, the panel under the pin is what comes out)
       drag = { dx: e.clientX - r.left, dy: e.clientY - r.top, left: r.left, top: r.top };
       try { bar.setPointerCapture(e.pointerId); } catch { /* the pointer went */ }
     });
@@ -1072,30 +959,10 @@
     const drop = (e) => { if (!drag) return; try { bar.releasePointerCapture(e.pointerId); } catch { /* already gone */ } drag = null; };
     bar.addEventListener('pointerup', drop);
     bar.addEventListener('pointercancel', drop);
-    const want = intent(item, () => {
-      if (item.classList.contains('is-out') || Date.now() < hold) return;
-      // one open at a time: a calculator left with the focus folds when the pointer moves on. One
-      // pulled out of the tray is not in that reckoning — it stays where it was put, open.
-      for (const other of document.querySelectorAll('#bcv-pins .bcv-quick.is-open:not(.is-free)')) if (other !== item) { other.querySelector(':focus')?.blur(); other.classList.remove('is-hover'); other.classList.remove('is-open'); other.setAttribute('aria-expanded', 'false'); }
-      openQ();
-    });
-    item.addEventListener('pointerenter', (e) => {
-      if (e.pointerType === 'touch' || item.classList.contains('is-out') || Date.now() < hold) return; // (the tray works over an open popup too: the widget's green light puts its tool on top of it)
-      clearTimeout(leave);
-      item.classList.add('is-hover');
-      if (!item.classList.contains('is-open')) want(e);
-    });
-    item.addEventListener('pointerleave', (e) => {
-      if (e.pointerType === 'touch') return;
-      item.classList.remove('is-hover');
-      clearTimeout(leave);
-      leave = setTimeout(() => { if (!item.classList.contains('is-hover') && !item.querySelector(':focus')) closeQ(); }, 260); // (a field being typed in holds it open)
-    });
     item.addEventListener('keydown', (e) => { if (e.key === 'Escape' && item.classList.contains('is-open')) { e.stopPropagation(); if (pulledOut()) dock(true); else closeQ(); item.querySelector('.bcv-pin__btn')?.focus(); } });
-    item.addEventListener('focusout', () => setTimeout(() => { if (!item.classList.contains('is-hover') && !item.querySelector(':focus')) closeQ(); }, 0));
     return [glass, body, bar];
   }
-  document.addEventListener('pointerdown', (e) => { for (const item of document.querySelectorAll('#bcv-pins .bcv-quick.is-open:not(.is-free)')) if (!item.contains(e.target)) { trayMoves(); item.classList.remove('is-hover'); item.querySelector(':focus')?.blur(); item.classList.remove('is-open'); item.setAttribute('aria-expanded', 'false'); } }, true);
+  document.addEventListener('pointerdown', (e) => { for (const item of document.querySelectorAll('#bcv-pins .bcv-quick.is-open:not(.is-free)')) if (!item.contains(e.target)) { item.querySelector(':focus')?.blur(); item.classList.remove('is-open'); item.setAttribute('aria-expanded', 'false'); } }, true);
   /** A widget's head: the two lights a Mac window wears — red to put it back in the tray (only once
    *  it has been pulled out), green to open the tool at full size — and the widget's name beside them. */
   const quickName = (name, go, title) => U.el('bcv-quick__lights', [
@@ -1656,7 +1523,12 @@
     const el = h('span', { class: 'bcv-pin', dataset: { tool: t.key } });
     el.style.setProperty('--bcv-pin-color', t.color);
     const btn = h('button', { type: 'button', class: 'bcv-pin__btn', title: t.name, 'aria-label': t.name, tabindex: demo ? '-1' : '0',
-      onclick: demo ? null : (e) => { if (el.classList.contains('is-live')) islandOpen(el, 6000, e.detail === 0); else if (live) islandSet(el, e.detail === 0); else open(t.key, { from: e.currentTarget, over: true }); } }, [
+      onclick: demo ? null : (e) => {
+        // (2.99.54) a press opens its panel under it, as the Mac's pins do, and a press again folds it
+        if (live) { if (el.classList.contains('is-open')) { islandClose(el); return; } el._bcvStick = true; if (el.classList.contains('is-live')) islandOpen(el, 6000, e.detail === 0); else islandSet(el, e.detail === 0); }
+        else if (el._bcvToggle) el._bcvToggle();
+        else open(t.key, { from: e.currentTarget, over: true });
+      } }, [
       h('span', { class: 'bcv-pin__ic' }, U.svg(t.icon, { size: 15, stroke: 'currentColor', width: 2.3 })), // (dark, from the stylesheet: .bcv-pin__ic)
       live ? islandGlyph() : null,
     ]);
@@ -1664,16 +1536,15 @@
       el.classList.add('bcv-island');
       el.dataset.live = 'pomo';
       el.setAttribute('aria-expanded', 'false');
-      el.append(h('div', { class: 'bcv-island__face' }, [U.el('bcv-island__glass'), btn, islandBody(el), islandSetter(el)]));
-      islandHover(el);
+      el.append(btn, h('div', { class: 'bcv-island__face' }, [U.el('bcv-island__glass'), islandBody(el), islandSetter(el)]));
       // its setter's strip laid out ahead, while the page is idle (primeSoon), like a panel's
       el._bcvPrime = async () => { if (!focusRead) await focusLoad().catch(() => {}); if (el.isConnected && !el.classList.contains('is-live')) paintSetter(el, focus); };
       // open: a press on the count opens the timer, a press elsewhere on the body keeps it open a while longer
       el.addEventListener('click', (e) => { if (!el.classList.contains('is-open') || e.target.closest('button')) return; if (e.target.closest('.bcv-island__right')) open('pomo', { from: el, over: true }); else islandOpen(el); });
       el.addEventListener('keydown', (e) => { if (e.key === 'Escape' && el.classList.contains('is-open')) { e.stopPropagation(); islandClose(el); btn.focus(); } });
     } else {
-      const quick = demo ? null : quickHover(el, t); // [glass, body, bar] — the glass goes behind the button, or it would paint over the icon
-      if (quick) { el.setAttribute('aria-expanded', 'false'); el.append(h('div', { class: 'bcv-quick__face' }, [quick[0], btn, ...quick.slice(1)])); } else el.append(btn);
+      const quick = demo ? null : quickPanel(el, t); // [glass, body, bar]: the panel under the pin, the pin itself beside it
+      if (quick) { el.setAttribute('aria-expanded', 'false'); el.append(btn, h('div', { class: 'bcv-quick__face' }, quick)); } else el.append(btn);
     }
     if (!demo) el.append(h('button', { type: 'button', class: 'bcv-pin__x', title: `Unpin ${t.name}`, 'aria-label': `Unpin ${t.name}`, onclick: (e) => { e.stopPropagation(); unpin(t.key); } }, U.svg(IC.close, { size: 8, stroke: '#fff', width: 2.6 })));
     return el;
@@ -1695,7 +1566,7 @@
     // An unpinned pin leaves the way it landed (app.css .bcv-pin.is-out:not(.is-live)): taken out of the row
     // where it stands, so the pins beside it slide into its place at once — by translate, on the pin spring,
     // from wherever they are drawn (a slide already going is taken up, not stacked), as a swell moves them
-    // (swellWatch). Reduced motion: it fades in its place, and the others then simply close up.
+    // (2.99.4). Reduced motion: it fades in its place, and the others then simply close up.
     const leaving = [...have].filter(([k, el]) => !keys.includes(k) && !el.classList.contains('is-live')).map(([, el]) => el);
     const slide = leaving.length > 0 && !U.reducedMotion();
     const drawn = slide ? new Map([...bar.children].map((p) => [p, p.getBoundingClientRect()])) : null;
