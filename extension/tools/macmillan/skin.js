@@ -89,7 +89,13 @@
     'html.simpl-mm.simpl-mm-glass .parent-module-container{background:transparent!important;box-shadow:none!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;border-radius:0!important;padding:4px 6px 12px!important}' +
     'html.simpl-mm.simpl-mm-glass .raptor-container{padding:16px 20px 0!important}' +
     'html.simpl-mm article.module-container{background:transparent!important;border-radius:0!important;padding:6px 0!important;margin:0 0 10px!important;min-height:0!important;box-sizing:border-box!important;box-shadow:none!important;line-height:1.5;color:var(--mm-ink)!important}' +
-    'html.simpl-mm [data-simpl-pic] img{width:100%!important}' +
+    // (Mac 1.3.121) a picture a small preview that always fits: whatever fixed width Macmillan draws it (or its wrappers)
+    // at, it is held to its column and to a short height, and enlarged on a press (below)
+    'html.simpl-mm [data-simpl-pic]{max-width:100%!important;overflow:hidden}' +
+    'html.simpl-mm [data-simpl-pic] *:not(img){width:auto!important;max-width:100%!important;min-width:0!important;box-sizing:border-box!important}' +
+    'html.simpl-mm [data-simpl-pic] img{display:block!important;width:auto!important;max-width:100%!important;max-height:300px!important;height:auto!important;object-fit:contain;margin:0 auto!important}' +
+    'html.simpl-mm .raw-html img,html.simpl-mm article.module-container img{max-width:100%!important;height:auto!important}' +
+    'html.simpl-mm .raw-html :has(> img),html.simpl-mm article.module-container :has(> img){max-width:100%!important}' +
     // (Mac 1.3.120) the question drawn a little smaller, so more of it (and its pictures) fits
     'html.simpl-mm #raptor-content-container .content-area{zoom:.86}' +
     // (Mac 1.3.120) a picture enlarged on a press, as Alta's graphs are: a hint of it at its corner, then large over the page
@@ -105,7 +111,7 @@
     // the left in their order (Macmillan's own two-column layouts and its one-column ones alike). A grid of the parts on
     // the left a row each, then a last row that takes what a tall picture needs (picture() counts the rows)
     'html.simpl-mm .authoring-area .module-container{display:block!important;width:auto!important;float:none!important;clear:none!important}' +
-    'html.simpl-mm .parent-module-container[data-simpl-rows]{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,42%);column-gap:24px;align-content:start}' +
+    'html.simpl-mm .parent-module-container[data-simpl-rows]{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,36%);column-gap:24px;align-content:start}' +
     'html.simpl-mm .parent-module-container[data-simpl-rows] > *{grid-column:1;min-width:0}' +
     'html.simpl-mm .parent-module-container[data-simpl-rows] > [data-simpl-pic]{grid-column:2;grid-row:1 / -1;align-self:start;position:sticky;top:8px}' +
     ROWS +
