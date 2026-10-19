@@ -63,6 +63,8 @@
   var ROWS = ''; for (var n = 1; n <= 60; n++) ROWS += 'html.simpl-mm .parent-module-container[data-simpl-rows="' + n + '"]{grid-template-rows:repeat(' + n + ',auto) 1fr}';
   var SKIN =
     'html.simpl-mm .simpl-mm-dlghide{display:none!important}' + // (Mac 1.3.123: Macmillan's pop-up, drawn by the app instead)
+    // (Mac 1.3.124) and never seen for a moment before the skin reads it: hidden by the stylesheet the instant it is on the page
+    'html.simpl-mm.simpl-mm-glass:not(.simpl-mm-dlgpage) div[style*="position: fixed"]:has(> #react-aria-modal-dialog, > [role="dialog"].sac-modal){display:none!important}' +
     'html.simpl-mm{--mm-ink:#1c1c1e;--mm-ink2:rgba(60,60,67,.62);--mm-card:rgba(255,255,255,.74);--mm-line:rgba(0,0,0,.07);--mm-field:rgba(255,255,255,.92);--mm-good:#1a6b30;--mm-good-bg:rgba(52,199,89,.16);--mm-bad:#c01d43;--mm-bad-bg:rgba(255,59,48,.13);--mm-good-line:rgba(52,199,89,.35);--mm-bad-line:rgba(255,59,48,.3);--mm-on:#fff;--mm-accent:#0a84ff;--mm-accent-ring:rgba(10,132,255,.25);--mm-field2:rgba(0,0,0,.04);--mm-pop:#fff;--mm-rim:rgba(255,255,255,.7);color-scheme:light}' +
     'html.simpl-mm.simpl-mm-dark{--mm-ink:#f2f2f7;--mm-ink2:rgba(235,235,245,.62);--mm-card:rgba(255,255,255,.075);--mm-line:rgba(255,255,255,.11);--mm-field:rgba(255,255,255,.09);--mm-good:#5ddb7d;--mm-good-bg:rgba(52,199,89,.2);--mm-bad:#ff8098;--mm-bad-bg:rgba(255,69,58,.2);--mm-good-line:rgba(93,219,125,.45);--mm-bad-line:rgba(255,128,152,.4);--mm-on:#0b2a14;--mm-accent:#409cff;--mm-accent-ring:rgba(64,156,255,.3);--mm-field2:rgba(255,255,255,.08);--mm-pop:#2c2c2e;--mm-rim:rgba(255,255,255,.08);color-scheme:dark}' +
     'html.simpl-mm,html.simpl-mm body{background:transparent!important;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif!important}' +
@@ -286,6 +288,8 @@
   var last = '';
   var timer = 0;
   function report() {
+    // (Mac 1.3.124) a pop-up just come is read at once, not after the settle: the app's card comes with no wait
+    if (window.__simplMacmillanGlass && skinned && !lastDlg && dlgNow()) dialogReport();
     clearTimeout(timer);
     timer = setTimeout(function () {
       // (Mac 1.3.115) only the player itself says what it shows: a frame of its own inside it (a widget) never does, or
@@ -314,7 +318,7 @@
   function dialogReport() {
     if (!window.__simplMacmillanGlass) return;
     var d = skinned ? dlgNow() : null;
-    if (!d) { if (lastDlg) { lastDlg = ''; dlgInPage = false; post({ kind: 'dialog', open: false }); } return; }
+    if (!d) { if (lastDlg) { lastDlg = ''; dlgInPage = false; document.documentElement.classList.remove('simpl-mm-dlgpage'); post({ kind: 'dialog', open: false }); } return; }
     var ov = dlgOverlay(d);
     if (dlgInPage) { ov.classList.remove('simpl-mm-dlghide'); return; }
     ov.classList.add('simpl-mm-dlghide');
@@ -340,7 +344,7 @@
       case 'main': return click(tid('btn-sac-main'));
       // (Mac 1.3.123) the pop-up's buttons, and the pop-up given back to the page
       case 'dialog': return click(dlgButtons(dlgNow())[Number(arg)]);
-      case 'dialogPage': { dlgInPage = true; var d = dlgNow(); if (d) dlgOverlay(d).classList.remove('simpl-mm-dlghide'); post({ kind: 'dialog', open: true, inPage: true }); return true; }
+      case 'dialogPage': { dlgInPage = true; document.documentElement.classList.add('simpl-mm-dlgpage'); var d = dlgNow(); if (d) dlgOverlay(d).classList.remove('simpl-mm-dlghide'); post({ kind: 'dialog', open: true, inPage: true }); return true; }
       case 'resources': return click(q('[aria-label="Open Resources"]'));
       case 'tutor': return click(q('[aria-label="Open AI Tutor"]'));
       case 'solution': return click(q('[aria-label="Open Solution"]'));

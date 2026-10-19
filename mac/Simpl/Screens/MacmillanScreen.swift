@@ -55,10 +55,11 @@ struct MacmillanScreen: View {
         }
         .frame(width: ideal.width, height: ideal.height)
         // (1.3.123) Macmillan's pop-ups as the Mac's own, as Knewton Alta's are (AltaQuiz): a card of the popup's own over
-        // its content, its buttons pressing Macmillan's; held open meanwhile, Escape answering the pop-up
+        // its content, its buttons pressing Macmillan's; held open meanwhile, Escape answering the pop-up. (1.3.124) Its own
+        // card: what it says large and centred, a check when it is a question solved (MacmillanDialogLayer)
         .overlay {
             if let d = session.dialog {
-                AltaDialogLayer(dialog: d, brand: .macmillan, press: { i in session.pressDialog(i) }, link: { _ in }, giveBack: { session.dialogDismissed() })
+                MacmillanDialogLayer(dialog: d) { i in session.pressDialog(i) }
             }
         }
         .animation(Motion.gentle, value: session.dialog?.id)
@@ -412,5 +413,135 @@ private struct MacmillanStartScreen: View {
                 .frame(maxWidth: .infinity)
             }
         }
+    }
+}
+
+
+/// (1.3.124) Macmillan's pop-up — You solved it in 1 attempt!, View Solution, Next Question — as a card of the Mac's own:
+/// a check in a soft green disc (a question solved) or the pop-up's own title, what it says large and centred, its
+/// buttons side by side across the card with Macmillan's main one lit, and its × at the top corner. Return presses the
+/// main one, Escape the ×. It springs in over the dimmed question; a press rests the buttons until Macmillan moves on.
+private struct MacmillanDialogLayer: View {
+    let dialog: AltaDialog
+    let press: (Int) -> Void
+    @State private var shown = false
+    @State private var pressed = false
+
+    private struct Action: Identifiable {
+        let id: Int
+        let choice: AltaDialog.Choice
+    }
+
+    private var message: String {
+        RichText.plainText(dialog.html).split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+    private var solved: Bool {
+        let m = message.lowercased()
+        return m.contains("solved") || (m.contains("correct") && !m.contains("incorrect"))
+    }
+    private var closeIndex: Int? { dialog.buttons.firstIndex(where: \.close) }
+    private var actions: [Action] {
+        dialog.buttons.enumerated().filter { !$0.element.close }.map { Action(id: $0.offset, choice: $0.element) }
+    }
+    private var mainIndex: Int? { actions.last(where: { $0.choice.primary })?.id ?? actions.last?.id }
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.28)
+                .contentShape(Rectangle())
+                .onTapGesture {}
+                .accessibilityHidden(true)
+            card
+                .scaleEffect(shown ? 1 : 0.92)
+                .opacity(shown ? 1 : 0)
+                .accessibilityAddTraits(.isModal)
+        }
+        .onAppear { withAnimation(.spring(response: 0.34, dampingFraction: 0.78)) { shown = true } }
+        .onChange(of: dialog.step) { _, _ in pressed = false }
+        .transition(.opacity)
+    }
+
+    private var card: some View {
+        VStack(spacing: 16) {
+            if solved {
+                ZStack {
+                    Circle()
+                        .fill(Color.green.opacity(0.16))
+                        .frame(width: 92, height: 92)
+                    Circle()
+                        .strokeBorder(Color.green.opacity(0.35), lineWidth: 1.5)
+                        .frame(width: 92, height: 92)
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 40, weight: .bold))
+                        .foregroundStyle(.green)
+                        .symbolEffect(.bounce, value: shown)
+                }
+                .overlay(alignment: .topTrailing) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.yellow)
+                        .offset(x: 10, y: -6)
+                        .opacity(shown ? 1 : 0)
+                        .scaleEffect(shown ? 1 : 0.4)
+                        .animation(.spring(response: 0.4, dampingFraction: 0.6).delay(0.15), value: shown)
+                }
+                .padding(.top, 6)
+                .accessibilityHidden(true)
+            } else {
+                HStack(spacing: 10) {
+                    IconTile(symbol: "books.vertical", color: .red, size: 26)
+                    Text(dialog.title.trimmingCharacters(in: .whitespaces).isEmpty ? "Macmillan Learning" : dialog.title)
+                        .font(.sHeadline)
+                }
+            }
+            if !message.isEmpty {
+                Text(message)
+                    .font(solved ? Font.sTitle2 : Font.sBody)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+            }
+            HStack(spacing: 10) {
+                ForEach(actions) { a in
+                    Button { tap(a.id) } label: {
+                        Text(a.choice.label).frame(maxWidth: .infinity)
+                    }
+                    .glassButton(prominent: a.id == mainIndex)
+                    .keyboardShortcut(a.id == mainIndex ? KeyboardShortcut.defaultAction : nil)
+                    .disabled(!a.choice.enabled || pressed)
+                    .help(a.choice.label)
+                }
+            }
+            .controlSize(.large)
+            .padding(.top, 4)
+        }
+        .padding(.horizontal, 26)
+        .padding(.top, 28)
+        .padding(.bottom, 22)
+        .frame(width: 400)
+        .overlay(alignment: .topTrailing) {
+            if let x = closeIndex {
+                Button { tap(x) } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 26, height: 26)
+                        .background(Circle().fill(Color.primary.opacity(0.08)))
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut(.cancelAction)
+                .help("Close")
+                .padding(12)
+            }
+        }
+        .glassCard(radius: 26)
+        .shadow(color: .black.opacity(0.3), radius: 30, y: 12)
+    }
+
+    private func tap(_ i: Int) {
+        pressed = true
+        press(i)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { pressed = false }
     }
 }
