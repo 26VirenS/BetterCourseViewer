@@ -2629,10 +2629,13 @@ try {
   await page.click('.bcv-side .bcv-fav[data-load="fav:101"]');
   await page.waitForSelector('.bcv-side .bcv-ctabs .bcv-ctab', { timeout: 15000 });
   await page.click('.bcv-side .bcv-fav:not([data-load="fav:101"]) .bcv-fav__chev');
+  // (2.99.59) sections grow open under their row, and fold shut into it (held there while they go)
+  const grows = await page.evaluate(() => { const t = [...document.querySelectorAll('.bcv-side .bcv-ctabs[data-course]')].find((e) => e.dataset.course !== '101'); return !!t && t.dataset.grew === '1'; });
   const openBefore = await page.$$eval('.bcv-side .bcv-ctabs', (e) => e.length);
   await page.click('.bcv-side .bcv-nav__item[data-nav="dashboard"]');
   const folded = await eventually(() => page.evaluate(() => location.pathname === '/' && !document.querySelector('.bcv-side .bcv-ctabs')), 8000);
   check(openBefore === 2 && folded, `clicked out of a course, its sections and those of another opened by its chevron fold away (${openBefore} open before)`);
+  check(grows, 'a course\'s sections grow open under its row as they come');
   // Settings ▸ Appearance switches it back (two sidebars: the rail again)
   const opts = await context.newPage();
   await opts.goto(`chrome-extension://${extId}/options/options.html`);
@@ -6971,6 +6974,23 @@ try {
   const pinPaint = await page.$eval('#bcv-pins .bcv-pin[data-tool="pomo"]', (e) => ({ face: getComputedStyle(e.querySelector('.bcv-island__face')).visibility, glass: getComputedStyle(e.querySelector('.bcv-island__glass')).opacity, ic: getComputedStyle(e.querySelector('.bcv-pin__ic')).color, stroke: e.querySelector('.bcv-pin__ic svg')?.getAttribute('stroke') }));
   check(pinPaint.face === 'hidden' && pinPaint.glass === '0' && pinPaint.ic === 'rgb(255, 149, 0)' && pinPaint.stroke === 'currentColor', `(2.99.53) the pin is its glyph in the tool's colour (the timer's orange) in the bar's capsule, as the Mac's toolbar has it, no dark glass while folded (${JSON.stringify(pinPaint)})`);
   await shot(page, '41b-tools-pinned');
+  // (2.99.59) a popup up: ⋯ goes, and the pinned tools move beside the sidebar's button at the top left, the popup
+  // below them — nothing overlaps
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-stats .bcv-stat', { timeout: 15000 });
+  await page.click('.bcv-stats .bcv-stat:nth-child(4)');
+  await page.waitForSelector('.bcv-sheet-ov .bcv-sheet', { timeout: 5000 });
+  await page.waitForTimeout(500);
+  const popBar = await page.evaluate(() => {
+    const r = (el) => el.getBoundingClientRect();
+    const tray = r(document.getElementById('bcv-tray')), tog = r(document.getElementById('bcv-sidetoggle')), sheet = r(document.querySelector('.bcv-sheet-ov .bcv-sheet'));
+    const meet = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+    return { look: getComputedStyle(document.getElementById('bcv-look')).opacity, trayLeft: Math.round(tray.left), togRight: Math.round(tog.right), overlap: meet(tray, sheet) || meet(tog, sheet) || meet(tray, tog), top: document.elementFromPoint(tray.left + 12, tray.top + 15)?.closest('#bcv-tray') ? 'tray' : 'other' };
+  });
+  check(popBar.look === '0' && popBar.trayLeft >= popBar.togRight && popBar.trayLeft - popBar.togRight <= 12 && !popBar.overlap && popBar.top === 'tray', `a popup up: ⋯ gone, the tools beside the sidebar's button and over the scrim, overlapping nothing: ${JSON.stringify(popBar)}`);
+  await shot(page, '41c-tools-over-popup');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
   await page.goto(`${BASE}/calendar`);
   await page.waitForSelector('#bcv-pins .bcv-pin', { timeout: 10000 });
   // the pin is on every page; pressed while nothing is going, it swells into a small setter: the strip under the marker and Start — set, and go

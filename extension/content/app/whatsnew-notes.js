@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.59', date: '2026-10-19', notes: [
+      { kind: 'improved', title: 'Smoother Sidebar', body: "A course's sections slide open and shut.", icon: P.check },
+      { kind: 'improved', title: 'Tools Over Popups', body: 'Pinned tools move aside while a popup is open.', icon: P.pin },
+    ] },
     { version: '2.99.58', date: '2026-10-19', notes: [
       { kind: 'fixed', title: 'Quiz Feedback', body: "A quiz's See Feedback opens its marked answers.", icon: P.check },
     ] },

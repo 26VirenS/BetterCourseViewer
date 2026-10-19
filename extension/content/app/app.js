@@ -703,7 +703,7 @@
       h('span', { class: 'bcv-ctab__ic', style: { color } }, U.svg(t.icon, { size: 17, width: 1.8 })),
       h('span', { class: 'bcv-ellip', text: t.label }),
       nav.counts?.[t.id] ? h('span', { class: 'bcv-nav__count', text: String(nav.counts[t.id]) }) : null,
-    ].filter(Boolean))), { role: 'group', 'aria-label': `${c.shortName || c.name} sections` });
+    ].filter(Boolean))), { role: 'group', 'aria-label': `${c.shortName || c.name} sections`, dataset: { course: String(c.id) } });
   }
   let quickNav = null; // { el, key, anchor, closeTimer }
   let quickNavDismissed = false; // Escape was pressed: hold it shut until the pointer or focus leaves the row
@@ -747,7 +747,7 @@
     return U.el('bcv-ctabs', SIDE_SECTIONS.map(([k, label, icon]) => h('button', { type: 'button', class: 'bcv-ctab', dataset: { tab: k, href: `${base}/${k === 'syllabus' ? 'assignments/syllabus' : k}` }, title: label, onclick: () => { progress(true, `tab:${k}`); go(`${base}/${k === 'syllabus' ? 'assignments/syllabus' : k}`); } }, [
       h('span', { class: 'bcv-ctab__ic', style: { color: c.color } }, U.svg(icon, { size: 17, width: 1.8 })),
       h('span', { class: 'bcv-ellip', text: label }),
-    ])), { role: 'group', 'aria-label': `${c.shortName || c.name} sections` });
+    ])), { role: 'group', 'aria-label': `${c.shortName || c.name} sections`, dataset: { course: String(c.id) } });
   }
 
   let quickNavGoing = null; // (the panel on its way out: the pointer back on its row brings it back from there — U.recall)
@@ -920,6 +920,7 @@
     const sidePic = BCV.theme.picOf(state.themeImages, state.themeImages?.side); // { sharp, blur } (lib/theme.js assets)
     side.classList.toggle('bcv-side--pic', !!sidePic);
     side.classList.toggle('bcv-side--ink', !!sidePic?.ink); // (the paper: the complement of the colour, app.css)
+    const wasOpen = new Map([...side.querySelectorAll('.bcv-ctabs[data-course]')].map((e) => [e.dataset.course, e]));
     side.replaceChildren(...[
       // the theme's photo, under everything: sharp at the foot, blurred up the side (app.css: .bcv-side__pic)
       sidePic ? h('div', { class: `bcv-side__pic ${sidePic.ink ? 'has-ink' : ''} ${sidePic.scene ? 'is-scene' : ''}`, 'aria-hidden': 'true', style: { ...(sidePic.ink ? { '--bcv-pic-ink': BCV.theme.picCss(sidePic.ink), '--bcv-pic-ink-blur': BCV.theme.picCss(sidePic.inkBlur) } : { '--bcv-pic': BCV.theme.picCss(sidePic.sharp) }), '--bcv-veil': BCV.theme.veilBase(state.settings?.appearance?.theme?.accent || '', state.themeImages?.tones?.side, 0.66), ...BCV.theme.placeVars(BCV.theme.placeOf(state.themeImages, 'side')) } }, [h('i', { class: 'bcv-side__pic-sharp' }), h('i', { class: 'bcv-side__pic-blur' }), h('i', { class: 'bcv-side__pic-veil' })]) : null, // (the place: where the picture is pinned, and its zoom — lib/theme.js placeOf)
@@ -958,6 +959,46 @@
       ]),
     ].filter(Boolean));
     paintLoad(); // a row still loading keeps its wash across a redraw
+    if (oneBar()) sideMotion(wasOpen, r);
+  }
+  /** (2.99.59) One sidebar, as the Mac's: a course's sections grow open under its row and fold shut into it, and a
+   *  course opened in the sidebar comes up to its top. The sidebar is drawn anew each time, so what folds shut is the
+   *  last drawing's rows, held under the course's row while they go. */
+  function sideMotion(wasOpen, r) {
+    const still = U.reducedMotion();
+    const ease = 'cubic-bezier(0.23, 1, 0.32, 1)';
+    const nowOpen = new Map([...side.querySelectorAll('.bcv-ctabs[data-course]')].map((e) => [e.dataset.course, e]));
+    for (const [id, el] of nowOpen) {
+      if (wasOpen.has(id)) { el.classList.remove('is-new'); continue; }
+      el.classList.remove('is-new');
+      if (still) continue;
+      const hgt = el.getBoundingClientRect().height;
+      el.dataset.grew = '1'; // (said for the tests: it grew open)
+      el.style.overflow = 'hidden';
+      el.animate([{ height: '0px', opacity: 0, marginBottom: '0px' }, { height: `${hgt}px`, opacity: 1 }], { duration: 260, easing: ease }).finished.then(() => { el.style.overflow = ''; }, () => {});
+    }
+    for (const [id, old] of wasOpen) {
+      if (nowOpen.has(id) || still) continue;
+      const row = side.querySelector(`.bcv-fav[data-load="fav:${CSS.escape(id)}"]`);
+      if (!row) continue;
+      const hgt = old.getBoundingClientRect().height || old.offsetHeight;
+      old.classList.remove('is-new');
+      old.style.overflow = 'hidden';
+      old.style.pointerEvents = 'none';
+      old.setAttribute('aria-hidden', 'true');
+      old.querySelectorAll('.is-active').forEach((x) => x.classList.remove('is-active'));
+      row.after(old);
+      old.animate([{ height: `${hgt}px`, opacity: 1 }, { height: '0px', opacity: 0, marginTop: '0px', marginBottom: '0px' }], { duration: 200, easing: ease, fill: 'forwards' }).finished.then(() => old.remove(), () => old.remove());
+    }
+    // the course on show, newly opened: its row to the sidebar's top (as the Mac's sidebar brings it there)
+    const shown = r.screen === 'course' && r.courseId ? String(r.courseId) : null;
+    if (shown && nowOpen.has(shown) && !wasOpen.has(shown)) {
+      const row = side.querySelector(`.bcv-fav[data-load="fav:${CSS.escape(shown)}"]`);
+      if (row) {
+        const top = row.getBoundingClientRect().top - side.getBoundingClientRect().top + side.scrollTop - 8;
+        side.scrollTo({ top: Math.max(0, top), behavior: still ? 'auto' : 'smooth' });
+      }
+    }
   }
 
   /** Log out of Canvas: the app's own sign-out in the iOS app, else Canvas's logout form (a DELETE

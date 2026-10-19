@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.58"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.59"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -5568,6 +5568,15 @@ html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-look .bcv-loo
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-report { display: none; }
 /* the pinned tools: one capsule of the bar's fill, each tool its glyph in its own colour (the Mac's toolbar group) */
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-tray { top: 7px; right: var(--bcv-tray-r, 300px); }
+/* (2.99.59) a popup up (a sheet, the viewer, a tool, Feedback): ⋯ goes, and the pinned tools move up beside the sidebar's
+   button at the top left — over the popup's scrim, still to hand — and the popup itself starts below that row, so the
+   two never meet whatever the popup's size */
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under), .bcv-fbs-ov:not(.is-closing)) #bcv-look { opacity: 0; pointer-events: none; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under), .bcv-fbs-ov:not(.is-closing)) #bcv-tray { right: auto; left: calc(var(--bcv-side-w) - 4px); z-index: var(--bcv-z-ghost); }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under), .bcv-fbs-ov:not(.is-closing)).bcv-side-off #bcv-tray { left: 54px; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under), .bcv-fbs-ov:not(.is-closing)) #bcv-sidetoggle { z-index: var(--bcv-z-ghost); }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under), .bcv-fbs-ov:not(.is-closing)) :is(.bcv-sheet-ov, .bcv-fbs-ov) { padding-top: 52px; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under), .bcv-fbs-ov:not(.is-closing)) :is(.bcv-sheet-ov, .bcv-fbs-ov) > * { max-height: calc(100vh - 80px); }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-pins:not(:empty) { align-items: flex-start; gap: 10px; height: 30px; padding: 3px 8px 0; box-sizing: border-box; border-radius: 15px; background: var(--bcv-fill); }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-pins .bcv-pin:not(.is-open) .bcv-pin__btn { background: transparent; box-shadow: none; }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-pins .bcv-pin:not(.is-open) .bcv-pin__ic { color: var(--bcv-pin-color, var(--bcv-ink2)); }
