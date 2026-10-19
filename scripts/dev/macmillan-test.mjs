@@ -177,6 +177,18 @@ try {
   });
   check(pal.palTop >= pal.fieldBottom && pal.palH > 100 && pal.inside, `the math keyboard under the field it types into, never on it: ${JSON.stringify(pal)}`);
 
+  // (Mac 1.3.126) finished: the points give way to the final score as a percentage, and that is the score sent
+  const fin = await sac().evaluate(async () => {
+    const f = document.querySelector('[data-test-id="final-score-fraction"]'), keep = f.outerHTML;
+    f.outerHTML = '<div data-test-id="final-score-percentage" aria-label="Assignment Final Score: 99%"><div><span>99</span><span>%</span></div><div>Final Score</div></div>';
+    window.__msgs.length = 0; window.__simplMacmillan('state');
+    await new Promise((r) => setTimeout(r, 300));
+    const st = window.__msgs.filter((m) => m.kind === 'state').pop();
+    document.querySelector('[data-test-id="final-score-percentage"]').outerHTML = keep;
+    return st && st.score;
+  });
+  check(JSON.stringify(fin) === '[99,100,1]', `a finished assignment's final score read as a percentage: ${JSON.stringify(fin)}`);
+
   // (Mac 1.3.117) Macmillan's two_col_all (each prompt beside its answer): one column, nothing past the edge, the answer a
   // field's width; its tools menu (×10ʸ) a popover in the app's colours, dark in dark
   await page.setViewportSize({ width: 820, height: 720 });

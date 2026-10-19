@@ -238,7 +238,8 @@ private struct MacmillanRail: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("Score").font(.sHeadline)
                 Spacer(minLength: 6)
-                Text(total > 0 ? "\(Self.number(got)) / \(Self.number(total))" : "–")
+                // (1.3.126) finished, Macmillan gives the final score as a percentage (a third number marks it)
+                Text(total > 0 ? ((state.score?.count ?? 0) > 2 ? "\(Self.number(got))%" : "\(Self.number(got)) / \(Self.number(total))") : "–")
                     .font(.sHeadline.monospacedDigit())
                     .contentTransition(.numericText(value: got))
                     .animation(Motion.snappy, value: got)

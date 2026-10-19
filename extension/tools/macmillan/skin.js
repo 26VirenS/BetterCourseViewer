@@ -271,6 +271,11 @@
     });
     var scoreEl = tid('final-score-fraction');
     var sm = ((scoreEl && scoreEl.getAttribute('aria-label')) || '').match(/(\d+(?:\.\d+)?) out of (\d+(?:\.\d+)?)/);
+    // (Mac 1.3.126) finished, the points give way to the final score as a percentage ("Assignment Final Score: 99%"): sent
+    // as 99 of 100, marked as a percentage (the third number)
+    var pctEl = sm ? null : tid('final-score-percentage');
+    var pm = ((pctEl && pctEl.getAttribute('aria-label')) || '').match(/(\d+(?:\.\d+)?)\s*%/);
+    if (pm) sm = [null, pm[1], '100', '%'];
     var done = completedOf();
     var main = tid('btn-sac-main');
     var att = tid('attempts-dropdown-button');
@@ -282,7 +287,7 @@
     return {
       kind: 'state', page: 'question', dark: dark, title: title, index: Number(m[1] || 0) - 1, count: Number(m[2] || items.length),
       completed: done[1] ? Number(done[1]) : items.filter(function (i) { return i.state === 'success'; }).length,
-      score: sm ? [Number(sm[1]), Number(sm[2])] : null, policies: policies(), items: items,
+      score: sm ? (sm[3] === '%' ? [Number(sm[1]), 100, 1] : [Number(sm[1]), Number(sm[2])]) : null, policies: policies(), items: items,
       main: main ? (main.getAttribute('aria-label') || words(main)) : null, mainOn: !!(main && !main.disabled),
       tools: { resources: !!q('[aria-label="Open Resources"]'), tutor: !!q('[aria-label="Open AI Tutor"]'), solution: !!q('[aria-label="Open Solution"]'), layout: !!tid('switch-to-new-layout') },
       attempts: att ? { label: words(att), choices: choices } : null, results: results, verdict: verdict,
