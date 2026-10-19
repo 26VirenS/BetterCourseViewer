@@ -45,7 +45,7 @@ struct AltaQuizScreen: View {
         VStack(spacing: 0) {
             topBar
             HStack(spacing: 0) {
-                AltaRail(session: session, dark: $pageDark, browser: $showBrowser)
+                AltaRail(session: session)
                     .frame(width: ideal.width >= 960 ? 290 : 240)
                 Divider()
                 // (1.3.79) Alta's page in light whatever the app's appearance — on light glass, over a light ground —
@@ -123,6 +123,10 @@ struct AltaQuizScreen: View {
                 }
             }
             Spacer(minLength: 8)
+            // (1.3.131) Light / Dark — a switch now — and Browser in the bar, left of the tools, no longer above the
+            // objectives
+            AltaLookSwitch(dark: $pageDark)
+            AltaBrowserToggle(on: $showBrowser, label: "Browser")
             PopupPins() // (1.3.73: the toolbar's pins, here too)
             GlassGroup(spacing: 8) {
                 // (1.3.47) shown once Alta's page was not recognised (and given back as it is); (1.3.72) to developers
@@ -650,35 +654,13 @@ private struct AltaPageHost: NSViewRepresentable {
 
 // MARK: - The rail
 
-/// Down the left: the objectives as the quiz's question tiles, each by name with its own bar, and the total mastery;
-/// (1.3.83) above them, how Alta's side is shown — Light or Dark, and Show Browser — in one row: in words while they
-/// fit, Show Browser as "Browser" before the sun and moon lose theirs.
+/// Down the left: the objectives as the quiz's question tiles, each by name with its own bar, and the total mastery.
+/// (1.3.131: Light / Dark and Browser, above them since 1.3.83, are in the popup's bar now.)
 private struct AltaRail: View {
     @ObservedObject var session: AltaSession
-    @Binding var dark: Bool
-    @Binding var browser: Bool
 
     var body: some View {
-        let list = session.objectives
-        VStack(spacing: 0) {
-            ViewThatFits(in: .horizontal) {
-                controls(words: true, browser: "Show Browser")
-                controls(words: true, browser: "Browser")
-                controls(words: false, browser: "Browser")
-            }
-            .controlSize(.small)
-            .padding(.horizontal, 20)
-            .padding(.top, 10)
-            rail(list)
-        }
-    }
-
-    private func controls(words: Bool, browser label: String) -> some View {
-        HStack(spacing: 8) {
-            AltaLookPicker(dark: $dark, words: words)
-            Spacer(minLength: 0)
-            AltaBrowserToggle(on: $browser, label: label)
-        }
+        rail(session.objectives)
     }
 
     private func rail(_ list: [AltaObjective]) -> some View {
@@ -743,42 +725,46 @@ private struct AltaRail: View {
     }
 }
 
-/// (1.3.83) Above the objectives: Alta's side of the popup Light or Dark — two glass chips that blend into one control,
-/// the one picked filled in the accent; with `words`, each says its name beside its sun or moon. Light (the default
-/// since 1.3.79) shows Alta's page as Alta draws it; Dark lays the question on dark glass, its colours turned over, and
-/// Alta's page as it is drawn dark.
-private struct AltaLookPicker: View {
+/// (1.3.131) In the popup's bar: Alta's side of the popup Light or Dark, as a switch between a sun and a moon (two
+/// chips above the objectives since 1.3.83). Light (the default since 1.3.79) shows Alta's page as Alta draws it; Dark
+/// lays the question on dark glass, its colours turned over, and Alta's page as it is drawn dark.
+private struct AltaLookSwitch: View {
     @Binding var dark: Bool
-    var words = true
 
     var body: some View {
-        GlassGroup(spacing: 4) {
-            HStack(spacing: 4) {
-                choice(dark: false)
-                choice(dark: true)
-            }
+        HStack(spacing: 7) {
+            side(dark: false)
+            Toggle("Dark", isOn: Binding(get: { dark }, set: { d in withAnimation(Motion.gentle) { dark = d } }))
+                .toggleStyle(.switch)
+                .labelsHidden()
+                .controlSize(.small)
+                .tint(Theme.accent)
+            side(dark: true)
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Knewton Alta's page")
+        .padding(.horizontal, 11)
+        .frame(height: 30)
+        .background(Capsule(style: .continuous).fill(Color.primary.opacity(0.07)))
+        .fixedSize()
+        .help(dark ? "Knewton Alta's page is dark — switch for light, as Alta draws it" : "Knewton Alta's page is light — switch for dark")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Dark page")
+        .accessibilityValue(dark ? "On" : "Off")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { withAnimation(Motion.gentle) { dark.toggle() } }
     }
 
-    private func choice(dark d: Bool) -> some View {
-        let on = dark == d
-        let name = d ? "Dark" : "Light"
-        let symbol = d ? "moon.fill" : "sun.max.fill"
-        return Button {
-            withAnimation(Motion.gentle) { dark = d }
-        } label: {
-            if words { Label(name, systemImage: symbol).labelStyle(.titleAndIcon) } else { Label(name, systemImage: symbol).labelStyle(.iconOnly) }
-        }
-        .glassChip(Theme.accent, on: on)
-        .fixedSize()
-        .help(d ? "Show Knewton Alta's page dark" : "Show Knewton Alta's page light, as Alta draws it")
-        .accessibilityAddTraits(on ? .isSelected : [])
+    /// The sun or the moon: lit while its side is chosen; clicked, it chooses it.
+    private func side(dark d: Bool) -> some View {
+        Image(systemName: d ? "moon.fill" : "sun.max.fill")
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(dark == d ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.secondary))
+            .frame(width: 16)
+            .contentShape(Rectangle())
+            .onTapGesture { withAnimation(Motion.gentle) { dark = d } }
     }
 }
 
-/// (1.3.83) Beside Light / Dark: Show Browser — Knewton Alta's own page on the right, as Alta draws it, in place of the
+/// (1.3.83) Beside Light / Dark (1.3.131: in the popup's bar): Show Browser — Knewton Alta's own page on the right, as Alta draws it, in place of the
 /// app's view of it — a glass chip filled while it is on.
 private struct AltaBrowserToggle: View {
     @Binding var on: Bool
