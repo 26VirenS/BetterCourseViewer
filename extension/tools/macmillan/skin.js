@@ -62,6 +62,7 @@
   // and one column when narrow.
   var ROWS = ''; for (var n = 1; n <= 60; n++) ROWS += 'html.simpl-mm .parent-module-container[data-simpl-rows="' + n + '"]{grid-template-rows:repeat(' + n + ',auto) 1fr}';
   var SKIN =
+    'html.simpl-mm .simpl-mm-dlghide{display:none!important}' + // (Mac 1.3.123: Macmillan's pop-up, drawn by the app instead)
     'html.simpl-mm{--mm-ink:#1c1c1e;--mm-ink2:rgba(60,60,67,.62);--mm-card:rgba(255,255,255,.74);--mm-line:rgba(0,0,0,.07);--mm-field:rgba(255,255,255,.92);--mm-good:#1a6b30;--mm-good-bg:rgba(52,199,89,.16);--mm-bad:#c01d43;--mm-bad-bg:rgba(255,59,48,.13);--mm-good-line:rgba(52,199,89,.35);--mm-bad-line:rgba(255,59,48,.3);--mm-on:#fff;--mm-accent:#0a84ff;--mm-accent-ring:rgba(10,132,255,.25);--mm-field2:rgba(0,0,0,.04);--mm-pop:#fff;--mm-rim:rgba(255,255,255,.7);color-scheme:light}' +
     'html.simpl-mm.simpl-mm-dark{--mm-ink:#f2f2f7;--mm-ink2:rgba(235,235,245,.62);--mm-card:rgba(255,255,255,.075);--mm-line:rgba(255,255,255,.11);--mm-field:rgba(255,255,255,.09);--mm-good:#5ddb7d;--mm-good-bg:rgba(52,199,89,.2);--mm-bad:#ff8098;--mm-bad-bg:rgba(255,69,58,.2);--mm-good-line:rgba(93,219,125,.45);--mm-bad-line:rgba(255,128,152,.4);--mm-on:#0b2a14;--mm-accent:#409cff;--mm-accent-ring:rgba(64,156,255,.3);--mm-field2:rgba(255,255,255,.08);--mm-pop:#2c2c2e;--mm-rim:rgba(255,255,255,.08);color-scheme:dark}' +
     'html.simpl-mm,html.simpl-mm body{background:transparent!important;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif!important}' +
@@ -89,7 +90,14 @@
     'html.simpl-mm.simpl-mm-glass .parent-module-container{background:transparent!important;box-shadow:none!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;border-radius:0!important;padding:4px 6px 12px!important}' +
     'html.simpl-mm.simpl-mm-glass .raptor-container{padding:16px 20px 0!important}' +
     'html.simpl-mm article.module-container{background:transparent!important;border-radius:0!important;padding:6px 0!important;margin:0 0 10px!important;min-height:0!important;box-sizing:border-box!important;box-shadow:none!important;line-height:1.5;color:var(--mm-ink)!important}' +
-    'html.simpl-mm [data-simpl-pic] img{width:100%!important}' +
+    // (Mac 1.3.121) a picture a small preview that always fits: whatever fixed width Macmillan draws it (or its wrappers)
+    // at, it is held to its column and to a short height, and enlarged on a press (below)
+    'html.simpl-mm [data-simpl-pic]{max-width:100%!important;overflow:hidden}' +
+    'html.simpl-mm [data-simpl-pic] *:not(img){width:auto!important;max-width:100%!important;min-width:0!important;box-sizing:border-box!important}' +
+    'html.simpl-mm [data-simpl-pic] img{display:block!important;width:auto!important;max-width:100%!important;max-height:300px!important;height:auto!important;object-fit:contain;margin:0 auto!important}' +
+    '@media (max-width:1100px){html.simpl-mm [data-simpl-pic] img{max-height:220px!important}}' +
+    'html.simpl-mm .raw-html img,html.simpl-mm article.module-container img{max-width:100%!important;height:auto!important}' +
+    'html.simpl-mm .raw-html :has(> img),html.simpl-mm article.module-container :has(> img){max-width:100%!important}' +
     // (Mac 1.3.120) the question drawn a little smaller, so more of it (and its pictures) fits
     'html.simpl-mm #raptor-content-container .content-area{zoom:.86}' +
     // (Mac 1.3.120) a picture enlarged on a press, as Alta's graphs are: a hint of it at its corner, then large over the page
@@ -105,7 +113,7 @@
     // the left in their order (Macmillan's own two-column layouts and its one-column ones alike). A grid of the parts on
     // the left a row each, then a last row that takes what a tall picture needs (picture() counts the rows)
     'html.simpl-mm .authoring-area .module-container{display:block!important;width:auto!important;float:none!important;clear:none!important}' +
-    'html.simpl-mm .parent-module-container[data-simpl-rows]{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,42%);column-gap:24px;align-content:start}' +
+    'html.simpl-mm .parent-module-container[data-simpl-rows]{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,36%);column-gap:24px;align-content:start}' +
     'html.simpl-mm .parent-module-container[data-simpl-rows] > *{grid-column:1;min-width:0}' +
     'html.simpl-mm .parent-module-container[data-simpl-rows] > [data-simpl-pic]{grid-column:2;grid-row:1 / -1;align-self:start;position:sticky;top:8px}' +
     ROWS +
@@ -159,6 +167,21 @@
 
   // (Mac 1.3.119) The question's picture: a part that is a picture and next to no words. Marked, it goes up the right
   // (the skin's grid), the rest down the left; the left's parts counted for the grid's rows.
+  // (Mac 1.3.122) the picture never past the right edge, whatever the page's widths and zoom do: measured as drawn, and
+  // held to the room it has; on a narrower window it is a smaller preview still
+  function fitPics() {
+    qa('[data-simpl-pic] img').forEach(function (img) {
+      var box = img.closest('[data-simpl-pic]'); if (!box) return;
+      img.style.removeProperty('max-width');
+      var r = img.getBoundingClientRect(); if (!r.width) return;
+      var z = img.offsetWidth ? r.width / img.offsetWidth : 1;
+      var edge = Math.min(document.documentElement.clientWidth, (box.closest('.parent-module-container') || document.documentElement).getBoundingClientRect().right) - 16;
+      if (r.right > edge) img.style.setProperty('max-width', Math.max(80, Math.floor((r.width - (r.right - edge)) / (z || 1))) + 'px', 'important');
+    });
+  }
+  var fitT = 0;
+  window.addEventListener('resize', function () { clearTimeout(fitT); fitT = setTimeout(fitPics, 60); });
+  document.addEventListener('load', function (e) { if (e.target && e.target.tagName === 'IMG') fitPics(); }, true);
   function picture() {
     // (a part of a kind the skin knows reads in the app's ink; any other kind keeps its own colours on a plate)
     qa('article.module-container').forEach(function (m) {
@@ -183,6 +206,7 @@
       var rows = String(Math.min(60, Math.max(1, kids.length - 1)));
       if (box.getAttribute('data-simpl-rows') !== rows) box.setAttribute('data-simpl-rows', rows);
     });
+    fitPics();
   }
 
   // (Mac 1.3.115) Macmillan keeps its side panel folded when it was last folded — and folded, it does not draw the list of
@@ -274,10 +298,37 @@
       var s = state();
       var text = JSON.stringify(s);
       if (text !== last) { last = text; post(s); }
+      dialogReport();
     }, 120);
   }
 
   function click(el) { if (!el) return false; el.click(); report(); return true; }
+
+  // (Mac 1.3.123) Macmillan's pop-up — You solved it…, with View Solution and Next Question — as the app's own card, the
+  // way Knewton Alta's are: read whole (its title, its body, every button, its × as Close) and hidden in the page while
+  // the app shows it; the card's buttons press Macmillan's. Given back (Show in Macmillan's Page), it shows as drawn.
+  var lastDlg = '', dlgInPage = false;
+  function dlgNow() { return q('#react-aria-modal-dialog, [role="dialog"].sac-modal'); }
+  function dlgButtons(d) { return d ? qa('button', d).filter(function (b) { return b.offsetParent !== null || b.closest('.simpl-mm-dlghide'); }) : []; }
+  function dlgOverlay(d) { var o = d; while (o && o.parentElement && o.parentElement !== document.body) { if (/fixed/.test(o.getAttribute('style') || '')) return o; o = o.parentElement; } return d.parentElement || d; }
+  function dialogReport() {
+    if (!window.__simplMacmillanGlass) return;
+    var d = skinned ? dlgNow() : null;
+    if (!d) { if (lastDlg) { lastDlg = ''; dlgInPage = false; post({ kind: 'dialog', open: false }); } return; }
+    var ov = dlgOverlay(d);
+    if (dlgInPage) { ov.classList.remove('simpl-mm-dlghide'); return; }
+    ov.classList.add('simpl-mm-dlghide');
+    var body = q('#solution-modal-content, .modal-body, .content', d) || d;
+    var copy = body.cloneNode(true);
+    qa('script, button', copy).forEach(function (x) { x.remove(); });
+    var m = { kind: 'dialog', open: true, title: words(q('#modal-title, h1, h2', d)), html: copy.innerHTML.trim(),
+      buttons: dlgButtons(d).map(function (b) {
+        var x = b.id === 'close-modal-x' || b.getAttribute('data-test-id') === 'close-modal-x' || (/close/i.test(b.getAttribute('aria-label') || '') && !/\w{3,}/.test(words(b).replace(/close modal/i, '')));
+        return { label: x ? 'Close' : words(b), primary: /\bprimary\b/.test(b.className), enabled: !b.disabled, close: x };
+      }) };
+    var text = JSON.stringify(m);
+    if (text !== lastDlg) { lastDlg = text; post(m); }
+  }
 
   // the app's presses
   window.__simplMacmillan = function (cmd, arg) {
@@ -287,6 +338,9 @@
       case 'prev': return click(tid('nav-item-back'));
       case 'next': return click(tid('nav-item-forward'));
       case 'main': return click(tid('btn-sac-main'));
+      // (Mac 1.3.123) the pop-up's buttons, and the pop-up given back to the page
+      case 'dialog': return click(dlgButtons(dlgNow())[Number(arg)]);
+      case 'dialogPage': { dlgInPage = true; var d = dlgNow(); if (d) dlgOverlay(d).classList.remove('simpl-mm-dlghide'); post({ kind: 'dialog', open: true, inPage: true }); return true; }
       case 'resources': return click(q('[aria-label="Open Resources"]'));
       case 'tutor': return click(q('[aria-label="Open AI Tutor"]'));
       case 'solution': return click(q('[aria-label="Open Solution"]'));
@@ -312,10 +366,26 @@
     var img = e.target && e.target.closest && e.target.closest('[data-simpl-pic] img, article.module-container .raw-html img');
     if (!img || img.closest('a,button,[data-simpl-plate]')) return;
     e.preventDefault(); e.stopPropagation();
+    // (Mac 1.3.122) in the Mac app it opens in a window of its own, as Knewton Alta's graphs do: its bytes as the page
+    // has them (a canvas, or a fetch), else its address for the app to read
+    if (window.__simplMacmillanGlass && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.simplMacmillan) { popOut(img); return; }
     var box = document.createElement('div'); box.id = 'simpl-mm-zoom'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', img.alt || 'Picture');
     var big = document.createElement('img'); big.src = img.currentSrc || img.src; big.alt = img.alt || '';
     box.appendChild(big); document.body.appendChild(box);
   }, true);
+  function popOut(img) {
+    var src = img.currentSrc || img.src;
+    var title = (q('[data-test-id="question-title"], .question-title, h1') || {}).textContent || '';
+    var send = function (b64) { post(b64 ? { kind: 'pic', data: b64, title: title.trim() } : { kind: 'pic', url: src, title: title.trim() }); };
+    try {
+      var c = document.createElement('canvas'); c.width = img.naturalWidth || img.width; c.height = img.naturalHeight || img.height;
+      var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+      send(c.toDataURL('image/png').split(',')[1]); return;
+    } catch (err) { /* (a picture from elsewhere: the canvas is not ours to read) */ }
+    try {
+      fetch(src, { credentials: 'include' }).then(function (r) { return r.blob(); }).then(function (b) { var fr = new FileReader(); fr.onload = function () { send(String(fr.result).split(',')[1]); }; fr.readAsDataURL(b); }).catch(function () { send(null); });
+    } catch (err) { send(null); }
+  }
   document.addEventListener('keydown', function (e) { var z = document.getElementById('simpl-mm-zoom'); if (z && e.key === 'Escape') { z.remove(); e.stopPropagation(); } }, true);
 
   function watch() {

@@ -1,3 +1,7 @@
+**What's new in 0.3.38** (beta)
+
+- **Macmillan Learning, pictures on a narrower window** — a question's picture is a smaller preview on a narrower window, and measured as drawn so it never runs past the right edge, whatever width Macmillan draws it at.
+
 **What's new in 0.3.37** (beta)
 
 - **Macmillan Learning, pictures and units** — a number's unit sits right beside its field, the whole question is drawn a little smaller so more of it fits, and a picture shows smaller with a ⤢ badge: click it to see it full size (click or press Escape to close).
