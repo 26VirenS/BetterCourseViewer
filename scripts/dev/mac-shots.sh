@@ -489,6 +489,9 @@ ui_review() {
   # (1.3.112) the Calculator, GeoGebra's: its suite with a function graphed, and its pin's scientific calculator
   MODE=light SIZE=1280x900 shoot light-57b-tool-geogebra 20 -SimplPlace tools -SimplTool calc -SimplSolver "f(x) = x^2 - 2x - 3"
   MODE=light shoot light-54f-pin-calc 14 -SimplPinnedTools calc -SimplPinOpen calc
+  # (1.3.127) the timer's pin: the web's mini timer — the strip of minutes under its marker, and Start
+  MODE=light shoot light-54z-pin-pomo 14 -SimplPinnedTools pomo -SimplPinOpen pomo
+  MODE=dark shoot dark-54z-pin-pomo 14 -SimplPinnedTools pomo -SimplPinOpen pomo
   MODE=light shoot light-54e-pin-need 14 -SimplPinnedTools need -SimplPinOpen need
   # (a two-page reading, for the annotator and Merge & Split: one PDF opens Split)
   MODE=light shoot light-58-tool-annotate 14 -SimplPlace tools -SimplTool mark -SimplToolFile "$PWD/scripts/dev/fixtures/reading.pdf"

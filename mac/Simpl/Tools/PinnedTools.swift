@@ -181,11 +181,14 @@ struct PinnedToolPopover: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 10) {
-                IconTile(symbol: kind.symbol, color: kind.color, size: 28)
-                QuickPanelName(kind: kind)
-                Spacer(minLength: 8)
-                QuickFullScreenButton(kind: kind, action: openFullScreen)
+            // (1.3.127) the timer is the web's mini timer, its own minutes (or Open) opening the whole timer: no head
+            if kind != .pomo {
+                HStack(spacing: 10) {
+                    IconTile(symbol: kind.symbol, color: kind.color, size: 28)
+                    QuickPanelName(kind: kind)
+                    Spacer(minLength: 8)
+                    QuickFullScreenButton(kind: kind, action: openFullScreen)
+                }
             }
             PinnedToolQuick(kind: kind) { info, files in openFull(info: info, files: files) }
                 .onPreferenceChange(QuickCarryKey.self) { c in MainActor.assumeIsolated { carry = c } }
@@ -327,7 +330,7 @@ struct PinnedToolQuick: View {
 
     var body: some View {
         switch kind {
-        case .pomo: FocusTimerCompact()
+        case .pomo: FocusTimerCompact { openFull([:], []) }
         case .calc: CalculatorCompact { openFull($0, []) }
         case .need: GradeNeededCompact { openFull($0, []) }
         case .ptable, .lewis, .molecule, .atoms, .balance, .moles, .gas, .solution:

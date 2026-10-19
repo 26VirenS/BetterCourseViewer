@@ -212,6 +212,17 @@ final class FocusTimer: ObservableObject {
         setPhase(nextPhase, keepRunning: running)
     }
 
+    /// (1.3.127) The mini timer's Focus | Break switch, as the web's island has it: the other phase at once — still going
+    /// if it was going, or waiting with its full time, still paused, if it was paused; the break the one the cycle is at.
+    func switchPhase(toFocus: Bool) {
+        let p: Phase = toFocus ? .focus : (rec.phase == .focus ? nextPhase : rec.phase)
+        guard p != rec.phase else { return }
+        if running { setPhase(p, keepRunning: true); return }
+        let held = paused
+        setPhase(p)
+        if held { rec.left = length(p); commit() }
+    }
+
     /// A phase's minutes set (1 to 90); the phase showing, if nothing is going, starts from the new length.
     func setMinutes(_ m: Int, for p: Phase) {
         let v = max(1, min(90, m))
@@ -526,39 +537,206 @@ struct FocusSettings: View {
     }
 }
 
-/// The timer's pin, opened: the phase, the time large, its controls, and the minutes when nothing is going.
+/// (1.3.127) The timer's pin, opened: the web's mini timer. Nothing going: the minutes over a strip of them sliding under a
+/// marker (a drag sets them; the minutes themselves open the timer) and a round Start in the phase's colour — set, and go.
+/// Going: End and Pause as round buttons, and on the right the phase with Open beside it, the count large in its colour,
+/// and a Focus | Break switch under it.
 struct FocusTimerCompact: View {
+    var open: () -> Void = {}
     @ObservedObject private var timer = FocusTimer.shared
     @ObservedObject private var clock = FocusClock.shared
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            FocusPhasePicker()
-            // (tools-25: the shared second hand, so this and the toolbar's pin say the same time)
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(FocusTimer.clock(timer.remaining(at: clock.now)))
-                        .font(.system(size: 46, weight: .semibold, design: .rounded).monospacedDigit())
-                        .foregroundStyle(timer.active ? timer.rec.phase.color : Color.primary)
-                        .contentTransition(.numericText(countsDown: true))
-                    Spacer()
-                    Text(timer.endsText ?? (timer.paused ? "Paused" : ""))
-                        .font(.sCallout)
+        Group {
+            if timer.active { live } else { setter }
+        }
+        .frame(height: 64)
+        .animation(Motion.snappy, value: timer.active)
+    }
+
+    private var setter: some View {
+        let p = timer.rec.phase
+        let m = timer.minutes(p)
+        return HStack(spacing: 12) {
+            VStack(spacing: 0) {
+                Button(action: open) {
+                    HStack(spacing: 3) {
+                        Text("\(m) min").monospacedDigit()
+                        Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 8, weight: .bold))
+                    }
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(MiniPressStyle())
+                .help("Open the timer")
+                FocusMinuteRuler(minutes: m, maxMinutes: p == .focus ? 90 : 60, color: p.color) { timer.setMinutes($0, for: p) }
+            }
+            roundButton("play.fill", label: "Start", tint: p.color) { timer.start() }
+        }
+        .transition(.opacity.combined(with: .scale(scale: 0.96)))
+    }
+
+    private var live: some View {
+        let p = timer.rec.phase
+        let onBreak = p != .focus
+        return HStack(spacing: 12) {
+            HStack(spacing: 8) {
+                roundButton("xmark", label: "End", tint: nil) { timer.reset() }
+                roundButton(timer.running ? "pause.fill" : "play.fill", label: timer.running ? "Pause" : "Resume", tint: p.color) { timer.toggle() }
+            }
+            Spacer(minLength: 4)
+            VStack(alignment: .trailing, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(timer.paused ? "PAUSED" : (onBreak ? "BREAK" : "FOCUS"))
+                        .font(.system(size: 10, weight: .semibold))
+                        .kerning(0.6)
                         .foregroundStyle(.secondary)
+                    Button(action: open) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 8, weight: .bold))
+                            Text("Open")
+                        }
+                        .font(.system(size: 10, weight: .semibold))
+                        .padding(.horizontal, 7)
+                        .frame(height: 18)
+                        .background(Capsule().fill(Color.primary.opacity(0.08)))
+                        .contentShape(Capsule())
+                    }
+                    .buttonStyle(MiniPressStyle())
+                    .help("Open the timer")
                 }
-                ProgressView(value: timer.fraction(at: clock.now))
-                    .tint(timer.rec.phase.color)
-            }
-            FocusControls()
-            if !timer.active {
-                Stepper(value: Binding(get: { timer.minutes(timer.rec.phase) }, set: { timer.setMinutes($0, for: timer.rec.phase) }), in: 1...90) {
-                    Text("\(timer.rec.phase.name): \(timer.minutes(timer.rec.phase)) minutes").font(.sCallout)
+                Text(FocusTimer.clock(timer.remaining(at: clock.now)))
+                    .font(.system(size: 32, weight: .light, design: .rounded).monospacedDigit())
+                    .foregroundStyle(p.color)
+                    .contentTransition(.numericText(countsDown: true))
+                    .lineLimit(1)
+                HStack(spacing: 2) {
+                    segment("Focus", on: !onBreak) { timer.switchPhase(toFocus: true) }
+                    segment("Break", on: onBreak) { timer.switchPhase(toFocus: false) }
                 }
+                .padding(2)
+                .background(Capsule().fill(Color.primary.opacity(0.07)))
             }
-            // (tools-26) "Session 1 of 4 · none finished today": the session under way, then what is done
-            Text("\(timer.cycleLine) · \(timer.finishedLine)")
-                .font(.sFootnote)
-                .foregroundStyle(.secondary)
+        }
+        .transition(.opacity.combined(with: .scale(scale: 0.96)))
+        .accessibilityElement(children: .contain)
+    }
+
+    private func segment(_ title: String, on: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            withAnimation(Motion.snappy) { action() }
+        } label: {
+            Text(title)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(on ? Color.primary : Color.secondary)
+                .padding(.horizontal, 9)
+                .frame(height: 16)
+                .background(Capsule().fill(on ? timer.rec.phase.color.opacity(0.32) : .clear))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(MiniPressStyle())
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    private func roundButton(_ symbol: String, label: String, tint: Color?, action: @escaping () -> Void) -> some View {
+        Button {
+            withAnimation(Motion.snappy) { action() }
+        } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(tint ?? Color.primary.opacity(0.75))
+                .frame(width: 40, height: 40)
+                .background(Circle().fill((tint ?? Color.primary).opacity(tint == nil ? 0.1 : 0.22)))
+                .contentShape(Circle())
+        }
+        .buttonStyle(MiniPressStyle())
+        .help(label)
+        .accessibilityLabel(label)
+    }
+}
+
+/// A press on the mini timer's buttons: pressed in, a touch.
+private struct MiniPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.95 : 1)
+            .opacity(configuration.isPressed ? 0.85 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
+/// (1.3.127) The web's strip of minutes: thirty of them across, ticks every minute (taller every five, numbered), sliding
+/// under a marker fixed at the middle in the phase's colour; a drag moves the strip, the arrow keys (VoiceOver's adjust)
+/// a minute at a time.
+struct FocusMinuteRuler: View {
+    let minutes: Int
+    let maxMinutes: Int
+    let color: Color
+    let set: (Int) -> Void
+    @State private var from: Int?
+    @State private var shown: Double?
+
+    var body: some View {
+        GeometryReader { geo in
+            let ppm = max(1, geo.size.width / 30)
+            let value = shown ?? Double(minutes)
+            Canvas { ctx, size in
+                let mid = size.width / 2
+                let lo = max(0, Int(floor(value - 16))), hi = min(maxMinutes, Int(ceil(value + 16)))
+                if lo <= hi {
+                    for m in lo...hi {
+                        let x = mid + (Double(m) - value) * ppm
+                        let major = m % 5 == 0
+                        let near = max(0.3, 1 - abs(Double(m) - value) / 15)
+                        var tick = Path()
+                        tick.move(to: CGPoint(x: x, y: major ? 14 : 18))
+                        tick.addLine(to: CGPoint(x: x, y: 27))
+                        ctx.stroke(tick, with: .color(Color.primary.opacity(near * (major ? 0.75 : 0.35))), lineWidth: major ? 1.5 : 1)
+                        if major && m > 0 {
+                            ctx.draw(Text("\(m)").font(.system(size: 9, weight: .medium)).foregroundColor(.secondary), at: CGPoint(x: x, y: 6))
+                        }
+                    }
+                }
+                var marker = Path()
+                marker.move(to: CGPoint(x: mid, y: 30))
+                marker.addLine(to: CGPoint(x: mid - 4, y: 36))
+                marker.addLine(to: CGPoint(x: mid + 4, y: 36))
+                marker.closeSubpath()
+                ctx.fill(marker, with: .color(color))
+            }
+            .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.2), .init(color: .black, location: 0.8), .init(color: .clear, location: 1)], startPoint: .leading, endPoint: .trailing))
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 1)
+                    .onChanged { g in
+                        let start = from ?? minutes
+                        if from == nil { from = minutes }
+                        let v = min(Double(maxMinutes), max(1, Double(start) - g.translation.width / ppm))
+                        shown = v
+                        let r = Int(v.rounded())
+                        if r != minutes { set(r) }
+                    }
+                    .onEnded { _ in
+                        let r = Int((shown ?? Double(minutes)).rounded())
+                        shown = nil
+                        from = nil
+                        set(r)
+                    }
+            )
+        }
+        .frame(height: 38)
+        .accessibilityElement()
+        .accessibilityLabel("Minutes")
+        .accessibilityValue("\(minutes) minutes")
+        .accessibilityAdjustableAction { dir in
+            switch dir {
+            case .increment: set(min(maxMinutes, minutes + 1))
+            case .decrement: set(max(1, minutes - 1))
+            @unknown default: break
+            }
         }
     }
 }

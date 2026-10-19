@@ -178,6 +178,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .motion, .vectors, .circuit: return PhysTools.popoverWidth(self)
         case .ptable, .lewis, .molecule, .atoms, .balance, .moles, .gas, .solution: return ChemTools.popoverWidth(self)
         case .calc: return 420
+        case .pomo: return 300 // (1.3.127) the web's mini timer: a strip of minutes and Start, or the count and its buttons
         case .cite: return 400
         case .graph: return 360
         case .fc: return 340
