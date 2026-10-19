@@ -73,6 +73,10 @@ try {
   await page.setViewportSize({ width: 560, height: 720 });
   const narrow = await until(async () => { const f = await fit(); return f.width === 560 && f; });
   check(narrow && narrow.over <= 1 && narrow.pic.top >= narrow.text.bottom - 1 && narrow.pic.right <= 560, `narrow, one column, the picture under the words: ${JSON.stringify(narrow && { over: narrow.over, pic: narrow.pic, text: narrow.text })}`);
+  // (Mac 1.3.122) a narrower window, still two columns: the picture a smaller preview, wholly in sight
+  await page.setViewportSize({ width: 680, height: 720 });
+  const mid = await until(async () => { const f = await fit(); return f.width === 680 && f; });
+  check(mid && mid.pic.right <= 680 - 8 && mid.pic.h <= 220 && mid.pic.left >= mid.text.right, `a narrower window: the picture smaller, beside the words, never past the edge: ${JSON.stringify(mid && mid.pic)}`);
   await page.setViewportSize({ width: 820, height: 720 });
   await sac().evaluate(() => window.__simplMacmillan('theme', true));
   const dk = await until(async () => { const f = await fit(); return f.dark && f; });

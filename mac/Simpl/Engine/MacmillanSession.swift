@@ -123,6 +123,7 @@ final class MacmillanSession: ObservableObject {
         // (1.3.114) the assessment as the skin reads it: the popup drawn round it
         if head["kind"] as? String == "state", let s = try? JSONDecoder().decode(MacmillanState.self, from: data) {
             player = frame
+            if s.index != state?.index || s.page != state?.page { AltaGraphWindow.shared.close() } // (1.3.122: another question, its picture's window goes)
             if s != state { withAnimation(Motion.gentle) { state = s } }
             if opening { withAnimation(Motion.gentle) { opening = false } }
             if browser { Task { await act("skin", false) } }
@@ -135,11 +136,34 @@ final class MacmillanSession: ObservableObject {
             }
             return
         }
+        // (1.3.122) a question's picture pressed: large, in a window of its own over the popup, as Knewton Alta's graphs
+        // open — moved and sized as the student likes (AltaGraphWindow); the picture's bytes as the page had them, or
+        // its address, read with the page's cookies
+        if head["kind"] as? String == "pic" {
+            let title = (head["title"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? launch.title
+            if let b64 = head["data"] as? String, let bytes = Data(base64Encoded: b64), let image = NSImage(data: bytes) {
+                AltaGraphWindow.shared.show(image, title: title, session: nil)
+            } else if let src = head["url"] as? String, let url = URL(string: src) {
+                Task { await openPic(url, title: title) }
+            }
+            return
+        }
         guard head["kind"] as? String == "frame", !frame.isMainFrame else { return }
         let key = frame.request.url?.absoluteString ?? ""
         frames.removeAll { ($0.request.url?.absoluteString ?? "") == key }
         frames.append(frame)
         if frames.count > 30 { frames.removeFirst() }
+    }
+
+    /// (1.3.122) A picture by its address, with the page's cookies (it may be behind Macmillan's sign-in), in the window.
+    private func openPic(_ url: URL, title: String) async {
+        let cookies = await withCheckedContinuation { (go: CheckedContinuation<[HTTPCookie], Never>) in
+            web.configuration.websiteDataStore.httpCookieStore.getAllCookies { go.resume(returning: $0) }
+        }
+        var req = URLRequest(url: url)
+        for (k, v) in HTTPCookie.requestHeaderFields(with: cookies.filter { url.host?.hasSuffix($0.domain.trimmingCharacters(in: CharacterSet(charactersIn: "."))) ?? false }) { req.setValue(v, forHTTPHeaderField: k) }
+        guard let res = try? await URLSession.shared.data(for: req), let image = NSImage(data: res.0) else { return }
+        AltaGraphWindow.shared.show(image, title: title, session: nil)
     }
 
     /// Every bit of code of the page as it is now — the page and each frame in it: its HTML (with any web component's own

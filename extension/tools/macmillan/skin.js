@@ -94,6 +94,7 @@
     'html.simpl-mm [data-simpl-pic]{max-width:100%!important;overflow:hidden}' +
     'html.simpl-mm [data-simpl-pic] *:not(img){width:auto!important;max-width:100%!important;min-width:0!important;box-sizing:border-box!important}' +
     'html.simpl-mm [data-simpl-pic] img{display:block!important;width:auto!important;max-width:100%!important;max-height:300px!important;height:auto!important;object-fit:contain;margin:0 auto!important}' +
+    '@media (max-width:1100px){html.simpl-mm [data-simpl-pic] img{max-height:220px!important}}' +
     'html.simpl-mm .raw-html img,html.simpl-mm article.module-container img{max-width:100%!important;height:auto!important}' +
     'html.simpl-mm .raw-html :has(> img),html.simpl-mm article.module-container :has(> img){max-width:100%!important}' +
     // (Mac 1.3.120) the question drawn a little smaller, so more of it (and its pictures) fits
@@ -165,6 +166,21 @@
 
   // (Mac 1.3.119) The question's picture: a part that is a picture and next to no words. Marked, it goes up the right
   // (the skin's grid), the rest down the left; the left's parts counted for the grid's rows.
+  // (Mac 1.3.122) the picture never past the right edge, whatever the page's widths and zoom do: measured as drawn, and
+  // held to the room it has; on a narrower window it is a smaller preview still
+  function fitPics() {
+    qa('[data-simpl-pic] img').forEach(function (img) {
+      var box = img.closest('[data-simpl-pic]'); if (!box) return;
+      img.style.removeProperty('max-width');
+      var r = img.getBoundingClientRect(); if (!r.width) return;
+      var z = img.offsetWidth ? r.width / img.offsetWidth : 1;
+      var edge = Math.min(document.documentElement.clientWidth, (box.closest('.parent-module-container') || document.documentElement).getBoundingClientRect().right) - 16;
+      if (r.right > edge) img.style.setProperty('max-width', Math.max(80, Math.floor((r.width - (r.right - edge)) / (z || 1))) + 'px', 'important');
+    });
+  }
+  var fitT = 0;
+  window.addEventListener('resize', function () { clearTimeout(fitT); fitT = setTimeout(fitPics, 60); });
+  document.addEventListener('load', function (e) { if (e.target && e.target.tagName === 'IMG') fitPics(); }, true);
   function picture() {
     // (a part of a kind the skin knows reads in the app's ink; any other kind keeps its own colours on a plate)
     qa('article.module-container').forEach(function (m) {
@@ -189,6 +205,7 @@
       var rows = String(Math.min(60, Math.max(1, kids.length - 1)));
       if (box.getAttribute('data-simpl-rows') !== rows) box.setAttribute('data-simpl-rows', rows);
     });
+    fitPics();
   }
 
   // (Mac 1.3.115) Macmillan keeps its side panel folded when it was last folded — and folded, it does not draw the list of
@@ -318,10 +335,26 @@
     var img = e.target && e.target.closest && e.target.closest('[data-simpl-pic] img, article.module-container .raw-html img');
     if (!img || img.closest('a,button,[data-simpl-plate]')) return;
     e.preventDefault(); e.stopPropagation();
+    // (Mac 1.3.122) in the Mac app it opens in a window of its own, as Knewton Alta's graphs do: its bytes as the page
+    // has them (a canvas, or a fetch), else its address for the app to read
+    if (window.__simplMacmillanGlass && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.simplMacmillan) { popOut(img); return; }
     var box = document.createElement('div'); box.id = 'simpl-mm-zoom'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', img.alt || 'Picture');
     var big = document.createElement('img'); big.src = img.currentSrc || img.src; big.alt = img.alt || '';
     box.appendChild(big); document.body.appendChild(box);
   }, true);
+  function popOut(img) {
+    var src = img.currentSrc || img.src;
+    var title = (q('[data-test-id="question-title"], .question-title, h1') || {}).textContent || '';
+    var send = function (b64) { post(b64 ? { kind: 'pic', data: b64, title: title.trim() } : { kind: 'pic', url: src, title: title.trim() }); };
+    try {
+      var c = document.createElement('canvas'); c.width = img.naturalWidth || img.width; c.height = img.naturalHeight || img.height;
+      var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+      send(c.toDataURL('image/png').split(',')[1]); return;
+    } catch (err) { /* (a picture from elsewhere: the canvas is not ours to read) */ }
+    try {
+      fetch(src, { credentials: 'include' }).then(function (r) { return r.blob(); }).then(function (b) { var fr = new FileReader(); fr.onload = function () { send(String(fr.result).split(',')[1]); }; fr.readAsDataURL(b); }).catch(function () { send(null); });
+    } catch (err) { send(null); }
+  }
   document.addEventListener('keydown', function (e) { var z = document.getElementById('simpl-mm-zoom'); if (z && e.key === 'Escape') { z.remove(); e.stopPropagation(); } }, true);
 
   function watch() {
