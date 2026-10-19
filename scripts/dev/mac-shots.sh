@@ -956,8 +956,9 @@ push_set() {
   shoot light-37-developer 16 -SimplOpen developer # (1.3.72: the Developer window)
   shoot light-01p-dashboard-preview 16 -SimplOpen preview
   # (1.3.102) an assignment pushed on the Dashboard (as Hand In or See Feedback pushes one), then the Dashboard's row in
-  # the sidebar pressed again: the Dashboard at its root, nothing pushed (again_check)
-  shoot light-01x-sidebar-again 30 -SimplWalk "on:/courses/101/assignments/1001,again" -SimplWalkWait 2
+  # the sidebar pressed again: the Dashboard at its root, nothing pushed (again_check) — (1.3.133) 45 s: on a slow GitHub
+  # Mac the Dashboard took 14.5 s to open and 30 s cut the walk off before it said where it ended
+  shoot light-01x-sidebar-again 45 -SimplWalk "on:/courses/101/assignments/1001,again" -SimplWalkWait 2
   # (1.3.104) a tool Canvas opens in a new window, its one-time launch refused by the mock (as Smartwork's is at the
   # owner's school): Canvas's page for it, its launch sent on in the tool window (newwin_check)
   shoot light-21k-tool-new-window 24 -SimplOpen tool:101:20
