@@ -1772,6 +1772,16 @@
     const focus = inQuiz() && !state.quizOpen;
     if (focus || root.classList.contains('bcv-focus') || !side.querySelector('.bcv-nav')) { renderSide(); return; }
     const r = state.route || parseRoute();
+    // (2.99.57) one sidebar: out of a course — or on to another — the sections open under its row fold away, those
+    // opened by a chevron too; the sidebar is drawn again for it (its rows are kept within the same course)
+    const shown = r.screen === 'course' && r.courseId ? String(r.courseId) : null;
+    if (oneBar() && state.sideShownLast !== undefined && state.sideShownLast !== shown) {
+      state.sideShownLast = shown;
+      state.sideOpen?.clear(); state.sideShut?.clear();
+      renderSide();
+      return;
+    }
+    state.sideShownLast = shown;
     for (const b of side.querySelectorAll('.bcv-nav__item')) b.classList.toggle('is-active', r.screen === b.dataset.nav || (b.dataset.nav === 'groups' && r.screen === 'group'));
     for (const b of side.querySelectorAll('.bcv-fav')) b.classList.toggle('is-active', !!r.courseId && r.screen === 'course' && b.dataset.load === `fav:${r.courseId}`);
     paintLoad();

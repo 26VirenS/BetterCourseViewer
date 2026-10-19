@@ -2624,6 +2624,15 @@ try {
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-stat', { timeout: 15000 });
   check(!(await page.$('.bcv-side .bcv-ctabs')), 'on the Dashboard no course has its sections open');
+  // (2.99.57) clicked out of a course within the app — its sections open, another course's opened by its chevron too —
+  // every course's sections fold away
+  await page.click('.bcv-side .bcv-fav[data-load="fav:101"]');
+  await page.waitForSelector('.bcv-side .bcv-ctabs .bcv-ctab', { timeout: 15000 });
+  await page.click('.bcv-side .bcv-fav:not([data-load="fav:101"]) .bcv-fav__chev');
+  const openBefore = await page.$$eval('.bcv-side .bcv-ctabs', (e) => e.length);
+  await page.click('.bcv-side .bcv-nav__item[data-nav="dashboard"]');
+  const folded = await eventually(() => page.evaluate(() => location.pathname === '/' && !document.querySelector('.bcv-side .bcv-ctabs')), 8000);
+  check(openBefore === 2 && folded, `clicked out of a course, its sections and those of another opened by its chevron fold away (${openBefore} open before)`);
   // Settings ▸ Appearance switches it back (two sidebars: the rail again)
   const opts = await context.newPage();
   await opts.goto(`chrome-extension://${extId}/options/options.html`);
