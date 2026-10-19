@@ -421,9 +421,8 @@ private struct QuizChip: View {
 }
 
 /// A tile's face: the number in a small rounded square — the one showing filled with the colour, an answered one washed
-/// in it with a small tick in its corner, one not yet answered a quiet grey; a flagged one edged in orange with its flag
-/// in the corner, one on its way a spinner. Flat: no glass. (1.3.78) In dark mode the wash is deeper — a dark green
-/// beside a dark grey could hardly be told apart — and the tick says it without the colour.
+/// in it, one not yet answered a quiet grey; a flagged one edged in orange, one on its way a spinner. Flat: no glass.
+/// (1.3.78) In dark mode the wash is deeper — a dark green beside a dark grey could hardly be told apart.
 private struct QuizNumberTile: View {
     let number: Int
     let current: Bool
@@ -445,26 +444,8 @@ private struct QuizNumberTile: View {
             .frame(width: width, height: 32)
             .frame(maxWidth: width == nil ? .infinity : nil)
             .background(shape.fill(current ? tint : (done ? tint.opacity(QuizNumberTile.answeredWash(scheme)) : Color.primary.opacity(0.07))))
-            .overlay(shape.strokeBorder(flagged && !current ? Color.orange : Color.clear, lineWidth: 1.5))
-            .overlay(alignment: .topTrailing) {
-                if flagged {
-                    Image(systemName: "flag.fill")
-                        .font(.system(size: 7, weight: .bold))
-                        .foregroundStyle(current ? Color.white : Color.orange)
-                        .padding(4)
-                        .transition(.opacity)
-                }
-            }
-            .overlay(alignment: .bottomTrailing) {
-                if done && !current {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 7, weight: .heavy))
-                        .foregroundStyle(scheme == .dark ? Color.white.opacity(0.85) : tint)
-                        .padding(4)
-                        .transition(.opacity)
-                        .accessibilityHidden(true)
-                }
-            }
+            // (1.3.129) no tick or flag drawn on the number: answered is the wash, flagged the orange edge (the legend's)
+            .overlay(shape.strokeBorder(flagged ? Color.orange : Color.clear, lineWidth: current ? 2 : 1.5))
             .overlay {
                 if loading { ProgressView().controlSize(.mini) }
             }
