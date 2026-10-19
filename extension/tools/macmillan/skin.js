@@ -90,6 +90,15 @@
     'html.simpl-mm.simpl-mm-glass .raptor-container{padding:16px 20px 0!important}' +
     'html.simpl-mm article.module-container{background:transparent!important;border-radius:0!important;padding:6px 0!important;margin:0 0 10px!important;min-height:0!important;box-sizing:border-box!important;box-shadow:none!important;line-height:1.5;color:var(--mm-ink)!important}' +
     'html.simpl-mm [data-simpl-pic] img{width:100%!important}' +
+    // (Mac 1.3.120) the question drawn a little smaller, so more of it (and its pictures) fits
+    'html.simpl-mm #raptor-content-container .content-area{zoom:.86}' +
+    // (Mac 1.3.120) a picture enlarged on a press, as Alta's graphs are: a hint of it at its corner, then large over the page
+    'html.simpl-mm :is([data-simpl-pic], article.module-container .raw-html) img{cursor:zoom-in}' +
+    'html.simpl-mm [data-simpl-pic]{position:relative}' +
+    'html.simpl-mm [data-simpl-pic]::after{content:"\\2922";position:absolute;top:12px;right:12px;width:26px;height:26px;border-radius:13px;display:grid;place-items:center;font-size:14px;line-height:1;color:#1c1c1e;background:rgba(255,255,255,.88);box-shadow:0 1px 4px rgba(0,0,0,.18);pointer-events:none}' +
+    '#simpl-mm-zoom{position:fixed;inset:0;z-index:2147483647;display:grid;place-items:center;padding:24px;background:rgba(0,0,0,.6);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);cursor:zoom-out;animation:simpl-mm-zoom-in .18s ease-out}' +
+    '#simpl-mm-zoom img{max-width:100%;max-height:100%;object-fit:contain;background:#fff;border-radius:14px;padding:10px;box-sizing:border-box;box-shadow:0 20px 60px rgba(0,0,0,.4)}' +
+    '@keyframes simpl-mm-zoom-in{from{opacity:0}}' +
     'html.simpl-mm article.module-container .raw-html p{margin:0 0 10px!important}html.simpl-mm article.module-container .raw-html p:last-child{margin-bottom:0!important}' +
     'html.simpl-mm article.module-container>.sl-module{padding-bottom:0!important;overflow:visible!important;max-width:100%!important}' +
     // (Mac 1.3.119) any question with a picture: the picture up the right, the words, the questions and their answers down
@@ -117,6 +126,7 @@
     // (Mac 1.3.117) a number's answer, one field sized as a field (it stretched across the page): its frame the field, the
     // box inside it clear; ×10 and the power in the app's ink
     'html.simpl-mm .numeric-entry-table{width:auto!important;max-width:100%!important}' +
+    'html.simpl-mm .numeric-entry-table .graded-equations-td{width:auto!important}' + // (Mac 1.3.120: its cells their own size — the unit beside the field, not across the page)
     'html.simpl-mm .numeric-entry-table .graded-equations-td.not-considered-in-grading-module-frame{width:auto!important}' +
     'html.simpl-mm .numeric-entry-border{width:15em!important;max-width:100%!important;box-sizing:border-box!important;background:var(--mm-field)!important;border:1px solid var(--mm-line)!important;border-radius:10px!important;box-shadow:0 1px 2px rgba(0,0,0,.06)!important}' +
     'html.simpl-mm .numeric-entry-border.focused{border-color:var(--mm-accent)!important;box-shadow:0 0 0 3px var(--mm-accent-ring)!important}' +
@@ -293,6 +303,20 @@
     }
     return false;
   };
+
+  // (Mac 1.3.120) a press on a question's picture shows it large over the page; a press anywhere or Escape puts it away
+  document.addEventListener('click', function (e) {
+    if (!skinned || !document.documentElement.classList.contains('simpl-mm')) return;
+    var z = document.getElementById('simpl-mm-zoom');
+    if (z) { z.remove(); e.preventDefault(); e.stopPropagation(); return; }
+    var img = e.target && e.target.closest && e.target.closest('[data-simpl-pic] img, article.module-container .raw-html img');
+    if (!img || img.closest('a,button,[data-simpl-plate]')) return;
+    e.preventDefault(); e.stopPropagation();
+    var box = document.createElement('div'); box.id = 'simpl-mm-zoom'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', img.alt || 'Picture');
+    var big = document.createElement('img'); big.src = img.currentSrc || img.src; big.alt = img.alt || '';
+    box.appendChild(big); document.body.appendChild(box);
+  }, true);
+  document.addEventListener('keydown', function (e) { var z = document.getElementById('simpl-mm-zoom'); if (z && e.key === 'Escape') { z.remove(); e.stopPropagation(); } }, true);
 
   function watch() {
     report();

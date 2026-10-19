@@ -54,10 +54,6 @@
     }
     page();
   };
-  /** (2.98.64) The chip opens its box on a hover too, where there is a mouse (U.hoverOpens: after a
-   *  moment's rest on it, not again under a pointer that has not moved since the box folded back into
-   *  it). A press still opens at once. */
-  const hoverOpens = U.hoverOpens;
   /** (2.99.13) A box that grows out of what opened it (U.cardBox): the mark's card from a grade, the hand-in panel from the
    *  assignment's big pill. `make(api)` fills it — { cls, kids, measure(), glide?: [[box's word, button's word]] } — and
    *  can call api.swap(make2) to turn it into something else in place (the card's Submit again), api.relayout() when what
@@ -412,7 +408,7 @@
     if (!nav || (!nav.prev && !nav.next)) return null;
     const one = (x, dir) => (x ? h('button', { type: 'button', class: `bcv-asg__navbtn bcv-asg__navbtn--${dir}`, title: `${dir === 'prev' ? 'Previous' : 'Next'}: ${x.name}`, onclick: () => app.go(x.href) }, [
       dir === 'prev' ? U.svg('M15 6l-6 6 6 6', { size: 13, stroke: 'currentColor', width: 2.4 }) : null,
-      h('span', { class: 'bcv-ellip', text: x.name }),
+      h('span', { class: 'bcv-ellip', text: dir === 'prev' ? 'Previous' : 'Next' }), // (2.99.52: just the word, the item's name on hover)
       dir === 'next' ? U.svg('M9 6l6 6-6 6', { size: 13, stroke: 'currentColor', width: 2.4 }) : null,
     ]) : null);
     return U.el('bcv-asg__nav', [one(nav.prev, 'prev'), one(nav.next, 'next')].filter(Boolean));
@@ -424,8 +420,22 @@
     const itemId = route.params?.get?.('module_item_id') || null;
     const viaModules = !!itemId || /^\s*Modules\s*$/.test(backEl.textContent || '');
     const slot = h('span', { class: 'bcv-asg__navslot', hidden: '' });
+    // (2.99.52) on the desktop the pill sits in the bar across the top, beside the search box and across from the widgets
+    // (as the Mac's Previous / Next sit in its toolbar), and goes as the item is left; on the phone, in the item's own row
+    const inBar = !BCV.phone?.active?.();
     store.itemNeighbours(c.id, type, assetId, { viaModules, itemId, kind, courseUrl: c.url })
-      .then((nav) => { if (!ctx.alive() || !slot.parentNode) return; const el = navPill(app, nav); if (el) slot.replaceWith(el); else slot.remove(); })
+      .then((nav) => {
+        if (!ctx.alive() || !slot.parentNode) return;
+        const el = navPill(app, nav);
+        if (el && inBar) {
+          slot.remove();
+          let host = document.getElementById('bcv-topsearch');
+          if (!host) { host = h('div', { id: 'bcv-topsearch', class: 'bcv-topsearch' }); document.body.append(host); }
+          host.querySelectorAll('.bcv-asg__nav').forEach((x) => x.remove());
+          el.classList.add('bcv-asg__nav--bar');
+          host.append(el); // (taken away as the next screen is drawn: app.js)
+        } else if (el) slot.replaceWith(el); else slot.remove();
+      })
       .catch(() => slot.remove());
     return U.el('bcv-asg__top bcv-item__top', [backEl, h('span', { class: 'bcv-asg__spring' }), slot]);
   }
@@ -571,11 +581,6 @@
     };
     let sentOff = false;
     const afterClose = () => { if (sentOff && ctx.alive()) app.go(`${c.url}/assignments/${a.id}`, { confirmed: true }); }; // (handed in: the page redraws, Submitted)
-    const openCard = (pill, { hover = false } = {}) => {
-      const run = () => { opened = openMarkBox(ctx, c, a, current, pill, { anchor: 'center', within: pill.closest('.bcv-asg__card'), hover, onClosed: afterClose, again: canAgain(current) ? (bx) => openHand(pill, bx) : null }); };
-      const need = [BCV.screens.feedback?.card ? null : BCV.lazy?.load?.('submit'), a.rubric?.length && !BCV.rubricRing ? BCV.lazy?.load?.('rubric')?.catch(() => null) : null].filter(Boolean);
-      if (!need.length) run(); else Promise.all(need).then(() => { if (pill.isConnected) run(); }).catch(() => { if (!hover) app.go(`${c.url}/assignments/${a.id}?bcv=feedback`); });
-    };
     /** (2.99.16) How the class did, as a box plot beside the grade: the whiskers from the lowest mark to the highest, the
      *  box the middle half (lower to upper quartile), a tick at the median, a ring at the mean, and a dot for this student
      *  in their grade's tone. The numbers are there on a hover (or the arrow keys): the mark nearest the pointer lights
@@ -656,7 +661,7 @@
       const comments = (x.submission_comments || []).length;
       if (postedOf(x)) {
         const letter = a.grading_type && a.grading_type !== 'points' && x.grade !== null && x.grade !== undefined ? String(x.grade) : null;
-        main = pill('graded', '', null, { cls: `is-${toneOf(p)}`, title: 'Your grade: feedback, attempts and comments', onClick: openCard, kids: [
+        main = pill('graded', '', null, { cls: `is-${toneOf(p)}`, title: 'Your grade: feedback, attempts and comments', onClick: (el) => openFeedback(current, el), kids: [
           U.svg(ICONS.tick, { size: 15, stroke: 'currentColor', width: 2.5 }),
           h('span', { class: 'bcv-asg__score', 'data-glide': 'score', text: store.fmtPts(x.score) }),
           h('span', { class: 'bcv-asg__of', text: `/ ${a.points_possible ?? '—'}` }),
@@ -665,7 +670,7 @@
         aside = note(x.late ? `Late${x.points_deducted ? ` · −${store.fmtPts(x.points_deducted)} pts` : ''}` : null, comments ? U.plural(comments, 'comment') : null, classPlot(a.score_statistics, x.score, a.points_possible, toneOf(p)));
       } else if (heldOf(x) || x.submitted_at || x.excused) {
         const word = x.excused ? 'Excused' : heldOf(x) ? 'Submitted' : x.late ? 'Submitted late' : 'Submitted';
-        main = pill('done', word, ICONS.tick, { cls: x.excused ? 'is-grey' : '', title: 'What you handed in, and comments', onClick: x.submitted_at || heldOf(x) ? openCard : null, off: !(x.submitted_at || heldOf(x)) });
+        main = pill('done', word, ICONS.tick, { cls: x.excused ? 'is-grey' : '', title: 'What you handed in, and comments', onClick: x.submitted_at || heldOf(x) ? (el) => openFeedback(current, el) : null, off: !(x.submitted_at || heldOf(x)) });
         aside = note(againLink, heldOf(x) ? 'Grade not released yet' : x.submitted_at ? longAt(D0(x.submitted_at)) : null, comments ? U.plural(comments, 'comment') : null);
       } else if (closedNow() && handsIn) {
         main = pill('off', `Closed ${U.fmtShort(lockAt)}`, ICONS.x, { off: true, title: `Closed ${U.fmtAt(lockAt)}: nothing can be handed in now` });
@@ -685,8 +690,7 @@
         main = pill('go', 'Submit in Canvas', ICONS.out, { onClick: () => app.go(nativeHref(`${c.url}/assignments/${a.id}`)) });
         aside = note('Media and annotations are handed in on Canvas’s own page');
       }
-      // the mark (or what was handed in) opens on a moment's rest of the pointer too, as the chip it replaced did (U.hoverOpens)
-      if (main && (main.classList.contains('is-graded') || (main.classList.contains('is-done') && !main.disabled))) hoverOpens(main, (el) => openCard(el, { hover: true }));
+      // (2.99.52) no card on a hover any more: the grade, or what was handed in, opens the Feedback sheet when pressed
       const row = U.el('bcv-asg__action', [main, aside, ...extras]);
       return row;
     }
@@ -715,7 +719,7 @@
       if (!list.length) { commentsBody.replaceChildren(h('div', { class: 'bcv-asg__nocomments' }, [U.svg(IC.disc, { size: 15, stroke: 'currentColor', width: 2 }), h('span', { text: 'No comments yet.' })])); return; }
       commentsBody.replaceChildren(...list.map((cm) => U.el('bcv-asg__comment', [
         U.el('bcv-asg__commenthead', [U.text('bcv-asg__commentwho', cm.author_name || cm.author?.display_name || 'Someone', 'span'), cm.created_at ? U.text('bcv-asg__commentwhen', U.fmtAt(cm.created_at), 'span') : null]),
-        U.text('bcv-asg__commenttext', cm.comment || '', 'div'),
+        U.text('bcv-asg__commenttext', String(cm.comment || '').trim(), 'div'),
       ])));
     };
     drawComments(s);
@@ -730,7 +734,9 @@
         if (!box.value.trim()) { box.focus(); return; }
         send.disabled = true; send.textContent = 'Sending…';
         try {
-          await store.commentOnSubmission(c.id, a.id, box.value, current.attempt || null);
+          // (pinned to the latest attempt: the history's highest, the submission's own number when it has none)
+          const latest = Math.max(Number(current.attempt) || 0, ...(current.submission_history || []).map((h0) => Number(h0.attempt) || 0));
+          await store.commentOnSubmission(c.id, a.id, box.value, latest || null);
           const fresh = await store.submission(c.id, route.arg, { force: true }).catch(() => null);
           if (!ctx.alive()) return;
           if (fresh) { current = fresh; drawComments(fresh); }
@@ -786,7 +792,7 @@
         list.length ? U.el('bcv-fbs__comments', list.map((cm) => U.el('bcv-fbs__comment', [
           U.el('bcv-fbs__commenthead', [U.text('bcv-fbs__who', cm.author_name || cm.author?.display_name || 'Someone', 'span'), cm.attempt ? U.text('bcv-fbs__attempt', `Attempt ${cm.attempt}`, 'span') : null]),
           cm.created_at ? U.text('bcv-fbs__when', U.fmtAt(cm.created_at), 'div') : null,
-          U.text('bcv-fbs__said', cm.comment || '', 'div'),
+          U.text('bcv-fbs__said', String(cm.comment || '').trim(), 'div'),
         ]))) : U.text('bcv-fbs__none', 'No comments yet.', 'div'),
       ]);
       const close = () => { ov.classList.add('is-closing'); document.removeEventListener('keydown', onKey, true); setTimeout(() => ov.remove(), 180); from?.focus?.({ preventScroll: true }); };

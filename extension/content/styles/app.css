@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.51"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.52"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -4026,11 +4026,24 @@ html.bcv-setup-open #bcv-bar { display: none !important; }
 /* (2.98.70) the search box sits in the bar at its left, on every screen of the shell (search.js dock(): beside the bar, outside
  * the app's root, so it stays put as the screens change); it goes up with the bar for a quiz, and is not there where the bar is not */
 #bcv-topsearch { display: none; }
-html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-topsearch { display: flex; align-items: center; position: fixed; top: 0; left: calc(var(--bcv-side-w) + 20px); height: 44px; z-index: calc(var(--bcv-z-bar) + 1); pointer-events: none; transition: left .45s var(--bcv-ease), translate .45s var(--bcv-ease), opacity .3s ease; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-topsearch { display: flex; align-items: center; position: fixed; top: 0; left: calc(var(--bcv-side-w) + 96px); height: 44px; z-index: calc(var(--bcv-z-bar) + 1); pointer-events: none; transition: left .45s var(--bcv-ease), translate .45s var(--bcv-ease), opacity .3s ease; }
 html.bcv-setup-open #bcv-topsearch, #bcv-topsearch[hidden] { display: none !important; } /* (hidden: the Dashboard, whose header has the box) */
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab).bcv-quiz #bcv-topsearch { translate: 0 -64px; opacity: 0; pointer-events: none; }
 #bcv-topsearch .bcv-omni__box, .bcv-spot .bcv-omni__box { box-sizing: border-box; } /* (outside the app's root nothing sets it: the pill is 29 tall in the bar and as it sets off, as it was in the header) */
 #bcv-topsearch .bcv-omni { pointer-events: auto; flex: none; order: 0; width: clamp(220px, 26vw, 340px); max-width: none; min-width: 0; margin: 0; align-self: center; }
+/* (2.99.52) Back and Forward at the bar's left, before the search box, as the Mac's toolbar has them */
+#bcv-tophist { display: none; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-tophist { display: flex; align-items: center; gap: 2px; position: fixed; top: 7px; left: calc(var(--bcv-side-w) + 16px); height: 30px; padding: 0 2px; border-radius: 15px; background: var(--bcv-fill); z-index: calc(var(--bcv-z-bar) + 1); transition: translate .45s var(--bcv-ease), opacity .3s ease; }
+html.bcv-setup-open #bcv-tophist { display: none !important; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab).bcv-quiz #bcv-tophist { translate: 0 -64px; opacity: 0; pointer-events: none; }
+#bcv-tophist .bcv-tophist__btn { width: 32px; height: 26px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 13px; background: transparent; color: var(--bcv-ink2); cursor: pointer; font: inherit; }
+@media (hover: hover) { #bcv-tophist .bcv-tophist__btn:hover { background: var(--bcv-hover); color: var(--bcv-ink); } }
+#bcv-tophist .bcv-tophist__btn:active { scale: .92; }
+/* (2.99.52) an assignment is just the assignment on the desktop: no section header over it and no
+   row of its own for the way back — Back, Forward and Previous / Next are in the bar across the top */
+html.bcv-on:not(.bcv-phone) .bcv-screen--ctx:has(.bcv-asg) > .bcv-head--course { display: none; }
+html.bcv-on:not(.bcv-phone) .bcv-asg > .bcv-item__top { display: none; }
+#bcv-topsearch .bcv-asg__nav--bar { pointer-events: auto; flex: none; order: 1; margin-left: 12px; align-self: center; background: var(--bcv-fill); }
 #bcv-topsearch .bcv-omni__panel { right: auto; width: min(560px, calc(100vw - var(--bcv-side-w) - 40px)); } /* (shown in place only during the tour: wider than the pill) */
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-main { padding-top: var(--bcv-bar-h); }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-head, html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-qz__head, html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-pv { top: var(--bcv-bar-h); }

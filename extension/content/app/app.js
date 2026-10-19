@@ -1464,7 +1464,10 @@
     BCV.preview?.close(); // a preview beside the list belongs to the list it was opened from
     // a sheet (a counter's list, the calendars, a rubric, GPA settings) belongs to the screen it
     // was opened over: a Back with one up would otherwise leave it, scrim and all, over the next
-    for (const ov of document.querySelectorAll('.bcv-sheet-ov, .bcv-viewer-ov')) ov.remove();
+    for (const ov of document.querySelectorAll('.bcv-sheet-ov, .bcv-viewer-ov, .bcv-fbs-ov')) ov.remove();
+    // (2.99.52) an item's Previous / Next in the top bar belongs to that item: the next item puts its own there
+    for (const nav of document.querySelectorAll('#bcv-topsearch .bcv-asg__nav--bar')) nav.remove();
+    histButtons();
     syncSide(); // the sidebar follows the route in place; it is rebuilt only when what it shows changes
     BCV.search?.dock?.(BCV.app, r); // the search box at the left of the top bar on every screen but the Dashboard, whose header has it (kept as it is when it is already there)
     // ctx.swap: a screen that keeps its shell (a course's tabs) puts its new column in through it, so the column moves as a screen would
@@ -1736,6 +1739,17 @@
       html.style.setProperty('--bcv-hole-left', `${Math.round(r.left)}px`);
       html.style.setProperty('--bcv-hole-width', `${Math.round(r.width)}px`);
     }, { within: root || undefined });
+  }
+  /** (2.99.52) Back and Forward at the left of the bar across the top, as the Mac's toolbar has them: the browser's own
+   *  history, which the app's screens are part of. Built once, kept across screens (outside the app's root, as the
+   *  search box beside it). */
+  function histButtons() {
+    if (BCV.phone?.active?.() || document.getElementById('bcv-tophist')) return;
+    const btn = (dir, label, d, go) => h('button', { type: 'button', class: `bcv-tophist__btn bcv-tophist__btn--${dir}`, title: label, 'aria-label': label, onclick: go }, U.svg(d, { size: 16, stroke: 'currentColor', width: 2.3 }));
+    document.body.append(h('div', { id: 'bcv-tophist', class: 'bcv-tophist', role: 'group', 'aria-label': 'History' }, [
+      btn('back', 'Back', 'M15 5l-7 7 7 7', () => history.back()),
+      btn('fwd', 'Forward', 'M9 5l7 7-7 7', () => history.forward()),
+    ]));
   }
   function punchOut() {
     punchStop?.();

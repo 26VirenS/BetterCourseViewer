@@ -1907,28 +1907,16 @@ try {
   await page.waitForSelector('.bcv-asg__pill', { timeout: 10000 });
   const heldChip = await page.evaluate(() => { const e = document.querySelector('.bcv-asg__pill'); return { done: e.classList.contains('is-done'), text: e.innerText.replace(/\s+/g, ' ').trim(), digits: /\d/.test(e.innerText), status: document.querySelector('.bcv-asg__status')?.textContent, note: document.querySelector('.bcv-asg__note')?.innerText.replace(/\s+/g, ' ') }; });
   check(heldChip.done && heldChip.text === 'Submitted' && !heldChip.digits && heldChip.status === 'Submitted · grade not released yet' && /Grade not released yet/.test(heldChip.note || ''), `a held grade says so and shows no number: ${JSON.stringify(heldChip)}`);
-  // (2.98.55) The mark opens where it is: the chip grows into a box the way a Dashboard counter does — the
-  // page dimmed and blurred round it, the score gliding into the box's header — holding the feedback screen's
-  // content, the page (and its address) staying put under it. The screen of its own is still there for a link.
-  // (the sheet the screen replaced is gone from the build: the preview it framed was Canvas's own document
-  // service, which answers "service unavailable" often enough that a sheet built around it read as broken)
+  // (2.99.52) The grade opens the Feedback sheet, not a card: the work handed in on the left, the comments on the right
+  // (the card that grew out of the grade is gone from the assignment page); the page and its address stay put under it
   await page.goto(`${BASE}/courses/104/assignments/4001`);
   await page.waitForSelector('.bcv-asg__pill', { timeout: 10000 });
-  const chipRect = await page.$eval('.bcv-asg__pill', (e) => { const r = e.getBoundingClientRect(); return { l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), w: Math.round(r.width), h: Math.round(r.height) }; });
   await page.click('.bcv-asg__pill');
-  await page.waitForSelector('.bcv-mark .bcv-mcard', { timeout: 10000 });
-  check(!(await pageHeld(page, 300, 700)).moved, 'the page behind the mark box is held still while it is open');
-  await page.waitForTimeout(650);
-  const asBox = await page.evaluate(() => { const ov = document.querySelector('.bcv-sheet-ov--card'); const box = document.querySelector('.bcv-sheet.bcv-mark'); const r = box.getBoundingClientRect(); return { ov: !!ov, far: ov?.classList.contains('is-far'), atCard: box.classList.contains('is-at-card'), l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), w: Math.round(r.width), h: Math.round(r.height), inside: r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight, value: box.querySelector('.bcv-sheet__value')?.textContent, label: box.querySelector('.bcv-sheet__label')?.textContent, title: box.querySelector('.bcv-mark__title')?.textContent, cardL: Math.round(document.querySelector('.bcv-asg__card').getBoundingClientRect().left), cardR: Math.round(document.querySelector('.bcv-asg__card').getBoundingClientRect().right), side: box.classList.contains('bcv-mark--side') && !!box.querySelector('.bcv-mark__right .bcv-mcard__thread .bcv-mcard__bubble') && !!box.querySelector('.bcv-mark__right .bcv-mcard__pill'), folded: box.querySelector('.bcv-mark__cols').classList.contains('is-folded') && getComputedStyle(box.querySelector('.bcv-mark__right')).visibility === 'hidden' && box.querySelector('.bcv-mark__chatbtn')?.textContent === 'Comments · 3', note: box.querySelector('.bcv-sheet__note')?.textContent, embedded: !!document.querySelector('.bcv-fb')?.closest('.bcv-qz.is-embedded'), pageTitle: !!document.querySelector('.bcv-detail__title'), focus: document.activeElement === ov }; });
-  check(!page.url().includes('bcv=feedback') && asBox.ov && !asBox.far && !asBox.atCard && asBox.inside && asBox.w === 400 && asBox.side && asBox.folded && asBox.h >= 140 && asBox.h <= 560 && asBox.l >= asBox.cardL + 15 && asBox.r <= asBox.cardR - 15 && Math.abs(asBox.t + asBox.h / 2 - (chipRect.t + chipRect.h / 2)) <= 1 && asBox.value === '10' && asBox.label === '/ 10' && asBox.title === 'Week 1 reflection' && asBox.note === 'F26-SPRK 010 103 · File upload' && !asBox.embedded && asBox.pageTitle && asBox.focus, `the mark opens in place: the pill grows into a card out of its own middle, kept over the page's own card (not the course's rail), over the dimmed page (2.99.10: the score, the work's name, its course and kind in its header; 2.99.13: sideways, the comments a column to the right — 2.99.16: folded away behind a small button until asked for), the page and its address staying put: ${JSON.stringify(asBox)} from ${JSON.stringify(chipRect)}`);
-  await shot(page, '09i-mark-box');
-  // (2.99.16) the comments come out on a press: the card widens to the right, their column fading in
-  await page.click('.bcv-mark .bcv-mark__chatbtn');
-  const unfolded = await eventually(() => page.evaluate(() => { const b = document.querySelector('.bcv-sheet.bcv-mark'), r = b.getBoundingClientRect(), rt = b.querySelector('.bcv-mark__right'); return Math.round(r.width) === 680 && !b.querySelector('.bcv-mark__cols').classList.contains('is-folded') && getComputedStyle(rt).visibility === 'visible' && getComputedStyle(rt).opacity === '1' && !rt.inert; }), 3000);
-  check(unfolded, 'Comments widens the card to the right, the comments a column of their own');
-  // (2.98.57) the box lives in the page body, outside the app's root: its controls still wear the app's own look, not Canvas's
-  const boxCtl = await page.evaluate(() => { const q = (s) => document.querySelector(`.bcv-mark ${s}`); const g = (s) => getComputedStyle(q(s)); return { chip: g('.bcv-mcard__chip').borderRadius, chipBg: g('.bcv-mcard__chip').backgroundColor, pill: g('.bcv-mcard__pill').borderRadius, pillH: g('.bcv-mcard__pill').height, inputH: g('.bcv-mcard__input').height, inputB: g('.bcv-mcard__input').borderTopWidth, inputBg: g('.bcv-mcard__input').backgroundColor, sendW: g('.bcv-mcard__send').width, sendR: g('.bcv-mcard__send').borderRadius, sendOff: q('.bcv-mcard__send').disabled, tile: q('.bcv-mcard__tile')?.tagName, ring: q('.bcv-mark__ringslot .bcv-mring--rubric')?.tagName, rubBtn: !!q('.bcv-rubbtn, .bcv-fb__btns'), old: !!q('.bcv-fb__scorecard, .bcv-fb__q') }; });
-  check(boxCtl.chip === '15px' && boxCtl.chipBg !== 'rgba(0, 0, 0, 0)' && boxCtl.pill === '23px' && boxCtl.pillH === '46px' && boxCtl.inputH === '44px' && boxCtl.inputB === '0px' && boxCtl.inputBg === 'rgba(0, 0, 0, 0)' && boxCtl.sendW === '36px' && boxCtl.sendR === '50%' && boxCtl.sendOff && boxCtl.tile === 'BUTTON' && boxCtl.ring === 'BUTTON' && !boxCtl.rubBtn && !boxCtl.old, `outside the app's root the card's controls wear the app's own look — the file a soft chip, the comment one pill with a round send (off until there are words), the attempts tiles to press — and the rubric is the ring itself, no button of its own: ${JSON.stringify(boxCtl)}`);
+  await page.waitForSelector('.bcv-fbs', { timeout: 5000 });
+  const fromGrade = await page.evaluate(() => ({ card: !!document.querySelector('.bcv-mark'), frame: document.querySelector('.bcv-fbs__frame')?.getAttribute('src') || '', said: [...document.querySelectorAll('.bcv-fbs__said')].map((e) => e.textContent) }));
+  check(!fromGrade.card && /mock-docviewer/.test(fromGrade.frame) && fromGrade.said.length === 3 && fromGrade.said.every((t) => t === t.trim()) && !page.url().includes('bcv=feedback'), `the grade opens the Feedback sheet (no card), the file beside the comments, each comment trimmed: ${JSON.stringify(fromGrade)}`);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-fbs-ov'), null, { timeout: 3000 });
   const sheetGone = await sw.evaluate(async (base) => {
     const [tab] = await chrome.tabs.query({ url: `${base}/*` });
     const [{ result }] = await chrome.scripting.executeScript({
@@ -1937,70 +1925,28 @@ try {
     return result;
   }, BASE);
   check(sheetGone, 'and the sheet it replaced is gone from the build, not merely switched off');
-  // (2.99.10) the card's body, as in the mockups: when it was handed in and when marked, the instructor's words on the
-  // attempt shown as bubbles, the attempts as tiles with the one that counts lit, then the comment pill
-  const mcard = () => page.evaluate(() => { const b = document.querySelector('.bcv-mark'); const t = (s) => [...b.querySelectorAll(s)].map((e) => e.innerText.replace(/\s+/g, ' ').trim()); return { pct: b.querySelector('.bcv-mring__pct')?.textContent, segs: new Set([...b.querySelectorAll('.bcv-mring--rubric svg.bcv-rubring path[fill]')].map((p) => p.getAttribute('fill'))).size, sweep: !!b.querySelector('.bcv-mring--rubric mask .bcv-ring--fill'), times: t('.bcv-mcard__when'), done: !!b.querySelector('.bcv-mcard__link.is-done'), chips: t('.bcv-mcard__chip'), quote: t('.bcv-mcard__quote'), bubbles: t('.bcv-mcard__btext'), who: t('.bcv-mcard__bwho'), mine: t('.bcv-mcard__bubble.is-mine .bcv-mcard__btext'), head: t('.bcv-mcard__attempts .bcv-mcard__head .bcv-mcard__k'), tiles: t('.bcv-mcard__tile'), kept: t('.bcv-mcard__tile.is-kept'), on: t('.bcv-mcard__tile.is-on'), perm: b.querySelector('.bcv-mcard__perm')?.textContent, hint: b.querySelector('.bcv-mcard__input')?.placeholder }; });
-  const card1 = await mcard();
-  const stampRe = /^[A-Z][a-z]{2} \d{1,2}, \d{1,2}:\d\d ?(am|pm|AM|PM)$/;
-  check(card1.pct === '100%' && card1.segs > 10 && card1.sweep && card1.times.length === 2 && /^Submitted /.test(card1.times[0]) && stampRe.test(card1.times[0].replace(/^Submitted /, '')) && /^Graded /.test(card1.times[1]) && stampRe.test(card1.times[1].replace(/^Graded /, '')) && card1.done, `the ring is the rubric's own in miniature (its smooth band, colours running into each other, sweeping in) with the share in the middle; Submitted and Graded, joined by a line: ${JSON.stringify({ pct: card1.pct, colours: card1.segs, times: card1.times })}`);
-  check(card1.chips.length === 1 && /^PDF /.test(card1.chips[0]) && /\.pdf$/.test(card1.chips[0]) && card1.quote.length === 0, `the latest attempt's file is a chip saying its kind and name: ${card1.chips.join(' | ')}`);
-  check(card1.bubbles.length === 2 && /derivative questions/.test(card1.bubbles[0]) && /Thanks, I see it now/.test(card1.bubbles[1]) && card1.mine.length === 1 && /Thanks/.test(card1.mine[0]) && /^You · /.test(card1.who[1]) && !/You/.test(card1.who[0]), `the words on the graded attempt are bubbles, yours on the right, each with who and when — the first draft's comment not among them: ${JSON.stringify(card1.bubbles).slice(0, 140)} · ${card1.who.join(' | ')}`);
-  check(card1.head.join(' | ') === 'Attempts | Latest kept' && card1.tiles.length === 2 && /^Attempt 1 —$/.test(card1.tiles[0]) && card1.tiles[1] === 'Attempt 2 10 / 10' && card1.kept.join() === 'Attempt 2 10 / 10' && card1.on.join() === 'Attempt 2 10 / 10', `the attempts are tiles, the one that counts lit and named: ${JSON.stringify({ head: card1.head, tiles: card1.tiles })}`);
-  check(card1.hint === 'Comment to instructor' && card1.perm === 'Sent comments can’t be edited or deleted.', `the comment pill and its warning: ${card1.hint} · ${card1.perm}`);
-  // a tile pressed shows that attempt's own work and words; back on the latest, its own again
-  await page.click('.bcv-mark .bcv-mcard__tile:nth-child(1)');
-  const card0 = await mcard();
-  check(card0.on.join() === 'Attempt 1 —' && card0.kept.join() === 'Attempt 2 10 / 10' && card0.chips.length === 0 && /First pass at Week 1 reflection/.test(card0.quote[0] || '') && card0.bubbles.length === 1 && /only a first pass/.test(card0.bubbles[0]) && !!(await page.$('.bcv-sheet-ov--card')), `a tile pressed shows that attempt's own work and words, the box staying: ${JSON.stringify({ on: card0.on, quote: card0.quote, bubbles: card0.bubbles }).slice(0, 200)}`);
-  await page.click('.bcv-mark .bcv-mcard__tile:nth-child(2)');
-  check((await mcard()).bubbles.length === 2, 'and the latest tile brings its own back');
-  // the file is a press away: a PDF is drawn in the viewer itself (2.98.99); one whose bytes it cannot read falls back
-  // to Canvas's own preview — made to happen here by handing the page something that is not a PDF. What was handed
-  // in is the student's own file, not the course's: asked for under /courses/:id it is Canvas's 404 page, so it has
-  // to be previewed with no context at all
+  // the file is a press away from Your Work: a PDF is drawn in the viewer itself (2.98.99); one whose bytes it cannot
+  // read falls back to Canvas's own preview — made to happen here by handing the page something that is not a PDF.
+  // What was handed in is the student's own file, not the course's: asked for under /courses/:id it is Canvas's 404
+  // page, so it has to be previewed with no context at all
   const notPdf = (r) => r.fulfill({ status: 200, contentType: 'application/pdf', body: 'not a pdf at all' });
   await page.route('**/files/*/download*', notPdf);
-  await page.click('.bcv-mark .bcv-mcard__chip');
+  await page.click('.bcv-asg__workprev');
   await page.waitForSelector('.bcv-viewer-ov .bcv-viewer__frame', { timeout: 8000 });
   await page.unroute('**/files/*/download*', notPdf);
   const attSrc = await page.$eval('.bcv-viewer-ov .bcv-viewer__frame', (e) => e.getAttribute('src'));
-  check(/^\/files\/\w+\/file_preview/.test(attSrc || '') && !(await page.$('.bcv-viewer-ov .bcv-dv')), `a PDF the viewer cannot read falls back to Canvas's preview — and a submission attachment's with no course context: ${attSrc}`);
-  const attFramed = await eventually(async () => {
-    const fr = page.frames().find((f) => /\/file_preview/.test(f.url()));
-    return fr ? (await fr.$('#file_preview[data-bcv-scope="no-context"]')) !== null : false;
-  });
-  check(attFramed, 'and Canvas serves it, rather than the page-not-found it answers a course context with');
+  // (a submission's file carries Canvas's DocViewer address, which is the preview then; one without it is previewed with no context)
+  check((/^\/mock-docviewer\//.test(attSrc || '') || /^\/files\/\w+\/file_preview/.test(attSrc || '')) && !(await page.$('.bcv-viewer-ov .bcv-dv')), `a PDF the viewer cannot read falls back to Canvas's preview of the hand-in: ${attSrc}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-viewer-ov'), null, { timeout: 5000 });
-  check(!!(await page.$('.bcv-mark .bcv-mcard')), 'closing the file leaves the card it was opened from standing');
-  // a comment of your own goes to Canvas, pinned to the attempt on show, and comes back as a bubble of yours
-  // (2.99.15) the comment is a button first: pressed, the field opens in its place, the cursor in it
-  const cmShut = await page.evaluate(() => { const f = document.querySelector('.bcv-mark .bcv-mcard__foot'); return { writing: f.classList.contains('is-writing'), pillOp: getComputedStyle(f.querySelector('.bcv-mcard__pill')).opacity, inert: f.querySelector('.bcv-mcard__pill').inert, opener: f.querySelector('.bcv-mcard__opener')?.textContent }; });
-  await page.click('.bcv-mark .bcv-mcard__opener');
-  const writing = await eventually(() => page.evaluate(() => { const f = document.querySelector('.bcv-mark .bcv-mcard__foot'); return f.classList.contains('is-writing') && document.activeElement?.classList.contains('bcv-mcard__input') && getComputedStyle(f.querySelector('.bcv-mcard__pill')).opacity === '1'; }), 2000);
-  check(!cmShut.writing && cmShut.pillOp === '0' && cmShut.inert && cmShut.opener === 'Comment to instructor' && writing, `the comment is a button until pressed; pressed, the field opens in its place with the cursor in it: ${JSON.stringify(cmShut)}`);
-  await page.keyboard.press('Escape');
-  check(await eventually(() => page.evaluate(() => !document.querySelector('.bcv-mark .bcv-mcard__foot').classList.contains('is-writing') && !!document.querySelector('.bcv-sheet-ov--card:not(.is-folding)')), 2000), 'Escape on the empty field turns it back into the button, the card still open');
-  await page.click('.bcv-mark .bcv-mcard__opener');
-  await page.fill('.bcv-mark .bcv-mcard__input', 'Could you say more about part b?');
-  check(!(await page.$eval('.bcv-mark .bcv-mcard__send', (e) => e.disabled)), 'words in the pill turn its send on');
-  await page.click('.bcv-mark .bcv-mcard__send');
-  check(await eventually(async () => (await mcard()).mine.some((t) => /Could you say more about part b\?/.test(t))), 'a comment of your own is sent to Canvas and comes back as a bubble of yours');
+  // a comment of your own goes to Canvas from Add a Comment, pinned to the latest attempt, and comes back in the list
+  await page.click('.bcv-asg__addcomment');
+  await page.waitForSelector('.bcv-asg__composerbox', { timeout: 3000 });
+  await page.fill('.bcv-asg__composerbox', 'Could you say more about part b?');
+  await page.click('.bcv-asg__composerrow .bcv-btn--primary');
+  check(await eventually(() => page.evaluate(() => [...document.querySelectorAll('.bcv-asg__commenttext')].some((e) => /part b\?/.test(e.textContent)) && !!document.querySelector('.bcv-asg__composer[hidden]')), 5000), 'a comment of your own is sent to Canvas and comes back in the list, the composer put away');
   const posted = (await readSub('104', '4001')).submission_comments.find((cm) => /part b\?/.test(cm.comment));
-  check((await mcard()).bubbles.length === 3 && (await page.inputValue('.bcv-mark .bcv-mcard__input')) === '' && posted && Number(posted.attempt) === 2, `and Canvas has it against the attempt it was written on, the pill emptied: ${JSON.stringify(posted && { attempt: posted.attempt })}`);
-  // (2.99.10) the rubric is the ring: a press on it opens the rubric over the card; Escape closes the rubric alone
-  await page.click('.bcv-mark .bcv-mring--rubric');
-  check(await eventually(() => page.$('.bcv-rr-ov').then((e) => !!e), 5000), 'a press on the ring opens the rubric');
-  await shot(page, '09j-mark-rubric');
-  check(!!(await page.$('.bcv-sheet-ov--card.is-under .bcv-mark .bcv-mcard')), 'and the card steps back under it, still there');
-  await page.keyboard.press('Escape'); // (the first may only step back from a criterion to the whole ring)
-  await page.waitForTimeout(600);
-  if (await page.$('.bcv-rr-ov:not(.is-closing)')) await page.keyboard.press('Escape');
-  check(await eventually(() => page.evaluate(() => !document.querySelector('.bcv-rr-ov')), 3000) && await eventually(() => page.$('.bcv-sheet-ov--card:not(.is-folding):not(.is-under) .bcv-mark .bcv-mcard').then((e) => !!e), 2000) && (await page.evaluate(() => document.activeElement?.classList.contains('bcv-mring--rubric'))), 'Escape closes the rubric, back onto the card and its ring');
-  // Escape — from wherever the cursor is left — folds the box back into the chip, the veil letting go outward, the page still there
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(80);
-  const folding = await page.evaluate(() => { const ov = document.querySelector('.bcv-sheet-ov--card'); return { there: !!ov, folding: ov?.classList.contains('is-folding'), far: ov?.classList.contains('is-far') }; });
-  check(await eventually(() => page.evaluate(() => !document.querySelector('.bcv-sheet-ov') && !!document.querySelector('.bcv-asg__pill')), 3000) && folding.there && folding.folding && folding.far && !page.url().includes('bcv=feedback'), `Escape folds the box back into the chip, the assignment page still there: ${JSON.stringify(folding)}`);
+  check(posted && Number(posted.attempt) === 2, `and Canvas has it against the latest attempt: ${JSON.stringify(posted && { attempt: posted.attempt })}`);
   // the screen of its own is still there for a link (and the phone): the same content, the way back out at its end
   await page.goto(`${BASE}/courses/104/assignments/4001?bcv=feedback`);
   await page.waitForSelector('.bcv-fb__scorecard', { timeout: 10000 });
@@ -2035,35 +1981,12 @@ try {
   await page.click('.bcv-fb__btns .bcv-qz__big:nth-child(2)');
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check(!page.url().includes('bcv=feedback'), 'and Back to the assignment leaves the feedback screen behind');
-  // (2.98.64) the chip opens its box on a hover too: after a moment's rest (not a pass over it), and a box opened so goes
-  // again when the pointer leaves it — unless it was taken up — and does not come back under a pointer that has not moved
+  // (2.99.52) resting on the grade opens nothing any more: no card on a hover
   await page.mouse.move(5, 5);
-  const chipAt = await page.$eval('.bcv-asg__pill', (e) => { const r = e.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; });
-  const boxUp = () => page.evaluate(() => { const ov = document.querySelector('.bcv-sheet-ov--card'); return ov && !ov.classList.contains('is-folding') ? { hover: ov.hasAttribute('data-hover') } : null; });
-  const boxGone = () => page.evaluate(() => !document.querySelector('.bcv-sheet-ov'));
-  await page.mouse.move(chipAt.x, chipAt.y, { steps: 4 });
-  await page.waitForTimeout(150);
-  const tooSoon = await boxUp();
-  check(!tooSoon && await eventually(async () => !!(await boxUp()), 2500) && (await boxUp()).hover, `resting on the chip opens its box (not at once: a pointer passing over does nothing): ${JSON.stringify({ tooSoon, now: await boxUp() })}`);
-  await page.waitForTimeout(750);
-  const vp = page.viewportSize();
-  await page.mouse.move(12, vp.height - 12, { steps: 6 });
-  check(await eventually(boxGone, 2500), 'a box opened by a hover folds again once the pointer has left it');
-  await page.mouse.move(chipAt.x, chipAt.y, { steps: 4 });
-  check(await eventually(async () => !!(await boxUp()), 2500), 'back on the chip, it opens again');
-  await page.waitForTimeout(750);
-  await page.click('.bcv-sheet.bcv-mark .bcv-sheet__note'); // (a press in the box takes it up)
-  await page.mouse.move(12, vp.height - 12, { steps: 6 });
-  await page.waitForTimeout(1200);
-  check(!!(await boxUp()) && !(await boxUp()).hover, 'a box taken up (a press in it) stays when the pointer leaves, as a pressed one does');
-  await page.keyboard.press('Escape');
-  check(await eventually(boxGone, 2500), 'and Escape folds it');
-  await page.mouse.move(chipAt.x, chipAt.y, { steps: 4 });
-  await eventually(async () => !!(await boxUp()), 2500);
-  await page.keyboard.press('Escape'); // (the pointer left resting on the chip)
-  await eventually(boxGone, 2500);
-  await page.waitForTimeout(1200);
-  check(await boxGone(), 'folded under a pointer that has not moved, it does not open again by itself');
+  const gAt = await page.$eval('.bcv-asg__pill', (e) => { const r = e.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; });
+  await page.mouse.move(gAt.x, gAt.y, { steps: 4 });
+  await page.waitForTimeout(1500);
+  check(await page.evaluate(() => !document.querySelector('.bcv-sheet-ov, .bcv-fbs-ov')), 'resting on the grade opens nothing');
   await page.mouse.move(5, 5);
 
   // (2.98.64) Canvas's own address for a mark — where its notifications, its e-mails and its activity send a grade or a
@@ -2154,19 +2077,16 @@ try {
   const at1003 = ordered.findIndex((a) => String(a.id) === '1003');
   // (2.99.13: one pill at the top, beside the way back — each half names where it goes)
   await page.waitForSelector('.bcv-asg__nav .bcv-asg__navbtn', { timeout: 10000 });
-  const navBtns = await page.$$eval('.bcv-asg__nav .bcv-asg__navbtn', (els) => els.map((e) => ({ dir: e.classList.contains('bcv-asg__navbtn--prev') ? 'prev' : 'next', kicker: e.title.split(':')[0], name: e.textContent.trim() })));
+  const navBtns = await page.$$eval('.bcv-asg__nav .bcv-asg__navbtn', (els) => els.map((e) => ({ dir: e.classList.contains('bcv-asg__navbtn--prev') ? 'prev' : 'next', kicker: e.title.split(':')[0], name: e.title.slice(e.title.indexOf(':') + 1).trim(), word: e.textContent.trim() })));
   const want = [ordered[at1003 - 1] && { dir: 'prev', kicker: 'Previous', name: ordered[at1003 - 1].name }, ordered[at1003 + 1] && { dir: 'next', kicker: 'Next', name: ordered[at1003 + 1].name }].filter(Boolean);
-  const navAt = await page.evaluate(() => { const n = document.querySelector('.bcv-asg__nav').getBoundingClientRect(), b = document.querySelector('.bcv-asg__back').getBoundingClientRect(); return { sameRow: Math.abs((n.top + n.bottom) / 2 - (b.top + b.bottom) / 2) < 3, aboveTitle: n.bottom <= document.querySelector('.bcv-asg__title').getBoundingClientRect().top }; });
-  check(JSON.stringify(navBtns) === JSON.stringify(want) && navAt.sameRow && navAt.aboveTitle, `Previous and Next name the assignments either side, in the tab's order, on the way back's own row: ${navBtns.map((b) => `${b.kicker}: ${b.name}`).join(' | ')} ${JSON.stringify(navAt)}`);
-  // (2.99.20) a long name for the way back stays on one line, cut short, the pill beside it: never wrapped onto two
-  const longBack = await page.evaluate(() => {
-    const bk = document.querySelector('.bcv-asg__back'), l = bk.querySelector('.bcv-detail__backlabel'), was = l.textContent;
-    l.textContent = 'Lab04 - Local g - (week 1, in-progress) - UPLOAD and a few more words to be sure';
-    const r = { h: Math.round(bk.getBoundingClientRect().height), cut: l.scrollWidth > l.clientWidth, row: Math.round(document.querySelector('.bcv-asg__top').getBoundingClientRect().height), left: getComputedStyle(bk).justifyContent, title: !!bk.title };
-    l.textContent = was;
-    return r;
+  // (2.99.52) in the bar across the top, beside the search box, just Previous and Next (the item's name on hover); Back and
+  // Forward at the bar's left; the item is just the item — no section header over it, no row of its own for the way back
+  const navAt = await page.evaluate(() => {
+    const n = document.querySelector('.bcv-asg__nav'), hist = document.querySelector('#bcv-tophist');
+    return { inBar: !!n.closest('#bcv-topsearch') && n.getBoundingClientRect().bottom <= 44, hist: !!hist && getComputedStyle(hist).display !== 'none' && [...hist.querySelectorAll('button')].map((b) => b.title).join('|') === 'Back|Forward',
+      noHead: getComputedStyle(document.querySelector('.bcv-head--course')).display === 'none', noRow: getComputedStyle(document.querySelector('.bcv-asg__top')).display === 'none' };
   });
-  check(longBack.h <= 32 && longBack.row <= 36 && longBack.cut && longBack.title, `a long way back stays one line, cut short, its whole name on hover: ${JSON.stringify(longBack)}`);
+  check(JSON.stringify(navBtns.map(({ word, ...b }) => b)) === JSON.stringify(want) && navBtns.every((b) => b.word === (b.dir === 'prev' ? 'Previous' : 'Next')) && navAt.inBar && navAt.hist && navAt.noHead && navAt.noRow, `Previous and Next in the top bar, just the words, the assignments either side on hover, in the tab's order; Back and Forward beside them; no header or back row over the item: ${navBtns.map((b) => `${b.word} → ${b.name}`).join(' | ')} ${JSON.stringify(navAt)}`);
   await page.click('.bcv-asg__nav .bcv-asg__navbtn--next');
   // the old title is still on screen while the next page comes: wait for the new one, not for a title
   const nextOpened = await page.waitForFunction((x) => location.pathname.endsWith(`/assignments/${x.id}`) && document.querySelector('.bcv-detail__title')?.textContent === x.name, ordered[at1003 + 1], { timeout: 10000 }).then(() => true).catch(() => false);
@@ -2585,21 +2505,11 @@ try {
   // Handed in and waiting: the pill opens what was handed in — attempt by attempt — the way a graded one opens the mark
   const subChip = await page.evaluate(() => ({ text: document.querySelector('.bcv-asg__pill').innerText.trim(), done: document.querySelector('.bcv-asg__pill').classList.contains('is-done'), sideCards: document.querySelectorAll('.bcv-body--course-cols > .bcv-col').length }));
   check(page.url() === `${BASE}/courses/104/assignments/4002` && subChip.done && subChip.text === 'Submitted' && subChip.sideCards === 1, `handed in, the page redraws with the Submitted pill, and no side card: ${JSON.stringify(subChip)}`);
+  // (2.99.52) and opens the Feedback sheet, as a graded one does: the latest attempt's words on the left, the comments on the right
   await page.click('.bcv-asg__pill');
-  await page.waitForSelector('.bcv-mark .bcv-mcard', { timeout: 10000 });
-  await page.waitForTimeout(500);
-  await page.click('.bcv-mark .bcv-mark__chatbtn'); // (the comments, folded away until asked for)
-  await page.waitForFunction(() => !document.querySelector('.bcv-mark__cols').classList.contains('is-folded'), null, { timeout: 3000 });
-  await page.waitForTimeout(400);
-  const subCard = () => page.evaluate(() => { const b = document.querySelector('.bcv-mark'); const t = (s) => [...b.querySelectorAll(s)].map((e) => e.innerText.replace(/\s+/g, ' ').trim()); return {
-    url: location.search, value: b.querySelector('.bcv-sheet__value')?.textContent, label: b.querySelector('.bcv-sheet__label')?.textContent || '', note: b.querySelector('.bcv-sheet__note')?.textContent, pct: b.querySelector('.bcv-mring__pct')?.textContent, rubric: !!b.querySelector('.bcv-mring--rubric'), track: !!b.querySelector('.bcv-mring .bcv-mring__track'),
-    times: t('.bcv-mcard__when'), quote: t('.bcv-mcard__quote'), chips: t('.bcv-mcard__chip'), bubbles: t('.bcv-mcard__btext'), head: t('.bcv-mcard__attempts .bcv-mcard__head .bcv-mcard__k'), tiles: t('.bcv-mcard__tile'), kept: b.querySelectorAll('.bcv-mcard__tile.is-kept').length,
-  }; });
-  const subFb = await subCard();
-  check(!/bcv=feedback/.test(subFb.url) && subFb.value === 'Submitted' && !subFb.label && /^F26-SPRK 010 103 · Text entry · [A-Z][a-z]{2} \d+ at \d+:\d\d ?(am|pm)$/.test(subFb.note || '') && subFb.pct === '—' && !subFb.rubric && subFb.track && /^Submitted [A-Z]/.test(subFb.times[0] || '') && subFb.times[1] === 'Graded Waiting' && subFb.quote.join() === 'Clean water for all. Three sources follow.' && subFb.chips.length === 0 && subFb.bubbles.join() === 'Three sources, APA.' && subFb.head.join() === 'Attempts' && subFb.tiles.join(' | ') === 'Attempt 1 — | Attempt 2 —' && subFb.kept === 0, `an ungraded submission opens the same card: Submitted, Waiting, the latest attempt's words and the comment left with it on show, both attempts as tiles with none kept: ${JSON.stringify(subFb)}`);
-  await page.click('.bcv-mark .bcv-mcard__tile:nth-child(1)');
-  const subFb1 = await subCard();
-  check(subFb1.chips.length === 2 && /grand-challenge-notes\.docx/.test(subFb1.chips[0]) && /GC-articles-Sharma\.pdf/.test(subFb1.chips[1]) && subFb1.quote.length === 0 && subFb1.bubbles.length === 0, `and the first attempt's tile its own files (and none of the latest's comment): ${JSON.stringify({ chips: subFb1.chips, bubbles: subFb1.bubbles })}`);
+  await page.waitForSelector('.bcv-fbs', { timeout: 10000 });
+  const subFb = await page.evaluate(() => ({ card: !!document.querySelector('.bcv-mark'), url: location.search, text: document.querySelector('.bcv-fbs__text')?.innerText.replace(/\s+/g, ' ').trim(), said: [...document.querySelectorAll('.bcv-fbs__said')].map((e) => e.textContent) }));
+  check(!subFb.card && !/bcv=feedback/.test(subFb.url) && subFb.text === 'Clean water for all. Three sources follow.' && subFb.said.includes('Three sources, APA.'), `an ungraded submission opens the same Feedback sheet: the latest attempt's words beside the comment left with it: ${JSON.stringify(subFb)}`);
   await shot(page, '09h-submitted-ungraded');
   await page.keyboard.press('Escape');
   // To Do rows open the assignment with the hand-in panel grown out of its pill, and the page's back link returns there
@@ -3537,7 +3447,7 @@ try {
   await nav('todo');
   await page.waitForSelector('.bcv-body .bcv-row a.bcv-row__body[href*="/assignments/"]', { timeout: 10000 });
   await clickScreen('.bcv-body .bcv-row a.bcv-row__body[href*="/assignments/"]');
-  await page.waitForSelector('.bcv-detail__back', { timeout: 10000 });
+  await page.waitForSelector('.bcv-detail__back', { state: 'attached', timeout: 10000 }); // (2.99.52: on an assignment the way back is kept but not shown — Back is in the top bar)
   check((await texts('.bcv-detail__back'))[0] === 'To Do' && (await texts('.bcv-ctx__back'))[0] === 'To Do', `an assignment opened from To Do says Back to To Do, and so does the course header: ${(await texts('.bcv-detail__back'))[0]} / ${(await texts('.bcv-ctx__back'))[0]}`);
   await tab('modules');
   check((await texts('.bcv-ctx__back'))[0] === 'To Do', 'moving between the course\'s tabs keeps the header\'s Back on where the course was entered from');
@@ -4366,7 +4276,7 @@ try {
   await page.waitForSelector('#bcv-omni', { timeout: 10000 });
   // (2.98.70) the box sits in the top bar — the widgets' bar — at its left, on every screen; the Dashboard's header has none of its own
   const barBox = () => page.evaluate(() => { const host = document.getElementById('bcv-topsearch'); const box = document.getElementById('bcv-omni-box'); const s = box.getBoundingClientRect(); const bar = document.getElementById('bcv-bar').getBoundingClientRect(); const hit = document.elementFromPoint((s.left + s.right) / 2, (s.top + s.bottom) / 2); return { inBar: !!host && host.contains(box), left: Math.round(s.left - bar.left), mid: Math.round((s.top + s.bottom) / 2 - (bar.top + bar.bottom) / 2), h: Math.round(s.height), w: Math.round(s.width), headBox: !!document.querySelector('.bcv-head #bcv-omni-box'), hit: !!hit && box.contains(hit), placeholder: document.getElementById('bcv-omni').placeholder, pills: getComputedStyle(document.getElementById('bcv-omni-root')).backgroundColor === 'rgba(0, 0, 0, 0)', key: document.querySelector('.bcv-omni__key')?.textContent, panelHidden: document.getElementById('bcv-omni-panel').hidden }; });
-  const inTheBar = (b) => b.inBar && Math.abs(b.left - 20) <= 1 && Math.abs(b.mid) <= 1 && b.h === 29 && b.w >= 220 && !b.headBox && b.hit && b.panelHidden;
+  const inTheBar = (b) => b.inBar && Math.abs(b.left - 96) <= 1 /* (2.99.52: after Back and Forward) */ && Math.abs(b.mid) <= 1 && b.h === 29 && b.w >= 220 && !b.headBox && b.hit && b.panelHidden;
   const sBox = await page.evaluate(() => { const row = document.querySelector('.bcv-head__in'); const s = row.querySelector('#bcv-omni-box').getBoundingClientRect(); const h1 = row.querySelector('.bcv-h1').getBoundingClientRect(); const seg = row.querySelector('.bcv-seg').getBoundingClientRect(); return { placeholder: document.getElementById('bcv-omni').placeholder, between: s.left > h1.right && (s.bottom <= seg.top + 1 || s.right <= seg.left + 1 || s.top >= seg.bottom - 1), level: Math.abs(s.height - seg.height) <= 1, pills: getComputedStyle(document.getElementById('bcv-omni-root')).backgroundColor === 'rgba(0, 0, 0, 0)', key: document.querySelector('.bcv-omni__key')?.textContent, panelHidden: document.getElementById('bcv-omni-panel').hidden }; });
   check(sBox.placeholder === 'Search everything' && sBox.between && sBox.level && sBox.pills && sBox.key === '/' && sBox.panelHidden, `the Dashboard's header carries a search box right of the greeting, above the view switcher's row (2.99.41) — one pill, the switcher's height — its panel closed (2.98.71: on the Dashboard the box is the header's, as it always was): ${JSON.stringify(sBox)}`);
   check(await page.evaluate(() => !!document.getElementById('bcv-topsearch')?.hidden && !document.querySelector('#bcv-topsearch #bcv-omni-box')), 'and the top bar shows no box of its own on the Dashboard');
