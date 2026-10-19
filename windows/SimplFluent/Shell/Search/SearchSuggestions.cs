@@ -57,7 +57,7 @@ public sealed partial class SearchPalette
         }
     }
 
-    private enum JobKind { Kinds, Due, Grades }
+    private enum JobKind { Kinds, Due, Grades, Everything }
 
     /// <summary>What the app answers later: the school's search for one kind, the planner, the grades.</summary>
     private sealed record Job(JobKind Kind, string Title, string Q, string[]? Kinds = null, bool Overdue = false);
@@ -65,7 +65,12 @@ public sealed partial class SearchPalette
     private (List<PaletteSection> Sections, Job? Job) Suggest(string raw)
     {
         var typed = Typed.Of(raw);
-        return typed.Command ? CommandSections(typed) : (PlainSections(typed), null);
+        if (typed.Command) return CommandSections(typed);
+        // (0.3.44) as the web box does: from the second letter, after a pause, everything in the school answers under the
+        //  box — assignments, announcements, pages, discussions, files, people — before Enter is pressed
+        var words = typed.Raw.Trim();
+        var everything = words.Length >= 2 && PaletteSum.Answer(words) == null ? new Job(JobKind.Everything, "", words) : null;
+        return (PlainSections(typed), everything);
     }
 
     // ---- words typed ----
@@ -426,6 +431,31 @@ public sealed partial class SearchPalette
             return d;
         }
         catch { return null; }
+    }
+
+    /// <summary>(0.3.44) The school searched for what is typed, each kind its own section (five rows at most), put in
+    /// before the "Search for …" row — the kinds the app lists already (courses, groups) left out.</summary>
+    private async Task<List<PaletteSection>?> Everything(string q, List<PaletteSection> based, CancellationToken token)
+    {
+        await Task.Delay(280, token); // (a pause in the typing before the school is asked)
+        SearchData d;
+        try { d = await engine.Call<SearchData>("search", new { q }); }
+        catch { return null; }
+        var shown = based.Select(s => s.Title).ToHashSet();
+        var found = new List<PaletteSection>();
+        foreach (var g in d.Groups.Where(g => !shown.Contains(g.Title)))
+        {
+            var items = g.Rows.Take(5).Select((r, i) => new PaletteItem($"r.{g.Title}.{i}", r.Title, KindSymbol(g.Title), PaletteAction.Open(r.Url, r.Title, r.External == true))
+            {
+                Sub = r.Sub, Color = r.Color, Filled = true,
+            }).ToList();
+            if (items.Count > 0) found.Add(new PaletteSection(g.Title, items));
+        }
+        if (found.Count == 0) return null;
+        var outList = based.ToList();
+        var at = outList.FindIndex(s => s.Title == "Search");
+        outList.InsertRange(at < 0 ? outList.Count : at, found);
+        return outList;
     }
 
     /// <summary>A section that answered later in the place of the one that waited for it (or after the rest).</summary>

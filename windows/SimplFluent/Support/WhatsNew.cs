@@ -26,6 +26,8 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.44", "2026-10-19",
+            ("new", "Instant Search", "Results show under the search box as you type.")),
         R("0.3.43", "2026-10-19",
             ("fixed", "Alta Graphs Show", "A question's Desmos graph shows instead of a blank box.")),
         R("0.3.42", "2026-10-19",

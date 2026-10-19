@@ -263,6 +263,17 @@ public sealed partial class SearchPalette : IDisposable
 
     private async void Later(Job job, List<PaletteSection> based, int mine, CancellationToken token)
     {
+        if (job.Kind == JobKind.Everything)
+        {
+            List<PaletteSection>? all;
+            try { all = await Everything(job.Q, based, token); }
+            catch { return; }
+            if (token.IsCancellationRequested || seq != mine || all == null) return;
+            Publish(all, keepChoice: true);
+            if (sections.Count > 0 && (box.IsKeyboardFocusWithin || forced)) Open();
+            Shot.Moved();
+            return;
+        }
         PaletteSection? extra;
         try { extra = await Run(job, token); }
         catch { return; }

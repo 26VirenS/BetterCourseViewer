@@ -1,3 +1,7 @@
+**What's new in 0.3.44** (beta)
+
+- **Instant search** — results from your school (assignments, announcements, pages, discussions, files and people) now show under the search box as you type, before you press Enter.
+
 **What's new in 0.3.43** (beta)
 
 - **Knewton Alta, graphs show** — a question with a Desmos graph (like "Consider the graph of f′(x) below") showed a blank box; the graph now shows, drawn small, and opens large when you click it.
