@@ -135,7 +135,8 @@ struct DeveloperMenu: View {
 
 struct DeveloperView: View {
     @EnvironmentObject private var model: AppModel
-    @State private var page: Page? = .overview
+    /// (1.3.134: -SimplDevPage logs opens on a page of its own, for the pictures)
+    @State private var page: Page? = UserDefaults.standard.string(forKey: "SimplDevPage").flatMap(Page.init(rawValue:)) ?? .overview
 
     enum Page: String, CaseIterable, Identifiable {
         case overview, logs, system, stats, updates, engine, popups, interface, preferences // (1.3.109: logs, system, stats)

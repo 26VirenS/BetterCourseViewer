@@ -187,17 +187,56 @@ struct DevLogLine: Identifiable, Hashable {
     let text: String
 }
 
-/// The app's own log (what it writes with NSLog and os_log), read from the system's log store for this process.
+/// (1.3.134) Simpl's own lines, kept here as they are written: every `NSLog` in the app is this module's (below), which
+/// hands the line on to the system's log as before and keeps a copy — the last 5,000, from launch, whether or not the
+/// Developer window is open. The system's log store alone showed none of them: for this process it is flooded by
+/// WebKit's and the frameworks' own lines, which pushed Simpl's out of the 5,000 kept (and the store may not give
+/// back an app's NSLog lines at all).
+final class OwnLog: @unchecked Sendable {
+    static let shared = OwnLog()
+    private let lock = NSLock()
+    private var pending: [(Date, String)] = []
+
+    func add(_ text: String) {
+        lock.lock()
+        pending.append((Date(), text))
+        if pending.count > 5000 { pending.removeFirst(pending.count - 5000) }
+        lock.unlock()
+    }
+
+    /// The lines written since last asked.
+    func take() -> [(Date, String)] {
+        lock.lock()
+        defer { lock.unlock() }
+        let p = pending
+        pending = []
+        return p
+    }
+}
+
+/// (1.3.134) The app's NSLog: as Foundation's (the system's log, the console), and a copy kept for the Developer
+/// window's Logs (OwnLog). Declared in this module, it is the one every NSLog in the app calls.
+func NSLog(_ format: String, _ args: CVarArg...) {
+    OwnLog.shared.add(String(format: format, arguments: args))
+    withVaList(args) { NSLogv(format, $0) }
+}
+
+/// The app's own log — (1.3.134) Simpl's lines as it writes them (OwnLog), kept apart from the rest — and everything
+/// else this process writes (the frameworks', WebKit's), read from the system's log store; 5,000 of each.
 @MainActor
 final class DevLog: ObservableObject {
     static let shared = DevLog()
-    @Published private(set) var lines: [DevLogLine] = []
+    @Published private(set) var own: [DevLogLine] = []
+    @Published private(set) var system: [DevLogLine] = []
     @Published private(set) var problem: String?
     @Published var following = true
     private var last = Date.distantPast
     private var next = 0
     private var timer: Timer?
     private var reading = false
+
+    /// Both, in the order they were written.
+    var lines: [DevLogLine] { (own + system).sorted { $0.at == $1.at ? $0.id < $1.id : $0.at < $1.at } }
 
     func watch() {
         guard timer == nil else { return }
@@ -207,12 +246,26 @@ final class DevLog: ObservableObject {
 
     func unwatch() { timer?.invalidate(); timer = nil }
 
-    func clear() { lines = [] }
+    func clear() { own = []; system = [] }
+
+    private static func level(of text: String) -> String {
+        text.localizedCaseInsensitiveContains("error") || text.localizedCaseInsensitiveContains("fail") ? "error" : "notice"
+    }
 
     func read() {
+        // Simpl's own, at once
+        let mine = OwnLog.shared.take()
+        if !mine.isEmpty {
+            for m in mine {
+                own.append(DevLogLine(id: next, at: m.0, level: Self.level(of: m.1), category: "Simpl", text: m.1))
+                next += 1
+            }
+            if own.count > 5000 { own.removeFirst(own.count - 5000) }
+        }
         guard !reading else { return }
         reading = true
         let since = last == .distantPast ? DevMonitor.started : last
+        let ownTexts = Set(own.suffix(500).map(\.text))
         Task.detached(priority: .utility) {
             var got: [(Date, String, String, String)] = []
             var failed: String?
@@ -220,6 +273,8 @@ final class DevLog: ObservableObject {
                 let store = try OSLogStore(scope: .currentProcessIdentifier)
                 for e in try store.getEntries(at: store.position(date: since)) {
                     guard let l = e as? OSLogEntryLog, l.date > since else { continue }
+                    // (Simpl's own lines are kept as they are written: not twice)
+                    if l.composedMessage.contains("[Simpl]") || ownTexts.contains(l.composedMessage) { continue }
                     let level: String
                     switch l.level {
                     case .error: level = "error"
@@ -239,13 +294,13 @@ final class DevLog: ObservableObject {
                 let log = DevLog.shared
                 log.reading = false
                 log.problem = problem
-                guard !found.isEmpty else { return }
+                guard let end = found.last?.0 else { return }
                 for g in found {
-                    log.lines.append(DevLogLine(id: log.next, at: g.0, level: g.1, category: g.2, text: g.3))
+                    log.system.append(DevLogLine(id: log.next, at: g.0, level: g.1, category: g.2, text: g.3))
                     log.next += 1
                 }
-                log.last = found.last!.0
-                if log.lines.count > 5000 { log.lines.removeFirst(log.lines.count - 5000) }
+                log.last = end
+                if log.system.count > 5000 { log.system.removeFirst(log.system.count - 5000) }
             }
         }
     }
@@ -265,10 +320,10 @@ struct DevLogsPage: View {
     @State private var simplOnly = true
     @State private var level = "all"
 
+    /// (1.3.134) Simpl's own: the lines it wrote (DevLog.own); else everything this process wrote, in order.
     private var shown: [DevLogLine] {
-        log.lines.filter { l in
-            (!simplOnly || l.text.contains("[Simpl]") || l.category == "Simpl")
-                && (level == "all" || (level == "problems" ? (l.level == "error" || l.level == "fault" || l.text.localizedCaseInsensitiveContains("error") || l.text.localizedCaseInsensitiveContains("fail")) : true))
+        (simplOnly ? log.own : log.lines).filter { l in
+            (level == "all" || (level == "problems" ? (l.level == "error" || l.level == "fault" || l.text.localizedCaseInsensitiveContains("error") || l.text.localizedCaseInsensitiveContains("fail")) : true))
                 && (filter.isEmpty || l.text.localizedCaseInsensitiveContains(filter) || l.category.localizedCaseInsensitiveContains(filter))
         }
     }
@@ -285,14 +340,14 @@ struct DevLogsPage: View {
                 Toggle("Simpl's own", isOn: $simplOnly).toggleStyle(.checkbox)
                 Toggle("Follow", isOn: $log.following).toggleStyle(.checkbox)
                 Spacer()
-                Text("\(shown.count) of \(log.lines.count)").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                Text("\(shown.count) of \(log.own.count + log.system.count)").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                 Button("Copy") { copyToPasteboard(DevLog.text(shown)) }
                 Button("Save…") { save() }
                 Button("Clear") { log.clear() }
             }
             .padding(10)
             Divider()
-            if let p = log.problem, log.lines.isEmpty {
+            if let p = log.problem, log.own.isEmpty, log.system.isEmpty {
                 ContentUnavailableView("The log could not be read", systemImage: "exclamationmark.triangle", description: Text(p))
             } else {
                 ScrollViewReader { proxy in
@@ -308,7 +363,7 @@ struct DevLogsPage: View {
                         .font(.system(size: 11, design: .monospaced))
                         .id(l.id)
                     }
-                    .onChange(of: log.lines.count) { _, _ in
+                    .onChange(of: log.own.count + log.system.count) { _, _ in
                         if log.following, let last = shown.last { proxy.scrollTo(last.id, anchor: .bottom) }
                     }
                 }

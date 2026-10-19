@@ -954,6 +954,7 @@ push_set() {
   # until AppKit stopped the app; its console says the list is still open after the read (tool_list_check)
   shoot light-36d-external-tools-list-reread 16 -SimplPlace externaltools -SimplExternalToolList knewton -SimplExternalToolReread YES
   shoot light-37-developer 16 -SimplOpen developer # (1.3.72: the Developer window)
+  shoot light-37b-developer-logs 20 -SimplOpen developer -SimplDevPage logs # (1.3.134: Simpl's own lines in Logs)
   shoot light-01p-dashboard-preview 16 -SimplOpen preview
   # (1.3.102) an assignment pushed on the Dashboard (as Hand In or See Feedback pushes one), then the Dashboard's row in
   # the sidebar pressed again: the Dashboard at its root, nothing pushed (again_check) — (1.3.133) 45 s: on a slow GitHub
