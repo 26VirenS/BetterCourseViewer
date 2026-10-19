@@ -1066,7 +1066,8 @@ the_set() {
     shoot "$MODE-09-assignments" 12 -SimplPlace section:courses/101:assignments
     shoot "$MODE-10-assignment" 14 -SimplPlace course:101 -SimplPush /courses/101/assignments/1001
     shoot "$MODE-11-course-grades" 14 -SimplPlace section:courses/101:grades
-    shoot "$MODE-12-hand-in" 16 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin
+    # (1.3.134: 24 s, not 16 — on a slow GitHub Mac the hand-in page was still loading at 16)
+    shoot "$MODE-12-hand-in" 24 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin
     shoot "$MODE-12c-hand-in-phone" 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES
     shoot "$MODE-13-discussion" 14 -SimplPlace course:101 -SimplPush /courses/101/discussion_topics/7003
     shoot "$MODE-14-modules" 12 -SimplPlace section:courses/101:modules
@@ -1144,8 +1145,8 @@ the_set() {
   shoot light-37-tool-calc 12 -SimplPlace tools -SimplTool calc
   shoot light-38-tool-ptable 12 -SimplPlace tools -SimplTool ptable -SimplPTColour category
   shoot light-39-tool-need 14 -SimplPlace tools -SimplTool need
-  shoot light-70d-more-tool 30 -SimplOpen more:tool # (More from Canvas: My Materials in the tool window)
-  MODE=dark shoot dark-70d-more-tool 30 -SimplOpen more:tool # (1.3.80: the app dark, the school's tool page light)
+  shoot light-70d-more-tool 45 -SimplOpen more:tool # (More from Canvas: My Materials in the tool window — 1.3.134: 45 s, a slow GitHub Mac had it still loading at 30)
+  MODE=dark shoot dark-70d-more-tool 45 -SimplOpen more:tool # (1.3.80: the app dark, the school's tool page light)
   SIZE=1280x900 shoot light-35b-tools-biology 12 -SimplPlace tools -SimplToolsScroll biology -SimplBioCheck YES # (1.3.78)
   SIZE=940x820 shoot light-40-narrow-dashboard 14
   SIZE=940x820 shoot light-41-narrow-grades 14 -SimplPlace grades
