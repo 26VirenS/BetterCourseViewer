@@ -7,7 +7,6 @@
   const U = BCV.ui;
   const IC = BCV.IC;
   /** How a quiz is restricted, in words: an access code, an IP filter, Respondus LockDown Browser. */
-  const restrictions = (q) => [q.has_access_code || q.access_code ? 'Access code' : null, q.ip_filter ? 'Allowed networks only' : null, q.require_lockdown_browser ? 'LockDown Browser' : null].filter(Boolean);
   const hasGrade = (a) => { const s = a?.submission || {}; return s.workflow_state === 'graded' && s.score !== null && s.score !== undefined && s.posted_at !== null; }; // (marked and posted: a held mark is not yours to see yet)
   const store = BCV.store;
   const CS = () => BCV.screens.course;
@@ -863,7 +862,24 @@
       if (!handsIn) return typeList.includes('on_paper') ? 'Handed in on paper.' : 'Nothing is handed in for this one.';
       return '';
     }
+    // (2.99.55) a quiz taken, as the Mac's assignment page has it: Continue Quiz while an attempt is under way; else See
+    // Feedback where its results show, and New Attempt beside it while one is left — straight into the attempt, no intro
+    // between. Read from the quiz once the page is up (until then: its feedback, and New Attempt while the assignment's
+    // own count leaves one).
+    const quizKind = typeList.includes('online_quiz') && !!a.quiz_id;
+    let quizNow = null;
+    const quizTaken = (x) => !!(x.submitted_at || gradedOf(x));
+    function quizSteps(x) {
+      if (!quizKind || !quizTaken(x)) return null;
+      if (quizNow?.underWay) return [{ title: 'Continue Quiz', icon: IC.bolt, go: 'quizgo' }];
+      const out = [];
+      if (quizNow ? quizNow.feedback : true) out.push({ title: 'See Feedback', short: 'Feedback', icon: IC.disc, go: 'quizfb' });
+      if (quizNow ? quizNow.canStart : leftOf(x)) out.push({ title: 'New Attempt', short: 'Retake', icon: IC.bolt, go: 'quizgo' });
+      return out.length ? out : null;
+    }
     function stepsOf(x) {
+      const quizzed = quizSteps(x);
+      if (quizzed) return quizzed;
       const one = (() => {
         if (canAgain(x)) return x.submitted_at || used(x) > 0 ? { title: 'Hand In Again', short: 'Hand In', icon: TRAY_UP, go: 'hand' } : { title: 'Hand In', icon: TRAY_UP, go: 'hand' };
         if (isTool && !lockedNow()) return { title: 'Open Tool', icon: IC.tool, go: 'tool' };
@@ -883,6 +899,8 @@
       else if (step.go === 'look') openFeedback(current, el);
       else if (step.go === 'tool') launchTool(el);
       else if (step.go === 'quiz') app.go(`${c.url}/quizzes/${a.quiz_id}`);
+      else if (step.go === 'quizgo') app.go(`${c.url}/quizzes/${a.quiz_id}?bcv=take&begin=1`);
+      else if (step.go === 'quizfb') app.go(`${c.url}/quizzes/${a.quiz_id}?bcv=feedback`);
       else if (step.go === 'disc') app.go(`${c.url}/discussion_topics/${a.discussion_topic.id}`);
       else if (step.go === 'canvas') app.go(nativeHref(`${c.url}/assignments/${a.id}`));
     };
@@ -950,6 +968,19 @@
       drawComments(x);
       drawWork(x);
     };
+    if (quizKind) {
+      Promise.all([store.quiz(c.id, a.quiz_id), store.quizSubmissions(c.id, a.quiz_id)]).then(([q, subs]) => {
+        if (!q || !ctx.alive()) return;
+        const limit = store.quizAttemptLimit(q, subs || []);
+        const underWay = (subs || []).some((x) => x.workflow_state === 'untaken');
+        const finishedN = (subs || []).filter((x) => x.workflow_state === 'complete' || x.workflow_state === 'pending_review').length;
+        const survey = /survey/.test(q.quiz_type || '');
+        const held = current.posted_at === null && !!(current.submitted_at || gradedOf(current));
+        const hidden = q.hide_results === 'always' || (q.hide_results === 'until_after_last_attempt' && limit.allowed !== null && limit.left > 0) || held;
+        quizNow = { underWay, canStart: !q.locked_for_user && !q.require_lockdown_browser && (limit.left === null || limit.left > 0 || underWay), feedback: (finishedN > 0 || quizTaken(current)) && !survey && !hidden };
+        repaint(current);
+      }).catch(() => {});
+    }
     page.addEventListener('dragover', (e) => { if (canAgain(current) && typeList.includes('online_upload') && [...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); page.classList.add('is-dropping'); } });
     page.addEventListener('dragleave', (e) => { if (!page.contains(e.relatedTarget)) page.classList.remove('is-dropping'); });
     page.addEventListener('drop', (e) => { page.classList.remove('is-dropping'); if (e.target.closest?.('.bcv-sb__drop')) return; if (!canAgain(current) || !e.dataTransfer?.files?.length) return; e.preventDefault(); takeDrop([...e.dataTransfer.files]); });
@@ -1115,80 +1146,6 @@
     return b;
   };
 
-  D.quiz = async (ctx, shell) => {
-    const { app, route } = ctx;
-    const c = shell.course;
-    const b = cols();
-    const main = mainCol(), side = sideCol();
-    b.append(main, side);
-    main.append(U.loading());
-    const [q, subs] = await Promise.all([store.quiz(c.id, route.arg).catch(() => null), store.quizSubmissions(c.id, route.arg).catch(() => [])]);
-    // Canvas keeps one quiz submission per student — the one in play — so the attempts before it are
-    // not in that list at all. Every finished attempt is in the assignment submission's history.
-    const asub = q?.assignment_id ? await store.submission(c.id, q.assignment_id).catch(() => null) : null;
-    // a grade not posted yet (Canvas: "Your quiz has been muted") keeps the results back: no score, no feedback (quiz.js heldBack)
-    const held = !!asub && asub.posted_at === null && !!(asub.submitted_at || asub.workflow_state === 'graded' || asub.workflow_state === 'pending_review');
-    if (!ctx.alive()) return b;
-    if (!q) return main.replaceChildren(U.errorBox('This quiz could not be loaded.')) || b;
-    shell.reader = { title: q.title, html: q.description || '' };
-    app.nameHere?.(q.title);
-    const TYPE = { assignment: 'Graded quiz', practice_quiz: 'Practice quiz', graded_survey: 'Graded survey', survey: 'Survey' };
-    // attempts used/allowed from Canvas's own count on the submission; the Take button goes away at the limit
-    const limit = store.quizAttemptLimit(q, subs);
-    const open = (subs || []).some((s) => s.workflow_state === 'untaken');
-    const noneLeft = limit.allowed !== null && limit.left <= 0 && !open;
-    const finished = (subs || []).filter((s) => s.workflow_state === 'complete' || s.workflow_state === 'pending_review');
-    const latest = finished.slice().sort((a, b) => (Number(b.attempt) || 0) - (Number(a.attempt) || 0))[0] || null;
-    const feedbackHref = (s) => `${c.url}/quizzes/${q.id}?bcv=feedback&sub=${encodeURIComponent(s.id)}`;
-    // an earlier attempt has no quiz submission of its own to name, so it is asked for by its number
-    const feedbackAt = (n) => `${c.url}/quizzes/${q.id}?bcv=feedback&attempt=${n}`;
-    const takeHref = `${c.url}/quizzes/${q.id}?bcv=take`; // every quiz is taken here, one question at a time included
-    /** Every attempt: the finished ones from the history, and the one in play from the live submission. */
-    function attemptList() {
-      const hist = (asub?.submission_history || []).filter((x) => Number(x.attempt) > 0);
-      const done = hist.length
-        ? hist.map((x) => ({ n: Number(x.attempt), score: x.score, at: x.submitted_at || x.graded_at, href: feedbackAt(Number(x.attempt)), live: false }))
-        : finished.map((s) => ({ n: Number(s.attempt) || 0, score: s.score, at: s.finished_at, href: feedbackHref(s), live: false }));
-      const inPlay = (subs || []).find((s) => s.workflow_state === 'untaken');
-      // the open attempt carries the best score so far, which is an earlier attempt's: it shows none
-      if (inPlay) done.push({ n: Number(inPlay.attempt) || done.length + 1, score: null, at: null, href: takeHref, live: true });
-      return done.sort((x, y) => x.n - y.n).filter((x, i, all) => i === all.findIndex((z) => z.n === x.n));
-    }
-    const attempts = attemptList();
-    const attemptRows = attempts.map((x) => U.row([
-      U.tile(IC.bolt, { color: '#7d7bef', tint: 'rgba(88,86,214,.16)' }),
-      U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--145', `Attempt ${x.n}`), U.text('bcv-row__sub', x.live ? 'In progress' : (x.at ? `Finished ${U.fmtAt(x.at)}` : 'Finished'))]),
-      U.badge(!x.live && !held && x.score !== null && x.score !== undefined ? `${store.fmtPts(x.score)} / ${q.points_possible}` : '—', x.live || held ? '' : 'green'),
-      // a finished attempt opens its own feedback; the one in play resumes
-    ], { mod: 'bcv-row--p12', href: x.href }));
-    /** What the header says about attempts, with the one being taken counted as taken. */
-    function attemptsLine() {
-      const inPlay = attempts.find((x) => x.live);
-      const used = attempts.length; // the open one is one of them
-      if (limit.allowed === null) return `${used} used · unlimited`;
-      return inPlay ? `${used} of ${limit.allowed} used · attempt ${inPlay.n} in progress` : `${used} of ${limit.allowed} used`;
-    }
-    main.replaceChildren(
-      itemTop(ctx, c, backTo(app, `${c.url}/quizzes`, 'Quizzes'), 'Quiz', q.id),
-      U.card(U.el('bcv-detail', [
-        h('h2', { class: 'bcv-detail__title bcv-pretty', text: q.title }),
-        meta([['Due', q.due_at ? U.fmtAt(q.due_at) : 'No due date'], ['Points', q.points_possible ?? '—'], ['Questions', q.question_count ?? '—'], ['Time limit', q.time_limit ? `${q.time_limit} minutes` : 'None'], ['Attempts', attemptsLine()], ['Type', TYPE[q.quiz_type] || q.quiz_type], ...(restrictions(q).length ? [['Restrictions', restrictions(q).join(' · ')]] : []), ['Available until', q.lock_at ? U.fmtAt(q.lock_at) : null]]),
-        U.el('bcv-detail__actions', [
-          q.locked_for_user ? U.badge(q.lock_explanation ? htmlToText(q.lock_explanation, 120) : 'Locked', 'orange')
-            : noneLeft ? U.badge(`No attempts left · ${U.plural(limit.allowed, 'attempt')} allowed`, 'orange')
-              : U.btn(open ? (/survey/.test(q.quiz_type || '') ? 'Continue survey' : 'Resume attempt') : (/survey/.test(q.quiz_type || '') ? 'Take the survey' : 'Take the quiz'), { kind: 'primary', icon: IC.bolt, iconColor: '#fff', onClick: () => app.go(takeHref) }),
-          latest && held && !/survey/.test(q.quiz_type || '') ? U.badge('Results not released yet', '')
-            : latest && q.hide_results !== 'always' && !/survey/.test(q.quiz_type || '') ? U.btn('See feedback', { kind: noneLeft && !q.locked_for_user ? 'primary' : '', icon: IC.check, iconColor: noneLeft && !q.locked_for_user ? '#fff' : undefined, onClick: () => app.go(feedbackHref(latest)) }) : null,
-          q.locked_for_user ? null : U.btn('Open in Canvas', { icon: IC.external, onClick: () => app.go(nativeHref(`${c.url}/quizzes/${q.id}`)) }),
-        ]),
-        q.cant_go_back ? U.text('bcv-hint bcv-pretty', 'This quiz seals each question once you leave it: an answer cannot be changed and you cannot go back.') : null,
-        q.description ? CS().prose(q.description) : U.text('bcv-hint', 'No instructions.'),
-      ]), 'bcv-card--22'),
-    );
-    side.append(h('div', {}, [U.label('Attempts'), attemptRows.length ? U.card(attemptRows, 'bcv-card--list') : U.emptyCard('No attempts yet.')]));
-    return b;
-  };
-
   D.syllabus = async (ctx, shell) => {
     const { app } = ctx;
     const c = shell.course;
@@ -1216,5 +1173,7 @@
   D.doneButton = doneButton;
   D.navRow = navRow;
 
+  // (2.99.55) the row along an item's top — the way back, Previous / Next — for the quiz's intro too (screens/quiz.js)
+  D.itemTop = (ctx, c, type, assetId, backHref, backLabel) => itemTop(ctx, c, backTo(ctx.app, backHref, backLabel), type, assetId);
   BCV.screens.courseDetail = D;
 })();

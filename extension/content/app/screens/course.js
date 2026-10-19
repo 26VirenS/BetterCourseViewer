@@ -790,7 +790,7 @@
       case 'assignment': el = route.params.get('bcv') === 'feedback' ? await BCV.screens.feedback.render(ctx, shell) : await D.assignment(ctx, shell); break;
       case 'syllabus': el = await D.syllabus(ctx, shell); break;
       case 'page': el = await D.page(ctx, shell); break;
-      case 'quiz': el = ['take', 'feedback'].includes(route.params.get('bcv')) ? await BCV.screens.quiz.render(ctx, course) : await D.quiz(ctx, shell); break;
+      case 'quiz': el = await BCV.screens.quiz.render(ctx, course); break; // (2.99.55) a quiz opens on its intro, as on the Mac: no page of facts before it
       default: el = B.native(ctx, shell);
     }
     if (!ctx.alive()) return out;

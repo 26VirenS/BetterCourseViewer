@@ -345,6 +345,7 @@
     // results back too — its score and which answers were right. Read here for the buttons; the
     // feedback itself reads the submission afresh before it shows a thing (loadFeedback)
     st.held = heldBack(asub0);
+    st.asub = asub0; // (the intro's attempts: the assignment's submission history)
     const layout = LAYOUTS.includes(picked) ? picked : 'side';
     // a quiz set to one question at a time can be drawn either way that shows one question: the side
     // layout or the plain one — never all on one scroll
@@ -426,10 +427,11 @@
       type: 'button', class: 'bcv-qz__devimport', hidden: true, onclick: () => importEarlier(),
       title: 'Developer: show in purple what you picked last time, where it was right — nothing is filled in',
     }, [U.svg('M12 4v11M7 10l5 5 5-5M5 20h14', { size: 13, width: 2 }), h('span', { text: 'Import answers' })]);
+    const subLine = U.text('bcv-qz__sub', '');
     const head = U.el('bcv-qz__head', [
       U.el('bcv-qz__headrow', [
         exitBtn,
-        h('div', { class: 'bcv-qz__titles' }, [U.text('bcv-qz__title bcv-ellip', quiz.title), U.text('bcv-qz__sub', simulated ? 'Simulation · nothing goes to Canvas' : `${course.name} · ${dueDay}`)]),
+        h('div', { class: 'bcv-qz__titles' }, [U.text('bcv-qz__title bcv-ellip', quiz.title), subLine]),
         modeWrap,
         devBtn,
         instrBtn,
@@ -690,6 +692,8 @@
       const closeWord = st.stage === 'feedback' ? 'Back to the quiz' : 'Save and exit';
       exitBtn.title = closeWord;
       exitBtn.setAttribute('aria-label', closeWord);
+      // (2.99.55) the intro's line is the course alone, as the Mac's sheet names it; its facts say the due date below
+      subLine.textContent = simulated ? 'Simulation · nothing goes to Canvas' : st.stage === 'intro' ? course.name : `${course.name} · ${dueDay}`;
       paintProgress();
       body.classList.toggle('is-busy', st.loadingIdx !== null && st.stage === 'take');
       if (st.stage === 'intro') body.replaceChildren(intro());
@@ -759,57 +763,155 @@
       })));
     }
 
+    /** (2.99.55) Every finished attempt, newest first, with its score (where Canvas shows results) and when it was handed
+     *  in, and the one Canvas keeps by the quiz's scoring rule — the Mac's intro's (native-app.js quizAttempts). */
+    function introAttempts(survey) {
+      const possible = store.fmtPts(quiz.points_possible || 0);
+      const seen = new Set();
+      const hist = (st.asub?.submission_history || [])
+        .filter((x) => x && Number(x.attempt) > 0 && (x.submitted_at || (x.score !== null && x.score !== undefined)))
+        .sort((a, b) => Number(b.attempt) - Number(a.attempt))
+        .filter((x) => !seen.has(Number(x.attempt)) && seen.add(Number(x.attempt)));
+      const hidden = hist.length ? resultsHidden(latestFinished() || hist[0]) : null;
+      const scored = (x) => !survey && !hidden && x.workflow_state !== 'pending_review' && x.score !== null && x.score !== undefined;
+      const rows = hist.map((x) => ({
+        attempt: Number(x.attempt),
+        score: scored(x) ? `${store.fmtPts(x.score)} / ${possible}` : null,
+        when: x.submitted_at ? `Handed in ${U.fmtAt(x.submitted_at)}` : '',
+        why: scored(x) ? '' : (survey ? 'Survey' : hidden ? 'Hidden' : x.workflow_state === 'pending_review' ? 'Waiting to be graded' : ''),
+        kept: false,
+      }));
+      const marked = rows.filter((r) => r.score !== null);
+      let keptNote = '';
+      if (marked.length > 1 && !survey) {
+        const policy = quiz.scoring_policy || 'keep_highest';
+        if (policy === 'keep_latest') { marked[0].kept = true; keptNote = 'Canvas keeps your latest score.'; }
+        else if (policy === 'keep_average') keptNote = 'Canvas keeps the average of your scores.';
+        else {
+          const best = hist.filter(scored).reduce((m, x) => (m === null || Number(x.score) > Number(m.score) ? x : m), null);
+          const row = best && rows.find((r) => r.attempt === Number(best.attempt));
+          if (row) row.kept = true;
+          keptNote = 'Canvas keeps your highest score.';
+        }
+      }
+      return { rows, keptNote };
+    }
+    /** (2.99.55) Whether an attempt may begin, and why not (the Mac's intro: canStart, begin). */
+    const introCanStart = () => !quiz.locked_for_user && !quiz.require_lockdown_browser && (attemptsLeft === null || attemptsLeft > 0 || !!st.sub);
+    const introNeedsCode = () => !!(quiz.access_code || quiz.has_access_code || st.needsCode);
+    /**
+     * A quiz before an attempt, as the Mac's quiz sheet opens on it (2.99.55): what it is — its facts, each with its
+     * symbol, and where the attempts stand in one line — then why it cannot begin, its instructions ("Before You Start"),
+     * the access code when it wants one, its rules, and every attempt so far; on a wide page the instructions on the
+     * left and the code, the rules and the attempts in a column beside them. Just the buttons float at the foot: an
+     * attempt under way, Continue; a finished one with its feedback and another attempt left, See Feedback and Take
+     * Quiz side by side; none left, See Feedback alone; else Begin Attempt, waiting (greyed out) for the code. Enter
+     * presses the main one.
+     */
     function intro() {
-      const pts = quiz.points_possible !== null && quiz.points_possible !== undefined ? `${store.fmtPts(quiz.points_possible)} points` : 'ungraded';
-      // Canvas tells a student a quiz has a code (has_access_code) but not the code; where it does not
-      // say, the refusal at Begin does (st.needsCode), and the field appears then
-      const needsCode = !!(quiz.access_code || quiz.has_access_code || st.needsCode);
-      if (needsCode && !(st.code || '').trim()) st.code = remembered(); // (an attempt resumed in this tab: the code is still known)
-      const lockdown = !!quiz.require_lockdown_browser;
-      // a survey: no right answers, points (if any) for taking part, and the words say so
       const survey = /survey/.test(quiz.quiz_type || '');
       const gradedSurvey = quiz.quiz_type === 'graded_survey';
-      const ptsLine = survey ? (gradedSurvey ? `${pts} for taking part` : 'not graded') : pts;
-      let refreshBegin = () => {};
-      const bullets = [
-        noBack ? ['#ff9500', IC.lock, 'This quiz seals each question once you leave it: an answer cannot be changed and you cannot go back.'] : null,
-        survey ? ['#34c759', CHECK, 'A survey has no right answers. Your responses are saved as you go, and you can leave and come back.'] : ['#34c759', CHECK, 'Answers save as you pick them. You can leave and come back.'],
-        quiz.anonymous_submissions ? ['var(--bcv-ink3)', IC.people, 'Your responses are anonymous.'] : null,
-        timed ? ['#ff9500', IC.warn, `Time limit: ${quiz.time_limit} minutes. The clock starts when you begin and keeps running if you leave.`] : null,
-        forcedOne ? ['var(--bcv-ink3)', MODE_ONE, noBack ? 'One question at a time, and you cannot go back to a previous question.' : 'One question at a time.'] : null,
-        attemptsLeft !== null ? ['var(--bcv-ink3)', IC.bolt, attemptsLeft > 0 ? `${U.plural(attemptsLeft, 'attempt')} left of ${allowed}.` : `No attempts left — this quiz allows ${U.plural(allowed, 'attempt')}.`] : ['var(--bcv-ink3)', IC.bolt, 'Unlimited attempts.'],
-        quiz.lock_at ? ['var(--bcv-ink3)', IC.lock, `Available until ${U.fmtAt(quiz.lock_at)}.`] : null,
-        // the restrictions Canvas lets an instructor set: an access code, an IP filter, LockDown Browser
-        needsCode ? ['#ff9500', IC.lock, 'This quiz needs an access code from your instructor.'] : null,
-        quiz.ip_filter ? ['#ff9500', IC.lock, 'This quiz can only be taken from an allowed network, such as the classroom or campus.'] : null,
-        lockdown ? ['#ff9500', IC.lock, 'This quiz requires Respondus LockDown Browser. Open Canvas in that browser to take it.'] : null,
+      const needsCode = introNeedsCode();
+      if (needsCode && !(st.code || '').trim()) st.code = remembered(); // (an attempt resumed in this tab: the code is still known)
+      const lockdown = !!quiz.require_lockdown_browser;
+      const canStart = introCanStart();
+      const pts = quiz.points_possible !== null && quiz.points_possible !== undefined ? `${store.fmtPts(quiz.points_possible)} ${Number(quiz.points_possible) === 1 ? 'point' : 'points'}` : 'Ungraded';
+      const facts = [
+        [IC.list || IC.task, U.plural(quiz.question_count || 0, 'question')],
+        [IC.star, survey ? (gradedSurvey ? `${pts} for taking part` : 'Not graded') : pts],
+        [IC.cal, quiz.due_at ? `Due ${U.fmtAtUpper(quiz.due_at)}` : 'No due date'],
+      ];
+      // where the attempts stand, in one line that counts the attempt under way (the engine's note)
+      const n = st.sub ? Number(st.sub.attempt) || limit.used + 1 : limit.used + 1;
+      const N = allowed;
+      const which = N === null ? `Attempt ${n}` : N === 1 ? 'This is your only attempt' : `Attempt ${n} of ${N}`;
+      const after = N === null || N === 1 ? '' : N - n > 0 ? `${N - n} more after this one` : 'your last one';
+      const note = st.sub ? [which, `started ${U.fmtAt(st.sub.started_at)}`, after].filter(Boolean).join(' · ')
+        : N !== null && attemptsLeft <= 0 ? (N === 1 ? 'Your one attempt is used' : `All ${N} attempts used`)
+          : N !== null ? [which, after].filter(Boolean).join(' · ')
+            : 'Nothing is submitted until you say so.';
+      const rules = [
+        noBack ? [IC.lock, '#ff9500', 'Each question is sealed once you leave it: an answer cannot be changed and you cannot go back.'] : null,
+        [IC.okcircle || IC.check, '#34c759', survey ? 'A survey has no right answers. Your responses save as you go, and you can leave and come back.' : 'Answers save as you pick them. You can leave and come back.'],
+        quiz.anonymous_submissions ? [IC.people, 'var(--bcv-ink3)', 'Your responses are anonymous.'] : null,
+        timed ? [IC.timer || IC.clock, '#ff9500', `Time limit: ${quiz.time_limit} minutes. The clock starts when you begin and keeps running if you leave.`] : null,
+        quiz.one_question_at_a_time ? [MODE_ONE, 'var(--bcv-ink3)', noBack ? 'One question at a time, with no going back.' : 'One question at a time.'] : null,
+        allowed === null ? [IC.bolt, 'var(--bcv-ink3)', 'Unlimited attempts.'] : null,
+        quiz.lock_at ? [IC.cal, 'var(--bcv-ink3)', `Available until ${U.fmtAt(quiz.lock_at)}.`] : null,
+        quiz.ip_filter ? [IC.globe || IC.lock, '#ff9500', 'This quiz can only be taken from an allowed network, such as the classroom or campus.'] : null,
+        lockdown ? [IC.shield || IC.lock, '#ff9500', 'This quiz needs Respondus LockDown Browser. Open Canvas in that browser to take it.'] : null,
       ].filter(Boolean);
-      const codeInput = needsCode ? h('input', { class: 'bcv-input bcv-qz__code', type: 'text', placeholder: 'Access code', value: st.code || '', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Access code', oninput: (e) => { st.code = e.target.value; refreshBegin(); }, onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); begin(); } } }) : null;
-      const canStart = !quiz.locked_for_user && !lockdown && (attemptsLeft === null || attemptsLeft > 0 || !!st.sub);
-      const codeMissing = () => needsCode && !(st.code || '').trim(); // the code comes first: Begin waits for it
-      const beginLabel = () => (canStart && codeMissing() ? 'Enter the access code' : st.sub ? (survey ? 'Continue survey' : 'Continue attempt') : canStart ? (survey ? 'Begin survey' : 'Begin attempt') : lockdown ? 'Needs LockDown Browser' : 'No attempts left');
-      const lastDone = canStart ? null : latestFinished();
-      // out of attempts: the primary action becomes the feedback for the last one (when released)
-      const startBtn = !canStart && lastDone && !survey && !resultsHidden(lastDone)
-        ? h('button', { type: 'button', class: 'bcv-qz__begin', text: 'See your feedback', onclick: () => openFeedback(lastDone, 'intro') })
-        : h('button', { type: 'button', class: 'bcv-qz__begin', text: beginLabel(), disabled: (!canStart || codeMissing()) || null, dataset: { begin: '1' }, onclick: begin });
-      refreshBegin = () => { if (startBtn.dataset.begin) { startBtn.disabled = (!canStart || codeMissing()) || null; startBtn.textContent = beginLabel(); } };
-      return U.el('bcv-qz__intro', [
-        h('div', {}, [
-          h('h1', { class: 'bcv-qz__h1 bcv-pretty', text: quiz.title }),
-          h('p', { class: 'bcv-qz__lead', text: `${course.name} · ${U.plural(quiz.question_count || 0, 'question')} · ${ptsLine} · ${quiz.due_at ? `Due ${U.fmtAtUpper(quiz.due_at)}` : 'No due date'}` }), // ("Sep 25 at 10:30 AM", the day first, as every other due line reads)
-        ]),
-        U.card(U.el('bcv-qz__before', [
-          U.text('bcv-qz__kicker', 'Before you start'),
-          quiz.description ? BCV.screens.course.prose(quiz.description, { cls: 'bcv-qz__desc' }) : h('p', { class: 'bcv-qz__p', text: 'Read each question carefully. Your answers are sent to Canvas as you pick them.' }),
-          U.el('bcv-qz__bullets', bullets.map(([color, icon, text]) => U.el('bcv-qz__bullet', [U.svg(icon, { size: 18, stroke: color, width: 2, style: { flex: 'none', marginTop: '1px' } }), h('span', { class: 'bcv-pretty', text })]))),
-          codeInput,
-          st.codeErr ? U.text('bcv-error bcv-qz__codeerr', st.codeErr) : null,
-          quiz.locked_for_user ? U.text('bcv-error', quiz.lock_explanation ? htmlToText(quiz.lock_explanation, 200) : 'This quiz is locked.') : null,
-        ]), 'bcv-card--22'),
-        startBtn,
-        h('p', { class: 'bcv-qz__note', text: st.sub ? `Started ${U.fmtTime(st.sub.started_at)} · attempt ${st.sub.attempt}` : (attemptsLeft !== null ? (attemptsLeft > 0 ? `Attempt ${limit.used + 1} of ${allowed}` : `${U.plural(limit.used, 'attempt')} used of ${allowed}`) : 'Take your time — nothing is submitted until you say so.') }),
+      const last = latestFinished();
+      const lastHidden = last ? resultsHidden(last) : null;
+      const feedback = !!last && !survey && !lastHidden && !st.sub;
+      const codeMissing = () => needsCode && !(st.code || '').trim();
+      const beginTitle = canStart ? (st.sub ? (survey ? 'Continue Survey' : 'Continue Attempt') : (survey ? 'Begin Survey' : 'Begin Attempt')) : lockdown ? 'Needs LockDown Browser' : quiz.locked_for_user ? 'Locked' : 'No Attempts Left';
+      const takeTitle = survey ? 'Take Survey' : 'Take Quiz';
+      const sec = (title, body, part) => U.el(`bcv-qzi__sec bcv-qzi__sec--${part}`, [h('h2', { class: 'bcv-qzi__sechead', text: title }), body]);
+      const icon = (path, color) => U.svg(path, { size: 16, stroke: color, width: 2, style: { flex: 'none' } });
+
+      const heading = U.el('bcv-qzi__heading', [
+        h('h1', { class: 'bcv-qzi__title bcv-pretty', text: quiz.title }), // (the Mac's sheet names it in its bar; here the page does)
+        U.el('bcv-qzi__facts', facts.map(([ic, text]) => U.el('bcv-qzi__fact', [icon(ic, 'var(--bcv-cc, var(--bcv-blue))'), h('span', { text })]))),
+        note ? U.el('bcv-qzi__note', [U.svg('M4 12a8 8 0 108-8 8 8 0 00-6 2.7M4 4v4h4', { size: 14, stroke: 'currentColor', width: 2, style: { flex: 'none' } }), h('span', { text: note })]) : null,
       ]);
+      const lockText = quiz.locked_for_user ? (quiz.lock_explanation ? htmlToText(quiz.lock_explanation, 200) : 'This quiz is locked.') : '';
+      const notices = st.codeErr || lockText ? U.el('bcv-qzi__notices', [
+        st.codeErr ? U.el('bcv-qzi__notice is-bad', [icon(IC.warn, 'currentColor'), h('span', { class: 'bcv-qz__codeerr', text: st.codeErr })]) : null,
+        lockText ? U.el('bcv-qzi__notice', [icon(IC.lock, 'currentColor'), h('span', { text: lockText })]) : null,
+      ]) : null;
+      const instructions = htmlToText(quiz.description || '', 4000).trim() ? sec('Before You Start', BCV.screens.course.prose(quiz.description, { cls: 'bcv-qz__desc' }), 'instr') : null;
+      let mainBtn = null;
+      const codeInput = needsCode ? h('input', { class: 'bcv-input bcv-qz__code', type: 'text', placeholder: 'Access code', value: st.code || '', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Access code', oninput: (e) => { st.code = e.target.value; if (mainBtn?.dataset.begin) mainBtn.disabled = (!canStart || codeMissing()) || null; }, onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); if (canStart && !codeMissing()) begin(); } } }) : null;
+      const code = needsCode ? sec('Access Code', U.el('bcv-qzi__code', [codeInput, U.text('bcv-qzi__caption', 'Your instructor gives the code. It stays with this attempt.')]), 'code') : null;
+      const rulesEl = rules.length ? sec('Rules', U.el('bcv-qzi__rules', rules.map(([ic, color, text]) => U.el('bcv-qzi__rule', [U.el('bcv-qzi__ruleic', [icon(ic, color)]), h('span', { class: 'bcv-pretty', text })]))), 'rules') : null;
+      const { rows, keptNote } = introAttempts(survey);
+      const attemptsEl = rows.length
+        ? sec(rows.length === 1 ? 'Your Attempt' : 'Your Attempts', U.el('bcv-qzi__attempts', [
+          ...rows.map((r) => U.el('bcv-qzi__attempt', [
+            U.el('bcv-qzi__attemptl', [
+              U.el('bcv-qzi__attemptn', [h('span', { text: `Attempt ${r.attempt}` }), r.kept ? U.badge('Kept', 'green') : null]),
+              r.when ? U.text('bcv-qzi__attemptwhen', r.when) : null,
+            ]),
+            r.score ? U.text(`bcv-qzi__score${r.kept ? ' is-kept' : ''}`, r.score) : r.why ? U.text('bcv-qzi__why', r.why) : null,
+          ])),
+          keptNote ? U.text('bcv-qzi__caption', keptNote) : null,
+        ]), 'attempts')
+        : null;
+      // the buttons, floating at the foot
+      const bar = U.el('bcv-qzi__bar');
+      const btn = (text, primary, onclick) => h('button', { type: 'button', class: `bcv-qzi__btn${primary ? ' is-primary bcv-qz__begin' : ''}`, text, onclick }); // (bcv-qz__begin: the main one, as it has always been named)
+      if (feedback && canStart) {
+        mainBtn = btn(takeTitle, true, () => { if (canStart && !codeMissing()) begin(); });
+        mainBtn.dataset.begin = '1';
+        mainBtn.disabled = codeMissing() || null;
+        mainBtn.title = codeMissing() ? 'Type the access code first' : takeTitle;
+        bar.append(btn('See Feedback', false, () => openFeedback(last, 'intro')), mainBtn);
+      } else if (feedback) {
+        mainBtn = btn('See Feedback', true, () => openFeedback(last, 'intro'));
+        bar.append(mainBtn);
+      } else {
+        mainBtn = btn(beginTitle, true, () => { if (canStart && !codeMissing()) begin(); });
+        mainBtn.dataset.begin = '1';
+        mainBtn.disabled = (!canStart || codeMissing()) || null;
+        mainBtn.title = codeMissing() && canStart ? 'Type the access code first' : beginTitle;
+        bar.append(mainBtn);
+      }
+      // (2.99.55) the way back and Previous / Next, as every item has them (and the Mac's toolbar for the quiz)
+      const top = !simulated && BCV.screens.courseDetail?.itemTop ? BCV.screens.courseDetail.itemTop(ctx, course, 'Quiz', quiz.id, `${course.url}/quizzes`, 'Quizzes') : null;
+      const root = U.el('bcv-qzi', [
+        top,
+        U.el('bcv-qzi__cols', [
+          U.el('bcv-qzi__main', [heading, notices, instructions].filter(Boolean)),
+          U.el('bcv-qzi__side', [code, rulesEl, attemptsEl].filter(Boolean)),
+        ]),
+        bar,
+      ].filter(Boolean));
+      // Enter presses the main button (not while typing in a field other than the code's, which has its own)
+      root.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.defaultPrevented && !e.target.closest('input,textarea,select,button,a') && mainBtn && !mainBtn.disabled) { e.preventDefault(); mainBtn.click(); } });
+      // a quiz that wants a code: its field ready to type in
+      if (codeInput && !(st.code || '').trim()) setTimeout(() => { if (codeInput.isConnected) codeInput.focus(); }, 120);
+      return root;
     }
 
     async function begin() {
@@ -1860,6 +1962,9 @@
     }
 
     draw();
+    // (2.99.55) New Attempt and Continue Quiz on the assignment page go straight into the attempt, as the Mac's do
+    // (?bcv=take&begin=1) — unless it cannot begin, or wants its code typed first: then the intro is where they land
+    if (route.params.get('begin') === '1' && st.stage === 'intro' && introCanStart() && !introNeedsCode()) begin();
     return screen;
   }
 

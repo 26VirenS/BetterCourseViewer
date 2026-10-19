@@ -2094,7 +2094,7 @@ try {
   // (2.99.17) every item has the pill: quizzes, pages and discussions each walk their own tab's order
   const pillOn = async (path) => {
     await page.goto(`${BASE}${path}`);
-    await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+    await page.waitForSelector('.bcv-detail__title, .bcv-qzi', { timeout: 10000 });
     await eventually(() => page.$('.bcv-asg__nav .bcv-asg__navbtn').then((e) => !!e), 6000);
     return page.$$eval('.bcv-asg__nav .bcv-asg__navbtn', (els) => els.map((e) => e.title));
   };
@@ -3305,8 +3305,8 @@ try {
   check((await texts('.bcv-body .bcv-row')).some((t) => /Lec06-PreQuiz Due .* at 10:30am · 17 pts · 4 questions/.test(t)), 'quiz rows');
   await shot(page, '21-course-quizzes');
   await page.click('.bcv-body .bcv-row');
-  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check((await texts('.bcv-detail__meta'))[0].includes('Time limit 20 minutes') && (await texts('.bcv-grades__side, .bcv-col .bcv-row')).some((t) => /Attempt 1/.test(t)), 'quiz detail with attempts');
+  await page.waitForSelector('.bcv-qzi', { timeout: 10000 });
+  check((await texts('.bcv-qzi__rule')).some((t) => /Time limit: 20 minutes/.test(t)) && (await texts('.bcv-qzi__attemptn')).some((t) => /Attempt 1/.test(t)), `a quiz in the list opens its intro, as on the Mac: its rules and its attempts (${(await texts('.bcv-qzi__attemptn')).join(' | ')})`);
 
   // modules
   await tab('modules');
@@ -3513,12 +3513,12 @@ try {
 
   // ---- quiz flow (mockup): intro → questions → review → submitted -----------------------------
   console.log('quiz flow');
+  // (2.99.55) a quiz opens on its intro, as on the Mac: no page of facts before it
   await page.goto(`${BASE}/courses/101/quizzes/9011`);
-  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  await page.click('.bcv-detail__actions .bcv-btn--primary');
   await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
-  check(page.url().endsWith('/quizzes/9011?bcv=take') && (await visible('.bcv-side')) && (await visible('.bcv-rail')) && !!(await page.$('.bcv-cmain .bcv-qz.is-embedded')) && !(await page.$eval('html', (e) => e.classList.contains('bcv-quiz'))), 'the quiz intro sits in the course column, under the header beside the rail; nothing folds away yet');
-  check((await texts('.bcv-qz__h1'))[0] === 'Lec06-PreQuiz' && (await texts('.bcv-qz__bullet')).some((t) => /Time limit: 20 minutes/.test(t)) && (await texts('.bcv-qz__begin'))[0] === 'Begin attempt', 'intro card lists the quiz settings');
+  check(page.url().endsWith('/quizzes/9011') && (await visible('.bcv-side')) && (await visible('.bcv-rail')) && !!(await page.$('.bcv-cmain .bcv-qz.is-embedded')) && !(await page.$eval('html', (e) => e.classList.contains('bcv-quiz'))), 'the quiz intro sits in the course column, under the header beside the rail; nothing folds away yet');
+  const introParts = await page.evaluate(() => ({ heads: [...document.querySelectorAll('.bcv-qzi__sechead')].map((e) => e.textContent), facts: [...document.querySelectorAll('.bcv-qzi__fact')].map((e) => e.textContent).join(' · '), note: document.querySelector('.bcv-qzi__note')?.textContent || '', buttons: [...document.querySelectorAll('.bcv-qzi__bar .bcv-qzi__btn')].map((b) => b.textContent).join('|') }));
+  check((await texts('.bcv-qz__title'))[0] === 'Lec06-PreQuiz' && (await texts('.bcv-qzi__rule')).some((t) => /Time limit: 20 minutes/.test(t)) && (await texts('.bcv-qz__begin'))[0] === 'Begin Attempt' && /^\d+ questions? · \d+ points? · (Due|No due date)/.test(introParts.facts) && introParts.heads.includes('Rules') && introParts.buttons === 'Begin Attempt', `the intro as the Mac's: its facts, the attempts line, Rules, and Begin Attempt alone at the foot (${JSON.stringify(introParts)})`);
   check((await texts('.bcv-qz__clock'))[0] === '20 min', 'timer pill shows the limit before the attempt starts');
   await shot(page, '22c-quiz-intro');
   check((await page.$eval('.bcv-qz__begin', (e) => getComputedStyle(e).color)) === 'rgb(255, 255, 255)', 'Begin reads white on its blue (a plain class used to lose to `#bcv-app button { color: inherit }`)');
@@ -3624,7 +3624,7 @@ try {
   page.once('dialog', (d) => d.dismiss());
   await page.click('#bcv-q3 .bcv-qz__qtext a');
   await page.waitForTimeout(400);
-  check(page.url().endsWith('/quizzes/9011?bcv=take') && (await page.$('.bcv-qz__page--all')), 'leaving mid-attempt asks first; cancelling stays');
+  check(page.url().endsWith('/quizzes/9011') && (await page.$('.bcv-qz__page--all')), 'leaving mid-attempt asks first; cancelling stays');
   await page.click('.bcv-qz__foot .bcv-qz__btn--primary');
   await page.waitForSelector('.bcv-qz__sum', { timeout: 5000 });
   const sums = await texts('.bcv-qz__sum');
@@ -3754,13 +3754,10 @@ try {
   await page.waitForSelector('.bcv-qz__done', { timeout: 5000 });
   check((await texts('.bcv-qz__h1'))[0] === 'Attempt submitted', 'Back to receipt returns to the submitted screen');
   await page.click('.bcv-qz__donebtns .bcv-qz__big:last-child');
-  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check(page.url() === `${BASE}/courses/101/quizzes/9011` && (await texts('.bcv-grades__side, .bcv-col .bcv-row')).some((t) => /Attempt 1/.test(t)), 'back to the quiz page, which now lists the attempt');
-  // attempt limits: one attempt allowed and one used → no Take button anywhere, feedback instead
-  check((await texts('.bcv-detail__actions .bcv-badge'))[0] === 'No attempts left · 1 attempt allowed' && (await texts('.bcv-detail__actions .bcv-btn')).join(',') === 'See feedback,Open in Canvas' && /Attempts 1 of 1 used/.test((await texts('.bcv-detail'))[0]), `the quiz page refuses a second attempt: ${(await texts('.bcv-detail__actions'))[0]}`);
-  await page.goto(`${BASE}/courses/101/quizzes/9011?bcv=take`);
-  await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
-  check((await texts('.bcv-qz__begin'))[0] === 'See your feedback' && (await texts('.bcv-qz__bullet')).some((t) => /No attempts left — this quiz allows 1 attempt\./.test(t)) && (await texts('.bcv-qz__note'))[0] === '1 attempt used of 1', 'the intro cannot start another attempt either; it offers the feedback');
+  await page.waitForSelector('.bcv-qzi', { timeout: 10000 });
+  check(page.url() === `${BASE}/courses/101/quizzes/9011` && (await texts('.bcv-qzi__attemptn')).some((t) => /Attempt 1/.test(t)) && (await texts('.bcv-qzi__sechead')).includes('Your Attempt'), 'back to the quiz, whose intro now lists the attempt (Your Attempt)');
+  // attempt limits: one attempt allowed and one used → no way to begin; See Feedback alone, as on the Mac
+  check((await texts('.bcv-qz__begin'))[0] === 'See Feedback' && (await texts('.bcv-qzi__bar .bcv-qzi__btn')).join('|') === 'See Feedback' && (await texts('.bcv-qzi__note'))[0] === 'Your one attempt is used', `the intro cannot start another attempt; it offers the feedback alone: ${(await texts('.bcv-qzi__bar .bcv-qzi__btn')).join('|')} · ${(await texts('.bcv-qzi__note'))[0]}`);
   // (and when Canvas's results page cannot be read, nothing is made up in its place: a question's points
   // are the ones it earned, never "/ 0", and nothing claims the instructor left no solution)
   await mockConfig({ quizHistory: false });
@@ -3777,11 +3774,8 @@ try {
   // A quiz Canvas locks seals each answer as you pass it and cannot be gone back to. It is taken
   // here like any other now — the sealing is what the screen enforces, and it says so.
   await page.goto(`${BASE}/courses/101/quizzes/9014`);
-  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check((await texts('.bcv-detail__actions .bcv-btn')).join(',') === 'Take the quiz,Open in Canvas' && (await texts('.bcv-detail')).join(' ').includes('seals each question once you leave it'), `a quiz that locks its questions has the same Take button as any other, and says what the sealing means: ${(await texts('.bcv-detail__actions'))[0]}`);
-  await page.click('.bcv-detail__actions .bcv-btn--primary');
   await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
-  check((await texts('.bcv-qz__bullet')).some((t) => /One question at a time, and you cannot go back/.test(t)) && (await texts('.bcv-qz__begin'))[0] === 'Begin attempt', 'the intro says one at a time and no going back; Begin starts the attempt here');
+  check((await texts('.bcv-qzi__rule')).some((t) => /sealed once you leave it/.test(t)) && (await texts('.bcv-qzi__rule')).some((t) => /One question at a time, with no going back/.test(t)) && (await texts('.bcv-qz__begin'))[0] === 'Begin Attempt', `a quiz that locks its questions has the same Begin as any other, its rules saying what the sealing means: ${(await texts('.bcv-qzi__rule')).join(' | ')}`);
   // a slow quiz page: the popup opens at once with a pill per question and the first filling as the progress bar — no skeleton
   await noteApi('POST', '/__mock/config', { quizPageDelay: 900 });
   await page.click('.bcv-qz__begin');
@@ -3804,10 +3798,8 @@ try {
   oq = await noteApi('GET', `/__mock/quizsub/${oqSub.id}`);
   check(oq.read['90141'] === true && oq.flags['90141'] === true && (await page.$('.bcv-qz__pill:first-child:disabled')) && (await page.$('.bcv-qz__pill:first-child.is-answered.is-flagged')) && (await page.$('.bcv-qz__pill:nth-child(2).is-current')), 'Next posted Canvas\'s record-answer form: question 1 is marked read (and locked here), the flag went through the API, question 2 came from the next page');
   await page.click('.bcv-qz__exit');
-  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check(page.url() === `${BASE}/courses/101/quizzes/9014` && (await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Resume attempt', 'Save and exit keeps the attempt open: the quiz page offers to resume it');
-  await page.click('.bcv-detail__actions .bcv-btn--primary');
-  await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
+  await page.waitForSelector('.bcv-qzi', { timeout: 10000 });
+  check(page.url() === `${BASE}/courses/101/quizzes/9014` && (await texts('.bcv-qz__begin'))[0] === 'Continue Attempt' && / · started /.test((await texts('.bcv-qzi__note'))[0] || ''), `Save and exit keeps the attempt open: the intro offers to continue it (${(await texts('.bcv-qzi__note'))[0]})`);
   await page.click('.bcv-qz__begin');
   await page.waitForSelector('.bcv-qz__opt', { timeout: 10000 });
   check((await texts('.bcv-qz__qnum'))[0] === 'Question 2' && (await page.$('.bcv-qz__pill:first-child.is-answered:disabled')) && (await texts('.bcv-qz__answered'))[0].startsWith('1 of 4 answered'), 'resuming lands on the first unread question, as Canvas decides, with question 1 still counted as answered');
@@ -3844,10 +3836,11 @@ try {
   check((await page.$$('.bcv-qfb__q')).length === 4 && oneYours.includes('-3.15 m/s') && oneYours.includes('3.15'), `feedback for a one-at-a-time quiz: the attempt's own question set, the answers from the graded history: ${oneYours.join(' | ')}`);
   // a quiz graded before today (seeded): its attempt row opens the feedback, with the instructor's comment
   await page.goto(`${BASE}/courses/101/quizzes/9001`);
-  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check((await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'See feedback' && (await texts('.bcv-detail__actions .bcv-badge'))[0] === 'No attempts left · 1 attempt allowed' && (await page.$eval('.bcv-col .bcv-row[href]', (a) => a.getAttribute('href'))) === '/courses/101/quizzes/9001?bcv=feedback&attempt=1', 'a used-up quiz leads to its feedback from the button and the attempt row');
+  await page.waitForSelector('.bcv-qzi', { timeout: 10000 });
+  const usedUp = await page.evaluate(() => ({ btns: [...document.querySelectorAll('.bcv-qzi__bar .bcv-qzi__btn')].map((b) => b.textContent).join('|'), rows: [...document.querySelectorAll('.bcv-qzi__attempt')].map((r) => r.textContent) }));
+  check(usedUp.btns === 'See Feedback' && usedUp.rows.length === 1 && /^Attempt 1/.test(usedUp.rows[0]) && /13 \/ 16/.test(usedUp.rows[0]), `a used-up quiz's intro: its attempt with its score, and See Feedback alone (${JSON.stringify(usedUp)})`);
   await mockConfig({ staleFlag: true }); // (every right/wrong flag gone stale, as after a regrade: the points decide)
-  await page.click('.bcv-col .bcv-row[href]');
+  await page.goto(`${BASE}/courses/101/quizzes/9001?bcv=feedback&attempt=1`);
   await page.waitForSelector('.bcv-qfb__q', { timeout: 10000 });
   const fbLine2 = (await texts('.bcv-fb__scoreline'))[0];
   const fbComments = await texts('.bcv-fb__ctext');
@@ -3857,8 +3850,8 @@ try {
   await mockConfig({ staleFlag: false });
   await shot(page, '22j-quiz-feedback-seeded');
   await page.click('.bcv-fb__btns .bcv-qz__big--primary');
-  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check(new URL(page.url()).pathname === '/courses/101/quizzes/9001' && (await texts('.bcv-detail__title'))[0] === 'Lec01-PreQuiz', `Back to the quiz goes to the quiz's own page, not the course: ${page.url()} · ${(await texts('.bcv-detail__title'))[0]}`);
+  await page.waitForSelector('.bcv-qzi', { timeout: 10000 });
+  check(new URL(page.url()).pathname === '/courses/101/quizzes/9001' && (await texts('.bcv-qz__title'))[0] === 'Lec01-PreQuiz', `Back to the quiz goes to the quiz's own intro, not the course: ${page.url()} · ${(await texts('.bcv-qz__title'))[0]}`);
   // (2.98.64) Canvas's own results page for an attempt (/history) is the same feedback, not Canvas's old page
   await page.goto(`${BASE}/courses/101/quizzes/9001/history?version=1`);
   await page.waitForSelector('.bcv-qfb__q', { timeout: 10000 });
@@ -3869,9 +3862,9 @@ try {
   // well) still says which answers were right
   await mockConfig({ held: ['1001'] });
   await page.goto(`${BASE}/courses/101/quizzes/9001`);
-  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  const mutedPage = await page.evaluate(() => ({ btns: [...document.querySelectorAll('.bcv-detail__actions .bcv-btn')].map((b) => b.textContent.trim()), badges: [...document.querySelectorAll('.bcv-detail__actions .bcv-badge')].map((b) => b.textContent.trim()), scores: [...document.querySelectorAll('.bcv-col .bcv-row .bcv-badge')].map((b) => b.textContent.trim()) }));
-  check(!mutedPage.btns.includes('See feedback') && mutedPage.badges.includes('Results not released yet') && mutedPage.scores.length > 0 && mutedPage.scores.every((t) => t === '—'), `a quiz whose grade is not posted offers no feedback and shows no score: ${JSON.stringify(mutedPage)}`);
+  await page.waitForSelector('.bcv-qzi', { timeout: 10000 });
+  const mutedPage = await page.evaluate(() => ({ btns: [...document.querySelectorAll('.bcv-qzi__bar .bcv-qzi__btn')].map((b) => `${b.textContent}${b.disabled ? ' (off)' : ''}`), scores: [...document.querySelectorAll('.bcv-qzi__score')].map((b) => b.textContent), why: [...document.querySelectorAll('.bcv-qzi__why')].map((b) => b.textContent) }));
+  check(!mutedPage.btns.some((b) => /Feedback/.test(b)) && mutedPage.btns.join('|') === 'No Attempts Left (off)' && mutedPage.scores.length === 0 && mutedPage.why.join('|') === 'Hidden', `a quiz whose grade is not posted offers no feedback and shows no score: ${JSON.stringify(mutedPage)}`);
   const mutedAt = async (url) => {
     await page.goto(url);
     await page.waitForSelector('.bcv-qfb__withheld, .bcv-qfb__q', { timeout: 10000 });
@@ -3894,13 +3887,11 @@ try {
   await page.waitForSelector('.bcv-row', { timeout: 10000 });
   check(await page.$$eval('.bcv-row', (els) => els.some((e) => /Lec08-PreQuiz/.test(e.textContent) && /Access code/.test(e.textContent))), 'the quiz list says which quiz needs an access code');
   await page.goto(`${BASE}/courses/102/quizzes/10019`);
-  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check((await texts('.bcv-detail__title'))[0] === 'Lec08-PreQuiz' && /Restrictions Access code/.test((await texts('.bcv-detail'))[0]), 'the quiz page names the restriction');
-  await page.click('.bcv-detail__actions .bcv-btn--primary');
   await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
-  check((await texts('.bcv-qz__bullet')).some((t) => /needs an access code from your instructor/.test(t)) && (await page.$('.bcv-qz__code')) !== null && (await texts('.bcv-qz__begin'))[0] === 'Enter the access code' && (await page.$eval('.bcv-qz__begin', (b) => b.disabled)), 'the intro says an access code is needed, offers the field, and Begin waits for it');
+  check((await texts('.bcv-qz__title'))[0] === 'Lec08-PreQuiz' && (await texts('.bcv-qzi__sechead')).includes('Access Code') && (await texts('.bcv-qzi__caption')).includes('Your instructor gives the code. It stays with this attempt.') && (await page.$('.bcv-qz__code')) !== null && (await texts('.bcv-qz__begin'))[0] === 'Begin Attempt' && (await page.$eval('.bcv-qz__begin', (b) => b.disabled)), 'the intro asks for the access code in a section of its own, and Begin Attempt waits (greyed out) for it, keeping its name');
+  check(await eventually(() => page.evaluate(() => document.activeElement?.classList.contains('bcv-qz__code')), 2000), 'the code field is ready to type in');
   await page.fill('.bcv-qz__code', 'nope');
-  check(await eventually(async () => !(await page.$eval('.bcv-qz__begin', (b) => b.disabled)) && (await texts('.bcv-qz__begin'))[0] === 'Begin attempt', 2000), 'a code typed turns Begin on');
+  check(await eventually(async () => !(await page.$eval('.bcv-qz__begin', (b) => b.disabled)) && (await texts('.bcv-qz__begin'))[0] === 'Begin Attempt', 2000), 'a code typed turns Begin on');
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => /refused/.test(document.querySelector('.bcv-qz__codeerr')?.textContent || ''), null, { timeout: 10000 });
   check((await texts('.bcv-qz__codeerr'))[0] === 'That access code was refused. Check it with your instructor.' && (await page.$('.bcv-qz__opt')) === null, 'a wrong code is refused, in words');
@@ -3917,7 +3908,7 @@ try {
   const tab2 = await context.newPage();
   await tab2.goto(`${BASE}/courses/102/quizzes/10019?bcv=take`);
   await tab2.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
-  check((await tab2.$eval('.bcv-qz__begin', (b) => b.disabled)) && (await tab2.$eval('.bcv-qz__begin', (b) => b.textContent.trim())) === 'Enter the access code', 'resumed in another tab, the attempt asks for the code again before continuing');
+  check((await tab2.$eval('.bcv-qz__begin', (b) => b.disabled)) && (await tab2.$eval('.bcv-qz__begin', (b) => b.textContent.trim())) === 'Continue Attempt', 'resumed in another tab, the attempt asks for the code again before continuing');
   await tab2.fill('.bcv-qz__code', 'PHYS8');
   await tab2.click('.bcv-qz__begin');
   await tab2.waitForSelector('.bcv-qz__opt', { timeout: 10000 });
@@ -3943,15 +3934,15 @@ try {
   page.once('dialog', leaveRestricted);
   await page.goto(`${BASE}/courses/102/quizzes/10019`);
   page.off('dialog', leaveRestricted);
-  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  await page.waitForSelector('.bcv-qzi', { timeout: 10000 });
   // a code Canvas does not even announce: the refusal at Begin brings the field
   await page.goto(`${BASE}/courses/102/quizzes/10022?bcv=take`);
   await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
-  check((await page.$('.bcv-qz__code')) === null && (await texts('.bcv-qz__begin'))[0] === 'Begin attempt' && !(await page.$eval('.bcv-qz__begin', (b) => b.disabled)), 'a quiz whose code Canvas does not announce opens with Begin and no field');
+  check((await page.$('.bcv-qz__code')) === null && (await texts('.bcv-qz__begin'))[0] === 'Begin Attempt' && !(await page.$eval('.bcv-qz__begin', (b) => b.disabled)), 'a quiz whose code Canvas does not announce opens with Begin and no field');
   await page.click('.bcv-qz__begin');
   await page.waitForSelector('.bcv-qz__codeerr', { timeout: 10000 });
   await page.waitForFunction(() => document.activeElement?.classList.contains('bcv-qz__code'), null, { timeout: 3000 });
-  check((await texts('.bcv-qz__codeerr'))[0] === 'This quiz needs an access code. Enter it above, then begin.' && (await page.$('.bcv-qz__opt')) === null && (await texts('.bcv-qz__begin'))[0] === 'Enter the access code', 'Canvas refuses: the field appears with the words, the cursor in it, and Begin waits');
+  check((await texts('.bcv-qz__codeerr'))[0] === 'This quiz needs an access code. Enter it above, then begin.' && (await page.$('.bcv-qz__opt')) === null && (await texts('.bcv-qz__begin'))[0] === 'Begin Attempt' && (await page.$eval('.bcv-qz__begin', (b) => b.disabled)), 'Canvas refuses: the field appears with the words, the cursor in it, and Begin waits');
   await page.fill('.bcv-qz__code', 'PHYS9');
   await page.click('.bcv-qz__begin');
   await page.waitForSelector('.bcv-qz__opt', { timeout: 10000 });
@@ -3959,18 +3950,15 @@ try {
   page.once('dialog', leaveRestricted);
   await page.goto(`${BASE}/courses/102/quizzes/10022`);
   page.off('dialog', leaveRestricted);
-  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  await page.waitForSelector('.bcv-qzi', { timeout: 10000 });
   } // restricted quiz
   if (on('survey')) {
 
   // ---- a graded survey: no right answers, points for taking part, its own words --------------------
   console.log('survey');
   await page.goto(`${BASE}/courses/102/quizzes/10020`);
-  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check((await texts('.bcv-detail__title'))[0] === 'EXTRA POINTS 1' && /Type Graded survey/.test((await texts('.bcv-detail'))[0]) && (await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Take the survey', 'a graded survey is listed as one, and the button says survey');
-  await page.click('.bcv-detail__actions .bcv-btn--primary');
   await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
-  check(/4 questions · 2 points for taking part/.test((await texts('.bcv-qz__lead'))[0]) && (await texts('.bcv-qz__bullet')).some((t) => /no right answers/.test(t)) && (await texts('.bcv-qz__begin'))[0] === 'Begin survey', 'the intro says what a survey is: no right answers, the points for taking part, Begin survey');
+  check((await texts('.bcv-qz__title'))[0] === 'EXTRA POINTS 1' && (await texts('.bcv-qzi__fact')).join(' · ').startsWith('4 questions · 2 points for taking part') && (await texts('.bcv-qzi__rule')).some((t) => /no right answers/.test(t)) && (await texts('.bcv-qz__begin'))[0] === 'Begin Survey', 'the intro says what a survey is: no right answers, the points for taking part, Begin Survey');
   await page.click('.bcv-qz__begin');
   await page.waitForSelector('.bcv-qz__opt', { timeout: 10000 });
   for (const i of [0, 1, 2]) await page.click(`#bcv-q${i} .bcv-qz__opt:nth-child(1)`);
@@ -3992,9 +3980,7 @@ try {
   // answered here now, and go up in the shapes Canvas's own API asks for.
   console.log('quiz: matching and blanks');
   await noteApi('POST', '/__mock/config', { richQuestions: true });
-  await page.goto(`${BASE}/courses/101/quizzes/9001`);
-  await page.waitForSelector('.bcv-detail__actions .bcv-btn--primary', { timeout: 20000 });
-  await page.click('.bcv-detail__actions .bcv-btn--primary'); // to the quiz's own intro
+  await page.goto(`${BASE}/courses/101/quizzes/9001`); // (its intro, at once)
   await page.waitForSelector('.bcv-qz__begin', { timeout: 20000 });
   await page.click('.bcv-qz__begin');
   await page.waitForSelector('.bcv-qz__pill', { timeout: 20000 });
@@ -4114,12 +4100,13 @@ try {
   // from the assignment submission's history. The open one carries the best score so far, which is an
   // earlier attempt's: it must not be shown against the attempt still being taken.
   await page.goto(`${BASE}/courses/101/quizzes/9001`);
-  await page.waitForSelector('.bcv-col .bcv-row[href]', { timeout: 20000 });
-  const attempts = await page.$$eval('.bcv-col .bcv-row[href]', (els) => els.map((e) => ({ t: e.textContent.replace(/\s+/g, ' ').trim(), href: e.getAttribute('href') })));
-  check(attempts.length === 2 && /^Attempt 1Finished.*13 \/ 16$/.test(attempts[0].t) && attempts[0].href === '/courses/101/quizzes/9001?bcv=feedback&attempt=1' && attempts[1].t === 'Attempt 2In progress—' && /bcv=take$/.test(attempts[1].href), `both attempts are listed, the one in play without a score that is not its own: ${attempts.map((x) => x.t).join(' | ')}`);
-  check(/2 of 5 used · attempt 2 in progress/.test(await page.$eval('.bcv-detail__meta, .bcv-detail', (e) => e.textContent)), `the header counts the attempt being taken: ${(await page.$eval('.bcv-detail', (e) => e.textContent)).match(/\d+ of \d+ used[^·]*(· attempt \d+ in progress)?/)?.[0]}`);
+  await page.waitForSelector('.bcv-qzi', { timeout: 20000 });
+  await page.waitForSelector('.bcv-qzi__attempt', { timeout: 20000 });
+  const attempts = await texts('.bcv-qzi__attempt');
+  check(attempts.length === 1 && /^Attempt 1.*13 \/ 16$/.test(attempts[0].replace(/\s+/g, ' ')), `the finished attempt is listed with its own score; the one in play is not given the best score so far: ${attempts.join(' | ')}`);
+  check(/^Attempt 2 of 5 · started .* · 3 more after this one$/.test((await texts('.bcv-qzi__note'))[0] || '') && (await texts('.bcv-qz__begin'))[0] === 'Continue Attempt', `the attempts line counts the attempt being taken, and the button continues it: ${(await texts('.bcv-qzi__note'))[0]}`);
   // and the earlier one opens, with its own score rather than the best so far
-  await page.click('.bcv-col .bcv-row[href*="attempt=1"]');
+  await page.goto(`${BASE}/courses/101/quizzes/9001?bcv=feedback&attempt=1`);
   await page.waitForSelector('.bcv-fb__scoreline', { timeout: 15000 });
   check(/^13 \/ 16 /.test((await texts('.bcv-fb__scoreline'))[0]) && (await page.$$('.bcv-qfb__q')).length >= 4, `an earlier attempt opens its own feedback: ${(await texts('.bcv-fb__scoreline'))[0]}`);
   // its points and marks from its own results page: Canvas's page opens on the latest attempt, and an
@@ -4164,7 +4151,7 @@ try {
   await page.waitForSelector('.bcv-qz__done', { timeout: 20000 });
   await noteApi('POST', '/__mock/config', { richQuestions: false });
   await page.goto(`${BASE}/courses/101/quizzes/9001`);
-  await page.waitForSelector('.bcv-qz__intro, .bcv-detail__title', { timeout: 20000 });
+  await page.waitForSelector('.bcv-qzi', { timeout: 20000 });
   } // quiz: matching and blanks
   if (on('native pages')) {
 
@@ -5375,7 +5362,7 @@ try {
   await page.goto(`${BASE}/courses/101/quizzes/9001`); // with the look still off, then turn it on here
   await page.waitForSelector('#application', { timeout: 10000 });
   await setSettings({ appearance: { skin: true } });
-  await page.waitForSelector('.bcv-detail__title', { timeout: 20000 });
+  await page.waitForSelector('.bcv-qzi', { timeout: 20000 });
   await sw.evaluate(async (base) => (await fetch(`${base}/__mock/reopen-quiz`, { method: 'POST', body: JSON.stringify({ quizId: '9001' }) })).ok, BASE);
   await sw.evaluate(async (base) => {
     const [tab] = await chrome.tabs.query({ url: `${base}/*` });
@@ -7873,7 +7860,7 @@ try {
     const [tab] = await chrome.tabs.query({ url: `${base}/*` });
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => document.dispatchEvent(new Event('visibilitychange')) });
   }, BASE);
-  await page.click('.bcv-qz__h1');
+  await page.click('.bcv-qzi__title');
   check(!(await quizNav) && !(await page.$('.bcv-toast')) && !(await page.$('#bcv-away')) && (await page.$('.bcv-qz__begin')) !== null, 'a quiz is left alone by the stale-page reload: no pill, nothing reloads and nothing is said');
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-stat', { timeout: 20000 });
@@ -8505,7 +8492,7 @@ try {
   const keptQ1 = await liveAnswer(90011);
   check(!lostFirst && handedIn && Number(keptQ1) === 900111, `Submit sends a lost answer again before handing the attempt in: ${JSON.stringify({ lostFirst, handedIn, keptQ1 })}`);
   await page.goto(`${BASE}/courses/101/quizzes/9001`);
-  await page.waitForSelector('.bcv-detail__title', { timeout: 15000 });
+  await page.waitForSelector('.bcv-qzi', { timeout: 15000 });
   await mockConfig({ richQuestions: false, moreTypes: false });
   // The simulation quiz (2.98.31): Open in the Quiz tab lands a Canvas tab on it — every Classic kind, nothing sent to Canvas
   await options.bringToFront();
@@ -8520,7 +8507,7 @@ try {
   page.on('request', simWatch);
   await page.goto(`${BASE}/?bcv=simquiz`);
   await page.waitForSelector('.bcv-qz__begin[data-begin]:not([disabled])', { timeout: 20000 });
-  check((await texts('.bcv-qz__h1'))[0] === 'Simulation quiz' && /12 questions · 27 points/.test((await texts('.bcv-qz__lead'))[0] || ''), `the simulation's intro: every kind, 27 points: ${(await texts('.bcv-qz__lead'))[0]}`);
+  check((await texts('.bcv-qz__title'))[0] === 'Simulation quiz' && /^12 questions · 27 points/.test((await texts('.bcv-qzi__fact')).join(' · ')), `the simulation's intro: every kind, 27 points: ${(await texts('.bcv-qzi__fact')).join(' · ')}`);
   await page.click('.bcv-qz__begin');
   await page.waitForSelector('.bcv-qz__pill', { timeout: 15000 });
   check((await page.$$('.bcv-qz__pill')).length === 12 && (await texts('.bcv-qz__sub'))[0] === 'Simulation · nothing goes to Canvas' && !(await page.isVisible('.bcv-qz__raw')), 'twelve questions, the header says it is the simulation, and there is no Canvas page to go to');
@@ -8561,7 +8548,7 @@ try {
   page.off('request', simWatch);
   check(!simHits.length, `and nothing of it went to Canvas: ${simHits.join(' ')}`);
   await page.click('.bcv-qz__exit');
-  await page.waitForSelector('.bcv-qz__intro', { timeout: 15000 });
+  await page.waitForSelector('.bcv-qzi', { timeout: 15000 });
   // Storage: every key, its size, opened in place, filtered
   await options.bringToFront();
   await options.click('#devTabs [data-pane="storage"]');

@@ -85,9 +85,7 @@ try {
     await shot(`web-calendar${sfx}`);
     // a quiz, a question at a time: begun, the first answer picked
     await page.goto(`${BASE}/courses/101/quizzes/9011`);
-    await page.waitForSelector('.bcv-detail__actions .bcv-btn--primary', { timeout: 20000 });
-    await page.click('.bcv-detail__actions .bcv-btn--primary');
-    await page.waitForSelector('.bcv-qz__begin', { timeout: 20000 });
+    await page.waitForSelector('.bcv-qz__begin', { timeout: 20000 }); // (the quiz opens on its intro)
     await page.click('.bcv-qz__begin');
     await page.waitForSelector('.bcv-qz__opt', { timeout: 20000 });
     await page.waitForTimeout(900);

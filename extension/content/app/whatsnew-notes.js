@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.55', date: '2026-10-19', notes: [
+      { kind: 'improved', title: 'Quizzes Like the Mac', body: 'A quiz opens on its intro; New Attempt starts it.', icon: P.check },
+    ] },
     { version: '2.99.54', date: '2026-10-19', notes: [
       { kind: 'improved', title: 'Widgets Open on Click', body: 'A pinned tool opens under its pin, as on the Mac.', icon: P.pin },
     ] },
