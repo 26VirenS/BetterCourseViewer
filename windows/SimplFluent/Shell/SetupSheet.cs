@@ -100,7 +100,7 @@ public sealed class SetupSheet
             if (Launch.IsDevelopment && Launch.Flag("setup-first")) d.Done = false;
             foreach (var c in d.Courses)
             {
-                if (c.On) chosen.Add(c.Id);
+                if (c.On && d.Done) chosen.Add(c.Id); // (0.3.40) a first run ticks nothing: the student picks the courses they take; run again, it starts from those chosen then
                 nicknames[c.Id] = c.Nickname ?? "";
                 targets[c.Id] = string.IsNullOrEmpty(c.Target) ? "A+" : c.Target;
             }

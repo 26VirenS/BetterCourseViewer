@@ -1,6 +1,7 @@
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Text.Json;
 
 namespace Simpl.Support;
 
@@ -33,6 +34,12 @@ public sealed record SavedLogin(string Host, string User, DateTime SavedAt, bool
 /// it. Its prompt cancelled, it is not asked again by itself this run until the student asks: Start Over, signing in by
 /// hand, Settings.
 /// <para/>
+/// (0.3.40) Windows Hello asked as seldom as it can be: once it has opened the password (or the password was just typed
+/// at "Stay logged in?", or locked as it was used), this PC is trusted with it for 30 days — a copy sealed by the vault
+/// alone (login.bin.trust: this PC's TPM and Windows, no prompt) gives it back without asking until then, across runs.
+/// Let go when the 30 days are up, the sign-in is kept anew or forgotten, the school refuses the password, or Settings
+/// locks it again.
+/// <para/>
 /// login.bin is held in memory only as sealed, and opened each time it is asked for. The browser underneath never sees
 /// it: WebView2's own password saving and autofill are off (Engine). A development run (the mock, a demo, a picture)
 /// keeps nothing past the run and never asks Windows Hello. An earlier Simpl kept it in Windows' Credential Manager as
@@ -57,6 +64,10 @@ public static class LoginVault
     private static readonly UnlockGate Once = new(OpenWithHello);
     /// <summary>The lock under way (Settings', or one as the sign-in is used): asked for again meanwhile, it is awaited.</summary>
     private static Task<HelloResult>? locking;
+    private const string TrustPurpose = "login-trust";
+    /// <summary>(0.3.40) How long this PC is trusted with the password after Windows Hello has given it.</summary>
+    private static readonly TimeSpan TrustFor = TimeSpan.FromDays(30);
+    private static string TrustPath => AppPaths.Login + ".trust";
     /// <summary>login.bin's bytes, sealed, once read (null: none kept).</summary>
     private static byte[]? kept;
     private static bool read;
@@ -98,6 +109,7 @@ public static class LoginVault
     /// <summary>The school refused the saved password (a wrong or changed one): what this run held of it let go.</summary>
     public static void Refused()
     {
+        Untrust();
         if (!Once.Holds) return;
         Once.Wipe();
         Log.Write("sign-in: the password held for this run let go (the school did not take it)");
@@ -117,9 +129,15 @@ public static class LoginVault
         var r = Record(out _);
         if (r == null) return null;
         if (!r.LockedWithHello) return r.Pass;
+        if (!Once.Holds && Trusted(r) is { } trusted)
+        {
+            Log.Write("sign-in: opened without asking Windows Hello (this PC trusted with it for 30 days since it last answered)");
+            return trusted;
+        }
         var held = Once.Holds;
         var pass = await Once.OpenAsync(reason);
         if (held && pass != null) Log.Write("sign-in: opened without asking Windows Hello again (held since it answered this run)");
+        else if (pass != null) Trust(r, pass);
         return pass;
     }
 
@@ -204,6 +222,7 @@ public static class LoginVault
             if (ok && record.LockedWithHello) Once.Hold(pass);
             else Once.AskAgain();
         }
+        if (ok && record.LockedWithHello) Trust(record, pass);
         if (ok) Log.Write(record.LockedWithHello ? "sign-in: kept, locked with Windows Hello" : $"sign-in: kept in the vault{(record.Hello is { } why ? $" ({why}: not locked with Windows Hello)" : "")}");
         Changed?.Invoke();
         return ok;
@@ -280,6 +299,9 @@ public static class LoginVault
             if (ok && hold && next.LockedWithHello) Once.Hold(r.Pass);
         }
         if (!ok) return HelloResult.Failed;
+        // (locked as it was used: trusted for 30 days, as one Windows Hello opened; locked from Settings: the next sign-in
+        //  asks Windows Hello, as one who has just locked it expects)
+        if (hold && next.LockedWithHello) Trust(next, r.Pass); else Untrust();
         if (result == HelloResult.Success) Log.Write("sign-in: locked with Windows Hello");
         Changed?.Invoke();
         return result;
@@ -331,6 +353,44 @@ public static class LoginVault
         Once.Wipe();
         try { File.Delete(AppPaths.Login); } catch (Exception e) { Log.Write("sign-in: login.bin could not be deleted: " + e.Message); }
         try { File.Delete(AppPaths.Login + ".tmp"); } catch { }
+        Untrust();
+    }
+
+    // ---- (0.3.40) this PC trusted with the password for 30 days ----
+
+    private sealed record TrustRecord(string Host, string User, DateTime SavedAt, string Pass, DateTime Until);
+
+    /// <summary>The password, sealed by the vault alone for 30 days, beside the saved sign-in it belongs to.</summary>
+    private static void Trust(LoginRecord r, string pass)
+    {
+        var json = JsonSerializer.SerializeToUtf8Bytes(new TrustRecord(r.Host, r.User, r.SavedAt, pass, DateTime.UtcNow + TrustFor));
+        try { Vault.Write(TrustPath, json, TrustPurpose); }
+        catch (Exception e) { Log.Write("sign-in: the 30 days' trust could not be kept: " + e.Message); }
+        finally { CryptographicOperations.ZeroMemory(json); }
+    }
+
+    /// <summary>The trusted password for this saved sign-in, while its 30 days last; else null (and let go when it is
+    /// out of date or belongs to another).</summary>
+    private static string? Trusted(LoginRecord r)
+    {
+        byte[]? plain = null;
+        try
+        {
+            if (!File.Exists(TrustPath)) return null;
+            plain = Vault.Open(File.ReadAllBytes(TrustPath), TrustPurpose);
+            var t = plain == null ? null : JsonSerializer.Deserialize<TrustRecord>(plain);
+            if (t != null && t.Host == r.Host && t.User == r.User && t.SavedAt == r.SavedAt && t.Until > DateTime.UtcNow) return t.Pass;
+            Untrust();
+            return null;
+        }
+        catch { return null; }
+        finally { if (plain != null) CryptographicOperations.ZeroMemory(plain); }
+    }
+
+    private static void Untrust()
+    {
+        try { File.Delete(TrustPath); } catch { }
+        try { File.Delete(TrustPath + ".tmp"); } catch { }
     }
 
     /// <summary>

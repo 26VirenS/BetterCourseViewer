@@ -528,7 +528,7 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
                 K.Button("Sign-in options", () => Engine.Engine.OpenExternally(new Uri("ms-settings:signinoptions")))));
         v.Children.Add(group);
         var foot = locked
-            ? "Locked with Windows Hello: Simpl asks for your face, fingerprint or PIN before it signs you in. Kept on this PC only, never synced."
+            ? "Locked with Windows Hello: Simpl asks for your face, fingerprint or PIN at most once every 30 days. Kept on this PC only, never synced."
             : saved != null ? "Kept on this PC only, encrypted, never synced."
             : hello == true ? "Saved sign-ins stay on this PC only, locked with Windows Hello."
             : "Saved sign-ins stay on this PC only.";

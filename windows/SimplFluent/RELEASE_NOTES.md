@@ -1,3 +1,8 @@
+**What's new in 0.3.40** (beta)
+
+- **Windows Hello, far less often** — once your face, fingerprint or PIN has opened your saved sign-in, Simpl doesn't ask again for 30 days. It asks sooner only if you sign in anew, forget the sign-in, your school stops taking the password, or you lock it again in Settings.
+- **Setup: pick your courses** — the first setup starts with no courses ticked, so you choose the ones you're taking instead of unticking old ones.
+
 **What's new in 0.3.39** (beta)
 
 - **Macmillan Learning, the math keyboard** — on a question answered with an expression (θ = arctan…), Macmillan's math keyboard now sits under the answer field instead of on top of it, and the question below moves down to make room.

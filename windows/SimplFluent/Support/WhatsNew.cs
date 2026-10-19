@@ -26,6 +26,9 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.40", "2026-10-19",
+            ("improved", "Fewer PIN Prompts", "Windows Hello asks at most once every 30 days."),
+            ("improved", "Pick Your Courses", "Setup starts with no courses ticked.")),
         R("0.3.39", "2026-10-19",
             ("fixed", "Math Keyboard", "Macmillan's math keyboard sits under the answer."),
             ("fixed", "Final Score", "A finished Macmillan assignment shows its score.")),
