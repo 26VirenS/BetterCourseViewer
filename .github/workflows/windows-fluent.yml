@@ -323,11 +323,12 @@ jobs:
           Shot 'school-picker-light' '1024x681' 8 @('--appearance', 'light')
           Shot 'school-search' '1024x681' 10 @('--appearance', 'light', '--picker-query', 'state')
           Shot 'school-confirm' '1024x681' 10 @('--appearance', 'dark', '--picker-query', 'state', '--picker-confirm')
-          # signing in (the mock with --login): the card, a wrong password, "Logging you in", "Stay logged in?", a page
+          # signing in (the mock with --login): the card (given 22 s: at 14 the sign-in page had once not painted yet on a
+          # busy runner, and the picture came out blank), a wrong password, "Logging you in", "Stay logged in?", a page
           # finished by hand (a one-time code)
-          Shot 'sign-in-dark' '1024x681' 14 ($login + @('--appearance', 'dark'))
-          Shot 'sign-in-light' '1024x681' 14 ($login + @('--appearance', 'light'))
-          Shot 'sign-in-light-wide' '1366x778' 14 ($login + @('--appearance', 'light'))
+          Shot 'sign-in-dark' '1024x681' 22 ($login + @('--appearance', 'dark'))
+          Shot 'sign-in-light' '1024x681' 22 ($login + @('--appearance', 'light'))
+          Shot 'sign-in-light-wide' '1366x778' 22 ($login + @('--appearance', 'light'))
           Shot 'sign-in-wrong' '1024x681' 16 ($login + @('--appearance', 'light', '--sign-in', 'student:wrong'))
           Shot 'sign-in-working' '1024x681' 14 ($login + @('--appearance', 'light', '--sign-in', 'slow:demo'))
           Shot 'sign-in-stay' '1024x681' 40 ($login + @('--appearance', 'dark', '--sign-in', 'student:demo'))
