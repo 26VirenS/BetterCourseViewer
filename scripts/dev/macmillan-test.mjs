@@ -114,6 +114,16 @@ try {
   check(q2 && q2.picLeft >= q2.leftRight && q2.lefts.length === 1 && q2.tops.every((t, i, a) => i === 0 || t > a[i - 1]) && q2.right <= q2.width && Math.abs(q2.picTop - q2.tops[0]) < 60, `a picture up the right, the question then its answers down the left: ${JSON.stringify(q2)}`);
   await page.setViewportSize({ width: 1000, height: 720 });
 
+  // (Mac 1.3.120) a number's unit beside its field, not across the page; a picture pressed shows large, Escape puts it away
+  await sac().evaluate(() => window.__simplMacmillan('go', 1));
+  await until(async () => (await last())?.index === 0);
+  const unit = await sac().evaluate(() => { const f = document.querySelector('.numeric-entry-border').getBoundingClientRect(), u = [...document.querySelectorAll('.numeric-entry-table .graded-equations-td')].pop().getBoundingClientRect(); return Math.round(u.left - f.right); });
+  check(unit >= 0 && unit < 40, `the unit sits beside its field: ${unit}px away`);
+  await sac().click('[data-simpl-pic] img');
+  const zoomed = await until(async () => sac().evaluate(() => { const z = document.getElementById('simpl-mm-zoom'); return z && z.querySelector('img').getBoundingClientRect().width > 300; }));
+  await sac().evaluate(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  check(zoomed && (await sac().evaluate(() => !document.getElementById('simpl-mm-zoom'))), 'a picture pressed shows large over the page, and Escape puts it away');
+
   // (Mac 1.3.119) a part of Macmillan's that draws its own (a labelling with its answer bank): in dark kept as drawn on a
   // white plate, its words dark, and wider than the page it scrolls in its part rather than being cut
   await sac().evaluate(() => { window.__simplMacmillan('go', 3); window.__simplMacmillan('theme', true); });

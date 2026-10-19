@@ -1,3 +1,7 @@
+**What's new in 0.3.37** (beta)
+
+- **Macmillan Learning, pictures and units** — a number's unit sits right beside its field, the whole question is drawn a little smaller so more of it fits, and a picture shows smaller with a ⤢ badge: click it to see it full size (click or press Escape to close).
+
 **What's new in 0.3.36** (beta)
 
 - **Macmillan Learning, diagrams and widgets** — a question with a picture keeps the picture on the right and the question with its answers down the left, whatever layout Macmillan gives it; parts that draw themselves (a labelling with its answer bank, a graph) stay readable in dark on a white plate and scroll in place instead of being cut off; nothing of the page runs past the right edge.
