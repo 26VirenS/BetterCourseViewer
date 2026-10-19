@@ -175,6 +175,24 @@ final class SearchPalette: ObservableObject {
             built = commandSections(typed, engine)
         } else {
             built = (sections: plainSections(typed, engine), job: nil)
+            // (1.3.136) as the web box does: from the second letter, after a pause, everything in the school answers under the
+            // field — assignments, announcements, pages, discussions, files, people — before Return is pressed
+            let words = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            if words.count >= 2, !words.hasPrefix(Self.mark), QuickSum.answer(words) == nil {
+                let base = built.sections
+                lookup = Task { [weak self] in
+                    guard let self else { return }
+                    let found = await self.everything(words, engine: engine)
+                    guard !Task.isCancelled, self.seq == mine, !found.isEmpty else { return }
+                    var out = base
+                    let shown = Set(base.map(\.title))
+                    let found = found.filter { !shown.contains($0.title) } // (the courses and groups the app holds, listed already)
+                    guard !found.isEmpty else { return }
+                    let at = out.firstIndex(where: { $0.title == "Search" }) ?? out.endIndex
+                    out.insert(contentsOf: found, at: at)
+                    self.publish(out)
+                }
+            }
         }
         publish(built.sections)
         guard let job = built.job else { return }
@@ -623,6 +641,18 @@ final class SearchPalette: ObservableObject {
         case .grades(let q):
             guard await grades(engine) != nil else { return nil } // (the sidebar's scores stay)
             return PaletteSection(title: "Grades", items: gradeItems(q, engine))
+        }
+    }
+
+    /// (1.3.136) The school searched for what is typed, each kind its own section under the field (five rows at most).
+    private func everything(_ q: String, engine: Engine) async -> [PaletteSection] {
+        try? await Task.sleep(nanoseconds: 280_000_000) // (a pause in the typing before the school is asked)
+        guard !Task.isCancelled, let d = try? await engine.call("search", ["q": q], as: SearchData.self) else { return [] }
+        return d.groups.compactMap { g in
+            let items = g.rows.prefix(5).enumerated().map { i, r in
+                PaletteItem(id: "r.\(g.title).\(i).\(r.id)", title: r.title, sub: r.sub, symbol: SearchGlyph.of(g.title), color: r.color, trailing: r.external == true ? "↗" : nil, action: .open(url: r.url, title: r.title, external: r.external == true))
+            }
+            return items.isEmpty ? nil : PaletteSection(title: g.title, items: Array(items))
         }
     }
 

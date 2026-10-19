@@ -476,6 +476,7 @@ ui_review() {
   MODE=light SIZE=1440x900 shoot light-01h-dashboard-cards-wide 14 -SimplDashView cards
   MODE=light shoot light-01u-counter-unread 30 -SimplSheet unread # (1.3.80: up to 30 seconds for its list, as the others)
   MODE=light shoot light-30b-palette-sum 14 -SimplOpen "palette:12*4"
+  MODE=light shoot light-30d-palette-instant 20 -SimplOpen "palette:quiz" # (1.3.136: the school's results under the field before Return)
   MODE=light shoot light-29b-tour-search 16 -SimplOpen tour:5
   MODE=light shoot light-27b-tour-offer 8 -SimplOpen touroffer
   MODE=light shoot light-18b-quiz-code 22 -SimplOpen quiz:102:10019
