@@ -131,9 +131,12 @@ try {
   // page while the app shows it, its buttons pressed from the app; given back, it shows as drawn; gone, the app is told
   const dlg = await sac().evaluate(async () => {
     window.__simplMacmillanGlass = true;
+    window.__simplMacmillan('state');
+    await new Promise((r) => setTimeout(r, 400));
     const wrap = document.createElement('div');
     wrap.innerHTML = '<div style="position: fixed; top: 0px; left: 0px; width: 100%; height: 100%; z-index: 1050; background: rgba(0, 0, 0, 0.5);"><div role="dialog" id="react-aria-modal-dialog" class="sac-modal" aria-labelledby="modal-title"><div class="modal-solution-container"><div class="modal-title-container-borderless"><h1 id="modal-title">  </h1><button data-test-id="close-modal-x" id="close-modal-x" aria-label="Close Modal"><svg width="15" height="15" viewBox="0 0 24 24"><polygon points="1 1 2 2"></polygon></svg><span class="sr-only">Close modal</span></button></div><div id="solution-modal-content" class="content solution"><svg width="200" height="152" viewBox="0 0 200 152"><circle cx="100" cy="76" r="50" fill="#d8f1f5"></circle></svg><p data-test-id="modal-body-text" class="message attempts solution">You solved it  in 1 attempt!</p></div><div class="modal-actions" data-test-id="modal-actions"><button id="solution-modal-view-solution" class="modal-button cdl-button secondary">View Solution</button><button id="solution-modal-next-item" class="modal-button cdl-button primary">Next Question</button></div></div></div></div>';
     document.body.appendChild(wrap);
+    const instant = getComputedStyle(wrap.firstElementChild).display === 'none'; // (Mac 1.3.124: never seen, not even for a moment)
     window.__pressed = [];
     wrap.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => window.__pressed.push(b.id)));
     const posted = () => window.__msgs.filter((m) => m.kind === 'dialog').slice(-1)[0];
@@ -147,9 +150,9 @@ try {
     wrap.remove();
     for (let i = 0; i < 40 && posted().open; i++) await new Promise((r) => setTimeout(r, 50));
     window.__simplMacmillanGlass = false;
-    return { open: m && m.open, title: m && m.title, words: m && /You solved it\s+in 1 attempt!/.test(m.html), svg: m && /<svg/.test(m.html), buttons: m && m.buttons.map((b) => `${b.label}${b.primary ? '*' : ''}${b.close ? '(x)' : ''}`).join(' | '), hidden, pressed, shownAgain, closed: posted().open === false };
+    return { instant, open: m && m.open, title: m && m.title, words: m && /You solved it\s+in 1 attempt!/.test(m.html), svg: m && /<svg/.test(m.html), buttons: m && m.buttons.map((b) => `${b.label}${b.primary ? '*' : ''}${b.close ? '(x)' : ''}`).join(' | '), hidden, pressed, shownAgain, closed: posted().open === false };
   });
-  check(dlg.open && dlg.title === '' && dlg.words && dlg.svg && dlg.buttons === 'Close(x) | View Solution | Next Question*' && dlg.hidden && dlg.pressed.join() === 'solution-modal-next-item' && dlg.shownAgain && dlg.closed, `Macmillan's pop-up goes to the app whole — its words, its drawing, Close, View Solution and Next Question (the main one) — hidden in the page meanwhile; the app's press presses Macmillan's; given back it shows; gone, the app is told: ${JSON.stringify(dlg)}`);
+  check(dlg.instant && dlg.open && dlg.title === '' && dlg.words && dlg.svg && dlg.buttons === 'Close(x) | View Solution | Next Question*' && dlg.hidden && dlg.pressed.join() === 'solution-modal-next-item' && dlg.shownAgain && dlg.closed, `Macmillan's pop-up goes to the app whole — its words, its drawing, Close, View Solution and Next Question (the main one) — hidden in the page meanwhile; the app's press presses Macmillan's; given back it shows; gone, the app is told: ${JSON.stringify(dlg)}`);
 
   // (Mac 1.3.119) a part of Macmillan's that draws its own (a labelling with its answer bank): in dark kept as drawn on a
   // white plate, its words dark, and wider than the page it scrolls in its part rather than being cut
@@ -160,6 +163,31 @@ try {
   }));
   check(plate && plate.bg === 'rgb(255, 255, 255)' && plate.chip === 'rgb(34, 34, 34)' && plate.scroll === 'auto', `a widget of Macmillan's own on a white plate in dark, its words as drawn, scrolling in its part: ${JSON.stringify(plate)}`);
   await sac().evaluate(() => window.__simplMacmillan('theme', false));
+
+  // (Mac 1.3.125) an expression's answer: Macmillan's math keyboard, placed by its own sums over the field, laid in under it
+  const pal = await sac().evaluate(async () => {
+    const host = document.querySelector('article.module-container');
+    const art = document.createElement('article'); art.className = 'module-container'; art.id = 'simpl-test-eq';
+    art.innerHTML = '<div class="sl-module" data-module-type="graded_equation"><div class="greq-container"><div class="graded-equations-table"><div class="graded-equations-box graded-equations-nowrap"><span class="mq-editable-field mq-math-mode" style="display:inline-block;width:300px;height:40px;border:2px solid #36c"><span class="mq-root-block"></span></span><div><div class="math-palette as-popup" style="position:absolute;top:-30px;left:40px;width:520px;height:130px;background:#fff"><div class="math-palette-tab-bar">BASIC</div><button class="palette-button">x</button></div></div></div></div></div></div>';
+    host.after(art);
+    await new Promise((r) => setTimeout(r, 200));
+    const f = art.querySelector('.mq-editable-field').getBoundingClientRect(), p = art.querySelector('.math-palette').getBoundingClientRect(), a = art.getBoundingClientRect();
+    art.remove();
+    return { fieldBottom: Math.round(f.bottom), palTop: Math.round(p.top), palH: Math.round(p.height), inside: p.bottom <= a.bottom + 1 && p.right <= innerWidth };
+  });
+  check(pal.palTop >= pal.fieldBottom && pal.palH > 100 && pal.inside, `the math keyboard under the field it types into, never on it: ${JSON.stringify(pal)}`);
+
+  // (Mac 1.3.126) finished: the points give way to the final score as a percentage, and that is the score sent
+  const fin = await sac().evaluate(async () => {
+    const f = document.querySelector('[data-test-id="final-score-fraction"]'), keep = f.outerHTML;
+    f.outerHTML = '<div data-test-id="final-score-percentage" aria-label="Assignment Final Score: 99%"><div><span>99</span><span>%</span></div><div>Final Score</div></div>';
+    window.__msgs.length = 0; window.__simplMacmillan('state');
+    await new Promise((r) => setTimeout(r, 300));
+    const st = window.__msgs.filter((m) => m.kind === 'state').pop();
+    document.querySelector('[data-test-id="final-score-percentage"]').outerHTML = keep;
+    return st && st.score;
+  });
+  check(JSON.stringify(fin) === '[99,100,1]', `a finished assignment's final score read as a percentage: ${JSON.stringify(fin)}`);
 
   // (Mac 1.3.117) Macmillan's two_col_all (each prompt beside its answer): one column, nothing past the edge, the answer a
   // field's width; its tools menu (×10ʸ) a popover in the app's colours, dark in dark

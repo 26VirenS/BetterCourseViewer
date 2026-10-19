@@ -81,11 +81,11 @@ internal static class MacmillanParts
     public static FrameworkElement Rail(MacmillanState s, bool browser, Action<bool> setBrowser, Action<int> go)
     {
         var got = s.Score is { Length: > 0 } sc ? sc[0] : 0;
-        var total = s.Score is { Length: > 1 } sc2 ? sc2[1] : 0;
+        var total = s.Score is { Length: > 1 } sc2 ? sc2[1] : 0; // (0.3.39) finished: a third number marks the final score a percentage
         var count = s.Count ?? s.Items?.Count ?? 0;
         var bar = new ProgressBar { Minimum = 0, Maximum = total > 0 ? total : 1, Value = Math.Min(got, total), Height = 6 };
         var score = K.V(8,
-            K.Columns("*, auto", K.Text("Score", Ty.BodyStrong).Col(0), K.Text(total > 0 ? $"{Number(got)} / {Number(total)}" : "–", Ty.BodyStrong).Col(1)),
+            K.Columns("*, auto", K.Text("Score", Ty.BodyStrong).Col(0), K.Text(total > 0 ? (s.Score!.Length > 2 ? $"{Number(got)}%" : $"{Number(got)} / {Number(total)}") : "–", Ty.BodyStrong).Col(1)),
             bar,
             K.Text($"{s.Completed ?? 0} of {count} questions completed", Ty.Caption, B.Text2));
 

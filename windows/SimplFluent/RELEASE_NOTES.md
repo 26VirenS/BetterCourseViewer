@@ -1,3 +1,8 @@
+**What's new in 0.3.39** (beta)
+
+- **Macmillan Learning, the math keyboard** — on a question answered with an expression (θ = arctan…), Macmillan's math keyboard now sits under the answer field instead of on top of it, and the question below moves down to make room.
+- **Macmillan Learning, the final score** — once an assignment is finished, Macmillan shows its final score as a percentage instead of points; that score is now read and shown instead of a dash.
+
 **What's new in 0.3.38** (beta)
 
 - **Macmillan Learning, pictures on a narrower window** — a question's picture is a smaller preview on a narrower window, and measured as drawn so it never runs past the right edge, whatever width Macmillan draws it at.

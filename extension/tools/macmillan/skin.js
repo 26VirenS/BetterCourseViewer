@@ -63,6 +63,8 @@
   var ROWS = ''; for (var n = 1; n <= 60; n++) ROWS += 'html.simpl-mm .parent-module-container[data-simpl-rows="' + n + '"]{grid-template-rows:repeat(' + n + ',auto) 1fr}';
   var SKIN =
     'html.simpl-mm .simpl-mm-dlghide{display:none!important}' + // (Mac 1.3.123: Macmillan's pop-up, drawn by the app instead)
+    // (Mac 1.3.124) and never seen for a moment before the skin reads it: hidden by the stylesheet the instant it is on the page
+    'html.simpl-mm.simpl-mm-glass:not(.simpl-mm-dlgpage) div[style*="position: fixed"]:has(> #react-aria-modal-dialog, > [role="dialog"].sac-modal){display:none!important}' +
     'html.simpl-mm{--mm-ink:#1c1c1e;--mm-ink2:rgba(60,60,67,.62);--mm-card:rgba(255,255,255,.74);--mm-line:rgba(0,0,0,.07);--mm-field:rgba(255,255,255,.92);--mm-good:#1a6b30;--mm-good-bg:rgba(52,199,89,.16);--mm-bad:#c01d43;--mm-bad-bg:rgba(255,59,48,.13);--mm-good-line:rgba(52,199,89,.35);--mm-bad-line:rgba(255,59,48,.3);--mm-on:#fff;--mm-accent:#0a84ff;--mm-accent-ring:rgba(10,132,255,.25);--mm-field2:rgba(0,0,0,.04);--mm-pop:#fff;--mm-rim:rgba(255,255,255,.7);color-scheme:light}' +
     'html.simpl-mm.simpl-mm-dark{--mm-ink:#f2f2f7;--mm-ink2:rgba(235,235,245,.62);--mm-card:rgba(255,255,255,.075);--mm-line:rgba(255,255,255,.11);--mm-field:rgba(255,255,255,.09);--mm-good:#5ddb7d;--mm-good-bg:rgba(52,199,89,.2);--mm-bad:#ff8098;--mm-bad-bg:rgba(255,69,58,.2);--mm-good-line:rgba(93,219,125,.45);--mm-bad-line:rgba(255,128,152,.4);--mm-on:#0b2a14;--mm-accent:#409cff;--mm-accent-ring:rgba(64,156,255,.3);--mm-field2:rgba(255,255,255,.08);--mm-pop:#2c2c2e;--mm-rim:rgba(255,255,255,.08);color-scheme:dark}' +
     'html.simpl-mm,html.simpl-mm body{background:transparent!important;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif!important}' +
@@ -134,6 +136,11 @@
     // (Mac 1.3.117) a number's answer, one field sized as a field (it stretched across the page): its frame the field, the
     // box inside it clear; ×10 and the power in the app's ink
     'html.simpl-mm .numeric-entry-table{width:auto!important;max-width:100%!important}' +
+    // (Mac 1.3.125) an expression's answer (θ = arctan…): Macmillan places its math keyboard by sums that know nothing of
+    // the zoom above, so it landed on the field it types into — laid in under the field instead, the words below moving
+    // down to make room, whole and inside the page
+    'html.simpl-mm .math-palette.as-popup{position:relative!important;inset:auto!important;transform:none!important;translate:none!important;margin:10px 0 4px!important;max-width:100%!important;white-space:normal!important;box-sizing:border-box!important;border-radius:12px!important;overflow:hidden!important;box-shadow:0 0 0 1px rgba(0,0,0,.12),0 6px 20px rgba(0,0,0,.16)!important;z-index:1!important}' +
+    'html.simpl-mm .graded-equations-box:has(.math-palette){white-space:normal!important;max-width:100%!important}' +
     'html.simpl-mm .numeric-entry-table .graded-equations-td{width:auto!important}' + // (Mac 1.3.120: its cells their own size — the unit beside the field, not across the page)
     'html.simpl-mm .numeric-entry-table .graded-equations-td.not-considered-in-grading-module-frame{width:auto!important}' +
     'html.simpl-mm .numeric-entry-border{width:15em!important;max-width:100%!important;box-sizing:border-box!important;background:var(--mm-field)!important;border:1px solid var(--mm-line)!important;border-radius:10px!important;box-shadow:0 1px 2px rgba(0,0,0,.06)!important}' +
@@ -264,6 +271,11 @@
     });
     var scoreEl = tid('final-score-fraction');
     var sm = ((scoreEl && scoreEl.getAttribute('aria-label')) || '').match(/(\d+(?:\.\d+)?) out of (\d+(?:\.\d+)?)/);
+    // (Mac 1.3.126) finished, the points give way to the final score as a percentage ("Assignment Final Score: 99%"): sent
+    // as 99 of 100, marked as a percentage (the third number)
+    var pctEl = sm ? null : tid('final-score-percentage');
+    var pm = ((pctEl && pctEl.getAttribute('aria-label')) || '').match(/(\d+(?:\.\d+)?)\s*%/);
+    if (pm) sm = [null, pm[1], '100', '%'];
     var done = completedOf();
     var main = tid('btn-sac-main');
     var att = tid('attempts-dropdown-button');
@@ -275,7 +287,7 @@
     return {
       kind: 'state', page: 'question', dark: dark, title: title, index: Number(m[1] || 0) - 1, count: Number(m[2] || items.length),
       completed: done[1] ? Number(done[1]) : items.filter(function (i) { return i.state === 'success'; }).length,
-      score: sm ? [Number(sm[1]), Number(sm[2])] : null, policies: policies(), items: items,
+      score: sm ? (sm[3] === '%' ? [Number(sm[1]), 100, 1] : [Number(sm[1]), Number(sm[2])]) : null, policies: policies(), items: items,
       main: main ? (main.getAttribute('aria-label') || words(main)) : null, mainOn: !!(main && !main.disabled),
       tools: { resources: !!q('[aria-label="Open Resources"]'), tutor: !!q('[aria-label="Open AI Tutor"]'), solution: !!q('[aria-label="Open Solution"]'), layout: !!tid('switch-to-new-layout') },
       attempts: att ? { label: words(att), choices: choices } : null, results: results, verdict: verdict,
@@ -286,6 +298,8 @@
   var last = '';
   var timer = 0;
   function report() {
+    // (Mac 1.3.124) a pop-up just come is read at once, not after the settle: the app's card comes with no wait
+    if (window.__simplMacmillanGlass && skinned && !lastDlg && dlgNow()) dialogReport();
     clearTimeout(timer);
     timer = setTimeout(function () {
       // (Mac 1.3.115) only the player itself says what it shows: a frame of its own inside it (a widget) never does, or
@@ -314,7 +328,7 @@
   function dialogReport() {
     if (!window.__simplMacmillanGlass) return;
     var d = skinned ? dlgNow() : null;
-    if (!d) { if (lastDlg) { lastDlg = ''; dlgInPage = false; post({ kind: 'dialog', open: false }); } return; }
+    if (!d) { if (lastDlg) { lastDlg = ''; dlgInPage = false; document.documentElement.classList.remove('simpl-mm-dlgpage'); post({ kind: 'dialog', open: false }); } return; }
     var ov = dlgOverlay(d);
     if (dlgInPage) { ov.classList.remove('simpl-mm-dlghide'); return; }
     ov.classList.add('simpl-mm-dlghide');
@@ -340,7 +354,7 @@
       case 'main': return click(tid('btn-sac-main'));
       // (Mac 1.3.123) the pop-up's buttons, and the pop-up given back to the page
       case 'dialog': return click(dlgButtons(dlgNow())[Number(arg)]);
-      case 'dialogPage': { dlgInPage = true; var d = dlgNow(); if (d) dlgOverlay(d).classList.remove('simpl-mm-dlghide'); post({ kind: 'dialog', open: true, inPage: true }); return true; }
+      case 'dialogPage': { dlgInPage = true; document.documentElement.classList.add('simpl-mm-dlgpage'); var d = dlgNow(); if (d) dlgOverlay(d).classList.remove('simpl-mm-dlghide'); post({ kind: 'dialog', open: true, inPage: true }); return true; }
       case 'resources': return click(q('[aria-label="Open Resources"]'));
       case 'tutor': return click(q('[aria-label="Open AI Tutor"]'));
       case 'solution': return click(q('[aria-label="Open Solution"]'));
