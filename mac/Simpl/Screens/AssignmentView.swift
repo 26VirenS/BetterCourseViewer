@@ -206,10 +206,13 @@ struct AssignmentView: View {
         }
     }
 
-    // MARK: - The left: what to read, what was handed in, what was said
+    // MARK: - The left: what was handed in, what was said, what to read
 
     private func mainColumn(_ d: AssignmentData) -> some View {
         VStack(alignment: .leading, spacing: 32) {
+            // (1.3.118) what was handed in and what was said first, the instructions after them
+            workSection(d)
+            commentsSection(d)
             if !d.html.isEmpty {
                 PageSection(title: "Instructions") {
                     RichText(html: d.html, size: 15, placeholder: true) // (its words at once, natively, while the page draws them)
@@ -219,8 +222,6 @@ struct AssignmentView: View {
                         .card()
                 }
             }
-            workSection(d)
-            commentsSection(d)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
