@@ -67,7 +67,7 @@ final class MacmillanSession: ObservableObject {
             // (1.3.116) light or dark as the app is, from the page's first moment (told again by setDark)
             let dark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             self.dark = dark
-            config.userContentController.addUserScript(WKUserScript(source: "window.__simplMacmillanDark = \(dark ? "true" : "false");", injectionTime: .atDocumentStart, forMainFrameOnly: false))
+            config.userContentController.addUserScript(WKUserScript(source: "window.__simplMacmillanDark = \(dark ? "true" : "false"); window.__simplMacmillanGlass = true;", injectionTime: .atDocumentStart, forMainFrameOnly: false))
             config.userContentController.addUserScript(skin)
         }
         let r = MacmillanRelay()

@@ -131,12 +131,20 @@ struct MacmillanScreen: View {
 
     /// (1.3.116) The page skinned now: the assessment player's cover or question, Show Browser off.
     private var skinned: Bool { !session.browser && (session.state?.isQuestion == true || session.state?.isCover == true) }
+    /// (1.3.119) A question shown skinned: laid on the app's own glass panel.
+    private var glassPanel: Bool { !session.browser && session.state?.isQuestion == true }
 
     private var page: some View {
         ZStack {
-            // (1.3.116) skinned, laid on the popup's glass; as Macmillan draws it (Show Browser, another kind), on white
+            // (1.3.116) skinned, laid on the popup's glass; as Macmillan draws it (Show Browser, another kind), on white.
+            // (1.3.119) The question on a panel of real glass the app draws (the page clear over it, its own panel put
+            // away: the skin's simpl-mm-glass), inset from the popup's edges
             MacmillanPageHost(web: session.web)
-                .background(skinned ? Color.clear : Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: glassPanel ? 22 : 0, style: .continuous))
+                .background {
+                    if glassPanel { Color.clear.glassCard(radius: 22) } else if !skinned { Color.white }
+                }
+                .padding(glassPanel ? 16 : 0)
             // (1.3.114) the cover as a start screen, over the page, until Open Assignment
             if let s = session.state, s.isCover, let c = s.cover, !session.browser {
                 MacmillanStartScreen(cover: c) { Task { await session.act("open") } }

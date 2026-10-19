@@ -23,10 +23,12 @@ const QUESTIONS = [
   ] },
   { parts: [
     ['text', 'A 2 kg book rests on a table.'],
+    ['picture', 'A book resting on a table, its weight drawn down and the table’s push drawn up.'],
     ['choice', 'What is the net force on the book?', ['0 N', '2 N', '9.8 N', '19.6 N'], 0],
   ] },
   { parts: [
     ['text', 'A ball swings in a vertical circle on a string.'],
+    ['labeling', 'Answer Bank', ['tension', 'weight', 'normal force']],
     ['select', 'Which forces act on the ball at the top of the circle? Select all that apply.', ['the tension in the string', 'the force of gravity (weight)', 'the normal force'], [0, 1]],
   ] },
   { layout: 'two_col_all', parts: [
@@ -81,6 +83,7 @@ function part(p,i,n){
  if(p[0]==='numeric'){var v=a[i]||'';var ok=done?'Correct':(S.attempts[n]&&a['w'+i]?'Incorrect':'');
   // (Mac 1.3.117) as Macmillan's number entry is: a table of the prefix, the field in its frame (its tools menu, ×10ʸ, shown while it is focused), the unit
   return '<article class="module-container" role="group" aria-label="Ungraded Text"><div class="sl-module"><span class="stix-font"><div class="raw-html"><p>'+p[1]+'</p></div></span></div></article><article class="module-container" data-module-id="'+n+i+'" role="group" aria-label="Numeric Entry"><div data-module-type="numeric_entry" class="ne-take-mode sl-module"><div class="numeric-entry-table" style="width:100%"><div class="graded-equations-td"><label><span data-test-id="equation-prefix" class="stix-font">'+p[2]+'</span></label></div><div class="graded-equations-td not-considered-in-grading-module-frame" style="width:100%"><div class="'+(ok?'module-graded-'+(ok==='Correct'?'correct':'incorrect'):'')+'">'+(ok?'<div data-test-id="result-frame-'+n+i+'" aria-label="'+ok+'"></div>':'')+'<div class="numeric-entry-border'+(done?' disabled':'')+'"><input class="numeric-entry-input editable" data-i="'+i+'" value="'+v+'"'+(done?' disabled':'')+'></div>'+(ok?'<div class="grading-status">'+ok+'</div>':'')+'</div><div class="numeric-entry-toolmenu" style="display:none" role="toolbar"><span class="tools">tools</span><button data-test-id="sci-not-button" aria-label="Change answer format to or from scientific notation"><span>×10<sup>y</sup></span></button></div></div><div class="graded-equations-td"><span class="stix-font">'+p[3]+'</span></div></div></div></article>';}
+ if(p[0]==='labeling')return '<article class="module-container" role="group" aria-label="Labeling"><div data-module-type="labeling" class="sl-module"><div class="react-resizable" style="height:180px"><div class="sl-labeling" style="width:880px;position:relative"><div style="background:#fff;border:1px solid #ccc;width:300px;position:absolute;right:0;top:0"><div class="mm-bank-head" style="background:#51647a;color:#fff;padding:6px;text-align:center">'+p[1]+'</div>'+p[2].map(function(w){return '<span class="mm-chip" style="display:inline-block;margin:6px;padding:6px 10px;border:1px solid #999;color:#222">'+w+'</span>'}).join('')+'</div></div></div></div></article>';
  if(p[0]==='choice'||p[0]==='select'){var t=p[0]==='choice'?'radio':'checkbox';var h='<article class="module-container" role="group" aria-label="'+(t==='radio'?'Multiple Choice':'Multiple Select')+'"><div data-module-type="'+(t==='radio'?'multiple_choice':'multiple_select')+'"><p>'+p[1]+'</p>';
   p[2].forEach(function(o,k){var on=(a[i]||[]).indexOf(k)>=0;h+='<label><input type="'+t+'" name="q'+n+'p'+i+'" data-i="'+i+'" data-k="'+k+'"'+(on?' checked':'')+(done?' disabled':'')+'> '+o+'</label><br>'});
   return h+'</div></article>';}

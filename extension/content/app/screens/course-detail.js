@@ -743,8 +743,74 @@
     };
     const comments = section('Comments', addBtn, U.el('bcv-asg__commentwrap', [composer, commentsBody]));
 
+    // (2.99.51) what was handed in, as the Mac's Your Work: when, then each file (Preview opens it in the viewer), the
+    // text written or the web address given
+    const workBody = U.el('bcv-asg__panel bcv-asg__work');
+    const workSection = section('Your Work', null, workBody);
+    const drawWork = (x) => {
+      const files = x.attachments || [];
+      const parts = [];
+      if (x.submitted_at) parts.push(h('div', { class: `bcv-asg__worksent${x.late ? ' is-late' : ''}` }, [U.svg('M20 6L9 17l-5-5', { size: 14, stroke: 'currentColor', width: 2.6 }), h('span', { text: `Submitted ${longAt(D0(x.submitted_at))}${x.late ? ' · late' : ''}` })]));
+      for (const f of files) parts.push(h('div', { class: 'bcv-asg__workfile' }, [
+        h('span', { class: 'bcv-asg__workicon', 'aria-hidden': 'true' }, U.svg(IC.doc, { size: 16, stroke: 'currentColor', width: 1.9 })),
+        U.text('bcv-asg__workname bcv-ellip', f.display_name || f.filename || 'File', 'span'),
+        h('button', { type: 'button', class: 'bcv-asg__workprev' }, [U.svg('M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 9a3 3 0 100 6 3 3 0 000-6z', { size: 14, stroke: 'currentColor', width: 2 }), h('span', { text: 'Preview' })]),
+      ]));
+      if (x.body && htmlToText(x.body, 40).trim()) parts.push(U.el('bcv-asg__worktext', [CS().prose(x.body, { cls: 'bcv-asg__prose' })]));
+      if (x.url && x.submission_type === 'online_url') parts.push(h('a', { class: 'bcv-asg__worklink bcv-ellip', href: x.url, target: '_blank', rel: 'noopener', text: x.url }));
+      workBody.replaceChildren(...parts);
+      // each Preview to its own file
+      [...workBody.querySelectorAll('.bcv-asg__workprev')].forEach((b, i) => { b.onclick = () => BCV.viewer?.open(files[i], { canvas: true, from: b }); });
+      workSection.hidden = !parts.length;
+    };
+    drawWork(s);
+
+    // (2.99.51) See Feedback, as the Mac's: a sheet over the page, the work handed in on the left (Canvas's own preview of
+    // the file, or the text written), the comments on the right
+    function openFeedback(x, from) {
+      const files = x.attachments || [];
+      let at = 0;
+      const doc = U.el('bcv-fbs__doc');
+      const drawDoc = () => {
+        const f = files[at];
+        if (f && f.preview_url) doc.replaceChildren(h('iframe', { class: 'bcv-fbs__frame', src: f.preview_url, title: f.display_name || 'Your file', allow: 'fullscreen' }));
+        else if (f) doc.replaceChildren(U.el('bcv-fbs__nodoc', [U.text('bcv-fbs__nodoctext', 'This file has no preview here.', 'div'), h('button', { type: 'button', class: 'bcv-btn', text: 'Open the file', onclick: () => BCV.viewer?.open(f, { canvas: true }) })]));
+        else if (x.body) doc.replaceChildren(U.el('bcv-fbs__text', [CS().prose(x.body, { cls: 'bcv-asg__prose' })]));
+        else doc.replaceChildren(U.el('bcv-fbs__nodoc', [U.text('bcv-fbs__nodoctext', x.submitted_at ? 'Nothing to preview for this hand-in.' : 'Nothing was handed in.', 'div')]));
+      };
+      drawDoc();
+      const tabs = files.length > 1 ? U.el('bcv-fbs__tabs', files.map((f, i) => h('button', { type: 'button', class: `bcv-fbs__tab${i === at ? ' is-on' : ''}`, text: f.display_name || `File ${i + 1}`, onclick: (e) => { at = i; drawDoc(); e.currentTarget.parentNode.querySelectorAll('.bcv-fbs__tab').forEach((t, k) => t.classList.toggle('is-on', k === i)); } }))) : null;
+      const list = (x.submission_comments || []).slice().sort((p, q) => String(p.created_at).localeCompare(String(q.created_at)));
+      const side = U.el('bcv-fbs__side', [
+        U.el('bcv-fbs__sidehead', [h('h3', { class: 'bcv-fbs__sidetitle', text: 'Comments' }), list.length ? U.text('bcv-fbs__count', String(list.length), 'span') : null]),
+        list.length ? U.el('bcv-fbs__comments', list.map((cm) => U.el('bcv-fbs__comment', [
+          U.el('bcv-fbs__commenthead', [U.text('bcv-fbs__who', cm.author_name || cm.author?.display_name || 'Someone', 'span'), cm.attempt ? U.text('bcv-fbs__attempt', `Attempt ${cm.attempt}`, 'span') : null]),
+          cm.created_at ? U.text('bcv-fbs__when', U.fmtAt(cm.created_at), 'div') : null,
+          U.text('bcv-fbs__said', cm.comment || '', 'div'),
+        ]))) : U.text('bcv-fbs__none', 'No comments yet.', 'div'),
+      ]);
+      const close = () => { ov.classList.add('is-closing'); document.removeEventListener('keydown', onKey, true); setTimeout(() => ov.remove(), 180); from?.focus?.({ preventScroll: true }); };
+      const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } };
+      const sheet = U.el('bcv-fbs', [
+        U.el('bcv-fbs__head', [
+          h('span', { class: 'bcv-fbs__tile', 'aria-hidden': 'true' }, U.svg(IC.disc, { size: 16, stroke: 'currentColor', width: 2.1 })),
+          U.el('bcv-fbs__titles', [U.text('bcv-fbs__title', 'Feedback', 'div'), U.text('bcv-fbs__sub bcv-ellip', a.name, 'div')]),
+          h('button', { type: 'button', class: 'bcv-fbs__close', text: 'Close', onclick: close }),
+        ]),
+        U.el('bcv-fbs__body', [U.el('bcv-fbs__left', [tabs, doc]), side]),
+      ], { role: 'dialog', 'aria-modal': 'true', 'aria-label': `Feedback: ${a.name}` });
+      const ov = U.el('bcv-fbs-ov', [sheet], { style: courseVars(c) });
+      ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+      document.addEventListener('keydown', onKey, true);
+      (document.getElementById('bcv-app') || document.body).append(ov);
+      sheet.querySelector('.bcv-fbs__close').focus({ preventScroll: true });
+    }
+    const feedbackBtn = (x) => (x.submitted_at || (x.submission_comments || []).length || postedOf(x)
+      ? h('button', { type: 'button', class: 'bcv-asg__seefb', onclick: (e) => openFeedback(current, e.currentTarget) }, [U.svg(IC.disc, { size: 15, stroke: 'currentColor', width: 2 }), h('span', { text: 'See Feedback' })])
+      : null);
+
     // the right-hand side: the big action, the grade, the details
-    const LETTERS = [[93, 'A'], [90, 'A-'], [87, 'B+'], [83, 'B'], [80, 'B-'], [77, 'C+'], [73, 'C'], [70, 'C-'], [67, 'D+'], [60, 'D'], [0, 'F']];
+    const LETTERS = [[97, 'A+'], [93, 'A'], [90, 'A-'], [87, 'B+'], [83, 'B'], [80, 'B-'], [77, 'C+'], [73, 'C'], [70, 'C-'], [67, 'D+'], [60, 'D'], [0, 'F']];
     const letterOf = (x, p) => (a.grading_type === 'letter_grade' && x.grade ? String(x.grade) : p === null ? '' : LETTERS.find(([m]) => p >= m)[1]);
     function gradeRing(x) {
       const p = pct(x), tone = toneOf(p), f = Math.max(0, Math.min(1, (Number(x.score) || 0) / Math.max(1, Number(a.points_possible) || 1)));
@@ -769,13 +835,15 @@
       const parts = [];
       // a tool's graded page still opens the tool, as the Mac's Open Tool does
       if (isTool && postedOf(x) && !lockedNow()) parts.push(h('button', { type: 'button', class: 'bcv-asg__primary bcv-detail__tool', onclick: (e) => launchTool(e.currentTarget) }, [U.svg(IC.tool, { size: 16, stroke: 'currentColor', width: 2.2 }), h('span', { text: 'Open Tool' })]));
+      const fb = feedbackBtn(x);
+      if (fb) parts.push(fb);
       if (postedOf(x)) parts.push(U.el('bcv-asg__panel bcv-asg__gradep', [h('div', { class: 'bcv-asg__panelk', text: 'Grade' }), U.el('bcv-asg__graderow', [gradeRing(x), act]), classLine()]));
       else parts.push(act);
       parts.push(factsEl(x));
       return U.el('bcv-asg__rail', parts);
     }
     let railNow = railEl(s);
-    const left = U.el('bcv-asg__left', [instructions, comments]);
+    const left = U.el('bcv-asg__left', [workSection, comments, instructions]); // (2.99.51: the work and what was said, then what was asked)
     const colsEl = U.el('bcv-asg__cols', [railNow, left]); // (the grade read before the instructions; drawn on the right when wide)
     const page = U.el('bcv-asg', [top, headEl, colsEl].filter(Boolean), { style: { '--bcv-cc': c.color || 'var(--bcv-blue)', '--bcv-cc-ink': c.palette?.text || c.color || 'var(--bcv-blue)' } });
     /** Drawn again from a fresher submission (a tool's grade landing): the status, the action, the grade and the facts, in place. */
@@ -785,6 +853,7 @@
       statusNow.replaceWith(st2); railNow.replaceWith(r2);
       statusNow = st2; railNow = r2;
       drawComments(x);
+      drawWork(x);
     };
     main.replaceChildren(U.card(page, 'bcv-card--22 bcv-asg__card'));
     // opened to hand in (a To Do row's Submit, ?bcv=submit): the panel grows out of the pill once the page is up

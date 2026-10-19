@@ -20,6 +20,7 @@ const at = (dayOffset, hour = 23, minute = 59) => {
   return d.toISOString();
 };
 const ago = (ms) => new Date(now.getTime() - ms).toISOString();
+const past = (iso) => (iso && new Date(iso) > now && new Date(iso) - now < 24 * 3600e3 ? ago(3600e3) : iso);
 // a day as Canvas names an all-day event's day (all_day_date), local to the maker
 const ymd = (dayOffset) => { const d = new Date(now); d.setDate(d.getDate() + dayOffset); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 // the session's CSRF token, as Canvas keeps it: in the _csrf_token cookie, URL-encoded (base64 has + / =)
@@ -87,7 +88,7 @@ const A = {
     ['2004', 'W3 HW', 'Homework', 15, null, 6, 23.98, null, { description: `<p>Work the set on <a href="http://localhost:${simPort}/sim?from=webassign">WebAssign</a>, then upload your written solutions here. The <a href="/courses/102/files/f21">formula sheet</a> is in Files.</p>` }], // (a site the instructions send you to — on the suite's own second origin — and a same-site file link, which is no tool)
   ],
   103: [
-    ['3001', 'Prelab 2', 'Prelabs', 15, 15, -4, 23.98, -5, {}],
+    ['3001', 'Prelab 2', 'Prelabs', 15, 15, -4, 23.98, -5, { gradedNow: true }], // (graded a minute ago: whatever the weekday, something is graded this week)
     ['3002', 'Prelab 3', 'Prelabs', 15, null, 3, 23.98, null, {}],
   ],
   104: [
@@ -136,7 +137,9 @@ function assignmentObj(courseId, row) {
   const submitted = subDay !== null || (earned !== null && !extra.noSub); // (noSub: marked with nothing ever handed in — a tool's score sent back, a teacher's entry — as Canvas then reports it: graded, no submitted_at, missing)
   const submission = {
     id: `s${id}`, assignment_id: id, user_id: '7', workflow_state: earned !== null ? 'graded' : submitted ? 'submitted' : 'unsubmitted', score: earned, grade: earned === null ? null : extra.gradingType === 'pass_fail' ? (earned > 0 ? 'complete' : 'incomplete') : String(earned),
-    submitted_at: subDay !== null ? at(subDay, 15, 52) : (earned !== null && !extra.noSub ? at(dueDay - 1, 16, 1) : null), graded_at: earned !== null ? at(extra.gradedDay ?? dueDay, 8, 0) : null,
+    // (a time of day today later than now is put an hour back: run after midnight, "today at 8:00" was still to come, and
+    // a grade or hand-in from the future dropped out of every "recently" list)
+    submitted_at: past(subDay !== null ? at(subDay, 15, 52) : (earned !== null && !extra.noSub ? at(dueDay - 1, 16, 1) : null)), graded_at: earned !== null ? (extra.gradedNow ? ago(60e3) : past(at(extra.gradedDay ?? dueDay, 8, 0))) : null,
     // Canvas posts a grade separately from marking it; one assignment here is marked but held back
     posted_at: earned !== null ? (extra.held || (mockConfig.held || []).includes(String(id)) ? null : at(dueDay, 8, 5)) : null, // (POST /__mock/config {"held": ["1001"]} holds one back for a test: a quiz Canvas calls muted)
     late: !!extra.late, missing: !submitted && new Date(due) < now, excused: !!extra.excused || !!(mockConfig.excused || []).includes(String(id)), attempt: submitted ? 1 : null, // (POST /__mock/config {"excused": ["4002"]} excuses an assignment for a test)

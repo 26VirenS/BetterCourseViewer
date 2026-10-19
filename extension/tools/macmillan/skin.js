@@ -60,6 +60,7 @@
   // away, so it ran under the edge (a scroll bar along the foot) and its right column — the diagram, in a two-column
   // question — was cut off. The sheet fills the width now; the two columns kept side by side, the picture on the right,
   // and one column when narrow.
+  var ROWS = ''; for (var n = 1; n <= 60; n++) ROWS += 'html.simpl-mm .parent-module-container[data-simpl-rows="' + n + '"]{grid-template-rows:repeat(' + n + ',auto) 1fr}';
   var SKIN =
     'html.simpl-mm{--mm-ink:#1c1c1e;--mm-ink2:rgba(60,60,67,.62);--mm-card:rgba(255,255,255,.74);--mm-line:rgba(0,0,0,.07);--mm-field:rgba(255,255,255,.92);--mm-good:#1a6b30;--mm-good-bg:rgba(52,199,89,.16);--mm-bad:#c01d43;--mm-bad-bg:rgba(255,59,48,.13);--mm-good-line:rgba(52,199,89,.35);--mm-bad-line:rgba(255,59,48,.3);--mm-on:#fff;--mm-accent:#0a84ff;--mm-accent-ring:rgba(10,132,255,.25);--mm-field2:rgba(0,0,0,.04);--mm-pop:#fff;--mm-rim:rgba(255,255,255,.7);color-scheme:light}' +
     'html.simpl-mm.simpl-mm-dark{--mm-ink:#f2f2f7;--mm-ink2:rgba(235,235,245,.62);--mm-card:rgba(255,255,255,.075);--mm-line:rgba(255,255,255,.11);--mm-field:rgba(255,255,255,.09);--mm-good:#5ddb7d;--mm-good-bg:rgba(52,199,89,.2);--mm-bad:#ff8098;--mm-bad-bg:rgba(255,69,58,.2);--mm-good-line:rgba(93,219,125,.45);--mm-bad-line:rgba(255,128,152,.4);--mm-on:#0b2a14;--mm-accent:#409cff;--mm-accent-ring:rgba(64,156,255,.3);--mm-field2:rgba(255,255,255,.08);--mm-pop:#2c2c2e;--mm-rim:rgba(255,255,255,.08);color-scheme:dark}' +
@@ -77,25 +78,39 @@
     'html.simpl-mm .parent-module-container{min-height:0!important;height:auto!important;padding:0!important;display:flow-root!important}' +
     'html.simpl-mm [copyrightmessagestyle]{position:static!important;transform:none!important;left:auto!important;top:auto!important}' +
     'html.simpl-mm [data-test-id="copyright-box"]{font-size:11px!important;color:var(--mm-ink2)!important;margin:0 0 6px!important}' +
+    // (Mac 1.3.119) never wider than the view: nothing of the page runs past its right edge
+    'html.simpl-mm,html.simpl-mm body{overflow-x:hidden!important;max-width:100vw!important}' +
+    'html.simpl-mm :is(#root,#sac,#main,.raptor-container,#raptor-content-container,.content-area,.authoring-area,.parent-module-container){max-width:100%!important;box-sizing:border-box!important;min-width:0!important}' +
+    'html.simpl-mm .parent-module-container{width:auto!important}' +
     // (Mac 1.3.117) the whole question one panel of the glass (its parts in it, not each a card of its own)
     'html.simpl-mm .parent-module-container{background:var(--mm-card)!important;border-radius:22px!important;padding:20px 24px 12px!important;box-sizing:border-box!important;box-shadow:0 1px 3px rgba(0,0,0,.06),0 8px 28px rgba(0,0,0,.06),0 0 0 1px var(--mm-line),inset 0 1px 0 var(--mm-rim)!important;-webkit-backdrop-filter:blur(24px) saturate(170%);backdrop-filter:blur(24px) saturate(170%)}' +
+    // (Mac 1.3.119) on the Mac the app lays the page on a panel of real glass of its own (window.__simplMacmillanGlass):
+    // the page's panel then clear, the question straight on that glass
+    'html.simpl-mm.simpl-mm-glass .parent-module-container{background:transparent!important;box-shadow:none!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;border-radius:0!important;padding:4px 6px 12px!important}' +
+    'html.simpl-mm.simpl-mm-glass .raptor-container{padding:16px 20px 0!important}' +
     'html.simpl-mm article.module-container{background:transparent!important;border-radius:0!important;padding:6px 0!important;margin:0 0 10px!important;min-height:0!important;box-sizing:border-box!important;box-shadow:none!important;line-height:1.5;color:var(--mm-ink)!important}' +
-    'html.simpl-mm .two_col_single_right .module-container:nth-of-type(2){padding-left:12px!important}' +
+    'html.simpl-mm [data-simpl-pic] img{width:100%!important}' +
     'html.simpl-mm article.module-container .raw-html p{margin:0 0 10px!important}html.simpl-mm article.module-container .raw-html p:last-child{margin-bottom:0!important}' +
     'html.simpl-mm article.module-container>.sl-module{padding-bottom:0!important;overflow:visible!important;max-width:100%!important}' +
-    // two columns (Macmillan's "single right"): the first part and all after it down the left, the second (the picture) up the right
-    'html.simpl-mm .two_col_single_right .module-container{display:block!important;width:calc(50% - 6px)!important;float:none!important}' +
-    'html.simpl-mm .two_col_single_right .module-container:nth-of-type(1){float:left!important}' +
-    'html.simpl-mm .two_col_single_right .module-container:nth-of-type(2){float:right!important}' +
-    'html.simpl-mm .two_col_single_right .module-container:nth-of-type(n+3){clear:left!important}' +
-    // (Mac 1.3.117) Macmillan's other two-column layouts (each prompt beside its answer) one column: the prompt, then its
-    // answer under it — side by side the answers ran off the edge
-    'html.simpl-mm :is(.two_col_one_top,.one_col_two_col_alternate,.two_col_all) .module-container{display:block!important;width:auto!important;float:none!important}' +
-    '@media (max-width:640px){html.simpl-mm .authoring-area .module-container{width:auto!important;float:none!important;display:block!important;clear:both!important}}' +
+    // (Mac 1.3.119) any question with a picture: the picture up the right, the words, the questions and their answers down
+    // the left in their order (Macmillan's own two-column layouts and its one-column ones alike). A grid of the parts on
+    // the left a row each, then a last row that takes what a tall picture needs (picture() counts the rows)
+    'html.simpl-mm .authoring-area .module-container{display:block!important;width:auto!important;float:none!important;clear:none!important}' +
+    'html.simpl-mm .parent-module-container[data-simpl-rows]{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,42%);column-gap:24px;align-content:start}' +
+    'html.simpl-mm .parent-module-container[data-simpl-rows] > *{grid-column:1;min-width:0}' +
+    'html.simpl-mm .parent-module-container[data-simpl-rows] > [data-simpl-pic]{grid-column:2;grid-row:1 / -1;align-self:start;position:sticky;top:8px}' +
+    ROWS +
+    'html.simpl-mm #raptor-content-container .content-area:has([data-simpl-pic]){max-width:1080px!important}' +
+    '@media (max-width:640px){html.simpl-mm .parent-module-container[data-simpl-rows]{display:block!important}html.simpl-mm .parent-module-container[data-simpl-rows] > [data-simpl-pic]{position:static}}' +
     'html.simpl-mm .raw-html img,html.simpl-mm article.module-container img{max-width:100%!important;height:auto!important;border-radius:10px}' +
     'html.simpl-mm.simpl-mm-dark article.module-container :is(.raw-html,figure) img{background:#fff!important;padding:6px!important;box-sizing:border-box!important}' +
     // words and fields in the app's ink (dark: Macmillan's black put to the light ink)
-    'html.simpl-mm.simpl-mm-dark #raptor-content-container :is(p,span,div,label,li,td,th,h1,h2,h3,h4,h5,h6,b,i,em,strong,sup,sub,a,mjx-container,legend,caption,figcaption){color:var(--mm-ink)!important}' +
+    'html.simpl-mm.simpl-mm-dark #raptor-content-container :is(.parent-module-container > div, article.module-container:not([data-simpl-plate])) :is(p,span,div,label,li,td,th,h1,h2,h3,h4,h5,h6,b,i,em,strong,sup,sub,a,mjx-container,legend,caption,figcaption){color:var(--mm-ink)!important}' +
+    // (Mac 1.3.119) a part of Macmillan's that draws its own (a drag-and-drop labelling with its answer bank, a graph, a
+    // table of its own): in dark kept as drawn, on a white plate — its words were made light on its own white boxes
+    'html.simpl-mm article.module-container[data-simpl-plate]>.sl-module{overflow:auto!important}' +
+    'html.simpl-mm #raptor-content-container .content-area:has([data-simpl-plate]){max-width:1080px!important}' +
+    'html.simpl-mm.simpl-mm-dark article.module-container[data-simpl-plate]{background:#fff!important;color:#1c1c1e!important;border-radius:14px!important;padding:12px!important;margin-bottom:14px!important}' +
     'html.simpl-mm.simpl-mm-dark #raptor-content-container :is(table,td,th){border-color:var(--mm-line)!important}' +
     'html.simpl-mm.simpl-mm-dark #raptor-content-container th{background:rgba(255,255,255,.06)!important}' +
     'html.simpl-mm input[type=text]:not(.numeric-entry-input):not(.numeric-entry-sci-not-coeff),html.simpl-mm input:not([type]):not(.numeric-entry-input):not(.numeric-entry-sci-not-coeff),html.simpl-mm textarea,html.simpl-mm select{border-radius:8px!important;background:var(--mm-field)!important;color:var(--mm-ink)!important;border:1px solid var(--mm-line)!important}' +
@@ -120,16 +135,44 @@
     'html.simpl-mm #results{display:none!important}' +
     // (Mac 1.3.117) each answer's own Correct or Incorrect, a pill that reads in light and dark (Alta's: tick or cross,
     // the tone's ink on its tint) — in dark it was white words on Macmillan's pale green
-    'html.simpl-mm #raptor-content-container div.grading-status.grading-status{display:inline-flex!important;align-items:center;gap:5px;margin-top:6px!important;padding:3px 11px 3px 8px!important;border-radius:999px!important;font:600 13px/20px -apple-system,BlinkMacSystemFont,"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif!important;background:var(--mm-good-bg)!important;color:var(--mm-good)!important;box-shadow:inset 0 0 0 1px var(--mm-good-line)!important}' +
-    'html.simpl-mm #raptor-content-container div.grading-status.grading-status::before{content:"\\2713";display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;background:var(--mm-good)!important;color:var(--mm-on)!important;font-size:10px;font-weight:800}' +
-    'html.simpl-mm #raptor-content-container :is(.module-graded-incorrect,.module-graded-missed) div.grading-status.grading-status{background:var(--mm-bad-bg)!important;color:var(--mm-bad)!important;box-shadow:inset 0 0 0 1px var(--mm-bad-line)!important}' +
-    'html.simpl-mm #raptor-content-container :is(.module-graded-incorrect,.module-graded-missed) div.grading-status.grading-status::before{content:"\\2715";background:var(--mm-bad)!important}';
+    'html.simpl-mm #raptor-content-container div.grading-status.grading-status.grading-status.grading-status{display:inline-flex!important;align-items:center;gap:5px;margin-top:6px!important;padding:3px 11px 3px 8px!important;border-radius:999px!important;font:600 13px/20px -apple-system,BlinkMacSystemFont,"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif!important;background:var(--mm-good-bg)!important;color:var(--mm-good)!important;box-shadow:inset 0 0 0 1px var(--mm-good-line)!important}' +
+    'html.simpl-mm #raptor-content-container div.grading-status.grading-status.grading-status.grading-status::before{content:"\\2713";display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;background:var(--mm-good)!important;color:var(--mm-on)!important;font-size:10px;font-weight:800}' +
+    'html.simpl-mm #raptor-content-container :is(.module-graded-incorrect,.module-graded-missed) div.grading-status.grading-status.grading-status.grading-status{background:var(--mm-bad-bg)!important;color:var(--mm-bad)!important;box-shadow:inset 0 0 0 1px var(--mm-bad-line)!important}' +
+    'html.simpl-mm #raptor-content-container :is(.module-graded-incorrect,.module-graded-missed) div.grading-status.grading-status.grading-status.grading-status::before{content:"\\2715";background:var(--mm-bad)!important}';
   var dark = !!window.__simplMacmillanDark;
 
   function mark() {
     var nav = q('#question-nav');
     var side = q('#side-nav') || (nav && (nav.closest('nav') || nav.parentElement));
     if (side) side.setAttribute('data-simpl-hide', '');
+  }
+
+  // (Mac 1.3.119) The question's picture: a part that is a picture and next to no words. Marked, it goes up the right
+  // (the skin's grid), the rest down the left; the left's parts counted for the grid's rows.
+  function picture() {
+    // (a part of a kind the skin knows reads in the app's ink; any other kind keeps its own colours on a plate)
+    qa('article.module-container').forEach(function (m) {
+      var t = (m.querySelector('.sl-module[data-module-type], [data-module-type]') || {}).getAttribute ? m.querySelector('[data-module-type]').getAttribute('data-module-type') : '';
+      var known = !t || /^(static_textfield|numeric_entry|multiple_choice|multiple_select|short_answer|text_entry)$/.test(t);
+      if (!known && !m.hasAttribute('data-simpl-plate')) m.setAttribute('data-simpl-plate', '');
+      if (known && m.hasAttribute('data-simpl-plate')) m.removeAttribute('data-simpl-plate');
+    });
+    qa('.parent-module-container').forEach(function (box) {
+      var kids = Array.prototype.slice.call(box.children);
+      var pic = kids.filter(function (k) {
+        if (!k.matches || !k.matches('article.module-container')) return false;
+        var img = k.querySelector('img');
+        if (!img || img.closest('mjx-container')) return false;
+        var w = img.naturalWidth || img.width || 0;
+        if (w && w < 80) return false;
+        return words(k).length < 40;
+      })[0] || null;
+      kids.forEach(function (k) { if (k !== pic && k.hasAttribute('data-simpl-pic')) k.removeAttribute('data-simpl-pic'); });
+      if (!pic) { if (box.hasAttribute('data-simpl-rows')) box.removeAttribute('data-simpl-rows'); return; }
+      if (!pic.hasAttribute('data-simpl-pic')) pic.setAttribute('data-simpl-pic', '');
+      var rows = String(Math.min(60, Math.max(1, kids.length - 1)));
+      if (box.getAttribute('data-simpl-rows') !== rows) box.setAttribute('data-simpl-rows', rows);
+    });
   }
 
   // (Mac 1.3.115) Macmillan keeps its side panel folded when it was last folded — and folded, it does not draw the list of
@@ -214,9 +257,10 @@
       // (Mac 1.3.115) only the player itself says what it shows: a frame of its own inside it (a widget) never does, or
       // its blank page would stand in for the question; a page that is not the player and holds its frame is the hub
       if (!isPlayer()) { if (hub()) post({ kind: 'hub' }); return; }
-      if (skinned) { document.documentElement.classList.add('simpl-mm'); css('simpl-mm-skin', SKIN); mark(); unfold(); }
+      if (skinned) { document.documentElement.classList.add('simpl-mm'); css('simpl-mm-skin', SKIN); mark(); picture(); unfold(); }
       else { document.documentElement.classList.remove('simpl-mm'); }
       document.documentElement.classList.toggle('simpl-mm-dark', skinned && dark);
+      document.documentElement.classList.toggle('simpl-mm-glass', skinned && !!window.__simplMacmillanGlass);
       var s = state();
       var text = JSON.stringify(s);
       if (text !== last) { last = text; post(s); }

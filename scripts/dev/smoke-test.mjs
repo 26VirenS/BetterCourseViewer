@@ -2276,6 +2276,7 @@ try {
   await page.keyboard.press('Escape');
   const ringGone = await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov'), null, { timeout: 5000 }).then(() => true).catch(() => false);
   check(ringGone && await page.evaluate(() => document.activeElement?.classList.contains('bcv-asg__fact--rubric')), 'a second Escape closes the ring, and focus goes back to the rubric box');
+  await page.evaluate(() => window.scrollTo(0, 0)); // (2.99.51: focus back on the rubric box, low in the right column, can leave the page at its end; the wheel is tried from the top)
   const freed = await pageHeld(page, 760, 420);
   check(freed.moved || !freed.scrollable, `with the ring gone the page scrolls again: ${JSON.stringify(freed)}`);
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -4945,6 +4946,30 @@ try {
   await page.goto(`${BASE}/courses/101`);
   await page.waitForSelector('.bcv-front', { timeout: 10000 });
   await shot(page, '27-dark-course-home');
+  // (2.99.51) the assignment in dark, its grade panel as the Mac's: the ring, the score in the page's ink (no tinted box
+  // round it), the percentage under it, and the class's line and chart across the panel under them
+  await page.goto(`${BASE}/courses/104/assignments/4001`);
+  await page.waitForSelector('.bcv-asg__gradep .bcv-asg__pill', { timeout: 10000 });
+  const darkGrade = await page.evaluate(() => {
+    const p = document.querySelector('.bcv-asg__gradep'), pill = p.querySelector('.bcv-asg__pill'), ring = p.querySelector('.bcv-asg__ring').getBoundingClientRect();
+    const sc = p.querySelector('.bcv-asg__score').getBoundingClientRect(), pc = p.querySelector('.bcv-asg__pct').getBoundingClientRect(), plot = p.querySelector('.bcv-cplot')?.getBoundingClientRect();
+    return { bg: getComputedStyle(pill).backgroundColor, ink: getComputedStyle(p.querySelector('.bcv-asg__score')).color, beside: sc.left > ring.right, under: pc.top >= sc.bottom - 1, plotBelow: !plot || plot.top > ring.bottom, letter: p.querySelector('.bcv-asg__ringletter').textContent };
+  });
+  check(darkGrade.bg === 'rgba(0, 0, 0, 0)' && darkGrade.ink === 'rgb(242, 242, 247)' && darkGrade.beside && darkGrade.under && darkGrade.plotBelow && darkGrade.letter === 'A+', `the dark grade panel is the Mac's: no box round the score, white ink, the percentage under it, the chart under the ring: ${JSON.stringify(darkGrade)}`);
+  await shot(page, '27e-dark-assignment');
+  // (2.99.51) Your Work over the comments and the instructions; See Feedback opens a sheet with the work on the left (Canvas's
+  // preview of the file) and the comments on the right, Escape putting it away
+  const order = await page.evaluate(() => [...document.querySelectorAll('.bcv-asg__left .bcv-asg__h2')].map((e) => e.textContent));
+  const work = await page.evaluate(() => ({ sent: document.querySelector('.bcv-asg__worksent')?.textContent || '', files: document.querySelectorAll('.bcv-asg__workfile').length }));
+  check(order.join('|') === 'Your Work|Comments|Instructions' && /^Submitted /.test(work.sent) && work.files >= 1, `Your Work first, then Comments, then Instructions: ${JSON.stringify({ order, work })}`);
+  await page.click('.bcv-asg__seefb');
+  await page.waitForSelector('.bcv-fbs', { timeout: 5000 });
+  const fbs = await page.evaluate(() => { const f = document.querySelector('.bcv-fbs'), fr = f.querySelector('.bcv-fbs__frame'), side = f.querySelector('.bcv-fbs__side').getBoundingClientRect(), left = f.querySelector('.bcv-fbs__left').getBoundingClientRect(); return { frame: fr ? fr.getAttribute('src') : null, comments: f.querySelectorAll('.bcv-fbs__comment').length, beside: side.left >= left.right - 1 }; });
+  check(/mock-docviewer/.test(fbs.frame || '') && fbs.comments >= 1 && fbs.beside, `See Feedback: the file previewed on the left, the comments beside it: ${JSON.stringify(fbs)}`);
+  await page.waitForTimeout(400);
+  await shot(page, '27f-dark-feedback');
+  await page.keyboard.press('Escape');
+  check(await page.waitForFunction(() => !document.querySelector('.bcv-fbs-ov'), null, { timeout: 3000 }).then(() => true).catch(() => false), 'Escape puts the Feedback sheet away');
   // a Canvas page that paints its own light panel keeps dark text there, so a school's template
   // does not read as blank in the dark appearance
   await page.goto(`${BASE}/courses/101/pages/course-information`);
@@ -5298,7 +5323,7 @@ try {
   await page.evaluate(() => sessionStorage.removeItem('bcv:dash-arrived')); // (a first arrival: its entrances are what reduced motion is checked against)
   await page.reload();
   await page.waitForSelector('.bcv-stat', { timeout: 10000 });
-  await page.waitForSelector('.bcv-work__fill', { timeout: 10000 });
+  await page.waitForSelector('.bcv-work__fill', { state: 'attached', timeout: 10000 }); // (there: early on a Monday the week's first bar is at 0, drawn but no width to see)
   const reduced = await page.evaluate(() => {
     const probe = document.createElement('span'); probe.className = 'bcv-load'; document.querySelector('.bcv-nav__item').append(probe); // a wash under reduced motion: a still, partial fill
     const cs = getComputedStyle(probe);

@@ -100,6 +100,30 @@ try {
   const q3 = await until(async () => { const s = await last(); return s?.index === 2 && s; });
   check(q3 && q3.main === 'Submit Answer' && q3.items[0].state === 'success', 'a question opened from the list');
 
+  // (Mac 1.3.119) a one-column question with a picture: the picture up the right, the question and its answers down the
+  // left in their order
+  await page.setViewportSize({ width: 820, height: 720 });
+  await sac().evaluate(() => window.__simplMacmillan('go', 2));
+  await until(async () => (await last())?.index === 1);
+  const q2 = await until(async () => sac().evaluate(() => {
+    const pic = document.querySelector('[data-simpl-pic]'); if (!pic) return null;
+    const left = [...document.querySelectorAll('article.module-container:not([data-simpl-pic])')].map((e) => e.getBoundingClientRect());
+    const p = pic.getBoundingClientRect();
+    return { picLeft: Math.round(p.left), picTop: Math.round(p.top), leftRight: Math.round(Math.max(...left.map((r) => r.right))), lefts: [...new Set(left.map((r) => Math.round(r.left)))], tops: left.map((r) => Math.round(r.top)), right: Math.round(p.right), width: innerWidth };
+  }));
+  check(q2 && q2.picLeft >= q2.leftRight && q2.lefts.length === 1 && q2.tops.every((t, i, a) => i === 0 || t > a[i - 1]) && q2.right <= q2.width && Math.abs(q2.picTop - q2.tops[0]) < 60, `a picture up the right, the question then its answers down the left: ${JSON.stringify(q2)}`);
+  await page.setViewportSize({ width: 1000, height: 720 });
+
+  // (Mac 1.3.119) a part of Macmillan's that draws its own (a labelling with its answer bank): in dark kept as drawn on a
+  // white plate, its words dark, and wider than the page it scrolls in its part rather than being cut
+  await sac().evaluate(() => { window.__simplMacmillan('go', 3); window.__simplMacmillan('theme', true); });
+  const plate = await until(async () => sac().evaluate(() => {
+    const m = document.querySelector('[data-module-type="labeling"]')?.closest('article'); if (!m || !m.hasAttribute('data-simpl-plate') || !document.documentElement.classList.contains('simpl-mm-dark')) return null;
+    return { bg: getComputedStyle(m).backgroundColor, chip: getComputedStyle(m.querySelector('.mm-chip')).color, scroll: getComputedStyle(m.querySelector('.sl-module')).overflowX };
+  }));
+  check(plate && plate.bg === 'rgb(255, 255, 255)' && plate.chip === 'rgb(34, 34, 34)' && plate.scroll === 'auto', `a widget of Macmillan's own on a white plate in dark, its words as drawn, scrolling in its part: ${JSON.stringify(plate)}`);
+  await sac().evaluate(() => window.__simplMacmillan('theme', false));
+
   // (Mac 1.3.117) Macmillan's two_col_all (each prompt beside its answer): one column, nothing past the edge, the answer a
   // field's width; its tools menu (×10ʸ) a popover in the app's colours, dark in dark
   await page.setViewportSize({ width: 820, height: 720 });
