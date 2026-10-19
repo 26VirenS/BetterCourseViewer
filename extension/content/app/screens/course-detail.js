@@ -538,11 +538,12 @@
       if (due && due < Date.now()) return { text: `${x.missing ? 'Missing' : 'Past due'} · ${lockAt ? `open until ${shortAt(lockAt)}` : `was due ${shortAt(due)}`}`, tone: x.missing ? 'red' : 'orange', icon: WARN };
       return { text: due ? `Open · due ${longAt(due)}` : 'Open · no due date', tone: 'blue', icon: CLOCK };
     }
-    const statusEl = (x) => { const st = standingOf(x); return h('div', { class: `bcv-asg__status is-${st.tone}` }, [U.svg(st.icon, { size: 14, stroke: 'currentColor', width: 2.2 }), U.text('bcv-asg__statustext', st.text, 'span')]); };
+    // (2.99.53) the word alone, as the Mac's chip says it (the when is in Your Work and the facts)
+    const statusEl = (x) => { const st = standingOf(x); return h('div', { class: `bcv-asg__status is-${st.tone}`, title: st.text }, [U.text('bcv-asg__statustext', st.text.split(' · ')[0], 'span')]); };
 
     const GRADING = { points: 'Graded', pass_fail: 'Complete or incomplete', letter_grade: 'Letter grade', gpa_scale: 'GPA scale', percent: 'Percentage', not_graded: 'Not graded' };
     // (2.99.50) each fact led by its own tile, as the Mac's details are (Due, Points, Handed in as)
-    const FACT_ICON = { Due: IC.cal, Points: IC.star, 'Submit as': 'M12 15V4M8 8l4-4 4 4M5 14v4a2 2 0 002 2h10a2 2 0 002-2v-4', Rubric: IC.check };
+    const FACT_ICON = { Due: IC.cal, Points: IC.star, Available: 'M12 4a8 8 0 100 16 8 8 0 000-16zM12 8v4l3 2', 'Handed In As': 'M12 15V4M8 8l4-4 4 4M5 14v4a2 2 0 002 2h10a2 2 0 002-2v-4', Attempts: 'M4 12a8 8 0 108-8 8 8 0 00-5.7 2.3L4 8.6M4 4v4.6h4.6', 'Submit as': 'M12 15V4M8 8l4-4 4 4M5 14v4a2 2 0 002 2h10a2 2 0 002-2v-4', Rubric: IC.check };
     const fact = (k, v, sub, extra = {}) => h(extra.onclick ? 'button' : 'div', { class: `bcv-asg__fact ${extra.cls || ''}`, type: extra.onclick ? 'button' : null, onclick: extra.onclick || null, title: extra.title || null }, [
       FACT_ICON[k] ? h('span', { class: 'bcv-asg__facttile', 'aria-hidden': 'true' }, U.svg(FACT_ICON[k], { size: 15, stroke: 'currentColor', width: 2 })) : null,
       U.el('bcv-asg__facttext', [U.text('bcv-asg__factk', k, 'span'), U.text('bcv-asg__factv bcv-ellip', v, 'span'), sub ? U.text('bcv-asg__factsub bcv-ellip', sub, 'span') : null]),
@@ -557,11 +558,15 @@
       const worth = a.rubric.reduce((n, cr) => n + (Number(cr.points) || 0), 0);
       return fact('Rubric', U.plural(a.rubric.length, 'criterion', 'criteria'), worth ? `${store.fmtPts(worth)} pts` : null, { cls: 'bcv-asg__fact--rubric', onclick: () => CS().openRubric(a, s), title: 'How it is marked', side: ringSlot });
     };
-    const factsEl = (x) => U.el(`bcv-asg__facts ${a.rubric?.length ? 'is-four' : ''}`, [
-      fact('Due', due ? shortAt(due) : 'No due date', dueSub),
-      fact('Points', a.points_possible !== null && a.points_possible !== undefined ? store.fmtPts(a.points_possible) : '—', a.omit_from_final_grade ? 'Doesn’t count toward your grade' : (GRADING[a.grading_type] || 'Graded')),
-      fact('Submit as', howWord, handsIn && !typeList.some((t) => t === 'on_paper' || t === 'none') ? attemptsWord(x) : null),
-      rubricFact(),
+    // (2.99.53) the Mac's facts, one to a line: Due, Points, Available, Handed In As, Attempts
+    const macAt = (d) => `${U.fmtShort(d)} at ${U.fmtTime(d)}`;
+    const availWord = [unlockAt ? `Opens ${macAt(unlockAt)}` : null, lockAt ? `Closes ${macAt(lockAt)}` : null].filter(Boolean).join(' · ');
+    const factsEl = (x) => U.el('bcv-asg__facts', [
+      fact('Due', due ? macAt(due) : 'No due date', null),
+      a.points_possible !== null && a.points_possible !== undefined ? fact('Points', `${store.fmtPts(a.points_possible)} pts`, null) : null,
+      availWord ? fact('Available', availWord, null) : null,
+      fact('Handed In As', howWord, null),
+      handsIn && !typeList.some((t) => t === 'on_paper' || t === 'none') ? fact('Attempts', attemptsWord(x), null) : null,
     ]);
 
     // ---- the one big pill ----------------------------------------------------------------------------------------
@@ -707,19 +712,25 @@
     const courseChip = h('span', { class: 'bcv-asg__coursechip bcv-ellip', text: c.shortName || c.name || '' });
     let statusNow = statusEl(s);
     const chipsEl = U.el('bcv-asg__chips', [kindChip, courseChip, statusNow]);
-    const headEl = U.el('bcv-detail__head bcv-asg__head', [chipsEl, titleEl]);
+    const headEl = U.el('bcv-detail__head bcv-asg__head', [chipsEl, titleEl, a.rubric?.length && !postedOf(s) ? U.el('bcv-asg__headrubric', [rubricFact()]) : null].filter(Boolean));
     const section = (title, extra, body) => U.el('bcv-asg__section', [U.el('bcv-asg__sectionhead', [h('h2', { class: 'bcv-asg__h2', text: title }), extra || null]), body]);
     const desc = a.description && htmlToText(a.description, 40).trim() ? CS().prose(a.description, { cls: 'bcv-asg__prose' }) : (isTool ? null : U.text('bcv-asg__quiet', 'No instructions were given.'));
     const instructions = desc ? section('Instructions', null, U.el('bcv-asg__panel', [desc])) : null;
 
     // the comments on the submission, and one to add (the thread the teacher's feedback comes back on)
     const commentsBody = U.el('bcv-asg__panel bcv-asg__comments');
+    const commentCount = h('span', { class: 'bcv-asg__count', text: (s.submission_comments || []).length ? String((s.submission_comments || []).length) : '' });
     const drawComments = (x) => {
       const list = (x.submission_comments || []).slice().sort((p, q) => String(p.created_at).localeCompare(String(q.created_at)));
+      commentCount.textContent = list.length ? String(list.length) : '';
       if (!list.length) { commentsBody.replaceChildren(h('div', { class: 'bcv-asg__nocomments' }, [U.svg(IC.disc, { size: 15, stroke: 'currentColor', width: 2 }), h('span', { text: 'No comments yet.' })])); return; }
+      // (2.99.53) as the Mac's: the photo, the name, the attempt it was left on, the when at the right; the words under them
       commentsBody.replaceChildren(...list.map((cm) => U.el('bcv-asg__comment', [
-        U.el('bcv-asg__commenthead', [U.text('bcv-asg__commentwho', cm.author_name || cm.author?.display_name || 'Someone', 'span'), cm.created_at ? U.text('bcv-asg__commentwhen', U.fmtAt(cm.created_at), 'span') : null]),
-        U.text('bcv-asg__commenttext', String(cm.comment || '').trim(), 'div'),
+        U.avatar(cm.author?.avatar_image_url || cm.avatar_path || null, cm.author_name || cm.author?.display_name || '', 34),
+        U.el('bcv-asg__commentbody', [
+          U.el('bcv-asg__commenthead', [U.text('bcv-asg__commentwho', cm.author_name || cm.author?.display_name || 'Someone', 'span'), cm.attempt ? U.text('bcv-asg__commentatt', `Attempt ${cm.attempt}`, 'span') : null, cm.created_at ? U.text('bcv-asg__commentwhen', U.fmtAt(cm.created_at), 'span') : null]),
+          U.text('bcv-asg__commenttext', String(cm.comment || '').trim(), 'div'),
+        ]),
       ])));
     };
     drawComments(s);
@@ -747,7 +758,7 @@
       composer.hidden = false;
       box.focus();
     };
-    const comments = section('Comments', addBtn, U.el('bcv-asg__commentwrap', [composer, commentsBody]));
+    const comments = section('Comments', U.el('bcv-asg__headtools', [commentCount, addBtn]), U.el('bcv-asg__commentwrap', [composer, commentsBody]));
 
     // (2.99.51) what was handed in, as the Mac's Your Work: when, then each file (Preview opens it in the viewer), the
     // text written or the web address given
@@ -756,9 +767,10 @@
     const drawWork = (x) => {
       const files = x.attachments || [];
       const parts = [];
-      if (x.submitted_at) parts.push(h('div', { class: `bcv-asg__worksent${x.late ? ' is-late' : ''}` }, [U.svg('M20 6L9 17l-5-5', { size: 14, stroke: 'currentColor', width: 2.6 }), h('span', { text: `Submitted ${longAt(D0(x.submitted_at))}${x.late ? ' · late' : ''}` })]));
+      // (2.99.53) the Mac's seal, filled, and the when as the Mac says it
+      if (x.submitted_at) parts.push(h('div', { class: `bcv-asg__worksent${x.late ? ' is-late' : ''}` }, [h('span', { class: 'bcv-asg__seal', 'aria-hidden': 'true', html: '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 1.6l2.4 1.8 3-.2.9 2.9 2.5 1.7-.9 2.9.9 2.9-2.5 1.7-.9 2.9-3-.2L12 22.4 9.6 20.6l-3 .2-.9-2.9-2.5-1.7.9-2.9-.9-2.9 2.5-1.7.9-2.9 3 .2z"/><path d="M8 12.2l2.7 2.7L16.2 9.4" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>' }), h('span', { text: `Submitted ${macAt(D0(x.submitted_at))}${x.late ? ' · late' : ''}` })]));
       for (const f of files) parts.push(h('div', { class: 'bcv-asg__workfile' }, [
-        h('span', { class: 'bcv-asg__workicon', 'aria-hidden': 'true' }, U.svg(IC.doc, { size: 16, stroke: 'currentColor', width: 1.9 })),
+        h('span', { class: 'bcv-asg__workicon', 'aria-hidden': 'true', html: '<svg viewBox="0 0 32 40" width="26" height="32"><path d="M3 3a3 3 0 013-3h14l9 9v28a3 3 0 01-3 3H6a3 3 0 01-3-3z" fill="#f2f2f7"/><path d="M20 0v6a3 3 0 003 3h6" fill="#d1d1d6"/><path d="M9 17h14M9 21h14M9 25h10" stroke="#aeaeb2" stroke-width="1.6" stroke-linecap="round"/></svg>' }),
         U.text('bcv-asg__workname bcv-ellip', f.display_name || f.filename || 'File', 'span'),
         h('button', { type: 'button', class: 'bcv-asg__workprev' }, [U.svg('M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 9a3 3 0 100 6 3 3 0 000-6z', { size: 14, stroke: 'currentColor', width: 2 }), h('span', { text: 'Preview' })]),
       ]));
@@ -836,18 +848,95 @@
       const bits = [`Class mean ${store.fmtPts(Math.round(st.mean * 10) / 10)}`, st.max !== undefined ? `high ${store.fmtPts(st.max)}` : null, st.min !== undefined ? `low ${store.fmtPts(st.min)}` : null].filter(Boolean);
       return h('div', { class: 'bcv-asg__classline' }, [U.svg(IC.people, { size: 14, stroke: 'currentColor', width: 2 }), h('span', { text: bits.join(' · ') })]);
     }
-    function railEl(x) {
-      const act = actionEl(x);
-      const parts = [];
-      // a tool's graded page still opens the tool, as the Mac's Open Tool does
-      if (isTool && postedOf(x) && !lockedNow()) parts.push(h('button', { type: 'button', class: 'bcv-asg__primary bcv-detail__tool', onclick: (e) => launchTool(e.currentTarget) }, [U.svg(IC.tool, { size: 16, stroke: 'currentColor', width: 2.2 }), h('span', { text: 'Open Tool' })]));
-      const fb = feedbackBtn(x);
-      if (fb) parts.push(fb);
-      if (postedOf(x)) parts.push(U.el('bcv-asg__panel bcv-asg__gradep', [h('div', { class: 'bcv-asg__panelk', text: 'Grade' }), U.el('bcv-asg__graderow', [gradeRing(x), act]), classLine()]));
-      else parts.push(act);
-      parts.push(factsEl(x));
-      return U.el('bcv-asg__rail', parts);
+    // (2.99.53) The Mac's right column: what to do next, as wide as the column — Hand In (or Open Tool, Take Quiz, Open
+    // Discussion) lit in the course's colour; handed in and it may be handed in again, what was handed in beside it (See
+    // Feedback once it is marked, View Submission till then); with nothing to do here, why, and See Feedback — then the
+    // grade, then the facts.
+    const TRAY_UP = 'M12 15V4M8 8l4-4 4 4M5 14v4a2 2 0 002 2h10a2 2 0 002-2v-4';
+    const DOC_LOOK = 'M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h4M14 3l5 5M14 3v5h5M16 13a3 3 0 100 6 3 3 0 000-6zM18.2 18.2L21 21';
+    const hasWork = (x) => !!(x.submitted_at || postedOf(x) || (x.attachments || []).length || x.body || x.url);
+    function whyOf(x) {
+      if (closedNow() && handsIn) return `Closed ${U.fmtAt(lockAt)}: nothing can be handed in now.`;
+      if (lockedNow() && handsIn) return unlockAt && unlockAt > Date.now() ? `Opens ${macAt(unlockAt)}.` : (a.lock_explanation ? htmlToText(a.lock_explanation, 160) : 'Locked.');
+      if (nativeSubmit && !isTool && a.can_submit === false) return 'Submissions are closed.';
+      if (nativeSubmit && !isTool && !leftOf(x)) return `No attempts left: this assignment allows ${U.plural(allowed, 'attempt')}.`;
+      if (!handsIn) return typeList.includes('on_paper') ? 'Handed in on paper.' : 'Nothing is handed in for this one.';
+      return '';
     }
+    function stepsOf(x) {
+      const one = (() => {
+        if (canAgain(x)) return x.submitted_at || used(x) > 0 ? { title: 'Hand In Again', short: 'Hand In', icon: TRAY_UP, go: 'hand' } : { title: 'Hand In', icon: TRAY_UP, go: 'hand' };
+        if (isTool && !lockedNow()) return { title: 'Open Tool', icon: IC.tool, go: 'tool' };
+        if (typeList.includes('online_quiz') && a.quiz_id) return { title: 'Take Quiz', icon: IC.bolt, go: 'quiz' };
+        if (typeList.includes('discussion_topic') && a.discussion_topic?.id) return { title: 'Open Discussion', icon: IC.disc, go: 'disc' };
+        if (canvasOnly && !closedNow() && !lockedNow()) return { title: `Hand In on ${BCV.lms.name}`, short: 'Hand In', icon: 'M9 6h9v9M18 6L7 17', go: 'canvas' };
+        return null;
+      })();
+      if (one && (one.go === 'hand' || one.go === 'canvas') && hasWork(x)) {
+        const marked = postedOf(x) || (x.submission_comments || []).length;
+        return [marked ? { title: 'See Feedback', short: 'Feedback', icon: IC.disc, go: 'look' } : { title: 'View Submission', short: 'Submission', icon: DOC_LOOK, go: 'look' }, one];
+      }
+      return one ? [one] : [];
+    }
+    const doStep = (step, el) => {
+      if (step.go === 'hand') openHand(el);
+      else if (step.go === 'look') openFeedback(current, el);
+      else if (step.go === 'tool') launchTool(el);
+      else if (step.go === 'quiz') app.go(`${c.url}/quizzes/${a.quiz_id}`);
+      else if (step.go === 'disc') app.go(`${c.url}/discussion_topics/${a.discussion_topic.id}`);
+      else if (step.go === 'canvas') app.go(nativeHref(`${c.url}/assignments/${a.id}`));
+    };
+    function stepsEl(x) {
+      const steps = stepsOf(x);
+      const why = whyOf(x);
+      if (!steps.length) {
+        if (!why && !hasWork(x)) return null;
+        return U.el('bcv-asg__panel bcv-asg__whycard', [
+          why ? h('div', { class: 'bcv-asg__why' }, [U.svg('M12 3a9 9 0 100 18 9 9 0 000-18zM12 11v5M12 8h.01', { size: 15, stroke: 'currentColor', width: 2 }), h('span', { text: why })]) : null,
+          hasWork(x) ? h('button', { type: 'button', class: 'bcv-asg__step bcv-asg__seefb bcv-asg__pill is-done', title: 'Your work, with your teacher\'s marks and comments', 'aria-haspopup': 'dialog', onclick: (e) => openFeedback(current, e.currentTarget) }, [U.svg(IC.disc, { size: 16, stroke: 'currentColor', width: 2 }), h('span', { 'data-glide': 'word', text: 'See Feedback' })]) : null,
+        ].filter(Boolean));
+      }
+      const two = steps.length > 1;
+      const btns = steps.map((st, i) => {
+        const lit = i === steps.length - 1;
+        const legacy = st.go === 'look' ? 'bcv-asg__pill is-done' : st.go === 'tool' ? 'bcv-asg__pill is-go bcv-detail__tool' : 'bcv-asg__pill is-go';
+        return h('button', { type: 'button', class: `bcv-asg__step ${lit ? 'is-lit' : ''} ${legacy}`, title: st.title, 'aria-haspopup': st.go === 'hand' || st.go === 'look' ? 'dialog' : null, 'aria-expanded': st.go === 'hand' ? 'false' : null, onclick: (e) => doStep(st, e.currentTarget) }, [
+          U.svg(st.icon, { size: 17, stroke: 'currentColor', width: 2.1 }), h('span', { 'data-glide': 'word', text: two && st.short ? st.short : st.title }),
+        ]);
+      });
+      const drops = steps.some((st) => st.go === 'hand') && (typeList.includes('online_upload') || typeList.includes('online_url'));
+      return U.el('bcv-asg__steps', [
+        U.el('bcv-asg__stepbtns', btns),
+        drops ? U.text('bcv-asg__drophint', typeList.includes('online_upload') ? 'Or drop files on this page.' : 'Or drop a link on this page.', 'div') : null,
+        why ? h('div', { class: 'bcv-asg__why' }, [U.svg('M12 3a9 9 0 100 18 9 9 0 000-18zM12 11v5M12 8h.01', { size: 15, stroke: 'currentColor', width: 2 }), h('span', { text: why })]) : null,
+      ].filter(Boolean));
+    }
+    function railEl(x) {
+      const parts = [stepsEl(x)];
+      if (postedOf(x)) parts.push(U.el('bcv-asg__panel bcv-asg__gradep', [h('div', { class: 'bcv-asg__panelk', text: 'Grade' }), U.el('bcv-asg__graderow', [gradeRing(x), actionEl(x)]), classLine(), a.rubric?.length ? rubricFact() : null].filter(Boolean)));
+      else if (heldOf(x)) parts.push(U.el('bcv-asg__panel bcv-asg__held', [h('div', { class: 'bcv-asg__why' }, [U.svg('M3 3l18 18M10.6 5.1A10 10 0 0122 12s-1 2.2-3.2 4.2M6.4 6.4C3.8 8.1 2 12 2 12s3.5 7 10 7c1.8 0 3.4-.5 4.8-1.3', { size: 15, stroke: 'currentColor', width: 2 }), h('span', { text: 'Graded, but your teacher has not released the grade yet.' })])]));
+      // (a module's Mark as done, and a quiz's Open quiz, kept under the steps till there is a grade card to hold them)
+      if (!postedOf(x)) {
+        const done = slot('bcv-detail__doneslot');
+        fill(done, ({ modItem }) => doneButton(ctx, c, a, modItem, { primary: !handsIn }));
+        parts.push(U.el('bcv-asg__action bcv-asg__extras', [a.quiz_id && !typeList.includes('online_quiz') ? U.btn('Open quiz', { icon: IC.bolt, onClick: () => app.go(`${c.url}/quizzes/${a.quiz_id}`) }) : null, done].filter(Boolean)));
+      }
+      parts.push(factsEl(x));
+      return U.el('bcv-asg__rail', parts.filter(Boolean));
+    }
+    // (2.99.53) files dropped on the page, as on the Mac's: the hand-in opens with them in
+    const takeDrop = (files) => {
+      const pill = page.querySelector('.bcv-asg__step.is-go:not(.bcv-detail__tool)');
+      if (!pill || !files?.length) return;
+      openHand(pill);
+      const put = (n = 0) => {
+        let input = handScreen?.querySelector('input[type=file]');
+        if (!input) { const tab = handScreen?.querySelector('.bcv-sb__tab[data-tab="file"]'); if (tab && !tab.classList.contains('is-active')) tab.click(); input = handScreen?.querySelector('input[type=file]'); }
+        if (!input) { if (n < 20) setTimeout(() => put(n + 1), 60); return; }
+        try { const dt = new DataTransfer(); for (const f of files) dt.items.add(f); input.files = dt.files; input.dispatchEvent(new Event('change', { bubbles: true })); } catch { /* the panel is open: they can be chosen there */ }
+      };
+      setTimeout(put, 80);
+    };
     let railNow = railEl(s);
     const left = U.el('bcv-asg__left', [workSection, comments, instructions]); // (2.99.51: the work and what was said, then what was asked)
     const colsEl = U.el('bcv-asg__cols', [railNow, left]); // (the grade read before the instructions; drawn on the right when wide)
@@ -861,6 +950,9 @@
       drawComments(x);
       drawWork(x);
     };
+    page.addEventListener('dragover', (e) => { if (canAgain(current) && typeList.includes('online_upload') && [...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); page.classList.add('is-dropping'); } });
+    page.addEventListener('dragleave', (e) => { if (!page.contains(e.relatedTarget)) page.classList.remove('is-dropping'); });
+    page.addEventListener('drop', (e) => { page.classList.remove('is-dropping'); if (e.target.closest?.('.bcv-sb__drop')) return; if (!canAgain(current) || !e.dataTransfer?.files?.length) return; e.preventDefault(); takeDrop([...e.dataTransfer.files]); });
     main.replaceChildren(U.card(page, 'bcv-card--22 bcv-asg__card'));
     // opened to hand in (a To Do row's Submit, ?bcv=submit): the panel grows out of the pill once the page is up
     if (handScreen && route.params.get('bcv') === 'submit' && canAgain(s)) {

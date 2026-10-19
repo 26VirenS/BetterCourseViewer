@@ -390,7 +390,8 @@ try {
   if (input) {
     await input.setInputFiles({ name: 'sources.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 sources') });
     await page.waitForTimeout(800);
-    const send = await page.$('button:has-text("Submit"):not(:has-text("assignment")), button:has-text("Hand in"), button:has-text("Turn in")');
+    // (2.99.53: the page's own step says Hand In too, as the Mac's: the panel's send button first)
+    const send = (await page.$('.bcv-sheet-ov .bcv-sb__go')) || (await page.$('.bcv-sheet-ov button:has-text("Submit"), .bcv-sheet-ov button:has-text("Hand in"), .bcv-sheet-ov button:has-text("Turn in")'));
     if (send) await send.click();
     await page.waitForTimeout(2500);
   }

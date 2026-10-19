@@ -853,7 +853,7 @@
     if (spot) settle(); // (a box built afresh while the last was afloat: the old box and its palette go)
     if (docked) { docked.remove(); docked = null; } // (one box at a time: the phone's Today builds its own, and the bar's is built again on the way back)
     const phone = !!BCV.phone?.active?.();
-    const input = h('input', { type: 'search', class: 'bcv-omni__in', id: 'bcv-omni', placeholder: phone ? 'Search, or type / for a command' : 'Search everything', autocomplete: 'off', autocapitalize: 'off', autocorrect: 'off', enterkeyhint: 'go', spellcheck: 'false', 'aria-label': 'Search everything: courses, assignments, pages, files, people and Wikipedia — or type / for a command', 'aria-controls': 'bcv-omni-panel', 'aria-autocomplete': 'list' });
+    const input = h('input', { type: 'search', class: 'bcv-omni__in', id: 'bcv-omni', placeholder: phone ? 'Search, or type / for a command' : 'Search or type /', autocomplete: 'off', autocapitalize: 'off', autocorrect: 'off', enterkeyhint: 'go', spellcheck: 'false', 'aria-label': 'Search everything: courses, assignments, pages, files, people and Wikipedia — or type / for a command', 'aria-controls': 'bcv-omni-panel', 'aria-autocomplete': 'list' });
     const panel = h('div', { class: 'bcv-omni__panel', id: 'bcv-omni-panel', role: 'listbox', 'aria-label': 'Results' });
     panel.hidden = true;
     // the Wikipedia switch, inside the box at its right where the "/" hint sits: shown while the box has

@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.52"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.53"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -5518,3 +5518,139 @@ html.bcv-onebar .bcv-screen--ctx[data-bcv-ctx^="courses:"] .bcv-cmain { border-l
 .bcv-choose__go:focus-visible { outline: 2px solid #0a84ff; outline-offset: 3px; }
 .bcv-choose__note { margin-top: 14px; font: 400 12.5px/1.4 var(--bcv-font); color: rgba(255,255,255,.45); }
 @media (prefers-reduced-motion: reduce) { .bcv-choose__card { animation: none; } .bcv-choose__tick { transition: opacity .15s ease; scale: 1; } }
+
+/* ---- (2.99.53) The bar across the top, as the Mac's toolbar: the sidebar's button at the sidebar's corner; Back and
+ * Forward in one capsule, Refresh, and the screen's title with its course under it at the left; at the right the
+ * pinned tools in one capsule, Previous / Next, ⋯ (the Simpl switch) and the search box. app.js barLayout() measures
+ * the right side and says where each part sits (--bcv-tray-r, --bcv-look-r, --bcv-right-w). */
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) { --bcv-search-w: clamp(170px, 19vw, 250px); }
+#bcv-sidetoggle { display: none; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-sidetoggle { display: grid; place-items: center; position: fixed; top: 7px; left: calc(var(--bcv-side-w) - 46px); width: 34px; height: 30px; padding: 0; border: 0; border-radius: 15px; background: var(--bcv-fill); color: var(--bcv-ink2); cursor: pointer; z-index: calc(var(--bcv-z-bar) + 2); transition: left .45s var(--bcv-ease), translate .45s var(--bcv-ease), opacity .3s ease; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab).bcv-side-off #bcv-sidetoggle { left: 12px; }
+@media (hover: hover) { #bcv-sidetoggle:hover { background: var(--bcv-hover); color: var(--bcv-ink); } }
+#bcv-sidetoggle:active { scale: .94; }
+html.bcv-setup-open #bcv-sidetoggle { display: none !important; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab).bcv-quiz #bcv-sidetoggle { translate: 0 -64px; opacity: 0; pointer-events: none; }
+/* the sidebar folded away by its button: as an attempt folds it */
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab).bcv-side-off { --bcv-side-w: 0px; }
+html.bcv-on.bcv-side-off:not(.bcv-phone) #bcv-app:has(> .bcv-side)::before { width: 0; }
+html.bcv-side-off:not(.bcv-phone) .bcv-side { width: 0; padding-left: 0; padding-right: 0; opacity: 0; overflow: hidden; border-right-width: 0; pointer-events: none; }
+/* the left: the history capsule, Refresh and the title, one row */
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-tophist { top: 7px; height: 30px; gap: 8px; padding: 0; background: transparent; border-radius: 0; left: calc(var(--bcv-side-w) + 14px); transition: left .45s var(--bcv-ease), translate .45s var(--bcv-ease), opacity .3s ease; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab).bcv-side-off #bcv-tophist { left: 58px; }
+#bcv-tophist .bcv-tophist__pill { display: flex; align-items: center; gap: 0; height: 30px; padding: 0 2px; border-radius: 15px; background: var(--bcv-fill); }
+#bcv-tophist .bcv-tophist__pill .bcv-tophist__btn + .bcv-tophist__btn { position: relative; }
+#bcv-tophist .bcv-tophist__pill .bcv-tophist__btn + .bcv-tophist__btn::before { content: ''; position: absolute; left: -1px; top: 7px; bottom: 7px; width: 1px; background: var(--bcv-sep); }
+#bcv-tophist .bcv-tophist__reload { flex: none; width: 30px; height: 30px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 15px; background: var(--bcv-fill); color: var(--bcv-ink2); cursor: pointer; }
+@media (hover: hover) { #bcv-tophist .bcv-tophist__reload:hover { background: var(--bcv-hover); color: var(--bcv-ink); } }
+#bcv-tophist .bcv-tophist__reload:active { scale: .92; }
+#bcv-tophist .bcv-tophist__reload.is-turning svg { animation: bcv-turn .6s var(--bcv-ease-out); }
+@keyframes bcv-turn { from { rotate: 0deg; } to { rotate: 360deg; } }
+#bcv-tophist .bcv-toptitle { min-width: 0; max-width: max(0px, calc(100vw - var(--bcv-side-w) - var(--bcv-right-w, 420px) - 150px)); margin-left: 4px; display: flex; flex-direction: column; justify-content: center; line-height: 1.15; }
+#bcv-tophist .bcv-toptitle__t, #bcv-tophist .bcv-toptitle__s { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#bcv-tophist .bcv-toptitle__t { font: 700 13.5px/1.2 var(--bcv-font); letter-spacing: -.01em; color: var(--bcv-ink); }
+#bcv-tophist .bcv-toptitle__s { font: 500 11.5px/1.2 var(--bcv-font); color: var(--bcv-ink2); }
+#bcv-tophist .bcv-toptitle:not(.has-sub) .bcv-toptitle__s { display: none; }
+/* the right: the search box at the right edge, ⋯ left of it, Previous / Next left of that */
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-topsearch { left: auto; right: 12px; flex-direction: row; gap: 0; }
+#bcv-topsearch .bcv-omni { order: 3 !important; width: var(--bcv-search-w) !important; }
+#bcv-topsearch::after { content: ''; order: 2; flex: none; width: 46px; } /* (the room ⋯ sits in, 8 + 30 + 8) */
+#bcv-topsearch .bcv-asg__nav--bar { order: 1; margin-left: 0; }
+#bcv-topsearch .bcv-omni__panel { left: auto; right: 0; }
+/* ⋯: the Simpl switch, in the bar as the Mac's More button — a round button of the bar's fill with ⋯ in it; its
+ * Turn on / Turn off buttons fold down under it as they always did */
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-look { top: 7px; right: var(--bcv-look-r, 12px); }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-look .bcv-look__main { width: 30px; height: 30px; border-radius: 15px; background: var(--bcv-fill); box-shadow: none; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-look:hover .bcv-look__main { transform: none; box-shadow: none; background: var(--bcv-hover); }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-look .bcv-look__mark { width: 30px; height: 30px; border-radius: 15px; background: transparent; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-look .bcv-look__mark svg { display: none; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-look .bcv-look__mark::after { content: ''; width: 18px; height: 18px; background: var(--bcv-ink2); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9.2' fill='none' stroke='black' stroke-width='1.7'/%3E%3Ccircle cx='7.6' cy='12' r='1.35'/%3E%3Ccircle cx='12' cy='12' r='1.35'/%3E%3Ccircle cx='16.4' cy='12' r='1.35'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9.2' fill='none' stroke='black' stroke-width='1.7'/%3E%3Ccircle cx='7.6' cy='12' r='1.35'/%3E%3Ccircle cx='12' cy='12' r='1.35'/%3E%3Ccircle cx='16.4' cy='12' r='1.35'/%3E%3C/svg%3E") center / contain no-repeat; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-look .bcv-look__menu { top: 30px; }
+/* Report a Bug is in the account's ⋯ menu at the sidebar's foot, as the Mac has it: no purple button in the bar */
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-report { display: none; }
+/* the pinned tools: one capsule of the bar's fill, each tool its glyph in its own colour (the Mac's toolbar group) */
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-tray { top: 7px; right: var(--bcv-tray-r, 300px); }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-pins:not(:empty) { align-items: flex-start; gap: 10px; height: 30px; padding: 3px 8px 0; box-sizing: border-box; border-radius: 15px; background: var(--bcv-fill); }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-pins .bcv-pin:not(.is-open) .bcv-pin__btn { background: transparent; box-shadow: none; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-pins .bcv-pin:not(.is-open) .bcv-pin__ic { color: var(--bcv-pin-color, var(--bcv-ink2)); }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-pins .bcv-pin:not(.is-open)::before { box-shadow: none; }
+@media (hover: hover) { html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-pins .bcv-pin:not(.is-open) .bcv-pin__btn:hover { background: var(--bcv-hover); transform: none; } }
+#bcv-topsearch .bcv-omni__key { display: none; } /* (the Mac's field says it in its words: Search or type /) */
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-pins .bcv-pin:not(.is-open):not(.is-live) :is(.bcv-quick__face, .bcv-island__face) { background: transparent; box-shadow: none; } /* (a running timer keeps its disc and dial: its time at a glance) */
+#bcv-topsearch .bcv-asg__nav--bar { height: 30px; padding: 0; gap: 0; border-radius: 15px; }
+#bcv-topsearch .bcv-asg__nav--bar .bcv-asg__navbtn { height: 30px; gap: 4px; padding: 0 10px 0 8px; border-radius: 15px; font: 600 13px/1 var(--bcv-font); color: var(--bcv-ink); }
+#bcv-topsearch .bcv-asg__nav--bar .bcv-asg__navbtn--next { padding: 0 8px 0 10px; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-pins .bcv-pin:not(.is-open) .bcv-pin__ic svg { width: 18px; height: 18px; }
+
+/* ---- (2.99.53) One sidebar, as the Mac's: section titles in the sidebar's small grey (not shouting capitals); a course a
+ * rounded square of its colour, its name, its chevron at the right (turned down while its sections are open, under it);
+ * All Courses and Groups (its own chevron) with the courses; the account bar at the foot — photo, name, address, ⋯. */
+html.bcv-onebar .bcv-side__label { padding: 10px 10px 4px; font: 600 11.5px/1.2 var(--bcv-font); text-transform: none; letter-spacing: 0; color: var(--bcv-ink3); }
+html.bcv-onebar .bcv-fav { font: 500 14px/1.2 var(--bcv-font); gap: 9px; }
+html.bcv-onebar .bcv-fav__dot { width: 13px; height: 13px; border-radius: 3.5px; }
+.bcv-fav__chev { margin-left: auto; flex: none; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 5px; color: var(--bcv-ink3); cursor: pointer; transition: rotate .2s var(--bcv-ease-out), background .15s ease; }
+.bcv-fav__chev.is-open { rotate: 90deg; }
+@media (hover: hover) { .bcv-fav__chev:hover { background: var(--bcv-fill); color: var(--bcv-ink2); } }
+.bcv-nav__item .bcv-fav__chev { margin-left: 0; }
+.bcv-nav__item:has(.bcv-fav__chev) .bcv-nav__count:empty { margin-left: auto; }
+html.bcv-onebar .bcv-ctabs { padding-left: 20px; }
+html.bcv-onebar .bcv-ctabs::before { display: none; }
+html.bcv-onebar .bcv-ctab { font: 500 14px/1.2 var(--bcv-font); }
+.bcv-ctab__sq { flex: none; width: 13px; height: 13px; border-radius: 4px; }
+/* the account bar */
+.bcv-acctbar { display: flex; align-items: center; gap: 10px; padding: 10px 6px 8px 8px; border-top: 1px solid var(--bcv-sep); }
+.bcv-acctbar__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.bcv-acctbar .bcv-account__name { font: 600 13.5px/1.2 var(--bcv-font); color: var(--bcv-ink); }
+.bcv-acctbar .bcv-account__sub { font: 400 11.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-acctbar .bcv-account { flex: none; width: 28px; height: 28px; padding: 0; display: grid; place-items: center; border-radius: 14px; background: transparent; color: #0a84ff; }
+.bcv-acctbar .bcv-account .bcv-account__more { width: auto; height: auto; background: transparent !important; color: inherit; display: grid; place-items: center; }
+@media (hover: hover) { .bcv-acctbar .bcv-account:hover { background: var(--bcv-fill); } }
+
+/* ---- (2.99.53) The assignment page, as the Mac's ------------------------------------------------------------------- */
+/* two columns from the Mac's width on: the side a third of the room (290 to 400), 28 between */
+@container bcv-main (min-width: 700px) {
+  .bcv-asg__cols { grid-template-columns: minmax(0, 1fr) clamp(290px, 32%, 400px); grid-template-areas: "left rail"; gap: 28px; align-items: start; }
+}
+/* the chip says where it stands in a word */
+.bcv-asg__chips .bcv-asg__status { padding: 4px 9px; border-radius: 7px; font: 600 13px/1.2 var(--bcv-font); }
+.bcv-asg__headrubric { margin-top: 12px; max-width: 420px; }
+.bcv-asg__headrubric .bcv-asg__fact { border-radius: 14px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); padding: 10px 14px; }
+/* what to do next: the buttons side by side, as wide as the column, the last lit in the course's colour */
+.bcv-asg__steps { display: flex; flex-direction: column; gap: 10px; }
+.bcv-asg__stepbtns { display: flex; gap: 10px; }
+#bcv-app .bcv-asg__steps .bcv-asg__step, #bcv-app .bcv-asg__whycard .bcv-asg__step { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 8px; height: 46px; margin: 0; padding: 0 14px; border: 0; border-radius: 23px; background: var(--bcv-fill) !important; color: var(--bcv-ink) !important; box-shadow: inset 0 0 0 1px var(--bcv-edge); font: 600 16px/1 var(--bcv-font); letter-spacing: -.01em; white-space: nowrap; cursor: pointer; transition: filter .15s ease, scale .12s ease-out, background .15s ease; }
+#bcv-app .bcv-asg__steps .bcv-asg__step.is-lit { background: var(--bcv-cc, var(--bcv-blue)) !important; color: #fff !important; box-shadow: 0 4px 14px color-mix(in srgb, var(--bcv-cc, var(--bcv-blue)) 30%, transparent); }
+#bcv-app .bcv-asg__step > span { overflow: hidden; text-overflow: ellipsis; }
+#bcv-app .bcv-asg__step svg { flex: none; }
+@media (hover: hover) { #bcv-app .bcv-asg__step:hover { filter: brightness(1.08); } }
+#bcv-app .bcv-asg__step:active { scale: .98; }
+.bcv-asg__drophint { text-align: center; font: 400 14px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-asg__why { display: flex; align-items: flex-start; gap: 8px; font: 400 14px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-asg__why svg { flex: none; margin-top: 2px; }
+.bcv-asg__whycard { display: flex; flex-direction: column; gap: 12px; }
+#bcv-app .bcv-asg__whycard .bcv-asg__step { flex: none; width: 100%; height: 40px; font-size: 15px; }
+.bcv-asg.is-dropping { outline: 2.5px dashed var(--bcv-cc, var(--bcv-blue)); outline-offset: 6px; border-radius: 18px; }
+/* the facts: a label in small capitals over each value, one line */
+.bcv-asg__rail .bcv-asg__factk { font: 600 11.5px/1.2 var(--bcv-font); text-transform: uppercase; letter-spacing: .06em; color: var(--bcv-ink3); }
+.bcv-asg__rail .bcv-asg__factv { margin-top: 3px; font: 500 15px/1.3 var(--bcv-font); white-space: normal; }
+.bcv-asg__rail .bcv-asg__fact { padding: 9px 14px; align-items: center; }
+/* Your Work: the seal, then each file under it */
+.bcv-asg__worksent { color: #30d158; }
+html[data-bcv-theme="light"] .bcv-asg__worksent { color: #1f9d45; }
+.bcv-asg__seal { display: grid; place-items: center; flex: none; }
+.bcv-asg__workicon { width: 32px; height: 32px; background: transparent; border-radius: 0; }
+/* the comments: a photo, the name, the attempt and the when at the right */
+.bcv-asg__headtools { display: flex; align-items: center; gap: 12px; }
+.bcv-asg__count { font: 500 15px/1 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-asg__count:empty { display: none; }
+.bcv-asg__comment { display: flex; align-items: flex-start; gap: 12px; }
+.bcv-asg__comment > .bcv-avatar, .bcv-asg__comment > img, .bcv-asg__comment > span:first-child { flex: none; }
+.bcv-asg__commentbody { flex: 1; min-width: 0; }
+.bcv-asg__commenthead { display: flex; align-items: baseline; gap: 8px; }
+.bcv-asg__commentwho { font-weight: 600; }
+.bcv-asg__commentatt { font: 400 12px/1.2 var(--bcv-font); color: var(--bcv-ink3); opacity: .8; }
+.bcv-asg__commenthead .bcv-asg__commentwhen { margin-left: auto; font: 400 12px/1.2 var(--bcv-font); color: var(--bcv-ink3); white-space: nowrap; }
+.bcv-asg__commenttext { margin-top: 5px; }
+.bcv-asg__gradep > .bcv-asg__fact { order: 4; grid-column: 1 / -1; margin-top: 2px; padding: 8px 12px; border-radius: 12px; background: var(--bcv-fill); }
+.bcv-asg__rail .bcv-asg__factv.bcv-ellip { white-space: normal; overflow: visible; text-overflow: clip; }
+.bcv-asg__extras:empty, .bcv-asg__extras:not(:has(button)) { display: none; }

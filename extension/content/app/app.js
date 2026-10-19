@@ -684,6 +684,7 @@
     const r = state.route || parseRoute();
     if (r.screen !== 'course') state.courseNavOpen = null; // (out of the course: back in, its rows slide in again)
     if (!oneBar() || !nav || String(nav.id) !== String(c.id) || r.screen !== 'course' || String(r.courseId) !== String(c.id)) return null;
+    if (!sideOpen(c.id)) return null; // (2.99.53: folded by its chevron)
     const color = nav.course?.color || c.color;
     const fresh = state.courseNavOpen !== String(nav.id); // (the rows slide in when the course opens, not at every redraw after)
     state.courseNavOpen = String(nav.id);
@@ -724,7 +725,29 @@
         go(c.url, { motion: 'fade' }); // (a place of its own in the sidebar: a section, crossfaded)
       },
       title: c.name,
-    }, [h('span', { class: 'bcv-fav__dot', style: { background: c.color } }), h('span', { class: 'bcv-ellip', text: c.shortName || c.name })]);
+    }, [h('span', { class: 'bcv-fav__dot', style: { background: c.color } }), h('span', { class: 'bcv-ellip', text: c.shortName || c.name }),
+      oneBar() && cls === 'bcv-fav' ? h('span', { class: `bcv-fav__chev ${sideOpen(c.id) ? 'is-open' : ''}`, role: 'button', title: sideOpen(c.id) ? 'Hide sections' : 'Show sections', 'aria-label': sideOpen(c.id) ? 'Hide sections' : 'Show sections', onclick: (e) => { e.stopPropagation(); toggleSide(c.id); } }, U.svg('M9 6l6 6-6 6', { size: 12, stroke: 'currentColor', width: 2.4 })) : null,
+    ].filter(Boolean));
+  }
+  /** (2.99.53) One sidebar, as the Mac's: a course's sections open under its row by its chevron — the course on show
+   *  open unless folded by it, any other open once asked. */
+  const isShown = (id) => { const r = state.route || parseRoute(); return r.screen === 'course' && String(r.courseId) === String(id); };
+  const sideOpen = (id) => (state.sideOpen ||= new Set()).has(String(id)) || (isShown(id) && !(state.sideShut ||= new Set()).has(String(id)));
+  function toggleSide(id) {
+    const k = String(id);
+    state.sideOpen ||= new Set(); state.sideShut ||= new Set();
+    if (sideOpen(k)) { state.sideOpen.delete(k); if (isShown(k)) state.sideShut.add(k); } else { state.sideOpen.add(k); state.sideShut.delete(k); }
+    renderSide();
+  }
+  // (2.99.53) the sections a course not on show lists under its row, before its own are known — the Mac's defaults
+  const SIDE_SECTIONS = [['announcements', 'Announcements', IC.bell], ['assignments', 'Assignments', IC.doc], ['discussions', 'Discussions', IC.disc], ['grades', 'Grades', IC.chart], ['modules', 'Modules', IC.modules], ['pages', 'Pages', IC.page], ['files', 'Files', IC.folder], ['quizzes', 'Quizzes', IC.bolt], ['people', 'People', IC.people], ['syllabus', 'Syllabus', IC.page]];
+  function sideSections(c) {
+    if (!oneBar() || isShown(c.id) || !sideOpen(c.id)) return null;
+    const base = c.url || `/courses/${c.id}`;
+    return U.el('bcv-ctabs', SIDE_SECTIONS.map(([k, label, icon]) => h('button', { type: 'button', class: 'bcv-ctab', dataset: { tab: k, href: `${base}/${k === 'syllabus' ? 'assignments/syllabus' : k}` }, title: label, onclick: () => { progress(true, `tab:${k}`); go(`${base}/${k === 'syllabus' ? 'assignments/syllabus' : k}`); } }, [
+      h('span', { class: 'bcv-ctab__ic', style: { color: c.color } }, U.svg(icon, { size: 17, width: 1.8 })),
+      h('span', { class: 'bcv-ellip', text: label }),
+    ])), { role: 'group', 'aria-label': `${c.shortName || c.name} sections` });
   }
 
   let quickNavGoing = null; // (the panel on its way out: the pointer back on its row brings it back from there — U.recall)
@@ -815,6 +838,61 @@
     first.focus();
   }
 
+  /** (2.99.53) One sidebar, as the Mac's: the app's own places first — Dashboard, To Do, Calendar, Grades, Notifications,
+   *  Inbox, Tools — the courses (All Courses and Groups with them) in a section of their own under them. */
+  const SIDE_ORDER = ['dashboard', 'todo', 'calendar', 'gpa', 'notifications', 'inbox', 'tools'];
+  const sideNav = () => (oneBar() ? SIDE_ORDER.map((k) => navDef().find((d) => d[0] === k)).filter(Boolean) : navDef());
+  /** A row of the sidebar's own places: its glyph in its colour, its name, its count. */
+  function navButton([key, label, icon, glyphColor, href, count], i, all, r, extra = null) {
+    return h('button', {
+      type: 'button',
+      class: `bcv-nav__item ${r.screen === key || (key === 'groups' && r.screen === 'group') ? 'is-active' : ''}`,
+      dataset: { nav: key, load: key, loadColor: glyphColor, href }, // (href: the pointer resting on the row reads its screen's data ahead, wireIntent)
+      style: tabShades(all.length)[i] ? { '--bcv-tab-icon': tabShades(all.length)[i].icon, '--bcv-tab-text': tabShades(all.length)[i].text } : { '--bcv-tab-icon': glyphColor }, // (the glyph's colour as a variable either way: a photo behind the rail lightens it)
+      ...(key === 'courses' && hoverCourses() ? { 'aria-haspopup': 'true', 'aria-expanded': 'false' } : {}),
+      onclick: () => { if (state.loadKey === key && !loadStuck()) return; closeQuickNav(); progress(true, key); go(href, { motion: 'fade' }); }, // a second press on the loading row is a no-op, until that load is plainly stuck; a section crossfades
+      onpointerenter: (e) => {
+        const a = e.currentTarget;
+        clearTimeout(quickNavIntent);
+        if (quickNav?.key === key || quickNavGoing?.key === key) quickNavHover(key, a); // (open, or still leaving: at once)
+        else quickNavIntent = setTimeout(() => quickNavHover(key, a), 70); // (a moment's rest first, as the pins ask: a pass on the way elsewhere opens nothing)
+      },
+      onpointerleave: () => { clearTimeout(quickNavIntent); quickNavRelease(key); quickNavLeave(key); },
+      onfocus: (e) => quickNavHover(key, e.currentTarget),
+      onblur: () => { quickNavRelease(key); quickNavLeave(key); },
+      onkeydown: (e) => quickNavKey(e, key, e.currentTarget),
+    }, [
+      h('span', { class: 'bcv-nav__ic' }, U.svg(icon, { size: 21, stroke: glyphColor, width: 1.8 })),
+      h('span', { text: label }),
+      h('span', { class: 'bcv-nav__count', text: count }),
+      extra,
+    ].filter(Boolean));
+  }
+  /** (2.99.53) One sidebar's Courses: each favourite with its chevron and, open, its sections under it; All Courses; and
+   *  Groups, its own chevron listing the groups under it — as the Mac's sidebar has them. */
+  function sideCourses(r) {
+    const defs = navDef();
+    const all = defs.find((d) => d[0] === 'courses');
+    const groups = defs.find((d) => d[0] === 'groups');
+    const gOpen = !!state.sideGroupsOpen;
+    const gChev = groups ? h('span', { class: `bcv-fav__chev ${gOpen ? 'is-open' : ''}`, role: 'button', title: gOpen ? 'Hide groups' : 'Show groups', 'aria-label': gOpen ? 'Hide groups' : 'Show groups', onclick: (e) => {
+      e.stopPropagation();
+      state.sideGroupsOpen = !gOpen;
+      if (state.sideGroupsOpen && !state.sideGroups) store.groups().then((g) => { state.sideGroups = g || []; renderSide(); }).catch(() => { state.sideGroups = []; renderSide(); });
+      renderSide();
+    } }, U.svg('M9 6l6 6-6 6', { size: 12, stroke: 'currentColor', width: 2.4 })) : null;
+    return U.el('bcv-side__group bcv-side__group--courses', [
+      U.text('bcv-side__label', 'Courses'),
+      ...state.favs.flatMap((c) => [favRow(c), courseNavRows(c) || sideSections(c)]),
+      state.favs.length ? null : U.text('bcv-hint', 'Star a course under Courses to pin it here.'),
+      all ? navButton([all[0], 'All Courses', ...all.slice(2)], 0, [all], r) : null,
+      groups ? navButton(groups, 0, [groups], r, gChev) : null,
+      gOpen && state.sideGroups ? U.el('bcv-ctabs bcv-ctabs--groups', state.sideGroups.map((g) => h('button', { type: 'button', class: `bcv-ctab ${r.screen === 'group' && String(r.courseId) === String(g.id) ? 'is-active' : ''}`, title: g.name, onclick: () => go(`/groups/${g.id}`, { motion: 'fade' }) }, [
+        h('span', { class: 'bcv-ctab__sq', style: { background: g.color || '#30b0c7' } }),
+        h('span', { class: 'bcv-ellip', text: g.name }),
+      ])), { role: 'group', 'aria-label': 'Groups' }) : null,
+    ].filter(Boolean));
+  }
   function renderSide() {
     if (phone()) {
       if (root) BCV.phone.paintChrome(BCV.app, { focus: inQuiz() && !state.quizOpen });
@@ -849,31 +927,10 @@
       // mockup 11: the glyph in its own colour, no tile behind it; full strength on the active row, dimmed elsewhere
       // under a theme each row takes its own shade of the colour (lib/theme.js shades()), lighter at
       // the top and deeper below, so the rail is never one flat colour
-      h('nav', { class: 'bcv-nav' }, navDef().map(([key, label, icon, glyphColor, href, count], i, all) => h('button', {
-        type: 'button',
-        class: `bcv-nav__item ${r.screen === key || (key === 'groups' && r.screen === 'group') ? 'is-active' : ''}`,
-        dataset: { nav: key, load: key, loadColor: glyphColor, href }, // (href: the pointer resting on the row reads its screen's data ahead, wireIntent)
-        style: tabShades(all.length)[i] ? { '--bcv-tab-icon': tabShades(all.length)[i].icon, '--bcv-tab-text': tabShades(all.length)[i].text } : { '--bcv-tab-icon': glyphColor }, // (the glyph's colour as a variable either way: a photo behind the rail lightens it)
-        ...(key === 'courses' && hoverCourses() ? { 'aria-haspopup': 'true', 'aria-expanded': 'false' } : {}),
-        onclick: () => { if (state.loadKey === key && !loadStuck()) return; closeQuickNav(); progress(true, key); go(href, { motion: 'fade' }); }, // a second press on the loading row is a no-op, until that load is plainly stuck; a section crossfades
-        onpointerenter: (e) => {
-          const a = e.currentTarget;
-          clearTimeout(quickNavIntent);
-          if (quickNav?.key === key || quickNavGoing?.key === key) quickNavHover(key, a); // (open, or still leaving: at once)
-          else quickNavIntent = setTimeout(() => quickNavHover(key, a), 70); // (a moment's rest first, as the pins ask: a pass on the way elsewhere opens nothing)
-        },
-        onpointerleave: () => { clearTimeout(quickNavIntent); quickNavRelease(key); quickNavLeave(key); },
-        onfocus: (e) => quickNavHover(key, e.currentTarget),
-        onblur: () => { quickNavRelease(key); quickNavLeave(key); },
-        onkeydown: (e) => quickNavKey(e, key, e.currentTarget),
-      }, [
-        h('span', { class: 'bcv-nav__ic' }, U.svg(icon, { size: 21, stroke: glyphColor, width: 1.8 })),
-        h('span', { text: label }),
-        h('span', { class: 'bcv-nav__count', text: count }),
-      ]))),
+      h('nav', { class: 'bcv-nav' }, sideNav().map((d, i, all) => navButton(d, i, all, r))),
       // Listed here, or kept in a panel that opens off the Courses row (Settings → Appearance, and
       // the last step of the guided setup). Either way it is the same list in the same order.
-      hoverCourses() ? null : U.el('bcv-side__group', [
+      oneBar() ? sideCourses(r) : hoverCourses() ? null : U.el('bcv-side__group', [
         U.text('bcv-side__label', 'Favorite courses'),
         ...state.favs.flatMap((c) => [favRow(c), courseNavRows(c)]), // (2.99.39: the course on show opens under its row, one sidebar)
         state.favs.length ? null : U.text('bcv-hint', 'Star a course under Courses to pin it here.'),
@@ -883,23 +940,20 @@
       (() => {
         const nav = state.courseNav;
         if (!oneBar() || !nav?.course || r.screen !== 'course' || String(r.courseId) !== String(nav.id)) return null;
-        if (!hoverCourses() && state.favs.some((c) => String(c.id) === String(nav.id))) return null;
+        if ((oneBar() || !hoverCourses()) && state.favs.some((c) => String(c.id) === String(nav.id))) return null;
         const c = { ...nav.course, url: nav.course.url || `/courses/${nav.id}` };
         return U.el('bcv-side__group', [U.text('bcv-side__label', 'This course'), favRow(c), courseNavRows(c)]);
       })(),
       BCV.extras?.sideGroup?.(BCV.app), // what the school added to Canvas's own nav (tools, History, Help)
+      // (2.99.53) who is signed in, at the foot, as the Mac's account bar: the photo, the name and the address they sign in
+      // with, and ⋯ — Settings, Appearance, What's New, the profile, Report a Bug and Sign Out
       U.el('bcv-side__bottom', [
-        // Appearance expands into a menu above itself: Light, Dark, and Personalize (the editor)
-        h('button', { type: 'button', class: 'bcv-theme-btn', id: 'bcv-theme-btn', title: 'Appearance: light, dark, or Personalize', 'aria-haspopup': 'menu', onclick: (e) => { e.stopPropagation(); appearanceMenu(e.currentTarget); } }, [
-          h('span', { class: 'bcv-theme-btn__ic' }, U.svg(IC.image, { size: 14, width: 1.8 })),
-          h('span', { text: 'Appearance' }),
-        ]),
-        // Profile & settings (2.98.41): the photo and the name, and what a press opens — the panel above
-        // it, the photo large at its head with the pronouns and the e-mail Canvas holds, then the settings
-        h('button', { type: 'button', class: 'bcv-account', id: 'bcv-account', onclick: (e) => { e.stopPropagation(); accountMenu(e.currentTarget); }, title: 'Profile & settings', 'aria-label': `Profile & settings${state.me?.name ? `: ${state.me.name}` : ''}`, 'aria-haspopup': 'menu' }, [
+        h('div', { class: 'bcv-acctbar' }, [
           U.avatar(state.me?.avatar, state.me?.name, 30),
-          h('div', { style: { minWidth: '0', flex: '1' } }, [U.text('bcv-account__name bcv-ellip', state.me?.name || 'Account'), U.text('bcv-account__sub bcv-ellip', 'Profile & settings')]),
-          h('span', { class: 'bcv-account__more', 'aria-hidden': 'true' }, U.svg(IC.settings, { size: 14, width: 1.9 })),
+          h('div', { class: 'bcv-acctbar__text' }, [U.text('bcv-account__name bcv-ellip', state.me?.name || 'Account'), U.text('bcv-account__sub bcv-ellip', state.me?.email || state.me?.loginId || siteName())]),
+          h('button', { type: 'button', class: 'bcv-account', id: 'bcv-account', onclick: (e) => { e.stopPropagation(); accountMenu(e.currentTarget); }, title: 'Account, and Report a Bug', 'aria-label': `Account${state.me?.name ? `: ${state.me.name}` : ''}`, 'aria-haspopup': 'menu' }, [
+            h('span', { class: 'bcv-account__more', 'aria-hidden': 'true' }, U.svg('M12 3a9 9 0 110 18 9 9 0 010-18zM7.6 12h.01M12 12h.01M16.4 12h.01', { size: 18, width: 1.8 })),
+          ]),
         ]),
       ]),
     ].filter(Boolean));
@@ -940,6 +994,7 @@
       h('span', { class: 'bcv-menu__ic' }, U.svg(icon, { size: 14, width: 1.9 })),
       h('span', { style: { flex: '1', minWidth: '0' } }, [h('span', { class: 'bcv-ellip', style: { display: 'block' }, text: label }), sub ? h('span', { class: 'bcv-menu__sub', text: sub }) : null]),
     ]);
+    // (2.99.53) the Mac's account menu, item for item
     const m = U.el('bcv-menu bcv-menu--account', [
       // the photo, large, at the head (the initials in the accent's colour when Canvas has none); a press on it opens the Canvas profile
       h('div', { class: 'bcv-menu__head bcv-menu__head--profile' }, [
@@ -947,14 +1002,14 @@
         U.text('bcv-menu__name bcv-ellip', `${me?.name || 'Account'}${me?.pronouns ? ` (${me.pronouns})` : ''}`),
         U.text('bcv-menu__sub bcv-ellip', me?.email || me?.loginId || siteName()),
       ]),
-      // Canvas's own settings, and one link to Simpl's (the look, the setup, Personalize, the welcome and What's new all live there or in the sidebar)
-      item(IC.settings, 'Simpl Courses settings', 'Look, courses and grades', openSettings),
+      item(IC.settings, 'Settings…', null, openSettings),
+      item(IC.image, 'Appearance…', null, () => setTimeout(() => appearanceMenu(anchor), 0), 'bcv-menu__item--appearance'),
+      item(IC.sparkle || IC.star, 'What’s New', null, () => BCV.whatsnew?.open(BCV.app, { manual: true })),
+      item(IC.people, `${BCV.lms.name} Profile`, null, () => go('/profile')),
       U.el('bcv-menu__sep'),
-      item(IC.people, `${BCV.lms.name} profile`, null, () => go('/profile')),
-      item(IC.external, `All ${BCV.lms.name} settings`, 'Profile, notifications, integrations', () => go('/profile/settings')),
-      item(IC.bell, 'Notification preferences', null, () => go('/profile/communication')),
+      item('M8 7a4 4 0 018 0M6 11h12v3a6 6 0 01-12 0zM12 11v9M3 13h3M18 13h3M4 8l2.5 2M20 8l-2.5 2M4.5 19l2.5-2M19.5 19l-2.5-2', 'Report a Bug…', null, async () => { const url = await reportUrl(); anchor.dataset.opened = url; window.open(url, '_blank', 'noopener'); }, 'bcv-menu__item--report'),
       U.el('bcv-menu__sep'),
-      item(IC.external, 'Log out', null, logout, 'bcv-menu__item--danger'),
+      item(IC.external, 'Sign Out…', null, () => { if (confirm(`Sign out of ${BCV.lms.name}?`)) logout(); }, 'bcv-menu__item--danger'),
     ]);
     const r = anchor.getBoundingClientRect();
     Object.assign(m.style, { position: 'fixed', left: `${Math.max(8, r.left)}px`, bottom: `${Math.max(8, window.innerHeight - r.top + 6)}px`, top: 'auto', transformOrigin: 'left bottom' }); // (it grows up out of the row it hangs from)
@@ -1470,6 +1525,7 @@
     histButtons();
     syncSide(); // the sidebar follows the route in place; it is rebuilt only when what it shows changes
     BCV.search?.dock?.(BCV.app, r); // the search box at the left of the top bar on every screen but the Dashboard, whose header has it (kept as it is when it is already there)
+    barLayout();
     // ctx.swap: a screen that keeps its shell (a course's tabs) puts its new column in through it, so the column moves as a screen would
     const ctx = { app: BCV.app, route: r, alive, dark: state.dark, swap: (update, scope) => (alive() ? swap(update, kind, scope) : Promise.resolve(update())) };
     // Screens build off-DOM and land whole. A screen still fetching after 150ms gets a
@@ -1556,6 +1612,8 @@
     if ((BCV.canvas.keptCount?.() ?? 0) > kept0) redrawWhenAnswered(id, r); // (drawn from what was kept: Canvas's own answer puts it right)
     else html.classList.remove('bcv-kept');
     document.title = titleFor(r);
+    barTitle(r);
+    barLayout();
     if (phone()) BCV.phone.afterRender(BCV.app, r, el);
     BCV.iosShell?.rendered(); // (the iPhone app's bar takes the screen's title)
     // ?bcv=setup (the popup's Set up button, the account sheet, the app's first launch): the guided
@@ -1742,14 +1800,74 @@
   }
   /** (2.99.52) Back and Forward at the left of the bar across the top, as the Mac's toolbar has them: the browser's own
    *  history, which the app's screens are part of. Built once, kept across screens (outside the app's root, as the
-   *  search box beside it). */
+   *  search box beside it). (2.99.53) The Mac's toolbar whole, in its order: the sidebar's button over the sidebar's
+   *  corner, then Back and Forward, Refresh, and the screen's title with its course under it; the pinned tools,
+   *  Previous / Next, ⋯ and the search box at the right (app.css). */
   function histButtons() {
     if (BCV.phone?.active?.() || document.getElementById('bcv-tophist')) return;
     const btn = (dir, label, d, go) => h('button', { type: 'button', class: `bcv-tophist__btn bcv-tophist__btn--${dir}`, title: label, 'aria-label': label, onclick: go }, U.svg(d, { size: 16, stroke: 'currentColor', width: 2.3 }));
+    const reload = h('button', { type: 'button', class: 'bcv-tophist__reload', title: 'Refresh', 'aria-label': 'Refresh', onclick: () => { reload.classList.remove('is-turning'); void reload.offsetWidth; reload.classList.add('is-turning'); BCV.canvas.clearAll(); render({ quiet: true }); } }, U.svg('M20 11a8 8 0 10-2.3 5.7M20 4v7h-7', { size: 16, stroke: 'currentColor', width: 2.2 }));
     document.body.append(h('div', { id: 'bcv-tophist', class: 'bcv-tophist', role: 'group', 'aria-label': 'History' }, [
-      btn('back', 'Back', 'M15 5l-7 7 7 7', () => history.back()),
-      btn('fwd', 'Forward', 'M9 5l7 7-7 7', () => history.forward()),
+      h('div', { class: 'bcv-tophist__pill' }, [
+        btn('back', 'Back', 'M15 5l-7 7 7 7', () => history.back()),
+        btn('fwd', 'Forward', 'M9 5l7 7-7 7', () => history.forward()),
+      ]),
+      reload,
+      h('div', { id: 'bcv-toptitle', class: 'bcv-toptitle' }, [U.text('bcv-toptitle__t bcv-ellip', '', 'div'), U.text('bcv-toptitle__s bcv-ellip', '', 'div')]),
     ]));
+    // the sidebar's own button, at its top right corner (the Mac's, beside the window's buttons): the sidebar folds away and back
+    const side = h('button', { type: 'button', id: 'bcv-sidetoggle', class: 'bcv-sidetoggle', title: 'Hide Sidebar', 'aria-label': 'Hide Sidebar', 'aria-pressed': 'false', onclick: () => {
+      const off = !html.classList.contains('bcv-side-off');
+      html.classList.toggle('bcv-side-off', off);
+      side.title = off ? 'Show Sidebar' : 'Hide Sidebar';
+      side.setAttribute('aria-label', side.title);
+      side.setAttribute('aria-pressed', off ? 'true' : 'false');
+    } }, U.svg('M4 5h16a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1zM9 5v14M5.5 8.5h1.5M5.5 11h1.5', { size: 17, stroke: 'currentColor', width: 1.9 }));
+    document.body.append(side);
+  }
+  /** (2.99.53) Where the right of the bar sits, measured: the search box at the right edge (with Previous / Next in its
+   *  row, and the room ⋯ takes between them), ⋯ (the switch) in that room, the pinned tools left of them all; and how
+   *  wide the right side is, for the title to stop short of it. On every change of the row's size. */
+  let barRO = null;
+  function barLayout() {
+    if (BCV.phone?.active?.()) return;
+    const ts = document.getElementById('bcv-topsearch');
+    const shown = !!ts && !ts.hidden && getComputedStyle(ts).display !== 'none';
+    const omni = shown ? ts.querySelector('.bcv-omni') : null;
+    const ow = omni ? Math.round(omni.getBoundingClientRect().width) : 0;
+    const lookR = 12 + (ow ? ow + 8 : 0);
+    const tsW = shown ? Math.round(ts.getBoundingClientRect().width) : 0;
+    const nav = shown ? ts.querySelector('.bcv-asg__nav--bar') : null;
+    const trayR = nav ? 12 + tsW + 8 : lookR + 30 + 8; // (left of Previous / Next, else of ⋯: 8 between, as the Mac's groups)
+    const tray = document.getElementById('bcv-tray');
+    const trayW = tray ? Math.round(tray.getBoundingClientRect().width) : 0;
+    html.style.setProperty('--bcv-look-r', `${lookR}px`);
+    html.style.setProperty('--bcv-tray-r', `${trayR}px`);
+    html.style.setProperty('--bcv-right-w', `${trayR + trayW}px`);
+    if (!barRO && typeof ResizeObserver === 'function') {
+      barRO = new ResizeObserver(() => barLayout());
+      addEventListener('resize', () => barLayout());
+    }
+    if (barRO) {
+      for (const el of [ts, document.getElementById('bcv-pins')]) if (el && !el.dataset.bcvBarWatched) { el.dataset.bcvBarWatched = '1'; barRO.observe(el); }
+    }
+  }
+  /** (2.99.53) The bar's title, as the Mac's window title: the item, the section or the screen, with its course under it. */
+  function barTitle(r) {
+    const el = document.getElementById('bcv-toptitle');
+    if (!el) return;
+    const main = document.getElementById('bcv-main');
+    const c = r.courseId ? (state.favs || []).find((x) => String(x.id) === String(r.courseId)) : null;
+    const course = c ? (c.shortName || c.name) : '';
+    const item = main?.querySelector('.bcv-detail__title')?.textContent.trim();
+    const head = main?.querySelector('.bcv-head .bcv-h1')?.textContent.trim();
+    const root = { dashboard: 'Dashboard', courses: 'Courses', groups: 'Groups', todo: 'To Do', calendar: 'Calendar', inbox: 'Inbox', gpa: 'Grades', notifications: 'Notifications', tools: 'Tools' }[r.screen];
+    const t = item || root || (r.courseId && (!r.tab || r.tab === 'home') ? course : head) || (document.title || '').split(' · ')[0];
+    const sub = r.courseId && t !== course ? course : '';
+    el.querySelector('.bcv-toptitle__t').textContent = t || '';
+    el.querySelector('.bcv-toptitle__s').textContent = sub;
+    el.classList.toggle('has-sub', !!sub);
+    el.title = sub ? `${t} — ${sub}` : t || '';
   }
   function punchOut() {
     punchStop?.();

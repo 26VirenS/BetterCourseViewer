@@ -80,7 +80,7 @@
   const searchBox = () => $('#bcv-omni-box');
   const searchPanel = () => $('#bcv-omni-panel');
   const report = () => $('#bcv-report');
-  const themeBtn = () => $('#bcv-theme-btn');
+  const themeBtn = () => $('#bcv-account'); // (2.99.53: Appearance… is in the account's ⋯ menu, as the Mac's)
   /** The first of the Grades page's cards whose ring opens into groups (a course with groups to show). */
   const ringCard = () => [...document.querySelectorAll('.bcv-gpa__card')].find((c) => drawn(c.querySelector('.bcv-gpa__ringbox[title]'))) || null;
   const pinnedN = () => document.querySelectorAll('.bcv-tool-card.is-pinned').length;
@@ -118,7 +118,7 @@
     },
     // the purple button left of the switch (2.98.20)
     report: () => [
-      { id: 'report', name: 'the purple button', target: report, when: () => !!report() && !phone(),
+      { id: 'report', name: 'the purple button', target: report, when: () => !!report() && !phone() && report().getClientRects().length > 0, // (2.99.53: none in the shell's bar — Report a Bug is in the account's ⋯ menu, as the Mac's)
         title: 'Report a bug', body: 'Found a bug or want something added? Tell us here.', act: 'hover', doing: 'Hover over the purple button',
         done: () => !!report()?.matches(':hover, :focus-visible'), after: 'Use it any time.' },
     ],
@@ -208,8 +208,8 @@
     // the sidebar's Appearance button, after Personalize was tried from the theme invitation
     appearance: () => [
       { id: 'appearance', name: 'Appearance', where: 'sidebar', target: themeBtn, wait: 4000,
-        title: 'Themes live here', body: 'Switch light and dark, or change colors and photos.', act: 'click', doing: 'Click Appearance',
-        done: () => !!$('.bcv-menu--theme'), after: 'Personalize changes colors and photos.' },
+        title: 'Themes live here', body: 'Appearance… in this menu switches light and dark, or changes colors and photos.', act: 'click', doing: 'Click ⋯',
+        done: () => !!$('.bcv-menu--account, .bcv-menu--theme'), after: 'Personalize changes colors and photos.' },
     ],
     // the rubric ring's own (2.98.85): on the first ring opened (rubric-ring.js), the ring worked by the
     // student — a colour hovered, one opened into its bar, a dot pressed, the little ring pressed to go
@@ -273,7 +273,7 @@
       if (f[KEY] === true) return 'setup';
       if (f[KEY3] === true) return 'appearance';
       if (f['setup:done'] && !f[KEY2] && typeof f['whatsnew:seen'] === 'string' && older(f['whatsnew:seen'], LOOK2_SINCE)) return 'look';
-      if (f['setup:done'] && !f[KEY5] && typeof f['whatsnew:seen'] === 'string' && older(f['whatsnew:seen'], REPORT_SINCE)) return 'report';
+      // (2.99.53) the purple button's step alone is no longer owed: there is no purple button in the shell's bar
       if (f['setup:done'] && !f[KEY4]) return 'search';
     } catch { /* nothing to read: nothing owed */ }
     return false;
