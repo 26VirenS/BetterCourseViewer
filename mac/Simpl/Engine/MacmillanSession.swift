@@ -18,6 +18,10 @@ final class MacmillanSession: ObservableObject {
     /// with the list of questions, the score and the controls; nil until the assessment player has said (an assignment
     /// of another kind of Macmillan's is shown as it is).
     @Published private(set) var state: MacmillanState?
+    /// (1.3.123) Macmillan's pop-up open (You solved it…), shown as the app's own card — as Knewton Alta's are.
+    @Published var dialog: AltaDialog?
+    /// Given back to Macmillan's page (Show in Macmillan's Page): shown as it is drawn until it closes.
+    @Published private(set) var dialogInPage = false
     /// (1.3.114) Show Browser: Macmillan's own page, as Macmillan draws it, in place of the skinned one.
     @Published private(set) var browser = UserDefaults.standard.bool(forKey: MacmillanSession.browserKey)
     static let browserKey = "SimplMacmillanShowBrowser"
@@ -136,6 +140,28 @@ final class MacmillanSession: ObservableObject {
             }
             return
         }
+        // (1.3.123) Macmillan's pop-up, read whole by the skin: the app's own card over the popup, or none
+        if head["kind"] as? String == "dialog" {
+            guard head["open"] as? Bool == true else { withAnimation(Motion.gentle) { dialog = nil; dialogInPage = false }; return }
+            if head["inPage"] as? Bool == true { withAnimation(Motion.gentle) { dialog = nil; dialogInPage = true }; return }
+            let title = head["title"] as? String ?? ""
+            let html = head["html"] as? String ?? ""
+            let choices = (head["buttons"] as? [[String: Any]] ?? []).map { b in
+                AltaDialog.Choice(label: b["label"] as? String ?? "", primary: b["primary"] as? Bool ?? false,
+                                  enabled: b["enabled"] as? Bool ?? true, close: b["close"] as? Bool ?? false)
+            }
+            guard !html.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !choices.isEmpty else { dialogDismissed(); return }
+            dialogInPage = false
+            if dialog != nil {
+                dialog?.title = title
+                dialog?.html = html
+                dialog?.buttons = choices
+                dialog?.step += 1
+            } else {
+                withAnimation(Motion.gentle) { dialog = AltaDialog(title: title, html: html, buttons: choices, base: frame.request.url ?? web.url ?? URL(fileURLWithPath: "/")) }
+            }
+            return
+        }
         // (1.3.122) a question's picture pressed: large, in a window of its own over the popup, as Knewton Alta's graphs
         // open — moved and sized as the student likes (AltaGraphWindow); the picture's bytes as the page had them, or
         // its address, read with the page's cookies
@@ -153,6 +179,15 @@ final class MacmillanSession: ObservableObject {
         frames.removeAll { ($0.request.url?.absoluteString ?? "") == key }
         frames.append(frame)
         if frames.count > 30 { frames.removeFirst() }
+    }
+
+    /// (1.3.123) One of the pop-up's buttons, pressed in Macmillan's own.
+    func pressDialog(_ index: Int) { Task { _ = await act("dialog", index) } }
+
+    /// The card put away without a button (Show in Macmillan's Page): the pop-up given back to the page.
+    func dialogDismissed() {
+        dialog = nil
+        Task { _ = await act("dialogPage") }
     }
 
     /// (1.3.122) A picture by its address, with the page's cookies (it may be behind Macmillan's sign-in), in the window.

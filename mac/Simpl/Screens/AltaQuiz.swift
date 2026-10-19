@@ -888,8 +888,10 @@ private struct AltaMasteryBar: View {
 /// the pop-up up as a sheet: begun from a view in this popup, a borderless child panel over the window rather than a
 /// window of its own, it dimmed the main window, and the popup with its pop-up went from sight.) Nothing outside the
 /// popup is dimmed or held.
-private struct AltaDialogLayer: View {
+struct AltaDialogLayer: View {
     let dialog: AltaDialog
+    /// (1.3.123) Whose pop-up it is: Knewton Alta's, or Macmillan's (MacmillanScreen) — the card's name, glyph and its page.
+    var brand = AltaDialogCard.Brand.alta
     let press: (Int) -> Void
     let link: (Int) -> Void
     let giveBack: () -> Void
@@ -901,7 +903,7 @@ private struct AltaDialogLayer: View {
                     .contentShape(Rectangle())
                     .onTapGesture {}
                     .accessibilityHidden(true)
-                AltaDialogCard(dialog: dialog, tallest: max(120, g.size.height - 240), press: press, link: link, giveBack: giveBack)
+                AltaDialogCard(dialog: dialog, brand: brand, tallest: max(120, g.size.height - 240), press: press, link: link, giveBack: giveBack)
                     .background {
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
                             .fill(Theme.card)
@@ -923,8 +925,17 @@ private struct AltaDialogLayer: View {
 /// once it has measured itself; a long one scrolls. A next step updates it in place, its buttons resting from a press
 /// until it comes. Return presses Alta's main button (else the last); Escape its Close, Cancel, Got it or OK, else Show
 /// in Alta's Page, which gives the pop-up back to the page.
-private struct AltaDialogCard: View {
+struct AltaDialogCard: View {
+    struct Brand {
+        let name: String
+        let symbol: String
+        let color: Color
+        let page: String
+        static let alta = Brand(name: "Knewton Alta", symbol: "brain.head.profile", color: Theme.accent, page: "Alta's Page")
+        static let macmillan = Brand(name: "Macmillan Learning", symbol: "books.vertical", color: .red, page: "Macmillan's Page")
+    }
     let dialog: AltaDialog
+    var brand = Brand.alta
     /// (1.3.84) Taller than this, its body scrolls: the room the popup leaves it.
     let tallest: CGFloat
     let press: (Int) -> Void
@@ -953,8 +964,8 @@ private struct AltaDialogCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 10) {
-                IconTile(symbol: "brain.head.profile", color: Theme.accent, size: 26)
-                Text(dialog.title.isEmpty ? "Knewton Alta" : dialog.title)
+                IconTile(symbol: brand.symbol, color: brand.color, size: 26)
+                Text(dialog.title.trimmingCharacters(in: .whitespaces).isEmpty ? brand.name : dialog.title)
                     .font(.sHeadline)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
@@ -995,10 +1006,10 @@ private struct AltaDialogCard: View {
 
     private var buttons: some View {
         HStack(spacing: 10) {
-            Button("Show in Alta's Page", action: giveBack)
+            Button("Show in \(brand.page)", action: giveBack)
                 .glassButton()
                 .keyboardShortcut(escapeIndex == nil ? KeyboardShortcut.cancelAction : nil)
-                .help("Show this pop-up as Alta draws it, in Alta's page")
+                .help("Show this pop-up as it is drawn, in \(brand.page.lowercased())")
             Spacer(minLength: 8)
             // (Escape on a lone Got it, which Return presses too)
             if let e = escapeIndex, e == defaultIndex {
@@ -1013,7 +1024,7 @@ private struct AltaDialogCard: View {
                     .glassButton(prominent: i == defaultIndex)
                     .keyboardShortcut(i == defaultIndex ? KeyboardShortcut.defaultAction : (i == escapeIndex ? KeyboardShortcut.cancelAction : nil))
                     .disabled(!b.enabled || pressed)
-                    .help(b.enabled ? "\(b.label) (Alta's own button)" : "Not ready yet")
+                    .help(b.enabled ? "\(b.label) (\(brand.name)'s own button)" : "Not ready yet")
             }
         }
         .controlSize(.large)

@@ -54,6 +54,15 @@ struct MacmillanScreen: View {
             }
         }
         .frame(width: ideal.width, height: ideal.height)
+        // (1.3.123) Macmillan's pop-ups as the Mac's own, as Knewton Alta's are (AltaQuiz): a card of the popup's own over
+        // its content, its buttons pressing Macmillan's; held open meanwhile, Escape answering the pop-up
+        .overlay {
+            if let d = session.dialog {
+                AltaDialogLayer(dialog: d, brand: .macmillan, press: { i in session.pressDialog(i) }, link: { _ in }, giveBack: { session.dialogDismissed() })
+            }
+        }
+        .animation(Motion.gentle, value: session.dialog?.id)
+        .popupCloseHeld(session.dialog != nil)
         .background(PageGround())
         .tint(Theme.accent)
         .task { await session.start(engine: engine) }

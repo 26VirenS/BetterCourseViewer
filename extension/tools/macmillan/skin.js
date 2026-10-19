@@ -62,6 +62,7 @@
   // and one column when narrow.
   var ROWS = ''; for (var n = 1; n <= 60; n++) ROWS += 'html.simpl-mm .parent-module-container[data-simpl-rows="' + n + '"]{grid-template-rows:repeat(' + n + ',auto) 1fr}';
   var SKIN =
+    'html.simpl-mm .simpl-mm-dlghide{display:none!important}' + // (Mac 1.3.123: Macmillan's pop-up, drawn by the app instead)
     'html.simpl-mm{--mm-ink:#1c1c1e;--mm-ink2:rgba(60,60,67,.62);--mm-card:rgba(255,255,255,.74);--mm-line:rgba(0,0,0,.07);--mm-field:rgba(255,255,255,.92);--mm-good:#1a6b30;--mm-good-bg:rgba(52,199,89,.16);--mm-bad:#c01d43;--mm-bad-bg:rgba(255,59,48,.13);--mm-good-line:rgba(52,199,89,.35);--mm-bad-line:rgba(255,59,48,.3);--mm-on:#fff;--mm-accent:#0a84ff;--mm-accent-ring:rgba(10,132,255,.25);--mm-field2:rgba(0,0,0,.04);--mm-pop:#fff;--mm-rim:rgba(255,255,255,.7);color-scheme:light}' +
     'html.simpl-mm.simpl-mm-dark{--mm-ink:#f2f2f7;--mm-ink2:rgba(235,235,245,.62);--mm-card:rgba(255,255,255,.075);--mm-line:rgba(255,255,255,.11);--mm-field:rgba(255,255,255,.09);--mm-good:#5ddb7d;--mm-good-bg:rgba(52,199,89,.2);--mm-bad:#ff8098;--mm-bad-bg:rgba(255,69,58,.2);--mm-good-line:rgba(93,219,125,.45);--mm-bad-line:rgba(255,128,152,.4);--mm-on:#0b2a14;--mm-accent:#409cff;--mm-accent-ring:rgba(64,156,255,.3);--mm-field2:rgba(255,255,255,.08);--mm-pop:#2c2c2e;--mm-rim:rgba(255,255,255,.08);color-scheme:dark}' +
     'html.simpl-mm,html.simpl-mm body{background:transparent!important;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif!important}' +
@@ -297,10 +298,37 @@
       var s = state();
       var text = JSON.stringify(s);
       if (text !== last) { last = text; post(s); }
+      dialogReport();
     }, 120);
   }
 
   function click(el) { if (!el) return false; el.click(); report(); return true; }
+
+  // (Mac 1.3.123) Macmillan's pop-up — You solved it…, with View Solution and Next Question — as the app's own card, the
+  // way Knewton Alta's are: read whole (its title, its body, every button, its × as Close) and hidden in the page while
+  // the app shows it; the card's buttons press Macmillan's. Given back (Show in Macmillan's Page), it shows as drawn.
+  var lastDlg = '', dlgInPage = false;
+  function dlgNow() { return q('#react-aria-modal-dialog, [role="dialog"].sac-modal'); }
+  function dlgButtons(d) { return d ? qa('button', d).filter(function (b) { return b.offsetParent !== null || b.closest('.simpl-mm-dlghide'); }) : []; }
+  function dlgOverlay(d) { var o = d; while (o && o.parentElement && o.parentElement !== document.body) { if (/fixed/.test(o.getAttribute('style') || '')) return o; o = o.parentElement; } return d.parentElement || d; }
+  function dialogReport() {
+    if (!window.__simplMacmillanGlass) return;
+    var d = skinned ? dlgNow() : null;
+    if (!d) { if (lastDlg) { lastDlg = ''; dlgInPage = false; post({ kind: 'dialog', open: false }); } return; }
+    var ov = dlgOverlay(d);
+    if (dlgInPage) { ov.classList.remove('simpl-mm-dlghide'); return; }
+    ov.classList.add('simpl-mm-dlghide');
+    var body = q('#solution-modal-content, .modal-body, .content', d) || d;
+    var copy = body.cloneNode(true);
+    qa('script, button', copy).forEach(function (x) { x.remove(); });
+    var m = { kind: 'dialog', open: true, title: words(q('#modal-title, h1, h2', d)), html: copy.innerHTML.trim(),
+      buttons: dlgButtons(d).map(function (b) {
+        var x = b.id === 'close-modal-x' || b.getAttribute('data-test-id') === 'close-modal-x' || (/close/i.test(b.getAttribute('aria-label') || '') && !/\w{3,}/.test(words(b).replace(/close modal/i, '')));
+        return { label: x ? 'Close' : words(b), primary: /\bprimary\b/.test(b.className), enabled: !b.disabled, close: x };
+      }) };
+    var text = JSON.stringify(m);
+    if (text !== lastDlg) { lastDlg = text; post(m); }
+  }
 
   // the app's presses
   window.__simplMacmillan = function (cmd, arg) {
@@ -310,6 +338,9 @@
       case 'prev': return click(tid('nav-item-back'));
       case 'next': return click(tid('nav-item-forward'));
       case 'main': return click(tid('btn-sac-main'));
+      // (Mac 1.3.123) the pop-up's buttons, and the pop-up given back to the page
+      case 'dialog': return click(dlgButtons(dlgNow())[Number(arg)]);
+      case 'dialogPage': { dlgInPage = true; var d = dlgNow(); if (d) dlgOverlay(d).classList.remove('simpl-mm-dlghide'); post({ kind: 'dialog', open: true, inPage: true }); return true; }
       case 'resources': return click(q('[aria-label="Open Resources"]'));
       case 'tutor': return click(q('[aria-label="Open AI Tutor"]'));
       case 'solution': return click(q('[aria-label="Open Solution"]'));
