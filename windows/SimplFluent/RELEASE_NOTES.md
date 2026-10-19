@@ -1,3 +1,7 @@
+**What's new in 0.3.36** (beta)
+
+- **Macmillan Learning, diagrams and widgets** — a question with a picture keeps the picture on the right and the question with its answers down the left, whatever layout Macmillan gives it; parts that draw themselves (a labelling with its answer bank, a graph) stay readable in dark on a white plate and scroll in place instead of being cut off; nothing of the page runs past the right edge.
+
 **What's new in 0.3.35** (beta)
 
 - **Macmillan Learning, polished** — the whole question sits on one panel; Macmillan's Solved bar is replaced by the same Correct or Incorrect pill Knewton Alta shows, and each answer's own Correct is easy to read in dark too; questions that put each prompt beside its answer are one readable column (the answers no longer run off the edge); a number's answer is a field-sized box and its ×10ʸ tools menu matches the app; the words use the app's font; Switch to new layout is gone.

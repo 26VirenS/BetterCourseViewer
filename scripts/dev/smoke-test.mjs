@@ -5180,7 +5180,7 @@ try {
   await page.evaluate(() => sessionStorage.removeItem('bcv:dash-arrived')); // (a first arrival: its entrances are what reduced motion is checked against)
   await page.reload();
   await page.waitForSelector('.bcv-stat', { timeout: 10000 });
-  await page.waitForSelector('.bcv-work__fill', { timeout: 10000 });
+  await page.waitForSelector('.bcv-work__fill', { state: 'attached', timeout: 10000 }); // (there: early on a Monday the week's first bar is at 0, drawn but no width to see)
   const reduced = await page.evaluate(() => {
     const probe = document.createElement('span'); probe.className = 'bcv-load'; document.querySelector('.bcv-nav__item').append(probe); // a wash under reduced motion: a still, partial fill
     const cs = getComputedStyle(probe);
