@@ -1,3 +1,7 @@
+**What's new in 0.3.42** (beta)
+
+- **Knewton Alta, a sun and moon switch** — the sun and moon are now inside the Light/Dark switch: the knob slides to the side you pick and carries its icon.
+
 **What's new in 0.3.41** (beta)
 
 - **Knewton Alta, controls on top** — Light and Dark are now one switch, and it sits with Browser in the popup's top bar, left of your tools, instead of above the objectives.

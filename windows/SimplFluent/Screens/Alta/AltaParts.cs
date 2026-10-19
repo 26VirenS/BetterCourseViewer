@@ -310,29 +310,42 @@ internal static class AltaParts
 /// </summary>
 internal sealed class AltaPageBar : StackPanel
 {
-    private readonly ToggleSwitch look = new() { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, -4, 0) };
-    private readonly SymbolIcon sun = new() { Symbol = SymbolRegular.WeatherSunny24, FontSize = 16, VerticalAlignment = VerticalAlignment.Center };
-    private readonly SymbolIcon moon = new() { Symbol = SymbolRegular.WeatherMoon24, FontSize = 16, VerticalAlignment = VerticalAlignment.Center };
+    // (0.3.42) the sun and moon in the switch itself: each faint at its end of the track, and the knob, sliding over to
+    // the side chosen, carrying it
+    private const double W = 58, H = 30, Inset = 3, Knob = H - Inset * 2;
+    private readonly Border track = new() { Width = W, Height = H, CornerRadius = new CornerRadius(H / 2), Focusable = true, Cursor = System.Windows.Input.Cursors.Hand, VerticalAlignment = VerticalAlignment.Center };
+    private readonly SymbolIcon sunFaint = new() { Symbol = SymbolRegular.WeatherSunny24, Filled = true, FontSize = 13, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0), Foreground = Brushes.White };
+    private readonly SymbolIcon moonFaint = new() { Symbol = SymbolRegular.WeatherMoon24, Filled = true, FontSize = 13, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
+    private readonly SymbolIcon knobIcon = new() { Filled = true, FontSize = 14, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+    private readonly TranslateTransform slide = new();
     private readonly Wpf.Ui.Controls.Button browser;
-    private readonly StackPanel pair;
-    private bool on, showing;
+    private bool on, isDarkNow, first = true;
 
     public AltaPageBar(bool isDark, bool isBrowser, Action<bool> choose, Action<bool> show)
     {
         Orientation = Orientation.Horizontal;
         VerticalAlignment = VerticalAlignment.Center;
-        look.Checked += (_, _) => { if (!showing) choose(true); };
-        look.Unchecked += (_, _) => { if (!showing) choose(false); };
-        sun.Cursor = moon.Cursor = System.Windows.Input.Cursors.Hand;
-        sun.MouseLeftButtonUp += (_, e) => { e.Handled = true; if (look.IsEnabled) choose(false); };
-        moon.MouseLeftButtonUp += (_, e) => { e.Handled = true; if (look.IsEnabled) choose(true); };
-        pair = new StackPanel { Orientation = Orientation.Horizontal, Children = { sun, look, moon }, VerticalAlignment = VerticalAlignment.Center };
-        var chip = new Border { CornerRadius = new CornerRadius(15), Padding = new Thickness(11, 3, 11, 3), Child = pair, VerticalAlignment = VerticalAlignment.Center }.Bg(B.Subtle);
-        ToolTipService.SetShowOnDisabled(chip, true);
-        System.Windows.Automation.AutomationProperties.SetName(look, "Dark page");
+        moonFaint.SetResourceReference(IconElement.ForegroundProperty, B.Text2);
+        var knob = new Border
+        {
+            Width = Knob, Height = Knob, CornerRadius = new CornerRadius(Knob / 2), Background = Brushes.White,
+            HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(Inset, 0, 0, 0),
+            RenderTransform = slide, Child = knobIcon,
+            Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 4, ShadowDepth = 1, Direction = 270, Opacity = 0.25 },
+        };
+        track.Child = new Grid { Children = { sunFaint, moonFaint, knob } };
+        track.MouseLeftButtonUp += (_, e) => { e.Handled = true; if (!on) choose(!isDarkNow); };
+        track.KeyDown += (_, e) =>
+        {
+            if (on || e.Key is not (System.Windows.Input.Key.Space or System.Windows.Input.Key.Enter)) return;
+            e.Handled = true;
+            choose(!isDarkNow);
+        };
+        ToolTipService.SetShowOnDisabled(track, true);
+        System.Windows.Automation.AutomationProperties.SetName(track, "Dark page");
         browser = new Wpf.Ui.Controls.Button { Icon = new SymbolIcon { Symbol = SymbolRegular.Globe24 }, Content = "Browser", MinWidth = 0, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
         browser.Click += (_, e) => { e.Handled = true; show(!on); };
-        Children.Add(chip);
+        Children.Add(track);
         Children.Add(browser);
         Show(isDark, isBrowser);
     }
@@ -342,16 +355,23 @@ internal sealed class AltaPageBar : StackPanel
     public void Show(bool isDark, bool isBrowser)
     {
         on = isBrowser;
-        showing = true;
-        look.IsChecked = isDark;
-        showing = false;
-        look.IsEnabled = !isBrowser;
-        pair.Opacity = isBrowser ? 0.5 : 1;
-        sun.SetResourceReference(IconElement.ForegroundProperty, isDark || isBrowser ? B.Text2 : B.AccentText);
-        moon.SetResourceReference(IconElement.ForegroundProperty, isDark && !isBrowser ? B.AccentText : B.Text2);
+        isDarkNow = isDark;
+        track.SetResourceReference(Border.BackgroundProperty, isDark ? B.Accent : B.Subtle);
+        track.Opacity = isBrowser ? 0.5 : 1;
+        sunFaint.Opacity = isDark ? 0.8 : 0;
+        moonFaint.Opacity = isDark ? 0 : 0.7;
+        knobIcon.Symbol = isDark ? SymbolRegular.WeatherMoon24 : SymbolRegular.WeatherSunny24;
+        if (isDark) knobIcon.SetResourceReference(IconElement.ForegroundProperty, B.Accent);
+        else knobIcon.Foreground = new SolidColorBrush(Color.FromRgb(0xF5, 0x9E, 0x0B));
+        var x = isDark ? W - Knob - Inset * 2 : 0;
+        if (first || !Motion.On) slide.BeginAnimation(TranslateTransform.XProperty, null);
+        if (first || !Motion.On) slide.X = x;
+        else slide.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(x, Motion.Ms(220)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+        first = false;
+        System.Windows.Automation.AutomationProperties.SetItemStatus(track, isDark ? "On" : "Off");
         var tip = isBrowser ? "Alta’s own page is shown as Alta draws it: Light and Dark come back with the question laid out"
             : isDark ? "Alta’s page is dark — switch for light" : "Alta’s page is light — switch for dark";
-        ((Border)Children[0]).ToolTip = tip;
+        track.ToolTip = tip;
         browser.Appearance = isBrowser ? ControlAppearance.Primary : ControlAppearance.Secondary;
         browser.ToolTip = isBrowser ? "Back to the question laid out by Simpl" : "Show Alta’s own page, as in a browser — the objectives stay";
         System.Windows.Automation.AutomationProperties.SetName(browser, "Show browser");

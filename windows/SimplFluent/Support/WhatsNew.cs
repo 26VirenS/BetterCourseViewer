@@ -26,6 +26,8 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.42", "2026-10-19",
+            ("improved", "Sun and Moon Switch", "Alta's Light/Dark switch carries its sun and moon.")),
         R("0.3.41", "2026-10-19",
             ("improved", "Alta Controls on Top", "Light/Dark is a switch, beside Browser in the top bar.")),
         R("0.3.40", "2026-10-19",
