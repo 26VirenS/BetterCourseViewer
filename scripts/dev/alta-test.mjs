@@ -892,6 +892,32 @@ try {
     await hp.close();
   }
 
+  // (Mac 1.3.133 / Windows 0.3.43) a Desmos graph in the question, larger than a small graph: drawn small, as wide as its
+  // drawing — its box holds only parts as wide as it and its drawing laid over them, so fit-content made it 0 wide and
+  // Desmos drew nothing (Mac's page script, and Windows' copy where it is in this checkout)
+  {
+    const desmosCheck = async (label, src, init) => {
+      const gp = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+      await gp.addInitScript(init);
+      await gp.addInitScript({ content: src });
+      await gp.goto(`${BASE}/mock-alta/learn/course/c1/assignment/a3?sample=1`);
+      await gp.waitForFunction(() => document.documentElement.hasAttribute('data-simpl-q'), null, { timeout: 15000 }).catch(() => {});
+      await gp.evaluate(() => {
+        const q = document.querySelector('#qsec .theme__card___3E6YM') || document.querySelector('[data-simpl-keep]');
+        q.insertAdjacentHTML('beforeend', '<div class="atomic-content" data-type="desmos" style="width:100%"><div id="simpl-dz" class="desmos-atom__atomDesmos___2X415" style="position:relative;height:694px"><div style="width:100%;height:100%"><div class="dcg-grapher" style="position:absolute;left:0;top:0;width:926px;height:694px"><canvas style="width:926px;height:694px;display:block"></canvas></div></div></div></div>');
+      });
+      const got = await gp.waitForFunction(() => { const d = document.getElementById('simpl-dz'); return d && d.hasAttribute('data-simpl-mini') ? { w: Math.round(d.getBoundingClientRect().width) } : null; }, null, { timeout: 6000 }).then((h) => h.jsonValue()).catch(() => null);
+      check(!!got && got.w >= 250 && got.w < 926, `${label}: a Desmos graph 926 wide is drawn small, ${got ? got.w : 'not'} wide (never 0)`);
+      await gp.close();
+    };
+    await desmosCheck('the page script', source, () => { window.webkit = { messageHandlers: { simplAlta: { postMessage: () => {} } } }; });
+    const wh = join(ROOT, 'windows/SimplFluent/Screens/Alta/AltaHook.cs');
+    if (existsSync(wh)) {
+      const w = /public const string Source = """\n([\s\S]*?)\n\s*""";/.exec(readFileSync(wh, 'utf8'));
+      if (w) await desmosCheck('Windows’ copy', w[1].split('\n').map((l) => l.replace(/^ {8}/, '')).join('\n'), () => { window.chrome = window.chrome || {}; window.chrome.webview = { postMessage: () => {} }; });
+    }
+  }
+
   // (Windows 0.3.5) Simpl for Windows' copy of the page script (windows/SimplFluent/Screens/Alta/AltaHook.cs), where it is
   // in this checkout: Alta's pop-ups read whole once they have settled — the body that comes in after the pop-up opens,
   // its lists, formulas and pictures, all its buttons, each step — and given back to the page when they cannot be
