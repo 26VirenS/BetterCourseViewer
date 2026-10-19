@@ -287,7 +287,7 @@ enum AltaHook {
           + 'html[data-simpl-q][data-simpl-dark][data-simpl-pics-light] section[data-simpl-keep] [data-simpl-pic] { background-color: #fff !important; border-radius: 10px !important; box-shadow: 0 0 0 6px #fff !important; }\n'
           // (1.3.70) a graph in what a question asks drawn small — the popup's button by it, or a click on it, opens it
           // large in a window of its own
-          + 'html[data-simpl-q] [data-simpl-mini] { zoom: var(--simpl-zoom, 1) !important; width: fit-content !important; cursor: zoom-in !important; border-radius: 10px !important; outline: 2px solid transparent !important; outline-offset: 6px !important; transition: outline-color .18s ease !important; }\n'
+          + 'html[data-simpl-q] [data-simpl-mini] { zoom: var(--simpl-zoom, 1) !important; width: var(--simpl-w, fit-content) !important; cursor: zoom-in !important; border-radius: 10px !important; outline: 2px solid transparent !important; outline-offset: 6px !important; transition: outline-color .18s ease !important; }\n'
           + 'html[data-simpl-q] [data-simpl-mini]:hover { outline-color: rgba(10, 132, 255, .55) !important; }\n';
         var txt = function (el) { return String((el && (el.innerText || el.textContent)) || '').replace(/\s+/g, ' ').trim(); };
         var all = function (sel) { return [].slice.call(document.querySelectorAll(sel)); };
@@ -365,6 +365,9 @@ enum AltaHook {
             if (r.width < MINI_W + 60 && r.height < MINI_H + 60) return;
             var z = Math.min(MINI_W / r.width, MINI_H / r.height);
             el.style.setProperty('--simpl-zoom', String(Math.round(z * 1000) / 1000));
+            // (Mac 1.3.133 / Windows 0.3.43) as wide as its drawing, not fit-content: a Desmos graph's box holds only parts as
+            // wide as it (100%) and its drawing laid over them, so fit-content made it 0 wide, and Desmos drew nothing in it
+            el.style.setProperty('--simpl-w', Math.round(r.width) + 'px');
             mark(el, 'data-simpl-mini');
             picEls.push(el);
           });

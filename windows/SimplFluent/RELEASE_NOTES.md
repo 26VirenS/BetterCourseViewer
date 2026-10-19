@@ -1,3 +1,7 @@
+**What's new in 0.3.43** (beta)
+
+- **Knewton Alta, graphs show** — a question with a Desmos graph (like "Consider the graph of f′(x) below") showed a blank box; the graph now shows, drawn small, and opens large when you click it.
+
 **What's new in 0.3.42** (beta)
 
 - **Knewton Alta, a sun and moon switch** — the sun and moon are now inside the Light/Dark switch: the knob slides to the side you pick and carries its icon.
