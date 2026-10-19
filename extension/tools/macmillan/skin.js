@@ -136,6 +136,11 @@
     // (Mac 1.3.117) a number's answer, one field sized as a field (it stretched across the page): its frame the field, the
     // box inside it clear; ×10 and the power in the app's ink
     'html.simpl-mm .numeric-entry-table{width:auto!important;max-width:100%!important}' +
+    // (Mac 1.3.125) an expression's answer (θ = arctan…): Macmillan places its math keyboard by sums that know nothing of
+    // the zoom above, so it landed on the field it types into — laid in under the field instead, the words below moving
+    // down to make room, whole and inside the page
+    'html.simpl-mm .math-palette.as-popup{position:relative!important;inset:auto!important;transform:none!important;translate:none!important;margin:10px 0 4px!important;max-width:100%!important;white-space:normal!important;box-sizing:border-box!important;border-radius:12px!important;overflow:hidden!important;box-shadow:0 0 0 1px rgba(0,0,0,.12),0 6px 20px rgba(0,0,0,.16)!important;z-index:1!important}' +
+    'html.simpl-mm .graded-equations-box:has(.math-palette){white-space:normal!important;max-width:100%!important}' +
     'html.simpl-mm .numeric-entry-table .graded-equations-td{width:auto!important}' + // (Mac 1.3.120: its cells their own size — the unit beside the field, not across the page)
     'html.simpl-mm .numeric-entry-table .graded-equations-td.not-considered-in-grading-module-frame{width:auto!important}' +
     'html.simpl-mm .numeric-entry-border{width:15em!important;max-width:100%!important;box-sizing:border-box!important;background:var(--mm-field)!important;border:1px solid var(--mm-line)!important;border-radius:10px!important;box-shadow:0 1px 2px rgba(0,0,0,.06)!important}' +

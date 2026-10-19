@@ -164,6 +164,19 @@ try {
   check(plate && plate.bg === 'rgb(255, 255, 255)' && plate.chip === 'rgb(34, 34, 34)' && plate.scroll === 'auto', `a widget of Macmillan's own on a white plate in dark, its words as drawn, scrolling in its part: ${JSON.stringify(plate)}`);
   await sac().evaluate(() => window.__simplMacmillan('theme', false));
 
+  // (Mac 1.3.125) an expression's answer: Macmillan's math keyboard, placed by its own sums over the field, laid in under it
+  const pal = await sac().evaluate(async () => {
+    const host = document.querySelector('article.module-container');
+    const art = document.createElement('article'); art.className = 'module-container'; art.id = 'simpl-test-eq';
+    art.innerHTML = '<div class="sl-module" data-module-type="graded_equation"><div class="greq-container"><div class="graded-equations-table"><div class="graded-equations-box graded-equations-nowrap"><span class="mq-editable-field mq-math-mode" style="display:inline-block;width:300px;height:40px;border:2px solid #36c"><span class="mq-root-block"></span></span><div><div class="math-palette as-popup" style="position:absolute;top:-30px;left:40px;width:520px;height:130px;background:#fff"><div class="math-palette-tab-bar">BASIC</div><button class="palette-button">x</button></div></div></div></div></div></div>';
+    host.after(art);
+    await new Promise((r) => setTimeout(r, 200));
+    const f = art.querySelector('.mq-editable-field').getBoundingClientRect(), p = art.querySelector('.math-palette').getBoundingClientRect(), a = art.getBoundingClientRect();
+    art.remove();
+    return { fieldBottom: Math.round(f.bottom), palTop: Math.round(p.top), palH: Math.round(p.height), inside: p.bottom <= a.bottom + 1 && p.right <= innerWidth };
+  });
+  check(pal.palTop >= pal.fieldBottom && pal.palH > 100 && pal.inside, `the math keyboard under the field it types into, never on it: ${JSON.stringify(pal)}`);
+
   // (Mac 1.3.117) Macmillan's two_col_all (each prompt beside its answer): one column, nothing past the edge, the answer a
   // field's width; its tools menu (×10ʸ) a popover in the app's colours, dark in dark
   await page.setViewportSize({ width: 820, height: 720 });
