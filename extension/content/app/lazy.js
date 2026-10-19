@@ -41,6 +41,7 @@
     'tool:mark': () => !!BCV.toolsMark,
     'tool:ocr': () => !!BCV.toolsOcr,
     'tool:ptable': () => !!BCV.toolsPtable,
+    appearance: () => !!BCV.appearance && !BCV.appearance.__stub,
   };
   /** name → its files, in order, what it needs first, and how to tell the module is here. */
   const MODULES = {};
@@ -73,6 +74,7 @@
   // ---- the stubs: the same names, loading on the first call --------------------------------------
   const stub = (obj) => Object.assign(obj, { __stub: true });
   if (!BCV.setup) BCV.setup = stub({ active: () => false, open: async (...a) => { await load('setup'); return BCV.setup.open(...a); } });
+  if (!BCV.appearance) BCV.appearance = stub({ active: () => false, close: () => {}, open: async (...a) => { await load('appearance'); return BCV.appearance.open(...a); }, resume: async (...a) => { await load('appearance'); return BCV.appearance.resume(...a); } });
   if (!BCV.personalize) BCV.personalize = stub({ open: async (...a) => { await load('setup'); return BCV.personalize.open(...a); }, close: () => {} });
   for (const [key, name] of [['quiz', 'quiz'], ['submit', 'submit'], ['feedback', 'submit']]) {
     if (!BCV.screens[key]) BCV.screens[key] = stub({ render: async (...a) => { await load(name); return BCV.screens[key].render(...a); } });

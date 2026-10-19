@@ -4845,28 +4845,25 @@ try {
   console.log('appearance');
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#bcv-account', { timeout: 10000 });
-  // (2.99.53) the account's ⋯ menu has Appearance…, as the Mac's: a menu above it of Light, Dark and Personalize (the editor,
-  // which drops its ?bcv=personalize from the address at once); the one in effect is marked
+  // (2.99.60) the account's ⋯ menu has Appearance…, as the Mac's: Appearance itself, over the Dashboard; its bar's Dark
+  // is a fresh load in a browser, and Appearance comes back after it, Dark marked; Light brings it back
   await page.click('#bcv-account'); await page.click('.bcv-menu--account .bcv-menu__item--appearance');
-  await page.waitForSelector('.bcv-menu--theme', { timeout: 5000 });
-  const themeMenu = await page.evaluate(() => { const m = document.querySelector('.bcv-menu--theme'); const b = document.getElementById('bcv-account').getBoundingClientRect(); const r = m.getBoundingClientRect(); return { items: [...m.querySelectorAll('.bcv-menu__item')].map((it) => `${it.querySelector('.bcv-ellip').textContent}${it.classList.contains('is-active') ? '*' : ''}`).join(' | '), above: r.bottom <= b.top, inView: r.top >= 0, icons: m.querySelectorAll('.bcv-menu__ic svg').length }; });
-  check(themeMenu.items === 'Light* | Dark | Personalize' && themeMenu.above && themeMenu.inView && themeMenu.icons === 3, `Appearance… in the account's ⋯ menu opens a menu above it — Light (in effect, marked), Dark, Personalize — each with a glyph: ${JSON.stringify(themeMenu)}`);
-  await shot(page, '24-appearance-menu');
-  await page.click('.bcv-menu--theme .bcv-menu__item:has-text("Personalize")');
-  check(await eventually(() => page.$('#bcv-setup .pz'), 8000) && page.url() === `${BASE}/` && !(await page.$('.bcv-menu--theme')), `Personalize opens the appearance editor, the menu gone, the address left clean: ${page.url()}`);
-  await page.goto(`${BASE}/`);
-  await page.waitForSelector('#bcv-account', { timeout: 10000 });
-  await page.click('#bcv-account'); await page.click('.bcv-menu--account .bcv-menu__item--appearance');
-  await page.waitForSelector('.bcv-menu--theme', { timeout: 5000 });
-  await page.click('.bcv-menu--theme .bcv-menu__item:has-text("Dark")');
-  await page.waitForFunction(() => document.documentElement.getAttribute('data-bcv-theme') === 'dark', null, { timeout: 8000 });
-  await page.waitForSelector('#bcv-account', { timeout: 10000 });
-  await page.click('#bcv-account'); await page.click('.bcv-menu--account .bcv-menu__item--appearance');
-  await page.waitForSelector('.bcv-menu--theme', { timeout: 5000 });
-  check((await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.darkMode)) === 'on' && (await page.$$eval('.bcv-menu--theme .bcv-menu__item', (els) => els.map((it) => `${it.querySelector('.bcv-ellip').textContent}${it.classList.contains('is-active') ? '*' : ''}`).join(' | '))) === 'Light | Dark* | Personalize', 'Dark is saved (the page loaded afresh in it) and the menu marks it now');
-  await page.click('.bcv-menu--theme .bcv-menu__item:has-text("Light")');
-  await page.waitForFunction(() => document.documentElement.getAttribute('data-bcv-theme') === 'light', null, { timeout: 8000 });
+  await page.waitForSelector('.bcv-ap-looks', { timeout: 10000 });
+  const looksAt = () => page.$$eval('.bcv-ap-looks .bcv-ap-seg__b', (els) => els.map((b) => `${b.textContent}${b.classList.contains('is-on') ? '*' : ''}`).join(' | '));
+  const lookStart = await looksAt();
+  check(/^Light\*? \| Dark \| System\*?$/.test(lookStart) && !(await page.$('.bcv-menu--theme')), `Appearance… in the account's ⋯ menu opens Appearance, its Light / Dark / System at the foot: ${lookStart}`);
+  await page.evaluate(() => { window.__bcvOldDoc = true; });
+  await page.click('.bcv-ap-looks [data-k="on"]');
+  await page.waitForFunction(() => !window.__bcvOldDoc && document.documentElement.getAttribute('data-bcv-theme') === 'dark', null, { timeout: 10000 });
+  await page.waitForSelector('.bcv-ap-looks', { timeout: 10000 });
+  check((await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.darkMode)) === 'on' && (await looksAt()) === 'Light | Dark* | System', 'Dark is saved (the page loaded afresh in it), and Appearance came back with Dark marked');
+  await page.evaluate(() => { window.__bcvOldDoc = true; });
+  await page.click('.bcv-ap-looks [data-k="off"]');
+  await page.waitForFunction(() => !window.__bcvOldDoc && document.documentElement.getAttribute('data-bcv-theme') === 'light', null, { timeout: 10000 });
   check((await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.darkMode)) === 'off', 'and Light brings it back');
+  await page.waitForSelector('.bcv-ap-done', { timeout: 10000 });
+  await page.click('.bcv-ap-done');
+  await page.waitForFunction(() => !document.querySelector('.bcv-ap-bar'), null, { timeout: 5000 });
   // the look is switched in Settings (the popup, the options page): written there, and the page loaded afresh
   const toggleLook = async (to) => { await setSettings({ appearance: { darkMode: to } }); await page.waitForTimeout(300); await page.goto(page.url().replace(/[?&]bcv=[^&]*/, '')); };
   await toggleLook('on');
@@ -4983,6 +4980,44 @@ try {
   await toggleLook('off');
   await page.waitForFunction(() => !window.__bcvOldDoc && document.documentElement.getAttribute('data-bcv-theme') === 'light' && !!document.querySelector('.bcv-front'), null, { timeout: 15000 });
   await page.waitForLoadState('networkidle', { timeout: 15000 });
+  // (2.99.60) Appearance, as the Mac's: from the account's ⋯ menu, over the Dashboard — the page darkened but for the
+  // sidebar and the counters, a photo button on each, the bar at the foot; a ready-made theme worn at once (its colour,
+  // its drawings on the sidebar and the counters), and Done puts it away
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-stats .bcv-stat', { timeout: 15000 });
+  await page.click('#bcv-account');
+  await page.click('.bcv-menu__item--appearance');
+  await page.waitForSelector('.bcv-ap-bar .bcv-ap-ready', { timeout: 10000 });
+  await page.waitForTimeout(500);
+  const ap = await page.evaluate(() => {
+    const veil = document.querySelector('.bcv-ap-veil');
+    const side = document.querySelector('.bcv-side').getBoundingClientRect(), stat = document.querySelector('.bcv-stats .bcv-stat').getBoundingClientRect();
+    const at = (x, y) => document.elementFromPoint(x, y);
+    return {
+      veil: !!veil && /path\(evenodd/.test(veil.style.clipPath),
+      badges: document.querySelectorAll('.bcv-ap-badge').length, stats: document.querySelectorAll('.bcv-stats .bcv-stat[data-stat]').length,
+      litStat: !at(stat.left + 10, stat.top + 10)?.closest('.bcv-ap-veil'), litSide: !at(side.left + 30, side.bottom - 200)?.closest('.bcv-ap-veil'),
+      dim: !!at(innerWidth - 60, innerHeight / 2 - 120)?.closest('.bcv-ap-veil'),
+      tabs: [...document.querySelectorAll('.bcv-ap-tabs .bcv-ap-seg__b')].map((b) => b.textContent).join('|'), looks: [...document.querySelectorAll('.bcv-ap-looks .bcv-ap-seg__b')].map((b) => b.textContent).join('|'),
+      readies: document.querySelectorAll('.bcv-ap-ready').length,
+    };
+  });
+  check(ap.veil && ap.badges === ap.stats + 1 && ap.litStat && ap.litSide && ap.dim && ap.tabs === 'Theme|Courses' && ap.looks === 'Light|Dark|System' && ap.readies === 7, `Appearance over the Dashboard: darkened but for the sidebar and the counters, a photo button on each, Theme / Courses and Light / Dark / System at the foot: ${JSON.stringify(ap)}`);
+  await shot(page, '27c-appearance');
+  await page.click('.bcv-ap-ready[data-ready="Ocean"]');
+  const worn = await eventually(() => sw.evaluate(async () => { const s = await self.BCV.settings.get(); const im = (await self.BCV.api.storage.local.get('theme:images'))['theme:images']; return s.appearance?.theme?.name === 'Teal' && !!im?.side; }), 8000);
+  check(worn, 'a ready-made theme is worn as it is picked: Ocean, its colour (Teal) and its drawings kept');
+  await page.click('.bcv-ap-tabs [data-k="courses"]');
+  check(await eventually(() => page.$$('.bcv-ap-course').then((r) => r.length > 0), 6000), 'Courses: each course with its colour');
+  await page.click('.bcv-ap-done');
+  check(await eventually(() => page.evaluate(() => !document.querySelector('.bcv-ap-bar, .bcv-ap-veil, .bcv-ap-badge') && !document.documentElement.classList.contains('bcv-appear')), 3000), 'Done puts it away');
+  await page.click('#bcv-account');
+  await page.click('.bcv-menu__item--appearance');
+  await page.waitForSelector('.bcv-ap-ready[data-ready="Default"]', { timeout: 10000 });
+  await page.click('.bcv-ap-ready[data-ready="Default"]');
+  await eventually(() => sw.evaluate(async () => (await self.BCV.settings.get()).appearance?.theme?.name === 'Regular'), 8000);
+  await page.keyboard.press('Escape');
+  check(await eventually(() => page.evaluate(() => !document.querySelector('.bcv-ap-bar')), 3000), 'Escape puts it away too');
   } // appearance
   if (on('background loading')) {
 
@@ -5892,12 +5927,12 @@ try {
   // the sidebar's courses: listed under the Courses row here, so a course is hovered (Enter does nothing: there is no Next)
   await tourStep('courses');
   const t9 = await tourAt();
-  check(t9.title === 'Your courses' && t9.doing === 'Hover over a course' && t9.act === 'hover' && t9.next === null && !t9.skip && await ringHolds(t9.ring, '#bcv-side .bcv-nav__item[data-nav="courses"]') && await ringHolds(t9.ring, '#bcv-side .bcv-side__group:has(.bcv-fav)'), `then the Courses row with the starred courses under it, lit together, a course to hover, no Next and no Skip: ${JSON.stringify(t9)}`);
+  check(t9.title === 'Your courses' && t9.doing === 'Hover over a course' && t9.act === 'hover' && t9.next === null && !t9.skip && await ringHolds(t9.ring, '#bcv-side .bcv-nav__item[data-nav="courses"]') && (await ringHolds(t9.ring, '#bcv-side .bcv-side__group:has(.bcv-fav)') || await ringHolds(t9.ring, '#bcv-side .bcv-nav > .bcv-fav')), `then the Courses row with the starred courses under it, lit together, a course to hover, no Next and no Skip: ${JSON.stringify(t9)}`);
   await shot(page, '31f-tour-courses');
   await page.keyboard.press('Enter');
   await page.waitForTimeout(400);
   check((await tourAt()).step === 'courses', 'Enter does not get past a step that asks for something');
-  await page.hover('#bcv-side .bcv-side__group .bcv-fav');
+  await page.hover('#bcv-side .bcv-fav');
   // Tools: the row pressed, then any tool dragged up to the top — the student's choice — to be a pin
   await tourStep('tools');
   const t10 = await tourAt();

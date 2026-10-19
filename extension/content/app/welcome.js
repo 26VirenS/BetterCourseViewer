@@ -157,7 +157,7 @@
         ? { id: 'courses', name: 'Courses', where: 'sidebar', target: () => navRow('courses'), area: () => [navRow('courses'), quickNav()], when: () => !!navRow('courses'),
           title: 'Your courses', body: 'Your courses open from here.', act: 'hover', doing: 'Hover over Courses',
           done: () => !!quickNav(), after: 'Starred courses come first.' }
-        : { id: 'courses', name: 'your courses', where: 'sidebar', target: () => drawn(favsGroup()?.querySelector('.bcv-fav')) || navRow('courses'), area: () => [navRow('courses'), favsGroup()], when: () => !!navRow('courses'),
+        : { id: 'courses', name: 'your courses', where: 'sidebar', target: () => drawn(favsGroup()?.querySelector('.bcv-fav')) || navRow('courses'), area: () => [navRow('courses'), favsGroup() || [...document.querySelectorAll('#bcv-side .bcv-nav > .bcv-fav, #bcv-side .bcv-nav > .bcv-ctabs')]].flat(), when: () => !!navRow('courses'), // (2.99.60: one sidebar lists the courses in the rows, under All Courses)
           title: 'Your courses', body: 'Your classes are listed here.', act: 'hover', doing: 'Hover over a course',
           done: () => !!document.querySelector('#bcv-side .bcv-fav:hover, #bcv-side .bcv-nav__item[data-nav="courses"]:hover'), after: 'Click one any time to open it.' },
     ],

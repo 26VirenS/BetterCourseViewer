@@ -28,6 +28,7 @@ self.BCV_LAZY_MODULES = {
   setup: { needs: ['setupcss'], files: ['content/app/personalize.js', 'content/app/setup.js'] },
   notes: { needs: ['setupcss'], files: ['content/app/whatsnew-notes.js'] },
   phone: { files: ['content/app/phone.js'] },
+  appearance: { files: ['content/app/appearance.js'] }, // (2.99.60) Appearance, as the Mac's: over the Dashboard, loaded when it is opened
   rubric: { files: ['content/app/rubric-ring.js'] }, // the rubric ring (desktop): loaded when a rubric is opened
   docview: { files: ['content/app/docview.js'] }, // the file viewer's own pages (a PDF, a Word file, a picture, text): loaded when a file is first opened
   nativeapp: { files: ['content/app/native-app.js'] }, // the iPhone app's native shell (its engine calls and its navigation): only the app injects it, with the group

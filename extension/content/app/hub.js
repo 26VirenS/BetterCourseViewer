@@ -940,7 +940,7 @@
     { name: 'tools', aliases: [], hint: 'Open the Tools page', icon: IC.tool, takes: null, run: go('/#tools') },
     { name: 'dark', aliases: ['night'], hint: 'Switch to the dark look', icon: IC.moon, takes: null, run: (_it, ctx) => { ctx.close(); if (!app().isDark()) app().toggleTheme(); else U.toast('The dark look is on already.'); } },
     { name: 'light', aliases: ['day'], hint: 'Switch to the light look', icon: IC.sun, takes: null, run: (_it, ctx) => { ctx.close(); if (app().isDark()) app().toggleTheme(); else U.toast('The light look is on already.'); } },
-    { name: 'theme', aliases: ['personalize', 'appearance', 'colour', 'color'], hint: 'Personalize: colours, themes and photos', label: 'Personalize', icon: IC.sparkle, takes: null, run: go('/?bcv=personalize') },
+    { name: 'theme', aliases: ['personalize', 'appearance', 'colour', 'color'], hint: 'Personalize: colours, themes and photos', label: 'Personalize', icon: IC.sparkle, takes: null, run: (_it, ctx) => { ctx.close(); BCV.appearance.open(app()); } },
     { name: 'settings', aliases: ['preferences', 'options'], hint: 'Open Simpl’s settings', icon: IC.settings, takes: null, run: (_it, ctx) => { ctx.close(); app().openSettings?.(); } },
     { name: 'whatsnew', aliases: ['changes', 'version', 'new'], hint: 'What changed in this version', icon: IC.star, takes: null, run: (_it, ctx) => { ctx.close(); BCV.whatsnew?.open?.(app(), { manual: true }); } },
     { name: 'setup', aliases: [], hint: 'Run the guided setup again', icon: IC.check, takes: null, run: go('/?bcv=setup') },

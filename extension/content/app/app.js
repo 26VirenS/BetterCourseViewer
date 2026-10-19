@@ -840,7 +840,7 @@
 
   /** (2.99.53) One sidebar, as the Mac's: the app's own places first — Dashboard, To Do, Calendar, Grades, Notifications,
    *  Inbox, Tools — the courses (All Courses and Groups with them) in a section of their own under them. */
-  const SIDE_ORDER = ['dashboard', 'todo', 'calendar', 'gpa', 'notifications', 'inbox', 'tools'];
+  const SIDE_ORDER = ['dashboard', 'courses', 'groups', 'todo', 'calendar', 'gpa', 'notifications', 'inbox', 'tools']; // (2.99.60: All Courses and Groups back in their own places)
   const sideNav = () => (oneBar() ? SIDE_ORDER.map((k) => navDef().find((d) => d[0] === k)).filter(Boolean) : navDef());
   /** A row of the sidebar's own places: its glyph in its colour, its name, its count. */
   function navButton([key, label, icon, glyphColor, href, count], i, all, r, extra = null) {
@@ -870,6 +870,30 @@
   }
   /** (2.99.53) One sidebar's Courses: each favourite with its chevron and, open, its sections under it; All Courses; and
    *  Groups, its own chevron listing the groups under it — as the Mac's sidebar has them. */
+  /** (2.99.60) One sidebar: All Courses back in its own place among the sidebar's rows (second, as it always was), the
+   *  courses under it — each with its sections under its own row — and Groups after them, its groups under it. */
+  function sideCourseRows(r) {
+    return [
+      ...state.favs.flatMap((c) => [favRow(c), courseNavRows(c) || sideSections(c)]),
+      state.favs.length ? null : U.text('bcv-hint bcv-side__hint', 'Star a course under All Courses to pin it here.'),
+    ].filter(Boolean);
+  }
+  function sideGroupRows(r, groupsDef, i, all) {
+    const gOpen = !!state.sideGroupsOpen;
+    const gChev = h('span', { class: `bcv-fav__chev ${gOpen ? 'is-open' : ''}`, role: 'button', title: gOpen ? 'Hide groups' : 'Show groups', 'aria-label': gOpen ? 'Hide groups' : 'Show groups', onclick: (e) => {
+      e.stopPropagation();
+      state.sideGroupsOpen = !gOpen;
+      if (state.sideGroupsOpen && !state.sideGroups) store.groups().then((g) => { state.sideGroups = g || []; renderSide(); }).catch(() => { state.sideGroups = []; renderSide(); });
+      renderSide();
+    } }, U.svg('M9 6l6 6-6 6', { size: 12, stroke: 'currentColor', width: 2.4 }));
+    return [
+      navButton(groupsDef, i, all, r, gChev),
+      gOpen && state.sideGroups ? U.el('bcv-ctabs bcv-ctabs--groups', state.sideGroups.map((g) => h('button', { type: 'button', class: `bcv-ctab ${r.screen === 'group' && String(r.courseId) === String(g.id) ? 'is-active' : ''}`, title: g.name, onclick: () => go(`/groups/${g.id}`, { motion: 'fade' }) }, [
+        h('span', { class: 'bcv-ctab__sq', style: { background: g.color || '#30b0c7' } }),
+        h('span', { class: 'bcv-ellip', text: g.name }),
+      ])), { role: 'group', 'aria-label': 'Groups' }) : null,
+    ].filter(Boolean);
+  }
   function sideCourses(r) {
     const defs = navDef();
     const all = defs.find((d) => d[0] === 'courses');
@@ -928,10 +952,12 @@
       // mockup 11: the glyph in its own colour, no tile behind it; full strength on the active row, dimmed elsewhere
       // under a theme each row takes its own shade of the colour (lib/theme.js shades()), lighter at
       // the top and deeper below, so the rail is never one flat colour
-      h('nav', { class: 'bcv-nav' }, sideNav().map((d, i, all) => navButton(d, i, all, r))),
+      h('nav', { class: 'bcv-nav' }, oneBar()
+        ? sideNav().flatMap((d, i, all) => d[0] === 'courses' ? [navButton([d[0], 'All Courses', ...d.slice(2)], i, all, r), ...sideCourseRows(r)] : d[0] === 'groups' ? sideGroupRows(r, d, i, all) : [navButton(d, i, all, r)])
+        : sideNav().map((d, i, all) => navButton(d, i, all, r))),
       // Listed here, or kept in a panel that opens off the Courses row (Settings → Appearance, and
       // the last step of the guided setup). Either way it is the same list in the same order.
-      oneBar() ? sideCourses(r) : hoverCourses() ? null : U.el('bcv-side__group', [
+      oneBar() ? null : hoverCourses() ? null : U.el('bcv-side__group', [
         U.text('bcv-side__label', 'Favorite courses'),
         ...state.favs.flatMap((c) => [favRow(c), courseNavRows(c)]), // (2.99.39: the course on show opens under its row, one sidebar)
         state.favs.length ? null : U.text('bcv-hint', 'Star a course under Courses to pin it here.'),
@@ -1044,7 +1070,7 @@
         U.text('bcv-menu__sub bcv-ellip', me?.email || me?.loginId || siteName()),
       ]),
       item(IC.settings, 'Settings…', null, openSettings),
-      item(IC.image, 'Appearance…', null, () => setTimeout(() => appearanceMenu(anchor), 0), 'bcv-menu__item--appearance'),
+      item(IC.image, 'Appearance…', null, () => BCV.appearance.open(BCV.app), 'bcv-menu__item--appearance'), // (2.99.60: Appearance itself, as the Mac's ⋯ menu opens it)
       item(IC.sparkle || IC.star, 'What’s New', null, () => BCV.whatsnew?.open(BCV.app, { manual: true })),
       item(IC.people, `${BCV.lms.name} Profile`, null, () => go('/profile')),
       U.el('bcv-menu__sep'),
@@ -1082,7 +1108,7 @@
       item(IC.sun, 'Light', null, !dark, () => setLook('off')),
       item(IC.moon, 'Dark', null, dark, () => setLook('on')),
       U.el('bcv-menu__sep'),
-      item(IC.image, 'Personalize', 'Colour, photos, themes', false, () => go('/?bcv=personalize')),
+      item(IC.image, 'Personalize', 'Colour, photos, themes', false, () => BCV.appearance.open(BCV.app)), // (2.99.60: over the Dashboard, as the Mac's)
     ], { role: 'menu', 'aria-label': 'Appearance' });
     const r = anchor.getBoundingClientRect();
     Object.assign(m.style, { position: 'fixed', left: `${Math.max(8, r.left)}px`, bottom: `${Math.max(8, window.innerHeight - r.top + 6)}px`, top: 'auto', transformOrigin: 'left bottom' }); // (it grows up out of the row it hangs from)
@@ -2414,6 +2440,8 @@
       if (change && !busy()) BCV.whatsnew.open(BCV.app, change);
     }
     BCV.extras?.prime?.(BCV.app);
+    // (2.99.60) Appearance open when its Light / Dark changed the look (a fresh load): back into it
+    try { if (state.lookOn && !phone() && sessionStorage.getItem('bcv:appearance:again') === '1') BCV.appearance.resume(BCV.app); } catch { /* private window */ }
     // Settings reads this site, and writes to Canvas with the session's token the page can see (Settings cannot read the cookie itself).
     // Written when it changed, or once an hour — not on every page load.
     const token = BCV.canvas.csrfToken();
