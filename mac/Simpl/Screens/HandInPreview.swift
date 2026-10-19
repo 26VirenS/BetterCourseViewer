@@ -54,8 +54,11 @@ final class HandInPreview: ObservableObject {
     /// of its own before the pane goes below 380 — together never wider than the window, less a margin.
     private func fit() {
         // (the window the popup is over: the main window — a popup is never the main one — or the app's largest window;
-        // the app need not be in front)
-        let parent = NSApp.keyWindow?.sheetParent ?? NSApp.mainWindow ?? NSApp.windows
+        // the app need not be in front. (1.3.130) Never the file chooser's: a file just picked, its panel is still the key
+        // window, hung on the Hand In popup — whose width the preview was measured against, and it opened small)
+        let key = NSApp.keyWindow.flatMap { $0 is NSSavePanel ? nil : $0 }
+        let main = NSApp.mainWindow.flatMap { $0 is NSPanel ? nil : $0 }
+        let parent = key?.sheetParent ?? main ?? NSApp.windows
             .filter { $0.isVisible && $0.sheetParent == nil && !($0 is NSPanel) }
             .max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
         let room = max(700, (parent?.frame.width ?? 1400) - 48)

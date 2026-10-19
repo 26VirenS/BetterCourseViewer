@@ -171,14 +171,28 @@ struct QuickLookView: NSViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
+    /// (1.3.130) Quick Look given the file only once it has its size: handed it at no size (the view made before the
+    /// popup had grown round it — a file just added for Hand In), it laid the document out for none, and the pages
+    /// showed small and would not scroll.
+    final class SettledPreviewView: QLPreviewView {
+        var pending: URL?
+
+        override func layout() {
+            super.layout()
+            guard let file = pending, bounds.width > 40, bounds.height > 40 else { return }
+            pending = nil
+            previewItem = file as NSURL
+        }
+    }
+
     func makeNSView(context: Context) -> NSView {
         let box = NSView(frame: .zero)
-        let made: QLPreviewView? = QLPreviewView(frame: .zero, style: .normal)
+        let made: SettledPreviewView? = SettledPreviewView(frame: .zero, style: .normal)
         if let preview = made {
             preview.autoresizingMask = [.width, .height]
             preview.frame = box.bounds
             preview.autostarts = false
-            preview.previewItem = file as NSURL
+            preview.pending = file
             box.addSubview(preview)
             context.coordinator.preview = preview
         }
@@ -189,7 +203,11 @@ struct QuickLookView: NSViewRepresentable {
     func updateNSView(_ box: NSView, context: Context) {
         guard context.coordinator.file != file else { return }
         context.coordinator.file = file
-        context.coordinator.preview?.previewItem = file as NSURL
+        if let p = context.coordinator.preview as? SettledPreviewView, p.bounds.width <= 40 || p.bounds.height <= 40 {
+            p.pending = file // (not laid out yet: given it once it has its size)
+        } else {
+            context.coordinator.preview?.previewItem = file as NSURL
+        }
     }
 
     static func dismantleNSView(_ box: NSView, coordinator: Coordinator) {

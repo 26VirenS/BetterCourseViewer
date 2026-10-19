@@ -191,9 +191,13 @@ struct PTGrid: View {
                         .equatable()
                         .frame(width: cell, height: cell)
                         .tourTarget(!compact && e.number == 6 ? "ptCarbon" : nil)
-                        .offset(x: x, y: y)
                         .onTapGesture { pick(e, CGRect(x: origin.x + x, y: origin.y + y, width: cell, height: cell)) }
                         .onHover { inside in hover(inside ? e : nil) }
+                        // (1.3.130) put in its place by layout, not by .offset: a hover's tracking area stays where a view
+                        // is laid out, so offset squares all hovered from the top-left corner — hydrogen's — the last
+                        // drawn (oganesson) answering
+                        .padding(.leading, x)
+                        .padding(.top, y)
                 }
                 if !compact {
                     rowLabel("57–71", cell: cell).offset(x: 2 * (cell + gap), y: 5 * (cell + gap))
