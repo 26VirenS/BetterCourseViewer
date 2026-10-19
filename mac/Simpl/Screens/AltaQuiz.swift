@@ -725,42 +725,55 @@ private struct AltaRail: View {
     }
 }
 
-/// (1.3.131) In the popup's bar: Alta's side of the popup Light or Dark, as a switch between a sun and a moon (two
-/// chips above the objectives since 1.3.83). Light (the default since 1.3.79) shows Alta's page as Alta draws it; Dark
-/// lays the question on dark glass, its colours turned over, and Alta's page as it is drawn dark.
+/// (1.3.131) In the popup's bar: Alta's side of the popup Light or Dark, as a switch (two chips above the objectives
+/// since 1.3.83) — (1.3.132) its sun and moon in the switch itself: each at its end of the track, and the knob, sliding
+/// over to the side chosen, carrying it. Light (the default since 1.3.79) shows Alta's page as Alta draws it; Dark lays
+/// the question on dark glass, its colours turned over, and Alta's page as it is drawn dark.
 private struct AltaLookSwitch: View {
     @Binding var dark: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private let width: CGFloat = 58, height: CGFloat = 30, inset: CGFloat = 3
 
     var body: some View {
-        HStack(spacing: 7) {
-            side(dark: false)
-            Toggle("Dark", isOn: Binding(get: { dark }, set: { d in withAnimation(Motion.gentle) { dark = d } }))
-                .toggleStyle(.switch)
-                .labelsHidden()
-                .controlSize(.small)
-                .tint(Theme.accent)
-            side(dark: true)
+        let knob = height - inset * 2
+        Button {
+            withAnimation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.3, dampingFraction: 0.85)) { dark.toggle() }
+        } label: {
+            ZStack {
+                Capsule(style: .continuous)
+                    .fill(dark ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(Color.primary.opacity(0.12)))
+                // the side not chosen, faint in the track
+                HStack {
+                    Image(systemName: "sun.max.fill").opacity(dark ? 0.75 : 0)
+                    Spacer(minLength: 0)
+                    Image(systemName: "moon.fill").opacity(dark ? 0 : 0.55)
+                }
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(dark ? Color.white : Color.primary)
+                .padding(.horizontal, 8)
+                // the knob, carrying the side chosen
+                Circle()
+                    .fill(Color.white)
+                    .shadow(color: .black.opacity(0.22), radius: 2, y: 1)
+                    .frame(width: knob, height: knob)
+                    .overlay {
+                        Image(systemName: dark ? "moon.fill" : "sun.max.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(dark ? Theme.accent : Color.orange)
+                            .contentTransition(.symbolEffect(.replace))
+                    }
+                    .frame(maxWidth: .infinity, alignment: dark ? .trailing : .leading)
+                    .padding(inset)
+            }
+            .frame(width: width, height: height)
+            .contentShape(Capsule())
         }
-        .padding(.horizontal, 11)
-        .frame(height: 30)
-        .background(Capsule(style: .continuous).fill(Color.primary.opacity(0.07)))
+        .buttonStyle(.plain)
         .fixedSize()
         .help(dark ? "Knewton Alta's page is dark — switch for light, as Alta draws it" : "Knewton Alta's page is light — switch for dark")
-        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Dark page")
         .accessibilityValue(dark ? "On" : "Off")
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction { withAnimation(Motion.gentle) { dark.toggle() } }
-    }
-
-    /// The sun or the moon: lit while its side is chosen; clicked, it chooses it.
-    private func side(dark d: Bool) -> some View {
-        Image(systemName: d ? "moon.fill" : "sun.max.fill")
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(dark == d ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.secondary))
-            .frame(width: 16)
-            .contentShape(Rectangle())
-            .onTapGesture { withAnimation(Motion.gentle) { dark = d } }
     }
 }
 
