@@ -1307,7 +1307,7 @@ shown, and writes "alta: a pop-up shown as the app's own: …" with its words, f
 
 Alta's page is light (0.3.5), as it is made — the owner's choice for every outside tool (0.3.1) — whatever the app's
 appearance; until then Alta's popup followed the app, its question's colours turned over on a dark ground in dark mode.
-Above the objectives, Light and Dark (`AltaPageBar`, under the words "Alta's page") choose, and the choice is kept for
+In the header, left of the tools (0.3.41; above the objectives before), the Light/Dark switch (`AltaPageBar`) chooses, and the choice is kept for
 every assignment (`altaDark`; `--alta-look dark` starts a development run in Dark). Dark is the old dark look. The
 page is told the student prefers light (`LightPages`, as an outside tool's), and turned over by the page script when
 Dark is chosen. What the popup shows in the page's place — the page's ground, the panels behind its question, its

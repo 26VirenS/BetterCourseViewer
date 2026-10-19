@@ -89,16 +89,16 @@ internal sealed class AltaPopupView
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         tileSlot.Content = Tile(32);
         title.Text = launch.Title;
-        header = AltaLook.Header(engine, tileSlot, title, subtitle, K.H(8, codeSlot, logsSlot), Close, "Close — your progress is kept by Alta");
+        // (0.3.41) Light or Dark and Browser in the header, left of the tools, where they were above the objectives
+        pageBar = new AltaPageBar(session.Dark, session.Browser, SetDark, SetBrowser);
+        header = AltaLook.Header(engine, tileSlot, title, subtitle, K.H(8, codeSlot, logsSlot, pageBar), Close, "Close — your progress is kept by Alta");
         root.Children.Add(header.Row(0));
 
-        // the rail under Light or Dark for the page, and Alta's page in its frame (the popup's own in its place while it
-        // loads, and its buttons under it)
+        // the rail, and Alta's page in its frame (the popup's own in its place while it loads, and its buttons under it)
         var body = new Grid();
         body.ColumnDefinitions.Add(railColumn);
         body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        pageBar = new AltaPageBar(session.Dark, session.Browser, SetDark, SetBrowser) { Margin = new Thickness(20, 4, 16, 14) };
-        body.Children.Add(K.Rows("auto, *", pageBar.Row(0), rail.Row(1)).Col(0));
+        body.Children.Add(rail.Col(0));
         webHolder.Child = session.Web;
         // (clear of the popup's right edge, which sizes it: FloatPopup.EdgeRoom)
         webHolder.Margin = new Thickness(0, 0, FloatPopup.EdgeRoom, 8);
@@ -197,7 +197,7 @@ internal sealed class AltaPopupView
         Update();
     }
 
-    /// <summary>(0.3.5) Alta's page in light or dark, as the student chose it above the objectives: the page told, and
+    /// <summary>(0.3.5) Alta's page in light or dark, as the student chose it in the header: the page told, and
     /// what the popup shows in its place dressed again.</summary>
     private void SetDark(bool dark)
     {

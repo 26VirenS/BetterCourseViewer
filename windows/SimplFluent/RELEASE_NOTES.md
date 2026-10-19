@@ -1,3 +1,7 @@
+**What's new in 0.3.41** (beta)
+
+- **Knewton Alta, controls on top** — Light and Dark are now one switch, and it sits with Browser in the popup's top bar, left of your tools, instead of above the objectives.
+
 **What's new in 0.3.40** (beta)
 
 - **Windows Hello, far less often** — once your face, fingerprint or PIN has opened your saved sign-in, Simpl doesn't ask again for 30 days. It asks sooner only if you sign in anew, forget the sign-in, your school stops taking the password, or you lock it again in Settings.
