@@ -785,6 +785,9 @@
     // (2.99.51) See Feedback, as the Mac's: a sheet over the page, the work handed in on the left (Canvas's own preview of
     // the file, or the text written), the comments on the right
     function openFeedback(x, from) {
+      // (2.99.58) a quiz's feedback is the quiz's own: its answers, marked (screens/quiz.js), never the sheet of what was
+      // handed in, which for a quiz holds only Canvas's line about it ("user: …, quiz: …, score: …")
+      if (typeList.includes('online_quiz') && a.quiz_id) { app.go(`${c.url}/quizzes/${a.quiz_id}?bcv=feedback`); return; }
       const files = x.attachments || [];
       let at = 0;
       const doc = U.el('bcv-fbs__doc');
@@ -871,7 +874,11 @@
     const quizTaken = (x) => !!(x.submitted_at || gradedOf(x));
     function quizSteps(x) {
       if (!quizKind || !quizTaken(x)) return null;
-      if (quizNow?.underWay) return [{ title: 'Continue Quiz', icon: IC.bolt, go: 'quizgo' }];
+      // (2.99.58) an attempt under way: Continue Quiz — the smaller of two, beside See Feedback, while an earlier attempt's
+      // feedback can be seen
+      if (quizNow?.underWay) return quizNow.feedback
+        ? [{ title: 'Continue Quiz', short: 'Continue', icon: IC.bolt, go: 'quizgo' }, { title: 'See Feedback', short: 'Feedback', icon: IC.disc, go: 'quizfb' }]
+        : [{ title: 'Continue Quiz', icon: IC.bolt, go: 'quizgo' }];
       const out = [];
       if (quizNow ? quizNow.feedback : true) out.push({ title: 'See Feedback', short: 'Feedback', icon: IC.disc, go: 'quizfb' });
       if (quizNow ? quizNow.canStart : leftOf(x)) out.push({ title: 'New Attempt', short: 'Retake', icon: IC.bolt, go: 'quizgo' });

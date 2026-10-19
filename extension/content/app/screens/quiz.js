@@ -845,7 +845,8 @@
       ].filter(Boolean);
       const last = latestFinished();
       const lastHidden = last ? resultsHidden(last) : null;
-      const feedback = !!last && !survey && !lastHidden && !st.sub;
+      const seeable = !!last && !survey && !lastHidden; // (an earlier attempt's feedback can be seen)
+      const feedback = seeable && !st.sub;
       const codeMissing = () => needsCode && !(st.code || '').trim();
       const beginTitle = canStart ? (st.sub ? (survey ? 'Continue Survey' : 'Continue Attempt') : (survey ? 'Begin Survey' : 'Begin Attempt')) : lockdown ? 'Needs LockDown Browser' : quiz.locked_for_user ? 'Locked' : 'No Attempts Left';
       const takeTitle = survey ? 'Take Survey' : 'Take Quiz';
@@ -864,7 +865,7 @@
       ]) : null;
       const instructions = htmlToText(quiz.description || '', 4000).trim() ? sec('Before You Start', BCV.screens.course.prose(quiz.description, { cls: 'bcv-qz__desc' }), 'instr') : null;
       let mainBtn = null;
-      const codeInput = needsCode ? h('input', { class: 'bcv-input bcv-qz__code', type: 'text', placeholder: 'Access code', value: st.code || '', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Access code', oninput: (e) => { st.code = e.target.value; if (mainBtn?.dataset.begin) mainBtn.disabled = (!canStart || codeMissing()) || null; }, onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); if (canStart && !codeMissing()) begin(); } } }) : null;
+      const codeInput = needsCode ? h('input', { class: 'bcv-input bcv-qz__code', type: 'text', placeholder: 'Access code', value: st.code || '', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Access code', oninput: (e) => { st.code = e.target.value; bar.querySelectorAll('[data-begin]').forEach((b) => { b.disabled = (!canStart || codeMissing()) || null; }); }, onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); if (canStart && !codeMissing()) begin(); } } }) : null;
       const code = needsCode ? sec('Access Code', U.el('bcv-qzi__code', [codeInput, U.text('bcv-qzi__caption', 'Your instructor gives the code. It stays with this attempt.')]), 'code') : null;
       const rulesEl = rules.length ? sec('Rules', U.el('bcv-qzi__rules', rules.map(([ic, color, text]) => U.el('bcv-qzi__rule', [U.el('bcv-qzi__ruleic', [icon(ic, color)]), h('span', { class: 'bcv-pretty', text })]))), 'rules') : null;
       const { rows, keptNote } = introAttempts(survey);
@@ -883,7 +884,15 @@
       // the buttons, floating at the foot
       const bar = U.el('bcv-qzi__bar');
       const btn = (text, primary, onclick) => h('button', { type: 'button', class: `bcv-qzi__btn${primary ? ' is-primary bcv-qz__begin' : ''}`, text, onclick }); // (bcv-qz__begin: the main one, as it has always been named)
-      if (feedback && canStart) {
+      if (st.sub && seeable && canStart) {
+        // (2.99.58) an attempt under way, an earlier one's feedback to see: See Feedback, Continue Attempt the smaller
+        const cont = btn(beginTitle, false, () => { if (canStart && !codeMissing()) begin(); });
+        cont.dataset.begin = '1';
+        cont.disabled = codeMissing() || null;
+        cont.title = codeMissing() ? 'Type the access code first' : beginTitle;
+        mainBtn = btn('See Feedback', true, () => openFeedback(last, 'intro'));
+        bar.append(cont, mainBtn);
+      } else if (feedback && canStart) {
         mainBtn = btn(takeTitle, true, () => { if (canStart && !codeMissing()) begin(); });
         mainBtn.dataset.begin = '1';
         mainBtn.disabled = codeMissing() || null;

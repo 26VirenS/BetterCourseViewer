@@ -3896,6 +3896,22 @@ try {
   await mockConfig({ held: [] });
   const posted = await mutedAt(`${BASE}/courses/101/quizzes/9001?bcv=feedback&sub=qs1`);
   check(!posted.title && posted.marks > 4, `posted, the same attempt's feedback is back: ${JSON.stringify(posted)}`);
+  // (2.99.58) an attempt under way beside a finished one whose feedback shows: the intro offers See Feedback, Continue
+  // Attempt the smaller; the assignment page the same (Continue, then Feedback lit), and its grade opens the quiz's
+  // own feedback — never the sheet of what was handed in (for a quiz, Canvas's line "user: …, quiz: …, score: …")
+  await page.evaluate((b) => fetch(`${b}/api/v1/courses/101/quizzes/9001/submissions`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-csrf-token': decodeURIComponent((document.cookie.match(/_csrf_token=([^;]+)/) || [])[1] || '') }, body: '{}' }), BASE);
+  await page.goto(`${BASE}/courses/101/quizzes/9001`);
+  await page.waitForSelector('.bcv-qzi__bar .bcv-qzi__btn', { timeout: 10000 });
+  const underWay = await page.evaluate(() => [...document.querySelectorAll('.bcv-qzi__bar .bcv-qzi__btn')].map((b) => `${b.textContent}${b.classList.contains('is-primary') ? '*' : ''}`).join('|'));
+  check(underWay === 'Continue Attempt|See Feedback*', `an attempt under way, an earlier one's feedback to see: See Feedback, Continue Attempt the smaller (${underWay})`);
+  const qAsg = await page.evaluate(async (b) => (await (await fetch(`${b}/api/v1/courses/101/assignments?per_page=100`)).text()).replace(/^while\(1\);/, ''), BASE).then((t) => JSON.parse(t).find((x) => String(x.quiz_id) === '9001'));
+  await page.goto(`${BASE}/courses/101/assignments/${qAsg.id}`);
+  await eventually(() => page.evaluate(() => [...document.querySelectorAll('.bcv-asg__stepbtns .bcv-asg__step')].map((b) => b.textContent).join('|') === 'Continue|Feedback'), 10000);
+  const asgSteps = await page.evaluate(() => [...document.querySelectorAll('.bcv-asg__stepbtns .bcv-asg__step')].map((b) => `${b.textContent}${b.classList.contains('is-lit') ? '*' : ''}`).join('|'));
+  check(asgSteps === 'Continue|Feedback*', `the quiz's assignment page: Continue the smaller, See Feedback lit (${asgSteps})`);
+  await page.click('.bcv-asg__stepbtns .bcv-asg__step.is-lit');
+  const fbGone = await eventually(() => page.evaluate(() => /bcv=feedback/.test(location.search) && /\/quizzes\/9001/.test(location.pathname) && !document.querySelector('.bcv-fbs')), 10000);
+  check(fbGone, `See Feedback opens the quiz's own feedback, not the hand-in sheet (${page.url()})`);
   } // quiz feedback
   if (on('restricted quiz')) {
 
@@ -4122,7 +4138,7 @@ try {
   await page.waitForSelector('.bcv-qzi__attempt', { timeout: 20000 });
   const attempts = await texts('.bcv-qzi__attempt');
   check(attempts.length === 1 && /^Attempt 1.*13 \/ 16$/.test(attempts[0].replace(/\s+/g, ' ')), `the finished attempt is listed with its own score; the one in play is not given the best score so far: ${attempts.join(' | ')}`);
-  check(/^Attempt 2 of 5 · started .* · 3 more after this one$/.test((await texts('.bcv-qzi__note'))[0] || '') && (await texts('.bcv-qz__begin'))[0] === 'Continue Attempt', `the attempts line counts the attempt being taken, and the button continues it: ${(await texts('.bcv-qzi__note'))[0]}`);
+  check(/^Attempt 2 of 5 · started .* · 3 more after this one$/.test((await texts('.bcv-qzi__note'))[0] || '') && (await texts('.bcv-qzi__bar .bcv-qzi__btn')).join('|') === 'Continue Attempt|See Feedback', `the attempts line counts the attempt being taken, and Continue Attempt continues it — the smaller, beside the finished one's See Feedback (2.99.58): ${(await texts('.bcv-qzi__note'))[0]}`);
   // and the earlier one opens, with its own score rather than the best so far
   await page.goto(`${BASE}/courses/101/quizzes/9001?bcv=feedback&attempt=1`);
   await page.waitForSelector('.bcv-fb__scoreline', { timeout: 15000 });
