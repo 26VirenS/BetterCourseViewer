@@ -389,7 +389,8 @@
     const leave = () => {
       setOpen(false);
       clearInterval(st.timer);
-      app.go(simulated ? (st.stage === 'intro' ? course.url : simHome) : quizUrl, { confirmed: true });
+      // (2.99.56: from the intro, back to the course's quizzes — the intro is the quiz's address now)
+      app.go(st.stage === 'intro' ? (simulated ? course.url : `${course.url}/quizzes`) : simulated ? simHome : quizUrl, { confirmed: true });
     };
 
     // ---- header -------------------------------------------------------------------
@@ -672,9 +673,10 @@
         window.removeEventListener('beforeunload', onUnload);
         return;
       }
-      // The intro sits in the course's column, under its header; the attempt, the receipt and (2.98.27)
-      // the feedback take the page — the feedback's own rail and cards need the width a column leaves.
-      const embedded = st.stage === 'intro';
+      // (2.99.56) every stage takes the page, the intro too — the quiz's own page, as the Mac's sheet holds its intro
+      // and its attempt alike; the intro sat in the course's column under its header until then. A phone keeps the
+      // intro a pushed course screen, its back bar and tab bar there.
+      const embedded = phone && st.stage === 'intro';
       const switchable = st.stage === 'take' && !phone; // (a phone shows one question a screen, always)
       modeWrap.replaceChildren(...(switchable ? [
         modeBtn('side', 'Controls at the sides', MODE_SIDE),
@@ -689,7 +691,7 @@
       screen.classList.toggle('is-side', side);
       instrBtn.hidden = st.stage === 'intro' || st.stage === 'feedback'; // the intro card already has them in front of you; the feedback is about the answers
       rawBtn.hidden = simulated || st.stage === 'feedback'; // (the simulation has no page on Canvas)
-      const closeWord = st.stage === 'feedback' ? 'Back to the quiz' : 'Save and exit';
+      const closeWord = st.stage === 'feedback' ? 'Back to the quiz' : st.stage === 'intro' ? 'Close' : 'Save and exit';
       exitBtn.title = closeWord;
       exitBtn.setAttribute('aria-label', closeWord);
       // (2.99.55) the intro's line is the course alone, as the Mac's sheet names it; its facts say the due date below
@@ -897,10 +899,8 @@
         mainBtn.title = codeMissing() && canStart ? 'Type the access code first' : beginTitle;
         bar.append(mainBtn);
       }
-      // (2.99.55) the way back and Previous / Next, as every item has them (and the Mac's toolbar for the quiz)
-      const top = !simulated && BCV.screens.courseDetail?.itemTop ? BCV.screens.courseDetail.itemTop(ctx, course, 'Quiz', quiz.id, `${course.url}/quizzes`, 'Quizzes') : null;
+      // (2.99.56: no way-back row — the quiz's own page has Close at its top, as the Mac's sheet)
       const root = U.el('bcv-qzi', [
-        top,
         U.el('bcv-qzi__cols', [
           U.el('bcv-qzi__main', [heading, notices, instructions].filter(Boolean)),
           U.el('bcv-qzi__side', [code, rulesEl, attemptsEl].filter(Boolean)),

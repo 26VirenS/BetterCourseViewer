@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.55"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.56"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -5704,6 +5704,8 @@ html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-pins .bcv-pin
    columns on a wide page; just the buttons floating at the foot in glass. ---- */
 .bcv-qzi { container: bcv-qzi / inline-size; position: relative; width: 100%; box-sizing: border-box; max-width: 1100px; min-height: calc(100vh - 210px); display: flex; flex-direction: column; margin: 0 auto; padding: 20px 4px 0; font-family: var(--bcv-font); color: var(--bcv-ink); }
 .bcv-qzi__cols { display: flex; flex-direction: column; gap: 30px; }
+/* (2.99.56) on the quiz's own page (its head ~63px above it, the app's bar folded away): the buttons at the window's foot */
+.bcv-qz:not(.is-embedded) .bcv-qzi { min-height: calc(100vh - 64px - var(--bcv-bar-h, 0px)); }
 .bcv-qzi__main, .bcv-qzi__side { display: flex; flex-direction: column; gap: 30px; min-width: 0; }
 .bcv-qzi__main { order: 0; }
 @container bcv-qzi (min-width: 820px) {
