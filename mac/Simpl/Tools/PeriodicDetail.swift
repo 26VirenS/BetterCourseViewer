@@ -170,7 +170,7 @@ struct PTElementPage: View {
             sectionTitle("Atom")
             HStack(alignment: .center, spacing: 16) {
                 PTBohrSketch(element: e)
-                    .frame(width: 124, height: 124)
+                    .frame(width: 96, height: 96)
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Shells \(e.shells.map(String.init).joined(separator: " · "))")
                         .font(.sCallout.weight(.semibold).monospacedDigit())
@@ -179,20 +179,13 @@ struct PTElementPage: View {
                         .font(.sCaption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text("Turn its atom, its orbitals' shapes and its electron cloud in 3D.")
-                        .font(.sCaption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
             }
-            Button(action: openAtom) {
-                Label("Open in Atoms & Orbitals", systemImage: ToolKind.atoms.symbol)
-                    .frame(maxWidth: .infinity)
-            }
-            .glassButton(prominent: true)
-            .controlSize(.large)
-            .help("\(e.name)'s atom, orbitals and electron cloud in 3D, in Atoms & Orbitals")
+            // (1.3.135) its atom, orbitals and electron cloud in 3D, here on its page — part of the table, not a tool
+            // of its own to be sent to
+            PTAtomPanel(element: e)
+                .id(e.number)
         }
         .padding(16)
         .frame(maxHeight: .infinity, alignment: .top)

@@ -522,3 +522,118 @@ struct AtomsOrbitalsCompact: View {
         openFull(["element": String(e.number)])
     }
 }
+
+/// (1.3.135) The element's atom, its orbitals' shapes and its electron cloud in 3D, on its own page in the Periodic Table
+/// (PeriodicDetail.swift) — part of the table, where a button sent the student to Atoms & Orbitals before. Atom,
+/// Orbitals or Cloud, the subshell under the latter two, the model turned by dragging and zoomed by scrolling. The view
+/// picked is the one Atoms & Orbitals keeps (ChemPrefs `atoms.view`), so the two agree.
+struct PTAtomPanel: View {
+    let element: PTElement
+    @State private var model: PTModel = ChemPrefs.string(.atoms, "view").flatMap { PTModel(rawValue: $0) } ?? .atom
+    /// The Orbitals view's subshell; nil, the outer one being filled.
+    @State private var subshellID: String?
+    /// The Cloud view's chosen subshell; nil, the whole atom.
+    @State private var cloudFocus: String?
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var e: PTElement { element }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Picker("View", selection: Binding(get: { model }, set: { m in
+                withAnimation(reduceMotion ? nil : Motion.gentle) { model = m }
+                ChemPrefs.set(.atoms, "view", m.rawValue)
+                PTTour.shared.did(.atoms)
+            })) {
+                Text("Atom").tag(PTModel.atom)
+                Text("Orbitals").tag(PTModel.orbitals)
+                Text("Cloud").tag(PTModel.cloud)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            Atom3DView(element: e, model: model, subshell: subshell, focus: cloudFocus, dark: scheme == .dark)
+                .frame(height: 300)
+                .frame(maxWidth: .infinity)
+                .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .accessibilityElement()
+                .accessibilityLabel(label)
+                .accessibilityHint("Drag to turn, scroll to zoom")
+            switch model {
+            case .atom:
+                Text("Drag to turn · scroll to zoom").font(.sCaption).foregroundStyle(.secondary).frame(maxWidth: .infinity)
+            case .orbitals:
+                chips(orbitalChips)
+            case .cloud:
+                chips(cloudChips)
+            }
+        }
+    }
+
+    /// The subshell whose orbitals are shown: the one picked, else the outer one being filled.
+    private var subshell: PTSubshell? {
+        let all = PTConfig.subshells(of: e)
+        if let picked = all.first(where: { $0.id == subshellID }) { return picked }
+        let valence = PTConfig.valence(of: e)
+        let top = valence.map(\.l).max() ?? 0
+        return valence.last { $0.l == top } ?? all.last
+    }
+
+    private var label: String {
+        switch model {
+        case .atom: return "\(e.name)'s atom in 3D"
+        case .orbitals: return "The \(subshell?.name ?? "1s") orbitals of \(e.name) in 3D"
+        case .cloud: return cloudFocus.map { "The \($0) electrons of \(e.name) as a cloud in 3D" } ?? "\(e.name)'s electron cloud in 3D"
+        }
+    }
+
+    private struct Chip: Identifiable {
+        let id: String
+        let text: String
+        let dot: Color?
+        let on: Bool
+        let pick: () -> Void
+    }
+
+    private var orbitalChips: [Chip] {
+        let current = subshell?.id
+        return PTConfig.subshells(of: e).map { s in
+            Chip(id: s.id, text: "\(s.name)\(PTConfig.superscript(s.count))", dot: nil, on: s.id == current, pick: { subshellID = s.id })
+        }
+    }
+
+    private var cloudChips: [Chip] {
+        let cloud = ElectronCloud.cloud(for: e)
+        let chosen = cloud.subs.first { $0.id == cloudFocus }
+        let dark = scheme == .dark
+        var out = [Chip(id: "all", text: "All", dot: nil, on: chosen == nil, pick: { cloudFocus = nil })]
+        for s in cloud.subs {
+            out.append(Chip(id: s.id, text: "\(s.id)\(PTConfig.superscript(s.count))", dot: Color(nsColor: ElectronCloud.color(s.l, dark: dark)),
+                            on: chosen?.id == s.id, pick: { cloudFocus = s.id }))
+        }
+        return out
+    }
+
+    private func chips(_ items: [Chip]) -> some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 58), spacing: 6)], alignment: .leading, spacing: 6) {
+            ForEach(items) { item in
+                Button {
+                    if !item.on { withAnimation(reduceMotion ? nil : Motion.snappy) { item.pick() } }
+                } label: {
+                    HStack(spacing: 5) {
+                        if let dot = item.dot { Circle().fill(dot).frame(width: 7, height: 7) }
+                        Text(item.text).font(.sCaption.weight(item.on ? .bold : .regular).monospaced())
+                    }
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4)
+                    .frame(maxWidth: .infinity)
+                    .background(item.on ? Theme.accent.opacity(0.25) : Color.primary.opacity(0.06), in: Capsule())
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(item.on ? AccessibilityTraits.isSelected : [])
+            }
+        }
+    }
+}

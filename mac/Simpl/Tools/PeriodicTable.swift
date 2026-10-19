@@ -606,17 +606,16 @@ struct PeriodicTableTool: View {
                 .tourTarget("ptGrid")
             }
             .frame(maxWidth: 1300)
-            Text("Point at an element to see it here; press it to see it in a small window, and its whole page from there. Type a symbol, name or number and press Return to open its page.")
+            Text("Point at an element to see it here; press it to open its page — its atom, orbitals and electron cloud in 3D there too. Type a symbol, name or number and press Return to open its page.")
                 .font(.sCallout)
                 .foregroundStyle(.secondary)
         }
     }
 
-    /// (1.3.110) An element pressed: in the mini element window (PeriodicMini.swift), its Full Page opening it here.
-    /// (The tour, under way: its step asks for the page itself, opened as before.)
+    /// (1.3.110) An element pressed: in the mini element window (PeriodicMini.swift), its Full Page opening it here —
+    /// (1.3.135) its page now, at once, from the large table (the small one, in a pin's popover, keeps its mini window).
     private func pickElement(_ e: PTElement, from rect: CGRect, in size: CGSize) {
-        if tourStep != nil { openElement(e, from: rect, in: size); return }
-        PTMini.shared.show(e) { x in openElement(x, from: rect, in: size) }
+        openElement(e, from: rect, in: size)
     }
 
     private func openElement(_ e: PTElement, from rect: CGRect, in size: CGSize) {

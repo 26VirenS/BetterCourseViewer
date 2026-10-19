@@ -27,7 +27,9 @@ struct ChemToolInfo {
 
 enum ChemTools {
     /// The tools in the Tools page's order: the Periodic Table's four, then (tools) the calculators.
-    static let kinds: [ToolKind] = [.ptable, .lewis, .molecule, .atoms, .balance, .moles, .gas, .solution]
+    /// (1.3.135: Atoms & Orbitals is part of the Periodic Table now — each element's page has its atom, orbitals and cloud
+    /// in 3D — and no longer a tile of its own; a pin or a link to it still opens it)
+    static let kinds: [ToolKind] = [.ptable, .lewis, .molecule, .balance, .moles, .gas, .solution]
 
     /// Each tool's name, line, symbol and colour — a palette of their own (red, cyan, green and violet; the
     /// calculators' orange-red and the rest), none of them near a biology tile's colour.

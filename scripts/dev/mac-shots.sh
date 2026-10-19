@@ -600,7 +600,9 @@ chem_tools() {
   done
   MODE=light SIZE=1440x920 shoot light-55o-atoms 16 -SimplPlace tools -SimplTool atoms -SimplPTElement 26
   MODE=light SIZE=780x700 shoot light-55p-atoms-narrow 16 -SimplPlace tools -SimplTool atoms -SimplPTElement 8 -SimplPTModel orbitals
-  MODE=light SIZE=1440x920 shoot light-55q-atoms-from-facts 18 -SimplPlace tools -SimplTool ptable -SimplPTElement 6 -SimplPTHandOff atoms
+  # (1.3.135: carbon's page with its atom in 3D on it — part of the table now; and its Orbitals)
+  MODE=light SIZE=1440x920 shoot light-55q-atoms-from-facts 18 -SimplPlace tools -SimplTool ptable -SimplPTElement 6
+  MODE=dark SIZE=1440x920 shoot dark-55r-ptable-page-3d 18 -SimplPlace tools -SimplTool ptable -SimplPTElement 26
   MODE=dark SIZE=1440x920 shoot dark-55r-lewis 14 -SimplPlace tools -SimplTool lewis -SimplLewisPreset "NO₃⁻"
   MODE=light shoot light-54h-pin-atoms 14 -SimplPinnedTools atoms -SimplPinOpen atoms
   MODE=light shoot light-30c-palette-chemistry 14 -SimplOpen "palette:orbitals"

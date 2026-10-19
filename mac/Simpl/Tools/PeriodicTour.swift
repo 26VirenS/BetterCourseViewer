@@ -36,8 +36,8 @@ struct PTTourStep {
                    doing: "Click carbon, or any element", act: .open, target: "ptCarbon"),
         PTTourStep(title: "Find anything", text: "A symbol, name or number; Return opens it.",
                    doing: "Search for an element", gesture: .type, act: .typed, target: "ptSearch"),
-        PTTourStep(title: "Its atom in 3D", text: "Its shells, orbitals and electron cloud open in Atoms & Orbitals.",
-                   doing: "Click Open in Atoms & Orbitals", act: .event(.atoms), target: "ptAtoms", element: 6),
+        PTTourStep(title: "Its atom in 3D", text: "Its atom, orbitals and electron cloud turn in 3D, here on its page.",
+                   doing: "Pick Orbitals or Cloud", act: .event(.atoms), target: "ptAtoms", element: 6),
     ]
 }
 
