@@ -841,6 +841,9 @@ try {
   // window lit in its grade's colour once marked and posted (A green, B yellow-green, C yellow, D orange, F red), dark
   // while to come; a course with no score an outline under a dash; a tower opens its course's grades
   await page.waitForSelector('.bcv-sky__win', { timeout: 10000 });
+  await page.waitForTimeout(400);
+  const skyAcross = await page.evaluate(() => [...document.querySelectorAll('.bcv-sky__wins')].filter((g) => g.children.length).map((g) => ({ cols: getComputedStyle(g).gridTemplateColumns.split(' ').length, tops: new Set([...g.children].map((w) => Math.round(w.getBoundingClientRect().top))).size, n: g.children.length, inside: [...g.children].every((w) => { const t = g.closest('.bcv-sky__tower').getBoundingClientRect(), r = w.getBoundingClientRect(); return r.top >= t.top - 1 && r.bottom <= t.bottom + 1; }) })));
+  check(skyAcross.length > 0 && skyAcross.every((x) => x.cols === 4 && x.n <= x.tops * 4 && x.inside), `the skyline's towers are four windows across, never more, each window inside its tower (the rest hidden): ${JSON.stringify(skyAcross)}`);
   const sky = await page.evaluate(() => {
     const box = (e) => e.getBoundingClientRect();
     const LIT = { A: 'rgb(76, 217, 100)', B: 'rgb(181, 224, 54)', C: 'rgb(255, 212, 38)', D: 'rgb(255, 159, 10)', F: 'rgb(255, 69, 58)' };

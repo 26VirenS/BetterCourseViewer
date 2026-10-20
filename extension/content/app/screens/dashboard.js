@@ -194,16 +194,17 @@
     const t = (r) => (r.at ? r.at.getTime() : Infinity);
     return [...rows.filter((r) => r.band).sort((x, y) => t(x) - t(y)), ...rows.filter((r) => !r.band).sort((x, y) => t(x) - t(y))];
   }
-  /** Windows `n` to a w × hgt space: four across while they fit, more across (and smaller) when they do not. */
-  function skyFit(n, w, hgt) {
-    const g = 3;
-    let best = { cols: 4, s: 0 };
-    for (const cols of [4, 3, 5, 6, 7, 8]) {
-      const rows = Math.max(1, Math.ceil(n / cols));
-      const s = Math.min(6.5, (w - (cols - 1) * g) / cols, (hgt - (rows - 1) * g) / rows);
-      if (s > best.s + 0.01) best = { cols, s };
-    }
-    return { cols: best.cols, s: Math.max(2, Math.floor(best.s * 2) / 2), g };
+  /** (2.99.68) Windows to a tower w wide and hgt tall: four across, always, at the size four across leaves — and only as many
+   *  rows as the tower has floors for; the rest are not drawn (they were squeezed in, more across and smaller, until then).
+   *  `up`, `down`: how many count and how many do not; those that count take the floors first. */
+  function skyFit(up, down, w, hgt) {
+    const g = 3, cols = 4;
+    const s = Math.max(2, Math.floor(Math.min(6.5, (w - (cols - 1) * g) / cols) * 2) / 2);
+    const floors = (h) => Math.max(0, Math.floor((h + g) / (s + g)));
+    const total = floors(hgt);
+    const upRows = Math.min(Math.ceil(up / cols), total);
+    const downRows = Math.min(Math.ceil(down / cols), Math.max(0, floors(hgt - (upRows ? upRows * (s + g) + 6 : 0))));
+    return { cols, s, g, up: Math.min(up, upRows * cols), down: Math.min(down, downRows * cols) };
   }
 
   const ACTIVITY_ICON = { Announcement: IC.bell, DiscussionTopic: IC.disc, Conversation: IC.mail, Message: IC.doc, Submission: IC.chart, Conference: IC.people, Collaboration: IC.people, AssessmentRequest: IC.people, WebConference: IC.people };
@@ -734,8 +735,9 @@
           const rows = skyWindows(data.byCourse.find((b) => b.c.id === x.c.id)?.list, data.weights.get(x.c.id));
           // (2.98.91) what counts from the top floor down; what does not, in grey, on the floors at the street — one size of
           // window for both, fitted to the tower with room between the two
-          const up = rows.filter((r) => !r.free), down = rows.filter((r) => r.free);
-          const f = skyFit(rows.length, TW - 10, x.th - 7 - (down.length ? 7 : 0) - (up.length && down.length ? 6 : 0));
+          const allUp = rows.filter((r) => !r.free), allDown = rows.filter((r) => r.free);
+          const f = skyFit(allUp.length, allDown.length, TW - 10, x.th - 7 - (allDown.length ? 7 : 0));
+          const up = allUp.slice(0, f.up), down = allDown.slice(0, f.down); // (2.99.68: four across; the rest hidden)
           for (const g of [x.wins, x.low]) {
             g.style.gridTemplateColumns = `repeat(${f.cols}, ${f.s}px)`;
             g.style.gridAutoRows = `${f.s}px`;

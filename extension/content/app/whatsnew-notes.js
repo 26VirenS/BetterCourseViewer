@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.68', date: '2026-10-20', notes: [
+      { kind: 'improved', title: 'Tidier Skyline', body: 'Four windows across each tower; the rest hide.', icon: P.check },
+    ] },
     { version: '2.99.67', date: '2026-10-20', notes: [
       { kind: 'improved', title: 'Quiz Intro Popup', body: "A quiz's intro opens as a large popup, as on Mac.", icon: P.check },
     ] },
