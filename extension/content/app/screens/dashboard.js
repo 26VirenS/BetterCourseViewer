@@ -13,7 +13,6 @@
   let arrived = false;
   const arrivedBefore = () => { if (arrived) return true; try { return sessionStorage.getItem(ARRIVED) === '1'; } catch { return false; } };
   const markArrived = () => { arrived = true; try { sessionStorage.setItem(ARRIVED, '1'); } catch { /* (private window: this page's memory is enough) */ } };
-  let byHover = false; // (set while a counter's box is being opened by a hover; openSheet reads it once)
 
   /** The counters' own lists — shared by the Dashboard and the phone's Today (2.98.36), so the two
    *  never count differently: what is due today, tomorrow and in the next 7 days (and what of each is already
@@ -486,25 +485,23 @@
         U.el('bcv-stat__head', [U.svg(icon, { size: 14, stroke: color, width: 1.9 }), shortLabel(U.text('bcv-label bcv-label--inline', lbl, 'span'), lbl), valueEl]),
         U.el('bcv-stat__noterow', [U.text('bcv-stat__note', note, 'span'), U.svg(IC.chevron, { size: 13, stroke: 'var(--bcv-ink3)', width: 2, cls: 'bcv-stat__chev' })]),
       ]);
-      // (2.98.97) a moment's rest on a counter opens its box too, as a press does (U.hoverOpens: a mouse only, never while
-      // another box or a tour is up); the box so opened folds again when the pointer leaves it, unless it is taken up
-      U.hoverOpens(btn, (b) => { byHover = true; try { onOpen(b); } finally { byHover = false; } });
+      // (2.99.69: a press opens it, as on the Mac — no longer a moment's rest on it too)
       return U.enter(btn, 0); // no stagger: the six land together
     }
 
     /** The detail sheet behind a counter (2.98.45): the counter itself grows, where it stands, into a
-     *  taller box holding its list — the page dimmed and blurred away from it, more the further off, as
-     *  the tour does it — and a row pressed widens the box to the right for its preview (a pane a little
-     *  smaller than the page's own), the box sliding left when the window has no room there, the list
-     *  kept at its left. Closing folds it back into the counter. With no counter to grow out of it opens
-     *  in the middle, as before. */
+     *  taller box holding its list, and folds back into it closing. (2.99.69) As the Mac app's: the box floats over
+     *  the page — no dim, no blur, the page left as it is — as tall as its list (up to what the window has room
+     *  for), on the Mac's own spring (motion.js morph); a press anywhere outside it folds it back and still does what
+     *  it does (on another counter, that one grows as this one folds). With no counter to grow out of it opens in the
+     *  middle, as before. */
     function openSheet(def, from = null) {
-      const prev = document.querySelector('.bcv-sheet-ov');
+      const prev = document.querySelector('.bcv-sheet-ov:not(.is-folding)') || document.querySelector('.bcv-sheet-ov');
       if (prev?.bcvReopen && prev.bcvCard === from && prev.classList.contains('is-folding')) { prev.bcvReopen(); return; } // (pressed again as it folds: it opens again from where it is)
-      if (prev) { clearTimeout(prev._bcvFoldT); prev.remove(); }
+      if (prev?.bcvFold && !prev.classList.contains('is-folding')) prev.bcvFold(); // (another counter's box folds back as this one grows)
+      else if (prev && !prev.bcvFold) { clearTimeout(prev._bcvFoldT); prev.remove(); } // (a counter's box already folding finishes)
       const card = from && from.getBoundingClientRect && from.isConnected ? from : null;
-      const hover = byHover && !!card;
-      const ov = U.el(`bcv-sheet-ov${card ? ' bcv-sheet-ov--card is-far' : ''}`, null, { role: 'dialog', 'aria-label': def.label }); // (is-far: the dim and blur start out wide, to close in on the box)
+      const ov = U.el(`bcv-sheet-ov${card ? ' bcv-sheet-ov--card bcv-sheet-ov--float is-far' : ''}`, null, { role: 'dialog', 'aria-label': def.label });
       let folding = false;
       let lastPt = null; // (where the pointer was last seen over the box's layer)
       ov.addEventListener('pointermove', (e) => { lastPt = { x: e.clientX, y: e.clientY }; }, { passive: true });
@@ -513,6 +510,7 @@
         if (!card) { BCV.ui.dismiss(ov); return; }
         if (folding || !ov.isConnected) return;
         folding = true;
+        document.removeEventListener('pointerdown', outside, true);
         if (sheet.classList.contains('has-pv')) BCV.preview?.close({ gently: true }); // (its preview card goes first)
         U.hoverCool(card, lastPt); // (a pointer still over the counter as the box folds into it does not open it again until it has left)
         ov.classList.add('is-folding', 'is-far'); // (the focus lets go outward as the box folds)
@@ -523,9 +521,19 @@
       // pressed again as it folds: the fold is called off and it opens again from where it has got to (never cut off
       // for a new box to grow from nothing, nor the counter left showing through it by the fold's timer)
       ov.bcvCard = card;
+      ov.bcvFold = card ? close : null;
+      // (2.99.69, the Mac's) a press anywhere but the box (and its preview card, a menu or a toast over it) folds it back;
+      // the press goes on to what it was on — the box's layer lets everything else through (app.css .bcv-sheet-ov--float)
+      const outside = (e) => {
+        if (!ov.isConnected) { document.removeEventListener('pointerdown', outside, true); return; }
+        if (folding || ov.contains(e.target) || e.target.closest?.('.bcv-pv, .bcv-menu, .bcv-toast, .bcv-sheet-ov:not(.bcv-sheet-ov--float)')) return;
+        close();
+      };
+      if (card) document.addEventListener('pointerdown', outside, true);
       ov.bcvReopen = () => {
         clearTimeout(ov._bcvFoldT);
         folding = false;
+        document.addEventListener('pointerdown', outside, true);
         ov.classList.remove('is-folding', 'is-far');
         card.classList.add('is-lifted');
         box.reopen();
@@ -561,11 +569,26 @@
       ov.append(sheet);
       // (2.99.37) a press in the box away from its rows puts its preview card away, the box staying
       sheet.addEventListener('pointerdown', (e) => { if (sheet.classList.contains('has-pv') && !e.target.closest('.bcv-sheet__row, .bcv-sheet__qrow, .bcv-sheet__x')) BCV.preview?.close({ gently: true }); });
-      if (card) ov.append(U.el('bcv-card-blur', null, { 'aria-hidden': 'true' })); // (the page blurred round the box: a layer of its own, after the box, which stays the overlay's first child)
       // where the box goes: the counter's own corner, as wide as a list wants (the list and the preview
-      // side by side once a row is pressed), 430px tall (2.98.50: a third shorter than it was) or as
+      // side by side once a row is pressed) — (2.99.69) 440px as the Mac's panel is — and as tall as what it holds, or as
       // tall as the window allows, pushed back inside the window
-      const M = 16, LIST_W = 380, PV_W = 500, H_MAX = 430;
+      const M = 16, LIST_W = 440, PV_W = 500;
+      /** How tall the box stands at width w with nothing holding it in: its header and the whole of its list. Measured in
+       *  the page (the layer put in, unseen, for the moment it takes when it is not in yet). */
+      function naturalHeight(w) {
+        const away = !ov.isConnected;
+        if (away) { ov.style.visibility = 'hidden'; document.body.append(ov); }
+        const list = sheet.querySelector('.bcv-sheet__list');
+        const keep = [sheet.style.width, sheet.style.height, list?.style.maxHeight, list?.style.overflow];
+        sheet.style.width = `${Math.round(w)}px`;
+        sheet.style.height = 'auto';
+        if (list) Object.assign(list.style, { maxHeight: 'none', overflow: 'visible' });
+        const hgt = Math.ceil(sheet.getBoundingClientRect().height);
+        [sheet.style.width, sheet.style.height] = keep;
+        if (list) Object.assign(list.style, { maxHeight: keep[2], overflow: keep[3] });
+        if (away) { ov.remove(); ov.style.visibility = ''; }
+        return hgt;
+      }
       /** Where in its row the counter stands: the box hangs from its top-left corner (the left of the row), its top
        *  centre (the middle) or its top-right corner (the right) — growing away from the row's edge, and on the right
        *  its preview opening on the left of the list (2.98.82). */
@@ -584,7 +607,10 @@
         const split = sheet.classList.contains('is-split');
         const narrow = split && room < listW + 360; // (no room for both: the preview takes the box)
         const w = split ? (narrow ? room : Math.min(listW + PV_W, room)) : listW;
-        const hgt = Math.max(Math.min(H_MAX, vh - 2 * M), Math.min(r.height, vh - 2 * M));
+        // (2.99.69, the Mac's) as tall as its list, down to the window's foot from the counter's top — pushed up only where
+        // that leaves it shorter than 430px (a short window), never shorter than the counter
+        const nat = naturalHeight(listW);
+        const hgt = Math.max(Math.min(nat, vh - r.top - M), Math.min(nat, 430, vh - 2 * M), Math.min(r.height, vh - 2 * M));
         const side = sideOf();
         const x = Math.max(M, Math.min(side === 'end' ? r.right - w : side === 'mid' ? r.left + r.width / 2 - w / 2 : r.left, vw - M - w));
         const y = Math.max(M, Math.min(r.top, vh - M - hgt));
@@ -625,6 +651,7 @@
             ov.querySelector('.bcv-sheet__value').textContent = def.value;
             ov.querySelector('.bcv-sheet__note').textContent = def.note;
             if (list && !list.querySelector('.bcv-sheet__row')) { const lead = list.querySelector(':scope > .bcv-sheet__sec'); const e = U.empty(def.empty || 'Nothing here.'); if (lead) lead.after(e); else list.prepend(e); }
+            if (!folding) box?.relayout(); // (2.99.69: the box takes the height of what is left in it)
             ov.focus(); // the press took the focus with it; Escape still closes the sheet
           }, 220);
         } });
@@ -656,8 +683,7 @@
         addEventListener('resize', onResize);
       } else U.morphFrom(sheet, from);
       ov.tabIndex = -1;
-      ov.focus();
-      if (hover) U.hoverHold(ov, sheet, close, () => folding); // (opened by a hover: it folds again once the pointer has been off it a moment, unless it was taken up)
+      ov.focus({ preventScroll: true });
     }
 
     // ---- workload ------------------------------------------------------------------

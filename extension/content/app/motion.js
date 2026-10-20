@@ -29,6 +29,7 @@
     scrim: { stiffness: 300, damping: 34, mass: 1 }, // opacity only: ~400 ms (ζ ≈ .98)
     phone: { stiffness: 260, damping: 30, mass: 1 }, // push and pop, bottom sheets: ~390 ms (ζ ≈ .93)
     island: { stiffness: 150, damping: 22.8, mass: 1 }, // the look switch growing under the pointer into its list: ~490 ms, no overshoot (ζ ≈ .93)
+    morph: { stiffness: 224, damping: 27.5, mass: 1 }, // (2.99.69) a Dashboard counter growing into its box and folding back: the Mac app's own spring for it (SwiftUI response .42, damping fraction .92) — ~410 ms, no visible overshoot
     pin: { stiffness: 300, damping: 32.5, mass: 1 }, // the widgets: the timer's island and every pin's panel swelling under the pointer — ~370 ms, nine tenths there by 200 ms, no overshoot (ζ ≈ .94)
   }; // (2.98.4: each a fifth slower than before and softer at the turn — smoother over speed)
   const REST_DIST = 0.01; // of the travel: at rest once within this and slower than REST_SPEED (a pixel of a hundred: the eye's threshold)
@@ -118,7 +119,7 @@
   // behind whatever script is running. Each spring there is the cubic-bezier() closest to it over its settle time (within
   // 1%, the bouncy snappy within 2.2%: scripts/dev/fit-springs.mjs fits them), which the compositor plays at the display's
   // own rate. Script-driven motion (run) is unaffected: its keyframes are joined by straight lines, which it can play.
-  const BEZIER = { snappy: [0.304, 0.43, 0.056, 1.23], gentle: [0.229, 0.147, 0.179, 1.007], settle: [0.225, 0.109, 0.225, 1.039], scrim: [0.225, 0.164, 0.155, 1.015], phone: [0.227, 0.133, 0.195, 1.023], island: [0.231, 0.129, 0.205, 0.998], pin: [0.226, 0.141, 0.183, 1.029] };
+  const BEZIER = { snappy: [0.304, 0.43, 0.056, 1.23], gentle: [0.229, 0.147, 0.179, 1.007], settle: [0.225, 0.109, 0.225, 1.039], scrim: [0.225, 0.164, 0.155, 1.015], phone: [0.227, 0.133, 0.195, 1.023], island: [0.231, 0.129, 0.205, 0.998], morph: [0.227, 0.124, 0.206, 1.026], pin: [0.226, 0.141, 0.183, 1.029] };
   const coreAnimation = (() => {
     try {
       if (self.BCV_CORE_ANIMATION !== undefined) return !!self.BCV_CORE_ANIMATION; // (tests: either way)

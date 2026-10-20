@@ -708,57 +708,28 @@ try {
   await page.hover('.bcv-sheet__qrow');
   check(await eventually(async () => Number(await page.$eval('.bcv-sheet__qrow', (e) => getComputedStyle(e).opacity)) > 0.95, 2000), 'a quiet row comes up to full strength under the pointer');
   // this Chromium draws in software, which skips every backdrop-filter (lib/theme.js checkBlur): the
-  // bars take their colour over the page's ground, and an open sheet blurs the page with a filter
+  // bars take their colour over the page's ground (a sheet blurs the page with a filter; a counter's box does not)
   const noBlur = await page.evaluate(() => ({ cls: document.documentElement.classList.contains('bcv-noblur'), kept: JSON.parse(localStorage.getItem('bcv:blur') || 'null')?.drawn, bar: getComputedStyle(document.getElementById('bcv-bar')).backgroundImage, side: getComputedStyle(document.getElementById('bcv-side')).backgroundImage, main: getComputedStyle(document.getElementById('bcv-main')).filter }));
-  check(noBlur.cls && noBlur.kept === false && /^linear-gradient/.test(noBlur.bar) && /^linear-gradient/.test(noBlur.side) && noBlur.main === 'blur(6px)', `a Chrome that draws no blur gets solid bars, and the page behind a sheet blurred by a filter: ${JSON.stringify(noBlur)}`);
-  await page.click('.bcv-sheet-ov', { position: { x: 5, y: 5 } });
-  await page.waitForFunction(() => !document.querySelector('.bcv-sheet'), null, { timeout: 3000 });
-  // (2.98.97) a counter opens its box on a hover too: after a moment's rest on it (a pointer passing over does nothing);
-  // the box so opened folds again when the pointer leaves it, stays once taken up (a press in it), and does not open
-  // again under a pointer that has not moved since it folded
+  check(noBlur.cls && noBlur.kept === false && /^linear-gradient/.test(noBlur.bar) && /^linear-gradient/.test(noBlur.side) && noBlur.main === 'none', `a Chrome that draws no blur gets solid bars, and (2.99.69, the Mac's) the page under a counter's box left sharp: ${JSON.stringify(noBlur)}`);
+  // (2.99.69, the Mac's panel) a press outside the box folds it back and still does what it does: on another counter, that
+  // one grows as this one folds — the box's layer lets the press through
+  {
+    const boxes = () => page.evaluate(() => [...document.querySelectorAll('.bcv-sheet-ov--card')].map((o) => `${o.classList.contains('is-folding') ? 'folding' : 'open'}:${o.querySelector('.bcv-sheet__label')?.textContent}`));
+    const at = await page.$eval('.bcv-stats .bcv-stat:nth-child(1)', (e) => { const r = e.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; });
+    await page.mouse.click(at.x, at.y);
+    const both = await boxes();
+    check(both.includes('folding:Next 7 days') && both.includes('open:Due today') && await eventually(async () => (await boxes()).join() === 'open:Due today', 2500), `a press on another counter folds the box open back and grows that one's, in the one press: ${JSON.stringify(both)}`);
+    const hi = await page.$eval('.bcv-dash__hello', (e) => { const r = e.getBoundingClientRect(); return { x: Math.round(r.left + 8), y: Math.round(r.top + r.height / 2) }; });
+    await page.mouse.click(hi.x, hi.y);
+    check(await eventually(async () => !(await page.$('.bcv-sheet-ov')), 2500), 'a press on the page away from the box folds it back');
+  }
+  // (2.99.69) as on the Mac, a press opens a counter's box — a moment's rest on it does not (2.98.97's hover-open is gone)
   {
     await page.mouse.move(5, 5);
     const at = await page.$eval('.bcv-stat[data-stat="week"]', (e) => { const r = e.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; });
-    const vp = page.viewportSize();
-    const up = () => page.evaluate(() => { const ov = document.querySelector('.bcv-sheet-ov--card'); return ov && !ov.classList.contains('is-folding') ? { hover: ov.hasAttribute('data-hover'), label: ov.querySelector('.bcv-sheet__label')?.textContent } : null; });
-    const gone = () => page.evaluate(() => !document.querySelector('.bcv-sheet-ov'));
-    await page.mouse.move(at.x, at.y, { steps: 3 });
-    await page.mouse.move(5, 5, { steps: 3 }); // (a pass over it)
-    await page.waitForTimeout(700);
-    const passed = await up();
-    await page.mouse.move(at.x, at.y, { steps: 3 });
-    await page.waitForTimeout(150);
-    const tooSoon = await up();
-    check(!passed && !tooSoon && await eventually(async () => (await up())?.hover === true, 2500) && (await up()).label === 'Next 7 days',
-      `resting on a counter opens its box, as a press does — not at once, and not for a pointer passing over: ${JSON.stringify({ passed, tooSoon, now: await up() })}`);
-    await page.waitForTimeout(750);
-    await page.mouse.move(12, vp.height - 12, { steps: 6 });
-    check(await eventually(gone, 2500), 'a box a counter opened on a hover folds again once the pointer has left it');
     await page.mouse.move(at.x, at.y, { steps: 4 });
-    check(await eventually(async () => !!(await up()), 2500), 'back on the counter, it opens again');
-    await page.waitForTimeout(750);
-    await page.click('.bcv-sheet--stat .bcv-sheet__note'); // (a press in the box takes it up)
-    await page.mouse.move(12, vp.height - 12, { steps: 6 });
-    await page.waitForTimeout(1200);
-    check(!!(await up()) && !(await up()).hover, 'a box taken up (a press in it) stays when the pointer leaves, as a pressed one does');
-    await page.keyboard.press('Escape');
-    check(await eventually(gone, 2500), 'and Escape folds it');
-    await page.mouse.move(at.x, at.y, { steps: 4 });
-    await eventually(async () => !!(await up()), 2500);
-    await page.keyboard.press('Escape'); // (the pointer left resting on the counter)
-    await eventually(gone, 2500);
-    await page.waitForTimeout(1200);
-    check(await gone(), 'folded under a pointer that has not moved, it does not open again by itself');
-    // a counter drawn under a pointer that is resting there (the Dashboard painting where the mouse happens to be) is
-    // not a hover: only a pointer that moves onto a counter opens it
-    await page.goto(`${BASE}/`);
-    await page.waitForSelector('.bcv-stat[data-stat="week"]', { timeout: 10000 });
-    await page.waitForTimeout(1300);
-    const painted = await up();
-    await page.mouse.move(at.x + 6, at.y + 2, { steps: 2 });
-    check(!painted && await eventually(async () => !!(await up()), 2500), `a counter painted under a resting pointer does not open by itself; the pointer moving on it does: ${JSON.stringify({ painted })}`);
-    await page.keyboard.press('Escape');
-    await eventually(gone, 2500);
+    await page.waitForTimeout(1500);
+    check(!(await page.$('.bcv-sheet-ov')), 'resting on a counter opens nothing: a press does');
     await page.mouse.move(5, 5);
   }
   check(await page.$eval('#bcv-main', (e) => getComputedStyle(e).filter) === 'none', 'the page is sharp again once the sheet is gone');
@@ -782,8 +753,8 @@ try {
   check(glassBox.stat && glassBox.layers === 2 && (!glassBox.noblur || (glassBox.solid && glassBox.blur === 'none')) && /^blur\(20px\)/.test(glassLit.blur) && !glassLit.solid && glassBox.ink === 'rgb(255, 255, 255)' && glassBox.row === 'rgb(255, 255, 255)' && glassBox.ground === '0' && glassBox.counter === 'hidden', `the counter's box wears the search's glass (20px behind it, the rim, white words; solid where no blur is drawn), the counter's own ground faded from over it, the counter itself hidden behind it: ${JSON.stringify({ glassBox, lit: glassLit.blur })}`);
   check(!(await pageHeld(page, 20, 700)).moved, "the page behind a counter's box is held still while it is open");
   // (2.98.45) the counter grows where it stands into a taller box — its own corner, the page dimmed round it (darker further off)
-  const steady0 = await page.evaluate(() => { const e = document.querySelector('.bcv-sheet'); const r = e.getBoundingClientRect(); const c = document.querySelector('.bcv-stats .bcv-stat:nth-child(3)').getBoundingClientRect(); const ov = document.querySelector('.bcv-sheet-ov'); return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), cx: Math.round(c.left), cy: Math.round(c.top), from: e.dataset.from, card: e.classList.contains('bcv-sheet--card'), hint: !!e.querySelector('.bcv-sheet__pvhint'), veil: /^radial-gradient/.test(getComputedStyle(ov.querySelector('.bcv-card-dim')).backgroundImage), vw: innerWidth, vh: innerHeight }; });
-  check(steady0.card && !steady0.hint && steady0.veil && steady0.w >= 360 && steady0.w <= 460 && steady0.h === 430 && steady0.y === steady0.cy && steady0.x + steady0.w <= steady0.vw - 15 && steady0.x <= steady0.cx && steady0.x >= steady0.cx - 120, `the counter grows in place into a taller box (430px) with its list (no pane waiting), the page dimmed round it: ${JSON.stringify(steady0)}`);
+  const steady0 = await page.evaluate(() => { const e = document.querySelector('.bcv-sheet'); const r = e.getBoundingClientRect(); const c = document.querySelector('.bcv-stats .bcv-stat:nth-child(3)').getBoundingClientRect(); const ov = document.querySelector('.bcv-sheet-ov'); return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), cx: Math.round(c.left), cy: Math.round(c.top), from: e.dataset.from, card: e.classList.contains('bcv-sheet--card'), hint: !!e.querySelector('.bcv-sheet__pvhint'), veil: [...ov.querySelectorAll('.bcv-card-dim, .bcv-card-blur')].some((d) => getComputedStyle(d).display !== 'none'), through: getComputedStyle(ov).pointerEvents, fits: (() => { const l = e.querySelector('.bcv-sheet__list'); return l.scrollHeight <= l.clientHeight + 1; })(), vw: innerWidth, vh: innerHeight }; });
+  check(steady0.card && !steady0.hint && !steady0.veil && steady0.through === 'none' && steady0.w === 440 && steady0.fits && steady0.h < 430 && steady0.y === steady0.cy && steady0.x + steady0.w <= steady0.vw - 15 && steady0.x <= steady0.cx && steady0.x >= steady0.cx - 160, `the counter grows in place into a box 440px wide as tall as its list (2.99.69, the Mac's panel), no pane waiting, the page neither dimmed nor blurred and taking presses round it: ${JSON.stringify(steady0)}`);
   await page.click('.bcv-sheet__row');
   // (2.99.37, the Mac's preview card) a row pressed opens its preview as a glass card of its own over the list — the box
   // keeping its size, the row lit — its kind and course on top in the course's colour, a Close pill, the title, its facts
@@ -5206,22 +5177,16 @@ try {
   await motionAt(page, WATCH);
   await page.click('.bcv-stat');
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
-  // (2.98.45) the counter's box grows where the counter stands: its place and size eased from the counter's, the page dimmed round it and blurred
+  // (2.98.45) the counter's box grows where the counter stands, drawn through a clip that opens from the counter's — (2.99.69)
+  // as the Mac's panel: the page round it neither dimmed nor blurred, on the Mac's own spring (motion.js morph)
   const sheetAnim = await page.evaluate(() => {
     const ov = document.querySelector('.bcv-sheet-ov'), sh = ov.querySelector('.bcv-sheet'), card = document.querySelector('.bcv-stat').getBoundingClientRect();
-    const cs = getComputedStyle(sh), blurEl = ov.querySelector('.bcv-card-blur'), before = getComputedStyle(blurEl);
-    const after = getComputedStyle(ov.querySelector('.bcv-card-dim')); // (2.99.4: the dim is a layer of its own, moved by transform)
-    // (2.98.46) the dim and the blur are layers of their own, in together on one short fade; the box never fades (its words glide from the counter's)
-    return { noblur: document.documentElement.classList.contains('bcv-noblur'), veil: `${before.animationName}/${after.animationName}`, boxFade: getComputedStyle(ov).animationName, card: sh.classList.contains('bcv-sheet--card'), eased: cs.transitionProperty.includes('clip-path') && !/(^|,\s*)(left|top|width|height)(,|$)/.test(cs.transitionProperty) && /^inset\(/.test(cs.clipPath), blur: document.documentElement.classList.contains('bcv-noblur') || /blur/.test(before.backdropFilter || before.webkitBackdropFilter || ''), dim: /radial-gradient/.test(after.backgroundImage), ramp: /\+ 120px/.test(before.maskImage || before.webkitMaskImage || '') || document.documentElement.classList.contains('bcv-noblur'), top: Math.round(sh.getBoundingClientRect().top - card.top), w: parseFloat(sh.style.width), reach: parseFloat(after.scale), blurFirst: parseFloat((before.backdropFilter || before.webkitBackdropFilter || '').replace(/^blur\(/, '')) };
+    const cs = getComputedStyle(sh), root = getComputedStyle(document.documentElement);
+    return { boxFade: getComputedStyle(ov).animationName, card: sh.classList.contains('bcv-sheet--card'), eased: cs.transitionProperty.includes('clip-path') && !/(^|,\s*)(left|top|width|height)(,|$)/.test(cs.transitionProperty) && /^inset\(/.test(cs.clipPath), veil: [...ov.querySelectorAll('.bcv-card-dim, .bcv-card-blur')].filter((d) => getComputedStyle(d).display !== 'none').length, top: Math.round(sh.getBoundingClientRect().top - card.top), w: parseFloat(sh.style.width), spring: (() => { const probe = document.createElement('i'); probe.style.transitionTimingFunction = 'var(--bcv-spring-morph)'; document.body.append(probe); const want = getComputedStyle(probe).transitionTimingFunction; probe.remove(); return !!root.getPropertyValue('--bcv-spring-morph').trim() && cs.transitionTimingFunction === want; })(), springT: cs.transitionDuration, morphT: root.getPropertyValue('--bcv-t-morph').trim() };
   });
-  check(sheetAnim.veil === 'bcv-card-veil/bcv-card-veil' && sheetAnim.boxFade === 'none' && sheetAnim.card && sheetAnim.eased && sheetAnim.blur && sheetAnim.dim && sheetAnim.ramp && Math.abs(sheetAnim.top) <= 2 && sheetAnim.w >= 360, `a sheet grows out of the counter that opened it, where it stands, the page dimmed and blurred round it at once (a tight ramp, the box itself never faded): ${JSON.stringify(sheetAnim)}`);
-  // (2.98.48) the page focuses onto the box: the dim's clear middle starts wide enough to hold the page and closes in over
-  // .8s. (2.98.81) The blur is one strength from the first frame and stays it, its clear hole centred where the box lands
-  // (set with the box, never animated: Safari dropped a blur whose strength and hole were animated, once they settled)
+  check(sheetAnim.boxFade === 'none' && sheetAnim.card && sheetAnim.eased && sheetAnim.veil === 0 && Math.abs(sheetAnim.top) <= 2 && sheetAnim.w === 440 && sheetAnim.spring && parseFloat(sheetAnim.springT) * 1000 === parseFloat(sheetAnim.morphT), `a counter's box grows out of the counter where it stands, the page round it left as it is (no dim, no blur), on the Mac's spring: ${JSON.stringify(sheetAnim)}`);
   await motionAt(page, MOTION_RATE);
   await page.waitForTimeout(300);
-  const focused = await page.evaluate(() => { const ov = document.querySelector('.bcv-sheet-ov'); const sh = ov.querySelector('.bcv-sheet').getBoundingClientRect(); const o = getComputedStyle(ov); const b = getComputedStyle(ov.querySelector('.bcv-card-blur')); return { reach: parseFloat(getComputedStyle(ov.querySelector('.bcv-card-dim')).scale), dimMoves: /translate/.test(getComputedStyle(ov.querySelector('.bcv-card-dim')).transitionProperty), blurPx: document.documentElement.classList.contains('bcv-noblur') ? 10 : parseFloat((b.backdropFilter || b.webkitBackdropFilter || '').replace(/^blur\(/, '')), holeAt: Math.round(Math.abs(parseFloat(o.getPropertyValue('--bcv-mx')) - (sh.left + sh.width / 2)) + Math.abs(parseFloat(o.getPropertyValue('--bcv-my')) - (sh.top + sh.height / 2))), animated: /bcv-(m[xyr]|blur|hole)/.test(o.transitionProperty) }; });
-  check(sheetAnim.reach > focused.reach * 1.4 && focused.dimMoves && (sheetAnim.blurFirst === 10 || sheetAnim.noblur) && focused.blurPx === 10 && focused.holeAt <= 2 && !focused.animated, `the page focuses onto the box: the dim's light middle starts wide (scaled ${sheetAnim.reach.toFixed(2)}) and closes in (${focused.reach.toFixed(2)}), moved by transform alone, while the blur is one strength from the first frame on (${sheetAnim.blurFirst}px → ${focused.blurPx}px), its hole where the box lands (${focused.holeAt}px off), nothing of it animated: ${JSON.stringify(focused)}`);
   await page.keyboard.press('Escape');
   // (2.98.75) the counter is back under the box once the box has landed on it, while the overlay is still there and before it
   // goes (its fade waits for the landing) — the counter's place never left empty
@@ -5261,7 +5226,7 @@ try {
   await page.waitForTimeout(300);
   const shortFull = await posOf();
   const near = (a, b, d = 3) => !!a && !!b && Math.abs(a[0] - b[0]) <= d && Math.abs(a[1] - b[1]) <= d;
-  check(near(shortOpen.num, shortOpen.cardNum) && near(shortOpen.lbl, shortOpen.cardLbl) && shortFull.boxTop < shortFull.cardTop - 30 && shortFull.boxH === 430 && shortFull.boxTop + shortFull.boxH <= 620 - 16, `in a short window the words start exactly on the counter's, though the box (its full 430px) is pushed up away from it (box top ${shortFull.boxTop}, counter ${shortFull.cardTop}): ${JSON.stringify(shortOpen)}`);
+  check(near(shortOpen.num, shortOpen.cardNum) && near(shortOpen.lbl, shortOpen.cardLbl) && shortFull.boxTop < shortFull.cardTop - 30 && shortFull.boxH > 300 && shortFull.boxTop + shortFull.boxH <= 620 - 16, `in a short window the words start exactly on the counter's, though the box (as tall as its list, up to the window) is pushed up away from it (box top ${shortFull.boxTop}, counter ${shortFull.cardTop}): ${JSON.stringify(shortOpen)}`);
   await motionAt(page, MOTION_RATE);
   await page.keyboard.press('Escape');
   // (the box leaves the page a moment after it lands: its last reading is the landing, polled for, however busy the machine)
@@ -7822,7 +7787,7 @@ try {
   await page.click('.bcv-sheet', { position: { x: 24, y: 24 } });
   await page.waitForTimeout(400);
   check(!(await sheetNav) && (await page.$('#bcv-away')) === null && !!(await page.$('.bcv-sheet-ov')) && (await awayAge()) < 60 * 1000, 'with a sheet, a popup or a preview open, Away Refresh stands down: no pill, no reload, and the page counts as awake again');
-  await page.click('.bcv-sheet-ov', { position: { x: 5, y: 5 } }); // the scrim closes it, as everywhere else in the suite
+  await page.keyboard.press('Escape'); // (a counter's box: Escape folds it)
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
   await windBack(4 * 60 * 1000); // away since before the three minutes
   const awayNav = page.waitForNavigation({ timeout: 15000 }).then(() => true).catch(() => false);
@@ -7860,7 +7825,7 @@ try {
   const afterCancelNav = page.waitForNavigation({ timeout: 1200 }).then(() => true).catch(() => false);
   await page.click('.bcv-stat');
   check(!(await afterCancelNav) && !!(await page.$('.bcv-sheet-ov')) && !(await page.$('#bcv-away')), 'and the press after a cancel does what it says');
-  await page.click('.bcv-sheet-ov', { position: { x: 5, y: 5 } });
+  await page.keyboard.press('Escape'); // (a counter's box: Escape folds it)
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
   // A press HELD on the pill turns Away Refresh off for good: the count waits under the finger while a
   // red ring closes round the dial and a wash crosses the pill (let go early, and it was the click:
@@ -7911,7 +7876,7 @@ try {
   await pressStat();
   await page.waitForTimeout(300);
   check(!(await stalePress) && (await page.$('#bcv-away')) === null && !!(await page.$('.bcv-sheet-ov')) && (await awayAge()) < 60 * 1000, 'with Away Refresh off, a stale press does what it says: no pill, no reload, and the page counts as awake');
-  await page.click('.bcv-sheet-ov', { position: { x: 5, y: 5 } });
+  await page.keyboard.press('Escape'); // (a counter's box: Escape folds it)
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
   await windBack(4 * 60 * 1000);
   const staleBack = page.waitForNavigation({ timeout: 1200 }).then(() => true).catch(() => false);
@@ -7994,7 +7959,7 @@ try {
   const scrolledNav = page.waitForNavigation({ timeout: 1200 }).then(() => true).catch(() => false);
   await page.click('.bcv-stat');
   check(!(await scrolledNav) && !!(await page.$('.bcv-sheet-ov')), 'reading keeps the page awake: a scroll stands the stale reload down');
-  await page.click('.bcv-sheet-ov', { position: { x: 5, y: 5 } });
+  await page.keyboard.press('Escape'); // (a counter's box: Escape folds it)
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
   await page.evaluate(() => sessionStorage.removeItem('bcv:reloaded'));
   await windBack(0);

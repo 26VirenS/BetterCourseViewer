@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.68"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.69"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -88,7 +88,7 @@ html.bcv-noblur { --bcv-chrome-ground: linear-gradient(var(--bcv-chrome), var(--
 html.bcv-noblur *, html.bcv-noblur *::before, html.bcv-noblur *::after { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 html.bcv-noblur :is(.bcv-away__btn, .bcv-toast) { background: rgba(28,28,30,.94); }
 @keyframes bcv-noblur-in { from { filter: blur(0); } to { filter: blur(6px); } }
-html.bcv-noblur body:has(> .bcv-sheet-ov) > #bcv-app > :is(#bcv-main, #bcv-side), html.bcv-noblur body:has(> .bcv-sheet-ov) > #bcv-bar { animation: bcv-noblur-in .24s ease both; } /* (not under the search afloat: it leaves the page sharp) */
+html.bcv-noblur body:has(> .bcv-sheet-ov:not(.bcv-sheet-ov--float)) > #bcv-app > :is(#bcv-main, #bcv-side), html.bcv-noblur body:has(> .bcv-sheet-ov:not(.bcv-sheet-ov--float)) > #bcv-bar { animation: bcv-noblur-in .24s ease both; } /* (not under the search afloat: it leaves the page sharp) */
 /* data arrives rather than appears: an arc sweeps from empty to its value (the `to` is the ring's own dasharray), a line strokes itself on */
 @keyframes bcv-ring-fill { from { stroke-dasharray: 0 999; } }
 @keyframes bcv-ring-unfill { to { stroke-dasharray: 0 999; } }
@@ -865,6 +865,13 @@ html.bcv-noblur .bcv-card-blur { display: none; }
 @keyframes bcv-card-veil { from { opacity: 0; } }
 @keyframes bcv-card-unveil { to { opacity: 0; } }
 .bcv-sheet-ov--card.is-folding { opacity: 0; pointer-events: none; }
+/* (2.99.69) a Dashboard counter's box, as the Mac app's panel: it floats over the page — no dim, no blur, the page left as it
+   is and taking every press outside the box (one folds the box back: dashboard.js openSheet) — with the Mac's lighter
+   shadow, and grows and folds on the Mac's own spring (motion.js morph) in place of the house's gentle one */
+.bcv-sheet-ov--float { pointer-events: none; --bcv-spring-gentle: var(--bcv-spring-morph, cubic-bezier(.227, .124, .206, 1.026)); --bcv-t-gentle: var(--bcv-t-morph, .41s); }
+.bcv-sheet-ov--float > :is(.bcv-sheet, .bcv-pv) { pointer-events: auto; }
+.bcv-sheet-ov--float > :is(.bcv-card-dim, .bcv-card-blur) { display: none; }
+.bcv-sheet-ov--float > .bcv-card-shadow { box-shadow: 0 10px 48px rgba(0,0,0,.18), 0 1px 4px rgba(0,0,0,.08); }
 .bcv-sheet--card { position: fixed; z-index: 1; margin: 0; max-width: none; max-height: none; background: var(--bcv-card); -webkit-backdrop-filter: none; backdrop-filter: none; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); animation: none; transform: none; box-shadow: inset 0 0 0 var(--bcv-line) var(--bcv-hair); transition: clip-path var(--bcv-t-gentle) var(--bcv-spring-gentle); } /* (2.99.4: laid out once where it goes and drawn through a clip that grows out of the card — U.cardBox — never a size animated; its hairline inside its edge, its shadow a layer of its own) */
 .bcv-sheet--card.is-at-card { transition: none; }
 /* (2.98.73) the box a Dashboard counter opens into wears the search's glass — smoky, the page coming through it softly

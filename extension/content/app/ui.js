@@ -1444,11 +1444,11 @@
     const left = b.left + l, top = b.top + t, right = b.right - r, bottom = b.bottom - bt;
     return { left, top, right, bottom, width: right - left, height: bottom - top };
   }
-  const gentleEase = () => {
-    const v = getComputedStyle(document.documentElement).getPropertyValue('--bcv-spring-gentle').trim();
+  const gentleEase = (at = document.documentElement) => {
+    const v = getComputedStyle(at).getPropertyValue('--bcv-spring-gentle').trim();
     return v && (!/^linear\(/.test(v) || CSS.supports('animation-timing-function', v)) ? v : 'cubic-bezier(.32,.72,0,1)';
   };
-  const gentleMs = () => { const v = getComputedStyle(document.documentElement).getPropertyValue('--bcv-t-gentle').trim(), n = parseFloat(v); return Number.isFinite(n) ? (/ms$/.test(v) ? n : n * 1000) : 460; }; // (motion.js writes ms, the stylesheet's fallback s)
+  const gentleMs = (at = document.documentElement) => { const v = getComputedStyle(at).getPropertyValue('--bcv-t-gentle').trim(), n = parseFloat(v); return Number.isFinite(n) ? (/ms$/.test(v) ? n : n * 1000) : 460; }; // (motion.js writes ms, the stylesheet's fallback s)
   /** The motion of a box (`sheet`, position: fixed, in the overlay `ov`) that opens out of `card`. `geometry()` says
    *  where it goes ({ x, y, w, h }). Call with the sheet already in the overlay, before the overlay is in the page. */
   function cardBox({ ov, sheet, card, geometry, cardRadius = null }) {
@@ -1550,7 +1550,7 @@
         ['--bcv-mx', '--bcv-my', '--bcv-mr'].forEach((k, i) => blurWas.style.setProperty(k, holeWas[i])); // (the old layer keeps the old hole)
         const blurNow = el('bcv-card-blur', null, { 'aria-hidden': 'true' });
         blurWas.after(blurNow);
-        const ms = gentleMs();
+        const ms = gentleMs(ov);
         blurNow.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms, easing: 'ease' }); // (no fill: once in, the stylesheet's own fold takes it out)
         const out = blurWas.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ms, easing: 'ease', fill: 'forwards' });
         out.finished.then(() => blurWas.remove(), () => blurWas.remove());
@@ -1564,7 +1564,7 @@
       shadowAs(null);
       aim(boxRect(), false);
       if (reducedMotion()) return;
-      const easing = gentleEase(), duration = gentleMs();
+      const easing = gentleEase(ov), duration = gentleMs(ov); // (the box's own spring: a counter's is the Mac's, app.css .bcv-sheet-ov--float)
       kids.forEach((k, i) => {
         const r = k.getBoundingClientRect(), dx = at[i].left - r.left, dy = at[i].top - r.top;
         if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) k.animate([{ translate: `${pxs(dx)} ${pxs(dy)}` }, { translate: '0px 0px' }], { duration, easing });
