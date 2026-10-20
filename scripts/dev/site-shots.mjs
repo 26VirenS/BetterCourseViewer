@@ -97,6 +97,18 @@ try {
     await page.waitForSelector('.bcv-stat', { timeout: 20000 }).catch(() => {});
     await shot(`web-brightspace${sfx}`);
   }
+  // the same student's Dashboard as Canvas itself draws it, with no extension: the "before" under the hero's slider. The
+  // mock's own page is a bare stand-in, so Canvas's stock Dashboard is drawn here — its dark global nav, the course cards,
+  // To Do down the right — from the mock school's own courses and work (Canvas has one look, so one picture)
+  const plain = await chromium.launch();
+  try {
+    const pp = await (await plain.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 })).newPage();
+    await pp.setContent(canvasDashboard(crest));
+    await pp.waitForTimeout(400);
+    await pp.screenshot({ path: join(raw, 'web-canvas.png') });
+    made.push('web-canvas');
+    console.log('  shot web-canvas');
+  } finally { await plain.close(); }
 } catch (e) {
   console.error('crashed:', e?.stack || e);
   process.exitCode = 1;
@@ -104,6 +116,40 @@ try {
   await context.close().catch(() => {});
   rmSync(userDataDir, { recursive: true, force: true });
   rmSync(extDir, { recursive: true, force: true });
+}
+
+/** Canvas's stock Dashboard for Sam Student at Lakeside, as Canvas draws it (the "before" on the website). */
+function canvasDashboard(logo) {
+  const courses = [['F26-MATH 021 20', 'MATH-021-20', 'Fall 2026', '#0B874B'], ['F26-PHYS 008 01', 'PHYS-008-01', 'Fall 2026', '#0770A3'], ['F26-PHYS 008HL 01/PHYS 008L 01', 'PHYS-008HL', 'Fall 2026', '#BF32A4'], ['F26-SPRK 010 103', 'SPRK-010-103', 'Fall 2026', '#E71F63'], ['F26-WRI 010 20', 'WRI-010-20', 'Fall 2026', '#8F3E97'], ['F26-CHEM 002 01', 'CHEM-002-01', 'Fall 2026', '#4D3D4D']];
+  const todo = [['Dis01', 'F26-MATH 021 20', '10 points • Oct 20 at 11:59pm'], ['Qz01', 'F26-MATH 021 20', '10 points • Oct 20 at 11:59pm'], ['Week 2 Post Class Assignment: GC articles', 'F26-SPRK 010 103', '10 points • Oct 20 at 11:59pm'], ['Research Day Activity: Choosing a Field Site', 'F26-WRI 010 20', '5 points • Oct 20 at 11:59pm'], ['Lec06-PreQuiz', 'F26-MATH 021 20', '17 points • Oct 21 at 10:30am'], ['Composition of Functions', 'F26-MATH 021 20', '30 points • Oct 21 at 11:59pm']];
+  const nav = [['Account', '<circle cx="12" cy="9" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>'], ['Dashboard', '<path d="M4 13a8 8 0 1 1 16 0"/><path d="M12 13l4-4"/>'], ['Courses', '<path d="M5 4h10a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h10"/>'], ['Groups', '<circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M2 20c1-3 3.5-4.5 6-4.5s5 1.5 6 4.5M10 20c1-3 3.5-4.5 6-4.5s5 1.5 6 4.5"/>'], ['Calendar', '<rect x="4" y="5" width="16" height="15" rx="1"/><path d="M4 10h16M9 3v4M15 3v4"/>'], ['Inbox', '<path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 3h6l1-3h5"/>'], ['History', '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>'], ['Help', '<circle cx="12" cy="12" r="8"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7M12 17h.01"/>']];
+  const card = ([name, code, term, colour]) => `<div class="card"><div class="hero" style="background:${colour}"><span class="dots">⋮</span></div><div class="body"><div class="name" style="color:${colour}">${name}</div><div class="code">${code}</div><div class="term">${term}</div><div class="icons"><i></i><i></i><i></i><i></i></div></div></div>`;
+  const item = ([t, c, d]) => `<li><span class="chk"></span><div><a>${t}</a><div class="ctx">${c}</div><div class="due">${d}</div></div><span class="x">×</span></li>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+  * { box-sizing: border-box; } body { margin: 0; font: 16px/1.4 "Lato", "Helvetica Neue", Helvetica, Arial, sans-serif; color: #2d3b45; background: #fff; display: flex; height: 100vh; overflow: hidden; }
+  .gnav { width: 84px; flex: none; background: #12355b; display: flex; flex-direction: column; align-items: center; padding-top: 10px; }
+  .gnav .logo { width: 56px; height: 56px; margin-bottom: 12px; } .gnav .logo img { width: 100%; height: 100%; border-radius: 10px; }
+  .gnav a { width: 84px; padding: 9px 0 8px; display: flex; flex-direction: column; align-items: center; gap: 3px; color: #fff; font-size: 12px; text-decoration: none; }
+  .gnav a.on { background: #fff; color: #12355b; } .gnav svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  header { height: 72px; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; border-bottom: 1px solid #c7cdd1; }
+  header h1 { font-size: 28px; font-weight: 400; margin: 0; } header .opt { width: 38px; height: 38px; border: 1px solid #c7cdd1; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #2d3b45; font-size: 20px; }
+  .wrap { flex: 1; display: flex; min-height: 0; } .grid { flex: 1; padding: 24px; display: flex; flex-wrap: wrap; gap: 36px 24px; align-content: flex-start; }
+  .card { width: 262px; height: 266px; box-shadow: 0 2px 5px rgba(0,0,0,.3); border-radius: 4px; overflow: hidden; background: #fff; }
+  .hero { height: 146px; position: relative; } .dots { position: absolute; top: 10px; right: 12px; color: #fff; font-size: 20px; }
+  .body { padding: 12px 16px 0; } .name { font-weight: 700; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .code, .term { font-size: 14px; color: #6b7780; white-space: nowrap; }
+  .icons { display: flex; gap: 30px; margin-top: 14px; padding-left: 4px; } .icons i { width: 20px; height: 18px; border: 2px solid #6b7780; border-radius: 3px; opacity: .8; }
+  aside { width: 312px; flex: none; padding: 22px 24px; } aside .btn { display: block; text-align: center; padding: 8px; border: 1px solid #c7cdd1; border-radius: 4px; background: #f5f5f5; font-size: 15px; margin-bottom: 10px; }
+  aside h2 { font-size: 16px; font-weight: 700; margin: 22px 0 6px; padding-bottom: 6px; border-bottom: 1px solid #c7cdd1; }
+  aside ul { list-style: none; margin: 0; padding: 0; } aside li { display: flex; gap: 10px; padding: 9px 0; font-size: 14px; border-bottom: 1px solid #eef0f1; }
+  aside li .chk { width: 18px; height: 18px; border: 2px solid #8b969e; border-radius: 50%; flex: none; margin-top: 1px; } aside li > div { flex: 1; min-width: 0; }
+  aside li a { color: #0770a3; font-weight: 700; } .ctx, .due { color: #6b7780; font-size: 12.5px; } .x { color: #8b969e; }
+</style></head><body>
+<nav class="gnav"><div class="logo"><img src="${logo}" alt=""></div>${nav.map(([n, d], i) => `<a class="${i === 1 ? 'on' : ''}"><svg viewBox="0 0 24 24">${d}</svg>${n}</a>`).join('')}</nav>
+<main><header><h1>Dashboard</h1><span class="opt">⋮</span></header>
+<div class="wrap"><div class="grid">${courses.map(card).join('')}</div>
+<aside><span class="btn">Start a New Course</span><span class="btn">View Grades</span><h2>To Do</h2><ul>${todo.map(item).join('')}</ul></aside></div></main>
+</body></html>`;
 }
 
 // 2× and 1× WebP of each, for srcset (Pillow)
