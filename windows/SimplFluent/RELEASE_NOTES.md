@@ -1,3 +1,7 @@
+**What's new in 0.3.45** (beta)
+
+- **A new look** — Simpl has a new icon: a bold white S with a blue dot on a black tile, on the app, the taskbar and the installer.
+
 **What's new in 0.3.44** (beta)
 
 - **Instant search** — results from your school (assignments, announcements, pages, discussions, files and people) now show under the search box as you type, before you press Enter.
