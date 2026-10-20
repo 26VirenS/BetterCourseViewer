@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.67', date: '2026-10-20', notes: [
+      { kind: 'improved', title: 'Quiz Intro Popup', body: "A quiz's intro opens as a large popup, as on Mac.", icon: P.check },
+    ] },
     { version: '2.99.66', date: '2026-10-20', notes: [
       { kind: 'improved', title: 'Previews as Popups', body: 'Previews open as a card by the item, not a side panel.', icon: P.check },
     ] },

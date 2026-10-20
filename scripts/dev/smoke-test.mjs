@@ -3332,10 +3332,10 @@ try {
   check((await texts('.bcv-qzi__rule')).some((t) => /Time limit: 20 minutes/.test(t)) && (await texts('.bcv-qzi__attemptn')).some((t) => /Attempt 1/.test(t)), `a quiz in the list opens its intro, as on the Mac: its rules and its attempts (${(await texts('.bcv-qzi__attemptn')).join(' | ')})`);
   // (2.99.56) the intro is the quiz's own page, as the Mac's sheet: it takes the page (no course header or rail), and
   // its Close goes back to the course's quizzes
-  const introPage = await page.evaluate(() => document.documentElement.classList.contains('bcv-quiz') && !document.querySelector('.bcv-qz.is-embedded') && !!document.querySelector('.bcv-qz__head .bcv-qz__exit'));
+  const introPage = await page.evaluate(() => !document.documentElement.classList.contains('bcv-quiz') && !!document.querySelector('.bcv-qz.is-pop') && !!document.querySelector('.bcv-qz-veil') && !!document.querySelector('.bcv-qz__head .bcv-qz__exit'));
   await page.click('.bcv-qz__head .bcv-qz__exit');
-  const closedTo = await eventually(() => page.evaluate(() => /\/courses\/101\/quizzes$/.test(location.pathname) && !document.documentElement.classList.contains('bcv-quiz') && !!document.querySelector('.bcv-rail [data-tab="modules"]')));
-  check(introPage && closedTo, `the intro is the quiz's own page, the course's header and rail away, and its Close goes back to the quizzes (${introPage}, ${closedTo})`);
+  const closedTo = await eventually(() => page.evaluate(() => /\/courses\/101\/quizzes$/.test(location.pathname) && !document.documentElement.classList.contains('bcv-quiz') && !document.querySelector('.bcv-qz-veil') && !!document.querySelector('.bcv-rail [data-tab="modules"]')));
+  check(introPage && closedTo, `the intro is a popup over the dimmed page, and its Close goes back to where it was opened from — the quizzes — the dimming gone (${introPage}, ${closedTo})`);
 
   // modules
   await tab('modules');
@@ -3546,7 +3546,9 @@ try {
   await page.goto(`${BASE}/courses/101/quizzes/9011`);
   await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
   // (2.99.56) the intro is the quiz's own page, as the Mac's sheet holds it: the sidebar and the course's header fold away
-  check(page.url().endsWith('/quizzes/9011') && (await visible('.bcv-qz__head')) && !(await page.$('.bcv-qz.is-embedded')) && (await page.$eval('html', (e) => e.classList.contains('bcv-quiz'))), "the quiz intro is the quiz's own page: its head with the title and Close, the course's header and rail folded away");
+  // (2.99.67) on a computer the intro is a large popup over the page, as the Mac's sheet: the app dimmed behind it, not folded away
+  const pop = await page.evaluate(() => { const r = document.querySelector('.bcv-qz.is-pop')?.getBoundingClientRect(); return { pop: !!r, inside: !!r && r.left > 0 && r.top > 0 && r.right < innerWidth && r.bottom < innerHeight && r.width >= 700, veil: !!document.querySelector('.bcv-qz-veil'), folded: document.documentElement.classList.contains('bcv-quiz') }; });
+  check(page.url().endsWith('/quizzes/9011') && (await visible('.bcv-qz__head')) && !(await page.$('.bcv-qz.is-embedded')) && pop.pop && pop.inside && pop.veil && !pop.folded, `the quiz intro is a large popup over the dimmed page, its head with the title and Close: ${JSON.stringify(pop)}`);
   const introParts = await page.evaluate(() => ({ heads: [...document.querySelectorAll('.bcv-qzi__sechead')].map((e) => e.textContent), facts: [...document.querySelectorAll('.bcv-qzi__fact')].map((e) => e.textContent).join(' · '), note: document.querySelector('.bcv-qzi__note')?.textContent || '', buttons: [...document.querySelectorAll('.bcv-qzi__bar .bcv-qzi__btn')].map((b) => b.textContent).join('|') }));
   check((await texts('.bcv-qz__title'))[0] === 'Lec06-PreQuiz' && (await texts('.bcv-qzi__rule')).some((t) => /Time limit: 20 minutes/.test(t)) && (await texts('.bcv-qz__begin'))[0] === 'Begin Attempt' && /^\d+ questions? · \d+ points? · (Due|No due date)/.test(introParts.facts) && introParts.heads.includes('Rules') && introParts.buttons === 'Begin Attempt', `the intro as the Mac's: its facts, the attempts line, Rules, and Begin Attempt alone at the foot (${JSON.stringify(introParts)})`);
   check((await texts('.bcv-qz__clock'))[0] === '20 min', 'timer pill shows the limit before the attempt starts');

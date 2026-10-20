@@ -389,9 +389,22 @@
     const leave = () => {
       setOpen(false);
       clearInterval(st.timer);
-      // (2.99.56: from the intro, back to the course's quizzes — the intro is the quiz's address now)
-      app.go(st.stage === 'intro' ? (simulated ? course.url : `${course.url}/quizzes`) : simulated ? simHome : quizUrl, { confirmed: true });
+      // (2.99.56: from the intro, back to the course's quizzes — the intro is the quiz's address now; 2.99.67: on a computer
+      //  the intro is a popup over the page it was opened from, so closing it goes back to that page)
+      const from = st.stage === 'intro' && !simulated && !phone ? app.backTo?.({ href: `${course.url}/quizzes` })?.href : null;
+      app.go(st.stage === 'intro' ? (simulated ? course.url : from || `${course.url}/quizzes`) : simulated ? simHome : quizUrl, { confirmed: true });
     };
+
+    // the dimmed page behind the intro's popup (2.99.67): a press on it closes the popup, as Escape does
+    const veil = h('div', { class: 'bcv-qz-veil', 'aria-hidden': 'true', onclick: () => leave() });
+    const dropVeil = () => { veil.remove(); document.removeEventListener('keydown', onPopKey, true); };
+    U.onGone?.(screen, dropVeil); // (the screen gone — any navigation — takes the dimming with it)
+    function onPopKey(e) {
+      if (e.key !== 'Escape' || !screen.classList.contains('is-pop') || !ctx.alive()) { if (!ctx.alive()) dropVeil(); return; }
+      if (document.querySelector('.bcv-sheet-ov, .bcv-menu, .bcv-pv')) return; // (something over it goes first)
+      e.stopPropagation();
+      leave();
+    }
 
     // ---- header -------------------------------------------------------------------
     const dueDay = quiz.due_at ? U.DAYS_LONG[U.parse(quiz.due_at).getDay()] : 'No due date';
@@ -677,6 +690,9 @@
       // and its attempt alike; the intro sat in the course's column under its header until then. A phone keeps the
       // intro a pushed course screen, its back bar and tab bar there.
       const embedded = phone && st.stage === 'intro';
+      // (2.99.67) on a computer the intro is a large popup over the page, as the Mac's sheet is — the app dimmed behind it,
+      // a press on the dimmed part or Escape closing it; the attempt itself still takes the page
+      const pop = !phone && st.stage === 'intro';
       const switchable = st.stage === 'take' && !phone; // (a phone shows one question a screen, always)
       modeWrap.replaceChildren(...(switchable ? [
         modeBtn('side', 'Controls at the sides', MODE_SIDE),
@@ -706,7 +722,10 @@
       else body.replaceChildren(done());
       screen.classList.toggle('is-feedback', st.stage === 'feedback');
       screen.classList.toggle('is-embedded', embedded);
-      html.classList.toggle('bcv-quiz', !embedded); // the attempt (and its receipt) takes the page
+      screen.classList.toggle('is-pop', pop);
+      html.classList.toggle('bcv-quiz', !embedded && !pop); // the attempt (and its receipt) takes the page
+      if (pop && !veil.isConnected) { document.body.append(veil); document.addEventListener('keydown', onPopKey, true); }
+      else if (!pop && veil.isConnected) dropVeil();
       setOpen(st.stage === 'take' || st.stage === 'review');
     }
     function modeBtn(key, label, icon) {

@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.66"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.67"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -5729,6 +5729,16 @@ html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-pins .bcv-pin
 .bcv-qzi__cols { display: flex; flex-direction: column; gap: 30px; }
 /* (2.99.56) on the quiz's own page (its head ~63px above it, the app's bar folded away): the buttons at the window's foot */
 .bcv-qz:not(.is-embedded) .bcv-qzi { min-height: calc(100vh - 64px - var(--bcv-bar-h, 0px)); }
+/* (2.99.67) on a computer the intro is a large popup over the page it was opened from, as the Mac's sheet: the app dimmed
+   behind it (a press there closes it), the card centred, its header kept at its top while the rest scrolls */
+.bcv-qz-veil { position: fixed; inset: 0; z-index: var(--bcv-z-sheet); background: rgba(0,0,0,.42); animation: bcv-fade-in .2s var(--bcv-ease-out) both; }
+.bcv-qz.is-pop { position: fixed; z-index: calc(var(--bcv-z-sheet) + 1); left: 50%; top: 50%; translate: -50% -50%; width: min(1120px, calc(100vw - 96px)); height: min(820px, calc(100vh - 80px)); min-height: 0; overflow: auto; border-radius: var(--bcv-r-sheet, 22px); background: var(--bcv-bg); box-shadow: 0 0 0 1px var(--bcv-edge), 0 30px 80px rgba(0,0,0,.45), 0 4px 14px rgba(0,0,0,.2); animation: bcv-qzpop-in .26s cubic-bezier(.23,1,.32,1) both; }
+@keyframes bcv-qzpop-in { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+.bcv-qz.is-pop .bcv-qzi { min-height: calc(100% - 64px); padding-left: 24px; padding-right: 24px; }
+.bcv-qz.is-pop .bcv-qz__body { min-height: calc(100% - 64px); }
+@media (prefers-reduced-motion: reduce) { .bcv-qz.is-pop { animation: bcv-fade-in .15s ease both; } }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch) .bcv-qz.is-pop .bcv-qz__head { top: 0; } /* (its own top: the app's bar is behind the popup, not over it) */
+.bcv-qz.is-pop .bcv-qz__headrow { max-width: none; padding: 12px 20px; }
 .bcv-qzi__main, .bcv-qzi__side { display: flex; flex-direction: column; gap: 30px; min-width: 0; }
 .bcv-qzi__main { order: 0; }
 @container bcv-qzi (min-width: 820px) {
