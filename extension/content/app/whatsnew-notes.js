@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.63', date: '2026-10-20', notes: [
+      { kind: 'improved', title: 'The Real Logo', body: 'The icon is now drawn from the official artwork.', icon: P.check },
+    ] },
     { version: '2.99.62', date: '2026-10-20', notes: [
       { kind: 'improved', title: 'Courses in Color', body: 'Courses sit under All Courses, named in their color.', icon: P.check },
     ] },

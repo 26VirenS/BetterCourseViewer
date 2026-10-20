@@ -303,6 +303,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .fr__brand { flex: none; display: flex; align-items: center; gap: 11px; border: 0; background: transparent; padding: 0; cursor: pointer; font: 500 13.5px/1.2 var(--font); letter-spacing: -.012em; color: var(--ink3); }
 .fr__brand svg { display: block; flex: none; }
 .fr__arc1 { stroke: var(--ink); }
+.fr__mark { fill: var(--ink); } /* (the logo's S beside "Set up" and "What's New": the page's ink, its dot blue) */
 .fr__arc2 { stroke: var(--ink4); }
 .fr__spacer { flex: 1; }
 .fr__count { flex: none; font: 500 12px/1.2 var(--font); color: var(--ink4); }
