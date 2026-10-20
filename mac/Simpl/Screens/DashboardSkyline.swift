@@ -217,24 +217,17 @@ private struct DashTowerStyle: ButtonStyle {
     }
 }
 
-/// How many windows across, and how large, to fit `count` in a space: four across while they fit, more (and smaller)
-/// when they do not — the web skyline's rule.
+/// (1.3.140) Windows to a tower: four across, always, at the size four across leaves — and only as many rows as the tower
+/// has floors for; the rest are not drawn (they were squeezed in, more across and smaller, until then) — the web
+/// skyline's rule. `up`, `down`: how many count and how many do not; those that count take the floors first.
 enum DashSkyFit {
-    static func fit(count n: Int, width w: CGFloat, height h: CGFloat) -> (cols: Int, size: CGFloat, gap: CGFloat) {
-        let g: CGFloat = 3
-        var bestCols = 4
-        var bestSize: CGFloat = 0
-        for cols in [4, 3, 5, 6, 7, 8] {
-            let rows = max(1, (n + cols - 1) / cols)
-            let across = (w - CGFloat(cols - 1) * g) / CGFloat(cols)
-            let down = (h - CGFloat(rows - 1) * g) / CGFloat(rows)
-            let s = min(7, across, down)
-            if s > bestSize + 0.01 {
-                bestCols = cols
-                bestSize = s
-            }
-        }
-        return (bestCols, max(2, (bestSize * 2).rounded(.down) / 2), g)
+    static func fit(up: Int, down: Int, width w: CGFloat, height h: CGFloat) -> (cols: Int, size: CGFloat, gap: CGFloat, up: Int, down: Int) {
+        let g: CGFloat = 3, cols = 4
+        let s = max(2, (min(7, (w - CGFloat(cols - 1) * g) / CGFloat(cols)) * 2).rounded(.down) / 2)
+        func floors(_ room: CGFloat) -> Int { max(0, Int(((room + g) / (s + g)).rounded(.down))) }
+        let upRows = min((up + cols - 1) / cols, floors(h))
+        let downRows = min((down + cols - 1) / cols, floors(h - (upRows > 0 ? CGFloat(upRows) * (s + g) + 6 : 0)))
+        return (cols, s, g, min(up, upRows * cols), min(down, downRows * cols))
     }
 }
 
@@ -259,13 +252,13 @@ private struct DashWindows: View {
 
     private func panes(in size: CGSize) -> [Pane] {
         guard !windows.isEmpty, size.width > 12, size.height > 12 else { return [] }
-        let up = windows.filter { $0.free != true }
-        let down = windows.filter { $0.free == true }
+        let allUp = windows.filter { $0.free != true }
+        let allDown = windows.filter { $0.free == true }
         let top: CGFloat = 7
-        let bottom: CGFloat = down.isEmpty ? 0 : 7
-        let between: CGFloat = up.isEmpty || down.isEmpty ? 0 : 6
-        let fit = DashSkyFit.fit(count: windows.count, width: size.width - 10, height: size.height - top - bottom - between)
+        let bottom: CGFloat = allDown.isEmpty ? 0 : 7
+        let fit = DashSkyFit.fit(up: allUp.count, down: allDown.count, width: size.width - 10, height: size.height - top - bottom)
         let s = fit.size, g = fit.gap, cols = fit.cols
+        let up = Array(allUp.prefix(fit.up)), down = Array(allDown.prefix(fit.down)) // (1.3.140: four across; the rest hidden)
         let gridWidth = CGFloat(cols) * s + CGFloat(cols - 1) * g
         let x0 = ((size.width - gridWidth) / 2).rounded()
         var out: [Pane] = []
