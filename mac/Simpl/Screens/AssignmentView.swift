@@ -1166,6 +1166,9 @@ private struct HandInSheet: View {
     @State private var text = ""
     @State private var url = ""
     @State private var files: [PickedFile] = []
+    /// (1.3.143) The files sent as one .zip (HandInZip), chosen where there are two or more; a file of a type the assignment
+    /// does not take, where it takes .zip, goes zipped whatever this says (`mustZip`).
+    @State private var asZip = false
     @State private var note = ""
     @State private var importing = false
     @State private var photos: [PhotosPickerItem] = []
@@ -1346,6 +1349,14 @@ private struct HandInSheet: View {
                     Text("Converting \(name)…").foregroundStyle(.secondary)
                 }
             }
+            if zipOK && (files.count >= 2 || mustZip) {
+                Toggle(isOn: mustZip ? .constant(true) : $asZip) {
+                    Label("Send as one .zip", systemImage: "doc.zipper")
+                }
+                .disabled(mustZip)
+                .help(mustZip ? "This assignment takes .zip files: these go zipped" : "Put these files in one .zip and hand that in")
+                .transition(.opacity)
+            }
             // (1.3.78) Send from Phone beside them; Photos said shorter before any goes to a line of its own, so the
             // empty form fits the sheet without scrolling
             ViewThatFits(in: .horizontal) {
@@ -1371,7 +1382,11 @@ private struct HandInSheet: View {
             if !kindNamed { Text("Files") }
         } footer: {
             if let a = assignment.allowed, !a.isEmpty {
-                Text("This assignment takes \(allowedList) files." + (convertible.line.isEmpty ? "" : " \(convertible.line)."))
+                Text("This assignment takes \(allowedList) files." + (convertible.line.isEmpty ? "" : " \(convertible.line).") + (zipOK ? " Any file or folder can go as a .zip." : ""))
+                    .font(.sCallout)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("A folder goes as a .zip.")
                     .font(.sCallout)
                     .foregroundStyle(.secondary)
             }
@@ -1598,6 +1613,7 @@ private struct HandInSheet: View {
 
     private var progressWord: String {
         guard type == "online_upload" else { return "Handing in…" }
+        if zipping { return "Zipping and uploading…" }
         return files.count == 1 ? "Uploading 1 file…" : "Uploading \(files.count) files…"
     }
 
@@ -1621,8 +1637,21 @@ private struct HandInSheet: View {
 
     private var allowedTypes: [UTType] {
         let list = ((assignment.allowed ?? []) + convertible.exts).compactMap { UTType(filenameExtension: $0) }
-        return (assignment.allowed ?? []).isEmpty ? [.item] : list
+        // (1.3.143) where a .zip is taken, anything can be chosen — a folder too — and goes zipped
+        return zipOK ? [.item, .folder] : list
     }
+
+    /// (1.3.143) Whether the assignment takes a .zip: it names no types, or .zip among them.
+    private var zipOK: Bool {
+        let a = assignment.allowed ?? []
+        return a.isEmpty || a.contains("zip")
+    }
+
+    /// (1.3.143) A file of a type the assignment does not take, let in because it takes .zip: the files go zipped.
+    private var mustZip: Bool { files.contains { !allowedName($0.name) } }
+
+    /// Whether the files go as one .zip.
+    private var zipping: Bool { type == "online_upload" && zipOK && (mustZip || (asZip && files.count >= 2)) }
 
     private var allowedList: String {
         (assignment.allowed ?? []).map { ".\($0)" }.joined(separator: ", ")
@@ -1679,7 +1708,16 @@ private struct HandInSheet: View {
         let name = u.lastPathComponent
         let facts = try? u.resourceValues(forKeys: [.isDirectoryKey, .fileSizeKey])
         if facts?.isDirectory == true {
-            error = "\(name) is a folder. Choose the files in it."
+            // (1.3.143) a folder goes as a .zip of it, where the assignment takes one
+            guard zipOK else {
+                error = "\(name) is a folder, and this assignment doesn’t take .zip files. Choose the files in it."
+                return
+            }
+            do {
+                add(PickedFile(name: "\(name).zip", type: "application/zip", data: try HandInZip.zip(folder: u)))
+            } catch {
+                self.error = "\(name) could not be zipped."
+            }
             return
         }
         if let size = facts?.fileSize, size > HandInSheet.limit {
@@ -1699,7 +1737,10 @@ private struct HandInSheet: View {
             error = "\(f.name) is larger than 50 MB. Hand it in on \(engine.lmsName)’s own page."
             return
         }
-        guard allowedName(f.name) else {
+        // (1.3.143) a type the assignment does not take is converted where it can be, else — where a .zip is taken — let in
+        // to go zipped (mustZip)
+        let ext = (f.name as NSString).pathExtension.lowercased()
+        guard allowedName(f.name) || (zipOK && !convertible.exts.contains(ext)) else {
             convert(f, preview: open)
             return
         }
@@ -1787,9 +1828,18 @@ private struct HandInSheet: View {
         case "online_url": args["url"] = url.trimmingCharacters(in: .whitespaces)
         default: args["files"] = files.map { ["name": $0.name, "type": $0.type, "data": $0.data.base64EncodedString()] }
         }
+        let zipName = HandInZip.name(assignment.title)
+        let toZip = zipping ? files : []
+        let plain = args
         Task {
             do {
-                _ = try await engine.call("submit", args, as: OK.self)
+                var call = plain
+                if !toZip.isEmpty { // (1.3.143) the files in one .zip, made off the main thread
+                    let data = try await Task.detached(priority: .userInitiated) { try HandInZip.zip(files: toZip, name: zipName) }.value
+                    guard data.count <= HandInSheet.limit else { throw HandInZip.Failure("The .zip is larger than 50 MB. Hand it in on \(engine.lmsName)’s own page.") }
+                    call["files"] = [["name": "\(zipName).zip", "type": "application/zip", "data": data.base64EncodedString()]]
+                }
+                _ = try await engine.call("submit", call, as: OK.self)
                 dismiss()
                 await done() // (after the sheet goes: the assignment shows the work arriving)
             } catch {
@@ -1802,4 +1852,54 @@ private struct HandInSheet: View {
     /// (1.3.76) Why it could not be handed in comes and goes as a row of the form does (its own insert and removal),
     /// on the snappy spring; under Reduce Motion a short ease.
     private var errorMotion: Animation { reduceMotion ? .easeInOut(duration: 0.15) : Motion.snappy }
+}
+
+/// (1.3.143) Files handed in as one .zip: a folder zipped as the Finder's Compress does it (the file coordinator's own
+/// archive for uploading), or files chosen gathered in a folder of the assignment's name and zipped so.
+enum HandInZip {
+    struct Failure: LocalizedError {
+        let message: String
+        init(_ message: String) { self.message = message }
+        var errorDescription: String? { message }
+    }
+
+    /// The assignment's title as a file's name ("Lab 3: Forces" → "Lab 3 - Forces").
+    static func name(_ title: String) -> String {
+        let bad = CharacterSet(charactersIn: "/\\:*?\"<>|").union(.controlCharacters)
+        let cleaned = title.components(separatedBy: bad).filter { !$0.isEmpty }.joined(separator: " - ")
+            .trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ".")))
+        return cleaned.isEmpty ? "Hand-in" : String(cleaned.prefix(80))
+    }
+
+    /// A folder as a .zip (the folder itself at the top of it).
+    static func zip(folder: URL) throws -> Data {
+        var out: Data?
+        var inner: Error?
+        var outer: NSError?
+        NSFileCoordinator().coordinate(readingItemAt: folder, options: [.forUploading], error: &outer) { zipped in
+            do { out = try Data(contentsOf: zipped) } catch { inner = error }
+        }
+        if let outer { throw outer }
+        if let inner { throw inner }
+        guard let out else { throw Failure("The folder could not be zipped.") }
+        return out
+    }
+
+    /// Files as a .zip: put in a folder called `name` (two of one name kept apart: "notes 2.txt"), and that zipped.
+    static func zip(files: [PickedFile], name: String) throws -> Data {
+        let fm = FileManager.default
+        let base = fm.temporaryDirectory.appendingPathComponent("SimplZip-\(UUID().uuidString)", isDirectory: true)
+        let dir = base.appendingPathComponent(name, isDirectory: true)
+        try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: base) }
+        var used = Set<String>()
+        for f in files {
+            let stem = (f.name as NSString).deletingPathExtension, ext = (f.name as NSString).pathExtension
+            var n = f.name, k = 2
+            while used.contains(n.lowercased()) { n = ext.isEmpty ? "\(stem) \(k)" : "\(stem) \(k).\(ext)"; k += 1 }
+            used.insert(n.lowercased())
+            try f.data.write(to: dir.appendingPathComponent(n))
+        }
+        return try zip(folder: dir)
+    }
 }
