@@ -161,6 +161,21 @@ svg { flex: none; }
 .stage__tilt { transform-origin: 50% 0; }
 .stage__glow { position: absolute; inset: 14% 10% -4%; z-index: -1; border-radius: 40px; background: #0a84ff; opacity: .16; filter: blur(80px); }
 
+/* ---- the hero's before and after: Canvas as it is under Simpl, a handle dragged across to compare ---------------- */
+.cmp { position: relative; line-height: 0; }
+.cmp img { display: block; width: 100%; height: auto; }
+.cmp__before { position: absolute; inset: 0; clip-path: inset(0 calc(100% - var(--x)) 0 0); }
+.cmp__handle { position: absolute; top: 0; bottom: 0; left: var(--x); width: 0; pointer-events: none; }
+.cmp__handle::before { content: ""; position: absolute; top: 0; bottom: 0; left: -1px; width: 2px; background: #fff; box-shadow: 0 0 0 .5px rgba(0, 0, 0, .18), 0 0 12px rgba(0, 0, 0, .25); }
+.cmp__handle i { position: absolute; top: 50%; left: 0; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; background: rgba(255, 255, 255, .92); color: #1d1d1f; box-shadow: 0 4px 16px rgba(0, 0, 0, .28), 0 0 0 .5px rgba(0, 0, 0, .12); display: flex; align-items: center; justify-content: center; -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); transition: transform .16s cubic-bezier(0.23, 1, 0.32, 1); }
+.cmp__handle svg { width: 20px; height: 20px; }
+.cmp:active .cmp__handle i { transform: scale(1.08); }
+.cmp:has(.cmp__range:focus-visible) .cmp__handle i { box-shadow: 0 0 0 3px var(--accent), 0 4px 16px rgba(0, 0, 0, .28); }
+.cmp__tag { position: absolute; bottom: 14px; padding: 6px 11px; border-radius: 999px; font: 600 12.5px/1 var(--font); letter-spacing: -.01em; color: #fff; background: rgba(0, 0, 0, .55); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); pointer-events: none; transition: opacity .2s ease; }
+.cmp__tag--l { left: 14px; opacity: calc(min(1, var(--xn, .5) * 6)); }
+.cmp__tag--r { right: 14px; opacity: calc(min(1, (1 - var(--xn, .5)) * 6)); }
+.cmp__range { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; -webkit-appearance: none; appearance: none; touch-action: pan-y; }
+
 /* ---- device frames -------------------------------------------------------------------------------------- */
 .win { position: relative; margin: 0; border-radius: 12px; overflow: hidden; background: var(--card); box-shadow: var(--shadow-win); }
 .win__bar { height: 44px; display: grid; grid-template-columns: 1fr minmax(0, 2.2fr) 1fr; align-items: center; gap: 12px; padding: 0 14px; background: var(--toolbar); border-bottom: 1px solid var(--toolbar-line); }
@@ -382,10 +397,16 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
               <div class="win__url"><svg><use href="#i-lock"/></svg>canvas.lakeside.edu</div>
               <div class="win__right"><span class="win__ext"><img src="/img/icon-128.png" alt="" width="20" height="20"></span><svg><use href="#i-share"/></svg><svg><use href="#i-plus"/></svg></div>
             </div>
-            <picture>
-              <source media="(prefers-color-scheme: dark)" srcset="/img/web-dashboard-dark.webp 1440w, /img/web-dashboard-dark@2x.webp 2880w" sizes="(min-width: 1164px) 1120px, calc(100vw - 44px)">
-              <img src="/img/web-dashboard.webp" srcset="/img/web-dashboard.webp 1440w, /img/web-dashboard@2x.webp 2880w" sizes="(min-width: 1164px) 1120px, calc(100vw - 44px)" width="1440" height="900" alt="The Simpl dashboard in Safari: what’s due today, the next seven days, what’s overdue and what was graded, each course’s grade and the week’s workload, and today’s work in one list." fetchpriority="high">
-            </picture>
+            <div class="cmp" style="--x:50%">
+              <picture>
+                <source media="(prefers-color-scheme: dark)" srcset="/img/web-dashboard-dark.webp 1440w, /img/web-dashboard-dark@2x.webp 2880w" sizes="(min-width: 1164px) 1120px, calc(100vw - 44px)">
+                <img src="/img/web-dashboard.webp" srcset="/img/web-dashboard.webp 1440w, /img/web-dashboard@2x.webp 2880w" sizes="(min-width: 1164px) 1120px, calc(100vw - 44px)" width="1440" height="900" alt="The Simpl dashboard in Safari: what’s due today, the next seven days, what’s overdue and what was graded, each course’s grade and the week’s workload, and today’s work in one list." fetchpriority="high">
+              </picture>
+              <div class="cmp__before" aria-hidden="true"><img src="/img/web-canvas.webp" srcset="/img/web-canvas.webp 1440w, /img/web-canvas@2x.webp 2880w" sizes="(min-width: 1164px) 1120px, calc(100vw - 44px)" width="1440" height="900" alt=""></div>
+              <span class="cmp__tag cmp__tag--l" aria-hidden="true">Canvas</span><span class="cmp__tag cmp__tag--r" aria-hidden="true">Simpl</span>
+              <div class="cmp__handle" aria-hidden="true"><i><svg viewBox="0 0 24 24"><path d="M9 6l-6 6 6 6M15 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i></div>
+              <input class="cmp__range" type="range" min="0" max="100" value="50" step="0.1" aria-label="Drag to compare Canvas before and after Simpl">
+            </div>
           </figure>
         </div>
       </div>
@@ -699,6 +720,35 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
   }
   document.addEventListener('pointerdown', (e) => choosers.forEach((root) => { if (!root.contains(e.target)) close(root); }));
 })();
+  // the hero's before and after: the handle follows the range under it (drag, click, arrows); a nudge once in view
+  {
+  const cmp = document.querySelector('.cmp');
+  if (cmp) {
+    const range = cmp.querySelector('.cmp__range');
+    const set = (v) => { cmp.style.setProperty('--x', v + '%'); cmp.style.setProperty('--xn', String(v / 100)); };
+    range.addEventListener('input', () => { set(+range.value); });
+    set(+range.value);
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches && 'IntersectionObserver' in window) {
+      let touched = false;
+      range.addEventListener('pointerdown', () => { touched = true; }, { once: true });
+      const io = new IntersectionObserver((es) => {
+        if (!es.some((e) => e.isIntersecting)) return;
+        io.disconnect();
+        // 50 → 32 → 50 over 1.4s, eased, unless the reader has the handle already
+        const t0 = performance.now() + 900;
+        const step = (now) => {
+          if (touched) return;
+          const t = Math.min(1, Math.max(0, (now - t0) / 1400));
+          const v = 50 - 18 * Math.sin(Math.PI * t);
+          range.value = String(v); set(v);
+          if (t < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }, { threshold: 0.5 });
+      io.observe(cmp);
+    }
+  }
+  }
 </script>
 </body>
 </html>
