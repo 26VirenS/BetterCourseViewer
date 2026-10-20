@@ -1,4 +1,5 @@
 using System.IO;
+using System.IO.Compression;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -64,6 +65,10 @@ internal sealed class HandInSheet
     private readonly List<string> converting = new();
     private ConvertInfo convertible = new();
     private bool sending, kindShown;
+    /// <summary>(0.3.49) The files sent as one .zip, chosen where there are two or more (the box); a file of a type the
+    /// assignment does not take, where it takes .zip, goes zipped whatever the box says (MustZip).</summary>
+    private bool asZip, painting;
+    private readonly CheckBox zipBox = new() { Content = "Send as one .zip", Margin = new Thickness(2, 2, 0, 0) };
 
     // the form
     private readonly Grid body = new() { AllowDrop = true, MinHeight = 460 };
@@ -301,6 +306,13 @@ internal sealed class HandInSheet
     private FrameworkElement FilesSection()
     {
         var choose = K.Button("Choose files…", ChooseFiles, icon: SymbolRegular.Folder24);
+        // (0.3.49) a folder goes as a .zip of it, where the assignment takes one
+        var chooseFolder = K.Button("Choose folder…", ChooseFolder, icon: SymbolRegular.FolderOpen24);
+        chooseFolder.ToolTip = "A folder, handed in as a .zip of it";
+        chooseFolder.Visibility = ZipOK ? Visibility.Visible : Visibility.Collapsed;
+        zipBox.ToolTip = "Put these files in one .zip and hand that in";
+        zipBox.Checked += (_, _) => { if (!painting) { asZip = true; Paint(); } };
+        zipBox.Unchecked += (_, _) => { if (!painting) { asZip = false; Paint(); } };
         var pictures = K.Button("Choose pictures…", ChoosePictures, icon: SymbolRegular.ImageMultiple24);
         pictures.ToolTip = "Pictures and videos from your Pictures folder";
         // (Send from phone beside them, onto a line of its own when the three will not fit)
@@ -308,9 +320,9 @@ internal sealed class HandInSheet
         fromPhone.ToolTip = "Scan a code with your phone to send photos and files to this hand-in";
         phoneButton = fromPhone;
         var buttons = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, -8) };
-        foreach (var b in new FrameworkElement[] { choose, pictures, fromPhone }) buttons.Children.Add(b.Margin(0, 0, 10, 8));
+        foreach (var b in new FrameworkElement[] { choose, chooseFolder, pictures, fromPhone }) buttons.Children.Add(b.Margin(0, 0, 10, 8));
         // (its heading only where no kind selector above says "Files" already)
-        var v = K.V(8, filesList, buttons, filesFoot);
+        var v = K.V(8, filesList, zipBox, buttons, filesFoot);
         if (a.Types.Count <= 1) v.Children.Insert(0, K.Text("Files", Ty.BodyStrong));
         return v;
     }
@@ -324,8 +336,14 @@ internal sealed class HandInSheet
         foreach (var f in files) filesList.Children.Add(FileRow(f));
         foreach (var n in converting) filesList.Children.Add(K.H(10, K.Spinner(16), K.Text($"Converting {n}…", Ty.Body, B.Text2)).Margin(4, 6, 0, 6));
         var allowed = a.Allowed ?? new List<string>();
-        filesFoot.Text = allowed.Count > 0 ? $"This assignment takes {AllowedList} files." + (convertible.Line.Length == 0 ? "" : $" {convertible.Line}.") : "";
-        filesFoot.Visibility = allowed.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        filesFoot.Text = allowed.Count > 0 ? $"This assignment takes {AllowedList} files." + (convertible.Line.Length == 0 ? "" : $" {convertible.Line}.") + (ZipOK ? " Any file or folder can go as a .zip." : "") : "A folder goes as a .zip.";
+        filesFoot.Visibility = Visibility.Visible;
+        painting = true;
+        zipBox.Visibility = ZipOK && (files.Count >= 2 || MustZip) ? Visibility.Visible : Visibility.Collapsed;
+        zipBox.IsChecked = MustZip || asZip;
+        zipBox.IsEnabled = !MustZip && !sending;
+        zipBox.ToolTip = MustZip ? "This assignment takes .zip files: these go zipped" : "Put these files in one .zip and hand that in";
+        painting = false;
         submit.Enabled = Ready && !sending && !phone.IsOpen;
         cancel.Enabled = !sending;
         sheet.Modal = sending || phone.IsOpen;
@@ -381,7 +399,16 @@ internal sealed class HandInSheet
 
     // ---- what it knows ----
 
-    private string ProgressWord => type != "online_upload" ? "Handing in…" : files.Count == 1 ? "Uploading 1 file…" : $"Uploading {files.Count} files…";
+    private string ProgressWord => type != "online_upload" ? "Handing in…" : Zipping ? "Zipping and uploading…" : files.Count == 1 ? "Uploading 1 file…" : $"Uploading {files.Count} files…";
+
+    /// <summary>(0.3.49) Whether the assignment takes a .zip: it names no types, or .zip among them.</summary>
+    private bool ZipOK => a.Allowed is not { Count: > 0 } allowed || allowed.Contains("zip");
+
+    /// <summary>(0.3.49) A file of a type the assignment does not take, let in because it takes .zip: the files go zipped.</summary>
+    private bool MustZip => files.Any(f => !AllowedName(f.Name));
+
+    /// <summary>Whether the files go as one .zip.</summary>
+    private bool Zipping => type == "online_upload" && ZipOK && (MustZip || (asZip && files.Count >= 2));
 
     private bool Ready => type switch
     {
@@ -436,7 +463,14 @@ internal sealed class HandInSheet
     private void AddPath(string path)
     {
         var name = System.IO.Path.GetFileName(path.TrimEnd('\\', '/'));
-        if (Directory.Exists(path)) { Fail($"{name} is a folder. Choose the files in it."); return; }
+        if (Directory.Exists(path))
+        {
+            // (0.3.49) a folder goes as a .zip of it, where the assignment takes one
+            if (!ZipOK) { Fail($"{name} is a folder, and this assignment doesn’t take .zip files. Choose the files in it."); return; }
+            try { Add(new Picked(Guid.NewGuid(), $"{name}.zip", "application/zip", HandInZip.Folder(path))); }
+            catch { Fail($"{name} could not be zipped."); }
+            return;
+        }
         try
         {
             var info = new FileInfo(path);
@@ -449,7 +483,10 @@ internal sealed class HandInSheet
     private void Add(Picked f, bool preview = true)
     {
         if (f.Data.LongLength > Limit) { Fail($"{f.Name} is larger than 50 MB. Hand it in on {engine.LmsName}’s own page."); return; }
-        if (!AllowedName(f.Name)) { Convert(f, preview); return; }
+        // (0.3.49) a type the assignment does not take is converted where it can be, else — where a .zip is taken — let in to
+        // go zipped (MustZip)
+        var ext = System.IO.Path.GetExtension(f.Name).TrimStart('.').ToLowerInvariant();
+        if (!AllowedName(f.Name) && !(ZipOK && !convertible.Exts.Contains(ext))) { Convert(f, preview); return; }
         Fail(null);
         if (files.Any(x => x.Name == f.Name && x.Data.LongLength == f.Data.LongLength)) return; // (dropped twice)
         files.Add(f);
@@ -497,12 +534,22 @@ internal sealed class HandInSheet
         if (a.Allowed is { Count: > 0 } allowed)
         {
             var exts = allowed.Concat(convertible.Exts).Select(x => x.ToLowerInvariant().TrimStart('.')).Distinct().ToList();
-            dlg.Filter = $"Files this assignment takes ({string.Join(", ", exts.Select(x => "." + x))})|{string.Join(";", exts.Select(x => "*." + x))}";
+            dlg.Filter = $"Files this assignment takes ({string.Join(", ", exts.Select(x => "." + x))})|{string.Join(";", exts.Select(x => "*." + x))}" + (ZipOK ? "|All files (handed in as a .zip)|*.*" : "");
         }
         if (Ask(dlg) != true) return;
         if (!a.Types.Contains("online_upload")) return;
         SetType("online_upload");
         foreach (var p in dlg.FileNames) AddPath(p);
+    }
+
+    /// <summary>(0.3.49) A folder, handed in as a .zip of it.</summary>
+    private void ChooseFolder()
+    {
+        var dlg = new Microsoft.Win32.OpenFolderDialog { Multiselect = true, Title = "Choose a folder to hand in as a .zip" };
+        var ok = (Window.GetWindow(body) ?? Application.Current?.MainWindow) is { } owner ? dlg.ShowDialog(owner) : dlg.ShowDialog();
+        if (ok != true || !a.Types.Contains("online_upload")) return;
+        SetType("online_upload");
+        foreach (var p in dlg.FolderNames) AddPath(p);
     }
 
     /// <summary>Windows' Open dialog over the hand-in's own popup (over Simpl's window it could open behind it).</summary>
@@ -648,6 +695,14 @@ internal sealed class HandInSheet
         };
         try
         {
+            if (Zipping) // (0.3.49) the files in one .zip, made off the UI thread
+            {
+                var name = HandInZip.Name(a.Title);
+                var list = files.Select(f => (f.Name, f.Data)).ToList();
+                var zip = await Task.Run(() => HandInZip.Files(list, name));
+                if (zip.LongLength > Limit) throw new InvalidOperationException($"The .zip is larger than 50 MB. Hand it in on {engine.LmsName}’s own page.");
+                args = new { course = a.Course, id = a.Id, type, comment = note.Text, files = new[] { new { name = $"{name}.zip", type = "application/zip", data = System.Convert.ToBase64String(zip) } } };
+            }
             await engine.Call<OK>("submit", args);
             sending = false;
             sheet.Close();
@@ -695,5 +750,47 @@ internal sealed class HandInSheet
         }
         if (photos) phonePdf = f.Id;
         Add(f, preview: false);
+    }
+}
+
+/// <summary>(0.3.49) Files handed in as one .zip: a folder zipped with itself at the top, or files chosen gathered in a
+/// folder of the assignment's name and zipped so.</summary>
+internal static class HandInZip
+{
+    /// <summary>The assignment's title as a file's name ("Lab 3: Forces" → "Lab 3 - Forces").</summary>
+    public static string Name(string title)
+    {
+        var bad = System.IO.Path.GetInvalidFileNameChars();
+        var parts = (title ?? "").Split(bad, StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).Where(x => x.Length > 0);
+        var n = string.Join(" - ", parts).Trim().Trim('.');
+        return n.Length == 0 ? "Hand-in" : n.Length > 80 ? n[..80] : n;
+    }
+
+    /// <summary>A folder as a .zip, the folder itself at the top of it.</summary>
+    public static byte[] Folder(string path)
+    {
+        using var ms = new MemoryStream();
+        ZipFile.CreateFromDirectory(path, ms, CompressionLevel.Optimal, includeBaseDirectory: true);
+        return ms.ToArray();
+    }
+
+    /// <summary>Files as a .zip, in a folder called <paramref name="name"/> (two of one name kept apart: "notes 2.txt").</summary>
+    public static byte[] Files(IReadOnlyList<(string Name, byte[] Data)> files, string name)
+    {
+        using var ms = new MemoryStream();
+        using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (fileName, data) in files)
+            {
+                var stem = System.IO.Path.GetFileNameWithoutExtension(fileName);
+                var ext = System.IO.Path.GetExtension(fileName);
+                var n = fileName;
+                for (var k = 2; !used.Add(n); k++) n = $"{stem} {k}{ext}";
+                using var e = zip.CreateEntry($"{name}/{n}", CompressionLevel.Optimal).Open();
+                e.Write(data, 0, data.Length);
+            }
+        }
+        return ms.ToArray();
     }
 }

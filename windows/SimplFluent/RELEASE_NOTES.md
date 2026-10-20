@@ -1,3 +1,7 @@
+**What's new in 0.3.49** (beta)
+
+- **Hand in as a .zip** — Hand In takes a folder (Choose folder…, or drop one) and sends it as a .zip of it, and two or more files can go as one .zip ("Send as one .zip"); where an assignment takes .zip files, any file can go zipped.
+
 **What's new in 0.3.48** (beta)
 
 - **A tidier skyline** — each course's tower on the Dashboard shows at most four windows across; what doesn't fit is hidden instead of squeezed in smaller.
