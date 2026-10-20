@@ -1002,7 +1002,7 @@
           if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; // new-tab clicks stay native
           e.preventDefault();
           // reading it beside the list counts as opening it, so the unread dot clears either way
-          const looked = BCV.preview?.open(url);
+          const looked = BCV.preview?.open(url, { anchor: rowEl });
           store.markStreamSeen(a.id).catch(() => {}).then(() => { if (!looked) app.go(url); });
           if (looked) dot.style.background = 'transparent';
         });

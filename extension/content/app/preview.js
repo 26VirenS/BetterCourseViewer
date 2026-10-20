@@ -1,7 +1,8 @@
 /* A preview of a listed item, without leaving the list it is in.
  *
- * Pressing a row opens the item beside it rather than navigating: the interface slides left and a
- * panel comes in on the right with what that item actually says — an announcement or discussion's
+ * Pressing a row opens the item over it rather than navigating: a card grows out of the row pressed (2.99.66 — the only
+ * shape on a computer now; the panel that docked on the right and pushed the page aside is gone) with what that item
+ * actually says — an announcement or discussion's
  * first post, an assignment's instructions with its due date, points and where the submission
  * stands, a quiz's rules, a page's body. The button at the bottom is the way through to the item's
  * own screen; Escape, the close button, a press outside and any navigation dismiss it.
@@ -17,7 +18,6 @@
   const U = BCV.ui;
   const IC = BCV.IC;
   const store = () => BCV.store; // read late: this file loads before the screens that use it
-  const html = document.documentElement;
 
   // the item kinds with something to show, by the tab name app.parseRoute() gives them. `group` is
   // false where the API path only exists under a course, so a group link navigates as it always did.
@@ -56,7 +56,7 @@
     } else p.remove();
     cur.host?.classList.remove('is-split', 'has-pv');
     for (const e of cur.host?.querySelectorAll('.is-on') || []) e.classList.remove('is-on');
-    html.classList.remove('bcv-preview');
+    if (!cur.host) cur.anchor?.classList.remove('is-on');
     document.removeEventListener('keydown', onKey, true);
     document.removeEventListener('pointerdown', onDown, true);
     cur = null;
@@ -155,6 +155,7 @@
    *  right one for a box at the right of its row — just under the row pressed, the row left in sight above it, and kept
    *  inside the window; it grows out of the row. */
   function place(panel, host, anchor) {
+    if (!host) return placeFloat(panel, anchor);
     if (!panel.isConnected || !host.isConnected) return;
     const M = 16, vw = innerWidth, vh = innerHeight;
     const box = host.getBoundingClientRect();
@@ -171,6 +172,25 @@
     if (a) panel.style.transformOrigin = `${Math.round(Math.max(0, Math.min(w, a.left + a.width / 2 - x)))}px ${Math.round(a.top + a.height / 2 - y)}px`;
   }
 
+  /** (2.99.66) A card opened from the page itself (a list, the calendar, a course's page): over the row pressed — under it
+   *  where there is room, above it where there is not — as wide as a card, kept inside the window, grown out of the row. */
+  function placeFloat(panel, anchor) {
+    if (!panel.isConnected) return;
+    const M = 16, vw = innerWidth, vh = innerHeight;
+    const w = Math.min(460, vw - 2 * M);
+    panel.style.width = `${Math.round(w)}px`;
+    panel.style.maxHeight = `${Math.round(Math.min(560, vh - 2 * M))}px`;
+    const a = anchor?.isConnected ? anchor.getBoundingClientRect() : null;
+    const hgt = panel.getBoundingClientRect().height;
+    const x = Math.max(M, Math.min(a ? a.left + Math.min(a.width, 640) / 2 - w / 2 : (vw - w) / 2, vw - M - w));
+    let y = a ? a.bottom + 8 : (vh - hgt) / 2;
+    if (a && y + hgt > vh - M && a.top - 8 - hgt >= M) y = a.top - 8 - hgt;
+    y = Math.max(M, Math.min(y, vh - M - hgt));
+    panel.style.left = `${Math.round(x)}px`;
+    panel.style.top = `${Math.round(y)}px`;
+    if (a) panel.style.transformOrigin = `${Math.round(Math.max(0, Math.min(w, a.left + a.width / 2 - x)))}px ${Math.round(a.top + a.height / 2 - y)}px`;
+  }
+
   /** Opens the panel for a link. Returns false when that link is not one we preview.
    *  `host` puts the panel inside something that is already on screen — a counter's sheet — which
    *  widens to make room for it instead of standing aside; a counter's box (`.bcv-sheet--card`) instead has it as a
@@ -180,7 +200,7 @@
     const r = previewable(href);
     if (!r) return false;
     const app = BCV.app;
-    const asCard = !!host && host.classList.contains('bcv-sheet--card') && !BCV.phone?.active();
+    const asCard = !!host && !BCV.phone?.active(); // (2.99.66: a counter's box, of either shape, has the card too)
     // another row pressed while one shows: the panel stays where it is and only what it says changes (no slide in again)
     const swap = !!cur && !BCV.phone?.active() && ((!cur.host && !host && cur.panel.classList.contains('bcv-pv')) || (asCard && cur.host === host && cur.card));
     close();
@@ -256,20 +276,18 @@
       fill(panel);
       return true;
     }
-    if (host) {
-      // beside the list it was opened from, inside the thing already on screen: it widens, nothing moves
-      panel.classList.add('bcv-pv--in');
-      host.classList.add('is-split');
-      host.append(panel);
-    } else {
-      if (swap) panel.classList.add('is-swap');
-      document.body.append(panel);
-      html.classList.add('bcv-preview');
-      document.addEventListener('keydown', onKey, true);
-      // on the next frame, so the press that opened this one does not close it again
-      requestAnimationFrame(() => { if (cur && cur.panel === panel) document.addEventListener('pointerdown', onDown, true); });
-    }
-    cur = { panel, route: r, host };
+    // (2.99.66) from the page itself: the same card, over the row pressed, the page left where it is under it
+    panel.classList.add('bcv-pv--card', 'bcv-pv--float');
+    if (swap) panel.classList.add('is-swap');
+    anchor?.classList.add('is-on');
+    document.body.append(panel);
+    place(panel, null, anchor);
+    const onResize = () => { if (!panel.isConnected) { removeEventListener('resize', onResize); return; } place(panel, null, anchor); };
+    addEventListener('resize', onResize);
+    document.addEventListener('keydown', onKey, true);
+    // on the next frame, so the press that opened this one does not close it again
+    requestAnimationFrame(() => { if (cur && cur.panel === panel) document.addEventListener('pointerdown', onDown, true); });
+    cur = { panel, route: r, host: null, anchor, card: true };
     fill(panel);
     return true;
   }
@@ -282,7 +300,7 @@
       if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const a = e.target.closest?.('a[href]');
       if (!a || !screen.contains(a) || a.target === '_blank') return;
-      if (!open(a.href)) return;
+      if (!open(a.href, { anchor: a })) return;
       e.preventDefault();
       e.stopPropagation();
     });

@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.65"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.66"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -3180,13 +3180,9 @@ html[data-bcv-theme="dark"] #bcv-app .bcv-qz__opt.is-selected { color: #7ab8ff; 
 .bcv-qz__donebtns .bcv-qz__big { flex: none; height: 46px; padding: 0 22px; border-radius: 23px; font-size: 15px; }
 
 
-/* ---- an item previewed beside the list ------------------------------------
- * The interface keeps its place and gives up its right edge: #bcv-app takes a padding the width of
- * the panel, so the list reflows narrower rather than sliding out of reach, and the panel comes in
- * from the right beside it. Nothing is dimmed — the point is to read the two together. */
-html.bcv-preview { --bcv-pv-w: clamp(340px, 33vw, 520px); }
-html.bcv-preview #bcv-app { padding-right: var(--bcv-pv-w); }
-#bcv-app { transition: padding-right .34s var(--bcv-ease); }
+/* ---- an item previewed over the list ----------------------------------------
+ * The panel's own parts; on a computer it is always a card over the row pressed (.bcv-pv--card, below — 2.99.66: the
+ * panel docked on the right that pushed the page aside is gone), on a phone a sheet from the bottom. */
 .bcv-pv {
   position: fixed; top: 0; right: 0; bottom: 0; z-index: var(--bcv-z-panel); width: clamp(340px, 33vw, 520px);
   display: flex; flex-direction: column; box-sizing: border-box;
@@ -3219,7 +3215,6 @@ html.bcv-preview #bcv-app { padding-right: var(--bcv-pv-w); }
 .bcv-pv__go:hover { filter: brightness(1.07); }
 /* narrow windows have no room for both: the panel takes the screen and the interface stays put */
 @media (max-width: 1100px) {
-  html.bcv-preview #bcv-app { padding-right: 0; }
   .bcv-pv { width: 100%; }
 }
 /* on a phone the same preview is the body of a sheet: no chrome of its own, the sheet carries it */
@@ -5434,6 +5429,8 @@ html.bcv-noblur .bcv-pv.bcv-pv--card { background: rgb(40,40,44); -webkit-backdr
 @keyframes bcv-pvcard-out { to { opacity: 0; transform: scale(.96); } }
 .bcv-pv.bcv-pv--card.is-leaving { animation: bcv-pvcard-out .15s cubic-bezier(.23,1,.32,1) both; }
 .bcv-pv.bcv-pv--card.is-swap { animation: none; }
+.bcv-pv.bcv-pv--float { z-index: var(--bcv-z-panel); overflow: hidden; display: flex; flex-direction: column; } /* (2.99.66: opened from the page itself, over it — the only preview on a computer) */
+.bcv-pv--float .bcv-pv__body { min-height: 0; }
 /* its head (every preview): the kind's glyph on the course's tint, "Kind · Course" in the course's colour, a Close pill */
 .bcv-pv__head { padding: 16px 16px 4px 20px; border-bottom: 0; gap: 10px; }
 .bcv-pv__tile { flex: none; width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--bcv-ink3); background: var(--bcv-fill); }

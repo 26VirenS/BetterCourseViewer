@@ -924,6 +924,11 @@ try {
   }));
   check(page.url().endsWith('/') && /^(Assignment|Tool) · F26-/.test(pvRow.meta) && /^(Due .+|No due date)( \| \d+(\.\d+)? pts)?$/.test(pvRow.facts) && pvRow.chips.length >= 1 && /^(Graded|Submitted|Submitted late|Missing|Not submitted|Excused)$/.test(pvRow.chips[0]) && pvRow.has && pvRow.go === 'Open the assignment', `a list row previews the assignment without navigating: ${JSON.stringify(pvRow)}`);
   check(!/null|NaN|undefined/.test(await page.$eval('.bcv-pv', (e) => e.textContent)), 'the preview never shows a raw null');
+  const pvFloat = await page.evaluate(() => {
+    const p = document.querySelector('.bcv-pv').getBoundingClientRect(), row = document.querySelector('.bcv-day a.bcv-row.is-on')?.getBoundingClientRect();
+    return { card: document.querySelector('.bcv-pv').classList.contains('bcv-pv--card'), w: Math.round(p.width), inside: p.left >= 0 && p.right <= innerWidth && p.top >= 0 && p.bottom <= innerHeight, near: !!row && (Math.abs(p.top - row.bottom - 8) <= 2 || Math.abs(row.top - 8 - p.bottom) <= 2), pad: getComputedStyle(document.getElementById('bcv-app')).paddingRight, docked: !!document.querySelector('.bcv-pv:not(.bcv-pv--card)') };
+  });
+  check(pvFloat.card && pvFloat.w <= 460 && pvFloat.inside && pvFloat.near && pvFloat.pad === '0px' && !pvFloat.docked, `the preview is a card over the row pressed — no panel docked on the right, the page not pushed aside: ${JSON.stringify(pvFloat)}`);
   // nothing is covered or dimmed: the interface stays live beside the panel, so pressing another
   // item we can read swaps what the panel shows rather than putting it away
   const wasTitle = await page.$eval('.bcv-pv__title', (e) => e.textContent);
@@ -931,10 +936,10 @@ try {
   await nextRow.click({ position: { x: 220, y: 22 } });
   await page.waitForFunction((was) => document.querySelector('.bcv-pv__title')?.textContent !== was && !document.querySelector('.bcv-pv .bcv-skel'), wasTitle, { timeout: 10000 });
   const pvSwap = await page.$eval('.bcv-pv__kicker', (e) => e.textContent);
-  check((await page.$$('.bcv-pv')).length === 1 && /^Assignment · /.test(pvSwap) && (await page.$eval('html', (e) => e.classList.contains('bcv-preview'))), `pressing another row swaps the preview in place, the interface never moving back: ${pvSwap}`);
+  check((await page.$$('.bcv-pv')).length === 1 && /^Assignment · /.test(pvSwap) && (await page.$eval('.bcv-pv', (e) => e.classList.contains('bcv-pv--float') && e.classList.contains('bcv-pv--card'))), `pressing another row swaps the preview in place, the interface never moving back: ${pvSwap}`);
   // a press anywhere else puts it away, and goes through to what was pressed
   await page.click('.bcv-head .bcv-h1');
-  await page.waitForFunction(() => !document.querySelector('.bcv-pv') && !document.documentElement.classList.contains('bcv-preview'), null, { timeout: 3000 });
+  await page.waitForFunction(() => !document.querySelector('.bcv-pv'), null, { timeout: 3000 });
   check(true, 'a press on the interface closes the preview');
   // only the kinds we can read are previewed; everything else navigates the way it always did
   const pvRoutes = await sw.evaluate(async (base) => {
@@ -957,7 +962,7 @@ try {
   check(assignHref.includes('/assignments/') && (await page.$eval('.bcv-pv', (e) => e.parentElement.tagName)) === 'BODY', 'the preview stands over the page, beside the dashboard it came from');
   await page.click('.bcv-nav__item[data-nav="courses"]');
   await page.waitForSelector('[data-term]', { timeout: 10000 });
-  check(!(await page.$('.bcv-pv')) && !(await page.$eval('html', (e) => e.classList.contains('bcv-preview'))), 'navigating away closes the preview');
+  check(!(await page.$('.bcv-pv')), 'navigating away closes the preview');
   await page.click('.bcv-nav__item[data-nav="dashboard"]');
   await page.waitForSelector('.bcv-day .bcv-row', { timeout: 10000 });
   // mark one done
@@ -1525,7 +1530,7 @@ try {
   await page.click('.bcv-ev[href*="/assignments/"]');
   await page.waitForSelector('.bcv-pv', { timeout: 10000 }); // (the panel stands beside the page here, the way the To Do list's does)
   await page.waitForFunction(() => !document.querySelector('.bcv-pv .bcv-skel'), null, { timeout: 10000 });
-  check(/\/calendar/.test(page.url()) && (await page.$eval('html', (e) => e.classList.contains('bcv-preview'))) && /^Assignment · /.test((await texts('.bcv-pv__kicker'))[0]) && (await texts('.bcv-pv__title'))[0] === chipTitle && /^Due /.test((await texts('.bcv-pv__fact'))[0]) && (await page.$eval('.bcv-pv__go', (e) => e.getAttribute('aria-label'))) === 'Open the assignment' && (await page.$('.bcv-cal__grid')) !== null, `pressing an assignment on the calendar previews it beside the month: ${JSON.stringify({ chip: chipTitle, url: page.url(), html: await page.$eval('html', (e) => e.className), kicker: (await texts('.bcv-pv__kicker'))[0], title: (await texts('.bcv-pv__title'))[0], meta: (await texts('.bcv-pv__meta'))[0], go: (await texts('.bcv-pv__go'))[0], grid: !!(await page.$('.bcv-cal__grid')) })}`);
+  check(/\/calendar/.test(page.url()) && (await page.$eval('.bcv-pv', (e) => e.classList.contains('bcv-pv--float') && e.classList.contains('bcv-pv--card'))) && /^Assignment · /.test((await texts('.bcv-pv__kicker'))[0]) && (await texts('.bcv-pv__title'))[0] === chipTitle && /^Due /.test((await texts('.bcv-pv__fact'))[0]) && (await page.$eval('.bcv-pv__go', (e) => e.getAttribute('aria-label'))) === 'Open the assignment' && (await page.$('.bcv-cal__grid')) !== null, `pressing an assignment on the calendar previews it beside the month: ${JSON.stringify({ chip: chipTitle, url: page.url(), html: await page.$eval('html', (e) => e.className), kicker: (await texts('.bcv-pv__kicker'))[0], title: (await texts('.bcv-pv__title'))[0], meta: (await texts('.bcv-pv__meta'))[0], go: (await texts('.bcv-pv__go'))[0], grid: !!(await page.$('.bcv-cal__grid')) })}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-pv'), null, { timeout: 5000 });
   await page.click('.bcv-seg__btn[data-value="week"]');
