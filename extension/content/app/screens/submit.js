@@ -40,6 +40,70 @@
   const textToHtml = (t) => t.trim().split(/\n{2,}/).map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`).join('');
   let seq = 0;
 
+  // ---- a .zip (2.99.70) -----------------------------------------------------------------------------------------
+  // Files handed in as one .zip: a folder chosen or dropped, or several files put together. Each entry deflated where the
+  // browser can (CompressionStream) and that is smaller, else stored; names in UTF-8.
+  const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  const crc32 = (u8) => { let c = ~0; for (let i = 0; i < u8.length; i++) c = CRC[(c ^ u8[i]) & 255] ^ (c >>> 8); return ~c >>> 0; };
+  async function deflated(u8) {
+    if (typeof CompressionStream === 'undefined') return null;
+    try { return new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer()); } catch { return null; }
+  }
+  /** [{ path, file }] → a .zip Blob. */
+  async function makeZip(items) {
+    const enc = new TextEncoder(), parts = [], central = [];
+    const d = new Date(), time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1), date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+    let offset = 0;
+    for (const it of items) {
+      const raw = new Uint8Array(await it.file.arrayBuffer()), name = enc.encode(it.path), crc = crc32(raw);
+      const z = await deflated(raw), packed = !!z && z.length < raw.length, data = packed ? z : raw;
+      const lh = new DataView(new ArrayBuffer(30));
+      [[0, 0x04034b50, 4], [4, 20], [6, 0x0800], [8, packed ? 8 : 0], [10, time], [12, date], [14, crc, 4], [18, data.length, 4], [22, raw.length, 4], [26, name.length]].forEach(([at, v, n]) => (n === 4 ? lh.setUint32(at, v, true) : lh.setUint16(at, v, true)));
+      const ch = new DataView(new ArrayBuffer(46));
+      [[0, 0x02014b50, 4], [4, 20], [6, 20], [8, 0x0800], [10, packed ? 8 : 0], [12, time], [14, date], [16, crc, 4], [20, data.length, 4], [24, raw.length, 4], [28, name.length], [42, offset, 4]].forEach(([at, v, n]) => (n === 4 ? ch.setUint32(at, v, true) : ch.setUint16(at, v, true)));
+      parts.push(lh.buffer, name, data);
+      central.push(ch.buffer, name);
+      offset += 30 + name.length + data.length;
+    }
+    const size = central.reduce((n, x) => n + x.byteLength, 0);
+    const end = new DataView(new ArrayBuffer(22));
+    [[0, 0x06054b50, 4], [8, items.length], [10, items.length], [12, size, 4], [16, offset, 4]].forEach(([at, v, n]) => (n === 4 ? end.setUint32(at, v, true) : end.setUint16(at, v, true)));
+    return new Blob([...parts, ...central, end.buffer], { type: 'application/zip' });
+  }
+  /** The assignment's name as a file's ("Lab 3: Forces" → "Lab 3 - Forces"). */
+  const zipNameOf = (title) => String(title || '').split(/[\\/:*?"<>|\u0000-\u001f]+/).map((x) => x.trim()).filter(Boolean).join(' - ').replace(/^\.+|\.+$/g, '').slice(0, 80) || 'Hand-in';
+  /** Names kept apart in one folder: a second "notes.txt" is "notes 2.txt". */
+  function uniqueNames(names) {
+    const used = new Set();
+    return names.map((n) => {
+      const dot = n.lastIndexOf('.'), stem = dot > 0 ? n.slice(0, dot) : n, ext = dot > 0 ? n.slice(dot) : '';
+      let out = n;
+      for (let k = 2; used.has(out.toLowerCase()); k++) out = `${stem} ${k}${ext}`;
+      used.add(out.toLowerCase());
+      return out;
+    });
+  }
+  /** What a drop holds, read before the event is over: its folders (entries, read on) and its loose files. */
+  function dropOf(dt) {
+    const entries = [...(dt?.items || [])].map((i) => (i.kind === 'file' ? i.webkitGetAsEntry?.() : null));
+    const dirs = entries.filter((e) => e?.isDirectory);
+    return { dirs, files: dirs.length ? [...(dt?.files || [])].filter((f, i) => !entries[i]?.isDirectory) : [...(dt?.files || [])] };
+  }
+  /** Every file under a dropped folder, as [{ path, file }] (its path from the folder's own name down). */
+  async function filesUnder(dir, prefix = dir.name) {
+    const out = [];
+    const reader = dir.createReader();
+    for (;;) {
+      const batch = await new Promise((res, rej) => reader.readEntries(res, rej));
+      if (!batch.length) break;
+      for (const e of batch) {
+        if (e.isDirectory) out.push(...(await filesUnder(e, `${prefix}/${e.name}`)));
+        else out.push({ path: `${prefix}/${e.name}`, file: await new Promise((res, rej) => e.file(res, rej)) });
+      }
+    }
+    return out;
+  }
+
   /** The flow on its own (the phone), or — `embed` — the block the assignment page hosts at the
    *  end of its own scroll (mockup 11): the assignment already on the page is reused, never
    *  refetched, the instructions stay above, and the mode chosen is remembered per assignment. */
@@ -85,6 +149,9 @@
     if (!ctx.alive()) return screen;
     const extWords = () => listWords(allowedExt.map((e) => e.toUpperCase()));
     const typesLine = allowedExt.length ? `${extWords()} only` : 'Any file type';
+    // (2.99.70) a .zip: where the assignment takes one (it names no types, or .zip among them), a folder goes as a .zip of it
+    // and several files can go as one; a file of a type it does not take, that nothing here converts, goes zipped (zipOnly)
+    const zipOK = !allowedExt.length || allowedExt.includes('zip');
     const acceptsLine = `accepts ${listWords(types.map((t) => WORDS[t] || t.replace(/_/g, ' ')))}`;
     const windowLine = a.unlock_at && a.lock_at ? `Open ${U.fmtShort(a.unlock_at)} – ${U.fmtShort(a.lock_at)}` : a.lock_at ? `Open until ${U.fmtAt(a.lock_at)}` : a.unlock_at ? `Opens ${U.fmtAt(a.unlock_at)}` : '';
     const unlimited = !(a.allowed_attempts > 0);
@@ -92,7 +159,7 @@
     const hasOther = toolRows.length > 0 || toolsFailed || can.url || can.media || can.annot;
 
     const tabAllowed = (k) => ((k === 'file' && can.file) || (k === 'text' && can.text) || (k === 'other' && hasOther) ? k : null);
-    const st = { stage: 'edit', tab: tabAllowed(modePref) || (can.file ? 'file' : can.text ? 'text' : 'other'), files: [], text: draft, link: null, urlOpen: false, comment: '', commentOpen: false, busy: false, attempt: Number(s0.attempt) || 0, done: null, sent: null };
+    const st = { stage: 'edit', tab: tabAllowed(modePref) || (can.file ? 'file' : can.text ? 'text' : 'other'), files: [], zip: false, text: draft, link: null, urlOpen: false, comment: '', commentOpen: false, busy: false, attempt: Number(s0.attempt) || 0, done: null, sent: null };
     const attemptsLeft = () => (unlimited ? Infinity : Math.max(0, a.allowed_attempts - st.attempt));
     const lockedText = () => (a.locked_for_user ? (a.lock_explanation ? htmlToText(a.lock_explanation, 220) : 'This assignment is locked.') : a.lock_at && U.parse(a.lock_at) < Date.now() ? `This assignment closed ${U.fmtAt(a.lock_at)}.` : null);
     const dueChip = () => {
@@ -183,8 +250,11 @@
 
     function filePane() {
       // the picker takes the allowed types and the ones that convert into them: a Word file is not greyed out where only PDF is allowed
-      const input = h('input', { type: 'file', multiple: true, hidden: true, accept: allowedExt.length ? [...allowedExt, ...(conv?.exts || [])].map((e) => `.${e}`).join(',') : null, onchange: () => { addFiles(input.files); input.value = ''; } });
-      const drop = h('button', { type: 'button', class: 'bcv-sb__drop', title: pop && conv?.line ? conv.line.replace(/^./, (m) => m.toUpperCase()) : null, onclick: () => input.click(), ondragover: (e) => { e.preventDefault(); drop.classList.add('is-over'); }, ondragleave: () => drop.classList.remove('is-over'), ondrop: (e) => { e.preventDefault(); drop.classList.remove('is-over'); addFiles(e.dataTransfer?.files); } }, [
+      const input = h('input', { type: 'file', multiple: true, hidden: true, accept: allowedExt.length && !zipOK ? [...allowedExt, ...(conv?.exts || [])].map((e) => `.${e}`).join(',') : null, onchange: () => { addFiles(input.files); input.value = ''; } });
+      // (2.99.70) a folder, handed in as a .zip of it
+      const dirInput = zipOK ? h('input', { type: 'file', multiple: true, hidden: true, onchange: () => { addFolder([...dirInput.files].map((file) => ({ path: file.webkitRelativePath || file.name, file }))); dirInput.value = ''; } }) : null;
+      dirInput?.setAttribute('webkitdirectory', '');
+      const drop = h('button', { type: 'button', class: 'bcv-sb__drop', title: pop && conv?.line ? conv.line.replace(/^./, (m) => m.toUpperCase()) : null, onclick: () => input.click(), ondragover: (e) => { e.preventDefault(); drop.classList.add('is-over'); }, ondragleave: () => drop.classList.remove('is-over'), ondrop: (e) => { e.preventDefault(); drop.classList.remove('is-over'); dropped(dropOf(e.dataTransfer)); } }, [
         h('span', { class: 'bcv-sb__dropicon' }, U.svg(UPLOAD, { size: 22, stroke: 'var(--bcv-blue)', width: 1.9 })),
         pop ? h('span', { class: 'bcv-sb__droptext' }, [h('span', { class: 'bcv-sb__droptitle' }, ['Drop files, or ', h('span', { class: 'bcv-sb__browse', text: 'browse' })]), h('span', { class: 'bcv-sb__dropsub', text: conv?.line ? `${typesLine} · others converted` : typesLine })])
           : h('span', { class: 'bcv-sb__droptitle', text: 'Drop a file here or choose one' }),
@@ -192,10 +262,17 @@
         conv?.line ? h('span', { class: 'bcv-sb__dropsub bcv-sb__dropconv', text: conv.line }) : null,
       ]);
       const n = st.files.length;
+      const zipRow = zipOK && st.files.every((f) => f.file || f.status === 'converting') && (n >= 2 || mustZip())
+        ? h('label', { class: 'bcv-sb__zip', title: mustZip() ? 'This assignment takes .zip files: these go zipped' : 'Put these files in one .zip and hand that in' }, [
+          h('input', { type: 'checkbox', checked: st.zip || mustZip(), disabled: mustZip() || st.busy || null, onchange: (e) => { st.zip = e.target.checked; paintFoot(); } }),
+          h('span', { text: 'Send as one .zip' }),
+        ]) : null;
       return U.el('bcv-sb__pane', [
-        input, drop,
+        input, dirInput, drop,
+        zipOK ? h('button', { type: 'button', class: 'bcv-sb__folder', text: 'Choose a folder (sent as a .zip)', onclick: () => dirInput.click() }) : null,
         U.text('bcv-sb__count', n === 0 ? 'Nothing attached yet' : `${U.plural(n, 'file')} attached`),
         n ? U.el('bcv-sb__files', st.files.map(fileRow)) : null,
+        zipRow,
       ]);
     }
     const fileStatus = (f) => {
@@ -245,6 +322,12 @@
         }
         if (allowedExt.length && !allowedExt.includes(extOf(file.name))) {
           const p = await withConverter(() => BCV.toolsConvert?.plan?.(file, allowedExt) || null).catch(() => null);
+          if (!p && zipOK) { // (2.99.70) nothing turns it into a type taken, but a .zip is taken: it goes zipped
+            if (st.files.some((f) => f.file && f.name === file.name && f.size === file.size)) continue;
+            st.files.push({ id: ++seq, name: file.name, size: file.size, file, status: 'ready', progress: 0, fileId: null, zipOnly: true });
+            added++;
+            continue;
+          }
           if (!p) {
             await U.askSheet({ title: `“${file.name}” can’t be attached`, note: `This assignment only takes ${extWords()}. A ${(extOf(file.name) || 'file').toUpperCase()} file can’t be turned into any of those here.`, okLabel: 'OK', cancelLabel: null });
             continue;
@@ -274,6 +357,33 @@
       if (added) {
         st.tab = 'file';
         draw();
+      }
+    }
+
+    /** (2.99.70) A file the assignment takes only inside a .zip is attached: the files go zipped, whatever the box says. */
+    const mustZip = () => st.files.some((f) => f.zipOnly);
+    const zipping = () => st.tab === 'file' && zipOK && st.files.length > 0 && st.files.every((f) => f.file) && (mustZip() || (st.zip && st.files.length >= 2));
+    /** A drop: its loose files as files, each folder as a .zip of it. */
+    async function dropped({ dirs, files }) {
+      if (files.length) await addFiles(files);
+      for (const d of dirs) {
+        if (!zipOK) { U.toast(`“${d.name}” is a folder, and this assignment doesn’t take .zip files. Choose the files in it.`, { error: true, ms: 5000 }); continue; }
+        try { await addFolder(await filesUnder(d)); } catch { U.toast(`“${d.name}” could not be read.`, { error: true }); }
+      }
+    }
+    /** A folder's files ([{ path, file }], each path from the folder's name down) attached as "<folder>.zip". */
+    async function addFolder(items) {
+      if (!ctx.alive() || !items.length) return;
+      const root = String(items[0].path).split('/')[0] || 'Folder';
+      try {
+        const blob = await makeZip(items);
+        if (!ctx.alive()) return;
+        const file = new File([blob], `${root}.zip`, { type: 'application/zip' });
+        st.files.push({ id: ++seq, name: file.name, size: file.size, file, status: 'ready', progress: 0, fileId: null });
+        st.tab = 'file';
+        draw();
+      } catch (e) {
+        U.toast(`“${root}” could not be zipped: ${e?.message || e}`, { error: true, ms: 5000 });
       }
     }
 
@@ -445,7 +555,7 @@
       const r = readiness();
       if (pop) {
         const said = !!st.comment.trim();
-        const what = st.tab === 'file' ? (st.files.length ? U.plural(st.files.length, 'file') : 'attach a file') : st.tab === 'text' ? (wordsOf(st.text) ? U.plural(wordsOf(st.text), 'word') : 'write something') : (st.link?.url ? 'a link' : 'pick a tool or a link');
+        const what = st.tab === 'file' ? (st.files.length ? (zipping() ? `${U.plural(st.files.length, 'file')} as one .zip` : U.plural(st.files.length, 'file')) : 'attach a file') : st.tab === 'text' ? (wordsOf(st.text) ? U.plural(wordsOf(st.text), 'word') : 'write something') : (st.link?.url ? 'a link' : 'pick a tool or a link');
         const late = r.ok && U.parse(a.due_at) && Date.now() > U.parse(a.due_at) ? ' · late' : '';
         foot.replaceChildren(U.el('bcv-sb__footin', [
           h('button', { type: 'button', class: `bcv-sb__bubble ${st.commentOpen || said ? 'is-on' : ''}`, title: st.commentOpen ? 'Hide the comment' : 'Add a comment for your instructor (it can’t be edited or deleted once sent)', 'aria-label': st.commentOpen ? 'Hide the comment' : 'Add a comment for your instructor', 'aria-pressed': String(st.commentOpen), onclick: () => { st.commentOpen = !st.commentOpen; draw(); if (st.commentOpen) screen.querySelector('.bcv-sb__comment')?.focus(); } }, U.svg('M5 6.5A2.5 2.5 0 017.5 4h9A2.5 2.5 0 0119 6.5v7a2.5 2.5 0 01-2.5 2.5H11l-4 3.5V16h0A2 2 0 015 14z', { size: 15, stroke: 'currentColor', width: 1.9 })),
@@ -472,6 +582,16 @@
         let result;
         const comment = st.comment.trim();
         if (st.tab === 'file') {
+          if (zipping()) { // (2.99.70) the files in one .zip, named after the assignment, in a folder of that name
+            const name = zipNameOf(a.name);
+            const names = uniqueNames(st.files.map((f) => f.name));
+            const blob = await makeZip(st.files.map((f, i) => ({ path: `${name}/${names[i]}`, file: f.file })));
+            for (const f of st.files) if (f.objectUrl) { URL.revokeObjectURL(f.objectUrl); f.objectUrl = null; }
+            const file = new File([blob], `${name}.zip`, { type: 'application/zip' });
+            st.files = [{ id: ++seq, name: file.name, size: file.size, file, status: 'ready', progress: 0, fileId: null }];
+            st.zip = false;
+            draw();
+          }
           for (const f of st.files) {
             if (f.fileId) continue;
             f.status = 'uploading';

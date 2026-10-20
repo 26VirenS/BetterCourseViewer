@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.70', date: '2026-10-20', notes: [
+      { kind: 'new', title: 'Hand In as a .zip', body: 'Hand in a folder, or several files, as one .zip.', icon: P.check },
+    ] },
     { version: '2.99.69', date: '2026-10-20', notes: [
       { kind: 'improved', title: 'Mac-Style Counters', body: 'Counter boxes float, fit their list and fold as on Mac.', icon: P.check },
     ] },
