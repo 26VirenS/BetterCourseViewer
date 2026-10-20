@@ -1,3 +1,7 @@
+**What's new in 0.3.46** (beta)
+
+- **The real logo** — the app, taskbar and installer icons are now drawn from the official logo artwork itself.
+
 **What's new in 0.3.45** (beta)
 
 - **A new look** — Simpl has a new icon: a bold white S with a blue dot on a black tile, on the app, the taskbar and the installer.

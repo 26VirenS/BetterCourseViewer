@@ -26,6 +26,8 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.46", "2026-10-20",
+            ("improved", "The Real Logo", "The icon is now drawn from the official artwork.")),
         R("0.3.45", "2026-10-20",
             ("new", "A New Look", "Simpl has a new icon: a bold S with a blue dot.")),
         R("0.3.44", "2026-10-19",
