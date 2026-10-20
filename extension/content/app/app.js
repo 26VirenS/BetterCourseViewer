@@ -725,6 +725,7 @@
         go(c.url, { motion: 'fade' }); // (a place of its own in the sidebar: a section, crossfaded)
       },
       title: c.name,
+      style: { '--bcv-c': c.color }, // (2.99.62: one sidebar names the course in its colour, nested under All Courses)
     }, [h('span', { class: 'bcv-fav__dot', style: { background: c.color } }), h('span', { class: 'bcv-ellip', text: c.shortName || c.name }),
       oneBar() && cls === 'bcv-fav' ? h('span', { class: `bcv-fav__chev ${sideOpen(c.id) ? 'is-open' : ''}`, role: 'button', title: sideOpen(c.id) ? 'Hide sections' : 'Show sections', 'aria-label': sideOpen(c.id) ? 'Hide sections' : 'Show sections', onclick: (e) => { e.stopPropagation(); toggleSide(c.id); } }, U.svg('M9 6l6 6-6 6', { size: 12, stroke: 'currentColor', width: 2.4 })) : null,
     ].filter(Boolean));

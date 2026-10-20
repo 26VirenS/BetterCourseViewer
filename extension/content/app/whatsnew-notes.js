@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.62', date: '2026-10-20', notes: [
+      { kind: 'improved', title: 'Courses in Color', body: 'Courses sit under All Courses, named in their color.', icon: P.check },
+    ] },
     { version: '2.99.61', date: '2026-10-20', notes: [
       { kind: 'new', title: 'A New Look', body: 'Simpl has a new icon: a bold S with a blue dot.', icon: P.check },
     ] },
