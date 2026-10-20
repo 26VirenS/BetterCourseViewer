@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.64"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.65"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -513,12 +513,9 @@ html[data-bcv-theme="dark"] #bcv-app .bcv-brand--simpl .bcv-brand__tile { box-sh
 .bcv-brand__mark { display: flex; align-items: center; min-width: 0; }
 .bcv-brand__word { display: block; height: 24px; width: auto; overflow: visible; }
 .bcv-brand__word text { font: 600 116px/1 -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -5px; }
-.bcv-brand__w1 { fill: var(--bcv-ink); }
-.bcv-brand__w2 { fill: var(--bcv-ink3); }
-.bcv-brand__w3 { fill: color-mix(in srgb, var(--bcv-ink3) 55%, transparent); }
+.bcv-brand__w1, .bcv-brand__w2, .bcv-brand__w3 { fill: var(--bcv-ink); } /* (2.99.65: the word all in the ink — white in dark — its bands kept as the cuts between them) */
 .bcv-brand__dot { fill: #0a84ff; }
-.bcv-side--pic .bcv-brand__w1 { fill: var(--bcv-photo-ink); }
-.bcv-side--pic .bcv-brand__w2, .bcv-side--pic .bcv-brand__w3 { fill: color-mix(in srgb, var(--bcv-photo-ink) 60%, transparent); }
+.bcv-side--pic .bcv-brand__w1, .bcv-side--pic .bcv-brand__w2, .bcv-side--pic .bcv-brand__w3 { fill: var(--bcv-photo-ink); }
 .bcv-nav { display: flex; flex-direction: column; gap: 2px; }
 .bcv-nav__item { display: flex; align-items: center; gap: 11px; width: 100%; padding: 7px 10px; border: 0; border-radius: 10px; cursor: pointer; text-align: left; font: 600 14px/1.2 var(--bcv-font); color: var(--bcv-ink); background: transparent; box-shadow: none; }
 .bcv-nav__item:hover { background: var(--bcv-fill); }

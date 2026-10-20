@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.65', date: '2026-10-20', notes: [
+      { kind: 'improved', title: 'Simpl in White', body: 'The Simpl name up top is one solid color.', icon: P.check },
+    ] },
     { version: '2.99.64', date: '2026-10-20', notes: [
       { kind: 'improved', title: 'Simpl Up Top', body: 'The sidebar now opens with the Simpl logo and name.', icon: P.check },
     ] },
