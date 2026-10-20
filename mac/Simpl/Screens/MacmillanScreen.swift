@@ -37,7 +37,7 @@ struct MacmillanScreen: View {
             topBar
             HStack(spacing: 0) {
                 if let s = session.state, s.isQuestion {
-                    MacmillanRail(state: s, browser: Binding(get: { session.browser }, set: { session.setBrowser($0) })) { n in
+                    MacmillanRail(state: s) { n in
                         Task { await session.act("go", n) }
                     }
                     .frame(width: ideal.width >= 960 ? 280 : 236)
@@ -89,6 +89,19 @@ struct MacmillanScreen: View {
                 }
             }
             Spacer(minLength: 8)
+            // (1.3.139) Browser in the top bar, left of the tools, as Knewton Alta's is (it sat in the rail until then)
+            if session.state?.isQuestion == true {
+                Button {
+                    withAnimation(Motion.gentle) { session.setBrowser(!session.browser) }
+                } label: {
+                    Label("Browser", systemImage: "globe").labelStyle(.titleAndIcon)
+                }
+                .glassChip(Theme.accent, on: session.browser)
+                .fixedSize()
+                .help(session.browser ? "Back to Simpl's view of the assignment" : "Show Macmillan Learning's own page, as Macmillan draws it")
+                .accessibilityLabel("Show Browser")
+                .accessibilityAddTraits(session.browser ? .isSelected : [])
+            }
             PopupPins() // (1.3.73: the toolbar's pins, here too)
             GlassGroup(spacing: 8) {
                 // (1.3.109) Save Page Code here too, to developers (and in the Developer menu)
@@ -185,11 +198,10 @@ private struct MacmillanPageHost: NSViewRepresentable {
 
 // MARK: - (1.3.114) The skin's parts
 
-/// Down the left, as Alta's objectives are: the score and how many questions are done, every question as a tile, Show
-/// Browser, and the grading settings.
+/// Down the left, as Alta's objectives are: the score and how many questions are done, every question as a tile, and the
+/// grading settings (Browser is in the top bar since 1.3.139).
 private struct MacmillanRail: View {
     let state: MacmillanState
-    @Binding var browser: Bool
     let go: (Int) -> Void
     @State private var settingsOpen = true
 
@@ -198,14 +210,6 @@ private struct MacmillanRail: View {
             VStack(alignment: .leading, spacing: 18) {
                 score
                 questions
-                Button {
-                    withAnimation(Motion.gentle) { browser.toggle() }
-                } label: {
-                    Label("Show Browser", systemImage: "globe").labelStyle(.titleAndIcon)
-                }
-                .glassChip(Theme.accent, on: browser)
-                .fixedSize()
-                .help(browser ? "Back to Simpl's view of the assignment" : "Show Macmillan Learning's own page, as Macmillan draws it")
                 if let p = state.policies, !p.isEmpty {
                     DisclosureGroup(isExpanded: $settingsOpen) {
                         VStack(alignment: .leading, spacing: 8) {
