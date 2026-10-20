@@ -186,10 +186,10 @@ final class SearchPalette: ObservableObject {
                     guard !Task.isCancelled, self.seq == mine, !found.isEmpty else { return }
                     var out = base
                     let shown = Set(base.map(\.title))
-                    let found = found.filter { !shown.contains($0.title) } // (the courses and groups the app holds, listed already)
-                    guard !found.isEmpty else { return }
+                    let fresh = found.filter { !shown.contains($0.title) } // (the courses and groups the app holds, listed already)
+                    guard !fresh.isEmpty else { return }
                     let at = out.firstIndex(where: { $0.title == "Search" }) ?? out.endIndex
-                    out.insert(contentsOf: found, at: at)
+                    out.insert(contentsOf: fresh, at: at)
                     self.publish(out)
                 }
             }
