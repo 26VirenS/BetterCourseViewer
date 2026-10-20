@@ -2420,6 +2420,7 @@ try {
   await page.setInputFiles('.bcv-sb__pane input[type=file]', { name: 'figure.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64') });
   await footIs(/· 2 files$/);
   check((await page.$$('.bcv-sb__file .bcv-sb__preview')).length === 2, 'each attached file has a Preview button');
+  check(!(await page.$('.bcv-sb__zipgo')), 'an assignment that takes no .zip offers no Submit as ZIP, two files or not (2.99.71)');
   await page.click('.bcv-sb__files .bcv-sb__file:nth-child(2) .bcv-sb__preview');
   await page.waitForFunction(() => document.querySelector('.bcv-viewer img.bcv-viewer__img')?.naturalWidth === 1, null, { timeout: 5000 });
   const pv = await page.evaluate(() => { const v = document.querySelector('.bcv-viewer'); const img = v.querySelector('img.bcv-viewer__img'); return { title: v.querySelector('.bcv-sheet__title').textContent, note: v.querySelector('.bcv-sheet__note').textContent, blob: img.src.startsWith('blob:'), acts: [...v.querySelectorAll('.bcv-viewer__acts .bcv-btn')].map((b) => b.textContent.trim()) }; });

@@ -159,7 +159,7 @@
     const hasOther = toolRows.length > 0 || toolsFailed || can.url || can.media || can.annot;
 
     const tabAllowed = (k) => ((k === 'file' && can.file) || (k === 'text' && can.text) || (k === 'other' && hasOther) ? k : null);
-    const st = { stage: 'edit', tab: tabAllowed(modePref) || (can.file ? 'file' : can.text ? 'text' : 'other'), files: [], zip: false, text: draft, link: null, urlOpen: false, comment: '', commentOpen: false, busy: false, attempt: Number(s0.attempt) || 0, done: null, sent: null };
+    const st = { stage: 'edit', tab: tabAllowed(modePref) || (can.file ? 'file' : can.text ? 'text' : 'other'), files: [], text: draft, link: null, urlOpen: false, comment: '', commentOpen: false, busy: false, attempt: Number(s0.attempt) || 0, done: null, sent: null };
     const attemptsLeft = () => (unlimited ? Infinity : Math.max(0, a.allowed_attempts - st.attempt));
     const lockedText = () => (a.locked_for_user ? (a.lock_explanation ? htmlToText(a.lock_explanation, 220) : 'This assignment is locked.') : a.lock_at && U.parse(a.lock_at) < Date.now() ? `This assignment closed ${U.fmtAt(a.lock_at)}.` : null);
     const dueChip = () => {
@@ -262,17 +262,11 @@
         conv?.line ? h('span', { class: 'bcv-sb__dropsub bcv-sb__dropconv', text: conv.line }) : null,
       ]);
       const n = st.files.length;
-      const zipRow = zipOK && st.files.every((f) => f.file || f.status === 'converting') && (n >= 2 || mustZip())
-        ? h('label', { class: 'bcv-sb__zip', title: mustZip() ? 'This assignment takes .zip files: these go zipped' : 'Put these files in one .zip and hand that in' }, [
-          h('input', { type: 'checkbox', checked: st.zip || mustZip(), disabled: mustZip() || st.busy || null, onchange: (e) => { st.zip = e.target.checked; paintFoot(); } }),
-          h('span', { text: 'Send as one .zip' }),
-        ]) : null;
       return U.el('bcv-sb__pane', [
         input, dirInput, drop,
         zipOK ? h('button', { type: 'button', class: 'bcv-sb__folder', text: 'Choose a folder (sent as a .zip)', onclick: () => dirInput.click() }) : null,
         U.text('bcv-sb__count', n === 0 ? 'Nothing attached yet' : `${U.plural(n, 'file')} attached`),
         n ? U.el('bcv-sb__files', st.files.map(fileRow)) : null,
-        zipRow,
       ]);
     }
     const fileStatus = (f) => {
@@ -362,7 +356,10 @@
 
     /** (2.99.70) A file the assignment takes only inside a .zip is attached: the files go zipped, whatever the box says. */
     const mustZip = () => st.files.some((f) => f.zipOnly);
-    const zipping = () => st.tab === 'file' && zipOK && st.files.length > 0 && st.files.every((f) => f.file) && (mustZip() || (st.zip && st.files.length >= 2));
+    /** (2.99.71) Submit as ZIP beside Submit: two or more files (each one on this device), or one the assignment takes only
+     *  zipped — where it is then the one way to hand them in. */
+    const zipOffered = () => st.tab === 'file' && zipOK && st.files.length > 0 && st.files.every((f) => f.file && f.status !== 'converting') && (st.files.length >= 2 || mustZip());
+    const zipOnly = () => st.tab === 'file' && mustZip();
     /** A drop: its loose files as files, each folder as a .zip of it. */
     async function dropped({ dirs, files }) {
       if (files.length) await addFiles(files);
@@ -555,12 +552,13 @@
       const r = readiness();
       if (pop) {
         const said = !!st.comment.trim();
-        const what = st.tab === 'file' ? (st.files.length ? (zipping() ? `${U.plural(st.files.length, 'file')} as one .zip` : U.plural(st.files.length, 'file')) : 'attach a file') : st.tab === 'text' ? (wordsOf(st.text) ? U.plural(wordsOf(st.text), 'word') : 'write something') : (st.link?.url ? 'a link' : 'pick a tool or a link');
+        const what = st.tab === 'file' ? (st.files.length ? U.plural(st.files.length, 'file') : 'attach a file') : st.tab === 'text' ? (wordsOf(st.text) ? U.plural(wordsOf(st.text), 'word') : 'write something') : (st.link?.url ? 'a link' : 'pick a tool or a link');
         const late = r.ok && U.parse(a.due_at) && Date.now() > U.parse(a.due_at) ? ' · late' : '';
         foot.replaceChildren(U.el('bcv-sb__footin', [
           h('button', { type: 'button', class: `bcv-sb__bubble ${st.commentOpen || said ? 'is-on' : ''}`, title: st.commentOpen ? 'Hide the comment' : 'Add a comment for your instructor (it can’t be edited or deleted once sent)', 'aria-label': st.commentOpen ? 'Hide the comment' : 'Add a comment for your instructor', 'aria-pressed': String(st.commentOpen), onclick: () => { st.commentOpen = !st.commentOpen; draw(); if (st.commentOpen) screen.querySelector('.bcv-sb__comment')?.focus(); } }, U.svg('M5 6.5A2.5 2.5 0 017.5 4h9A2.5 2.5 0 0119 6.5v7a2.5 2.5 0 01-2.5 2.5H11l-4 3.5V16h0A2 2 0 015 14z', { size: 15, stroke: 'currentColor', width: 1.9 })),
           U.text('bcv-sb__footnote bcv-ellip', st.busy ? `Sending to ${BCV.lms.name}…` : `Attempt ${st.attempt + 1} · ${what}${late}`, 'span'),
-          h('button', { type: 'button', class: 'bcv-sb__btn bcv-sb__btn--primary bcv-sb__go', text: st.busy ? 'Submitting…' : 'Submit', title: r.ok ? r.note : r.note, disabled: !r.ok || st.busy || null, onclick: submit }),
+          zipOffered() ? h('button', { type: 'button', class: 'bcv-sb__btn bcv-sb__zipgo', text: 'Submit as ZIP', title: 'Hand these files in as one .zip named after the assignment', disabled: st.busy || null, onclick: () => submit(true) }) : null,
+          h('button', { type: 'button', class: 'bcv-sb__btn bcv-sb__btn--primary bcv-sb__go', text: st.busy ? 'Submitting…' : 'Submit', title: zipOnly() ? 'This assignment takes these files only as a .zip: Submit as ZIP' : r.note, disabled: !r.ok || zipOnly() || st.busy || null, onclick: () => submit() }),
         ]));
         return;
       }
@@ -568,13 +566,15 @@
         U.text('bcv-sb__footnote bcv-pretty', st.busy ? `Sending to ${BCV.lms.name}…` : r.note, 'span'),
         extra,
         embed ? null : h('button', { type: 'button', class: 'bcv-sb__btn', text: 'Cancel', disabled: st.busy || null, onclick: () => app.go(back.href) }),
-        h('button', { type: 'button', class: 'bcv-sb__btn bcv-sb__btn--primary', text: st.busy ? 'Submitting…' : 'Submit assignment', disabled: !r.ok || st.busy || null, onclick: submit }),
+        zipOffered() ? h('button', { type: 'button', class: 'bcv-sb__btn bcv-sb__zipgo', text: 'Submit as ZIP', title: 'Hand these files in as one .zip named after the assignment', disabled: st.busy || null, onclick: () => submit(true) }) : null,
+        h('button', { type: 'button', class: 'bcv-sb__btn bcv-sb__btn--primary', text: st.busy ? 'Submitting…' : 'Submit assignment', title: zipOnly() ? 'This assignment takes these files only as a .zip: Submit as ZIP' : null, disabled: !r.ok || zipOnly() || st.busy || null, onclick: () => submit() }),
       ]));
     }
 
     // ---- submit --------------------------------------------------------------------------
-    async function submit() {
+    async function submit(asZip = false) {
       if (st.busy || !readiness().ok) return;
+      if (asZip ? !zipOffered() : zipOnly()) return;
       st.busy = true;
       paintFoot();
       for (const f of st.files) f.paint?.();
@@ -582,14 +582,13 @@
         let result;
         const comment = st.comment.trim();
         if (st.tab === 'file') {
-          if (zipping()) { // (2.99.70) the files in one .zip, named after the assignment, in a folder of that name
+          if (asZip) { // (2.99.70; 2.99.71: Submit as ZIP) the files in one .zip, named after the assignment, in a folder of that name
             const name = zipNameOf(a.name);
             const names = uniqueNames(st.files.map((f) => f.name));
             const blob = await makeZip(st.files.map((f, i) => ({ path: `${name}/${names[i]}`, file: f.file })));
             for (const f of st.files) if (f.objectUrl) { URL.revokeObjectURL(f.objectUrl); f.objectUrl = null; }
             const file = new File([blob], `${name}.zip`, { type: 'application/zip' });
             st.files = [{ id: ++seq, name: file.name, size: file.size, file, status: 'ready', progress: 0, fileId: null }];
-            st.zip = false;
             draw();
           }
           for (const f of st.files) {
