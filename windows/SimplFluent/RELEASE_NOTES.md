@@ -1,3 +1,7 @@
+**What's new in 0.3.48** (beta)
+
+- **A tidier skyline** — each course's tower on the Dashboard shows at most four windows across; what doesn't fit is hidden instead of squeezed in smaller.
+
 **What's new in 0.3.47** (beta)
 
 - **Macmillan Learning, Browser on top** — the Browser button is now in the popup's top bar, left of your tools, as in Knewton Alta (it was in the left rail).

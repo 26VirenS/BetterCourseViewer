@@ -160,12 +160,13 @@ public sealed partial class DashboardScreen
 
     private FrameworkElement Windows(List<DashSkyWindow> windows, double w, double h, bool ghost)
     {
-        var up = windows.Where(x => x.Free != true).ToList();
-        var down = windows.Where(x => x.Free == true).ToList();
+        var allUp = windows.Where(x => x.Free != true).ToList();
+        var allDown = windows.Where(x => x.Free == true).ToList();
         const double top = 7;
-        var bottom = down.Count == 0 ? 0 : 7.0;
-        var between = up.Count == 0 || down.Count == 0 ? 0 : 6.0;
-        var (cols, s, gap) = Fit(windows.Count, w - 10, h - top - bottom - between);
+        var bottom = allDown.Count == 0 ? 0 : 7.0;
+        var (cols, s, gap, nUp, nDown) = Fit(allUp.Count, allDown.Count, w - 10, h - top - bottom);
+        var up = allUp.Take(nUp).ToList(); // (0.3.48: four across; the rest hidden)
+        var down = allDown.Take(nDown).ToList();
         var gridW = cols * s + (cols - 1) * gap;
         var x0 = Math.Round((w - gridW) / 2);
         var canvas = new Canvas { Width = w, Height = h };
@@ -184,20 +185,18 @@ public sealed partial class DashboardScreen
         return canvas;
     }
 
-    private static (int Cols, double Size, double Gap) Fit(int n, double w, double h)
+    /// <summary>(0.3.48) Windows to a tower: four across, always, at the size four across leaves — and only as many rows as
+    /// the tower has floors for; the rest are not drawn (they were squeezed in, more across and smaller, until then) — the
+    /// web skyline's rule. Those that count take the floors first.</summary>
+    private static (int Cols, double Size, double Gap, int Up, int Down) Fit(int up, int down, double w, double h)
     {
         const double g = 3;
-        var bestCols = 4;
-        var bestSize = 0.0;
-        foreach (var cols in new[] { 4, 3, 5, 6, 7, 8 })
-        {
-            var rows = Math.Max(1, (n + cols - 1) / cols);
-            var across = (w - (cols - 1) * g) / cols;
-            var down = (h - (rows - 1) * g) / rows;
-            var s = Math.Min(7, Math.Min(across, down));
-            if (s > bestSize + 0.01) { bestCols = cols; bestSize = s; }
-        }
-        return (bestCols, Math.Max(2, Math.Floor(bestSize * 2) / 2), g);
+        const int cols = 4;
+        var s = Math.Max(2, Math.Floor(Math.Min(7, (w - (cols - 1) * g) / cols) * 2) / 2);
+        int Floors(double room) => Math.Max(0, (int)Math.Floor((room + g) / (s + g)));
+        var upRows = Math.Min((up + cols - 1) / cols, Floors(h));
+        var downRows = Math.Min((down + cols - 1) / cols, Floors(h - (upRows > 0 ? upRows * (s + g) + 6 : 0)));
+        return (cols, s, g, Math.Min(up, upRows * cols), Math.Min(down, downRows * cols));
     }
 
     private static Color WindowColor(DashSkyWindow w, bool ghost)
