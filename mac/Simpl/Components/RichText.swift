@@ -87,6 +87,7 @@ struct HTMLBlock: NSViewRepresentable {
         let ucc = WKUserContentController()
         ucc.add(WeakHandler(context.coordinator), name: "size")
         if math { for s in TeX.scripts { ucc.addUserScript(s) } } // (before the sizer: it measures the typeset page)
+        ucc.addUserScript(WKUserScript(source: HTMLBlock.readableInk, injectionTime: .atDocumentEnd, forMainFrameOnly: true)) // (1.3.141)
         ucc.addUserScript(WKUserScript(source: math ? HTMLBlock.mathSizer : HTMLBlock.sizer, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
         config.userContentController = ucc
         let v = PassThroughWebView(frame: NSRect(x: 0, y: 0, width: 480, height: 24), configuration: config)
@@ -107,6 +108,37 @@ struct HTMLBlock: NSViewRepresentable {
         v.navigationDelegate = nil
         v.uiDelegate = nil
     }
+
+    /// (1.3.141) Words the page coloured itself (Canvas's editor writes its dark grey into the text, a teacher's highlight
+    /// behind it) made to read in either appearance, as the web's prose does (course.js fitInk): each colour measured
+    /// against what is behind it — the nearest background the page paints, else the card — and, below a contrast of 3,
+    /// moved in lightness, its hue kept, until it reads (4.5). Done again when the appearance changes.
+    static let readableInk = #"""
+    (function(){
+      var MIN=3,AIM=4.5;
+      function rgb(css){var m=/rgba?\(([^)]+)\)/.exec(css||'');if(!m)return null;var p=m[1].split(/[\s,\/]+/).filter(Boolean).map(Number);return{r:p[0],g:p[1],b:p[2],a:p.length>3?p[3]:1};}
+      function lum(c){function f(v){v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);}return 0.2126*f(c.r)+0.7152*f(c.g)+0.0722*f(c.b);}
+      function con(a,b){return(Math.max(a,b)+0.05)/(Math.min(a,b)+0.05);}
+      function hsl(c){var R=c.r/255,G=c.g/255,B=c.b/255,mx=Math.max(R,G,B),mn=Math.min(R,G,B),d=mx-mn,l=(mx+mn)/2,h=0;if(d){h=mx===R?((G-B)/d)%6:mx===G?(B-R)/d+2:(R-G)/d+4;h*=60;if(h<0)h+=360;}return{h:h,s:d?d/(1-Math.abs(2*l-1)):0,l:l};}
+      function fromHsl(h,s,l){function k(n){return(n+h/30)%12;}var a=s*Math.min(l,1-l);function f(n){return Math.round(255*(l-a*Math.max(-1,Math.min(k(n)-3,9-k(n),1))));}return{r:f(0),g:f(8),b:f(4)};}
+      function readable(c,plate){var x=hsl(c),sat=Math.min(0.8,x.s),pl=lum(plate),up=con(pl,1)>=con(pl,0);var l=up?Math.min(0.96,Math.max(0.72,1-x.l)):Math.max(0.08,Math.min(0.32,1-x.l));for(var i=0;i<12&&con(lum(fromHsl(x.h,sat,l)),pl)<AIM;i++)l=up?Math.min(0.98,l+0.03):Math.max(0.04,l-0.03);return'hsl('+Math.round(x.h)+','+Math.round(sat*100)+'%,'+Math.round(l*100)+'%)';}
+      function pass(){
+        if(!document.body)return;
+        document.querySelectorAll('[data-simpl-ink]').forEach(function(e){e.style.removeProperty('color');e.removeAttribute('data-simpl-ink');});
+        var dark=matchMedia('(prefers-color-scheme: dark)').matches;
+        var card=dark?{r:30,g:30,b:32}:{r:255,g:255,b:255};
+        var plates=new Map();
+        function plateOf(el){for(var p=el;p&&p!==document.documentElement;p=p.parentElement){if(plates.has(p))return plates.get(p);var st=getComputedStyle(p);if(st.backgroundImage&&st.backgroundImage!=='none'&&!/gradient/.test(st.backgroundImage)){plates.set(p,null);return null;}var bg=rgb(st.backgroundColor);if(bg&&bg.a>0.5){plates.set(p,bg);return bg;}}return card;}
+        var holders=new Set(),tw=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,{acceptNode:function(n){return/\S/.test(n.nodeValue)?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_REJECT;}});
+        while(tw.nextNode()){var e=tw.currentNode.parentElement;if(e&&!e.closest('.katex'))holders.add(e);}
+        var fixes=[];
+        holders.forEach(function(el){var plate=plateOf(el);if(!plate)return;var c=rgb(getComputedStyle(el).color);if(!c||c.a<0.2)return;var seen=c.a<1?{r:c.r*c.a+plate.r*(1-c.a),g:c.g*c.a+plate.g*(1-c.a),b:c.b*c.a+plate.b*(1-c.a)}:c;if(con(lum(seen),lum(plate))>=MIN)return;fixes.push([el,readable(seen,plate)]);});
+        fixes.forEach(function(f){f[0].style.setProperty('color',f[1],'important');f[0].setAttribute('data-simpl-ink','');});
+      }
+      pass();
+      try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',pass);}catch(e){}
+    })();
+    """#
 
     /// The height of what it holds, told whenever it changes (a picture loading, the window narrowing).
     static let sizer = """
