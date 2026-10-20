@@ -235,7 +235,7 @@ internal sealed class HandInSheet
         var label = new Border
         {
             Child = K.H(8, K.Icon(SymbolRegular.DocumentArrowDown20, 18, B.Text, filled: true),
-                K.Text(a.Types.Contains("online_upload") ? "Drop to add files" : "Drop to add the link", Ty.BodyStrong)),
+                K.Text(a.Types.Contains("online_upload") ? (ZipOK ? "Drop to add files or a folder" : "Drop to add files") : "Drop to add the link", Ty.BodyStrong)),
             Padding = new Thickness(18, 10, 18, 10), CornerRadius = new CornerRadius(20), HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center, Effect = K.Shadow(20, 4, 0.18),
         };
@@ -366,13 +366,13 @@ internal sealed class HandInSheet
     {
         var words = K.V(6,
             K.Icon(SymbolRegular.DocumentArrowDown20, 26, B.Text2).Align(HorizontalAlignment.Center),
-            K.Text("Drop files here", Ty.BodyStrong).Center());
+            K.Text(ZipOK ? "Drop files or a folder here" : "Drop files here", Ty.BodyStrong).Center()); // (0.3.49: a folder goes as a .zip)
         var dash = new Rectangle { RadiusX = 8, RadiusY = 8, StrokeThickness = 1.5, StrokeDashArray = new DoubleCollection { 3.4, 2.6 } };
         dash.SetResourceReference(Shape.StrokeProperty, B.StrongStroke);
         var g = new Grid { Children = { dash, words.Margin(0, 18, 0, 18) } };
         var b = K.Subtle(g, ChooseFiles, new Thickness(0), 8);
         b.ToolTip = "Choose files to hand in";
-        System.Windows.Automation.AutomationProperties.SetName(b, "Drop files here, or choose them");
+        System.Windows.Automation.AutomationProperties.SetName(b, ZipOK ? "Drop files or a folder here, or choose them" : "Drop files here, or choose them");
         return b;
     }
 
