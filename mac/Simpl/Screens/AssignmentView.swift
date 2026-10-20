@@ -1166,9 +1166,9 @@ private struct HandInSheet: View {
     @State private var text = ""
     @State private var url = ""
     @State private var files: [PickedFile] = []
-    /// (1.3.143) The files sent as one .zip (HandInZip), chosen where there are two or more; a file of a type the assignment
-    /// does not take, where it takes .zip, goes zipped whatever this says (`mustZip`).
-    @State private var asZip = false
+    /// (1.3.144) The files going as one .zip (HandInZip): Submit as ZIP pressed — beside Submit where there are two or more,
+    /// or a file of a type the assignment takes only zipped (`mustZip`), where it is the one way to hand them in.
+    @State private var zipping = false
     @State private var note = ""
     @State private var importing = false
     @State private var photos: [PhotosPickerItem] = []
@@ -1349,14 +1349,6 @@ private struct HandInSheet: View {
                     Text("Converting \(name)…").foregroundStyle(.secondary)
                 }
             }
-            if zipOK && (files.count >= 2 || mustZip) {
-                Toggle(isOn: mustZip ? .constant(true) : $asZip) {
-                    Label("Send as one .zip", systemImage: "doc.zipper")
-                }
-                .disabled(mustZip)
-                .help(mustZip ? "This assignment takes .zip files: these go zipped" : "Put these files in one .zip and hand that in")
-                .transition(.opacity)
-            }
             // (1.3.78) Send from Phone beside them; Photos said shorter before any goes to a line of its own, so the
             // empty form fits the sheet without scrolling
             ViewThatFits(in: .horizontal) {
@@ -1496,10 +1488,19 @@ private struct HandInSheet: View {
                 .glassButton()
                 .keyboardShortcut(phoneOpen ? nil : .cancelAction)
                 .disabled(sending)
+            // (1.3.144) with two or more files, or one the assignment takes only zipped: Submit as ZIP beside Submit
+            if zipOffered {
+                Button("Submit as ZIP") { submit(asZip: true) }
+                    .glassButton()
+                    .disabled(sending || phoneOpen)
+                    .help("Hand these files in as one .zip named after the assignment")
+                    .transition(.opacity)
+            }
             Button("Submit") { submit() }
                 .glassButton(prominent: true)
                 .keyboardShortcut(phoneOpen ? nil : submitKey)
-                .disabled(!ready || sending || phoneOpen)
+                .disabled(!ready || (type == "online_upload" && mustZip) || sending || phoneOpen)
+                .help(type == "online_upload" && mustZip ? "This assignment takes these files only as a .zip: Submit as ZIP" : "")
         }
         .controlSize(.large)
         .padding(.horizontal, 20)
@@ -1647,11 +1648,11 @@ private struct HandInSheet: View {
         return a.isEmpty || a.contains("zip")
     }
 
-    /// (1.3.143) A file of a type the assignment does not take, let in because it takes .zip: the files go zipped.
+    /// (1.3.143) A file of a type the assignment does not take, let in because it takes .zip: only Submit as ZIP hands it in.
     private var mustZip: Bool { files.contains { !allowedName($0.name) } }
 
-    /// Whether the files go as one .zip.
-    private var zipping: Bool { type == "online_upload" && zipOK && (mustZip || (asZip && files.count >= 2)) }
+    /// (1.3.144) Submit as ZIP beside Submit: two or more files, or one the assignment takes only zipped.
+    private var zipOffered: Bool { type == "online_upload" && zipOK && (files.count >= 2 || mustZip) && converting.isEmpty }
 
     private var allowedList: String {
         (assignment.allowed ?? []).map { ".\($0)" }.joined(separator: ", ")
@@ -1818,8 +1819,10 @@ private struct HandInSheet: View {
 
     // MARK: - Sending
 
-    private func submit() {
+    private func submit(asZip: Bool = false) {
         guard ready, !sending else { return }
+        guard asZip ? zipOffered : !(type == "online_upload" && mustZip) else { return }
+        zipping = asZip
         sending = true
         withAnimation(errorMotion) { error = nil }
         var args: [String: Any] = ["course": assignment.course, "id": assignment.id, "type": type, "comment": note]
