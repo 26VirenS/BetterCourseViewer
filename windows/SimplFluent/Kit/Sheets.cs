@@ -40,6 +40,25 @@ public sealed class SheetButton
         Text = text;
         if (Control != null) Control.Content = text;
     }
+
+    private bool visible = true;
+    /// <summary>(0.3.50) Shown at the sheet's foot, or not — and not taking a place there while it is not (its column and
+    /// the gap before it folded away, the other buttons sharing the row).</summary>
+    public bool Visible
+    {
+        get => visible;
+        set { visible = value; Apply(); }
+    }
+
+    internal void Apply()
+    {
+        if (Control == null) return;
+        Control.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        if (Control.Parent is not Grid row) return;
+        var c = Grid.GetColumn(Control);
+        if (c < row.ColumnDefinitions.Count) row.ColumnDefinitions[c].Width = visible ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        if (c > 0 && c - 1 < row.ColumnDefinitions.Count) row.ColumnDefinitions[c - 1].Width = new GridLength(visible ? 8 : 0);
+    }
 }
 
 /// <summary>
@@ -338,6 +357,7 @@ public sealed class SheetHost : Grid
                 Grid.SetColumn(btn, col);
                 col += 2;
                 row.Children.Add(btn);
+                b.Apply(); // (0.3.50: one not shown takes no place)
             }
             var foot = new Border { Child = row, BorderThickness = new Thickness(0, 1, 0, 0) };
             foot.SetResourceReference(Border.BackgroundProperty, "ContentDialogBackground");

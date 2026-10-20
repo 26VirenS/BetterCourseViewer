@@ -1,3 +1,7 @@
+**What's new in 0.3.50** (beta)
+
+- **Submit as ZIP** — with two or more files in Hand In, a Submit as ZIP button sits beside Submit (the "Send as one .zip" box is gone): Submit hands them in as they are, Submit as ZIP as one .zip named after the assignment. A file the assignment takes only zipped is handed in with Submit as ZIP.
+
 **What's new in 0.3.49** (beta)
 
 - **Hand in as a .zip** — Hand In takes a folder (Choose folder…, or drop one) and sends it as a .zip of it, and two or more files can go as one .zip ("Send as one .zip"); where an assignment takes .zip files, any file can go zipped.

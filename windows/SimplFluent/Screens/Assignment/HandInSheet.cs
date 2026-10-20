@@ -59,16 +59,15 @@ internal sealed class HandInSheet
     private readonly AssignmentData a;
     private readonly Action done;
     private readonly Sheet sheet;
-    private readonly SheetButton submit, cancel;
+    private readonly SheetButton submit, zipSubmit, cancel;
     private string type;
     private readonly List<Picked> files = new();
     private readonly List<string> converting = new();
     private ConvertInfo convertible = new();
     private bool sending, kindShown;
-    /// <summary>(0.3.49) The files sent as one .zip, chosen where there are two or more (the box); a file of a type the
-    /// assignment does not take, where it takes .zip, goes zipped whatever the box says (MustZip).</summary>
-    private bool asZip, painting;
-    private readonly CheckBox zipBox = new() { Content = "Send as one .zip", Margin = new Thickness(2, 2, 0, 0) };
+    /// <summary>(0.3.50) The files going as one .zip: Submit as ZIP pressed (beside Submit where there are two or more, or
+    /// a file of a type the assignment takes only zipped — MustZip — where it is the one way to hand them in).</summary>
+    private bool zipping;
 
     // the form
     private readonly Grid body = new() { AllowDrop = true, MinHeight = 460 };
@@ -162,7 +161,9 @@ internal sealed class HandInSheet
 
         // (a popup floating over the window: the assignment, its files and the rest of Simpl at hand while it is open)
         sheet = new Sheet { Bare = true, Width = FormWidth, Body = body, Floats = true, Name = a.Resubmit == true ? "Hand in again" : "Hand in" };
-        submit = sheet.Add("Submit", SheetButtonKind.Primary, Submit, closes: false);
+        submit = sheet.Add("Submit", SheetButtonKind.Primary, () => Submit(), closes: false);
+        zipSubmit = sheet.Add("Submit as ZIP", SheetButtonKind.Secondary, () => Submit(asZip: true), closes: false);
+        zipSubmit.Visible = false;
         cancel = sheet.Add("Cancel", SheetButtonKind.Close);
         sheet.Closed += Closed;
         Build();
@@ -310,9 +311,6 @@ internal sealed class HandInSheet
         var chooseFolder = K.Button("Choose folder…", ChooseFolder, icon: SymbolRegular.FolderOpen24);
         chooseFolder.ToolTip = "A folder, handed in as a .zip of it";
         chooseFolder.Visibility = ZipOK ? Visibility.Visible : Visibility.Collapsed;
-        zipBox.ToolTip = "Put these files in one .zip and hand that in";
-        zipBox.Checked += (_, _) => { if (!painting) { asZip = true; Paint(); } };
-        zipBox.Unchecked += (_, _) => { if (!painting) { asZip = false; Paint(); } };
         var pictures = K.Button("Choose pictures…", ChoosePictures, icon: SymbolRegular.ImageMultiple24);
         pictures.ToolTip = "Pictures and videos from your Pictures folder";
         // (Send from phone beside them, onto a line of its own when the three will not fit)
@@ -322,7 +320,7 @@ internal sealed class HandInSheet
         var buttons = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, -8) };
         foreach (var b in new FrameworkElement[] { choose, chooseFolder, pictures, fromPhone }) buttons.Children.Add(b.Margin(0, 0, 10, 8));
         // (its heading only where no kind selector above says "Files" already)
-        var v = K.V(8, filesList, zipBox, buttons, filesFoot);
+        var v = K.V(8, filesList, buttons, filesFoot);
         if (a.Types.Count <= 1) v.Children.Insert(0, K.Text("Files", Ty.BodyStrong));
         return v;
     }
@@ -338,13 +336,9 @@ internal sealed class HandInSheet
         var allowed = a.Allowed ?? new List<string>();
         filesFoot.Text = allowed.Count > 0 ? $"This assignment takes {AllowedList} files." + (convertible.Line.Length == 0 ? "" : $" {convertible.Line}.") + (ZipOK ? " Any file or folder can go as a .zip." : "") : "A folder goes as a .zip.";
         filesFoot.Visibility = Visibility.Visible;
-        painting = true;
-        zipBox.Visibility = ZipOK && (files.Count >= 2 || MustZip) ? Visibility.Visible : Visibility.Collapsed;
-        zipBox.IsChecked = MustZip || asZip;
-        zipBox.IsEnabled = !MustZip && !sending;
-        zipBox.ToolTip = MustZip ? "This assignment takes .zip files: these go zipped" : "Put these files in one .zip and hand that in";
-        painting = false;
-        submit.Enabled = Ready && !sending && !phone.IsOpen;
+        zipSubmit.Visible = ZipOffered;
+        zipSubmit.Enabled = ZipOffered && !sending && !phone.IsOpen;
+        submit.Enabled = Ready && !(type == "online_upload" && MustZip) && !sending && !phone.IsOpen;
         cancel.Enabled = !sending;
         sheet.Modal = sending || phone.IsOpen;
         foreach (var e in new UIElement[] { text, url, note, filesSection }) e.IsEnabled = !sending;
@@ -399,16 +393,17 @@ internal sealed class HandInSheet
 
     // ---- what it knows ----
 
-    private string ProgressWord => type != "online_upload" ? "Handing in…" : Zipping ? "Zipping and uploading…" : files.Count == 1 ? "Uploading 1 file…" : $"Uploading {files.Count} files…";
+    private string ProgressWord => type != "online_upload" ? "Handing in…" : zipping ? "Zipping and uploading…" : files.Count == 1 ? "Uploading 1 file…" : $"Uploading {files.Count} files…";
 
     /// <summary>(0.3.49) Whether the assignment takes a .zip: it names no types, or .zip among them.</summary>
     private bool ZipOK => a.Allowed is not { Count: > 0 } allowed || allowed.Contains("zip");
 
-    /// <summary>(0.3.49) A file of a type the assignment does not take, let in because it takes .zip: the files go zipped.</summary>
+    /// <summary>(0.3.49) A file of a type the assignment does not take, let in because it takes .zip: only Submit as ZIP
+    /// hands them in.</summary>
     private bool MustZip => files.Any(f => !AllowedName(f.Name));
 
-    /// <summary>Whether the files go as one .zip.</summary>
-    private bool Zipping => type == "online_upload" && ZipOK && (MustZip || (asZip && files.Count >= 2));
+    /// <summary>(0.3.50) Submit as ZIP beside Submit: two or more files, or one the assignment takes only zipped.</summary>
+    private bool ZipOffered => type == "online_upload" && ZipOK && (files.Count >= 2 || MustZip) && converting.Count == 0;
 
     private bool Ready => type switch
     {
@@ -681,9 +676,11 @@ internal sealed class HandInSheet
 
     // ---- sending ----
 
-    private async void Submit()
+    private async void Submit(bool asZip = false)
     {
         if (!Ready || sending || phone.IsOpen) return;
+        if (asZip ? !ZipOffered : type == "online_upload" && MustZip) return;
+        zipping = asZip;
         sending = true;
         Fail(null);
         Paint();
@@ -695,7 +692,7 @@ internal sealed class HandInSheet
         };
         try
         {
-            if (Zipping) // (0.3.49) the files in one .zip, made off the UI thread
+            if (zipping) // (0.3.49) the files in one .zip, made off the UI thread
             {
                 var name = HandInZip.Name(a.Title);
                 var list = files.Select(f => (f.Name, f.Data)).ToList();
