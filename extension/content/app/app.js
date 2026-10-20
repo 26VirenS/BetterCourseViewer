@@ -2076,7 +2076,7 @@
   // list. The popup and Settings → General have the saved switch; "Open in stock Canvas" on a
   // Canvas-drawn page is This page only. (2.98.18: before it, three stops — green, a grey one for
   // this page, red for good.)
-  const LOOK_MARK = '<svg viewBox="0 0 120 120" width="18" height="18" aria-hidden="true"><rect x="16" y="18" width="53" height="84" rx="14" fill="rgba(255,255,255,.35)"/><path d="M28 30 H69 A30 30 0 0 1 69 90 H28" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M35 42 H69 A18 18 0 0 1 69 78 H35" fill="none" stroke="rgba(255,255,255,.72)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M42 54 H69 A6 6 0 0 1 69 66 H42" fill="none" stroke="rgba(255,255,255,.46)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const LOOK_MARK = '<svg viewBox="23 23 74 74" width="16" height="16" aria-hidden="true"><g transform="translate(-5 1)"><path d="M73.40 36.19A17 13.5 0 1 0 60 58A17 13.5 0 1 1 46.60 80.81" fill="none" stroke="#fff" stroke-width="12.5"/><circle cx="87" cy="83" r="7" fill="#fff"/></g></svg>';
   // the two buttons, in the order they float down: green on, red off (its list under it)
   const LOOK_OPTS = [
     { pos: 1, key: 'on', color: '#34c759', label: 'Turn on Simpl', title: 'Simpl Courses on', glyph: 'M20 6L9 17l-5-5' },

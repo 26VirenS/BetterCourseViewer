@@ -64,7 +64,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 /* ---- layout ---- */
 .page { position: relative; z-index: 1; min-height: 100vh; padding: 32px 24px 52px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
 .top { width: 100%; max-width: 560px; display: flex; align-items: center; gap: 12px; animation: fadeUp .5s var(--ease) both; }
-.mark { flex: none; border-radius: 8px; background: linear-gradient(158deg, #0a84ff, #0a4fd6); box-shadow: 0 2px 6px rgba(10,79,214,.28); display: flex; align-items: center; justify-content: center; }
+.mark { flex: none; border-radius: 8px; background: linear-gradient(180deg, #1c1c1e, #000); box-shadow: 0 2px 6px rgba(0,0,0,.28); display: flex; align-items: center; justify-content: center; }
 .mark--sm { width: 30px; height: 30px; }
 .mark--sm svg { display: block; }
 .top__name { font: 600 14px/1.2 var(--display); letter-spacing: -.02em; }
@@ -103,7 +103,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .h1 { margin: 0; font: 700 26px/1.2 var(--display); letter-spacing: -.03em; }
 .sub { margin: 7px 0 0; font: 400 13.5px/1.5 var(--font); color: var(--ink3); text-wrap: pretty; }
 .welcome { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px; padding: 8px 0 4px; }
-.mark--lg { width: 96px; height: 96px; border-radius: 24px; box-shadow: 0 12px 30px rgba(10,79,214,.3); animation: pop .6s var(--spring) both; }
+.mark--lg { width: 96px; height: 96px; border-radius: 24px; box-shadow: 0 12px 30px rgba(0,0,0,.3), inset 0 0 0 1px rgba(255,255,255,.12); animation: pop .6s var(--spring) both; }
 .mark--lg svg { display: block; }
 .mark--lg .sheet { animation: fadeIn .5s ease .45s both; }
 .mark--lg .arc { stroke-dashoffset: var(--len); animation: drawStroke 1s var(--ease) both; }
@@ -158,7 +158,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pic__popuphead { display: flex; align-items: center; gap: 7px; font: 600 11.5px/1.2 var(--font); color: var(--ink3); }
 .pic__btn { display: block; height: 32px; border-radius: 16px; background: var(--blue); color: #fff; font: 600 13px/32px var(--font); text-align: center; }
 .how__s b { font-weight: 600; color: var(--ink2); }
-.how__icon { display: inline-flex; vertical-align: -3px; width: 16px; height: 16px; border-radius: 4px; background: linear-gradient(158deg, #0a84ff, #0a4fd6); margin: 0 2px; }
+.how__icon { display: inline-flex; vertical-align: -3px; width: 16px; height: 16px; border-radius: 4px; background: linear-gradient(180deg, #1c1c1e, #000); margin: 0 2px; }
 .how__puzzle { display: inline-flex; align-items: center; justify-content: center; vertical-align: -4px; width: 20px; height: 20px; border-radius: 6px; background: var(--fill); color: var(--ink2); margin: 0 2px; }
 .how__puzzle svg { display: block; }
 
@@ -907,7 +907,7 @@ html.is-splash, html.is-splash body { background: #000; color: #fff; animation: 
 @keyframes splashIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @keyframes splashOut { to { opacity: 0; transform: translateY(-8px); } }
 .splash__brand { display: flex; align-items: center; gap: 22px; }
-.mark--splash { width: 84px; height: 84px; padding: 12px; border-radius: 22px; box-shadow: 0 16px 40px rgba(10,79,214,.45); animation: pop .6s var(--spring) both; }
+.mark--splash { width: 84px; height: 84px; padding: 12px; border-radius: 22px; box-shadow: 0 16px 40px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.12); animation: pop .6s var(--spring) both; }
 .mark--splash svg { display: block; width: 100%; height: 100%; }
 .splash__word { font: 700 64px/1 var(--display); letter-spacing: -.045em; color: #fff; animation: fadeUp .5s var(--ease) .25s both; }
 .splash__text { position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 540px; }

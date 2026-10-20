@@ -115,7 +115,7 @@
     const foot = h('div', { class: 'fr__foot', id: 'foot' });
     const main = h('div', { class: 'fr', id: 'card' }, [
       h('div', { class: 'fr__top' }, [
-        h('button', { type: 'button', class: 'fr__brand', title: 'Replay', onclick: () => playIntro(), html: '<svg viewBox="0 0 120 120" width="20" height="20" aria-hidden="true"><path d="M28 30 H69 A30 30 0 0 1 69 90 H28" fill="none" class="fr__arc1" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M35 42 H69 A18 18 0 0 1 69 78 H35" fill="none" class="fr__arc2" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Set up Simpl Courses</span>' }),
+        h('button', { type: 'button', class: 'fr__brand', title: 'Replay', onclick: () => playIntro(), html: '<svg viewBox="23 23 74 74" width="20" height="20" aria-hidden="true"><g transform="translate(-5 1)"><path d="M73.40 36.19A17 13.5 0 1 0 60 58A17 13.5 0 1 1 46.60 80.81" fill="none" class="fr__arc1" stroke-width="12.5"/><circle cx="87" cy="83" r="7" fill="#0A84FF"/></g></svg><span>Set up Simpl Courses</span>' }),
         h('span', { class: 'fr__spacer' }),
         stepLabel,
       ]),

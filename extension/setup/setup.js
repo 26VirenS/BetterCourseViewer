@@ -12,7 +12,7 @@
   const { h } = BCV.utils;
   const safari = /apple/i.test(navigator.vendor || '') && !/chrome|crios|edg/i.test(navigator.userAgent);
   const SPLASH = 1600; // the wordmark holds this long before the words
-  const SHEET = '<svg viewBox="0 0 120 120" width="100%" height="100%"><rect x="16" y="18" width="53" height="84" rx="14" fill="rgba(255,255,255,.35)"/><path d="M28 30 H69 A30 30 0 0 1 69 90 H28" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M35 42 H69 A18 18 0 0 1 69 78 H35" fill="none" stroke="rgba(255,255,255,.72)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M42 54 H69 A6 6 0 0 1 69 66 H42" fill="none" stroke="rgba(255,255,255,.46)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const SHEET = '<svg viewBox="23 23 74 74" width="100%" height="100%"><g transform="translate(-5 1)"><path d="M73.40 36.19A17 13.5 0 1 0 60 58A17 13.5 0 1 1 46.60 80.81" fill="none" stroke="#fff" stroke-width="12.5"/><circle cx="87" cy="83" r="7" fill="#0A84FF"/></g></svg>';
 
   const root = document.getElementById('splash');
   document.documentElement.classList.add('is-splash');

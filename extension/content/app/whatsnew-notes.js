@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.61', date: '2026-10-20', notes: [
+      { kind: 'new', title: 'A New Look', body: 'Simpl has a new icon: a bold S with a blue dot.', icon: P.check },
+    ] },
     { version: '2.99.60', date: '2026-10-19', notes: [
       { kind: 'new', title: 'Appearance on the Page', body: 'Theme and photos right on your Dashboard, as on Mac.', icon: P.check },
       { kind: 'improved', title: 'All Courses Is Back', body: 'All Courses sits up top, your courses under it.', icon: P.check },

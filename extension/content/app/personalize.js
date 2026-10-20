@@ -232,7 +232,7 @@
   /** The row at the top: the brand and the steps' bars. */
   function top() {
     return h('div', { class: 'pz__top' }, [
-      h('span', { class: 'pz__brand' }, [h('i', { class: 'pz__tile', html: '<svg viewBox="0 0 120 120" width="18" height="18" aria-hidden="true"><path d="M28 30 H69 A30 30 0 0 1 69 90 H28" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><path d="M35 42 H69 A18 18 0 0 1 69 78 H35" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><path d="M42 54 H69 A6 6 0 0 1 69 66 H42" fill="none" stroke="rgba(255,255,255,.45)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/></svg>' }), h('span', { class: 'pz__name', text: 'Simpl Courses' })]),
+      h('span', { class: 'pz__brand' }, [h('i', { class: 'pz__tile', html: '<svg viewBox="23 23 74 74" width="16" height="16" aria-hidden="true"><g transform="translate(-5 1)"><path d="M73.40 36.19A17 13.5 0 1 0 60 58A17 13.5 0 1 1 46.60 80.81" fill="none" stroke="#fff" stroke-width="12.5"/><circle cx="87" cy="83" r="7" fill="#fff"/></g></svg>' }), h('span', { class: 'pz__name', text: 'Simpl Courses' })]),
       st.done ? h('span', { class: 'pz__bars' }) : h('span', { class: 'pz__bars', id: 'pzBars' }, STEPS.map((label, i) => h('button', { type: 'button', class: `pz__bar ${i === st.step ? 'is-on' : ''} ${i <= st.step ? 'is-done' : ''}`, title: label, 'aria-label': label, dataset: { bar: String(i) }, onclick: () => { st.step = i; st.target = null; closePicker(true); render('full'); } }))),
     ]);
   }
