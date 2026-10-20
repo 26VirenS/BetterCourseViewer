@@ -1,3 +1,7 @@
+**What's new in 0.3.47** (beta)
+
+- **Macmillan Learning, Browser on top** — the Browser button is now in the popup's top bar, left of your tools, as in Knewton Alta (it was in the left rail).
+
 **What's new in 0.3.46** (beta)
 
 - **The real logo** — the app, taskbar and installer icons are now drawn from the official logo artwork itself.

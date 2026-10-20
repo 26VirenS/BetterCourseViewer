@@ -26,6 +26,8 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.47", "2026-10-20",
+            ("improved", "Macmillan Browser", "Browser sits in the popup's top bar, as in Alta.")),
         R("0.3.46", "2026-10-20",
             ("improved", "The Real Logo", "The icon is now drawn from the official artwork.")),
         R("0.3.45", "2026-10-20",

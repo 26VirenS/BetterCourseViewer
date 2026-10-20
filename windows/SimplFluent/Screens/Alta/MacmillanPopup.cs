@@ -21,9 +21,9 @@ namespace Simpl.Screens;
 /// (0.3.32, the Mac's 1.3.114) Skinned as Alta's is (extension/tools/macmillan/skin.js): before it is opened, its cover as
 /// a start screen (its questions, its due line, its grading settings, Open assignment); then down the left the score, how
 /// many questions are done, every question as a tile — the one shown filled, a solved one ticked, one tried and not yet
-/// right marked — Show browser and the grading settings; in the rest Macmillan's own question, its parts on cards, and
-/// along its foot the arrows, Question or My answer, Resources, AI Tutor, Solution, Switch to new layout and the main
-/// button. Show browser puts Macmillan's page back as it draws it; another kind of Macmillan assignment is shown as it is.
+/// right marked — and the grading settings; in the rest Macmillan's own question, its parts on cards, and along its foot the
+/// arrows, Question or My answer, Resources, AI Tutor, Solution, Switch to new layout and the main button. Browser, in the
+/// top bar (0.3.47), puts Macmillan's page back as it draws it; another kind of Macmillan assignment is shown as it is.
 /// </summary>
 public static class MacmillanPopup
 {
@@ -58,6 +58,8 @@ internal sealed class MacmillanPopupView
     private readonly ContentControl railSlot = new() { Focusable = false };
     private readonly ContentControl barSlot = new() { Focusable = false };
     private readonly ContentControl coverSlot = new() { Focusable = false };
+    /// <summary>(0.3.47) Browser, in the top bar while a question is on (Macmillan's own page, as it draws it).</summary>
+    private readonly ContentControl browserSlot = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
     /// <summary>(0.3.34) What the page sits on: the popup's ground when skinned (the page clear, laid on it), white as
     /// Macmillan draws it.</summary>
     private readonly Grid holder = new() { Background = Brushes.White };
@@ -75,7 +77,8 @@ internal sealed class MacmillanPopupView
         var tile = K.IconTile(SymbolRegular.Library24, K.Tone("red"), 32);
         title = K.Text(launch.Title, Ty.Subtitle);
         subtitle = K.Text("Macmillan Learning", Ty.Body, B.Text2);
-        header = AltaLook.Header(engine, tile, title, subtitle, codeSlot, Close, "Close — your work is kept by Macmillan");
+        // (0.3.47) Browser in the top bar, left of the tools, as Knewton Alta's is (it sat in the rail until then)
+        header = AltaLook.Header(engine, tile, title, subtitle, K.H(8, codeSlot, browserSlot), Close, "Close — your work is kept by Macmillan");
         root.Children.Add(header.Row(0));
         // (the page on white, edge to edge under the header, as Macmillan draws it — clear of the popup's rounded foot;
         // the popup's own ground in its place while it opens)
@@ -302,11 +305,22 @@ internal sealed class MacmillanPopupView
         Skin();
     }
 
+    /// <summary>(0.3.47) Browser for the top bar: filled while Macmillan's own page shows.</summary>
+    private FrameworkElement BrowserButton()
+    {
+        var b = K.Button("Browser", () => SetBrowser(!browser), icon: SymbolRegular.Globe24);
+        b.Appearance = browser ? ControlAppearance.Primary : ControlAppearance.Secondary;
+        b.ToolTip = browser ? "Back to Simpl’s view of the assignment" : "Show Macmillan Learning’s own page, as Macmillan draws it";
+        System.Windows.Automation.AutomationProperties.SetName(b, "Show Browser");
+        return b;
+    }
+
     /// <summary>The rail, the bar and the start screen as the assessment now stands.</summary>
     private void Skin()
     {
         var s = state;
-        railSlot.Content = s is { IsQuestion: true } ? MacmillanParts.Rail(s, browser, SetBrowser, n => _ = Act("go", n)) : null;
+        railSlot.Content = s is { IsQuestion: true } ? MacmillanParts.Rail(s, n => _ = Act("go", n)) : null;
+        browserSlot.Content = s is { IsQuestion: true } ? BrowserButton() : null;
         barSlot.Content = s is { IsQuestion: true } && !browser ? MacmillanParts.Bar(s, (c, a) => _ = Act(c, a)) : null;
         coverSlot.Content = s is { IsCover: true, Cover: { } c } && !browser ? MacmillanParts.Start(c, () => _ = Act("open")) : null;
         coverSlot.Visibility = coverSlot.Content == null ? Visibility.Collapsed : Visibility.Visible;

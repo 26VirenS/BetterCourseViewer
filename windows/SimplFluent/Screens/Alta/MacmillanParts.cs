@@ -77,8 +77,8 @@ internal sealed class MacmillanState
 internal static class MacmillanParts
 {
     /// <summary>Down the left, as Alta's objectives are: the score and how many questions are done, every question as a
-    /// tile, Show browser, and the grading settings.</summary>
-    public static FrameworkElement Rail(MacmillanState s, bool browser, Action<bool> setBrowser, Action<int> go)
+    /// tile, and the grading settings (Browser is in the top bar since 0.3.47).</summary>
+    public static FrameworkElement Rail(MacmillanState s, Action<int> go)
     {
         var got = s.Score is { Length: > 0 } sc ? sc[0] : 0;
         var total = s.Score is { Length: > 1 } sc2 ? sc2[1] : 0; // (0.3.39) finished: a third number marks the final score a percentage
@@ -97,12 +97,7 @@ internal static class MacmillanParts
         }
         var questions = K.Card(K.V(10, K.Text("Questions", Ty.BodyStrong), grid), new Thickness(14), 8);
 
-        var show = K.Button("Show browser", () => setBrowser(!browser), icon: SymbolRegular.Globe24);
-        show.Appearance = browser ? ControlAppearance.Primary : ControlAppearance.Secondary;
-        show.ToolTip = browser ? "Back to Simpl’s view of the assignment" : "Show Macmillan Learning’s own page, as Macmillan draws it";
-        show.HorizontalAlignment = HorizontalAlignment.Left;
-
-        var v = K.V(16, score, questions, show);
+        var v = K.V(16, score, questions);
         if (s.Policies is { Count: > 0 } p)
         {
             var list = K.V(8);
