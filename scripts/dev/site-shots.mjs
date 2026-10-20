@@ -56,7 +56,7 @@ try {
     await chrome.storage.local.set({ [k]: p });
   }, `prefs:localhost:${PORT}`);
   const settings = (patch) => sw.evaluate(async (p) => self.BCV.settings.update(p), patch);
-  await settings({ appearance: { siteName: 'Lakeside University', logoUrl: crest, darkMode: 'off' } });
+  await settings({ appearance: { siteName: 'Lakeside University', logoUrl: crest, darkMode: 'off', sidebar: 'one' } }); // (the one sidebar, as a new install has it)
   const page = await context.newPage();
   const settle = async () => {
     await page.waitForFunction(() => { const c = document.documentElement.classList; return c.contains('bcv-settled'); }, null, { timeout: 20000 }).catch(() => {});
