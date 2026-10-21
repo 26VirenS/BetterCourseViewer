@@ -369,6 +369,8 @@ jobs:
           Shot 'tour-counter' '1366x778' 45 ($mock + @('--appearance', 'light', '--open', 'tour:1'))
           Shot 'tour-end' '1280x600' 45 ($mock + @('--appearance', 'dark', '--open', 'tour:6'))
           Shot 'taskbar-ask' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'taskbar'))
+          # (0.3.51) the developer tools' Crashes page (Support/CrashLog): an empty log in a fresh profile, said so
+          Shot 'developer-crashes' '1280x820' 45 ($mock + @('--appearance', 'dark', '--open', 'developer:crashes'))
           Shot 'theme-dusk' '1366x778' 45 ($mock + @('--appearance', 'dark', '--theme', 'Dusk'))
           # To Do, Calendar, Notifications
           Shot 'todo' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'todo'))
