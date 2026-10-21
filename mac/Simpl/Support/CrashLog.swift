@@ -162,7 +162,7 @@ enum CrashLog {
                 let file = u.lastPathComponent
                 guard file.hasPrefix("\(name)-") || file.hasPrefix("\(name)_"), ["ips", "crash", "hang", "spin", "diag"].contains(u.pathExtension) else { continue }
                 let at = (try? u.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-                let head = (try? summaryHead(u)) ?? (u.pathExtension == "ips" ? "Crash report" : u.pathExtension.capitalized)
+                let head = (try? summaryHead(u)) ?? (title: u.pathExtension == "ips" ? "Crash report" : u.pathExtension.capitalized, version: "?")
                 out.append(Entry(id: u.path, url: u, kind: .mac, at: at, title: head.title, version: head.version))
             }
         }
