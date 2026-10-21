@@ -33,8 +33,13 @@ struct CalendarView: View {
     /// The way the last move went (the month slides in from that side): set a frame before the move itself, so the
     /// month leaving reads it as it leaves.
     @State private var dir = 1
+    /// (1.3.147) The list's days, picked beside it: the next three weeks until another span is picked (kept).
+    @State private var agenda = AgendaSpan.saved() ?? .standard
+    /// The first day of a span being picked, while its last is still to come.
+    @State private var agendaFrom: Date?
     @FocusState private var focused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.pageWidth) private var pageWidth
 
     private static let modes = ["month", "week", "list"]
     private static let line = Color(nsColor: .separatorColor)
@@ -148,28 +153,34 @@ struct CalendarView: View {
                     .controlSize(.small)
                     .transition(.opacity)
             }
-            // (planning-25) the list does not page — it is always the three weeks from today — so it has no ‹ Today ›
-            if mode != "list" {
-                pager
-                    .transition(.opacity)
-            }
+            // (1.3.147) the list pages too, by as many days as it shows
+            pager
         }
         .animation(Motion.gentle, value: loading)
     }
 
-    /// ‹ Today › beside the month's or the week's title, as the Mac's Calendar has it.
+    /// What ‹ and › move by, as their help names it.
+    private var stepWords: (back: String, on: String) {
+        switch mode {
+        case "week": return ("Previous Week", "Next Week")
+        case "list": return ("Earlier Days", "Later Days")
+        default: return ("Previous Month", "Next Month")
+        }
+    }
+
+    /// ‹ Today › beside the month's, the week's or the list's title, as the Mac's Calendar has it.
     private var pager: some View {
         GlassGroup(spacing: 6) {
             HStack(spacing: 6) {
                 Button {
                     shift(-1)
                 } label: {
-                    Label(mode == "week" ? "Previous Week" : "Previous Month", systemImage: "chevron.left")
+                    Label(stepWords.back, systemImage: "chevron.left")
                         .labelStyle(.iconOnly)
                         .frame(minWidth: 14)
                 }
                 .glassButton()
-                .help(mode == "week" ? "Previous week (←)" : "Previous month (←)")
+                .help("\(stepWords.back) (←)")
                 Button("Today") { goToday() }
                     .glassButton()
                     .keyboardShortcut("t", modifiers: .command)
@@ -177,12 +188,12 @@ struct CalendarView: View {
                 Button {
                     shift(1)
                 } label: {
-                    Label(mode == "week" ? "Next Week" : "Next Month", systemImage: "chevron.right")
+                    Label(stepWords.on, systemImage: "chevron.right")
                         .labelStyle(.iconOnly)
                         .frame(minWidth: 14)
                 }
                 .glassButton()
-                .help(mode == "week" ? "Next week (→)" : "Next month (→)")
+                .help("\(stepWords.on) (→)")
             }
             .controlSize(.large)
         }
@@ -191,21 +202,25 @@ struct CalendarView: View {
     /// (1.2) Under the heading: how much the month or the week holds and how much of it is missing ("14 items · 2
     /// missing"); the list's span.
     private func periodLine(_ d: CalendarData) -> String {
-        if mode == "list" { return "The next three weeks" }
+        if mode == "list" && agenda.isStandard { return "The next three weeks" }
         let month = String(Self.dayKey.string(from: anchor).prefix(7))
         let shown = mode == "month" ? d.events.filter { $0.day.hasPrefix(month) } : d.events
-        guard !shown.isEmpty else { return mode == "month" ? "Nothing this month" : "Nothing this week" }
+        guard !shown.isEmpty else { return mode == "month" ? "Nothing this month" : mode == "week" ? "Nothing this week" : "Nothing in these days" }
         let missing = shown.filter { $0.missing == true }.count
         var parts = ["\(shown.count) \(shown.count == 1 ? "item" : "items")"]
         if missing > 0 { parts.append("\(missing) missing") }
         return parts.joined(separator: " · ")
     }
 
-    /// "October 2026", "Oct 4 – 10, 2026", "Upcoming".
+    /// "October 2026", "Oct 4 – 10, 2026", "Upcoming" (the next three weeks) or the days picked for the list.
     private var periodTitle: String {
         switch mode {
         case "list":
-            return "Upcoming"
+            guard !agenda.isStandard else { return "Upcoming" }
+            let f = DateIntervalFormatter()
+            f.dateStyle = .medium
+            f.timeStyle = .none
+            return f.string(from: agenda.start, to: agenda.last)
         case "week":
             let end = cal.date(byAdding: .day, value: 6, to: weekStart) ?? weekStart
             let f = DateIntervalFormatter()
@@ -275,17 +290,36 @@ struct CalendarView: View {
 
     // MARK: Month
 
+    /// The day panel's width beside the month, and the least the grid keeps beside it.
+    private static let dayWidth: CGFloat = 300
+    private static let gridLeast: CGFloat = 476
+
     /// The month's grid with the day picked beside it on a wide window, under it on a narrow one. (1.3.78) Chosen by the
-    /// page's width (MonthLayout), not by building both and measuring them: the grid is the heaviest thing drawn.
+    /// page's width, not by building both and measuring them: the grid is the heaviest thing drawn. (1.3.147) The grid's
+    /// weeks as tall as its days are wide (84 to 118 points), so a narrow window is not given a month taller than wide;
+    /// the day beside it from a grid of 476 points.
+    @ViewBuilder
     private func monthView(_ byDay: [String: [CalEvent]]) -> some View {
-        MonthLayout {
-            monthGrid(byDay)
-        } day: {
-            dayPanel(selected, events: byDay[key(selected)] ?? [])
+        let width = pageWidth ?? 1000
+        let beside = width >= Self.gridLeast + 20 + Self.dayWidth
+        let gridWidth = beside ? width - 20 - Self.dayWidth : width
+        let row = min(118, max(84, (gridWidth / 7).rounded(.down)))
+        if beside {
+            HStack(alignment: .top, spacing: 20) {
+                monthGrid(byDay, height: row * 6)
+                    .frame(maxWidth: .infinity)
+                dayPanel(selected, events: byDay[key(selected)] ?? [])
+                    .frame(width: Self.dayWidth)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 22) {
+                monthGrid(byDay, height: row * 6)
+                dayPanel(selected, events: byDay[key(selected)] ?? [])
+            }
         }
     }
 
-    private func monthGrid(_ byDay: [String: [CalEvent]]) -> some View {
+    private func monthGrid(_ byDay: [String: [CalEvent]], height: CGFloat) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
                 ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, s in
@@ -301,7 +335,7 @@ struct CalendarView: View {
             .accessibilityHidden(true)
             Self.line.frame(height: 1)
             ZStack {
-                monthWeeks(byDay)
+                monthWeeks(byDay, total: height)
                     .id(anchor) // (a new month is a new grid: it slides in from the side the move went)
                     .transition(slide)
             }
@@ -319,9 +353,6 @@ struct CalendarView: View {
         return Array(s[first...] + s[..<first])
     }
 
-    /// The grid's height whatever the month (six weeks of 112 points): a month of five weeks has taller days.
-    private static let monthHeight: CGFloat = 6 * 112
-
     /// (planning-23) The weeks the month touches — five or six, four for a February that starts on the week's first day —
     /// counted from the first day of the week it starts in. A row of the next month's days is never drawn.
     private func weekCount() -> Int {
@@ -331,12 +362,12 @@ struct CalendarView: View {
         return min(6, max(4, (days + 6) / 7))
     }
 
-    /// The month's weeks from the first day of the week it starts in; the grid is always as tall, its days taller when
-    /// there are fewer weeks (more of each name fits).
-    private func monthWeeks(_ byDay: [String: [CalEvent]]) -> some View {
+    /// The month's weeks from the first day of the week it starts in; the grid is always as tall (six weeks' worth), its
+    /// days taller when there are fewer weeks (more of each name fits).
+    private func monthWeeks(_ byDay: [String: [CalEvent]], total: CGFloat) -> some View {
         let first = Self.firstOfWeek(anchor)
         let weeks = weekCount()
-        let height = (Self.monthHeight / CGFloat(weeks)).rounded(.down)
+        let height = (total / CGFloat(weeks)).rounded(.down)
         let days = (0..<(weeks * 7)).compactMap { cal.date(byAdding: .day, value: $0, to: first) }
         return VStack(spacing: 0) {
             ForEach(0..<weeks, id: \.self) { w in
@@ -410,7 +441,8 @@ struct CalendarView: View {
             }
             .padding(5)
             .frame(maxWidth: .infinity, minHeight: height, maxHeight: height, alignment: .topLeading)
-            .background(Theme.accent.opacity(isSel ? 0.07 : 0))
+            // (1.3.147: the days of the months either side a shade deeper, so the month's own stand out)
+            .background(isSel ? Theme.accent.opacity(0.07) : Color.primary.opacity(off ? 0.035 : 0))
             .animation(Motion.snappy, value: isSel)
         }
         .buttonStyle(RowButtonStyle(radius: 0))
@@ -537,16 +569,24 @@ struct CalendarView: View {
 
     // MARK: Week
 
-    /// The week as seven columns on a wide window, as seven days one under another on a narrow one.
+    /// An hour of the week's grid, and the room for the hours' names before the days.
+    private static let hourHeight: CGFloat = 42
+    private static let gutter: CGFloat = 46
+
+    /// (1.3.147) The week as the Mac's Calendar draws one: its seven days side by side over the hours, each item at its
+    /// time, the day-long ones over the hours — down to a page of 520 points; on a narrower one, its days one under
+    /// another.
     private func weekView(_ byDay: [String: [CalEvent]]) -> some View {
         let days = (0..<7).compactMap { cal.date(byAdding: .day, value: $0, to: weekStart) }
         return ZStack {
-            ViewThatFits(in: .horizontal) {
-                weekColumns(days, byDay: byDay)
-                    .frame(minWidth: 770, idealWidth: 770, maxWidth: .infinity)
-                VStack(alignment: .leading, spacing: 18) {
-                    ForEach(days, id: \.self) { day in
-                        dayCard(day, events: byDay[key(day)] ?? [])
+            Group {
+                if (pageWidth ?? 1000) >= 520 {
+                    weekGrid(days, byDay: byDay)
+                } else {
+                    VStack(alignment: .leading, spacing: 18) {
+                        ForEach(days, id: \.self) { day in
+                            dayCard(day, events: byDay[key(day)] ?? [])
+                        }
                     }
                 }
             }
@@ -558,54 +598,156 @@ struct CalendarView: View {
         .padding(-6)
     }
 
-    private func weekColumns(_ days: [Date], byDay: [String: [CalEvent]]) -> some View {
-        HStack(alignment: .top, spacing: 0) {
-            ForEach(Array(days.enumerated()), id: \.element) { i, day in
-                weekColumn(day, events: byDay[key(day)] ?? [])
-                    .overlay(alignment: .leading) {
-                        if i > 0 { Self.line.frame(width: 1) }
+    /// The minutes into its day an item is at; nil for one that lasts the day (or has no time).
+    private func minutes(_ ev: CalEvent) -> Int? {
+        guard ev.allDay != true, let t = ev.time, !t.isEmpty, let d = PreviewFormat.date(ev.date) else { return nil }
+        let c = cal.dateComponents([.hour, .minute], from: d)
+        return (c.hour ?? 0) * 60 + (c.minute ?? 0)
+    }
+
+    /// "8 AM", "Noon", "1 PM" — or "08", "13" on a Mac set to the 24-hour clock — as the Mac writes an hour.
+    private func hourName(_ h: Int) -> String {
+        guard let d = cal.date(bySettingHour: h, minute: 0, second: 0, of: Date()) else { return "\(h)" }
+        let name = d.formatted(.dateTime.hour())
+        return h == 12 && name.contains("PM") ? "Noon" : name
+    }
+
+    private func weekGrid(_ days: [Date], byDay: [String: [CalEvent]]) -> some View {
+        let timed = days.map { day in
+            (byDay[key(day)] ?? []).compactMap { ev in minutes(ev).map { WeekItem(ev: ev, at: $0) } }.sorted { $0.at < $1.at }
+        }
+        let allDay = days.map { day in (byDay[key(day)] ?? []).filter { minutes($0) == nil } }
+        // (from 8 in the morning, or the hour of the week's earliest item, to midnight)
+        let first = min(8, timed.flatMap { $0 }.map { $0.at / 60 }.min() ?? 8)
+        let hours = Array(first..<24)
+        let span = CGFloat(hours.count) * Self.hourHeight
+        return VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                Color.clear.frame(width: Self.gutter)
+                ForEach(days, id: \.self) { day in
+                    weekHeader(day, count: (byDay[key(day)] ?? []).count)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(.vertical, 4)
+            Self.line.frame(height: 1)
+            if allDay.contains(where: { !$0.isEmpty }) {
+                HStack(alignment: .top, spacing: 0) {
+                    Text("all-day")
+                        .font(.sCaption2)
+                        .foregroundStyle(.secondary)
+                        .frame(width: Self.gutter - 8, alignment: .trailing)
+                        .padding(.trailing, 8)
+                        .padding(.top, 7)
+                    ForEach(Array(days.enumerated()), id: \.element) { i, _ in
+                        VStack(spacing: 3) {
+                            ForEach(allDay[i]) { weekBlock($0) }
+                        }
+                        .padding(3)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                        .overlay(alignment: .leading) { Self.line.frame(width: 1) }
                     }
+                }
+                .fixedSize(horizontal: false, vertical: true) // (every day's strip as tall as the fullest)
+                Self.line.frame(height: 1)
+            }
+            HStack(alignment: .top, spacing: 0) {
+                VStack(spacing: 0) {
+                    ForEach(hours, id: \.self) { h in
+                        Text(hourName(h))
+                            .font(.sCaption2.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .padding(.trailing, 8)
+                            .padding(.top, 3)
+                            .frame(width: Self.gutter, height: Self.hourHeight, alignment: .topTrailing)
+                    }
+                }
+                ForEach(Array(days.enumerated()), id: \.element) { i, day in
+                    WeekDayStack {
+                        ForEach(timed[i]) { item in
+                            weekBlock(item.ev)
+                                .layoutValue(key: WeekAt.self, value: CGFloat(item.at - first * 60) / 60 * Self.hourHeight)
+                        }
+                    }
+                    .padding(.horizontal, 3)
+                    .frame(maxWidth: .infinity, minHeight: span, maxHeight: .infinity, alignment: .top)
+                    .background(Theme.accent.opacity(cal.isDateInToday(day) ? 0.045 : 0))
+                    .overlay(alignment: .top) {
+                        if cal.isDateInToday(day) { nowLine(from: first) }
+                    }
+                    .overlay(alignment: .leading) { Self.line.frame(width: 1) }
+                }
+            }
+            .fixedSize(horizontal: false, vertical: true) // (every day as tall as the hours, or the fullest day)
+            .background(alignment: .top) {
+                // (a hairline at each hour, past the hours' names)
+                VStack(spacing: 0) {
+                    ForEach(hours, id: \.self) { h in
+                        VStack(spacing: 0) {
+                            if h > first { Self.line.opacity(0.7).frame(height: 1) }
+                            Spacer(minLength: 0)
+                        }
+                        .frame(height: Self.hourHeight)
+                    }
+                }
+                .padding(.leading, Self.gutter)
             }
         }
-        .fixedSize(horizontal: false, vertical: true) // (every column as tall as the fullest)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .card()
     }
 
-    private func weekColumn(_ day: Date, events evs: [CalEvent]) -> some View {
+    /// Now, on today's column: a red line at the minute, kept there as the minutes go by.
+    private func nowLine(from first: Int) -> some View {
+        TimelineView(.everyMinute) { context in
+            let c = cal.dateComponents([.hour, .minute], from: context.date)
+            let at = CGFloat((c.hour ?? 0) * 60 + (c.minute ?? 0) - first * 60) / 60 * Self.hourHeight
+            if at >= 0 {
+                HStack(spacing: 0) {
+                    Circle().fill(Color.red).frame(width: 7, height: 7)
+                    Rectangle().fill(Color.red).frame(height: 1.5)
+                }
+                .offset(x: -3.5, y: at - 3.5)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+            }
+        }
+    }
+
+    /// A day's name and number over its column; a click picks the day (its month, when Month is chosen).
+    private func weekHeader(_ day: Date, count: Int) -> some View {
         let isToday = cal.isDateInToday(day)
         let isSel = cal.isDate(day, inSameDayAs: selected)
-        return VStack(alignment: .leading, spacing: 6) {
-            Button {
-                pick(day)
-            } label: {
-                VStack(spacing: 3) {
-                    Text(day.formatted(.dateTime.weekday(.abbreviated)).uppercased())
-                        .font(.sFootnote.weight(.semibold))
-                        .tracking(0.6)
-                        .foregroundStyle(.secondary)
-                    Text("\(cal.component(.day, from: day))")
-                        .font(.sTitle3.weight(isToday || isSel ? .bold : .medium).monospacedDigit())
-                        .foregroundStyle(isToday ? Color.white : (isSel ? Theme.accent : Color.primary))
-                        .frame(width: 34, height: 34)
-                        .background {
-                            if isToday {
-                                Circle().fill(Theme.accent)
-                            } else if isSel {
-                                Circle().fill(Theme.accent.opacity(0.16))
-                            }
+        return Button {
+            pick(day)
+        } label: {
+            VStack(spacing: 2) {
+                Text(day.formatted(.dateTime.weekday(.abbreviated)).uppercased())
+                    .font(.sCaption.weight(.semibold))
+                    .tracking(0.6)
+                    .foregroundStyle(.secondary)
+                Text("\(cal.component(.day, from: day))")
+                    .font(.sTitle3.weight(isToday || isSel ? .bold : .medium).monospacedDigit())
+                    .foregroundStyle(isToday ? Color.white : (isSel ? Theme.accent : Color.primary))
+                    .frame(width: 32, height: 32)
+                    .background {
+                        if isToday {
+                            Circle().fill(Theme.accent)
+                        } else if isSel {
+                            Circle().fill(Theme.accent.opacity(0.16))
                         }
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
-                .animation(Motion.snappy, value: isSel)
+                    }
             }
-            .buttonStyle(RowButtonStyle(radius: 9))
-            .accessibilityLabel(Self.spoken(day, count: evs.count))
-            .accessibilityAddTraits(isSel ? .isSelected : [])
-            ForEach(evs) { ev in weekBlock(ev) }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 4)
+            .animation(Motion.snappy, value: isSel)
         }
-        .padding(6)
-        .frame(maxWidth: .infinity, minHeight: 380, maxHeight: .infinity, alignment: .top)
+        .buttonStyle(RowButtonStyle(radius: 9))
+        .padding(.horizontal, 2)
+        .accessibilityLabel(Self.spoken(day, count: count))
+        .accessibilityAddTraits(isSel ? .isSelected : [])
     }
 
     private func weekBlock(_ ev: CalEvent) -> some View {
@@ -619,13 +761,33 @@ struct CalendarView: View {
 
     // MARK: List
 
-    /// The next three weeks, each day with something on it as a section of its own.
+    /// The list's days — the next three weeks, or the days picked — each day with something on it as a section of its
+    /// own; (1.3.147) the days' picker beside it on a page of 620 points or more, over it on a narrower one.
+    @ViewBuilder
     private func listView(_ byDay: [String: [CalEvent]]) -> some View {
+        if (pageWidth ?? 1000) >= 620 {
+            HStack(alignment: .top, spacing: 20) {
+                listDays(byDay)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                agendaPicker
+                    .frame(width: 256)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 22) {
+                agendaPicker
+                    .frame(maxWidth: 380, alignment: .leading)
+                listDays(byDay)
+            }
+        }
+    }
+
+    private func listDays(_ byDay: [String: [CalEvent]]) -> some View {
         let keys = byDay.keys.sorted()
         return VStack(alignment: .leading, spacing: 22) {
             if keys.isEmpty {
-                EmptyNote(text: "Nothing in the next three weeks.", symbol: "calendar")
+                EmptyNote(text: agenda.isStandard ? "Nothing in the next three weeks." : "Nothing in these days.", symbol: "calendar")
                     .padding(.horizontal, 18)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .card()
             }
             ForEach(keys, id: \.self) { k in
@@ -633,6 +795,48 @@ struct CalendarView: View {
                     dayCard(day, events: byDay[k] ?? [])
                         .transition(.opacity)
                 }
+            }
+        }
+    }
+
+    private var agendaPicker: some View {
+        AgendaPicker(span: agenda, from: agendaFrom, pick: pickAgenda, reset: resetAgenda)
+    }
+
+    /// (1.3.147) A day clicked in the list's picker: the first of a new span, then its last (one before the first makes
+    /// that one the first) — at most 120 days, as the web's agenda has it. The list moves once both are picked.
+    private func pickAgenda(_ day: Date) {
+        focused = true
+        guard let from = agendaFrom else {
+            withAnimation(Motion.snappy) { agendaFrom = day }
+            return
+        }
+        let start = min(from, day)
+        var end = max(from, day)
+        if let most = cal.date(byAdding: .day, value: 119, to: start), end > most { end = most }
+        let next = AgendaSpan(start: start, end: end)
+        Task {
+            await move(start < agenda.start ? -1 : 1) {
+                agendaFrom = nil
+                agenda = next
+            }
+        }
+        next.save()
+    }
+
+    /// Back to the next three weeks.
+    private func resetAgenda() {
+        focused = true
+        let next = AgendaSpan.standard
+        AgendaSpan.forget()
+        guard next != agenda else {
+            withAnimation(Motion.snappy) { agendaFrom = nil }
+            return
+        }
+        Task {
+            await move(next.start < agenda.start ? -1 : 1) {
+                agendaFrom = nil
+                agenda = next
             }
         }
     }
@@ -655,19 +859,24 @@ struct CalendarView: View {
     }
 
     private func step(_ way: Int) -> KeyPress.Result {
-        guard mode != "list" else { return .ignored }
         shift(way)
         return .handled
     }
 
-    /// A month or a week on or back; the day picked becomes today when it is in it, else its first day.
+    /// A month or a week on or back; the day picked becomes today when it is in it, else its first day. (1.3.147) The
+    /// list moves by as many days as it shows.
     private func shift(_ way: Int) {
-        guard mode != "list" else { return }
         focused = true
         Task {
             await move(way) {
                 let today = cal.startOfDay(for: Date())
-                if mode == "week" {
+                if mode == "list" {
+                    let days = (cal.dateComponents([.day], from: agenda.start, to: agenda.last).day ?? 20) + 1
+                    let start = cal.date(byAdding: .day, value: days * way, to: agenda.start) ?? agenda.start
+                    agendaFrom = nil
+                    agenda = AgendaSpan(start: start, end: cal.date(byAdding: .day, value: days - 1, to: start))
+                    agenda.isStandard ? AgendaSpan.forget() : agenda.save()
+                } else if mode == "week" {
                     let next = cal.date(byAdding: .day, value: 7 * way, to: weekStart) ?? weekStart
                     let end = cal.date(byAdding: .day, value: 7, to: next) ?? next
                     weekStart = next
@@ -683,6 +892,7 @@ struct CalendarView: View {
 
     private func goToday() {
         focused = true
+        if mode == "list" { return resetAgenda() }
         let today = cal.startOfDay(for: Date())
         let month = Self.monthStart(today)
         let week = Self.firstOfWeek(today)
@@ -730,19 +940,18 @@ struct CalendarView: View {
 
     // MARK: - Reading
 
-    /// The span shown: six weeks round the month, the week, or three weeks from today.
+    /// The span shown: six weeks round the month, the week, or the list's days.
     private var range: (Date, Date) {
-        Self.span(mode, anchor: anchor, weekStart: weekStart)
+        Self.span(mode, anchor: anchor, weekStart: weekStart, agenda: agenda)
     }
 
-    private static func span(_ mode: String, anchor: Date, weekStart: Date) -> (Date, Date) {
+    private static func span(_ mode: String, anchor: Date, weekStart: Date, agenda: AgendaSpan) -> (Date, Date) {
         let cal = Calendar.current
         switch mode {
         case "week":
             return (weekStart, cal.date(byAdding: .day, value: 7, to: weekStart) ?? weekStart)
         case "list":
-            let s = cal.startOfDay(for: Date())
-            return (s, cal.date(byAdding: .day, value: 21, to: s) ?? s)
+            return (agenda.start, cal.date(byAdding: .day, value: 1, to: agenda.last) ?? agenda.last)
         default:
             let s = Self.firstOfWeek(anchor)
             return (s, cal.date(byAdding: .day, value: 42, to: s) ?? s)
@@ -759,7 +968,8 @@ struct CalendarView: View {
     static func readAhead() -> ReadAhead.Ask? {
         ReadAhead.Ask(key: "calendar|now") { engine in
             let v = (try? await engine.read("calView", as: OK.self, quiet: true))?.view ?? "month"
-            let shown = Self.span(Self.modes.contains(v) ? v : "month", anchor: Self.monthStart(Date()), weekStart: Self.firstOfWeek(Date()))
+            let shown = Self.span(Self.modes.contains(v) ? v : "month", anchor: Self.monthStart(Date()), weekStart: Self.firstOfWeek(Date()),
+                                  agenda: AgendaSpan.saved() ?? .standard)
             _ = try? await engine.read("calendar", Self.args(shown), as: CalendarData.self, quiet: true)
         }
     }
@@ -840,28 +1050,184 @@ struct CalendarView: View {
 
 // MARK: - Pieces
 
-/// (1.3.78) The month's grid with the day picked beside it when the page has room for both at their ideal widths (the
-/// grid's 640 and the day's 340, 22 apart: as a ViewThatFits of the two chose), else the day under the grid — only the
-/// one shown is built.
-private struct MonthLayout<Grid: View, Day: View>: View {
-    @ViewBuilder var grid: () -> Grid
-    @ViewBuilder var day: () -> Day
-    @Environment(\.pageWidth) private var width
+/// (1.3.147) The list's days: its first and its last, both shown — the next three weeks from today until other days are
+/// picked beside it (kept, as the web's agenda keeps its range).
+struct AgendaSpan: Equatable {
+    var start: Date
+    var end: Date?
+
+    /// The last day shown (three weeks' worth when no end was given).
+    var last: Date { end ?? Calendar.current.date(byAdding: .day, value: 20, to: start) ?? start }
+
+    static var standard: AgendaSpan {
+        let s = Calendar.current.startOfDay(for: Date())
+        return AgendaSpan(start: s, end: Calendar.current.date(byAdding: .day, value: 20, to: s))
+    }
+
+    var isStandard: Bool {
+        let cal = Calendar.current
+        let std = AgendaSpan.standard
+        return cal.isDate(start, inSameDayAs: std.start) && cal.isDate(last, inSameDayAs: std.last)
+    }
+
+    private static let key = "SimplAgendaSpan"
+    private static let dayKey: DateFormatter = {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
+    /// The days last picked, while they are not the next three weeks.
+    static func saved() -> AgendaSpan? {
+        guard let days = UserDefaults.standard.stringArray(forKey: key), days.count == 2,
+              let s = dayKey.date(from: days[0]), let e = dayKey.date(from: days[1]), e >= s else { return nil }
+        return AgendaSpan(start: s, end: e)
+    }
+
+    func save() {
+        UserDefaults.standard.set([Self.dayKey.string(from: start), Self.dayKey.string(from: last)], forKey: Self.key)
+    }
+
+    static func forget() { UserDefaults.standard.removeObject(forKey: key) }
+}
+
+/// (1.3.147) The list's days picked on a small month beside it, as the web's agenda has them: a day clicked starts the
+/// span, the next ends it; the days between washed in the accent, its ends on it. ‹ and › move the small month; Reset
+/// goes back to the next three weeks.
+private struct AgendaPicker: View {
+    let span: AgendaSpan
+    let from: Date?
+    let pick: (Date) -> Void
+    let reset: () -> Void
+    /// The month shown when another than the span's first was moved to.
+    @State private var month: Date?
+    private var cal: Calendar { Calendar.current }
+
+    private var shown: Date {
+        let m = month ?? from ?? span.start
+        return cal.date(from: cal.dateComponents([.year, .month], from: m)) ?? m
+    }
 
     var body: some View {
-        if (width ?? 0) >= 640 + 22 + 340 {
-            HStack(alignment: .top, spacing: 22) {
-                grid()
-                    .frame(minWidth: 540, idealWidth: 640, maxWidth: .infinity)
-                day()
-                    .frame(width: 340)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Text(shown.formatted(.dateTime.month(.wide).year()))
+                    .font(.sHeadline)
+                Spacer(minLength: 4)
+                Button {
+                    turn(-1)
+                } label: {
+                    Image(systemName: "chevron.left").frame(width: 14, height: 14)
+                }
+                .buttonStyle(.borderless)
+                .help("Previous month")
+                .accessibilityLabel("Previous Month")
+                Button {
+                    turn(1)
+                } label: {
+                    Image(systemName: "chevron.right").frame(width: 14, height: 14)
+                }
+                .buttonStyle(.borderless)
+                .help("Next month")
+                .accessibilityLabel("Next Month")
             }
-        } else {
-            VStack(alignment: .leading, spacing: 22) {
-                grid()
-                day()
+            grid
+            Divider()
+            HStack(alignment: .center, spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(from.map { "\(Self.words($0)) – …" } ?? "\(Self.words(span.start)) – \(Self.words(span.last))")
+                        .font(.sCallout.weight(.semibold).monospacedDigit())
+                        .contentTransition(.numericText())
+                    Text(from == nil ? "Click a day to start new days" : "Click the last day")
+                        .font(.sFootnote)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 4)
+                Button("Reset", action: reset)
+                    .glassButton()
+                    .disabled(from == nil && span.isStandard)
+                    .help("Back to the next three weeks")
             }
         }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card()
+        .onChange(of: span) { _, _ in month = nil }
+        .animation(Motion.snappy, value: from)
+        .animation(Motion.snappy, value: span)
+    }
+
+    private func turn(_ way: Int) {
+        withAnimation(Motion.snappy) { month = cal.date(byAdding: .month, value: way, to: shown) }
+    }
+
+    private static func words(_ d: Date) -> String { d.formatted(.dateTime.month(.abbreviated).day()) }
+
+    private var grid: some View {
+        let back = (cal.component(.weekday, from: shown) - cal.firstWeekday + 7) % 7
+        let first = cal.date(byAdding: .day, value: -back, to: shown) ?? shown
+        let days = (0..<42).compactMap { cal.date(byAdding: .day, value: $0, to: first) }
+        let symbols: [String] = {
+            let s = cal.veryShortWeekdaySymbols
+            guard s.count == 7 else { return s }
+            let f = (cal.firstWeekday - 1 + 7) % 7
+            return Array(s[f...] + s[..<f])
+        }()
+        return VStack(spacing: 2) {
+            HStack(spacing: 0) {
+                ForEach(Array(symbols.enumerated()), id: \.offset) { _, s in
+                    Text(s)
+                        .font(.sCaption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .accessibilityHidden(true)
+            ForEach(0..<6, id: \.self) { w in
+                HStack(spacing: 0) {
+                    ForEach(days[(w * 7)..<(w * 7 + 7)], id: \.self) { day in
+                        cell(day)
+                    }
+                }
+            }
+        }
+    }
+
+    private func cell(_ day: Date) -> some View {
+        let start = from ?? span.start
+        let last = from ?? span.last
+        let isStart = cal.isDate(day, inSameDayAs: start)
+        let isEnd = cal.isDate(day, inSameDayAs: last)
+        let inside = day > start && day < last
+        let off = !cal.isDate(day, equalTo: shown, toGranularity: .month)
+        let today = cal.isDateInToday(day)
+        return Button {
+            pick(cal.startOfDay(for: day))
+        } label: {
+            Text("\(cal.component(.day, from: day))")
+                .font(.sCallout.weight(isStart || isEnd || today ? .semibold : .regular).monospacedDigit())
+                .foregroundStyle(isStart || isEnd ? Color.white : (today ? Theme.accent : (off ? Color.secondary.opacity(0.6) : Color.primary)))
+                .frame(width: 28, height: 28)
+                .background {
+                    if isStart || isEnd { Circle().fill(Theme.accent) }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 30)
+                // (the days between, and the half of each end toward them, washed in the accent: one band)
+                .background {
+                    HStack(spacing: 0) {
+                        Theme.accent.opacity(inside || (isEnd && !isStart) ? 0.16 : 0)
+                        Theme.accent.opacity(inside || (isStart && !isEnd) ? 0.16 : 0)
+                    }
+                    .padding(.vertical, 1)
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(day.formatted(.dateTime.weekday(.wide).month(.wide).day()))
+        .accessibilityAddTraits(isStart || isEnd ? .isSelected : [])
     }
 }
 
@@ -1025,46 +1391,95 @@ private struct CalendarEventLine: View {
     }
 }
 
-/// A piece of work or an event in a column of the week: (1.2) its name beside a bar in its calendar's colour, flat in the
-/// column, its time, and whether it is missing or excused.
+/// A piece of work or an event in a day of the week: (1.3.147) a small block washed in its calendar's colour, a bar of it
+/// before its name, its time under it (or that it is missing: then in red, a mark before the time); greyed once over,
+/// struck through only once handed in. The names wrap to three lines in a narrow day.
 private struct CalendarWeekBlock: View {
     let event: CalEvent
 
     var body: some View {
         let c = Color(hex: event.color)
         let missing = event.missing == true
-        VStack(alignment: .leading, spacing: 3) {
+        let grey = event.isPast && !missing
+        let time = event.allDay == true ? nil : PreviewFormat.text(event.time)
+        VStack(alignment: .leading, spacing: 1) {
             // (planning-24) struck through only once handed in, greyed once over: as on the month's grid
             Text(event.title)
+                .font(.sCaption.weight(.semibold))
                 .strikethrough(event.isStruck && !missing, color: .secondary)
-                .font(.sCallout.weight(.medium))
-                .foregroundStyle(event.isPast && !missing ? Color.secondary : Color.primary)
+                .foregroundStyle(grey ? Color.secondary : Color.primary)
                 .lineLimit(3)
                 .multilineTextAlignment(.leading)
-            HStack(spacing: 5) {
-                if let time = event.time, !time.isEmpty {
-                    Text(time).font(.sFootnote.monospacedDigit()).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if time != nil || missing || event.excused == true {
+                HStack(spacing: 3) {
+                    if missing {
+                        Image(systemName: "exclamationmark.circle.fill")
+                    }
+                    Text(time ?? (missing ? "Missing" : "Excused"))
+                        .monospacedDigit()
                 }
-                if missing {
-                    FlagBadge(flag: WorkFlag(word: "Missing", kind: "bad"))
-                } else if event.excused == true {
-                    FlagBadge(flag: WorkFlag(word: "Excused", kind: "muted"))
-                }
+                .font(.sCaption2)
+                .foregroundStyle(missing ? Color.red : Color.secondary)
+                .lineLimit(1)
             }
         }
-        .padding(.leading, 12)
-        .padding(.trailing, 6)
-        .padding(.vertical, 6)
+        .padding(.leading, 8)
+        .padding(.trailing, 4)
+        .padding(.vertical, 4)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(c.opacity(grey ? 0.07 : 0.15))
+        }
         .overlay(alignment: .leading) {
             Capsule()
-                .fill(c)
-                .frame(width: 3.5)
-                .padding(.vertical, 5)
-                .padding(.leading, 3)
+                .fill(c.opacity(grey ? 0.5 : 1))
+                .frame(width: 3)
+                .padding(.vertical, 3)
+                .padding(.leading, 2)
         }
         .contentShape(Rectangle())
     }
+}
+
+/// (1.3.147) A day of the week's grid: each item at its time, the next one under it where they would meet (Canvas gives
+/// an item no end, so each takes the room its name needs); the day as tall as its last item reaches.
+private struct WeekDayStack: Layout {
+    var gap: CGFloat = 2
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? 100
+        return CGSize(width: width, height: frames(subviews, width: width).last?.maxY ?? 0)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for (s, f) in zip(subviews, frames(subviews, width: bounds.width)) {
+            s.place(at: CGPoint(x: bounds.minX, y: bounds.minY + f.minY), proposal: ProposedViewSize(width: bounds.width, height: f.height))
+        }
+    }
+
+    private func frames(_ subviews: Subviews, width: CGFloat) -> [CGRect] {
+        var out: [CGRect] = []
+        for s in subviews {
+            let h = s.sizeThatFits(ProposedViewSize(width: width, height: nil)).height
+            let y = max(s[WeekAt.self], (out.last?.maxY ?? -gap) + gap)
+            out.append(CGRect(x: 0, y: y, width: width, height: h))
+        }
+        return out
+    }
+}
+
+/// An item of a day of the week's grid, and the minutes into the day it is at.
+private struct WeekItem: Identifiable {
+    let ev: CalEvent
+    let at: Int
+    var id: String { ev.id }
+}
+
+/// Where an item's time puts it in its day of the week's grid.
+private struct WeekAt: LayoutValueKey {
+    static let defaultValue: CGFloat = 0
 }
 
 /// The calendars shown, each with its colour: your own courses on, the rest off until turned on — ten at most, as Canvas
