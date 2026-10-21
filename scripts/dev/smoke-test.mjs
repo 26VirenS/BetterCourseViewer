@@ -3542,18 +3542,24 @@ try {
   // (2.99.67) on a computer the intro is a large popup over the page, as the Mac's sheet: the app dimmed behind it, not folded away
   // (2.99.83) a page again, in the app: no popup over the page, nothing dimmed, the sidebar and the course's header kept
   const pop = await page.evaluate(() => ({ page: !!document.querySelector('.bcv-qz.is-page'), pop: !!document.querySelector('.bcv-qz.is-pop'), veil: !!document.querySelector('.bcv-qz-veil'), folded: document.documentElement.classList.contains('bcv-quiz') }));
-  check(page.url().endsWith('/quizzes/9011') && (await visible('.bcv-qzi__tools .bcv-qz__timer')) && !(await page.$('.bcv-qz.is-embedded')) && pop.page && !pop.pop && !pop.veil && !pop.folded, `the quiz intro is a page in the app, its head with the title: ${JSON.stringify(pop)}`);
-  // (2.99.87) laid out as the assignment page: no course header over it, the name said once, the Canvas page and the timer
-  // level with the title at the right, nothing over the title
+  check(page.url().endsWith('/quizzes/9011') && (await visible('.bcv-qzi__tools .bcv-qz__raw')) && (await page.$eval('.bcv-qz__timer', (e) => e.getClientRects().length === 0)) /* (no clock drawn before an attempt: its row is folded away) */ && !(await page.$('.bcv-qz.is-embedded')) && pop.page && !pop.pop && !pop.veil && !pop.folded, `the quiz intro is a page in the app, its head with the title: ${JSON.stringify(pop)}`);
+  // (2.99.93) laid out as the assignment page: no course header over it, the name said once under the kind, course and status
+  // chips (the Canvas page at their row's end); Begin and the details down the right, the rules down the left; no clock
   const pageLook = await page.evaluate(() => {
     const vis = (e) => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
-    const t = document.querySelector('.bcv-qzi__title').getBoundingClientRect(), timer = document.querySelector('.bcv-qz__timer').getBoundingClientRect();
-    const raw = document.querySelector('.bcv-qz__raw').getBoundingClientRect(), rules = document.querySelector('.bcv-qzi__side')?.getBoundingClientRect();
-    return { courseHead: vis(document.querySelector('.bcv-head--course')), headTitle: vis(document.querySelector('.bcv-qz__titles')), level: Math.abs(timer.top - t.top) < 24, right: raw.left >= t.right - 1, clear: !rules || timer.right <= rules.left + 1 || timer.bottom <= rules.top };
+    const r = (sel) => document.querySelector(sel)?.getBoundingClientRect();
+    const t = r('.bcv-qzi__title'), raw = r('.bcv-qz__raw'), chips = r('.bcv-qzi--page .bcv-asg__chips'), rail = r('.bcv-qzi__side'), left = r('.bcv-qzi--page .bcv-asg__left'), begin = r('.bcv-qz__begin');
+    return {
+      courseHead: vis(document.querySelector('.bcv-head--course')), headTitle: vis(document.querySelector('.bcv-qz__titles')),
+      chips: [...document.querySelectorAll('.bcv-qzi--page .bcv-asg__chips > :not(.bcv-qzi__tools)')].map((e) => e.textContent.trim()).join('|'),
+      rawInChips: !!raw && !!chips && raw.top >= chips.top - 1 && raw.bottom <= chips.bottom + 1 && raw.bottom <= t.top,
+      railRight: !!rail && !!left && rail.left >= left.right - 1, beginInRail: !!begin && begin.left >= rail.left - 1 && begin.top < rail.top + 60,
+      keys: [...document.querySelectorAll('.bcv-qzi__side .bcv-asg__factk')].map((e) => e.textContent).join('|'),
+    };
   });
-  check(!pageLook.courseHead && !pageLook.headTitle && pageLook.level && pageLook.right && pageLook.clear, `the quiz page as the assignment page: no course header, its name once, the Canvas page and the timer level with the title at its right: ${JSON.stringify(pageLook)}`);
+  check(!pageLook.courseHead && !pageLook.headTitle && /^Quiz\|.+\|Open$/.test(pageLook.chips) && pageLook.rawInChips && pageLook.railRight && pageLook.beginInRail && pageLook.keys === 'Questions|Points|Due|Time Limit|Attempts', `the quiz page as the assignment page: kind, course and status over the title, the Canvas page beside them, Begin and the details down the right: ${JSON.stringify(pageLook)}`);
   const introParts = await page.evaluate(() => ({ heads: [...document.querySelectorAll('.bcv-qzi__sechead')].map((e) => e.textContent), facts: [...document.querySelectorAll('.bcv-qzi__fact')].map((e) => e.textContent).join(' · '), note: document.querySelector('.bcv-qzi__note')?.textContent || '', buttons: [...document.querySelectorAll('.bcv-qzi__bar .bcv-qzi__btn')].map((b) => b.textContent).join('|') }));
-  check((await texts('.bcv-qz__title'))[0] === 'Lec06-PreQuiz' && (await texts('.bcv-qzi__rule')).some((t) => /Time limit: 20 minutes/.test(t)) && (await texts('.bcv-qz__begin'))[0] === 'Begin Attempt' && /^\d+ questions? · \d+ points? · (Due|No due date)/.test(introParts.facts) && introParts.heads.includes('Rules') && introParts.buttons === 'Begin Attempt', `the intro as the Mac's: its facts, the attempts line, Rules, and Begin Attempt alone at the foot (${JSON.stringify(introParts)})`);
+  check((await texts('.bcv-qz__title'))[0] === 'Lec06-PreQuiz' && (await texts('.bcv-qzi__rule')).some((t) => /Time limit: 20 minutes/.test(t)) && (await texts('.bcv-qz__begin'))[0] === 'Begin Attempt' && /^\d+ questions? · \d+ points? · ([A-Z][a-z]{2} \d+ at |No due date)/.test(introParts.facts) && introParts.heads.includes('Rules') && introParts.buttons === 'Begin Attempt', `the intro as the Mac's: its facts, the attempts line, Rules, and Begin Attempt alone at the foot (${JSON.stringify(introParts)})`);
   check((await texts('.bcv-qz__clock'))[0] === '20 min', 'timer pill shows the limit before the attempt starts');
   await shot(page, '22c-quiz-intro');
   check((await page.$eval('.bcv-qz__begin', (e) => getComputedStyle(e).color)) === 'rgb(255, 255, 255)', 'Begin reads white on its blue (a plain class used to lose to `#bcv-app button { color: inherit }`)');

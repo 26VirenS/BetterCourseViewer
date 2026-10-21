@@ -721,7 +721,7 @@
       subLine.textContent = simulated ? 'Simulation · nothing goes to Canvas' : st.stage === 'intro' ? course.name : `${course.name} · ${dueDay}`;
       paintProgress();
       body.classList.toggle('is-busy', st.loadingIdx !== null && st.stage === 'take');
-      if (asPage) { if (rawBtn.parentElement !== introTools) introTools.append(rawBtn, timerBox); } else if (rawBtn.parentElement !== headRow) headRow.append(rawBtn, timerBox);
+      if (asPage) { if (rawBtn.parentElement !== introTools) introTools.append(rawBtn); } else if (rawBtn.parentElement !== headRow) headRow.append(rawBtn, timerBox); // (2.99.93: no clock on the page before an attempt — the time limit is among its details)
       if (st.stage === 'intro') body.replaceChildren(intro());
       else if (st.stage === 'starting') body.replaceChildren(h('p', { class: 'bcv-qz__starting', text: st.sub ? 'Resuming your attempt…' : 'Starting your attempt…' }));
       else if (st.stage === 'take') body.replaceChildren(st.mode === 'all' ? takeAll() : st.mode === 'side' ? takeSide() : takeOne());
@@ -878,7 +878,10 @@
       const codeMissing = () => needsCode && !(st.code || '').trim();
       const beginTitle = canStart ? (st.sub ? (survey ? 'Continue Survey' : 'Continue Attempt') : (survey ? 'Begin Survey' : 'Begin Attempt')) : lockdown ? 'Needs LockDown Browser' : quiz.locked_for_user ? 'Locked' : 'No Attempts Left';
       const takeTitle = survey ? 'Take Survey' : 'Take Quiz';
-      const sec = (title, body, part) => U.el(`bcv-qzi__sec bcv-qzi__sec--${part}`, [h('h2', { class: 'bcv-qzi__sechead', text: title }), body]);
+      // (2.99.93) on a computer the page is laid out as the assignment page (introPage below): each section a heading over a card
+      const sec = phone
+        ? (title, body, part) => U.el(`bcv-qzi__sec bcv-qzi__sec--${part}`, [h('h2', { class: 'bcv-qzi__sechead', text: title }), body])
+        : (title, body, part) => U.el(`bcv-asg__section bcv-qzi__sec--${part}`, [U.el('bcv-asg__sectionhead', [h('h2', { class: 'bcv-asg__h2 bcv-qzi__sechead', text: title })]), U.el('bcv-asg__panel', [body])]);
       const icon = (path, color) => U.svg(path, { size: 16, stroke: color, width: 2, style: { flex: 'none' } });
 
       const heading = U.el('bcv-qzi__heading', [
@@ -887,11 +890,11 @@
         note ? U.el('bcv-qzi__note', [U.svg('M4 12a8 8 0 108-8 8 8 0 00-6 2.7M4 4v4h4', { size: 14, stroke: 'currentColor', width: 2, style: { flex: 'none' } }), h('span', { text: note })]) : null,
       ]);
       const lockText = quiz.locked_for_user ? (quiz.lock_explanation ? htmlToText(quiz.lock_explanation, 200) : 'This quiz is locked.') : '';
-      const notices = st.codeErr || lockText ? U.el('bcv-qzi__notices', [
+      const notices = st.codeErr || lockText ? U.el(`bcv-qzi__notices${phone ? '' : ' bcv-asg__panel'}`, [
         st.codeErr ? U.el('bcv-qzi__notice is-bad', [icon(IC.warn, 'currentColor'), h('span', { class: 'bcv-qz__codeerr', text: st.codeErr })]) : null,
         lockText ? U.el('bcv-qzi__notice', [icon(IC.lock, 'currentColor'), h('span', { text: lockText })]) : null,
       ]) : null;
-      const instructions = htmlToText(quiz.description || '', 4000).trim() ? sec('Before You Start', BCV.screens.course.prose(quiz.description, { cls: 'bcv-qz__desc' }), 'instr') : null;
+      const instructions = htmlToText(quiz.description || '', 4000).trim() ? sec(phone ? 'Before You Start' : 'Instructions', BCV.screens.course.prose(quiz.description, { cls: phone ? 'bcv-qz__desc' : 'bcv-qz__desc bcv-asg__prose' }), 'instr') : null;
       let mainBtn = null;
       const codeInput = needsCode ? h('input', { class: 'bcv-input bcv-qz__code', type: 'text', placeholder: 'Access code', value: st.code || '', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Access code', oninput: (e) => { st.code = e.target.value; bar.querySelectorAll('[data-begin]').forEach((b) => { b.disabled = (!canStart || codeMissing()) || null; }); }, onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); if (canStart && !codeMissing()) begin(); } } }) : null;
       const code = needsCode ? sec('Access Code', U.el('bcv-qzi__code', [codeInput, U.text('bcv-qzi__caption', 'Your instructor gives the code. It stays with this attempt.')]), 'code') : null;
@@ -911,7 +914,12 @@
         : null;
       // the buttons, floating at the foot
       const bar = U.el('bcv-qzi__bar');
-      const btn = (text, primary, onclick) => h('button', { type: 'button', class: `bcv-qzi__btn${primary ? ' is-primary bcv-qz__begin' : ''}`, text, onclick }); // (bcv-qz__begin: the main one, as it has always been named)
+      const BTN_IC = { 'See Feedback': IC.disc };
+      const btn = (text, primary, onclick) => (phone
+        ? h('button', { type: 'button', class: `bcv-qzi__btn${primary ? ' is-primary bcv-qz__begin' : ''}`, text, onclick }) // (bcv-qz__begin: the main one, as it has always been named)
+        : h('button', { type: 'button', class: `bcv-qzi__btn bcv-asg__step${primary ? ' is-primary is-lit bcv-qz__begin' : ''}`, onclick }, [ // (the rail's pills, as the assignment page's Hand In)
+          U.svg(BTN_IC[text] || 'M8 5v14l11-7z', { size: 16, stroke: 'currentColor', width: 2.1 }), h('span', { text }),
+        ]));
       if (st.sub && seeable && canStart) {
         // (2.99.58) an attempt under way, an earlier one's feedback to see: See Feedback, Continue Attempt the smaller
         const cont = btn(beginTitle, false, () => { if (canStart && !codeMissing()) begin(); });
@@ -936,6 +944,7 @@
         mainBtn.title = codeMissing() && canStart ? 'Type the access code first' : beginTitle;
         bar.append(mainBtn);
       }
+      if (!phone) return introPage({ survey, gradedSurvey, pts, note, notices, code, instructions, rulesEl, attemptsEl, bar, mainBtn, codeInput, canStart, last, N, codeFocus: codeInput && !(st.code || '').trim() });
       // (2.99.56: no way-back row — the quiz's own page has Close at its top, as the Mac's sheet)
       const root = U.el('bcv-qzi', [
         U.el('bcv-qzi__cols', [
@@ -948,6 +957,48 @@
       root.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.defaultPrevented && !e.target.closest('input,textarea,select,button,a') && mainBtn && !mainBtn.disabled) { e.preventDefault(); mainBtn.click(); } });
       // a quiz that wants a code: its field ready to type in
       if (codeInput && !(st.code || '').trim()) setTimeout(() => { if (codeInput.isConnected) codeInput.focus(); }, 120);
+      return root;
+    }
+
+    /** (2.99.93) The quiz's page on a computer, as the assignment page: over the title its kind, its course and where it
+     *  stands; down the right the one big button (and the attempts line under it) over the details — Due, Points,
+     *  Questions, the time limit, the attempts; down the left what to know first (the code, the instructions, the rules,
+     *  the attempts made). No clock before an attempt: the time limit is one of the details. */
+    function introPage(o) {
+      const kind = h('span', { class: 'bcv-asg__kind' }, [h('span', { class: 'bcv-asg__kindtile', 'aria-hidden': 'true' }, U.svg(IC.bolt, { size: 14, stroke: 'currentColor', width: 2 })), h('span', { text: o.survey ? 'Survey' : 'Quiz' })]);
+      const used = o.N !== null && attemptsLeft <= 0;
+      const [word, tone] = st.sub ? ['In progress', 'orange'] : quiz.locked_for_user ? ['Locked', 'grey'] : used ? ['Done', 'green'] : o.last ? ['Submitted', 'green'] : ['Open', 'blue'];
+      const chips = U.el('bcv-asg__chips', [
+        kind,
+        h('span', { class: 'bcv-asg__coursechip bcv-ellip', text: course.shortName || course.name || '' }),
+        h('div', { class: `bcv-asg__status is-${tone}` }, [U.text('bcv-asg__statustext', word, 'span')]),
+        introTools, // (the Canvas page, at the row's end)
+      ]);
+      const headEl = U.el('bcv-detail__head bcv-asg__head', [chips, h('h1', { class: 'bcv-detail__title bcv-asg__title bcv-qzi__title bcv-pretty', text: quiz.title })]);
+      const FACT = { Due: IC.cal, Points: IC.star, Questions: IC.list || IC.task, 'Time Limit': 'M12 5a8 8 0 100 16 8 8 0 000-16zM12 9v4l3 2M10 2h4', Attempts: 'M4 12a8 8 0 108-8 8 8 0 00-5.7 2.3L4 8.6M4 4v4.6h4.6', Available: 'M12 4a8 8 0 100 16 8 8 0 000-16zM12 8v4l3 2' };
+      const fact = (k, v) => h('div', { class: 'bcv-asg__fact' }, [
+        h('span', { class: 'bcv-asg__facttile', 'aria-hidden': 'true' }, U.svg(FACT[k], { size: 15, stroke: 'currentColor', width: 2 })),
+        U.el('bcv-asg__facttext', [U.text('bcv-asg__factk', k, 'span'), U.text('bcv-asg__factv bcv-qzi__fact bcv-ellip', v, 'span')]),
+      ]);
+      const at = (d) => `${U.fmtShort(d)} at ${U.fmtTime(d)}`;
+      const facts = U.el('bcv-asg__facts', [
+        fact('Questions', U.plural(quiz.question_count || 0, 'question')),
+        fact('Points', o.survey ? (o.gradedSurvey ? `${o.pts} for taking part` : 'Not graded') : o.pts),
+        fact('Due', quiz.due_at ? at(quiz.due_at) : 'No due date'),
+        timed ? fact('Time Limit', `${quiz.time_limit} minutes`) : null,
+        fact('Attempts', o.N === null ? 'Unlimited' : o.N === 1 ? 'One attempt' : `${o.N} attempts`),
+        quiz.lock_at ? fact('Available', `Until ${at(quiz.lock_at)}`) : null,
+      ].filter(Boolean));
+      o.bar.classList.add('bcv-asg__stepbtns');
+      const steps = U.el('bcv-asg__steps', [
+        o.bar,
+        o.note ? U.el('bcv-qzi__note bcv-asg__drophint', [h('span', { text: o.note })]) : null,
+      ].filter(Boolean));
+      const rail = U.el('bcv-asg__rail bcv-qzi__side', [steps, facts]);
+      const left = U.el('bcv-asg__left', [o.notices, o.code, o.instructions, o.rulesEl, o.attemptsEl].filter(Boolean));
+      const root = U.el('bcv-qzi bcv-qzi--page bcv-asg', [headEl, U.el('bcv-asg__cols', [rail, left])], { style: { '--bcv-cc': course.color || 'var(--bcv-blue)', '--bcv-cc-ink': course.palette?.text || course.color || 'var(--bcv-blue)' } });
+      root.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.defaultPrevented && !e.target.closest('input,textarea,select,button,a') && o.mainBtn && !o.mainBtn.disabled) { e.preventDefault(); o.mainBtn.click(); } });
+      if (o.codeFocus) setTimeout(() => { if (o.codeInput.isConnected) o.codeInput.focus(); }, 120);
       return root;
     }
 

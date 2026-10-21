@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.92"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.93"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -6124,6 +6124,18 @@ html.bcv-on:not(.bcv-phone) .bcv-screen--ctx:has(.bcv-qz.is-page) > .bcv-head--c
 .bcv-qzi__tools:empty { display: none; }
 @container bcv-qzi (max-width: 520px) { .bcv-qzi__titlerow { flex-direction: column; gap: 10px; } }
 .bcv-qz.is-page .bcv-qzi { min-height: calc(100vh - 250px - var(--bcv-bar-h, 0px)); }
+/* (2.99.93) the quiz's page laid out as the assignment page (quiz.js introPage): the kind, the course and where it stands over
+   the title; Begin (and the attempts line) over the details down the right; the code, instructions, rules and attempts as
+   cards down the left. The intro's own frame — its floating bar, its loose facts, its clock — is not used here. */
+.bcv-qz.is-page .bcv-qzi.bcv-qzi--page { max-width: none; min-height: 0; display: flex; box-sizing: border-box; padding: 40px var(--bcv-px, 44px); } /* (the screen's own margins, as the assignment page has them) */
+.bcv-qzi--page .bcv-asg__chips .bcv-qzi__tools { margin: 0 0 0 auto; }
+.bcv-qzi--page .bcv-qzi__bar { position: static; margin: 0; padding: 0; pointer-events: auto; }
+.bcv-qzi--page .bcv-qzi__fact { display: block; }
+.bcv-qzi--page .bcv-qzi__note { display: block; }
+.bcv-qzi--page .bcv-asg__panel .bcv-qz__desc { font-size: 15px; }
+.bcv-qzi--page .bcv-qzi__rules { gap: 14px; }
+.bcv-qzi--page .bcv-qzi__rule { color: var(--bcv-ink); }
+.bcv-qzi--page .bcv-qzi__notices { gap: 10px; }
 /* (2.99.84) Spotlight's shapes: the pill's ends halves of a superellipse, the panel's corners continuous (ui.js squircle, drawn
    through a clip). A clip cuts the rim a border draws at the corners, so afloat the rim is drawn again along it: a ring a
    pixel wide in the clip's own shape, a picture on the background (--bcv-sq-ring), which stays with the box while the panel
