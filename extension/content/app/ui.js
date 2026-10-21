@@ -880,6 +880,58 @@
     return node;
   }
 
+  /** (2.99.80) Apple's continuous corner: the element drawn through a clip whose corners are the squircle iOS and macOS
+   *  use — a corner that eases into its straight edges rather than meeting them at a circle's end — after Figma's
+   *  reconstruction of it (corner smoothing 0.6 matches Apple's), at the element's own border radius. Kept to its size as
+   *  it changes. */
+  function squirclePath(w, h, r, smoothing = 0.6) {
+    const budget = Math.min(w, h) / 2;
+    r = Math.min(r, budget);
+    if (!(r > 0) || !(w > 0) || !(h > 0)) return '';
+    let p = (1 + smoothing) * r;
+    if (p > budget) { smoothing = Math.max(0, Math.min(smoothing, budget / r - 1)); p = Math.min(p, budget); }
+    const rad = (deg) => (deg * Math.PI) / 180;
+    const arcMeasure = 90 * (1 - smoothing);
+    const arc = Math.sin(rad(arcMeasure / 2)) * r * Math.SQRT2;
+    const alpha = (90 - arcMeasure) / 2;
+    const p3p4 = r * Math.tan(rad(alpha / 2));
+    const beta = 45 * smoothing;
+    const c = p3p4 * Math.cos(rad(beta));
+    const d = c * Math.tan(rad(beta));
+    const b = (p - arc - c - d) / 3;
+    const a = 2 * b;
+    const n = (v) => (Math.round(v * 1000) / 1000).toString();
+    const ab = a + b, abc = a + b + c, bc = b + c;
+    return [
+      `M ${n(w - p)} 0`,
+      `c ${n(a)} 0 ${n(ab)} 0 ${n(abc)} ${n(d)}`, `a ${n(r)} ${n(r)} 0 0 1 ${n(arc)} ${n(arc)}`, `c ${n(d)} ${n(c)} ${n(d)} ${n(bc)} ${n(d)} ${n(abc)}`,
+      `L ${n(w)} ${n(h - p)}`,
+      `c 0 ${n(a)} 0 ${n(ab)} ${n(-d)} ${n(abc)}`, `a ${n(r)} ${n(r)} 0 0 1 ${n(-arc)} ${n(arc)}`, `c ${n(-c)} ${n(d)} ${n(-bc)} ${n(d)} ${n(-abc)} ${n(d)}`,
+      `L ${n(p)} ${n(h)}`,
+      `c ${n(-a)} 0 ${n(-ab)} 0 ${n(-abc)} ${n(-d)}`, `a ${n(r)} ${n(r)} 0 0 1 ${n(-arc)} ${n(-arc)}`, `c ${n(-d)} ${n(-c)} ${n(-d)} ${n(-bc)} ${n(-d)} ${n(-abc)}`,
+      `L 0 ${n(p)}`,
+      `c 0 ${n(-a)} 0 ${n(-ab)} ${n(d)} ${n(-abc)}`, `a ${n(r)} ${n(r)} 0 0 1 ${n(arc)} ${n(-arc)}`, `c ${n(c)} ${n(-d)} ${n(bc)} ${n(-d)} ${n(abc)} ${n(-d)}`,
+      'Z',
+    ].join(' ');
+  }
+  let squircleWatch = null;
+  function squircleFit(el) {
+    const w = el.offsetWidth, h = el.offsetHeight;
+    const r = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0;
+    const key = `${w}x${h}x${r}`;
+    if (el._bcvSq === key) return;
+    el._bcvSq = key;
+    const d = squirclePath(w, h, r);
+    el.style.clipPath = d ? `path('${d}')` : '';
+    el.classList.toggle('bcv-squircle', !!d);
+  }
+  function squircle(el) {
+    if (!el || typeof ResizeObserver === 'undefined') return el;
+    if (!squircleWatch) squircleWatch = new ResizeObserver((entries) => { for (const e of entries) squircleFit(e.target); });
+    squircleWatch.observe(el);
+    return el;
+  }
+
   const initials = (name) => String(name || '').trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || '').join('');
 
   const reducedMotion = () => {
@@ -1596,6 +1648,7 @@
   BCV.ui = {
     groupPicker, groupAttrs, BANDS, gradeBand, bandChip, bandSlider, whatIfAdder, whatIfRemove,
     svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, statusBadge, seg, segSlide, search, switchEl, btn, iconbtn, pill, placeDot, haptic,
+    squircle, squirclePath,
     empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, picker, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField, promptSheet, askSheet,
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,
     fmtTime, fmtTimeLower, fmtShort, fmtLong, fmtDateComma, fmtAt, fmtAtUpper, fmtBy, dayTitle, fmtDow, fmtRecent, whenShort, plural,

@@ -878,6 +878,9 @@ try {
   check(listRows.some((t) => /Dis01.*10 pts.*Due 11:59 PM/.test(t)) && listRows.some((t) => /Quiz.*Qz01/.test(t)), 'list rows show course · kind, points and due time');
   check(listRows.some((t) => /to-do date/.test(t)), 'to-do-dated items are labelled, not shown as due');
   await shot(page, '01-dashboard-list');
+  // (2.99.80) the counters drawn with Apple's continuous corners: each through a squircle clip at its own size and radius
+  const sq = await page.evaluate(() => [...document.querySelectorAll('.bcv-stats > .bcv-stat')].map((c) => { const cp = c.style.clipPath || ''; const m = /^path\("M ([\d.]+) 0 c/.exec(cp); return { sq: c.classList.contains('bcv-squircle'), start: m ? Number(m[1]) : null, w: c.offsetWidth, r: parseFloat(getComputedStyle(c).borderTopLeftRadius) }; }));
+  check(sq.length === 6 && sq.every((x) => x.sq && x.start !== null && Math.abs(x.w - x.start - 1.6 * x.r) < 1), `the counters wear Apple's squircle, at their size: ${JSON.stringify(sq.slice(0, 2))}`);
   // a list row previews the item beside the dashboard rather than navigating to it
   const assignRow = await page.$('.bcv-day a.bcv-row[href*="/assignments/"]');
   const assignHref = await assignRow.getAttribute('href');

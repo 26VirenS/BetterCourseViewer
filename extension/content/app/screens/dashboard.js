@@ -465,6 +465,7 @@
       };
       if (W !== Wf) Promise.all([W.overdueP, W.gradedP]).then((r) => show(r, false));
       Promise.all([Wf.overdueP, Wf.gradedP]).then((r) => show(r, true));
+      for (const c of cards) U.squircle?.(c); // (2.99.80, a beta: Apple's continuous corners on the counters)
       return U.el('bcv-stats', cards);
     }
     let statIndex = 0;

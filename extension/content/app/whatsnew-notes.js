@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.80', date: '2026-10-21', notes: [
+      { kind: 'improved', title: 'Squircle Counters', body: 'The counters have Apple’s smooth corners.', icon: P.check },
+    ] },
     { version: '2.99.79', date: '2026-10-21', notes: [
       { kind: 'improved', title: 'Tools in Sections', body: 'Study, Math & science, Files and Chemistry.', icon: P.check },
       { kind: 'improved', title: 'Pin With a Press', body: 'Every tool has a pin at its corner.', icon: P.check },
