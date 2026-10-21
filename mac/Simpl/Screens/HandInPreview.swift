@@ -95,8 +95,12 @@ final class HandInPreview: ObservableObject {
         }
     }
 
+    /// (1.3.146) The file before taken away a moment later, not at once: the preview that showed it is still going away
+    /// as the next comes in (Quick Look's reads it from a process of its own) — taken from under it, the app stopped.
     private func clean() {
-        if let folder { try? FileManager.default.removeItem(at: folder) }
+        if let old = folder {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { try? FileManager.default.removeItem(at: old) }
+        }
         folder = nil
     }
 }

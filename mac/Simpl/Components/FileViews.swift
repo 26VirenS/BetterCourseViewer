@@ -212,7 +212,10 @@ struct QuickLookView: NSViewRepresentable {
     /// The file put in the box: in PDFKit's view where it is a PDF PDFKit can read, else in Quick Look's.
     private func show(_ url: URL, in box: NSView, _ c: Coordinator) {
         c.file = url
-        if Self.isPDF(url), let doc = PDFDocument(url: url) {
+        // (1.3.146) read whole, from memory: PDFKit reads a document from its file as it draws, and the file of the one
+        // before is taken away as the next comes in (HandInPreview) — read from a file going away, it stopped the app
+        if Self.isPDF(url), let data = try? Data(contentsOf: url), let doc = PDFDocument(data: data) {
+            NSLog("SimplPreview: %@ in PDFKit (%d pages)", url.lastPathComponent, doc.pageCount)
             Self.retire(c)
             let pdf = PDFView(frame: box.bounds) // (one page under the next, fitted to the width, the wheel scrolling them)
             pdf.autoresizingMask = [.width, .height]
@@ -230,6 +233,7 @@ struct QuickLookView: NSViewRepresentable {
             if p.bounds.width <= 40 || p.bounds.height <= 40 { p.pending = url } else { p.started = true; p.previewItem = url as NSURL }
             return
         }
+        NSLog("SimplPreview: %@ in Quick Look", url.lastPathComponent)
         Self.retire(c)
         let preview = SettledPreviewView(frame: box.bounds, style: .normal)
         if let preview {
@@ -254,7 +258,12 @@ struct QuickLookView: NSViewRepresentable {
             if (p as? SettledPreviewView)?.started ?? true { DispatchQueue.main.async { p.close() } }
         }
         c.preview = nil
-        c.pdf?.removeFromSuperview()
+        // (1.3.146) PDFKit's view let go of its document before it goes: it draws pages on threads of its own, which
+        // went on drawing a document whose view had gone
+        if let pdf = c.pdf {
+            pdf.document = nil
+            pdf.removeFromSuperview()
+        }
         c.pdf = nil
     }
 

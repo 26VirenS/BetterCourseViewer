@@ -139,12 +139,13 @@ struct DeveloperView: View {
     @State private var page: Page? = UserDefaults.standard.string(forKey: "SimplDevPage").flatMap(Page.init(rawValue:)) ?? .overview
 
     enum Page: String, CaseIterable, Identifiable {
-        case overview, logs, system, stats, updates, engine, popups, interface, preferences // (1.3.109: logs, system, stats)
+        case overview, logs, crashes, system, stats, updates, engine, popups, interface, preferences // (1.3.109: logs, system, stats; 1.3.146: crashes)
         var id: String { rawValue }
         var title: String {
             switch self {
             case .overview: return "Overview"
             case .logs: return "Logs"
+            case .crashes: return "Crashes"
             case .system: return "System"
             case .stats: return "Stats"
             case .updates: return "Updates"
@@ -158,6 +159,7 @@ struct DeveloperView: View {
             switch self {
             case .overview: return "info.circle"
             case .logs: return "text.alignleft"
+            case .crashes: return "exclamationmark.octagon"
             case .system: return "gauge.with.dots.needle.33percent"
             case .stats: return "chart.bar.xaxis"
             case .updates: return "arrow.down.circle"
@@ -180,6 +182,7 @@ struct DeveloperView: View {
                 switch page ?? .overview {
                 case .overview: DevOverview()
                 case .logs: DevLogsPage()
+                case .crashes: DevCrashesPage()
                 case .system: DevSystemPage()
                 case .stats: DevStatsPage()
                 case .updates: DevUpdates()
@@ -208,6 +211,8 @@ private struct DevOverview: View {
                 LabeledContent("Bundle", value: Bundle.main.bundleIdentifier ?? "?")
                 LabeledContent("Development run", value: Updater.isDevelopmentRun ? "Yes" : "No")
                 LabeledContent("Translocated", value: AppPlacement.isTranslocated ? "Yes" : "No")
+                // (1.3.146) the newest crash kept (Crashes has them all)
+                LabeledContent("Last crash", value: CrashLog.all().first.map { "\($0.at.formatted(date: .abbreviated, time: .shortened)) — \($0.title)" } ?? "None kept")
             }
             Section("Diagnostics") {
                 Text(text)

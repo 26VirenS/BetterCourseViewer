@@ -197,10 +197,37 @@ final class OwnLog: @unchecked Sendable {
     private let lock = NSLock()
     private var pending: [(Date, String)] = []
 
+    /// (1.3.146) This run's file of the log (CrashLog): each line written there as it comes, so the lines before a crash
+    /// are still there at the next launch. Started over past 4 MB.
+    private var file: FileHandle?
+    private var written = 0
+    private let stamp: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss.SSS"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+
+    func mirror(to url: URL?) {
+        lock.lock()
+        defer { lock.unlock() }
+        try? file?.close()
+        file = url.flatMap { try? FileHandle(forWritingTo: $0) }
+        _ = try? file?.seekToEnd()
+        written = 0
+    }
+
     func add(_ text: String) {
         lock.lock()
-        pending.append((Date(), text))
+        let now = Date()
+        pending.append((now, text))
         if pending.count > 5000 { pending.removeFirst(pending.count - 5000) }
+        if let file {
+            let line = Data("\(stamp.string(from: now)) \(text)\n".utf8)
+            if written + line.count > 4_000_000 { try? file.truncate(atOffset: 0); written = 0 }
+            try? file.write(contentsOf: line)
+            written += line.count
+        }
         lock.unlock()
     }
 
@@ -487,5 +514,93 @@ struct DevStatsPage: View {
             Text(title).font(.caption).foregroundStyle(.secondary)
             Text(value).font(.title3.monospacedDigit().weight(.semibold))
         }
+    }
+}
+
+// MARK: - Crashes
+
+/// (1.3.146) The crash log (Support/CrashLog.swift): Simpl's own — a run that ended without quitting, with what stopped
+/// it and the last of its log — and the Mac's own crash reports for Simpl, newest first; one read beside the list.
+struct DevCrashesPage: View {
+    @State private var entries: [CrashLog.Entry] = []
+    @State private var picked: CrashLog.Entry.ID?
+    @State private var text = ""
+    @State private var askCrash = false
+
+    private var current: CrashLog.Entry? { entries.first { $0.id == picked } }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Text(entries.isEmpty ? "No crashes kept" : "\(entries.count) kept").font(.callout).foregroundStyle(.secondary)
+                Spacer()
+                Button("Reload") { load() }
+                Button("Copy") { copyToPasteboard(text) }.disabled(current == nil)
+                Button("Save…") { save() }.disabled(current == nil)
+                Button("Show in Finder") { if let c = current { NSWorkspace.shared.activateFileViewerSelecting([c.url]) } }.disabled(current == nil)
+                Button("Delete") { if let c = current { CrashLog.delete(c); load() } }.disabled(current?.kind != .simpl)
+                Menu("More") {
+                    Button("Delete All of Simpl's") { CrashLog.deleteOwn(); load() }
+                    Button("Open the Crashes Folder") { NSWorkspace.shared.open(CrashLog.folder) }
+                    Button("Open Console") { NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Console.app")) }
+                    Divider()
+                    Button("Crash Now…") { askCrash = true }
+                }
+                .fixedSize()
+            }
+            .padding(10)
+            Divider()
+            if entries.isEmpty {
+                ContentUnavailableView("No crashes", systemImage: "checkmark.seal", description: Text("A run of Simpl that ends without quitting is kept here, with what stopped it and the last of its log, and so are the Mac’s own crash reports for Simpl."))
+            } else {
+                HSplitView {
+                    List(entries, selection: $picked) { e in
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 6) {
+                                Text(e.kind.rawValue)
+                                    .font(.caption2.weight(.semibold))
+                                    .padding(.horizontal, 5).padding(.vertical, 1)
+                                    .background(Capsule().fill(e.kind == .simpl ? Color.red.opacity(0.18) : Color.secondary.opacity(0.18)))
+                                Text(e.at.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
+                                Spacer(minLength: 0)
+                                Text(e.version).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                            }
+                            Text(e.title).font(.callout).lineLimit(2)
+                        }
+                        .padding(.vertical, 2)
+                        .tag(e.id)
+                    }
+                    .frame(minWidth: 230, idealWidth: 270, maxWidth: 340)
+                    ScrollView([.vertical, .horizontal]) {
+                        Text(text.isEmpty ? "—" : text)
+                            .font(.system(size: 11, design: .monospaced))
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
+                            .padding(10)
+                    }
+                    .frame(minWidth: 360)
+                }
+            }
+        }
+        .onAppear { load() }
+        .onChange(of: picked) { _, _ in text = current.map(CrashLog.text(of:)) ?? "" }
+        .confirmationDialog("Stop Simpl now, as a crash would?", isPresented: $askCrash) {
+            Button("Crash Now", role: .destructive) { CrashLog.crashNow() }
+        } message: {
+            Text("For trying the crash log: Simpl stops at once, and the next time it opens the crash is here.")
+        }
+    }
+
+    private func load() {
+        entries = CrashLog.all()
+        if current == nil { picked = entries.first?.id }
+        text = current.map(CrashLog.text(of:)) ?? ""
+    }
+
+    private func save() {
+        guard let c = current else { return }
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = c.kind == .simpl ? c.url.lastPathComponent : "\(c.url.deletingPathExtension().lastPathComponent).txt"
+        if panel.runModal() == .OK, let url = panel.url { try? text.write(to: url, atomically: true, encoding: .utf8) }
     }
 }

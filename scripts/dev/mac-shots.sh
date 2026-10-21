@@ -262,6 +262,7 @@ phone_check() {
   ok "the notes are in the hand-in" "grep -q 'SimplHandIn added Notes.txt' '$OUT_ABS/console-light-12d-hand-in-phone-connected.txt'"
   ok "a PDF-only assignment's photos were taken and an mp3 refused (415): $(grep 12e "$t" 2>/dev/null)" "grep -q '12e-hand-in-phone-photos: page 200, wrong key 404, uploads 200 200 415' '$t'"
   ok "its two photos became one PDF in the hand-in" "[ \"\$(grep -c 'SimplHandIn added project01.pdf (1 files)' '$OUT_ABS/console-dark-12e-hand-in-phone-photos.txt')\" -ge 2 ]"
+  ok "(1.3.146) four files added one after another, each previewed: all four in, the app still up" "grep -q 'SimplHandIn added file 4 of 4: 4 in' '$OUT_ABS/console-light-12f-hand-in-one-by-one.txt'"
   cat "$out"
 }
 
@@ -958,6 +959,7 @@ push_set() {
   shoot light-36d-external-tools-list-reread 16 -SimplPlace externaltools -SimplExternalToolList knewton -SimplExternalToolReread YES
   shoot light-37-developer 16 -SimplOpen developer # (1.3.72: the Developer window)
   shoot light-37b-developer-logs 20 -SimplOpen developer -SimplDevPage logs # (1.3.134: Simpl's own lines in Logs)
+  shoot light-37c-developer-crashes 20 -SimplOpen developer -SimplDevPage crashes # (1.3.146: the crash log — runs of the suite's that were stopped, kept)
   shoot light-01p-dashboard-preview 16 -SimplOpen preview
   # (1.3.102) an assignment pushed on the Dashboard (as Hand In or See Feedback pushes one), then the Dashboard's row in
   # the sidebar pressed again: the Dashboard at its root, nothing pushed (again_check) — (1.3.133) 45 s: on a slow GitHub
@@ -989,6 +991,8 @@ push_set() {
   shoot light-12e-hand-in-preview-scroll 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplScrollProbe YES -SimplHandInPreview "$PWD/scripts/dev/fixtures/long-reading.pdf"
   # (1.3.145) several files added at once, as the file chooser hands them back: the hand-in stays up, all of them in
   shoot light-12c-hand-in-several 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplHandInFiles "$PWD/docs/screenshots/calendar.png|$PWD/docs/screenshots/grades.png|$PWD/docs/screenshots/dashboard.png"
+  # (1.3.146) files added one after another, each previewed as it comes (PDF, picture, PDF, picture): the hand-in stays up
+  shoot light-12f-hand-in-one-by-one 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplHandInOneByOne YES -SimplHandInFiles "$PWD/scripts/dev/fixtures/long-reading.pdf|$PWD/docs/screenshots/calendar.png|$PWD/scripts/dev/fixtures/reading.pdf|$PWD/docs/screenshots/grades.png"
   # (1.3.78) Send from Phone: the phone connected and two files in (posted by phone_send); a PDF-only assignment's
   # photos made into one PDF, and a kind it does not take refused (1013 made PDF-only above)
   if [ -z "$PLANNING" ]; then

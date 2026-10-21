@@ -1230,7 +1230,20 @@ private struct HandInSheet: View {
             }
             // (1.3.145, the screenshot suite: -SimplHandInFiles "<file>|<file>|…" puts several in at once, as the file
             // chooser hands back several — the way a crash came, adding more than one at a time)
-            if let list = UserDefaults.standard.string(forKey: "SimplHandInFiles") {
+            // (1.3.146: -SimplHandInOneByOne YES puts them in one after another instead, two seconds apart, each previewed
+            // as it comes — as a student picks a second file once the first is in, the way the next crash came)
+            if let list = UserDefaults.standard.string(forKey: "SimplHandInFiles"), UserDefaults.standard.bool(forKey: "SimplHandInOneByOne") {
+                let urls = list.split(separator: "|").map { URL(fileURLWithPath: String($0)) }
+                Shot.began()
+                for (i, u) in urls.enumerated() {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5 + 2 * Double(i)) {
+                        NSLog("SimplHandIn adding file %d of %d: %@", i + 1, urls.count, u.lastPathComponent)
+                        _ = take([u])
+                        NSLog("SimplHandIn added file %d of %d: %d in", i + 1, urls.count, files.count)
+                        if i == urls.count - 1 { DispatchQueue.main.asyncAfter(deadline: .now() + 3) { Shot.ended() } }
+                    }
+                }
+            } else if let list = UserDefaults.standard.string(forKey: "SimplHandInFiles") {
                 let urls = list.split(separator: "|").map { URL(fileURLWithPath: String($0)) }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                     NSLog("SimplHandIn adding %d files at once", urls.count)

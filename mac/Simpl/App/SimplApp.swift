@@ -14,6 +14,7 @@ struct SimplApp: App {
     @StateObject private var model = AppModel.shared
 
     init() {
+        CrashLog.install() // (1.3.146: first — the run before looked at, this one's log kept and its crashes caught)
         Vault.prepare() // (1.3.76: what Simpl keeps is sealed; its vault opened off the main thread before the first read)
         Shot.forgetWindowFramesIfAsked() // (1.3.79: the screenshot suite's windows open at their own size, then as asked)
     }
@@ -88,6 +89,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MoveToApplications.offerIfNeeded() // (1.3.13: opened from Downloads or a disk image, an offer to move to Applications)
         DevMode.shared.watchKeys() // (1.3.72: Control-Option-Shift-Command-D, developer mode in or out)
         Updater.shared.start() // (1.2: the update feed at launch and every hour (1.2.19); nothing in a development run)
+    }
+
+    /// (1.3.146) Quit as asked (Quit, an update's restart, logging out): no crash to keep (CrashLog).
+    func applicationWillTerminate(_ notification: Notification) {
+        CrashLog.quitting()
     }
 
     /// The window closed: the app stays (its reminders and new-activity alerts keep coming); the Dock icon brings the window back.
