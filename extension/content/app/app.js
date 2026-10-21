@@ -1915,6 +1915,7 @@
    *  wide the right side is, for the title to stop short of it. On every change of the row's size. */
   let barRO = null;
   function barLayout() {
+    popTrayWatch();
     if (BCV.phone?.active?.()) return;
     const ts = document.getElementById('bcv-topsearch');
     const shown = !!ts && !ts.hidden && getComputedStyle(ts).display !== 'none';
@@ -1937,6 +1938,60 @@
       for (const el of [ts, document.getElementById('bcv-pins')]) if (el && !el.dataset.bcvBarWatched) { el.dataset.bcvBarWatched = '1'; barRO.observe(el); }
     }
   }
+  /** (2.99.72) With a popup up (a sheet, the viewer, a tool, Feedback — not a counter's box, which leaves the bar as it
+   *  is), the pinned tools sit in the popup's own head: left of its buttons (Open in new tab, Download, ×), level with
+   *  them, as a Mac window's toolbar items — the head found by its × (the topmost Close in it), its buttons the ones on
+   *  that row in the head's right half. Measured again as the popup grows in, takes another size or the window does;
+   *  with no head to sit in, the tools stay beside the sidebar's button (app.css). */
+  const POP_OV = 'body > :is(.bcv-sheet-ov:not(.is-closing):not(.is-under):not(.bcv-sheet-ov--float):not(.is-folding), .bcv-fbs-ov:not(.is-closing))';
+  function popTrayPlace() {
+    const tray = document.getElementById('bcv-tray');
+    const ov = [...document.querySelectorAll(POP_OV)].pop();
+    const box = ov?.firstElementChild?.getBoundingClientRect();
+    const seen = (r) => r.width > 0 && r.height > 0;
+    const closes = ov ? [...ov.querySelectorAll('button[aria-label="Close"], .bcv-sheet__close')].map((b) => ({ b, r: b.getBoundingClientRect() })).filter((x) => seen(x.r)) : [];
+    if (!tray || !ov || !box || !closes.length || BCV.phone?.active?.()) { html.classList.remove('bcv-tray-pop'); return; }
+    const head = closes.sort((x, y) => x.r.top - y.r.top || y.r.right - x.r.right)[0].r;
+    const mid = head.top + head.height / 2;
+    const half = box.left + box.width / 2;
+    let left = head.left;
+    for (const b of ov.querySelectorAll('button, a[role="button"], .bcv-btn')) {
+      const r = b.getBoundingClientRect();
+      if (seen(r) && Math.abs(r.top + r.height / 2 - mid) < 8 && r.left > half && r.right <= head.right + 1) left = Math.min(left, r.left);
+    }
+    const t = tray.getBoundingClientRect();
+    html.style.setProperty('--bcv-tray-px', `${Math.round(innerWidth - left + 10)}px`);
+    html.style.setProperty('--bcv-tray-py', `${Math.round(mid - (t.height || 32) / 2)}px`);
+    html.classList.add('bcv-tray-pop');
+  }
+  let popTrayT = 0;
+  /** Measured each frame for a moment after a popup comes, goes or changes (it grows in; its buttons arrive). */
+  function popTraySoon(ms = 700) {
+    const until = performance.now() + ms;
+    const step = () => { popTrayPlace(); if (performance.now() < until) popTrayT = requestAnimationFrame(step); };
+    cancelAnimationFrame(popTrayT);
+    popTrayT = requestAnimationFrame(step);
+  }
+  let popTrayWatched = false;
+  /** Watched once the page has its body: a popup put in or taken out, one's own class changing (closing, folding, under
+   *  another) or its card taking another size. */
+  function popTrayWatch() {
+    if (popTrayWatched || !document.body || typeof MutationObserver !== 'function') return;
+    popTrayWatched = true;
+    const isPop = (n) => n.nodeType === 1 && /\bbcv-(sheet|fbs)-ov\b/.test(typeof n.className === 'string' ? n.className : '');
+    const sized = typeof ResizeObserver === 'function' ? new ResizeObserver(() => popTraySoon(150)) : null;
+    const own = new MutationObserver(() => popTraySoon());
+    new MutationObserver((list) => {
+      let any = false;
+      for (const m of list) {
+        for (const n of m.addedNodes) if (isPop(n)) { any = true; own.observe(n, { attributes: true, attributeFilter: ['class'] }); if (n.firstElementChild) sized?.observe(n.firstElementChild); }
+        for (const n of m.removedNodes) if (isPop(n)) any = true;
+      }
+      if (any) popTraySoon();
+    }).observe(document.body, { childList: true });
+    addEventListener('resize', () => popTraySoon(200));
+  }
+
   /** (2.99.53) The bar's title, as the Mac's window title: the item, the section or the screen, with its course under it. */
   function barTitle(r) {
     const el = document.getElementById('bcv-toptitle');

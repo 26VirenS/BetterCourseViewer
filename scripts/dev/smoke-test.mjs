@@ -6991,21 +6991,23 @@ try {
   await shot(page, '41b-tools-pinned');
   // (2.99.59) a popup up: ⋯ goes, and the pinned tools move beside the sidebar's button at the top left, the popup
   // below them — nothing overlaps
-  await page.goto(`${BASE}/`);
-  await page.waitForSelector('.bcv-stats .bcv-stat', { timeout: 15000 });
-  await page.click('.bcv-stats .bcv-stat:nth-child(4)');
-  await page.waitForSelector('.bcv-sheet-ov .bcv-sheet', { timeout: 5000 });
-  await page.waitForTimeout(500);
+  // (2.99.72) a popup up: ⋯ gone, and the tools in the popup's own head — left of its buttons (Open in new tab, Download),
+  // level with its × — over its scrim; the sidebar's button gone with ⋯
+  await page.goto(`${BASE}/courses/101/files`);
+  await page.waitForSelector('.bcv-body .bcv-row:has-text("planned lecture schedule.xlsx")', { timeout: 15000 });
+  await page.click('.bcv-body .bcv-row:has-text("planned lecture schedule.xlsx")');
+  await page.waitForSelector('.bcv-viewer .bcv-viewer__acts', { timeout: 8000 });
+  await page.waitForTimeout(900);
   const popBar = await page.evaluate(() => {
     const r = (el) => el.getBoundingClientRect();
-    const tray = r(document.getElementById('bcv-tray')), tog = r(document.getElementById('bcv-sidetoggle')), sheet = r(document.querySelector('.bcv-sheet-ov .bcv-sheet'));
-    const meet = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-    return { look: getComputedStyle(document.getElementById('bcv-look')).opacity, trayLeft: Math.round(tray.left), togRight: Math.round(tog.right), overlap: meet(tray, sheet) || meet(tog, sheet) || meet(tray, tog), top: document.elementFromPoint(tray.left + 12, tray.top + 15)?.closest('#bcv-tray') ? 'tray' : 'other' };
+    const tray = r(document.getElementById('bcv-tray')), acts = r(document.querySelector('.bcv-viewer__acts')), x = r(document.querySelector('.bcv-viewer-ov .bcv-sheet__close')), tog = r(document.getElementById('bcv-sidetoggle'));
+    return { look: getComputedStyle(document.getElementById('bcv-look')).opacity, gap: Math.round(acts.left - tray.right), level: Math.round((tray.top + tray.height / 2) - (x.top + x.height / 2)), pop: document.documentElement.classList.contains('bcv-tray-pop'), top: document.elementFromPoint(tray.left + 12, tray.top + tray.height / 2)?.closest('#bcv-tray') ? 'tray' : 'other', toggle: getComputedStyle(document.getElementById('bcv-sidetoggle')).opacity === '0' && document.elementFromPoint(tog.left + tog.width / 2, tog.top + tog.height / 2)?.closest('#bcv-sidetoggle') == null ? 'under' : 'over' };
   });
-  check(popBar.look === '0' && popBar.trayLeft >= popBar.togRight && popBar.trayLeft - popBar.togRight <= 12 && !popBar.overlap && popBar.top === 'tray', `a popup up: ⋯ gone, the tools beside the sidebar's button and over the scrim, overlapping nothing: ${JSON.stringify(popBar)}`);
+  check(popBar.look === '0' && popBar.pop && popBar.gap >= 4 && popBar.gap <= 16 && Math.abs(popBar.level) <= 3 && popBar.top === 'tray' && popBar.toggle === 'under', `a popup up: ⋯ gone, the tools in the popup's head left of its buttons and level with its ×, over the scrim; the sidebar's button gone with ⋯: ${JSON.stringify(popBar)}`);
   await shot(page, '41c-tools-over-popup');
   await page.keyboard.press('Escape');
-  await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
+  await page.waitForFunction(() => !document.querySelector('.bcv-viewer'), null, { timeout: 5000 });
+  check(await eventually(async () => page.evaluate(() => !document.documentElement.classList.contains('bcv-tray-pop')), 2000), 'and back in the bar once the popup has gone');
   await page.goto(`${BASE}/calendar`);
   await page.waitForSelector('#bcv-pins .bcv-pin', { timeout: 10000 });
   // the pin is on every page; pressed while nothing is going, it swells into a small setter: the strip under the marker and Start — set, and go

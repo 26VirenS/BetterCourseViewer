@@ -27,6 +27,7 @@
   self.BCV_WHATS_NEW = [
     { version: '2.99.72', date: '2026-10-21', notes: [
       { kind: 'improved', title: 'Counter Boxes Polished', body: 'Tinted like the Mac, smoother open, tools stay put.', icon: P.check },
+      { kind: 'improved', title: 'Tools in Popups', body: 'Pinned tools sit in a popup\'s head, by its buttons.', icon: P.check },
     ] },
     { version: '2.99.71', date: '2026-10-20', notes: [
       { kind: 'improved', title: 'Submit as ZIP', body: 'Two or more files: Submit as ZIP sits beside Submit.', icon: P.check },
