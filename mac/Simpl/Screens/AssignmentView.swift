@@ -1228,6 +1228,16 @@ private struct HandInSheet: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { openPhone() }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) { Shot.ended() }
             }
+            // (1.3.145, the screenshot suite: -SimplHandInFiles "<file>|<file>|…" puts several in at once, as the file
+            // chooser hands back several — the way a crash came, adding more than one at a time)
+            if let list = UserDefaults.standard.string(forKey: "SimplHandInFiles") {
+                let urls = list.split(separator: "|").map { URL(fileURLWithPath: String($0)) }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    NSLog("SimplHandIn adding %d files at once", urls.count)
+                    _ = take(urls)
+                    NSLog("SimplHandIn added %d files at once: %d in", urls.count, files.count)
+                }
+            }
             // (the screenshot suite: -SimplHandInPreview <file> puts a file in and opens its preview)
             // (1.3.8: a moment after the sheet is up, and through add(), as a file chosen is: the preview opens by itself)
             if let path = UserDefaults.standard.string(forKey: "SimplHandInPreview"), let data = FileManager.default.contents(atPath: path) {

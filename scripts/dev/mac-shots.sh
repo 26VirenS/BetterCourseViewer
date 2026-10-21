@@ -985,6 +985,8 @@ push_set() {
   shoot light-51-appearance-mode 16 -SimplAppearanceMode YES -SimplTheme Ocean
   shoot light-51c-appearance-courses 16 -SimplAppearanceMode YES -SimplAppearanceTab courses
   shoot light-12b-hand-in-preview 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplHandInPreview "$PWD/docs/screenshots/calendar.png"
+  # (1.3.145) several files added at once, as the file chooser hands them back: the hand-in stays up, all of them in
+  shoot light-12c-hand-in-several 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplHandInFiles "$PWD/docs/screenshots/calendar.png|$PWD/docs/screenshots/grades.png|$PWD/docs/screenshots/dashboard.png"
   # (1.3.78) Send from Phone: the phone connected and two files in (posted by phone_send); a PDF-only assignment's
   # photos made into one PDF, and a kind it does not take refused (1013 made PDF-only above)
   if [ -z "$PLANNING" ]; then
