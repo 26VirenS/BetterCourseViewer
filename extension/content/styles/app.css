@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.76"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.77"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -765,6 +765,14 @@ html[data-bcv-theme="dark"] .bcv-stats > .bcv-stat[data-stat]:not(.bcv-stat--pic
 html[data-bcv-theme="dark"] .bcv-stats > .bcv-stat[data-stat]:not(.bcv-stat--pic):hover { background: color-mix(in srgb, var(--bcv-stat-tone) 33%, var(--bcv-card)); }
 #bcv-app .bcv-stats > .bcv-stat[data-stat]:not(.bcv-stat--pic) .bcv-stat__head > svg { stroke: var(--bcv-stat-tone) !important; }
 .bcv-stats > .bcv-stat[data-stat="overdue"]:not(.bcv-stat--pic) .bcv-stat__value { color: #ff3b30; }
+/* (2.99.77) under a colour of your own the six counters are that colour alone, a shade each — lightest first, deepest last */
+html.bcv-themed .bcv-stats > .bcv-stat[data-stat="today"] { --bcv-stat-tone: color-mix(in oklab, var(--bcv-accent) 62%, #fff); }
+html.bcv-themed .bcv-stats > .bcv-stat[data-stat="tomorrow"] { --bcv-stat-tone: color-mix(in oklab, var(--bcv-accent) 80%, #fff); }
+html.bcv-themed .bcv-stats > .bcv-stat[data-stat="week"] { --bcv-stat-tone: var(--bcv-accent); }
+html.bcv-themed .bcv-stats > .bcv-stat[data-stat="overdue"] { --bcv-stat-tone: color-mix(in oklab, var(--bcv-accent) 84%, #000); }
+html.bcv-themed .bcv-stats > .bcv-stat[data-stat="unread"] { --bcv-stat-tone: color-mix(in oklab, var(--bcv-accent) 68%, #000); }
+html.bcv-themed .bcv-stats > .bcv-stat[data-stat="graded"] { --bcv-stat-tone: color-mix(in oklab, var(--bcv-accent) 52%, #000); }
+html.bcv-themed .bcv-stats > .bcv-stat[data-stat="overdue"]:not(.bcv-stat--pic) .bcv-stat__value { color: inherit; }
 @container bcv-main (min-width: 860px) {
   .bcv-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
   .bcv-stats > .bcv-stat { aspect-ratio: auto; min-height: 112px; padding: 14px 15px 13px; }
@@ -5313,9 +5321,19 @@ html[data-bcv-theme="light"] .bcv-spot { --bcv-spot-shade: .24; }
 .bcv-head__row--center { row-gap: 8px; }
 @container bcv-main (max-width: 1080px) {
   .bcv-cal__tools { gap: 6px; }
-  .bcv-cal__apptbtn > span:not(.bcv-cal__calcount), .bcv-cal__calbtn > span:not(.bcv-cal__calcount) { display: none; }
-  .bcv-cal__apptbtn, .bcv-cal__calbtn { padding: 0 8px 0 10px; gap: 6px; }
+  .bcv-cal__calbtn > span:not(.bcv-cal__calcount) { display: none; } /* (2.99.77: Find appointment keeps its words) */
+  .bcv-cal__calbtn { padding: 0 8px 0 10px; gap: 6px; }
 }
+@container bcv-main (max-width: 640px) {
+  .bcv-cal__apptbtn > span:not(.bcv-cal__calcount) { display: none; }
+  .bcv-cal__apptbtn { padding: 0 8px 0 10px; gap: 6px; }
+}
+/* (2.99.77) the agenda's range picker stands to the right of its list, never under it, until the column is too narrow
+ * for both */
+.bcv-body--cal { flex-wrap: nowrap; }
+.bcv-body--cal > .bcv-cal__main { flex: 1 1 0 !important; min-width: 0; }
+.bcv-body--cal > .bcv-cal__side { flex: 0 0 280px; position: sticky; top: calc(var(--bcv-bar-h, 0px) + 96px); }
+@container bcv-main (max-width: 700px) { .bcv-body--cal { flex-wrap: wrap; } .bcv-body--cal > .bcv-cal__main { flex-basis: 100% !important; } .bcv-body--cal > .bcv-cal__side { position: static; } }
 /* 2.81.0: the Appearance button expands into a menu above itself — Light, Dark, Personalize */
 .bcv-menu--theme { width: 224px; max-height: none; padding: 8px; }
 .bcv-menu--theme .bcv-menu__item.is-active .bcv-menu__ic { background: var(--bcv-blue); color: #fff; }
@@ -5883,6 +5901,29 @@ html.bcv-dark .bcv-ap-veil { background: rgba(0,0,0,.58); }
 .bcv-ap-course { flex: none; display: inline-flex; align-items: center; gap: 8px; max-width: 220px; padding: 8px 12px 8px 10px; border: 0; border-radius: 999px; background: var(--bcv-fill); color: var(--bcv-ink); font: 500 13px/1 var(--bcv-font); cursor: pointer; }
 .bcv-ap-course__sw { flex: none; width: 22px; height: 22px; border-radius: 6px; }
 .bcv-ap-empty { color: var(--bcv-ink3); font: 400 13px/1.4 var(--bcv-font); }
+/* (2.99.77) Any colour, round as Personalize's picker was: a hue ring, the saturation and depth arcs inside it, and at its
+ * heart the colour as words on white and on dark — grown out of its dot */
+.bcv-ap-wheel { position: fixed; z-index: var(--bcv-z-tray); box-sizing: border-box; width: 272px; height: 272px; border-radius: 50%; background: rgba(36,36,40,.92); -webkit-backdrop-filter: blur(24px) saturate(1.6); backdrop-filter: blur(24px) saturate(1.6); border: 1px solid rgba(255,255,255,.12); box-shadow: 0 24px 60px rgba(0,0,0,.45); touch-action: none; cursor: pointer; animation: bcv-apw-in .44s var(--bcv-ease-out) both; }
+.bcv-ap-wheel.is-closing { animation: bcv-apw-out .2s cubic-bezier(.23,1,.32,1) both; pointer-events: none; }
+@keyframes bcv-apw-in { from { opacity: 0; transform: scale(.13); } to { opacity: 1; transform: none; } }
+@keyframes bcv-apw-out { to { opacity: 0; transform: scale(.13); } }
+@keyframes bcv-apw-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes bcv-apw-knob { from { opacity: 0; transform: scale(.4); } 60% { opacity: 1; transform: scale(1.18); } to { opacity: 1; transform: scale(1); } }
+@keyframes bcv-apw-spin { from { opacity: 0; transform: rotate(-70deg) scale(.92); } to { opacity: 1; transform: none; } }
+@keyframes bcv-apw-core { from { opacity: 0; transform: scale(.55); } to { opacity: 1; transform: none; } }
+.bcv-ap-wheel__ring { position: absolute; inset: 8px; border-radius: 50%; animation: bcv-apw-spin .6s var(--bcv-ease-out) .1s both; background: conic-gradient(#ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000); -webkit-mask-image: radial-gradient(circle, transparent 107px, #000 108px, #000 127px, transparent 128px); mask-image: radial-gradient(circle, transparent 107px, #000 108px, #000 127px, transparent 128px); }
+.bcv-ap-wheel__svg { position: absolute; inset: 0; display: block; overflow: visible; }
+.bcv-ap-wheel__track { animation: bcv-apw-draw .5s cubic-bezier(.65,0,.35,1) .08s both; }
+.bcv-ap-wheel__track--dep { animation-delay: .13s; }
+.bcv-ap-wheel__label { font: 600 8.5px var(--bcv-font); letter-spacing: .14em; fill: rgba(235,235,245,.6); animation: bcv-fade-in .3s ease both; }
+.bcv-ap-wheel__knob { transform-box: fill-box; transform-origin: center; animation: bcv-apw-knob .38s var(--bcv-ease-out) .26s both; }
+.bcv-ap-wheel__knob--sat { animation-delay: .32s; } .bcv-ap-wheel__knob--dep { animation-delay: .37s; }
+.bcv-ap-wheel__core { position: absolute; left: 80px; top: 80px; width: 112px; height: 112px; border-radius: 50%; overflow: hidden; animation: bcv-apw-core .45s var(--bcv-ease-out) .16s both; box-shadow: 0 0 0 3px var(--hex), 0 6px 18px rgba(0,0,0,.25); }
+.bcv-ap-wheel__aa { position: absolute; left: 0; right: 0; height: 56px; display: flex; justify-content: center; font: 700 17px/1 var(--bcv-display); letter-spacing: -.02em; box-sizing: border-box; }
+.bcv-ap-wheel__aa--light { top: 0; background: #fff; align-items: flex-start; padding-top: 14px; }
+.bcv-ap-wheel__aa--dark { bottom: 0; background: #1c1c1e; align-items: flex-end; padding-bottom: 14px; }
+.bcv-ap-wheel__done { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); height: 26px; padding: 0 13px; border: 0; border-radius: 13px; background: var(--hex); color: var(--ink); cursor: pointer; font: 600 11.5px/1 var(--bcv-font); box-shadow: 0 2px 8px rgba(0,0,0,.28); }
+@media (prefers-reduced-motion: reduce) { .bcv-ap-wheel, .bcv-ap-wheel *, .bcv-ap-wheel.is-closing { animation-duration: .01s !important; animation-delay: 0s !important; } }
 .bcv-ap-custom { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .bcv-ap-custom__head { display: flex; align-items: center; gap: 8px; font: 600 13px/1 var(--bcv-font); }
 .bcv-ap-custom__sw { width: 22px; height: 22px; border-radius: 50%; }

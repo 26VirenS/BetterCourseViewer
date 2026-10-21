@@ -41,8 +41,8 @@
     const apptCount = h('span', { class: 'bcv-cal__calcount bcv-cal__apptcount', text: '' });
     apptCount.hidden = true;
     const apptBtn = h('button', { type: 'button', class: 'bcv-roundbtn bcv-cal__apptbtn', title: 'Office hours, conferences and sign-ups with a time to reserve', 'aria-haspopup': 'dialog', onclick: (e) => openAppointments(e.currentTarget) }, [U.svg(IC.calendarPlus, { size: 13, stroke: 'var(--bcv-blue)', width: 2.1 }), h('span', { text: 'Find appointment' }), apptCount]);
-    const body = U.el('bcv-body bcv-body--cols');
-    const mainCol = h('div', { style: { flex: '1 1 720px', minWidth: '0' } });
+    const body = U.el('bcv-body bcv-body--cols bcv-body--cal');
+    const mainCol = h('div', { class: 'bcv-cal__main', style: { flex: '1 1 720px', minWidth: '0' } });
     const sideCol = U.el('bcv-cal__side'); // the agenda's range picker; nothing else lives beside the grid now
     sideCol.hidden = true;
     body.append(mainCol, sideCol);

@@ -25,6 +25,12 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.77', date: '2026-10-21', notes: [
+      { kind: 'improved', title: 'Colour Wheel Is Back', body: 'Any colour in Appearance opens the round picker.', icon: P.check },
+      { kind: 'improved', title: 'Counters in Your Hue', body: 'With a theme colour, the counters are its shades.', icon: P.check },
+      { kind: 'improved', title: 'Find Appointment', body: 'The button keeps its name on smaller windows.', icon: P.check },
+      { kind: 'improved', title: 'Agenda Range Beside', body: 'The range picker sits beside the agenda.', icon: P.check },
+    ] },
     { version: '2.99.76', date: '2026-10-21', notes: [
       { kind: 'improved', title: 'Wider Sidebar', body: 'The sidebar has a little more room.', icon: P.check },
       { kind: 'improved', title: 'Shorter Counter Boxes', body: 'A box shows two and a half items, then scrolls.', icon: P.check },

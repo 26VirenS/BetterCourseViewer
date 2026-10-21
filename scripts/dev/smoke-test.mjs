@@ -1518,6 +1518,15 @@ try {
   // (the grid is the start's month: the end is marked when it falls inside, and otherwise the grid's last day is inside the range)
   const mini = await page.$$eval('.bcv-mini__day', (els) => ({ n: els.length, start: els.some((e) => e.classList.contains('bcv-mini__day--start')), end: els.some((e) => e.classList.contains('bcv-mini__day--end')), lastInside: !!els[els.length - 1]?.classList.contains('bcv-mini__day--inside') }));
   check(mini.n === 42 && mini.start && (mini.end || mini.lastInside), `agenda range picker mini calendar (${JSON.stringify(mini)})`);
+  // (2.99.77) the range picker stands to the right of the agenda, beside it, not under it — at a narrower window too
+  const sideAt = async () => page.evaluate(() => { const m = document.querySelector('.bcv-cal__main').getBoundingClientRect(), sd = document.querySelector('.bcv-cal__side').getBoundingClientRect(); return { right: sd.left >= m.right, top: Math.abs(sd.top - m.top) < 4 }; });
+  const sideWide = await sideAt();
+  const vpWas = page.viewportSize();
+  await page.setViewportSize({ width: 1040, height: vpWas.height });
+  await page.waitForTimeout(300);
+  const sideNarrow = await sideAt();
+  await page.setViewportSize(vpWas);
+  check(sideWide.right && sideWide.top && sideNarrow.right && sideNarrow.top, `the agenda's range picker stands to its right, at 1040px too: ${JSON.stringify({ sideWide, sideNarrow })}`);
   const agendaHeads = await texts('.bcv-agenda .bcv-group__head');
   check(agendaHeads[0].includes('Today ·') && /\d items?/.test(agendaHeads[0]), `agenda day heads: ${agendaHeads[0]}`);
   // a row says the course, then what the work is worth or where the event is
@@ -4997,6 +5006,20 @@ try {
   await page.click('.bcv-ap-ready[data-ready="Ocean"]');
   const worn = await eventually(() => sw.evaluate(async () => { const s = await self.BCV.settings.get(); const im = (await self.BCV.api.storage.local.get('theme:images'))['theme:images']; return s.appearance?.theme?.name === 'Teal' && !!im?.side; }), 8000);
   check(worn, 'a ready-made theme is worn as it is picked: Ocean, its colour (Teal) and its drawings kept');
+  // (2.99.77) under a colour of your own the six counters are that colour alone, a shade of it each
+  const tones = await eventually(async () => { const v = await page.evaluate(() => ({ accent: getComputedStyle(document.documentElement).getPropertyValue('--bcv-accent').trim().toLowerCase(), tones: [...document.querySelectorAll('.bcv-stats > .bcv-stat[data-stat]')].map((c) => getComputedStyle(c).getPropertyValue('--bcv-stat-tone').trim().toLowerCase()) })); return v.accent && v.tones.length === 6 && new Set(v.tones).size === 6 && v.tones.every((t) => t.includes(v.accent)) ? v : null; }, 6000);
+  check(!!tones, `the counters take the theme's colour, six shades of it: ${JSON.stringify(tones)}`);
+  // (2.99.77) Any colour opens the round picker again: a press on the hue ring turns the colour, kept as it turns
+  await page.click('.bcv-ap-dot[data-theme="Custom"]');
+  await page.waitForSelector('.bcv-ap-wheel .bcv-ap-wheel__core', { timeout: 3000 });
+  await page.waitForTimeout(600); // (it grows out of its dot)
+  const wb = await page.$eval('.bcv-ap-wheel', (e) => { const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, arcs: e.querySelectorAll('.bcv-ap-wheel__track').length, knobs: e.querySelectorAll('.bcv-ap-wheel__knob').length, labels: [...e.querySelectorAll('.bcv-ap-wheel__label')].map((l) => l.textContent).join('|') }; });
+  await page.mouse.click(wb.x + ((136 + 118) * wb.w) / 272, wb.y + (136 * wb.w) / 272); // (the ring at 90°)
+  const turned = await eventually(() => sw.evaluate(async () => { const t = (await self.BCV.settings.get()).appearance?.theme; return t?.name === 'Custom' && Math.abs(t.h - 90) < 4 ? t : null; }), 4000);
+  check(wb.w === 272 && wb.arcs === 2 && wb.knobs === 3 && wb.labels === 'SATURATION|DEPTH' && !!turned, `Any colour opens the round picker — hue ring, saturation and depth arcs — and a press on the ring is the colour, kept: ${JSON.stringify({ wb, turned })}`);
+  await shot(page, '27c-appearance-any-colour');
+  await page.click('.bcv-ap-wheel__done');
+  check(await eventually(() => page.evaluate(() => !document.querySelector('.bcv-ap-wheel')), 2000), 'its Done puts the picker away');
   await page.click('.bcv-ap-tabs [data-k="courses"]');
   check(await eventually(() => page.$$('.bcv-ap-course').then((r) => r.length > 0), 6000), 'Courses: each course with its colour');
   // (2.99.74) Sidebar: the first course opens behind the bar, its sidebars lit and no photo buttons, and one sidebar or two

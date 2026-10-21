@@ -307,26 +307,95 @@
     keepTheme();
     keepImages();
   }
-  /** Any colour: its hue and depth, in a small panel over its dot. */
+  /** (2.99.77) Any colour: the round picker Personalize had — the hue on a ring, saturation and depth on the two arcs
+   *  inside it, and at its heart how the colour reads as words on white and on dark — over its dot, grown out of it. */
+  const NS = 'http://www.w3.org/2000/svg';
+  const C = 136; // the wheel's centre, in its own 272 × 272 space
+  const pt = (deg, r) => { const a = (deg * Math.PI) / 180; return [C + r * Math.sin(a), C - r * Math.cos(a)]; };
+  const arc = (a0, a1, r) => { const s = pt(a0, r), e = pt(a1, r); return `M${s[0].toFixed(1)} ${s[1].toFixed(1)} A${r} ${r} 0 0 1 ${e[0].toFixed(1)} ${e[1].toFixed(1)}`; };
   function customPop(anchor) {
     U.closeMenus();
+    document.querySelector('.bcv-ap-wheel')?.remove();
+    const t = T();
     const th = st.theme;
-    const swatch = h('i', { class: 'bcv-ap-custom__sw' });
-    const paint = () => { swatch.style.background = T().customHex(th.h, th.s, th.depth); };
+    th.depth = Math.max(0, Math.min(100, Number(th.depth) || 0));
+    th.s = Math.max(0, Math.min(1, Number(th.s) || 0));
     let t0 = 0;
-    const kept = () => { clearTimeout(t0); t0 = setTimeout(keepTheme, 160); }; // (kept a moment after the slider rests, not on every step)
-    const range = (label, min, max, step, get, set) => h('label', { class: 'bcv-ap-custom__row' }, [h('span', { text: label }), h('input', { type: 'range', min, max, step, value: get(), oninput: (e) => { set(Number(e.target.value)); paint(); kept(); } })]);
-    const m = U.el('bcv-menu bcv-ap-custom', [
-      h('div', { class: 'bcv-ap-custom__head' }, [swatch, h('span', { text: 'Any colour' })]),
-      range('Hue', 0, 360, 1, () => th.h, (v) => { th.h = v; }),
-      range('Strength', 0.2, 1, 0.01, () => th.s, (v) => { th.s = v; }),
-      range('Depth', 0, 80, 1, () => th.depth, (v) => { th.depth = v; }),
-    ], { onclick: (e) => e.stopPropagation() });
+    const kept = () => { clearTimeout(t0); t0 = setTimeout(keepTheme, 160); }; // (kept a moment after the knob rests, not on every step)
+    const ns = (tag, attrs) => { const n = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
+    const el = h('div', { class: 'bcv-ap-wheel', role: 'dialog', 'aria-label': 'Any colour' });
+    const svgEl = ns('svg', { viewBox: '0 0 272 272', width: '272', height: '272', class: 'bcv-ap-wheel__svg' });
+    const defs = ns('defs', {});
+    const gSat = ns('linearGradient', { id: 'bcvApSat', gradientUnits: 'userSpaceOnUse', x1: '0', y1: '232', x2: '0', y2: '40' });
+    const gDep = ns('linearGradient', { id: 'bcvApDep', gradientUnits: 'userSpaceOnUse', x1: '0', y1: '40', x2: '0', y2: '232' });
+    const stops = { satLo: ns('stop', { offset: '0' }), satHi: ns('stop', { offset: '1' }), depLo: ns('stop', { offset: '0' }), depHi: ns('stop', { offset: '1' }) };
+    gSat.append(stops.satLo, stops.satHi); gDep.append(stops.depLo, stops.depHi); defs.append(gSat, gDep);
+    const track = (d, grad, cls) => ns('path', { d, pathLength: '1', 'stroke-dasharray': '1', fill: 'none', stroke: `url(#${grad})`, 'stroke-width': '14', 'stroke-linecap': 'round', class: `bcv-ap-wheel__track ${cls}` });
+    const label = (id, d, text, delay) => { const p = ns('path', { id, d, fill: 'none' }); const tx = ns('text', { class: 'bcv-ap-wheel__label', style: `animation-delay: ${delay}` }); const tp = ns('textPath', { href: `#${id}`, startOffset: '50%', 'text-anchor': 'middle' }); tp.textContent = text; tx.append(tp); return [p, tx]; };
+    const knobs = { hue: ns('circle', { r: '11', stroke: '#fff', 'stroke-width': '3.5', class: 'bcv-ap-wheel__knob' }), sat: ns('circle', { r: '9', stroke: '#fff', 'stroke-width': '3', class: 'bcv-ap-wheel__knob bcv-ap-wheel__knob--sat' }), dep: ns('circle', { r: '9', stroke: '#fff', 'stroke-width': '3', class: 'bcv-ap-wheel__knob bcv-ap-wheel__knob--dep' }) };
+    svgEl.append(defs, track(arc(200, 340, 86), 'bcvApSat', ''), track(arc(20, 160, 86), 'bcvApDep', 'bcv-ap-wheel__track--dep'), ...label('bcvApSatL', arc(214, 326, 66), 'SATURATION', '.34s'), ...label('bcvApDepL', arc(34, 146, 66), 'DEPTH', '.38s'), knobs.hue, knobs.sat, knobs.dep);
+    const close = () => {
+      document.removeEventListener('pointerdown', outside, true);
+      if (!el.isConnected) return;
+      el.classList.add('is-closing');
+      setTimeout(() => el.remove(), 200);
+    };
+    const core = h('div', { class: 'bcv-ap-wheel__core', title: 'How your colour reads as text' }, [
+      h('span', { class: 'bcv-ap-wheel__aa bcv-ap-wheel__aa--light', text: 'Aa' }), h('span', { class: 'bcv-ap-wheel__aa bcv-ap-wheel__aa--dark', text: 'Aa' }),
+      h('button', { type: 'button', class: 'bcv-ap-wheel__done', text: 'Done', onclick: (e) => { e.stopPropagation(); close(); } }),
+    ]);
+    el.append(h('i', { class: 'bcv-ap-wheel__ring' }), svgEl, core);
+    const paint = () => {
+      const L = (72 - th.depth * 0.4) / 100;
+      const hex = t.hslToHex([th.h, th.s, L]);
+      const [hx, hy] = pt(th.h, 118), [sx, sy] = pt(200 + th.s * 140, 86), [dx, dy] = pt(20 + (th.depth / 100) * 140, 86);
+      knobs.hue.setAttribute('cx', hx.toFixed(1)); knobs.hue.setAttribute('cy', hy.toFixed(1)); knobs.hue.setAttribute('fill', t.hslToHex([th.h, 1, 0.5]));
+      knobs.sat.setAttribute('cx', sx.toFixed(1)); knobs.sat.setAttribute('cy', sy.toFixed(1)); knobs.sat.setAttribute('fill', hex);
+      knobs.dep.setAttribute('cx', dx.toFixed(1)); knobs.dep.setAttribute('cy', dy.toFixed(1)); knobs.dep.setAttribute('fill', hex);
+      stops.satLo.setAttribute('stop-color', t.hslToHex([th.h, 0, L])); stops.satHi.setAttribute('stop-color', t.hslToHex([th.h, 1, L]));
+      stops.depLo.setAttribute('stop-color', t.hslToHex([th.h, th.s, 0.72])); stops.depHi.setAttribute('stop-color', t.hslToHex([th.h, th.s, 0.32]));
+      core.style.setProperty('--hex', hex);
+      core.style.setProperty('--ink', t.luminance(t.hexToRgb(hex)) > 0.36 ? '#1c1c1e' : '#ffffff');
+      core.querySelector('.bcv-ap-wheel__aa--light').style.color = t.readableOn(hex, '#ffffff');
+      core.querySelector('.bcv-ap-wheel__aa--dark').style.color = t.readableOn(hex, '#1c1c1e');
+      el.dataset.hex = hex;
+      const dot = document.querySelector('.bcv-ap-dot[data-theme="Custom"]');
+      dot?.style.setProperty('--dot', `radial-gradient(circle, ${hex} 0 38%, transparent 40%), conic-gradient(#f44,#fb3,#4d4,#3cf,#66f,#e4e,#f44)`);
+    };
+    el.addEventListener('click', (e) => e.stopPropagation());
+    el.addEventListener('pointerdown', (e) => {
+      if (e.target.closest?.('button')) return;
+      const r = el.getBoundingClientRect(), k = r.width / 272;
+      const read = (x, y) => { const dx = (x - r.left) / k - C, dy = (y - r.top) / k - C; let a = (Math.atan2(dx, -dy) * 180) / Math.PI; if (a < 0) a += 360; return { a, d: Math.hypot(dx, dy) }; };
+      const first = read(e.clientX, e.clientY);
+      const mode = first.d >= 100 && first.d <= 136 ? 'hue' : first.d >= 68 && first.d < 100 ? (first.a >= 180 ? 'sat' : 'depth') : null;
+      if (!mode) return;
+      e.preventDefault();
+      const clamp = (v) => Math.max(0, Math.min(1, v));
+      const apply = (x, y) => {
+        const q = read(x, y);
+        if (mode === 'hue') th.h = q.a; else if (mode === 'sat') th.s = clamp((q.a - 200) / 140); else th.depth = clamp((q.a - 20) / 140) * 100;
+        if (st.theme.name !== 'Custom') st.theme.name = 'Custom';
+        paint();
+        kept();
+      };
+      apply(e.clientX, e.clientY);
+      try { el.setPointerCapture(e.pointerId); } catch { /* a pointer that cannot be held */ }
+      const mv = (ev) => apply(ev.clientX, ev.clientY);
+      const up = () => { el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up); };
+      el.addEventListener('pointermove', mv);
+      el.addEventListener('pointerup', up);
+      el.addEventListener('pointercancel', up);
+    });
+    // a press anywhere else puts it away (its own dot, pressed again, too)
+    const outside = (e) => { if (!el.contains(e.target)) close(); };
+    setTimeout(() => document.addEventListener('pointerdown', outside, true), 0);
+    document.body.append(el);
+    const r = anchor.getBoundingClientRect(), W = 272, M = 12;
+    const left = Math.max(M, Math.min(innerWidth - M - W, r.left + r.width / 2 - W / 2));
+    const top = Math.max(M, r.top - 12 - W);
+    Object.assign(el.style, { left: `${Math.round(left)}px`, top: `${Math.round(top)}px`, transformOrigin: `${Math.round(r.left + r.width / 2 - left)}px ${Math.round(r.top + r.height / 2 - top)}px` });
     paint();
-    document.body.append(m);
-    const r = anchor.getBoundingClientRect();
-    Object.assign(m.style, { position: 'fixed', left: `${Math.max(8, Math.min(innerWidth - 248, r.left - 110))}px`, bottom: `${Math.round(innerHeight - r.top + 10)}px`, top: 'auto', width: '240px' });
-    setTimeout(() => document.addEventListener('click', U.closeMenus, { once: true }), 0);
   }
   function coursesRow() {
     if (!st.courses.length) return h('div', { class: 'bcv-ap-empty', text: 'Your courses show here once they have loaded.' });
