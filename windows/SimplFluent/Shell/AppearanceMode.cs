@@ -309,7 +309,7 @@ public sealed class AppearanceOverlay : Grid
                   && Appearance.ReadyThemes.All(r => !string.Equals(r.Accent, hex, StringComparison.OrdinalIgnoreCase));
         Brush fill = own && Appearance.Hex(hex) is { } c ? K.Brush(c) : ColourKit.Hues();
         return ColourKit.Dot(fill, own, "Custom colour…",
-            () => ColourKit.Custom(window, Appearance.Accent, "Custom colour", "Use colour", picked => Appearance.SetAccent(ColourKit.Code(picked))),
+            () => ColourKit.Custom(window, Appearance.Accent, "Custom colour", null, picked => Appearance.SetAccent(ColourKit.Code(picked))),
             own ? null : K.Icon(SymbolRegular.Add24, 14, Colors.White), size: 28);
     }
 
@@ -380,9 +380,11 @@ internal static class ColourKit
     /// <summary>
     /// Custom colour (Windows 11's colour picker, the Mac's wheel), in a sheet over the window: a spectrum — every hue
     /// across, light to deep down — dragged or clicked 1:1 under the pointer, a sample of the colour picked, and its hex
-    /// code, which can be typed. Its button hands the colour on.
+    /// code, which can be typed. Its button hands the colour on — (0.3.52) or, with no button named (the theme's own colour),
+    /// the colour is handed on as it is picked: once the pointer rests a moment, as the drag ends and as the sheet closes,
+    /// never on every step of a drag (each one drew the whole window again), so what is picked is kept with nothing pressed.
     /// </summary>
-    internal static void Custom(Window owner, Color? from, string title, string action, Action<Color> use)
+    internal static void Custom(Window owner, Color? from, string title, string? action, Action<Color> use)
     {
         var (h0, l0) = from is { } f ? HueShade(f) : (210.0, 0.5);
         double hue = h0, shade = l0;
@@ -402,6 +404,18 @@ internal static class ColourKit
         var sample = new Border { Width = 56, Height = 56, CornerRadius = new CornerRadius(8) }.Stroke(B.CardStroke);
         var code = new TextBox { Width = 120, MaxLength = 7, PlaceholderText = "#RRGGBB" };
         var typing = false;
+        var live = action == null;
+        Color? handed = from;
+        void Hand()
+        {
+            var c = Picked();
+            if (handed == c) return;
+            handed = c;
+            use(c);
+        }
+        var rest = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(160) };
+        rest.Tick += (_, _) => { rest.Stop(); Hand(); };
+        void Soon() { if (!live) return; rest.Stop(); rest.Start(); }
         void Paint()
         {
             var c = Picked();
@@ -415,10 +429,11 @@ internal static class ColourKit
             hue = Math.Clamp(p.X / W, 0, 1) * 360;
             shade = 0.85 - Math.Clamp(p.Y / H, 0, 1) * 0.7;
             Paint();
+            Soon();
         }
         spectrum.MouseLeftButtonDown += (_, e) => { spectrum.CaptureMouse(); At(e.GetPosition(spectrum)); };
         spectrum.MouseMove += (_, e) => { if (spectrum.IsMouseCaptured) At(e.GetPosition(spectrum)); };
-        spectrum.MouseLeftButtonUp += (_, _) => spectrum.ReleaseMouseCapture();
+        spectrum.MouseLeftButtonUp += (_, _) => { spectrum.ReleaseMouseCapture(); if (live) { rest.Stop(); Hand(); } };
         code.TextChanged += (_, _) =>
         {
             if (Appearance.Hex(code.Text.Trim()) is not { } c || code.Text.Trim().TrimStart('#').Length != 6) return;
@@ -427,6 +442,7 @@ internal static class ColourKit
             (hue, shade) = HueShade(c);
             Paint();
             typing = false;
+            Soon();
         };
         Paint();
         var s = new Sheet
@@ -437,8 +453,16 @@ internal static class ColourKit
                 K.V(2, K.Wrapped("Drag across for the hue, up and down for the shade.", Ty.Caption, B.Text2, 3)).Align(HorizontalAlignment.Stretch, VerticalAlignment.Center).Col(2),
                 K.V(4, K.Text("Hex", Ty.Caption, B.Text2), code).Col(3))),
         };
-        s.Add(action, SheetButtonKind.Primary, () => use(Picked()));
-        s.Add("Cancel", SheetButtonKind.Close);
+        if (live)
+        {
+            s.Closed += () => { rest.Stop(); Hand(); }; // (closed mid-pick: what was shown is kept)
+            s.Add("Close", SheetButtonKind.Close);
+        }
+        else
+        {
+            s.Add(action!, SheetButtonKind.Primary, () => use(Picked()));
+            s.Add("Cancel", SheetButtonKind.Close);
+        }
         Dialogs.Show(s, owner);
     }
 
