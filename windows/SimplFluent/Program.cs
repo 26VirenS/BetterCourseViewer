@@ -21,6 +21,7 @@ public static class Program
         Instance.WaitForPrevious();       // (opened again by Reset Everything: the copy before it gone first)
         EraseAll.FinishIfAsked();         // (and what it could not delete, deleted now)
         if (!Instance.Claim()) return;    // (already open: that one is brought forward instead)
+        CrashLog.Install();               // (0.3.51: the run before looked at — did it end without quitting? — and this one marked)
         Vault.Preload();                  // (the vault's key unwrapped by the TPM and Windows meanwhile, off this thread)
         Engine.BridgeStore.Preload();     // (the extension's storage read meanwhile, once the vault is open)
         LoginVault.Preload();             // (and the saved sign-in, an earlier Simpl's moved into the vault)
@@ -31,9 +32,14 @@ public static class Program
         app.DispatcherUnhandledException += (_, e) =>
         {
             Log.Write("unhandled: " + e.Exception);
+            CrashLog.Exception(e.Exception, fatal: false, "the window's thread (caught there: Simpl kept going)");
             e.Handled = true;
         };
-        AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Write("fatal: " + e.ExceptionObject);
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            Log.Write("fatal: " + e.ExceptionObject);
+            CrashLog.Exception(e.ExceptionObject, fatal: e.IsTerminating, "a thread of Simpl's (nothing caught it)");
+        };
         TaskScheduler.UnobservedTaskException += (_, e) => { Log.Write("task: " + e.Exception); e.SetObserved(); };
         Log.Write($"Simpl for Windows {WhatsNew.Current} starting{(Updates.Installed ? " (installed)" : "")}: {Launch.Said(args)}");
         // (opened again by an update: where the window was, so it opens there; and the Mac's Pause updates, asked for here)

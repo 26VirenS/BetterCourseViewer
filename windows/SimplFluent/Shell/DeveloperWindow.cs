@@ -47,6 +47,7 @@ public sealed class DeveloperWindow : FluentWindow
     {
         ("overview", "Overview", SymbolRegular.Info24, Color.FromRgb(0x00, 0x78, 0xd4)),
         ("logs", "Logs", SymbolRegular.TextAlignLeft24, Color.FromRgb(0x76, 0x76, 0x7c)),
+        ("crashes", "Crashes", SymbolRegular.ErrorCircle24, Color.FromRgb(0xc4, 0x2b, 0x1c)), // (0.3.51)
         ("system", "System", SymbolRegular.Gauge24, Color.FromRgb(0x10, 0x89, 0x3e)),
         ("stats", "Stats", SymbolRegular.DataBarVertical24, Color.FromRgb(0x88, 0x64, 0xd8)),
         ("engine", "Engine", SymbolRegular.Code24, Color.FromRgb(0xe3, 0x6c, 0x0a)),
@@ -138,6 +139,7 @@ public sealed class DeveloperWindow : FluentWindow
         FrameworkElement content = key switch
         {
             "logs" => LogsPage(),
+            "crashes" => CrashesPage(),
             "system" => SystemPage(),
             "stats" => StatsPage(),
             "engine" => EnginePage(),
@@ -346,6 +348,69 @@ public sealed class DeveloperWindow : FluentWindow
         Load(true);
         onTick = () => Load(false);
         return K.Rows("auto, *, auto", bar.Margin(0, 0, 0, 12).Row(0), Box(text).Row(1), foot.Margin(0, 12, 0, 0).Row(2));
+    }
+
+    // ---- Crashes ----
+
+    /// <summary>(0.3.51, the Mac's 1.3.146) The crash log (Support/CrashLog): each run that went down — an exception nothing
+    /// caught, or a run that ended without quitting, with Windows' own report of it — and each exception the window's
+    /// catch let pass; with the last of simpl.log before it. The list at the left, the one picked read at the right.</summary>
+    private FrameworkElement CrashesPage()
+    {
+        var list = new System.Windows.Controls.ListBox { BorderThickness = new Thickness(0), Background = Brushes.Transparent };
+        ScrollViewer.SetHorizontalScrollBarVisibility(list, ScrollBarVisibility.Disabled);
+        var text = Code("");
+        var count = K.Text("", Ty.Caption, B.Text2).Align(HorizontalAlignment.Left, VerticalAlignment.Center);
+        List<CrashLog.Entry> entries = new();
+        CrashLog.Entry? Picked() => list.SelectedIndex >= 0 && list.SelectedIndex < entries.Count ? entries[list.SelectedIndex] : null;
+
+        void Load()
+        {
+            var keep = Picked()?.Path;
+            entries = CrashLog.All();
+            list.Items.Clear();
+            foreach (var e in entries)
+            {
+                var when = K.Text(e.At.ToString("g", CultureInfo.CurrentCulture) + " · " + e.Version, Ty.Caption, B.Text2);
+                var what = K.Text(e.Title, Ty.Body);
+                what.TextWrapping = TextWrapping.Wrap;
+                what.MaxHeight = 40;
+                var kind = K.Text(e.Fatal ? "Crash" : "Kept going", Ty.Caption, e.Fatal ? B.Text : B.Text2);
+                kind.FontWeight = FontWeights.SemiBold;
+                if (e.Fatal) kind.Foreground = new SolidColorBrush(Color.FromRgb(0xc4, 0x2b, 0x1c));
+                list.Items.Add(K.V(2, kind, what, when).Margin(4, 6, 4, 6));
+            }
+            count.Text = entries.Count == 0 ? "No crashes kept" : $"{entries.Count} kept · {entries.Count(e => e.Fatal)} crashes";
+            var at = keep == null ? 0 : Math.Max(0, entries.FindIndex(e => e.Path == keep));
+            list.SelectedIndex = entries.Count > 0 ? at : -1;
+            if (entries.Count == 0) text.Text = "No crashes kept.\n\nA run of Simpl that goes down — or ends without quitting — is kept here the next time it opens, with what stopped it, Windows’ own report and the last of simpl.log.";
+        }
+
+        list.SelectionChanged += (_, _) => { if (Picked() is { } e) { text.Text = CrashLog.Text(e); text.ScrollToHome(); } };
+        var buttons = K.H(8,
+            K.Button("Reload", Load, icon: SymbolRegular.ArrowClockwise24),
+            K.Button("Copy", () => { if (Picked() is { } e) Copy(CrashLog.Text(e), "crash"); }, icon: SymbolRegular.Copy24),
+            K.Button("Save…", () => { if (Picked() is { } e && SaveText("Simpl Crash", CrashLog.Text(e)) is { } p) ShowFile(p); else System.Media.SystemSounds.Beep.Play(); }, icon: SymbolRegular.Save24),
+            K.Button("Delete", () => { if (Picked() is { } e) { CrashLog.Delete(e); Load(); } }, icon: SymbolRegular.Delete24),
+            K.Button("Open folder", () => { Directory.CreateDirectory(CrashLog.Folder); OpenFolder(CrashLog.Folder); }, icon: SymbolRegular.Folder24),
+            K.Button("Delete all", async () =>
+            {
+                if (!await Dialogs.Ask(this, "Delete every crash kept?", "Windows’ own reports stay in its Application log.", "Delete All", "Cancel", danger: true)) return;
+                CrashLog.DeleteAll();
+                Load();
+            }, icon: SymbolRegular.DeleteDismiss24),
+            K.Button("Crash now…", async () =>
+            {
+                if (!await Dialogs.Ask(this, "Stop Simpl now, as a crash would?", "For trying the crash log: Simpl stops at once, and the next time it opens the crash is here.", "Crash Now", "Cancel", danger: true)) return;
+                CrashLog.CrashNow();
+            }, icon: SymbolRegular.ErrorCircle24));
+        var body = new Grid();
+        body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(300) });
+        body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        body.Children.Add(Box(list).Margin(0, 0, 12, 0).Col(0));
+        body.Children.Add(Box(text).Col(1));
+        Load();
+        return K.Rows("*, auto", body.Row(0), K.Columns("*, auto", count.Col(0), buttons.Col(1)).Margin(0, 12, 0, 0).Row(1));
     }
 
     // ---- System ----

@@ -1,3 +1,7 @@
+**What's new in 0.3.51** (beta)
+
+- **Crash log** — the developer tools have a Crashes page: a run of Simpl that goes down, or ends without quitting, is kept the next time it opens, with what stopped it, Windows' own report of it and the last of simpl.log; Copy, Save, Delete and Crash now… (to try it).
+
 **What's new in 0.3.50** (beta)
 
 - **Submit as ZIP** — with two or more files in Hand In, a Submit as ZIP button sits beside Submit (the "Send as one .zip" box is gone): Submit hands them in as they are, Submit as ZIP as one .zip named after the assignment. A file the assignment takes only zipped is handed in with Submit as ZIP.
