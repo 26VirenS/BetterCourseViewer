@@ -376,7 +376,9 @@
       root.append(side, main);
     }
     document.body.prepend(root);
-    if (!phone()) BCV.ui.squircleAll?.(); // (2.99.86: every rounded rectangle drawn with Apple's continuous corners)
+    // (2.99.86: every rounded rectangle drawn with Apple's continuous corners) — (2.99.91) not in the Mac and iPhone apps: the
+    // page is their engine there, its screens the app's own, and the sweep (every element read and watched) slowed it threefold
+    if (!phone() && !self.BCVBridge?.native) BCV.ui.squircleAll?.();
     wireIntent(root); // (a pointer resting on a link reads its screen ahead: see the background, above)
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') U.closeMenus();
