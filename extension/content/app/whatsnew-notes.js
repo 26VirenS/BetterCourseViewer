@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.92', date: '2026-10-21', notes: [
+      { kind: 'improved', title: "This week's betas", body: 'Everything from the betas since 2.99.68, for everyone.', icon: P.sparkle },
+    ] },
     { version: '2.99.91', date: '2026-10-21', notes: [
       { kind: 'fixed', title: 'Apps quick again', body: 'The Mac and iPhone apps run at full speed again.', icon: P.check },
     ] },
