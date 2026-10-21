@@ -148,7 +148,7 @@ try {
       check(Math.abs(parseFloat(line.dpx) - 1 / c.z) < 0.01 && Math.abs(lineW - Math.max(1, 1 / c.z)) < 0.01, `${c.label}: one screen pixel is ${line.dpx} here, and a hairline is never thinner (${lineW}px)`);
       if (!phone) {
         const compact = c.cw <= 1100;
-        check(first.sideW === (compact ? '200px' : '242px'), `${c.label}: the sidebar is ${compact ? 'the compact 200px' : 'the full 242px'} (${first.sideW})`);
+        check(first.sideW === (compact ? '200px' : '264px'), `${c.label}: the sidebar is ${compact ? 'the compact 200px' : 'the full 264px'} (${first.sideW})`);
         check(first.statCols === colsFor(first.statsW) && first.statsW / first.statCols >= (first.statCols === 6 ? 110 : 200), `${c.label}: the Dashboard's counters run ${first.statCols} across in ${first.statsW}px, none squeezed`);
       }
       await go('/');
