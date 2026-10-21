@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.73', date: '2026-10-21', notes: [
+      { kind: 'fixed', title: 'Tools in Popups Fixed', body: 'Pinned tools sit right beside a popup\'s buttons.', icon: P.check },
+    ] },
     { version: '2.99.72', date: '2026-10-21', notes: [
       { kind: 'improved', title: 'Counter Boxes Polished', body: 'Tinted like the Mac, smoother open, tools stay put.', icon: P.check },
       { kind: 'improved', title: 'Tools in Popups', body: 'Pinned tools sit in a popup\'s head, by its buttons.', icon: P.check },

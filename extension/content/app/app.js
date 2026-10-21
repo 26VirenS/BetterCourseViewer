@@ -1944,24 +1944,48 @@
    *  that row in the head's right half. Measured again as the popup grows in, takes another size or the window does;
    *  with no head to sit in, the tools stay beside the sidebar's button (app.css). */
   const POP_OV = 'body > :is(.bcv-sheet-ov:not(.is-closing):not(.is-under):not(.bcv-sheet-ov--float):not(.is-folding), .bcv-fbs-ov:not(.is-closing))';
+  let popTrayHead = null, popTrayHeadMO = null;
   function popTrayPlace() {
     const tray = document.getElementById('bcv-tray');
     const ov = [...document.querySelectorAll(POP_OV)].pop();
-    const box = ov?.firstElementChild?.getBoundingClientRect();
+    const card = ov?.firstElementChild;
+    if (!tray || !ov || !card || BCV.phone?.active?.()) { html.classList.remove('bcv-tray-pop'); return; }
+    // (2.99.73) where things sit once the popup has grown in: from the layout (offsets up to the overlay), not from what is
+    // on screen this frame — the card grows from smaller, so its buttons drawn mid-way are nearer its middle than where they
+    // come to rest (the tools landed short of them, or low). Off the overlay's own chain (none here): as drawn.
+    const ovR = ov.getBoundingClientRect();
+    const rect = (el) => {
+      let x = 0, y = 0, n = el;
+      while (n && n !== ov) { x += n.offsetLeft; y += n.offsetTop; n = n.offsetParent; }
+      if (n !== ov) return el.getBoundingClientRect();
+      return { left: ovR.left + x, top: ovR.top + y, width: el.offsetWidth, height: el.offsetHeight, right: ovR.left + x + el.offsetWidth };
+    };
     const seen = (r) => r.width > 0 && r.height > 0;
-    const closes = ov ? [...ov.querySelectorAll('button[aria-label="Close"], .bcv-sheet__close')].map((b) => ({ b, r: b.getBoundingClientRect() })).filter((x) => seen(x.r)) : [];
-    if (!tray || !ov || !box || !closes.length || BCV.phone?.active?.()) { html.classList.remove('bcv-tray-pop'); return; }
-    const head = closes.sort((x, y) => x.r.top - y.r.top || y.r.right - x.r.right)[0].r;
+    const closes = [...ov.querySelectorAll('button[aria-label="Close"], .bcv-sheet__close')].map((b) => ({ b, r: rect(b) })).filter((x) => seen(x.r));
+    if (!closes.length) { html.classList.remove('bcv-tray-pop'); return; }
+    const top = closes.sort((x, y) => x.r.top - y.r.top || y.r.right - x.r.right)[0];
+    const head = top.r;
+    const row = top.b.closest('[class*="__head"]') || top.b.parentElement;
+    const box = rect(card);
     const mid = head.top + head.height / 2;
     const half = box.left + box.width / 2;
     let left = head.left;
-    for (const b of ov.querySelectorAll('button, a[role="button"], .bcv-btn')) {
-      const r = b.getBoundingClientRect();
+    for (const b of row.querySelectorAll('button, a[role="button"], .bcv-btn')) {
+      const r = rect(b);
       if (seen(r) && Math.abs(r.top + r.height / 2 - mid) < 8 && r.left > half && r.right <= head.right + 1) left = Math.min(left, r.left);
     }
-    const t = tray.getBoundingClientRect();
-    html.style.setProperty('--bcv-tray-px', `${Math.round(innerWidth - left + 10)}px`);
-    html.style.setProperty('--bcv-tray-py', `${Math.round(mid - (t.height || 32) / 2)}px`);
+    // its buttons can come after the head does (the viewer's Open in new tab and Download, once the file is known): watched
+    if (row !== popTrayHead && typeof MutationObserver === 'function') {
+      popTrayHeadMO ||= new MutationObserver(() => popTraySoon(150));
+      popTrayHeadMO.disconnect();
+      popTrayHeadMO.observe(row, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'class'] });
+      popTrayHead = row;
+    }
+    const pins = document.getElementById('bcv-pins');
+    const tall = pins?.offsetHeight || tray.offsetHeight || 32;
+    // (right: from the viewport's width less its scroll bar — innerWidth counts the bar, which put the tools its width short)
+    html.style.setProperty('--bcv-tray-px', `${Math.round(document.documentElement.clientWidth - left + 10)}px`);
+    html.style.setProperty('--bcv-tray-py', `${Math.round(mid - tall / 2)}px`);
     html.classList.add('bcv-tray-pop');
   }
   let popTrayT = 0;

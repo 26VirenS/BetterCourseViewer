@@ -6997,13 +6997,20 @@ try {
   await page.waitForSelector('.bcv-body .bcv-row:has-text("planned lecture schedule.xlsx")', { timeout: 15000 });
   await page.click('.bcv-body .bcv-row:has-text("planned lecture schedule.xlsx")');
   await page.waitForSelector('.bcv-viewer .bcv-viewer__acts', { timeout: 8000 });
+  // (2.99.73) where the tools are sent is where the popup's buttons come to rest, from the first frames on — not where
+  // they are drawn while the card still grows in (that sent them short of the buttons, and low)
+  const trayAim = () => page.evaluate(() => new Promise((ok) => requestAnimationFrame(() => { const cs = getComputedStyle(document.documentElement); ok([parseFloat(cs.getPropertyValue('--bcv-tray-px')), parseFloat(cs.getPropertyValue('--bcv-tray-py'))]); })));
+  const aimEarly = await trayAim();
   await page.waitForTimeout(900);
+  const aimLate = await trayAim();
+  check(aimEarly.every((v, i) => Math.abs(v - aimLate[i]) <= 1), `(2.99.73) the tools are aimed at where the popup's buttons come to rest while it is still growing in: ${JSON.stringify({ aimEarly, aimLate })}`);
   const popBar = await page.evaluate(() => {
     const r = (el) => el.getBoundingClientRect();
     const tray = r(document.getElementById('bcv-tray')), acts = r(document.querySelector('.bcv-viewer__acts')), x = r(document.querySelector('.bcv-viewer-ov .bcv-sheet__close')), tog = r(document.getElementById('bcv-sidetoggle'));
-    return { look: getComputedStyle(document.getElementById('bcv-look')).opacity, gap: Math.round(acts.left - tray.right), level: Math.round((tray.top + tray.height / 2) - (x.top + x.height / 2)), pop: document.documentElement.classList.contains('bcv-tray-pop'), top: document.elementFromPoint(tray.left + 12, tray.top + tray.height / 2)?.closest('#bcv-tray') ? 'tray' : 'other', toggle: getComputedStyle(document.getElementById('bcv-sidetoggle')).opacity === '0' && document.elementFromPoint(tog.left + tog.width / 2, tog.top + tog.height / 2)?.closest('#bcv-sidetoggle') == null ? 'under' : 'over' };
+    const hit = [...document.querySelectorAll('.bcv-viewer-ov .bcv-sheet__head :is(button, a)')].some((b) => { const q = r(b); return q.width && q.left < tray.right && q.right > tray.left && q.top < tray.bottom && q.bottom > tray.top; });
+    return { look: getComputedStyle(document.getElementById('bcv-look')).opacity, hit, gap: Math.round(acts.left - tray.right), level: Math.round((tray.top + tray.height / 2) - (x.top + x.height / 2)), pop: document.documentElement.classList.contains('bcv-tray-pop'), top: document.elementFromPoint(tray.left + 12, tray.top + tray.height / 2)?.closest('#bcv-tray') ? 'tray' : 'other', toggle: getComputedStyle(document.getElementById('bcv-sidetoggle')).opacity === '0' && document.elementFromPoint(tog.left + tog.width / 2, tog.top + tog.height / 2)?.closest('#bcv-sidetoggle') == null ? 'under' : 'over' };
   });
-  check(popBar.look === '0' && popBar.pop && popBar.gap >= 4 && popBar.gap <= 16 && Math.abs(popBar.level) <= 3 && popBar.top === 'tray' && popBar.toggle === 'under', `a popup up: ⋯ gone, the tools in the popup's head left of its buttons and level with its ×, over the scrim; the sidebar's button gone with ⋯: ${JSON.stringify(popBar)}`);
+  check(popBar.look === '0' && !popBar.hit && popBar.pop && popBar.gap >= 4 && popBar.gap <= 16 && Math.abs(popBar.level) <= 3 && popBar.top === 'tray' && popBar.toggle === 'under', `a popup up: ⋯ gone, the tools in the popup's head left of its buttons and level with its ×, over the scrim; the sidebar's button gone with ⋯: ${JSON.stringify(popBar)}`);
   await shot(page, '41c-tools-over-popup');
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-viewer'), null, { timeout: 5000 });
