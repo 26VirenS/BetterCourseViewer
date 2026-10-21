@@ -884,7 +884,7 @@
    *  use — a corner that eases into its straight edges rather than meeting them at a circle's end — after Figma's
    *  reconstruction of it (corner smoothing 0.6 matches Apple's), at the element's own border radius. Kept to its size as
    *  it changes. */
-  function squirclePath(w, h, r, smoothing = 0.6) {
+  function squirclePath(w, h, r, smoothing = 0.6, ox = 0, oy = 0) {
     const budget = Math.min(w, h) / 2;
     r = Math.min(r, budget);
     if (!(r > 0) || !(w > 0) || !(h > 0)) return '';
@@ -902,31 +902,63 @@
     const a = 2 * b;
     const n = (v) => (Math.round(v * 1000) / 1000).toString();
     const ab = a + b, abc = a + b + c, bc = b + c;
+    // (ox, oy: the path drawn that far in — a ring's inner edge)
     return [
-      `M ${n(w - p)} 0`,
+      `M ${n(ox + w - p)} ${n(oy)}`,
       `c ${n(a)} 0 ${n(ab)} 0 ${n(abc)} ${n(d)}`, `a ${n(r)} ${n(r)} 0 0 1 ${n(arc)} ${n(arc)}`, `c ${n(d)} ${n(c)} ${n(d)} ${n(bc)} ${n(d)} ${n(abc)}`,
-      `L ${n(w)} ${n(h - p)}`,
+      `L ${n(ox + w)} ${n(oy + h - p)}`,
       `c 0 ${n(a)} 0 ${n(ab)} ${n(-d)} ${n(abc)}`, `a ${n(r)} ${n(r)} 0 0 1 ${n(-arc)} ${n(arc)}`, `c ${n(-c)} ${n(d)} ${n(-bc)} ${n(d)} ${n(-abc)} ${n(d)}`,
-      `L ${n(p)} ${n(h)}`,
+      `L ${n(ox + p)} ${n(oy + h)}`,
       `c ${n(-a)} 0 ${n(-ab)} 0 ${n(-abc)} ${n(-d)}`, `a ${n(r)} ${n(r)} 0 0 1 ${n(-arc)} ${n(-arc)}`, `c ${n(-d)} ${n(-c)} ${n(-d)} ${n(-bc)} ${n(-d)} ${n(-abc)}`,
-      `L 0 ${n(p)}`,
+      `L ${n(ox)} ${n(oy + p)}`,
       `c 0 ${n(-a)} 0 ${n(-ab)} ${n(d)} ${n(-abc)}`, `a ${n(r)} ${n(r)} 0 0 1 ${n(arc)} ${n(-arc)}`, `c ${n(c)} ${n(-d)} ${n(bc)} ${n(-d)} ${n(abc)} ${n(-d)}`,
       'Z',
     ].join(' ');
   }
+  /** (2.99.84) A pill as Spotlight's field draws one: each end half a superellipse (|x/a|⁴ + |y/b|⁴ = 1) reaching in two
+   *  thirds of the height, so the ends ease into the straight edges with no jump in curvature where a stadium's half-circles
+   *  meet them. Drawn `ox, oy` in for a ring's inner edge. */
+  function superPillPath(w, h, ox = 0, oy = 0) {
+    if (!(w > 0) || !(h > 0)) return '';
+    const b = h / 2, a = Math.min(h * 0.66, w / 2), N = 24;
+    const n = (v) => (Math.round(v * 1000) / 1000).toString();
+    const cy = oy + b, left = ox + a, right = ox + w - a;
+    const pt = (cx, t) => { const c = Math.cos(t), sn = Math.sin(t); return `${n(cx + a * Math.sign(c) * Math.abs(c) ** 0.5)} ${n(cy + b * Math.sign(sn) * Math.abs(sn) ** 0.5)}`; };
+    const out = [`M ${n(left)} ${n(oy)}`, `L ${n(right)} ${n(oy)}`];
+    for (let i = 1; i <= N; i++) out.push(`L ${pt(right, -Math.PI / 2 + (Math.PI * i) / N)}`);
+    out.push(`L ${n(left)} ${n(oy + h)}`);
+    for (let i = 1; i <= N; i++) out.push(`L ${pt(left, Math.PI / 2 + (Math.PI * i) / N)}`);
+    out.push('Z');
+    return out.join(' ');
+  }
   let squircleWatch = null;
+  /** Fit an element's clip (and its ring's, where it has one) to its size now — at once, where a layout change must not
+   *  wait a frame for the watcher. */
   function squircleFit(el) {
+    const o = el._bcvSqOpt || {};
     const w = el.offsetWidth, h = el.offsetHeight;
     const r = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0;
     const key = `${w}x${h}x${r}`;
     if (el._bcvSq === key) return;
     el._bcvSq = key;
-    const d = squirclePath(w, h, r);
+    const d = o.pill ? superPillPath(w, h) : squirclePath(w, h, r);
     el.style.clipPath = d ? `path('${d}')` : '';
     el.classList.toggle('bcv-squircle', !!d);
+    // (a ring a pixel wide along the edge — the rim a border draws, which the clip would cut at the corners — as a picture
+    //  for the background (--bcv-sq-ring): a background stays with the element's box while its content scrolls)
+    if (o.ring) {
+      const inner = o.pill ? superPillPath(w - 2, h - 2, 1, 1) : squirclePath(w - 2, h - 2, Math.max(0, r - 1), 0.6, 1, 1);
+      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}' viewBox='0 0 ${w} ${h}' preserveAspectRatio='none'><defs><linearGradient id='g' x1='0' y1='0' x2='.42' y2='1'><stop offset='0' stop-color='#fff' stop-opacity='.1'/><stop offset='.22' stop-color='#fff' stop-opacity='.03'/><stop offset='.48' stop-color='#fff' stop-opacity='.008'/><stop offset='.74' stop-color='#fff' stop-opacity='.015'/><stop offset='1' stop-color='#fff' stop-opacity='.06'/></linearGradient></defs><path fill='url(#g)' fill-rule='evenodd' d='${d} ${inner}'/></svg>`;
+      el.style.setProperty('--bcv-sq-ring', d ? `url("data:image/svg+xml,${encodeURIComponent(svg)}")` : 'none');
+    }
   }
-  function squircle(el) {
+  /** Draw an element through Apple's continuous corners, kept to its size; `pill`: Spotlight's superellipse pill instead;
+   *  `ring`: its edge drawn again along the clip (class bcv-sqring). */
+  function squircle(el, { pill = false, ring = false } = {}) {
     if (!el || typeof ResizeObserver === 'undefined') return el;
+    el._bcvSqOpt = { pill, ring };
+    el._bcvSq = '';
+    if (ring) el.classList.add('bcv-sqring');
     if (!squircleWatch) squircleWatch = new ResizeObserver((entries) => { for (const e of entries) squircleFit(e.target); });
     squircleWatch.observe(el);
     return el;
@@ -1648,7 +1680,7 @@
   BCV.ui = {
     groupPicker, groupAttrs, BANDS, gradeBand, bandChip, bandSlider, whatIfAdder, whatIfRemove,
     svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, statusBadge, seg, segSlide, search, switchEl, btn, iconbtn, pill, placeDot, haptic,
-    squircle, squirclePath,
+    squircle, squirclePath, squircleFit, superPillPath,
     empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, picker, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField, promptSheet, askSheet,
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,
     fmtTime, fmtTimeLower, fmtShort, fmtLong, fmtDateComma, fmtAt, fmtAtUpper, fmtBy, dayTitle, fmtDow, fmtRecent, whenShort, plural,

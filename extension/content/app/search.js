@@ -68,7 +68,7 @@
     { key: 'files', label: 'Files', hint: 'Course files and pages', icon: IC.folder, groups: ['Files', 'Pages'], title: 'Recents' },
     { key: 'actions', label: 'Actions', hint: 'Commands: /submit, /open, /todo, /dark…', icon: IC.bolt, groups: ['Commands'], title: 'Commands' },
   ];
-  const SPOT_W = 680, SPOT_MS = 470; // the pill's width at most; the float's length (app.css .46s)
+  const SPOT_W = 580, SPOT_MS = 470; // the pill's width at most (2.99.84: narrower, as Spotlight's); the float's length (app.css .46s)
   let spot = null; // afloat: { ov, pal, ghost, timer, onResize, folding }
   const afloat = () => !!spot && !spot.folding;
   const canFloat = () => !!ui && ui.root.isConnected && !BCV.phone?.active?.() && !document.getElementById('bcv-tour') && !document.getElementById('bcv-setup');
@@ -84,6 +84,8 @@
     if (!spot) return;
     const vw = innerWidth, vh = innerHeight, w = Math.min(SPOT_W, vw - 32);
     Object.assign(spot.pal.style, { left: `${Math.round((vw - w) / 2)}px`, top: `${Math.round(Math.min(vh * 0.18, 160))}px`, width: `${w}px` });
+    const box = ui?.root.querySelector('.bcv-omni__box');
+    if (box && U.squircleFit) U.squircleFit(box); // (its clip at the middle's size from the first frame, not one behind it)
   }
   // (2.99.4) The pill moves between the header's place and the middle by transform alone. Afloat, it is laid out at once at
   // the middle's size — its height, padding and words' size are the middle's from the first frame — and drawn where the
@@ -604,7 +606,11 @@
       const grow = h1 > was.h, cut = `${Math.round(Math.abs(h1 - was.h))}px`;
       if (!grow) panel.style.minHeight = `${Math.round(was.h)}px`;
       panel.style.overflowY = 'hidden';
-      const open = `inset(0px 0px 0px 0px round ${R})`, shut = `inset(0px 0px ${cut} 0px round ${R})`;
+      // (2.99.84: a panel drawn through continuous corners changes size through the same corners, at each height)
+      const sq = panel.classList.contains('bcv-squircle') && U.squirclePath;
+      const w1 = panel.offsetWidth, r1 = parseFloat(R) || 0;
+      const at = (hh) => `path('${U.squirclePath(w1, hh, r1)}')`;
+      const open = sq ? at(Math.max(h1, was.h)) : `inset(0px 0px 0px 0px round ${R})`, shut = sq ? at(Math.min(h1, was.h)) : `inset(0px 0px ${cut} 0px round ${R})`;
       const anim = panel.animate([{ clipPath: grow ? shut : open }, { clipPath: grow ? open : shut }], { duration: 260, easing: EASE });
       ui.hAnim = anim;
       if (shade) { // (its shadow grows and shrinks with it: scaled, it has nothing in it to stretch)
@@ -880,6 +886,9 @@
       h('kbd', { class: 'bcv-omni__key', text: '/', 'aria-hidden': 'true' }),
     ]);
     const root = h('div', { class: 'bcv-omni', id: 'bcv-omni-root' }, [box, panel]);
+    // (2.99.84) on a computer the pill is Spotlight's — its ends halves of a superellipse — and the panel's corners Apple's
+    // continuous ones; afloat, each with its rim drawn again along the clip (app.css .bcv-sqring)
+    if (!phone) { U.squircle?.(box, { pill: true, ring: true }); U.squircle?.(panel, { ring: true }); }
     ui = { app, root, input, panel, chip, scope: null, fkind: null, walk: false, placeholder: input.placeholder, ariaLabel: input.getAttribute('aria-label'), wiki: wikiOn, seq: 0, q: '', raw: '', groups: new Map(), pending: 0, cursor: -1, items: [], timer: 0, mode: 'plain', cmd: null, arg: '', cs: null, reading: '' };
     // the highlight is measured from the chosen row; afloat, the rows are first drawn while the palette still eases from the
     // header's width to its own, so a change of the panel's width puts the highlight back on its row (its height is left
