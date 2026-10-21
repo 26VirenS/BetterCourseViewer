@@ -340,14 +340,34 @@
       el.classList.add('is-closing');
       setTimeout(() => el.remove(), 200);
     };
+    // (2.99.85) in the middle, where Done was, the colour's code — to read, or to type: six digits typed wear it as they come,
+    // a code that is not one goes back to the colour worn as the field is left; Return or Escape puts the picker away
+    const hexIn = h('input', { type: 'text', class: 'bcv-ap-wheel__hex', maxlength: '7', spellcheck: 'false', autocomplete: 'off', 'aria-label': 'Colour code', title: "The colour's code: type one to wear it" });
+    const wearCode = (raw) => {
+      const code = String(raw || '').trim().replace(/^#?/, '#');
+      if (!/^#[0-9a-f]{6}$/i.test(code)) return false;
+      const [hh, ss, ll] = t.rgbToHsl(t.hexToRgb(code));
+      th.h = hh; th.s = Math.max(0, Math.min(1, ss));
+      th.depth = Math.max(0, Math.min(100, (72 - ll * 100) / 0.4)); // (kept within the wheel's shades: words in it still read)
+      if (st.theme.name !== 'Custom') st.theme.name = 'Custom';
+      paint({ typing: true });
+      kept();
+      return true;
+    };
+    hexIn.addEventListener('input', () => wearCode(hexIn.value));
+    hexIn.addEventListener('blur', () => { if (!wearCode(hexIn.value)) hexIn.value = el.dataset.hex || ''; });
+    hexIn.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (!wearCode(hexIn.value)) hexIn.value = el.dataset.hex || ''; close(); }
+    });
     const core = h('div', { class: 'bcv-ap-wheel__core', title: 'How your colour reads as text' }, [
       h('span', { class: 'bcv-ap-wheel__aa bcv-ap-wheel__aa--light', text: 'Aa' }), h('span', { class: 'bcv-ap-wheel__aa bcv-ap-wheel__aa--dark', text: 'Aa' }),
-      h('button', { type: 'button', class: 'bcv-ap-wheel__done', text: 'Done', onclick: (e) => { e.stopPropagation(); close(); } }),
+      hexIn,
     ]);
     el.append(h('i', { class: 'bcv-ap-wheel__ring' }), svgEl, core);
-    const paint = () => {
+    const paint = ({ typing = false } = {}) => {
       const L = (72 - th.depth * 0.4) / 100;
       const hex = t.hslToHex([th.h, th.s, L]);
+      if (!typing && document.activeElement !== hexIn) hexIn.value = hex;
       const [hx, hy] = pt(th.h, 118), [sx, sy] = pt(200 + th.s * 140, 86), [dx, dy] = pt(20 + (th.depth / 100) * 140, 86);
       knobs.hue.setAttribute('cx', hx.toFixed(1)); knobs.hue.setAttribute('cy', hy.toFixed(1)); knobs.hue.setAttribute('fill', t.hslToHex([th.h, 1, 0.5]));
       knobs.sat.setAttribute('cx', sx.toFixed(1)); knobs.sat.setAttribute('cy', sy.toFixed(1)); knobs.sat.setAttribute('fill', hex);
@@ -364,7 +384,7 @@
     };
     el.addEventListener('click', (e) => e.stopPropagation());
     el.addEventListener('pointerdown', (e) => {
-      if (e.target.closest?.('button')) return;
+      if (e.target.closest?.('button, input')) return;
       const r = el.getBoundingClientRect(), k = r.width / 272;
       const read = (x, y) => { const dx = (x - r.left) / k - C, dy = (y - r.top) / k - C; let a = (Math.atan2(dx, -dy) * 180) / Math.PI; if (a < 0) a += 360; return { a, d: Math.hypot(dx, dy) }; };
       const first = read(e.clientX, e.clientY);

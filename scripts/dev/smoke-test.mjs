@@ -5029,8 +5029,13 @@ try {
   const turned = await eventually(() => sw.evaluate(async () => { const t = (await self.BCV.settings.get()).appearance?.theme; return t?.name === 'Custom' && Math.abs(t.h - 90) < 4 ? t : null; }), 4000);
   check(wb.w === 272 && wb.arcs === 2 && wb.knobs === 3 && wb.labels === 'SATURATION|DEPTH' && !!turned, `Any colour opens the round picker — hue ring, saturation and depth arcs — and a press on the ring is the colour, kept: ${JSON.stringify({ wb, turned })}`);
   await shot(page, '27c-appearance-any-colour');
-  await page.click('.bcv-ap-wheel__done');
-  check(await eventually(() => page.evaluate(() => !document.querySelector('.bcv-ap-wheel')), 2000), 'its Done puts the picker away');
+  // (2.99.85) its middle is the colour's code, where Done was: typed, the colour is worn and kept; Return puts it away
+  const codeShown = await page.$eval('.bcv-ap-wheel__hex', (e) => e.value);
+  await page.click('.bcv-ap-wheel__hex', { clickCount: 3 });
+  await page.keyboard.type('#2f9e6a');
+  const typedKept = await eventually(() => sw.evaluate(async () => { const t = (await self.BCV.settings.get()).appearance?.theme; return t?.name === 'Custom' && Math.abs(t.h - 153) < 3 ? t : null; }), 4000);
+  await page.keyboard.press('Enter');
+  check(/^#[0-9a-f]{6}$/.test(codeShown) && !!typedKept && await eventually(() => page.evaluate(() => !document.querySelector('.bcv-ap-wheel') && !document.querySelector('.bcv-ap-wheel__done')), 2000), `the middle shows the colour's code (${codeShown}); a code typed there is the colour, kept with nothing pressed (${JSON.stringify(typedKept)}); Return puts the picker away`);
   await page.click('.bcv-ap-tabs [data-k="courses"]');
   check(await eventually(() => page.$$('.bcv-ap-course').then((r) => r.length > 0), 6000), 'Courses: each course with its colour');
   // (2.99.74) Sidebar: the first course opens behind the bar, its sidebars lit and no photo buttons, and one sidebar or two

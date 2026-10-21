@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.85', date: '2026-10-21', notes: [
+      { kind: 'improved', title: 'Hex code in the wheel', body: "The colour's code sits in the middle, where Done was.", icon: P.check },
+    ] },
     { version: '2.99.84', date: '2026-10-21', notes: [
       { kind: 'improved', title: 'Spotlight-style search', body: "Search is Spotlight's shape now, and a little narrower.", icon: P.check },
     ] },
