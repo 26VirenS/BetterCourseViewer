@@ -9,17 +9,21 @@ import SwiftUI
 /// The web's radial picker (content/app/personalize.js, setup-css.js .pz__pk), drawn as the web draws it: a disc with a
 /// thin hue band round its edge; inside it, saturation up the left arc (grey to full) and the shade down the right (light
 /// to deep), each named along its arc; and at the middle the colour as words — "Aa" on white over "Aa" on the dark card,
-/// each stepped until it reads — ringed in the colour, with Done on it. Dragged anywhere on a part, that part follows.
-/// (onboarding-24) Its arcs' names are 11-point, the right one "Shade" (a word students use; it was "Depth"), and under
-/// the disc the colour's code can be read and typed.
+/// each stepped until it reads — ringed in the colour, with its code on it. Dragged anywhere on a part, that part follows.
+/// (onboarding-24) Its arcs' names are 11-point, the right one "Shade" (a word students use; it was "Depth"). (1.3.148) The
+/// colour's code sits in the middle where Done was, to read or to type; a drag turns the wheel at once and hands the colour
+/// on (`change`) as the pointer rests and as the drag ends — never on every step of it, which drew the whole window again
+/// each time — so what is chosen is kept without Done.
 struct RadialColorPicker: View {
     let value: AppearanceStore.Custom
     let change: (AppearanceStore.Custom) -> Void
     /// (1.3.76) On its way out: it shrinks back and fades as it grew in, before its row is taken away.
     var leaving = false
-    var done: () -> Void = {}
     @State private var mode: Mode?
-    @State private var shown = UserDefaults.standard.string(forKey: "SimplShotFile") != nil // (a screenshot: already in)
+    /// The colour as the wheel shows it mid-drag, before it is handed on.
+    @State private var live: AppearanceStore.Custom?
+    @State private var settle: Task<Void, Never>?
+    @State private var grown = UserDefaults.standard.string(forKey: "SimplShotFile") != nil // (a screenshot: already in)
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private enum Mode { case hue, sat, depth }
@@ -31,23 +35,43 @@ struct RadialColorPicker: View {
         return CGPoint(x: c + r * sin(a), y: c - r * cos(a))
     }
 
-    private var lightness: Double { (72 - value.depth * 0.4) / 100 }
+    /// What the wheel draws: the colour being dragged, else the one worn.
+    private var shown: AppearanceStore.Custom { live ?? value }
+    private var lightness: Double { (72 - shown.depth * 0.4) / 100 }
 
     private func color(_ h: Double, _ s: Double, _ l: Double) -> Color { Color(hex: AppearanceStore.hex(h: h, s: s, l: l)) }
 
     var body: some View {
-        VStack(spacing: 14) {
-            wheel
-            HexField(hex: value.hex, wear: wear)
+        wheel
+            .scaleEffect((grown && !leaving) || reduceMotion ? 1 : 0.92)
+            .opacity(grown && !leaving ? 1 : 0)
+            .onAppear { withAnimation(Motion.gentle) { grown = true } }
+            .onDisappear { commit() } // (closed mid-drag: what was shown is kept)
+            .allowsHitTesting(!leaving) // (put away: a click on it as it fades turns nothing)
+    }
+
+    /// A colour from a drag: shown at once on the wheel, handed on once the pointer has rested a moment.
+    private func preview(_ v: AppearanceStore.Custom) {
+        live = v
+        settle?.cancel()
+        settle = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 140_000_000)
+            if !Task.isCancelled { commit() }
         }
-        .scaleEffect((shown && !leaving) || reduceMotion ? 1 : 0.92)
-        .opacity(shown && !leaving ? 1 : 0)
-        .onAppear { withAnimation(Motion.gentle) { shown = true } }
-        .allowsHitTesting(!leaving) // (put away: a click on it as it fades turns nothing, Done included)
+    }
+
+    /// The colour shown handed on, if it has not been yet.
+    private func commit() {
+        settle?.cancel()
+        settle = nil
+        guard let v = live else { return }
+        live = nil
+        if v != value { change(v) }
     }
 
     private var wheel: some View {
-        let hex = value.hex
+        let v0 = shown
+        let hex = v0.hex
         return ZStack {
             Circle().fill(.regularMaterial)
             Circle().strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
@@ -56,15 +80,15 @@ struct RadialColorPicker: View {
                 .stroke(AngularGradient(colors: [.red, .yellow, .green, .cyan, .blue, Color(red: 1, green: 0, blue: 1), .red],
                                         center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)), lineWidth: 19)
                 .frame(width: 235, height: 235)
-            arc(200, 340, LinearGradient(colors: [color(value.h, 0, lightness), color(value.h, 1, lightness)],
+            arc(200, 340, LinearGradient(colors: [color(v0.h, 0, lightness), color(v0.h, 1, lightness)],
                                          startPoint: UnitPoint(x: 0.5, y: 232 / size), endPoint: UnitPoint(x: 0.5, y: 40 / size)))
-            arc(20, 160, LinearGradient(colors: [color(value.h, value.s, 0.72), color(value.h, value.s, 0.32)],
+            arc(20, 160, LinearGradient(colors: [color(v0.h, v0.s, 0.72), color(v0.h, v0.s, 0.32)],
                                         startPoint: UnitPoint(x: 0.5, y: 40 / size), endPoint: UnitPoint(x: 0.5, y: 232 / size)))
             curved("SATURATION", around: 270)
             curved("SHADE", around: 90)
-            knob(at: pt(value.h, 117.5), fill: color(value.h, 1, 0.5), r: 11, line: 3.5)
-            knob(at: pt(200 + value.s * 140, 86), fill: Color(hex: hex), r: 9, line: 3)
-            knob(at: pt(20 + value.depth / 100 * 140, 86), fill: Color(hex: hex), r: 9, line: 3)
+            knob(at: pt(v0.h, 117.5), fill: color(v0.h, 1, 0.5), r: 11, line: 3.5)
+            knob(at: pt(200 + v0.s * 140, 86), fill: Color(hex: hex), r: 9, line: 3)
+            knob(at: pt(20 + v0.depth / 100 * 140, 86), fill: Color(hex: hex), r: 9, line: 3)
             core(hex)
         }
         .frame(width: size, height: size)
@@ -73,7 +97,10 @@ struct RadialColorPicker: View {
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { g in turn(g.startLocation, g.location) }
-                .onEnded { _ in mode = nil }
+                .onEnded { _ in
+                    mode = nil
+                    commit()
+                }
         )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Colour")
@@ -128,7 +155,7 @@ struct RadialColorPicker: View {
             .allowsHitTesting(false)
     }
 
-    /// The colour as words, by day over by night, ringed in the colour; Done on it, in it.
+    /// The colour as words, by day over by night, ringed in the colour; its code on it, in it (1.3.148: where Done was).
     private func core(_ hex: String) -> some View {
         let ns = NSColor(Color(hex: hex))
         let dark = NSColor(srgbRed: 28 / 255, green: 28 / 255, blue: 30 / 255, alpha: 1)
@@ -147,17 +174,7 @@ struct RadialColorPicker: View {
                     .background(Color(nsColor: dark))
             }
             .clipShape(Circle())
-            Button(action: done) {
-                Text("Done")
-                    .font(.system(size: 11.5, weight: .semibold))
-                    .foregroundStyle(ink)
-                    .padding(.horizontal, 13)
-                    .frame(height: 26)
-                    .background(Capsule().fill(Color(hex: hex)))
-                    .shadow(color: .black.opacity(0.28), radius: 4, y: 2)
-            }
-            .buttonStyle(.plain)
-            .keyboardShortcut(.defaultAction)
+            HexField(hex: hex, ink: ink, wear: wear)
         }
         .frame(width: 112, height: 112)
         .overlay(Circle().strokeBorder(Color(hex: hex), lineWidth: 3).padding(-3))
@@ -165,7 +182,7 @@ struct RadialColorPicker: View {
         .help("How your colour reads as words, by day and by night")
     }
 
-    /// A drag on the picker: the part it began on follows the pointer (the core's Done keeps its own press).
+    /// A drag on the picker: the part it began on follows the pointer (the core's code keeps its own presses).
     private func turn(_ start: CGPoint, _ now: CGPoint) {
         func read(_ p: CGPoint) -> (a: Double, d: Double) {
             let dx = Double(p.x - c), dy = Double(p.y - c)
@@ -178,14 +195,14 @@ struct RadialColorPicker: View {
             if f.d >= 100 && f.d <= 136 { mode = .hue } else if f.d >= 68 && f.d < 100 { mode = f.a >= 180 ? .sat : .depth } else { return }
         }
         let q = read(now)
-        var v = value
+        var v = shown
         switch mode {
         case .hue: v.h = q.a
         case .sat: v.s = min(max((q.a - 200) / 140, 0), 1)
         case .depth: v.depth = min(max((q.a - 20) / 140, 0), 1) * 100
         case nil: return
         }
-        change(v)
+        preview(v)
     }
 
     /// (onboarding-24) A colour code typed ("#2f7cf6", "2F7CF6", "#28f"): its hue, saturation and lightness, the
@@ -196,7 +213,7 @@ struct RadialColorPicker: View {
         let r = Double((n >> 16) & 0xff) / 255, g = Double((n >> 8) & 0xff) / 255, b = Double(n & 0xff) / 255
         let hi = max(r, g, b), lo = min(r, g, b), d = hi - lo
         let l = (hi + lo) / 2
-        var v = value
+        var v = shown
         if d > 0.0001 {
             v.s = min(max(d / (1 - abs(2 * l - 1)), 0), 1)
             var h: Double
@@ -213,42 +230,49 @@ struct RadialColorPicker: View {
             v.s = 0 // (a grey: the hue left where it was)
         }
         v.depth = min(max((72 - l * 100) / 0.4, 0), 100)
+        live = nil
+        settle?.cancel()
         change(v)
         return true
     }
 }
 
-/// (onboarding-24) Under the wheel: the colour as a code, to read or to type. Six digits typed wear it as they come (a
-/// three-digit code once Return is pressed or the field is left); a code that is not one goes back to the colour worn.
+/// (onboarding-24) The colour as a code, to read or to type — (1.3.148) in the wheel's middle, on a capsule of the colour,
+/// where Done was. Six digits typed wear it as they come (a three-digit code once Return is pressed or the field is left);
+/// a code that is not one goes back to the colour worn.
 private struct HexField: View {
     let hex: String
+    let ink: Color
     let wear: (String) -> Bool
     @State private var text = ""
     @FocusState private var focused: Bool
 
     var body: some View {
-        HStack(spacing: 8) {
-            Text("Hex")
-                .font(.sCallout)
-                .foregroundStyle(.secondary)
-            TextField("Colour code", text: $text, prompt: Text("#2f7cf6"))
-                .labelsHidden()
-                .textFieldStyle(.roundedBorder)
-                .font(.sCallout.monospaced())
-                .autocorrectionDisabled()
-                .frame(width: 96)
-                .focused($focused)
-                .onSubmit(apply)
-                .accessibilityLabel("Colour code")
-        }
-        .onAppear { text = hex }
-        .onChange(of: hex) { _, h in if !focused { text = h } }
-        .onChange(of: text) { _, t in
-            // (a whole six-digit code, worn as it is typed: the wheel and the window follow)
-            let digits = t.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "#", with: "")
-            if focused, digits.count == 6 { _ = wear(t) }
-        }
-        .onChange(of: focused) { _, on in if !on { apply() } }
+        TextField("Colour code", text: $text, prompt: Text("#2f7cf6"))
+            .labelsHidden()
+            .textFieldStyle(.plain)
+            .font(.system(size: 11.5, weight: .semibold).monospaced())
+            .foregroundStyle(ink)
+            .multilineTextAlignment(.center)
+            .autocorrectionDisabled()
+            .frame(width: 70)
+            .padding(.horizontal, 6)
+            .frame(height: 26)
+            .background(Capsule().fill(Color(hex: hex)))
+            .overlay(Capsule().strokeBorder(ink.opacity(focused ? 0.55 : 0), lineWidth: 1.5))
+            .shadow(color: .black.opacity(0.28), radius: 4, y: 2)
+            .focused($focused)
+            .onSubmit(apply)
+            .accessibilityLabel("Colour code")
+            .help("The colour's code: type one to wear it")
+            .onAppear { text = hex }
+            .onChange(of: hex) { _, h in if !focused { text = h } }
+            .onChange(of: text) { _, t in
+                // (a whole six-digit code, worn as it is typed: the wheel and the window follow)
+                let digits = t.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "#", with: "")
+                if focused, digits.count == 6 { _ = wear(t) }
+            }
+            .onChange(of: focused) { _, on in if !on { apply() } }
     }
 
     private func apply() {

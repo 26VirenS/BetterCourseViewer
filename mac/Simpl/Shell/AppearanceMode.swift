@@ -285,7 +285,7 @@ struct AppearanceBar: View {
         .help("Any colour")
         .accessibilityLabel(Text("Custom colour"))
         .popover(isPresented: $picking, arrowEdge: .top) {
-            RadialColorPicker(value: store.custom, change: { store.setCustom($0) }, done: { picking = false })
+            RadialColorPicker(value: store.custom, change: { store.setCustom($0) })
                 .padding(20)
         }
     }
@@ -374,9 +374,14 @@ private struct CourseColourPicker: View {
                 }
             }
             if any {
-                RadialColorPicker(value: custom, change: { custom = $0 }, done: { save(custom.hex) })
+                RadialColorPicker(value: custom, change: { custom = $0 })
                     .frame(maxWidth: .infinity)
                     .padding(.top, 6)
+                // (1.3.148: the wheel's middle is its code now; the course's colour is kept here)
+                Button("Use This Colour") { save(custom.hex) }
+                    .glassButton()
+                    .keyboardShortcut(.defaultAction)
+                    .frame(maxWidth: .infinity)
             } else {
                 Button("Any Colour…") { withAnimation(Motion.gentle) { any = true } }
             }
