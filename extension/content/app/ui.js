@@ -964,6 +964,71 @@
     return el;
   }
 
+  /** (2.99.86) Every rounded rectangle of the app with Apple's continuous corners. Where the browser draws corner shapes
+   *  itself (CSS corner-shape) a class asks for them, and borders, shadows and focus rings follow the corner; elsewhere
+   *  (Safari) the element is drawn through a squircle clip (squircle above) — save where a clip would cut what shows
+   *  outside it: a deep shadow (a popup, a menu), a fixed or sticky surface, or a clip of its own. Circles stay circles;
+   *  a pill's ends become halves of a superellipse. Watched as the app draws: each element looked at once. */
+  const CORNERS = (() => { try { return CSS.supports('corner-shape', 'superellipse(1.5)'); } catch { return false; } })();
+  const seenSq = new WeakSet();
+  let sqQueue = [], sqTimer = 0, sqWatch = null;
+  const SQ_SKIP = 'svg, svg *, img, video, canvas, iframe, math, math *, .bcv-prose *, .bcv-squircle, .bcv-nosq, .bcv-nosq *';
+  function squircleOne(el) {
+    if (seenSq.has(el) || !el.isConnected) return;
+    if (el.matches(SQ_SKIP)) { seenSq.add(el); return; }
+    const w = el.offsetWidth, hh = el.offsetHeight;
+    if (!w || !hh) return; // (not laid out yet: looked at again when it next changes)
+    seenSq.add(el);
+    const cs = getComputedStyle(el);
+    if (cs.display === 'inline') return;
+    const r = parseFloat(cs.borderTopLeftRadius) || 0;
+    if (r < 4) return;
+    // (a corner rounded on one side only — a group's first row, a tab — keeps its own shape)
+    if (cs.borderTopRightRadius !== cs.borderTopLeftRadius || cs.borderBottomLeftRadius !== cs.borderTopLeftRadius || cs.borderBottomRightRadius !== cs.borderTopLeftRadius) return;
+    const round = Math.min(w, hh) / 2;
+    if (Math.abs(w - hh) <= 1 && r >= round - 0.5) return; // (a circle stays a circle)
+    if (CORNERS) { el.classList.add('bcv-sqc'); return; } // (the element's own radius kept: what lays itself out by it still can)
+    if (cs.clipPath && cs.clipPath !== 'none') return;
+    if (cs.position === 'fixed' || cs.position === 'sticky') return;
+    const deep = /(\d+(?:\.\d+)?)px\s+(\d+(?:\.\d+)?)px\s+(\d+(?:\.\d+)?)px/g;
+    let m, shadow = 0;
+    const outer = cs.boxShadow.split(/,(?![^(]*\))/).filter((s) => !/inset/.test(s)).join(',');
+    while ((m = deep.exec(outer))) shadow = Math.max(shadow, parseFloat(m[3]) + Math.abs(parseFloat(m[2])));
+    if (shadow > 6) return;
+    squircle(el, { pill: r >= hh / 2 - 0.5 && w > hh });
+  }
+  // (looked at a little at a time, when the page is idle — never a long run of style reads in the middle of a motion)
+  let sqPending = [];
+  const sqIdle = self.requestIdleCallback ? (f) => self.requestIdleCallback(f, { timeout: 600 }) : (f) => setTimeout(() => f({ timeRemaining: () => 6, didTimeout: false }), 80);
+  function squircleSweep(deadline) {
+    sqTimer = 0;
+    // (nothing looked at while something moves: a style read mid-transition can hold up its frames)
+    if (document.getAnimations?.().some((a) => a.playState === 'running')) { sqTimer = setTimeout(() => { sqTimer = sqIdle(squircleSweep); }, 300); return; }
+    for (const root of sqQueue.splice(0)) {
+      if (!root.isConnected) continue;
+      sqPending.push(root, ...root.querySelectorAll('[class]'));
+    }
+    let i = 0;
+    while (i < sqPending.length && (deadline.timeRemaining() > 2 || (deadline.didTimeout && i < 40))) squircleOne(sqPending[i++]);
+    sqPending = sqPending.slice(i);
+    if (sqPending.length) sqTimer = sqIdle(squircleSweep);
+  }
+  const squircleSoon = (root) => {
+    sqQueue.push(root);
+    if (!sqTimer) sqTimer = sqIdle(squircleSweep);
+  };
+  /** Start watching: the app's root and what is drawn over it (sheets, menus, previews, the search afloat). */
+  function squircleAll() {
+    if (sqWatch || typeof MutationObserver === 'undefined') return;
+    document.documentElement.classList.toggle('bcv-sq-css', CORNERS);
+    sqWatch = new MutationObserver((records) => {
+      for (const rec of records) for (const n of rec.addedNodes) if (n.nodeType === 1 && (n.id?.startsWith('bcv') || String(n.className?.baseVal ?? n.className ?? '').includes('bcv'))) squircleSoon(n);
+    });
+    sqWatch.observe(document.body, { childList: true, subtree: true });
+    const app = document.getElementById('bcv-app');
+    if (app) squircleSoon(app);
+  }
+
   const initials = (name) => String(name || '').trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || '').join('');
 
   const reducedMotion = () => {
@@ -1680,7 +1745,7 @@
   BCV.ui = {
     groupPicker, groupAttrs, BANDS, gradeBand, bandChip, bandSlider, whatIfAdder, whatIfRemove,
     svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, statusBadge, seg, segSlide, search, switchEl, btn, iconbtn, pill, placeDot, haptic,
-    squircle, squirclePath, squircleFit, superPillPath,
+    squircle, squirclePath, squircleFit, superPillPath, squircleAll,
     empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, picker, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField, promptSheet, askSheet,
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,
     fmtTime, fmtTimeLower, fmtShort, fmtLong, fmtDateComma, fmtAt, fmtAtUpper, fmtBy, dayTitle, fmtDow, fmtRecent, whenShort, plural,

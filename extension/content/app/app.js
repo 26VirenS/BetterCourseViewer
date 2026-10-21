@@ -376,6 +376,7 @@
       root.append(side, main);
     }
     document.body.prepend(root);
+    if (!phone()) BCV.ui.squircleAll?.(); // (2.99.86: every rounded rectangle drawn with Apple's continuous corners)
     wireIntent(root); // (a pointer resting on a link reads its screen ahead: see the background, above)
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') U.closeMenus();

@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.85"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.86"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -6128,3 +6128,7 @@ html.bcv-appear #bcv-tray, html.bcv-appear #bcv-look { opacity: 0; pointer-event
 .bcv-spot:not(.is-far) .bcv-omni__box.bcv-squircle { background: var(--bcv-sq-ring, none) 0 0 / 100% 100% no-repeat border-box, linear-gradient(180deg, rgba(6,6,8,.84), rgba(34,34,38,.62)) padding-box; box-shadow: var(--bcv-glass-shade); }
 .bcv-spot .bcv-omni__panel.bcv-squircle { background: var(--bcv-sq-ring, none) 0 0 / 100% 100% no-repeat border-box, linear-gradient(180deg, rgba(46,44,50,.4), rgba(28,26,30,.5)) padding-box; box-shadow: var(--bcv-glass-shade); }
 html.bcv-noblur .bcv-spot:not(.is-far) .bcv-omni__box.bcv-squircle, html.bcv-noblur .bcv-spot .bcv-omni__panel.bcv-squircle { background: var(--bcv-sq-ring, none) 0 0 / 100% 100% no-repeat border-box, linear-gradient(rgba(40,40,44,.97), rgba(40,40,44,.97)) padding-box; }
+/* (2.99.86) every rounded rectangle with continuous corners (ui.js squircleAll): where the browser draws corner shapes
+   itself, a gentle superellipse at each element's own radius — nearest Apple's continuous corner without changing the radius
+   anything lays itself out by — its border, shadow and focus ring following the corner */
+.bcv-sqc { corner-shape: superellipse(1.25); }
