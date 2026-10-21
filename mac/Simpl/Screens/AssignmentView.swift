@@ -1695,7 +1695,7 @@ private struct HandInSheet: View {
         let links = urls.filter { ["http", "https"].contains($0.scheme?.lowercased() ?? "") }
         if !local.isEmpty && assignment.types.contains("online_upload") {
             if type != "online_upload" { withAnimation(Motion.snappy) { type = "online_upload" } }
-            for u in local { addFile(u) }
+            for (i, u) in local.enumerated() { addFile(u, preview: i == local.count - 1) } // (1.3.145: only the last one's preview opens)
             return true
         }
         if let link = links.first, assignment.types.contains("online_url") {
@@ -1713,7 +1713,7 @@ private struct HandInSheet: View {
     }
 
     /// A file on this Mac, read to be handed in (not a folder, and not over the size the page can take).
-    private func addFile(_ u: URL) {
+    private func addFile(_ u: URL, preview open: Bool = true) {
         let scoped = u.startAccessingSecurityScopedResource()
         defer { if scoped { u.stopAccessingSecurityScopedResource() } }
         let name = u.lastPathComponent
@@ -1725,7 +1725,7 @@ private struct HandInSheet: View {
                 return
             }
             do {
-                add(PickedFile(name: "\(name).zip", type: "application/zip", data: try HandInZip.zip(folder: u)))
+                add(PickedFile(name: "\(name).zip", type: "application/zip", data: try HandInZip.zip(folder: u)), preview: open)
             } catch {
                 self.error = "\(name) could not be zipped."
             }
@@ -1740,7 +1740,7 @@ private struct HandInSheet: View {
             return
         }
         let mime = UTType(filenameExtension: u.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
-        add(PickedFile(name: name, type: mime, data: bytes))
+        add(PickedFile(name: name, type: mime, data: bytes), preview: open)
     }
 
     private func add(_ f: PickedFile, preview open: Bool = true) {
@@ -1800,7 +1800,7 @@ private struct HandInSheet: View {
     private func pickedFiles(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
-            for u in urls { addFile(u) }
+            for (i, u) in urls.enumerated() { addFile(u, preview: i == urls.count - 1) } // (1.3.145: only the last one's preview opens)
         case .failure(let e):
             error = e.localizedDescription
         }

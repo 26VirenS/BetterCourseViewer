@@ -1,4 +1,5 @@
 import AppKit
+import PDFKit
 import Quartz
 import SwiftUI
 import UniformTypeIdentifiers
@@ -161,12 +162,16 @@ struct FileMenuItems: View {
 }
 
 /// Quick Look's own view of a file, drawn in a page (a PDF to scroll, a picture, a film to play, a document's pages).
+/// (1.3.145) A PDF is drawn by PDFKit's own view instead, in the app — Quick Look draws its preview in a process of its
+/// own, which a scroll of the wheel over it never reached (the screenshot suite's SimplScrollProbe: the pages stood
+/// still) — scrolling down its pages, fitted to the width.
 struct QuickLookView: NSViewRepresentable {
     let file: URL
 
     final class Coordinator {
         var file: URL?
         var preview: QLPreviewView?
+        var pdf: PDFView?
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -176,71 +181,107 @@ struct QuickLookView: NSViewRepresentable {
     /// showed small and would not scroll.
     final class SettledPreviewView: QLPreviewView {
         var pending: URL?
+        /// (1.3.145) It was given a file: only then may it be closed (Quick Look stops the app — an assertion — on a
+        /// close of a preview never given one, as Hand In's did when several files came in at once, each replacing the
+        /// last one's preview before it had its size).
+        var started = false
 
         override func layout() {
             super.layout()
             guard let file = pending, bounds.width > 40, bounds.height > 40 else { return }
             pending = nil
+            started = true
             previewItem = file as NSURL
             if UserDefaults.standard.bool(forKey: "SimplScrollProbe") {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in self?.probeScroll() }
-            }
-        }
-
-        /// (1.3.145, the screenshot suite: -SimplScrollProbe YES) A scroll of the wheel posted over the middle of the
-        /// preview, as a mouse's would come: what the window says is under it, and where each scroll view in the preview
-        /// stood before and after — whether a scroll over a preview reaches it.
-        func probeScroll() {
-            guard let window else { NSLog("SimplScrollProbe: no window"); return }
-            let mid = convert(NSPoint(x: bounds.midX, y: bounds.midY), to: nil)
-            let hit = window.contentView?.hitTest(window.contentView!.convert(mid, from: nil))
-            func scrolls(_ v: NSView) -> [NSScrollView] { (v as? NSScrollView).map { [$0] } ?? [] + v.subviews.flatMap(scrolls) }
-            let inner = scrolls(self)
-            let before = inner.map { $0.contentView.bounds.origin.y }
-            let screen = window.convertPoint(toScreen: mid)
-            let flipped = CGPoint(x: screen.x, y: (NSScreen.screens.first?.frame.height ?? 0) - screen.y)
-            if let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: -240, wheel2: 0, wheel3: 0) {
-                cg.location = flipped
-                if let e = NSEvent(cgEvent: cg) { window.sendEvent(e) }
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                let after = inner.map { $0.contentView.bounds.origin.y }
-                NSLog("SimplScrollProbe: hit %@ (in preview: %@), key %@, scroll views %d, before %@, after %@, subviews %@",
-                      hit.map { String(describing: type(of: $0)) } ?? "nil", (hit?.isDescendant(of: self) ?? false) ? "yes" : "no",
-                      window.isKeyWindow ? "yes" : "no", inner.count, "\(before)", "\(after)",
-                      self.subviews.map { String(describing: type(of: $0)) }.joined(separator: ","))
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
+                    guard let self, let window = self.window else { return }
+                    NSLog("SimplScrollProbe: Quick Look, key %@", window.isKeyWindow ? "yes" : "no")
+                }
             }
         }
     }
 
+    private static func isPDF(_ url: URL) -> Bool { url.pathExtension.lowercased() == "pdf" }
+
     func makeNSView(context: Context) -> NSView {
         let box = NSView(frame: .zero)
-        let made: SettledPreviewView? = SettledPreviewView(frame: .zero, style: .normal)
-        if let preview = made {
-            preview.autoresizingMask = [.width, .height]
-            preview.frame = box.bounds
-            preview.autostarts = false
-            preview.pending = file
-            box.addSubview(preview)
-            context.coordinator.preview = preview
-        }
-        context.coordinator.file = file
+        show(file, in: box, context.coordinator)
         return box
+    }
+
+    /// The file put in the box: in PDFKit's view where it is a PDF PDFKit can read, else in Quick Look's.
+    private func show(_ url: URL, in box: NSView, _ c: Coordinator) {
+        c.file = url
+        if Self.isPDF(url), let doc = PDFDocument(url: url) {
+            Self.retire(c)
+            let pdf = PDFView(frame: box.bounds) // (one page under the next, fitted to the width, the wheel scrolling them)
+            pdf.autoresizingMask = [.width, .height]
+            pdf.displayMode = .singlePageContinuous
+            pdf.displaysPageBreaks = true
+            pdf.backgroundColor = .clear
+            pdf.document = doc
+            pdf.autoScales = true
+            box.addSubview(pdf)
+            c.pdf = pdf
+            if UserDefaults.standard.bool(forKey: "SimplScrollProbe") { Self.probe(pdf) }
+            return
+        }
+        if let p = c.preview as? SettledPreviewView {
+            if p.bounds.width <= 40 || p.bounds.height <= 40 { p.pending = url } else { p.started = true; p.previewItem = url as NSURL }
+            return
+        }
+        Self.retire(c)
+        let preview = SettledPreviewView(frame: box.bounds, style: .normal)
+        if let preview {
+            preview.autoresizingMask = [.width, .height]
+            preview.autostarts = false
+            preview.pending = url
+            box.addSubview(preview)
+            c.preview = preview
+        }
     }
 
     func updateNSView(_ box: NSView, context: Context) {
         guard context.coordinator.file != file else { return }
-        context.coordinator.file = file
-        if let p = context.coordinator.preview as? SettledPreviewView, p.bounds.width <= 40 || p.bounds.height <= 40 {
-            p.pending = file // (not laid out yet: given it once it has its size)
-        } else {
-            context.coordinator.preview?.previewItem = file as NSURL
+        show(file, in: box, context.coordinator)
+    }
+
+    /// What showed before taken out of the box: Quick Look's view closed once the moment is over (never during the
+    /// update that replaced it) and only if it was ever given its file.
+    private static func retire(_ c: Coordinator) {
+        if let p = c.preview {
+            p.removeFromSuperview()
+            if (p as? SettledPreviewView)?.started ?? true { DispatchQueue.main.async { p.close() } }
         }
+        c.preview = nil
+        c.pdf?.removeFromSuperview()
+        c.pdf = nil
     }
 
     static func dismantleNSView(_ box: NSView, coordinator: Coordinator) {
-        coordinator.preview?.close()
-        coordinator.preview = nil
+        retire(coordinator)
+    }
+
+    /// (1.3.145, the screenshot suite: -SimplScrollProbe YES) A scroll of the wheel posted over the middle of the pages,
+    /// as a mouse's would come, and where the pages stood before and after.
+    private static func probe(_ pdf: PDFView) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak pdf] in
+            guard let pdf, let window = pdf.window, let scroll = pdf.documentView?.enclosingScrollView else {
+                NSLog("SimplScrollProbe: PDF, no scroll view")
+                return
+            }
+            let before = scroll.contentView.bounds.origin.y
+            let mid = pdf.convert(NSPoint(x: pdf.bounds.midX, y: pdf.bounds.midY), to: nil)
+            let screen = window.convertPoint(toScreen: mid)
+            if let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: -240, wheel2: 0, wheel3: 0) {
+                cg.location = CGPoint(x: screen.x, y: (NSScreen.screens.first?.frame.height ?? 0) - screen.y)
+                if let e = NSEvent(cgEvent: cg) { window.sendEvent(e) }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                NSLog("SimplScrollProbe: PDF, pages %d, scrolled %@ (%.0f → %.0f)", pdf.document?.pageCount ?? 0,
+                      scroll.contentView.bounds.origin.y != before ? "yes" : "no", before, scroll.contentView.bounds.origin.y)
+            }
+        }
     }
 }
 
