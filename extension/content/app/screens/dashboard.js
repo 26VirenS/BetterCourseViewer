@@ -574,8 +574,9 @@
       // side by side once a row is pressed) — (2.99.69) 440px as the Mac's panel is — and as tall as what it holds, or as
       // tall as the window allows, pushed back inside the window
       const M = 16, LIST_W = 440, PV_W = 500;
-      /** How tall the box stands at width w with nothing holding it in: its header and the whole of its list. Measured in
-       *  the page (the layer put in, unseen, for the moment it takes when it is not in yet). */
+      /** How tall the box stands at width w with nothing holding it in: its header and its list — (2.99.76) no more than
+       *  two and a half of its rows, the half row cut through saying the list scrolls on. Measured in the page (the layer
+       *  put in, unseen, for the moment it takes when it is not in yet). */
       function naturalHeight(w) {
         const away = !ov.isConnected;
         if (away) { ov.style.visibility = 'hidden'; document.body.append(ov); }
@@ -584,7 +585,13 @@
         sheet.style.width = `${Math.round(w)}px`;
         sheet.style.height = 'auto';
         if (list) Object.assign(list.style, { maxHeight: 'none', overflow: 'visible' });
-        const hgt = Math.ceil(sheet.getBoundingClientRect().height);
+        const at = sheet.getBoundingClientRect();
+        let hgt = Math.ceil(at.height);
+        const rows = list ? [...list.querySelectorAll(':scope > .bcv-sheet__row, :scope > .bcv-sheet__item, .bcv-sheet__recent > .bcv-sheet__qrow')] : [];
+        if (rows.length > 2) {
+          const third = rows[2].getBoundingClientRect();
+          hgt = Math.min(hgt, Math.ceil(third.top + third.height / 2 - at.top + (at.bottom - list.getBoundingClientRect().bottom)));
+        }
         [sheet.style.width, sheet.style.height] = keep;
         if (list) Object.assign(list.style, { maxHeight: keep[2], overflow: keep[3] });
         if (away) { ov.remove(); ov.style.visibility = ''; }

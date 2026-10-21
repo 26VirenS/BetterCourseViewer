@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.75"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.76"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -492,11 +492,11 @@ html.bcv-on.bcv-d2l body { visibility: visible !important; opacity: 1 !important
 #bcv-app .bcv-pretty { text-wrap: pretty; }
 
 /* ---- sidebar ------------------------------------------------------------ */
-.bcv-side { flex: none; width: 242px; padding: 14px 12px; background: var(--bcv-chrome-ground, var(--bcv-chrome)); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-right: 1px solid var(--bcv-edge); display: flex; flex-direction: column; gap: 18px; position: fixed; top: 0; left: 0; bottom: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+.bcv-side { flex: none; width: 264px; padding: 14px 12px; background: var(--bcv-chrome-ground, var(--bcv-chrome)); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-right: 1px solid var(--bcv-edge); display: flex; flex-direction: column; gap: 18px; position: fixed; top: 0; left: 0; bottom: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
 /* The sidebar is pinned to the window and scrolls on its own, apart from the page: a page scroll never moves
  * it, and scrolling it never moves the page. Out of the row as it is, this holds its place there, at its
  * width in every tier (and folding with it when a quiz takes the page). */
-html.bcv-on:not(.bcv-phone) #bcv-app:has(> .bcv-side)::before { content: ''; flex: none; order: -1; width: 242px; transition: width .45s var(--bcv-ease); }
+html.bcv-on:not(.bcv-phone) #bcv-app:has(> .bcv-side)::before { content: ''; flex: none; order: -1; width: 264px; transition: width .45s var(--bcv-ease); }
 html.bcv-on.bcv-quiz:not(.bcv-phone) #bcv-app:has(> .bcv-side)::before { width: 0; }
 .bcv-brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px 2px; }
 .bcv-brand__tile { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(160deg, #1b3f76, #12305c); display: flex; align-items: center; justify-content: center; font: 700 14px/1 var(--bcv-font); color: #f0b429; flex: none; overflow: hidden; }
@@ -4032,7 +4032,7 @@ html.bcv-dragpin #bcv-tray { opacity: 0; }
 /* The bar sits beside the sidebar, over the page alone: the sidebar runs from the very top, and the
  * bar starts at its right edge (--bcv-side-w follows the sidebar's width: narrower on a small window,
  * nothing in a quiz, where the sidebar folds away — and the bar's left edge eases with it). */
-html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) { --bcv-bar-h: 44px; --bcv-side-w: 242px; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) { --bcv-bar-h: 44px; --bcv-side-w: 264px; }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab).bcv-quiz { --bcv-side-w: 0px; }
 /* (2.98.28) A quiz takes the whole window: the top bar goes up and out of view, and the pins, the switch and the
  * report button with it — the quiz's own head keeps the way out to Canvas's page. The heads that stuck under the
@@ -5468,6 +5468,20 @@ html.bcv-noblur .bcv-pv.bcv-pv--card { background: rgb(40,40,44); -webkit-backdr
 .bcv-pv__foot { display: flex; justify-content: flex-end; align-items: center; gap: 10px; padding: 10px 16px 16px; border-top: 0; }
 .bcv-pv__go { width: auto; min-width: 92px; height: 38px; padding: 0 22px; border-radius: 19px; font: 600 15px/1 var(--bcv-font); }
 .bcv-pv__alt { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 18px 0 14px; border: 1px solid var(--bcv-edge); border-radius: 19px; background: var(--bcv-fill2); color: var(--bcv-ink); font: 500 15px/1 var(--bcv-font); cursor: pointer; transition: background-color .15s ease, scale .16s var(--bcv-spring-snappy); }
+/* (2.99.76) one size for every card (preview.js CARD_H): the title smaller, its facts on one line, the words under them
+ * scrolling within, faded where they run on past the foot */
+.bcv-pv--card .bcv-pv__head { padding: 12px 12px 2px 16px; }
+.bcv-pv--card .bcv-pv__tile { width: 24px; height: 24px; border-radius: 7px; }
+.bcv-pv--card .bcv-pv__x { height: 26px; font-size: 13px; padding: 0 10px 0 8px; }
+.bcv-pv--card .bcv-pv__body { padding: 6px 18px 22px; -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent); }
+.bcv-pv--card .bcv-pv__title { font-size: 18px; margin: 0 0 8px; }
+.bcv-pv--card .bcv-pv__facts { flex-direction: row; flex-wrap: wrap; gap: 4px 16px; }
+.bcv-pv--card .bcv-pv__fact { gap: 6px; font-size: 13px; }
+.bcv-pv--card .bcv-pv__chips { margin-top: 8px; }
+.bcv-pv--card .bcv-pv__prose, .bcv-pv--card .bcv-pv__none { margin-top: 10px; font-size: 13.5px; }
+.bcv-pv--card .bcv-pv__foot { padding: 6px 12px 12px; }
+.bcv-pv--card .bcv-pv__go { min-width: 80px; height: 32px; padding: 0 18px; border-radius: 16px; font-size: 14px; }
+.bcv-pv--card .bcv-pv__alt { height: 32px; padding: 0 14px 0 11px; border-radius: 16px; font-size: 14px; }
 .bcv-pv__alt:hover { background: var(--bcv-fill); }
 .bcv-pv__alt:active { scale: .96; }
 .bcv-pv__alt[hidden] { display: none; }

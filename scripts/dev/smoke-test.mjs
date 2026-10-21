@@ -1129,7 +1129,7 @@ try {
   const pinnedLocked = await sidePin();
   const lockOv = await page.evaluate(() => [getComputedStyle(document.documentElement).overflow, getComputedStyle(document.body).overflow]);
   await page.evaluate(() => { document.documentElement.classList.remove('bcv-setup-open'); window.scrollTo(0, 0); });
-  check(pinned.y > 100 && pinned.top === 0 && pinned.bottom === pinned.vh && pinned.pos === 'fixed' && pinned.os === 'contain' && pinned.main === 242 && pinnedLocked.top === 0 && pinnedLocked.bottom === pinnedLocked.vh && lockOv.join() === 'visible,hidden', `the sidebar stays put at the bottom of a long page, and under a scroll lock too; the page starts beside it: ${JSON.stringify({ pinned, pinnedLocked, lockOv })}`);
+  check(pinned.y > 100 && pinned.top === 0 && pinned.bottom === pinned.vh && pinned.pos === 'fixed' && pinned.os === 'contain' && pinned.main === 264 && pinnedLocked.top === 0 && pinnedLocked.bottom === pinnedLocked.vh && lockOv.join() === 'visible,hidden', `the sidebar stays put at the bottom of a long page, and under a scroll lock too; the page starts beside it: ${JSON.stringify({ pinned, pinnedLocked, lockOv })}`);
   const todoGroups = await texts('.bcv-group__head');
   check(todoGroups[0].startsWith('Overdue') && todoGroups[1].startsWith('Today') && todoGroups[2].startsWith('Tomorrow') && todoGroups[3].startsWith('Next 7 days'), `to do groups — past due with nothing handed in first, as Canvas's own list keeps it: ${todoGroups.join(' | ')}`);
   check((await texts('.bcv-body .bcv-row')).some((t) => /Qz01.*F26-MATH 021 20 · Quiz · 10 pts.*11:59 PM/.test(t)), 'to do rows show course · kind · pts and time');
@@ -2650,8 +2650,8 @@ try {
   check(page.url() === `${BASE}/courses/101`, 'favourite opens the course page');
   const tabs = await texts('.bcv-rail__item');
   check(tabs.length === 10 && tabs[0] === 'Home' && tabs[6] === 'Modules' && (await texts('.bcv-rail__title')).join(',').toLowerCase() === 'course,materials,people,campus tools', `course rail groups the tabs from the API: ${tabs.join(', ')}`);
-  // dense screens fill the column up to 1180 (mockup 7 layout notes): 1400 viewport − 242 sidebar − 80 padding = 1078 here
-  check(await page.$eval('.bcv-screen--ctx .bcv-head__in', (el) => Math.round(el.getBoundingClientRect().width) === 1078), `course screens fill the column (capped at 1180): ${await page.$eval('.bcv-screen--ctx .bcv-head__in', (el) => Math.round(el.getBoundingClientRect().width))}px`);
+  // dense screens fill the column up to 1180 (mockup 7 layout notes): 1400 viewport − 264 sidebar − 80 padding = 1056 here
+  check(await page.$eval('.bcv-screen--ctx .bcv-head__in', (el) => Math.round(el.getBoundingClientRect().width) === 1056), `course screens fill the column (capped at 1180): ${await page.$eval('.bcv-screen--ctx .bcv-head__in', (el) => Math.round(el.getBoundingClientRect().width))}px`);
   check((await texts('.bcv-rail__ext')).join(',') === 'Resources & Policy', 'external tools are plain links under Campus tools');
   // (2.98.28) the course rail sticks under the course's head, which sticks under the top bar — never tucked under it
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));

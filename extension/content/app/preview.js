@@ -151,6 +151,10 @@
     return { kind: 'Page', title: p.title, facts: [p.updated_at ? { icon: 'clock', text: `Edited ${U.fmtDateComma(p.updated_at)}` } : null], body: p.body || '' };
   }
 
+  /** (2.99.76) Every preview card is one size, however long the item: its facts on a line, the words under them
+   *  scrolling within, so the card never stands taller than this whatever it holds. */
+  const CARD_H = 272;
+
   /** (2.99.37) Where the card stands over the box it came from (the Mac's preview card): off the box's left edge — its
    *  right one for a box at the right of its row — just under the row pressed, the row left in sight above it, and kept
    *  inside the window; it grows out of the row. */
@@ -163,7 +167,7 @@
     const fromEnd = host.dataset.from === 'end';
     const x = Math.max(M, Math.min(fromEnd ? box.right - 52 - w : box.left + 52, vw - M - w));
     panel.style.width = `${Math.round(w)}px`;
-    panel.style.maxHeight = `${Math.round(Math.min(480, vh - 2 * M))}px`;
+    panel.style.height = `${Math.round(Math.min(CARD_H, vh - 2 * M))}px`;
     const a = anchor?.isConnected ? anchor.getBoundingClientRect() : null;
     const hgt = panel.getBoundingClientRect().height;
     const y = Math.max(M, Math.min(a ? a.bottom + 8 : box.top + 96, vh - M - hgt));
@@ -179,7 +183,7 @@
     const M = 16, vw = innerWidth, vh = innerHeight;
     const w = Math.min(460, vw - 2 * M);
     panel.style.width = `${Math.round(w)}px`;
-    panel.style.maxHeight = `${Math.round(Math.min(560, vh - 2 * M))}px`;
+    panel.style.height = `${Math.round(Math.min(CARD_H, vh - 2 * M))}px`;
     const a = anchor?.isConnected ? anchor.getBoundingClientRect() : null;
     const hgt = panel.getBoundingClientRect().height;
     const x = Math.max(M, Math.min(a ? a.left + Math.min(a.width, 640) / 2 - w / 2 : (vw - w) / 2, vw - M - w));
