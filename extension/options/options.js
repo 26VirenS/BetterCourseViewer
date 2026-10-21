@@ -579,7 +579,6 @@
     const b = e.target.closest('.theme');
     if (b) save({ appearance: { darkMode: b.dataset.value } });
   });
-  onSeg($('sideCourses'), (v) => save({ appearance: { sideCourses: v } }));
   onSeg($('sidebarLayout'), (v) => save({ appearance: { sidebar: v } })); // (2.99.39)
   // the Dashboard's views: a switch may not take the last one off — a dashboard with nothing on it is not one
   const DASH = [['dashCards', 'cards'], ['dashList', 'list'], ['dashActivity', 'activity']];
@@ -776,7 +775,6 @@
     setSwitch($('awayRefresh'), settings.appearance.awayRefresh !== false);
     for (const [id, path] of TEXT) { const el = $(id); if (document.activeElement !== el) el.value = getPath(settings, path) ?? ''; }
     [...$('themes').querySelectorAll('.theme')].forEach((b) => b.classList.toggle('is-on', b.dataset.value === (settings.appearance.darkMode || 'system')));
-    setSeg($('sideCourses'), settings.appearance.sideCourses || 'always');
     setSeg($('sidebarLayout'), settings.appearance.sidebar === 'two' ? 'two' : 'one');
     $('themeSub').textContent = settings.appearance.theme?.accent ? `${settings.appearance.theme.name || 'Your own colour'} · ${settings.appearance.theme.accent}. Photos are kept on the device they were added on.` : 'The look, a colour of your own, the courses’ colours, photos on the counters, the sidebar and the page headers.';
     for (const [id, key] of DASH) setSwitch($(id), settings.appearance.dashboard?.[key] !== false);

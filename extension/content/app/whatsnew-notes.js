@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.89', date: '2026-10-21', notes: [
+      { kind: 'improved', title: 'Courses always listed', body: 'Your courses stay on the sidebar; the hover menu is gone.', icon: P.list },
+    ] },
     { version: '2.99.88', date: '2026-10-21', notes: [
       { kind: 'improved', title: 'Snappier search', body: 'Search opens and grows with a quick ease-out.', icon: P.sparkle },
     ] },

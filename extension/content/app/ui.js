@@ -583,7 +583,6 @@
     const c = ov.classList;
     if (c.contains('bcv-sheet-ov')) return document.documentElement.classList.contains('bcv-phone') ? 'down' : 'shrink';
     if (c.contains('bcv-toast')) return 'toast';
-    if (c.contains('bcv-quicknav')) return 'left';
     if (c.contains('bcv-menu') || c.contains('bcv-picker__list')) return 'pop'; // (back toward the edge it grew from: ui.anchor's origin)
     return 'fade';
   }

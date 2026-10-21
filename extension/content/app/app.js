@@ -668,11 +668,8 @@
     return row;
   }
 
-  // ---- the courses, on hover ---------------------------------------------------------------------
-  // With "On hover" chosen the favourite courses are not listed down the sidebar: the Courses row
-  // opens them in a panel beside it instead. The pointer has to cross the gap between the row and
-  // the panel, so closing waits a moment and any of the two staying under the pointer cancels it.
-  const hoverCourses = () => state.settings?.appearance?.sideCourses === 'hover';
+  // (2.99.89) The favourite courses are always listed on the sidebar: the panel the Courses row opened on hover is gone, and
+  // with it the choice (a sideCourses: 'hover' kept from before is read by nothing).
   // (2.99.39) One sidebar, as the Mac's: the course on show opens under its row here, with its sections, and the course's
   // own rail beside the page is gone. 'two' keeps the rail, as before — and so does a choice not made yet (''), until the
   // chooser has asked (sidebarChoice); a new install has one from its setup.
@@ -713,23 +710,16 @@
       nav.counts?.[t.id] ? h('span', { class: 'bcv-nav__count', text: String(nav.counts[t.id]) }) : null,
     ].filter(Boolean))), { role: 'group', 'aria-label': `${c.shortName || c.name} sections`, dataset: { course: String(c.id) } });
   }
-  let quickNav = null; // { el, key, anchor, closeTimer }
-  let quickNavDismissed = false; // Escape was pressed: hold it shut until the pointer or focus leaves the row
-
   /** One favourite: the course's colour, its name, and the same press behaviour everywhere. */
   function favRow(c, cls = 'bcv-fav') {
     return h('button', {
       type: 'button',
       class: `${cls} ${state.route?.courseId === c.id && state.route?.screen === 'course' ? 'is-active' : ''}`,
       dataset: { load: `fav:${c.id}`, loadColor: c.color, href: c.url }, // (href: the pointer resting on it reads the course's home ahead, wireIntent)
-      // the wash marks what was pressed, and in hover mode the row pressed is no longer on the
-      // sidebar — the Courses row it came out of carries it instead
       onclick: () => {
         const key = `fav:${c.id}`;
         if (state.loadKey === key && !loadStuck()) return;
-        const wash = hoverCourses() ? 'courses' : key;
-        closeQuickNav();
-        progress(true, wash);
+        progress(true, key); // (the wash marks the row pressed)
         go(c.url, { motion: 'fade' }); // (a place of its own in the sidebar: a section, crossfaded)
       },
       title: c.name,
@@ -759,94 +749,6 @@
     ])), { role: 'group', 'aria-label': `${c.shortName || c.name} sections`, dataset: { course: String(c.id) } });
   }
 
-  let quickNavGoing = null; // (the panel on its way out: the pointer back on its row brings it back from there — U.recall)
-  let quickNavIntent = null; // (a pointer passing over the Courses row on its way elsewhere does not open the panel)
-  function closeQuickNav() {
-    if (!quickNav) return;
-    clearTimeout(quickNav.closeTimer);
-    quickNav.anchor.setAttribute('aria-expanded', 'false');
-    U.dismiss(quickNav.el);
-    quickNavGoing = quickNav;
-    quickNav = null;
-  }
-  const quickNavLeave = (key) => {
-    if (!quickNav || quickNav.key !== key) return;
-    clearTimeout(quickNav.closeTimer);
-    quickNav.closeTimer = setTimeout(closeQuickNav, 220); // long enough to reach the panel
-  };
-  /** The pointer or focus has actually left the row, so Escape's hold on it is spent. Kept apart
-   *  from quickNavLeave, which the panel's own focusout calls as it is being taken away. */
-  const quickNavRelease = (key) => { if (key === 'courses') quickNavDismissed = false; };
-  /** Escape shuts the panel and puts focus back on the row — and the row taking focus is itself
-   *  what would open it again, so the shut is held until the pointer or focus actually leaves. */
-  function dismissQuickNav(anchor) {
-    quickNavDismissed = true;
-    closeQuickNav();
-    anchor.focus();
-  }
-
-  /** Opens the panel beside the Courses row, or keeps an open one open. */
-  function quickNavHover(key, anchor) {
-    if (key !== 'courses' || quickNavDismissed || !hoverCourses() || BCV.phone?.active()) return;
-    if (quickNav) {
-      if (quickNav.key === key) { clearTimeout(quickNav.closeTimer); return; }
-      closeQuickNav();
-    }
-    if (quickNavGoing?.key === key && quickNavGoing.anchor === anchor && U.recall(quickNavGoing.el)) { // (still leaving: it turns round)
-      quickNav = quickNavGoing;
-      quickNavGoing = null;
-      quickNav.closeTimer = null;
-      anchor.setAttribute('aria-expanded', 'true');
-      return;
-    }
-    const el = U.el('bcv-quicknav', [
-      U.text('bcv-quicknav__label', 'Favorite courses'),
-      ...state.favs.map((c) => favRow(c, 'bcv-fav bcv-fav--qn')),
-      state.favs.length ? null : U.text('bcv-hint', 'Star a course under Courses to pin it here.'),
-      U.el('bcv-quicknav__sep'),
-      h('button', { type: 'button', class: 'bcv-quicknav__all', onclick: () => { closeQuickNav(); progress(true, 'courses'); go('/courses', { motion: 'fade' }); } }, [
-        U.svg(IC.book, { size: 14, stroke: '#ff9500', width: 1.9 }), h('span', { text: 'All courses' }),
-      ]),
-    ]);
-    // the row blurs as focus moves in here, which schedules a close: arriving cancels it
-    el.addEventListener('pointerenter', () => { if (quickNav) clearTimeout(quickNav.closeTimer); });
-    el.addEventListener('focusin', () => { if (quickNav) clearTimeout(quickNav.closeTimer); });
-    el.addEventListener('pointerleave', () => quickNavLeave(key));
-    el.addEventListener('focusout', (e) => { if (!el.contains(e.relatedTarget) && e.relatedTarget !== anchor) quickNavLeave(key); });
-    // the panel is a sibling of the row, not a child, so keys pressed inside it never reach the
-    // row's own handler: Escape and the arrows are answered here
-    el.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') { dismissQuickNav(anchor); return; }
-      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-      const items = [...el.querySelectorAll('button')];
-      const i = items.indexOf(document.activeElement);
-      if (i === -1) return;
-      e.preventDefault();
-      const next = i + (e.key === 'ArrowDown' ? 1 : -1);
-      if (next < 0) anchor.focus(); // back out of the top of the list onto the row it came from
-      else items[Math.min(next, items.length - 1)].focus();
-    });
-    // beside the row, level with it, kept on screen (ui.anchor: to its left when the window has no room to the right)
-    el.style.visibility = 'hidden';
-    document.body.append(el);
-    U.anchor(el, anchor, { side: 'right', gap: 8, margin: 12 });
-    el.style.visibility = '';
-    anchor.setAttribute('aria-expanded', 'true');
-    quickNav = { el, key, anchor, closeTimer: null };
-  }
-
-  /** Keyboard: the row opens the panel and hands it the first course; Escape closes it. */
-  function quickNavKey(e, key, anchor) {
-    if (key !== 'courses' || !hoverCourses()) return;
-    if (e.key === 'Escape' && quickNav) { dismissQuickNav(anchor); return; }
-    if (e.key !== 'ArrowRight' && e.key !== 'ArrowDown') return;
-    quickNavHover(key, anchor);
-    const first = quickNav?.el.querySelector('button');
-    if (!first) return;
-    e.preventDefault();
-    first.focus();
-  }
-
   /** (2.99.53) One sidebar, as the Mac's: the app's own places first — Dashboard, To Do, Calendar, Grades, Notifications,
    *  Inbox, Tools — the courses (All Courses and Groups with them) in a section of their own under them. */
   const SIDE_ORDER = ['dashboard', 'courses', 'groups', 'todo', 'calendar', 'gpa', 'notifications', 'inbox', 'tools']; // (2.99.60: All Courses and Groups back in their own places)
@@ -858,18 +760,7 @@
       class: `bcv-nav__item ${r.screen === key || (key === 'groups' && r.screen === 'group') ? 'is-active' : ''}`,
       dataset: { nav: key, load: key, loadColor: glyphColor, href }, // (href: the pointer resting on the row reads its screen's data ahead, wireIntent)
       style: tabShades(all.length)[i] ? { '--bcv-tab-icon': tabShades(all.length)[i].icon, '--bcv-tab-text': tabShades(all.length)[i].text } : { '--bcv-tab-icon': glyphColor }, // (the glyph's colour as a variable either way: a photo behind the rail lightens it)
-      ...(key === 'courses' && hoverCourses() ? { 'aria-haspopup': 'true', 'aria-expanded': 'false' } : {}),
-      onclick: () => { if (state.loadKey === key && !loadStuck()) return; closeQuickNav(); progress(true, key); go(href, { motion: 'fade' }); }, // a second press on the loading row is a no-op, until that load is plainly stuck; a section crossfades
-      onpointerenter: (e) => {
-        const a = e.currentTarget;
-        clearTimeout(quickNavIntent);
-        if (quickNav?.key === key || quickNavGoing?.key === key) quickNavHover(key, a); // (open, or still leaving: at once)
-        else quickNavIntent = setTimeout(() => quickNavHover(key, a), 70); // (a moment's rest first, as the pins ask: a pass on the way elsewhere opens nothing)
-      },
-      onpointerleave: () => { clearTimeout(quickNavIntent); quickNavRelease(key); quickNavLeave(key); },
-      onfocus: (e) => quickNavHover(key, e.currentTarget),
-      onblur: () => { quickNavRelease(key); quickNavLeave(key); },
-      onkeydown: (e) => quickNavKey(e, key, e.currentTarget),
+      onclick: () => { if (state.loadKey === key && !loadStuck()) return; progress(true, key); go(href, { motion: 'fade' }); }, // a second press on the loading row is a no-op, until that load is plainly stuck; a section crossfades
     }, [
       h('span', { class: 'bcv-nav__ic' }, U.svg(icon, { size: 21, stroke: glyphColor, width: 1.8 })),
       h('span', { text: label }),
@@ -932,7 +823,6 @@
       return;
     }
     if (!side) return;
-    closeQuickNav(); // the panel is anchored to a row this rebuild is about to replace
     const r = state.route || parseRoute();
     const name = siteName();
     html.classList.toggle('bcv-onebar', oneBar()); // (2.99.39: the course's rail goes, app.css)
@@ -964,19 +854,17 @@
       h('nav', { class: 'bcv-nav' }, oneBar()
         ? sideNav().flatMap((d, i, all) => d[0] === 'courses' ? [navButton([d[0], 'All Courses', ...d.slice(2)], i, all, r), ...sideCourseRows(r)] : d[0] === 'groups' ? sideGroupRows(r, d, i, all) : [navButton(d, i, all, r)])
         : sideNav().map((d, i, all) => navButton(d, i, all, r))),
-      // Listed here, or kept in a panel that opens off the Courses row (Settings → Appearance, and
-      // the last step of the guided setup). Either way it is the same list in the same order.
-      oneBar() ? null : hoverCourses() ? null : U.el('bcv-side__group', [
+      // (two sidebars) the favourites listed under the navigation
+      oneBar() ? null : U.el('bcv-side__group', [
         U.text('bcv-side__label', 'Favorite courses'),
         ...state.favs.flatMap((c) => [favRow(c), courseNavRows(c)]), // (2.99.39: the course on show opens under its row, one sidebar)
         state.favs.length ? null : U.text('bcv-hint', 'Star a course under Courses to pin it here.'),
       ].filter(Boolean)),
-      // (2.99.39) one sidebar: a course on show that is not listed above (not a favourite, or the favourites in the
-      // Courses row's panel) has its row and its sections here
+      // (2.99.39) one sidebar: a course on show that is not listed above (not a favourite) has its row and its sections here
       (() => {
         const nav = state.courseNav;
         if (!oneBar() || !nav?.course || r.screen !== 'course' || String(r.courseId) !== String(nav.id)) return null;
-        if ((oneBar() || !hoverCourses()) && state.favs.some((c) => String(c.id) === String(nav.id))) return null;
+        if (state.favs.some((c) => String(c.id) === String(nav.id))) return null;
         const c = { ...nav.course, url: nav.course.url || `/courses/${nav.id}` };
         return U.el('bcv-side__group', [U.text('bcv-side__label', 'This course'), favRow(c), courseNavRows(c)]);
       })(),
@@ -1591,7 +1479,6 @@
     state.submitOpen = false;
     html.classList.remove('bcv-quiz', 'bcv-quiz-fb'); // the quiz screen puts them back while an attempt or its feedback is on screen
     punchOut(); // a native screen punches back in while it builds
-    closeQuickNav(); // the courses panel belongs to the row it came from, not to the next screen
     BCV.preview?.close(); // a preview beside the list belongs to the list it was opened from
     // a sheet (a counter's list, the calendars, a rubric, GPA settings) belongs to the screen it
     // was opened over: a Back with one up would otherwise leave it, scrim and all, over the next
@@ -1720,7 +1607,7 @@
       // item's own page drew nothing kept but its course's header, which a later visit has right.
       if (!differs || id !== state.renderId || depthOf(r) > 1 || r.params.get('bcv')) return done(); // (nor a screen with work of its own over it: the setup, a hand-in, a quiz)
       await U.afterMotion(main, 900); // (its arrival plays out first: the rows are not swapped mid-entrance)
-      const busy = () => overlayOpen() || !!document.querySelector('.bcv-pv, .bcv-quicknav, .bcv-spot-ov') || BCV.welcome?.active?.() || BCV.setup?.active?.() || quizHere() || state.submitOpen
+      const busy = () => overlayOpen() || !!document.querySelector('.bcv-pv, .bcv-spot-ov') || BCV.welcome?.active?.() || BCV.setup?.active?.() || quizHere() || state.submitOpen
         || (document.activeElement && document.activeElement.matches?.('input, textarea, select, [contenteditable="true"]')) || !!String(window.getSelection?.() || '').trim();
       if (id !== state.renderId || touchedAt > drawnAt || busy()) return done(); // (in use: Canvas's answers are in the memo for the next draw)
       await render({ quiet: true });

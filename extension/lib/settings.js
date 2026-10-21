@@ -91,7 +91,7 @@
   // The scripts' own version, stamped: content/app/app.js compares it with the stylesheet's
   // (--bcv-version) and the manifest's, because Safari can run one version's script with
   // another's stylesheet after the Mac app has updated under it. Bumped with every release.
-  self.BCV_VERSION = '2.99.88';
+  self.BCV_VERSION = '2.99.89';
 
   const DEFAULTS = {
     version: 3, // (3: Away Refresh off unless turned on — settings written before carry it on, and the one-time step in getSettings turns it off for everyone)
@@ -104,7 +104,6 @@
       darkMode: 'system',         // 'off' | 'on' | 'system'
       siteName: '',               // shown in the sidebar brand row; blank = derived from the host
       logoUrl: '',                // sidebar tile image; blank = the school's own mark from Canvas's theme
-      sideCourses: 'always',      // where the favourite courses live: 'always' on the sidebar, or 'hover' off the Courses row
       sidebar: '',                // (2.99.39) 'one': the course on show opens under its row in the sidebar (as the Mac app); 'two': its own rail beside the page, as before. '' = not chosen yet: two, as before, until the chooser has asked (content/app/app.js sidebarChoice); a new install's setup picks one
       awayRefresh: false,         // on: a page left three minutes reloads itself when you come back (content/app/app.js); off unless turned on with the switch under General (a hold on the pill turns it off again)
       dashboard: { cards: true, list: true, activity: true }, // which of the Dashboard's views are offered; at least one stays on

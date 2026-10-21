@@ -51,7 +51,7 @@ const MEASURE = () => {
   const name = (el) => `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}.${String(el.className && el.className.baseVal !== undefined ? el.className.baseVal : el.className || '').split(' ').filter(Boolean).slice(0, 2).join('.')}`;
   const visible = (el, cs) => cs.display !== 'none' && cs.visibility !== 'hidden' && cs.opacity !== '0';
   const inScroller = (el) => { let p = el.parentElement, n = 0; while (p && p !== document.body && n++ < 12) { const c = getComputedStyle(p); if (/(auto|scroll)/.test(c.overflowX) || /(auto|scroll)/.test(c.overflow)) return true; p = p.parentElement; } return false; };
-  const roots = [...document.querySelectorAll('#bcv-app, .bcv-sheet-ov, #bcv-tray, #bcv-bar, .bcv-omni__panel, .bcv-menu, .bcv-quicknav, .bcv-toast')];
+  const roots = [...document.querySelectorAll('#bcv-app, .bcv-sheet-ov, #bcv-tray, #bcv-bar, .bcv-omni__panel, .bcv-menu, .bcv-toast')];
   const wn = document.querySelector('#bcv-whatsnew');
   if (wn?.shadowRoot) roots.push(wn.shadowRoot);
   const seenWide = new Set();

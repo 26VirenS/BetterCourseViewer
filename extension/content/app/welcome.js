@@ -72,7 +72,6 @@
   const onScreen = (key) => !!document.querySelector(`#bcv-side .bcv-nav__item.is-active[data-nav="${key}"]`);
   /** The sidebar's list of starred courses, when they are listed there (the group with course rows in it). */
   const favsGroup = () => drawn([...document.querySelectorAll('#bcv-side .bcv-side__group')].find((el) => el.querySelector('.bcv-fav')) || null);
-  const quickNav = () => $('.bcv-quicknav'); // (the panel the Courses row opens under the pointer, when the courses are not listed in the sidebar)
   const weekCard = () => $('#bcv-app .bcv-stat[data-stat="week"]') || $('.bcv-ph-stats .bcv-ph-stat:nth-child(2)'); // (the Dashboard's Next 7 days, on a phone Today's)
   const sheet = () => $('.bcv-sheet-ov .bcv-sheet');
   const sheetClose = () => $('.bcv-sheet-ov .bcv-sheet__close');
@@ -151,15 +150,11 @@
         title: 'Back to the real scores', body: 'Close it to go back to your real scores.', act: 'click', doing: 'Close it',
         done: () => !document.querySelector('.bcv-sheet-ov') },
     ],
-    // the Courses row: its courses listed under it (told, with a Next), or in the panel it opens under the pointer (hovered, the panel lit with it)
-    courses: (app) => [
-      app?.state?.settings?.appearance?.sideCourses === 'hover'
-        ? { id: 'courses', name: 'Courses', where: 'sidebar', target: () => navRow('courses'), area: () => [navRow('courses'), quickNav()], when: () => !!navRow('courses'),
-          title: 'Your courses', body: 'Your courses open from here.', act: 'hover', doing: 'Hover over Courses',
-          done: () => !!quickNav(), after: 'Starred courses come first.' }
-        : { id: 'courses', name: 'your courses', where: 'sidebar', target: () => drawn(favsGroup()?.querySelector('.bcv-fav')) || navRow('courses'), area: () => [navRow('courses'), favsGroup() || [...document.querySelectorAll('#bcv-side .bcv-nav > .bcv-fav, #bcv-side .bcv-nav > .bcv-ctabs')]].flat(), when: () => !!navRow('courses'), // (2.99.60: one sidebar lists the courses in the rows, under All Courses)
-          title: 'Your courses', body: 'Your classes are listed here.', act: 'hover', doing: 'Hover over a course',
-          done: () => !!document.querySelector('#bcv-side .bcv-fav:hover, #bcv-side .bcv-nav__item[data-nav="courses"]:hover'), after: 'Click one any time to open it.' },
+    // the Courses row: its courses listed on the sidebar (2.99.89: always — the panel it opened on hover is gone)
+    courses: () => [
+      { id: 'courses', name: 'your courses', where: 'sidebar', target: () => drawn(favsGroup()?.querySelector('.bcv-fav')) || navRow('courses'), area: () => [navRow('courses'), favsGroup() || [...document.querySelectorAll('#bcv-side .bcv-nav > .bcv-fav, #bcv-side .bcv-nav > .bcv-ctabs')]].flat(), when: () => !!navRow('courses'), // (2.99.60: one sidebar lists the courses in the rows, under All Courses)
+        title: 'Your courses', body: 'Your classes are listed here.', act: 'hover', doing: 'Hover over a course',
+        done: () => !!document.querySelector('#bcv-side .bcv-fav:hover, #bcv-side .bcv-nav__item[data-nav="courses"]:hover'), after: 'Click one any time to open it.' },
     ],
     // Tools: the row pressed, then any tool's pin pressed (a pin beside the switch); a press on a card itself is
     // held while the pin is asked for, so no tool opens over the page instead

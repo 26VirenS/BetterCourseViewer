@@ -6199,7 +6199,7 @@ try {
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 20000 });
   const themeReset = await sw.evaluate(async () => ({ accent: (await self.BCV.settings.get()).appearance.theme?.accent, name: (await self.BCV.settings.get()).appearance.theme?.name, images: (await self.BCV.api.storage.local.get('theme:images'))['theme:images'] }));
   check(await eventually(async () => !(await page.$('html.bcv-themed')) && !(await page.$('.bcv-side__pic')) && !(await page.$('.bcv-head--pic')), 5000) && themeReset.accent === '' && themeReset.name === 'Regular' && !(await page.evaluate(() => document.documentElement.style.getPropertyValue('--bcv-bg') || document.documentElement.classList.contains('bcv-head-pic'))) && !themeReset.images?.side && !Object.keys(themeReset.images?.cards || {}).length && !Object.keys(themeReset.images?.headers || {}).length && (await page.evaluate(() => JSON.parse(localStorage.getItem('bcv:early') || '{}').accent)) === '' && ((await colourNow()) || '').toLowerCase() === colourWas.toLowerCase() && (await page.$eval('.bcv-h1', (e) => getComputedStyle(e).color)) === 'rgb(28, 28, 30)', `Save writes it all and Open Canvas reloads: the regular colours, no photos, the course's colour back, the title ink again: ${JSON.stringify({ ...themeReset, images: undefined })}`);
-  check((await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.sideCourses)) === 'always' && VIEW_OF[(await apiGet('/dashboard/view')).dashboard_view] === viewBefore && (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.darkMode)) === { light: 'off', dark: 'on', system: 'system' }[lookBefore], 'the sidebar, appearance and dashboard choices were written on the way out');
+  check((await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.sideCourses)) !== 'hover' && VIEW_OF[(await apiGet('/dashboard/view')).dashboard_view] === viewBefore && (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.darkMode)) === { light: 'off', dark: 'on', system: 'system' }[lookBefore], 'the sidebar, appearance and dashboard choices were written on the way out');
   const favAfter = (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).map((c) => c.course_code || c.name);
   check(!favAfter.includes(offCode) && favAfter.includes(onCode) && favAfter.length === 5, `the chosen courses became the Canvas favourites: −${offCode} +${onCode}`);
   const nickedInSetup = (await apiGet('/api/v1/courses?per_page=100')).find((c) => String(c.id) === nickId);
@@ -8299,7 +8299,7 @@ try {
   await sfPage.close();
   const fitRun = (await import('node:child_process')).spawnSync(process.execPath, [join(root, 'scripts/dev/fit-springs.mjs'), '--check'], { encoding: 'utf8' });
   check(fitRun.status === 0, `each bezier is within 2.5% of its spring (scripts/dev/fit-springs.mjs): ${(fitRun.stdout || fitRun.stderr).trim().split('\n').map((l) => l.replace(/\s+/g, ' ')).join(' | ')}`);
-  // the search panel's entrance, which 2.96 had written with two easings in one shorthand (dropped whole by the parser), plays now: read from the panel on the screen (the quick nav's is checked the same way in the side-courses suite)
+  // the search panel's entrance, which 2.96 had written with two easings in one shorthand (dropped whole by the parser), plays now: read from the panel on the screen
   await page.click('#bcv-omni');
   await page.keyboard.type('a');
   await page.waitForSelector('#bcv-omni-panel:not([hidden])', { timeout: 5000 });
@@ -8484,14 +8484,8 @@ try {
   await options.screenshot({ path: join(out, '29-options-dark.png') });
   await options.click('.theme[data-value="system"]');
   await options.waitForTimeout(250);
-  // Appearance: and where the courses sit, the same choice the last step of the setup offers
   check(await options.$eval('#noBlur', (e) => !e.hidden && /graphics acceleration/.test(e.textContent) && /chrome:\/\/settings\/system/.test(e.textContent)), 'Appearance says Chrome is drawing without its blur, and where to turn graphics acceleration back on');
-  check((await options.$$eval('#sideCourses button', (bs) => bs.map((b) => b.textContent))).join(',') === 'Always listed,On hover' && (await options.$eval('#sideCourses button.is-on', (b) => b.dataset.value)) === 'always', 'the courses in the sidebar: listed or on hover, listed to begin with');
-  await options.click('#sideCourses button[data-value="hover"]');
-  await options.waitForTimeout(250);
-  check((await sw.evaluate(() => self.BCV.settings.get())).appearance.sideCourses === 'hover' && (await options.$eval('#sideCourses button.is-on', (b) => b.dataset.value)) === 'hover', 'changing it saves');
-  await options.click('#sideCourses button[data-value="always"]');
-  await options.waitForTimeout(250);
+  check(!(await options.$('#sideCourses')), 'no choice of courses on hover: they are always listed on the sidebar (2.99.89)');
   // Appearance: the Dashboard's views, the same three the setup asks about
   check((await options.$$eval('#dashCards, #dashList, #dashActivity', (bs) => bs.map((b) => b.classList.contains('is-on')))).join(',') === 'true,true,true', 'the three dashboard switches start on');
   await options.click('#dashActivity');
