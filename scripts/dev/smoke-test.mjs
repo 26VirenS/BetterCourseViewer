@@ -8497,10 +8497,10 @@ try {
   check((await page.$(su('#skip'))) === null && (await page.$(su('.top__skip'))) === null, 'the card has no Skip');
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
-  check((await page.$('#bcv-setup')) !== null && (await sStep()) === '1 of 4', 'Escape does not close it');
+  check((await page.$('#bcv-setup')) !== null && (await sStep()) === '1 of 3', 'Escape does not close it');
   await page.goto(`${BASE}/courses`); // walking away: the next page opens it again, over the Dashboard
   await page.waitForSelector(su('.row'), { timeout: 20000 });
-  check(page.url() === `${BASE}/` && (await sStep()) === '1 of 4' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === undefined, `leaving the page does not get past it: the next page opens the card again, unfinished (${await sStep()})`);
+  check(page.url() === `${BASE}/` && (await sStep()) === '1 of 3' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === undefined, `leaving the page does not get past it: the next page opens the card again, unfinished (${await sStep()})`);
   // the only way out is through: the steps, then the welcome (the favourites already starred are the
   // ones picked, so finishing here changes nothing in Canvas for the sections that follow)
   const keepStarred = (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).map((c) => String(c.id));
@@ -8510,19 +8510,16 @@ try {
   await page.waitForSelector(su('#track'), { timeout: 10000 });
   await page.click(su('#next'));
   await page.waitForSelector(su('.tile[data-view]'), { timeout: 10000 });
-  await page.click(su('#next'));
-  await page.waitForSelector(su('.tile[data-value]'), { timeout: 10000 });
   await page.click(su('#next')); // Finish
   await page.waitForSelector(su('.summary__row'), { timeout: 10000 });
-  await page.click(su('#next')); // Continue to appearance: Personalize, its two steps left as they are
-  await page.waitForSelector(su('.pz #pzNext'), { timeout: 20000 });
-  await page.click(su('.pz #pzNext'));
-  await page.waitForSelector(su('.pz #pzCourses'), { timeout: 10000 });
-  await page.click(su('.pz #pzNext')); // Save
-  await page.waitForSelector(su('.pz #pzOpen'), { timeout: 10000 });
-  await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click(su('.pz #pzOpen'))]); // Open Canvas: the page reloads
+  // (2.99.74) Continue: the page reloads into Appearance over the Dashboard; Next, then Done, as they are
+  await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click(su('#next'))]);
+  await page.waitForSelector('#bcv-ap-next', { timeout: 20000 });
+  await page.click('#bcv-ap-next');
+  await page.waitForSelector('#bcv-ap-done', { timeout: 10000 });
+  await page.click('#bcv-ap-done');
   await tourStep('look', 20000);
-  check((await page.$('#bcv-setup')) === null && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true, 'finishing the steps is what marks the setup done, and the tour follows the reload');
+  check((await page.$('#bcv-setup')) === null && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true, "finishing the steps is what marks the setup done, and the tour follows Appearance's Done");
   await tourEnd(); // (the tour itself is walked through in the other half)
   await page.goto(`${BASE}/grades`);
   await page.waitForSelector('.bcv-gpa__hero', { timeout: 15000 });
