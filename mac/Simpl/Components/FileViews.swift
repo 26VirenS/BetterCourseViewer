@@ -250,12 +250,21 @@ struct QuickLookView: NSViewRepresentable {
         show(file, in: box, context.coordinator)
     }
 
-    /// What showed before taken out of the box: Quick Look's view closed once the moment is over (never during the
-    /// update that replaced it) and only if it was ever given its file.
+    /// What showed before taken out of the box: Quick Look's view closed first, while it is still in its window, and
+    /// only if it was ever given its file. (1.3.146) Closed once it had left its window — as 1.3.145 did, a moment after
+    /// taking it out — Quick Look stopped the app (QLPreviewView deactivate, an assertion: the screenshot suite's
+    /// light-12f-hand-in-one-by-one, a PDF added after a picture); closed in place, as up to 1.3.144, it never did. One
+    /// never given a file, or already out of its window, is not closed at all (the first was 1.3.144's crash).
     private static func retire(_ c: Coordinator) {
         if let p = c.preview {
+            if (p as? SettledPreviewView)?.started ?? true {
+                if p.window != nil {
+                    p.close()
+                } else {
+                    NSLog("SimplPreview: Quick Look left unclosed: already out of its window") // (closed there, it would stop the app)
+                }
+            }
             p.removeFromSuperview()
-            if (p as? SettledPreviewView)?.started ?? true { DispatchQueue.main.async { p.close() } }
         }
         c.preview = nil
         // (1.3.146) PDFKit's view let go of its document before it goes: it draws pages on threads of its own, which
