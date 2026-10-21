@@ -5598,9 +5598,10 @@ html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-tray { top: 7
    button at the top left — over the popup's scrim, still to hand — and the popup itself starts below that row, so the
    two never meet whatever the popup's size */
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under):not(.bcv-sheet-ov--float), .bcv-fbs-ov:not(.is-closing)) #bcv-look { opacity: 0; pointer-events: none; }
-html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under):not(.bcv-sheet-ov--float), .bcv-fbs-ov:not(.is-closing)) #bcv-tray { right: auto; left: calc(var(--bcv-side-w) - 4px); z-index: var(--bcv-z-ghost); }
-html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under):not(.bcv-sheet-ov--float), .bcv-fbs-ov:not(.is-closing)).bcv-side-off #bcv-tray { left: 54px; }
-/* (2.99.72) and once the popup's head is measured (app.js popTray), the tools sit in it: left of its own buttons (Open in new
+/* (2.99.73) the tools themselves stay where they are in the bar, over the scrim — for a box grown out of the page (the
+   hand-in panel, a mark's card) and for a popup whose head has no room for them */
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under):not(.bcv-sheet-ov--float), .bcv-fbs-ov:not(.is-closing)) #bcv-tray { z-index: var(--bcv-z-ghost); }
+/* (2.99.72) and once the popup's head is measured (app.js popTray) and has room, the tools sit in it: left of its own buttons (Open in new
    tab, Download, ×), level with them — where a Mac window's toolbar items would — gliding there from the bar */
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under):not(.bcv-sheet-ov--float), .bcv-fbs-ov:not(.is-closing)).bcv-tray-pop #bcv-tray { left: auto; right: var(--bcv-tray-px); top: var(--bcv-tray-py); }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under):not(.bcv-sheet-ov--float), .bcv-fbs-ov:not(.is-closing)) #bcv-sidetoggle { opacity: 0; pointer-events: none; } /* (2.99.72: the sidebar's button goes with ⋯ while a popup is up — nothing of the bar left over the scrim but the tools in the popup's head) */

@@ -26,7 +26,7 @@
   };
   self.BCV_WHATS_NEW = [
     { version: '2.99.73', date: '2026-10-21', notes: [
-      { kind: 'fixed', title: 'Tools in Popups Fixed', body: 'Pinned tools sit right beside a popup\'s buttons.', icon: P.check },
+      { kind: 'fixed', title: 'Tools in Popups Fixed', body: 'Tools sit by a popup\'s buttons, never over what it shows.', icon: P.check },
     ] },
     { version: '2.99.72', date: '2026-10-21', notes: [
       { kind: 'improved', title: 'Counter Boxes Polished', body: 'Tinted like the Mac, smoother open, tools stay put.', icon: P.check },

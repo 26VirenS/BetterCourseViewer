@@ -1943,30 +1943,37 @@
    *  them, as a Mac window's toolbar items — the head found by its × (the topmost Close in it), its buttons the ones on
    *  that row in the head's right half. Measured again as the popup grows in, takes another size or the window does;
    *  with no head to sit in, the tools stay beside the sidebar's button (app.css). */
-  const POP_OV = 'body > :is(.bcv-sheet-ov:not(.is-closing):not(.is-under):not(.bcv-sheet-ov--float):not(.is-folding), .bcv-fbs-ov:not(.is-closing))';
+  // (2.99.73) a popup of its own (a sheet, the viewer, a tool, Feedback) — not a box grown out of something on the page (a
+  // counter's box, the hand-in panel out of the big pill, a mark's card: --float and --card), which leaves the tools in the bar
+  const POP_OV = 'body > :is(.bcv-sheet-ov:not(.is-closing):not(.is-under):not(.bcv-sheet-ov--float):not(.bcv-sheet-ov--card):not(.is-folding), .bcv-fbs-ov:not(.is-closing))';
   let popTrayHead = null, popTrayHeadMO = null;
   function popTrayPlace() {
     const tray = document.getElementById('bcv-tray');
     const ov = [...document.querySelectorAll(POP_OV)].pop();
     const card = ov?.firstElementChild;
-    if (!tray || !ov || !card || BCV.phone?.active?.()) { html.classList.remove('bcv-tray-pop'); return; }
-    // (2.99.73) where things sit once the popup has grown in: from the layout (offsets up to the overlay), not from what is
-    // on screen this frame — the card grows from smaller, so its buttons drawn mid-way are nearer its middle than where they
-    // come to rest (the tools landed short of them, or low). Off the overlay's own chain (none here): as drawn.
+    const off = () => html.classList.remove('bcv-tray-pop');
+    if (!tray || !ov || !card || BCV.phone?.active?.()) return off();
+    // (2.99.73) where things sit once the popup has grown in, not where they are drawn this frame — the card grows from
+    // smaller, so its buttons drawn mid-way are nearer its middle than where they come to rest (the tools landed short of
+    // them, or low): the card's own box from the layout (offsets, which no transform moves) and as drawn, and anything
+    // drawn in it mapped back from the one to the other
     const ovR = ov.getBoundingClientRect();
-    const rect = (el) => {
-      let x = 0, y = 0, n = el;
-      while (n && n !== ov) { x += n.offsetLeft; y += n.offsetTop; n = n.offsetParent; }
-      if (n !== ov) return el.getBoundingClientRect();
-      return { left: ovR.left + x, top: ovR.top + y, width: el.offsetWidth, height: el.offsetHeight, right: ovR.left + x + el.offsetWidth };
+    let cx = 0, cy = 0, n = card;
+    while (n && n !== ov) { cx += n.offsetLeft; cy += n.offsetTop; n = n.offsetParent; }
+    const drawn = card.getBoundingClientRect();
+    const box = n === ov && card.offsetWidth ? { left: ovR.left + cx, top: ovR.top + cy, width: card.offsetWidth, height: card.offsetHeight } : drawn;
+    const sx = drawn.width / (box.width || 1) || 1, sy = drawn.height / (box.height || 1) || 1;
+    const at = (r) => {
+      const left = box.left + (r.left - drawn.left) / sx, top = box.top + (r.top - drawn.top) / sy;
+      return { left, top, width: r.width / sx, height: r.height / sy, right: left + r.width / sx, bottom: top + r.height / sy };
     };
+    const rect = (el) => at(el.getBoundingClientRect());
     const seen = (r) => r.width > 0 && r.height > 0;
     const closes = [...ov.querySelectorAll('button[aria-label="Close"], .bcv-sheet__close')].map((b) => ({ b, r: rect(b) })).filter((x) => seen(x.r));
-    if (!closes.length) { html.classList.remove('bcv-tray-pop'); return; }
+    if (!closes.length) return off();
     const top = closes.sort((x, y) => x.r.top - y.r.top || y.r.right - x.r.right)[0];
     const head = top.r;
     const row = top.b.closest('[class*="__head"]') || top.b.parentElement;
-    const box = rect(card);
     const mid = head.top + head.height / 2;
     const half = box.left + box.width / 2;
     let left = head.left;
@@ -1978,11 +1985,32 @@
     if (row !== popTrayHead && typeof MutationObserver === 'function') {
       popTrayHeadMO ||= new MutationObserver(() => popTraySoon(150));
       popTrayHeadMO.disconnect();
-      popTrayHeadMO.observe(row, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'class'] });
+      popTrayHeadMO.observe(row, { childList: true, subtree: true });
       popTrayHead = row;
     }
     const pins = document.getElementById('bcv-pins');
     const tall = pins?.offsetHeight || tray.offsetHeight || 32;
+    const wide = pins?.offsetWidth || tray.offsetWidth || 0;
+    // (2.99.73) only where the head has room for them: the span left of its buttons inside the card, and nothing of the
+    // head's in it — no words (its title, a tab's name), no control. Else the tools stay where they are in the bar.
+    const spot = { left: left - 10 - wide, right: left - 10, top: mid - tall / 2, bottom: mid + tall / 2 };
+    const hits = (r) => seen(r) && r.left < spot.right && r.right > spot.left && r.top < spot.bottom && r.bottom > spot.top;
+    let room = wide > 0 && spot.left >= box.left + 12;
+    if (room) {
+      for (const el of row.querySelectorAll('button, a, input, select, textarea, img, svg, [role="tab"], [role="button"]')) {
+        if (hits(rect(el))) { room = false; break; }
+      }
+    }
+    if (room) {
+      const walk = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
+      const range = document.createRange();
+      for (let t = walk.nextNode(); t && room; t = walk.nextNode()) {
+        if (!t.nodeValue.trim()) continue;
+        range.selectNodeContents(t);
+        for (const r of range.getClientRects()) if (hits(at(r))) { room = false; break; }
+      }
+    }
+    if (!room) return off();
     // (right: from the viewport's width less its scroll bar — innerWidth counts the bar, which put the tools its width short)
     html.style.setProperty('--bcv-tray-px', `${Math.round(document.documentElement.clientWidth - left + 10)}px`);
     html.style.setProperty('--bcv-tray-py', `${Math.round(mid - tall / 2)}px`);

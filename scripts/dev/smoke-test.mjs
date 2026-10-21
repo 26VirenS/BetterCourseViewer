@@ -2359,6 +2359,10 @@ try {
   await page.waitForTimeout(600);
   const pop = await page.evaluate(() => { const b = document.querySelector('.bcv-sheet-ov--card .bcv-hand'), r = b.getBoundingClientRect(), k = document.querySelector('.bcv-asg__card').getBoundingClientRect(); return { inCard: r.left >= k.left + 15 && r.right <= k.right - 15, cy: Math.round(r.top + r.height / 2), w: Math.round(r.width), src: getComputedStyle(document.querySelector('.bcv-asg__pill')).opacity, tabs: [...b.querySelectorAll('.bcv-sb__tab')].map((t) => t.textContent).join(' | '), close: !!b.querySelector('.bcv-sb__poptop .bcv-sb__close'), foot: b.querySelector('.bcv-sb__footnote')?.textContent, off: b.querySelector('.bcv-sb__go')?.disabled, bubble: !!b.querySelector('.bcv-sb__bubble'), comment: !!b.querySelector('.bcv-sb__comment'), expanded: document.querySelector('.bcv-asg__pill').getAttribute('aria-expanded'), url: location.href }; });
   check(pop.inCard && Math.abs(pop.cy - pillAt.cy) <= 1 && pop.src === '0' && pop.w === 380 && pop.tabs === 'File upload | Text entry | Other' && pop.close && pop.foot === 'Attempt 1 · attach a file' && pop.off && pop.bubble && !pop.comment && pop.expanded === 'true' && pop.url === `${BASE}/courses/104/assignments/4002` && (await visible('#bcv-side')), `Submit assignment grows into the panel out of its own middle, kept over the page's card, the button itself stepping out while it is up — tabs and × on a row, Submit off until there is something to send, the comment behind its bubble — the page staying put: ${JSON.stringify(pop)}`);
+  // (2.99.73) a box grown out of the page — the hand-in panel — leaves the pinned tools in the bar: never in its head, where
+  // they sat over its tabs
+  const handTray = await page.evaluate(() => { const t = document.getElementById('bcv-tray')?.getBoundingClientRect(), b = document.querySelector('.bcv-sheet-ov--card .bcv-hand').getBoundingClientRect(); return { pop: document.documentElement.classList.contains('bcv-tray-pop'), over: !!t && t.width > 0 && t.left < b.right && t.right > b.left && t.top < b.bottom && t.bottom > b.top }; });
+  check(!handTray.pop && !handTray.over, `(2.99.73) the hand-in panel, grown out of its button, leaves the pinned tools in the bar, never over its tabs: ${JSON.stringify(handTray)}`);
   await shot(page, '17a-handin-panel');
   const dropTo = async () => ({ sub: (await texts('.bcv-sb__dropsub'))[0], title: await page.getAttribute('.bcv-sb__drop', 'title'), accept: await page.getAttribute('.bcv-sb__pane input[type=file]', 'accept') });
   const drop0 = await dropTo();
@@ -7015,6 +7019,21 @@ try {
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-viewer'), null, { timeout: 5000 });
   check(await eventually(async () => page.evaluate(() => !document.documentElement.classList.contains('bcv-tray-pop')), 2000), 'and back in the bar once the popup has gone');
+  // (2.99.73) a box grown out of the page (the hand-in panel out of Submit assignment) is no popup of its own: the tools
+  // stay where they are in the bar, over its scrim, and never over the box
+  await page.goto(`${BASE}/courses/104/assignments/4002`);
+  await page.waitForSelector('.bcv-asg__pill.is-go', { timeout: 20000 });
+  const trayBar = await page.evaluate(() => { const t = document.getElementById('bcv-tray').getBoundingClientRect(); return { left: Math.round(t.left), top: Math.round(t.top) }; });
+  await page.click('.bcv-asg__pill.is-go');
+  await page.waitForSelector('.bcv-sheet-ov--card .bcv-hand .bcv-sb__tabs', { timeout: 10000 });
+  await page.waitForTimeout(900);
+  const handBar = await page.evaluate(() => {
+    const t = document.getElementById('bcv-tray').getBoundingClientRect(), b = document.querySelector('.bcv-sheet-ov--card .bcv-hand').getBoundingClientRect();
+    return { pop: document.documentElement.classList.contains('bcv-tray-pop'), left: Math.round(t.left), top: Math.round(t.top), over: t.left < b.right && t.right > b.left && t.top < b.bottom && t.bottom > b.top, top1: document.elementFromPoint(t.left + 12, t.top + t.height / 2)?.closest('#bcv-tray') ? 'tray' : 'other' };
+  });
+  check(!handBar.pop && !handBar.over && Math.abs(handBar.left - trayBar.left) <= 2 && Math.abs(handBar.top - trayBar.top) <= 2 && handBar.top1 === 'tray', `(2.99.73) the hand-in panel leaves the pinned tools where they are in the bar, over its scrim, never over its tabs: ${JSON.stringify({ trayBar, handBar })}`);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(700);
   await page.goto(`${BASE}/calendar`);
   await page.waitForSelector('#bcv-pins .bcv-pin', { timeout: 10000 });
   // the pin is on every page; pressed while nothing is going, it swells into a small setter: the strip under the marker and Start — set, and go
