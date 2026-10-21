@@ -68,7 +68,7 @@
     { key: 'files', label: 'Files', hint: 'Course files and pages', icon: IC.folder, groups: ['Files', 'Pages'], title: 'Recents' },
     { key: 'actions', label: 'Actions', hint: 'Commands: /submit, /open, /todo, /dark…', icon: IC.bolt, groups: ['Commands'], title: 'Commands' },
   ];
-  const SPOT_W = 580, SPOT_MS = 470; // the pill's width at most (2.99.84: narrower, as Spotlight's); the float's length (app.css .46s)
+  const SPOT_W = 580, SPOT_MS = 310; // the pill's width at most (2.99.84: narrower, as Spotlight's); the float's length (app.css .3s, 2.99.88)
   let spot = null; // afloat: { ov, pal, ghost, timer, onResize, folding }
   const afloat = () => !!spot && !spot.folding;
   const canFloat = () => !!ui && ui.root.isConnected && !BCV.phone?.active?.() && !document.getElementById('bcv-tour') && !document.getElementById('bcv-setup');
@@ -184,7 +184,7 @@
     if (!q) startAsHome({ left: r.left, top: r.top }); // (its first frame is the header's pill, where it stood)
     pal.classList.remove('is-far');
     if (!q) pal.classList.add('is-lifting'); // (the panel arrives with the pill, not before it)
-    spot.lift = q ? 0 : setTimeout(() => pal.classList.remove('is-lifting'), 600);
+    spot.lift = q ? 0 : setTimeout(() => pal.classList.remove('is-lifting'), 320);
     drawAs(null); // (and from there to its own place)
     window.addEventListener('resize', spot.onResize);
     ui.input.focus(); // (the move took the cursor)
