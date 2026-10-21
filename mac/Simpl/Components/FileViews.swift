@@ -182,6 +182,34 @@ struct QuickLookView: NSViewRepresentable {
             guard let file = pending, bounds.width > 40, bounds.height > 40 else { return }
             pending = nil
             previewItem = file as NSURL
+            if UserDefaults.standard.bool(forKey: "SimplScrollProbe") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in self?.probeScroll() }
+            }
+        }
+
+        /// (1.3.145, the screenshot suite: -SimplScrollProbe YES) A scroll of the wheel posted over the middle of the
+        /// preview, as a mouse's would come: what the window says is under it, and where each scroll view in the preview
+        /// stood before and after — whether a scroll over a preview reaches it.
+        func probeScroll() {
+            guard let window else { NSLog("SimplScrollProbe: no window"); return }
+            let mid = convert(NSPoint(x: bounds.midX, y: bounds.midY), to: nil)
+            let hit = window.contentView?.hitTest(window.contentView!.convert(mid, from: nil))
+            func scrolls(_ v: NSView) -> [NSScrollView] { (v as? NSScrollView).map { [$0] } ?? [] + v.subviews.flatMap(scrolls) }
+            let inner = scrolls(self)
+            let before = inner.map { $0.contentView.bounds.origin.y }
+            let screen = window.convertPoint(toScreen: mid)
+            let flipped = CGPoint(x: screen.x, y: (NSScreen.screens.first?.frame.height ?? 0) - screen.y)
+            if let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: -240, wheel2: 0, wheel3: 0) {
+                cg.location = flipped
+                if let e = NSEvent(cgEvent: cg) { window.sendEvent(e) }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                let after = inner.map { $0.contentView.bounds.origin.y }
+                NSLog("SimplScrollProbe: hit %@ (in preview: %@), key %@, scroll views %d, before %@, after %@, subviews %@",
+                      hit.map { String(describing: type(of: $0)) } ?? "nil", (hit?.isDescendant(of: self) ?? false) ? "yes" : "no",
+                      window.isKeyWindow ? "yes" : "no", inner.count, "\(before)", "\(after)",
+                      self.subviews.map { String(describing: type(of: $0)) }.joined(separator: ","))
+            }
         }
     }
 
