@@ -27,6 +27,8 @@ self.BCV_LAZY_MODULES = {
   'tool:units': { files: ['content/app/tools/units.js'] },
   'tool:words': { files: ['content/app/tools/words.js'] },
   'tool:stats': { files: ['content/app/tools/stats.js'] },
+  'tool:balance': { needs: ['tool:ptable', 'tool:stats'], files: ['content/app/tools/chem.js'] }, // (the elements' masses, and numbers written as Statistics writes them)
+  'tool:moles': { needs: ['tool:balance'], files: ['content/app/tools/moles.js'] }, // (the balancer's reading and sums)
   'tool:matrix': { needs: ['tool:stats'], files: ['content/app/tools/matrix.js'] }, // (its numbers written as Statistics writes them)
   setupcss: { files: ['setup/setup-css.js'] }, // the setup's stylesheet: the setup, Personalize and What's New draw with it
   setup: { needs: ['setupcss'], files: ['content/app/personalize.js', 'content/app/setup.js'] },

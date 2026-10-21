@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.82', date: '2026-10-21', notes: [
+      { kind: 'new', title: 'Equation Balancer', body: 'Balances any chemical equation as you type.', icon: P.check },
+      { kind: 'new', title: 'Molar Mass & Moles', body: 'Molar mass, conversions, yields and formulas.', icon: P.check },
+    ] },
     { version: '2.99.81', date: '2026-10-21', notes: [
       { kind: 'new', title: 'Statistics', body: 'Describe data, regression, z and t-tests.', icon: P.check },
       { kind: 'new', title: 'Matrix Calculator', body: 'Determinant, inverse, RREF and eigenvalues.', icon: P.check },

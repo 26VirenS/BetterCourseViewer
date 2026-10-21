@@ -89,5 +89,7 @@
     scan: 'M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16M8.5 9h7M12 9v7',
     ruler: 'M3.5 15.5l12-12 5 5-12 12zM7 12l2 2M10 9l1.5 1.5M13 6l2 2', // (2.99.79: the unit converter)
     words: 'M4 6h16M4 10h10M4 14h16M4 18h8M17 17.5l1.5 1.5 3-3', // (2.99.79: the word counter — lines of text, ticked)
+    scale: 'M12 4v16M7 20h10M5 7h14M5 7l-2.5 6a3 3 0 0 0 5 0zM19 7l-2.5 6a3 3 0 0 0 5 0z', // (2.99.82: the equation balancer)
+    flask: 'M9.5 3h5M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3M7.5 14h9', // (2.99.82: molar mass & stoichiometry)
   };
 })();

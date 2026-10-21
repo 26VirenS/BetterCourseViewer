@@ -45,6 +45,8 @@
     'tool:words': () => !!BCV.toolsWords,
     'tool:stats': () => !!BCV.toolsStats,
     'tool:matrix': () => !!BCV.toolsMatrix,
+    'tool:balance': () => !!BCV.toolsChem,
+    'tool:moles': () => !!BCV.toolsMoles,
     appearance: () => !!BCV.appearance && !BCV.appearance.__stub,
   };
   /** name → its files, in order, what it needs first, and how to tell the module is here. */
