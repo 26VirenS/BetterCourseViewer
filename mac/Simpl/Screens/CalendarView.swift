@@ -40,6 +40,10 @@ struct CalendarView: View {
     @FocusState private var focused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.pageWidth) private var pageWidth
+    /// The width the calendar's views really have, measured where they are drawn: the page's own width counts the room
+    /// under a sidebar the window draws over its content.
+    @State private var roomWidth: CGFloat?
+    private var room: CGFloat { roomWidth ?? pageWidth ?? 1000 }
 
     private static let modes = ["month", "week", "list"]
     private static let line = Color(nsColor: .separatorColor)
@@ -76,6 +80,14 @@ struct CalendarView: View {
                         noticeBar(note.text, problem: note.problem)
                     }
                     content(d)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background {
+                            GeometryReader { g in
+                                Color.clear
+                                    .onAppear { roomWidth = g.size.width }
+                                    .onChange(of: g.size.width) { _, w in roomWidth = w }
+                            }
+                        }
                         .focusable()
                         .focused($focused)
                         .focusEffectDisabled()
@@ -300,7 +312,7 @@ struct CalendarView: View {
     /// the day beside it from a grid of 476 points.
     @ViewBuilder
     private func monthView(_ byDay: [String: [CalEvent]]) -> some View {
-        let width = pageWidth ?? 1000
+        let width = room
         let beside = width >= Self.gridLeast + 20 + Self.dayWidth
         let gridWidth = beside ? width - 20 - Self.dayWidth : width
         let row = min(118, max(84, (gridWidth / 7).rounded(.down)))
@@ -580,7 +592,7 @@ struct CalendarView: View {
         let days = (0..<7).compactMap { cal.date(byAdding: .day, value: $0, to: weekStart) }
         return ZStack {
             Group {
-                if (pageWidth ?? 1000) >= 520 {
+                if room >= 520 {
                     weekGrid(days, byDay: byDay)
                 } else {
                     VStack(alignment: .leading, spacing: 18) {
@@ -772,7 +784,7 @@ struct CalendarView: View {
     /// own; (1.3.147) the days' picker beside it on a page of 620 points or more, over it on a narrower one.
     @ViewBuilder
     private func listView(_ byDay: [String: [CalEvent]]) -> some View {
-        if (pageWidth ?? 1000) >= 620 {
+        if room >= 620 {
             HStack(alignment: .top, spacing: 20) {
                 listDays(byDay)
                     .frame(maxWidth: .infinity, alignment: .leading)
