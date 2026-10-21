@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.71"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.72"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -868,10 +868,18 @@ html.bcv-noblur .bcv-card-blur { display: none; }
 /* (2.99.69) a Dashboard counter's box, as the Mac app's panel: it floats over the page — no dim, no blur, the page left as it
    is and taking every press outside the box (one folds the box back: dashboard.js openSheet) — with the Mac's lighter
    shadow, and grows and folds on the Mac's own spring (motion.js morph) in place of the house's gentle one */
-.bcv-sheet-ov--float { pointer-events: none; --bcv-spring-gentle: var(--bcv-spring-morph, cubic-bezier(.227, .124, .206, 1.026)); --bcv-t-gentle: var(--bcv-t-morph, .41s); }
+.bcv-sheet-ov--float { pointer-events: none; --bcv-spring-gentle: cubic-bezier(.77, 0, .175, 1); --bcv-t-gentle: .38s; } /* (2.99.72) grows and folds on a strong ease-in-out — one move on screen, slow out, quick through, soft in */
 .bcv-sheet-ov--float > :is(.bcv-sheet, .bcv-pv) { pointer-events: auto; }
 .bcv-sheet-ov--float > :is(.bcv-card-dim, .bcv-card-blur) { display: none; }
 .bcv-sheet-ov--float > .bcv-card-shadow { box-shadow: 0 10px 48px rgba(0,0,0,.18), 0 1px 4px rgba(0,0,0,.08); }
+/* (2.99.72, the Mac's panel) its glass tinted by the counter's own colour (--bcv-stat-tint, a tenth or so of it, as the
+   Mac's .glass(tint: colour.opacity(0.10))) — the page through it blurred but not darkened; dark glass in the dark look,
+   light glass in the light one, the words the page's own there */
+.bcv-sheet-ov--float > .bcv-sheet--stat { background: linear-gradient(color-mix(in srgb, var(--bcv-stat-tint, transparent) 12%, rgba(30,30,33,.80)), color-mix(in srgb, var(--bcv-stat-tint, transparent) 12%, rgba(30,30,33,.80))) padding-box, var(--bcv-glass-rim) border-box; -webkit-backdrop-filter: blur(28px) saturate(1.5); backdrop-filter: blur(28px) saturate(1.5); }
+html[data-bcv-theme="light"] .bcv-sheet-ov--float > .bcv-sheet--stat { background: linear-gradient(color-mix(in srgb, var(--bcv-stat-tint, transparent) 10%, rgba(250,250,252,.84)), color-mix(in srgb, var(--bcv-stat-tint, transparent) 10%, rgba(250,250,252,.84))) padding-box, linear-gradient(rgba(0,0,0,.08), rgba(0,0,0,.08)) border-box; }
+html[data-bcv-theme="light"] .bcv-sheet-ov--float:not(.is-folding) > .bcv-sheet--stat:not(.is-at-card) { --bcv-ink: inherit; --bcv-ink2: inherit; --bcv-ink3: inherit; --bcv-sep: inherit; --bcv-edge: inherit; --bcv-fill: inherit; --bcv-fill2: inherit; --bcv-hover: inherit; --bcv-card: inherit; color-scheme: light; }
+html.bcv-noblur .bcv-sheet-ov--float > .bcv-sheet--stat { background: linear-gradient(color-mix(in srgb, var(--bcv-stat-tint, transparent) 12%, rgb(36,36,40)), color-mix(in srgb, var(--bcv-stat-tint, transparent) 12%, rgb(36,36,40))) padding-box, var(--bcv-glass-rim) border-box; }
+html.bcv-noblur[data-bcv-theme="light"] .bcv-sheet-ov--float > .bcv-sheet--stat { background: linear-gradient(color-mix(in srgb, var(--bcv-stat-tint, transparent) 10%, rgb(248,248,250)), color-mix(in srgb, var(--bcv-stat-tint, transparent) 10%, rgb(248,248,250))) padding-box, linear-gradient(rgba(0,0,0,.08), rgba(0,0,0,.08)) border-box; }
 .bcv-sheet--card { position: fixed; z-index: 1; margin: 0; max-width: none; max-height: none; background: var(--bcv-card); -webkit-backdrop-filter: none; backdrop-filter: none; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); animation: none; transform: none; box-shadow: inset 0 0 0 var(--bcv-line) var(--bcv-hair); transition: clip-path var(--bcv-t-gentle) var(--bcv-spring-gentle); } /* (2.99.4: laid out once where it goes and drawn through a clip that grows out of the card — U.cardBox — never a size animated; its hairline inside its edge, its shadow a layer of its own) */
 .bcv-sheet--card.is-at-card { transition: none; }
 /* (2.98.73) the box a Dashboard counter opens into wears the search's glass — smoky, the page coming through it softly
@@ -5589,12 +5597,12 @@ html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-tray { top: 7
 /* (2.99.59) a popup up (a sheet, the viewer, a tool, Feedback): ⋯ goes, and the pinned tools move up beside the sidebar's
    button at the top left — over the popup's scrim, still to hand — and the popup itself starts below that row, so the
    two never meet whatever the popup's size */
-html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under), .bcv-fbs-ov:not(.is-closing)) #bcv-look { opacity: 0; pointer-events: none; }
-html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under), .bcv-fbs-ov:not(.is-closing)) #bcv-tray { right: auto; left: calc(var(--bcv-side-w) - 4px); z-index: var(--bcv-z-ghost); }
-html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under), .bcv-fbs-ov:not(.is-closing)).bcv-side-off #bcv-tray { left: 54px; }
-html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under), .bcv-fbs-ov:not(.is-closing)) #bcv-sidetoggle { z-index: var(--bcv-z-ghost); }
-html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under), .bcv-fbs-ov:not(.is-closing)) :is(.bcv-sheet-ov, .bcv-fbs-ov) { padding-top: 52px; }
-html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under), .bcv-fbs-ov:not(.is-closing)) :is(.bcv-sheet-ov, .bcv-fbs-ov) > * { max-height: calc(100vh - 80px); }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under):not(.bcv-sheet-ov--float), .bcv-fbs-ov:not(.is-closing)) #bcv-look { opacity: 0; pointer-events: none; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under):not(.bcv-sheet-ov--float), .bcv-fbs-ov:not(.is-closing)) #bcv-tray { right: auto; left: calc(var(--bcv-side-w) - 4px); z-index: var(--bcv-z-ghost); }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under):not(.bcv-sheet-ov--float), .bcv-fbs-ov:not(.is-closing)).bcv-side-off #bcv-tray { left: 54px; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under):not(.bcv-sheet-ov--float), .bcv-fbs-ov:not(.is-closing)) #bcv-sidetoggle { z-index: var(--bcv-z-ghost); }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under):not(.bcv-sheet-ov--float), .bcv-fbs-ov:not(.is-closing)) :is(.bcv-sheet-ov, .bcv-fbs-ov) { padding-top: 52px; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under):not(.bcv-sheet-ov--float), .bcv-fbs-ov:not(.is-closing)) :is(.bcv-sheet-ov, .bcv-fbs-ov) > * { max-height: calc(100vh - 80px); }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-pins:not(:empty) { align-items: flex-start; gap: 10px; height: 30px; padding: 3px 8px 0; box-sizing: border-box; border-radius: 15px; background: var(--bcv-fill); }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-pins .bcv-pin:not(.is-open) .bcv-pin__btn { background: transparent; box-shadow: none; }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-pins .bcv-pin:not(.is-open) .bcv-pin__ic { color: var(--bcv-pin-color, var(--bcv-ink2)); }

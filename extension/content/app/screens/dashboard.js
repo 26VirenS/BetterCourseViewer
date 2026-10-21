@@ -566,6 +566,7 @@
         ]),
         card ? null : U.el('bcv-sheet__pvhint', [U.svg(IC.doc, { size: 22, stroke: 'var(--bcv-ink3)', width: 1.7 }), U.text('bcv-sheet__pvhint-t', 'Press an item to preview it here', 'span')]),
       ]);
+      if (card && def.color) sheet.style.setProperty('--bcv-stat-tint', def.color); // (2.99.72: its glass tinted by the counter's colour, as the Mac's panel)
       ov.append(sheet);
       // (2.99.37) a press in the box away from its rows puts its preview card away, the box staying
       sheet.addEventListener('pointerdown', (e) => { if (sheet.classList.contains('has-pv') && !e.target.closest('.bcv-sheet__row, .bcv-sheet__qrow, .bcv-sheet__x')) BCV.preview?.close({ gently: true }); });
