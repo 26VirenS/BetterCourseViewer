@@ -25,6 +25,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.78', date: '2026-10-21', notes: [
+      { kind: 'improved', title: 'Two Quiz Layouts', body: 'Side by side, or scroll every question in the middle.', icon: P.check },
+      { kind: 'improved', title: 'Review Side by Side', body: 'Your answers on the left, Submit on the right.', icon: P.check },
+      { kind: 'fixed', title: 'Formulas in Review', body: 'A formula no longer shows its code beside it.', icon: P.check },
+    ] },
     { version: '2.99.77', date: '2026-10-21', notes: [
       { kind: 'improved', title: 'Colour Wheel Is Back', body: 'Any colour in Appearance opens the round picker.', icon: P.check },
       { kind: 'improved', title: 'Counters in Your Hue', body: 'With a theme colour, the counters are its shades.', icon: P.check },

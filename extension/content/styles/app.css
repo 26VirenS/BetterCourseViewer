@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.77"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.78"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -2976,8 +2976,8 @@ html.bcv-phone .bcv-qz__raw, html.bcv-phone .bcv-qz__instrbtn { padding: 0 9px; 
 .bcv-qz__pill.is-flagged { border-color: var(--bcv-orange); }
 .bcv-qz__pill.is-current { background: var(--bcv-blue); color: #fff; }
 .bcv-qz__pill:disabled { opacity: .45; cursor: default; }
-.bcv-qz__progress--all { padding: 0 28px 11px; justify-content: flex-end; gap: 4px; flex-wrap: wrap; }
-.bcv-qz__progress--all .bcv-qz__pill { flex: none; width: 27px; height: 27px; border-radius: 9px; font-size: 11.5px; }
+.bcv-qz__progress--all:not(.bcv-qz__progress--side) { padding: 0 28px 11px; justify-content: flex-end; gap: 4px; flex-wrap: wrap; }
+.bcv-qz__progress--all:not(.bcv-qz__progress--side) .bcv-qz__pill { flex: none; width: 27px; height: 27px; border-radius: 9px; font-size: 11.5px; }
 .bcv-qz__body { flex: 1; display: flex; flex-direction: column; }
 .bcv-qz__stage { flex: 1; display: flex; flex-direction: column; }
 .bcv-qz__intro { flex: 1; max-width: 640px; margin: 0 auto; width: 100%; padding: 40px 28px 60px; display: flex; flex-direction: column; gap: 18px; }
@@ -3005,6 +3005,11 @@ html.bcv-phone .bcv-qz__raw, html.bcv-phone .bcv-qz__instrbtn { padding: 0 9px; 
 .bcv-qz__page--all .bcv-qz__q.is-current .bcv-qz__qnum { color: var(--bcv-blue); }
 .bcv-qz__progress--all .bcv-qz__pill { transition: background var(--bcv-t-snappy) var(--bcv-spring-snappy), color var(--bcv-t-snappy) var(--bcv-spring-snappy); }
 @media (prefers-reduced-motion: reduce) { .bcv-qz__page--all .bcv-qz__q, .bcv-qz__page--all .bcv-qz__q::before, .bcv-qz__page--all .bcv-qz__qnum { transition: none; } }
+/* (2.99.78) the scrolling layout in the side frame: the questions one after another, a hairline between them */
+.bcv-qz__page--side.bcv-qz__page--all { gap: 0; }
+.bcv-qz__page--side.bcv-qz__page--all .bcv-qz__q { scroll-margin-top: calc(var(--bcv-qz-stick, 63px) + 20px); }
+.bcv-qz__page--side.bcv-qz__page--all .bcv-qz__q + .bcv-qz__q { margin-top: 40px; padding-top: 38px; border-top: 1px solid var(--bcv-sep); }
+.bcv-qz__page--side.bcv-qz__page--all .bcv-qz__q + .bcv-qz__q::before { top: 40px; }
 .bcv-qz__qhead { display: flex; align-items: center; gap: 10px; padding: 0 4px 14px; }
 .bcv-qz__qnum { font: 700 13px/1.2 var(--bcv-font); letter-spacing: -.01em; }
 .bcv-qz__qof { font: 400 13px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
@@ -3182,6 +3187,25 @@ html[data-bcv-theme="dark"] #bcv-app .bcv-qz__opt.is-selected { color: #7ab8ff; 
   .bcv-qz__page.bcv-qz__page--side { padding: 26px 28px 60px; }
 }
 .bcv-qz__review { flex: 1; max-width: 700px; margin: 0 auto; width: 100%; padding: 32px 28px 60px; display: flex; flex-direction: column; gap: 16px; }
+/* (2.99.78) the review uses the width: the questions on the left, two lines each at most, and on the right — staying in view
+ * as the list scrolls — what is answered, what is blank or flagged, and Submit */
+.bcv-qz__review.bcv-qz__review--wide { max-width: 1180px; display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px 32px; align-items: start; }
+.bcv-qz__review--wide > .bcv-qz__reviewhead { grid-column: 1 / -1; }
+.bcv-qz__review--wide > .bcv-card { grid-column: 1; min-width: 0; }
+.bcv-qz__review--wide .bcv-qz__sumq { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; white-space: normal; text-overflow: clip; }
+.bcv-qz__reviewrail { grid-column: 2; grid-row: 2 / span 3; position: sticky; top: calc(var(--bcv-qz-stick, 63px) + 20px); display: flex; flex-direction: column; gap: 12px; padding: 20px; border-radius: 18px; background: var(--bcv-card); border: 1px solid var(--bcv-edge); }
+.bcv-qz__reviewrail .bcv-qz__reviewbtns { flex-direction: column; align-items: stretch; gap: 10px; }
+.bcv-qz__reviewrail .bcv-qz__big { flex: none; height: 46px; font-size: 15px; }
+.bcv-qz__reviewrail .bcv-qz__note { text-align: left; }
+.bcv-qz__rvcount { font: 700 34px/1 var(--bcv-display); letter-spacing: -.02em; color: var(--bcv-ink); }
+.bcv-qz__rvcount small { font: 500 15px/1 var(--bcv-font); letter-spacing: 0; color: var(--bcv-ink3); margin-left: 6px; }
+.bcv-qz__rvfacts { display: flex; flex-direction: column; gap: 6px; font: 500 13.5px/1.3 var(--bcv-font); color: var(--bcv-ink2); }
+.bcv-qz__rvfacts .is-blank { color: var(--bcv-red-text); }
+.bcv-qz__rvfacts .is-flag { color: #ff9500; }
+@container bcv-main (max-width: 820px) {
+  .bcv-qz__review.bcv-qz__review--wide { grid-template-columns: minmax(0, 1fr); max-width: 700px; }
+  .bcv-qz__reviewrail { grid-column: 1; grid-row: auto; position: static; }
+}
 .bcv-qz__sum { display: flex; align-items: center; gap: 13px; width: 100%; padding: 14px 18px; border: 0; border-top: 1px solid var(--bcv-sep); background: transparent; cursor: pointer; text-align: left; color: inherit; }
 .bcv-qz__sum:first-child { border-top: 0; }
 .bcv-qz__sum:hover { background: var(--bcv-hover); }
@@ -4827,7 +4851,9 @@ html[data-bcv-theme="dark"] .bcv-conv__delta.is-more, html[data-bcv-theme="dark"
 .bcv-mark__bubble { flex-wrap: nowrap; }
 .bcv-mark__bubble .bcv-mark__sep { background: rgba(255,255,255,.22); margin: 0 2px; }
 html.bcv-in-quiz #bcv-tray { display: none !important; } /* (no pinned tools, no quick menus, over a quiz attempt) */
-.bcv-qz__suma .bcv-qz__sumrich, .bcv-qz__suma .bcv-qz__sumrich p, .bcv-qz__sumq .bcv-qz__sumrich, .bcv-qz__sumq .bcv-qz__sumrich * { display: inline; margin: 0; padding: 0; font: inherit; color: inherit; } /* (a formula answer on the review row: the image, in line with the words) */
+.bcv-qz__suma .bcv-qz__sumrich, .bcv-qz__suma .bcv-qz__sumrich p, .bcv-qz__sumq .bcv-qz__sumrich, .bcv-qz__sumq .bcv-qz__sumrich :not(math, math *) { display: inline; margin: 0; padding: 0; font: inherit; color: inherit; } /* (a formula answer on the review row: the image, in line with the words) */
+/* (2.99.78) a formula written as MathML is left to draw itself: its TeX source (the annotation) never shows beside it */
+.bcv-qz__sumrich :is(annotation, annotation-xml), .bcv-prose :is(annotation, annotation-xml) { display: none !important; }
 .bcv-qz__suma img.equation_image { max-height: 1.7em; }
 .bcv-qz__sumq img.equation_image { max-height: 1.6em; }
 

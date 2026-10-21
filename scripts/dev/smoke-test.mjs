@@ -3572,7 +3572,7 @@ try {
       next: getComputedStyle(document.querySelector('.bcv-qz__btn--next')).color, current: getComputedStyle(document.querySelector('.bcv-qz__pill.is-current')).color,
     };
   });
-  check(sideL.side && sideL.modes === 'side* one all' && sideL.pillsLeft === 4 && sideL.pillsInHead === 0 && sideL.order && sideL.controls === 'Next|Back|Flag for review|Review answers' && sideL.numTop && sideL.numSize === '26px' && sideL.text === '16px/400' && sideL.sticky === 'sticky' && sideL.next === 'rgb(255, 255, 255)' && sideL.current === 'rgb(255, 255, 255)', `the side layout is the default: the list of questions on the left, the controls on the right, the number large on top, the text at Canvas's size, white on the blue buttons (${JSON.stringify(sideL)})`);
+  check(sideL.side && sideL.modes === 'side* all' && sideL.pillsLeft === 4 && sideL.pillsInHead === 0 && sideL.order && sideL.controls === 'Next|Back|Flag for review|Review answers' && sideL.numTop && sideL.numSize === '26px' && sideL.text === '16px/400' && sideL.sticky === 'sticky' && sideL.next === 'rgb(255, 255, 255)' && sideL.current === 'rgb(255, 255, 255)', `the side layout is the default: the list of questions on the left, the controls on the right, the number large on top, the text at Canvas's size, white on the blue buttons (${JSON.stringify(sideL)})`);
   // Begin attempt folds the chrome away, smoothly: the sidebar, the course header and the rail slide to nothing
   const folded = await page.waitForFunction(() => document.documentElement.classList.contains('bcv-quiz') && getComputedStyle(document.querySelector('.bcv-side')).width === '0px' && getComputedStyle(document.querySelector('.bcv-rail')).width === '0px' && getComputedStyle(document.querySelector('.bcv-head--course')).maxHeight === '0px', null, { timeout: 5000 }).then(() => true).catch(() => false);
   check(folded && /width/.test(await page.$eval('.bcv-side', (e) => getComputedStyle(e).transitionProperty)) && !(await page.$('#bcv-fab')), 'the attempt takes the page: the sidebar, header and rail fold away (a transition)');
@@ -3599,16 +3599,14 @@ try {
   await page.click('.bcv-qz__pill:first-child');
   await waitText('.bcv-qz__qnum', /Question 1/);
   check(await page.$('.bcv-qz__opt.is-selected'), 'pills jump between questions and answers are kept');
-  // the one-at-a-time layout, as it was: the pills over the question, the buttons along the bottom
-  await page.click('.bcv-qz__mode[data-mode="one"]');
-  await page.waitForFunction(() => !document.querySelector('.bcv-qz__side') && !!document.querySelector('.bcv-qz__head .bcv-qz__pill'), null, { timeout: 5000 });
-  const oneL = await page.evaluate(() => ({ side: document.querySelector('.bcv-qz').classList.contains('is-side'), pillsInHead: document.querySelectorAll('.bcv-qz__head .bcv-qz__pill').length, foot: [...document.querySelectorAll('.bcv-qz__foot .bcv-qz__btn')].map((b) => b.textContent).join('|'), bottom: getComputedStyle(document.querySelector('.bcv-qz__foot')).bottom, text: getComputedStyle(document.querySelector('.bcv-qz__qtext')).fontSize, rail: !!document.querySelector('.bcv-qz__rrail, .bcv-qz__lrail') }));
-  check(!oneL.side && oneL.pillsInHead === 4 && oneL.foot === 'Back|Next' && oneL.bottom === '0px' && oneL.text === '27px' && !oneL.rail, `the one-at-a-time layout is still there: pills in the head, Back and Next along the bottom (${JSON.stringify(oneL)})`);
-  await shot(page, '22d3-quiz-one');
   // scroll-all mode
   await page.click('.bcv-qz__mode[data-mode="all"]');
   await page.waitForSelector('.bcv-qz__page--all', { timeout: 5000 });
   check((await page.$$('.bcv-qz__q')).length === 4 && (await page.$$('.bcv-qz__progress--all .bcv-qz__pill')).length === 4, 'scroll mode shows every question on one page');
+  // (2.99.78) the scrolling layout keeps the side layout's frame: the squares down the left, the controls down the right,
+  // every question in the middle at the side layout's size, each with its own flag
+  const scrollL = await page.evaluate(() => { const box = (sel) => { const e = document.querySelector(sel); if (!e) return null; const r = e.getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(r.right) }; }; const q = box('.bcv-qz__page--all'), lr = box('.bcv-qz__lrail'), rr = box('.bcv-qz__rrail'); return { side: document.querySelector('.bcv-qz').classList.contains('is-side'), order: !!(q && lr && rr && lr.r <= q.l && q.r <= rr.l), pillsLeft: document.querySelectorAll('.bcv-qz__lrail .bcv-qz__pill').length, flags: document.querySelectorAll('.bcv-qz__page--all .bcv-qz__q .bcv-qz__flag').length, controls: [...document.querySelectorAll('.bcv-qz__rrail button')].map((b) => b.textContent).join('|'), modes: [...document.querySelectorAll('.bcv-qz__mode')].map((b) => `${b.dataset.mode}${b.classList.contains('is-active') ? '*' : ''}`).join(' ') }; });
+  check(scrollL.side && scrollL.order && scrollL.pillsLeft === 4 && scrollL.flags === 4 && scrollL.controls === 'Review answers|Next question|Previous question' && scrollL.modes === 'side all*', `the scrolling layout looks as the side one does, the middle scrolling through every question: ${JSON.stringify(scrollL)}`);
   // the question under the reading line is the current one: a bar at its side, its number lit, its pill in
   // the head with it, the others standing back — and the mark follows the scroll
   const current = () => page.evaluate(() => {
@@ -3649,6 +3647,10 @@ try {
   await page.waitForSelector('.bcv-qz__sum', { timeout: 5000 });
   const sums = await texts('.bcv-qz__sum');
   check(sums.length === 4 && /^Q1.*-3\.15 m\/s$/.test(sums[0]) && /Q3.*Not answered/.test(sums[2]) && /^Q4.*3\.15$/.test(sums[3]) && /3 of 4 answered · 1 left blank/.test((await texts('.bcv-qz__lead'))[0]), `review lists every answer: ${sums.join(' | ')}`);
+  // (2.99.78) the review uses the right side: the list on the left, and beside it — in view — the count, a bar, what is blank,
+  // and Submit, with Keep working under it
+  const rv = await page.evaluate(() => { const list = document.querySelector('.bcv-qz__review .bcv-card').getBoundingClientRect(), rail = document.querySelector('.bcv-qz__reviewrail')?.getBoundingClientRect(); return { beside: !!rail && rail.left >= list.right && Math.abs(rail.top - list.top) < 4, btns: [...document.querySelectorAll('.bcv-qz__reviewrail button')].map((b) => b.textContent).join('|'), count: document.querySelector('.bcv-qz__rvcount')?.textContent, blank: document.querySelector('.bcv-qz__rvfacts .is-blank')?.textContent, sticky: rail ? getComputedStyle(document.querySelector('.bcv-qz__reviewrail')).position : '' }; });
+  check(rv.beside && rv.btns === 'Submit quiz|Keep working' && rv.count === '3of 4 answered' && rv.blank === '1 question left blank' && rv.sticky === 'sticky', `the review's right side holds the count and Submit: ${JSON.stringify(rv)}`);
   await shot(page, '22f-quiz-review');
   await page.click('.bcv-qz__sum:nth-child(3)');
   await page.waitForSelector('.bcv-qz__page--all', { timeout: 5000 });
@@ -3805,7 +3807,7 @@ try {
   await page.waitForSelector('.bcv-qz__opt', { timeout: 10000 });
   check(!(await page.$('.bcv-qz__pill.is-loading')) && !(await page.$('.bcv-qz__body.is-busy')), 'the fill goes once the question is there');
   check((await page.$$('.bcv-qz__pill')).length === 4 && (await page.$('.bcv-qz__pill:first-child.is-current')) && (await texts('.bcv-qz__qnum'))[0] === 'Question 1' && (await texts('.bcv-qz__qof'))[0] === 'of 4 · 4 points' && (await texts('.bcv-qz__optlabel')).join('|') === '-3.15 m/s|-2 m/s|0 m/s|1.37 m/s|None of the above', `question 1 as read from Canvas's own quiz page, the list of four from its right column: ${(await texts('.bcv-qz__optlabel')).join(' | ')}`);
-  check((await page.$$eval('.bcv-qz__mode', (els) => els.map((e) => e.dataset.mode).join(','))) === 'side,one' && (await texts('.bcv-qz__foot .bcv-qz__btn')).join(',') === 'Next,Review answers', 'one question at a time: the switch offers the two layouts that show one question (never all on one scroll), and no Back button when the quiz forbids it');
+  check((await page.$$('.bcv-qz__mode')).length === 0 && (await texts('.bcv-qz__foot .bcv-qz__btn')).join(',') === 'Next,Review answers', 'one question at a time: no switch (never all on one scroll), and no Back button when the quiz forbids it');
   await page.click('.bcv-qz__opt');
   await waitText('.bcv-qz__answered', /1 of 4 answered · Saved/);
   const oqSub = (await noteApi('GET', '/api/v1/courses/101/quizzes/9014/submissions')).quiz_submissions.find((s) => s.workflow_state === 'untaken');
