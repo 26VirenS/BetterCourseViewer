@@ -87,5 +87,7 @@
     merge: 'M7 3.5h7l4 4v13H7zM14 3.5v4h4M4.5 13h2M9 13h2M13.5 13h2M18 13h1.5', // (a page with a cut line across it)
     marker: 'M5 15l8.5-8.5 4 4L9 19H5zM12 8.5l4 4M3 21h9',
     scan: 'M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16M8.5 9h7M12 9v7',
+    ruler: 'M3.5 15.5l12-12 5 5-12 12zM7 12l2 2M10 9l1.5 1.5M13 6l2 2', // (2.99.79: the unit converter)
+    words: 'M4 6h16M4 10h10M4 14h16M4 18h8M17 17.5l1.5 1.5 3-3', // (2.99.79: the word counter — lines of text, ticked)
   };
 })();

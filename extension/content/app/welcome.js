@@ -161,20 +161,20 @@
           title: 'Your courses', body: 'Your classes are listed here.', act: 'hover', doing: 'Hover over a course',
           done: () => !!document.querySelector('#bcv-side .bcv-fav:hover, #bcv-side .bcv-nav__item[data-nav="courses"]:hover'), after: 'Click one any time to open it.' },
     ],
-    // Tools: the row pressed, then any tool dragged up to the top (a pin beside the switch); a press on a
-    // card is held while the drag is asked for, so no tool opens over the page instead
+    // Tools: the row pressed, then any tool's pin pressed (a pin beside the switch); a press on a card itself is
+    // held while the pin is asked for, so no tool opens over the page instead
     tools: () => {
       let before = 0;
       return [
         { id: 'tools', name: 'Tools', where: 'sidebar', target: () => navRow('tools'), when: () => !!navRow('tools'),
           title: 'Tools and widgets', body: [['Find a ', ''], ['PDF Editor, ', '#ff9f0a'], ['File Converter, ', '#34c759'], ['Calculators, ', '#bf5af2'], ['Flashcards, ', '#2f7cf6'], ['Citation Generator', '#40c8e0'], [' & more.', '']], act: 'click', doing: 'Click Tools',
           done: () => onScreen('tools') },
-        { id: 'pin', name: 'the tools', target: () => $('.bcv-tool-card[data-tool="pomo"]') || $('.bcv-tool-card'), area: () => [$('#bcv-main .bcv-tools'), $('#bcv-pins-drop'), $('#bcv-pins')], wait: 8000, allow: '#bcv-main .bcv-tool-card',
+        // (2.99.79) a tool is pinned with the pin at its card's corner — the drag to the top is gone
+        { id: 'pin', name: 'the tools', target: () => $('.bcv-tool-card[data-tool="pomo"] .bcv-tool-card__pin') || $('.bcv-tool-card__pin'), area: () => [$('#bcv-main .bcv-tools-page'), $('#bcv-pins')], wait: 8000, allow: '#bcv-main .bcv-tool-card__pin',
           when: () => !phone() && !self.BCVBridge?.native, // (the pins sit beside the switch: none on a phone or in the app)
           start: () => { before = pinnedN(); },
-          title: 'Pin a tool', body: 'Drag any tool to the top to keep it one click away.', act: 'drag', doing: 'Drag a tool to the top',
-          dragTo: () => { const l = look()?.getBoundingClientRect(); return l ? { x: l.left - 60, y: l.top + l.height / 2 } : null; },
-          on: { click: (e) => { if (e.target.closest?.('.bcv-tool-card')) { e.preventDefault(); e.stopImmediatePropagation(); } return false; } },
+          title: 'Pin a tool', body: 'Press the pin on any tool to keep it one click away.', act: 'click', doing: 'Press a pin',
+          on: { click: (e) => { if (e.target.closest?.('.bcv-tool-card') && !e.target.closest('.bcv-tool-card__pin')) { e.preventDefault(); e.stopImmediatePropagation(); } return false; } },
           done: () => pinnedN() > before, after: 'Pinned — it’s by the switch now.' },
       ];
     },

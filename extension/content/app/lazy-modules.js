@@ -24,6 +24,8 @@ self.BCV_LAZY_MODULES = {
   'tool:mark': { files: ['content/app/tools/mark.js'] },
   'tool:ocr': { files: ['content/app/tools/ocr.js'] },
   'tool:ptable': { files: ['content/app/tools/ptable-data.js', 'content/app/tools/ptable.js'] },
+  'tool:units': { files: ['content/app/tools/units.js'] },
+  'tool:words': { files: ['content/app/tools/words.js'] },
   setupcss: { files: ['setup/setup-css.js'] }, // the setup's stylesheet: the setup, Personalize and What's New draw with it
   setup: { needs: ['setupcss'], files: ['content/app/personalize.js', 'content/app/setup.js'] },
   notes: { needs: ['setupcss'], files: ['content/app/whatsnew-notes.js'] },

@@ -33,19 +33,27 @@
   // key, name, the one line under it, the icon and the accent (used for the icon tile and nothing
   // else); open() draws the tool. A tool that is not built is not listed: a dead card is worse
   // than a shorter grid.
+  // (2.99.79) each in a section, as the Mac's Tools page has them (Tools.swift ToolGroup): Study, Math & science, Files,
+  // Chemistry — the order of GROUPS, and within each the order here
+  const GROUPS = [['study', 'Study'], ['science', 'Math & science'], ['files', 'Files'], ['chemistry', 'Chemistry']];
   const TOOLS = [
-    { key: 'cite', name: 'Citation generator', note: 'Cite a source in MLA, APA or Chicago.', icon: IC.quote, color: '#30b0c7', open: (app, o) => BCV.toolsCite.open(app, o) },
-    { key: 'pomo', name: 'Focus timer', note: 'Focus for a while, then take a break.', icon: IC.timer, color: '#ff9500', open: (app, o) => openTimer(app, o) },
-    { key: 'calc', name: 'Calculator', note: 'GeoGebra: graphs, CAS, 3D and more.', icon: IC.calc, color: '#ff9f0a', open: (app, o) => openCalc(app, o) },
-    { key: 'graph', name: 'Graphing calculator', note: 'Desmos, right here.', icon: IC.graph, color: '#5856d6', open: (app, o) => openGraph(app, o) },
-    { key: 'ptable', name: 'Periodic table', note: 'Every element and its facts, in place.', icon: IC.table, color: '#30d158', open: (app, o) => BCV.toolsPtable.open(app, o) },
-    { key: 'need', name: 'Grade needed', note: 'What you need on the final to hit your goal.', icon: IC.percent, color: '#ff375f', open: (app, o) => BCV.toolsNeed.open(app, o) },
-    { key: 'conv', name: 'File converter', note: 'Word, PDF and images, any way round.', icon: IC.convert, color: '#34c759', open: (app, o) => BCV.toolsConvert.open(app, o) },
-    { key: 'pdfx', name: 'Merge & split PDFs', note: 'Join pages from PDFs into one, or take pages out.', icon: IC.merge, color: '#bf5af2', open: (app, o) => BCV.toolsPdfs.open(app, o) },
-    { key: 'mark', name: 'PDF annotator', note: 'Highlight and add notes, kept per file.', icon: IC.marker, color: '#e5a500', open: (app, o) => BCV.toolsMark.open(app, o) },
-    { key: 'ocr', name: 'Image to text', note: 'Read the words off a picture or a scan.', icon: IC.scan, color: '#00b3a4', open: (app, o) => BCV.toolsOcr.open(app, o) },
-    { key: 'fc', name: 'Flashcards', note: 'Make a set. Flip, learn, test, match.', icon: IC.cards, color: '#0a84ff', open: (app, o) => BCV.toolsCards.open(app, o) },
+    { key: 'cite', group: 'study', name: 'Citation generator', note: 'Cite a source in MLA, APA or Chicago.', icon: IC.quote, color: '#30b0c7', open: (app, o) => BCV.toolsCite.open(app, o) },
+    { key: 'pomo', group: 'study', name: 'Focus timer', note: 'Focus for a while, then take a break.', icon: IC.timer, color: '#ff9500', open: (app, o) => openTimer(app, o) },
+    { key: 'calc', group: 'science', name: 'Calculator', note: 'GeoGebra: graphs, CAS, 3D and more.', icon: IC.calc, color: '#ff9f0a', open: (app, o) => openCalc(app, o) },
+    { key: 'graph', group: 'science', name: 'Graphing calculator', note: 'Desmos, right here.', icon: IC.graph, color: '#5856d6', open: (app, o) => openGraph(app, o) },
+    { key: 'ptable', group: 'chemistry', name: 'Periodic table', note: 'Every element and its facts, in place.', icon: IC.table, color: '#30d158', open: (app, o) => BCV.toolsPtable.open(app, o) },
+    { key: 'need', group: 'study', name: 'Grade needed', note: 'What you need on the final to hit your goal.', icon: IC.percent, color: '#ff375f', open: (app, o) => BCV.toolsNeed.open(app, o) },
+    { key: 'conv', group: 'files', name: 'File converter', note: 'Word, PDF and images, any way round.', icon: IC.convert, color: '#34c759', open: (app, o) => BCV.toolsConvert.open(app, o) },
+    { key: 'pdfx', group: 'files', name: 'Merge & split PDFs', note: 'Join pages from PDFs into one, or take pages out.', icon: IC.merge, color: '#bf5af2', open: (app, o) => BCV.toolsPdfs.open(app, o) },
+    { key: 'mark', group: 'files', name: 'PDF annotator', note: 'Highlight and add notes, kept per file.', icon: IC.marker, color: '#e5a500', open: (app, o) => BCV.toolsMark.open(app, o) },
+    { key: 'ocr', group: 'files', name: 'Image to text', note: 'Read the words off a picture or a scan.', icon: IC.scan, color: '#00b3a4', open: (app, o) => BCV.toolsOcr.open(app, o) },
+    { key: 'fc', group: 'study', name: 'Flashcards', note: 'Make a set. Flip, learn, test, match.', icon: IC.cards, color: '#0a84ff', open: (app, o) => BCV.toolsCards.open(app, o) },
+    { key: 'words', group: 'study', name: 'Word Counter', note: 'Words, characters, reading time.', icon: IC.words, color: '#8e8e93', open: (app, o) => BCV.toolsWords.open(app, o) },
+    { key: 'units', group: 'science', name: 'Unit converter', note: 'Lengths, weights, temperatures and more.', icon: IC.ruler, color: '#64d2ff', open: (app, o) => BCV.toolsUnits.open(app, o) },
   ];
+  /** The tools of a section, in the Mac's order within it. */
+  const ORDER = { study: ['fc', 'pomo', 'cite', 'need', 'words'], science: ['calc', 'graph', 'units'], files: ['conv', 'pdfx', 'mark', 'ocr'], chemistry: ['ptable'] };
+  const toolsIn = (group) => (ORDER[group] || []).map((k) => TOOLS.find((t) => t.key === k)).filter(Boolean);
   const toolOf = (key) => TOOLS.find((t) => t.key === key) || null;
   const tintOf = (color, dark) => `color-mix(in srgb, ${color} ${dark ? 26 : 15}%, transparent)`;
 
@@ -1596,99 +1604,43 @@
         if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) Object.assign(p.animate([{ translate: `${dx}px ${dy}px` }, { translate: '0px 0px' }], { duration, easing }), { id: 'bcv-swell' });
       }
     }
-    for (const c of document.querySelectorAll('.bcv-tool-card')) c.classList.toggle('is-pinned', pins.includes(c.dataset.tool));
+    for (const c of document.querySelectorAll('.bcv-tool-card')) {
+      const on = pins.includes(c.dataset.tool);
+      c.classList.toggle('is-pinned', on);
+      const b = c.querySelector('button.bcv-tool-card__pin');
+      const name = toolOf(c.dataset.tool)?.name || '';
+      if (b) { b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.title = on ? `Unpin ${name}` : `Pin ${name} next to the switch`; b.setAttribute('aria-label', on ? `Unpin ${name}` : `Pin ${name}`); }
+    }
   }
-  /** The drag: press a card and pull it up; a ghost of it follows the pointer, the top of the page
-   *  says "Pin here", and letting go there pins the tool (the ghost flies into its new spot). A press
-   *  that never moved is the card's own click. Mouse and pen only: a finger on a card scrolls. */
-  const DROP_BAND = 96; // px from the top: letting go above this line pins
-  function draggable(cardEl, t) {
-    let st = null;
-    cardEl.addEventListener('pointerdown', (e) => {
-      if (e.button !== 0 || (e.pointerType !== 'mouse' && e.pointerType !== 'pen')) return;
-      if (self.BCVBridge?.native) return;
-      const r = cardEl.getBoundingClientRect();
-      st = { x: e.clientX, y: e.clientY, ox: e.clientX - r.left, oy: e.clientY - r.top, w: r.width, h: r.height, ghost: null, id: e.pointerId, over: false };
-    });
-    cardEl.addEventListener('pointermove', (e) => {
-      if (!st || e.pointerId !== st.id) return;
-      if (!st.ghost) {
-        if (Math.hypot(e.clientX - st.x, e.clientY - st.y) < 7) return;
-        try { cardEl.setPointerCapture(st.id); } catch { /* no capture */ }
-        st.ghost = cardEl.cloneNode(true);
-        st.ghost.className = 'bcv-tool-card bcv-tool-card--ghost';
-        st.ghost.style.width = `${st.w}px`;
-        st.ghost.setAttribute('aria-hidden', 'true');
-        overlayRoot().append(st.ghost);
-        cardEl.classList.add('is-dragging');
-        html.classList.add('bcv-dragpin');
-        dropZone(true, t);
-      }
-      const over = e.clientY < DROP_BAND;
-      st.over = over;
-      st.ghost.style.left = `${e.clientX - st.ox}px`;
-      st.ghost.style.top = `${e.clientY - st.oy}px`;
-      st.ghost.classList.toggle('is-over', over);
-      document.getElementById('bcv-pins-drop')?.classList.toggle('is-over', over);
-    });
-    const end = async (e) => {
-      if (!st || e.pointerId !== st.id) return;
-      const s = st;
-      st = null;
-      if (!s.ghost) return; // a plain press: the click follows
-      try { cardEl.releasePointerCapture(s.id); } catch { /* not captured */ }
-      cardEl.classList.remove('is-dragging');
-      html.classList.remove('bcv-dragpin');
-      swallow = true; // the click that follows a drag is not an Open
-      setTimeout(() => { swallow = false; }, 0);
-      const ghost = s.ghost;
-      if (s.over && e.type !== 'pointercancel') {
-        await pin(t.key);
-        const target = document.querySelector(`#bcv-pins .bcv-pin[data-tool="${t.key}"]`)?.getBoundingClientRect();
-        if (target) {
-          ghost.style.transition = 'transform .32s var(--bcv-ease), left .32s var(--bcv-ease), top .32s var(--bcv-ease), opacity .25s ease .1s';
-          ghost.style.left = `${target.left}px`;
-          ghost.style.top = `${target.top}px`;
-          ghost.style.transform = `scale(${target.width / s.w})`;
-          ghost.style.opacity = '0';
-        }
-        U.toast(`${t.name} pinned next to the switch. It is on every page now.`);
-      } else {
-        ghost.style.transition = 'opacity .2s ease, transform .2s ease';
-        ghost.style.opacity = '0';
-        ghost.style.transform = 'scale(.96)';
-      }
-      dropZone(false);
-      setTimeout(() => ghost.remove(), 360);
-    };
-    cardEl.addEventListener('pointerup', end);
-    cardEl.addEventListener('pointercancel', end);
-    let swallow = false;
-    cardEl.addEventListener('click', (e) => { if (swallow) { e.preventDefault(); e.stopImmediatePropagation(); } }, true);
-  }
-  /** "Pin here": the landing spot, drawn beside the switch while a card is being dragged. */
-  function dropZone(show, t = null) {
-    let z = document.getElementById('bcv-pins-drop');
-    if (!show) { z?.remove(); return; }
-    if (!z) { z = h('div', { id: 'bcv-pins-drop', class: 'bcv-pins-drop', 'aria-hidden': 'true' }); overlayRoot().append(z); }
-    z.replaceChildren(U.svg(IC.pin, { size: 13, stroke: 'currentColor', width: 2 }), h('span', { text: t && pinned(t.key) ? 'Already pinned' : 'Pin here' }));
-  }
-
-  /** A tool card (the Tools page, and the welcome's demo): the tile, the name, the line, Open. */
+  /** A tool card (the Tools page, and the welcome's demo): the tile, the name, the line, Open — (2.99.79) and its pin at
+   *  the top right, a press pinning it beside the switch or taking it away (as the Mac's tiles have it); no drag. */
   function cardEl(t, { dark = false, demo = false, onOpen = null } = {}) {
-    const el = h(demo ? 'div' : 'button', {
-      ...(demo ? {} : { type: 'button' }),
+    const go = (e) => (onOpen ? onOpen(e) : open(t.key, { from: e.currentTarget }));
+    const el = h('div', {
+      ...(demo ? {} : { role: 'button', tabindex: '0', 'aria-label': `${t.name}: open` }),
       class: `bcv-tool-card ${pinned(t.key) ? 'is-pinned' : ''}`,
       dataset: { tool: t.key },
-      onclick: demo ? null : (e) => (onOpen ? onOpen(e) : open(t.key, { from: e.currentTarget })),
+      onclick: demo ? null : (e) => { if (e.target.closest?.('.bcv-tool-card__pin')) return; go(e); },
+      onkeydown: demo ? null : (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); go(e); } },
     }, [
       h('span', { class: 'bcv-tool-card__tile', style: { background: tintOf(t.color, dark) } }, U.svg(t.icon, { size: 21, stroke: t.color, width: 1.8 })),
       U.el('bcv-tool-card__text', [U.text('bcv-tool-card__name', t.name), U.text('bcv-tool-card__note bcv-pretty', t.note)]),
       U.el('bcv-tool-card__open', [h('span', { text: 'Open' }), U.svg('M9 6l6 6-6 6', { size: 13, stroke: 'var(--bcv-blue)', width: 2.2, cls: 'bcv-tool-card__chev' })]),
-      h('span', { class: 'bcv-tool-card__pinned', title: 'Pinned next to the switch' }, U.svg(IC.pin, { size: 11, stroke: 'currentColor', width: 2 })),
+      self.BCVBridge?.native ? null : h(demo ? 'span' : 'button', {
+        ...(demo ? {} : { type: 'button' }),
+        class: 'bcv-tool-card__pin',
+        title: pinned(t.key) ? `Unpin ${t.name}` : `Pin ${t.name} next to the switch`,
+        'aria-label': pinned(t.key) ? `Unpin ${t.name}` : `Pin ${t.name}`,
+        'aria-pressed': pinned(t.key) ? 'true' : 'false',
+        onclick: demo ? null : async (e) => {
+          e.stopPropagation();
+          if (pinned(t.key)) { await unpin(t.key); return; }
+          await pin(t.key);
+          U.toast(`${t.name} pinned next to the switch. It is on every page now.`);
+        },
+      }, U.svg(IC.pin, { size: 13, stroke: 'currentColor', width: 2.1 })),
     ]);
     if (!demo) {
-      draggable(el, t);
       // the tool's script asked for as the pointer (or the focus) reaches its card, not on the press:
       // the popup then opens on the click itself rather than after a trip to the background
       const ahead = () => { const mod = BCV.lazy?.toolModule?.(t.key); if (mod && !BCV.lazy.has(mod)) BCV.lazy.load(mod).catch(() => {}); };
@@ -1699,7 +1651,7 @@
   }
 
   BCV.tools = {
-    TOOLS, toolOf, tintOf, open, popup, seg, note, hint, card, label, stepper, input, rise, saveFile, copyText, parseCsv, csvCell, readAs, holdFiles, overlayRoot, kb, fileBase, uid, load, save, vendor, evalSum,
+    TOOLS, GROUPS, toolsIn, toolOf, tintOf, open, popup, seg, note, hint, card, label, stepper, input, rise, saveFile, copyText, parseCsv, csvCell, readAs, holdFiles, overlayRoot, kb, fileBase, uid, load, save, vendor, evalSum,
     focusActive, focusLoad, remaining, running, mmss,
     mountTray, pinsLoad, pin, unpin, pinned, pinEl, cardEl, paintPins,
   };

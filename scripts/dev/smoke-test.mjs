@@ -264,14 +264,8 @@ try {
     await sw.evaluate(async (base) => { const [tab] = await chrome.tabs.query({ url: `${base}/*` }); await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => { self.BCV.welcome.finish(); } }); }, BASE);
     await tourGone();
   };
-  // a tool card pulled up to the top of the page with the mouse, in steps (tools.js: a drag, then a drop above 96px pins it)
-  const dragPin = async (sel) => {
-    const r = await page.$eval(sel, (e) => { const b = e.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; });
-    await page.mouse.move(r.x, r.y);
-    await page.mouse.down();
-    for (let i = 1; i <= 14; i++) await page.mouse.move(r.x + (1100 - r.x) * (i / 14), r.y + (40 - r.y) * (i / 14));
-    await page.mouse.up();
-  };
+  // (2.99.79) a tool pinned with the pin at its card's corner (tools.js: no drag any more)
+  const dragPin = async (sel) => { await page.click(`${sel} .bcv-tool-card__pin`); };
   const ringHolds = (ring, sel) => page.$eval(sel, (el, rg) => { const r = el.getBoundingClientRect(); return !!rg && rg.x <= r.left + 1 && rg.y <= r.top + 1 && rg.x + rg.w >= r.right - 1 && rg.y + rg.h >= r.bottom - 1; }, ring).catch(() => false);
   // the mock's answers read straight (its while(1); prefix off), and the site's preferences as the extension keeps them
   const apiGet = (p) => fetch(`${BASE}${p}`).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, '')));
@@ -5827,15 +5821,15 @@ try {
   await page.click('#bcv-side .bcv-nav__item[data-nav="tools"]');
   await tourStep('pin');
   const tp = await tourAt();
-  check(page.url() === `${BASE}/#tools` && tp.title === 'Pin a tool' && tp.doing === 'Drag a tool to the top' && tp.act === 'drag' && tp.next === null && await ringHolds(tp.ring, '#bcv-main .bcv-tools'), `Tools open, every card lit, a drag to the top asked for (the pointer showing it), no Next: ${JSON.stringify(tp)}`);
+  check(page.url() === `${BASE}/#tools` && tp.title === 'Pin a tool' && tp.doing === 'Press a pin' && tp.act === 'click' && tp.next === null && await ringHolds(tp.ring, '#bcv-main .bcv-tools-sec'), `(2.99.79) Tools open, a card lit and its pin to press, no Next: ${JSON.stringify(tp)}`);
   await shot(page, '31f2-tour-pin');
   await page.click('.bcv-tool-card[data-tool="calc"]');
   await page.waitForTimeout(400);
-  check(!(await page.$('.bcv-tool-ov')) && (await tourAt()).step === 'pin', 'a press on a card opens nothing while the drag is asked for');
+  check(!(await page.$('.bcv-tool-ov')) && (await tourAt()).step === 'pin', 'a press on a card opens nothing while a pin is asked for');
   await dragPin('.bcv-tool-card[data-tool="calc"]');
   await tourStep('home');
   const pinsAfter = (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:pins'))['tools:pins'])) || [];
-  check(pinsAfter.includes('calc') && !!(await page.$('#bcv-pins .bcv-pin[data-tool="calc"]')), `the tool dragged up (the Calculator, not the one the pointer showed) is pinned beside the switch, and the tour moves on: ${JSON.stringify(pinsAfter)}`);
+  check(pinsAfter.includes('calc') && !!(await page.$('#bcv-pins .bcv-pin[data-tool="calc"]')), `the tool whose pin was pressed (the Calculator, not the one the pointer showed) is pinned beside the switch, and the tour moves on: ${JSON.stringify(pinsAfter)}`);
   await tourStep('home');
   await page.click('#bcv-side .bcv-nav__item[data-nav="dashboard"]');
   // the Dashboard's way in: its own card, its sheet, an item previewed beside the list
@@ -6419,9 +6413,9 @@ try {
   await page.waitForTimeout(600);
   check(!(await page.$('#bcv-tour')), 'Tools opens without a tour of its own');
   const toolNav = await texts('.bcv-nav > .bcv-nav__item');
-  check(toolNav[toolNav.length - 1].startsWith('Tools') && (await page.$eval('.bcv-nav__item[data-nav="tools"]', (e) => e.classList.contains('is-active'))) && (await texts('.bcv-h1'))[0] === 'Tools' && (await texts('.bcv-head__sub'))[0] === 'Handy things, right here.', 'Tools is the last row of the sidebar, lit, and the page is titled');
+  check(toolNav[toolNav.length - 1].startsWith('Tools') && (await page.$eval('.bcv-nav__item[data-nav="tools"]', (e) => e.classList.contains('is-active'))) && (await texts('.bcv-h1'))[0] === 'Tools' && (await texts('.bcv-head__sub'))[0] === 'Pin a tool to keep it beside the switch on every page.', 'Tools is the last row of the sidebar, lit, and the page is titled');
   const cardNames = await texts('.bcv-tool-card__name');
-  check(cardNames.join(' | ') === 'Citation generator | Focus timer | Calculator | Graphing calculator | Periodic table | Grade needed | File converter | Merge & split PDFs | PDF annotator | Image to text | Flashcards' && (await page.$$('.bcv-tool-card__open')).length === 11, `eleven cards, each with Open: ${cardNames.join(' | ')}`);
+  check(cardNames.join(' | ') === 'Flashcards | Focus timer | Citation generator | Grade needed | Word Counter | Calculator | Graphing calculator | Unit converter | File converter | Merge & split PDFs | PDF annotator | Image to text | Periodic table' && (await page.$$('.bcv-tool-card__open')).length === 13 && (await texts('.bcv-tools-sec__h')).join(' | ') === 'Study | Math & science | Files | Chemistry | Your widgets', `(2.99.79) thirteen cards in the Mac's sections, each with Open: ${cardNames.join(' | ')}`);
   await shot(page, '36c-tools');
   } // tools
   if (on('widgets')) {
@@ -6449,7 +6443,7 @@ try {
 </script>`;
   const widgetsKept = () => sw.evaluate(async () => (await self.BCV.api.storage.local.get('widgets:custom'))['widgets:custom'] || []);
   const widgetData = (id) => sw.evaluate(async (k) => (await self.BCV.api.storage.local.get(k))[k], `widgets:data:${id}`);
-  check((await page.$$('.bcv-tool-card')).length === 11 && (await texts('.bcv-tool-add__name'))[0] === 'Add a widget' && (await page.$eval('.bcv-tools', (g) => g.lastElementChild.classList.contains('bcv-tool-add'))), 'after the eleven tools, a dashed card: Add a widget');
+  check((await page.$$('.bcv-tool-card')).length === 13 && (await texts('.bcv-tool-add__name'))[0] === 'Add a widget' && (await page.$eval('.bcv-tools-sec[data-group="widgets"] .bcv-tools', (g) => g.lastElementChild.classList.contains('bcv-tool-add'))), 'after the thirteen tools, in Your widgets, a dashed card: Add a widget');
   await page.click('.bcv-tool-add');
   await page.waitForSelector('.bcv-tool[data-tool="widgets"]', { timeout: 8000 });
   check((await texts('.bcv-tool__title'))[0] === 'Add a widget' && (await texts('.bcv-tool--wimp .bcv-seg__btn')).join(' | ') === 'Paste | A file | An address | Starters', 'it opens the importer: Paste, A file, An address, Starters');
@@ -6476,7 +6470,7 @@ try {
   check((await widgetsKept()).length === 0 && (await page.evaluate(() => Math.round(document.querySelector('.bcv-wimp__preview .bcv-widget__frame').getBoundingClientRect().height))) === 220, 'the preview runs the widget (resize took) but keeps nothing of it yet');
   await shot(page, '36d-widget-import');
   await page.click('.bcv-wimp__foot .bcv-btn--primary');
-  await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov') && document.querySelectorAll('.bcv-tool-card').length === 12, null, { timeout: 8000 });
+  await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov') && document.querySelectorAll('.bcv-tool-card').length === 14, null, { timeout: 8000 });
   const wKept = await widgetsKept();
   check(wKept.length === 1 && wKept[0].name === 'Probe' && wKept[0].size === 'S' && wKept[0].icon === 'shield' && wKept[0].color === '#ff375f' && /^w/.test(wKept[0].id) && wKept[0].html === probeWidget && (await texts('.bcv-tool-card__name')).slice(-1)[0] === 'Probe', `Add to Tools keeps it — name, icon, size, colour, its whole file — and its card joins the grid after the built-in tools: ${JSON.stringify({ name: wKept[0].name, size: wKept[0].size, icon: wKept[0].icon })}`);
   const wKey = `w:${wKept[0].id}`;
@@ -6500,7 +6494,7 @@ try {
   await page.reload();
   await page.waitForSelector('.bcv-tool-add', { timeout: 15000 });
   await page.waitForSelector(`#bcv-pins .bcv-pin[data-tool="${wKey}"]`, { timeout: 10000 });
-  check((await page.$$('.bcv-tool-card')).length === 12 && (await page.$eval(`.bcv-tool-card[data-tool="${wKey}"]`, (e) => e.classList.contains('is-pinned'))), 'pinned beside the switch, and still there after a reload, its card marked');
+  check((await page.$$('.bcv-tool-card')).length === 14 && (await page.$eval(`.bcv-tool-card[data-tool="${wKey}"]`, (e) => e.classList.contains('is-pinned'))), 'pinned beside the switch, and still there after a reload, its card marked');
   await page.click(`#bcv-pins .bcv-pin[data-tool="${wKey}"] .bcv-pin__btn`);
   await page.waitForSelector(`.bcv-tool[data-tool="${wKey}"] .bcv-widget__frame`, { timeout: 8000 });
   check(true, 'the pin opens it');
@@ -6523,7 +6517,7 @@ try {
   await page.waitForSelector('.bcv-wimp__preview', { timeout: 10000 });
   check((await texts('.bcv-wimp__preview .bcv-tool-card__name'))[0] === 'Fetched widget', 'an address: the file is fetched through the background and checked');
   await page.click('.bcv-wimp__foot .bcv-btn--primary');
-  await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov') && document.querySelectorAll('.bcv-tool-card').length === 13, null, { timeout: 8000 });
+  await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov') && document.querySelectorAll('.bcv-tool-card').length === 15, null, { timeout: 8000 });
   await page.click('.bcv-tool-add');
   await page.waitForSelector('.bcv-tool--wimp', { timeout: 8000 });
   await page.click('.bcv-tool--wimp .bcv-seg__btn[data-value="starters"]');
@@ -6537,7 +6531,7 @@ try {
   check((await stFrame.inputValue('#b')) === '0.003' && (await stFrame.$$eval('#kinds button', (bs) => bs.map((b) => b.textContent))).join(' ') === 'Length Mass Volume Speed Temperature', 'the starter works in its frame: 3 m is 0.003 km');
   await shot(page, '36f-widget-starter');
   await page.click('.bcv-wimp__foot .bcv-btn--primary');
-  await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov') && document.querySelectorAll('.bcv-tool-card').length === 14, null, { timeout: 8000 });
+  await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov') && document.querySelectorAll('.bcv-tool-card').length === 16, null, { timeout: 8000 });
   check((await widgetsKept()).map((w) => w.name).join(' | ') === 'Probe | Fetched widget | Unit converter', 'three widgets kept');
   // remove: from the popup (asked first), its card, pin and store go
   await page.click(`.bcv-tool-card[data-tool="${wKey}"]`);
@@ -6546,12 +6540,12 @@ try {
   await page.waitForSelector('.bcv-sheet--ask .bcv-ask__ok', { timeout: 5000 });
   check((await texts('.bcv-sheet--ask .bcv-sheet__title'))[0] === 'Remove Probe?', 'the bin asks first');
   await page.click('.bcv-sheet--ask .bcv-ask__ok');
-  await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov') && document.querySelectorAll('.bcv-tool-card').length === 13, null, { timeout: 8000 });
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov') && document.querySelectorAll('.bcv-tool-card').length === 15, null, { timeout: 8000 });
   // (the Tools page draws its thirteen cards as soon as the list is kept; the widget's own store, its pin and the pin's
   //  record go a moment after — widgets.js remove() — so they are waited for, not caught half way)
   check(await eventually(async () => (await widgetsKept()).length === 2 && (await widgetData(wKept[0].id)) === undefined && !(await page.$(`#bcv-pins .bcv-pin[data-tool="${wKey}"]`)) && JSON.stringify(await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:pins'))['tools:pins'])) === '[]'), 'removed: the card, the pin and its store all go');
   await sw.evaluate(async (base) => { const [tab] = await chrome.tabs.query({ url: `${base}/*` }); await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: async () => { for (const w of await self.BCV.widgets.all()) await self.BCV.widgets.remove(w.id); self.BCV.app.render(); } }); }, BASE);
-  await page.waitForFunction(() => document.querySelectorAll('.bcv-tool-card').length === 11, null, { timeout: 8000 });
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-tool-card').length === 13, null, { timeout: 8000 });
   check((await widgetsKept()).length === 0, 'the others removed too: the eleven built-in tools again');
   // every tool opens clean: nothing empty spelled out as a word in it
   for (const key of ['cite', 'pomo', 'calc', 'graph', 'ptable', 'need', 'conv', 'pdfx', 'mark', 'ocr', 'fc']) {
@@ -7046,22 +7040,39 @@ try {
   const keptDecks = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:decks'))['tools:decks']);
   check(!!spare && deleting.out && deleting.inert && deleting.name === 'bcv-leave-shrink' && keptDecks.length === 1 && keptDecks[0].id === decks[0].id && (await page.$(`.bcv-fc__deck[data-deck="${spare.id}"]`)) === null && (await toolSub()) === '1 set', `the X deletes the set: it fades where it stood (pressed no more) and is gone from the list and the store, the other kept (${JSON.stringify(deleting)})`);
   await closeTool();
-  // a card dragged to the top becomes a pin beside the switch, on every page
-  const cardBox = await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + 60, y: r.top + 30 }; });
-  await page.mouse.move(cardBox.x, cardBox.y);
-  await page.mouse.down();
-  for (let i = 1; i <= 10; i++) { await page.mouse.move(cardBox.x + (900 - cardBox.x) * (i / 10), cardBox.y + (40 - cardBox.y) * (i / 10)); await page.waitForTimeout(20); }
-  await page.waitForTimeout(250);
-  const dragging = await page.evaluate(() => ({ ghost: !!document.querySelector('.bcv-tool-card--ghost.is-over'), drop: document.getElementById('bcv-pins-drop')?.textContent, over: document.getElementById('bcv-pins-drop')?.classList.contains('is-over'), src: document.querySelector('.bcv-tool-card[data-tool="pomo"]').classList.contains('is-dragging') }));
-  check(dragging.ghost && dragging.drop === 'Pin here' && dragging.over && dragging.src, `pulling a card up: a ghost follows the pointer and "Pin here" lights at the top (${JSON.stringify(dragging)})`);
-  await shot(page, '41-tools-drag');
-  await page.mouse.up();
+  // (2.99.79) the unit converter, the Mac's: a value in one unit, shown in another and in every unit of its kind; a row
+  // pressed is the unit wanted, and a temperature is its own sum
+  await openTool('units');
+  await page.fill('.bcv-units__value', '');
+  await page.fill('.bcv-units__value', '1');
+  const unitsSeen = await page.evaluate(() => ({ kinds: document.querySelectorAll('.bcv-units__kind').length, on: document.querySelector('.bcv-units__kind.is-on')?.textContent, answer: document.querySelector('.bcv-units__answer').textContent, echo: document.querySelector('.bcv-units__echo').textContent, rows: document.querySelectorAll('.bcv-units__line').length }));
+  check(unitsSeen.kinds === 11 && unitsSeen.on === 'Length' && unitsSeen.answer === '3.280839895 ft' && unitsSeen.echo === '= 1 m' && unitsSeen.rows === 11, `1 m is 3.280839895 ft, and every length under it: ${JSON.stringify(unitsSeen)}`);
+  await page.click('.bcv-units__kind[data-kind="Temperature"]');
+  await page.fill('.bcv-units__value', '100');
+  check((await texts('.bcv-units__answer'))[0] === '212 °F', `100 °C is 212 °F: ${(await texts('.bcv-units__answer'))[0]}`);
+  await page.click('.bcv-units__line[data-unit="K"]');
+  check((await texts('.bcv-units__answer'))[0] === '373.15 K', 'a row pressed is the unit wanted: 373.15 K');
+  await shot(page, '40f-tools-units');
+  await closeTool();
+  // (2.99.79) the word counter, the Mac's: words, characters, sentences and paragraphs, the words used most, and a target
+  await openTool('words');
+  await page.fill('.bcv-words__text', "The cell is the unit of life. Cells divide; cells grow.\n\nDon't stop now, well-read student!");
+  await page.fill('.bcv-words__targetin', '20');
+  const wordsSeen = await page.evaluate(() => ({ stats: Object.fromEntries([...document.querySelectorAll('.bcv-words__stat')].map((e) => [e.dataset.stat, e.querySelector('.bcv-words__statv').textContent])), top: [...document.querySelectorAll('.bcv-words__word')].map((e) => e.textContent).slice(0, 2), target: document.querySelector('.bcv-words__targettext').textContent }));
+  check(wordsSeen.stats.Words === '16' && wordsSeen.stats.Sentences === '3' && wordsSeen.stats.Paragraphs === '2' && wordsSeen.stats['Longest word'] === 'well-read' && wordsSeen.top[0] === 'cells2' && wordsSeen.target === '4 to go', `the words counted as the Mac counts them: ${JSON.stringify(wordsSeen)}`);
+  await shot(page, '40g-tools-words');
+  await closeTool();
+  // (2.99.79) the Tools page in the Mac's sections, and a pin at each card's top right: a press pins the tool beside the
+  // switch, on every page — no drag
+  const toolsPage = await page.evaluate(() => ({ secs: [...document.querySelectorAll('.bcv-tools-sec')].map((x) => `${x.querySelector('.bcv-tools-sec__h').textContent}:${[...x.querySelectorAll('.bcv-tool-card')].map((c) => c.dataset.tool).join(',')}`), pins: document.querySelectorAll('.bcv-tool-card .bcv-tool-card__pin').length, cards: document.querySelectorAll('.bcv-tool-card').length, corner: (() => { const c = document.querySelector('.bcv-tool-card[data-tool="pomo"]').getBoundingClientRect(), b = document.querySelector('.bcv-tool-card[data-tool="pomo"] .bcv-tool-card__pin').getBoundingClientRect(); return c.right - b.right < 20 && b.top - c.top < 20; })() }));
+  check(toolsPage.secs.slice(0, 4).join(' | ') === 'Study:fc,pomo,cite,need,words | Math & science:calc,graph,units | Files:conv,pdfx,mark,ocr | Chemistry:ptable' && toolsPage.pins === toolsPage.cards && toolsPage.corner, `the tools in the Mac's sections, a pin at every card's top right: ${JSON.stringify(toolsPage)}`);
+  await page.click('.bcv-tool-card[data-tool="pomo"] .bcv-tool-card__pin');
+  await shot(page, '41-tools-pin');
   await page.waitForSelector('#bcv-pins .bcv-pin[data-tool="pomo"]', { timeout: 5000 });
-  await page.waitForFunction(() => !document.querySelector('.bcv-tool-card--ghost'), null, { timeout: 3000 }); // the ghost flies into the pin's spot, then goes
   await page.waitForFunction(() => { const p = document.querySelector('#bcv-pins .bcv-pin'); return !!p && p.getAnimations({ subtree: true }).every((a) => a.playState === 'finished'); }, null, { timeout: 3000 }); // (and the pin has finished popping in)
   const pinBox = await page.$eval('#bcv-pins .bcv-pin', (e) => { const r = e.getBoundingClientRect(); const l = document.getElementById('bcv-look').getBoundingClientRect(); return { top: Math.round(r.top), gap: Math.round(l.left - r.right), h: Math.round(r.height) }; }); // (2.99.53: the pins in their capsule left of ⋯, 8 between, the capsule's 8 inside)
   const pinsStored = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:pins'))['tools:pins']);
-  check(pinBox.top === 10 && pinBox.gap === 16 && pinBox.h === 24 && JSON.stringify(pinsStored) === '["pomo"]' && (await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => e.classList.contains('is-pinned'))) && (await page.$('.bcv-tool-ov')) === null && (await page.$('.bcv-tool-card--ghost.is-over')) === null, `letting go pins it: a small button beside the switch, the card marked, nothing opened (${JSON.stringify(pinBox)})`);
+  check(pinBox.top === 10 && pinBox.gap === 16 && pinBox.h === 24 && JSON.stringify(pinsStored) === '["pomo"]' && (await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => e.classList.contains('is-pinned'))) && (await page.$('.bcv-tool-ov')) === null && (await page.$eval('.bcv-tool-card[data-tool="pomo"] .bcv-tool-card__pin', (e) => e.getAttribute('aria-pressed'))) === 'true', `the pin pressed pins it: a small button beside the switch, the card marked, nothing opened (${JSON.stringify(pinBox)})`);
   await page.waitForTimeout(500);
   // (2.98.23) folded, a pin is a dot of its tool's colour with the glyph dark on it
   const pinPaint = await page.$eval('#bcv-pins .bcv-pin[data-tool="pomo"]', (e) => ({ face: getComputedStyle(e.querySelector('.bcv-island__face')).visibility, glass: getComputedStyle(e.querySelector('.bcv-island__glass')).opacity, ic: getComputedStyle(e.querySelector('.bcv-pin__ic')).color, stroke: e.querySelector('.bcv-pin__ic svg')?.getAttribute('stroke') }));
@@ -7183,7 +7194,7 @@ try {
   await page.waitForFunction(() => !document.querySelector('#bcv-pins .bcv-pin'), null, { timeout: 3000 });
   check((await page.$eval('#bcv-pins', (e) => e.hidden)) && (await inPage('focusActive')) === false, 'End takes the borrowed pin away');
   await page.goto(`${BASE}/#tools`);
-  check((await page.$('#bcv-tour')) === null && (await page.$$('.bcv-tool-card')).length === 11 && !(await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => e.classList.contains('is-pinned'))), 'the second time, Tools opens without the tour, and the card is no longer marked');
+  check((await page.$('#bcv-tour')) === null && (await page.$$('.bcv-tool-card')).length === 13 && !(await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => e.classList.contains('is-pinned'))), 'the second time, Tools opens without the tour, and the card is no longer marked');
   } // converters and cards
   if (on('grade needed')) {
 
