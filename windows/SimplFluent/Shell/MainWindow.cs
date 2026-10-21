@@ -193,6 +193,14 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         PreviewKeyDown += OnKey;
         // (0.3.27) the developer tools' window, asked for (About's Version clicked seven times, Ctrl+Alt+Shift+D)
         DevMode.OpenAsked += () => Dispatcher.BeginInvoke(() => { if (engine != null) DeveloperWindow.Show(this, engine); });
+        // (0.3.51, the screenshot suite: --open developer:<page> turns the developer tools on for that profile and opens their
+        //  window on the page once the main window has settled — developer:crashes for the crash log)
+        if (Launch.Take("developer:") is { Length: > 0 } devPage)
+        {
+            Prefs.Set("developer", true);
+            Prefs.Set("developer:page", devPage);
+            ContentRendered += async (_, _) => { await Task.Delay(3000); if (engine != null) DeveloperWindow.Show(this, engine); };
+        }
         PreviewMouseDown += (_, e) =>
         {
             // (a press on the title bar, outside the shell, folds back what the shell has open too)
