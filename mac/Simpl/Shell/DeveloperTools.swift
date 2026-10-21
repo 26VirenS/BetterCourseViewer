@@ -571,10 +571,13 @@ struct DevCrashesPage: View {
                         .tag(e.id)
                     }
                     .frame(minWidth: 230, idealWidth: 270, maxWidth: 340)
-                    ScrollView([.vertical, .horizontal]) {
+                    // (down only, its long lines wrapped: scrolled both ways, the report sat in the middle of a wider
+                    //  page, its lines' starts out of sight — the screenshot suite's light-37c-developer-crashes)
+                    ScrollView(.vertical) {
                         Text(text.isEmpty ? "—" : text)
                             .font(.system(size: 11, design: .monospaced))
                             .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
                             .frame(maxWidth: .infinity, alignment: .topLeading)
                             .padding(10)
                     }
