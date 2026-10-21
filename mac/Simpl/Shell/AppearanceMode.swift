@@ -332,7 +332,7 @@ private struct AppearanceCourses: View {
         .buttonStyle(.plain)
         .help("\(c.code)'s colour")
         .popover(isPresented: Binding(get: { editing == c.id }, set: { if !$0 { editing = nil } }), arrowEdge: .top) {
-            CourseColourPicker(course: c) { editing = nil }
+            CourseColourPicker(course: c) { if editing == c.id { editing = nil } } // (saved after a click out: another course's may be open by then)
         }
     }
 }
@@ -345,6 +345,8 @@ private struct CourseColourPicker: View {
     @State private var custom = AppearanceStore.Custom(h: 211, s: 1, depth: 40)
     @State private var any = false
     @State private var saving = false
+    /// (1.3.149) The wheel turned and its colour not saved yet: clicking out saves it, as Use This Colour does.
+    @State private var turned = false
 
     /// Canvas's own course colours.
     static let palette = ["#BD3C14", "#FF2717", "#E71F63", "#8F3E97", "#65499D", "#4554A4", "#1770AB", "#0B9BE3",
@@ -374,7 +376,7 @@ private struct CourseColourPicker: View {
                 }
             }
             if any {
-                RadialColorPicker(value: custom, change: { custom = $0 })
+                RadialColorPicker(value: custom, change: { custom = $0; turned = true })
                     .frame(maxWidth: .infinity)
                     .padding(.top, 6)
                 // (1.3.148: the wheel's middle is its code now; the course's colour is kept here)
@@ -389,10 +391,13 @@ private struct CourseColourPicker: View {
         .padding(16)
         .frame(width: any ? 320 : 280)
         .disabled(saving)
+        .onDisappear { if turned { save(custom.hex) } }
     }
 
     private func save(_ hex: String) {
+        turned = false
         saving = true
+        let engine = engine // (held: clicking out saves after the popover is gone)
         Task {
             if await engine.act("setColor", ["id": course.id, "hex": hex]) {
                 _ = try? await engine.call("refresh", as: OK.self)

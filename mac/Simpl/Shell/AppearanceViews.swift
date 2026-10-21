@@ -239,12 +239,15 @@ struct RadialColorPicker: View {
 
 /// (onboarding-24) The colour as a code, to read or to type — (1.3.148) in the wheel's middle, on a capsule of the colour,
 /// where Done was. Six digits typed wear it as they come (a three-digit code once Return is pressed or the field is left);
-/// a code that is not one goes back to the colour worn.
+/// a code that is not one goes back to the colour worn. (1.3.149) Only what was typed is worn: the field takes focus as
+/// the wheel opens, and kept the code it opened with while the wheel turned — so clicking out wore that old code again.
 private struct HexField: View {
     let hex: String
     let ink: Color
     let wear: (String) -> Bool
     @State private var text = ""
+    /// Something typed that is not worn yet.
+    @State private var typed = false
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -266,16 +269,20 @@ private struct HexField: View {
             .accessibilityLabel("Colour code")
             .help("The colour's code: type one to wear it")
             .onAppear { text = hex }
-            .onChange(of: hex) { _, h in if !focused { text = h } }
+            .onChange(of: hex) { _, h in if !typed { text = h } } // (the wheel turned: its code, focused or not)
             .onChange(of: text) { _, t in
+                guard focused, t != hex else { return }
+                typed = true
                 // (a whole six-digit code, worn as it is typed: the wheel and the window follow)
                 let digits = t.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "#", with: "")
-                if focused, digits.count == 6 { _ = wear(t) }
+                if digits.count == 6, wear(t) { typed = false }
             }
             .onChange(of: focused) { _, on in if !on { apply() } }
     }
 
     private func apply() {
+        guard typed else { return }
+        typed = false
         if !wear(text) { text = hex }
     }
 }
