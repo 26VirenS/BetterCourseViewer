@@ -359,7 +359,7 @@ public sealed class DeveloperWindow : FluentWindow
     {
         var list = new System.Windows.Controls.ListBox { BorderThickness = new Thickness(0), Background = Brushes.Transparent };
         ScrollViewer.SetHorizontalScrollBarVisibility(list, ScrollBarVisibility.Disabled);
-        var text = Code("");
+        var text = Code("", wrap: true); // (a report's long lines, and the empty log's words, read whole)
         var count = K.Text("", Ty.Caption, B.Text2).Align(HorizontalAlignment.Left, VerticalAlignment.Center);
         List<CrashLog.Entry> entries = new();
         CrashLog.Entry? Picked() => list.SelectedIndex >= 0 && list.SelectedIndex < entries.Count ? entries[list.SelectedIndex] : null;

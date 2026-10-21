@@ -7,6 +7,10 @@
     {
       "pattern": "vault: the TPM did not take its key \\(CryptographicException: The device that is required by this cryptographic provider is not ready for use\\.\\): Windows \\(DPAPI\\) holds it",
       "reason": "GitHub's Windows runners have no TPM: the vault keeps its key with Windows (DPAPI) instead, as it does on a PC without one (windows/SimplFluent/Support/Vault.cs)"
+    },
+    {
+      "pattern": "starting: .*--open developer:crashes",
+      "reason": "the screenshot suite's picture of Developer > Crashes (0.3.51): \"crashes\" there is the page's name in the launch line, not a crash"
     }
   ]
 }
