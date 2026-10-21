@@ -445,18 +445,20 @@
       title: 'Developer: show in purple what you picked last time, where it was right — nothing is filled in',
     }, [U.svg('M12 4v11M7 10l5 5 5-5M5 20h14', { size: 13, width: 2 }), h('span', { text: 'Import answers' })]);
     const subLine = U.text('bcv-qz__sub', '');
-    const head = U.el('bcv-qz__head', [
-      U.el('bcv-qz__headrow', [
-        exitBtn,
-        h('div', { class: 'bcv-qz__titles' }, [U.text('bcv-qz__title bcv-ellip', quiz.title), subLine]),
-        modeWrap,
-        devBtn,
-        instrBtn,
-        rawBtn,
-        U.el('bcv-qz__timer', [U.svg('M12 5a8 8 0 100 16 8 8 0 000-16zM12 9v4l3 2', { size: 13, stroke: 'var(--bcv-ink3)', width: 2 }), timerLabel]),
-      ]),
-      progressWrap,
+    const timerBox = U.el('bcv-qz__timer', [U.svg('M12 5a8 8 0 100 16 8 8 0 000-16zM12 9v4l3 2', { size: 13, stroke: 'var(--bcv-ink3)', width: 2 }), timerLabel]);
+    const headRow = U.el('bcv-qz__headrow', [
+      exitBtn,
+      h('div', { class: 'bcv-qz__titles' }, [U.text('bcv-qz__title bcv-ellip', quiz.title), subLine]),
+      modeWrap,
+      devBtn,
+      instrBtn,
+      rawBtn,
+      timerBox,
     ]);
+    const head = U.el('bcv-qz__head', [headRow, progressWrap]);
+    // (2.99.87) the intro as a page in the app: the Canvas page and the timer move beside the page's own title (introTools);
+    // anywhere else they are the head's again
+    const introTools = U.el('bcv-qzi__tools');
     const body = h('div', { class: 'bcv-qz__body' });
     screen.replaceChildren(head, body);
 
@@ -719,6 +721,7 @@
       subLine.textContent = simulated ? 'Simulation · nothing goes to Canvas' : st.stage === 'intro' ? course.name : `${course.name} · ${dueDay}`;
       paintProgress();
       body.classList.toggle('is-busy', st.loadingIdx !== null && st.stage === 'take');
+      if (asPage) { if (rawBtn.parentElement !== introTools) introTools.append(rawBtn, timerBox); } else if (rawBtn.parentElement !== headRow) headRow.append(rawBtn, timerBox);
       if (st.stage === 'intro') body.replaceChildren(intro());
       else if (st.stage === 'starting') body.replaceChildren(h('p', { class: 'bcv-qz__starting', text: st.sub ? 'Resuming your attempt…' : 'Starting your attempt…' }));
       else if (st.stage === 'take') body.replaceChildren(st.mode === 'all' ? takeAll() : st.mode === 'side' ? takeSide() : takeOne());
@@ -879,7 +882,7 @@
       const icon = (path, color) => U.svg(path, { size: 16, stroke: color, width: 2, style: { flex: 'none' } });
 
       const heading = U.el('bcv-qzi__heading', [
-        h('h1', { class: 'bcv-qzi__title bcv-pretty', text: quiz.title }), // (the Mac's sheet names it in its bar; here the page does)
+        U.el('bcv-qzi__titlerow', [h('h1', { class: 'bcv-qzi__title bcv-pretty', text: quiz.title }), introTools]), // (the Mac's sheet names it in its bar; here the page does)
         U.el('bcv-qzi__facts', facts.map(([ic, text]) => U.el('bcv-qzi__fact', [icon(ic, 'var(--bcv-cc, var(--bcv-blue))'), h('span', { text })]))),
         note ? U.el('bcv-qzi__note', [U.svg('M4 12a8 8 0 108-8 8 8 0 00-6 2.7M4 4v4h4', { size: 14, stroke: 'currentColor', width: 2, style: { flex: 'none' } }), h('span', { text: note })]) : null,
       ]);

@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.87', date: '2026-10-21', notes: [
+      { kind: 'fixed', title: 'Tidier quiz page', body: 'One title, with Canvas page and the timer beside it.', icon: P.check },
+    ] },
     { version: '2.99.86', date: '2026-10-21', notes: [
       { kind: 'improved', title: 'Rounder corners', body: "Cards, buttons and boxes use Apple's continuous corners.", icon: P.check },
     ] },
