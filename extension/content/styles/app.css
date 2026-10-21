@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.73"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.74"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -5829,6 +5829,28 @@ html.bcv-dark .bcv-ap-veil { background: rgba(0,0,0,.58); }
 .bcv-ap-seg__b.is-on { background: var(--bcv-card); color: var(--bcv-ink); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
 #bcv-app .bcv-ap-seg__b, .bcv-ap-seg__b { color: var(--bcv-ink2); } .bcv-ap-seg__b.is-on { color: var(--bcv-ink); }
 .bcv-ap-done { height: 30px; padding: 0 18px; border: 0; border-radius: 15px; background: var(--bcv-accent, #0a84ff); color: #fff; font: 600 13px/1 var(--bcv-font); cursor: pointer; }
+/* (2.99.74) the guided setup's run: Next in Done's place (on to the sidebar), then Back and a title; and the sidebar's
+   row — one sidebar or two, each drawn small, the page itself the preview behind the bar */
+.bcv-ap-next { display: inline-flex; align-items: center; gap: 4px; padding: 0 12px 0 16px; }
+.bcv-ap-back { display: inline-flex; align-items: center; gap: 3px; height: 30px; padding: 0 12px 0 8px; border: 0; border-radius: 15px; background: var(--bcv-fill); color: var(--bcv-ink); font: 600 13px/1 var(--bcv-font); cursor: pointer; }
+.bcv-ap-bar__title { font: 700 15px/1.2 var(--bcv-font); color: var(--bcv-ink); }
+.bcv-ap-sides { display: flex; gap: 10px; width: 100%; }
+.bcv-ap-side { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 12px; height: 70px; padding: 8px 12px 8px 8px; border: 0; border-radius: 14px; background: var(--bcv-fill); color: var(--bcv-ink); text-align: left; cursor: pointer; transition: box-shadow .15s ease, background-color .15s ease; }
+.bcv-ap-side.is-on { background: color-mix(in srgb, var(--bcv-accent, #0a84ff) 14%, var(--bcv-card)); box-shadow: inset 0 0 0 2px var(--bcv-accent, #0a84ff); }
+.bcv-ap-side__text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.bcv-ap-side__t { font: 600 13.5px/1.2 var(--bcv-font); }
+.bcv-ap-side__s { font: 400 11.5px/1.3 var(--bcv-font); color: var(--bcv-ink2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.bcv-ap-side__mini { flex: none; display: flex; gap: 3px; width: 84px; height: 54px; padding: 4px; box-sizing: border-box; border-radius: 9px; background: var(--bcv-card); box-shadow: inset 0 0 0 1px var(--bcv-edge); }
+.bcv-ap-side__mini i { display: flex; flex-direction: column; gap: 3px; padding: 4px 3px; border-radius: 5px; }
+.bcv-ap-side__mini b { display: block; height: 3px; border-radius: 2px; background: var(--bcv-ink3); opacity: .45; }
+.bcv-ap-side__bar { width: 24px; background: var(--bcv-fill); }
+.bcv-ap-side__bar .is-course { background: var(--bcv-accent, #0a84ff); opacity: 1; }
+.bcv-ap-side__bar .is-sub { margin-left: 5px; }
+.bcv-ap-side__mini b.is-on { background: var(--bcv-accent, #0a84ff); opacity: .9; }
+.bcv-ap-side__rail { width: 15px; background: var(--bcv-fill); }
+.bcv-ap-side__page { flex: 1; }
+.bcv-ap-side__page .is-title { height: 5px; width: 70%; opacity: .7; }
+.bcv-ap-side__page .is-short { width: 55%; }
 .bcv-ap-theme { display: flex; align-items: center; gap: 14px; min-width: 0; width: 100%; }
 .bcv-ap-readies { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; flex: 1 1 auto; min-width: 0; padding: 2px; }
 .bcv-ap-ready { flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: var(--bcv-ink); cursor: pointer; }

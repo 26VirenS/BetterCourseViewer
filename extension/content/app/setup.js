@@ -1,6 +1,6 @@
 /* The guided setup, drawn over the Canvas page the student is on (the "First-Run Setup" mockup, in
  * a shadow root so Canvas's styles never reach it). An opaque ground, not a scrim: the page behind
- * is not yet configured, so showing it is noise. A word-mark plays first, then four steps with a
+ * is not yet configured, so showing it is noise. A word-mark plays first, then three steps with a
  * rail down the left that shows every step and the answer given so far — back is always open,
  * forward is Continue alone, steps ahead read "Not yet" and are really disabled:
  *   1 the courses, read from the enrolments (nothing ticked to start with — the student picks;
@@ -8,13 +8,16 @@
  *     screen follows) ·
  *   2 grades (a history kept on this device, a goal, a target letter per course) ·
  *   3 what the Dashboard shows first, chosen by looking at miniatures of the real layouts ·
- *   4 where those courses sit, on the sidebar or in a panel off the Courses row ·
- * then a read-back of what was chosen, and Continue to appearance writes it all at once and leads
- * into Personalize (content/app/personalize.js: the look, a colour, the courses' colours, photos),
- * whose Open Canvas reloads the page, which comes back with everything in place and the guided
- * tour on it (content/app/welcome.js). Opened by ?bcv=setup (the toolbar popup's Set
- * up, the account sheet on a phone, the app's first launch). A phone has no sidebar and no dashboard views to choose between: those two steps
- * are left out there. There is no Skip: an unconfigured install has nothing to show. */
+ * then a read-back of what was chosen, and Continue to appearance writes it all at once and loads
+ * the page afresh: (2.99.74) Appearance (content/app/appearance.js) over the real Dashboard, dimmed
+ * but for what it changes, its bar at the foot — the look, a theme, the courses' colours — then Next:
+ * the first course opens, and one sidebar or two is picked with the page itself as the preview; Done
+ * brings the guided tour (content/app/welcome.js). On a phone (no sidebar, no dashboard views, no
+ * Appearance) the read-back leads into Personalize (content/app/personalize.js) instead, and the
+ * dashboard step is left out. Opened by ?bcv=setup (the toolbar popup's Set up, the account sheet
+ * on a phone, the app's first launch). (2.99.74: the step that asked whether the courses are listed
+ * or open on hover is gone: they are listed.) There is no Skip: an unconfigured install has nothing
+ * to show. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
@@ -31,19 +34,18 @@
     { key: 'courses', name: 'Your courses', build: courses },
     { key: 'grades', name: 'Grades', build: grades },
     { key: 'dashboard', name: 'Dashboard', build: dashboard },
-    { key: 'sidebar', name: 'Sidebar', build: sidebar },
   ];
   let STEPS = ALL;
-  // (a phone has no sidebar and no dashboard views to choose between; the look, the colour and the
-  // photos follow in Personalize — content/app/personalize.js — which the read-back leads into)
+  // (a phone has no dashboard views to choose between; the look, the colour and the photos follow in
+  // Personalize there — content/app/personalize.js — which the read-back leads into)
   const PHONE_STEPS = ['courses', 'grades'];
   const settleSteps = () => { STEPS = BCV.phone?.active() ? ALL.filter((s) => PHONE_STEPS.includes(s.key)) : ALL; };
   const COPY = {
     courses: ['Which classes are you in?', 'Only select the courses that count towards your GPA.'],
     grades: ['Grades', `${BCV.lms.name} keeps no history. Simpl Courses can, on this device.`],
     dashboard: ['What you see first', 'Pick the shape of your dashboard.'],
-    sidebar: ['Where your courses live', 'Either way it is the same list.'],
-    done: ['You’re set', 'Next, the look: light or dark, a colour of your own, and photos.'],
+    done: ['You’re set', 'Next, the look: light or dark, a colour of your own, photos, and your sidebar.'],
+    donePhone: ['You’re set', 'Next, the look: light or dark, a colour of your own, and photos.'],
   };
 
 
@@ -96,7 +98,6 @@
       scanning: false, scanError: null, courses: [], favs: new Set(), nicks: {},
       tracking: true, goal: 4, targets: {}, letters: {},
       dashView: 'list', // the list to start with, whatever Canvas has: the pick here is the student's
-      sideCourses: settings.appearance?.sideCourses === 'always' ? 'always' : 'hover', // the panel off the Courses row is the default
       sidebar: settings.appearance?.sidebar || 'one', // (2.99.39) one sidebar, unless two was chosen before
       closing: false,
     };
@@ -163,7 +164,6 @@
       case 'courses': return picked ? `${picked} ${picked === 1 ? 'course' : 'courses'}` : 'None yet';
       case 'grades': { const pf = st.courses.filter((c) => st.favs.has(c.id) && st.targets[c.id] === PASS_FAIL).length; return `${st.tracking ? `Tracking · goal ${gpa2(st.goal)}` : 'Not tracking'}${pf ? ` · ${pf} pass/fail` : ''}`; }
       case 'dashboard': return VIEWS.find(([k]) => k === st.dashView)[1];
-      case 'sidebar': return st.sideCourses === 'always' ? 'Always listed' : 'On hover';
       default: return '';
     }
   }
@@ -448,30 +448,6 @@
     footer({ onNext: () => go(st.step + 1) });
   }
 
-  // ---- 4 · where the courses live --------------------------------------------------------------------
-  function sidebar() {
-    const { body } = ui;
-    const [a, b, c, d] = swatches();
-    const faint = () => h('span', { class: 'mini__bar mini__bar--faint' });
-    const minis = {
-      always: () => [h('span', { class: 'mini mini--side' }, [
-        h('span', { class: 'mini__nav' }, [faint(), faint(), faint(), h('span', { class: 'mini__hair' }), ...[a, b, c, d].map((col) => h('span', { class: 'mini__row mini__row--tight' }, [dot(col, 4), bar(col, { hgt: 4 })]))]),
-        h('span', { class: 'mini__stage' }),
-      ])],
-      hover: () => [h('span', { class: 'mini mini--side' }, [
-        h('span', { class: 'mini__nav' }, [faint(), h('span', { class: 'mini__bar mini__bar--accent' }), faint()]),
-        h('span', { class: 'mini__stage' }),
-        h('span', { class: 'mini__flyout' }, [a, b, c].map((col) => h('span', { class: 'mini__row mini__row--tight' }, [dot(col, 4), bar(col, { hgt: 4 })]))),
-      ])],
-    };
-    const OPTIONS = [['always', 'Always listed', 'Under the navigation, one press away.'], ['hover', 'On hover', 'They open beside the Courses row instead.']];
-    const grid = h('div', { class: 'tiles tiles--2' });
-    const draw = () => grid.replaceChildren(...OPTIONS.map(([value, title, why]) => tile({ dataset: { value }, on: st.sideCourses === value, title, why, mini: minis[value](), pick: () => { st.sideCourses = value; draw(); paintChrome(); } })));
-    draw();
-    body.append(...heading('sidebar'), grid);
-    footer({ onNext: () => go(st.step + 1) });
-  }
-
   // ---- ready: the read-back, then Open Canvas writes it all --------------------------------------------
   function done() {
     const { body } = ui;
@@ -480,10 +456,9 @@
       ['Courses shown', `${picked} of ${st.courses.length}`],
       ['Grade history', st.tracking ? `On · goal ${gpa2(st.goal)}` : 'Off'],
       ...(STEPS.some((s) => s.key === 'dashboard') ? [['Dashboard', answer('dashboard')]] : []),
-      ...(STEPS.some((s) => s.key === 'sidebar') ? [['Sidebar', answer('sidebar')]] : []),
     ];
     body.append(
-      ...heading('done'),
+      ...heading(BCV.phone?.active() ? 'donePhone' : 'done'),
       h('div', { class: 'summary' }, rows.map(([k, v]) => h('div', { class: 'summary__row' }, [h('span', { class: 'summary__k', text: k }), h('span', { class: 'summary__v', text: v })]))),
     );
     footer({ next: 'Continue to appearance', back: true, onNext: () => finish() });
@@ -533,7 +508,7 @@
         store.setPref('gpaGoal', st.goal),
         store.setPref('gpaTracking', st.tracking ? { priorGpa: null, priorCourses: 0, since: new Date().toISOString().slice(0, 10) } : null),
         store.setPref('gradeTargets', targets),
-        S.update({ appearance: { sideCourses: st.sideCourses, sidebar: st.sidebar } }).catch(() => {}), // (2.99.39: a new install has one sidebar, never the chooser)
+        S.update({ appearance: { sidebar: st.sidebar } }).catch(() => {}), // (2.99.39: a new install has one sidebar, never the chooser; 2.99.74: Appearance's Next asks one or two. Where the courses sit is no longer asked: listed, as the settings have it)
         STEPS.some((s) => s.key === 'dashboard') ? store.setDashboardView(st.dashView).catch(() => {}) : Promise.resolve(),
       ]);
       const changes = st.courses.filter((c) => c.favorite !== st.favs.has(c.id));
@@ -548,8 +523,14 @@
       console.error('[Simpl Courses setup]', e);
     }
     if (BCV.welcome) await BCV.welcome.arm().catch(() => {}); // armed: the reloaded page runs the guided tour
-    // then the look, the colour and the photos: Personalize, in this same overlay, whose Open Canvas
-    // loads the page afresh (the look last of all there — a change of it reloads on its own)
+    // (2.99.74) then the look, the colour, the photos and the sidebar: Appearance, over the real Dashboard of the page
+    // loaded afresh (app.js: owed until its Done, so a reload — a new look is one — comes back into it); the card stays
+    // up until the new page arrives. A phone keeps Personalize, in this same overlay, whose Open Canvas loads the page.
+    if (!BCV.phone?.active() && BCV.appearance) {
+      await BCV.appearance.arm().catch(() => {});
+      reloadClean();
+      return;
+    }
     st.closing = false;
     await personalize({ standalone: false });
   }

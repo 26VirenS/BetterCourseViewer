@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.74', date: '2026-10-21', notes: [
+      { kind: 'improved', title: 'Appearance in Setup', body: 'Setup ends over your Dashboard, then picks your sidebar.', icon: P.check },
+      { kind: 'new', title: 'Sidebar in Appearance', body: 'Choose one sidebar or two, with a live preview.', icon: P.check },
+    ] },
     { version: '2.99.73', date: '2026-10-21', notes: [
       { kind: 'fixed', title: 'Tools in Popups Fixed', body: 'Tools sit by a popup\'s buttons, never over what it shows.', icon: P.check },
     ] },

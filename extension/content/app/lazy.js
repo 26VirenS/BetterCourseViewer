@@ -74,7 +74,9 @@
   // ---- the stubs: the same names, loading on the first call --------------------------------------
   const stub = (obj) => Object.assign(obj, { __stub: true });
   if (!BCV.setup) BCV.setup = stub({ active: () => false, open: async (...a) => { await load('setup'); return BCV.setup.open(...a); } });
-  if (!BCV.appearance) BCV.appearance = stub({ active: () => false, close: () => {}, open: async (...a) => { await load('appearance'); return BCV.appearance.open(...a); }, resume: async (...a) => { await load('appearance'); return BCV.appearance.resume(...a); } });
+  if (!BCV.appearance) BCV.appearance = stub({ active: () => false, close: () => {}, open: async (...a) => { await load('appearance'); return BCV.appearance.open(...a); }, resume: async (...a) => { await load('appearance'); return BCV.appearance.resume(...a); },
+    // (2.99.74) the guided setup's run of it: armed and asked for without loading it (the key appearance.js reads)
+    arm: () => BCV.api.storage.local.set({ 'appearance:setup': true }), due: async () => { try { return (await BCV.api.storage.local.get('appearance:setup'))['appearance:setup'] === true; } catch { return false; } } });
   if (!BCV.personalize) BCV.personalize = stub({ open: async (...a) => { await load('setup'); return BCV.personalize.open(...a); }, close: () => {} });
   for (const [key, name] of [['quiz', 'quiz'], ['submit', 'submit'], ['feedback', 'submit']]) {
     if (!BCV.screens[key]) BCV.screens[key] = stub({ render: async (...a) => { await load(name); return BCV.screens[key].render(...a); } });

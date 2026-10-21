@@ -2528,7 +2528,10 @@
     if ((welcome === 'look' || welcome === 'report') && html.classList.contains('bcv-phone')) welcome = false; // (a phone's header has neither the switch nor the purple button)
     if (welcome === 'appearance' && html.classList.contains('bcv-phone')) { BCV.welcome.clear('appearance').catch(() => {}); welcome = false; } // (no sidebar, no Appearance button to point at)
     if (welcome === 'search' && (html.classList.contains('bcv-phone') || parseRoute().screen !== 'dashboard')) welcome = false; // (the search box is the Dashboard's, and a phone has none: it waits for the Dashboard)
-    if (welcome) BCV.welcome.cover();
+    // (2.99.74) the guided setup's Appearance comes first, over the Dashboard: the look, a theme, the courses' colours,
+    // then the sidebar; its Done brings the tour. Owed until then, so a reload (a new look is one) comes back into it.
+    const firstLook = state.lookOn && !nativeShell && !html.classList.contains('bcv-phone') && !inQuiz() && !!BCV.appearance && await BCV.appearance.due();
+    if (welcome && !firstLook) BCV.welcome.cover();
     // (2.99.33) what the first screen opens with, as it was last read, into the memo — read alongside the photos below,
     // so the screen is drawn at once and put right in place when Canvas answers (store.restoreKept)
     const keptP = state.lookOn ? store.restoreKept?.().catch(() => 0) : null;
@@ -2542,11 +2545,13 @@
     // (an update's own run: the switch's steps, the purple button and the Tools row — everyone sees those once;
     // an update from before the purple button: its step alone, once; after
     // Personalize from the theme invitation: the Appearance button alone, where the themes live now)
-    if (welcome) BCV.welcome.open(BCV.app, welcome === 'look' ? ['look', 'report', 'tools'] : welcome === 'report' ? ['report'] : welcome === 'appearance' ? ['appearance'] : welcome === 'search' ? ['search'] : null).catch(() => {});
+    const tour = () => BCV.welcome.open(BCV.app, welcome === 'look' ? ['look', 'report', 'tools'] : welcome === 'report' ? ['report'] : welcome === 'appearance' ? ['appearance'] : welcome === 'search' ? ['search'] : null).catch(() => {});
+    if (firstLook) await BCV.appearance.open(BCV.app, { setup: true, onDone: () => { if (welcome) tour(); } });
+    else if (welcome) tour();
     // The first Canvas page after an update shows what changed: once per version, never over the
     // setup, the welcome or a quiz attempt, and never on a fresh install (the setup marks its version seen).
     // (a release can put an invitation in the notes' place — whatsnew.js — which opens the same way)
-    const busy = () => BCV.setup?.active() || BCV.welcome?.active();
+    const busy = () => BCV.setup?.active() || BCV.welcome?.active() || BCV.appearance?.active?.();
     // (2.99.39) the sidebar chooser comes first, once; What's New waits for the next page then
     const chose = state.lookOn && !nativeShell && !html.classList.contains('bcv-native-shell') && !busy() && await sidebarChoiceDue();
     if (chose) await sidebarChoice();
