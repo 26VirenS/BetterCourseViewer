@@ -6418,7 +6418,7 @@ try {
   const toolNav = await texts('.bcv-nav > .bcv-nav__item');
   check(toolNav[toolNav.length - 1].startsWith('Tools') && (await page.$eval('.bcv-nav__item[data-nav="tools"]', (e) => e.classList.contains('is-active'))) && (await texts('.bcv-h1'))[0] === 'Tools' && (await texts('.bcv-head__sub'))[0] === 'Pin a tool to keep it beside the switch on every page.', 'Tools is the last row of the sidebar, lit, and the page is titled');
   const cardNames = await texts('.bcv-tool-card__name');
-  check(cardNames.join(' | ') === 'Flashcards | Focus timer | Citation generator | Grade needed | Word Counter | Calculator | Graphing calculator | Unit converter | File converter | Merge & split PDFs | PDF annotator | Image to text | Periodic table' && (await page.$$('.bcv-tool-card__open')).length === 13 && (await texts('.bcv-tools-sec__h')).join(' | ') === 'Study | Math & science | Files | Chemistry | Your widgets', `(2.99.79) thirteen cards in the Mac's sections, each with Open: ${cardNames.join(' | ')}`);
+  check(cardNames.join(' | ') === 'Flashcards | Focus timer | Citation generator | Grade needed | Word Counter | Calculator | Graphing calculator | Unit converter | Statistics | Matrix Calculator | File converter | Merge & split PDFs | PDF annotator | Image to text | Periodic table' && (await page.$$('.bcv-tool-card__open')).length === 15 && (await texts('.bcv-tools-sec__h')).join(' | ') === 'Study | Math & science | Files | Chemistry | Your widgets', `(2.99.81) fifteen cards in the Mac's sections, each with Open: ${cardNames.join(' | ')}`);
   await shot(page, '36c-tools');
   } // tools
   if (on('widgets')) {
@@ -6446,7 +6446,7 @@ try {
 </script>`;
   const widgetsKept = () => sw.evaluate(async () => (await self.BCV.api.storage.local.get('widgets:custom'))['widgets:custom'] || []);
   const widgetData = (id) => sw.evaluate(async (k) => (await self.BCV.api.storage.local.get(k))[k], `widgets:data:${id}`);
-  check((await page.$$('.bcv-tool-card')).length === 13 && (await texts('.bcv-tool-add__name'))[0] === 'Add a widget' && (await page.$eval('.bcv-tools-sec[data-group="widgets"] .bcv-tools', (g) => g.lastElementChild.classList.contains('bcv-tool-add'))), 'after the thirteen tools, in Your widgets, a dashed card: Add a widget');
+  check((await page.$$('.bcv-tool-card')).length === 15 && (await texts('.bcv-tool-add__name'))[0] === 'Add a widget' && (await page.$eval('.bcv-tools-sec[data-group="widgets"] .bcv-tools', (g) => g.lastElementChild.classList.contains('bcv-tool-add'))), 'after the fifteen tools, in Your widgets, a dashed card: Add a widget');
   await page.click('.bcv-tool-add');
   await page.waitForSelector('.bcv-tool[data-tool="widgets"]', { timeout: 8000 });
   check((await texts('.bcv-tool__title'))[0] === 'Add a widget' && (await texts('.bcv-tool--wimp .bcv-seg__btn')).join(' | ') === 'Paste | A file | An address | Starters', 'it opens the importer: Paste, A file, An address, Starters');
@@ -6473,7 +6473,7 @@ try {
   check((await widgetsKept()).length === 0 && (await page.evaluate(() => Math.round(document.querySelector('.bcv-wimp__preview .bcv-widget__frame').getBoundingClientRect().height))) === 220, 'the preview runs the widget (resize took) but keeps nothing of it yet');
   await shot(page, '36d-widget-import');
   await page.click('.bcv-wimp__foot .bcv-btn--primary');
-  await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov') && document.querySelectorAll('.bcv-tool-card').length === 14, null, { timeout: 8000 });
+  await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov') && document.querySelectorAll('.bcv-tool-card').length === 16, null, { timeout: 8000 });
   const wKept = await widgetsKept();
   check(wKept.length === 1 && wKept[0].name === 'Probe' && wKept[0].size === 'S' && wKept[0].icon === 'shield' && wKept[0].color === '#ff375f' && /^w/.test(wKept[0].id) && wKept[0].html === probeWidget && (await texts('.bcv-tool-card__name')).slice(-1)[0] === 'Probe', `Add to Tools keeps it — name, icon, size, colour, its whole file — and its card joins the grid after the built-in tools: ${JSON.stringify({ name: wKept[0].name, size: wKept[0].size, icon: wKept[0].icon })}`);
   const wKey = `w:${wKept[0].id}`;
@@ -6497,7 +6497,7 @@ try {
   await page.reload();
   await page.waitForSelector('.bcv-tool-add', { timeout: 15000 });
   await page.waitForSelector(`#bcv-pins .bcv-pin[data-tool="${wKey}"]`, { timeout: 10000 });
-  check((await page.$$('.bcv-tool-card')).length === 14 && (await page.$eval(`.bcv-tool-card[data-tool="${wKey}"]`, (e) => e.classList.contains('is-pinned'))), 'pinned beside the switch, and still there after a reload, its card marked');
+  check((await page.$$('.bcv-tool-card')).length === 16 && (await page.$eval(`.bcv-tool-card[data-tool="${wKey}"]`, (e) => e.classList.contains('is-pinned'))), 'pinned beside the switch, and still there after a reload, its card marked');
   await page.click(`#bcv-pins .bcv-pin[data-tool="${wKey}"] .bcv-pin__btn`);
   await page.waitForSelector(`.bcv-tool[data-tool="${wKey}"] .bcv-widget__frame`, { timeout: 8000 });
   check(true, 'the pin opens it');
@@ -6520,7 +6520,7 @@ try {
   await page.waitForSelector('.bcv-wimp__preview', { timeout: 10000 });
   check((await texts('.bcv-wimp__preview .bcv-tool-card__name'))[0] === 'Fetched widget', 'an address: the file is fetched through the background and checked');
   await page.click('.bcv-wimp__foot .bcv-btn--primary');
-  await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov') && document.querySelectorAll('.bcv-tool-card').length === 15, null, { timeout: 8000 });
+  await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov') && document.querySelectorAll('.bcv-tool-card').length === 17, null, { timeout: 8000 });
   await page.click('.bcv-tool-add');
   await page.waitForSelector('.bcv-tool--wimp', { timeout: 8000 });
   await page.click('.bcv-tool--wimp .bcv-seg__btn[data-value="starters"]');
@@ -6534,7 +6534,7 @@ try {
   check((await stFrame.inputValue('#b')) === '0.003' && (await stFrame.$$eval('#kinds button', (bs) => bs.map((b) => b.textContent))).join(' ') === 'Length Mass Volume Speed Temperature', 'the starter works in its frame: 3 m is 0.003 km');
   await shot(page, '36f-widget-starter');
   await page.click('.bcv-wimp__foot .bcv-btn--primary');
-  await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov') && document.querySelectorAll('.bcv-tool-card').length === 16, null, { timeout: 8000 });
+  await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov') && document.querySelectorAll('.bcv-tool-card').length === 18, null, { timeout: 8000 });
   check((await widgetsKept()).map((w) => w.name).join(' | ') === 'Probe | Fetched widget | Unit converter', 'three widgets kept');
   // remove: from the popup (asked first), its card, pin and store go
   await page.click(`.bcv-tool-card[data-tool="${wKey}"]`);
@@ -6543,12 +6543,12 @@ try {
   await page.waitForSelector('.bcv-sheet--ask .bcv-ask__ok', { timeout: 5000 });
   check((await texts('.bcv-sheet--ask .bcv-sheet__title'))[0] === 'Remove Probe?', 'the bin asks first');
   await page.click('.bcv-sheet--ask .bcv-ask__ok');
-  await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov') && document.querySelectorAll('.bcv-tool-card').length === 15, null, { timeout: 8000 });
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov') && document.querySelectorAll('.bcv-tool-card').length === 17, null, { timeout: 8000 });
   // (the Tools page draws its thirteen cards as soon as the list is kept; the widget's own store, its pin and the pin's
   //  record go a moment after — widgets.js remove() — so they are waited for, not caught half way)
   check(await eventually(async () => (await widgetsKept()).length === 2 && (await widgetData(wKept[0].id)) === undefined && !(await page.$(`#bcv-pins .bcv-pin[data-tool="${wKey}"]`)) && JSON.stringify(await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:pins'))['tools:pins'])) === '[]'), 'removed: the card, the pin and its store all go');
   await sw.evaluate(async (base) => { const [tab] = await chrome.tabs.query({ url: `${base}/*` }); await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: async () => { for (const w of await self.BCV.widgets.all()) await self.BCV.widgets.remove(w.id); self.BCV.app.render(); } }); }, BASE);
-  await page.waitForFunction(() => document.querySelectorAll('.bcv-tool-card').length === 13, null, { timeout: 8000 });
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-tool-card').length === 15, null, { timeout: 8000 });
   check((await widgetsKept()).length === 0, 'the others removed too: the eleven built-in tools again');
   // every tool opens clean: nothing empty spelled out as a word in it
   for (const key of ['cite', 'pomo', 'calc', 'graph', 'ptable', 'need', 'conv', 'pdfx', 'mark', 'ocr', 'fc']) {
@@ -7065,10 +7065,41 @@ try {
   check(wordsSeen.stats.Words === '16' && wordsSeen.stats.Sentences === '3' && wordsSeen.stats.Paragraphs === '2' && wordsSeen.stats['Longest word'] === 'well-read' && wordsSeen.top[0] === 'cells2' && wordsSeen.target === '4 to go', `the words counted as the Mac counts them: ${JSON.stringify(wordsSeen)}`);
   await shot(page, '40g-tools-words');
   await closeTool();
+  // (2.99.81) Statistics, the Mac's: a data set described, as the Mac describes it
+  await openTool('stats');
+  await page.fill('.bcv-stats-t__area[data-field="data"]', '2 4 4 4 5 5 7 9');
+  const statsSeen = await page.evaluate(() => ({ big: [...document.querySelectorAll('.bcv-stats-t__bigone')].map((e) => `${e.dataset.k}=${e.querySelector('.bcv-stats-t__bigv').textContent}`), rows: Object.fromEntries([...document.querySelectorAll('.bcv-stats-t__row')].map((r) => [r.dataset.k, r.querySelector('.bcv-stats-t__v').textContent])), charts: document.querySelectorAll('.bcv-stats-t__chart').length }));
+  check(statsSeen.big.join(' ') === 'Mean=5 Median=4.5 Sample SD=2.13809' && statsSeen.rows.Mode === '4' && statsSeen.rows.Q1 === '4' && statsSeen.rows.Q3 === '6' && statsSeen.charts === 2, `Statistics describes the data as the Mac does: ${JSON.stringify(statsSeen)}`);
+  await page.click('.bcv-stats-t__tabs .bcv-seg__btn:nth-child(3)');
+  await page.waitForSelector('.bcv-stats-t__field input[data-field="mean"]', { timeout: 3000 });
+  await page.fill('.bcv-stats-t__field input[data-field="mean"]', '0');
+  await page.fill('.bcv-stats-t__field input[data-field="sd"]', '1');
+  await page.fill('.bcv-stats-t__field input[data-field="a"]', '-1.96');
+  await page.fill('.bcv-stats-t__field input[data-field="b"]', '1.96');
+  await page.fill('.bcv-stats-t__field input[data-field="p"]', '0.975');
+  const distRows = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('.bcv-stats-t__row')].map((r) => [r.dataset.k, r.querySelector('.bcv-stats-t__v').textContent])));
+  check(distRows['P(−1.96 < X < 1.96)'] === '0.9500' && distRows['x with P(X < x) = 0.975'] === '1.95996', `the normal curve: 95% between ±1.96, and back again: ${JSON.stringify(distRows)}`);
+  await shot(page, '40h-tools-stats');
+  await closeTool();
+  // (2.99.81) the Matrix Calculator, the Mac's: exact fractions, the inverse and the eigenvalues
+  await openTool('matrix');
+  await page.click('.bcv-matrix__op[data-op="inverse"]');
+  const inv = await page.evaluate(() => [...document.querySelectorAll('.bcv-matrix__out .bcv-matrix__outcell')].map((e) => e.textContent).join(' '));
+  check(inv === '3/5 −1/5 −1/5 2/5', `A⁻¹ of [2 1; 1 3] in exact fractions: ${inv}`);
+  await page.click('.bcv-matrix__op[data-op="det"]');
+  check((await texts('.bcv-matrix__scalar'))[0] === '5', 'det A is 5');
+  await page.fill('input[data-m="a"][data-r="0"][data-c="0"]', '0');
+  await page.fill('input[data-m="a"][data-r="0"][data-c="1"]', '-1');
+  await page.fill('input[data-m="a"][data-r="1"][data-c="0"]', '1');
+  await page.fill('input[data-m="a"][data-r="1"][data-c="1"]', '0');
+  await page.click('.bcv-matrix__op[data-op="eigen"]');
+  check((await texts('.bcv-matrix__x')).join(' ') === 'λ₁ = ±i', `a rotation's eigenvalues are ±i: ${(await texts('.bcv-matrix__x')).join(' ')}`);
+  await shot(page, '40i-tools-matrix');
+  await closeTool();
   // (2.99.79) the Tools page in the Mac's sections, and a pin at each card's top right: a press pins the tool beside the
   // switch, on every page — no drag
   const toolsPage = await page.evaluate(() => ({ secs: [...document.querySelectorAll('.bcv-tools-sec')].map((x) => `${x.querySelector('.bcv-tools-sec__h').textContent}:${[...x.querySelectorAll('.bcv-tool-card')].map((c) => c.dataset.tool).join(',')}`), pins: document.querySelectorAll('.bcv-tool-card .bcv-tool-card__pin').length, cards: document.querySelectorAll('.bcv-tool-card').length, corner: (() => { const c = document.querySelector('.bcv-tool-card[data-tool="pomo"]').getBoundingClientRect(), b = document.querySelector('.bcv-tool-card[data-tool="pomo"] .bcv-tool-card__pin').getBoundingClientRect(); return c.right - b.right < 20 && b.top - c.top < 20; })() }));
-  check(toolsPage.secs.slice(0, 4).join(' | ') === 'Study:fc,pomo,cite,need,words | Math & science:calc,graph,units | Files:conv,pdfx,mark,ocr | Chemistry:ptable' && toolsPage.pins === toolsPage.cards && toolsPage.corner, `the tools in the Mac's sections, a pin at every card's top right: ${JSON.stringify(toolsPage)}`);
+  check(toolsPage.secs.slice(0, 4).join(' | ') === 'Study:fc,pomo,cite,need,words | Math & science:calc,graph,units,stats,matrix | Files:conv,pdfx,mark,ocr | Chemistry:ptable' && toolsPage.pins === toolsPage.cards && toolsPage.corner, `the tools in the Mac's sections, a pin at every card's top right: ${JSON.stringify(toolsPage)}`);
   await page.click('.bcv-tool-card[data-tool="pomo"] .bcv-tool-card__pin');
   await shot(page, '41-tools-pin');
   await page.waitForSelector('#bcv-pins .bcv-pin[data-tool="pomo"]', { timeout: 5000 });
@@ -7197,7 +7228,7 @@ try {
   await page.waitForFunction(() => !document.querySelector('#bcv-pins .bcv-pin'), null, { timeout: 3000 });
   check((await page.$eval('#bcv-pins', (e) => e.hidden)) && (await inPage('focusActive')) === false, 'End takes the borrowed pin away');
   await page.goto(`${BASE}/#tools`);
-  check((await page.$('#bcv-tour')) === null && (await page.$$('.bcv-tool-card')).length === 13 && !(await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => e.classList.contains('is-pinned'))), 'the second time, Tools opens without the tour, and the card is no longer marked');
+  check((await page.$('#bcv-tour')) === null && (await page.$$('.bcv-tool-card')).length === 15 && !(await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => e.classList.contains('is-pinned'))), 'the second time, Tools opens without the tour, and the card is no longer marked');
   } // converters and cards
   if (on('grade needed')) {
 

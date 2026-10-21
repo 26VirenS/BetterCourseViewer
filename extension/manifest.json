@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Simpl Courses",
-  "version": "2.99.80",
+  "version": "2.99.81",
   "description": "Canvas with navigation that actually makes sense and a UI that you can actually use.",
   "author": "Simpl Courses contributors",
   "icons": {
@@ -154,6 +154,8 @@
         "content/app/tools/ptable.js",
         "content/app/tools/units.js",
         "content/app/tools/words.js",
+        "content/app/tools/stats.js",
+        "content/app/tools/matrix.js",
         "setup/setup-css.js",
         "content/app/personalize.js",
         "content/app/setup.js",

@@ -894,7 +894,7 @@ try {
   await page.waitForSelector('.bcv-tool-card', { timeout: 20000 });
   await page.waitForTimeout(600);
   check(page.url() === `${BASE}/#tools` && !(await page.$('#bcv-tour')), 'Tools opens without a tour of its own');
-  check((await page.$$('.bcv-tool-card')).length === 13 && (await texts('.bcv-topbar__title'))[0] === 'Tools' && await noOverflow() && (await page.$eval('#bcv-pins', (e) => getComputedStyle(e).display).catch(() => 'none')) === 'none', 'the cards in one column, no pins (a phone has no switch to pin beside)');
+  check((await page.$$('.bcv-tool-card')).length === 15 && (await texts('.bcv-topbar__title'))[0] === 'Tools' && await noOverflow() && (await page.$eval('#bcv-pins', (e) => getComputedStyle(e).display).catch(() => 'none')) === 'none', 'the cards in one column, no pins (a phone has no switch to pin beside)');
   await shot('13b-tools');
   await page.click('.bcv-tool-card[data-tool="fc"]');
   await page.waitForSelector('.bcv-tool[data-tool="fc"]', { timeout: 5000 });

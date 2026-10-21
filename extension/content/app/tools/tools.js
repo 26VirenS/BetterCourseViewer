@@ -49,10 +49,12 @@
     { key: 'ocr', group: 'files', name: 'Image to text', note: 'Read the words off a picture or a scan.', icon: IC.scan, color: '#00b3a4', open: (app, o) => BCV.toolsOcr.open(app, o) },
     { key: 'fc', group: 'study', name: 'Flashcards', note: 'Make a set. Flip, learn, test, match.', icon: IC.cards, color: '#0a84ff', open: (app, o) => BCV.toolsCards.open(app, o) },
     { key: 'words', group: 'study', name: 'Word Counter', note: 'Words, characters, reading time.', icon: IC.words, color: '#8e8e93', open: (app, o) => BCV.toolsWords.open(app, o) },
+    { key: 'stats', group: 'science', name: 'Statistics', note: 'Mean, SD, regression, z and t.', icon: IC.chart, color: '#ff2d55', open: (app, o) => BCV.toolsStats.open(app, o) },
+    { key: 'matrix', group: 'science', name: 'Matrix Calculator', note: 'Determinant, inverse, solve, RREF.', icon: IC.grid, color: '#5e5ce6', open: (app, o) => BCV.toolsMatrix.open(app, o) },
     { key: 'units', group: 'science', name: 'Unit converter', note: 'Lengths, weights, temperatures and more.', icon: IC.ruler, color: '#64d2ff', open: (app, o) => BCV.toolsUnits.open(app, o) },
   ];
   /** The tools of a section, in the Mac's order within it. */
-  const ORDER = { study: ['fc', 'pomo', 'cite', 'need', 'words'], science: ['calc', 'graph', 'units'], files: ['conv', 'pdfx', 'mark', 'ocr'], chemistry: ['ptable'] };
+  const ORDER = { study: ['fc', 'pomo', 'cite', 'need', 'words'], science: ['calc', 'graph', 'units', 'stats', 'matrix'], files: ['conv', 'pdfx', 'mark', 'ocr'], chemistry: ['ptable'] };
   const toolsIn = (group) => (ORDER[group] || []).map((k) => TOOLS.find((t) => t.key === k)).filter(Boolean);
   const toolOf = (key) => TOOLS.find((t) => t.key === key) || null;
   const tintOf = (color, dark) => `color-mix(in srgb, ${color} ${dark ? 26 : 15}%, transparent)`;

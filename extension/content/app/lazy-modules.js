@@ -26,6 +26,8 @@ self.BCV_LAZY_MODULES = {
   'tool:ptable': { files: ['content/app/tools/ptable-data.js', 'content/app/tools/ptable.js'] },
   'tool:units': { files: ['content/app/tools/units.js'] },
   'tool:words': { files: ['content/app/tools/words.js'] },
+  'tool:stats': { files: ['content/app/tools/stats.js'] },
+  'tool:matrix': { needs: ['tool:stats'], files: ['content/app/tools/matrix.js'] }, // (its numbers written as Statistics writes them)
   setupcss: { files: ['setup/setup-css.js'] }, // the setup's stylesheet: the setup, Personalize and What's New draw with it
   setup: { needs: ['setupcss'], files: ['content/app/personalize.js', 'content/app/setup.js'] },
   notes: { needs: ['setupcss'], files: ['content/app/whatsnew-notes.js'] },

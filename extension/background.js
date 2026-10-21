@@ -296,6 +296,7 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
     'content/app/tools/cite.js', 'content/app/tools/cards.js', 'content/app/tools/convert.js',
     'content/app/tools/need.js', 'content/app/tools/pdfs.js', 'content/app/tools/mark.js',
     'content/app/tools/ocr.js', 'content/app/tools/units.js', 'content/app/tools/words.js',
+    'content/app/tools/stats.js', 'content/app/tools/matrix.js',
   ];
   async function toolWidgets(sender) {
     const id = sender?.tab?.id;
