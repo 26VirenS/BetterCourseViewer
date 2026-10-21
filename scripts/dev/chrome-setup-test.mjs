@@ -110,7 +110,7 @@ try {
   await setup.waitForSelector('.splash__stage[data-stage="go"]', { timeout: 8000 });
   await setup.waitForFunction(() => document.querySelectorAll('.splash__stage').length === 1, null, { timeout: 5000 });
   const words = await setup.evaluate(() => ({ title: document.querySelector('.splash__title')?.textContent, hint: document.querySelector('.splash__hint')?.textContent, presses: document.querySelectorAll('button, a').length, note: !!document.querySelector('.splash__note') }));
-  check(words.title === 'Open your Canvas' && words.hint === 'Setup will begin there.' && words.presses === 0 && !words.note, `it says the one thing to do, with nothing to press: ${JSON.stringify(words)}`);
+  check(words.title === 'Open your courses page' && words.hint === 'Setup will begin there.' && words.presses === 0 && !words.note, `it says the one thing to do, with nothing to press: ${JSON.stringify(words)}`);
   await setup.screenshot({ path: join(root, 'scripts', 'dev', 'out', 'chrome-setup-page.png') });
 
   console.log('a page that is not Canvas');

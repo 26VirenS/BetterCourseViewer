@@ -1,5 +1,5 @@
 /* The page after install (Safari and Chrome): black, the way the welcome on the page is — a splash,
- * then the one thing to do: Open your Canvas. Setup will begin there. Nothing to press: the setup
+ * then the one thing to do: Open your courses page. Setup will begin there. Nothing to press: the setup
  * runs over the Canvas page on its own (content/app/setup.js opens over the first signed-in Canvas
  * page until it is done), and this page closes itself the moment it has begun. The school's own
  * Canvas address is found by itself (content/sniff.js) on any site the extension may look at:
@@ -51,13 +51,13 @@
         asked.then((ok) => {
           if (!ok) { aSiteAtATime(); return; }
           find.hidden = true;
-          note.replaceChildren('Done. Open your Canvas, at whatever address your school uses, and setup begins there.');
+          note.replaceChildren('Done. Open your Canvas courses page, at whatever address your school uses, and setup begins there.');
         }, aSiteAtATime);
       });
     }
     return h('div', { class: `splash__stage splash__stage--go${safari ? ' is-safari' : ''}`, dataset: { stage: 'go' } }, [
       h('div', { class: 'splash__text' }, [
-        h('h1', { class: 'splash__title', text: 'Open your Canvas' }),
+        h('h1', { class: 'splash__title', text: 'Open your courses page' }),
         h('p', { class: 'splash__hint', text: 'Setup will begin there.' }),
         find,
         note,

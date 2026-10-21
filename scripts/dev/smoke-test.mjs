@@ -6327,7 +6327,7 @@ try {
   await setup.waitForSelector('.splash__stage[data-stage="go"]', { timeout: 6000 });
   await setup.waitForFunction(() => document.querySelectorAll('.splash__stage').length === 1, null, { timeout: 5000 });
   const goSeen = await setup.evaluate(() => ({ title: document.querySelector('.splash__title')?.textContent, hint: document.querySelector('.splash__hint')?.textContent, buttons: document.querySelectorAll('button, a').length, note: !!document.querySelector('.splash__note'), arrow: !!document.querySelector('.splash__arrow'), kicker: !!document.querySelector('.splash__kicker') }));
-  check(goSeen.title === 'Open your Canvas' && goSeen.hint === 'Setup will begin there.' && goSeen.buttons === 0 && !goSeen.note && !goSeen.arrow && !goSeen.kicker, `the splash gives way to the one thing to do — Open your Canvas, and under it that setup will begin there — and nothing to press: no button, no arrow, no aside (Safari's line about allowing the site is Safari's alone) (${JSON.stringify(goSeen)})`);
+  check(goSeen.title === 'Open your courses page' && goSeen.hint === 'Setup will begin there.' && goSeen.buttons === 0 && !goSeen.note && !goSeen.arrow && !goSeen.kicker, `the splash gives way to the one thing to do — Open your Canvas, and under it that setup will begin there — and nothing to press: no button, no arrow, no aside (Safari's line about allowing the site is Safari's alone) (${JSON.stringify(goSeen)})`);
   await setup.screenshot({ path: join(out, '32c-setup-go.png') });
   check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:offered'))['setup:offered'])) === true, 'and the page marks itself offered, so it does not open again');
   // the setup beginning on a Canvas tab (the card's note in storage) is the end of the page: it closes itself
@@ -6348,12 +6348,12 @@ try {
   await sfSetup.waitForSelector('.splash__stage[data-stage="go"]', { timeout: 8000 });
   await sfSetup.waitForFunction(() => document.querySelectorAll('.splash__stage').length === 1, null, { timeout: 5000 });
   const sfSeen = await sfSetup.evaluate(() => ({ title: document.querySelector('.splash__title')?.textContent, button: document.querySelector('.splash__btn')?.textContent, note: document.querySelector('.splash__note')?.textContent }));
-  check(sfSeen.title === 'Open your Canvas' && sfSeen.button === 'Let Simpl Courses find it' && /Safari asks once whether Simpl Courses may see every website/.test(sfSeen.note || ''), `Safari's page has the one press that asks for every website, and says why (${JSON.stringify(sfSeen)})`);
+  check(sfSeen.title === 'Open your courses page' && sfSeen.button === 'Let Simpl Courses find it' && /Safari asks once whether Simpl Courses may see every website/.test(sfSeen.note || ''), `Safari's page has the one press that asks for every website, and says why (${JSON.stringify(sfSeen)})`);
   await sfSetup.screenshot({ path: join(out, '32d-setup-safari.png') });
   await sfSetup.click('.splash__btn');
   await sfSetup.waitForTimeout(250);
   const sfAfter = await sfSetup.evaluate(() => ({ asked: window.__asked, hidden: document.querySelector('.splash__btn')?.hidden, note: document.querySelector('.splash__note')?.textContent }));
-  check(sfAfter.asked.length === 1 && (sfAfter.asked[0].origins || []).join() === '*://*/*' && sfAfter.hidden === true && /^Done\. Open your Canvas/.test(sfAfter.note || ''), `the press asks for every website and, allowed, the page says setup begins on the Canvas at any address (${JSON.stringify(sfAfter)})`);
+  check(sfAfter.asked.length === 1 && (sfAfter.asked[0].origins || []).join() === '*://*/*' && sfAfter.hidden === true && /^Done\. Open your Canvas courses page/.test(sfAfter.note || ''), `the press asks for every website and, allowed, the page says setup begins on the Canvas at any address (${JSON.stringify(sfAfter)})`);
   check((await sw.evaluate(() => self.BCV.api.runtime.getManifest().content_scripts.some((cs) => (cs.js || []).includes('content/sniff.js') && cs.matches.includes('*://*/*') && (cs.exclude_matches || []).includes('*://*.instructure.com/*')))), 'the sniffer is in the manifest for every build: every site but Canvas\'s own, at idle');
   await sfSetup.close().catch(() => {});
   } // setup page
