@@ -598,6 +598,12 @@ struct CalendarView: View {
         .padding(-6)
     }
 
+    /// How far down the week's hours a time of day is: `minutes` into the day, the hours drawn from `first`.
+    private static func weekY(_ minutes: Int, from first: Int) -> CGFloat {
+        let into = Double(minutes - first * 60)
+        return CGFloat(into / 60) * hourHeight
+    }
+
     /// The minutes into its day an item is at; nil for one that lasts the day (or has no time).
     private func minutes(_ ev: CalEvent) -> Int? {
         guard ev.allDay != true, let t = ev.time, !t.isEmpty, let d = PreviewFormat.date(ev.date) else { return nil }
@@ -668,7 +674,7 @@ struct CalendarView: View {
                     WeekDayStack {
                         ForEach(timed[i]) { item in
                             weekBlock(item.ev)
-                                .layoutValue(key: WeekAt.self, value: CGFloat(item.at - first * 60) / 60 * Self.hourHeight)
+                                .layoutValue(key: WeekAt.self, value: Self.weekY(item.at, from: first))
                         }
                     }
                     .padding(.horizontal, 3)
@@ -703,7 +709,8 @@ struct CalendarView: View {
     private func nowLine(from first: Int) -> some View {
         TimelineView(.everyMinute) { context in
             let c = cal.dateComponents([.hour, .minute], from: context.date)
-            let at = CGFloat((c.hour ?? 0) * 60 + (c.minute ?? 0) - first * 60) / 60 * Self.hourHeight
+            let minutes: Int = (c.hour ?? 0) * 60 + (c.minute ?? 0)
+            let at: CGFloat = Self.weekY(minutes, from: first)
             if at >= 0 {
                 HStack(spacing: 0) {
                     Circle().fill(Color.red).frame(width: 7, height: 7)
