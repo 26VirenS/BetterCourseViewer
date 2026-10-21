@@ -450,6 +450,12 @@
     if (!ctx.alive()) return b;
     if (!a) return main.replaceChildren(U.errorBox('This assignment could not be loaded.')) || b;
     const s = sub || a.submission || {};
+    // (2.99.83) a classic quiz's assignment opens as the quiz itself: its own page, as a quiz is what was asked for
+    // (?asg=1 still shows the assignment's)
+    if ((a.submission_types || []).includes('online_quiz') && a.quiz_id && route.params.get('asg') !== '1') {
+      app.go(`${c.url}/quizzes/${a.quiz_id}`, { replace: true });
+      return b;
+    }
     // The item's place in its modules (Mark as done) and among the course's assignments (Previous /
     // Next) are asked for now and drawn when they land: the page never waits for them. The course's
     // assignment list is the slow one — every assignment with its submission — and behind a

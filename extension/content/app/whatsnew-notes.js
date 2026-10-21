@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.83', date: '2026-10-21', notes: [
+      { kind: 'improved', title: 'Quizzes open the quiz', body: "A quiz's assignment opens the quiz's own page.", icon: P.check },
+      { kind: 'improved', title: 'Quiz page, not a popup', body: 'A quiz opens as a page in the app, not over it.', icon: P.check },
+    ] },
     { version: '2.99.82', date: '2026-10-21', notes: [
       { kind: 'new', title: 'Equation Balancer', body: 'Balances any chemical equation as you type.', icon: P.check },
       { kind: 'new', title: 'Molar Mass & Moles', body: 'Molar mass, conversions, yields and formulas.', icon: P.check },

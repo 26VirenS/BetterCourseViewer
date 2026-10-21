@@ -728,8 +728,9 @@ try {
   await press('.bcv-ph-nav .bcv-ph-navbtn--next');
   // the old title is still on screen while the next page comes: wait for the new one by name
   const nextName = phNav.find((x) => x.startsWith('Next: ')).slice(6);
-  const phNext = await page.waitForFunction((name) => !location.pathname.endsWith('/assignments/1003') && document.querySelector('.bcv-ph-item__title')?.textContent === name, nextName, { timeout: 10000 }).then(() => true).catch(() => false);
-  check(phNext, `Next opens the next assignment: ${(await texts('.bcv-ph-item__title'))[0]}`);
+  // (2.99.83: a quiz's assignment opens as the quiz, its intro a pushed screen)
+  const phNext = await page.waitForFunction((name) => !location.pathname.endsWith('/assignments/1003') && (document.querySelector('.bcv-ph-item__title')?.textContent === name || (/\/quizzes\/\d+$/.test(location.pathname) && document.querySelector('.bcv-qz.is-embedded .bcv-qz__title')?.textContent === name)), nextName, { timeout: 10000 }).then(() => true).catch(() => false);
+  check(phNext, `Next opens the next assignment (a quiz's, as the quiz): ${await page.evaluate(() => location.pathname)}`);
 
   // ---- "Open in Canvas" ---------------------------------------------------------------------------
   // A phone has no address bar to type its way out of a Canvas page with, so the way back has to be

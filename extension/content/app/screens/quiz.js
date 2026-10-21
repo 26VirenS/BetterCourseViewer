@@ -693,9 +693,11 @@
       // and its attempt alike; the intro sat in the course's column under its header until then. A phone keeps the
       // intro a pushed course screen, its back bar and tab bar there.
       const embedded = phone && st.stage === 'intro';
-      // (2.99.67) on a computer the intro is a large popup over the page, as the Mac's sheet is — the app dimmed behind it,
-      // a press on the dimmed part or Escape closing it; the attempt itself still takes the page
-      const pop = !phone && st.stage === 'intro';
+      // (2.99.83) on a computer the intro is the quiz's page, in the app beside its sidebar and under its course, its head
+      // (title, timer, Canvas page) at the top — no longer a popup over the page it was opened from (2.99.67); the
+      // attempt itself still takes the page
+      const pop = false;
+      const asPage = !phone && st.stage === 'intro';
       const switchable = st.stage === 'take' && !phone; // (a phone shows one question a screen, always)
       const twoWays = switchable && !forcedOne; // (a quiz shown a question at a time has the one way to draw it)
       modeWrap.replaceChildren(...(twoWays ? [
@@ -726,7 +728,8 @@
       screen.classList.toggle('is-feedback', st.stage === 'feedback');
       screen.classList.toggle('is-embedded', embedded);
       screen.classList.toggle('is-pop', pop);
-      html.classList.toggle('bcv-quiz', !embedded && !pop); // the attempt (and its receipt) takes the page
+      screen.classList.toggle('is-page', asPage);
+      html.classList.toggle('bcv-quiz', !embedded && !pop && !asPage); // the attempt (and its receipt) takes the page
       if (pop && !veil.isConnected) { document.body.append(veil); document.addEventListener('keydown', onPopKey, true); }
       else if (!pop && veil.isConnected) dropVeil();
       setOpen(st.stage === 'take' || st.stage === 'review');

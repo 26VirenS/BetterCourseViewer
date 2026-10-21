@@ -466,8 +466,8 @@ try {
   await page.waitForSelector('.bcv-sheet-ov .bcv-xrow', { timeout: 10000 });
   check((await texts('.bcv-xrow__t')).join(',') === 'Composition of Functions,Lec06-PreQuiz,Week 2 Post Class Assignment: GC articles' && /F26-MATH 021 20 · Assignment · /.test((await texts('.bcv-xrow__s'))[0]), `History opens Canvas's recently-visited list as a sheet: ${(await texts('.bcv-xrow__s'))[0]}`);
   await page.click('.bcv-xrow');
-  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check(page.url() === `${BASE}/courses/101/assignments/1002`, 'a history row opens the item (an absolute visited_url becomes a path)');
+  await page.waitForSelector('.bcv-qzi', { timeout: 10000 });
+  check(page.url() === `${BASE}/courses/101/quizzes/9002`, `a history row opens the item (an absolute visited_url becomes a path; a quiz's assignment, the quiz): ${page.url()}`);
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-nav__item--more[data-extra="help"]', { timeout: 10000 });
   await page.click('.bcv-nav__item--more[data-extra="help"]');
@@ -1709,8 +1709,10 @@ try {
   const gpaRow = await page.$eval('.bcv-gpa-detail__arow', (e) => ({ tag: e.tagName, href: e.getAttribute('href'), name: e.querySelector('.bcv-gpa-detail__aname')?.textContent }));
   check(gpaRow.tag === 'A' && /\/courses\/\d+\/assignments\/\d+$/.test(gpaRow.href || ''), `a row on the Grades page opens the assignment it is about: ${JSON.stringify(gpaRow)}`);
   await page.click('.bcv-gpa-detail__arow');
-  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check(/\/courses\/\d+\/assignments\/\d+$/.test(page.url()) && (await texts('.bcv-detail__title'))[0] === gpaRow.name && !(await page.$('.bcv-sheet-ov')), `and it lands there with the sheet put away: ${page.url()}`);
+  // (2.99.83: a quiz's assignment lands on the quiz's own page)
+  await page.waitForSelector('.bcv-detail__title, .bcv-qz.is-page .bcv-qz__title', { timeout: 10000 });
+  const landed = await page.evaluate(() => ({ path: location.pathname, title: (document.querySelector('.bcv-detail__title') || document.querySelector('.bcv-qz__title'))?.textContent }));
+  check(/\/courses\/\d+\/(assignments|quizzes)\/\d+$/.test(landed.path) && landed.title === gpaRow.name && !(await page.$('.bcv-sheet-ov')), `and it lands there with the sheet put away: ${JSON.stringify(landed)}`);
   await page.goBack();
   await page.waitForSelector('.bcv-gpa__card .bcv-gpa__details', { timeout: 15000 });
   await page.click('.bcv-gpa__card .bcv-gpa__details');
@@ -2078,8 +2080,9 @@ try {
   check(JSON.stringify(navBtns.map(({ word, ...b }) => b)) === JSON.stringify(want) && navBtns.every((b) => b.word === (b.dir === 'prev' ? 'Previous' : 'Next')) && navAt.inBar && navAt.hist && navAt.noHead && navAt.noRow, `Previous and Next in the top bar, just the words, the assignments either side on hover, in the tab's order; Back and Forward beside them; no header or back row over the item: ${navBtns.map((b) => `${b.word} → ${b.name}`).join(' | ')} ${JSON.stringify(navAt)}`);
   await page.click('.bcv-asg__nav .bcv-asg__navbtn--next');
   // the old title is still on screen while the next page comes: wait for the new one, not for a title
-  const nextOpened = await page.waitForFunction((x) => location.pathname.endsWith(`/assignments/${x.id}`) && document.querySelector('.bcv-detail__title')?.textContent === x.name, ordered[at1003 + 1], { timeout: 10000 }).then(() => true).catch(() => false);
-  check(nextOpened, `Next opens the next assignment: ${(await texts('.bcv-detail__title'))[0]}`);
+  // (2.99.83: a quiz's assignment opens as the quiz, its title at the head of its page)
+  const nextOpened = await page.waitForFunction((x) => (x.quiz_id && (x.submission_types || []).includes('online_quiz') ? location.pathname.endsWith(`/quizzes/${x.quiz_id}`) && document.querySelector('.bcv-qz__title')?.textContent === x.name : location.pathname.endsWith(`/assignments/${x.id}`) && document.querySelector('.bcv-detail__title')?.textContent === x.name), ordered[at1003 + 1], { timeout: 10000 }).then(() => true).catch(() => false);
+  check(nextOpened, `Next opens the next assignment (a quiz's, as the quiz): ${await page.evaluate(() => location.pathname)}`);
   // (2.99.17) every item has the pill: quizzes, pages and discussions each walk their own tab's order
   const pillOn = async (path) => {
     await page.goto(`${BASE}${path}`);
@@ -2090,7 +2093,7 @@ try {
   // (2.99.56) a quiz opens on its own page, as the Mac's quiz sheet: its head's Close, no way-back row or pill
   await page.goto(`${BASE}/courses/101/quizzes/9011`);
   await page.waitForSelector('.bcv-qzi', { timeout: 10000 });
-  check(!(await page.$('.bcv-qzi .bcv-asg__nav')) && !!(await page.$('.bcv-qz__head .bcv-qz__exit')), "a quiz's intro is the quiz's own page: Close at its head, no Previous / Next row");
+  check(!(await page.$('.bcv-qzi .bcv-asg__nav')) && !!(await page.$('.bcv-qz.is-page .bcv-qz__head .bcv-qz__title')), "a quiz's intro is the quiz's own page: its title at its head, no Previous / Next row");
   const pagePill = await pillOn('/courses/101/pages/course-information');
   check(JSON.stringify(pagePill) === JSON.stringify(['Next: Chapter 4 notes']), `a page has Previous / Next through the pages, the front page first: ${pagePill.join(' | ')}`);
   const discPill = await pillOn('/courses/101/discussion_topics/7001');
@@ -3026,8 +3029,15 @@ try {
   await new Promise((r) => setTimeout(r, 400));
   check(/\/courses\/101\/grades$/.test(page.url()), 'and a press on the score stays put, so a what-if can be started there');
   await page.click('.bcv-grades__main .bcv-card--list .bcv-row');
+  // (2.99.83) the row is a quiz's: its assignment opens as the quiz, its own page in the app (no popup, nothing dimmed)
+  await page.waitForSelector('.bcv-qz.is-page .bcv-qzi', { timeout: 10000 });
+  const quizPage = await page.evaluate(() => ({ path: location.pathname, title: document.querySelector('.bcv-qz__title')?.textContent, pop: !!document.querySelector('.bcv-qz.is-pop, .bcv-qz-veil'), folded: document.documentElement.classList.contains('bcv-quiz'), side: !!document.querySelector('#bcv-sidebar, .bcv-side') }));
+  check(/\/courses\/101\/quizzes\/\d+$/.test(quizPage.path) && quizPage.title === gradeRow.name && !quizPage.pop && !quizPage.folded, `pressing a quiz's row lands on the quiz's own page, in the app: ${JSON.stringify(quizPage)}`);
+  await shot(page, '22d-quiz-page');
+  // (?asg=1: its assignment's page, the mark first)
+  await page.goto(`${BASE}${gradeRow.href}?asg=1`);
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check(/\/courses\/101\/assignments\/\d+$/.test(page.url()) && (await texts('.bcv-detail__title'))[0] === gradeRow.name, `pressing the row lands on that assignment: ${page.url()}`);
+  check(/\/courses\/101\/assignments\/\d+$/.test(new URL(page.url()).pathname) && (await texts('.bcv-detail__title'))[0] === gradeRow.name, `?asg=1 shows that assignment: ${page.url()}`);
   // and the mark is the first thing on it, not something to go looking for in the side column
   const top = await page.evaluate(() => {
     const g = document.querySelector('.bcv-asg__pill.is-graded');
@@ -3315,12 +3325,10 @@ try {
   await page.click('.bcv-body .bcv-row');
   await page.waitForSelector('.bcv-qzi', { timeout: 10000 });
   check((await texts('.bcv-qzi__rule')).some((t) => /Time limit: 20 minutes/.test(t)) && (await texts('.bcv-qzi__attemptn')).some((t) => /Attempt 1/.test(t)), `a quiz in the list opens its intro, as on the Mac: its rules and its attempts (${(await texts('.bcv-qzi__attemptn')).join(' | ')})`);
-  // (2.99.56) the intro is the quiz's own page, as the Mac's sheet: it takes the page (no course header or rail), and
-  // its Close goes back to the course's quizzes
-  const introPage = await page.evaluate(() => !document.documentElement.classList.contains('bcv-quiz') && !!document.querySelector('.bcv-qz.is-pop') && !!document.querySelector('.bcv-qz-veil') && !!document.querySelector('.bcv-qz__head .bcv-qz__exit'));
-  await page.click('.bcv-qz__head .bcv-qz__exit');
-  const closedTo = await eventually(() => page.evaluate(() => /\/courses\/101\/quizzes$/.test(location.pathname) && !document.documentElement.classList.contains('bcv-quiz') && !document.querySelector('.bcv-qz-veil') && !!document.querySelector('.bcv-rail [data-tab="modules"]')));
-  check(introPage && closedTo, `the intro is a popup over the dimmed page, and its Close goes back to where it was opened from — the quizzes — the dimming gone (${introPage}, ${closedTo})`);
+  // (2.99.83) the intro is the quiz's own page in the app: under its course, beside the sidebar — no popup, nothing dimmed,
+  // no Close (the app's Back goes back)
+  const introPage = await page.evaluate(() => !document.documentElement.classList.contains('bcv-quiz') && !!document.querySelector('.bcv-qz.is-page') && !document.querySelector('.bcv-qz.is-pop, .bcv-qz-veil') && !!document.querySelector('.bcv-qz__title') && !document.querySelector('.bcv-qz__exit')?.getClientRects().length);
+  check(introPage, `the intro is a page in the app, its title at the top and no Close (${introPage})`);
 
   // modules
   await tab('modules');
@@ -3532,8 +3540,9 @@ try {
   await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
   // (2.99.56) the intro is the quiz's own page, as the Mac's sheet holds it: the sidebar and the course's header fold away
   // (2.99.67) on a computer the intro is a large popup over the page, as the Mac's sheet: the app dimmed behind it, not folded away
-  const pop = await page.evaluate(() => { const r = document.querySelector('.bcv-qz.is-pop')?.getBoundingClientRect(); return { pop: !!r, inside: !!r && r.left > 0 && r.top > 0 && r.right < innerWidth && r.bottom < innerHeight && r.width >= 700, veil: !!document.querySelector('.bcv-qz-veil'), folded: document.documentElement.classList.contains('bcv-quiz') }; });
-  check(page.url().endsWith('/quizzes/9011') && (await visible('.bcv-qz__head')) && !(await page.$('.bcv-qz.is-embedded')) && pop.pop && pop.inside && pop.veil && !pop.folded, `the quiz intro is a large popup over the dimmed page, its head with the title and Close: ${JSON.stringify(pop)}`);
+  // (2.99.83) a page again, in the app: no popup over the page, nothing dimmed, the sidebar and the course's header kept
+  const pop = await page.evaluate(() => ({ page: !!document.querySelector('.bcv-qz.is-page'), pop: !!document.querySelector('.bcv-qz.is-pop'), veil: !!document.querySelector('.bcv-qz-veil'), folded: document.documentElement.classList.contains('bcv-quiz') }));
+  check(page.url().endsWith('/quizzes/9011') && (await visible('.bcv-qz__head')) && !(await page.$('.bcv-qz.is-embedded')) && pop.page && !pop.pop && !pop.veil && !pop.folded, `the quiz intro is a page in the app, its head with the title: ${JSON.stringify(pop)}`);
   const introParts = await page.evaluate(() => ({ heads: [...document.querySelectorAll('.bcv-qzi__sechead')].map((e) => e.textContent), facts: [...document.querySelectorAll('.bcv-qzi__fact')].map((e) => e.textContent).join(' · '), note: document.querySelector('.bcv-qzi__note')?.textContent || '', buttons: [...document.querySelectorAll('.bcv-qzi__bar .bcv-qzi__btn')].map((b) => b.textContent).join('|') }));
   check((await texts('.bcv-qz__title'))[0] === 'Lec06-PreQuiz' && (await texts('.bcv-qzi__rule')).some((t) => /Time limit: 20 minutes/.test(t)) && (await texts('.bcv-qz__begin'))[0] === 'Begin Attempt' && /^\d+ questions? · \d+ points? · (Due|No due date)/.test(introParts.facts) && introParts.heads.includes('Rules') && introParts.buttons === 'Begin Attempt', `the intro as the Mac's: its facts, the attempts line, Rules, and Begin Attempt alone at the foot (${JSON.stringify(introParts)})`);
   check((await texts('.bcv-qz__clock'))[0] === '20 min', 'timer pill shows the limit before the attempt starts');
@@ -3906,7 +3915,7 @@ try {
   const underWay = await page.evaluate(() => [...document.querySelectorAll('.bcv-qzi__bar .bcv-qzi__btn')].map((b) => `${b.textContent}${b.classList.contains('is-primary') ? '*' : ''}`).join('|'));
   check(underWay === 'Continue Attempt|See Feedback*', `an attempt under way, an earlier one's feedback to see: See Feedback, Continue Attempt the smaller (${underWay})`);
   const qAsg = await page.evaluate(async (b) => (await (await fetch(`${b}/api/v1/courses/101/assignments?per_page=100`)).text()).replace(/^while\(1\);/, ''), BASE).then((t) => JSON.parse(t).find((x) => String(x.quiz_id) === '9001'));
-  await page.goto(`${BASE}/courses/101/assignments/${qAsg.id}`);
+  await page.goto(`${BASE}/courses/101/assignments/${qAsg.id}?asg=1`); // (2.99.83: the quiz's assignment page asked for: a quiz's assignment opens the quiz)
   await eventually(() => page.evaluate(() => [...document.querySelectorAll('.bcv-asg__stepbtns .bcv-asg__step')].map((b) => b.textContent).join('|') === 'Continue|Feedback'), 10000);
   const asgSteps = await page.evaluate(() => [...document.querySelectorAll('.bcv-asg__stepbtns .bcv-asg__step')].map((b) => `${b.textContent}${b.classList.contains('is-lit') ? '*' : ''}`).join('|'));
   check(asgSteps === 'Continue|Feedback*', `the quiz's assignment page: Continue the smaller, See Feedback lit (${asgSteps})`);
@@ -8249,7 +8258,7 @@ try {
   await page.goto(`${BASE}/#notifications`);
   await page.waitForSelector('.bcv-nf__row', { timeout: 15000 });
   await clickScreen('.bcv-nf__row[data-cat="graded"] .bcv-nf__act');
-  check(page.url() === `${BASE}/courses/101/assignments/1007` && !!(await page.$('.bcv-detail__title, .bcv-sb--embed')), `the action opens the item, in place: ${page.url()}`);
+  check(await eventually(() => page.evaluate(() => /\/courses\/101\/quizzes\/9007$/.test(location.pathname) && !!document.querySelector('.bcv-qzi')), 10000), `the action opens the item, in place (a quiz's assignment, as the quiz): ${page.url()}`);
   } // notifications
   if (on('springs')) {
 
