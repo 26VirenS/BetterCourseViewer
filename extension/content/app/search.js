@@ -68,7 +68,7 @@
     { key: 'files', label: 'Files', hint: 'Course files and pages', icon: IC.folder, groups: ['Files', 'Pages'], title: 'Recents' },
     { key: 'actions', label: 'Actions', hint: 'Commands: /submit, /open, /todo, /dark…', icon: IC.bolt, groups: ['Commands'], title: 'Commands' },
   ];
-  const SPOT_W = 580, SPOT_MS = 310; // the pill's width at most (2.99.84: narrower, as Spotlight's); the float's length (app.css .3s, 2.99.88)
+  const SPOT_W = 580, SPOT_MS = 470; // the pill's width at most (2.99.84: narrower, as Spotlight's); the float's length (app.css .46s; 2.99.90: back from 2.99.88's .3s, which was too fast)
   let spot = null; // afloat: { ov, pal, ghost, timer, onResize, folding }
   const afloat = () => !!spot && !spot.folding;
   const canFloat = () => !!ui && ui.root.isConnected && !BCV.phone?.active?.() && !document.getElementById('bcv-tour') && !document.getElementById('bcv-setup');
@@ -112,15 +112,28 @@
     for (const e of els) e.style.transition = '';
     return out;
   }
+  /** (2.99.90) The pill's outline as it is drawn: afloat, its own superellipse pill; drawn as the header's (scaled sx × sy), the
+   *  header's pill given in the afloat box's own units — so the outline morphs with the move (app.css: clip-path rides the
+   *  transform's curve) and lands as the header's pill exactly. Scaling the afloat outline instead squashed its ends, and
+   *  the header's own shape came back with a jump as the fold ended. */
+  function outline(box, home) {
+    if (!box.classList.contains('bcv-squircle') || !U.superPillPath) return;
+    if (!home) { box._bcvSq = ''; U.squircleFit(box); return; }
+    let i = 0;
+    const d = U.superPillPath(home.w, home.h).replace(/-?\d+(?:\.\d+)?/g, (v) => String(Math.round((i++ % 2 ? v / home.sy : v / home.sx) * 1000) / 1000));
+    box._bcvSq = 'home';
+    box.style.clipPath = `path('${d}')`;
+  }
   /** Draw the pill as the header's (its root's place on screen `at`), from its parts laid out afloat (`L`); `at` null: as itself. */
   function drawAs(at, L) {
     const p = pillParts();
     if (!p) return;
-    if (!at) { for (const e of [p.box, p.ic, p.input]) if (e) e.style.transform = ''; return; }
+    if (!at) { for (const e of [p.box, p.ic, p.input]) if (e) e.style.transform = ''; outline(p.box, null); return; }
     const H = spot.home, B = L.box;
     const hl = at.left + H.dx, ht = at.top + H.dy;
     const sx = H.w / B.width, sy = H.h / B.height;
     p.box.style.transform = `translate(${hl - B.left}px, ${ht - B.top}px) scale(${sx}, ${sy})`;
+    outline(p.box, { w: H.w, h: H.h, sx, sy });
     // a part (in the box, which is scaled sx × sy) drawn at the header's place: its own size, or for words `k` both ways
     const part = (e, Le, rel, k) => {
       if (!e || !Le || !rel) return;
@@ -163,6 +176,7 @@
     const p = pillParts(); // (home: drawn as itself again, nothing left moving it)
     if (p) for (const e of [p.box, p.ic, p.input]) if (e) { e.style.transition = 'none'; e.style.transform = ''; }
     if (s.ghost.isConnected && ui) s.ghost.replaceWith(ui.root); else { s.ghost.remove(); ui?.root.remove(); }
+    if (p) outline(p.box, null); // (home: its outline fitted to the header's size in the same frame, not the watcher's next)
     if (p) { void p.box.offsetWidth; for (const e of [p.box, p.ic, p.input]) if (e) e.style.transition = ''; }
     s.pal.remove(); s.ov.remove();
     spot = null;
@@ -184,7 +198,7 @@
     if (!q) startAsHome({ left: r.left, top: r.top }); // (its first frame is the header's pill, where it stood)
     pal.classList.remove('is-far');
     if (!q) pal.classList.add('is-lifting'); // (the panel arrives with the pill, not before it)
-    spot.lift = q ? 0 : setTimeout(() => pal.classList.remove('is-lifting'), 320);
+    spot.lift = q ? 0 : setTimeout(() => pal.classList.remove('is-lifting'), 600);
     drawAs(null); // (and from there to its own place)
     window.addEventListener('resize', spot.onResize);
     ui.input.focus(); // (the move took the cursor)

@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.89"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.90"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -5183,7 +5183,7 @@ html[data-bcv-theme="light"] .bcv-spot { --bcv-spot-shade: .24; }
 }
 .bcv-spot .bcv-omni { position: static; display: block; flex: none; align-self: stretch; width: auto; max-width: none; min-width: 0; margin: 0; }
 .bcv-omni--ghost { visibility: hidden; }
-.bcv-spot .bcv-omni__box, .bcv-spot .bcv-omni__box:focus-within { height: 72px; padding: 0 24px 0 28px; gap: 16px; border-radius: 36px; background: linear-gradient(180deg, rgba(6,6,8,.84), rgba(34,34,38,.62)) padding-box, var(--bcv-glass-rim) border-box; -webkit-backdrop-filter: blur(18px) saturate(1.7) brightness(.72); backdrop-filter: blur(18px) saturate(1.7) brightness(.72); border: 1px solid transparent; box-shadow: var(--bcv-glass-shade), 0 24px 64px rgba(0,0,0,.3), 0 2px 10px rgba(0,0,0,.16); transform-origin: 0 0; transition: transform var(--bcv-t-gentle) var(--bcv-spring-gentle), background .2s ease, border-color .2s ease, box-shadow .3s ease; }
+.bcv-spot .bcv-omni__box, .bcv-spot .bcv-omni__box:focus-within { height: 72px; padding: 0 24px 0 28px; gap: 16px; border-radius: 36px; background: linear-gradient(180deg, rgba(6,6,8,.84), rgba(34,34,38,.62)) padding-box, var(--bcv-glass-rim) border-box; -webkit-backdrop-filter: blur(18px) saturate(1.7) brightness(.72); backdrop-filter: blur(18px) saturate(1.7) brightness(.72); border: 1px solid transparent; box-shadow: var(--bcv-glass-shade), 0 24px 64px rgba(0,0,0,.3), 0 2px 10px rgba(0,0,0,.16); transform-origin: 0 0; transition: transform var(--bcv-t-gentle) var(--bcv-spring-gentle), clip-path var(--bcv-t-gentle) var(--bcv-spring-gentle), background .2s ease, border-color .2s ease, box-shadow .3s ease; }
 .bcv-spot .bcv-omni__ic svg { width: 24px; height: 24px; transform-origin: 0 0; transition: transform var(--bcv-t-gentle) var(--bcv-spring-gentle); }
 .bcv-spot .bcv-omni__box input.bcv-omni__in, .bcv-spot .bcv-omni__box input.bcv-omni__in[type="search"], .bcv-spot .bcv-omni__box input.bcv-omni__in:focus { height: 68px; font: 400 26px/1 var(--bcv-font); letter-spacing: -.015em; color: var(--bcv-ink); caret-color: var(--bcv-ink); transform-origin: 0 0; transition: transform var(--bcv-t-gentle) var(--bcv-spring-gentle), color .2s ease; }
 .bcv-spot .bcv-omni__wikit { font-size: 12.5px; }
@@ -5191,11 +5191,10 @@ html[data-bcv-theme="light"] .bcv-spot { --bcv-spot-shade: .24; }
 /* the panel arrives with the pill, not before it: faded and lifted in over the tail of the glide (is-lifting, the first .6s), and
    faded out as the pill sets off home (is-far), rather than snapping in at the header and riding up */
 .bcv-spot.is-far .bcv-omni__panel { opacity: 0; transform: translateY(-8px) scale(.985); pointer-events: none; transition-duration: .14s; }
-.bcv-spot.is-lifting .bcv-omni__panel { transition-delay: .1s; transition-duration: .2s; transition-timing-function: var(--bcv-ease-out); }
-/* (2.99.88) a fast ease-out: the pill glides from the header in .3s on a strong ease-out (it was a .46s drawer curve), and
-   opened from the keyboard — where it is simply there — it still arrives, in .16s, from a touch smaller and faded */
-.bcv-spot { --bcv-t-gentle: .3s; --bcv-spring-gentle: var(--bcv-ease-out); }
-.bcv-spot.is-still:not(.is-far) { animation: bcv-spot-in .16s var(--bcv-ease-out) both; }
+.bcv-spot.is-lifting .bcv-omni__panel { transition-delay: .2s; transition-duration: .28s; }
+/* (2.99.90) the pill glides from the header on its .46s drawer curve again (2.99.88's .3s ease-out was far too fast); opened
+   from the keyboard — where it is simply there — it still arrives, in .24s, from a touch smaller and faded */
+.bcv-spot.is-still:not(.is-far) { animation: bcv-spot-in .24s var(--bcv-ease-out) both; }
 @keyframes bcv-spot-in { from { opacity: 0; transform: translateY(-6px) scale(.97); } to { opacity: 1; transform: none; } }
 .bcv-spot.is-still, .bcv-spot.is-still .bcv-omni__box, .bcv-spot.is-still .bcv-omni__panel { transition: none; }
 /* the panel: a slab of its own under the pill, the page through it blurred soft and dimmed so the words hold on any page */

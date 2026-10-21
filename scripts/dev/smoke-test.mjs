@@ -6527,6 +6527,8 @@ try {
   await page.click(`#bcv-pins .bcv-pin[data-tool="${wKey}"] .bcv-pin__btn`);
   await page.waitForSelector(`.bcv-tool[data-tool="${wKey}"] .bcv-widget__frame`, { timeout: 8000 });
   check(true, 'the pin opens it');
+  // (2.99.90) the squircle sweep leaves the tools' bar alone: Safari's way, a clip on the bar's capsule, cut off the panel a pin opens
+  check(!(await page.$('#bcv-tray.bcv-sqc, #bcv-tray .bcv-sqc, #bcv-tray.bcv-squircle, #bcv-tray .bcv-squircle')), 'nothing in the tools\' bar is given squircle corners (a clip there hides the panels the pins open)');
   await closeTool();
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#bcv-omni', { timeout: 10000 });

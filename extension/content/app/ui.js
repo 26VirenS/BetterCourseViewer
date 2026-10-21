@@ -971,7 +971,9 @@
   const CORNERS = (() => { try { return CSS.supports('corner-shape', 'superellipse(1.5)'); } catch { return false; } })();
   const seenSq = new WeakSet();
   let sqQueue = [], sqTimer = 0, sqWatch = null;
-  const SQ_SKIP = 'svg, svg *, img, video, canvas, iframe, math, math *, .bcv-prose *, .bcv-squircle, .bcv-nosq, .bcv-nosq *';
+  // (2.99.90) not the tools in the bar either: each widget's panel grows out of its pin, inside the bar's capsule — a clip on
+  // the capsule (Safari's way) cut the panel off, and the pins looked as if they did not open
+  const SQ_SKIP = 'svg, svg *, img, video, canvas, iframe, math, math *, .bcv-prose *, .bcv-squircle, .bcv-nosq, .bcv-nosq *, #bcv-tray, #bcv-tray *';
   function squircleOne(el) {
     if (seenSq.has(el) || !el.isConnected) return;
     if (el.matches(SQ_SKIP)) { seenSq.add(el); return; }
