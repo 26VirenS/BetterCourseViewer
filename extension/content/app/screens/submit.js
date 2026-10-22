@@ -156,6 +156,8 @@
     const windowLine = a.unlock_at && a.lock_at ? `Open ${U.fmtShort(a.unlock_at)} – ${U.fmtShort(a.lock_at)}` : a.lock_at ? `Open until ${U.fmtAt(a.lock_at)}` : a.unlock_at ? `Opens ${U.fmtAt(a.unlock_at)}` : '';
     const unlimited = !(a.allowed_attempts > 0);
     const nativeAny = can.file || can.text || can.url;
+    // (2.99.96) Hand in from your phone: on a computer, where the assignment takes a file (the phone hands in there itself)
+    const phoneOK = can.file && !BCV.phone?.active?.();
     const hasOther = toolRows.length > 0 || toolsFailed || can.url || can.media || can.annot;
 
     const tabAllowed = (k) => ((k === 'file' && can.file) || (k === 'text' && can.text) || (k === 'other' && hasOther) ? k : null);
@@ -264,7 +266,10 @@
       const n = st.files.length;
       return U.el('bcv-sb__pane', [
         input, dirInput, drop,
-        zipOK ? h('button', { type: 'button', class: 'bcv-sb__folder', text: 'Choose a folder (sent as a .zip)', onclick: () => dirInput.click() }) : null,
+        zipOK || phoneOK ? U.el('bcv-sb__alts', [
+          zipOK ? h('button', { type: 'button', class: 'bcv-sb__folder', text: 'Choose a folder (sent as a .zip)', onclick: () => dirInput.click() }) : null,
+          phoneOK ? h('button', { type: 'button', class: 'bcv-sb__folder bcv-sb__phonego', text: 'Hand in from your phone', title: 'A code for your phone’s camera: take a photo or pick a file there', onclick: (e) => phoneSheet(e.currentTarget) }) : null,
+        ]) : null,
         U.text('bcv-sb__count', n === 0 ? 'Nothing attached yet' : `${U.plural(n, 'file')} attached`),
         n ? U.el('bcv-sb__files', st.files.map(fileRow)) : null,
       ]);
@@ -642,6 +647,123 @@
           for (const f of st.files) f.paint?.();
         }
       }
+    }
+
+    // ---- (2.99.96) hand in from your phone ---------------------------------------------------
+    /** A QR code of this assignment's own hand-in, for the phone's camera. The phone opens it in
+     *  the school's site, signed in there — with Simpl on the phone, straight to Hand In — and hands
+     *  in from its camera or its files. An extension cannot be the server the apps are for a phone
+     *  (Send from Phone, mac/Simpl/Support/PhoneServer.swift), so nothing passes between the two:
+     *  the code holds the address alone (no key, no sign-in), and this page asks the school every
+     *  few seconds while the sheet is open, showing the receipt once the hand-in lands. */
+    async function phoneSheet(from) {
+      if (document.querySelector('.bcv-phone-ov')) return;
+      try { await BCV.lazy.load('qr'); } catch { U.toast('The code could not be drawn.', { error: true }); return; }
+      if (!ctx.alive()) return;
+      const link = new URL(BCV.lms.toPage(`${course.url}/assignments/${aid}?bcv=submit`), location.origin).href;
+      // (what Canvas has now, so a hand-in from here earlier, or a resubmission, is not taken for the phone's)
+      const now0 = (await store.submission(cid, aid, { force: true }).catch(() => null)) || st.done || s0;
+      if (!ctx.alive() || document.querySelector('.bcv-phone-ov')) return;
+      const base = { attempt: Math.max(st.attempt, Number(now0.attempt) || 0), at: now0.submitted_at || null };
+      let timer = 0, closed = false;
+      const startedAt = Date.now();
+      const status = U.text('bcv-phone__status', 'Waiting for your phone…', 'span');
+      const again = h('button', { type: 'button', class: 'bcv-sb__folder', text: 'Check again', hidden: true, onclick: () => { again.hidden = true; status.textContent = 'Waiting for your phone…'; wait.classList.remove('is-idle'); look(); } });
+      const wait = U.el('bcv-phone__wait', [h('span', { class: 'bcv-phone__dot' }), status, again]);
+      const copy = h('button', { type: 'button', class: 'bcv-sb__folder', text: 'Copy link', onclick: async () => {
+        try { await navigator.clipboard.writeText(link); copy.textContent = 'Copied'; setTimeout(() => { copy.textContent = 'Copy link'; }, 1600); } catch { U.toast('The link could not be copied.', { error: true }); }
+      } });
+      const ov = U.el('bcv-sheet-ov bcv-phone-ov', null, { role: 'dialog', 'aria-label': 'Hand in from your phone' });
+      const close = () => {
+        if (closed) return;
+        closed = true;
+        clearTimeout(timer);
+        U.dismiss(ov);
+      };
+      ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+      ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
+      ov.append(U.el('bcv-sheet bcv-sheet--prompt bcv-sheet--phone', [
+        U.el('bcv-sheet__head', [
+          U.el('bcv-sheet__titles', [U.text('bcv-sheet__title bcv-pretty', 'Hand in from your phone')]),
+          h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
+        ]),
+        U.el('bcv-prompt bcv-phone', [
+          U.el('bcv-phone__row', [
+            qrCode(link),
+            U.el('bcv-phone__steps', [
+              U.text('bcv-phone__step', '1. Point your phone’s camera at the code.'),
+              U.text('bcv-phone__step', `2. It opens this assignment in ${BCV.lms.name} — signed in there, as you.`),
+              U.text('bcv-phone__step', '3. Take a photo or choose a file, and hand it in.'),
+              U.text('bcv-phone__note bcv-pretty', 'With Simpl on your phone, it opens straight to Hand In. This page shows the receipt when it lands.'),
+            ]),
+          ]),
+          U.el('bcv-prompt__btns', [wait, h('span', { style: { flex: '1' } }), copy]),
+        ]),
+      ]));
+      BCV.utils.overlayRoot().append(ov);
+      if (from) U.morphFrom(ov.firstElementChild, from);
+      ov.tabIndex = -1;
+      setTimeout(() => ov.focus({ preventScroll: true }), 30);
+
+      // the school asked every 5 s while the sheet is open (every 15 s while this tab is out of sight), for 20 minutes
+      async function look() {
+        clearTimeout(timer);
+        if (closed || !ctx.alive() || !ov.isConnected) { closed = true; return; }
+        const x = await store.submission(cid, aid, { force: true }).catch(() => null);
+        if (closed || !ctx.alive()) return;
+        if (x && (Number(x.attempt) > base.attempt || (x.submitted_at && x.submitted_at !== base.at))) { landed(x); return; }
+        if (Date.now() - startedAt > 20 * 60000) {
+          status.textContent = 'Stopped waiting.';
+          wait.classList.add('is-idle');
+          again.hidden = false;
+          return;
+        }
+        timer = setTimeout(look, document.hidden ? 15000 : 5000);
+      }
+      function landed(x) {
+        close();
+        if (st.stage !== 'edit') return;
+        const files = (x.attachments || []).map((f) => f.display_name || f.filename).filter(Boolean);
+        st.sent = x.submission_type === 'online_text_entry' ? { kind: 'text' } : x.url ? { kind: 'link', url: x.url } : { kind: 'file', names: files.length ? files : ['From your phone'] };
+        st.done = x;
+        st.attempt = Number(x.attempt) || st.attempt + 1;
+        st.stage = 'done';
+        for (const f of st.files) if (f.objectUrl) { URL.revokeObjectURL(f.objectUrl); f.objectUrl = null; } // (anything attached here was not what went)
+        st.files = [];
+        st.link = null;
+        app.refreshCounts?.();
+        draw();
+        toTop();
+        U.toast('Handed in from your phone.');
+        if (pop) pop.done?.(st.done);
+      }
+      timer = setTimeout(look, 5000);
+    }
+    /** The link as a QR code (qrcode-generator, lib/vendor/qrcode.js), drawn as one path: dark on white
+     *  in either theme — a camera reads it so — with the quiet margin a reader needs around it. */
+    function qrCode(text) {
+      const q = self.qrcode(0, 'M');
+      q.addData(text);
+      q.make();
+      const n = q.getModuleCount(), pad = 4, size = n + pad * 2;
+      let d = '';
+      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) d += `M${c + pad} ${r + pad}h1v1h-1z`;
+      const NS = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+      svg.setAttribute('class', 'bcv-phone__qr');
+      svg.setAttribute('role', 'img');
+      svg.setAttribute('aria-label', 'QR code of this assignment’s hand-in');
+      svg.setAttribute('shape-rendering', 'crispEdges');
+      const bg = document.createElementNS(NS, 'rect');
+      bg.setAttribute('width', size);
+      bg.setAttribute('height', size);
+      bg.setAttribute('fill', '#fff');
+      const path = document.createElementNS(NS, 'path');
+      path.setAttribute('d', d);
+      path.setAttribute('fill', '#000');
+      svg.append(bg, path);
+      return svg;
     }
 
     // ---- done stage -------------------------------------------------------------------

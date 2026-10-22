@@ -26,6 +26,7 @@
     quizsim: () => !!BCV.quizSim,
     submit: () => !!BCV.screens.submit && !BCV.screens.submit.__stub && !!BCV.screens.feedback && !BCV.screens.feedback.__stub,
     phone: () => !!BCV.phone,
+    qr: () => typeof self.qrcode === 'function',
     rubric: () => !!BCV.rubricRing,
     docview: () => !!BCV.docview,
     nativeapp: () => !!BCV.iosShell,

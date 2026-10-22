@@ -126,7 +126,9 @@
       top.replaceChildren(...(r.frequent.length ? r.frequent.map((f) => h('div', { class: 'bcv-words__word' }, [h('span', { text: f.word }), h('span', { class: 'bcv-words__n', text: String(f.count) })])) : [U.text('bcv-tool__hint', 'The words you use most show here.')]));
     }
     paint();
-    setTimeout(() => area.focus(), 60);
+    // (the text box takes the focus once the tool is in — unless a press or a key has already put it somewhere: the target
+    //  box clicked straight away kept its typing, which the late focus used to carry into the text)
+    setTimeout(() => { const a = document.activeElement; if (!a || a === document.body || !p.contains(a)) area.focus(); }, 60);
     return p;
   }
 

@@ -32,3 +32,5 @@ Data bundled with the tools (content/app/tools/):
 ptable-data.js         — the elements for the periodic table, trimmed from Bowserinator's
                          Periodic-Table-JSON, CC BY-SA 3.0 (the one-line summaries are Wikipedia's,
                          CC BY-SA) — https://github.com/Bowserinator/Periodic-Table-JSON
+qrcode.js              — qrcode-generator 1.4.4, MIT     — https://github.com/kazuhikoarase/qrcode-generator
+                         (Hand in from Phone's QR code: drawn on this device, nothing is sent)

@@ -9,6 +9,7 @@
 (function () {
   const P = {
     sparkle: 'M12 3l1.9 4.1L18 9l-4.1 1.9L12 15l-1.9-4.1L6 9l4.1-1.9z',
+    phone: 'M8 3h8a1 1 0 011 1v16a1 1 0 01-1 1H8a1 1 0 01-1-1V4a1 1 0 011-1zM11 18h2',
     layers: 'M12 4l8 4-8 4-8-4zM4 12l8 4 8-4M4 16l8 4 8-4',
     toggle: 'M3 12a5 5 0 015-5h8a5 5 0 010 10H8a5 5 0 01-5-5zM16 9.5v5',
     check: 'M20 6L9 17l-5-5',
@@ -25,6 +26,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.96', date: '2026-10-22', notes: [
+      { kind: 'new', title: 'Hand In from Phone', body: 'Scan a code to hand in with your phone’s camera.', icon: P.phone },
+    ] },
     { version: '2.99.95', date: '2026-10-22', notes: [
       { kind: 'new', title: 'Appointments in apps', body: 'The Mac and Windows apps can reserve office hours too.', icon: P.clock },
     ] },
