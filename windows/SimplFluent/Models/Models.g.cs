@@ -325,6 +325,76 @@ public sealed class CalEvent
     // (2.99.33) struck through only when handed in or excused; past once its due time (or its end) has gone by
     public bool? Struck { get; set; }
     public bool? Past { get; set; }
+    // (2.99.95) a time reserved off Find Appointment: its reservation, which Give Back hands to Canvas
+    public string? ReservationId { get; set; }
+}
+
+// (2.99.95) Find Appointment: Canvas's Scheduler as native-app.js `appointments` reads it — the classes with something to
+// sign up for, and each group with the time held and its times by day.
+public sealed class AppointmentsData
+{
+    public List<AppointmentGroup> Groups { get; set; } = new();
+    public List<AppointmentClass> Classes { get; set; } = new();
+    public string? Error { get; set; }
+}
+
+public sealed class AppointmentClass
+{
+    public string Code { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string? Color { get; set; }
+}
+
+public sealed class AppointmentGroup
+{
+    public string Id { get; set; } = "";
+    public string Title { get; set; } = "";
+    public string? Description { get; set; }
+    public string? Location { get; set; }
+    public List<string> Codes { get; set; } = new();
+    public string? Course { get; set; }
+    public string? Color { get; set; }
+    public int? Minutes { get; set; }
+    public int? Max { get; set; }
+    public bool? GroupSignup { get; set; }
+    public string? Url { get; set; }
+    public bool? Full { get; set; }
+    public List<AppointmentHeld> Mine { get; set; } = new();
+    public List<AppointmentDay> Days { get; set; } = new();
+}
+
+public sealed class AppointmentHeld
+{
+    public string Id { get; set; } = "";
+    public string? ReservationId { get; set; }
+    public string When { get; set; } = "";
+}
+
+public sealed class AppointmentDay
+{
+    public string Key { get; set; } = "";
+    public string Label { get; set; } = "";
+    public string Sub { get; set; } = "";
+    public bool? Held { get; set; }
+    public int? Open { get; set; }
+    public List<AppointmentSlot> Slots { get; set; } = new();
+}
+
+public sealed class AppointmentSlot
+{
+    public string Id { get; set; } = "";
+    public string Time { get; set; } = "";
+    public string? Start { get; set; }
+    public bool Reserved { get; set; }
+    public bool Open { get; set; }
+    public string? ReservationId { get; set; }
+}
+
+// (2.99.95) an action's answer, with Canvas's own words when it would not
+public sealed class ActReply
+{
+    public bool? Ok { get; set; }
+    public string? Error { get; set; }
 }
 
 public sealed class CalendarChoice

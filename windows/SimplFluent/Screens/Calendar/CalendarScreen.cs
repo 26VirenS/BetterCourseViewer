@@ -167,10 +167,12 @@ public sealed partial class CalendarScreen : Screen
             pager = nav;
             var calendars = K.IconButton(SymbolRegular.CalendarCheckmark24, ChooseCalendars, "Choose the calendars shown", 16, 32);
             System.Windows.Automation.AutomationProperties.SetName(calendars, "Calendars");
+            // (0.3.53) Canvas's Scheduler: office hours and sign-ups with a time to reserve
+            var finder = K.IconButton(SymbolRegular.CalendarClock24, FindAppointment, "Find Appointment", 16, 32);
             Button? more = null;
             more = K.IconButton(SymbolRegular.MoreHorizontal24, () => MoreMenu(more!), "More", 16, 32);
-            foreach (var e in new FrameworkElement[] { spinner, today, calendars, more }) e.VerticalAlignment = VerticalAlignment.Center;
-            commands = K.H(8, spinner, selector, nav, calendars, more);
+            foreach (var e in new FrameworkElement[] { spinner, today, finder, calendars, more }) e.VerticalAlignment = VerticalAlignment.Center;
+            commands = K.H(8, spinner, selector, nav, finder, calendars, more);
             PaintCommands();
             return commands;
         }
@@ -207,6 +209,15 @@ public sealed partial class CalendarScreen : Screen
     /// <summary>The calendars shown (the Mac's popover), as a dialog over the window; each change read again at once.</summary>
     private void ChooseCalendars() =>
         CalendarsSheet.Show(engine, (cal.Data ?? last)?.Calendars ?? new List<CalendarChoice>(), Read, Window.GetWindow(page));
+
+    /// <summary>(0.3.53) Find Appointment (the Mac's popup): a time reserved or given back there read again behind it.</summary>
+    private void FindAppointment() => AppointmentsSheet.Show(engine, Read, Window.GetWindow(page));
+
+    /// <summary>(0.3.53) A reserved time given back from its menu, the calendar read again after.</summary>
+    private async Task GiveBack(string reservation)
+    {
+        if (await engine.Act("cancelReservation", new { id = reservation })) Read();
+    }
 
     // ---- the page ----
 
@@ -560,6 +571,9 @@ public sealed partial class CalendarScreen : Screen
     /// <summary>The screenshot suite's preview (--open preview): the first item on screen opens its preview, once.</summary>
     private void PreviewShot()
     {
+        // (0.3.53) the screenshot suite's Find Appointment (--open appointments), over the calendar once it is drawn
+        if (cal.Data != null && !cal.Loading && Launch.Take("appointments") != null)
+            page.Dispatcher.BeginInvoke(FindAppointment, DispatcherPriority.Background);
         if (!shotAsked || cal.Data == null || cal.Loading || firstItem == null) return;
         shotAsked = false;
         if (Launch.Take("preview") == null) return;

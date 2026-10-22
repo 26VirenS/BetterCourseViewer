@@ -257,13 +257,24 @@ public sealed partial class CalendarScreen
         b.Tag = CalendarPeek.KeyOf(ev);
         AutomationProperties.SetName(b, string.IsNullOrEmpty(ev.Time) ? ev.Title : $"{ev.Title}, {ev.Time}");
         AutomationProperties.SetHelpText(b, "Shows a preview; a double-click opens it");
-        if (menu && CalendarKit.Text(ev.Url) is { } url)
+        var held = CalendarKit.Text(ev.ReservationId);
+        if (menu && (CalendarKit.Text(ev.Url) is { } || held != null))
         {
             var m = new ContextMenu();
-            m.Items.Add(CalendarKit.Item("Open", SymbolRegular.Open24, () => engine.OpenWeb(url, ev.Title)));
-            m.Items.Add(new Separator());
-            m.Items.Add(CalendarKit.Item($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen(url, ev.Title)));
-            m.Items.Add(CalendarKit.Item("Copy link", SymbolRegular.Link24, () => CalendarKit.Copy(engine.Absolute(url))));
+            if (CalendarKit.Text(ev.Url) is { } url)
+            {
+                m.Items.Add(CalendarKit.Item("Open", SymbolRegular.Open24, () => engine.OpenWeb(url, ev.Title)));
+                m.Items.Add(new Separator());
+                m.Items.Add(CalendarKit.Item($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen(url, ev.Title)));
+                m.Items.Add(CalendarKit.Item("Copy link", SymbolRegular.Link24, () => CalendarKit.Copy(engine.Absolute(url))));
+            }
+            // (0.3.53) a time reserved off Find Appointment: given back here, or another found
+            if (held != null)
+            {
+                if (m.Items.Count > 0) m.Items.Add(new Separator());
+                m.Items.Add(CalendarKit.Item("Give Back This Time", SymbolRegular.CalendarCancel24, () => _ = GiveBack(held)));
+                m.Items.Add(CalendarKit.Item("Find Another Time…", SymbolRegular.CalendarClock24, FindAppointment));
+            }
             b.ContextMenu = m;
         }
         peek.Anchor(b, ev);

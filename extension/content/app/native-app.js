@@ -1147,12 +1147,82 @@
         struck: !!(isA && (submitted || excused)), past: (allDay ? U.addDays(date, 1) : (!isA && U.parse(ev.end_at)) || date) <= now, // (an event under way is not past yet)
         sub: [cc?.name || ev.context_name || '', kind, a?.points_possible !== null && a?.points_possible !== undefined ? ptsOf(a.points_possible) : '', ev.location_name || ''].filter(Boolean).join(' · '),
         color: cc?.color || GRAY, url: ev.html_url || a?.html_url || null,
+        reservationId: !isA && ev.appointment_group_id ? String(ev.id) : null, // (2.99.95: a time reserved is the student's own event — Un-reserve gives it back)
       });
     }
     // (2.99.35) events at the same time by their id: Canvas's answers for several calendars arrive in any order, and the same
     // events are always the same answer (a live check compares them)
     out.sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : 0) || (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
     return { events: out, calendars: calsOf(contexts, chosen), notice: chosen.length ? '' : 'No calendars are selected. Turn one on under Calendars.' };
+  }
+  // (2.99.95) Find Appointment for the apps: Canvas's Scheduler as the web's sheet reads it (screens/calendar.js) — each group
+  // with its course, place and length, the time the student holds, and its times by day, each open, held or full. The
+  // classes are the student's own courses with something to sign up for, in the calendar's order.
+  async function appointments({ force = false } = {}) {
+    let list;
+    try { list = await store.appointmentGroups({ force }); } catch (err) { return { error: `Appointments could not be loaded: ${err.message}`, groups: [], classes: [] }; }
+    const contexts = await store.calendarContexts().catch(() => []);
+    const ctxMap = new Map((contexts || []).map((c) => [c.code, c]));
+    const me = String(store.env?.().current_user_id || (await store.me().catch(() => null))?.id || '');
+    const now = new Date();
+    const groups = (Array.isArray(list) ? list : []).map((g) => {
+      const held = g.reserved_times || [];
+      const slots = (g.appointments || []).map((x) => {
+        const start = U.parse(x.start_at);
+        if (!start) return null;
+        const mine = (x.child_events || []).find((c) => !me || c.user == null || String(c.user.id ?? c.user) === me) || null;
+        const heldHere = held.find((r) => r.start_at === x.start_at) || null;
+        const reserved = !!x.reserved || !!mine || !!heldHere;
+        const left = x.available_slots == null ? null : Number(x.available_slots);
+        return { id: String(x.id), start, end: U.parse(x.end_at), reserved, open: !reserved && (left === null || left > 0) && start >= now, reservationId: mine ? String(mine.id) : heldHere?.id != null ? String(heldHere.id) : null };
+      }).filter(Boolean).sort((a, b) => a.start - b.start);
+      const codes = (g.context_codes || []).map(String);
+      const ctxs = codes.map((c) => ctxMap.get(c)).filter(Boolean);
+      const days = [];
+      for (const x of slots) {
+        const k = U.startOfDay(x.start).getTime();
+        let d = days[days.length - 1];
+        if (!d || d.k !== k) { d = { k, list: [] }; days.push(d); }
+        d.list.push(x);
+      }
+      const first = slots[0];
+      return {
+        id: String(g.id), title: g.title || 'Appointments', description: textOf(g.description || '', 600).trim(), location: g.location_name || '',
+        codes, course: ctxs.map((c) => c.name).join(', ') || codes.join(', '), color: ctxs[0]?.color || GRAY,
+        minutes: first?.end ? Math.round((first.end - first.start) / 60000) : 0, max: Number(g.max_appointments_per_participant) || 0,
+        groupSignup: g.participant_type === 'Group', url: g.html_url || '/calendar',
+        full: (Number(g.max_appointments_per_participant) || 0) > 0 && slots.filter((x) => x.reserved).length >= Number(g.max_appointments_per_participant),
+        mine: slots.filter((x) => x.reserved).map((x) => ({ id: x.id, reservationId: x.reservationId, when: `${U.fmtDow(x.start)} at ${U.fmtTimeLower(x.start)}` })),
+        days: days.map(({ k, list: ds }) => {
+          const d = new Date(k);
+          const rel = U.sameDay(d, now) ? 'Today' : U.dayDiff(d, now) === 1 ? 'Tomorrow' : U.DAYS[d.getDay()];
+          const heldOne = ds.find((x) => x.reserved);
+          const open = ds.filter((x) => x.open).length;
+          return {
+            key: `${g.id}:${k}`, label: `${rel}, ${U.fmtShort(d)}`,
+            sub: heldOne ? `Your time · ${U.fmtTimeLower(heldOne.start)}` : open ? `${U.plural(open, 'time')} open · ${U.fmtTimeLower(ds[0].start)} – ${U.fmtTimeLower(ds[ds.length - 1].start)}` : 'Full',
+            held: !!heldOne, open,
+            slots: ds.map((x) => ({ id: x.id, time: U.fmtTimeLower(x.start), start: iso(x.start), reserved: x.reserved, open: x.open, reservationId: x.reservationId })),
+          };
+        }),
+      };
+    });
+    const have = new Set(groups.flatMap((g) => g.codes));
+    const classes = (contexts || []).filter((c) => have.has(c.code)).map((c) => ({ code: c.code, name: c.name, color: c.color || GRAY }));
+    for (const g of groups) if (!g.codes.some((c) => ctxMap.has(c)) && g.codes[0] && !classes.some((c) => c.code === g.codes[0])) classes.push({ code: g.codes[0], name: g.course || g.codes[0], color: GRAY });
+    return { groups, classes };
+  }
+  /** Reserve a time: Canvas's own answer when it will not (the time taken meanwhile, the most times already held). */
+  async function reserveAppointment({ id } = {}) {
+    if (!id) return { ok: false, error: 'No time was picked.' };
+    try { await store.reserveAppointment(String(id)); } catch (err) { return { ok: false, error: err.message || 'Canvas would not reserve that time.' }; }
+    return { ok: true };
+  }
+  /** Give a reserved time back (the reservation is the student's own event). */
+  async function cancelReservation({ id } = {}) {
+    if (!id) return { ok: false, error: 'This time cannot be given back here.' };
+    try { await store.cancelReservation(String(id)); } catch (err) { return { ok: false, error: err.message || 'Canvas would not give it back.' }; }
+    return { ok: true };
   }
   function calsOf(contexts, chosen) {
     const own = new Set(store.ownContexts(contexts).map((c) => c.code));
@@ -2951,7 +3021,7 @@
     return { ok: true };
   }
 
-  const CALLS = { setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, setColor, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, whatsNewSeen, refresh,
+  const CALLS = { setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, setColor, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, appointments, reserveAppointment, cancelReservation, notifications, notifMark, search, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, fileInfo, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage, messageUpload,
     toolLaunch, externalTools, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizAssignment, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback, neighbours };
   // (Mac 1.2) Grade needed: a course's score now (by the student's own weights where set, as the Grades screen) and each
