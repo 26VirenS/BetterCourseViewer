@@ -238,4 +238,6 @@ This is not the Safari extension: that stays **Simpl Courses** (the \`Simpl-Cour
 SHA-256: \`$SHA\`
 EOF
 gh release create "$TAG" "$ZIP" --target "${GITHUB_SHA:-HEAD}" --title "Simpl for Mac $VERSION$BETA_TITLE" --notes-file "$NOTES" ${BETA_FLAG[@]+"${BETA_FLAG[@]}"}
+# (1.3.152) the zip's signature beside it, before the Site workflow's feeds name it: the app installs only a signed zip
+python3 scripts/sign-releases.py --tag "$TAG" || echo "⚠ $TAG not signed now: the Site workflow signs it at its next run"
 echo "✅ https://github.com/${GITHUB_REPOSITORY:-26VirenS/BetterCourseViewer}/releases/tag/$TAG"

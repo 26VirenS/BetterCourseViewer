@@ -112,6 +112,8 @@ else
   fi
 fi
 ASSET="https://github.com/${GITHUB_REPOSITORY:-26VirenS/BetterCourseViewer}/releases/download/$TAG/$ZIP_NAME"
+# (2.99.101) the zip's signature beside it, before any feed names it: the app installs only a signed zip
+python3 scripts/sign-releases.py --tag "$TAG" || echo "⚠ $TAG not signed now: the Site workflow signs it at its next run"
 
 # ---- the site: the feed the app reads every hour, and the download address -------------------------
 git fetch origin site:refs/remotes/origin/site
