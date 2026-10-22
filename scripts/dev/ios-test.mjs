@@ -244,6 +244,25 @@ try {
   const from = new Date(now.getFullYear(), now.getMonth(), 1); from.setDate(from.getDate() - from.getDay());
   const cal = await nc('calendar', { from: from.toISOString(), to: new Date(from.getTime() + 42 * 864e5).toISOString() });
   check(!cal.error && cal.events.length > 0 && cal.events.every((e) => e.day && e.title && e.color) && cal.calendars.length > 0, `Calendar: a span's events with their day, colour and line, and the calendars to choose from: ${JSON.stringify({ events: cal.events.length, first: cal.events[0]?.title, calendars: cal.calendars.length })}`);
+  // (2.99.95) Find Appointment for the apps: the groups by class, the times by day; a time reserved is held (and is on the
+  // calendar as an appointment carrying its reservation), a second one is Canvas's own refusal, and giving it back frees it
+  const ap = await nc('appointments', { force: true });
+  const apG = ap.groups?.[0];
+  const slots0 = apG ? apG.days.flatMap((d) => d.slots) : [];
+  const open0 = slots0.filter((x) => x.open);
+  check(!ap.error && ap.classes.length === 1 && ap.classes[0].code === 'course_101' && apG?.course && apG.minutes === 15 && apG.max === 1 && apG.days.length === 2 && apG.days.every((d) => d.label && d.sub && d.slots.length === 6) && open0.length === 11 && apG.mine.length === 0 && !apG.full,
+    `Find Appointment: the class, its group (course, length, one time each) and its times by day, the one another student holds not open: ${JSON.stringify({ classes: ap.classes, days: apG?.days.map((d) => `${d.label}: ${d.sub}`), open: open0.length, error: ap.error })}`);
+  const res1 = await nc('reserveAppointment', { id: open0[0].id });
+  const ap1 = await nc('appointments', { force: true });
+  const held = ap1.groups[0].mine[0];
+  const res2 = await nc('reserveAppointment', { id: open0[1].id });
+  const calHeld = await nc('calendar', { from: new Date(Date.now() - 864e5).toISOString(), to: new Date(Date.now() + 10 * 864e5).toISOString() });
+  const onCal = calHeld.events.find((e) => e.kind === 'Appointment' && e.reservationId === held?.reservationId);
+  check(res1.ok && held?.reservationId && /at \d/.test(held.when) && ap1.groups[0].full && ap1.groups[0].days.some((d) => d.held && /^Your time/.test(d.sub)) && res2.ok === false && /maximum/i.test(res2.error || '') && !!onCal,
+    `a time reserved is held, said as "Your time", and on the calendar with its reservation; a second is Canvas's refusal: ${JSON.stringify({ res1, held, res2, onCal: onCal?.title })}`);
+  const back = await nc('cancelReservation', { id: held.reservationId });
+  const ap3 = await nc('appointments', { force: true });
+  check(back.ok && ap3.groups[0].mine.length === 0 && ap3.groups[0].days.flatMap((d) => d.slots).filter((x) => x.open).length === 11, 'and given back, the time is open again');
   const nf = await nc('notifications');
   check(!nf.error && nf.total > 0 && nf.days.length > 0 && nf.days[0].rows.every((r) => r.id && r.catLabel && r.title), `Notifications: grouped by day, each with its category: ${JSON.stringify({ total: nf.total, unread: nf.unread, days: nf.days.map((d) => `${d.title}:${d.rows.length}`), cats: nf.cats.map((c) => c.key) })}`);
   const one = nf.days[0].rows[0];

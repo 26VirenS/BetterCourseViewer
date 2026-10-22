@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.95', date: '2026-10-22', notes: [
+      { kind: 'new', title: 'Appointments in apps', body: 'The Mac and Windows apps can reserve office hours too.', icon: P.clock },
+    ] },
     { version: '2.99.94', date: '2026-10-22', notes: [
       { kind: 'improved', title: 'Quiz page for everyone', body: 'The new quiz page, out of beta.', icon: P.sparkle },
     ] },
