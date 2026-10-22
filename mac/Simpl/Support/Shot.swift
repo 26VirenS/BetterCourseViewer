@@ -50,8 +50,30 @@ enum Shot {
         for delay in [0.6, 2.0, 5.0] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { place() }
         }
-        if settle { poll(file, after: after) }
-        DispatchQueue.main.asyncAfter(deadline: .now() + after) { take(file) }
+        if settle {
+            poll(file, after: after)
+            DispatchQueue.main.asyncAfter(deadline: .now() + after) { take(file) }
+        } else {
+            waitForScreens(file, after: after)
+        }
+    }
+
+    /// (1.3.151) The full wait of a picture of a web page loading (-SimplShotSettle NO), counted from when the app's own
+    /// screens are up, not from launch: on a runner slow enough that the Dashboard took 18 s to open, a pin's graph and a
+    /// tool's page were pictured blank at 24 s. Screens up by their usual 6 s, the picture is taken when it always was;
+    /// later, it waits as much longer — and never past the wait and 40 s more, up or not.
+    private static func waitForScreens(_ file: String, after: Double) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            guard !taken else { return }
+            let up = Date().timeIntervalSince(started)
+            let ready = MainActor.assumeIsolated { AppModel.shared.engine.map { $0.phase == .native && $0.countsLive } ?? true }
+            if ready || up >= after + 40 {
+                let rest = max(after - up, ready ? after - 6 : 0)
+                DispatchQueue.main.asyncAfter(deadline: .now() + rest) { take(file) }
+            } else {
+                waitForScreens(file, after: after)
+            }
+        }
     }
 
     /// Every quarter second: the picture taken once the app has been up a little (its arrivals played), and nothing has
