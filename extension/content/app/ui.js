@@ -1689,22 +1689,7 @@
       const at = kids.map((k) => k.getBoundingClientRect());
       const now = geometry();
       if (before && Math.abs(now.x - before.x) < 1 && Math.abs(now.y - before.y) < 1 && Math.abs(now.w - before.w) < 1 && Math.abs(now.h - before.h) < 1) return;
-      // (2.99.20) the page round the box goes with it: the dim by its scale and place, which glide; the blur's clear hole
-      // (never animated: Safari drops a blur whose mask moves) by a new blur layer, its hole where the box lands, faded in
-      // over the old one fading out — opacity alone, as the box glides. Before, both jumped to the new size at once.
-      const hole = (o) => ['--bcv-mx', '--bcv-my', '--bcv-mr'].map((k) => o.style.getPropertyValue(k));
-      const holeWas = hole(ov);
-      layout({ keepDim: true });
-      const blurWas = [...ov.querySelectorAll(':scope > .bcv-card-blur')].pop();
-      if (blurWas && !reducedMotion() && !document.documentElement.classList.contains('bcv-noblur') && holeWas.join() !== hole(ov).join()) {
-        ['--bcv-mx', '--bcv-my', '--bcv-mr'].forEach((k, i) => blurWas.style.setProperty(k, holeWas[i])); // (the old layer keeps the old hole)
-        const blurNow = el('bcv-card-blur', null, { 'aria-hidden': 'true' });
-        blurWas.after(blurNow);
-        const ms = gentleMs(ov);
-        blurNow.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms, easing: 'ease' }); // (no fill: once in, the stylesheet's own fold takes it out)
-        const out = blurWas.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ms, easing: 'ease', fill: 'forwards' });
-        out.finished.then(() => blurWas.remove(), () => blurWas.remove());
-      }
+      layout({ keepDim: true }); // (2.99.97: nothing round the box blurred, so no blur to carry to its new place)
       still([sheet, shadow], () => {
         sheet.style.clipPath = clipAs(was, BOX_R);
         shadowAs(was);

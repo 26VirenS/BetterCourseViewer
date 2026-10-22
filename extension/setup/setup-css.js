@@ -51,8 +51,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .blob--d { bottom: 8%; left: 14%; width: 360px; height: 360px; background: #0a84ff; opacity: var(--blob-b); animation: driftD 33s ease-in-out infinite; }
 
 /* ---- the overlay (the same card, drawn over the Canvas page from the content script) ---- */
-.overlay { position: fixed; inset: 0; z-index: 2147482500; overflow: hidden; overscroll-behavior: contain; background: rgba(30,30,34,.36); -webkit-backdrop-filter: blur(14px) saturate(1.1); backdrop-filter: blur(14px) saturate(1.1); color: var(--ink); font: 14px/1.45 var(--font); -webkit-font-smoothing: antialiased; animation: fadeIn .35s ease both; transition: opacity .28s ease; }
-:host([data-theme="dark"]) .overlay { background: rgba(0,0,0,.5); }
+.overlay { position: fixed; inset: 0; z-index: 2147482500; overflow: hidden; overscroll-behavior: contain; background: transparent; color: var(--ink); font: 14px/1.45 var(--font); -webkit-font-smoothing: antialiased; animation: fadeIn .35s ease both; transition: opacity .28s ease; }
 .overlay.is-closing { opacity: 0; }
 /* the page never scrolls: the card's body does, between its title and its buttons */
 .overlay .page { height: 100%; min-height: 0; box-sizing: border-box; overflow: hidden; }

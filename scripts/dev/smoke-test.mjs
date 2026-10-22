@@ -2132,7 +2132,7 @@ try {
     html.classList.remove('bcv-noblur');
     const cs = (sel) => getComputedStyle(document.querySelector(sel));
     const blur = (sel) => cs(sel).backdropFilter || cs(sel).webkitBackdropFilter || '';
-    const out = { card: !!document.querySelector('.bcv-rr-ov .bcv-sheet'), dialog: document.querySelector('.bcv-rr-ov').getAttribute('aria-modal'), soft: blur('.bcv-rr__veil--soft'), deep: blur('.bcv-rr__veil--deep'), hole: /radial-gradient/.test(cs('.bcv-rr__veil--deep').maskImage || cs('.bcv-rr__veil--deep').webkitMaskImage || ''), dim: /radial-gradient/.test(cs('.bcv-rr__veil--dim').backgroundImage),
+    const out = { card: !!document.querySelector('.bcv-rr-ov .bcv-sheet'), dialog: document.querySelector('.bcv-rr-ov').getAttribute('aria-modal'), veils: [...document.querySelectorAll('.bcv-rr__veil')].map((v) => v.className.replace('bcv-rr__veil ', '')).join(','), ovBlur: blur('.bcv-rr-ov'), dim: /radial-gradient/.test(cs('.bcv-rr__veil--dim').backgroundImage),
       labels: [...document.querySelectorAll('.bcv-rr__label')].map((b) => b.getAttribute('aria-label')).join(' | '), shown: [...document.querySelectorAll('.bcv-rr__label')].map((b) => b.innerText.replace(/\s+/g, ' ')).join(' | '),
       centre: document.querySelector('.bcv-rr__centre').innerText.replace(/\s+/g, ' ').trim(), status: document.querySelector('.bcv-rr__status').textContent, title: document.querySelector('.bcv-rr__title').textContent };
     if (nb) html.classList.add('bcv-noblur');
@@ -2141,7 +2141,7 @@ try {
   // the page behind is held still while the ring is up: the wheel moves nothing (and its scrollbar stays put)
   const held = await pageHeld(page, 760, 420);
   check(!held.moved && held.scrollable && held.bar !== 'hidden', `the page behind the ring is held still — the wheel moves nothing: ${JSON.stringify(held)}`);
-  check(!ringOpen.card && ringOpen.dialog === 'true' && /blur\(4px\)/.test(ringOpen.soft) && /blur\(18px\)/.test(ringOpen.deep) && ringOpen.hole && ringOpen.dim, `the rubric opens as the ring alone over the page — no card — with the page dimmed, a light blur behind the ring and a heavier one around it: ${JSON.stringify(ringOpen)}`);
+  check(!ringOpen.card && ringOpen.dialog === 'true' && ringOpen.veils === 'bcv-rr__veil--dim' && !/blur/.test(ringOpen.ovBlur) && ringOpen.dim, `the rubric opens as the ring alone over the page — no card — the page dimmed under its light words but not blurred (2.99.97): ${JSON.stringify(ringOpen)}`);
   check(ringOpen.labels === 'Correctness, 4 of 6 | Work shown, 4 of 4' && ringOpen.shown === 'Correctness 4 / 6 | Work shown 4 / 4' && /^Score 8 of 10 · 80%/i.test(ringOpen.centre) && /^Graded \w{3} \d{1,2} · 2 criteria$/.test(ringOpen.status) && ringOpen.title === 'Week 1 reflection', `a slice per criterion, each a button named with its score, the rubric's own total in the middle: ${JSON.stringify(ringOpen)}`);
   // marked, the ring bends in where points were lost (Correctness, 4 of 6) and out where they were not (Work shown, 4 of 4)
   const bent = await eventually(async () => { const e = await ringEdges(page); return e[0].outer < 178.5 && e[1].outer > 183; }, 5000);
@@ -2384,21 +2384,20 @@ try {
   check(pdfOnly.sub === 'PDF only · others converted' && pdfOnly.title === 'Word, text and pictures are converted to PDF for you' && pdfOnly.accept === '.pdf,.docx,.txt,.md,.markdown,.png,.jpg,.jpeg,.webp,.gif,.bmp,.avif', `where only PDF is allowed, the drop says the others are converted (its title which), and the picker does not grey a Word file out (${JSON.stringify(pdfOnly)})`);
   await shot(page, '17b-handin-pdf-only');
   await mockConfig({ ext: {} });
-  // (2.99.20) the box taking a new size (another tab) takes the page round it along: the old blur fades out as a new one,
-  // its clear middle where the box now is, fades in, while the box glides — not the backdrop jumping at once
+  // (2.99.97) the page round the box is left as it is — neither dimmed nor blurred — whatever size the box takes
   const nbWas = await page.evaluate(() => { const nb = document.documentElement.classList.contains('bcv-noblur'); document.documentElement.classList.remove('bcv-noblur'); return nb; });
   await handIn();
   await page.evaluate(() => document.documentElement.classList.remove('bcv-noblur')); // (the reload above draws it as the run does)
   await page.waitForTimeout(700);
-  const { blurMid, blurEnd } = await realMotion(page, async () => {
-    const lastTab = await page.$$eval('.bcv-sb__tab', (els) => els.at(-1)?.dataset.tab);
-    await page.click(`.bcv-sb__tab[data-tab="${lastTab}"]`);
-    // (read in the page, frame by frame, until both layers are part-way: a loaded machine starts the fade a little late)
-    const mid = await page.evaluate(() => new Promise((res) => { const t0 = performance.now(); let last = []; const look = () => { last = [...document.querySelectorAll('.bcv-sheet-ov > .bcv-card-blur')].map((e) => Math.round(+getComputedStyle(e).opacity * 100) / 100); if ((last.length === 2 && last.every((o) => o > 0.05 && o < 0.95)) || performance.now() - t0 > 600) res(last); else requestAnimationFrame(look); }; look(); }));
-    await page.waitForTimeout(800);
-    return { blurMid: mid, blurEnd: await page.$$eval('.bcv-sheet-ov > .bcv-card-blur', (els) => els.map((e) => +getComputedStyle(e).opacity)) };
+  const lastTab = await page.$$eval('.bcv-sb__tab', (els) => els.at(-1)?.dataset.tab);
+  await page.click(`.bcv-sb__tab[data-tab="${lastTab}"]`);
+  await page.waitForTimeout(600);
+  const roundBox = await page.evaluate(() => {
+    const ov = document.querySelector('.bcv-sheet-ov--card'), cs = getComputedStyle(ov);
+    const dim = ov.querySelector(':scope > .bcv-card-dim');
+    return { blurLayers: ov.querySelectorAll('.bcv-card-blur').length, ovBg: cs.backgroundColor, ovBlur: cs.backdropFilter || cs.webkitBackdropFilter || 'none', dim: dim ? getComputedStyle(dim).display : 'none' };
   });
-  check(blurMid.length === 2 && blurMid.every((o) => o > 0.05 && o < 0.95) && blurEnd.length === 1 && blurEnd[0] === 1, `a new size cross-fades the page's blur to the box's new place, not at once: ${JSON.stringify({ blurMid, blurEnd })}`);
+  check(roundBox.blurLayers === 0 && roundBox.ovBg === 'rgba(0, 0, 0, 0)' && roundBox.ovBlur === 'none' && roundBox.dim === 'none', `the page round the box is neither dimmed nor blurred, at any size (2.99.97): ${JSON.stringify(roundBox)}`);
   await page.click('.bcv-sb__tab[data-tab="file"]'); // (the tab is remembered: the checks below start on the file one)
   await page.waitForTimeout(300);
   if (nbWas) await page.evaluate(() => document.documentElement.classList.add('bcv-noblur'));
@@ -5019,7 +5018,7 @@ try {
     const side = document.querySelector('.bcv-side').getBoundingClientRect(), stat = document.querySelector('.bcv-stats .bcv-stat').getBoundingClientRect();
     const at = (x, y) => document.elementFromPoint(x, y);
     return {
-      veil: !!veil && /path\(evenodd/.test(veil.style.clipPath),
+      veil: !!veil && /path\(evenodd/.test(veil.style.clipPath), veilBg: veil && getComputedStyle(veil).backgroundColor,
       badges: document.querySelectorAll('.bcv-ap-badge').length, stats: document.querySelectorAll('.bcv-stats .bcv-stat[data-stat]').length,
       litStat: !at(stat.left + 10, stat.top + 10)?.closest('.bcv-ap-veil'), litSide: !at(side.left + 30, side.bottom - 200)?.closest('.bcv-ap-veil'),
       dim: !!at(innerWidth - 60, innerHeight / 2 - 120)?.closest('.bcv-ap-veil'),
@@ -5027,7 +5026,7 @@ try {
       readies: document.querySelectorAll('.bcv-ap-ready').length,
     };
   });
-  check(ap.veil && ap.badges === ap.stats + 1 && ap.litStat && ap.litSide && ap.dim && ap.tabs === 'Theme|Courses|Sidebar' && ap.looks === 'Light|Dark|System' && ap.readies === 7, `Appearance over the Dashboard: darkened but for the sidebar and the counters, a photo button on each, Theme / Courses / Sidebar and Light / Dark / System at the foot: ${JSON.stringify(ap)}`);
+  check(ap.veil && ap.veilBg === 'rgba(0, 0, 0, 0)' && ap.badges === ap.stats + 1 && ap.litStat && ap.litSide && ap.dim && ap.tabs === 'Theme|Courses|Sidebar' && ap.looks === 'Light|Dark|System' && ap.readies === 7, `Appearance over the Dashboard: the page held but for the sidebar and the counters — not darkened (2.99.97) — a photo button on each, Theme / Courses / Sidebar and Light / Dark / System at the foot: ${JSON.stringify(ap)}`);
   await shot(page, '27c-appearance');
   await page.click('.bcv-ap-ready[data-ready="Ocean"]');
   const worn = await eventually(() => sw.evaluate(async () => { const s = await self.BCV.settings.get(); const im = (await self.BCV.api.storage.local.get('theme:images'))['theme:images']; return s.appearance?.theme?.name === 'Teal' && !!im?.side; }), 8000);
@@ -5775,9 +5774,9 @@ try {
   await tourStep('look', 20000);
   const t1 = await tourAt();
   const discAt = await page.$eval('#bcv-look .bcv-look__main', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
-  const veil = await page.evaluate(() => { const t = document.getElementById('bcv-tour'); const g = t.querySelector('radialGradient'); const b = getComputedStyle(t.querySelector('.bcv-tour__blur')); return { stops: [...t.querySelectorAll('stop')].map((s) => Number(s.getAttribute('stop-opacity'))), gx: Number(g.getAttribute('cx')), gy: Number(g.getAttribute('cy')), hole: Number(t.querySelector('.bcv-tour__hole').getAttribute('width')) > 0, mask: b.maskImage || b.webkitMaskImage || '', touring: document.documentElement.classList.contains('bcv-touring'), app: getComputedStyle(document.getElementById('bcv-app')).display !== 'none' }; });
+  const veil = await page.evaluate(() => { const t = document.getElementById('bcv-tour'); const g = t.querySelector('radialGradient'); const b = getComputedStyle(t.querySelector('.bcv-tour__blur')); return { stops: [...t.querySelectorAll('stop')].map((s) => Number(s.getAttribute('stop-opacity'))), gx: Number(g.getAttribute('cx')), gy: Number(g.getAttribute('cy')), hole: Number(t.querySelector('.bcv-tour__hole').getAttribute('width')) > 0, shown: [getComputedStyle(t.querySelector('.bcv-tour__veil')).display, b.display], touring: document.documentElement.classList.contains('bcv-touring'), app: getComputedStyle(document.getElementById('bcv-app')).display !== 'none' }; });
   check(page.url() === `${BASE}/` && /^(reload|navigate)$/.test(await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) && (await page.$('#bcv-setup')) === null && !(await page.$('html.bcv-setup-open')) && t1.bg === 'rgba(0, 0, 0, 0)' && veil.app && veil.touring, `(2.99.74) Appearance's Done brings the tour over the Dashboard — the page itself, not a black screen: ${JSON.stringify({ bg: t1.bg, veil })}`);
-  check(veil.hole && Math.abs(veil.gx - discAt.x) < 40 && Math.abs(veil.gy - discAt.y) < 40 && veil.stops[0] < veil.stops[2] && veil.stops[2] < veil.stops[3] && /radial-gradient/.test(veil.mask), `the dim is a gradient centred on the switch, darker the further from it, with the switch cut out of it; the blur fades in the same way: ${JSON.stringify(veil)}`);
+  check(veil.shown.join() === 'none,none', `the page round the lit place is neither dimmed nor blurred (2.99.97): the ring alone says where: ${JSON.stringify(veil)}`);
   check(t1.title === 'The Simpl switch' && t1.doing === 'Hover over the switch' && t1.kind === 'hover' && t1.act === 'hover' && /^1 of \d+$/.test(t1.count) && t1.steps.startsWith('look,look-green,look-red,look-for,grades,grade-ring') && t1.steps.endsWith('peek,peek-row,peek-close,search,end') && !t1.steps.includes('away') && await ringHolds(t1.ring, '#bcv-look .bcv-look__main') && t1.card.y >= t1.ring.y + t1.ring.h && t1.next === null, `the first step lights the switch: its card under it says what it is and asks for a hover, the pointer showing one (no Next: the hover moves it on; no Away Refresh step while that is off): ${JSON.stringify(t1)}`);
   // the page is held still outside the lit place: a press on a card does not open it, and the card nudges
   const wk = await page.$eval('.bcv-stat[data-stat="week"]', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });

@@ -159,7 +159,7 @@
     content = make(api);
     if (content.cls) sheet.classList.add(...content.cls.split(/\s+/).filter(Boolean));
     sheet.append(...content.kids.filter(Boolean));
-    ov.append(sheet, U.el('bcv-card-blur', null, { 'aria-hidden': 'true' })); // (the page blurred round the box: a layer of its own)
+    ov.append(sheet); // (2.99.97: the page round the box left as it is: no blur)
     // the box wears the button's own look while it is the button's size — its fill, edge and corners — and a copy of the
     // button's words sits over its header, so the first frame is the button exactly, and the last frame of the fold too;
     // the copy fades as the box grows (the box's own words fade in), all but the one word that glides, left out of the copy

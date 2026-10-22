@@ -202,7 +202,8 @@
 
     // ---- the page around it: dimmed, blurred (more away from the ring), and the header over that
     const ov = h('div', { class: 'bcv-sheet-ov bcv-rr-ov', role: 'dialog', 'aria-modal': 'true', 'aria-label': `${a.name || 'Assignment'} rubric`, tabindex: '-1', 'data-count': n > 15 ? 'lots' : n > 10 ? 'many' : 'few' });
-    const veils = ['soft', 'deep', 'dim'].map((k) => h('div', { class: `bcv-rr__veil bcv-rr__veil--${k}`, 'aria-hidden': 'true' }));
+    // (2.99.97: the page round the ring is not blurred; the dim stays, as the ring's words are drawn light on it)
+    const veils = [h('div', { class: 'bcv-rr__veil bcv-rr__veil--dim', 'aria-hidden': 'true' })];
     const many = n === 1 ? '1 criterion' : `${n} criteria`;
     const statusOf = () => (m.graded ? `Graded${sub?.graded_at ? ` ${U.fmtShort(sub.graded_at)}` : ''} · ${many}`
       : m.held ? `${many} · marks not posted yet` : `${many} · not graded yet`);

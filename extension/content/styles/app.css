@@ -14,12 +14,12 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.96"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.97"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
-  --bcv-hover: #fafafc; --bcv-chrome: rgba(242,242,246,.7); --bcv-panel: rgba(255,255,255,.55); --bcv-glass: rgba(255,255,255,.78); --bcv-scrim: rgba(0,0,0,.34);
-  --bcv-blur-chrome: blur(14px) saturate(1.4); --bcv-blur-glass: blur(22px); --bcv-blur-scrim: blur(8px);
+  --bcv-hover: #fafafc; --bcv-chrome: rgba(242,242,246,.7); --bcv-panel: rgba(255,255,255,.55); --bcv-glass: rgba(255,255,255,.78); --bcv-scrim: transparent;
+  --bcv-blur-chrome: blur(14px) saturate(1.4); --bcv-blur-glass: blur(22px); --bcv-blur-scrim: none; /* (2.99.97: nothing behind a popup is darkened or blurred: the page stays as it is, the popup's own shadow sets it apart) */
   /* the stacking ladder, named once: the phone's bars over the page, menus and panels over those, the bar, sheets over
      everything on the page, a side panel and pickers over sheets, toasts over all; then the things that must sit above
      Canvas's own top layer — the tray, the switch and what floats with it, a pin pulled free, a drag ghost, the welcome,
@@ -52,7 +52,7 @@ html[data-bcv-theme] {
 html[data-bcv-theme="dark"] {
   --bcv-bg: #000; --bcv-card: #1c1c1e; --bcv-ink: #f2f2f7; --bcv-ink2: #c7c7cc; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(255,255,255,.08); --bcv-edge: rgba(255,255,255,.1); --bcv-fill: rgba(118,118,128,.28); --bcv-fill2: rgba(118,118,128,.14);
-  --bcv-hover: #2c2c2e; --bcv-chrome: rgba(0,0,0,.6); --bcv-panel: rgba(255,255,255,.05); --bcv-glass: rgba(28,28,30,.74); --bcv-scrim: rgba(0,0,0,.42);
+  --bcv-hover: #2c2c2e; --bcv-chrome: rgba(0,0,0,.6); --bcv-panel: rgba(255,255,255,.05); --bcv-glass: rgba(28,28,30,.74); --bcv-scrim: transparent;
   --bcv-blue: #0a84ff; --bcv-blue-soft: rgba(10,132,255,.18);
   --bcv-shadow: 0 1px 2px rgba(0,0,0,.4); --bcv-shadow-hi: 0 6px 20px rgba(0,0,0,.5); --bcv-shadow-lift: 0 8px 20px rgba(0,0,0,.45);
   --bcv-red-text: #ff8a80; --bcv-green-text: #5ddb7d; --bcv-dash: rgba(255,255,255,.28);
@@ -87,8 +87,6 @@ html.bcv-noblur { --bcv-chrome-ground: linear-gradient(var(--bcv-chrome), var(--
  * in software still works it out for every frame (the sidebar, the bars and the header each did). */
 html.bcv-noblur *, html.bcv-noblur *::before, html.bcv-noblur *::after { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 html.bcv-noblur :is(.bcv-away__btn, .bcv-toast) { background: rgba(28,28,30,.94); }
-@keyframes bcv-noblur-in { from { filter: blur(0); } to { filter: blur(6px); } }
-html.bcv-noblur body:has(> .bcv-sheet-ov:not(.bcv-sheet-ov--float)) > #bcv-app > :is(#bcv-main, #bcv-side), html.bcv-noblur body:has(> .bcv-sheet-ov:not(.bcv-sheet-ov--float)) > #bcv-bar { animation: bcv-noblur-in .24s ease both; } /* (not under the search afloat: it leaves the page sharp) */
 /* data arrives rather than appears: an arc sweeps from empty to its value (the `to` is the ring's own dasharray), a line strokes itself on */
 @keyframes bcv-ring-fill { from { stroke-dasharray: 0 999; } }
 @keyframes bcv-ring-unfill { to { stroke-dasharray: 0 999; } }
@@ -375,7 +373,7 @@ html.bcv-phone.bcv-on #bcv-report, html.bcv-setup-open #bcv-report, html.bcv-in-
   -webkit-mask-image: radial-gradient(circle at var(--tx, 50%) var(--ty, 50%), transparent var(--r0, 0px), rgba(0,0,0,.7) calc(var(--r0, 0px) + 70px), #000 calc(var(--r0, 0px) + 220px));
   mask-image: radial-gradient(circle at var(--tx, 50%) var(--ty, 50%), transparent var(--r0, 0px), rgba(0,0,0,.7) calc(var(--r0, 0px) + 70px), #000 calc(var(--r0, 0px) + 220px));
   animation: bcv-tour-in .45s ease both; }
-html.bcv-noblur .bcv-tour__blur { display: none; } /* (Chrome drawing without graphics acceleration: the dim alone) */
+.bcv-tour__veil, .bcv-tour__blur { display: none; } /* (2.99.97: the page round the lit place neither dimmed nor blurred — its ring says where) */
 .bcv-tour__block { position: fixed; left: 0; top: 0; width: 0; height: 0; pointer-events: auto; touch-action: pan-x pan-y; }
 .bcv-tour__ring { position: fixed; left: 0; top: 0; box-sizing: border-box; pointer-events: none; border-radius: 14px; box-shadow: 0 0 0 2px var(--bcv-blue); transition: box-shadow .3s ease; }
 .bcv-tour__ring[hidden] { display: none; }
@@ -847,13 +845,10 @@ html.bcv-themed .bcv-stats > .bcv-stat[data-stat="overdue"]:not(.bcv-stat--pic) 
 /* (2.98.48; 2.99.4) the page focuses onto the box: the dim's lighter middle starts wide enough to hold the whole window and
    closes in on the box over .8s; folding lets it go the same way back. The dim is a gradient drawn once, on a 512px layer
    of its own (.bcv-card-dim) scaled to cover the window round the box's centre — moved and grown by transform alone
-   (U.cardBox), never a page-wide gradient drawn again on every frame from animated values. (2.98.81) The blur is a layer of
-   its own too (.bcv-card-blur) at one strength, its soft-edged clear hole round where the box lands (--bcv-mx, my, mr: set
-   with the box, never animated), fading in on the press and out as the box folds. Safari drew an earlier blur, whose
-   strength and hole were animated, while they moved — then dropped it the moment they settled. */
+   (U.cardBox), never a page-wide gradient drawn again on every frame from animated values. (2.99.97) Neither is drawn now:
+   the dim is kept for the motion that moves it, hidden, and the blur round the box is gone — the page stays as it is. */
 .bcv-sheet-ov--card { display: block; padding: 0; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; animation: none; transition: opacity .25s ease .3s; }
 .bcv-sheet-ov--card.is-under { opacity: 0; pointer-events: none; transition: opacity .18s ease; } /* (2.99.10: a mark's card under the rubric opened from its ring; it comes back as the rubric goes) */
-/* the dim and the blur are layers of their own under the box (z 0 to its 1); the box itself never fades in */
 /* the dim and the blur are layers of their own under the box (z 0 to its 1); the box itself never fades in. The dim's stops
    (--bcv-d1..3, on the layer itself) are the box's: its own half-diagonal × .8, + 220px and + 900px out, as a share of the
    layer's reach once scaled; its place (translate) glides with the box, its reach (scale) over .8s */
@@ -861,18 +856,15 @@ html.bcv-themed .bcv-stats > .bcv-stat[data-stat="overdue"]:not(.bcv-stat--pic) 
 /* the box's shadow: a layer of its own at the box's place and size, scaled from the card's as the box grows (a clip would
    cut a shadow drawn on the box itself), fading in as it leaves the card and out as it folds back */
 .bcv-card-shadow { position: fixed; z-index: 0; pointer-events: none; border-radius: var(--bcv-r-sheet); box-shadow: 0 30px 80px rgba(0,0,0,.34), 0 2px 10px rgba(0,0,0,.14); transform-origin: 0 0; opacity: 0; transition: transform var(--bcv-t-gentle) var(--bcv-spring-gentle), opacity .3s ease; }
-.bcv-card-blur { position: absolute; inset: 0; z-index: 0; pointer-events: none; -webkit-backdrop-filter: blur(10px) saturate(.85); backdrop-filter: blur(10px) saturate(.85); -webkit-mask-image: radial-gradient(circle at var(--bcv-mx, 50%) var(--bcv-my, 50%), transparent calc(var(--bcv-mr, 0px) * .8), rgba(0,0,0,.75) calc(var(--bcv-mr, 0px) + 36px), #000 calc(var(--bcv-mr, 0px) + 120px)); mask-image: radial-gradient(circle at var(--bcv-mx, 50%) var(--bcv-my, 50%), transparent calc(var(--bcv-mr, 0px) * .8), rgba(0,0,0,.75) calc(var(--bcv-mr, 0px) + 36px), #000 calc(var(--bcv-mr, 0px) + 120px)); animation: bcv-card-veil .32s ease both; }
-.bcv-sheet-ov--card.is-folding .bcv-card-blur { animation: bcv-card-unveil .32s ease both; }
-html.bcv-noblur .bcv-card-blur { display: none; }
+.bcv-card-dim { display: none; } /* (2.99.97: the page round a box grown out of a card neither dimmed nor blurred) */
 @keyframes bcv-card-veil { from { opacity: 0; } }
-@keyframes bcv-card-unveil { to { opacity: 0; } }
 .bcv-sheet-ov--card.is-folding { opacity: 0; pointer-events: none; }
 /* (2.99.69) a Dashboard counter's box, as the Mac app's panel: it floats over the page — no dim, no blur, the page left as it
    is and taking every press outside the box (one folds the box back: dashboard.js openSheet) — with the Mac's lighter
    shadow, and grows and folds on the Mac's own spring (motion.js morph) in place of the house's gentle one */
 .bcv-sheet-ov--float { pointer-events: none; --bcv-spring-gentle: cubic-bezier(.77, 0, .175, 1); --bcv-t-gentle: .38s; } /* (2.99.72) grows and folds on a strong ease-in-out — one move on screen, slow out, quick through, soft in */
 .bcv-sheet-ov--float > :is(.bcv-sheet, .bcv-pv) { pointer-events: auto; }
-.bcv-sheet-ov--float > :is(.bcv-card-dim, .bcv-card-blur) { display: none; }
+.bcv-sheet-ov--float > .bcv-card-dim { display: none; }
 .bcv-sheet-ov--float > .bcv-card-shadow { box-shadow: 0 10px 48px rgba(0,0,0,.18), 0 1px 4px rgba(0,0,0,.08); }
 /* (2.99.72, the Mac's panel) its glass tinted by the counter's own colour (--bcv-stat-tint, a tenth or so of it, as the
    Mac's .glass(tint: colour.opacity(0.10))) — the page through it blurred but not darkened; dark glass in the dark look,
@@ -1654,10 +1646,6 @@ html.bcv-phone .bcv-rubg__cellpts { font-size: 19px; }
 html[data-bcv-theme="dark"] .bcv-rr-ov { --rr-dim0: .52; --rr-dim1: .78; }
 .bcv-rr-ov.is-closing { animation: none; }
 .bcv-rr__veil { position: absolute; inset: 0; pointer-events: none; animation: bcv-card-veil .38s ease backwards; transition: opacity .38s ease; }
-.bcv-rr__veil--soft { -webkit-backdrop-filter: blur(4px) saturate(.9); backdrop-filter: blur(4px) saturate(.9); }
-.bcv-rr__veil--deep { -webkit-backdrop-filter: blur(18px) saturate(.8); backdrop-filter: blur(18px) saturate(.8);
-  -webkit-mask-image: radial-gradient(ellipse calc(var(--rr-w, 760px) * .6) calc(var(--rr-h, 560px) * .62) at var(--rr-x, 50%) var(--rr-y, 50%), transparent 58%, rgba(0,0,0,.7) 82%, #000 100%);
-  mask-image: radial-gradient(ellipse calc(var(--rr-w, 760px) * .6) calc(var(--rr-h, 560px) * .62) at var(--rr-x, 50%) var(--rr-y, 50%), transparent 58%, rgba(0,0,0,.7) 82%, #000 100%); }
 .bcv-rr__veil--dim { background: radial-gradient(ellipse calc(var(--rr-w, 760px) * .66) calc(var(--rr-h, 560px) * .7) at var(--rr-x, 50%) var(--rr-y, 50%), rgba(0,0,0,var(--rr-dim0)) 50%, rgba(0,0,0,var(--rr-dim1)) 100%); }
 .bcv-rr-ov.is-leaving .bcv-rr__veil { opacity: 0; }
 .bcv-rr__top { position: absolute; left: 0; right: 0; top: 0; padding: 22px 80px 0; display: flex; flex-direction: column; align-items: center; text-align: center; pointer-events: none; animation: bcv-fade-in .3s ease .1s backwards; transition: opacity .2s ease; }
@@ -2537,7 +2525,7 @@ html[data-bcv-theme="dark"] .bcv-asg__worksent.is-late { color: #ffb44d; }
 .bcv-asg__worktext .bcv-asg__prose { margin: 0; animation: none; }
 #bcv-app .bcv-asg__worklink { display: block; padding: 10px 0 2px; border-top: 1px solid var(--bcv-edge); color: var(--bcv-cc-ink); font: 500 14px/1.4 var(--bcv-font); }
 /* the Feedback sheet: the work on the left, the comments on the right */
-.bcv-fbs-ov { position: fixed; inset: 0; z-index: 2147483000; display: grid; place-items: center; padding: 28px; background: rgba(0,0,0,.32); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); animation: bcv-fbs-ov-in .2s ease-out; }
+.bcv-fbs-ov { position: fixed; inset: 0; z-index: 2147483000; display: grid; place-items: center; padding: 28px; background: transparent; animation: bcv-fbs-ov-in .2s ease-out; }
 .bcv-fbs-ov.is-closing { animation: bcv-fbs-ov-out .18s ease-in forwards; }
 @keyframes bcv-fbs-ov-in { from { opacity: 0; } }
 @keyframes bcv-fbs-ov-out { to { opacity: 0; } }
@@ -5177,7 +5165,7 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
  * Spotlight's way — a large pill over a light dim, the four kinds to search in under it — its root moved into a
  * fixed palette that eases from the header's place (left, top, width; the box's height and corners with them) while a
  * ghost keeps the header's row; the veil takes no pointer, so a press anywhere on the page lands, and puts it back */
-.bcv-spot-ov { position: fixed; inset: 0; z-index: calc(var(--bcv-z-sheet) - 2); pointer-events: none; background: rgba(0,0,0,.12); animation: bcv-card-veil .2s ease both; } /* (2.98.69: the page around the search stays sharp, only a little dimmer) */
+.bcv-spot-ov { position: fixed; inset: 0; z-index: calc(var(--bcv-z-sheet) - 2); pointer-events: none; background: transparent; animation: bcv-card-veil .2s ease both; } /* (2.98.69: the page around the search stays sharp, only a little dimmer) */
 html.bcv-noblur .bcv-spot:not(.is-far) .bcv-omni__box, html.bcv-noblur .bcv-spot .bcv-omni__panel { background: linear-gradient(rgba(40,40,44,.97), rgba(40,40,44,.97)) padding-box, var(--bcv-glass-rim) border-box; -webkit-backdrop-filter: none; backdrop-filter: none; } /* (solid, the rim kept) */
 .bcv-spot-ov.is-folding { opacity: 0; transition: opacity .3s ease; }
 .bcv-spot { position: fixed; z-index: calc(var(--bcv-z-sheet) - 1); display: flex; /* (under the sheets: a hand-in box or a question opened from a row comes up over the pill) */ flex-direction: column; gap: 10px; } /* (2.99.4: laid out in the middle at once; the pill is moved there by transform — search.js drawAs) */
@@ -5827,7 +5815,7 @@ html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-pins .bcv-pin
 .bcv-qz:not(.is-embedded) .bcv-qzi { min-height: calc(100vh - 64px - var(--bcv-bar-h, 0px)); }
 /* (2.99.67) on a computer the intro is a large popup over the page it was opened from, as the Mac's sheet: the app dimmed
    behind it (a press there closes it), the card centred, its header kept at its top while the rest scrolls */
-.bcv-qz-veil { position: fixed; inset: 0; z-index: var(--bcv-z-sheet); background: rgba(0,0,0,.42); animation: bcv-fade-in .2s var(--bcv-ease-out) both; }
+.bcv-qz-veil { position: fixed; inset: 0; z-index: var(--bcv-z-sheet); background: transparent; animation: bcv-fade-in .2s var(--bcv-ease-out) both; }
 .bcv-qz.is-pop { position: fixed; z-index: calc(var(--bcv-z-sheet) + 1); left: 50%; top: 50%; translate: -50% -50%; width: min(1120px, calc(100vw - 96px)); height: min(820px, calc(100vh - 80px)); min-height: 0; overflow: auto; border-radius: var(--bcv-r-sheet, 22px); background: var(--bcv-bg); box-shadow: 0 0 0 1px var(--bcv-edge), 0 30px 80px rgba(0,0,0,.45), 0 4px 14px rgba(0,0,0,.2); animation: bcv-qzpop-in .26s cubic-bezier(.23,1,.32,1) both; }
 @keyframes bcv-qzpop-in { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
 .bcv-qz.is-pop .bcv-qzi { min-height: calc(100% - 64px); padding-left: 24px; padding-right: 24px; }
@@ -5886,8 +5874,7 @@ html.bcv-on:not(.bcv-phone):not(.bcv-punch) .bcv-qz.is-pop .bcv-qz__head { top: 
 
 /* ---- (2.99.60) Appearance, as the Mac's: the page darkened but for the sidebar and the counters, a photo button on each,
    and a bar at the foot (content/app/appearance.js) ---- */
-.bcv-ap-veil { position: fixed; inset: 0; z-index: calc(var(--bcv-z-tray) - 2); background: rgba(0,0,0,.42); animation: bcv-ap-in .25s ease-out both; }
-html.bcv-dark .bcv-ap-veil { background: rgba(0,0,0,.58); }
+.bcv-ap-veil { position: fixed; inset: 0; z-index: calc(var(--bcv-z-tray) - 2); background: transparent; animation: bcv-ap-in .25s ease-out both; }
 .bcv-ap-badge { position: fixed; z-index: calc(var(--bcv-z-tray) - 1); width: 42px; height: 42px; display: grid; place-items: center; padding: 0; border: 2px solid rgba(255,255,255,.85); border-radius: 50%; background: var(--bcv-accent, #0a84ff); box-shadow: 0 3px 16px rgba(0,0,0,.3); cursor: pointer; animation: bcv-ap-pop .32s cubic-bezier(.34,1.4,.64,1) both; transition: transform .15s var(--bcv-ease-out, ease-out); }
 @media (hover: hover) { .bcv-ap-badge:hover { transform: scale(1.06); } }
 .bcv-ap-badge:active { transform: scale(.94); }

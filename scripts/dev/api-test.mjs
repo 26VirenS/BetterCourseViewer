@@ -311,9 +311,22 @@ console.log('the veil behind a box');
   const boxRule = (css.match(/\.bcv-sheet--card \{ position: fixed;([^}]*)\}/) || [])[1] || '';
   check(dimRule && /radial-gradient\(closest-side/.test(dimRule) && /transition:\s*translate [^;]*, scale /.test(dimRule) && !/@property --bcv-(cx|cy|r0|reach)\b/.test(css) && !/--bcv-(cx|cy|r0|reach)\b/.test(css), `the veil is a layer of its own, moved by transform alone, with no animated custom properties: ${dimRule.trim().slice(0, 90)}…`);
   check(/transition:\s*clip-path var\(--bcv-t-gentle\) var\(--bcv-spring-gentle\);/.test(boxRule) && !/transition:[^;]*\b(left|top|width|height)\b/.test(boxRule), `a counter's box grows through a clip on the gentle spring, never by its size: ${boxRule.trim().slice(-160)}`);
-  // the blur round a box: a layer of its own at one strength, its hole from values set with the box and never animated (Safari dropped the blur whose strength and hole were animated, once they settled)
-  const cb = (css.match(/\.bcv-card-blur \{([^}]*)\}/) || [])[1] || '';
-  check(cb && /backdrop-filter:\s*blur\(10px\)/.test(cb) && !/backdrop-filter:[^;]*var\(/.test(cb) && /var\(--bcv-mx/.test(cb) && !/@property --bcv-m[xyr]\b/.test(css) && !/transition:/.test(cb) && !/--bcv-(hole|blur)(?![-\w])/.test(css), `the blur round a box has one strength and a hole set with the box, nothing about it animated but its fade: ${cb.trim().slice(0, 90)}…`);
+  // (2.99.97) nothing behind a popup is darkened or blurred: no scrim on a sheet, no blur layer round a box, its dim hidden,
+  // and the other overlays — feedback, the quiz's intro, Appearance, the search afloat, the tour, the setup — left clear
+  const setupCss = readFileSync(join(root, 'extension', 'setup', 'setup-css.js'), 'utf8');
+  const ruleOf = (src, sel) => (src.match(new RegExp(`(^|\\n)${sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\{([^}]*)\\}`)) || [])[2] || '';
+  const clear = {
+    scrim: (css.match(/--bcv-scrim: ([^;]+);/g) || []).every((d) => /transparent/.test(d)) && /--bcv-blur-scrim: none;/.test(css),
+    boxBlur: !/\.bcv-card-blur\b/.test(css) && /\.bcv-card-dim \{ display: none; \}/.test(css),
+    tour: /\.bcv-tour__veil, \.bcv-tour__blur \{ display: none; \}/.test(css),
+    fbs: /background: transparent;/.test(ruleOf(css, '.bcv-fbs-ov')) && !/backdrop-filter/.test(ruleOf(css, '.bcv-fbs-ov')),
+    quiz: /background: transparent;/.test(ruleOf(css, '.bcv-qz-veil')),
+    appearance: /background: transparent;/.test(ruleOf(css, '.bcv-ap-veil')) && !/\.bcv-ap-veil \{ background: rgba/.test(css),
+    search: /background: transparent;/.test(ruleOf(css, '.bcv-spot-ov')),
+    setup: /background: transparent;/.test(ruleOf(setupCss, '.overlay')) && !/backdrop-filter/.test(ruleOf(setupCss, '.overlay')),
+    noPageBlur: !/bcv-noblur-in/.test(css),
+  };
+  check(Object.values(clear).every(Boolean), `nothing behind a popup is darkened or blurred (2.99.97): ${JSON.stringify(clear)}`);
   // the shade behind the search afloat: no filter (Safari dropped a blur-filtered one once its fade ended), on a layer of its own throughout
   const shade = (css.match(/\.bcv-spot::before \{([^}]*)\}/) || [])[1] || '';
   check(shade && !/(^|[;\s])filter:/.test(shade) && /will-change:\s*opacity/.test(shade) && /box-shadow:/.test(shade) && !/bcv-noblur \.bcv-spot::before/.test(css), `the shade behind the search is a plain shadow on its own layer, no filter: ${shade.trim().slice(0, 90)}…`);
