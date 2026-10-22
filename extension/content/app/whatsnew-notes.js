@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.94', date: '2026-10-22', notes: [
+      { kind: 'improved', title: 'Quiz page for everyone', body: 'The new quiz page, out of beta.', icon: P.sparkle },
+    ] },
     { version: '2.99.93', date: '2026-10-21', notes: [
       { kind: 'improved', title: 'Cleaner quiz page', body: 'Laid out like an assignment: Begin and details on the right.', icon: P.layers },
     ] },
