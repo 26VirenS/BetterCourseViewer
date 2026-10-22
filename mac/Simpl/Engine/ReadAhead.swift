@@ -28,7 +28,7 @@ final class AnswerMemo {
     static let neutral: Set<String> = [
         "resolveUrl", "pageFor", "search", "toolLaunch", "quizIntro", "quizRules", "quizAttempt", "quizFeedback",
         "composeContexts", "recipients", "gradeNeeded", "settingsInfo", "settingsExport", "historyExport", "convertInfo",
-        "convertFile", "reminders", "watchInfo", "setupInfo", "whatsNew", "appearance", "moreHistory", "moreHelp",
+        "convertFile", "reminders", "watchInfo", "setupInfo", "whatsNew", "appearance", "moreHistory", "moreHelp", "appointments",
     ]
     /// A read's arguments that set a preference as it reads (To Do's grouping and Show Completed, the Dashboard's Hide
     /// Completed, the calendar's view) or ask the page to read afresh (a course's grades): its answer is the plain read's

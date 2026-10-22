@@ -330,6 +330,71 @@ struct CalEvent: Codable, Identifiable, Hashable {
     /// has gone by (greyed, never struck: a lecture that is over is not cancelled).
     var struck: Bool?
     var past: Bool?
+    /// (2.99.95) A time reserved off Find Appointment: its reservation, which Give Back hands to Canvas.
+    var reservationId: String?
+}
+
+/// (2.99.95) Find Appointment: Canvas's Scheduler as native-app.js `appointments` reads it — the classes with something to
+/// sign up for, and each group with the time held and its times by day.
+struct AppointmentsData: Codable {
+    var groups: [AppointmentGroup]
+    var classes: [AppointmentClass]
+    var error: String?
+}
+
+struct AppointmentClass: Codable, Identifiable, Hashable {
+    var code: String
+    var name: String
+    var color: String?
+    var id: String { code }
+}
+
+struct AppointmentGroup: Codable, Identifiable, Hashable {
+    var id: String
+    var title: String
+    var description: String?
+    var location: String?
+    var codes: [String]
+    var course: String?
+    var color: String?
+    var minutes: Int?
+    var max: Int?
+    var groupSignup: Bool?
+    var url: String?
+    var full: Bool?
+    var mine: [AppointmentHeld]
+    var days: [AppointmentDay]
+}
+
+struct AppointmentHeld: Codable, Identifiable, Hashable {
+    var id: String
+    var reservationId: String?
+    var when: String
+}
+
+struct AppointmentDay: Codable, Identifiable, Hashable {
+    var key: String
+    var label: String
+    var sub: String
+    var held: Bool?
+    var open: Int?
+    var slots: [AppointmentSlot]
+    var id: String { key }
+}
+
+struct AppointmentSlot: Codable, Identifiable, Hashable {
+    var id: String
+    var time: String
+    var start: String?
+    var reserved: Bool
+    var open: Bool
+    var reservationId: String?
+}
+
+/// (2.99.95) An action's answer with Canvas's own words when it would not.
+struct ActReply: Codable {
+    var ok: Bool?
+    var error: String?
 }
 
 struct CalendarChoice: Codable, Identifiable, Hashable {

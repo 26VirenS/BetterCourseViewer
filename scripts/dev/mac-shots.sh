@@ -500,6 +500,9 @@ ui_review() {
   MODE=light shoot light-58b-tool-split 14 -SimplPlace tools -SimplTool pdfx -SimplToolFile "$PWD/scripts/dev/fixtures/reading.pdf"
   MODE=light shoot light-05w-calendar-week 12 -SimplPlace calendar -SimplCalView week
   MODE=light shoot light-05l-calendar-list 12 -SimplPlace calendar -SimplCalView list
+  # (1.3.151) Find Appointment's popup over the calendar: the class, the group's card, a day open to its times
+  MODE=light shoot light-05f-find-appointment 16 -SimplPlace calendar -SimplFindAppointment YES
+  MODE=dark shoot dark-05f-find-appointment 16 -SimplPlace calendar -SimplFindAppointment YES
   MODE=light shoot light-11w-course-grades-whatif 16 -SimplPlace section:courses/101:grades -SimplWhatIf YES
   MODE=light shoot light-25b-compose-attached 16 -SimplPlace inbox -SimplOpen compose -SimplAttach "$PWD/docs/screenshots/calendar.png"
   MODE=light SIZE=1720x1040 shoot light-45-wide-grades 14 -SimplPlace grades

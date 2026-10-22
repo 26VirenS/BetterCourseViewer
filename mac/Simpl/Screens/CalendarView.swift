@@ -26,6 +26,8 @@ struct CalendarView: View {
     /// The screenshot suite's -SimplCalView looked at (each Calendar drawn looks once).
     @State private var launchViewRead = false
     @State private var choosing = false
+    /// (1.3.151) Find Appointment's popup (Appointments.swift); the screenshot suite's -SimplFindAppointment YES opens it.
+    @State private var finding = UserDefaults.standard.bool(forKey: "SimplFindAppointment")
     /// (1.3.78) Where what is shown first came from, for the console's open line (OpenClock).
     @State private var source = "fetched"
     /// (1.3.80) What the live checks know of the span shown (its fingerprint: LiveRefresh).
@@ -103,6 +105,10 @@ struct CalendarView: View {
         .navigationSubtitle(periodTitle)
         .openTimed("Calendar", ready: data != nil, source: source)
         .toolbar { toolbarItems }
+        .floatingPopup("appointments", title: "Find Appointment", isPresented: $finding, engine: engine) {
+            AppointmentsPopup { Task { await load(animated: true) } } // (a time reserved or given back: the calendar shows it)
+                .environmentObject(engine)
+        }
         .onAppear(perform: seed)
         .task(id: engine.dataVersion) {
             // (the screenshot suite: -SimplCalView week|list opens on that view, in place of the one kept — the kept one
@@ -148,6 +154,14 @@ struct CalendarView: View {
                 CalendarsPopover(choices: data?.calendars ?? []) { Task { await load(animated: true) } }
                     .environmentObject(engine)
             }
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                finding = true
+            } label: {
+                Label("Find Appointment", systemImage: "calendar.badge.clock")
+            }
+            .help("Office hours, conferences and sign-ups with a time to reserve")
         }
         ToolbarItem(placement: .primaryAction) {
             CanvasMenu(url: "/calendar", title: "Calendar")
@@ -564,19 +578,31 @@ struct CalendarView: View {
     /// An item's own menu (open it, open it in Canvas, copy its link), where it has an address.
     @ViewBuilder
     private func withEventMenu<V: View>(_ ev: CalEvent, @ViewBuilder _ content: () -> V) -> some View {
-        if let url = ev.url, !url.isEmpty {
-            content().contextMenu { eventMenu(ev, url: url) }
-        } else {
+        if (ev.url ?? "").isEmpty && ev.reservationId == nil {
             content()
+        } else {
+            content().contextMenu { eventMenu(ev) }
         }
     }
 
     @ViewBuilder
-    private func eventMenu(_ ev: CalEvent, url: String) -> some View {
-        Button("Open") { engine.openWeb(url, title: ev.title) }
-        Divider()
-        Button("Open in \(engine.lmsName)") { engine.openWebScreen(url, title: ev.title) }
-        Button("Copy Link") { if let u = engine.absolute(url) { copyToPasteboard(u.absoluteString) } }
+    private func eventMenu(_ ev: CalEvent) -> some View {
+        if let url = ev.url, !url.isEmpty {
+            Button("Open") { engine.openWeb(url, title: ev.title) }
+            Divider()
+            Button("Open in \(engine.lmsName)") { engine.openWebScreen(url, title: ev.title) }
+            Button("Copy Link") { if let u = engine.absolute(url) { copyToPasteboard(u.absoluteString) } }
+        }
+        // (1.3.151) a time reserved off Find Appointment: given back from here too, or other times found
+        if let res = ev.reservationId {
+            Divider()
+            Button("Give Back This Time") { Task { await giveBack(res) } }
+            Button("Find Another Time…") { finding = true }
+        }
+    }
+
+    private func giveBack(_ reservation: String) async {
+        if await engine.act("cancelReservation", ["id": reservation]) { await load(animated: true) }
     }
 
     // MARK: Week
