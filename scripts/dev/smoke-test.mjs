@@ -7507,7 +7507,9 @@ try {
     await page.click('.bcv-mark__redo');
     await page.waitForTimeout(200);
     check(ntUndone && (await page.$$('.bcv-mark__hl--ul')).length === 1, 'Undo takes the underline back, Redo puts it back');
-    await page.mouse.click(ntPg.x + ntPg.width * 0.45, ntPg.y + ntPg.height * 0.44);
+    // (the page is measured again: the drag and the words picked since can scroll the viewer a few px, and a stroke 6 px wide is missed at the old place)
+    const ntPgNow = await (await page.$('.bcv-mark__page[data-page="1"]')).boundingBox();
+    await page.mouse.click(ntPgNow.x + ntPgNow.width * 0.45, ntPgNow.y + ntPgNow.height * 0.44);
     await page.waitForTimeout(150);
     const ntPicked = await page.$eval('.bcv-mark__stroke', (e) => e.classList.contains('is-active'));
     await page.keyboard.press('Delete');
