@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.98"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.99"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -5667,7 +5667,7 @@ html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under):not(.bcv-sheet-ov--float), .bcv-fbs-ov:not(.is-closing)).bcv-tray-pop #bcv-tray { left: auto; right: var(--bcv-tray-px); top: var(--bcv-tray-py); }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under):not(.bcv-sheet-ov--float), .bcv-fbs-ov:not(.is-closing)) #bcv-sidetoggle { opacity: 0; pointer-events: none; } /* (2.99.72: the sidebar's button goes with ⋯ while a popup is up — nothing of the bar left over the scrim but the tools in the popup's head) */
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under):not(.bcv-sheet-ov--float), .bcv-fbs-ov:not(.is-closing)) :is(.bcv-sheet-ov, .bcv-fbs-ov) { padding-top: 52px; }
-html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under):not(.bcv-sheet-ov--float), .bcv-fbs-ov:not(.is-closing)) :is(.bcv-sheet-ov, .bcv-fbs-ov) > * { max-height: calc(100vh - 80px); }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab):has(.bcv-sheet-ov:not(.is-closing):not(.is-under):not(.bcv-sheet-ov--float), .bcv-fbs-ov:not(.is-closing)) :is(.bcv-sheet-ov, .bcv-fbs-ov):not(.bcv-rr-ov) > * { max-height: calc(100vh - 80px); } /* (2.99.99: not the rubric ring's — its dim is the whole window, and was cut 80 px short of the bottom) */
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-pins:not(:empty) { align-items: flex-start; gap: 10px; height: 30px; padding: 3px 8px 0; box-sizing: border-box; border-radius: 15px; background: var(--bcv-fill); }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-pins .bcv-pin:not(.is-open) .bcv-pin__btn { background: transparent; box-shadow: none; }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-pins .bcv-pin:not(.is-open) .bcv-pin__ic { color: var(--bcv-pin-color, var(--bcv-ink2)); }

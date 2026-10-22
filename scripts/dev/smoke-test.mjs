@@ -2132,7 +2132,7 @@ try {
     html.classList.remove('bcv-noblur');
     const cs = (sel) => getComputedStyle(document.querySelector(sel));
     const blur = (sel) => cs(sel).backdropFilter || cs(sel).webkitBackdropFilter || '';
-    const out = { card: !!document.querySelector('.bcv-rr-ov .bcv-sheet'), dialog: document.querySelector('.bcv-rr-ov').getAttribute('aria-modal'), veils: [...document.querySelectorAll('.bcv-rr__veil')].map((v) => v.className.replace('bcv-rr__veil ', '')).join(','), ovBlur: blur('.bcv-rr-ov'), dim: /radial-gradient/.test(cs('.bcv-rr__veil--dim').backgroundImage),
+    const out = { card: !!document.querySelector('.bcv-rr-ov .bcv-sheet'), dialog: document.querySelector('.bcv-rr-ov').getAttribute('aria-modal'), veils: [...document.querySelectorAll('.bcv-rr__veil')].map((v) => v.className.replace('bcv-rr__veil ', '')).join(','), ovBlur: blur('.bcv-rr-ov'), dim: /radial-gradient/.test(cs('.bcv-rr__veil--dim').backgroundImage), dimBox: (() => { const r = document.querySelector('.bcv-rr__veil--dim').getBoundingClientRect(); return [r.top, r.left, r.bottom - innerHeight, r.right - document.documentElement.clientWidth].map(Math.round); })(),
       labels: [...document.querySelectorAll('.bcv-rr__label')].map((b) => b.getAttribute('aria-label')).join(' | '), shown: [...document.querySelectorAll('.bcv-rr__label')].map((b) => b.innerText.replace(/\s+/g, ' ')).join(' | '),
       centre: document.querySelector('.bcv-rr__centre').innerText.replace(/\s+/g, ' ').trim(), status: document.querySelector('.bcv-rr__status').textContent, title: document.querySelector('.bcv-rr__title').textContent };
     if (nb) html.classList.add('bcv-noblur');
@@ -2141,7 +2141,7 @@ try {
   // the page behind is held still while the ring is up: the wheel moves nothing (and its scrollbar stays put)
   const held = await pageHeld(page, 760, 420);
   check(!held.moved && held.scrollable && held.bar !== 'hidden', `the page behind the ring is held still — the wheel moves nothing: ${JSON.stringify(held)}`);
-  check(!ringOpen.card && ringOpen.dialog === 'true' && ringOpen.veils === 'bcv-rr__veil--dim' && !/blur/.test(ringOpen.ovBlur) && ringOpen.dim, `the rubric opens as the ring alone over the page — no card — the page dimmed under its light words but not blurred (2.99.97): ${JSON.stringify(ringOpen)}`);
+  check(!ringOpen.card && ringOpen.dialog === 'true' && ringOpen.veils === 'bcv-rr__veil--dim' && !/blur/.test(ringOpen.ovBlur) && ringOpen.dim && ringOpen.dimBox.every((d) => d >= 0) && ringOpen.dimBox[0] === 0 && ringOpen.dimBox[1] === 0, `the rubric opens as the ring alone over the page — no card — the page dimmed under its light words but not blurred (2.99.97), the dim the whole window to its bottom edge (2.99.99): ${JSON.stringify(ringOpen)}`);
   check(ringOpen.labels === 'Correctness, 4 of 6 | Work shown, 4 of 4' && ringOpen.shown === 'Correctness 4 / 6 | Work shown 4 / 4' && /^Score 8 of 10 · 80%/i.test(ringOpen.centre) && /^Graded \w{3} \d{1,2} · 2 criteria$/.test(ringOpen.status) && ringOpen.title === 'Week 1 reflection', `a slice per criterion, each a button named with its score, the rubric's own total in the middle: ${JSON.stringify(ringOpen)}`);
   // marked, the ring bends in where points were lost (Correctness, 4 of 6) and out where they were not (Work shown, 4 of 4)
   const bent = await eventually(async () => { const e = await ringEdges(page); return e[0].outer < 178.5 && e[1].outer > 183; }, 5000);
