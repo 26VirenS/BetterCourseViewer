@@ -1036,7 +1036,62 @@
     return b;
   };
 
-  D.discussion = async (ctx, shell, { announcement = false }) => {
+  /** "Today at 11:33 AM", "Yesterday at 9:05 AM", else "Oct 20 at 11:33 AM": when a post went up, as the Mac says it. */
+  const postedWhen = (v) => {
+    const d = U.parse(v);
+    if (!d) return '';
+    const diff = U.dayDiff(d);
+    return diff === 0 ? `Today at ${U.fmtTime(d)}` : diff === -1 ? `Yesterday at ${U.fmtTime(d)}` : U.fmtAtUpper(d);
+  };
+
+  /**
+   * (2.99.101) An announcement as the Mac's page has it (TopicView.swift), on the desktop: the title on the course's
+   * colour, "Announcement · <course>" under it; the post in a card — who wrote it, the course and when, its words and
+   * files; then Replies, each in reading order, or "No replies." A reply is written in a box that comes under the
+   * post when Reply is pressed (beside Replies, or on a reply). One column at a reading width: no facts beside it.
+   */
+  function announcementPage({ ctx, c, t, b, main, side, kind, entries, view, replyBox, replyTitle, cancelReply, post, replyToEntry, setComposer }) {
+    side.remove();
+    const course = c.shortName || c.name || '';
+    const who = t.author?.display_name || t.user_name || '';
+    const byLine = [course, postedWhen(t.posted_at || t.delayed_post_at)].filter(Boolean).join(' · ');
+    const canReply = !t.locked;
+    const composer = canReply ? U.el('bcv-reply bcv-ann__composer', [replyTitle, replyBox, h('div', { class: 'bcv-ann__composerbtns' }, [
+      h('button', { type: 'button', class: 'bcv-btn', text: 'Cancel', onclick: () => { replyBox.value = ''; replyToEntry(null); composer.hidden = true; } }), cancelReply, post])]) : null;
+    if (composer) { composer.hidden = true; setComposer(composer); }
+    const count = t.discussion_subentry_count ?? (view ? entries.length : 0);
+    const note = (icon, text) => h('div', { class: 'bcv-asg__nocomments bcv-ann__note' }, [U.svg(icon, { size: 15, stroke: 'currentColor', width: 2 }), h('span', { text })]);
+    const repliesBody = t.locked && !entries.length ? note(IC.lock, 'Replies are closed.')
+      : t.require_initial_post && !entries.length ? note(IC.disc, 'Reply to see what others wrote.')
+      : entries.length ? h('div', { class: 'bcv-ann__entries' }, entries) : note(IC.disc, 'No replies.');
+    // (the way back's row is hidden on the desktop, its Previous / Next pill going up into the bar across the top)
+    const top = itemTop(ctx, c, backTo(ctx.app, `${c.url}/announcements`, 'Announcements'), 'Announcement', t.id, { kind });
+    main.replaceChildren(top, U.el('bcv-ann', [
+      U.el('bcv-ann__head', [
+        U.el('bcv-ann__titlerow', [h('span', { class: 'bcv-ann__dot', style: { background: c.color }, 'aria-hidden': 'true' }), h('h1', { class: 'bcv-ann__title bcv-detail__title bcv-pretty', text: t.title })]),
+        U.text('bcv-ann__sub', ['Announcement', course].filter(Boolean).join(' · ')),
+      ]),
+      U.el('bcv-asg__panel bcv-ann__post', [
+        U.el('bcv-ann__by', [
+          who ? U.avatar(t.author?.avatar_image_url, who, 42) : h('span', { class: 'bcv-ann__tile', style: { background: c.color }, 'aria-hidden': 'true' }, U.svg(IC.bell, { size: 20, stroke: '#fff', width: 2 })),
+          h('div', { class: 'bcv-ann__bytext' }, [U.text('bcv-ann__who', who || course), byLine ? U.text('bcv-ann__when', who ? byLine : postedWhen(t.posted_at || t.delayed_post_at)) : null]),
+        ]),
+        t.message ? CS().prose(t.message, { cls: 'bcv-ann__prose' }) : null,
+        (t.attachments || []).length ? U.el('bcv-chips', t.attachments.map((att) => h('a', { class: 'bcv-chip', href: att.url, target: '_blank', rel: 'noopener', text: att.display_name }))) : null,
+      ]),
+      composer,
+      U.el('bcv-asg__section bcv-ann__replies', [
+        U.el('bcv-asg__sectionhead', [
+          h('h2', { class: 'bcv-asg__h2' }, ['Replies', count ? h('span', { class: 'bcv-asg__count bcv-ann__count', text: ` ${count}` }) : null]),
+          canReply ? h('button', { type: 'button', class: 'bcv-linkbtn bcv-ann__reply', onclick: () => replyToEntry(null) }, [U.svg('M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11', { size: 15, stroke: 'currentColor', width: 2 }), 'Reply']) : null,
+        ]),
+        U.el('bcv-asg__panel', [repliesBody]),
+      ]),
+    ]));
+    return b;
+  }
+
+  D.discussion = async (ctx, shell, { announcement: asAnnouncement = false }) => {
     const { app, route } = ctx;
     const c = shell.course;
     const b = cols();
@@ -1047,6 +1102,9 @@
     const [t, view] = await Promise.all([store.discussion(c.id, route.arg, K).catch(() => null), store.discussionView(c.id, route.arg, K).catch(() => null)]);
     if (!ctx.alive()) return b;
     if (!t) return main.replaceChildren(U.errorBox('This discussion could not be loaded.')) || b;
+    // (2.99.101) an announcement opened at its discussion_topics address (Canvas's own links, the Dashboard's) is one
+    // all the same: Canvas says so of the topic
+    const announcement = asAnnouncement || t.is_announcement === true;
     app.nameHere?.(t.title); // the next screen's Back names this thread
     store.markTopicRead(c.id, t.id, K);
     shell.reader = { title: t.title, html: t.message || '' };
@@ -1056,6 +1114,14 @@
     const replyTitle = U.text('bcv-reply__title', 'Reply');
     // a reply aimed at one post can be aimed at the thread again (the button shows while one is)
     const cancelReply = h('button', { type: 'button', class: 'bcv-btn', text: 'Cancel reply-to', hidden: true, onclick: () => { replyTo = null; replyTitle.textContent = 'Reply'; cancelReply.hidden = true; replyBox.focus(); } });
+    let composer = null; // (the reply box's row: always shown on a discussion; an announcement's comes when Reply is pressed)
+    const replyToEntry = (e, name) => {
+      replyTo = e ? { id: e.id, name } : null;
+      replyTitle.textContent = e ? `Reply to ${name}` : 'Reply';
+      cancelReply.hidden = !e;
+      if (composer?.hidden) composer.hidden = false;
+      replyBox.focus();
+    };
     const post = U.btn('Post reply', { kind: 'primary', icon: IC.send, iconColor: '#fff', onClick: async () => {
       const text = replyBox.value.trim();
       if (!text) return;
@@ -1084,12 +1150,16 @@
           U.el('bcv-entry__head', [U.text('bcv-entry__author', author?.display_name || 'Deleted user', 'span'), U.text('bcv-entry__date', U.fmtAtUpper(e.created_at), 'span'), e.deleted ? U.badge('Deleted', '', 'bcv-badge--xs') : null]),
           e.deleted || (!e.message && files.length) ? null : CS().prose(e.message || '', { cls: 'bcv-prose--14 bcv-entry__msg' }),
           files.length ? U.el('bcv-chips', files.map((att) => h('a', { class: 'bcv-chip', href: att.url, target: '_blank', rel: 'noopener', text: att.display_name || att.filename || 'Attachment' }))) : null,
-          t.locked || e.deleted ? null : U.el('bcv-entry__actions', h('button', { type: 'button', class: 'bcv-entry__action', text: 'Reply', onclick: () => { replyTo = { id: e.id, name: author?.display_name || 'this post' }; replyTitle.textContent = `Reply to ${replyTo.name}`; cancelReply.hidden = false; replyBox.focus(); } })),
+          t.locked || e.deleted ? null : U.el('bcv-entry__actions', h('button', { type: 'button', class: 'bcv-entry__action', text: 'Reply', onclick: () => replyToEntry(e, author?.display_name || 'this post') })),
         ]),
       ]);
     };
     const flatten = (entries, depth = 0) => entries.flatMap((e) => [entryEl(e, depth), ...flatten(e.replies || [], depth + 1)]);
     const entries = view ? flatten(view.view || []) : [];
+    // (2.99.101) a discussion is just the discussion on the desktop, as an assignment is: no section header over it and no
+    // row of its own for the way back — Back, Forward and Previous / Next are in the bar across the top (app.css)
+    main.classList.add('bcv-thread');
+    if (announcement && !BCV.phone?.active?.()) return announcementPage({ ctx, c, t, b, main, side, kind: shell.kind, entries, view, replyBox, replyTitle, cancelReply, post, replyToEntry, setComposer: (el) => { composer = el; } });
     main.replaceChildren(
       itemTop(ctx, c, backTo(app, announcement ? `${c.url}/announcements` : `${c.url}/discussion_topics`, announcement ? 'Announcements' : 'Discussions'), announcement ? 'Announcement' : 'Discussion', t.id, { kind: shell.kind }),
       U.card([

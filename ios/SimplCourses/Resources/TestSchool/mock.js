@@ -432,7 +432,9 @@ const announcements = {
 };
 const topicFull = (courseId, id) => {
   const t = [...(discussions[courseId] || []), ...(announcements[courseId] || [])].find((x) => x.id === String(id));
-  return t ? { ...t, html_url: `/courses/${courseId}/discussion_topics/${t.id}`, locked: false, require_initial_post: !!t.require_initial_post, attachments: [] } : null;
+  // (as Canvas: a topic says whether it is an announcement — opened at its discussion_topics address, it is one all the same)
+  const isAnn = (announcements[courseId] || []).includes(t);
+  return t ? { ...t, html_url: `/courses/${courseId}/discussion_topics/${t.id}`, is_announcement: isAnn, locked: false, require_initial_post: !!t.require_initial_post, attachments: [] } : null;
 };
 const entries = new Map();
 const viewFor = (topicId) => ({

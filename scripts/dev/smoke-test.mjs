@@ -2744,8 +2744,21 @@ try {
   check((await page.$$('.bcv-body .bcv-row')).length === 2, 'unread filter');
   await shot(page, '12-course-announcements');
   await page.click('.bcv-body .bcv-row');
-  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check((await texts('.bcv-detail__title'))[0] === 'Prerequisite Skills Test' && (await page.$$('.bcv-entry')).length === 3 && (await texts('.bcv-entry .bcv-chip')).includes('W8 Discussion Worksheet - More Newton’s Laws.pdf'), 'announcement opens as a thread (a reply that is a file alone shows its file)');
+  await page.waitForSelector('.bcv-ann__title', { timeout: 10000 });
+  // (2.99.101) as the Mac's page: the title on the course's colour with "Announcement · <course>" under it, the post in a
+  // card (who, the course and when), Replies under it — no section header over it, no facts beside it, no reply box
+  // until Reply is pressed
+  const annPage = await page.evaluate(() => ({
+    sub: document.querySelector('.bcv-ann__sub')?.textContent, who: document.querySelector('.bcv-ann__who')?.textContent,
+    when: document.querySelector('.bcv-ann__when')?.textContent, head: [...document.querySelectorAll('.bcv-head--course')].some((e) => getComputedStyle(e).display !== 'none'),
+    about: /About this thread/i.test(document.body.innerText), composer: !document.querySelector('.bcv-ann__composer')?.hidden,
+    replies: document.querySelector('.bcv-ann__replies .bcv-asg__h2')?.textContent,
+  }));
+  check(annPage.sub === 'Announcement · F26-MATH 021 20' && annPage.who === 'Yue Lei' && /^F26-MATH 021 20 · \w{3} \d{1,2} at \d{1,2}:\d\d [AP]M$/.test(annPage.when || '') && !annPage.head && !annPage.about && !annPage.composer && annPage.replies === 'Replies 3',
+    `an announcement opens as the Mac's page: ${JSON.stringify(annPage)}`);
+  await page.click('.bcv-ann__reply');
+  check(await eventually(() => page.evaluate(() => !document.querySelector('.bcv-ann__composer').hidden && document.activeElement?.classList.contains('bcv-textarea')), 2000), 'Reply beside Replies brings the reply box under the post, ready to write in');
+  check((await texts('.bcv-ann__title'))[0] === 'Prerequisite Skills Test' && (await page.$$('.bcv-entry')).length === 3 && (await texts('.bcv-entry .bcv-chip')).includes('W8 Discussion Worksheet - More Newton’s Laws.pdf'), 'announcement opens as a thread (a reply that is a file alone shows its file)');
 
   // assignments
   await tab('assignments');
@@ -2830,6 +2843,10 @@ try {
   await page.click('.bcv-body .bcv-row');
   await page.waitForSelector('.bcv-entry', { timeout: 10000 });
   check((await page.$$('.bcv-entry')).length === 3 && (await page.$('.bcv-entry--reply')), 'thread with nested replies');
+  // (2.99.101) a discussion is just the discussion, as an assignment is: no section header ("Discussions" over the course's
+  // name, its way back) and no row of its own for the way back — Back, Forward and Previous / Next are in the bar
+  const discBare = await page.evaluate(() => ({ head: [...document.querySelectorAll('.bcv-head--course')].some((e) => getComputedStyle(e).display !== 'none'), backRow: [...document.querySelectorAll('.bcv-thread > .bcv-item__top')].some((e) => getComputedStyle(e).display !== 'none') }));
+  check(!discBare.head && !discBare.backRow, `a discussion has no section header over it and no row for the way back: ${JSON.stringify(discBare)}`);
   await page.fill('.bcv-reply textarea', 'My question is about removable discontinuities.');
   await page.click('.bcv-reply .bcv-btn--primary');
   await page.waitForFunction(() => document.querySelectorAll('.bcv-entry').length === 3, null, { timeout: 10000 });
