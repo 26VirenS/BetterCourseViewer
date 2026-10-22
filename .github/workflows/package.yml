@@ -85,6 +85,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           GH_TOKEN: ${{ github.token }}
           BETA: ${{ inputs.beta && 'true' || 'false' }} # (2.99.38: a beta names only the beta feed)
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }} # (the zip signed as it is released: scripts/sign-releases.py)
         run: ./scripts/release-mac-app.sh
 
   # The website's sources kept here (site/: the Report a bug page and the Worker that answers it)

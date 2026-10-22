@@ -69,6 +69,7 @@ jobs:
           MAC_BETA: ${{ (inputs.beta && !inputs.critical) && '1' || '' }}
           MAC_CRITICAL: ${{ inputs.critical && '1' || '' }}
           MAC_PREBUILT: ${{ steps.ahead.outputs.cache-hit == 'true' && 'prebuilt' || '' }}
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }} # (the zip signed as it is released: scripts/sign-releases.py)
         run: bash scripts/release-mac-native.sh
       # (kept only when the app was compiled here: build-mac-native.log is the build's)
       - name: Keep this build for the next

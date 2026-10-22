@@ -45,4 +45,5 @@ jobs:
       - name: Publish site/ to the site branch
         env:
           GH_TOKEN: ${{ github.token }}
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }} # (update files signed before the feeds name them: scripts/sign-releases.py)
         run: ./scripts/publish-site.sh
