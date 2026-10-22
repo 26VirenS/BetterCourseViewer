@@ -260,7 +260,10 @@
     } catch {
       again = true; // no session storage to remember by: never risk a loop
     }
-    if (again) html.classList.remove('bcv-on');
+    // (in the apps the page is their engine, under their own screens: given back to Canvas, it would put the school's own
+    //  Dashboard in the window in their place — a page slow to come up, on a PC waking up or busy, did. There it is
+    //  loaded once more at the most, and never given back)
+    if (again) { if (!self.BCVBridge?.native) html.classList.remove('bcv-on'); }
     else location.reload();
   }, 8000);
   try {

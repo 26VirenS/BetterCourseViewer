@@ -32,10 +32,23 @@
   const lookOn = () => !!(BCV.early?.isOn?.() ?? BCV.settings?.lookOn?.(app()?.state?.settings));
   const wanted = () => signedIn() && lookOn() && !setupUp() && !BCV.exttool?.isToolTab?.() && window.self === window.top;
   let said = null;
+  let offT = 0;
   function sayState(force = false) {
     const on = wanted();
-    html.classList.toggle('bcv-native-shell', on);
+    // (a page that has said it is on says it is off only once it has stayed off a moment: an instant of a check coming out
+    //  false — the page's own body swapped as a screen is drawn, its settings read again — put the school's own page in
+    //  the app's window in place of its screens. Signed out, setting up, or a tool's tab stay off, and say so then.)
+    if (!on && said === true && !force) {
+      if (!offT) offT = setTimeout(() => { offT = 0; if (!wanted()) tell(false); }, 1500);
+      return;
+    }
+    clearTimeout(offT);
+    offT = 0;
     if (!force && said === on) return;
+    tell(on);
+  }
+  function tell(on) {
+    html.classList.toggle('bcv-native-shell', on);
     said = on;
     post('shell.state', { shell: on, signedIn: signedIn(), url: location.href, dark: !!app()?.isDark?.(), lms: BCV.lms?.kind || 'canvas' });
   }

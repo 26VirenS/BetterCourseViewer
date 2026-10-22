@@ -280,6 +280,14 @@ public sealed partial class Engine : Observable, IShellListener
                     SetPhase(Phase.Native);
                     if (!shownNative) { shownNative = true; FirstNative().ContinueWith(t => Log.Write("first: " + t.Exception), TaskContinuationOptions.OnlyOnFaulted); }
                 }
+                else if (body["signedIn"]?.GetValue<bool>() == true && Phase == Phase.Native)
+                {
+                    // (0.3.54) signed in, the page says its interface is off — it came up too slowly, on a PC waking up
+                    // or busy — yet nothing of the school's own is wanted here: the app's screens stay, and the page is
+                    // loaded again (once a minute at the most). Before, the school's own Dashboard took the window.
+                    ready = false;
+                    Log.Write("shell: the page said off while signed in; kept on the app's screens" + (ReloadSoon() ? ", the page loaded again" : ""));
+                }
                 else
                 {
                     ready = false;
@@ -295,6 +303,17 @@ public sealed partial class Engine : Observable, IShellListener
                 SwitchTab(body["tab"]?.ToString() ?? "today");
                 break;
         }
+    }
+
+    private DateTime lastShellReload = DateTime.MinValue;
+
+    /// <summary>(0.3.54) The page loaded again to bring its interface back, once a minute at the most: whether it was.</summary>
+    private bool ReloadSoon()
+    {
+        if (Web.CoreWebView2 is not { } core || DateTime.UtcNow - lastShellReload < TimeSpan.FromMinutes(1)) return false;
+        lastShellReload = DateTime.UtcNow;
+        core.Reload();
+        return true;
     }
 
     /// <summary>
