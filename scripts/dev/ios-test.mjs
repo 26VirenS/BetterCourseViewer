@@ -210,6 +210,27 @@ try {
   const chrome = await sp.evaluate(() => ({ shell: document.documentElement.classList.contains('bcv-native-shell'), tabbar: getComputedStyle(document.querySelector('#bcv-tabbar') || document.body).display, topbar: document.querySelector('#bcv-topbar') ? getComputedStyle(document.querySelector('#bcv-topbar')).display : 'none' }));
   const st = (await told('shell.state')).pop();
   check(chrome.shell && chrome.tabbar === 'none' && chrome.topbar === 'none' && st?.shell === true && st?.signedIn === true, `with the app's shell the page draws neither bar and tells the app it is ready, signed in: ${JSON.stringify({ chrome, st })}`);
+  // (2.99.98) an instant of the interface reading as off says nothing to the app — it once put the school's own Dashboard in
+  // the window — while off for good it says so, a moment later, and on again at once
+  const shellSaid = () => sp.evaluate(() => self.__nativeCalls.filter((c) => c.op === 'shell.state').map((c) => c.shell));
+  const saidBefore = (await shellSaid()).length;
+  const pokeBody = () => sp.evaluate(() => document.body.appendChild(document.createElement('i')).remove());
+  await sp.evaluate(() => document.documentElement.classList.remove('bcv-on'));
+  await pokeBody();
+  await sp.waitForTimeout(300);
+  await sp.evaluate(() => document.documentElement.classList.add('bcv-on'));
+  await pokeBody();
+  await sp.waitForTimeout(1800);
+  const offBlip = (await shellSaid()).slice(saidBefore);
+  await sp.evaluate(() => document.documentElement.classList.remove('bcv-on'));
+  await pokeBody();
+  await sp.waitForTimeout(2000);
+  const offGone = (await shellSaid()).slice(saidBefore);
+  await sp.evaluate(() => document.documentElement.classList.add('bcv-on'));
+  await pokeBody();
+  await sp.waitForTimeout(200);
+  const onAgain = (await shellSaid()).slice(saidBefore);
+  check(offBlip.length === 0 && offGone.join() === 'false' && onAgain.join() === 'false,true' && (await sp.evaluate(() => document.documentElement.classList.contains('bcv-native-shell'))), `an instant off tells the app nothing; off for good tells it after a moment, on again at once: ${JSON.stringify({ offBlip, offGone, onAgain })}`);
   const today = await nc('today');
   check(!today.error && today.counters?.length === 6 && today.counters.map((c) => c.key).join() === 'today,next,unread,overdue,tomorrow,graded' && Array.isArray(today.list?.rows) && today.list.rows.length > 0 && today.list.rows.every((r) => r.id && r.title && r.color && 'done' in r) && !!today.dateLine && today.me?.name, `Today for the app: the six counters, the day's list, the week's load, who is signed in: ${JSON.stringify({ counters: today.counters, heading: today.list?.heading, rows: today.list?.rows?.length, load: today.load?.length, me: today.me?.name })}`);
   const counts = await nc('todayCounts', { kept: false });

@@ -26,6 +26,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.98', date: '2026-10-22', notes: [
+      { kind: 'fixed', title: 'Apps Stay in Simpl', body: 'The apps no longer switch to the school\'s own pages.', icon: P.check },
+    ] },
     { version: '2.99.97', date: '2026-10-22', notes: [
       { kind: 'improved', title: 'No Dim Behind Popups', body: 'Popups no longer darken or blur the page behind them.', icon: P.eye },
     ] },
