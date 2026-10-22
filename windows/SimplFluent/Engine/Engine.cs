@@ -223,6 +223,8 @@ public sealed partial class Engine : Observable, IShellListener
             Loading = false;
             var u = Uri.TryCreate(core.Source, UriKind.Absolute, out var parsed) ? parsed : null;
             PageFinished(u);
+            // (0.3.55) signed in on the school's site: its session kept for the next start (SessionKeep)
+            if (e.IsSuccess && u != null && string.Equals(u.Host, BaseUrl.Host, StringComparison.OrdinalIgnoreCase) && !IsSignIn(u.AbsolutePath)) _ = SessionKeep.SaveAsync(core);
             // (a page that came, whatever it said — a sign-in refused with a 401 is still a page; one that never came is not)
             if (e.IsSuccess || e.HttpStatusCode > 0) Login.DidLoad(u);
             else if (e.WebErrorStatus != CoreWebView2WebErrorStatus.OperationCanceled) Login.PageFailed();
@@ -231,6 +233,12 @@ public sealed partial class Engine : Observable, IShellListener
         Bridge.Shared.SignOutRequested += SignOut;
         core.NewWindowRequested += OnNewWindow;
         core.DownloadStarting += OnDownload;
+        // (0.3.55) the school's session kept by the last run put back before the first page, and kept again every five
+        // minutes while Simpl runs: a restart — an update's — no longer asks for a sign-in
+        await SessionKeep.RestoreAsync(core);
+        var keep = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMinutes(5) };
+        keep.Tick += (_, _) => { if (Phase == Phase.Native && Web.CoreWebView2 is { } c) _ = SessionKeep.SaveAsync(c); };
+        keep.Start();
         core.Navigate(new Uri(BaseUrl, "/").ToString());
         // a page that never says (a school's sign-in on another host, a page that failed): shown as it is
         _ = Task.Delay(10_000).ContinueWith(_ => Application.Current.Dispatcher.Invoke(() => { if (Phase == Phase.Starting) SetPhase(Phase.Web); }));
@@ -403,6 +411,7 @@ public sealed partial class Engine : Observable, IShellListener
     public void SignedOut()
     {
         Answers.Clear();
+        SessionKeep.Clear(); // (0.3.55: the session kept for a restart goes with it)
         // (0.3.25) nothing of this account's Alta kept for the next: its web view made ahead let go, and whether it used
         // Alta forgotten
         Prefs.Remove(AltaAccountKey);

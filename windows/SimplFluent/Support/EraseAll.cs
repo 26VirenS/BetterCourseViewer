@@ -47,6 +47,7 @@ public static class EraseAll
             }
             catch (Exception e) { Log.Write("erase web: " + e.Message); }
         }
+        Engine.SessionKeep.Clear(); // (0.3.55: the school's session kept for a restart)
         try { Engine.Bridge.Shared.EraseStorage(); } catch (Exception e) { Log.Write("erase storage: " + e.Message); }
         Prefs.Erase();
         foreach (var f in new[] { AppPaths.Storage, AppPaths.Login, AppPaths.Flashcards })

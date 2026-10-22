@@ -26,6 +26,8 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.55", "2026-10-22",
+            ("fixed", "Stays Signed In", "A restart or an update no longer asks you to sign in.")),
         R("0.3.54", "2026-10-22",
             ("fixed", "Stays in Simpl", "No more switching to the school's own Dashboard.")),
         R("0.3.53", "2026-10-22",
