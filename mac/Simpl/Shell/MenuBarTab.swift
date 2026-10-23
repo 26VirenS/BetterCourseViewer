@@ -25,11 +25,13 @@ struct MenuBarTabProbe: NSViewRepresentable {
 }
 
 final class MenuBarTabProbeView: NSView {
-    var sidebarShown = true { didSet { if sidebarShown != oldValue { place() } } }
+    var sidebarShown = true { didSet { if sidebarShown != oldValue { placeSoon() } } }
     private weak var engine: Engine?
     private let popups: FloatingPopups
     private let tab = MenuBarTabView()
     private var watching: [NSObjectProtocol] = []
+    /// A placing asked for, not yet done (many asks in one turn of the run loop, one placing).
+    private var placing = false
 
     init(engine: Engine) {
         self.engine = engine
@@ -52,15 +54,28 @@ final class MenuBarTabProbeView: NSView {
         let center = NotificationCenter.default
         for name in [NSWindow.didEnterFullScreenNotification, NSWindow.didExitFullScreenNotification, NSWindow.willEnterFullScreenNotification, NSWindow.didResizeNotification] {
             watching.append(center.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.place() }
+                MainActor.assumeIsolated { self?.placeSoon() }
             })
         }
         // (a popup up or gone: the tab shown or not)
         watching.append(center.addObserver(forName: FloatingPopups.changed, object: popups, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.place() }
+            MainActor.assumeIsolated { self?.placeSoon() }
         })
         // (the title bar is laid out a moment after the window first shows)
-        DispatchQueue.main.async { [weak self] in self?.place() }
+        placeSoon()
+    }
+
+    /// (1.3.157) Placed on the next turn of the run loop, never there and then: a resize is told of in the middle of the
+    /// window laying itself out, and the tab moved or shown in the title bar then had AppKit lay the window out again,
+    /// and again, until it stopped the app.
+    private func placeSoon() {
+        guard !placing else { return }
+        placing = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.placing = false
+            self.place()
+        }
     }
 
     /// The tab put in the title bar again (in full screen it moves to the bar that drops with the menu bar), as a tab
@@ -72,6 +87,7 @@ final class MenuBarTabProbeView: NSView {
         let full = window.styleMask.contains(.fullScreen)
         if tab.superview !== bar {
             tab.removeFromSuperview()
+            tab.isHidden = true // (shown below once placed, if a large popup is up)
             tab.translatesAutoresizingMaskIntoConstraints = true
             bar.addSubview(tab)
         }
@@ -88,9 +104,11 @@ final class MenuBarTabProbeView: NSView {
             frame = NSRect(x: zoom.maxX + 16, y: close.frame.midY - size.height / 2, width: size.width, height: size.height)
             tab.autoresizingMask = close.autoresizingMask
         }
+        // (nothing set that is so already: each change has the title bar laid out again)
         if tab.frame != frame { tab.frame = frame }
         if tab.full != full { tab.full = full }
-        tab.isHidden = !sidebarShown || !popups.hasLarge
+        let hidden = !sidebarShown || !popups.hasLarge
+        if tab.isHidden != hidden { tab.isHidden = hidden }
     }
 
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
