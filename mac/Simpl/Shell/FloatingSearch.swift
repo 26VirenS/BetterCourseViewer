@@ -76,14 +76,20 @@ final class FloatingSearch: ObservableObject {
             Task { _ = try? await engine.call("searchWarm", as: Ack.self) } // (the index taken now: the first letters answer from it)
             palette?.update(engine.query, engine: engine)
         }
-        withAnimation(Motion.snappy) { shown = true }
+        withAnimation(Self.arrive) { shown = true }
         focusTick += 1
     }
+
+    /// (1.3.156) Its motion: in on a quick spring with no overshoot, out quicker on an ease-out (only a fade under Reduce
+    /// Motion, where it is drawn); the list's height following what it shows on the same kind of spring.
+    static let arrive = Animation.spring(response: 0.32, dampingFraction: 1)
+    static let leave = Animation.easeOut(duration: 0.14)
+    static let resize = Animation.spring(response: 0.28, dampingFraction: 1)
 
     /// Put away: what was typed and the kind go with it, as the web box's going home does.
     func hide(_ engine: Engine) {
         guard shown else { return }
-        withAnimation(Motion.snappy) { shown = false }
+        withAnimation(Self.leave) { shown = false }
         palette?.scope = nil
         if !engine.query.isEmpty { engine.query = "" }
     }
@@ -97,9 +103,9 @@ final class FloatingSearch: ObservableObject {
     private struct Ack: Decodable {}
 }
 
-/// (1.3.154) The toolbar's search field (`.searchable`) given the keyboard — pressed, or tabbed to — brings the floating
-/// search up, which takes it from there: the field in the toolbar is where the search starts, the floating one where it
-/// is done. (Typed in before it is up, the words go with it: MainShell's onChange.)
+/// (1.3.154, 1.3.156) The toolbar's search field (`.searchable`) only brings the floating search up: a press on it is
+/// taken before the field has it — it never gets the cursor or its focus ring, the floating search does — and, tabbed to,
+/// it gives the keyboard straight back. (Typed in before it is up, the words go with it: MainShell's onChange.)
 struct ToolbarSearchWatch: NSViewRepresentable {
     let pressed: () -> Void
 
@@ -115,20 +121,43 @@ struct ToolbarSearchWatch: NSViewRepresentable {
 final class ToolbarSearchWatchView: NSView {
     var pressed: (() -> Void)?
     private var watch: NSKeyValueObservation?
+    private var clicks: Any?
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        watch = window?.observe(\.firstResponder, options: [.new]) { [weak self] w, _ in
+        watch = nil
+        if let clicks { NSEvent.removeMonitor(clicks) }
+        clicks = nil
+        guard let window else { return }
+        // a press on the field: the floating search, and the press goes no further (in full screen the toolbar is in a
+        // window of its own: the field's window, not this one, is the one pressed)
+        clicks = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] e in
+            guard let self, let host = self.window, let field = Self.field(of: host), let w = e.window, field.window === w,
+                  !field.isHiddenOrHasHiddenAncestor, field.bounds.contains(field.convert(e.locationInWindow, from: nil)) else { return e }
+            self.pressed?()
+            return nil
+        }
+        // tabbed to (the keyboard's way in): given straight back, and the floating search up
+        watch = window.observe(\.firstResponder, options: [.new]) { [weak self] w, _ in
             MainActor.assumeIsolated {
-                // (the field's editor has the keyboard: it is the toolbar's search field being typed in)
-                guard let editor = w.firstResponder as? NSTextView, let field = editor.delegate as? NSSearchField else { return }
-                guard (w.toolbar?.items ?? []).contains(where: { ($0 as? NSSearchToolbarItem)?.searchField === field }) else { return }
+                guard let editor = w.firstResponder as? NSTextView, let field = editor.delegate as? NSSearchField,
+                      field === Self.field(of: w) else { return }
+                w.makeFirstResponder(nil)
                 self?.pressed?()
             }
         }
     }
 
+    /// The toolbar's search field, where it is now.
+    private static func field(of window: NSWindow) -> NSSearchField? {
+        (window.toolbar?.items ?? []).lazy.compactMap { ($0 as? NSSearchToolbarItem)?.searchField }.first
+    }
+
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    deinit {
+        if let clicks { NSEvent.removeMonitor(clicks) }
+    }
 }
 
 /// The floating search over the window: its field and its results.
@@ -148,19 +177,22 @@ struct FloatingSearchOverlay: View {
 
     var body: some View {
         GeometryReader { g in
-            if fs.shown {
-                ZStack(alignment: .top) {
+            // (1.3.156: the panel comes and goes itself — its transition plays — inside a stack that is always there;
+            // put in and taken out with the stack round it, it only ever popped)
+            ZStack(alignment: .top) {
+                if fs.shown {
                     // a press anywhere else puts it away (the page is not dimmed: Spotlight's way)
                     Color.black.opacity(0.001)
                         .contentShape(Rectangle())
                         .onTapGesture { fs.hide(engine) }
+                        .transition(.identity)
                     panel(maxHeight: max(220, g.size.height * 0.62))
                         .frame(width: min(700, g.size.width - 48))
                         .padding(.top, min(96, g.size.height * 0.1))
-                        .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.97, anchor: .top)))
+                        .transition(arrival)
                 }
-                .frame(width: g.size.width, height: g.size.height)
             }
+            .frame(width: g.size.width, height: g.size.height, alignment: .top)
         }
         .allowsHitTesting(fs.shown)
         .onChange(of: engine.query) { _, q in
@@ -176,6 +208,15 @@ struct FloatingSearchOverlay: View {
         }
     }
 
+    /// (1.3.156) In: faded and grown from a little under its top, a soft blur clearing — the panel materialising;
+    /// out: faded and settling a touch smaller. A fade alone under Reduce Motion.
+    private var arrival: AnyTransition {
+        if reduceMotion { return .opacity }
+        return .asymmetric(
+            insertion: .modifier(active: Materialise(scale: 0.96, lift: -8, blur: 8, opacity: 0), identity: Materialise()),
+            removal: .modifier(active: Materialise(scale: 0.98, lift: -4, blur: 0, opacity: 0), identity: Materialise()))
+    }
+
     private func panel(maxHeight: CGFloat) -> some View {
         VStack(spacing: 0) {
             field
@@ -185,6 +226,8 @@ struct FloatingSearchOverlay: View {
                 footer
             }
         }
+        // (the results coming and going with the panel's height, not in a jump)
+        .animation(reduceMotion ? nil : FloatingSearch.resize, value: palette.sections.isEmpty)
         .glassCard(radius: 22)
         .shadow(color: .black.opacity(0.22), radius: 30, y: 14)
         .onAppear { DispatchQueue.main.async { focused = true } }
@@ -259,26 +302,36 @@ struct FloatingSearchOverlay: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(palette.sections) { section in
-                        Text(section.title)
-                            .font(.sFootnote.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 12)
-                            .padding(.top, 10)
-                            .padding(.bottom, 2)
-                        ForEach(section.items) { item in
-                            row(item)
-                                .id(item.id)
-                        }
+                        sectionView(section)
                     }
                 }
                 .padding(8)
+                // (sections answering later — the school's, after a pause in the typing — fade in where they go)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: palette.sections.map(\.title))
             }
             .frame(height: min(maxHeight, listHeight))
+            .animation(reduceMotion ? nil : FloatingSearch.resize, value: listHeight)
             .onChange(of: chosen) { _, _ in
                 guard !byMouse, let r = chosenRow else { return }
                 withAnimation(reduceMotion ? nil : Motion.snappy) { proxy.scrollTo(r.id) }
             }
         }
+    }
+
+    private func sectionView(_ section: PaletteSection) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(section.title)
+                .font(.sFootnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
+                .padding(.bottom, 2)
+            ForEach(section.items) { item in
+                row(item)
+                    .id(item.id)
+            }
+        }
+        .transition(.opacity)
     }
 
     private func row(_ item: PaletteItem) -> some View {
@@ -384,5 +437,21 @@ struct FloatingSearchOverlay: View {
         } else {
             fs.hide(engine)
         }
+    }
+}
+
+/// (1.3.156) The floating search's panel part-way in or out: scaled from its top, lifted, blurred and faded.
+private struct Materialise: ViewModifier {
+    var scale: CGFloat = 1
+    var lift: CGFloat = 0
+    var blur: CGFloat = 0
+    var opacity: Double = 1
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(scale, anchor: .top)
+            .offset(y: lift)
+            .blur(radius: blur)
+            .opacity(opacity)
     }
 }
