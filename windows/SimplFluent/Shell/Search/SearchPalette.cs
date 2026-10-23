@@ -56,6 +56,9 @@ public sealed partial class SearchPalette : IDisposable
     private int seq;
     private CancellationTokenSource? lookup;
     private string lastRaw = "";
+    /// <summary>Where the pointer was last seen over the list: a row is chosen by the pointer only when it moves, never
+    /// because rows came up under a pointer resting there (WPF says the pointer entered them) — Enter would open another.</summary>
+    private Point? pointer;
 
     /// <summary>The palette of the window showing (the Search screen's command buttons run through it).</summary>
     public static SearchPalette? Shared { get; private set; }
@@ -136,6 +139,7 @@ public sealed partial class SearchPalette : IDisposable
         var opening = !IsOpen;
         if (opening)
         {
+            pointer = null;
             layer.Visibility = Visibility.Visible;
             Fit();
             // (the engine's index taken now, so the first letters answer from it)
@@ -345,6 +349,8 @@ public sealed partial class SearchPalette : IDisposable
     /// <summary>The list drawn again: a new one from its top, one that answered later where it was.</summary>
     private void Render(bool fresh)
     {
+        // (the pointer where it is now counts as seen: rows drawn under it do not take the choice)
+        pointer = IsOpen ? Mouse.GetPosition(layer) : null;
         list.Children.Clear();
         rows.Clear();
         var first = true;
@@ -393,8 +399,11 @@ public sealed partial class SearchPalette : IDisposable
         b.MinHeight = 40;
         b.Margin = new Thickness(4, 0, 4, 0);
         b.ToolTip = it.Title.Length > 60 ? it.Title : null;
-        b.MouseEnter += (_, _) =>
+        b.MouseMove += (_, e) =>
         {
+            var at = e.GetPosition(layer);
+            if (pointer == at) return;
+            pointer = at;
             if (chosen == item.Id) return;
             chosen = item.Id;
             Highlight(scroll: false);
