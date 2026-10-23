@@ -908,9 +908,15 @@ final class SearchPalette: ObservableObject {
     }
 
     /// A section that answered later in the place of the one that waited for it (or after the rest).
+    /// A section that answered later in the place of the one that waited for it — the same title, or (1.3.152: /open's
+    /// "Looking…" answered as "Knewton Alta: Which Assignment?") the one that held "Looking…" — or after the rest.
     private static func merge(_ base: [PaletteSection], _ extra: PaletteSection) -> [PaletteSection] {
         var out = base
-        if let i = out.firstIndex(where: { $0.title == extra.title }) { out[i] = extra } else { out.append(extra) }
+        if let i = out.firstIndex(where: { $0.title == extra.title }) ?? out.firstIndex(where: { $0.items.contains { $0.id == looking.id } }) {
+            out[i] = extra
+        } else {
+            out.append(extra)
+        }
         return out
     }
 }
