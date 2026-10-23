@@ -1,0 +1,17 @@
+2026-10-23 22:51:23.659 Simpl[30372:84644] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:51:24.188 Simpl[30372:84644] [Simpl] window: the app's screens (no page)
+2026-10-23 22:51:24.381 Simpl[30372:84644] [Simpl] appear To Do: 278 ms
+2026-10-23 22:51:24.534 Simpl[30372:84644] [Simpl] appear To Do: 431 ms
+2026-10-23 22:51:26.978 Simpl[30372:84644] [Simpl] call todo: 1737 ms
+2026-10-23 22:51:27.398 Simpl[30372:84644] [Simpl] call todo: 2158 ms
+2026-10-23 22:51:27.399 Simpl[30372:84644] [Simpl] open To Do: 3296 ms (fetched)
+2026-10-23 22:51:27.431 Simpl[30372:84644] [Simpl] call snapshot: 796 ms
+2026-10-23 22:51:27.757 Simpl[30372:84644] [Simpl] call courses: 162 ms
+2026-10-23 22:51:27.877 Simpl[30372:84644] [Simpl] call groups: 119 ms
+2026-10-23 22:51:28.508 Simpl[30372:84644] [Simpl] call moreFromCanvas: 630 ms
+2026-10-23 22:51:29.237 Simpl[30372:84644] [Simpl] live: todo unchanged · 0 reads
+2026-10-23 22:51:32.181 Simpl[30372:84644] [Simpl] live: dev change task made (planner_note:note1)
+2026-10-23 22:51:33.252 Simpl[30372:84644] [Simpl] live: todo updated todo · 8 reads
+2026-10-23 22:51:37.413 Simpl[30372:84644] [Simpl] live: todo unchanged · 8 reads
+2026-10-23 22:51:41.431 Simpl[30372:84644] [Simpl] live: todo unchanged · 8 reads
+2026-10-23 22:51:45.482 Simpl[30372:84644] [Simpl] live: todo unchanged · 8 reads

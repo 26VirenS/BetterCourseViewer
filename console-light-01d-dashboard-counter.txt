@@ -1,0 +1,25 @@
+2026-10-23 22:41:42.103 Simpl[5352:19717] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:41:43.985 Simpl[5352:19717] [Simpl] window: the app's screens (no page)
+2026-10-23 22:41:44.673 Simpl[5352:19717] [Simpl] appear Dashboard: 1193 ms
+2026-10-23 22:41:45.228 Simpl[5352:19717] [Simpl] appear Dashboard: 1748 ms
+2026-10-23 22:41:52.275 Simpl[5352:19717] [Simpl] open Dashboard: 8794 ms (kept)
+2026-10-23 22:41:52.954 Simpl[5352:19717] [Simpl] call dashCourses: 4166 ms
+2026-10-23 22:41:52.961 Simpl[5352:19717] [Simpl] call dashCourses: 4296 ms
+2026-10-23 22:41:52.965 Simpl[5352:19717] [Simpl] call dashList: 4177 ms
+2026-10-23 22:41:52.967 Simpl[5352:19717] [Simpl] call dashList: 4300 ms
+2026-10-23 22:41:53.082 Simpl[5352:19717] [Simpl] call today: 3896 ms
+2026-10-23 22:41:53.084 Simpl[5352:19717] [Simpl] call today: 3898 ms
+2026-10-23 22:41:53.084 Simpl[5352:19717] [Simpl] call todayCounts: 858 ms
+2026-10-23 22:41:53.085 Simpl[5352:19717] [Simpl] call todayCounts: 859 ms
+2026-10-23 22:41:53.085 Simpl[5352:19717] [Simpl] call todayCounts: 859 ms
+2026-10-23 22:41:53.085 Simpl[5352:19717] [Simpl] call todayCounts: 859 ms
+2026-10-23 22:41:53.863 Simpl[5352:19717] [Simpl] call coursesProgress: 900 ms
+2026-10-23 22:41:53.869 Simpl[5352:19717] [Simpl] call coursesProgress: 915 ms
+2026-10-23 22:41:53.870 Simpl[5352:19717] [Simpl] call dashSkyline: 5083 ms
+2026-10-23 22:41:53.871 Simpl[5352:19717] [Simpl] call dashSkyline: 5205 ms
+2026-10-23 22:41:53.873 Simpl[5352:19717] [Simpl] call snapshot: 1158 ms
+2026-10-23 22:41:54.524 Simpl[5352:19717] [Simpl] counter: next fades in (Reduce Motion)
+2026-10-23 22:41:54.659 Simpl[5352:19717] [Simpl] open Dashboard: 11179 ms (live)
+2026-10-23 22:41:54.659 Simpl[5352:19717] [Simpl] counter: next fades in (Reduce Motion)
+2026-10-23 22:42:22.636 Simpl[5352:19717] [Simpl] call courses: 28112 ms
+2026-10-23 22:42:22.638 Simpl[5352:19717] [Simpl] call todaySheet: 26214 ms

@@ -1,0 +1,28 @@
+2026-10-23 22:50:57.593 Simpl[29428:82206] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:50:58.166 Simpl[29428:82206] [Simpl] window: the app's screens (no page)
+2026-10-23 22:50:58.340 Simpl[29428:82206] [Simpl] appear Dashboard: 287 ms
+2026-10-23 22:50:58.497 Simpl[29428:82206] [Simpl] appear Dashboard: 443 ms
+2026-10-23 22:50:59.665 Simpl[29428:82206] [Simpl] open Dashboard: 1612 ms (kept)
+2026-10-23 22:51:00.103 Simpl[29428:82206] [Simpl] call dashCourses: 1012 ms
+2026-10-23 22:51:00.105 Simpl[29428:82206] [Simpl] call dashCourses: 1015 ms
+2026-10-23 22:51:00.198 Simpl[29428:82206] [Simpl] call today: 1065 ms
+2026-10-23 22:51:00.204 Simpl[29428:82206] [Simpl] call todayCounts: 548 ms
+2026-10-23 22:51:00.205 Simpl[29428:82206] [Simpl] call today: 1072 ms
+2026-10-23 22:51:00.205 Simpl[29428:82206] [Simpl] call todayCounts: 549 ms
+2026-10-23 22:51:00.205 Simpl[29428:82206] [Simpl] call todayCounts: 549 ms
+2026-10-23 22:51:00.205 Simpl[29428:82206] [Simpl] call dashSkyline: 1116 ms
+2026-10-23 22:51:00.207 Simpl[29428:82206] [Simpl] call snapshot: 345 ms
+2026-10-23 22:51:00.271 Simpl[29428:82206] [Simpl] call dashSkyline: 1180 ms
+2026-10-23 22:51:00.271 Simpl[29428:82206] [Simpl] call todayCounts: 615 ms
+2026-10-23 22:51:00.445 Simpl[29428:82206] [Simpl] call coursesProgress: 341 ms
+2026-10-23 22:51:00.446 Simpl[29428:82206] [Simpl] call coursesProgress: 341 ms
+2026-10-23 22:51:00.449 Simpl[29428:82206] [Simpl] open Dashboard: 2396 ms (live)
+2026-10-23 22:51:00.508 Simpl[29428:82206] [Simpl] call courses: 237 ms
+2026-10-23 22:51:00.606 Simpl[29428:82206] [Simpl] call groups: 98 ms
+2026-10-23 22:51:01.311 Simpl[29428:82206] [Simpl] call moreFromCanvas: 705 ms
+2026-10-23 22:51:03.150 Simpl[29428:82206] [Simpl] live: dashboard unchanged · 0 reads · 0 redraws
+2026-10-23 22:51:07.238 Simpl[29428:82206] [Simpl] live: dev change grade made (101)
+2026-10-23 22:51:07.884 Simpl[29428:82206] [Simpl] live: dashboard updated cards,skyline · 13 reads · 1 redraw
+2026-10-23 22:51:12.063 Simpl[29428:82206] [Simpl] live: dashboard unchanged · 13 reads · 0 redraws
+2026-10-23 22:51:16.111 Simpl[29428:82206] [Simpl] live: dashboard unchanged · 13 reads · 0 redraws
+2026-10-23 22:51:20.298 Simpl[29428:82206] [Simpl] live: dashboard unchanged · 13 reads · 0 redraws

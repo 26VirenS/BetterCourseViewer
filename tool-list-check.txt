@@ -1,0 +1,6 @@
+FAIL dark-36b-external-tools-list: 
+ok   light-36b-external-tools-list: tool list room: 290 (290 under the card, 313 over its foot)
+ok   light-36c-external-tools-macmillan: tool list room: 249 (249 under the card, 354 over its foot)
+ok   light-36d-external-tools-list-reread: tool list room: 290 (290 under the card, 313 over its foot)
+ok   the list was still open after the tools were read again under it: read again; Knewton Alta's list still open
+ok   no copy of the app crashed: 0 crash reports

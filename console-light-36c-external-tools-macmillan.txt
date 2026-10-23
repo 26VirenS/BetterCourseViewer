@@ -1,0 +1,16 @@
+2026-10-23 22:50:01.460 Simpl[25727:72513] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:50:03.688 Simpl[25727:72513] [Simpl] window: the app's screens (no page)
+2026-10-23 22:50:04.222 Simpl[25727:72513] [Simpl] appear External Tools: 1168 ms
+2026-10-23 22:50:04.682 Simpl[25727:72513] [Simpl] appear External Tools: 1628 ms
+2026-10-23 22:50:08.460 Simpl[25727:72513] [Simpl] call externalTools: 3777 ms
+2026-10-23 22:50:08.461 Simpl[25727:72513] [Simpl] tool list: opening Macmillan Learning
+2026-10-23 22:50:08.464 Simpl[25727:72513] [Simpl] call externalTools: 4241 ms
+2026-10-23 22:50:08.988 Simpl[25727:72513] [Simpl] tool list shown: Macmillan Learning
+2026-10-23 22:50:09.206 Simpl[25727:72513] [Simpl] open External Tools: 6151 ms (fetched)
+2026-10-23 22:50:09.206 Simpl[25727:72513] [Simpl] tool list room: 249 (249 under the card, 354 over its foot)
+2026-10-23 22:50:12.324 Simpl[25727:72513] [Simpl] call snapshot: 4473 ms
+2026-10-23 22:50:13.035 Simpl[25727:72513] [Simpl] call courses: 390 ms
+2026-10-23 22:50:13.551 Simpl[25727:72513] [Simpl] call groups: 515 ms
+2026-10-23 22:50:14.259 Simpl[25727:72513] [Simpl] call moreFromCanvas: 707 ms
+2026-10-23 22:50:19.078 Simpl[25727:72513] [Simpl] tool list room: 249 (249 under the card, 354 over its foot)
+2026-10-23 22:50:19.306 Simpl[25727:72513] [Simpl] tool list shown: Macmillan Learning

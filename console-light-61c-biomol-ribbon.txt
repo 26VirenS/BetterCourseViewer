@@ -1,0 +1,7 @@
+2026-10-23 22:43:02.694 Simpl[9500:31574] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:43:05.785 Simpl[9500:31574] [Simpl] window: the app's screens (no page)
+2026-10-23 22:43:07.509 Simpl[9500:31574] [Simpl] popup tool: 984 × 609, 20 in from the window (sidebar out)
+2026-10-23 22:43:18.936 Simpl[9500:31574] [Simpl] popup tool: 984 × 589, 20 in from the window (sidebar out)
+2026-10-23 22:43:19.715 Simpl[9500:31574] [Simpl] bio scene: peptide/1/true/only/ballStick/false/true/element/true/false/0 made in 910 ms, 14 objects
+2026-10-23 22:43:19.727 Simpl[9500:31574] [Simpl] bio frame peptide/1/true/only/ballStick/false/true/element/true/false/: view 570 × 363, model 75% across, 55% up
+2026-10-23 22:43:20.523 Simpl[9500:31574] [Simpl] popup tool: 984 × 588, 20 in from the window (sidebar out)

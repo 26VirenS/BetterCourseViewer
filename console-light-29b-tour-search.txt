@@ -1,0 +1,24 @@
+2026-10-23 22:46:40.455 Simpl[17514:51635] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:46:41.857 Simpl[17514:51635] [Simpl] window: the app's screens (no page)
+2026-10-23 22:46:42.317 Simpl[17514:51635] [Simpl] appear Dashboard: 755 ms
+2026-10-23 22:46:42.931 Simpl[17514:51635] [Simpl] appear Dashboard: 1369 ms
+2026-10-23 22:46:51.694 Simpl[17514:51635] [Simpl] open Dashboard: 10131 ms (kept)
+2026-10-23 22:46:52.186 Simpl[17514:51635] [Simpl] call dashList: 5413 ms
+2026-10-23 22:46:52.189 Simpl[17514:51635] [Simpl] call dashList: 5408 ms
+2026-10-23 22:46:52.224 Simpl[17514:51635] [Simpl] call dashCourses: 5444 ms
+2026-10-23 22:46:52.225 Simpl[17514:51635] [Simpl] call today: 4129 ms
+2026-10-23 22:46:52.226 Simpl[17514:51635] [Simpl] call dashCourses: 5453 ms
+2026-10-23 22:46:52.227 Simpl[17514:51635] [Simpl] call today: 4131 ms
+2026-10-23 22:46:52.227 Simpl[17514:51635] [Simpl] call todayCounts: 540 ms
+2026-10-23 22:46:52.227 Simpl[17514:51635] [Simpl] call todayCounts: 540 ms
+2026-10-23 22:46:52.290 Simpl[17514:51635] [Simpl] call dashSkyline: 5511 ms
+2026-10-23 22:46:52.290 Simpl[17514:51635] [Simpl] call dashSkyline: 5517 ms
+2026-10-23 22:46:52.290 Simpl[17514:51635] [Simpl] call snapshot: 329 ms
+2026-10-23 22:46:52.335 Simpl[17514:51635] [Simpl] call todayCounts: 648 ms
+2026-10-23 22:46:52.335 Simpl[17514:51635] [Simpl] call todayCounts: 648 ms
+2026-10-23 22:46:52.336 Simpl[17514:51635] [Simpl] open Dashboard: 10774 ms (live)
+2026-10-23 22:46:52.523 Simpl[17514:51635] [Simpl] call coursesProgress: 297 ms
+2026-10-23 22:46:52.523 Simpl[17514:51635] [Simpl] call coursesProgress: 300 ms
+2026-10-23 22:46:52.525 Simpl[17514:51635] [Simpl] call courses: 191 ms
+2026-10-23 22:46:52.650 Simpl[17514:51635] [Simpl] call groups: 125 ms
+2026-10-23 22:46:53.466 Simpl[17514:51635] [Simpl] call moreFromCanvas: 815 ms

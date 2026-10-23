@@ -1,0 +1,28 @@
+2026-10-23 22:45:02.709 Simpl[14554:44579] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:45:04.095 Simpl[14554:44579] [Simpl] window: the app's screens (no page)
+2026-10-23 22:45:04.421 Simpl[14554:44579] [Simpl] appear Dashboard: 695 ms
+2026-10-23 22:45:04.932 Simpl[14554:44579] [Simpl] appear Dashboard: 1206 ms
+2026-10-23 22:45:08.229 Simpl[14554:44579] [Simpl] open Dashboard: 4502 ms (kept)
+2026-10-23 22:45:11.106 Simpl[14554:44579] [Simpl] call todayCounts: 2906 ms
+2026-10-23 22:45:11.106 Simpl[14554:44579] [Simpl] call todayCounts: 2906 ms
+2026-10-23 22:45:11.106 Simpl[14554:44579] [Simpl] call todayCounts: 2907 ms
+2026-10-23 22:45:11.106 Simpl[14554:44579] [Simpl] call todayCounts: 2907 ms
+2026-10-23 22:45:11.266 Simpl[14554:44579] [Simpl] call today: 4803 ms
+2026-10-23 22:45:11.281 Simpl[14554:44579] [Simpl] call today: 4956 ms
+2026-10-23 22:45:11.285 Simpl[14554:44579] [Simpl] call dashList: 5091 ms
+2026-10-23 22:45:11.301 Simpl[14554:44579] [Simpl] call dashList: 5093 ms
+2026-10-23 22:45:11.303 Simpl[14554:44579] [Simpl] call dashCourses: 5110 ms
+2026-10-23 22:45:11.303 Simpl[14554:44579] [Simpl] call dashCourses: 5111 ms
+2026-10-23 22:45:11.304 Simpl[14554:44579] [Simpl] call dashSkyline: 5111 ms
+2026-10-23 22:45:11.304 Simpl[14554:44579] [Simpl] call dashSkyline: 5112 ms
+2026-10-23 22:45:11.305 Simpl[14554:44579] [Simpl] call snapshot: 284 ms
+2026-10-23 22:45:12.652 Simpl[14554:44579] [Simpl] open Dashboard: 8926 ms (live)
+2026-10-23 22:45:12.780 Simpl[14554:44579] [Simpl] call coursesProgress: 1477 ms
+2026-10-23 22:45:12.782 Simpl[14554:44579] [Simpl] call courses: 1323 ms
+2026-10-23 22:45:12.784 Simpl[14554:44579] [Simpl] call coursesProgress: 1481 ms
+2026-10-23 22:45:13.698 Simpl[14554:44579] [Simpl] call groups: 915 ms
+2026-10-23 22:45:17.050 Simpl[14554:44579] [Simpl] call moreFromCanvas: 3349 ms
+2026-10-23 22:45:19.650 Simpl[14554:44579] [Simpl] calculator: GeoGebra is ready
+2026-10-23 22:45:20.271 Simpl[14554:44589] NSSpellServer dataFromGeneratingCandidatesForSelectedRange timed out, index is 0
+2026-10-23 22:45:20.917 Simpl[14554:44579] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-10-23 22:45:24.505 Simpl[14554:44579] [Simpl] shot: another copy of the app is in front; brought forward again

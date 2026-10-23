@@ -1,0 +1,27 @@
+2026-10-23 22:49:58.346 Simpl[26580:74912] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:49:59.927 Simpl[26580:74912] [Simpl] window: the app's screens (no page)
+2026-10-23 22:50:00.333 Simpl[26580:74912] [Simpl] appear Dashboard: 600 ms
+2026-10-23 22:50:00.604 Simpl[26580:74912] [Simpl] appear Dashboard: 871 ms
+2026-10-23 22:50:03.989 Simpl[26580:74912] [Simpl] open Dashboard: 4256 ms (kept)
+2026-10-23 22:50:05.819 Simpl[26580:74912] [Simpl] call dashCourses: 4129 ms
+2026-10-23 22:50:05.822 Simpl[26580:74912] [Simpl] call dashCourses: 4130 ms
+2026-10-23 22:50:05.823 Simpl[26580:74912] [Simpl] call snapshot: 1553 ms
+2026-10-23 22:50:07.943 Simpl[26580:74912] [Simpl] call todayCounts: 3981 ms
+2026-10-23 22:50:07.944 Simpl[26580:74912] [Simpl] call todayCounts: 3982 ms
+2026-10-23 22:50:07.944 Simpl[26580:74912] [Simpl] call todayCounts: 3982 ms
+2026-10-23 22:50:07.944 Simpl[26580:74912] [Simpl] call todayCounts: 3982 ms
+2026-10-23 22:50:07.944 Simpl[26580:74912] [Simpl] call dashList: 6253 ms
+2026-10-23 22:50:07.945 Simpl[26580:74912] [Simpl] call today: 5942 ms
+2026-10-23 22:50:07.945 Simpl[26580:74912] [Simpl] call dashList: 6255 ms
+2026-10-23 22:50:07.945 Simpl[26580:74912] [Simpl] call today: 5943 ms
+2026-10-23 22:50:08.107 Simpl[26580:74912] [Simpl] call dashSkyline: 6403 ms
+2026-10-23 22:50:08.111 Simpl[26580:74912] [Simpl] call dashSkyline: 6419 ms
+2026-10-23 22:50:08.113 Simpl[26580:74912] [Simpl] counter: graded fades in (Reduce Motion)
+2026-10-23 22:50:08.119 Simpl[26580:74912] [Simpl] open Dashboard: 8385 ms (live)
+2026-10-23 22:50:08.249 Simpl[26580:74912] [Simpl] call courses: 2319 ms
+2026-10-23 22:50:08.250 Simpl[26580:74912] [Simpl] call coursesProgress: 2428 ms
+2026-10-23 22:50:08.250 Simpl[26580:74912] [Simpl] call coursesProgress: 2430 ms
+2026-10-23 22:50:08.655 Simpl[26580:74912] [Simpl] counter: graded fades in (Reduce Motion)
+2026-10-23 22:50:09.064 Simpl[26580:74912] [Simpl] call groups: 815 ms
+2026-10-23 22:50:09.184 Simpl[26580:74912] [Simpl] call todaySheet: 261 ms
+2026-10-23 22:50:11.138 Simpl[26580:74912] [Simpl] call moreFromCanvas: 2073 ms

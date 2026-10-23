@@ -1,0 +1,24 @@
+2026-10-23 22:50:36.557 Simpl[28110:78762] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:50:38.100 Simpl[28110:78762] [Simpl] window: the app's screens (no page)
+2026-10-23 22:50:38.731 Simpl[28110:78762] [Simpl] appear Course home: 809 ms
+2026-10-23 22:50:39.298 Simpl[28110:78762] [Simpl] appear Course home: 1376 ms
+2026-10-23 22:50:43.535 Simpl[28110:78762] [Simpl] open Course home: 5613 ms (kept)
+2026-10-23 22:50:43.875 Simpl[28110:78762] [Simpl] appear Assignment: 111 ms
+2026-10-23 22:50:45.123 Simpl[28110:78762] [Simpl] call neighbours: 952 ms
+2026-10-23 22:50:45.124 Simpl[28110:78762] [Simpl] call snapshot: 1361 ms
+2026-10-23 22:50:45.174 Simpl[28110:78762] [Simpl] call assignment: 441 ms
+2026-10-23 22:50:45.184 Simpl[28110:78762] SimplAssignment 1012: files 0, comments 0, steps Hand In, review 0, handIn 1, error -
+2026-10-23 22:50:46.515 Simpl[28110:78762] [Simpl] call home: 5121 ms
+2026-10-23 22:50:46.515 Simpl[28110:78762] [Simpl] call home: 5124 ms
+2026-10-23 22:50:46.515 Simpl[28110:78762] [Simpl] call home: 5186 ms
+2026-10-23 22:50:46.516 Simpl[28110:78762] [Simpl] open Assignment: 2753 ms (fetched)
+2026-10-23 22:50:46.517 Simpl[28110:78762] [Simpl] popup handin:101/1012: 580 × 560
+2026-10-23 22:50:46.873 Simpl[28110:78762] [Simpl] open Course home: 3110 ms (live)
+2026-10-23 22:50:46.880 Simpl[28110:78762] [Simpl] call neighbours: 797 ms
+2026-10-23 22:50:46.880 Simpl[28110:78762] [Simpl] call courses: 1707 ms
+2026-10-23 22:50:47.105 Simpl[28110:78762] [Simpl] call groups: 219 ms
+2026-10-23 22:50:47.497 Simpl[28110:78762] SimplHandIn added calendar.png (1 files)
+2026-10-23 22:50:47.577 Simpl[28110:78762] SimplPreview: calendar.png in Quick Look
+2026-10-23 22:50:49.861 Simpl[28110:78762] [Simpl] popup handin:101/1012: 977 × 560
+2026-10-23 22:50:50.748 Simpl[28110:78762] [Simpl] call moreFromCanvas: 3643 ms
+2026-10-23 22:51:12.827 Simpl[28110:78762] [Simpl] shot: another copy of the app is in front; brought forward again

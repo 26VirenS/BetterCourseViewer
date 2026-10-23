@@ -1,0 +1,16 @@
+2026-10-23 22:41:00.738 Simpl[4063:16801] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:41:02.805 Simpl[4063:16801] [Simpl] window: the app's screens (no page)
+2026-10-23 22:41:03.539 Simpl[4063:16801] [Simpl] appear Course home: 1050 ms
+2026-10-23 22:41:04.094 Simpl[4063:16801] [Simpl] appear Course home: 1605 ms
+2026-10-23 22:41:08.412 Simpl[4063:16801] [Simpl] appear Discussion: 463 ms
+2026-10-23 22:41:11.431 Simpl[4063:16801] [Simpl] call home: 4357 ms
+2026-10-23 22:41:11.433 Simpl[4063:16801] [Simpl] call home: 4360 ms
+2026-10-23 22:41:11.434 Simpl[4063:16801] [Simpl] call home: 4437 ms
+2026-10-23 22:41:14.301 Simpl[4063:16801] [Simpl] call topic: 3174 ms
+2026-10-23 22:41:14.302 Simpl[4063:16801] [Simpl] open Course home: 6350 ms (fetched)
+2026-10-23 22:41:14.302 Simpl[4063:16801] [Simpl] call snapshot: 6350 ms
+2026-10-23 22:41:26.180 Simpl[4063:16801] [Simpl] open Discussion: 18222 ms (fetched)
+2026-10-23 22:41:27.865 Simpl[4063:16801] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-10-23 22:41:32.300 Simpl[4063:16801] [richtext] not measured after 12 s, shown as plain text: <p>Is there a discussion section this week or is
+2026-10-23 22:41:32.702 Simpl[4063:16801] [Simpl] call courses: 15710 ms
+2026-10-23 22:41:32.704 Simpl[4063:16801] [Simpl] call neighbours: 13483 ms

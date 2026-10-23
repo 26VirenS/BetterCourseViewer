@@ -1,0 +1,9 @@
+2026-10-23 22:44:11.659 Simpl[10437:32924] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:44:13.464 Simpl[10437:32924] [Simpl] window: the app's screens (no page)
+2026-10-23 22:44:15.007 Simpl[10437:32924] [Simpl] popup tool: 984 × 609, 20 in from the window (sidebar out)
+2026-10-23 22:44:17.910 Simpl[10437:32924] [Simpl] bio launch: cell membrane:select=integral:channel:osmosis on the membrane page: osmosis on, selected part:integral:channel
+2026-10-23 22:44:23.364 Simpl[10437:32924] NSQuitAlwaysKeepsWindows=NO
+2026-10-23 22:44:26.183 Simpl[10437:32924] [Simpl] popup tool: 984 × 588, 20 in from the window (sidebar out)
+2026-10-23 22:44:28.652 Simpl[10437:32924] [Simpl] call snapshot: 344 ms
+2026-10-23 22:44:30.207 Simpl[10437:32924] [Simpl] bio scene: membrane|true|true|true|false|true|true made in 13621 ms, 24 objects
+2026-10-23 22:44:30.500 Simpl[10437:32924] [Simpl] bio frame membrane|true|true|true|false|true|true: view 570 × 383, model 75% across, 72% up

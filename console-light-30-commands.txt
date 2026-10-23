@@ -1,0 +1,25 @@
+2026-10-23 22:42:07.335 Simpl[6753:23940] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:42:08.963 Simpl[6753:23940] [Simpl] window: the app's screens (no page)
+2026-10-23 22:42:09.473 Simpl[6753:23940] [Simpl] appear Dashboard: 656 ms
+2026-10-23 22:42:09.639 Simpl[6753:23940] [Simpl] appear Dashboard: 822 ms
+2026-10-23 22:42:16.552 Simpl[6753:23940] [Simpl] open Dashboard: 7732 ms (kept)
+2026-10-23 22:42:21.518 Simpl[6753:23940] [Simpl] call searchWarm: 1337 ms
+2026-10-23 22:42:21.518 Simpl[6753:23940] [Simpl] call searchWarm: 1338 ms
+2026-10-23 22:42:21.519 Simpl[6753:23940] [Simpl] call dashList: 8686 ms
+2026-10-23 22:42:21.519 Simpl[6753:23940] [Simpl] call dashList: 8724 ms
+2026-10-23 22:42:21.525 Simpl[6753:23940] [Simpl] call dashCourses: 8731 ms
+2026-10-23 22:42:21.526 Simpl[6753:23940] [Simpl] call dashCourses: 8693 ms
+2026-10-23 22:42:21.532 Simpl[6753:23940] [Simpl] call today: 8306 ms
+2026-10-23 22:42:21.532 Simpl[6753:23940] [Simpl] call todayCounts: 5024 ms
+2026-10-23 22:42:21.532 Simpl[6753:23940] [Simpl] call todayCounts: 5024 ms
+2026-10-23 22:42:21.829 Simpl[6753:23940] [Simpl] call today: 8603 ms
+2026-10-23 22:42:21.840 Simpl[6753:23940] [Simpl] open Dashboard: 13017 ms (live)
+2026-10-23 22:42:22.151 Simpl[6753:23940] [Simpl] call todayCounts: 5643 ms
+2026-10-23 22:42:22.152 Simpl[6753:23940] [Simpl] call todayCounts: 5643 ms
+2026-10-23 22:42:22.164 Simpl[6753:23940] [Simpl] call coursesProgress: 638 ms
+2026-10-23 22:42:22.165 Simpl[6753:23940] [Simpl] call coursesProgress: 639 ms
+2026-10-23 22:42:22.167 Simpl[6753:23940] [Simpl] call dashSkyline: 9334 ms
+2026-10-23 22:42:22.168 Simpl[6753:23940] [Simpl] call dashSkyline: 9373 ms
+2026-10-23 22:42:22.171 Simpl[6753:23940] [Simpl] call snapshot: 678 ms
+2026-10-23 22:42:22.713 Simpl[6753:23940] [Simpl] call courses: 483 ms
+2026-10-23 22:42:22.908 Simpl[6753:23940] [Simpl] call groups: 195 ms

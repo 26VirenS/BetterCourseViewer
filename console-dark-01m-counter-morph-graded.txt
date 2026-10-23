@@ -1,0 +1,28 @@
+2026-10-23 22:51:01.478 Simpl[29432:82002] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:51:03.854 Simpl[29432:82002] [Simpl] window: the app's screens (no page)
+2026-10-23 22:51:05.206 Simpl[29432:82002] [Simpl] appear Dashboard: 1979 ms
+2026-10-23 22:51:05.891 Simpl[29432:82002] [Simpl] appear Dashboard: 2663 ms
+2026-10-23 22:51:08.779 Simpl[29432:82002] [Simpl] open Dashboard: 5551 ms (kept)
+2026-10-23 22:51:09.607 Simpl[29432:82002] [Simpl] call dashCourses: 2012 ms
+2026-10-23 22:51:09.664 Simpl[29432:82002] [Simpl] call dashCourses: 2076 ms
+2026-10-23 22:51:09.756 Simpl[29432:82002] [Simpl] call snapshot: 771 ms
+2026-10-23 22:51:11.295 Simpl[29432:82002] [Simpl] call dashList: 3700 ms
+2026-10-23 22:51:11.295 Simpl[29432:82002] [Simpl] call todayCounts: 2530 ms
+2026-10-23 22:51:11.296 Simpl[29432:82002] [Simpl] call todayCounts: 2530 ms
+2026-10-23 22:51:11.296 Simpl[29432:82002] [Simpl] call todayCounts: 2530 ms
+2026-10-23 22:51:11.296 Simpl[29432:82002] [Simpl] call todayCounts: 2530 ms
+2026-10-23 22:51:11.296 Simpl[29432:82002] [Simpl] call today: 3512 ms
+2026-10-23 22:51:11.297 Simpl[29432:82002] [Simpl] call today: 3513 ms
+2026-10-23 22:51:11.300 Simpl[29432:82002] [Simpl] call dashSkyline: 3705 ms
+2026-10-23 22:51:11.300 Simpl[29432:82002] [Simpl] call dashSkyline: 3711 ms
+2026-10-23 22:51:11.301 Simpl[29432:82002] [Simpl] call coursesProgress: 1636 ms
+2026-10-23 22:51:11.302 Simpl[29432:82002] [Simpl] call coursesProgress: 1693 ms
+2026-10-23 22:51:11.321 Simpl[29432:82002] [Simpl] call dashList: 3731 ms
+2026-10-23 22:51:11.680 Simpl[29432:82002] [Simpl] counter: graded grows, held 0.4 of the way
+2026-10-23 22:51:11.682 Simpl[29432:82002] [Simpl] open Dashboard: 8455 ms (live)
+2026-10-23 22:51:11.746 Simpl[29432:82002] [Simpl] call courses: 1238 ms
+2026-10-23 22:51:12.208 Simpl[29432:82002] [Simpl] counter: graded grows, held 0.4 of the way
+2026-10-23 22:51:12.851 Simpl[29432:82002] [Simpl] call groups: 1103 ms
+2026-10-23 22:51:14.336 Simpl[29432:82002] [Simpl] call todaySheet: 1943 ms
+2026-10-23 22:51:14.852 Simpl[29432:82002] [Simpl] call moreFromCanvas: 2000 ms
+2026-10-23 22:51:17.350 Simpl[29432:82002] [Simpl] shot: another copy of the app is in front; brought forward again

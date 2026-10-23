@@ -1,0 +1,26 @@
+2026-10-23 22:43:47.509 Simpl[9740:30882] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:43:51.979 Simpl[9740:30882] [Simpl] window: the app's screens (no page)
+2026-10-23 22:43:53.525 Simpl[9740:30882] [Simpl] appear Dashboard: 1981 ms
+2026-10-23 22:43:54.020 Simpl[9740:30882] [Simpl] appear Dashboard: 2478 ms
+2026-10-23 22:44:09.152 Simpl[9740:30882] [Simpl] open Dashboard: 17607 ms (kept)
+2026-10-23 22:44:10.061 Simpl[9740:30882] [Simpl] call moreHistory: 416 ms
+2026-10-23 22:44:10.786 Simpl[9740:30882] [Simpl] call dashCourses: 11152 ms
+2026-10-23 22:44:11.485 Simpl[9740:30882] [Simpl] call dashCourses: 11848 ms
+2026-10-23 22:44:11.487 Simpl[9740:30882] [Simpl] popup more: 440 × 196
+2026-10-23 22:44:11.490 Simpl[9740:30882] [Simpl] popup more: 440 × 248
+2026-10-23 22:44:11.562 Simpl[9740:30882] [Simpl] call dashList: 11925 ms
+2026-10-23 22:44:11.563 Simpl[9740:30882] [Simpl] call dashList: 11929 ms
+2026-10-23 22:44:11.583 Simpl[9740:30882] [Simpl] call today: 10879 ms
+2026-10-23 22:44:11.586 Simpl[9740:30882] [Simpl] call today: 10883 ms
+2026-10-23 22:44:11.591 Simpl[9740:30882] [Simpl] call todayCounts: 2585 ms
+2026-10-23 22:44:11.593 Simpl[9740:30882] [Simpl] call todayCounts: 2587 ms
+2026-10-23 22:44:11.593 Simpl[9740:30882] [Simpl] call todayCounts: 2587 ms
+2026-10-23 22:44:11.593 Simpl[9740:30882] [Simpl] call todayCounts: 2587 ms
+2026-10-23 22:44:11.594 Simpl[9740:30882] [Simpl] call dashSkyline: 11958 ms
+2026-10-23 22:44:11.594 Simpl[9740:30882] [Simpl] call dashSkyline: 11960 ms
+2026-10-23 22:44:11.594 Simpl[9740:30882] [Simpl] call snapshot: 1950 ms
+2026-10-23 22:44:14.121 Simpl[9740:30882] [Simpl] open Dashboard: 22580 ms (live)
+2026-10-23 22:44:15.047 Simpl[9740:30882] [Simpl] call coursesProgress: 3561 ms
+2026-10-23 22:44:15.083 Simpl[9740:30882] [Simpl] call coursesProgress: 4290 ms
+2026-10-23 22:44:15.207 Simpl[9740:30882] [Simpl] call courses: 3062 ms
+2026-10-23 22:44:19.392 Simpl[9740:30882] [Simpl] call groups: 4184 ms

@@ -1,0 +1,28 @@
+2026-10-23 22:54:14.551 Simpl[32984:89700] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:54:15.923 Simpl[32984:89700] [Simpl] window: the app's screens (no page)
+2026-10-23 22:54:16.867 Simpl[32984:89700] [Simpl] appear Course home: 1301 ms
+2026-10-23 22:54:17.648 Simpl[32984:89700] [Simpl] appear Course home: 2087 ms
+2026-10-23 22:54:23.064 Simpl[32984:89700] [Simpl] open Course home: 7504 ms (kept)
+2026-10-23 22:54:24.491 Simpl[32984:89700] [Simpl] appear Assignment: 692 ms
+2026-10-23 22:54:26.762 Simpl[32984:89700] [Simpl] call home: 6140 ms
+2026-10-23 22:54:26.763 Simpl[32984:89700] [Simpl] call home: 6142 ms
+2026-10-23 22:54:26.771 Simpl[32984:89700] [Simpl] call home: 6310 ms
+2026-10-23 22:54:27.812 Simpl[32984:89700] [Simpl] open Course home: 4013 ms (live)
+2026-10-23 22:54:27.823 Simpl[32984:89700] [Simpl] call snapshot: 4024 ms
+2026-10-23 22:54:27.898 Simpl[32984:89700] [Simpl] call neighbours: 2746 ms
+2026-10-23 22:54:28.263 Simpl[32984:89700] [Simpl] call assignment: 1669 ms
+2026-10-23 22:54:28.264 Simpl[32984:89700] SimplAssignment 1012: files 0, comments 0, steps Hand In, review 0, handIn 1, error -
+2026-10-23 22:54:33.762 Simpl[32984:89700] [Simpl] open Assignment: 9963 ms (fetched)
+2026-10-23 22:54:33.762 Simpl[32984:89700] [Simpl] popup handin:101/1012: 580 × 560
+2026-10-23 22:54:33.798 Simpl[32984:89700] SimplHandIn adding 3 files at once
+2026-10-23 22:54:33.846 Simpl[32984:89700] SimplHandIn added calendar.png (1 files)
+2026-10-23 22:54:34.037 Simpl[32984:89700] SimplHandIn added grades.png (2 files)
+2026-10-23 22:54:34.042 Simpl[32984:89700] SimplHandIn added dashboard.png (3 files)
+2026-10-23 22:54:34.212 Simpl[32984:89700] SimplHandIn added 3 files at once: 3 in
+2026-10-23 22:54:34.280 Simpl[32984:89700] SimplPreview: dashboard.png in Quick Look
+2026-10-23 22:54:35.425 Simpl[32984:89700] [Simpl] popup handin:101/1012: 977 × 560
+2026-10-23 22:54:35.578 Simpl[32984:89700] [Simpl] call courses: 7681 ms
+2026-10-23 22:54:36.020 Simpl[32984:89700] [Simpl] call neighbours: 3725 ms
+2026-10-23 22:54:36.100 Simpl[32984:89700] [Simpl] call groups: 514 ms
+2026-10-23 22:54:39.678 Simpl[32984:89700] [Simpl] call moreFromCanvas: 3577 ms
+2026-10-23 22:54:43.217 Simpl[32984:89700] [Simpl] shot: another copy of the app is in front; brought forward again

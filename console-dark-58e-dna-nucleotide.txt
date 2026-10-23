@@ -1,0 +1,7 @@
+2026-10-23 22:44:00.881 Simpl[11499:36169] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:44:04.099 Simpl[11499:36169] [Simpl] window: the app's screens (no page)
+2026-10-23 22:44:05.289 Simpl[11499:36169] [Simpl] popup tool: 984 × 611, 20 in from the window (sidebar out)
+2026-10-23 22:44:05.430 Simpl[11499:36169] [Simpl] bio launch: dna nucleotides:mol=DT:numbers:compare: style cartoon, grooves off, measure off, unzip 0.00, nucleotide DT (model3D), rna cloverleaf, step 1
+2026-10-23 22:44:09.503 Simpl[11499:36169] [Simpl] popup tool: 984 × 591, 20 in from the window (sidebar out)
+2026-10-23 22:44:11.975 Simpl[11499:36169] [Simpl] bio scene: nt|DT|ballStick|true|true|true|true|true|true made in 5770 ms, 76 objects
+2026-10-23 22:44:12.001 Simpl[11499:36169] [Simpl] bio frame nt|DT|ballStick|true|true|true|true|true|true: view 570 × 367, model 53% across, 75% up

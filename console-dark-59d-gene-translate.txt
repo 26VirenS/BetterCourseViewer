@@ -1,0 +1,9 @@
+2026-10-23 22:44:28.395 Simpl[12286:38282] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:44:29.910 Simpl[12286:38282] [Simpl] window: the app's screens (no page)
+2026-10-23 22:44:30.684 Simpl[12286:38282] [Simpl] popup tool: 984 × 608, 20 in from the window (sidebar out)
+2026-10-23 22:44:30.743 Simpl[12286:38282] [Simpl] bio launch: gene express:eukaryote:gene=teaching:step=93: teaching gene, eukaryote, codons as a grid, lookup none, step 93 of 99
+2026-10-23 22:44:33.747 Simpl[12286:38282] [Simpl] popup tool: 984 × 591, 20 in from the window (sidebar out)
+2026-10-23 22:44:35.450 Simpl[12286:38282] [Simpl] call snapshot: 63 ms
+2026-10-23 22:44:35.645 Simpl[12286:38282] [Simpl] call courses: 109 ms
+2026-10-23 22:44:36.442 Simpl[12286:38282] [Simpl] call groups: 796 ms
+2026-10-23 22:44:37.198 Simpl[12286:38282] [Simpl] call moreFromCanvas: 756 ms

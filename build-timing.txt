@@ -1,0 +1,34 @@
+Build Timing Summary
+
+SwiftCompile (4 tasks) | 21.832 seconds
+
+SwiftEmitModule (1 task) | 17.597 seconds
+
+RegisterWithLaunchServices (1 task) | 6.099 seconds
+
+Ld (3 tasks) | 5.970 seconds
+
+SwiftDriver (1 task) | 3.871 seconds
+
+CodeSign (3 tasks) | 0.854 seconds
+
+ExtractAppIntentsMetadata (1 task) | 0.408 seconds
+
+CpResource (1 task) | 0.358 seconds
+
+SwiftDriver Compilation (1 task) | 0.145 seconds
+
+CopySwiftLibs (1 task) | 0.118 seconds
+
+ConstructStubExecutorLinkFileList (1 task) | 0.105 seconds
+
+Copy (3 tasks) | 0.056 seconds
+
+ProcessInfoPlistFile (1 task) | 0.021 seconds
+
+SwiftDriver Compilation Requirements (1 task) | 0.002 seconds
+
+Validate (1 task) | 0.001 seconds
+
+** BUILD SUCCEEDED **
+

@@ -1,0 +1,27 @@
+2026-10-23 22:42:20.292 Simpl[6632:22752] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:42:23.129 Simpl[6632:22752] [Simpl] window: the app's screens (no page)
+2026-10-23 22:42:23.618 Simpl[6632:22752] [Simpl] appear Dashboard: 735 ms
+2026-10-23 22:42:24.199 Simpl[6632:22752] [Simpl] appear Dashboard: 1316 ms
+2026-10-23 22:42:31.704 Simpl[6632:22752] [Simpl] open Dashboard: 8821 ms (kept)
+2026-10-23 22:42:32.109 Simpl[6632:22752] [Simpl] call moreHistory: 132 ms
+2026-10-23 22:42:32.333 Simpl[6632:22752] [Simpl] call dashList: 6065 ms
+2026-10-23 22:42:32.339 Simpl[6632:22752] [Simpl] call dashList: 6072 ms
+2026-10-23 22:42:32.339 Simpl[6632:22752] [Simpl] popup more: 440 × 196
+2026-10-23 22:42:32.341 Simpl[6632:22752] [Simpl] popup more: 440 × 248
+2026-10-23 22:42:32.380 Simpl[6632:22752] [Simpl] call todayCounts: 736 ms
+2026-10-23 22:42:32.381 Simpl[6632:22752] [Simpl] call todayCounts: 737 ms
+2026-10-23 22:42:32.381 Simpl[6632:22752] [Simpl] call todayCounts: 737 ms
+2026-10-23 22:42:32.381 Simpl[6632:22752] [Simpl] call todayCounts: 737 ms
+2026-10-23 22:42:32.381 Simpl[6632:22752] [Simpl] call dashCourses: 6113 ms
+2026-10-23 22:42:32.381 Simpl[6632:22752] [Simpl] call dashCourses: 6115 ms
+2026-10-23 22:42:32.382 Simpl[6632:22752] [Simpl] call today: 4893 ms
+2026-10-23 22:42:32.382 Simpl[6632:22752] [Simpl] call today: 4894 ms
+2026-10-23 22:42:32.382 Simpl[6632:22752] [Simpl] call snapshot: 406 ms
+2026-10-23 22:42:32.661 Simpl[6632:22752] [Simpl] call dashSkyline: 6393 ms
+2026-10-23 22:42:32.661 Simpl[6632:22752] [Simpl] call dashSkyline: 6395 ms
+2026-10-23 22:42:33.580 Simpl[6632:22752] [Simpl] open Dashboard: 10691 ms (live)
+2026-10-23 22:42:34.143 Simpl[6632:22752] [Simpl] call courses: 1483 ms
+2026-10-23 22:42:34.147 Simpl[6632:22752] [Simpl] call coursesProgress: 1765 ms
+2026-10-23 22:42:34.150 Simpl[6632:22752] [Simpl] call coursesProgress: 1768 ms
+2026-10-23 22:42:34.672 Simpl[6632:22752] [Simpl] call groups: 527 ms
+2026-10-23 22:42:35.672 Simpl[6632:22752] [Simpl] call moreFromCanvas: 999 ms

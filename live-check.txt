@@ -1,0 +1,10 @@
+ok   the Dashboard checked with nothing new drew nothing: 4 unchanged, each 0 redraws (6 reads)
+ok   the mock school's soonest work marked done behind the engine's back
+ok   a check found it and put in place the counters: live: dashboard updated counters,day,greeting,list,sidebar
+ok   and the List's row (Coming up)
+ok   the check after it found nothing new again
+ok   a course's total moved: the Cards view's card changed (live: dashboard updated cards,skyline)
+ok   a task added: To Do's list changed
+ok   and To Do's next check found nothing new again
+ok   a course's assignments checked at their own pace: 3 checks
+ok   no check went without an answer

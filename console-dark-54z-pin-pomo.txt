@@ -1,0 +1,24 @@
+2026-10-23 22:46:51.537 Simpl[18342:53836] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:46:53.584 Simpl[18342:53836] [Simpl] window: the app's screens (no page)
+2026-10-23 22:46:54.247 Simpl[18342:53836] [Simpl] appear Dashboard: 1097 ms
+2026-10-23 22:46:54.842 Simpl[18342:53836] [Simpl] appear Dashboard: 1693 ms
+2026-10-23 22:47:04.506 Simpl[18342:53836] [Simpl] open Dashboard: 11357 ms (kept)
+2026-10-23 22:47:07.058 Simpl[18342:53836] [Simpl] call dashCourses: 9469 ms
+2026-10-23 22:47:07.060 Simpl[18342:53836] [Simpl] call dashCourses: 9472 ms
+2026-10-23 22:47:07.447 Simpl[18342:53836] [Simpl] call snapshot: 624 ms
+2026-10-23 22:47:08.221 Simpl[18342:53836] [Simpl] call dashList: 10633 ms
+2026-10-23 22:47:08.225 Simpl[18342:53836] [Simpl] call dashList: 10638 ms
+2026-10-23 22:47:08.226 Simpl[18342:53836] [Simpl] call today: 10637 ms
+2026-10-23 22:47:08.232 Simpl[18342:53836] [Simpl] call today: 10645 ms
+2026-10-23 22:47:08.234 Simpl[18342:53836] [Simpl] call todayCounts: 1780 ms
+2026-10-23 22:47:08.234 Simpl[18342:53836] [Simpl] call todayCounts: 1780 ms
+2026-10-23 22:47:08.235 Simpl[18342:53836] [Simpl] call todayCounts: 1781 ms
+2026-10-23 22:47:08.239 Simpl[18342:53836] [Simpl] call todayCounts: 1785 ms
+2026-10-23 22:47:08.239 Simpl[18342:53836] [Simpl] call coursesProgress: 1179 ms
+2026-10-23 22:47:12.463 Simpl[18342:53836] [Simpl] call coursesProgress: 5405 ms
+2026-10-23 22:47:12.522 Simpl[18342:53836] [Simpl] open Dashboard: 19373 ms (live)
+2026-10-23 22:47:13.949 Simpl[18342:53836] [Simpl] call dashSkyline: 16360 ms
+2026-10-23 22:47:13.953 Simpl[18342:53836] [Simpl] call dashSkyline: 16366 ms
+2026-10-23 22:47:14.006 Simpl[18342:53836] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-10-23 22:47:20.162 Simpl[18342:53836] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-10-23 22:47:23.832 Simpl[18342:53836] [Simpl] call courses: 15754 ms

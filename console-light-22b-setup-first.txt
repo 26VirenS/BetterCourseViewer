@@ -1,0 +1,25 @@
+2026-10-23 22:45:25.710 Simpl[15368:46774] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:45:26.537 Simpl[15368:46774] [Simpl] window: the app's screens (no page)
+2026-10-23 22:45:26.987 Simpl[15368:46774] [Simpl] appear Dashboard: 553 ms
+2026-10-23 22:45:27.775 Simpl[15368:46774] [Simpl] appear Dashboard: 1335 ms
+2026-10-23 22:45:32.557 Simpl[15368:46774] [Simpl] open Dashboard: 6123 ms (kept)
+2026-10-23 22:45:33.149 Simpl[15368:46774] [Simpl] call snapshot: 261 ms
+2026-10-23 22:45:34.363 Simpl[15368:46774] [Simpl] call todayCounts: 1847 ms
+2026-10-23 22:45:34.363 Simpl[15368:46774] [Simpl] call todayCounts: 1847 ms
+2026-10-23 22:45:34.363 Simpl[15368:46774] [Simpl] call today: 3658 ms
+2026-10-23 22:45:34.364 Simpl[15368:46774] [Simpl] call dashCourses: 3896 ms
+2026-10-23 22:45:34.364 Simpl[15368:46774] [Simpl] call todayCounts: 1848 ms
+2026-10-23 22:45:34.364 Simpl[15368:46774] [Simpl] call todayCounts: 1848 ms
+2026-10-23 22:45:34.364 Simpl[15368:46774] [Simpl] call dashCourses: 3829 ms
+2026-10-23 22:45:34.364 Simpl[15368:46774] [Simpl] call today: 3667 ms
+2026-10-23 22:45:34.365 Simpl[15368:46774] [Simpl] call dashSkyline: 3829 ms
+2026-10-23 22:45:34.365 Simpl[15368:46774] [Simpl] call dashSkyline: 3897 ms
+2026-10-23 22:45:34.371 Simpl[15368:46774] [Simpl] call dashList: 3835 ms
+2026-10-23 22:45:34.372 Simpl[15368:46774] [Simpl] call dashList: 3903 ms
+2026-10-23 22:45:34.771 Simpl[15368:46774] [Simpl] open Dashboard: 8336 ms (live)
+2026-10-23 22:45:35.184 Simpl[15368:46774] [Simpl] call coursesProgress: 819 ms
+2026-10-23 22:45:35.185 Simpl[15368:46774] [Simpl] call courses: 1226 ms
+2026-10-23 22:45:35.781 Simpl[15368:46774] [Simpl] call coursesProgress: 1417 ms
+2026-10-23 22:45:35.877 Simpl[15368:46774] [Simpl] call groups: 691 ms
+2026-10-23 22:45:37.794 Simpl[15368:46774] [Simpl] call moreFromCanvas: 1917 ms
+2026-10-23 22:45:43.319 Simpl[15368:46774] [Simpl] call setupInfo: 3094 ms

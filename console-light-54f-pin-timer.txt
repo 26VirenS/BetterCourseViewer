@@ -1,0 +1,27 @@
+2026-10-23 22:52:14.901 Simpl[31534:87310] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:52:15.784 Simpl[31534:87310] [Simpl] window: the app's screens (no page)
+2026-10-23 22:52:15.989 Simpl[31534:87310] [Simpl] appear Dashboard: 464 ms
+2026-10-23 22:52:16.261 Simpl[31534:87310] [Simpl] appear Dashboard: 736 ms
+2026-10-23 22:52:19.289 Simpl[31534:87310] [Simpl] open Dashboard: 3763 ms (kept)
+2026-10-23 22:52:21.343 Simpl[31534:87310] [Simpl] call dashCourses: 4454 ms
+2026-10-23 22:52:21.346 Simpl[31534:87310] [Simpl] call dashCourses: 4458 ms
+2026-10-23 22:52:21.347 Simpl[31534:87310] [Simpl] call snapshot: 543 ms
+2026-10-23 22:52:22.026 Simpl[31534:87310] [Simpl] call dashList: 5137 ms
+2026-10-23 22:52:22.027 Simpl[31534:87310] [Simpl] call dashList: 5139 ms
+2026-10-23 22:52:22.027 Simpl[31534:87310] [Simpl] call today: 2780 ms
+2026-10-23 22:52:22.033 Simpl[31534:87310] [Simpl] call today: 5143 ms
+2026-10-23 22:52:23.055 Simpl[31534:87310] [Simpl] call todayCounts: 2683 ms
+2026-10-23 22:52:23.055 Simpl[31534:87310] [Simpl] call todayCounts: 2686 ms
+2026-10-23 22:52:23.055 Simpl[31534:87310] [Simpl] call todayCounts: 2686 ms
+2026-10-23 22:52:23.055 Simpl[31534:87310] [Simpl] call todayCounts: 2686 ms
+2026-10-23 22:52:23.056 Simpl[31534:87310] [Simpl] call dashSkyline: 6167 ms
+2026-10-23 22:52:23.058 Simpl[31534:87310] [Simpl] call dashSkyline: 6170 ms
+2026-10-23 22:52:23.060 Simpl[31534:87310] [Simpl] open Dashboard: 7535 ms (live)
+2026-10-23 22:52:23.440 Simpl[31534:87310] [Simpl] call coursesProgress: 2094 ms
+2026-10-23 22:52:23.441 Simpl[31534:87310] [Simpl] call coursesProgress: 2095 ms
+2026-10-23 22:52:23.441 Simpl[31534:87310] [Simpl] call courses: 1919 ms
+2026-10-23 22:52:23.881 Simpl[31534:87310] [Simpl] call groups: 440 ms
+2026-10-23 22:52:24.680 Simpl[31534:87310] [Simpl] call moreFromCanvas: 799 ms
+2026-10-23 22:52:26.923 Simpl[31534:87310] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-10-23 22:52:27.962 Simpl[31534:87310] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-10-23 22:52:29.029 Simpl[31534:87310] [Simpl] shot: another copy of the app is in front; brought forward again

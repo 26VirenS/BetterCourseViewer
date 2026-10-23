@@ -1,0 +1,17 @@
+2026-10-23 22:48:15.663 Simpl[22803:65389] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:48:17.315 Simpl[22803:65389] [Simpl] window: the app's screens (no page)
+2026-10-23 22:48:17.767 Simpl[22803:65389] [Simpl] appear External Tools: 638 ms
+2026-10-23 22:48:18.328 Simpl[22803:65389] [Simpl] appear External Tools: 1199 ms
+2026-10-23 22:48:22.198 Simpl[22803:65389] [Simpl] call externalTools: 3869 ms
+2026-10-23 22:48:22.198 Simpl[22803:65389] [Simpl] tool list: opening Knewton Alta
+2026-10-23 22:48:22.211 Simpl[22803:65389] [Simpl] call externalTools: 4443 ms
+2026-10-23 22:48:22.977 Simpl[22803:65389] [Simpl] tool list shown: Knewton Alta
+2026-10-23 22:48:23.222 Simpl[22803:65389] [Simpl] open External Tools: 6093 ms (fetched)
+2026-10-23 22:48:23.222 Simpl[22803:65389] [Simpl] tool list room: 290 (290 under the card, 313 over its foot)
+2026-10-23 22:48:23.338 Simpl[22803:65389] [Simpl] call snapshot: 1440 ms
+2026-10-23 22:48:23.953 Simpl[22803:65389] [Simpl] call courses: 212 ms
+2026-10-23 22:48:24.362 Simpl[22803:65389] [Simpl] call groups: 409 ms
+2026-10-23 22:48:24.813 Simpl[22803:65389] [Simpl] tool list: the tools read again with Knewton Alta's list open
+2026-10-23 22:48:24.967 Simpl[22803:65389] [Simpl] call moreFromCanvas: 604 ms
+2026-10-23 22:48:24.969 Simpl[22803:65389] [Simpl] call externalTools: 157 ms
+2026-10-23 22:48:25.573 Simpl[22803:65389] [Simpl] tool list: read again; Knewton Alta's list still open

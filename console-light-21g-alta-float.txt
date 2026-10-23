@@ -1,0 +1,34 @@
+2026-10-23 22:41:41.900 Simpl[5306:19609] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:41:43.775 Simpl[5306:19609] [Simpl] window: the app's screens (no page)
+2026-10-23 22:41:44.608 Simpl[5306:19609] [Simpl] appear Dashboard: 1368 ms
+2026-10-23 22:41:45.231 Simpl[5306:19609] [Simpl] appear Dashboard: 1990 ms
+2026-10-23 22:41:53.592 Simpl[5306:19609] [Simpl] open Dashboard: 10351 ms (kept)
+2026-10-23 22:41:58.529 Simpl[5306:19609] [Simpl] popup alta: 984 × 591, 20 in from the window (sidebar out)
+2026-10-23 22:42:10.256 Simpl[5306:19609] [Simpl] popup alta: 984 × 589, 20 in from the window (sidebar out)
+2026-10-23 22:42:13.743 Simpl[5306:19609] [Simpl] calculator: GeoGebra is ready
+2026-10-23 22:42:16.436 Simpl[5306:19609] [Simpl] popup alta: 984 × 591, 20 in from the window (sidebar out)
+2026-10-23 22:42:16.896 Simpl[5306:19974] NSSpellServer dataFromGeneratingCandidatesForSelectedRange timed out, index is 0
+2026-10-23 22:42:17.629 Simpl[5306:19974] NSSpellServer dataFromGeneratingCandidatesForSelectedRange timed out, index is 0
+2026-10-23 22:42:18.756 Simpl[5306:19609] [Simpl] call toolLaunch: 8627 ms
+2026-10-23 22:42:18.778 Simpl[5306:19609] [Simpl] call todayCounts: 24270 ms
+2026-10-23 22:42:18.778 Simpl[5306:19609] [Simpl] call todayCounts: 24276 ms
+2026-10-23 22:42:18.778 Simpl[5306:19609] [Simpl] call todayCounts: 24271 ms
+2026-10-23 22:42:18.778 Simpl[5306:19609] [Simpl] call todayCounts: 24271 ms
+2026-10-23 22:42:18.787 Simpl[5306:19609] [Simpl] call dashCourses: 29936 ms
+2026-10-23 22:42:18.788 Simpl[5306:19609] [Simpl] call dashCourses: 29966 ms
+2026-10-23 22:42:18.789 Simpl[5306:19609] [Simpl] call today: 25339 ms
+2026-10-23 22:42:18.806 Simpl[5306:19609] [Simpl] call today: 29916 ms
+2026-10-23 22:42:18.809 Simpl[5306:19609] [Simpl] call dashList: 29958 ms
+2026-10-23 22:42:18.812 Simpl[5306:19609] [Simpl] call dashList: 29989 ms
+2026-10-23 22:42:18.813 Simpl[5306:19609] [Simpl] call dashSkyline: 29962 ms
+2026-10-23 22:42:18.813 Simpl[5306:19609] [Simpl] call snapshot: 22082 ms
+2026-10-23 22:42:19.795 Simpl[5306:19609] [Simpl] call dashSkyline: 30969 ms
+2026-10-23 22:42:21.910 Simpl[5306:19609] [Simpl] alta: view made 10 ms · asked 14647 ms · launch 23283 ms · page 25450 ms · overview 25611 ms · shown 25612 ms (overview, quiet 125 ms, 156 ms after DOMContentLoaded)
+2026-10-23 22:42:22.663 Simpl[5306:19609] [Simpl] open Dashboard: 39423 ms (live)
+2026-10-23 22:42:22.816 Simpl[5306:19609] [Simpl] call coursesProgress: 4028 ms
+2026-10-23 22:42:22.817 Simpl[5306:19609] [Simpl] call courses: 3026 ms
+2026-10-23 22:42:23.155 Simpl[5306:19609] [Simpl] call coursesProgress: 4366 ms
+2026-10-23 22:42:23.169 Simpl[5306:19609] [Simpl] call assignment: 520 ms
+2026-10-23 22:42:23.182 Simpl[5306:19609] [Simpl] call groups: 365 ms
+2026-10-23 22:42:25.735 Simpl[5306:19609] [Simpl] call moreFromCanvas: 2551 ms
+2026-10-23 22:42:48.317 Simpl[5306:19609] [Simpl] live: dashboard waits (assignment popup)

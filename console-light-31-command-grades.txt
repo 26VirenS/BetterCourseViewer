@@ -1,0 +1,28 @@
+2026-10-23 22:55:22.877 Simpl[35132:95116] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:55:27.771 Simpl[35132:95116] [Simpl] window: the app's screens (no page)
+2026-10-23 22:55:30.440 Simpl[35132:95116] [Simpl] appear Dashboard: 3897 ms
+2026-10-23 22:55:31.638 Simpl[35132:95116] [Simpl] appear Dashboard: 5096 ms
+2026-10-23 22:55:39.120 Simpl[35132:95116] [Simpl] open Dashboard: 12577 ms (kept)
+2026-10-23 22:55:43.327 Simpl[35132:95116] [Simpl] call searchWarm: 2493 ms
+2026-10-23 22:55:43.329 Simpl[35132:95116] [Simpl] call searchWarm: 2562 ms
+2026-10-23 22:55:43.331 Simpl[35132:95116] [Simpl] call dashList: 8221 ms
+2026-10-23 22:55:43.332 Simpl[35132:95116] [Simpl] call dashList: 8224 ms
+2026-10-23 22:55:43.411 Simpl[35132:95116] [Simpl] call dashCourses: 8300 ms
+2026-10-23 22:55:43.412 Simpl[35132:95116] [Simpl] call today: 7512 ms
+2026-10-23 22:55:43.413 Simpl[35132:95116] [Simpl] call today: 7512 ms
+2026-10-23 22:55:43.413 Simpl[35132:95116] [Simpl] call todayCounts: 4332 ms
+2026-10-23 22:55:43.449 Simpl[35132:95116] [Simpl] call snapshot: 290 ms
+2026-10-23 22:55:43.734 Simpl[35132:95116] [Simpl] call dashCourses: 8626 ms
+2026-10-23 22:55:44.762 Simpl[35132:95116] [Simpl] call todayCounts: 5681 ms
+2026-10-23 22:55:44.766 Simpl[35132:95116] [Simpl] open Dashboard: 18224 ms (live)
+2026-10-23 22:55:46.425 Simpl[35132:95116] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-10-23 22:55:48.443 Simpl[35132:95116] [Simpl] call dashSkyline: 13334 ms
+2026-10-23 22:55:48.460 Simpl[35132:95116] [Simpl] call dashSkyline: 13352 ms
+2026-10-23 22:55:48.461 Simpl[35132:95116] [Simpl] call todayCounts: 9379 ms
+2026-10-23 22:55:48.461 Simpl[35132:95116] [Simpl] call todayCounts: 9380 ms
+2026-10-23 22:55:48.463 Simpl[35132:95116] [Simpl] call grades: 7628 ms
+2026-10-23 22:55:48.467 Simpl[35132:95116] [Simpl] call grades: 7701 ms
+2026-10-23 22:55:48.468 Simpl[35132:95116] [Simpl] call grades: 7634 ms
+2026-10-23 22:55:49.157 Simpl[35132:95116] [Simpl] call coursesProgress: 5422 ms
+2026-10-23 22:55:49.163 Simpl[35132:95116] [Simpl] call coursesProgress: 5748 ms
+2026-10-23 22:55:49.164 Simpl[35132:95116] [Simpl] call courses: 5431 ms

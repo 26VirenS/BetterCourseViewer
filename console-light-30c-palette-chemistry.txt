@@ -1,0 +1,5 @@
+2026-10-23 22:48:37.606 Simpl[22160:63462] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:48:40.318 Simpl[22160:63462] [Simpl] window: the app's screens (no page)
+2026-10-23 22:48:40.768 Simpl[22160:63462] [Simpl] appear Dashboard: 743 ms
+2026-10-23 22:48:41.766 Simpl[22160:63462] [Simpl] appear Dashboard: 1741 ms
+2026-10-23 22:48:53.340 Simpl[22160:63462] [Simpl] open Dashboard: 13315 ms (kept)

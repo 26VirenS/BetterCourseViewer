@@ -1,0 +1,35 @@
+2026-10-23 22:55:50.973 Simpl[36212:97852] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:55:56.094 Simpl[36212:97852] [Simpl] window: the app's screens (/d2l/home)
+2026-10-23 22:55:57.044 Simpl[36212:97852] [Simpl] appear Dashboard: 2666 ms
+2026-10-23 22:55:57.343 Simpl[36212:97852] [Simpl] appear Dashboard: 3036 ms
+2026-10-23 22:56:01.759 Simpl[36212:97852] [Simpl] appear Course home: 99 ms
+2026-10-23 22:56:02.409 Simpl[36212:97852] [Simpl] appear Assignment: 749 ms
+2026-10-23 22:56:03.814 Simpl[36212:97852] [Simpl] call dashSkyline: 2046 ms
+2026-10-23 22:56:03.817 Simpl[36212:97852] [Simpl] call dashSkyline: 2051 ms
+2026-10-23 22:56:03.818 Simpl[36212:97852] [Simpl] call dashCourses: 2049 ms
+2026-10-23 22:56:03.823 Simpl[36212:97852] [Simpl] call dashList: 2057 ms
+2026-10-23 22:56:03.824 Simpl[36212:97852] [Simpl] call today: 2056 ms
+2026-10-23 22:56:03.825 Simpl[36212:97852] [Simpl] call today: 2059 ms
+2026-10-23 22:56:03.829 Simpl[36212:97852] [Simpl] call snapshot: 2065 ms
+2026-10-23 22:56:04.224 Simpl[36212:97852] [Simpl] call dashCourses: 2458 ms
+2026-10-23 22:56:04.225 Simpl[36212:97852] [Simpl] call dashList: 2457 ms
+2026-10-23 22:56:04.825 Simpl[36212:97852] [Simpl] call home: 2597 ms
+2026-10-23 22:56:04.825 Simpl[36212:97852] [Simpl] call neighbours: 2008 ms
+2026-10-23 22:56:04.825 Simpl[36212:97852] [Simpl] call home: 2598 ms
+2026-10-23 22:56:04.976 Simpl[36212:97852] [Simpl] open Dashboard: 3316 ms (fetched)
+2026-10-23 22:56:05.209 Simpl[36212:97852] [Simpl] call todayCounts: 1433 ms
+2026-10-23 22:56:05.210 Simpl[36212:97852] [Simpl] call todayCounts: 1435 ms
+2026-10-23 22:56:05.210 Simpl[36212:97852] [Simpl] open Course home: 3550 ms (fetched)
+2026-10-23 22:56:05.210 Simpl[36212:97852] [Simpl] call todayCounts: 1436 ms
+2026-10-23 22:56:05.211 Simpl[36212:97852] [Simpl] call todayCounts: 1436 ms
+2026-10-23 22:56:05.212 Simpl[36212:97852] [Simpl] call assignment: 1430 ms
+2026-10-23 22:56:05.214 Simpl[36212:97852] SimplAssignment 702: files 0, comments 0, steps Hand In, review 0, handIn 0, error -
+2026-10-23 22:56:06.568 Simpl[36212:97852] [Simpl] call dashSkyline: 2751 ms
+2026-10-23 22:56:06.569 Simpl[36212:97852] [Simpl] call dashSkyline: 2753 ms
+2026-10-23 22:56:06.570 Simpl[36212:97852] [Simpl] call coursesProgress: 2346 ms
+2026-10-23 22:56:06.572 Simpl[36212:97852] [Simpl] call coursesProgress: 2753 ms
+2026-10-23 22:56:06.575 Simpl[36212:97852] [Simpl] open Assignment: 4913 ms (fetched)
+2026-10-23 22:56:06.598 Simpl[36212:97852] [Simpl] call courses: 2376 ms
+2026-10-23 22:56:06.892 Simpl[36212:97852] [Simpl] call neighbours: 889 ms
+2026-10-23 22:56:06.929 Simpl[36212:97852] [Simpl] call groups: 330 ms
+2026-10-23 22:56:07.168 Simpl[36212:97852] [Simpl] call moreFromCanvas: 239 ms

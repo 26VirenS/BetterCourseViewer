@@ -1,0 +1,20 @@
+2026-10-23 22:41:00.597 Simpl[4057:16790] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:41:02.623 Simpl[4057:16790] [Simpl] window: the app's screens (no page)
+2026-10-23 22:41:03.319 Simpl[4057:16790] [Simpl] appear Course home: 1002 ms
+2026-10-23 22:41:04.036 Simpl[4057:16790] [Simpl] appear Course home: 1713 ms
+2026-10-23 22:41:08.477 Simpl[4057:16790] [Simpl] appear Assignment: 827 ms
+2026-10-23 22:41:12.182 Simpl[4057:16790] [Simpl] call home: 5461 ms
+2026-10-23 22:41:12.184 Simpl[4057:16790] [Simpl] call snapshot: 4534 ms
+2026-10-23 22:41:13.586 Simpl[4057:16790] [Simpl] call home: 6690 ms
+2026-10-23 22:41:13.586 Simpl[4057:16790] [Simpl] call home: 6664 ms
+2026-10-23 22:41:13.588 Simpl[4057:16790] [Simpl] call neighbours: 3983 ms
+2026-10-23 22:41:16.904 Simpl[4057:16790] [Simpl] call assignment: 8086 ms
+2026-10-23 22:41:16.905 Simpl[4057:16790] SimplAssignment 1012: files 0, comments 0, steps Hand In, review 0, handIn 1, error -
+2026-10-23 22:41:16.905 Simpl[4057:16790] [Simpl] open Course home: 9253 ms (fetched)
+2026-10-23 22:41:26.254 Simpl[4057:16790] [Simpl] open Assignment: 18584 ms (fetched)
+2026-10-23 22:41:26.255 Simpl[4057:16790] [Simpl] popup handin:101/1012: 580 × 560
+2026-10-23 22:41:27.624 Simpl[4057:16790] [Simpl] call courses: 15082 ms
+2026-10-23 22:41:29.198 Simpl[4057:16790] [Simpl] call neighbours: 5889 ms
+2026-10-23 22:41:29.253 Simpl[4057:16790] [Simpl] call groups: 1627 ms
+2026-10-23 22:41:29.315 Simpl[4057:16790] WARNING: Application performed a reentrant operation in its NSTableView delegate. This warning will become an assert in the future.
+2026-10-23 22:41:31.731 Simpl[4057:16790] [Simpl] call moreFromCanvas: 2476 ms

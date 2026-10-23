@@ -1,0 +1,13 @@
+2026-10-23 22:40:54.795 Simpl[4563:18434] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:40:56.596 Simpl[4563:18434] [Simpl] window: the app's screens (no page)
+2026-10-23 22:40:57.007 Simpl[4563:18434] [Simpl] appear Course grades: 617 ms
+2026-10-23 22:40:57.413 Simpl[4563:18434] [Simpl] appear Course grades: 1023 ms
+2026-10-23 22:41:03.846 Simpl[4563:18434] [Simpl] call snapshot: 2172 ms
+2026-10-23 22:41:03.970 Simpl[4563:18434] [Simpl] call home: 3586 ms
+2026-10-23 22:41:05.058 Simpl[4563:18434] [Simpl] call courses: 1088 ms
+2026-10-23 22:41:05.065 Simpl[4563:18434] [Simpl] call courseGrades: 7650 ms
+2026-10-23 22:41:05.069 Simpl[4563:18434] [Simpl] call courseGrades: 8061 ms
+2026-10-23 22:41:06.712 Simpl[4563:18434] NSQuitAlwaysKeepsWindows=NO
+2026-10-23 22:41:09.570 Simpl[4563:18434] [Simpl] open Course grades: 13177 ms (fetched)
+2026-10-23 22:41:09.573 Simpl[4563:18434] [Simpl] call groups: 4511 ms
+2026-10-23 22:41:10.287 Simpl[4563:18434] [Simpl] call moreFromCanvas: 714 ms

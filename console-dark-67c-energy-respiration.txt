@@ -1,0 +1,5 @@
+2026-10-23 22:48:00.235 Simpl[19239:55452] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:48:01.736 Simpl[19239:55452] [Simpl] window: the app's screens (no page)
+2026-10-23 22:48:02.782 Simpl[19239:55452] [Simpl] popup tool: 984 × 609, 20 in from the window (sidebar out)
+2026-10-23 22:48:03.284 Simpl[19239:55452] [Simpl] bio launch: energy respiration:step=7: with oxygen, step 7
+2026-10-23 22:48:12.341 Simpl[19239:55452] [Simpl] popup tool: 984 × 591, 20 in from the window (sidebar out)

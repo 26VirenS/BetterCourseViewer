@@ -1,0 +1,25 @@
+2026-10-23 22:49:17.729 Simpl[25490:72239] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+IOServiceMatchingfailed for: AppleM2ScalerParavirtDriver
+2026-10-23 22:49:33.393 Simpl[25490:72239] [Simpl] window: the app's screens (no page)
+2026-10-23 22:49:34.486 Simpl[25490:72239] [Simpl] appear Dashboard: 1734 ms
+2026-10-23 22:49:35.071 Simpl[25490:72239] [Simpl] appear Dashboard: 2319 ms
+2026-10-23 22:49:40.037 Simpl[25490:72239] [Simpl] open Dashboard: 7285 ms (kept)
+2026-10-23 22:49:40.451 Simpl[25490:72239] [Simpl] call snapshot: 160 ms
+2026-10-23 22:49:44.030 Simpl[25490:72239] [Simpl] call today: 5699 ms
+2026-10-23 22:49:44.030 Simpl[25490:72239] [Simpl] call today: 5700 ms
+2026-10-23 22:49:44.031 Simpl[25490:72239] [Simpl] call dashCourses: 5877 ms
+2026-10-23 22:49:44.031 Simpl[25490:72239] [Simpl] call dashList: 5878 ms
+2026-10-23 22:49:44.032 Simpl[25490:72239] [Simpl] call dashCourses: 5884 ms
+2026-10-23 22:49:44.032 Simpl[25490:72239] [Simpl] call todayCounts: 4015 ms
+2026-10-23 22:49:44.032 Simpl[25490:72239] [Simpl] call todayCounts: 4017 ms
+2026-10-23 22:49:44.032 Simpl[25490:72239] [Simpl] call todayCounts: 4015 ms
+2026-10-23 22:49:44.032 Simpl[25490:72239] [Simpl] call todayCounts: 4016 ms
+2026-10-23 22:49:44.032 Simpl[25490:72239] [Simpl] call dashList: 5885 ms
+2026-10-23 22:49:44.033 Simpl[25490:72239] [Simpl] call dashSkyline: 5879 ms
+2026-10-23 22:49:44.034 Simpl[25490:72239] [Simpl] call dashSkyline: 5886 ms
+2026-10-23 22:49:44.101 Simpl[25490:72239] [Simpl] call courses: 3141 ms
+2026-10-23 22:49:44.103 Simpl[25490:72239] [Simpl] open Dashboard: 11351 ms (live)
+2026-10-23 22:49:44.223 Simpl[25490:72239] [Simpl] call groups: 122 ms
+2026-10-23 22:49:44.310 Simpl[25490:72239] [Simpl] call coursesProgress: 278 ms
+2026-10-23 22:49:44.310 Simpl[25490:72239] [Simpl] call coursesProgress: 279 ms
+2026-10-23 22:49:45.184 Simpl[25490:72239] [Simpl] call moreFromCanvas: 961 ms

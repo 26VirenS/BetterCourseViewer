@@ -1,0 +1,15 @@
+2026-10-23 22:51:48.628 Simpl[31462:87410] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:51:49.062 Simpl[31462:87410] [Simpl] window: the app's screens (no page)
+2026-10-23 22:51:49.216 Simpl[31462:87410] [Simpl] appear Section Assignments: 251 ms
+2026-10-23 22:51:49.316 Simpl[31462:87410] [Simpl] appear Section Assignments: 351 ms
+2026-10-23 22:51:51.293 Simpl[31462:87410] [Simpl] call assignments: 1589 ms
+2026-10-23 22:51:51.524 Simpl[31462:87410] [Simpl] call assignments: 1822 ms
+2026-10-23 22:51:51.524 Simpl[31462:87410] [Simpl] open Section Assignments: 2559 ms (fetched)
+2026-10-23 22:51:51.526 Simpl[31462:87410] [Simpl] call snapshot: 481 ms
+2026-10-23 22:51:51.638 Simpl[31462:87410] [Simpl] call home: 1961 ms
+2026-10-23 22:51:51.682 Simpl[31462:87410] [Simpl] call courses: 97 ms
+2026-10-23 22:51:51.734 Simpl[31462:87410] [Simpl] call groups: 52 ms
+2026-10-23 22:51:52.146 Simpl[31462:87410] [Simpl] call moreFromCanvas: 411 ms
+2026-10-23 22:51:53.952 Simpl[31462:87410] [Simpl] live: assignments unchanged · 0 reads
+2026-10-23 22:51:57.988 Simpl[31462:87410] [Simpl] live: assignments unchanged · 7 reads
+2026-10-23 22:52:02.031 Simpl[31462:87410] [Simpl] live: assignments unchanged · 7 reads

@@ -1,0 +1,51 @@
+2026-10-23 22:50:17.323 Simpl[27425:77027] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:50:18.431 Simpl[27425:77027] [Simpl] window: the app's screens (no page)
+2026-10-23 22:50:18.843 Simpl[27425:77027] [Simpl] appear Dashboard: 585 ms
+2026-10-23 22:50:19.377 Simpl[27425:77027] [Simpl] appear Dashboard: 1118 ms
+2026-10-23 22:50:25.865 Simpl[27425:77027] [Simpl] open Dashboard: 7607 ms (kept)
+2026-10-23 22:50:26.451 Simpl[27425:77027] [Simpl] call dashList: 5251 ms
+2026-10-23 22:50:26.454 Simpl[27425:77027] [Simpl] call dashCourses: 5252 ms
+2026-10-23 22:50:26.456 Simpl[27425:77027] [Simpl] call dashList: 5324 ms
+2026-10-23 22:50:26.457 Simpl[27425:77027] [Simpl] call dashCourses: 5325 ms
+2026-10-23 22:50:26.464 Simpl[27425:77027] [Simpl] call todayCounts: 550 ms
+2026-10-23 22:50:26.464 Simpl[27425:77027] [Simpl] call todayCounts: 551 ms
+2026-10-23 22:50:26.464 Simpl[27425:77027] [Simpl] call todayCounts: 551 ms
+2026-10-23 22:50:26.464 Simpl[27425:77027] [Simpl] call todayCounts: 551 ms
+2026-10-23 22:50:26.464 Simpl[27425:77027] [Simpl] call snapshot: 271 ms
+2026-10-23 22:50:26.602 Simpl[27425:77027] [Simpl] call dashSkyline: 5469 ms
+2026-10-23 22:50:26.602 Simpl[27425:77027] [Simpl] call dashSkyline: 5403 ms
+2026-10-23 22:50:26.603 Simpl[27425:77027] [Simpl] call today: 5403 ms
+2026-10-23 22:50:27.065 Simpl[27425:77027] [Simpl] call today: 1242 ms
+2026-10-23 22:50:27.069 Simpl[27425:77027] [Simpl] open Dashboard: 8811 ms (live)
+2026-10-23 22:50:27.166 Simpl[27425:77027] [Simpl] call coursesProgress: 711 ms
+2026-10-23 22:50:27.170 Simpl[27425:77027] [Simpl] call coursesProgress: 713 ms
+2026-10-23 22:50:27.172 Simpl[27425:77027] [Simpl] call courses: 572 ms
+2026-10-23 22:50:27.298 Simpl[27425:77027] [Simpl] call groups: 125 ms
+2026-10-23 22:50:28.465 Simpl[27425:77027] [Simpl] walk: on:/courses/101/assignments/1001
+2026-10-23 22:50:28.856 Simpl[27425:77027] [Simpl] appear Assignment: 390 ms
+2026-10-23 22:50:29.384 Simpl[27425:77027] [Simpl] call moreFromCanvas: 2085 ms
+2026-10-23 22:50:30.210 Simpl[27425:77027] [Simpl] call neighbours: 1101 ms
+2026-10-23 22:50:30.211 Simpl[27425:77027] [Simpl] call assignment: 1354 ms
+2026-10-23 22:50:31.608 Simpl[27425:77027] [Simpl] open Assignment: 3143 ms (fetched)
+2026-10-23 22:50:31.716 Simpl[27425:77027] [Simpl] call quizIntro: 1497 ms
+2026-10-23 22:50:31.717 Simpl[27425:77027] SimplAssignment 1001: files 0, comments 2, steps See Feedback+New Attempt, review 0, handIn 0, error -
+2026-10-23 22:50:32.088 Simpl[27425:77027] [Simpl] call neighbours: 1144 ms
+2026-10-23 22:50:34.388 Simpl[27425:77027] [Simpl] walk: at dashboard, 1 pushed
+2026-10-23 22:50:34.388 Simpl[27425:77027] [Simpl] walk: again
+2026-10-23 22:50:35.468 Simpl[27425:77027] [Simpl] open Dashboard: 1080 ms (alive)
+2026-10-23 22:50:36.124 Simpl[27425:77027] [Simpl] read ahead calView: 15 ms
+2026-10-23 22:50:36.125 Simpl[27425:77027] [Simpl] read ahead todo: 17 ms
+2026-10-23 22:50:36.171 Simpl[27425:77027] [Simpl] read ahead calendar: 46 ms
+2026-10-23 22:50:36.323 Simpl[27425:77027] [Simpl] read ahead grades: 56 ms
+2026-10-23 22:50:36.326 Simpl[27425:77027] [Simpl] read ahead notifications: 18 ms
+2026-10-23 22:50:36.481 Simpl[27425:77027] [Simpl] walk: at dashboard, 0 pushed
+2026-10-23 22:50:36.481 Simpl[27425:77027] [Simpl] walk: done
+2026-10-23 22:50:36.493 Simpl[27425:77027] [Simpl] read ahead inbox: 37 ms
+2026-10-23 22:50:36.497 Simpl[27425:77027] [Simpl] read ahead allCourses: 42 ms
+2026-10-23 22:50:36.656 Simpl[27425:77027] [Simpl] read ahead coursesProgress: 23 ms
+2026-10-23 22:50:36.673 Simpl[27425:77027] [Simpl] read ahead home: 40 ms
+2026-10-23 22:50:36.787 Simpl[27425:77027] [Simpl] read ahead home: 8 ms
+2026-10-23 22:50:37.184 Simpl[27425:77027] [Simpl] read ahead home: 49 ms
+2026-10-23 22:50:37.187 Simpl[27425:77027] [Simpl] read ahead home: 52 ms
+2026-10-23 22:50:37.352 Simpl[27425:77027] [Simpl] read ahead home: 18 ms
+2026-10-23 22:50:38.922 Simpl[27425:77027] [Simpl] shot: another copy of the app is in front; brought forward again

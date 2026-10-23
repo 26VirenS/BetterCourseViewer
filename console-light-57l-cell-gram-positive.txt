@@ -1,0 +1,11 @@
+2026-10-23 22:44:59.189 Simpl[12338:37687] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:45:01.958 Simpl[12338:37687] [Simpl] window: the app's screens (no page)
+2026-10-23 22:45:03.954 Simpl[12338:37687] [Simpl] popup tool: 984 × 607, 20 in from the window (sidebar out)
+2026-10-23 22:45:06.306 Simpl[12338:37687] [Simpl] bio launch: cell bacterium:gram+:select=wall on the bacterium page: scale teaching, cutaway on, explode 0.00, selected organelle:wall, quiz none
+2026-10-23 22:45:12.996 Simpl[12338:37687] [Simpl] popup tool: 984 × 588, 20 in from the window (sidebar out)
+2026-10-23 22:45:15.411 Simpl[12338:37687] [Simpl] call snapshot: 332 ms
+2026-10-23 22:45:17.458 Simpl[12338:37687] [Simpl] bio scene: bacterium|false|true|true|0.0||-|false|false|- made in 11959 ms, 253 objects
+2026-10-23 22:45:17.594 Simpl[12338:37687] [Simpl] bio frame bacterium|false|true|true|0.0||-|false|false|-: view 570 × 383, model 48% across, 75% up
+2026-10-23 22:45:29.424 Simpl[12338:37687] [Simpl] call courses: 13761 ms
+2026-10-23 22:45:30.345 Simpl[12338:37687] [Simpl] call groups: 917 ms
+2026-10-23 22:45:36.796 Simpl[12338:37687] [Simpl] shot: another copy of the app is in front; brought forward again

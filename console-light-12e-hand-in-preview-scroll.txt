@@ -1,0 +1,24 @@
+2026-10-23 22:48:39.815 Simpl[23775:67786] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:48:44.053 Simpl[23775:67786] [Simpl] window: the app's screens (no page)
+2026-10-23 22:48:44.756 Simpl[23775:67786] [Simpl] appear Course home: 973 ms
+2026-10-23 22:48:45.524 Simpl[23775:67786] [Simpl] appear Course home: 1742 ms
+2026-10-23 22:48:53.777 Simpl[23775:67786] [Simpl] appear Assignment: 493 ms
+2026-10-23 22:48:56.254 Simpl[23775:67786] [Simpl] call home: 4236 ms
+2026-10-23 22:48:56.255 Simpl[23775:67786] [Simpl] call home: 4253 ms
+2026-10-23 22:48:56.256 Simpl[23775:67786] [Simpl] call home: 4369 ms
+2026-10-23 22:48:57.558 Simpl[23775:67786] [Simpl] call neighbours: 3158 ms
+2026-10-23 22:48:57.559 Simpl[23775:67786] [Simpl] open Course home: 4275 ms (fetched)
+2026-10-23 22:48:57.593 Simpl[23775:67786] [Simpl] call snapshot: 4298 ms
+2026-10-23 22:48:57.943 Simpl[23775:67786] [Simpl] call assignment: 2287 ms
+2026-10-23 22:48:57.943 Simpl[23775:67786] SimplAssignment 1012: files 0, comments 0, steps Hand In, review 0, handIn 1, error -
+2026-10-23 22:48:59.981 Simpl[23775:67786] [Simpl] open Assignment: 6698 ms (fetched)
+2026-10-23 22:48:59.982 Simpl[23775:67786] [Simpl] popup handin:101/1012: 580 × 560
+2026-10-23 22:49:00.187 Simpl[23775:67786] [Simpl] call courses: 2465 ms
+2026-10-23 22:49:00.532 Simpl[23775:67786] [Simpl] call neighbours: 1161 ms
+2026-10-23 22:49:00.588 Simpl[23775:67786] [Simpl] call groups: 401 ms
+2026-10-23 22:49:01.162 Simpl[23775:67786] SimplHandIn added long-reading.pdf (1 files)
+2026-10-23 22:49:01.295 Simpl[23775:67786] SimplPreview: long-reading.pdf in PDFKit (6 pages)
+IOServiceMatchingfailed for: AppleM2ScalerParavirtDriver
+2026-10-23 22:49:02.159 Simpl[23775:67786] [Simpl] popup handin:101/1012: 977 × 560
+2026-10-23 22:49:02.895 Simpl[23775:67786] [Simpl] call moreFromCanvas: 2306 ms
+2026-10-23 22:49:07.376 Simpl[23775:67786] SimplScrollProbe: PDF, pages 6, scrolled yes (4000 → 3624)

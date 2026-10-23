@@ -1,0 +1,4 @@
+2026-10-23 22:43:24.780 Simpl[8834:28672] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:43:31.010 Simpl[8834:28672] [Simpl] window: the app's screens (no page)
+2026-10-23 22:43:35.029 Simpl[8834:28672] [Simpl] appear Inbox: 5405 ms
+2026-10-23 22:43:36.861 Simpl[8834:28672] [Simpl] appear Inbox: 7236 ms

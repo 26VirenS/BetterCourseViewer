@@ -1,0 +1,17 @@
+2026-10-23 22:42:51.310 Simpl[7777:26022] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:42:55.941 Simpl[7777:26022] [Simpl] window: the app's screens (no page)
+2026-10-23 22:42:57.635 Simpl[7777:26022] [Simpl] appear Course home: 2265 ms
+2026-10-23 22:42:59.943 Simpl[7777:26022] [Simpl] appear Course home: 4572 ms
+2026-10-23 22:43:12.999 Simpl[7777:26022] [Simpl] appear Assignment: 562 ms
+2026-10-23 22:43:14.806 Simpl[7777:26022] [Simpl] call home: 4930 ms
+2026-10-23 22:43:14.807 Simpl[7777:26022] [Simpl] call snapshot: 2370 ms
+2026-10-23 22:43:15.010 Simpl[7777:26022] [Simpl] call neighbours: 1370 ms
+2026-10-23 22:43:15.011 Simpl[7777:26022] [Simpl] call home: 17373 ms
+2026-10-23 22:43:15.011 Simpl[7777:26022] [Simpl] call home: 4800 ms
+2026-10-23 22:43:16.879 Simpl[7777:26022] [Simpl] open Course home: 4442 ms (fetched)
+2026-10-23 22:43:17.068 Simpl[7777:26022] [Simpl] call courses: 2057 ms
+2026-10-23 22:43:17.069 Simpl[7777:26022] [Simpl] call assignment: 2688 ms
+2026-10-23 22:43:17.311 Simpl[7777:26022] SimplAssignment 1012: files 0, comments 0, steps Hand In, review 0, handIn 1, error -
+2026-10-23 22:43:28.710 Simpl[7777:26022] [Simpl] open Assignment: 16028 ms (fetched)
+2026-10-23 22:43:28.806 Simpl[7777:26022] [Simpl] popup handin:101/1012: 580 × 560
+2026-10-23 22:43:38.134 Simpl[7777:26022] [richtext] not measured after 12 s, shown as plain text: <p>Complete <strong>Composition of Functions</st

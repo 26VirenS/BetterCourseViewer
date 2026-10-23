@@ -1,0 +1,6 @@
+2026-10-23 22:54:11.155 Simpl[32873:89412] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+IOServiceMatchingfailed for: AppleM2ScalerParavirtDriver
+2026-10-23 22:54:29.694 Simpl[32873:89412] [Simpl] window: the app's screens (no page)
+2026-10-23 22:54:31.083 Simpl[32873:89412] [Simpl] appear Dashboard: 1986 ms
+2026-10-23 22:54:32.013 Simpl[32873:89412] [Simpl] appear Dashboard: 2915 ms
+2026-10-23 22:54:43.996 Simpl[32873:89412] [Simpl] open Dashboard: 14898 ms (kept)

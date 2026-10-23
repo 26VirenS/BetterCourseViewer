@@ -1,0 +1,5 @@
+2026-10-23 22:45:40.159 Simpl[13644:41346] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:45:42.181 Simpl[13644:41346] [Simpl] window: the app's screens (no page)
+2026-10-23 22:45:43.571 Simpl[13644:41346] [Simpl] popup tool: 984 × 607, 20 in from the window (sidebar out)
+2026-10-23 22:45:43.749 Simpl[13644:41346] [Simpl] bio launch: dna rna:view=mrna: style cartoon, grooves off, measure off, unzip 0.00, nucleotide DA (model3D), rna mrna, step 1
+2026-10-23 22:46:03.857 Simpl[13644:41346] [Simpl] popup tool: 984 × 591, 20 in from the window (sidebar out)

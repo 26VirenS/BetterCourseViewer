@@ -1,0 +1,25 @@
+2026-10-23 22:42:16.073 Simpl[6490:22382] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:42:17.637 Simpl[6490:22382] [Simpl] window: the app's screens (no page)
+2026-10-23 22:42:17.986 Simpl[6490:22382] [Simpl] appear Dashboard: 507 ms
+2026-10-23 22:42:18.335 Simpl[6490:22382] [Simpl] appear Dashboard: 855 ms
+2026-10-23 22:42:23.987 Simpl[6490:22382] [Simpl] open Dashboard: 6506 ms (kept)
+2026-10-23 22:42:24.448 Simpl[6490:22382] [Simpl] call dashCourses: 3677 ms
+2026-10-23 22:42:24.457 Simpl[6490:22382] [Simpl] call dashCourses: 3704 ms
+2026-10-23 22:42:24.499 Simpl[6490:22382] [Simpl] call snapshot: 238 ms
+2026-10-23 22:42:25.831 Simpl[6490:22382] [Simpl] call todayCounts: 1879 ms
+2026-10-23 22:42:25.831 Simpl[6490:22382] [Simpl] call todayCounts: 1879 ms
+2026-10-23 22:42:25.831 Simpl[6490:22382] [Simpl] call todayCounts: 1879 ms
+2026-10-23 22:42:25.831 Simpl[6490:22382] [Simpl] call todayCounts: 1879 ms
+2026-10-23 22:42:25.831 Simpl[6490:22382] [Simpl] call today: 4217 ms
+2026-10-23 22:42:25.832 Simpl[6490:22382] [Simpl] call today: 4217 ms
+2026-10-23 22:42:25.833 Simpl[6490:22382] [Simpl] call coursesProgress: 1376 ms
+2026-10-23 22:42:25.834 Simpl[6490:22382] [Simpl] call dashList: 5069 ms
+2026-10-23 22:42:25.834 Simpl[6490:22382] [Simpl] call coursesProgress: 1385 ms
+2026-10-23 22:42:25.835 Simpl[6490:22382] [Simpl] call dashList: 5083 ms
+2026-10-23 22:42:25.911 Simpl[6490:22382] [Simpl] call dashSkyline: 5147 ms
+2026-10-23 22:42:25.912 Simpl[6490:22382] [Simpl] call dashSkyline: 5160 ms
+2026-10-23 22:42:25.914 Simpl[6490:22382] [Simpl] open Dashboard: 8434 ms (live)
+2026-10-23 22:42:26.018 Simpl[6490:22382] [Simpl] call courses: 817 ms
+2026-10-23 22:42:26.426 Simpl[6490:22382] [Simpl] call groups: 408 ms
+2026-10-23 22:42:28.136 Simpl[6490:22382] [Simpl] call moreFromCanvas: 1710 ms
+2026-10-23 22:42:31.549 Simpl[6490:22382] [Simpl] shot: another copy of the app is in front; brought forward again

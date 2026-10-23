@@ -1,0 +1,28 @@
+2026-10-23 22:50:20.376 Simpl[26656:74930] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-23 22:50:21.994 Simpl[26656:74930] [Simpl] window: the app's screens (no page)
+2026-10-23 22:50:22.899 Simpl[26656:74930] [Simpl] appear Dashboard: 1263 ms
+2026-10-23 22:50:23.694 Simpl[26656:74930] [Simpl] appear Dashboard: 2055 ms
+2026-10-23 22:50:31.583 Simpl[26656:74930] [Simpl] open Dashboard: 9946 ms (kept)
+2026-10-23 22:50:33.990 Simpl[26656:74930] [Simpl] call quizIntro: 1455 ms
+2026-10-23 22:50:34.021 Simpl[26656:74930] [Simpl] call todayCounts: 2445 ms
+2026-10-23 22:50:34.021 Simpl[26656:74930] [Simpl] call todayCounts: 2446 ms
+2026-10-23 22:50:34.021 Simpl[26656:74930] [Simpl] call todayCounts: 2446 ms
+2026-10-23 22:50:34.021 Simpl[26656:74930] [Simpl] call todayCounts: 2446 ms
+2026-10-23 22:50:34.044 Simpl[26656:74930] [Simpl] call snapshot: 2074 ms
+2026-10-23 22:50:34.126 Simpl[26656:74930] [Simpl] call dashSkyline: 6918 ms
+2026-10-23 22:50:34.126 Simpl[26656:74930] [Simpl] call today: 6597 ms
+2026-10-23 22:50:34.129 Simpl[26656:74930] [Simpl] call dashSkyline: 6919 ms
+2026-10-23 22:50:34.131 Simpl[26656:74930] [Simpl] call today: 6601 ms
+2026-10-23 22:50:34.132 Simpl[26656:74930] [Simpl] call dashCourses: 6923 ms
+2026-10-23 22:50:34.133 Simpl[26656:74930] [Simpl] call dashCourses: 6924 ms
+2026-10-23 22:50:34.133 Simpl[26656:74930] [Simpl] call dashList: 6924 ms
+2026-10-23 22:50:34.134 Simpl[26656:74930] [Simpl] call dashList: 6925 ms
+2026-10-23 22:50:34.782 Simpl[26656:74930] [Simpl] open Dashboard: 13145 ms (live)
+2026-10-23 22:50:35.310 Simpl[26656:74930] [Simpl] call courses: 1184 ms
+2026-10-23 22:50:35.312 Simpl[26656:74930] [Simpl] call quizBegin: 1321 ms
+2026-10-23 22:50:35.868 Simpl[26656:74930] [Simpl] call coursesProgress: 1735 ms
+2026-10-23 22:50:35.868 Simpl[26656:74930] [Simpl] call coursesProgress: 1736 ms
+2026-10-23 22:50:35.912 Simpl[26656:74930] [Simpl] call groups: 601 ms
+2026-10-23 22:50:37.317 Simpl[26656:74930] [Simpl] call moreFromCanvas: 1404 ms
+2026-10-23 22:50:39.082 Simpl[26656:74930] SimplQuizClick 4 at {166, 452} (frame {{150, 125}, {32, 32}}): active 0, key 0, sheet 1; hit NSClipView < HostingScrollView < PlatformContainer < SheetHostingView<SheetContent> < NSThemeFrame
+2026-10-23 22:50:43.415 Simpl[26656:74930] SimplQuizClick after: question 4 showing
