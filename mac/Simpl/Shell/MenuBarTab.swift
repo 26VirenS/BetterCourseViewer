@@ -69,13 +69,15 @@ final class MenuBarTabProbeView: NSView {
             bar.addSubview(tab)
         }
         let frame: NSRect
+        // (past the window's buttons either way: (1.3.157) in full screen macOS shows them too as the bar drops down,
+        //  and the green one lay over the tab's start)
+        let zoom = (window.standardWindowButton(.zoomButton) ?? close).frame
         if full {
             let size = MenuBarTabView.tabSize
-            frame = NSRect(x: MenuBarTabView.tabLeading, y: bar.isFlipped ? 0 : bar.bounds.height - size.height, width: size.width, height: size.height)
+            frame = NSRect(x: max(MenuBarTabView.tabLeading, zoom.maxX + 8), y: bar.isFlipped ? 0 : bar.bounds.height - size.height, width: size.width, height: size.height)
             tab.autoresizingMask = bar.isFlipped ? [.maxYMargin] : [.minYMargin]
         } else {
             let size = MenuBarTabView.buttonSize
-            let zoom = (window.standardWindowButton(.zoomButton) ?? close).frame
             frame = NSRect(x: zoom.maxX + 14, y: close.frame.midY - size.height / 2, width: size.width, height: size.height)
             tab.autoresizingMask = close.autoresizingMask
         }
@@ -96,7 +98,7 @@ final class MenuBarTabProbeView: NSView {
 /// (the shape of the screen's notch); out of full screen, a black capsule. Either says New Window.
 final class MenuBarTabView: NSView {
     static let tabLeading: CGFloat = 58
-    static let tabSize = CGSize(width: 100, height: 24)
+    static let tabSize = CGSize(width: 92, height: 24)
     static let buttonSize = CGSize(width: 90, height: 20)
     private static let label = "New Window"
 
