@@ -558,7 +558,7 @@ final class Updater: ObservableObject {
             let target = try await Task.detached(priority: .userInitiated) {
                 try UpdateInstall.put(unpacked)
             }.value
-            AppPlacement.relaunch(target)
+            AppPlacement.relaunch(target, quietly: !asked) // (1.3.161: one that came by itself, never pulled to the front)
         } catch {
             UpdateInstall.discard(unpacked)
             state = .failed(error.localizedDescription)
@@ -795,12 +795,16 @@ enum AppPlacement {
     }
 
     /// The copy at `url` opens once this one has quit (ten seconds at most waited for; -n: started afresh rather than
-    /// this one found), and this one quits.
+    /// this one found), and this one quits. (1.3.161) `quietly` (an update that came by itself): while Simpl is behind
+    /// another app it opens again behind it (-g, never made the front app nor its window's space shown) — hidden if it
+    /// was hidden (-j) — so an update in the background is never pulled over what the student is doing; in front, it
+    /// comes back in front, as before.
     @MainActor
-    static func relaunch(_ url: URL) {
+    static func relaunch(_ url: URL, quietly: Bool = false) {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/sh")
-        let script = "i=0; while kill -0 \"$1\" 2>/dev/null && [ $i -lt 50 ]; do sleep 0.2; i=$((i+1)); done; /usr/bin/open -n \"$0\""
+        let flags = quietly && !NSApp.isActive ? (NSApp.isHidden ? "-n -g -j" : "-n -g") : "-n"
+        let script = "i=0; while kill -0 \"$1\" 2>/dev/null && [ $i -lt 50 ]; do sleep 0.2; i=$((i+1)); done; /usr/bin/open \(flags) \"$0\""
         p.arguments = ["-c", script, url.path, String(ProcessInfo.processInfo.processIdentifier)]
         try? p.run()
         Task { @MainActor in
