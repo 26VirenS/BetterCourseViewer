@@ -11,7 +11,7 @@ struct MainShell: View {
     @ObservedObject private var focus = FocusTimer.shared
     /// (1.3.79) How many pins the toolbar has room for, measured as it is laid out (Tools/PinnedTools.swift): the search
     /// field gives its room first.
-    @StateObject private var fit = ToolbarFit(searching: false) // (1.3.152: no search field in the toolbar — its pill is a button)
+    @StateObject private var fit = ToolbarFit(searching: true)
     // (the screenshot suite: -SimplSidebar hidden opens the window with the sidebar folded away)
     @State private var columns: NavigationSplitViewVisibility = UserDefaults.standard.string(forKey: "SimplSidebar") == "hidden" ? .detailOnly : .all
     /// (1.3) The window was last wide enough for the sidebar beside the screen: crossing below folds it away, crossing
@@ -55,6 +55,13 @@ struct MainShell: View {
         // with its results under it — what the field finds and does is the web box's (Shell/SearchCommands.swift) — and
         // no screen of its own (Shell/FloatingSearch.swift)
         .overlay { FloatingSearchOverlay(palette: palette) }
+        // (1.3.154) the toolbar's own search field, as before 1.3.152: pressed or typed in, the floating search comes up
+        //  and takes the typing on (ToolbarSearchWatch). Its prompt short enough to show whole on every school (home-29).
+        .searchable(text: $engine.query, placement: .toolbar, prompt: "Search or type /")
+        .onChange(of: engine.query) { _, q in
+            if !FloatingSearch.shared.shown, !q.isEmpty { SearchField.focus(engine) }
+        }
+        .background { ToolbarSearchWatch { SearchField.focus(engine) } }
         .onAppear {
             FloatingSearch.shared.palette = palette
             palette.launch(engine)
@@ -109,12 +116,6 @@ struct MainShell: View {
                             .toolbarFit(fit, .more)
                     }
                 }
-            }
-            // (1.3.152) the search's pill, at the toolbar's end: pressed (or ⌘K), the floating search comes up (the tour's
-            // search step among the rest: it asks for something typed in it)
-            ToolbarItem(placement: .primaryAction) {
-                SearchPill()
-                    .tourSpot(.searchPill)
             }
         }
         // (1.3.79) another screen (its own toolbar buttons) or the sidebar shown or hidden: the pins' room measured afresh

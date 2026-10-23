@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-// (1.3.152) Search as the web's box afloat (extension/content/app/search.js): a press on the toolbar's search pill — or
+// (1.3.152) Search as the web's box afloat (extension/content/app/search.js): a press in the toolbar's search field (1.3.154) — or
 // ⌘K, or Edit ▸ Search Commands — brings a large field over the middle of the window with its results under it, and
 // nothing else changes: no screen of its own, the page stays where it is (and is not dimmed). Before anything is typed,
 // the four kinds to search in (Courses ⌘1, Work ⌘2, Files ⌘3, Actions ⌘4); a kind chosen sits in the field as a chip
@@ -97,36 +97,38 @@ final class FloatingSearch: ObservableObject {
     private struct Ack: Decodable {}
 }
 
-/// The toolbar's search pill: pressed, the floating search comes up.
-struct SearchPill: View {
-    @EnvironmentObject private var engine: Engine
+/// (1.3.154) The toolbar's search field (`.searchable`) given the keyboard — pressed, or tabbed to — brings the floating
+/// search up, which takes it from there: the field in the toolbar is where the search starts, the floating one where it
+/// is done. (Typed in before it is up, the words go with it: MainShell's onChange.)
+struct ToolbarSearchWatch: NSViewRepresentable {
+    let pressed: () -> Void
 
-    var body: some View {
-        Button {
-            FloatingSearch.shared.show(engine)
-        } label: {
-            HStack(spacing: 7) {
-                Image(systemName: "magnifyingglass")
-                    .font(.sCallout.weight(.medium))
-                    .foregroundStyle(.secondary)
-                Text("Search or type /")
-                    .font(.sCallout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                Spacer(minLength: 8)
-                Text("⌘K")
-                    .font(.sFootnote.monospacedDigit())
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal, 12)
-            .frame(width: 240, height: 28)
-            .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .glassCapsule(interactive: true)
-        .help("Search everything, or type / for a command (⌘K)")
-        .accessibilityLabel("Search")
+    func makeNSView(context: Context) -> ToolbarSearchWatchView {
+        let v = ToolbarSearchWatchView()
+        v.pressed = pressed
+        return v
     }
+
+    func updateNSView(_ v: ToolbarSearchWatchView, context: Context) { v.pressed = pressed }
+}
+
+final class ToolbarSearchWatchView: NSView {
+    var pressed: (() -> Void)?
+    private var watch: NSKeyValueObservation?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        watch = window?.observe(\.firstResponder, options: [.new]) { [weak self] w, _ in
+            MainActor.assumeIsolated {
+                // (the field's editor has the keyboard: it is the toolbar's search field being typed in)
+                guard let editor = w.firstResponder as? NSTextView, let field = editor.delegate as? NSSearchField else { return }
+                guard (w.toolbar?.items ?? []).contains(where: { ($0 as? NSSearchToolbarItem)?.searchField === field }) else { return }
+                self?.pressed?()
+            }
+        }
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 /// The floating search over the window: its field and its results.

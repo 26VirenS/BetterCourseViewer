@@ -407,8 +407,9 @@ final class ToolbarFit: ObservableObject {
     @Published private(set) var shown: Int?
     /// The toolbar has the search field, which gives its room first.
     private let searching: Bool
-    /// The narrowest the pins leave the search field: wide enough for its prompt ("Search or type /") whole.
-    static let searchRoom: CGFloat = 140
+    /// The narrowest the pins leave the search field: (1.3.154) a search bar, not just its prompt ("Search or type /")
+    /// whole — at 140 it shrank to a stub beside a few pins.
+    static let searchRoom: CGFloat = 220
     /// A pin's room in the toolbar (from one pin to the next), and the Tools pull-down's: as last measured.
     private var pitch: CGFloat = 40
     private var menu: CGFloat = 60
