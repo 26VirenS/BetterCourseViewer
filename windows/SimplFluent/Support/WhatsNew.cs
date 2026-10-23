@@ -26,6 +26,8 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.57", "2026-10-23",
+            ("improved", "This Week's Betas", "Everything from the betas since 0.3.52, for everyone.")),
         R("0.3.56", "2026-10-23",
             ("new", "Search, Like the Web", "A big search over the window: kinds, commands, results."),
             ("improved", "Pick the Assignment", "/open on a tool lists its assignments to choose from.")),
