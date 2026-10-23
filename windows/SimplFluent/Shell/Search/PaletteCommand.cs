@@ -7,14 +7,18 @@ namespace Simpl.Shell;
 public enum PaletteDo
 {
     Go, Open, Work, Search, Fill, NewTask, AddTask, NewMessage, Refresh, ReloadPage, Settings, WhatsNew, Setup, Tour, Look,
-    Back, Forward, Browser, Copy, Tool, Nothing,
+    Back, Forward, Browser, Copy, Tool, Scope, ToolPlace, Nothing,
 }
+
+/// <summary>(0.3.56) One place an external tool is used, as /open lists it: the tool, the course, and the assignment or
+/// module item (none: the course's own tab).</summary>
+public sealed record ToolPick(string Tool, string Course, string? Kind, string? Item);
 
 /// <summary>
 /// A suggestion's action and what it needs: the place it goes to (<see cref="To"/>), and the address, the words, the
 /// text the box is filled with, the look or what is copied (<see cref="Text"/>), with a title for what is opened.
 /// </summary>
-public sealed record PaletteAction(PaletteDo Do, Place? To = null, string Text = "", string Title = "", bool External = false)
+public sealed record PaletteAction(PaletteDo Do, Place? To = null, string Text = "", string Title = "", bool External = false, ToolPick? Pick = null)
 {
     public static readonly PaletteAction None = new(PaletteDo.Nothing);
 
@@ -32,6 +36,10 @@ public sealed record PaletteAction(PaletteDo Do, Place? To = null, string Text =
     public static PaletteAction Copy(string text) => new(PaletteDo.Copy, Text: text);
     /// <summary>A tool opened in its popup over where you are, by its key ("lewis").</summary>
     public static PaletteAction Tool(string key) => new(PaletteDo.Tool, Text: key);
+    /// <summary>(0.3.56) The search narrowed to one of its kinds (SearchScope's key: "courses", "work", "files", "actions").</summary>
+    public static PaletteAction Scope(string key) => new(PaletteDo.Scope, Text: key);
+    /// <summary>(0.3.56) An external tool opened on the place picked from /open's list.</summary>
+    public static PaletteAction ToolPlace(ToolPick pick) => new(PaletteDo.ToolPlace, Pick: pick);
 
     /// <summary>Picked, it does something (not a hint, nor "Looking…").</summary>
     public bool Acts => Do != PaletteDo.Nothing;
@@ -58,7 +66,7 @@ public sealed record PaletteItem(string Id, string Title, SymbolRegular Symbol, 
 public sealed record PaletteSection(string Title, IReadOnlyList<PaletteItem> Items);
 
 /// <summary>What a command that takes something lists once a space follows its name.</summary>
-internal enum PaletteLists { Courses, Groups, Grades, Due, Overdue, Kinds, Words, Task, Commands }
+internal enum PaletteLists { Courses, Groups, Grades, Due, Overdue, Kinds, Words, Task, Commands, Tools }
 
 /// <summary>
 /// A command of the search box's, as the web box's (hub.js COMMANDS) in the app's own terms (the Mac's PaletteCommand):
@@ -134,7 +142,7 @@ internal sealed class PaletteCommand
         };
         if (canvas) c.Add(C("inbox", ["messages", "mail", "conversations"], "Inbox", "Your messages", SymbolRegular.Mail24, PaletteAction.Go(Place.Inbox), "Ctrl+6"));
         c.Add(C("courses", ["classes"], "All courses", "Every course you are in", SymbolRegular.Library24, PaletteAction.Go(Place.Courses)));
-        c.Add(C("course", ["class", "go", "open"], "Open a course", "A course — or one of its sections: /course bio files", SymbolRegular.Book24,
+        c.Add(C("course", ["class", "go"], "Open a course", "A course — or one of its sections: /course bio files", SymbolRegular.Book24,
             takes: "‹course› ‹section›", lists: PaletteLists.Courses));
         if (canvas)
         {
@@ -146,6 +154,8 @@ internal sealed class PaletteCommand
         c.AddRange(PhysicsTools());
         c.AddRange(EverydayTools());
         c.Add(C("external", ["external tools", "lti", "apps"], "External tools", "Every tool your courses use", SymbolRegular.PuzzlePiece24, PaletteAction.Go(Place.ExternalTools)));
+        // (0.3.56, the web's /open) a tool used through assignments asks which of them to open
+        c.Add(C("open", ["launch"], "Open a tool", "Knewton Alta, Macmillan… — on the assignment you choose", SymbolRegular.Open24, takes: "‹tool›", lists: PaletteLists.Tools));
         c.Add(C("due", ["upcoming", "soon", "week"], "Due", "What is due: today, tomorrow, this week, or by name", SymbolRegular.Clock24,
             takes: "‹when or name›", lists: PaletteLists.Due));
         c.Add(C("overdue", ["late", "missing"], "Overdue", "Past its date and not handed in", SymbolRegular.ErrorCircle24, takes: "‹name›", lists: PaletteLists.Overdue));

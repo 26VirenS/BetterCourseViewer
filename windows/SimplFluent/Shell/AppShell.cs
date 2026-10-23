@@ -44,9 +44,8 @@ public sealed partial class AppShell : Grid, IDisposable
     /// <summary>Where the pane's picture was last masked for: the foot of its rows and the top of its foot (MaskScene).</summary>
     private (double Rows, double Foot)? sceneMasked;
     private readonly ContentControl account = new() { Focusable = false };
+    /// <summary>The pane's search box: pressed, it brings up the floating search (SearchPalette), which has the keys.</summary>
     private readonly TextBox searchBox;
-    /// <summary>Where the search box is while it is lent to the title bar (a narrow window's Search); null at the pane's head.</summary>
-    private ContentControl? searchLent;
     private readonly SearchPalette palette;
     private readonly Grid header = new();
     private readonly ContentControl titleHost = new() { Focusable = false };
@@ -105,21 +104,19 @@ public sealed partial class AppShell : Grid, IDisposable
         // ---- the pane ----
         searchBox = new TextBox
         {
-            PlaceholderText = $"Search {engine.LmsName}", Icon = new SymbolIcon { Symbol = SymbolRegular.Search24 }, IconPlacement = ElementPlacement.Right,
+            PlaceholderText = $"Search {engine.LmsName} or type /", Icon = new SymbolIcon { Symbol = SymbolRegular.Search24 }, IconPlacement = ElementPlacement.Right,
             ClearButtonEnabled = false, Margin = new Thickness(16, 4, 16, 12), MinHeight = 34,
         };
-        // (its suggestions and commands as you type, the Mac's SearchPalette: Enter runs the one chosen, or searches)
-        palette = SearchPalette.Attach(searchBox, engine, window);
-        palette.Ran += () =>
-        {
-            if (narrow) ClosePane();
-            // (lent to the title bar: once it has run, the box goes back to the pane and the keys to the screen)
-            if (searchLent != null) { window.Focus(); ReturnSearch(); }
-        };
-        searchBox.LostKeyboardFocus += (_, _) => Dispatcher.BeginInvoke(() =>
-        {
-            if (searchLent != null && !searchBox.IsKeyboardFocusWithin && !palette.IsOpen) ReturnSearch();
-        }, System.Windows.Threading.DispatcherPriority.Input);
+        // (0.3.56) the search as the web's box afloat, over the page (the Mac's FloatingSearch): the pane's box only brings
+        //  it up — it never takes the keyboard itself, so a window come back to never reopens the search
+        palette = SearchPalette.Attach(engine, window);
+        palette.Ran += () => { if (narrow) ClosePane(); };
+        searchBox.Focusable = false;
+        searchBox.IsTabStop = false;
+        searchBox.Cursor = Cursors.Arrow;
+        searchBox.ToolTip = "Search (Ctrl+F)";
+        System.Windows.Automation.AutomationProperties.SetName(searchBox, "Search (Ctrl+F)");
+        searchBox.PreviewMouseLeftButtonDown += (_, e) => { e.Handled = true; FocusSearch(); };
         navScroll = new ScrollViewer { Content = nav, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Padding = new Thickness(0, 0, 0, 8) };
         // (the Mac's sidebar: the search at the top, the places and courses; at the foot Settings — Windows 11's place
         // for it — and who is signed in, whose menu holds Settings too, as the Mac's account bar does)
@@ -220,7 +217,8 @@ public sealed partial class AppShell : Grid, IDisposable
             case nameof(Engine.Engine.NavVersion): Navigate(); BuildPane(); break;
             case nameof(Engine.Engine.Courses) or nameof(Engine.Engine.Groups) or nameof(Engine.Engine.Sections) or nameof(Engine.Engine.Snapshot): BuildPane(); Header(); break;
             case nameof(Engine.Engine.DataVersion): current?.Refresh(); _ = LoadMore(); break;
-            case nameof(Engine.Engine.Query): if (searchBox.Text != engine.Query && !searchBox.IsKeyboardFocusWithin) searchBox.Text = engine.Query; break;
+            // (0.3.56: the pane's box only brings the search up, so it never holds the words typed — it names the school)
+            case nameof(Engine.Engine.LmsName): searchBox.PlaceholderText = $"Search {engine.LmsName} or type /"; break;
             // (signed out, or the page no longer the app's: History and Help go — the student's list never left over the
             //  sign-in page, nor handed to whoever signs in next)
             case nameof(Engine.Engine.Phase): if (engine.Phase != Phase.Native) MoreFromCanvas.CloseAll(); break;
@@ -598,55 +596,22 @@ public sealed partial class AppShell : Grid, IDisposable
         current?.Pressed(e);
     }
 
-    /// <summary>Search (Ctrl+F): the box at the pane's head, or — the window too narrow for the pane — up in the title bar.</summary>
+    /// <summary>The floating search, over the page (the window puts it among its layers).</summary>
+    public FrameworkElement SearchLayer => palette.Layer;
+
+    /// <summary>Search (Ctrl+F, the pane's box, the title bar's Search on a narrow window): the floating search, what it
+    /// held chosen to type over.</summary>
     public void FocusSearch()
     {
-        if (narrow) { OpenSearchBar(); return; }
-        searchBox.Focus();
-        searchBox.SelectAll();
+        if (paneOpen) ClosePane();
+        palette.Show(selectAll: true);
     }
+
+    /// <summary>Ctrl+1 to Ctrl+4 while the search is up: one of its kinds searched in (else the pane's places).</summary>
+    public bool SearchScopeKey(int index) => palette.ScopeKey(index);
 
     /// <summary>The search box's place at the pane's head.</summary>
     private static readonly Thickness SearchAtHead = new(16, 12, 16, 12);
-
-    /// <summary>
-    /// Search on a window too narrow for the pane (the title bar's Search, Ctrl+F, Ctrl+K): the pane's own search box
-    /// lent to the title bar, its suggestions under it as ever, without the pane sliding over the page. It goes back to
-    /// the pane's head once it is let go of (the keyboard elsewhere, a suggestion run), the pane opens or the window widens.
-    /// </summary>
-    public void OpenSearchBar()
-    {
-        if (!narrow) { FocusSearch(); return; }
-        if (paneOpen) ClosePane();
-        if (searchLent == null)
-        {
-            var slot = window.SearchSlot;
-            pane.Children.Remove(searchBox);
-            searchBox.Margin = new Thickness(0);
-            slot.Content = searchBox;
-            searchLent = slot;
-            window.SearchMoved();
-        }
-        Dispatcher.BeginInvoke(() =>
-        {
-            if (searchLent == null) return;
-            searchBox.Focus();
-            Keyboard.Focus(searchBox);
-            searchBox.SelectAll();
-        }, System.Windows.Threading.DispatcherPriority.Input);
-    }
-
-    /// <summary>The search box back at the pane's head, from the title bar.</summary>
-    private void ReturnSearch()
-    {
-        if (searchLent is not { } slot) return;
-        searchLent = null;
-        slot.Content = null;
-        searchBox.Margin = SearchAtHead;
-        Grid.SetRow(searchBox, 0);
-        pane.Children.Insert(0, searchBox);
-        window.SearchMoved();
-    }
 
     /// <summary>
     /// The pane's picture (a theme's scene, or a photo of the student's) kept faint behind the pane's words — at about a
@@ -829,7 +794,6 @@ public sealed partial class AppShell : Grid, IDisposable
     {
         var n = w < NarrowBelow;
         if (n == narrow) return;
-        if (!n) ReturnSearch();
         narrow = n;
         if (narrow)
         {
@@ -872,7 +836,6 @@ public sealed partial class AppShell : Grid, IDisposable
     private void OpenPane()
     {
         if (!narrow) return;
-        ReturnSearch();
         paneOpen = true;
         paneHolder.Visibility = Visibility.Visible;
         paneHolder.Bg(B.Flyout).Stroke(B.FlyoutStroke);
@@ -903,18 +866,17 @@ public sealed partial class AppShell : Grid, IDisposable
         Loaded += async (_, _) =>
         {
             if (narrow && Launch.Flag("pane-open")) OpenPane();
-            // (the screenshot suite: --search-bar has a narrow window's title bar hold the search box, as its Search
-            //  button does — a moment before --open palette:… types into it)
-            if (narrow && Launch.Flag("search-bar")) { await Task.Delay(2500); OpenSearchBar(); }
+            // (the screenshot suite: --search-bar presses a narrow window's Search, a moment before --open palette:… types)
+            if (narrow && Launch.Flag("search-bar")) { await Task.Delay(2500); FocusSearch(); }
             // (the screenshot suite: --open menu shows the account menu once the window has settled)
             if (Launch.Get("open") == "menu") { await Task.Delay(3000); if (accountTile != null) AccountMenu(accountTile); }
         };
     }
 
-    /// <summary>The search box's commands (Ctrl+K): on a narrow window, the box up in the title bar for them.</summary>
+    /// <summary>The search's commands (Ctrl+K).</summary>
     public void OpenCommands()
     {
-        if (narrow && !paneOpen) OpenSearchBar();
+        if (paneOpen) ClosePane();
         palette.OpenCommands();
     }
 

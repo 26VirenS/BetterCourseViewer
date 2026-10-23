@@ -233,7 +233,7 @@ public sealed partial class ExternalToolsScreen
         void Go()
         {
             CloseList();
-            Open(t, c, it);
+            Open(engine, t, c, it);
         }
         var b = K.Subtle(g, Go, new Thickness(10, 8, 10, 8), 4);
         AutomationProperties.SetName(b, string.Join(", ", new[] { it.Title, next ? "next" : null, it.Sub, it.Status?.Word }.Where(x => !string.IsNullOrEmpty(x))));

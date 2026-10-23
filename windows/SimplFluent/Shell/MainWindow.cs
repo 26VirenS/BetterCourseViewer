@@ -37,18 +37,10 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
     private readonly RotateTransform refreshTurn = new();
     private readonly System.Windows.Controls.Button menuButton;
     private readonly System.Windows.Controls.Button searchButton;
-    /// <summary>Where the pane's search box goes while the window is too narrow for the pane (AppShell.OpenSearchBar).</summary>
-    private readonly ContentControl searchSlot = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Left, Visibility = Visibility.Collapsed };
     private readonly ContentControl trailing = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
     private readonly HandoffBar handoff;
     private Tray? tray;
     private TourOverlay? tour;
-
-    /// <summary>The title bar's place for the search box on a narrow window.</summary>
-    public ContentControl SearchSlot => searchSlot;
-
-    /// <summary>The search box came up into the title bar, or went back to the pane: the title bar laid out again.</summary>
-    public void SearchMoved() => UpdateTitleButtons();
 
     /// <summary>The account menu's Take the tour.</summary>
     public void StartTour() => tour?.Start();
@@ -130,7 +122,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
             turning.RenderTransform = refreshTurn;
         }
         menuButton = TitleButton(SymbolRegular.LineHorizontal320, () => shell?.TogglePane(), "Navigation", 16);
-        searchButton = TitleButton(SymbolRegular.Search24, () => shell?.OpenSearchBar(), "Search (Ctrl+F)", 16);
+        searchButton = TitleButton(SymbolRegular.Search24, () => shell?.FocusSearch(), "Search (Ctrl+F)", 16);
         searchButton.Mark(TourSpot.Search); // (the tour's Search on a narrow window, the pane's box folded away)
         titleBar = new TitleBar
         {
@@ -155,7 +147,6 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         root.Children.Add(refresh);
         root.Children.Add(menuButton);
         root.Children.Add(searchButton);
-        root.Children.Add(searchSlot);
 
         Grid.SetRow(stage, 1);
         root.Children.Add(stage);
@@ -357,6 +348,10 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
                 //  pages are made with it — not on what was kept, which comes before the window has had a moment)
                 if (engine.CountsLive) Kit.FlatResources.Finish();
                 shell = new AppShell(engine, this);
+                // (0.3.56) the floating search over the page, under the tour, Appearance and the sheets; the title bar
+                //  left free (a press there puts the search away)
+                Grid.SetRow(shell.SearchLayer, 1);
+                root.Children.Insert(root.Children.IndexOf(sheets), shell.SearchLayer);
                 Notices.Start(engine, this);
                 tour = new TourOverlay(engine, this);
                 // (onboarding-4: Keep Simpl on your taskbar? is asked the third time Simpl is opened, not after the tour)
@@ -440,23 +435,13 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
     {
         var app = engine != null && engine.Phase == Phase.Native && !engine.Login.Covers;
         var narrow = app && shell != null && shell.Narrow;
-        var searching = narrow && searchSlot.Content != null;
         var x = 4.0;
-        foreach (var (b, shown) in new[] { (back, app), (refresh, app), (menuButton, narrow), (searchButton, narrow && !searching) })
+        foreach (var (b, shown) in new[] { (back, app), (refresh, app), (menuButton, narrow), (searchButton, narrow) })
         {
             b.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
             if (!shown) continue;
             b.Margin = new Thickness(x, 6, 0, 6);
             x += 44;
-        }
-        searchSlot.Visibility = searching ? Visibility.Visible : Visibility.Collapsed;
-        if (searching)
-        {
-            // (Windows' caption buttons take 138 at the right, the pinned tools theirs, the app's name about 90)
-            var room = ActualWidth - x - 138 - trailing.ActualWidth - 90 - 8;
-            searchSlot.Width = Math.Clamp(room, 160, 360);
-            searchSlot.Margin = new Thickness(x + 2, 7, 0, 7);
-            x += searchSlot.Width + 10;
         }
         back.IsEnabled = engine?.Nav.CanGoBack == true;
         titleBar.Margin = new Thickness(8 + (x - 4), 0, 0, 0);
@@ -559,6 +544,8 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         if (ctrl && shift && e.Key == Key.N) { if (engine is { OnBrightspace: false }) engine.AskNewMessage(); e.Handled = true; return; }
         // (what shows — an assignment, a course's Grades — in a window of its own, to keep beside the work)
         if (ctrl && shift && e.Key == Key.O) { if (engine != null) PlaceWindow.OpenCurrent(engine); e.Handled = true; return; }
+        // (0.3.56) while the search is up, Ctrl+1 to Ctrl+4 are its kinds (the Mac's ⌘1–⌘4 there)
+        if (ctrl && !shift && e.Key is >= Key.D1 and <= Key.D4 && shell?.SearchScopeKey(e.Key - Key.D1) == true) { e.Handled = true; return; }
         // (the Mac's ⌘1–⌘7: the pane's places in order)
         if (ctrl && !shift && engine != null && e.Key is >= Key.D1 and <= Key.D7)
         {

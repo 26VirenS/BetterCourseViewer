@@ -1,7 +1,6 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -10,124 +9,209 @@ using Simpl.Kit;
 using Simpl.Support;
 using Wpf.Ui.Controls;
 using Button = System.Windows.Controls.Button;
-using Popup = System.Windows.Controls.Primitives.Popup;
 using TextBlock = System.Windows.Controls.TextBlock;
 using TextBox = Wpf.Ui.Controls.TextBox;
 
 namespace Simpl.Shell;
 
 /// <summary>
-/// The navigation pane's search box as the web's search box (the Mac's SearchCommands.swift; 1.2, the extension's
-/// search.js and hub.js), drawn as Windows 11's AutoSuggestBox: what is typed is answered in a list under the box as each
-/// letter goes in — a sum worked out, the commands whose names it starts, your courses (and a course's section: "bio
-/// files"), your groups, and Search for the words. "/" (or ">") lists every command the box knows, narrowing as its name
-/// is typed; a command that takes something (/course, /grades, /due, /file …) lists what it can be once a space follows
-/// its name. A suggestion picked — clicked, or ↑ ↓ and Enter — runs; Enter on words alone searches everything (on a sum,
-/// copies its answer). Typing never moves the page: the full search runs only on Enter or Search for, so a quick answer
-/// or a jump to a course leaves the student where they were. Ctrl+K opens the box on "/".
+/// The search as the web's box afloat (0.3.56; the extension's search.js and hub.js, the Mac's FloatingSearch.swift): a
+/// press on the navigation pane's search box — or Ctrl+F, Ctrl+K, the title bar's Search on a narrow window — brings a
+/// large field over the top of the window with its results under it, and nothing else changes: no screen of its own, the
+/// page stays where it is. Before anything is typed, the four kinds to search in (Courses, Work, Files, Actions:
+/// Ctrl+1 to Ctrl+4); a kind chosen sits in the field as a chip and lists its own things at once — your courses, what is
+/// due this week, the files changed last, every command — what is typed then searching that kind alone. Each letter is
+/// answered at once from what the app and the engine's index hold (searchLocal), and by the school once the typing pauses
+/// (search): a sum worked out, the commands whose names it starts, your courses (and a course's section: "bio files"),
+/// your groups, then assignments, announcements, pages, discussions, files and people. "/" (or ">") lists every command,
+/// narrowing as its name is typed; a command that takes something (/course, /grades, /due, /open …) lists what it can be
+/// once a space follows its name. The first row is chosen as you type: Enter runs it, ↑ ↓ walk the rows, Tab completes a
+/// command, Escape steps back (the kind, then the search goes), Backspace on an empty field lets the kind go; a press
+/// anywhere else puts it away.
 /// </summary>
 public sealed partial class SearchPalette : IDisposable
 {
-    /// <summary>The widest the list grows (it may reach out of the pane over the page).</summary>
-    public const double ListWidth = 480;
-    // (room round the list for its shadow, inside the popup's own window)
-    private const double Side = 16, Above = 8, Below = 28;
+    /// <summary>The widest the panel grows, and how far under the title bar it sits.</summary>
+    public const double PanelWidth = 680, Top = 40;
 
     private readonly TextBox box;
     private readonly Engine.Engine engine;
     private readonly MainWindow window;
-    private readonly Popup popup;
-    private readonly Grid surface;
+    private readonly Grid layer;
+    private readonly Grid panel;
+    private readonly Border chip;
+    private readonly TextBlock chipText;
+    private readonly FrameworkElement spin;
+    private readonly Border divider;
     private readonly ScrollViewer scroller;
+    private readonly FrameworkElement foot;
     private readonly Stack list = new() { Orientation = Orientation.Vertical, Spacing = 2 };
     private readonly List<(PaletteItem Item, Button Row, Border Pill)> rows = new();
     private List<PaletteSection> sections = new();
     private string? chosen;
     private bool commandMode;
-    /// <summary>The screenshot suite's list, shown whether or not the box holds the keyboard.</summary>
+    private SearchScope? scope;
+    /// <summary>The screenshot suite's search, shown whether or not its field holds the keyboard.</summary>
     private bool forced;
     private int seq;
     private CancellationTokenSource? lookup;
     private string lastRaw = "";
-    private Point? placedAt;
 
     /// <summary>The palette of the window showing (the Search screen's command buttons run through it).</summary>
     public static SearchPalette? Shared { get; private set; }
 
-    /// <summary>A suggestion ran, or the words were searched: the pane, over the page while the window is narrow, can close.</summary>
+    /// <summary>A row ran: the pane, over the page while the window is narrow, can close.</summary>
     public event Action? Ran;
 
-    public bool IsOpen => popup.IsOpen;
+    public bool IsOpen => layer.Visibility == Visibility.Visible;
 
-    /// <summary>The box's suggestions and commands, taking over its keys (↑ ↓ Enter Escape) and its text.</summary>
-    public static SearchPalette Attach(TextBox box, Engine.Engine engine, MainWindow window)
+    /// <summary>The floating search, over the page (the window puts it in its layers, under its sheets).</summary>
+    public FrameworkElement Layer => layer;
+
+    /// <summary>The search for this window: its field, its kinds and commands, its results.</summary>
+    public static SearchPalette Attach(Engine.Engine engine, MainWindow window)
     {
-        var p = new SearchPalette(box, engine, window);
+        var p = new SearchPalette(engine, window);
         Shared = p;
         return p;
     }
 
-    private SearchPalette(TextBox box, Engine.Engine engine, MainWindow window)
+    private SearchPalette(Engine.Engine engine, MainWindow window)
     {
-        this.box = box;
         this.engine = engine;
         this.window = window;
 
-        // the list: Windows 11's flyout surface — its fill, its hairline, rounded 8, raised on a soft shadow (drawn by a
-        // copy of the surface behind it, so the words keep their crisp ClearType)
+        // the field: Windows 11's search box, large, with the kind searched in as a chip before it and a ring while
+        // the school is asked
+        box = new TextBox
+        {
+            PlaceholderText = Placeholder, Icon = new SymbolIcon { Symbol = SymbolRegular.Search24 }, IconPlacement = ElementPlacement.Left,
+            ClearButtonEnabled = false, FontSize = 18, MinHeight = 44, VerticalContentAlignment = VerticalAlignment.Center,
+        };
+        chipText = K.Text("", Ty.BodyStrong, B.OnAccent);
+        chip = new Border { CornerRadius = new CornerRadius(6), Padding = new Thickness(10, 4, 10, 5), Margin = new Thickness(0, 0, 8, 0), Child = chipText, Visibility = Visibility.Collapsed, VerticalAlignment = VerticalAlignment.Center }.Bg(B.Accent);
+        spin = K.Spinner(16).Margin(10, 0, 4, 0);
+        spin.Visibility = Visibility.Collapsed;
+        var field = K.Columns("auto, *, auto", chip.Col(0), box.Col(1), spin.Col(2));
+        field.Margin = new Thickness(12, 12, 12, 10);
+
+        divider = new Border { Height = 1, Visibility = Visibility.Collapsed }.Bg(B.Divider);
         scroller = new ScrollViewer
         {
             Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            Focusable = false, Padding = new Thickness(0, 4, 0, 6),
+            Focusable = false, Padding = new Thickness(0, 4, 0, 6), Visibility = Visibility.Collapsed,
         };
-        var shade = new Border { CornerRadius = new CornerRadius(8), Effect = K.Shadow(24, 6, 0.22) }.Bg(B.Flyout);
-        var face = new Border { CornerRadius = new CornerRadius(8), Child = scroller, SnapsToDevicePixels = true }.Bg(B.Flyout).Stroke(B.FlyoutStroke);
-        surface = new Grid { Margin = new Thickness(Side, Above, Side, Below), Children = { shade, face } };
-        popup = new Popup
-        {
-            Child = new Grid { Children = { surface } }, AllowsTransparency = true, StaysOpen = true, Focusable = false,
-            PlacementTarget = box, Placement = PlacementMode.Bottom, HorizontalOffset = -Side, VerticalOffset = 4 - Above,
-            PopupAnimation = PopupAnimation.None,
-        };
-        System.Windows.Automation.AutomationProperties.SetName(list, "Suggestions");
+        System.Windows.Automation.AutomationProperties.SetName(list, "Results");
+        foot = K.Text("↑ ↓ to choose · Enter to open · Tab to complete · Esc to close", Ty.Caption, B.Text3).Margin(16, 6, 16, 10);
+        var face = new Grid { RowDefinitions = { new() { Height = GridLength.Auto }, new() { Height = GridLength.Auto }, new() { Height = GridLength.Auto }, new() { Height = GridLength.Auto } } };
+        face.Children.Add(field.Row(0));
+        face.Children.Add(divider.Row(1));
+        face.Children.Add(scroller.Row(2));
+        face.Children.Add(foot.Row(3));
 
-        box.PlaceholderText = Placeholder;
+        // the panel: Windows 11's flyout surface — its fill, its hairline, rounded 8, raised on a soft shadow (drawn by a
+        // copy of the surface behind it, so the words keep their crisp ClearType)
+        var shade = new Border { CornerRadius = new CornerRadius(8), Effect = K.Shadow(32, 8, 0.26) }.Bg(B.Flyout);
+        var surface = new Border { CornerRadius = new CornerRadius(8), Child = face, SnapsToDevicePixels = true }.Bg(B.Flyout).Stroke(B.FlyoutStroke);
+        panel = new Grid { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, Top, 0, 0), Children = { shade, surface } };
+
+        // (a press beside the panel puts it away, and goes no further: the page under it is not pressed too)
+        var catcher = new Border { Background = Brushes.Transparent };
+        catcher.MouseDown += (_, e) => { e.Handled = true; Hide(); };
+        layer = new Grid { Visibility = Visibility.Collapsed, Children = { catcher, panel } };
+        layer.SizeChanged += (_, _) => Fit();
+
         box.TextChanged += OnText;
         box.PreviewKeyDown += OnKey;
-        box.GotKeyboardFocus += OnFocus;
         box.LostKeyboardFocus += OnBlur;
-        box.IsVisibleChanged += OnShown;
-        window.PreviewMouseDown += OnWindowMouse;
-        window.LocationChanged += OnWindowMoved;
-        window.SizeChanged += OnWindowMoved;
         engine.PropertyChanged += OnEngine;
         LaunchList();
     }
 
-    private string Placeholder => $"Search {engine.LmsName} or type /";
+    private string Placeholder => scope != null ? $"Search {scope.Title.ToLowerInvariant()}" : $"Search {engine.LmsName} or type /";
 
-    /// <summary>Search Commands (Ctrl+K): the box with "/" in it, every command listed.</summary>
-    public void OpenCommands()
+    /// <summary>The search brought up, holding what it held (or <paramref name="text"/>), its field given the keyboard.</summary>
+    public void Show(string? text = null, bool selectAll = false)
     {
-        if (box.Text == "/") Update("/"); else SetText("/");
-        FocusBox();
+        var opening = !IsOpen;
+        if (opening)
+        {
+            layer.Visibility = Visibility.Visible;
+            Fit();
+            // (the engine's index taken now, so the first letters answer from it)
+            _ = engine.Act("searchWarm");
+        }
+        if (text != null && box.Text != text) SetText(text);
+        else if (opening || text != null) Update(box.Text);
+        FocusBox(selectAll);
+        Shot.Moved();
     }
 
-    /// <summary>Escape: the list closed, if it was open.</summary>
+    /// <summary>Search Commands (Ctrl+K): the field with "/" in it, every command listed.</summary>
+    public void OpenCommands()
+    {
+        if (scope != null) SetScope(null);
+        if (box.Text == "/") Show(); else Show("/");
+    }
+
+    /// <summary>Put away: emptied, and searching everything again next time.</summary>
+    public void Hide()
+    {
+        forced = false;
+        if (!IsOpen) return;
+        lookup?.Cancel();
+        lookup = null;
+        seq++;
+        layer.Visibility = Visibility.Collapsed;
+        scope = null;
+        ShowScope();
+        if (box.Text.Length > 0) SetText("");
+        spin.Visibility = Visibility.Collapsed;
+        if (box.IsKeyboardFocusWithin)
+        {
+            window.Focus();
+            if (box.IsKeyboardFocusWithin) Keyboard.ClearFocus();
+        }
+    }
+
+    /// <summary>Escape: a step back — the kind let go of, else the search put away. False when it was not up.</summary>
     public bool Escape()
     {
-        if (!popup.IsOpen) return false;
-        Close();
+        if (!IsOpen) return false;
+        if (scope != null) SetScope(null); else Hide();
         return true;
     }
 
-    // ---- the box's moves ----
+    /// <summary>Ctrl+1 to Ctrl+4 while the search is up: that kind searched in. False when it is not up.</summary>
+    public bool ScopeKey(int index)
+    {
+        if (!IsOpen || index < 0 || index >= SearchScope.All.Count) return false;
+        SetScope(SearchScope.All[index]);
+        return true;
+    }
+
+    private void SetScope(SearchScope? s)
+    {
+        scope = s;
+        ShowScope();
+        // (a kind chosen from the list starts its search afresh; a command typed gives way to it)
+        if (s != null && IsCommand(box.Text)) SetText(""); else Update(box.Text);
+        FocusBox(false);
+    }
+
+    private void ShowScope()
+    {
+        chip.Visibility = scope != null ? Visibility.Visible : Visibility.Collapsed;
+        chipText.Text = scope?.Title ?? "";
+        box.PlaceholderText = Placeholder;
+    }
+
+    // ---- the field's moves ----
 
     private void OnText(object? sender, TextChangedEventArgs e)
     {
         var raw = box.Text;
         if (engine.Query != raw) engine.Query = raw;
-        // (the suggestions only: the page stays as it is until Enter or Search for asks for the full search)
         Update(raw);
     }
 
@@ -136,16 +220,10 @@ public sealed partial class SearchPalette : IDisposable
         switch (e.Key)
         {
             case Key.Down:
-                if (!popup.IsOpen)
-                {
-                    if (box.Text.Trim().Length == 0) return;
-                    Update(box.Text);
-                }
-                else Move(1);
+                Move(1);
                 e.Handled = true;
                 break;
             case Key.Up:
-                if (!popup.IsOpen) return;
                 Move(-1);
                 e.Handled = true;
                 break;
@@ -153,57 +231,27 @@ public sealed partial class SearchPalette : IDisposable
                 Submit();
                 e.Handled = true;
                 break;
-            case Key.Escape:
-                if (popup.IsOpen) Close();
-                else
-                {
-                    // (a second Escape lets go of the box: a command left in it is cleared, words searched stay)
-                    if (IsCommand(box.Text)) SetText("");
-                    LetGo();
-                }
+            case Key.Tab:
+                // (a command completed — "/gr" to "/grades " — and the keys kept in the search)
+                if (Chosen() is { Action.Do: PaletteDo.Fill } fill) Perform(fill.Action, fromField: true);
                 e.Handled = true;
+                break;
+            case Key.Back:
+                if (box.Text.Length == 0 && scope != null) { SetScope(null); e.Handled = true; }
                 break;
         }
     }
 
-    private void OnFocus(object sender, KeyboardFocusChangedEventArgs e)
-    {
-        if (box.Text.Trim().Length == 0) return;
-        if (lastRaw == box.Text && sections.Count > 0) Open(); else Update(box.Text);
-    }
-
     private void OnBlur(object sender, KeyboardFocusChangedEventArgs e)
     {
-        if (forced) return;
-        if (e.NewFocus is DependencyObject d && (Within(box, d) || Within(popup.Child, d))) return;
-        Close();
+        if (forced || !IsOpen) return;
+        if (e.NewFocus is DependencyObject d && Within(layer, d)) return;
+        Hide();
     }
 
-    private void OnShown(object sender, DependencyPropertyChangedEventArgs e)
-    {
-        if (!box.IsVisible) Close();
-    }
-
-    /// <summary>A press anywhere in the window but the box (or the list): the list closes and the box lets go of the
-    /// keyboard (it keeps what it holds) — left in the box after a click on the page, the keyboard held the live check
-    /// as if the student were typing.</summary>
-    private void OnWindowMouse(object sender, MouseButtonEventArgs e)
-    {
-        if (!popup.IsOpen && !box.IsKeyboardFocusWithin) return;
-        if (e.OriginalSource is DependencyObject d && (Within(box, d) || Within(popup.Child, d))) return;
-        LetGo();
-    }
-
-    /// <summary>The keyboard is in the pane's search box (<paramref name="focused"/> is it, or in it): a live check waits
+    /// <summary>The keyboard is in the search's field (<paramref name="focused"/> is it, or in it): a live check waits
     /// for it only while keys go into it.</summary>
     public bool Holds(DependencyObject focused) => Within(box, focused);
-
-    private void OnWindowMoved(object? sender, EventArgs e)
-    {
-        if (!popup.IsOpen) return;
-        Fit();
-        Nudge();
-    }
 
     private void OnEngine(object? sender, PropertyChangedEventArgs e)
     {
@@ -213,37 +261,28 @@ public sealed partial class SearchPalette : IDisposable
                 box.PlaceholderText = Placeholder;
                 break;
             case nameof(Engine.Engine.Courses) or nameof(Engine.Engine.Groups) or nameof(Engine.Engine.Sections):
-                // (the courses, the groups or a course's sections came in: the list open says so)
-                if (popup.IsOpen) Update(box.Text, keepChoice: true);
+                // (the courses, the groups or a course's sections came in: the search up says so)
+                if (IsOpen) Update(box.Text, keepChoice: true);
                 break;
         }
     }
 
-    /// <summary>Enter: the suggestion chosen runs; else a command's first suggestion (as the web box chooses its first row
-    /// as you type), or the words are searched.</summary>
+    private PaletteItem? Chosen() => chosen != null ? rows.FirstOrDefault(r => r.Item.Id == chosen).Item : null;
+
+    /// <summary>Enter: the row chosen runs (the first that does something, as you type); a command typed whose list is
+    /// still to come, its first row once it has.</summary>
     private void Submit()
     {
-        if (popup.IsOpen && chosen != null && rows.FirstOrDefault(r => r.Item.Id == chosen).Item is { } picked)
-        {
-            Perform(picked.Action, fromField: true);
-            return;
-        }
-        var t = box.Text.Trim();
-        if (t.Length == 0) return;
-        if (IsCommand(t))
-        {
-            if (lastRaw != box.Text) Update(box.Text);
-            if (sections.SelectMany(s => s.Items).FirstOrDefault(i => i.Action.Acts) is { } first) Perform(first.Action, fromField: true);
-            return;
-        }
-        Close();
-        engine.Search(t);
-        Ran?.Invoke();
+        if (Chosen() is { } picked) { Perform(picked.Action, fromField: true); return; }
+        if (box.Text.Trim().Length == 0) return;
+        if (lastRaw != box.Text) Update(box.Text);
+        if (sections.SelectMany(s => s.Items).FirstOrDefault(i => i.Action.Acts) is { } first) Perform(first.Action, fromField: true);
     }
 
-    // ---- the suggestions for what the box holds ----
+    // ---- the results for what the field holds ----
 
-    /// <summary>The suggestions for what the box holds now: what the app holds at once, what it must ask for after a pause.</summary>
+    /// <summary>The results for what the field holds now: what the app holds at once, the engine's index at once, what it
+    /// must ask the school for after a pause — each put up as it comes.</summary>
     private void Update(string raw, bool keepChoice = false)
     {
         seq++;
@@ -253,9 +292,8 @@ public sealed partial class SearchPalette : IDisposable
         lastRaw = raw;
         commandMode = Typed.Of(raw).Command;
         var (built, job) = Suggest(raw);
+        spin.Visibility = job?.Kind == JobKind.Everything ? Visibility.Visible : Visibility.Collapsed;
         Publish(built, keepChoice);
-        if (sections.Count == 0) Close();
-        else if (box.IsKeyboardFocusWithin || forced) Open();
         if (job == null) return;
         var cts = lookup = new CancellationTokenSource();
         Later(job, built, mine, cts.Token);
@@ -265,13 +303,9 @@ public sealed partial class SearchPalette : IDisposable
     {
         if (job.Kind == JobKind.Everything)
         {
-            List<PaletteSection>? all;
-            try { all = await Everything(job.Q, based, token); }
-            catch { return; }
-            if (token.IsCancellationRequested || seq != mine || all == null) return;
-            Publish(all, keepChoice: true);
-            if (sections.Count > 0 && (box.IsKeyboardFocusWithin || forced)) Open();
-            Shot.Moved();
+            try { await Everything(job, based, () => !token.IsCancellationRequested && seq == mine, token); }
+            catch { /* cancelled: a newer search answers */ }
+            if (seq == mine) spin.Visibility = Visibility.Collapsed;
             return;
         }
         PaletteSection? extra;
@@ -282,8 +316,8 @@ public sealed partial class SearchPalette : IDisposable
         Shot.Moved();
     }
 
-    /// <summary>The sections shown (each row's id its own), and the row chosen: kept where it still is, else — for a
-    /// command — the first that does something (what Enter runs), and for words none (Enter searches them).</summary>
+    /// <summary>The sections shown (each row's id its own), and the row chosen: kept where it still is, else the first
+    /// that does something (what Enter runs) — a sum's answer before it.</summary>
     private void Publish(List<PaletteSection> built, bool keepChoice)
     {
         var seen = new HashSet<string>();
@@ -302,8 +336,7 @@ public sealed partial class SearchPalette : IDisposable
         }
         sections = outList;
         var acting = outList.SelectMany(s => s.Items).Where(i => i.Action.Acts).Select(i => i.Id).ToList();
-        // (a sum's answer is what Enter takes — copied — never a search that finds nothing)
-        if (!(keepChoice && chosen != null && acting.Contains(chosen))) chosen = commandMode ? acting.FirstOrDefault() : acting.Contains("answer") ? "answer" : null;
+        if (!(keepChoice && chosen != null && acting.Contains(chosen))) chosen = acting.Contains("answer") ? "answer" : acting.FirstOrDefault();
         Render(fresh: !keepChoice);
     }
 
@@ -321,13 +354,15 @@ public sealed partial class SearchPalette : IDisposable
             first = false;
             foreach (var it in s.Items) list.Children.Add(Row(it));
         }
+        var any = sections.Count > 0;
+        scroller.Visibility = divider.Visibility = any ? Visibility.Visible : Visibility.Collapsed;
         Highlight(scroll: false);
         if (fresh) scroller.ScrollToTop();
     }
 
-    /// <summary>A suggestion (Windows 11's list item): its symbol — or a course's square — what it is (a command's name
-    /// with what it takes after it as grey placeholders) over the line after it, a shortcut or a score at its end; the one
-    /// chosen filled, with the accent's pill at its left.</summary>
+    /// <summary>A row (Windows 11's list item): its symbol — or a course's square — what it is (a command's name with what
+    /// it takes after it as grey placeholders) over the line after it, a shortcut or a score at its end; the one chosen
+    /// filled, with the accent's pill at its left. Pointed at, it is the one chosen.</summary>
     private FrameworkElement Row(PaletteItem it)
     {
         var grid = K.Columns("auto, *, auto", Symbol(it).Col(0));
@@ -353,11 +388,17 @@ public sealed partial class SearchPalette : IDisposable
         pill.SetResourceReference(Border.BackgroundProperty, B.Accent);
         var item = it;
         var b = K.Subtle(new Grid { Children = { grid, pill } }, () => Perform(item.Action, fromField: true), new Thickness(12, 8, 12, 8));
-        // (the box keeps the keyboard while a row is pressed)
+        // (the field keeps the keyboard while a row is pressed)
         b.Focusable = false;
         b.MinHeight = 40;
         b.Margin = new Thickness(4, 0, 4, 0);
-        b.ToolTip = it.Title.Length > 48 ? it.Title : null;
+        b.ToolTip = it.Title.Length > 60 ? it.Title : null;
+        b.MouseEnter += (_, _) =>
+        {
+            if (chosen == item.Id) return;
+            chosen = item.Id;
+            Highlight(scroll: false);
+        };
         var said = it.Args is { Length: > 0 } a2 ? $"{it.Title} {a2.Replace('‹', ' ').Replace('›', ' ').Trim()}" : it.Title;
         System.Windows.Automation.AutomationProperties.SetName(b, it.Sub is { Length: > 0 } s2 ? $"{said}, {s2}" : said);
         rows.Add((item, b, pill));
@@ -405,90 +446,31 @@ public sealed partial class SearchPalette : IDisposable
         }
     }
 
-    /// <summary>↑ and ↓: the next suggestion that does something; ↑ from the first goes back to the words typed.</summary>
+    /// <summary>↑ and ↓: the next row that does something, held at either end.</summary>
     private void Move(int step)
     {
         if (rows.Count == 0) return;
         var i = chosen == null ? -1 : rows.FindIndex(r => r.Item.Id == chosen);
-        var next = i < 0 ? (step > 0 ? 0 : rows.Count - 1) : i + step;
-        if (next < 0) chosen = commandMode ? rows[0].Item.Id : null;
-        else chosen = rows[Math.Min(next, rows.Count - 1)].Item.Id;
+        var next = i < 0 ? (step > 0 ? 0 : rows.Count - 1) : Math.Clamp(i + step, 0, rows.Count - 1);
+        chosen = rows[next].Item.Id;
         Highlight(scroll: true);
-        if (chosen == null) scroller.ScrollToTop();
+        if (next == 0) scroller.ScrollToTop();
     }
 
-    // ---- the list's window ----
-
-    private void Open()
-    {
-        Fit();
-        if (popup.IsOpen) return;
-        popup.IsOpen = true;
-        placedAt = Where();
-        Motion.Enter(surface, 0, -8, Motion.Medium);
-        Shot.Moved();
-        Follow();
-    }
-
-    private void Close()
-    {
-        forced = false;
-        if (popup.IsOpen) popup.IsOpen = false;
-    }
-
-    /// <summary>As wide as the room right of the box allows (never narrower than the box, at most <see cref="ListWidth"/>),
-    /// and no taller than the window below it.</summary>
+    /// <summary>As wide as the window spares (at most <see cref="PanelWidth"/>), the list no taller than about two thirds
+    /// of the window.</summary>
     private void Fit()
     {
-        double left = 0, bottom = box.ActualHeight;
-        try
-        {
-            var p = box.TranslatePoint(new Point(0, box.ActualHeight), window);
-            left = p.X;
-            bottom = p.Y;
-        }
-        catch (InvalidOperationException) { }
-        var room = window.ActualWidth - Math.Max(0, left) - 16;
-        surface.Width = Math.Max(box.ActualWidth, Math.Min(ListWidth, room));
-        scroller.MaxHeight = Math.Clamp(window.ActualHeight - bottom - 24, 180, 560);
-    }
-
-    private Point? Where()
-    {
-        try { return box.IsVisible ? box.PointToScreen(new Point(0, 0)) : null; }
-        catch (InvalidOperationException) { return null; }
-    }
-
-    /// <summary>The list placed again under the box where it is now.</summary>
-    private void Nudge()
-    {
-        var h = popup.HorizontalOffset;
-        popup.HorizontalOffset = h + 0.01;
-        popup.HorizontalOffset = h;
-    }
-
-    /// <summary>A moment after opening, the list follows the box if it is still moving (the pane sliding in over a
-    /// narrow window).</summary>
-    private async void Follow()
-    {
-        for (var i = 0; i < 10 && popup.IsOpen; i++)
-        {
-            await Task.Delay(40);
-            if (!popup.IsOpen) return;
-            var now = Where();
-            if (now is { } p && placedAt is { } q && (Math.Abs(p.X - q.X) > 0.5 || Math.Abs(p.Y - q.Y) > 0.5))
-            {
-                Fit();
-                Nudge();
-            }
-            placedAt = now;
-        }
+        var w = layer.ActualWidth > 0 ? layer.ActualWidth : window.ActualWidth;
+        var h = layer.ActualHeight > 0 ? layer.ActualHeight : window.ActualHeight;
+        panel.Width = Math.Clamp(w - 48, 280, PanelWidth);
+        scroller.MaxHeight = Math.Max(160, Math.Min(h * 0.62, h - Top - 140));
     }
 
     // ---- running one ----
 
-    /// <summary>A suggestion's action. From the box (<paramref name="fromField"/>), the box is let go of first — emptied, or
-    /// left holding the words searched — so its list closes and the keys go to the screen.</summary>
+    /// <summary>A row's action. From the search (<paramref name="fromField"/>), it is put away first, so the keys go to the
+    /// screen — but for a command completed, a kind chosen or words searched, which stay in the search.</summary>
     public void Perform(PaletteAction a, bool fromField)
     {
         switch (a.Do)
@@ -496,16 +478,19 @@ public sealed partial class SearchPalette : IDisposable
             case PaletteDo.Nothing:
                 return;
             case PaletteDo.Fill:
-                // (the box keeps the keyboard, listing what the command takes)
-                if (box.Text == a.Text) Update(a.Text); else SetText(a.Text);
-                FocusBox();
+                // (the field keeps the keyboard, listing what the command takes)
+                Show(a.Text);
+                return;
+            case PaletteDo.Search:
+                // (everything for the words, in the search itself: no screen of its own)
+                Show(a.Text);
+                return;
+            case PaletteDo.Scope:
+                if (!IsOpen) Show();
+                SetScope(SearchScope.Of(a.Text));
                 return;
         }
-        if (fromField)
-        {
-            LetGo();
-            SetText(a.Do == PaletteDo.Search ? a.Text : "");
-        }
+        if (fromField) Hide();
         switch (a.Do)
         {
             case PaletteDo.Go: if (a.To is { } place) engine.Go(place); break;
@@ -513,7 +498,6 @@ public sealed partial class SearchPalette : IDisposable
             case PaletteDo.Work:
                 if (a.Text.Length > 0) engine.OpenWeb(a.Text, a.Title); else engine.Go(Place.Todo);
                 break;
-            case PaletteDo.Search: engine.Search(a.Text); break;
             case PaletteDo.NewTask: engine.AskNewTask(); break;
             case PaletteDo.AddTask: AddTask(a.Text); break;
             case PaletteDo.NewMessage: engine.AskNewMessage(); break;
@@ -528,6 +512,7 @@ public sealed partial class SearchPalette : IDisposable
             case PaletteDo.Forward: engine.GoForward(); break;
             case PaletteDo.Browser: Engine.Engine.OpenExternally(engine.BaseUrl); break;
             case PaletteDo.Tool: Screens.ToolsScreen.OpenTool(engine, a.Text); break;
+            case PaletteDo.ToolPlace: if (a.Pick is { } pick) OpenToolPlace(pick); break;
             case PaletteDo.Copy:
                 try { Clipboard.SetText(a.Text); } catch { /* the clipboard busy with another app */ }
                 break;
@@ -565,7 +550,7 @@ public sealed partial class SearchPalette : IDisposable
         return b;
     }
 
-    // ---- the box itself ----
+    // ---- the field itself ----
 
     private void SetText(string text)
     {
@@ -573,33 +558,23 @@ public sealed partial class SearchPalette : IDisposable
         box.CaretIndex = text.Length;
     }
 
-    private void FocusBox()
+    private void FocusBox(bool selectAll)
     {
-        box.CaretIndex = box.Text.Length;
         box.Dispatcher.BeginInvoke(() =>
         {
+            if (!IsOpen) return;
             if (!box.IsKeyboardFocusWithin)
             {
                 box.Focus();
                 Keyboard.Focus(box);
             }
-            box.CaretIndex = box.Text.Length;
-            if (box.IsKeyboardFocusWithin && sections.Count > 0) Open();
+            if (selectAll) box.SelectAll(); else box.CaretIndex = box.Text.Length;
         }, DispatcherPriority.Input);
     }
 
-    /// <summary>The box let go of: its list closed, the keyboard to the window (and so the screen's shortcuts).</summary>
-    private void LetGo()
-    {
-        Close();
-        if (!box.IsKeyboardFocusWithin) return;
-        window.Focus();
-        if (box.IsKeyboardFocusWithin) Keyboard.ClearFocus();
-    }
-
-    /// <summary>The screenshot suite's way to the box's suggestions (--open palette:/gr): once the window has settled,
-    /// that typed in the box, its list shown. An underscore stands for a space ("palette:bio_files", "palette:/due_"), as
-    /// the suite's arguments cannot carry one.</summary>
+    /// <summary>The screenshot suite's way to the search (--open palette:/gr): once the window has settled, that typed in
+    /// the field, its results shown. An underscore stands for a space ("palette:bio_files", "palette:/due_"), as the
+    /// suite's arguments cannot carry one; "palette:" alone is the search as it opens.</summary>
     private void LaunchList()
     {
         if (Launch.Take("palette:") is not { } given) return;
@@ -609,10 +584,7 @@ public sealed partial class SearchPalette : IDisposable
         {
             timer.Stop();
             forced = true;
-            box.Focus();
-            Keyboard.Focus(box);
-            if (box.Text == text) Update(text); else box.Text = text;
-            box.CaretIndex = text.Length;
+            Show(text);
         };
         timer.Start();
     }
@@ -628,16 +600,12 @@ public sealed partial class SearchPalette : IDisposable
     public void Dispose()
     {
         lookup?.Cancel();
-        Close();
+        Hide();
         box.TextChanged -= OnText;
         box.PreviewKeyDown -= OnKey;
-        box.GotKeyboardFocus -= OnFocus;
         box.LostKeyboardFocus -= OnBlur;
-        box.IsVisibleChanged -= OnShown;
-        window.PreviewMouseDown -= OnWindowMouse;
-        window.LocationChanged -= OnWindowMoved;
-        window.SizeChanged -= OnWindowMoved;
         engine.PropertyChanged -= OnEngine;
+        if (layer.Parent is Panel p) p.Children.Remove(layer);
         if (Shared == this) Shared = null;
     }
 }

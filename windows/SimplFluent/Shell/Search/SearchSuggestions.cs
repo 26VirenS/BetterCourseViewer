@@ -2,6 +2,7 @@ using System.Globalization;
 using Simpl.Engine;
 using Simpl.Kit;
 using Simpl.Models;
+using Simpl.Support;
 using Wpf.Ui.Controls;
 
 namespace Simpl.Shell;
@@ -57,20 +58,41 @@ public sealed partial class SearchPalette
         }
     }
 
-    private enum JobKind { Kinds, Due, Grades, Everything }
+    private enum JobKind { Kinds, Due, Grades, Everything, Recent, Tools }
 
-    /// <summary>What the app answers later: the school's search for one kind, the planner, the grades.</summary>
+    /// <summary>What the app answers later: the school's search (for one kind, or every kind of <see cref="Kinds"/>), the
+    /// planner, the grades, the files changed last, the courses' external tools.</summary>
     private sealed record Job(JobKind Kind, string Title, string Q, string[]? Kinds = null, bool Overdue = false);
 
     private (List<PaletteSection> Sections, Job? Job) Suggest(string raw)
     {
         var typed = Typed.Of(raw);
         if (typed.Command) return CommandSections(typed);
-        // (0.3.44) as the web box does: from the second letter, after a pause, everything in the school answers under the
-        //  box — assignments, announcements, pages, discussions, files, people — before Enter is pressed
         var words = typed.Raw.Trim();
-        var everything = words.Length >= 2 && PaletteSum.Answer(words) == null ? new Job(JobKind.Everything, "", words) : null;
+        if (words.Length == 0) return EmptySections();
+        // (0.3.44, 0.3.56) as the web box does: from the second letter what the index holds answers at once, and
+        //  everything in the school after a pause — assignments, announcements, pages, discussions, files, people (those
+        //  of the kind searched in alone)
+        var kinds = scope?.Kinds;
+        var everything = words.Length >= 2 && PaletteSum.Answer(words) == null && kinds is not { Length: 0 } ? new Job(JobKind.Everything, "", words, kinds) : null;
         return (PlainSections(typed), everything);
+    }
+
+    /// <summary>(0.3.56) Before anything is typed: the four kinds to search in, or the kind's own things — your courses (the
+    /// pane's, in its order), what is due this week, the files and pages changed last, every command.</summary>
+    private (List<PaletteSection>, Job?) EmptySections()
+    {
+        if (scope == null)
+            return ([new PaletteSection("Search in", SearchScope.All.Select(k => new PaletteItem($"scope.{k.Key}", k.Title, k.Symbol, PaletteAction.Scope(k.Key)) { Sub = k.Hint, Trailing = k.Shortcut }).ToList())], null);
+        if (scope == SearchScope.Courses)
+        {
+            var items = CourseItems("", engine, 12);
+            return ([new PaletteSection("Courses", items.Count == 0 ? [Hint("No courses yet", SymbolRegular.Book24)] : items)], null);
+        }
+        if (scope == SearchScope.Work) return ([new PaletteSection("Due this week", [Looking])], new Job(JobKind.Due, "Due this week", "week"));
+        if (scope == SearchScope.Files) return ([new PaletteSection("Recent files", [Looking])], new Job(JobKind.Recent, "Recent files", ""));
+        var all = PaletteCommand.Catalog(engine).Where(c => c.Name != "help").Select(c => c.PlainRow).ToList();
+        return ([new PaletteSection("Commands", all)], null);
     }
 
     // ---- words typed ----
@@ -81,6 +103,18 @@ public sealed partial class SearchPalette
         var q = words.ToLowerInvariant();
         var outList = new List<PaletteSection>();
         if (q.Length == 0) return outList;
+        // (0.3.56) a kind searched in: its own things alone (Work's and Files' come from the search)
+        if (scope == SearchScope.Courses)
+        {
+            var mine = CourseItems(q, engine, 12);
+            return [new PaletteSection("Courses", mine.Count == 0 ? [Hint("No course by that name", SymbolRegular.Book24)] : mine)];
+        }
+        if (scope == SearchScope.Actions)
+        {
+            var list = PaletteCommand.Matching(PaletteCommand.Catalog(engine), q, strict: false).Where(c => c.Name != "help").Select(c => c.PlainRow).ToList();
+            return [new PaletteSection("Commands", list.Count == 0 ? [Hint("No command by that name", SymbolRegular.AppsList24)] : list)];
+        }
+        if (scope != null) return outList;
         // (a sum's answer comes first and is the row Enter runs: it alone says Enter — "Enter to copy" — and the search
         //  row under it says nothing of Enter)
         var answer = PaletteSum.Answer(words);
@@ -98,7 +132,7 @@ public sealed partial class SearchPalette
             var groups = GroupItems(q, engine, 3);
             if (groups.Count > 0) outList.Add(new PaletteSection("Groups", groups));
         }
-        outList.Add(new PaletteSection("Search", [SearchRow(words, enter: answer == null)]));
+        // (0.3.56: no "Search for" row — everything the school holds answers under these as you type)
         return outList;
     }
 
@@ -170,6 +204,13 @@ public sealed partial class SearchPalette
                 var list = PaletteCommand.Matching(all, q, strict: false).Where(c => c.Name != "help").Select(c => c.SlashRow).ToArray();
                 return (One("Commands", list), null);
             }
+            case PaletteLists.Tools:
+                if (toolsCache is { } tc && (DateTime.UtcNow - tc.At).TotalSeconds < 300)
+                {
+                    toolsShown = tc.Data;
+                    return ([ToolSection(tc.Data, arg)], null);
+                }
+                return (One("Open a tool", Looking), new Job(JobKind.Tools, "Open a tool", arg));
         }
         return (One(cmd.Title, cmd.SlashRow), null);
     }
@@ -180,8 +221,8 @@ public sealed partial class SearchPalette
 
     private static PaletteItem Hint(string text, SymbolRegular symbol) => new("hint", text, symbol, PaletteAction.None);
 
-    private PaletteItem SearchRow(string words, bool enter = true) =>
-        new("search", $"Search for “{words}”", SymbolRegular.Search24, PaletteAction.Search(words)) { Sub = $"Everything in {engine.LmsName}", Trailing = enter ? "Enter" : null };
+    private PaletteItem SearchRow(string words) =>
+        new("search", $"Search for “{words}”", SymbolRegular.Search24, PaletteAction.Search(words)) { Sub = $"Everything in {engine.LmsName}", Trailing = "Enter" };
 
     /// <summary>A course's sections before its home has said which it has (the Mac's Sidebar.defaultSections).</summary>
     private static readonly SectionLink[] DefaultSections =
@@ -348,6 +389,24 @@ public sealed partial class SearchPalette
             case JobKind.Grades:
                 if (await Grades() == null) return null; // (the courses' own scores stay)
                 return new PaletteSection("Grades", GradeItems(job.Q));
+            case JobKind.Recent:
+            {
+                SearchData d;
+                try { d = await engine.Call<SearchData>("searchRecent"); }
+                catch { return new PaletteSection(job.Title, [Hint("Your files could not be read just now.", SymbolRegular.Warning24)]); }
+                var items = d.Groups.SelectMany(g => g.Rows.Select((r, i) => new PaletteItem($"f.{g.Title}.{i}", r.Title, KindSymbol(g.Title), PaletteAction.Open(r.Url, r.Title, r.External == true))
+                {
+                    Sub = r.Sub, Color = r.Color, Filled = true,
+                })).Take(16).ToList();
+                return new PaletteSection(job.Title, items.Count == 0 ? [Hint("No files in your courses yet.", SymbolRegular.Folder24)] : items);
+            }
+            case JobKind.Tools:
+            {
+                if (await Tools() is not { } d)
+                    return new PaletteSection(job.Title, [Hint("Your courses’ tools could not be read just now.", SymbolRegular.Warning24)]);
+                toolsShown = d;
+                return ToolSection(d, job.Q);
+            }
         }
         return null;
     }
@@ -433,29 +492,131 @@ public sealed partial class SearchPalette
         catch { return null; }
     }
 
-    /// <summary>(0.3.44) The school searched for what is typed, each kind its own section (five rows at most), put in
-    /// before the "Search for …" row — the kinds the app lists already (courses, groups) left out.</summary>
-    private async Task<List<PaletteSection>?> Everything(string q, List<PaletteSection> based, CancellationToken token)
+    /// <summary>The search's kinds in the order the web box shows them; never Courses (the app's own rows, listed already).</summary>
+    private static readonly string[] KindOrder = ["Assignments", "Announcements", "Pages", "Discussions", "Files", "People"];
+
+    /// <summary>(0.3.44, 0.3.56) What is typed searched, each kind its own section (five rows at most) after the app's own:
+    /// what the engine's index holds at once (searchLocal), then — once the typing pauses — the school's answer for the
+    /// rest (search); a kind searched in, its own groups alone. Nothing found: says so.</summary>
+    private async Task Everything(Job job, List<PaletteSection> based, Func<bool> current, CancellationToken token)
     {
-        await Task.Delay(280, token); // (a pause in the typing before the school is asked)
-        SearchData d;
-        try { d = await engine.Call<SearchData>("search", new { q }); }
-        catch { return null; }
-        var shown = based.Select(s => s.Title).ToHashSet();
         var found = new List<PaletteSection>();
-        foreach (var g in d.Groups.Where(g => !shown.Contains(g.Title)))
+        try
         {
+            var near = await engine.Call<SearchData>("searchLocal", new { q = job.Q });
+            if (!current()) return;
+            found = KindSections(near, job.Kinds);
+            if (found.Count > 0) { Publish(Compose(based, found), keepChoice: true); Shot.Moved(); }
+        }
+        catch { /* the index not ready: the school answers */ }
+        await Task.Delay(280, token); // (a pause in the typing before the school is asked)
+        SearchData? all = null;
+        try { all = await engine.Call<SearchData>("search", new { q = job.Q }); }
+        catch { /* what the index gave stays */ }
+        if (!current()) return;
+        if (all != null) found = KindSections(all, job.Kinds);
+        var outList = Compose(based, found);
+        if (outList.Count == 0 || (job.Kinds != null && found.Count == 0))
+            outList.Add(new PaletteSection("No results", [Hint($"Nothing for “{job.Q}”", SymbolRegular.Search24)]));
+        Publish(outList, keepChoice: true);
+        Shot.Moved();
+    }
+
+    private static List<PaletteSection> KindSections(SearchData d, string[]? kinds) =>
+        KindOrder.Where(k => kinds == null || kinds.Contains(k)).Select(k =>
+        {
+            var g = d.Groups.FirstOrDefault(x => x.Title == k);
+            if (g == null) return null;
+            // (a result elsewhere opens in Simpl's own window, not the browser: no ↗, which is the browser's mark everywhere else)
             var items = g.Rows.Take(5).Select((r, i) => new PaletteItem($"r.{g.Title}.{i}", r.Title, KindSymbol(g.Title), PaletteAction.Open(r.Url, r.Title, r.External == true))
             {
                 Sub = r.Sub, Color = r.Color, Filled = true,
             }).ToList();
-            if (items.Count > 0) found.Add(new PaletteSection(g.Title, items));
+            return items.Count > 0 ? new PaletteSection(k, items) : null;
+        }).OfType<PaletteSection>().ToList();
+
+    private static List<PaletteSection> Compose(List<PaletteSection> based, List<PaletteSection> found)
+    {
+        var shown = based.Select(s => s.Title).ToHashSet();
+        return based.Concat(found.Where(f => !shown.Contains(f.Title))).ToList();
+    }
+
+    // ---- /open ----
+
+    private (DateTime At, Screens.ExternalToolsScreen.Data Data)? toolsCache;
+    /// <summary>The tools /open listed last, which a row picked is opened from.</summary>
+    private Screens.ExternalToolsScreen.Data? toolsShown;
+
+    private async Task<Screens.ExternalToolsScreen.Data?> Tools()
+    {
+        if (toolsCache is { } c && (DateTime.UtcNow - c.At).TotalSeconds < 300) return c.Data;
+        try
+        {
+            var d = await engine.Call<Screens.ExternalToolsScreen.Data>("externalTools");
+            toolsCache = (DateTime.UtcNow, d);
+            return d;
         }
-        if (found.Count == 0) return null;
-        var outList = based.ToList();
-        var at = outList.FindIndex(s => s.Title == "Search");
-        outList.InsertRange(at < 0 ? outList.Count : at, found);
-        return outList;
+        catch { return null; }
+    }
+
+    /// <summary>(0.3.56, the web's /open) /open's list: the tools whose names hold what is typed — one used through
+    /// assignments or module items asks which of them next ("/open Knewton Alta › "); one that is a course's own tab opens
+    /// there, a row for each course. After the ›, that tool's assignments and module items in every course — what is still
+    /// to do first, the soonest first — narrowed by what is typed after it.</summary>
+    private static PaletteSection ToolSection(Screens.ExternalToolsScreen.Data d, string raw)
+    {
+        var bar = raw.IndexOf('›');
+        if (bar >= 0)
+        {
+            var name = raw[..bar].Trim().ToLowerInvariant();
+            var q = raw[(bar + 1)..].Trim().ToLowerInvariant();
+            if (d.Rows.FirstOrDefault(t => t.Name.ToLowerInvariant() == name) is not { } tool)
+                return new PaletteSection("Open a tool", [Hint("No tool by that name in your courses", SymbolRegular.PuzzlePiece24)]);
+            var places = new List<(Screens.ExternalToolsScreen.Course C, Screens.ExternalToolsScreen.Item It, int N)>();
+            var n = 0;
+            foreach (var c in tool.Courses)
+                foreach (var it in c.Items)
+                {
+                    n++;
+                    if (q.Length > 0 && !it.Title.ToLowerInvariant().Contains(q, StringComparison.Ordinal) && !c.Name.ToLowerInvariant().Contains(q, StringComparison.Ordinal)) continue;
+                    places.Add((c, it, n));
+                }
+            // (each course's list is in its order already: still to do, soonest first; the courses' merged the same way)
+            var ordered = places
+                .OrderBy(p => p.It.Upcoming ? 0 : 1)
+                .ThenBy(p => p.It.Upcoming ? ParseDate(p.It.Due) ?? DateTime.MaxValue : DateTime.MaxValue)
+                .ThenBy(p => p.N);
+            var items = ordered.Select(p => new PaletteItem($"tp.{p.C.Id}.{p.It.Kind}.{p.It.Id}", p.It.Title, p.It.Kind == "moduleItem" ? SymbolRegular.BoxMultiple24 : SymbolRegular.DocumentText24,
+                PaletteAction.ToolPlace(new ToolPick(tool.Id, p.C.Id, p.It.Kind, p.It.Id)))
+            {
+                Sub = string.Join(" · ", new[] { p.C.Name, p.It.Sub ?? "" }.Where(x => x.Length > 0)), Color = p.C.Color, Trailing = p.It.Status?.Word, Filled = true,
+            }).ToList();
+            return new PaletteSection($"{tool.Name}: which assignment?", items.Count == 0 ? [Hint($"Nothing by that name in {tool.Name}", SymbolRegular.DocumentText24)] : items);
+        }
+        var words = raw.Trim().ToLowerInvariant();
+        var rows = new List<PaletteItem>();
+        foreach (var t in d.Rows)
+        {
+            if (words.Length > 0 && !t.Name.ToLowerInvariant().Contains(words, StringComparison.Ordinal) && !t.Host.ToLowerInvariant().Contains(words, StringComparison.Ordinal)) continue;
+            if (t.Instances > 0)
+            {
+                var line = $"{(t.Courses.Count == 1 ? t.Courses[0].Name : $"{t.Courses.Count} courses")} · {t.Instances} {(t.Instances == 1 ? "assignment" : "assignments")}";
+                rows.Add(new PaletteItem($"tool.{t.Id}", t.Name, SymbolRegular.PuzzlePiece24, PaletteAction.Fill($"/open {t.Name} › ")) { Sub = line, Trailing = "Choose…" });
+            }
+            else
+                foreach (var c in t.Courses)
+                    rows.Add(new PaletteItem($"tool.{t.Id}.{c.Id}", t.Name, SymbolRegular.PuzzlePiece24, PaletteAction.ToolPlace(new ToolPick(t.Id, c.Id, null, null))) { Sub = c.Name, Color = c.Color, Filled = true });
+        }
+        return new PaletteSection("Open a tool", rows.Count == 0 ? [Hint("No tool by that name in your courses", SymbolRegular.PuzzlePiece24)] : rows);
+    }
+
+    /// <summary>A place /open listed, opened as External Tools opens it (Knewton Alta's and Macmillan's in their own windows).</summary>
+    private void OpenToolPlace(ToolPick pick)
+    {
+        if (toolsShown?.Rows.FirstOrDefault(t => t.Id == pick.Tool) is not { } tool) return;
+        if (tool.Courses.FirstOrDefault(c => c.Id == pick.Course) is not { } course) return;
+        var it = pick.Kind == null ? null : course.Items.FirstOrDefault(i => i.Kind == pick.Kind && i.Id == pick.Item);
+        Screens.ExternalToolsScreen.Open(engine, tool, course, it);
     }
 
     /// <summary>A section that answered later in the place of the one that waited for it (or after the rest).</summary>

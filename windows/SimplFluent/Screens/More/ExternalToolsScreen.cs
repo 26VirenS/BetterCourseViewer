@@ -27,14 +27,14 @@ namespace Simpl.Screens;
 public sealed partial class ExternalToolsScreen : Screen
 {
     /// <summary>What the page's `externalTools` gives (the Mac's ExternalToolsData).</summary>
-    private sealed class Data
+    internal sealed class Data
     {
         public List<Tool> Rows { get; set; } = new();
         public string? Sub { get; set; }
         public string? Empty { get; set; }
     }
 
-    private sealed class Tool
+    internal sealed class Tool
     {
         public string Id { get; set; } = "";
         public string Name { get; set; } = "";
@@ -51,7 +51,7 @@ public sealed partial class ExternalToolsScreen : Screen
 
     /// <summary>A tool's next piece of work still to do: its title, the line under it ("Due Oct 18 at 11:59 PM · 20 pts")
     /// and its course's name.</summary>
-    private sealed class Soonest
+    internal sealed class Soonest
     {
         public string Title { get; set; } = "";
         /// <summary>(2.99.33) Its title with the tool's name taken off ("Unit 2" for "Knewton Alta: Unit 2").</summary>
@@ -60,7 +60,7 @@ public sealed partial class ExternalToolsScreen : Screen
         public string? Course { get; set; }
     }
 
-    private sealed class Course
+    internal sealed class Course
     {
         public string Id { get; set; } = "";
         public string Name { get; set; } = "";
@@ -75,7 +75,7 @@ public sealed partial class ExternalToolsScreen : Screen
     /// <summary>A place a tool is used: an assignment (`assignment`) or a module item (`moduleItem`), the line under its
     /// title ("Due Oct 18 at 11:59 PM · 20 pts", "In Week 2: Forces"), where the work stands (as every list of work says
     /// it), and whether it is still to do and due ahead.</summary>
-    private sealed class Item
+    internal sealed class Item
     {
         public string Kind { get; set; } = "";
         public string Id { get; set; } = "";
@@ -298,7 +298,7 @@ public sealed partial class ExternalToolsScreen : Screen
             name.Col(1),
             CourseKit.OwnWindowMark().Margin(6, 0, 0, 0).Col(2));
         // (K.Subtle marks its press handled: the card round it is not pressed, nor opened, by it)
-        var b = K.Subtle(row, () => { CloseList(); Open(t, c); }, new Thickness(10, 5, 10, 6), 12);
+        var b = K.Subtle(row, () => { CloseList(); Open(engine, t, c); }, new Thickness(10, 5, 10, 6), 12);
         b.SetResourceReference(Control.BackgroundProperty, B.Subtle3);
         b.Stroke(B.ControlStroke);
         b.HorizontalAlignment = HorizontalAlignment.Left;
@@ -362,10 +362,12 @@ public sealed partial class ExternalToolsScreen : Screen
         return null;
     }
 
-    /// <summary>Opened in that course (a chip): Knewton Alta's and Macmillan's assignments in their own windows, the rest
-    /// — a course's tab first — in the tool window.</summary>
-    private void Open(Tool t, Course c)
+    /// <summary>Opened in that course (a chip), or on one place it is used (<paramref name="it"/>, a row of its list) — as
+    /// the search's /open opens it too (0.3.56).</summary>
+    internal static void Open(Engine.Engine engine, Tool t, Course c, Item? it = null)
     {
+        if (it != null) { OpenItem(engine, t, c, it); return; }
+        // (Knewton Alta's and Macmillan's assignments in their own windows, the rest — a course's tab first — in the tool window)
         if (c.Open.TryGetValue("assignment", out var a) && c.Open.TryGetValue("course", out var course))
         {
             switch (WindowOf(t))
@@ -379,7 +381,7 @@ public sealed partial class ExternalToolsScreen : Screen
 
     /// <summary>One place the tool is used, opened (a row of its list): a module item in the tool window, as the course's
     /// Modules opens it; an assignment of Knewton Alta's or Macmillan's in its own window, any other in the tool window.</summary>
-    private void Open(Tool t, Course c, Item it)
+    private static void OpenItem(Engine.Engine engine, Tool t, Course c, Item it)
     {
         var course = c.Open.GetValueOrDefault("course") is { Length: > 0 } id ? id : c.Id;
         if (it.Kind == "moduleItem") { engine.OpenTool(ToolLaunch.ModuleItem(course, it.Id, it.Title)); return; }
