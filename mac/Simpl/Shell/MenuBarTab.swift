@@ -29,7 +29,7 @@ final class MenuBarTabProbeView: NSView {
         watching.forEach(NotificationCenter.default.removeObserver)
         watching = []
         guard let window else { tab.removeFromSuperview(); return }
-        for name in [NSWindow.didEnterFullScreenNotification, NSWindow.didExitFullScreenNotification, NSWindow.willEnterFullScreenNotification] {
+        for name in [NSWindow.didEnterFullScreenNotification, NSWindow.didExitFullScreenNotification, NSWindow.willEnterFullScreenNotification, NSWindow.didResizeNotification] {
             watching.append(NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in self?.place() })
         }
         // (the title bar is laid out a moment after the window first shows)
@@ -37,28 +37,29 @@ final class MenuBarTabProbeView: NSView {
     }
 
     /// The tab put in the title bar again (in full screen it moves to the bar that drops with the menu bar), as a tab
-    /// under the menu bar in full screen and a button beside the window's buttons otherwise.
+    /// under the menu bar in full screen and a button beside the window's buttons otherwise. Placed by its frame, never
+    /// by constraints: the title bar lays itself out, and constraints of ours in it looped its layout on narrow windows.
     private func place() {
         guard let window, let close = window.standardWindowButton(.closeButton), let bar = close.superview else { return }
         let full = window.styleMask.contains(.fullScreen)
         if tab.superview !== bar {
             tab.removeFromSuperview()
-            tab.translatesAutoresizingMaskIntoConstraints = false
+            tab.translatesAutoresizingMaskIntoConstraints = true
             bar.addSubview(tab)
         }
-        NSLayoutConstraint.deactivate(tab.placed)
-        let zoom = window.standardWindowButton(.zoomButton) ?? close
-        tab.placed = full
-            ? [tab.topAnchor.constraint(equalTo: bar.topAnchor),
-               tab.leadingAnchor.constraint(equalTo: bar.leadingAnchor, constant: MenuBarTabView.tabLeading),
-               tab.widthAnchor.constraint(equalToConstant: MenuBarTabView.tabSize.width),
-               tab.heightAnchor.constraint(equalToConstant: MenuBarTabView.tabSize.height)]
-            : [tab.centerYAnchor.constraint(equalTo: close.centerYAnchor),
-               tab.leadingAnchor.constraint(equalTo: zoom.trailingAnchor, constant: 14),
-               tab.widthAnchor.constraint(equalToConstant: MenuBarTabView.buttonSize.width),
-               tab.heightAnchor.constraint(equalToConstant: MenuBarTabView.buttonSize.height)]
-        NSLayoutConstraint.activate(tab.placed)
-        tab.full = full
+        let frame: NSRect
+        if full {
+            let size = MenuBarTabView.tabSize
+            frame = NSRect(x: MenuBarTabView.tabLeading, y: bar.isFlipped ? 0 : bar.bounds.height - size.height, width: size.width, height: size.height)
+            tab.autoresizingMask = bar.isFlipped ? [.maxYMargin] : [.minYMargin]
+        } else {
+            let size = MenuBarTabView.buttonSize
+            let zoom = (window.standardWindowButton(.zoomButton) ?? close).frame
+            frame = NSRect(x: zoom.maxX + 14, y: close.frame.midY - size.height / 2, width: size.width, height: size.height)
+            tab.autoresizingMask = close.autoresizingMask
+        }
+        if tab.frame != frame { tab.frame = frame }
+        if tab.full != full { tab.full = full }
         tab.isHidden = !sidebarShown
     }
 
@@ -77,7 +78,6 @@ final class MenuBarTabView: NSView {
     static let tabSize = CGSize(width: 78, height: 22)
     static let buttonSize = CGSize(width: 34, height: 20)
 
-    var placed: [NSLayoutConstraint] = []
     var full = false {
         didSet {
             toolTip = full ? nil : "Enter Full Screen"
