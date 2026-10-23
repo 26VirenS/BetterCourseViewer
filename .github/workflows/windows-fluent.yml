@@ -416,6 +416,10 @@ jobs:
           Shot 'palette-sum' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'palette:12*4'))
           Shot 'palette-grades' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'palette:/grades_'))
           Shot 'palette-narrow' '780x683' 45 ($mock + @('--appearance', 'dark', '--pane-open', '--open', 'palette:/'))
+          # (0.3.56) the search as it opens (its four kinds), and /open asking which of a tool's assignments (the › built, so
+          #  the script's own encoding never matters)
+          Shot 'palette-kinds' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'palette:'))
+          Shot 'palette-open-which' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', "palette:/open_Knewton_Alta_$([char]0x203A)_"))
           Shot 'external-tools' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'externaltools'))
           # (a tool used in assignments, its card pressed: the list of every place it is used, to choose the one to open)
           Shot 'external-tools-list' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'externaltools', '--tool-list', 'knewton'))
