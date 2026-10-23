@@ -26,6 +26,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.103', date: '2026-10-23', notes: [
+      { kind: 'improved', title: "This week's betas", body: 'Everything from the betas since 2.99.92, for everyone.', icon: P.sparkle },
+    ] },
     { version: '2.99.102', date: '2026-10-23', notes: [
       { kind: 'improved', title: 'Pick the Assignment', body: '/open on a tool now lists its assignments to choose from.', icon: P.tool || P.check },
     ] },
