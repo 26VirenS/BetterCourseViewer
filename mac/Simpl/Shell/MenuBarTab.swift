@@ -1,10 +1,10 @@
 import AppKit
 import SwiftUI
 
-// (1.3.153, 1.3.155) New Window: while a large popup is up over the window — a tool, a Knewton Alta or Macmillan
+// (1.3.153, 1.3.155, 1.3.157) New Window: while a large popup is up over the window — a tool, a Knewton Alta or Macmillan
 // assignment, the feedback, the rubric — a little black tab hangs from the menu bar over the empty start of the toolbar,
-// as if the menu bar went on down there, and says New Window; pressed, the popup becomes a window of its own
-// (FloatingPopups.openFrontInWindow). It lives in the window's own title bar, which in full screen is the bar that slides
+// as if the menu bar went on down there, and says New Window; pressed, another Simpl window opens on the screen this one
+// shows (File ▸ New Window's), the popup staying where it is — something else looked up while the assignment waits. It lives in the window's own title bar, which in full screen is the bar that slides
 // down with the menu bar as the pointer reaches the top of the screen — so the tab drops down with it and goes back up
 // with it. Out of full screen there is no menu bar to hang from: it is a small black New Window button beside the
 // window's buttons instead. While the sidebar is folded away its button sits there, so the tab steps aside.
@@ -13,10 +13,11 @@ import SwiftUI
 struct MenuBarTabProbe: NSViewRepresentable {
     /// The sidebar out: the room the tab takes is free.
     var sidebarShown: Bool
-    /// The window's popups: the tab shows while a large one is up, and takes it to a window of its own.
-    let popups: FloatingPopups
+    /// The window's engine: its popups (the tab shows while a large one is up), and the screen it shows (where the new
+    /// window opens).
+    let engine: Engine
 
-    func makeNSView(context: Context) -> MenuBarTabProbeView { MenuBarTabProbeView(popups: popups) }
+    func makeNSView(context: Context) -> MenuBarTabProbeView { MenuBarTabProbeView(engine: engine) }
 
     func updateNSView(_ v: MenuBarTabProbeView, context: Context) {
         v.sidebarShown = sidebarShown
@@ -25,14 +26,20 @@ struct MenuBarTabProbe: NSViewRepresentable {
 
 final class MenuBarTabProbeView: NSView {
     var sidebarShown = true { didSet { if sidebarShown != oldValue { place() } } }
+    private weak var engine: Engine?
     private let popups: FloatingPopups
     private let tab = MenuBarTabView()
     private var watching: [NSObjectProtocol] = []
 
-    init(popups: FloatingPopups) {
-        self.popups = popups
+    init(engine: Engine) {
+        self.engine = engine
+        popups = engine.popups
         super.init(frame: .zero)
-        tab.pressed = { [weak self] in self?.popups.openFrontInWindow() }
+        // (File ▸ New Window's: a window more of Simpl, on the screen this one shows — RootView opens it)
+        tab.pressed = { [weak self] in
+            guard let engine = self?.engine else { return }
+            NotificationCenter.default.post(name: .simplOpenWindow, object: Engine.name(of: engine.nav.current.place))
+        }
     }
 
     required init?(coder: NSCoder) { nil }
@@ -48,7 +55,7 @@ final class MenuBarTabProbeView: NSView {
                 MainActor.assumeIsolated { self?.place() }
             })
         }
-        // (a popup up, gone, or made a window of its own: the tab shown or not)
+        // (a popup up or gone: the tab shown or not)
         watching.append(center.addObserver(forName: FloatingPopups.changed, object: popups, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.place() }
         })
@@ -83,7 +90,7 @@ final class MenuBarTabProbeView: NSView {
         }
         if tab.frame != frame { tab.frame = frame }
         if tab.full != full { tab.full = full }
-        tab.isHidden = !sidebarShown || !popups.canOpenInWindow
+        tab.isHidden = !sidebarShown || !popups.hasLarge
     }
 
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -111,7 +118,7 @@ final class MenuBarTabView: NSView {
         setAccessibilityElement(true)
         setAccessibilityRole(.button)
         setAccessibilityLabel(Self.label)
-        toolTip = "Open the popup in a window of its own"
+        toolTip = "Open another Simpl window"
     }
 
     required init?(coder: NSCoder) { nil }

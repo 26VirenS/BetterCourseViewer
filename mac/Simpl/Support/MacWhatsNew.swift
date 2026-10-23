@@ -10,6 +10,7 @@ import Foundation
 enum MacWhatsNew {
     static let releases: [Release] = [
         Release(version: "1.3.157", date: "2026-10-23", notes: [
+            ReleaseNote(kind: "improved", title: "New Window Opens Simpl", body: "It opens another Simpl window; the popup stays put."),
             ReleaseNote(kind: "fixed", title: "New Window in View", body: "In full screen the window buttons no longer cover it."),
         ]),
         Release(version: "1.3.156", date: "2026-10-23", notes: [
