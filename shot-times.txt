@@ -1,0 +1,62 @@
+warmup 50s settled
+light-settle 22s after 16s
+light-01-today 13s settled
+light-02-courses 13s settled
+light-03-todo 10s settled
+light-04-grades 10s settled
+light-05-calendar 16s after 14s
+light-06-search 23s after 10s
+light-07-sheet-next 13s settled
+light-08-notifications 10s settled
+light-09-course 10s settled
+light-10-assignment 14s settled
+light-11-grades-sheet 26s settled
+light-12-hand-in 12s settled
+light-13-discussion 12s settled
+light-14-modules 11s settled
+light-15-files 9s settled
+light-16-groups 12s settled
+light-17-inbox 17s settled
+light-18-quiz 11s settled
+light-19-quiz-question 14s settled
+light-18b-quiz-done 10s settled
+light-19b-quiz-review 13s settled
+light-20-tool 24s after 20s
+light-21-setup 20s after 18s
+light-22-settings 29s settled
+light-23-school 14s after 12s
+dark-settle 18s after 16s
+dark-01-today 9s settled
+dark-02-courses 14s settled
+dark-03-todo 17s settled
+dark-04-grades 10s settled
+dark-05-calendar 12s settled
+dark-06-search 10s settled
+dark-07-sheet-next 14s settled
+dark-08-notifications 18s settled
+dark-09-course 15s settled
+dark-10-assignment 14s settled
+dark-11-grades-sheet 15s settled
+dark-12-hand-in 11s settled
+dark-13-discussion 11s settled
+dark-14-modules 10s settled
+dark-15-files 16s settled
+dark-16-groups 16s settled
+dark-17-inbox 12s settled
+dark-18-quiz 12s settled
+dark-19-quiz-question 14s settled
+dark-18b-quiz-done 12s settled
+dark-19b-quiz-review 13s settled
+dark-20-tool 23s after 20s
+dark-21-setup 11s settled
+dark-22-settings 11s settled
+dark-23-school 14s after 12s
+d2l-settle 28s after 16s
+d2l-01-today 10s settled
+d2l-02-course 10s settled
+d2l-03-assignment 11s settled
+d2l-04-grades-sheet 14s settled
+d2l-05-discussion 36s settled
+d2l-06-modules 12s settled
+test-01-sign-in 24s after 20s
+test-02-today 12s settled

@@ -1,0 +1,915 @@
+getpwuid_r did not find a match for uid 501
+Timestamp               Ty Process[PID:TID]
+2026-10-23 03:43:15.714 Df CoreSimulatorBridge[2462:31c8] [com.apple.installcoordination:framework] +[IXAppInstallCoordinator(IXSimpleInstaller) _beginInstallForURL:forPersonaUniqueString:consumeSource:options:progressBlock:completionWithIdentity:]: Beginning install for /Users/runner/work/BetterCourseViewer/BetterCourseViewer/build/Build/Products/Debug-iphonesimulator/Simpl Courses.app consuming source:N options:{
+    IsUserInitiated = 1;
+    PackageType = Developer;
+} installationRequestorAuditToken: NULL
+2026-10-23 03:43:15.813 Df installcoordinationd[3142:48f1] [com.apple.installcoordination:daemon] -[IXSDataPromiseManager registerPromise:]: Registered promise <IXSPlaceholder(0x1045081e0) Name:App Placeholder: Simpl Courses (com.simplcourses.app) Creator:InstallCoordination Simple SPI UUID:4BFABBB4-A3C3-4E15-98B7-26953C97AB9A Location:[system-defined]> for UUID 4BFABBB4-A3C3-4E15-98B7-26953C97AB9A
+2026-10-23 03:43:15.821 Df installcoordinationd[3142:3c38] [com.apple.installcoordination:daemon] -[IXSPlaceholder setAttributes:]: <IXSPlaceholder(0x1045081e0) Name:App Placeholder: Simpl Courses (com.simplcourses.app) Creator:InstallCoordination Simple SPI UUID:4BFABBB4-A3C3-4E15-98B7-26953C97AB9A Location:[system-defined]>: setting placeholder attributes to <IXPlaceholderAttributes<0x600003008090> : {
+    CFBundleShortVersionString = "1.7.5";
+    CFBundleSupportedPlatforms =     (
+        iPhoneSimulator
+    );
+    CFBundleVersion = 29;
+    DTPlatformName = iphonesimulator;
+    LSRequiresIPhoneOS = 1;
+    MinimumOSVersion = "18.0";
+    UIDeviceFamily =     (
+        1,
+        2
+    );
+    UILaunchScreen =     {
+    };
+}>
+2026-10-23 03:43:15.829 Df CoreSimulatorBridge[2462:2f05] [com.apple.installcoordination:framework] +[IXPlaceholder _placeholderForBundle:client:withParent:installType:metadata:placeholderType:mayBeDeltaPackage:isFromSerializedPlaceholder:location:error:]: Using full fidelity icons for com.simplcourses.app at /Users/runner/work/BetterCourseViewer/BetterCourseViewer/build/Build/Products/Debug-iphonesimulator/Simpl Courses.app
+2026-10-23 03:43:15.869 Df installcoordinationd[3142:48f2] [com.apple.installcoordination:daemon] -[IXSPlaceholder setIconResourcesPromise:]: <IXSPlaceholder(0x1045081e0) Name:App Placeholder: Simpl Courses (com.simplcourses.app) Creator:InstallCoordination Simple SPI UUID:4BFABBB4-A3C3-4E15-98B7-26953C97AB9A Location:[system-defined]>: setting icon resources promise to <IXSPromisedTransferToPath(0x600002c05200) Name:Icon resources for com.simplcourses.app Creator:InstallCoordination Simple SPI UUID:0616E949-CA85-43DD-A841-26D684F0B7A1 Location:[system-defined]>
+2026-10-23 03:43:15.871 Df installcoordinationd[3142:48f2] [com.apple.installcoordination:daemon] -[IXSPlaceholder setInfoPlistIconContentPromise:]: <IXSPlaceholder(0x1045081e0) Name:App Placeholder: Simpl Courses (com.simplcourses.app) Creator:InstallCoordination Simple SPI UUID:4BFABBB4-A3C3-4E15-98B7-26953C97AB9A Location:[system-defined]>: setting Info.plist icon content promise to <IXSPromisedInMemoryDictionary(0x600002c08d00) Name:Info.plist icon content for com.simplcourses.app Creator:InstallCoordination Simple SPI UUID:63634ABA-3562-4584-A953-E05A26F877F9 Location:[system-defined]>
+2026-10-23 03:43:15.874 Df installcoordinationd[3142:48f1] [com.apple.installcoordination:daemon] -[IXSDataPromiseManager promiseDidBegin:]: Unowned promise began: <IXSPlaceholder(0x1045081e0) Name:App Placeholder: Simpl Courses (com.simplcourses.app) Creator:InstallCoordination Simple SPI UUID:4BFABBB4-A3C3-4E15-98B7-26953C97AB9A Location:[system-defined]>
+2026-10-23 03:43:15.874 Df installcoordinationd[3142:48f1] [com.apple.installcoordination:daemon] -[IXSDataPromiseManager promise:didUpdateProgress:]: Unowned promise update progress to 0.000000 : <IXSPlaceholder(0x1045081e0) Name:App Placeholder: Simpl Courses (com.simplcourses.app) Creator:InstallCoordination Simple SPI UUID:4BFABBB4-A3C3-4E15-98B7-26953C97AB9A Location:[system-defined]>
+2026-10-23 03:43:15.874 Df installcoordinationd[3142:48f1] [com.apple.installcoordination:daemon] -[IXSDataPromiseManager promise:didUpdateProgress:]: Unowned promise update progress to 0.000000 : <IXSPlaceholder(0x1045081e0) Name:App Placeholder: Simpl Courses (com.simplcourses.app) Creator:InstallCoordination Simple SPI UUID:4BFABBB4-A3C3-4E15-98B7-26953C97AB9A Location:[system-defined]>
+2026-10-23 03:43:15.882 Df installcoordinationd[3142:3c38] [com.apple.installcoordination:daemon] -[IXSPlaceholder setLocalizationDictionaryPromise:]: <IXSPlaceholder(0x1045081e0) Name:App Placeholder: Simpl Courses (com.simplcourses.app) Creator:InstallCoordination Simple SPI UUID:4BFABBB4-A3C3-4E15-98B7-26953C97AB9A Location:[system-defined]>: setting localization dict promise to <IXSPromisedInMemoryDictionary(0x600002c00600) Name:Localizations for com.simplcourses.app Creator:InstallCoordination Simple SPI UUID:923B69EB-F4A9-4628-A98B-63B9BF733309 Location:[system-defined]>
+2026-10-23 03:43:15.887 Df installcoordinationd[3142:48f1] [com.apple.installcoordination:daemon] -[IXSDataPromiseManager promise:didUpdateProgress:]: Unowned promise update progress to 0.000000 : <IXSPlaceholder(0x1045081e0) Name:App Placeholder: Simpl Courses (com.simplcourses.app) Creator:InstallCoordination Simple SPI UUID:4BFABBB4-A3C3-4E15-98B7-26953C97AB9A Location:[system-defined]>
+2026-10-23 03:43:15.888 Df installcoordinationd[3142:3c38] [com.apple.installcoordination:daemon] -[IXSPlaceholder setConfigurationComplete:]: <IXSPlaceholder(0x1045081e0) Name:App Placeholder: Simpl Courses (com.simplcourses.app) Creator:InstallCoordination Simple SPI UUID:4BFABBB4-A3C3-4E15-98B7-26953C97AB9A Location:[system-defined]>: setting configuration complete to Y
+2026-10-23 03:43:15.891 Df installcoordinationd[3142:3c38] [com.apple.installcoordination:daemon] -[IXSPlaceholder _materialize]: <IXSPlaceholder(0x1045081e0) Name:App Placeholder: Simpl Courses (com.simplcourses.app) Creator:InstallCoordination Simple SPI UUID:4BFABBB4-A3C3-4E15-98B7-26953C97AB9A Location:[system-defined]>: Materializing placeholder at /Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Shared/SystemGroup/systemgroup.com.apple.installcoordinationd/Library/InstallCoordination/PromiseStaging/4BFABBB4-A3C3-4E15-98B7-26953C97AB9A/Simpl Courses.app
+2026-10-23 03:43:15.892 Df installcoordinationd[3142:3c38] [com.apple.installcoordination:daemon] -[IXSPlaceholder _materialize]: <IXSPlaceholder(0x1045081e0) Name:App Placeholder: Simpl Courses (com.simplcourses.app) Creator:InstallCoordination Simple SPI UUID:4BFABBB4-A3C3-4E15-98B7-26953C97AB9A Location:[system-defined]>: Using Info.plist icon content: {
+    CFBundleIcons =     {
+        CFBundlePrimaryIcon =         {
+            CFBundleIconName = AppIcon;
+        };
+    };
+    "CFBundleIcons~ipad" =     {
+        CFBundlePrimaryIcon =         {
+            CFBundleIconName = AppIcon;
+        };
+    };
+    ISIconPlatform = iPhoneOS;
+}
+2026-10-23 03:43:15.895 Df installcoordinationd[3142:3c38] [com.apple.installcoordination:daemon] -[IXSPlaceholder _materialize]_block_invoke: <IXSPlaceholder(0x1045081e0) Name:App Placeholder: Simpl Courses (com.simplcourses.app) Creator:InstallCoordination Simple SPI UUID:4BFABBB4-A3C3-4E15-98B7-26953C97AB9A Location:[system-defined]>: Using icon resource Assets.car
+2026-10-23 03:43:15.895 Df installcoordinationd[3142:3c38] [com.apple.installcoordination:daemon] -[IXSPlaceholder _materialize]: <IXSPlaceholder(0x1045081e0) Name:App Placeholder: Simpl Courses (com.simplcourses.app) Creator:InstallCoordination Simple SPI UUID:4BFABBB4-A3C3-4E15-98B7-26953C97AB9A Location:[system-defined]>: Including lproj localizations for (
+)
+2026-10-23 03:43:15.897 Df installcoordinationd[3142:48f1] [com.apple.installcoordination:daemon] -[IXSDataPromiseManager promiseDidComplete:]: Unowned promise completed: <IXSPlaceholder(0x1045081e0) Name:App Placeholder: Simpl Courses (com.simplcourses.app) Creator:InstallCoordination Simple SPI UUID:4BFABBB4-A3C3-4E15-98B7-26953C97AB9A Location:[system-defined]>
+2026-10-23 03:43:16.052 Df CoreSimulatorBridge[2462:2f05] [com.apple.installcoordination:framework] -[IXPromisedTransferToPath setComplete:]: <IXPromisedTransferToPath<0x600001703400> name:"App Asset: com.simplcourses.app" uuid:81BCAC5A-2587-4908-917A-FF3B4F36E1D8 creator:"InstallCoordination Simple SPI" location:[system-defined]> Copy operation from /Users/runner/work/BetterCourseViewer/BetterCourseViewer/build/Build/Products/Debug-iphonesimulator/Simpl Courses.app to /Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Shared/SystemGroup/systemgroup.com.apple.installcoordinationd/Library/InstallCoordination/PromiseStaging/81BCAC5A-2587-4908-917A-FF3B4F36E1D8/Simpl Courses.app took 0.104495 seconds
+2026-10-23 03:43:16.060 Df installcoordinationd[3142:48f1] [com.apple.installcoordination:daemon] -[IXSCoordinatedAppInstall setPlaceholderPromise:]: <IXSCoordinatedAppInstall<0x105805910> [P=CoreSimulatorBridge (pid 2462)] identifier:[com.simplcourses.app/Invalid/[system-defined]] uuid:33BB22B4-9D95-434A-A937-D95B27D15668 intent:IXCoordinatorIntentInitiating creator/appDRI:InstallCoordination Simple SPI importance:UserWaiting state:IXAppCoordinationStateReadyForPlaceholderInstall promise-state:PA2I4> : Placeholder Promise set: <IXSPlaceholder(0x1045081e0) Name:App Placeholder: Simpl Courses (com.simplcourses.app) Creator:InstallCoordination Simple SPI UUID:4BFABBB4-A3C3-4E15-98B7-26953C97AB9A Location:[system-defined]>
+2026-10-23 03:43:16.060 Df installcoordinationd[3142:48f2] [com.apple.installcoordination:daemon] -[IXSCoordinatedAppInstall promiseDidComplete:]: <IXSCoordinatedAppInstall<0x105805910> [P=CoreSimulatorBridge (pid 2462)] identifier:[com.simplcourses.app/Invalid/[system-defined]] uuid:33BB22B4-9D95-434A-A937-D95B27D15668 intent:IXCoordinatorIntentInitiating creator/appDRI:InstallCoordination Simple SPI importance:UserWaiting state:IXAppCoordinationStateReadyForPlaceholderInstall promise-state:PA2I4> : Promise completed: <IXSPlaceholder(0x1045081e0) Name:App Placeholder: Simpl Courses (com.simplcourses.app) Creator:InstallCoordination Simple SPI UUID:4BFABBB4-A3C3-4E15-98B7-26953C97AB9A Location:[system-defined]>
+2026-10-23 03:43:16.107 Df installd[3061:3887] (MobileSystemServices) 0x16fc37000 -[MIClientConnection _doInstallationForURL:identity:domain:options:operationType:completion:]: Install of "/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Shared/SystemGroup/systemgroup.com.apple.installcoordinationd/Library/InstallCoordination/PromiseStaging/4BFABBB4-A3C3-4E15-98B7-26953C97AB9A/Simpl Courses.app" type Placeholder (LSInstallType = 1, Domain: MIInstallationDomainDefault) requested by installcoordinationd (pid 3142 (501/20))
+2026-10-23 03:43:33.120 Df SpringBoard[2431:48bb] [com.apple.frontboard.ApplicationLibrary:default] Added placeholder: <SBApplicationPlaceholderProxy: 0x600002c91980; com.simplcourses.app (Simpl Courses); LSInstallType: StoreDownload>
+2026-10-23 03:43:33.121 Df SpringBoard[2431:2ead] [com.apple.frontboard.ApplicationLibrary:sb.placeholder] App placeholder proxies added: (
+    "<SBApplicationPlaceholderProxy: 0x600002c91980; com.simplcourses.app (Simpl Courses); LSInstallType: StoreDownload>"
+), currentlyKnownExistingPlaceholders: {
+}
+2026-10-23 03:43:33.451 Df SpringBoard[2431:2ead] [com.apple.frontboard.ApplicationLibrary:sb.placeholder] Placeholders added: (
+    "<SBApplicationPlaceholder: 0x600000d28060; bundleIdentifier: com.simplcourses.app; displayName: Simpl Courses>"
+), modified: (
+), removed: (null)
+2026-10-23 03:43:33.453 Df SpringBoard[2431:2ead] [com.apple.SpringBoard:Widgets] handleRemovedDataSource:<SBApplicationPlaceholder: 0x600000d28060; bundleIdentifier: com.simplcourses.app; displayName: Simpl Courses> ofIcon:<SBApplicationIcon: 0x600003339540; nodeID: com.simplcourses.app; bundleID: com.simplcourses.app>
+2026-10-23 03:43:35.919 Df installd[3061:38ae] (MobileSystemServices) 0x16fcc3000 -[MIClientConnection _doInstallationForURL:identity:domain:options:operationType:completion:]: Install of "/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Shared/SystemGroup/systemgroup.com.apple.installcoordinationd/Library/InstallCoordination/PromiseStaging/81BCAC5A-2587-4908-917A-FF3B4F36E1D8/Simpl Courses.app" type Developer (LSInstallType = 0, Domain: MIInstallationDomainDefault) requested by installcoordinationd (pid 3142 (501/20))
+2026-10-23 03:43:37.031 Df locationd[2456:3c48] [com.apple.locationd.Core:Core] {"msg":"AppMonitor - application (un)installation notification", "notification":Installation, "BundleId":com.simplcourses.app, "BundlePath":/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Bundle/Application/A15ECCF4-AC9B-4916-B4CA-86BC74A9BE23/Simpl Courses.app, "ExecutablePath":/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Bundle/Application/A15ECCF4-AC9B-4916-B4CA-86BC74A9BE23/Simpl Courses.app/Simpl Courses}
+2026-10-23 03:43:37.138 Df installcoordinationd[3142:48f1] [com.apple.installcoordination:daemon] -[IXSDataPromise decommission]: Decommissioning <IXSPlaceholder(0x1045081e0) Name:App Placeholder: Simpl Courses (com.simplcourses.app) Creator:InstallCoordination Simple SPI UUID:4BFABBB4-A3C3-4E15-98B7-26953C97AB9A Location:[system-defined]>
+2026-10-23 03:43:37.708 Df SpringBoard[2431:49e4] [com.apple.frontboard.ApplicationLibrary:default] Removed placeholder: <SBApplicationPlaceholderProxy: 0x600002c91980; com.simplcourses.app (Simpl Courses); LSInstallType: StoreDownload>
+2026-10-23 03:43:37.714 Df SpringBoard[2431:49e4] [com.apple.frontboard.ApplicationLibrary:default] Added application: <SBApplicationInfo: 0x10a391260; com.simplcourses.app (Simpl Courses)>
+2026-10-23 03:43:37.715 Df SpringBoard[2431:2ead] [com.apple.frontboard.ApplicationLibrary:sb.placeholder] App placeholder proxies installed: (
+    "<SBApplicationPlaceholderProxy: 0x600002c91980; com.simplcourses.app (Simpl Courses); LSInstallType: StoreDownload>"
+)
+2026-10-23 03:43:37.758 Df SpringBoard[2431:2ead] [com.apple.SpringBoard:Widgets] handleRemovedDataSource:<SBApplicationPlaceholder: 0x600000d28060; bundleIdentifier: com.simplcourses.app; displayName: Simpl Courses; progress: 100%; state: Finished> ofIcon:<SBApplicationIcon: 0x600003339540; nodeID: com.simplcourses.app; bundleID: com.simplcourses.app>
+2026-10-23 03:43:37.761 Df SpringBoard[2431:2ead] [com.apple.frontboard.ApplicationLibrary:sb.placeholder] Placeholders added: (null), modified: (null), removed: (
+    "<SBApplicationPlaceholder: 0x600000d28060; bundleIdentifier: com.simplcourses.app; displayName: Simpl Courses; progress: 100%; state: Finished>"
+)
+2026-10-23 03:44:26.205 Df runningboardd[2434:43a8] [com.apple.runningboard:job_oversize] 'app<com.simplcourses.app((null))>' Constructed job description:
+<dictionary: 0x60000263f660> { count = 21, transaction: 0, voucher = 0x0, contents =
+	"ProcessType" => <string: 0x600000c3c720> { string cache = 0x0, length = 3, contents = "App" }
+	"EnableTransactions" => <bool: 0x1e5760410>: false
+	"_ManagedBy" => <string: 0x600000c3c000> { string cache = 0x0, length = 22, contents = "com.apple.runningboard" }
+	"RootedSimulatorPath" => <bool: 0x1e57603f0>: true
+	"StandardOutPath" => <string: 0x600000c3e0d0> { string cache = 0x0, length = 12, contents = "/dev/ttys000" }
+	"CFBundleIdentifier" => <string: 0x600000c3cea0> { string cache = 0x0, length = 20, contents = "com.simplcourses.app" }
+	"_ResourceCoalition" => <string: 0x600000c3f870> { string cache = 0x0, length = 33, contents = "app<com.simplcourses.app((null))>" }
+	"ThrottleInterval" => <int64: 0xa1c776a9a42ebca7>: 2147483647
+	"StandardErrorPath" => <string: 0x600000c3e010> { string cache = 0x0, length = 12, contents = "/dev/ttys000" }
+	"MachServices" => <dictionary: 0x60000263fae0> { count = 0, transaction: 0, voucher = 0x0, contents =
+	}
+	"EnablePressuredExit" => <bool: 0x1e5760410>: false
+	"InitialTaskRole" => <int64: 0xa1c776aa5bd14357>: 1
+	"UserName" => <string: 0x600000c3f1e0> { string cache = 0x0, length = 6, contents = "mobile" }
+	"EnvironmentVariables" => <dictionary: 0x60000263fba0> { count = 3, transaction: 0, voucher = 0x0, contents =
+		"TMPDIR" => <string: 0x600000c3d560> { string cache = 0x0, length = 164, contents = "/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Data/Application/F71C914C-4ECD-4C06-8A6F-1E71A76778B7/tmp" }
+		"HOME" => <string: 0x600000c3e310> { string cache = 0x0, length = 160, contents = "/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Data/Application/F71C914C-4ECD-4C06-8A6F-1E71A76778B7" }
+		"CFFIXED_USER_HOME" => <string: 0x600000c3c240> { string cache = 0x0, length = 160, contents = "/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Data/Application/F71C914C-4ECD-4C06-8A6F-1E71A76778B7" }
+	}
+	"_AdditionalProperties" => <dictionary: 0x60000263fa80> { count = 1, transaction: 0, voucher = 0x0, contents =
+		"RunningBoard" => <dictionary: 0x60000263f7e0> { count = 3, transaction: 0, voucher = 0x0, contents =
+			"Managed" => <bool: 0x1e57603f0>: true
+			"RunningBoardLaunchedIdentity" => <dictionary: 0x60000263c4e0> { count = 2, transaction: 0, voucher = 0x0, contents =
+				"TYPE" => <int64: 0xa1c776aa5bd1434f>: 2
+				"EAI" => <string: 0x600000c3d380> { string cache = 0x0, length = 20, contents = "com.simplcourses.app" }
+			}
+			"RunningBoardLaunched" => <bool: 0x1e57603f0>: true
+		}
+	}
+	"ExitTimeOut" => <int64: 0xa1c776aa5bd14357>: 1
+	"Label" => <string: 0x600000c3eee0> { string cache = 0x0, length = 54, contents = "UIKitApplication:com.simplcourses.app[8054][rb-legacy]" }
+	"MaterializeDatalessFiles" => <bool: 0x1e57603f0>: true
+	"_LaunchType" => <int64: 0xa1c776aa5bd14347>: 3
+	"ProgramArguments" => <array: 0x600000c3e7c0> { count = 9, capacity = 16, contents =
+		0: <string: 0x600000c3fe10> { string cache = 0x0, length = 194, contents = "/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Bundle/Application/A15ECCF4-AC9B-4916-B4CA-86BC74A9BE23/Simpl Courses.app/Simpl Courses" }
+		1: <string: 0x600000c3f420> { string cache = 0x0, length = 13, contents = "-SimplBaseURL" }
+		2: <string: 0x600000c3c630> { string cache = 0x0, length = 21, contents = "http://localhost:8800" }
+		3: <string: 0x600000c3c450> { string cache = 0x0, length = 12, contents = "-setupOpened" }
+		4: <string: 0x600000c3c3c0> { string cache = 0x0, length = 3, contents = "YES" }
+		5: <string: 0x600000c3f990> { string cache = 0x0, length = 10, contents = "-SimplDemo" }
+		6: <string: 0x600000c3efa0> { string cache = 0x0, length = 3, contents = "YES" }
+		7: <string: 0x600000c3c690> { string cache = 0x0, length = 16, contents = "-SimplShotSettle" }
+		8: <string: 0x600000c3f660> { string cache = 0x0, length = 3, contents = "YES" }
+	}
+	"Program" => <string: 0x600000c3e550> { string cache = 0x0, length = 194, contents = "/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Bundle/Application/A15ECCF4-AC9B-4916-B4CA-86BC74A9BE23/Simpl Courses.app/Simpl Courses" }
+}
+2026-10-23 03:44:26.474 Df launchd_sim[2238:3673] [user/501/UIKitApplication:com.simplcourses.app[8054][rb-legacy] [4879]:] Successfully spawned Simpl Courses[4879] because launch job demand
+2026-10-23 03:44:26.490 Df CoreSimulatorBridge[2462:53df] [com.apple.FrontBoard:Common] [FBSSystemService][0xced1] Request successful: <BSProcessHandle: 0x600000c03090; Simpl Courses:4879; valid: YES>
+2026-10-23 03:44:28.504 Df Simpl Courses[4879:53f5] [com.apple.xpc:connection] [0x102d048e0] activating connection: mach=true listener=false peer=false name=com.apple.cfprefsd.daemon
+2026-10-23 03:44:28.509 Df Simpl Courses[4879:53f5] [com.apple.UserNotifications:Connections] [com.simplcourses.app] Creating a user notification center
+2026-10-23 03:44:28.680 Df Simpl Courses[4879:53f5] [com.apple.runningboard:connection] Initializing connection
+2026-10-23 03:44:28.681 Df Simpl Courses[4879:53f5] [com.apple.runningboard:process] Removing all cached process handles
+2026-10-23 03:44:28.681 Df Simpl Courses[4879:5422] [com.apple.runningboard:connection] Sending handshake request attempt #1 to server
+2026-10-23 03:44:28.681 Df Simpl Courses[4879:5422] [com.apple.runningboard:connection] Creating connection to com.apple.runningboard
+2026-10-23 03:44:28.681 Df Simpl Courses[4879:5422] [com.apple.xpc:connection] [0x102d04d60] activating connection: mach=true listener=false peer=false name=com.apple.runningboard
+2026-10-23 03:44:28.683 A  Simpl Courses[4879:5420] (RunningBoardServices) didChangeInheritances
+2026-10-23 03:44:28.684 Df Simpl Courses[4879:5422] [com.apple.runningboard:connection] Handshake succeeded
+2026-10-23 03:44:28.684 Df Simpl Courses[4879:5422] [com.apple.runningboard:connection] Identity resolved as app<com.simplcourses.app((null))>
+2026-10-23 03:44:28.687 A  Simpl Courses[4879:5422] (CoreFoundation) Loading Preferences From User Session CFPrefsD
+2026-10-23 03:44:28.695 Df Simpl Courses[4879:53f5] (libMobileGestalt.dylib) No persisted cache on this platform.
+2026-10-23 03:44:28.702 Df Simpl Courses[4879:5425] [com.apple.BoardServices:XPCErrors] [C:1] Alloc com.apple.frontboard.systemappservices
+2026-10-23 03:44:28.703 Df Simpl Courses[4879:5425] [com.apple.xpc:connection] [0x102a08490] activating connection: mach=false listener=false peer=false name=(anonymous)
+2026-10-23 03:44:28.708 Df backboardd[2453:4d71] [com.apple.iohid:default] Connection added: IOHIDEventSystemConnection uuid:9FC25655-DF95-47E6-88C8-A392A527BD08 pid:4879 process:Simpl Courses type:Passive entitlements:0x0 caller:BackBoardServices: ___getHIDEventSystemClient_block_invoke + 276 attributes:{
+    HighFrequency = 0;
+    bundleID = "com.simplcourses.app";
+    pid = 4879;
+} state:0x0 events:0 mask:0x0 dropped:0 dropStatus:0 droppedMask:0x0 lastDroppedTime:NONE
+2026-10-23 03:44:28.708 Df backboardd[2453:4d71] [com.apple.BackBoard:HID] Adding client connection: <BKHIDClientConnection: 0x600001711f80; IOHIDEventSystemConnectionRef: 0x104a1f180; vpid: 4879(v2868); taskPort: 0x13CD3; bundleID: com.simplcourses.app> for client: IOHIDEventSystemConnection uuid:9FC25655-DF95-47E6-88C8-A392A527BD08 pid:4879 process:Simpl Courses type:Passive entitlements:0x0 caller:BackBoardServices: ___getHIDEventSystemClient_block_invoke + 276 attributes:{
+    HighFrequency = 0;
+    bundleID = "com.simplcourses.app";
+    pid = 4879;
+} state:0x0 events:0 mask:0x0 dropped:0 dropStatus:0 droppedMask:0x0 lastDroppedTime:NONE
+2026-10-23 03:44:28.728 Df Simpl Courses[4879:53f5] [com.apple.UIKit:Application] Deactivation reason added: 10; deactivation reasons: 0 -> 1024; animating application lifecycle event: 0
+2026-10-23 03:44:28.728 Df Simpl Courses[4879:5420] [com.apple.UIKit:BackgroundTask] Creating new assertion because there is no existing background assertion.
+2026-10-23 03:44:28.729 Df Simpl Courses[4879:5420] [com.apple.UIKit:BackgroundTask] Creating new background assertion
+2026-10-23 03:44:28.729 Df Simpl Courses[4879:53f5] [com.apple.BoardServices:Injection] activating monitor for service com.apple.frontboard.open
+2026-10-23 03:44:28.729 Df Simpl Courses[4879:5420] [com.apple.UIKit:BackgroundTask] Created new background assertion <BKSProcessAssertion: 0x60000210a030>
+2026-10-23 03:44:28.729 Df Simpl Courses[4879:53f5] [com.apple.BoardServices:Injection] activating monitor for service com.apple.frontboard.workspace-service
+2026-10-23 03:44:28.729 Df Simpl Courses[4879:53f5] [com.apple.FrontBoard:Common] FBSWorkspace registering source: com.apple.frontboard.systemappservices
+2026-10-23 03:44:28.730 Df Simpl Courses[4879:5420] [com.apple.UIKit:BackgroundTask] Incrementing reference count for background assertion <BKSProcessAssertion: 0x60000210a030>
+2026-10-23 03:44:28.730 Df Simpl Courses[4879:5420] [com.apple.UIKit:BackgroundTask] Created background task <_UIBackgroundTaskInfo: 0x600001708dc0>: taskID = 1, taskName = Launch Background Task for Coalescing, creationTime = 550 (elapsed = 0).
+2026-10-23 03:44:28.730 Df Simpl Courses[4879:5420] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UIApplicationSceneKeyboardSettings on FBSSceneSettings
+2026-10-23 03:44:28.736 Df Simpl Courses[4879:5420] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneOcclusionSettings> on FBSSceneSettings
+2026-10-23 03:44:28.736 Df Simpl Courses[4879:5420] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneInterfaceProtectionSettings> on FBSSceneSettings
+2026-10-23 03:44:28.737 Df Simpl Courses[4879:5420] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneLayoutPreferencesHostSettingsExtension on FBSSceneSettings
+2026-10-23 03:44:28.737 Df Simpl Courses[4879:53f5] [com.apple.FrontBoard:Common] FBSWorkspace connected to endpoint : <BSServiceConnectionEndpoint: 0x600000206e60; target: com.apple.frontboard.systemappservices; service: com.apple.frontboard.workspace-service>
+2026-10-23 03:44:28.738 Df Simpl Courses[4879:53f5] [com.apple.FrontBoard:Common] <FBSWorkspaceScenesClient:0x6000030043f0 com.apple.frontboard.systemappservices> attempting immediate handshake from activate
+2026-10-23 03:44:28.738 Df Simpl Courses[4879:5420] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneSafeAreaSettingsExtension on FBSSceneSettings
+2026-10-23 03:44:28.739 Df Simpl Courses[4879:53f5] [com.apple.FrontBoard:Common] <FBSWorkspaceScenesClient:0x6000030043f0 com.apple.frontboard.systemappservices> sent handshake
+2026-10-23 03:44:28.739 Df Simpl Courses[4879:53f5] [com.apple.runningboard:general] Added observer for process assertions expiration warning: <_RBSExpirationWarningClient: 0x6000002184c0>
+2026-10-23 03:44:28.739 Df Simpl Courses[4879:5420] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneLayoutPreferenceClientSettingsExtension on FBSSceneClientSettings
+2026-10-23 03:44:28.741 Df Simpl Courses[4879:5420] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UIHomeAffordanceHostSceneSettings> on FBSSceneSettings
+2026-10-23 03:44:28.743 Df Simpl Courses[4879:5420] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISystemShellSceneHostingEnvironmentSettings on FBSSceneSettings
+2026-10-23 03:44:28.744 Df Simpl Courses[4879:5420] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneRenderingEnvironmentSettings on FBSSceneSettings
+2026-10-23 03:44:28.745 Df Simpl Courses[4879:5420] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneRenderingEnvironmentClientSettings> on FBSSceneClientSettings
+2026-10-23 03:44:28.747 Df Simpl Courses[4879:5420] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneTransitioningHostSettings> on FBSSceneSettings
+2026-10-23 03:44:28.748 Df Simpl Courses[4879:5420] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneFocusSystemSettings> on FBSSceneSettings
+2026-10-23 03:44:28.748 Df Simpl Courses[4879:5420] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneOrientationSettingsExtension on FBSSceneSettings
+2026-10-23 03:44:28.749 Df Simpl Courses[4879:5420] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneOrientationClientSettingsExtension on FBSSceneClientSettings
+2026-10-23 03:44:28.749 Df Simpl Courses[4879:53f5] [com.apple.UIKit:UIScreen] Evaluated capturing state as 0 on <UIScreen: 0x102c07f90> for initial
+2026-10-23 03:44:28.749 Df Simpl Courses[4879:5420] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneWindowingControlClientSettings on FBSSceneClientSettings
+2026-10-23 03:44:28.750 Df Simpl Courses[4879:53f5] [com.apple.UIKit:UIScreen] Evaluated capturing state as 0 on <UIScreen: 0x102c07f90> for CADisplay KVO
+2026-10-23 03:44:28.751 Df Simpl Courses[4879:5420] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneHostingContentSizePreferenceClientSettings> on FBSSceneClientSettings
+2026-10-23 03:44:28.752 Df Simpl Courses[4879:5420] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneHostingTraitCollectionPropagationSettings on FBSSceneSettings
+2026-10-23 03:44:28.753 Df Simpl Courses[4879:53f5] [com.apple.Accessibility:AXSupportCommon] Read CategoryName: per-app = 1, category name = (null)
+2026-10-23 03:44:28.753 Df Simpl Courses[4879:53f5] [com.apple.Accessibility:AXSupportCommon] Read CategoryName: per-app = 0, category name = (null)
+2026-10-23 03:44:28.754 Df Simpl Courses[4879:5420] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneHostingSheetPresentationSettings> on FBSSceneSettings
+2026-10-23 03:44:28.755 Df Simpl Courses[4879:5420] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneHostingSheetPresentationClientSettings> on FBSSceneClientSettings
+2026-10-23 03:44:28.755 Df Simpl Courses[4879:5420] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneHostingEventDeferringSettings> on FBSSceneSettings
+2026-10-23 03:44:28.758 Df Simpl Courses[4879:5420] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <UIKit__UITypedKeyValueSceneSettings> on FBSSceneSettings
+2026-10-23 03:44:28.759 Df Simpl Courses[4879:5420] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <UIKit__UITypedKeyValueSceneSettings> on FBSSceneClientSettings
+2026-10-23 03:44:28.760 Df Simpl Courses[4879:5420] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneHostingViewControllerPreferencePropagationClientSettings> on FBSSceneClientSettings
+2026-10-23 03:44:28.761 Df Simpl Courses[4879:5420] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneZoomTransitionSettings> on FBSSceneSettings
+2026-10-23 03:44:28.761 Df Simpl Courses[4879:5429] [com.apple.FrontBoard:SceneExtension] Realizing settings extension FBSSceneSettingsCore on FBSSceneSettings
+2026-10-23 03:44:28.765 Df Simpl Courses[4879:5429] [com.apple.FrontBoard:SceneExtension] Realizing settings extension FBSSceneClientSettingsCore on FBSSceneClientSettings
+2026-10-23 03:44:28.784 Df Simpl Courses[4879:5429] [com.apple.FrontBoard:SceneExtension] UIMutableApplicationSceneSettings setting counterpart class: UIApplicationSceneSettings
+2026-10-23 03:44:28.786 Df Simpl Courses[4879:5429] [com.apple.FrontBoard:SceneExtension] UIMutableApplicationSceneClientSettings setting counterpart class: UIApplicationSceneClientSettings
+2026-10-23 03:44:28.787 Df Simpl Courses[4879:5429] [com.apple.FrontBoard:SceneExtension] Realizing settings extension FBSSceneTransitionContextCore on FBSSceneTransitionContext
+2026-10-23 03:44:28.788 Df Simpl Courses[4879:53f5] [com.apple.dt.xctest:Default] Registering for test daemon availability notify post.
+2026-10-23 03:44:28.788 Df Simpl Courses[4879:53f5] [com.apple.dt.xctest:Default] notify_get_state check indicated test daemon not ready.
+2026-10-23 03:44:28.789 Df Simpl Courses[4879:53f5] [com.apple.dt.xctest:Default] notify_get_state check indicated test daemon not ready.
+2026-10-23 03:44:28.789 Df Simpl Courses[4879:53f5] [com.apple.dt.xctest:Default] notify_get_state check indicated test daemon not ready.
+2026-10-23 03:44:28.791 Df Simpl Courses[4879:53f5] [com.apple.UIKit:Application] Deactivation reason added: 11; deactivation reasons: 1024 -> 3072; animating application lifecycle event: 0
+2026-10-23 03:44:28.796 Df Simpl Courses[4879:53f5] [com.apple.UIKit:Application] Deactivation reason removed: 10; deactivation reasons: 3072 -> 2048; animating application lifecycle event: 0
+2026-10-23 03:44:28.796 Df Simpl Courses[4879:53f5] [com.apple.UIKit:EventBus] Event Timing Profile for Touch: not found, path="/System/Library/EventTimingProfiles/Sim.Touch.plist"
+2026-10-23 03:44:28.796 Df Simpl Courses[4879:53f5] [com.apple.UIKit:EventBus] Event Timing Profile for Pencil: not found, path="/System/Library/EventTimingProfiles/Sim.Pencil.plist"
+2026-10-23 03:44:28.797 Df Simpl Courses[4879:53f5] [com.apple.UIKit:UpdateScheduler] Selected display: name=LCD (PurpleMain), id=1
+2026-10-23 03:44:28.816 Df Simpl Courses[4879:53f5] [com.apple.UIKit:BackgroundTask] Will add backgroundTask with taskName: Persistent SceneSession Map Update, expirationHandler: <__NSGlobalBlock__: 0x1e61729e0>
+2026-10-23 03:44:28.817 Df Simpl Courses[4879:53f5] [com.apple.UIKit:BackgroundTask] Reusing background assertion <BKSProcessAssertion: 0x60000210a030>
+2026-10-23 03:44:28.817 Df Simpl Courses[4879:53f5] [com.apple.UIKit:BackgroundTask] Incrementing reference count for background assertion <BKSProcessAssertion: 0x60000210a030>
+2026-10-23 03:44:28.817 Df Simpl Courses[4879:53f5] [com.apple.UIKit:BackgroundTask] Created background task <_UIBackgroundTaskInfo: 0x600001713440>: taskID = 2, taskName = Persistent SceneSession Map Update, creationTime = 550 (elapsed = 0).
+2026-10-23 03:44:28.818 Df Simpl Courses[4879:53f5] [com.apple.UIKit:Application] Deactivation reason added: 5; deactivation reasons: 2048 -> 2080; animating application lifecycle event: 1
+2026-10-23 03:44:28.819 Df Simpl Courses[4879:53f5] [com.apple.UIKit:InterfaceStyle] Should send trait collection or coordinate space update, interface style 1 -> 1, <UIWindowScene: 0x102a05680> (8A5B03B1-DB7A-4FA3-8C68-9D52DA725679)
+2026-10-23 03:44:28.820 Df Simpl Courses[4879:53f5] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x102a05680> (8A5B03B1-DB7A-4FA3-8C68-9D52DA725679)
+2026-10-23 03:44:28.821 Df Simpl Courses[4879:53f5] [com.apple.UIKit:HomeAffordanceObservation] Initializing: <_UIHomeAffordanceSceneNotifier: 0x600002914cb0>; with scene: <UIWindowScene: 0x102a05680>
+2026-10-23 03:44:28.822 Df Simpl Courses[4879:53f5] [com.apple.BacklightServices:scenes] 0x600000c15110 setDelegate:<0x600000c0ca80 _UIBacklightEnvironment> hasDelegate:YES for environment:sceneID:com.simplcourses.app-default
+2026-10-23 03:44:28.824 Df Simpl Courses[4879:53f5] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x102a05680> (8A5B03B1-DB7A-4FA3-8C68-9D52DA725679)
+2026-10-23 03:44:28.824 Df Simpl Courses[4879:53f5] [com.apple.UIKit:EventDeferring] [0x600002910000] Initialized with scene: <UIWindowScene: 0x102a05680>; behavior: <_UIEventDeferringBehavior_iOS: 0x600000203280>; availableForProcess: 1, systemShellManagesKeyboardFocus: 1
+2026-10-23 03:44:28.825 Df Simpl Courses[4879:53f5] [com.apple.BoardServices:XPCErrors] [C:2] Alloc com.apple.backboard.hid-services.xpc
+2026-10-23 03:44:28.825 Df Simpl Courses[4879:53f5] [com.apple.xpc:connection] [0x102d0a190] activating connection: mach=false listener=false peer=false name=(anonymous)
+2026-10-23 03:44:28.829 Df Simpl Courses[4879:542a] [com.apple.BackBoard:EventDelivery] BKSHIDEventObserver - connection activation
+2026-10-23 03:44:28.830 Df Simpl Courses[4879:53f5] [com.apple.BackBoard:EventDelivery] policyStatus:<BKSHIDEventDeliveryPolicyObserver: 0x6000026016e0; process scope; status: target> was:none
+2026-10-23 03:44:28.830 Df Simpl Courses[4879:53f5] [com.apple.UIKit:KeyWindow] Setting default evaluation strategy for UIUserInterfaceIdiomPhone to LastOneWins
+2026-10-23 03:44:28.830 Df Simpl Courses[4879:53f5] [com.apple.UIKit:KeyWindow] Scene target of keyboard event deferring environment did change: 1; scene: UIWindowScene: 0x102a05680; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.simplcourses.app-default
+2026-10-23 03:44:28.831 Df Simpl Courses[4879:53f5] [com.apple.UIKit:EventDeferring] [0x600002910000] Scene target of event deferring environments did update: scene: 0x102a05680; current systemShellManagesKeyboardFocus: 1; systemShellManagesKeyboardFocusForScene: 1; eligibleForRecordRemoval: 1;
+2026-10-23 03:44:28.831 Df Simpl Courses[4879:53f5] [com.apple.UIKit:KeyWindow] Scene became target of keyboard event deferring environment: UIWindowScene: 0x102a05680; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.simplcourses.app-default
+2026-10-23 03:44:28.831 Df Simpl Courses[4879:53f5] [com.apple.UIKit:KeyWindow] Stack[KeyWindow] 0x600000c10660: Taking no further action for migration from LastOneWins -> SystemShellManaged as there are no scenes
+2026-10-23 03:44:28.831 Df Simpl Courses[4879:53f5] [com.apple.UIKit:KeyWindow] Setting default evaluation strategy for UIUserInterfaceIdiomPhone to SystemShellManaged
+2026-10-23 03:44:28.832 Df Simpl Courses[4879:53f5] [com.apple.UIKit:KeyWindow] Key window needs update: 0; currentKeyWindowScene: 0x0; evaluatedKeyWindowScene: 0x102a05680; currentApplicationKeyWindow: 0x0; evaluatedApplicationKeyWindow: 0x0; reason: UIWindowScene: 0x102a05680: Window scene became target of keyboard environment
+2026-10-23 03:44:28.832 Df Simpl Courses[4879:53f5] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x102a05680> (8A5B03B1-DB7A-4FA3-8C68-9D52DA725679)
+2026-10-23 03:44:28.833 Df Simpl Courses[4879:53f5] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x102a05680> (8A5B03B1-DB7A-4FA3-8C68-9D52DA725679)
+2026-10-23 03:44:28.835 Df Simpl Courses[4879:53f5] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x102a05680> (8A5B03B1-DB7A-4FA3-8C68-9D52DA725679)
+2026-10-23 03:44:29.021 Df Simpl Courses[4879:53f5] [com.apple.UIKit:Orientation] <UIWindowScene: 0x102a05680> (8A5B03B1-DB7A-4FA3-8C68-9D52DA725679) Scene updated orientation preferences: none -> ( Pu Ll Lr )
+2026-10-23 03:44:29.025 Df Simpl Courses[4879:53f5] [com.apple.UIKit:KeyWindow] Key window API is scene-level: YES
+2026-10-23 03:44:29.025 Df Simpl Courses[4879:53f5] [com.apple.UIKit:KeyWindow] UIWindowScene: 0x102a05680: Window became key in scene: UIWindow: 0x102a0bb30; contextId: 0x231B60A2: reason: UIWindowScene: 0x102a05680: Window requested to become key in scene: 0x102a0bb30
+2026-10-23 03:44:29.025 Df Simpl Courses[4879:53f5] [com.apple.UIKit:KeyWindow] Key window needs update: 1; currentKeyWindowScene: 0x0; evaluatedKeyWindowScene: 0x102a05680; currentApplicationKeyWindow: 0x0; evaluatedApplicationKeyWindow: 0x102a0bb30; reason: UIWindowScene: 0x102a05680: Window requested to become key in scene: 0x102a0bb30
+2026-10-23 03:44:29.025 Df Simpl Courses[4879:53f5] [com.apple.UIKit:KeyWindow] Window did become application key: UIWindow: 0x102a0bb30; contextId: 0x231B60A2; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.simplcourses.app-default
+2026-10-23 03:44:29.025 Df Simpl Courses[4879:53f5] [com.apple.UIKit:EventDeferring] [0x600002910000] Begin local event deferring requested for token: 0x60000260e2e0; environments: 1; reason: UIWindowScene: 0x102a05680: Begin event deferring in keyboardFocus for window: 0x102a0bb30
+2026-10-23 03:44:29.028 Df Simpl Courses[4879:542a] [com.apple.BackBoard:EventDelivery] BKSHIDEventDeliveryManager - connection activation
+2026-10-23 03:44:29.032 Df Simpl Courses[4879:53f5] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x102a05680> (8A5B03B1-DB7A-4FA3-8C68-9D52DA725679)
+2026-10-23 03:44:29.035 Df Simpl Courses[4879:542a] [com.apple.BackBoard:EventDelivery] policyStatus:<BKSHIDEventDeliveryPolicyObserver: 0x6000026016e0; token: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.simplcourses.app-default; status: ancestor> was:target
+2026-10-23 03:44:29.036 Df Simpl Courses[4879:53f5] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: sceneID:com.simplcourses.app-default  persistentID: 8A5B03B1-DB7A-4FA3-8C68-9D52DA725679
+2026-10-23 03:44:29.036 Df Simpl Courses[4879:53f5] [com.apple.UIKit:Application] Ignoring already applied deactivation reason: 5; deactivation reasons: 2080
+2026-10-23 03:44:29.037 Df Simpl Courses[4879:53f5] [com.apple.UIKit:Application] Deactivation reason added: 12; deactivation reasons: 2080 -> 6176; animating application lifecycle event: 1
+2026-10-23 03:44:29.037 Df Simpl Courses[4879:53f5] [com.apple.UIKit:Application] Deactivation reason removed: 11; deactivation reasons: 6176 -> 4128; animating application lifecycle event: 1
+2026-10-23 03:44:29.037 Df Simpl Courses[4879:53f5] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneIntelligenceSupportSettings> on FBSSceneSettings
+2026-10-23 03:44:29.039 Df Simpl Courses[4879:53f5] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x102a05680> (8A5B03B1-DB7A-4FA3-8C68-9D52DA725679)
+2026-10-23 03:44:29.040 Df Simpl Courses[4879:542a] [com.apple.UIIntelligenceSupport:xpc] establishing connection to agent
+2026-10-23 03:44:29.040 Df Simpl Courses[4879:542a] [com.apple.xpc:session] [0x60000210db80] Session created.
+2026-10-23 03:44:29.043 Df Simpl Courses[4879:542a] [com.apple.xpc:session] [0x60000210db80] Session created from connection [0x102c0adc0]
+2026-10-23 03:44:29.043 Df Simpl Courses[4879:542a] [com.apple.xpc:connection] [0x102c0adc0] activating connection: mach=true listener=false peer=false name=com.apple.uiintelligencesupport.agent
+2026-10-23 03:44:29.044 Df Simpl Courses[4879:542a] [com.apple.xpc:session] [0x60000210db80] Session activated
+2026-10-23 03:44:29.053 A  Simpl Courses[4879:53f5] (CoreFoundation) Updating Key-Value Observers Of Preferences
+2026-10-23 03:44:29.307 Df Simpl Courses[4879:53f5] (WebKit) 0x102d11258 - WebsiteDataStore::WebsiteDataStore sessionID=1 identifier=null
+2026-10-23 03:44:29.316 A  Simpl Courses[4879:5426] (libsystem_containermanager.dylib) container_system_group_path_for_identifier
+2026-10-23 03:44:29.317 Df Simpl Courses[4879:5426] [com.apple.containermanager:xpc] Requesting container lookup; class = 13, identifier = (null), group_identifier = systemgroup.com.apple.configurationprofiles, create = 1, temp = 0, euid = 501, uid = 501
+2026-10-23 03:44:29.317 A  Simpl Courses[4879:5426] (libsystem_containermanager.dylib) container_query_t
+2026-10-23 03:44:29.317 Df Simpl Courses[4879:5426] [com.apple.containermanager:xpc] Query; euid = 501, uid = 501, class = 13, identifier = [(null)](0), flags = 900000003
+2026-10-23 03:44:29.342 Df Simpl Courses[4879:542a] [com.apple.UIKit:BackgroundTask] Ending background task with UIBackgroundTaskIdentifier: 2
+2026-10-23 03:44:29.343 Df Simpl Courses[4879:542a] [com.apple.UIKit:BackgroundTask] Ending task with identifier 2 and description: <_UIBackgroundTaskInfo: 0x600001713440>: taskID = 2, taskName = Persistent SceneSession Map Update, creationTime = 550 (elapsed = 1), _expireHandler: <__NSGlobalBlock__: 0x1e61729e0>
+2026-10-23 03:44:29.343 Df Simpl Courses[4879:542a] [com.apple.UIKit:BackgroundTask] Decrementing reference count for assertion <BKSProcessAssertion: 0x60000210a030> (used by background task with identifier 2: <_UIBackgroundTaskInfo: 0x600001713440>: taskID = 2, taskName = Persistent SceneSession Map Update, creationTime = 550 (elapsed = 1))
+2026-10-23 03:44:29.350 Df Simpl Courses[4879:5426] [com.apple.containermanager:unspecified] _container_query_get_result_at_index: success
+2026-10-23 03:44:29.351 A  Simpl Courses[4879:5426] (libsystem_containermanager.dylib) container_copy_object
+2026-10-23 03:44:29.351 Df Simpl Courses[4879:5426] [com.apple.containermanager:unspecified] container_system_group_path_for_identifier: success
+2026-10-23 03:44:29.351 Df Simpl Courses[4879:5426] [com.apple.ManagedConfiguration:MC] Got system group container path from MCM for systemgroup.com.apple.configurationprofiles: /Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Shared/SystemGroup/systemgroup.com.apple.configurationprofiles
+2026-10-23 03:44:29.566 A  Simpl Courses[4879:53f5] (TCC) TCCAccessRequest() IPC
+2026-10-23 03:44:29.566 Df Simpl Courses[4879:53f5] [com.apple.xpc:connection] [0x102a10860] activating connection: mach=true listener=false peer=false name=com.apple.tccd
+2026-10-23 03:44:29.575 Df tccd[2443:4815] [com.apple.TCC:access] AUTHREQ_ATTRIBUTION: msgID=4879.1, attribution={requesting={TCCDProcess: identifier=Simpl Courses, pid=4879, auid=501, euid=501, binary_path=/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Bundle/Application/A15ECCF4-AC9B-4916-B4CA-86BC74A9BE23/Simpl Courses.app/Simpl Courses}, },
+2026-10-23 03:44:29.600 Df Simpl Courses[4879:53f5] [com.apple.xpc:connection] [0x102a10860] invalidated after the last release of the connection object
+2026-10-23 03:44:29.602 A  Simpl Courses[4879:53f5] (TCC) TCCAccessRequest() IPC
+2026-10-23 03:44:29.603 Df Simpl Courses[4879:53f5] [com.apple.xpc:connection] [0x102c0c260] activating connection: mach=true listener=false peer=false name=com.apple.tccd
+2026-10-23 03:44:29.604 Df tccd[2443:4302] [com.apple.TCC:access] AUTHREQ_ATTRIBUTION: msgID=4879.2, attribution={requesting={TCCDProcess: identifier=Simpl Courses, pid=4879, auid=501, euid=501, binary_path=/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Bundle/Application/A15ECCF4-AC9B-4916-B4CA-86BC74A9BE23/Simpl Courses.app/Simpl Courses}, },
+2026-10-23 03:44:29.606 Df Simpl Courses[4879:53f5] [com.apple.xpc:connection] [0x102c0c260] invalidated after the last release of the connection object
+2026-10-23 03:44:29.637 Df Simpl Courses[4879:53f5] (WebKit) 0x1110b80e0 - [PID=0] WebProcessCache::updateCapacity: Cache is disabled because process swap on navigation is disabled
+2026-10-23 03:44:29.663 Df Simpl Courses[4879:53f5] (libMobileGestalt.dylib) No persisted cache on this platform.
+2026-10-23 03:44:29.712 Df Simpl Courses[4879:5422] [com.apple.xpc:connection] [0x102a05f00] activating connection: mach=true listener=false peer=false name=com.apple.webprivacyd
+2026-10-23 03:44:29.723 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Process] 0x102c04298 - PageConfiguration::delaysWebProcessLaunchUntilFirstLoad() -> false because of associated processPool value
+2026-10-23 03:44:29.723 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Process] 0x10303d008 - WebProcessPool::createWebPage: Not delaying WebProcess launch
+2026-10-23 03:44:29.725 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Process] 0x1110d00c0 - [PID=0] WebProcessProxy::constructor:
+2026-10-23 03:44:29.734 Df Simpl Courses[4879:5426] [com.apple.xpc:connection] [0x102d05af0] activating connection: mach=true listener=false peer=false name=com.apple.lsd.mapdb
+2026-10-23 03:44:29.737 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Bundle/Application/A15ECCF4-AC9B-4916-B4CA-86BC74A9BE23/Simpl Courses.app'
+2026-10-23 03:44:29.738 Df Simpl Courses[4879:5426] [com.apple.extensionkit:launch] Launching process with config: bundleID: com.apple.WebKit.WebContent instance ID: Optional([_EXExtensionInstanceIdentifier: 0938EAC6-D7BC-4CB4-9A6B-C34123C7BD6D])
+2026-10-23 03:44:29.753 Df Simpl Courses[4879:53f5] [com.apple.avkit:AVKit] +[AVPictureInPicturePlatformAdapter isPictureInPictureSupported]_block_invoke isPictureInPictureSupported NO
+2026-10-23 03:44:29.761 Df Simpl Courses[4879:53f5] (libMobileGestalt.dylib) No persisted cache on this platform.
+2026-10-23 03:44:29.762 Df Simpl Courses[4879:53f5] [com.apple.xpc:connection] [0x102d17670] activating connection: mach=true listener=false peer=false name=com.apple.IOSurface.Remote
+2026-10-23 03:44:29.764 Df Simpl Courses[4879:542b] [com.apple.UIKit:BackgroundTask] Ending background task with UIBackgroundTaskIdentifier: 1
+2026-10-23 03:44:29.764 Df Simpl Courses[4879:542b] [com.apple.UIKit:BackgroundTask] Ending task with identifier 1 and description: <_UIBackgroundTaskInfo: 0x600001708dc0>: taskID = 1, taskName = Launch Background Task for Coalescing, creationTime = 550 (elapsed = 1), _expireHandler: (null)
+2026-10-23 03:44:29.764 Df Simpl Courses[4879:542b] [com.apple.UIKit:BackgroundTask] Decrementing reference count for assertion <BKSProcessAssertion: 0x60000210a030> (used by background task with identifier 1: <_UIBackgroundTaskInfo: 0x600001708dc0>: taskID = 1, taskName = Launch Background Task for Coalescing, creationTime = 550 (elapsed = 1))
+2026-10-23 03:44:29.764 Df Simpl Courses[4879:542b] [com.apple.UIKit:BackgroundTask] Will invalidate assertion: <BKSProcessAssertion: 0x60000210a030> for task identifier: 1
+2026-10-23 03:44:29.765 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Data/Application/F71C914C-4ECD-4C06-8A6F-1E71A76778B7/Library/WebKit/com.simplcourses.app/WebsiteData/MediaKeys/v1'
+2026-10-23 03:44:29.766 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e40c0 - [PID=0, throttler=0x1110d0150] ProcessThrottler::Activity::Activity: Starting foreground activity / 'Process initialization'
+2026-10-23 03:44:29.774 Df Simpl Courses[4879:542b] [com.apple.xpc:connection] [0x102c14040] activating connection: mach=true listener=false peer=false name=com.apple.accessibility.mediaaccessibilityd
+2026-10-23 03:44:29.809 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Loading] 0x10404b218 - [pageProxyID=94, webPageID=95, PID=0] WebPageProxy::constructor, site isolation enabled 0
+2026-10-23 03:44:29.816 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Media] PlaybackSessionManagerProxy::PlaybackSessionManagerProxy(54561682)
+2026-10-23 03:44:29.818 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Fullscreen] PlaybackSessionManagerProxy::VideoPresentationManagerProxy(54561682)
+2026-10-23 03:44:29.824 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Process] 0x1110d00c0 - [PID=0] WebProcessProxy::addExistingWebPage: webPage=0x10404b218, pageProxyID=94, webPageID=95
+2026-10-23 03:44:29.826 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSwapping] 0x1110b80e0 - [PID=0] WebProcessCache::updateCapacity: Cache is disabled by client
+2026-10-23 03:44:29.827 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Data/Application/F71C914C-4ECD-4C06-8A6F-1E71A76778B7/Library/Caches/com.apple.WebKit.GPU'
+2026-10-23 03:44:29.827 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Data/Application/F71C914C-4ECD-4C06-8A6F-1E71A76778B7/tmp/com.apple.WebKit.GPU'
+2026-10-23 03:44:29.828 Df Simpl Courses[4879:53f5] (libMobileGestalt.dylib) No persisted cache on this platform.
+2026-10-23 03:44:29.828 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e4150 - [PID=0, throttler=0x11111c270] ProcessThrottler::Activity::Activity: Starting foreground activity / 'Process initialization'
+2026-10-23 03:44:29.830 Df Simpl Courses[4879:5425] [com.apple.extensionkit:launch] Launching process with config: bundleID: com.apple.WebKit.GPU instance ID: Optional([_EXExtensionInstanceIdentifier: 839EDCD1-C826-412A-A5B8-BE440C15CED4])
+2026-10-23 03:44:29.851 Df Simpl Courses[4879:53f5] [com.apple.WebKit:TextInteraction] Conforming to BrowserEngineKit text input protocol
+2026-10-23 03:44:29.877 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Process] 0x11113c100 - NetworkProcessProxy::NetworkProcessProxy
+2026-10-23 03:44:29.877 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Data/Application/F71C914C-4ECD-4C06-8A6F-1E71A76778B7/Library/WebKit/com.simplcourses.app/WebsiteData/ResourceLoadStatistics'
+2026-10-23 03:44:29.877 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Data/Application/F71C914C-4ECD-4C06-8A6F-1E71A76778B7/Library/Caches/com.simplcourses.app/WebKit/NetworkCache'
+2026-10-23 03:44:29.877 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Data/Application/F71C914C-4ECD-4C06-8A6F-1E71A76778B7/Library/Caches/com.simplcourses.app/WebKit/HSTS'
+2026-10-23 03:44:29.877 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Data/Application/F71C914C-4ECD-4C06-8A6F-1E71A76778B7/Library/WebKit/com.simplcourses.app/WebsiteData/ResourceMonitorThrottler'
+2026-10-23 03:44:29.877 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Data/Application/F71C914C-4ECD-4C06-8A6F-1E71A76778B7/Library/WebKit/com.simplcourses.app/WebsiteData/LocalStorage'
+2026-10-23 03:44:29.878 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Data/Application/F71C914C-4ECD-4C06-8A6F-1E71A76778B7/Library/WebKit/com.simplcourses.app/WebsiteData/IndexedDB'
+2026-10-23 03:44:29.878 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Data/Application/F71C914C-4ECD-4C06-8A6F-1E71A76778B7/Library/WebKit/com.simplcourses.app/WebsiteData/Default'
+2026-10-23 03:44:29.878 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Data/Application/F71C914C-4ECD-4C06-8A6F-1E71A76778B7/Library/Caches/com.simplcourses.app/WebKit/CacheStorage'
+2026-10-23 03:44:29.878 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Data/Application/F71C914C-4ECD-4C06-8A6F-1E71A76778B7/Library/Caches/com.simplcourses.app/WebKit/ServiceWorkers'
+2026-10-23 03:44:29.878 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Data/Application/F71C914C-4ECD-4C06-8A6F-1E71A76778B7/Library/Caches/com.simplcourses.app/WebKit/AlternativeServices'
+2026-10-23 03:44:29.879 Df Simpl Courses[4879:53f5] [com.apple.CFNetwork:Default] Initializing CFHTTPCookieStorage singleton
+2026-10-23 03:44:29.879 Df Simpl Courses[4879:53f5] [com.apple.CFNetwork:Default] Creating default cookie storage with process/bundle identifier
+2026-10-23 03:44:29.880 Df Simpl Courses[4879:53f5] [com.apple.network:] networkd_settings_read_from_file initialized networkd settings by reading plist directly
+2026-10-23 03:44:29.881 Df Simpl Courses[4879:53f5] [com.apple.network:] networkd_settings_read_from_file initialized networkd settings by reading plist directly
+2026-10-23 03:44:29.881 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Data/Application/F71C914C-4ECD-4C06-8A6F-1E71A76778B7/Library/Cookies'
+2026-10-23 03:44:29.881 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Data/Application/F71C914C-4ECD-4C06-8A6F-1E71A76778B7/Library/Caches/com.apple.WebKit.Networking'
+2026-10-23 03:44:29.881 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Bundle/Application/A15ECCF4-AC9B-4916-B4CA-86BC74A9BE23/Simpl Courses.app'
+2026-10-23 03:44:29.883 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e41e0 - [PID=0, throttler=0x11113c190] ProcessThrottler::Activity::Activity: Starting foreground activity / 'Process initialization'
+2026-10-23 03:44:29.883 Df Simpl Courses[4879:5420] [com.apple.extensionkit:launch] Launching process with config: bundleID: com.apple.WebKit.Networking instance ID: Optional([_EXExtensionInstanceIdentifier: 9C3D7074-BC02-4E64-96EF-0C126588098A])
+2026-10-23 03:44:29.883 E  Simpl Courses[4879:5420] [com.apple.extensionkit:default] Failed to resolve host network app id to config: bundleID: com.apple.WebKit.Networking instance ID: Optional([_EXExtensionInstanceIdentifier: 9C3D7074-BC02-4E64-96EF-0C126588098A])
+2026-10-23 03:44:30.140 Df Simpl Courses[4879:53f5] [com.apple.UIKit:_UIVisualStyleRegistry] Warning: no visual style classes have been registered at all.
+2026-10-23 03:44:30.140 Df Simpl Courses[4879:53f5] [com.apple.UIKit:_UIVisualStyleRegistry] Warning: no visual style classes have been registered at all.
+2026-10-23 03:44:30.140 Df Simpl Courses[4879:53f5] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-10-23 03:44:30.140 Df Simpl Courses[4879:53f5] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-10-23 03:44:30.140 Df Simpl Courses[4879:53f5] [PrototypeTools:domain] Not observing PTDefaults on customer install.
+2026-10-23 03:44:30.163 Df Simpl Courses[4879:5426] [com.apple.runningboard:process] Starting death monitoring for handle [xpcservice<com.apple.WebKit.WebContent([app<com.simplcourses.app((null))>:4879])>{vt hash: 71395982}[uuid:0938EAC6-D7BC-4CB4-9A6B-C34123C7BD6D]{definition:com.apple.WebKit.WebContent[extension][client]}:4900]
+2026-10-23 03:44:30.167 A  Simpl Courses[4879:53f5] (Security) SecItemCopyMatching_ios
+2026-10-23 03:44:30.168 Df Simpl Courses[4879:53f5] [com.apple.securityd:secitemratelimit] Not internal release, disabling SIRL
+2026-10-23 03:44:30.169 Df Simpl Courses[4879:53f5] [com.apple.securityd:thread-local-client-debug] SecSecurityClientGet new thread!
+2026-10-23 03:44:30.170 Df Simpl Courses[4879:53f5] [com.apple.securityd:keychain] System Keychain Always Supported set via feature flag to disabled
+2026-10-23 03:44:30.170 Df Simpl Courses[4879:53f5] [com.apple.xpc:connection] [0x102d2a830] activating connection: mach=true listener=false peer=false name=com.apple.securityd
+2026-10-23 03:44:30.172 Df securityd[2498:2fa5] [com.apple.securityd:SecError] Simpl Courses[4879]/1#-1 LF=0 copy_matching Error Domain=NSOSStatusErrorDomain Code=-34018 "Client has neither application-identifier nor keychain-access-groups entitlements" UserInfo={numberOfErrorsDeep=0, NSDescription=Client has neither application-identifier nor keychain-access-groups entitlements}
+2026-10-23 03:44:30.187 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ViewState] 0x1110c8100 - ApplicationStateTracker::setIsInBackground: 0
+2026-10-23 03:44:30.187 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ViewState] 0x1110c8100 - ApplicationStateTracker: add observers for scene
+2026-10-23 03:44:30.188 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ViewState] 0x10381c600 - WKApplicationStateTrackingView: View with page [0x10404b218, pageProxyID=94] was added to a window, _lastObservedStateWasBackground=0, isNowBackground=0
+2026-10-23 03:44:30.210 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ViewState] 0x10404b218 - [pageProxyID=94, webPageID=95, PID=0] WebPageProxy::updateActivityState: view visibility state changed 0 -> 1
+2026-10-23 03:44:30.217 Df Simpl Courses[4879:53f5] [com.apple.BackBoard:Keyboard] Activating connection to server: (null)
+2026-10-23 03:44:30.217 Df Simpl Courses[4879:53f5] [com.apple.BackBoard:Keyboard] server remote target <BSXPCServiceConnectionProxy<BKSKeyboardServiceClientToServerIPC>: 0x60000291a680>
+2026-10-23 03:44:30.218 Df Simpl Courses[4879:53f5] [com.apple.BackBoard:Keyboard] currently observing: YES
+2026-10-23 03:44:30.218 Df Simpl Courses[4879:53f5] [com.apple.BackBoard:Keyboard] connected: (
+    "<BKSHIDKeyboardDevice: 0x60000022a0a0> {\134n    senderID: 0xACEFADE00000003;\134n    transport: <nil>;\134n    language: <nil>;\134n    layout: US;\134n    countryCode: 0;\134n    standardType: 4294967295;\134n    subinterfaceID: 0;\134n    capsLockKeyHasLanguageSwitchLabel: NO;\134n    globeKeyLabelHasGlobeSymbol: NO;\134n}"
+)
+2026-10-23 03:44:30.218 Df Simpl Courses[4879:53f5] [com.apple.BackBoard:Keyboard] currently observing: NO
+2026-10-23 03:44:30.219 Df Simpl Courses[4879:53f5] [com.apple.BackBoard:Keyboard] disconnected: (
+    "<BKSHIDKeyboardDevice: 0x60000022a0a0> {\134n    senderID: 0xACEFADE00000003;\134n    transport: <nil>;\134n    language: <nil>;\134n    layout: US;\134n    countryCode: 0;\134n    standardType: 4294967295;\134n    subinterfaceID: 0;\134n    capsLockKeyHasLanguageSwitchLabel: NO;\134n    globeKeyLabelHasGlobeSymbol: NO;\134n}"
+)
+2026-10-23 03:44:30.219 Df Simpl Courses[4879:53f5] [com.apple.BackBoard:Keyboard] currently observing: YES
+2026-10-23 03:44:30.220 Df Simpl Courses[4879:53f5] [com.apple.BackBoard:Keyboard] connected: (
+    "<BKSHIDKeyboardDevice: 0x600000266b00> {\134n    senderID: 0xACEFADE00000003;\134n    transport: <nil>;\134n    language: <nil>;\134n    layout: US;\134n    countryCode: 0;\134n    standardType: 4294967295;\134n    subinterfaceID: 0;\134n    capsLockKeyHasLanguageSwitchLabel: NO;\134n    globeKeyLabelHasGlobeSymbol: NO;\134n}"
+)
+2026-10-23 03:44:30.220 Df Simpl Courses[4879:53f5] [com.apple.BackBoard:Keyboard] currently observing: NO
+2026-10-23 03:44:30.220 Df Simpl Courses[4879:53f5] [com.apple.BackBoard:Keyboard] disconnected: (
+    "<BKSHIDKeyboardDevice: 0x600000266b00> {\134n    senderID: 0xACEFADE00000003;\134n    transport: <nil>;\134n    language: <nil>;\134n    layout: US;\134n    countryCode: 0;\134n    standardType: 4294967295;\134n    subinterfaceID: 0;\134n    capsLockKeyHasLanguageSwitchLabel: NO;\134n    globeKeyLabelHasGlobeSymbol: NO;\134n}"
+)
+2026-10-23 03:44:30.226 Df Simpl Courses[4879:53f5] [com.apple.UIKit:HardwareKeyboard] -[UIApplication GSKeyboardForHWLayout:senderID:forceRebuild:createIfNeeded:], New hardware layout is created with US layout and 0 standardType.
+2026-10-23 03:44:30.228 Df Simpl Courses[4879:53f5] [com.apple.BackBoard:Keyboard] currently observing: YES
+2026-10-23 03:44:30.228 Df Simpl Courses[4879:53f5] [com.apple.BackBoard:Keyboard] connected: (
+    "<BKSHIDKeyboardDevice: 0x60000026b180> {\134n    senderID: 0xACEFADE00000003;\134n    transport: <nil>;\134n    language: <nil>;\134n    layout: US;\134n    countryCode: 0;\134n    standardType: 4294967295;\134n    subinterfaceID: 0;\134n    capsLockKeyHasLanguageSwitchLabel: NO;\134n    globeKeyLabelHasGlobeSymbol: NO;\134n}"
+)
+2026-10-23 03:44:30.229 Df Simpl Courses[4879:53f5] [com.apple.BackBoard:Keyboard] currently observing: NO
+2026-10-23 03:44:30.229 Df Simpl Courses[4879:53f5] [com.apple.BackBoard:Keyboard] disconnected: (
+    "<BKSHIDKeyboardDevice: 0x60000026b180> {\134n    senderID: 0xACEFADE00000003;\134n    transport: <nil>;\134n    language: <nil>;\134n    layout: US;\134n    countryCode: 0;\134n    standardType: 4294967295;\134n    subinterfaceID: 0;\134n    capsLockKeyHasLanguageSwitchLabel: NO;\134n    globeKeyLabelHasGlobeSymbol: NO;\134n}"
+)
+2026-10-23 03:44:30.229 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ViewState] 0x10404b218 - [pageProxyID=94, webPageID=95, PID=0] WebPageProxy::viewIsBecomingVisible:
+2026-10-23 03:44:30.242 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ScreenTime] Screen Time has updated to use the system shield for any blocked URL.
+2026-10-23 03:44:30.243 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x10404b218 - [pageProxyID=94, webPageID=95, PID=0] WebPageProxy::updateThrottleState: UIProcess is taking a foreground assertion because the view is visible
+2026-10-23 03:44:30.243 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e42a0 - [PID=0, throttler=0x1110d0150] ProcessThrottler::Activity::Activity: Starting foreground activity / 'View is visible'
+2026-10-23 03:44:30.245 Df Simpl Courses[4879:53f5] [com.apple.WebKit:RemoteLayerTree] RemoteLayerTreeDrawingAreaProxy(97)::hideContentUntilAnyUpdate
+2026-10-23 03:44:30.247 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ViewState] 0x103042800 (pageProxyID=94) -[WKWebView _endLiveResize]
+2026-10-23 03:44:30.253 Df Simpl Courses[4879:5426] [com.apple.extensionkit:launch] Created new process ExtensionProcess: bundleID: com.apple.WebKit.WebContent instance ID: Optional([_EXExtensionInstanceIdentifier: 0938EAC6-D7BC-4CB4-9A6B-C34123C7BD6D]) pid: 4900.
+2026-10-23 03:44:30.269 Df Simpl Courses[4879:5426] [com.apple.WebKit:Process] AssertionCapability::AssertionCapability: taking assertion Foreground
+2026-10-23 03:44:30.538 Df Simpl Courses[4879:53f5] [com.apple.network:activity] Create activity from XPC object <nw_activity 50:1 [212311FF-FDA8-4890-9478-18D1B058F65A] (reporting strategy default)>
+2026-10-23 03:44:30.539 Df Simpl Courses[4879:53f5] [com.apple.network:activity] Create activity from XPC object <nw_activity 50:2 [2C185293-5B77-4C6D-A9A8-FBA255AA23C3] (reporting strategy default)>
+2026-10-23 03:44:30.539 Df Simpl Courses[4879:53f5] [com.apple.network:activity] Set activity <nw_activity 50:1 [212311FF-FDA8-4890-9478-18D1B058F65A] (reporting strategy default)> as the global parent
+2026-10-23 03:44:30.541 Df Simpl Courses[4879:53f5] [com.apple.UIKit:UpdateScheduler] Target list changed: <CADisplay:LCD PurpleMain>
+2026-10-23 03:44:30.542 Df Simpl Courses[4879:53f5] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: sceneID:com.simplcourses.app-default  persistentID: 8A5B03B1-DB7A-4FA3-8C68-9D52DA725679
+2026-10-23 03:44:30.544 Df Simpl Courses[4879:53f5] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x102a05680> (8A5B03B1-DB7A-4FA3-8C68-9D52DA725679)
+2026-10-23 03:44:30.562 Df Simpl Courses[4879:53f5] [com.apple.BackgroundTasks:Framework] Handling app launch
+2026-10-23 03:44:30.567 Df Simpl Courses[4879:5426] [com.apple.xpc:connection] [0x102c0fd70] activating connection: mach=true listener=false peer=false name=com.apple.fontservicesd
+2026-10-23 03:44:30.576 Df Simpl Courses[4879:53f5] [com.apple.UIKit:EventDeferring] [0x600002910000] Scene target of event deferring environments did update: scene: 0x102a05680; current systemShellManagesKeyboardFocus: 1; systemShellManagesKeyboardFocusForScene: 1; eligibleForRecordRemoval: 1;
+2026-10-23 03:44:30.577 Df Simpl Courses[4879:53f5] [com.apple.UIKit:KeyWindow] Scene became target of keyboard event deferring environment: UIWindowScene: 0x102a05680; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.simplcourses.app-default
+2026-10-23 03:44:30.577 Df Simpl Courses[4879:53f5] [com.apple.Accessibility:AXCommon] Read Per-App on Init: Smart invert = (null)
+2026-10-23 03:44:30.591 Df Simpl Courses[4879:53f5] [com.apple.gamecontroller:Session] Creating the shared game controller session...
+2026-10-23 03:44:30.600 Df backboardd[2453:540f] [com.apple.iohid:default] Connection added: IOHIDEventSystemConnection uuid:E448ADE9-DF99-4690-9429-882AC59F478C pid:4879 process:Simpl Courses type:Monitor entitlements:0x0 caller:GameControllerFoundation: -[GCHIDEventSystemClient initWithQueue:type:attributes:functions:] + 116 attributes:(null) state:0x0 events:0 mask:0x0 dropped:0 dropStatus:0 droppedMask:0x0 lastDroppedTime:NONE
+2026-10-23 03:44:30.603 Df Simpl Courses[4879:53f5] [com.apple.BackBoard:EventDelivery] policyStatus:<BKSHIDEventDeliveryPolicyObserver: 0x600002618300; process scope; status: target> was:none
+2026-10-23 03:44:30.604 A  Simpl Courses[4879:53f5] (GameController) [GCDeviceSession] Activate
+2026-10-23 03:44:30.608 Df Simpl Courses[4879:53f5] [com.apple.FrontBoard:SceneExtension] Realizing settings extension SBUISecureRenderingSettingsExtension on FBSSceneSettings
+2026-10-23 03:44:30.612 Df Simpl Courses[4879:53f5] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x102a05680> (8A5B03B1-DB7A-4FA3-8C68-9D52DA725679)
+2026-10-23 03:44:30.615 Df Simpl Courses[4879:53f5] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x102a05680> (8A5B03B1-DB7A-4FA3-8C68-9D52DA725679)
+2026-10-23 03:44:30.619 Df Simpl Courses[4879:53f5] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: sceneID:com.simplcourses.app-default  persistentID: 8A5B03B1-DB7A-4FA3-8C68-9D52DA725679
+2026-10-23 03:44:30.620 Df Simpl Courses[4879:53f5] [com.apple.UIKit:Application] Deactivation reason removed: 12; deactivation reasons: 4128 -> 32; animating application lifecycle event: 1
+2026-10-23 03:44:30.621 Df Simpl Courses[4879:53f5] [com.apple.KeyboardArbiter:Client] Send setDeactivating: N (-DeactivationReason:SuspendedEventsOnly)
+2026-10-23 03:44:30.621 Df Simpl Courses[4879:53f5] [com.apple.UIKit:Application] Deactivation reason removed: 5; deactivation reasons: 32 -> 0; animating application lifecycle event: 0
+2026-10-23 03:44:30.622 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Fullscreen] PlaybackSessionManagerProxy::applicationDidBecomeActive(54561682)
+2026-10-23 03:44:30.623 A  Simpl Courses[4879:53f5] (GameController) Notify ApplicationDidBecomeActive
+2026-10-23 03:44:30.631 Df Simpl Courses[4879:53f5] [com.apple.xpc:connection] [0x102d0fbc0] activating connection: mach=false listener=false peer=false name=(anonymous)
+2026-10-23 03:44:30.655 A  Simpl Courses[4879:5424] (CoreFoundation) Updating Key-Value Observers Of Preferences
+2026-10-23 03:44:30.660 A  Simpl Courses[4879:5424] (CoreFoundation) Updating Key-Value Observers Of Preferences
+2026-10-23 03:44:30.664 Df Simpl Courses[4879:53f5] [com.apple.gamecontroller:Session] Connected devices changed (2 added, 0 removed) -> [2] {(
+    <GCKeyboard 0x600000280440 'Generic Keyboard'>,
+    <GCController 0x600003d041e0 'MFi'/'Gamepad'>
+)}
+2026-10-23 03:44:30.668 Df Simpl Courses[4879:53f5] [com.apple.CoreAnalytics:client] No XPC connection in Simulator
+2026-10-23 03:44:30.669 Df Simpl Courses[4879:53f5] [com.apple.gamecontroller:Session] Connected devices changed (0 added, 0 removed) -> [2] {(
+    <GCKeyboard 0x600000280440 'Generic Keyboard'>,
+    <GCController 0x600003d041e0 'MFi'/'Gamepad'>
+)}
+2026-10-23 03:44:30.670 Df Simpl Courses[4879:53f5] [com.apple.gamecontroller:Session] Connected devices changed (0 added, 0 removed) -> [2] {(
+    <GCKeyboard 0x600000280440 'Generic Keyboard'>,
+    <GCController 0x600003d041e0 'MFi'/'Gamepad'>
+)}
+2026-10-23 03:44:30.671 A  Simpl Courses[4879:53f5] (GameControllerFoundation) [HID Event System Client] Activate
+2026-10-23 03:44:30.672 Df Simpl Courses[4879:53f5] (WebKit) WebContent[4900] Installed launch log hook
+2026-10-23 03:44:30.672 Df Simpl Courses[4879:53f5] [com.apple.KeyboardArbiter:Client] startConnection
+2026-10-23 03:44:30.674 Df Simpl Courses[4879:53f5] [com.apple.xpc:connection] [0x102d0fe50] activating connection: mach=true listener=false peer=false name=com.apple.UIKit.KeyboardManagement.hosted
+2026-10-23 03:44:30.679 A  Simpl Courses[4879:5424] (CoreFoundation) Updating Key-Value Observers Of Preferences
+2026-10-23 03:44:30.684 Df Simpl Courses[4879:53f5] [com.apple.KeyboardArbiter:Client] handleKeyboardChange: set currentKeyboard:N (wasKeyboard:N)
+2026-10-23 03:44:30.698 Df Simpl Courses[4879:53f5] [com.apple.UIKit:KeyboardArbiterClientLog] isWritingToolsHandlingKeyboardTracking:Y (WT ready:Y, Arbiter ready:Y)
+2026-10-23 03:44:30.707 Df Simpl Courses[4879:5425] [com.apple.runningboard:process] Starting death monitoring for handle [xpcservice<com.apple.WebKit.GPU([app<com.simplcourses.app((null))>:4879])>{vt hash: 223737757}[uuid:839EDCD1-C826-412A-A5B8-BE440C15CED4]{definition:com.apple.WebKit.GPU[extension][client]}:4901]
+2026-10-23 03:44:30.707 A  Simpl Courses[4879:5424] (CoreFoundation) Updating Key-Value Observers Of Preferences
+2026-10-23 03:44:30.713 A  Simpl Courses[4879:5424] (CoreFoundation) Updating Key-Value Observers Of Preferences
+2026-10-23 03:44:30.730 A  Simpl Courses[4879:5424] (CoreFoundation) Updating Key-Value Observers Of Preferences
+2026-10-23 03:44:30.742 Df Simpl Courses[4879:53f5] [com.apple.network:activity] <nw_activity 50:1 [212311FF-FDA8-4890-9478-18D1B058F65A] (global parent) (reporting strategy default) complete (reason success)> complete with reason 2 (success), duration 4561ms
+2026-10-23 03:44:30.742 Df Simpl Courses[4879:53f5] [com.apple.network:activity] <nw_activity 50:2 [2C185293-5B77-4C6D-A9A8-FBA255AA23C3] (reporting strategy default) complete (reason success)> complete with reason 2 (success), duration 4561ms
+2026-10-23 03:44:30.742 Df Simpl Courses[4879:53f5] [com.apple.network:activity] Unsetting the global parent activity <nw_activity 50:1 [212311FF-FDA8-4890-9478-18D1B058F65A] (global parent) (reporting strategy default) complete (reason success)>
+2026-10-23 03:44:30.743 Df Simpl Courses[4879:53f5] [com.apple.network:activity] Unset the global parent activity
+2026-10-23 03:44:30.752 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Process] 0x1110d00c0 - [PID=4900] WebProcessProxy::didFinishLaunching:
+2026-10-23 03:44:30.752 F  Simpl Courses[4879:53f5] [com.apple.WebKit:Process] WebContent process (0x1110d00c0) took 1.024295 seconds to launch
+2026-10-23 03:44:30.752 A  Simpl Courses[4879:53f5] (libsystem_trace.dylib) Activity for state dumps
+2026-10-23 03:44:30.753 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110d0150 - [PID=4900] ProcessThrottler::didConnectToProcess
+2026-10-23 03:44:30.753 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110d0150 - [PID=4900] ProcessThrottler::setThrottleState: Updating process assertion type to 3 (foregroundActivities=2, backgroundActivities=4)
+2026-10-23 03:44:30.753 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Process] AssertionCapability::AssertionCapability: taking assertion Foreground
+2026-10-23 03:44:30.755 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x600001742780 - WKProcessAssertionBackgroundTaskManager: beginBackgroundTaskWithName
+2026-10-23 03:44:30.756 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] WKProcessAssertionBackgroundTaskManager: Took a FinishTaskInterruptable assertion for own process
+2026-10-23 03:44:30.756 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110d00c0 - [PID=4900] WebProcessProxy::didChangeThrottleState: type=2
+2026-10-23 03:44:30.756 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110d00c0 - [PID=4900] WebProcessProxy::didChangeThrottleState(Foreground) Taking foreground assertion for network process
+2026-10-23 03:44:30.756 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e4300 - [PID=0, throttler=0x11113c190] ProcessThrottler::Activity::Activity: Starting foreground activity / 'Networking for foreground view(s)'
+2026-10-23 03:44:30.756 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e4330 - [PID=0, throttler=0x11111c270] ProcessThrottler::Activity::Activity: Starting foreground activity / 'GPU for foreground view(s)'
+2026-10-23 03:44:30.756 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Process] 0x11113c100 - NetworkProcessProxy::sendXPCEndpointToProcess(0x1110d00c0) state = 1 has connection = 1 XPC endpoint message = 0x0
+2026-10-23 03:44:30.758 Sd Simpl Courses[4879:0] (79E72B83-2384-3A91-8EE7-4315E85E9A91) IOHIDManager State
+{
+    DispatchQueue = 0;
+    RunLoop = 1;
+    createOptions = 0;
+    isOpen = 0;
+    openOptions = 0;
+}
+2026-10-23 03:44:30.759 Sd Simpl Courses[4879:0] (71A4AB2B-6C63-3811-A45D-80D677A41A21) UAUserActivity
+UAUserActivityManager supportsActivityContinuation=YES isEnabled=YES serverPid=0 PROJECT:UserActivity-551
+2026-10-23 03:44:30.759 Sd Simpl Courses[4879:0] (71A4AB2B-6C63-3811-A45D-80D677A41A21) UAUserActivity
+[6500AB3A-024B-4B43-B361-D191CACCE5D0 userInfo.count=1 dirty 
+2026-10-23 03:44:30.759 Df Simpl Courses[4879:5429] [com.apple.WebKit:ProcessSuspension] 0x1111580c0 - ProcessAssertion::acquireSync Trying to take RBS assertion 'WebProcess Foreground Assertion' for process with PID=4900
+2026-10-23 03:44:30.812 Df Simpl Courses[4879:5429] [com.apple.WebKit:ProcessSuspension] 0x1111580c0 - ProcessAssertion() Successfully granted capability
+2026-10-23 03:44:30.814 Df Simpl Courses[4879:5425] [com.apple.extensionkit:launch] Created new process ExtensionProcess: bundleID: com.apple.WebKit.GPU instance ID: Optional([_EXExtensionInstanceIdentifier: 839EDCD1-C826-412A-A5B8-BE440C15CED4]) pid: 4901.
+2026-10-23 03:44:30.814 Df Simpl Courses[4879:5425] [com.apple.WebKit:Process] AssertionCapability::AssertionCapability: taking assertion Foreground
+2026-10-23 03:44:30.815 A  Simpl Courses[4879:5424] (CoreFoundation) Updating Key-Value Observers Of Preferences
+2026-10-23 03:44:30.820 Df Simpl Courses[4879:53f5] [com.apple.xpc:connection] [0x102c19e50] activating connection: mach=false listener=false peer=false name=(anonymous)
+2026-10-23 03:44:30.827 A  Simpl Courses[4879:5424] (CoreFoundation) Updating Key-Value Observers Of Preferences
+2026-10-23 03:44:30.831 A  Simpl Courses[4879:5424] (CoreFoundation) Updating Key-Value Observers Of Preferences
+2026-10-23 03:44:30.865 A  Simpl Courses[4879:5424] (CoreFoundation) Updating Key-Value Observers Of Preferences
+2026-10-23 03:44:30.999 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Process] WebContent[4900] getNetworkProcessConnection: Request connection for core identifier 3
+2026-10-23 03:44:30.999 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e40c0 - [PID=4900, throttler=0x1110d0150] ProcessThrottler::Activity::invalidate: Ending foreground activity / 'Process initialization'
+2026-10-23 03:44:30.999 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x11113c100 - NetworkProcessProxy::getNetworkProcessConnection: Taking a background assertion because web process pid 4900 (core identifier 3) is requesting a connection
+2026-10-23 03:44:31.013 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Process] 0x11111c1e0 - GPUProcessProxy::didFinishLaunching:
+2026-10-23 03:44:31.013 F  Simpl Courses[4879:53f5] [com.apple.WebKit:Process] GPU process (0x11111c1e0) took 1.186214 seconds to launch
+2026-10-23 03:44:31.013 A  Simpl Courses[4879:53f5] (libsystem_trace.dylib) Activity for state dumps
+2026-10-23 03:44:31.013 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Process] 0x11111c1e0 - GPUProcessProxy::connectionWillOpen:
+2026-10-23 03:44:31.013 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x11111c270 - [PID=4901] ProcessThrottler::didConnectToProcess
+2026-10-23 03:44:31.014 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x11111c270 - [PID=4901] ProcessThrottler::setThrottleState: Updating process assertion type to 3 (foregroundActivities=2, backgroundActivities=1)
+2026-10-23 03:44:31.014 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Process] AssertionCapability::AssertionCapability: taking assertion Foreground
+2026-10-23 03:44:31.014 Df Simpl Courses[4879:545d] [com.apple.WebKit:ProcessSuspension] 0x111158180 - ProcessAssertion::acquireSync Trying to take RBS assertion 'GPUProcess Foreground Assertion' for process with PID=4901
+2026-10-23 03:44:31.014 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Process] 0x11113c100 - NetworkProcessProxy::sendXPCEndpointToProcess(0x11111c1e0) state = 1 has connection = 1 XPC endpoint message = 0x0
+2026-10-23 03:44:31.016 Sd Simpl Courses[4879:0] (79E72B83-2384-3A91-8EE7-4315E85E9A91) IOHIDManager State
+{
+    DispatchQueue = 0;
+    RunLoop = 1;
+    createOptions = 0;
+    isOpen = 0;
+    openOptions = 0;
+}
+2026-10-23 03:44:31.017 Sd Simpl Courses[4879:0] (71A4AB2B-6C63-3811-A45D-80D677A41A21) UAUserActivity
+UAUserActivityManager supportsActivityContinuation=YES isEnabled=YES serverPid=0 PROJECT:UserActivity-551
+2026-10-23 03:44:31.017 Sd Simpl Courses[4879:0] (71A4AB2B-6C63-3811-A45D-80D677A41A21) UAUserActivity
+[6500AB3A-024B-4B43-B361-D191CACCE5D0 userInfo.count=1 dirty 
+2026-10-23 03:44:31.018 A  Simpl Courses[4879:542b] (CoreServicesInternal) CFURLCreateBookmarkData
+2026-10-23 03:44:31.019 Df Simpl Courses[4879:545d] [com.apple.WebKit:ProcessSuspension] 0x111158180 - ProcessAssertion() Successfully granted capability
+2026-10-23 03:44:31.124 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e4150 - [PID=4901, throttler=0x11111c270] ProcessThrottler::Activity::invalidate: Ending foreground activity / 'Process initialization'
+2026-10-23 03:44:31.308 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Loading] 0x10404b218 - [pageProxyID=94, webPageID=95, PID=4900] WebPageProxy::loadRequest:
+2026-10-23 03:44:31.309 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Loading] 0x10404b218 - [pageProxyID=94, webPageID=95, PID=4900] WebPageProxy::loadRequestWithNavigationShared:
+2026-10-23 03:44:31.312 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x111130100 - NavigationState is taking a process network assertion because a page load started
+2026-10-23 03:44:31.312 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e40c0 - [PID=4900, throttler=0x1110d0150] ProcessThrottler::Activity::Activity: Starting background activity / 'Page Load'
+2026-10-23 03:44:31.315 Df Simpl Courses[4879:5420] [com.apple.runningboard:process] Starting death monitoring for handle [xpcservice<com.apple.WebKit.Networking([app<com.simplcourses.app((null))>:4879])>{vt hash: 114736818}[uuid:9C3D7074-BC02-4E64-96EF-0C126588098A]{definition:com.apple.WebKit.Networking[extension][client]}:4904]
+2026-10-23 03:44:31.330 Df Simpl Courses[4879:5420] [com.apple.extensionkit:launch] Created new process ExtensionProcess: bundleID: com.apple.WebKit.Networking instance ID: Optional([_EXExtensionInstanceIdentifier: 9C3D7074-BC02-4E64-96EF-0C126588098A]) pid: 4904.
+2026-10-23 03:44:31.330 Df Simpl Courses[4879:5424] [com.apple.WebKit:Process] AssertionCapability::AssertionCapability: taking assertion Foreground
+2026-10-23 03:44:31.332 Df Simpl Courses[4879:53f5] [com.apple.xpc:connection] [0x102d182f0] activating connection: mach=false listener=false peer=false name=(anonymous)
+2026-10-23 03:44:31.735 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Process] 0x11113c100 - NetworkProcessProxy::didFinishLaunching
+2026-10-23 03:44:31.735 F  Simpl Courses[4879:53f5] [com.apple.WebKit:Process] Networking process (0x11113c100) took 1.857615 seconds to launch
+2026-10-23 03:44:31.735 A  Simpl Courses[4879:53f5] (libsystem_trace.dylib) Activity for state dumps
+2026-10-23 03:44:31.735 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x11113c190 - [PID=4904] ProcessThrottler::didConnectToProcess
+2026-10-23 03:44:31.735 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x11113c190 - [PID=4904] ProcessThrottler::setThrottleState: Updating process assertion type to 3 (foregroundActivities=2, backgroundActivities=2)
+2026-10-23 03:44:31.736 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Process] AssertionCapability::AssertionCapability: taking assertion Foreground
+2026-10-23 03:44:31.736 Df Simpl Courses[4879:5426] [com.apple.WebKit:ProcessSuspension] 0x111158240 - ProcessAssertion::acquireSync Trying to take RBS assertion 'NetworkProcess Foreground Assertion' for process with PID=4904
+2026-10-23 03:44:31.740 Df Simpl Courses[4879:5426] [com.apple.WebKit:ProcessSuspension] 0x111158240 - ProcessAssertion() Successfully granted capability
+2026-10-23 03:44:31.745 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Process] 0x11113c100 - NetworkProcessProxy::sendXPCEndpointToProcess(0x1110d00c0) state = 1 has connection = 1 XPC endpoint message = 0x600003e1d600
+2026-10-23 03:44:31.745 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Process] 0x11113c100 - NetworkProcessProxy::sendXPCEndpointToProcess(0x11111c1e0) state = 1 has connection = 1 XPC endpoint message = 0x600003e1d600
+2026-10-23 03:44:31.746 Df Simpl Courses[4879:53f5] [com.apple.xpc:connection] WebContent[4900] [0x103604080] activating connection: mach=false listener=false peer=false name=(anonymous)
+2026-10-23 03:44:31.822 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e41e0 - [PID=4904, throttler=0x11113c190] ProcessThrottler::Activity::invalidate: Ending foreground activity / 'Process initialization'
+2026-10-23 03:44:31.866 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Loading] WebContent[4900] Received Launch Services database
+2026-10-23 03:44:31.866 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Process] WebContent[4900] 0x10e060150 - [sessionID=1] WebProcess::initializeLogForwarding: Debug logging enabled: 0
+2026-10-23 03:44:31.873 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Process] WebContent[4900] WebProcess::platformInitializeWebProcess
+2026-10-23 03:44:31.911 Df Simpl Courses[4879:53f5] [com.apple.xpc:connection] WebContent[4900] [0x103605f50] activating connection: mach=false listener=true peer=false name=(anonymous)
+2026-10-23 03:44:31.950 Df Simpl Courses[4879:53f5] [com.apple.xpc:connection] WebContent[4900] [0x103605f50] Connection returned listener port: 0x2e03
+2026-10-23 03:44:31.950 Df Simpl Courses[4879:53f5] [com.apple.xpc:connection] WebContent[4900] [0x103606090] activating connection: mach=false listener=false peer=false name=(anonymous)
+2026-10-23 03:44:31.950 Df Simpl Courses[4879:53f5] [com.apple.xpc:connection] WebContent[4900] [0x1036061d0] activating connection: mach=false listener=false peer=true name=com.apple.xpc.anonymous.0x103605f50.peer[4900].0x1036061d0
+2026-10-23 03:44:32.229 Df Simpl Courses[4879:53f5] [com.apple.Accessibility:AXSupportCommon] WebContent[4900] Application accessibility enabled: 0, (
+	0   libAccessibility.dylib              0x000000019215585c _AXSApplicationAccessibilitySetEnabled + 76
+	1   WebKit                              0x000000018e01aa24 _ZN6WebKit10WebProcess28platformInitializeWebProcessERNS_28WebProcessCreationParametersE + 2096
+	2   WebKit                              0x000000018e1fcc94 _ZN6WebKit10WebProcess20initializeWebProcessEONS_28WebProcessCreationParametersEON3WTF17CompletionHandlerIFvN7WebCore15ProcessIdentityEEEE + 188
+	3   WebKit                              0x000000018db9b684 _ZN3IPC18handleMessageAsyncIN8Messages10WebProcess20InitializeWebProcessENS_10ConnectionEN6WebKit10WebProcessES6_FvONS5_28WebProcessCreationParametersEON3WTF17CompletionHandlerIFvN7WebCore15ProcessIdentityEEEEEEEvRT0_RNS_7DecoderEPT1_MT2_T3_ + 224
+	4   WebKit                              0x000000018e5c03cc _ZN3IPC10Connection15dispatchMessageEN3WTF9UniqueRefINS_7DecoderEEE + 556
+	5   WebKit                              0x000000018e5db49c _Z<…>
+2026-10-23 03:44:32.229 Df Simpl Courses[4879:53f5] [com.apple.Accessibility:AXSupportCommon] WebContent[4900] Stored App AX setting: 0
+2026-10-23 03:44:32.233 Df Simpl Courses[4879:53f5] [com.apple.Accessibility:AXSupportCommon] WebContent[4900] AXS AccessibilityEnabled: (app ax: 0), ax settings: 0, cached: 0
+2026-10-23 03:44:32.377 Df Simpl Courses[4879:5425] [com.apple.xpc:connection] [0x102d0fbc0] Re-initialization successful; calling out to event handler with XPC_ERROR_CONNECTION_INTERRUPTED
+2026-10-23 03:44:33.031 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Loading] 0x10404b218 - [pageProxyID=94, webPageID=95, PID=4900] WebPageProxy::decidePolicyForNavigationAction: frameID=8589934593, isMainFrame=1, navigationID=100
+2026-10-23 03:44:33.040 A  Simpl Courses[4879:5426] (CoreFoundation) Loading Preferences From User Session CFPrefsD
+2026-10-23 03:44:33.041 Df Simpl Courses[4879:5426] [com.apple.xpc:connection] [0x102d0b460] activating connection: mach=true listener=false peer=false name=com.apple.Safari.SafeBrowsing.Service
+2026-10-23 03:44:33.043 Df Simpl Courses[4879:54a6] [com.apple.WebKit:RemoteLayerBuffers] WebContent[4900]: [renderingBackend=11] Created rendering backend for pageProxyID=94, webPageID=95
+2026-10-23 03:44:33.044 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Process] WebContent[4900] GPUProcessConnection::create - 0x10e0ca4c0
+2026-10-23 03:44:33.048 Df Simpl Courses[4879:53f5] [com.apple.WebKit:AppSSO] 0x1110400e0 - SOAuthorizationCoordinator::tryAuthorize
+2026-10-23 03:44:33.092 A  Simpl Courses[4879:53f5] (AppSSO) canPerformAuthorizationWithURL
+2026-10-23 03:44:33.097 A  Simpl Courses[4879:53f5] (AppSSOCore) canPerformAuthorizationWithURL
+2026-10-23 03:44:33.140 Df Simpl Courses[4879:53f5] [com.apple.authkit:nto] Fetching native takeover URLs
+2026-10-23 03:44:33.176 Df Simpl Courses[4879:53f5] [com.apple.xpc:connection] [0x102a0b5e0] activating connection: mach=true listener=false peer=false name=com.apple.ak.authorizationservices.xpc
+2026-10-23 03:44:33.177 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Data/Application/F71C914C-4ECD-4C06-8A6F-1E71A76778B7/tmp/com.simplcourses.app/WebKit/MediaCache'
+2026-10-23 03:44:33.178 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/B34C2F57-B98B-4C84-96E2-3170887BA2DB/data/Containers/Data/Application/F71C914C-4ECD-4C06-8A6F-1E71A76778B7/Library/WebKit/com.simplcourses.app/WebsiteData/MediaKeys/v1'
+2026-10-23 03:44:33.178 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x11111c1e0 - GPUProcessProxy is taking a background assertion because a web process is requesting a connection
+2026-10-23 03:44:33.226 Df akd[2593:3326] [com.apple.authkit:siwa] Daemon service initialized with client: Simpl Courses (4879)
+2026-10-23 03:44:33.242 Df Simpl Courses[4879:5426] [com.apple.authkit:nto] URL shouldn't be processed
+2026-10-23 03:44:33.242 Df Simpl Courses[4879:5426] [com.apple.AppSSO:SOConfigurationClient] -[SOConfigurationClient init]  on <SOConfigurationClient: 0x60000022ad60>
+2026-10-23 03:44:33.244 Df Simpl Courses[4879:5426] [com.apple.xpc:connection] [0x102d0d6e0] activating connection: mach=true listener=false peer=false name=com.apple.AppSSO.service-xpc
+2026-10-23 03:44:33.244 Df Simpl Courses[4879:5426] [com.apple.AppSSO:SOServiceConnection] <SOServiceConnection: 0x60000022b8e0>: new XPC connection
+2026-10-23 03:44:33.245 Df Simpl Courses[4879:545d] [com.apple.AppSSO:SOConfigurationClient] -[SOConfigurationClient _reloadConfig]  on <SOConfigurationClient: 0x60000022ad60>
+2026-10-23 03:44:33.245 Df Simpl Courses[4879:545d] [com.apple.AppSSO:SOClient] -[SOClient configurationWithCompletion:]  on <SOClient: 0x60000000b650>
+2026-10-23 03:44:33.462 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Process] 0x11111c1e0 - GPUProcessProxy::didCreateContextForVisibilityPropagation: webPageProxyID: 94, pagePID: 95, contextID: 3
+2026-10-23 03:44:33.464 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Process] Created visibility propagation interaction <_UIVisibilityPropagationInteraction: 0x600002602f40> for process with PID=4901
+2026-10-23 03:44:33.476 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Process] WebContent[4900] 0x10e0ca4c0 - GPUProcessConnection::didInitialize
+2026-10-23 03:44:33.481 Df Simpl Courses[4879:54a6] [com.apple.Accessibility:AXCommon] WebContent[4900] Read Per-App on Init: Smart invert = (null)
+2026-10-23 03:44:34.416 Df Simpl Courses[4879:53f5] [com.apple.WebKit:RemoteLayerTree] RemoteLayerTreeDrawingAreaProxy(97) Unhiding layer tree
+2026-10-23 03:44:34.802 Df Simpl Courses[4879:545d] [com.apple.AppSSO:SOClient] configurationWithCompletion: success = YES, error = (null)
+2026-10-23 03:44:34.805 Df Simpl Courses[4879:53f5] [com.apple.WebKit:AppSSO] SOAuthorizationCoordinator::tryAuthorize: The requested URL is not registered for AppSSO handling. No further action needed.
+2026-10-23 03:44:35.307 E  Simpl Courses[4879:53f5] [com.apple.WebKit:ResourceLoadStatistics] Failed to request storage access quirks from WebPrivacy.
+2026-10-23 03:44:35.307 E  Simpl Courses[4879:53f5] [com.apple.WebKit:ResourceLoadStatistics] Failed to request storage access user agent string quirks from WebPrivacy.
+2026-10-23 03:44:35.307 E  Simpl Courses[4879:53f5] [com.apple.WebKit:ResourceLoadStatistics] Failed to request known fingerprinting scripts from WebPrivacy: Error Domain=WebPrivacyErrorDomain Code=1001 "List data not found" UserInfo={NSLocalizedDescription=List data not found}
+2026-10-23 03:44:35.307 E  Simpl Courses[4879:53f5] [com.apple.WebKit:ResourceLoadStatistics] Failed to request query parameters from WebPrivacy.
+2026-10-23 03:44:35.307 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Loading] 0x10404b218 - [pageProxyID=94, webPageID=95, PID=4900] WebPageProxy::decidePolicyForNavigationAction: listener called: frameID=8589934593, isMainFrame=1, navigationID=100, policyAction=Use, isAppBoundDomain=0, wasNavigationIntercepted=0
+2026-10-23 03:44:35.308 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Loading] 0x10404b218 - [pageProxyID=94, webPageID=95, PID=4900] WebPageProxy::receivedNavigationActionPolicyDecision: frameID=8589934593, isMainFrame=1, navigationID=100, policyAction=Use
+2026-10-23 03:44:35.311 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSwapping] 0x10404b218 - [pageProxyID=94, webPageID=95, PID=4900] WebPageProxy::decidePolicyForNavigationAction: keep using process 4900 for navigation, reason=Process has not yet committed any provisional loads
+2026-10-23 03:44:35.312 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Process] 0x1110d00c0 - [PID=4900] WebProcessProxy::canTerminateAuxiliaryProcess: returns false (pageCount=1, provisionalPageCount=0, suspendedPageCount=0, m_isInProcessCache=0, m_shutdownPreventingScopeCounter=0)
+2026-10-23 03:44:35.314 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webFrameID=8589934593, webPageID=95] WebFrameLoaderClient::dispatchDecidePolicyForNavigationAction: Got policyAction Use from async IPC
+2026-10-23 03:44:35.317 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Loading] WebContent[4900] 0x10e080380 - [pageID=95, frameID=8589934593] PolicyChecker::checkNavigationPolicy: continuing because this policyAction from dispatchDecidePolicyForNavigationAction is Use
+2026-10-23 03:44:35.318 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95 frameID=8589934593 isMainFrame=1] FrameLoader::stopAllLoaders: m_provisionalDocumentLoader=0, m_documentLoader=4547440640
+2026-10-23 03:44:35.319 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=95, frameID=8589934593, isMainFrame=1] DocumentLoader::stopLoading
+2026-10-23 03:44:35.319 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95 frameID=8589934593 isMainFrame=1] FrameLoader::setProvisionalDocumentLoader: Setting provisional document loader to 4547444736 (was 0)
+2026-10-23 03:44:35.319 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95 frameID=8589934593 isMainFrame=1] FrameLoader::continueLoadAfterNavigationPolicy: Setting provisional document loader (m_provisionalDocumentLoader=4547444736)
+2026-10-23 03:44:35.319 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ProcessSuspension] WebContent[4900]: [webPageID=95] WebPage::freezeLayerTree: Adding a reason to freeze layer tree (reason=1, new=1, old=0)
+2026-10-23 03:44:35.319 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95 frameID=8589934593 isMainFrame=1] FrameLoader::setPolicyDocumentLoader: Setting policy document loader to 0 (was 4547444736)
+2026-10-23 03:44:35.319 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95 frameID=8589934593 isMainFrame=1] FrameLoader::prepareForLoadStart: Starting frame load
+2026-10-23 03:44:35.319 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: ProgressTracker::progressStarted: frameID 8589934593, value 0.100000, tracked frames 1, originating frameID 8589934593, isMainLoad 1
+2026-10-23 03:44:35.321 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=95, frameID=8589934593, isMainFrame=1] DocumentLoader::startLoadingMainResource: Starting load
+2026-10-23 03:44:35.323 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Loading] 0x10404b218 - [pageProxyID=94, webPageID=95, PID=4900] WebPageProxy::didStartProvisionalLoadForFrame: frameID=8589934593, isMainFrame=1
+2026-10-23 03:44:35.323 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Loading] 0x1110d00c0 - [PID=4900] WebProcessProxy::didStartProvisionalLoadForMainFrame:
+2026-10-23 03:44:35.326 E  Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoadStatistics] WebContent[4900] Unable to filter tracking query parameters (missing data)
+2026-10-23 03:44:35.331 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=18] ResourceLoader::willSendRequestInternal: calling completion handler
+2026-10-23 03:44:35.331 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=18 SubResourceLoader::willSendRequestInternal: resource load finished; calling completion handler
+2026-10-23 03:44:35.331 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: URL will be scheduled with the NetworkProcess
+2026-10-23 03:44:35.335 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: Resource is being scheduled with the NetworkProcess (priority=4, existingNetworkResourceLoadIdentifierToResume=0)
+2026-10-23 03:44:35.335 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=18] WebResourceLoader::WebResourceLoader
+2026-10-23 03:44:36.321 Df Simpl Courses[4879:5426] [com.apple.Safari.SafeBrowsing:Database] Service did finish database update with protection type 1 and provider 1
+2026-10-23 03:44:36.326 Df Simpl Courses[4879:5426] [com.apple.Safari.SafeBrowsing:Database] Service did finish database update with protection type 1 and provider 1
+2026-10-23 03:44:36.842 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ResourceLoadStatistics] StorageAccessPromptQuirkController::didUpdateCachedListData: Loaded 1 storage access prompt(s) quirks from WebPrivacy.
+2026-10-23 03:44:36.928 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=18] WebResourceLoader::didReceiveResponse: (httpStatusCode=200)
+2026-10-23 03:44:36.969 A  Simpl Courses[4879:53f5] (libsystem_containermanager.dylib) container_system_group_path_for_identifier
+2026-10-23 03:44:36.969 Df Simpl Courses[4879:53f5] [com.apple.containermanager:xpc] Requesting container lookup; class = 13, identifier = com.apple.nsurlsessiond, group_identifier = systemgroup.com.apple.nsurlstoragedresources, create = 1, temp = 0, euid = 501, uid = 501
+2026-10-23 03:44:36.969 A  Simpl Courses[4879:53f5] (libsystem_containermanager.dylib) container_query_t
+2026-10-23 03:44:36.969 Df Simpl Courses[4879:53f5] [com.apple.containermanager:xpc] Query; euid = 501, uid = 501, class = 13, identifier = [com.apple.nsurlsessiond](1), flags = 900000003
+2026-10-23 03:44:36.971 Df Simpl Courses[4879:53f5] [com.apple.containermanager:unspecified] _container_query_get_result_at_index: success
+2026-10-23 03:44:36.971 A  Simpl Courses[4879:53f5] (libsystem_containermanager.dylib) container_copy_object
+2026-10-23 03:44:36.972 Df Simpl Courses[4879:53f5] [com.apple.containermanager:unspecified] container_system_group_path_for_identifier: success
+2026-10-23 03:44:38.093 A  Simpl Courses[4879:53f5] (Security) SecItemDelete_ios
+2026-10-23 03:44:38.099 Df securityd[2498:3de3] [com.apple.securityd:SecError] Simpl Courses[4879]/1#-1 LF=0 delete Error Domain=NSOSStatusErrorDomain Code=-34018 "Client has neither application-identifier nor keychain-access-groups entitlements" UserInfo={numberOfErrorsDeep=0, NSDescription=Client has neither application-identifier nor keychain-access-groups entitlements}
+2026-10-23 03:44:38.100 A  Simpl Courses[4879:53f5] (Security) SecItemAdd_ios
+2026-10-23 03:44:38.100 Df securityd[2498:3de3] [com.apple.securityd:SecError] Simpl Courses[4879]/1#-1 LF=0 add Error Domain=NSOSStatusErrorDomain Code=-34018 "Client has neither application-identifier nor keychain-access-groups entitlements" UserInfo={numberOfErrorsDeep=0, NSDescription=Client has neither application-identifier nor keychain-access-groups entitlements}
+2026-10-23 03:44:45.619 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=18] WebResourceLoader::didReceiveData: Started receiving data
+2026-10-23 03:44:45.621 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95 frameID=8589934593 isMainFrame=1] FrameLoader::setDocumentLoader: Setting document loader to 4547444736 (was 4547440640)
+2026-10-23 03:44:45.621 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=95, frameID=8589934593, isMainFrame=1] DocumentLoader::detachFromFrame
+2026-10-23 03:44:45.621 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=95, frameID=8589934593, isMainFrame=1] DocumentLoader::stopLoading
+2026-10-23 03:44:45.621 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95 frameID=8589934593 isMainFrame=1] FrameLoader::transitionToCommitted: Clearing provisional document loader (m_provisionalDocumentLoader=4547444736)
+2026-10-23 03:44:45.621 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95 frameID=8589934593 isMainFrame=1] FrameLoader::setProvisionalDocumentLoader: Setting provisional document loader to 0 (was 4547444736)
+2026-10-23 03:44:45.623 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Loading] 0x10404b218 - [pageProxyID=94, webPageID=95, PID=4900] WebPageProxy::didNavigateWithNavigationDataShared:
+2026-10-23 03:44:45.628 E  Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoadStatistics] WebContent[4900] Unable to hide query parameters from script (missing data)
+2026-10-23 03:44:45.629 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ProcessSuspension] WebContent[4900]: [webPageID=95] WebPage::unfreezeLayerTree: Removing a reason to freeze layer tree (reason=128, new=1, old=1)
+2026-10-23 03:44:45.629 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ProcessSuspension] WebContent[4900]: [webPageID=95] WebPage::unfreezeLayerTree: Removing a reason to freeze layer tree (reason=128, new=1, old=1)
+2026-10-23 03:44:45.637 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Loading] 0x10404b218 - [pageProxyID=94, webPageID=95, PID=4900] WebPageProxy::didCommitLoadForFrame: frameID=8589934593, isMainFrame=1
+2026-10-23 03:44:45.637 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ProcessSuspension] WebContent[4900]: [webPageID=95] WebPage::unfreezeLayerTree: Removing a reason to freeze layer tree (reason=32, new=1, old=1)
+2026-10-23 03:44:45.646 E  Simpl Courses[4879:53f5] [com.apple.WebKit:ResourceLoadStatistics] Failed to request allowed query parameters from WebPrivacy.
+2026-10-23 03:44:46.039 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=31] ResourceLoader::willSendRequestInternal: calling completion handler
+2026-10-23 03:44:46.039 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=31 SubResourceLoader::willSendRequestInternal: resource load finished; calling completion handler
+2026-10-23 03:44:46.039 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: URL will be scheduled with the NetworkProcess
+2026-10-23 03:44:46.039 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: Resource is being scheduled with the NetworkProcess (priority=1, existingNetworkResourceLoadIdentifierToResume=0)
+2026-10-23 03:44:46.039 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=31] WebResourceLoader::WebResourceLoader
+2026-10-23 03:44:46.039 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=18] WebResourceLoader::didFinishResourceLoad: (length=6415)
+2026-10-23 03:44:46.040 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=18 SubResourceLoader::didFinishLoading
+2026-10-23 03:44:46.046 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ProcessSuspension] WebContent[4900]: [webPageID=95] WebPage::unfreezeLayerTree: Removing a reason to freeze layer tree (reason=1, new=0, old=1)
+2026-10-23 03:44:46.047 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Layout] WebContent[4900]: [pageID=95, frameID=8589934593, isMainFrame=1] LocalFrameView::fireLayoutRelatedMilestonesIfNeeded: Firing first visually non-empty layout milestone on the main frame
+2026-10-23 03:44:46.047 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Layout] WebContent[4900]: [webFrameID=8589934593, webPageID=95] WebLocalFrameLoaderClient::dispatchDidReachLayoutMilestone: dispatching DidReachLayoutMilestone (milestones=DidFirstVisuallyNonEmptyLayout)
+2026-10-23 03:44:46.047 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Layout] WebContent[4900]: [webFrameID=8589934593, webPageID=95] WebLocalFrameLoaderClient::dispatchDidReachLayoutMilestone: dispatching DidFirstVisuallyNonEmptyLayoutForFrame
+2026-10-23 03:44:46.047 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Layout] WebContent[4900]: [webFrameID=8589934593, webPageID=95] WebLocalFrameLoaderClient::completePageTransitionIfNeeded: dispatching didCompletePageTransition
+2026-10-23 03:44:46.302 Df Simpl Courses[4879:53f5] [com.apple.runningboard:connection] Creating side-channel connection to com.apple.runningboard
+2026-10-23 03:44:46.302 Df Simpl Courses[4879:53f5] [com.apple.xpc:connection] [0x102d17200] activating connection: mach=true listener=false peer=false name=com.apple.runningboard
+2026-10-23 03:44:46.304 Df Simpl Courses[4879:53f5] [com.apple.runningboard:process] Hit the server for a process handle 9b1e8f30000130f that resolved to: [app<com.simplcourses.app((null))>:4879]
+2026-10-23 03:44:46.305 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e40f0 - [PID=4900, throttler=0x1110d0150] ProcessThrottler::Activity::Activity: Starting foreground activity / 'WebPageProxy::runJavaScriptInFrameInScriptWorld'
+2026-10-23 03:44:46.868 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e4180 - [PID=4900, throttler=0x1110d0150] ProcessThrottler::Activity::Activity: Starting foreground activity / 'WebPageProxy::runJavaScriptInFrameInScriptWorld'
+2026-10-23 03:44:47.105 Df Simpl Courses[4879:53f5] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-10-23 03:44:47.105 Df Simpl Courses[4879:53f5] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-10-23 03:44:47.551 Df Simpl Courses[4879:53f5] [com.apple.runningboard:process] Hit the server for a process handle 9b1e8f30000130f that resolved to: [app<com.simplcourses.app((null))>:4879]
+2026-10-23 03:44:47.736 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ViewState] 0x103042800 (pageProxyID=94) -[WKWebView _updateVisibleContentRects:] - scroll view state is non-stable, bailing (shouldDeferGeometryUpdates 0, dynamicViewportUpdateMode 0, resetViewStateAfterTransactionID 3, sizeChangedSinceLastVisibleContentRectUpdate 0, [_scrollView isZoomBouncing] 0, currentlyAdjustingScrollViewInsetsForKeyboard 0)
+2026-10-23 03:44:47.842 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Layout] WebContent[4900]: [webFrameID=8589934593, webPageID=95] WebLocalFrameLoaderClient::dispatchDidReachLayoutMilestone: dispatching DidFirstLayoutForFrame
+2026-10-23 03:44:47.842 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Layout] WebContent[4900]: [webFrameID=8589934593, webPageID=95] WebLocalFrameLoaderClient::dispatchDidReachLayoutMilestone: dispatching DidReachLayoutMilestone (milestones=DidFirstLayout)
+2026-10-23 03:44:47.856 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Layout] WebContent[4900]: [webFrameID=8589934593, webPageID=95] WebLocalFrameLoaderClient::dispatchDidReachLayoutMilestone: dispatching DidReachLayoutMilestone (milestones=DidFirstMeaningfulPaint)
+2026-10-23 03:44:47.859 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=31] WebResourceLoader::didReceiveResponse: (httpStatusCode=200)
+2026-10-23 03:44:47.859 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=31] WebResourceLoader::didReceiveData: Started receiving data
+2026-10-23 03:44:47.867 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=31] WebResourceLoader::didFinishResourceLoad: (length=239)
+2026-10-23 03:44:47.867 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=31 SubResourceLoader::didFinishLoading
+2026-10-23 03:44:47.876 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=0 frameID=12884901889 isMainFrame=1] FrameLoader::setPolicyDocumentLoader: Setting policy document loader to 4549787648 (was 0)
+2026-10-23 03:44:47.876 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=0, frameID=12884901889, isMainFrame=1] DocumentLoader::attachToFrame
+2026-10-23 03:44:47.876 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=0 frameID=12884901889 isMainFrame=1] FrameLoader::setProvisionalDocumentLoader: Setting provisional document loader to 4549787648 (was 0)
+2026-10-23 03:44:47.877 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=0 frameID=12884901889 isMainFrame=1] FrameLoader::setDocumentLoader: Setting document loader to 4549787648 (was 0)
+2026-10-23 03:44:47.877 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=0 frameID=12884901889 isMainFrame=1] FrameLoader::transitionToCommitted: Clearing provisional document loader (m_provisionalDocumentLoader=4549787648)
+2026-10-23 03:44:47.877 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=0 frameID=12884901889 isMainFrame=1] FrameLoader::setProvisionalDocumentLoader: Setting provisional document loader to 0 (was 4549787648)
+2026-10-23 03:44:47.882 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=0, frameID=12884901889, isMainFrame=1] DocumentLoader::startLoadingMainResource: Returning empty document
+2026-10-23 03:44:47.883 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=0 frameID=12884901889 isMainFrame=1] FrameLoader::setPolicyDocumentLoader: Setting policy document loader to 0 (was 4549787648)
+2026-10-23 03:44:47.884 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=0 frameID=12884901889 isMainFrame=1] FrameLoader::setState: main frame load completed
+2026-10-23 03:44:47.907 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e41e0 - [PID=4900, throttler=0x1110d0150] ProcessThrottler::Activity::Activity: Starting foreground activity / 'WebPageProxy::runJavaScriptInFrameInScriptWorld'
+2026-10-23 03:44:47.929 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Loading] 0x10404b218 - [pageProxyID=94, webPageID=95, PID=4900] WebPageProxy::didFinishDocumentLoadForFrame: frameID=8589934593, isMainFrame=1
+2026-10-23 03:44:47.932 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e4240 - [PID=4900, throttler=0x1110d0150] ProcessThrottler::Activity::Activity: Starting foreground activity / 'WebPageProxy::runJavaScriptInFrameInScriptWorld'
+2026-10-23 03:44:47.976 Df Simpl Courses[4879:53f5] [com.apple.xpc:connection] [0x102a590d0] activating connection: mach=true listener=false peer=false name=com.apple.ScreenTimeAgent
+2026-10-23 03:44:47.983 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ViewState] 0x103042800 (pageProxyID=94) -[WKWebView _didCommitLayerTree:] - received a commit (3) while deferring visible content rect updates (dynamicViewportUpdateMode 0, resetViewStateAfterTransactionID 3, sizeChangedSinceLastVisibleContentRectUpdate 0, [_scrollView isZoomBouncing] 0, currentlyAdjustingScrollViewInsetsForKeyboard 0)
+2026-10-23 03:44:47.987 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ViewState] 0x103042800 (pageProxyID=94) -[WKWebView _updateVisibleContentRects:] - performing first visible content rect update after deferring updates
+2026-10-23 03:44:48.065 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95 frameID=8589934593 isMainFrame=1] FrameLoader::setState: main frame load completed
+2026-10-23 03:44:48.065 Df Simpl Courses[4879:54a6] [com.apple.WebKit:PerformanceLogging] WebContent[4900]: Memory usage info dump at MainFrameLoadCompleted:
+2026-10-23 03:44:48.065 Df Simpl Courses[4879:54a6] [com.apple.WebKit:PerformanceLogging] WebContent[4900]:   page_count: 1
+2026-10-23 03:44:48.065 Df Simpl Courses[4879:54a6] [com.apple.WebKit:PerformanceLogging] WebContent[4900]:   backforward_cache_page_count: 0
+2026-10-23 03:44:48.065 Df Simpl Courses[4879:54a6] [com.apple.WebKit:PerformanceLogging] WebContent[4900]:   document_count: 2
+2026-10-23 03:44:48.065 Df Simpl Courses[4879:54a6] [com.apple.WebKit:PerformanceLogging] WebContent[4900]:   javascript_gc_heap_capacity_mb: 4
+2026-10-23 03:44:48.065 Df Simpl Courses[4879:54a6] [com.apple.WebKit:PerformanceLogging] WebContent[4900]:   javascript_gc_heap_extra_memory_size_mb: 0
+2026-10-23 03:44:48.066 Df Simpl Courses[4879:54a6] [com.apple.WebKit:PerformanceLogging] WebContent[4900]:   internal_mb: 39
+2026-10-23 03:44:48.067 Df Simpl Courses[4879:54a6] [com.apple.WebKit:PerformanceLogging] WebContent[4900]:   compressed_mb: 2
+2026-10-23 03:44:48.067 Df Simpl Courses[4879:54a6] [com.apple.WebKit:PerformanceLogging] WebContent[4900]:   phys_footprint_mb: 44
+2026-10-23 03:44:48.067 Df Simpl Courses[4879:54a6] [com.apple.WebKit:PerformanceLogging] WebContent[4900]:   resident_size_mb: 179
+2026-10-23 03:44:48.067 Df Simpl Courses[4879:54a6] [com.apple.WebKit:PerformanceLogging] WebContent[4900]:   virtual_size_mb: 419215
+2026-10-23 03:44:48.067 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: ProgressTracker::progressCompleted: frameID 8589934593, value 0.261309, tracked frames 1, originating frameID 8589934593, isMainLoad 1
+2026-10-23 03:44:48.067 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: ProgressTracker::finalProgressComplete: value 0.261309, tracked frames 0, originating frameID 8589934593, isMainLoad 1, isMainLoadProgressing 0
+2026-10-23 03:44:48.067 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95 frameID=8589934593 isMainFrame=1] FrameLoader::checkLoadCompleteForThisFrame: Finished frame load
+2026-10-23 03:44:48.067 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Process] WebContent[4900] 0x103811208 - [webPageID=95] WebPage::runJavaScriptInFrameInScriptWorld: frameID=0
+2026-10-23 03:44:48.071 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Process] WebContent[4900] 0x103811208 - [webPageID=95] WebPage::runJavaScriptInFrameInScriptWorld: Request to run JavaScript succeeded
+2026-10-23 03:44:48.071 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Process] WebContent[4900] 0x103811208 - [webPageID=95] WebPage::runJavaScriptInFrameInScriptWorld: frameID=0
+2026-10-23 03:44:48.076 Df Simpl Courses[4879:53f5] [com.apple.WebKit:Loading] 0x10404b218 - [pageProxyID=94, webPageID=95, PID=4900] WebPageProxy::didFinishLoadForFrame: frameID=8589934593, isMainFrame=1
+2026-10-23 03:44:48.076 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x111130100 - NavigationState will release its process network assertion soon because the page load completed
+2026-10-23 03:44:48.079 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e40f0 - [PID=4900, throttler=0x1110d0150] ProcessThrottler::Activity::invalidate: Ending foreground activity / 'WebPageProxy::runJavaScriptInFrameInScriptWorld'
+2026-10-23 03:44:48.079 E  Simpl Courses[4879:53f5] [com.apple.WebKit:ResourceLoadStatistics] Failed to request restricted opener domains from WebPrivacy
+2026-10-23 03:44:48.080 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ScreenTime] Screen Time has updated to use the system shield for any blocked URL.
+2026-10-23 03:44:48.117 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=47] ResourceLoader::willSendRequestInternal: calling completion handler
+2026-10-23 03:44:48.117 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=47 SubResourceLoader::willSendRequestInternal: resource load finished; calling completion handler
+2026-10-23 03:44:48.117 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: URL will be scheduled with the NetworkProcess
+2026-10-23 03:44:48.117 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: Resource is being scheduled with the NetworkProcess (priority=2, existingNetworkResourceLoadIdentifierToResume=0)
+2026-10-23 03:44:48.117 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=47] WebResourceLoader::WebResourceLoader
+2026-10-23 03:44:48.117 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=48] ResourceLoader::willSendRequestInternal: calling completion handler
+2026-10-23 03:44:48.117 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=48 SubResourceLoader::willSendRequestInternal: resource load finished; calling completion handler
+2026-10-23 03:44:48.118 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: URL will be scheduled with the NetworkProcess
+2026-10-23 03:44:48.118 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: Resource is being scheduled with the NetworkProcess (priority=2, existingNetworkResourceLoadIdentifierToResume=0)
+2026-10-23 03:44:48.118 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=48] WebResourceLoader::WebResourceLoader
+2026-10-23 03:44:48.118 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=49] ResourceLoader::willSendRequestInternal: calling completion handler
+2026-10-23 03:44:48.119 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=49 SubResourceLoader::willSendRequestInternal: resource load finished; calling completion handler
+2026-10-23 03:44:48.119 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: URL will be scheduled with the NetworkProcess
+2026-10-23 03:44:48.119 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: Resource is being scheduled with the NetworkProcess (priority=2, existingNetworkResourceLoadIdentifierToResume=0)
+2026-10-23 03:44:48.119 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=49] WebResourceLoader::WebResourceLoader
+2026-10-23 03:44:48.120 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=50] ResourceLoader::willSendRequestInternal: calling completion handler
+2026-10-23 03:44:48.120 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=50 SubResourceLoader::willSendRequestInternal: resource load finished; calling completion handler
+2026-10-23 03:44:48.120 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: URL will be scheduled with the NetworkProcess
+2026-10-23 03:44:48.120 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: Resource is being scheduled with the NetworkProcess (priority=2, existingNetworkResourceLoadIdentifierToResume=0)
+2026-10-23 03:44:48.120 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=50] WebResourceLoader::WebResourceLoader
+2026-10-23 03:44:48.120 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=51] ResourceLoader::willSendRequestInternal: calling completion handler
+2026-10-23 03:44:48.120 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=51 SubResourceLoader::willSendRequestInternal: resource load finished; calling completion handler
+2026-10-23 03:44:48.120 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: URL will be scheduled with the NetworkProcess
+2026-10-23 03:44:48.121 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: Resource is being scheduled with the NetworkProcess (priority=2, existingNetworkResourceLoadIdentifierToResume=0)
+2026-10-23 03:44:48.121 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=51] WebResourceLoader::WebResourceLoader
+2026-10-23 03:44:48.121 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=52] ResourceLoader::willSendRequestInternal: calling completion handler
+2026-10-23 03:44:48.121 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=52 SubResourceLoader::willSendRequestInternal: resource load finished; calling completion handler
+2026-10-23 03:44:48.121 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: URL will be scheduled with the NetworkProcess
+2026-10-23 03:44:48.121 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: Resource is being scheduled with the NetworkProcess (priority=2, existingNetworkResourceLoadIdentifierToResume=0)
+2026-10-23 03:44:48.121 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=52] WebResourceLoader::WebResourceLoader
+2026-10-23 03:44:48.121 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=53] ResourceLoader::willSendRequestInternal: calling completion handler
+2026-10-23 03:44:48.122 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=53 SubResourceLoader::willSendRequestInternal: resource load finished; calling completion handler
+2026-10-23 03:44:48.122 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: URL will be scheduled with the NetworkProcess
+2026-10-23 03:44:48.122 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: Resource is being scheduled with the NetworkProcess (priority=2, existingNetworkResourceLoadIdentifierToResume=0)
+2026-10-23 03:44:48.122 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=53] WebResourceLoader::WebResourceLoader
+2026-10-23 03:44:48.122 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Process] WebContent[4900] 0x103811208 - [webPageID=95] WebPage::runJavaScriptInFrameInScriptWorld: frameID=0
+2026-10-23 03:44:48.122 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=57] ResourceLoader::willSendRequestInternal: calling completion handler
+2026-10-23 03:44:48.124 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=57 SubResourceLoader::willSendRequestInternal: resource load finished; calling completion handler
+2026-10-23 03:44:48.124 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: URL will be scheduled with the NetworkProcess
+2026-10-23 03:44:48.124 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: Resource is being scheduled with the NetworkProcess (priority=2, existingNetworkResourceLoadIdentifierToResume=0)
+2026-10-23 03:44:48.124 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=57] WebResourceLoader::WebResourceLoader
+2026-10-23 03:44:48.124 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=58] ResourceLoader::willSendRequestInternal: calling completion handler
+2026-10-23 03:44:48.124 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=58 SubResourceLoader::willSendRequestInternal: resource load finished; calling completion handler
+2026-10-23 03:44:48.125 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: URL will be scheduled with the NetworkProcess
+2026-10-23 03:44:48.125 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: Resource is being scheduled with the NetworkProcess (priority=2, existingNetworkResourceLoadIdentifierToResume=0)
+2026-10-23 03:44:48.125 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=58] WebResourceLoader::WebResourceLoader
+2026-10-23 03:44:48.125 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Process] WebContent[4900] 0x103811208 - [webPageID=95] WebPage::runJavaScriptInFrameInScriptWorld: frameID=0
+2026-10-23 03:44:48.125 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Process] WebContent[4900] 0x103811208 - [webPageID=95] WebPage::runJavaScriptInFrameInScriptWorld: Request to run JavaScript succeeded
+2026-10-23 03:44:48.135 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e4240 - [PID=4900, throttler=0x1110d0150] ProcessThrottler::Activity::invalidate: Ending foreground activity / 'WebPageProxy::runJavaScriptInFrameInScriptWorld'
+2026-10-23 03:44:48.172 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=61] ResourceLoader::willSendRequestInternal: calling completion handler
+2026-10-23 03:44:48.172 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=61 SubResourceLoader::willSendRequestInternal: resource load finished; calling completion handler
+2026-10-23 03:44:48.172 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: URL will be scheduled with the NetworkProcess
+2026-10-23 03:44:48.172 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: Resource is being scheduled with the NetworkProcess (priority=2, existingNetworkResourceLoadIdentifierToResume=0)
+2026-10-23 03:44:48.172 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=61] WebResourceLoader::WebResourceLoader
+2026-10-23 03:44:48.447 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=47] WebResourceLoader::didReceiveResponse: (httpStatusCode=200)
+2026-10-23 03:44:48.447 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=47] WebResourceLoader::didReceiveData: Started receiving data
+2026-10-23 03:44:48.447 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=47] WebResourceLoader::didFinishResourceLoad: (length=100)
+2026-10-23 03:44:48.447 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=47 SubResourceLoader::didFinishLoading
+2026-10-23 03:44:48.457 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=62] ResourceLoader::willSendRequestInternal: calling completion handler
+2026-10-23 03:44:48.457 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=62 SubResourceLoader::willSendRequestInternal: resource load finished; calling completion handler
+2026-10-23 03:44:48.457 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: URL will be scheduled with the NetworkProcess
+2026-10-23 03:44:48.457 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: Resource is being scheduled with the NetworkProcess (priority=2, existingNetworkResourceLoadIdentifierToResume=0)
+2026-10-23 03:44:48.457 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=62] WebResourceLoader::WebResourceLoader
+2026-10-23 03:44:48.476 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=53] WebResourceLoader::didReceiveResponse: (httpStatusCode=200)
+2026-10-23 03:44:48.477 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=53] WebResourceLoader::didReceiveData: Started receiving data
+2026-10-23 03:44:48.477 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=53] WebResourceLoader::didFinishResourceLoad: (length=29)
+2026-10-23 03:44:48.477 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=53 SubResourceLoader::didFinishLoading
+2026-10-23 03:44:48.511 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=57] WebResourceLoader::didReceiveResponse: (httpStatusCode=200)
+2026-10-23 03:44:48.511 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=57] WebResourceLoader::didReceiveData: Started receiving data
+2026-10-23 03:44:48.512 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=57] WebResourceLoader::didFinishResourceLoad: (length=2580)
+2026-10-23 03:44:48.512 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=57 SubResourceLoader::didFinishLoading
+2026-10-23 03:44:48.552 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=48] WebResourceLoader::didReceiveResponse: (httpStatusCode=200)
+2026-10-23 03:44:48.552 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=48] WebResourceLoader::didReceiveData: Started receiving data
+2026-10-23 03:44:48.552 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=48] WebResourceLoader::didFinishResourceLoad: (length=241)
+2026-10-23 03:44:48.552 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=48 SubResourceLoader::didFinishLoading
+2026-10-23 03:44:48.553 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=63] ResourceLoader::willSendRequestInternal: calling completion handler
+2026-10-23 03:44:48.553 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=63 SubResourceLoader::willSendRequestInternal: resource load finished; calling completion handler
+2026-10-23 03:44:48.553 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: URL will be scheduled with the NetworkProcess
+2026-10-23 03:44:48.553 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: Resource is being scheduled with the NetworkProcess (priority=2, existingNetworkResourceLoadIdentifierToResume=0)
+2026-10-23 03:44:48.553 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=63] WebResourceLoader::WebResourceLoader
+2026-10-23 03:44:48.553 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=64] ResourceLoader::willSendRequestInternal: calling completion handler
+2026-10-23 03:44:48.553 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=64 SubResourceLoader::willSendRequestInternal: resource load finished; calling completion handler
+2026-10-23 03:44:48.553 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: URL will be scheduled with the NetworkProcess
+2026-10-23 03:44:48.553 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: Resource is being scheduled with the NetworkProcess (priority=2, existingNetworkResourceLoadIdentifierToResume=0)
+2026-10-23 03:44:48.553 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=64] WebResourceLoader::WebResourceLoader
+2026-10-23 03:44:48.561 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=58] WebResourceLoader::didReceiveResponse: (httpStatusCode=200)
+2026-10-23 03:44:48.562 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=58] WebResourceLoader::didReceiveData: Started receiving data
+2026-10-23 03:44:48.562 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=58] WebResourceLoader::didFinishResourceLoad: (length=11)
+2026-10-23 03:44:48.562 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=58 SubResourceLoader::didFinishLoading
+2026-10-23 03:44:48.566 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=61] WebResourceLoader::didReceiveResponse: (httpStatusCode=200)
+2026-10-23 03:44:48.567 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=61] WebResourceLoader::didReceiveData: Started receiving data
+2026-10-23 03:44:48.567 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=61] WebResourceLoader::didFinishResourceLoad: (length=329)
+2026-10-23 03:44:48.567 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=61 SubResourceLoader::didFinishLoading
+2026-10-23 03:44:48.948 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=49] WebResourceLoader::didReceiveResponse: (httpStatusCode=200)
+2026-10-23 03:44:48.951 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=49] WebResourceLoader::didReceiveData: Started receiving data
+2026-10-23 03:44:48.951 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=49] WebResourceLoader::didFinishResourceLoad: (length=17763)
+2026-10-23 03:44:48.951 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=49 SubResourceLoader::didFinishLoading
+2026-10-23 03:44:48.961 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=62] WebResourceLoader::didReceiveResponse: (httpStatusCode=200)
+2026-10-23 03:44:48.961 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=62] WebResourceLoader::didReceiveData: Started receiving data
+2026-10-23 03:44:48.961 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=62] WebResourceLoader::didFinishResourceLoad: (length=47)
+2026-10-23 03:44:48.961 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=62 SubResourceLoader::didFinishLoading
+2026-10-23 03:44:48.971 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=63] WebResourceLoader::didReceiveResponse: (httpStatusCode=200)
+2026-10-23 03:44:48.971 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=63] WebResourceLoader::didReceiveData: Started receiving data
+2026-10-23 03:44:48.971 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=63] WebResourceLoader::didFinishResourceLoad: (length=11)
+2026-10-23 03:44:48.972 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=63 SubResourceLoader::didFinishLoading
+2026-10-23 03:44:48.979 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=64] WebResourceLoader::didReceiveResponse: (httpStatusCode=200)
+2026-10-23 03:44:48.981 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=64] WebResourceLoader::didReceiveData: Started receiving data
+2026-10-23 03:44:48.981 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=64] WebResourceLoader::didFinishResourceLoad: (length=11)
+2026-10-23 03:44:48.981 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=64 SubResourceLoader::didFinishLoading
+2026-10-23 03:44:48.992 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=50] WebResourceLoader::didReceiveResponse: (httpStatusCode=200)
+2026-10-23 03:44:48.994 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=50] WebResourceLoader::didReceiveData: Started receiving data
+2026-10-23 03:44:48.994 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=50] WebResourceLoader::didFinishResourceLoad: (length=5794)
+2026-10-23 03:44:48.994 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=50 SubResourceLoader::didFinishLoading
+2026-10-23 03:44:49.028 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=52] WebResourceLoader::didReceiveResponse: (httpStatusCode=200)
+2026-10-23 03:44:49.029 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=52] WebResourceLoader::didReceiveData: Started receiving data
+2026-10-23 03:44:49.029 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=52] WebResourceLoader::didFinishResourceLoad: (length=2894)
+2026-10-23 03:44:49.029 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=52 SubResourceLoader::didFinishLoading
+2026-10-23 03:44:49.044 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=51] WebResourceLoader::didReceiveResponse: (httpStatusCode=200)
+2026-10-23 03:44:49.044 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=51] WebResourceLoader::didReceiveData: Started receiving data
+2026-10-23 03:44:49.044 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=51] WebResourceLoader::didFinishResourceLoad: (length=281)
+2026-10-23 03:44:49.044 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=51 SubResourceLoader::didFinishLoading
+2026-10-23 03:44:49.048 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=65] ResourceLoader::willSendRequestInternal: calling completion handler
+2026-10-23 03:44:49.048 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=65 SubResourceLoader::willSendRequestInternal: resource load finished; calling completion handler
+2026-10-23 03:44:49.048 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: URL will be scheduled with the NetworkProcess
+2026-10-23 03:44:49.048 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: Resource is being scheduled with the NetworkProcess (priority=2, existingNetworkResourceLoadIdentifierToResume=0)
+2026-10-23 03:44:49.049 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=65] WebResourceLoader::WebResourceLoader
+2026-10-23 03:44:49.052 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=66] ResourceLoader::willSendRequestInternal: calling completion handler
+2026-10-23 03:44:49.052 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=66 SubResourceLoader::willSendRequestInternal: resource load finished; calling completion handler
+2026-10-23 03:44:49.052 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: URL will be scheduled with the NetworkProcess
+2026-10-23 03:44:49.052 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: Resource is being scheduled with the NetworkProcess (priority=2, existingNetworkResourceLoadIdentifierToResume=0)
+2026-10-23 03:44:49.052 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=66] WebResourceLoader::WebResourceLoader
+2026-10-23 03:44:49.053 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=67] ResourceLoader::willSendRequestInternal: calling completion handler
+2026-10-23 03:44:49.053 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=67 SubResourceLoader::willSendRequestInternal: resource load finished; calling completion handler
+2026-10-23 03:44:49.053 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: URL will be scheduled with the NetworkProcess
+2026-10-23 03:44:49.053 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: Resource is being scheduled with the NetworkProcess (priority=2, existingNetworkResourceLoadIdentifierToResume=0)
+2026-10-23 03:44:49.053 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=67] WebResourceLoader::WebResourceLoader
+2026-10-23 03:44:49.053 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=68] ResourceLoader::willSendRequestInternal: calling completion handler
+2026-10-23 03:44:49.053 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=68 SubResourceLoader::willSendRequestInternal: resource load finished; calling completion handler
+2026-10-23 03:44:49.053 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: URL will be scheduled with the NetworkProcess
+2026-10-23 03:44:49.054 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: Resource is being scheduled with the NetworkProcess (priority=2, existingNetworkResourceLoadIdentifierToResume=0)
+2026-10-23 03:44:49.054 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=68] WebResourceLoader::WebResourceLoader
+2026-10-23 03:44:49.054 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=69] ResourceLoader::willSendRequestInternal: calling completion handler
+2026-10-23 03:44:49.054 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=69 SubResourceLoader::willSendRequestInternal: resource load finished; calling completion handler
+2026-10-23 03:44:49.054 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: URL will be scheduled with the NetworkProcess
+2026-10-23 03:44:49.055 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: Resource is being scheduled with the NetworkProcess (priority=2, existingNetworkResourceLoadIdentifierToResume=0)
+2026-10-23 03:44:49.055 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=69] WebResourceLoader::WebResourceLoader
+2026-10-23 03:44:49.055 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=70] ResourceLoader::willSendRequestInternal: calling completion handler
+2026-10-23 03:44:49.055 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=70 SubResourceLoader::willSendRequestInternal: resource load finished; calling completion handler
+2026-10-23 03:44:49.056 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: URL will be scheduled with the NetworkProcess
+2026-10-23 03:44:49.056 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=95, resourceID=95] WebLoaderStrategy::scheduleLoad: Resource is being scheduled with the NetworkProcess (priority=2, existingNetworkResourceLoadIdentifierToResume=0)
+2026-10-23 03:44:49.056 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=70] WebResourceLoader::WebResourceLoader
+2026-10-23 03:44:49.143 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=65] WebResourceLoader::didReceiveResponse: (httpStatusCode=200)
+2026-10-23 03:44:49.143 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=65] WebResourceLoader::didReceiveData: Started receiving data
+2026-10-23 03:44:49.143 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=65] WebResourceLoader::didFinishResourceLoad: (length=1709)
+2026-10-23 03:44:49.143 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=65 SubResourceLoader::didFinishLoading
+2026-10-23 03:44:49.172 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Process] WebContent[4900] 0x103811208 - [webPageID=95] WebPage::runJavaScriptInFrameInScriptWorld: Request to run JavaScript succeeded
+2026-10-23 03:44:49.175 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e4180 - [PID=4900, throttler=0x1110d0150] ProcessThrottler::Activity::invalidate: Ending foreground activity / 'WebPageProxy::runJavaScriptInFrameInScriptWorld'
+2026-10-23 03:44:49.178 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Process] WebContent[4900] 0x103811208 - [webPageID=95] WebPage::runJavaScriptInFrameInScriptWorld: Request to run JavaScript succeeded
+2026-10-23 03:44:49.191 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=68] WebResourceLoader::didReceiveResponse: (httpStatusCode=200)
+2026-10-23 03:44:49.192 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=68] WebResourceLoader::didReceiveData: Started receiving data
+2026-10-23 03:44:49.192 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=68] WebResourceLoader::didFinishResourceLoad: (length=2993)
+2026-10-23 03:44:49.192 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=68 SubResourceLoader::didFinishLoading
+2026-10-23 03:44:49.192 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e40f0 - [PID=4900, throttler=0x1110d0150] ProcessThrottler::Activity::Activity: Starting foreground activity / 'WebPageProxy::runJavaScriptInFrameInScriptWorld'
+2026-10-23 03:44:49.192 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e41e0 - [PID=4900, throttler=0x1110d0150] ProcessThrottler::Activity::invalidate: Ending foreground activity / 'WebPageProxy::runJavaScriptInFrameInScriptWorld'
+2026-10-23 03:44:49.235 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Process] WebContent[4900] 0x103811208 - [webPageID=95] WebPage::runJavaScriptInFrameInScriptWorld: frameID=0
+2026-10-23 03:44:49.302 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=66] WebResourceLoader::didReceiveResponse: (httpStatusCode=200)
+2026-10-23 03:44:49.302 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=66] WebResourceLoader::didReceiveData: Started receiving data
+2026-10-23 03:44:49.302 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=66] WebResourceLoader::didFinishResourceLoad: (length=26133)
+2026-10-23 03:44:49.302 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=66 SubResourceLoader::didFinishLoading
+2026-10-23 03:44:49.302 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=67] WebResourceLoader::didReceiveResponse: (httpStatusCode=200)
+2026-10-23 03:44:49.302 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=67] WebResourceLoader::didReceiveData: Started receiving data
+2026-10-23 03:44:49.302 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=67] WebResourceLoader::didFinishResourceLoad: (length=10315)
+2026-10-23 03:44:49.302 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=67 SubResourceLoader::didFinishLoading
+2026-10-23 03:44:49.302 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=69] WebResourceLoader::didReceiveResponse: (httpStatusCode=200)
+2026-10-23 03:44:49.302 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=69] WebResourceLoader::didReceiveData: Started receiving data
+2026-10-23 03:44:49.302 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=69] WebResourceLoader::didFinishResourceLoad: (length=10578)
+2026-10-23 03:44:49.302 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=69 SubResourceLoader::didFinishLoading
+2026-10-23 03:44:49.306 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=70] WebResourceLoader::didReceiveResponse: (httpStatusCode=200)
+2026-10-23 03:44:49.306 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=70] WebResourceLoader::didReceiveData: Started receiving data
+2026-10-23 03:44:49.330 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Network] WebContent[4900]: [webPageID=95, frameID=8589934593, resourceID=70] WebResourceLoader::didFinishResourceLoad: (length=4218)
+2026-10-23 03:44:49.330 Df Simpl Courses[4879:54a6] [com.apple.WebKit:ResourceLoading] WebContent[4900]: [pageID=95, frameID=8589934593, resourceID=70 SubResourceLoader::didFinishLoading
+2026-10-23 03:44:49.335 Df launchd_sim[2238:546e] [user/501:] failed lookup: name = com.apple.metal.simulator.Simpl Courses, flags = 0x1, requestor = Simpl Courses[4879], error = 3: No such process
+2026-10-23 03:44:49.335 Df Simpl Courses[4879:53f5] [com.apple.xpc:connection] [0x102a0a270] activating connection: mach=true listener=false peer=false name=com.apple.metal.simulator
+2026-10-23 03:44:49.337 Df Simpl Courses[4879:53f5] [com.apple.xpc:connection] [0x102c72670] activating connection: mach=true listener=false peer=false name=com.apple.metal.simulator
+2026-10-23 03:44:49.338 Df Simpl Courses[4879:53f5] [com.apple.xpc:connection] [0x102d64ce0] activating connection: mach=true listener=false peer=false name=com.apple.metal.simulator
+2026-10-23 03:44:49.373 Df Simpl Courses[4879:53f5] [com.apple.renderbox:misc] RBDevice: initialized bg state: false
+2026-10-23 03:44:49.623 E  Simpl Courses[4879:53f5] (libCoreFSCache.dylib) fopen failed for data file: errno = 2 (No such file or directory)
+2026-10-23 03:44:49.623 E  Simpl Courses[4879:53f5] (libCoreFSCache.dylib) Errors found! Invalidating cache...
+2026-10-23 03:44:49.624 Df Simpl Courses[4879:53f5] [com.apple.xpc:connection] [0x102c51cb0] activating connection: mach=false listener=false peer=false name=com.apple.MTLCompilerService
+2026-10-23 03:44:50.131 Df Simpl Courses[4879:53f5] [com.apple.xpc:connection] [0x102a0c0d0] activating connection: mach=false listener=false peer=false name=com.apple.MTLCompilerService
+2026-10-23 03:44:50.132 A  Simpl Courses[4879:5420] (Metal) Metal Compiling Shader
+2026-10-23 03:44:50.814 E  Simpl Courses[4879:53f5] (libCoreFSCache.dylib) fopen failed for data file: errno = 2 (No such file or directory)
+2026-10-23 03:44:50.814 E  Simpl Courses[4879:53f5] (libCoreFSCache.dylib) Errors found! Invalidating cache...
+2026-10-23 03:44:50.815 A  Simpl Courses[4879:5420] (Metal) Metal Compiling Shader
+2026-10-23 03:44:50.839 A  Simpl Courses[4879:542b] (Metal) Metal Compiling Shader
+2026-10-23 03:44:50.850 F  Simpl Courses[4879:53f5] [com.apple.renderbox:error] building pipeline plane_color-ca16feba4 took 1.227955 seconds
+2026-10-23 03:44:50.850 A  Simpl Courses[4879:53f5] (libsystem_trace.dylib) Activity for state dumps
+2026-10-23 03:44:50.850 A  Simpl Courses[4879:5420] (Metal) Metal Compiling Shader
+2026-10-23 03:44:50.864 A  Simpl Courses[4879:5420] (Metal) Metal Compiling Shader
+2026-10-23 03:44:50.874 A  Simpl Courses[4879:545d] (Metal) Metal Compiling Shader
+2026-10-23 03:44:50.930 A  Simpl Courses[4879:5420] (Metal) Metal Compiling Shader
+2026-10-23 03:44:50.936 A  Simpl Courses[4879:545d] (Metal) Metal Compiling Shader
+2026-10-23 03:44:50.950 A  Simpl Courses[4879:5420] (Metal) Metal Compiling Shader
+2026-10-23 03:44:50.958 A  Simpl Courses[4879:545d] (Metal) Metal Compiling Shader
+2026-10-23 03:44:50.968 A  Simpl Courses[4879:5420] (Metal) Metal Compiling Shader
+2026-10-23 03:44:50.978 A  Simpl Courses[4879:545d] (Metal) Metal Compiling Shader
+2026-10-23 03:44:51.090 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Process] WebContent[4900] 0x103811208 - [webPageID=95] WebPage::runJavaScriptInFrameInScriptWorld: Request to run JavaScript succeeded
+2026-10-23 03:44:51.140 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e4180 - [PID=4900, throttler=0x1110d0150] ProcessThrottler::Activity::Activity: Starting foreground activity / 'WebPageProxy::runJavaScriptInFrameInScriptWorld'
+2026-10-23 03:44:51.140 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e40f0 - [PID=4900, throttler=0x1110d0150] ProcessThrottler::Activity::invalidate: Ending foreground activity / 'WebPageProxy::runJavaScriptInFrameInScriptWorld'
+2026-10-23 03:44:51.149 Sd Simpl Courses[4879:0] (79E72B83-2384-3A91-8EE7-4315E85E9A91) IOHIDManager State
+{
+    DispatchQueue = 0;
+    RunLoop = 1;
+    createOptions = 0;
+    isOpen = 0;
+    openOptions = 0;
+}
+2026-10-23 03:44:51.333 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Process] WebContent[4900] 0x103811208 - [webPageID=95] WebPage::runJavaScriptInFrameInScriptWorld: frameID=0
+2026-10-23 03:44:51.333 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Process] WebContent[4900] 0x103811208 - [webPageID=95] WebPage::runJavaScriptInFrameInScriptWorld: Request to run JavaScript succeeded
+2026-10-23 03:44:51.860 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e40f0 - [PID=4900, throttler=0x1110d0150] ProcessThrottler::Activity::Activity: Starting foreground activity / 'WebPageProxy::runJavaScriptInFrameInScriptWorld'
+2026-10-23 03:44:51.860 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e4180 - [PID=4900, throttler=0x1110d0150] ProcessThrottler::Activity::invalidate: Ending foreground activity / 'WebPageProxy::runJavaScriptInFrameInScriptWorld'
+2026-10-23 03:44:51.860 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e41e0 - [PID=4900, throttler=0x1110d0150] ProcessThrottler::Activity::Activity: Starting foreground activity / 'WebPageProxy::runJavaScriptInFrameInScriptWorld'
+2026-10-23 03:44:51.907 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x111130100 NavigationState is releasing background process assertion because a page load completed
+2026-10-23 03:44:51.907 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e40c0 - [PID=4900, throttler=0x1110d0150] ProcessThrottler::Activity::invalidate: Ending background activity / 'Page Load'
+2026-10-23 03:44:51.910 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Process] WebContent[4900] 0x103811208 - [webPageID=95] WebPage::runJavaScriptInFrameInScriptWorld: frameID=0
+2026-10-23 03:44:51.935 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Process] WebContent[4900] 0x103811208 - [webPageID=95] WebPage::runJavaScriptInFrameInScriptWorld: Request to run JavaScript succeeded
+2026-10-23 03:44:51.935 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Process] WebContent[4900] 0x103811208 - [webPageID=95] WebPage::runJavaScriptInFrameInScriptWorld: frameID=0
+2026-10-23 03:44:51.939 Sd Simpl Courses[4879:0] (71A4AB2B-6C63-3811-A45D-80D677A41A21) UAUserActivity
+UAUserActivityManager supportsActivityContinuation=YES isEnabled=YES serverPid=0 PROJECT:UserActivity-551
+2026-10-23 03:44:51.939 Sd Simpl Courses[4879:0] (71A4AB2B-6C63-3811-A45D-80D677A41A21) UAUserActivity
+[6500AB3A-024B-4B43-B361-D191CACCE5D0 userInfo.count=1 dirty 
+2026-10-23 03:44:51.955 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Process] WebContent[4900] 0x103811208 - [webPageID=95] WebPage::runJavaScriptInFrameInScriptWorld: Request to run JavaScript succeeded
+2026-10-23 03:44:51.997 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e40f0 - [PID=4900, throttler=0x1110d0150] ProcessThrottler::Activity::invalidate: Ending foreground activity / 'WebPageProxy::runJavaScriptInFrameInScriptWorld'
+2026-10-23 03:44:51.997 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e41e0 - [PID=4900, throttler=0x1110d0150] ProcessThrottler::Activity::invalidate: Ending foreground activity / 'WebPageProxy::runJavaScriptInFrameInScriptWorld'
+2026-10-23 03:44:52.015 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e4240 - [PID=4900, throttler=0x1110d0150] ProcessThrottler::Activity::Activity: Starting foreground activity / 'WebPageProxy::runJavaScriptInFrameInScriptWorld'
+2026-10-23 03:44:52.048 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Process] WebContent[4900] 0x103811208 - [webPageID=95] WebPage::runJavaScriptInFrameInScriptWorld: frameID=0
+2026-10-23 03:44:52.048 Df Simpl Courses[4879:54a6] [com.apple.WebKit:Process] WebContent[4900] 0x103811208 - [webPageID=95] WebPage::runJavaScriptInFrameInScriptWorld: Request to run JavaScript succeeded
+2026-10-23 03:44:52.099 Df Simpl Courses[4879:53f5] [com.apple.WebKit:ProcessSuspension] 0x1110e4240 - [PID=4900, throttler=0x1110d0150] ProcessThrottler::Activity::invalidate: Ending foreground activity / 'WebPageProxy::runJavaScriptInFrameInScriptWorld'
+2026-10-23 03:44:58.066 Df Simpl Courses[4879:54a6] [com.apple.WebKit:PerformanceLogging] WebContent[4900]: PerformanceMonitor::measurePostLoadMemoryUsage: Process was using 49291072 bytes of memory after the page load.
+2026-10-23 03:45:03.070 Df Simpl Courses[4879:54a6] [com.apple.WebKit:PerformanceLogging] WebContent[4900]: PerformanceMonitor::measurePostLoadCPUUsage: Process was using 0.2% CPU after the page load.
+2026-10-23 03:45:13.859 Df log[5647:0] [com.apple.log:] log run noninteractively, parent: 2238 (launchd_sim), args: 'log' 'show' '--last' '2m' '--style' 'compact' '--predicate' 'process CONTAINS "Simpl" OR eventMessage CONTAINS "Simpl Courses"'
