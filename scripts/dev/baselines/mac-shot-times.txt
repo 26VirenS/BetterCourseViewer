@@ -430,3 +430,5 @@ light-70c-more-help 18s
 light-70d-more-tool 33s
 light-05f-find-appointment 20s
 dark-05f-find-appointment 20s
+light-30e-search-kinds 14s
+light-30f-open-which 24s

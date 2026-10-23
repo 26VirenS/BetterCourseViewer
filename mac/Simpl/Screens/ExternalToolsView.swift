@@ -208,8 +208,27 @@ struct ExternalToolsView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { open(t, in: c, item: item, alta: alta) }
     }
 
-    /// Where a tool opens in a course: the Canvas arguments it opens with, and its title.
+    /// Where a tool opens in a course (ToolOpening).
     private func place(_ t: ExternalToolsData.Tool, in c: ExternalToolsData.Course, item: ExternalToolsData.Item?) -> (course: String, args: [String: String], title: String) {
+        ToolOpening.place(t, in: c, item: item)
+    }
+
+    /// The Knewton Alta assignment this opens in its popup, if it is one (ToolOpening).
+    private func altaLaunch(_ t: ExternalToolsData.Tool, in c: ExternalToolsData.Course, item: ExternalToolsData.Item?) -> AltaLaunch? {
+        ToolOpening.altaLaunch(t, in: c, item: item)
+    }
+
+    private func open(_ t: ExternalToolsData.Tool, in c: ExternalToolsData.Course, item: ExternalToolsData.Item? = nil, alta: AltaLaunch? = nil) {
+        ToolOpening.open(t, in: c, item: item, alta: alta, engine: engine)
+    }
+}
+
+/// (1.3.152) How a tool opens in a course, on its own or on one of its places — the External Tools screen's, and the
+/// search's /open (SearchCommands.swift) the same way.
+@MainActor
+enum ToolOpening {
+    /// Where a tool opens in a course: the Canvas arguments it opens with, and its title.
+    static func place(_ t: ExternalToolsData.Tool, in c: ExternalToolsData.Course, item: ExternalToolsData.Item?) -> (course: String, args: [String: String], title: String) {
         let course = c.open["course"] ?? c.id
         guard let item else { return (course, c.open, t.name) }
         let args = item.kind == "moduleItem" ? ["course": course, "moduleItem": item.id] : ["course": course, "assignment": item.id]
@@ -217,7 +236,7 @@ struct ExternalToolsView: View {
     }
 
     /// The Knewton Alta assignment this opens in its popup, if it is one.
-    private func altaLaunch(_ t: ExternalToolsData.Tool, in c: ExternalToolsData.Course, item: ExternalToolsData.Item?) -> AltaLaunch? {
+    static func altaLaunch(_ t: ExternalToolsData.Tool, in c: ExternalToolsData.Course, item: ExternalToolsData.Item?) -> AltaLaunch? {
         let p = place(t, in: c, item: item)
         guard let a = p.args["assignment"], (t.name + " " + t.host).lowercased().contains("knewton") else { return nil }
         // (1.3.101) with the assignment's due line, as its row says it ("Due Oct 12 at 11:59 PM · 10 pts"; "" for "No due
@@ -231,7 +250,7 @@ struct ExternalToolsView: View {
     /// Without `item`, as the course's chip opens it (its tab, else its first assignment or module item there); (1.3.77)
     /// with one, that assignment or module item itself, under its own title.
     /// (1.3.101) `alta`: the Alta launch already asked for as the place was chosen.
-    private func open(_ t: ExternalToolsData.Tool, in c: ExternalToolsData.Course, item: ExternalToolsData.Item? = nil, alta: AltaLaunch? = nil) {
+    static func open(_ t: ExternalToolsData.Tool, in c: ExternalToolsData.Course, item: ExternalToolsData.Item? = nil, alta: AltaLaunch? = nil, engine: Engine) {
         if let a = alta ?? altaLaunch(t, in: c, item: item) {
             engine.alta = a
             return

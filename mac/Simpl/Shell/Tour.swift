@@ -56,6 +56,7 @@ enum TourSpot: Hashable {
     case overlay, sidebar, account, dashboardRow, gradesRow, toolsRow, firstCourse, counters
     case gradeRing, gradeDetails, whatIfSwitch, whatIfScore, toolPin, counterNext, counterPanel
     case preview // (1.2.3) a piece of work's quick look (Shell/WorkPreviewOverlay.swift)
+    case searchPill // (1.3.152) the toolbar's search pill (Shell/FloatingSearch.swift)
 }
 
 // MARK: - Where each part is
@@ -103,6 +104,7 @@ final class TourFrames {
 
     /// The toolbar's search field, where it is in the window.
     static func searchField(in window: NSWindow) -> CGRect? {
+        if let r = shared.rect(.searchPill, in: window) { return r } // (1.3.152: the search's pill)
         for item in window.toolbar?.items ?? [] {
             if let s = item as? NSSearchToolbarItem, s.searchField.window === window {
                 return flip(s.searchField.convert(s.searchField.bounds, to: nil), window)

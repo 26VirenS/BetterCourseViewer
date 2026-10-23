@@ -1,12 +1,14 @@
 import AppKit
 import SwiftUI
 
-// The toolbar's search field as the web's search box (1.2, extension/content/app/search.js and hub.js): what is typed
-// is answered in the field's own suggestions as each letter goes in — a sum worked out, the commands whose names it
-// starts, your courses (and a course's section: "bio files"), your groups, and Search for the words. "/" (or ">") lists
-// every command the box knows, narrowing as its name is typed; a command that takes something (/course, /grades, /due,
-// /file …) lists what it can be once a space follows its name. A suggestion picked — clicked, or the arrows and Return —
-// runs; Return on words alone searches everything, as before. Edit ▸ Search Commands (⌘K) opens the field on "/".
+// The search as the web's search box (1.2, extension/content/app/search.js and hub.js): what is typed is answered as
+// each letter goes in — a sum worked out, the commands whose names it starts, your courses (and a course's section: "bio
+// files"), your groups, and (1.3.152) from the second letter what the engine's index holds at once (searchLocal), then
+// everything in the school once the typing pauses — each kind its own section. "/" (or ">") lists every command the box
+// knows, narrowing as its name is typed; a command that takes something (/course, /grades, /due, /file, /open …) lists
+// what it can be once a space follows its name. (1.3.152) It is drawn as the web's box afloat (FloatingSearch.swift): a
+// large field over the window with its results under it — no screen of its own — the four kinds to search in before
+// anything is typed (Courses ⌘1, Work ⌘2, Files ⌘3, Actions ⌘4). Edit ▸ Search Commands (⌘K) opens it on "/".
 
 /// What a suggestion does when it is picked.
 enum PaletteAction: Hashable {
@@ -31,6 +33,11 @@ enum PaletteAction: Hashable {
     case copy(String)
     /// (1.3.80) A tool opened in its popup over the window (the chemistry tools').
     case tool(ToolKind)
+    /// (1.3.152) One of the four kinds to search in (SearchScope's raw value): the search narrows to it.
+    case scope(String)
+    /// (1.3.152) /open: an external tool opened in a course — on one of its assignments or module items, or (none) as
+    /// its course's chip opens it (ToolOpening).
+    case toolPlace(tool: String, course: String, kind: String?, item: String?)
     case nothing
 }
 
@@ -61,6 +68,7 @@ struct PaletteCommand {
     enum Lists: Equatable {
         case courses, groups, grades, due, overdue, words, task, commands
         case kinds([String]) // (the search's own groups: Assignments, Files …)
+        case tools // (1.3.152) /open: the courses' external tools, then a tool's assignments
     }
 
     var name: String
@@ -105,6 +113,16 @@ struct PaletteCommand {
 @MainActor
 final class SearchPalette: ObservableObject {
     @Published private(set) var sections: [PaletteSection] = []
+    /// (1.3.152) The kind searched in (FloatingSearch's chip); nil for everything.
+    @Published var scope: SearchScope?
+    /// (1.3.152) Still waiting on the school for part of the answer (the field's spinner).
+    @Published private(set) var searching = false
+    /// (1.3.152) The answer's kinds as they came — the index's at once, the school's after the pause.
+    private var found: [PaletteSection] = []
+    private var fast: Task<Void, Never>?
+    /// (1.3.152) The courses' external tools for /open, read once a while (and the tool a row names, when it runs).
+    private var toolsCache: (at: Date, data: ExternalToolsData)?
+    static var toolsShown: ExternalToolsData?
     /// What the field holds once a suggestion is picked, and that suggestion.
     private var picked: [String: PaletteItem] = [:]
     /// The words last answered (a hint picked puts them back).
@@ -162,34 +180,51 @@ final class SearchPalette: ObservableObject {
         engine.search(t)
     }
 
-    /// The suggestions for what the field holds now: what the app holds at once, what it must ask for after a pause.
+    /// The answer for what the field holds now: what the app holds at once, the engine's index at once, what it must ask
+    /// the school for after a pause — each published as it comes.
     func update(_ raw: String, engine: Engine) {
         seq += 1
         let mine = seq
         lookup?.cancel()
         lookup = nil
+        fast?.cancel()
+        fast = nil
+        found = []
+        searching = false
         lastRaw = raw
         let typed = Typed(raw)
+        let words = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         let built: (sections: [PaletteSection], job: Job?)
         if typed.command {
             built = commandSections(typed, engine)
+        } else if words.isEmpty {
+            built = emptySections(engine)
         } else {
             built = (sections: plainSections(typed, engine), job: nil)
-            // (1.3.136) as the web box does: from the second letter, after a pause, everything in the school answers under the
-            // field — assignments, announcements, pages, discussions, files, people — before Return is pressed
-            let words = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-            if words.count >= 2, !words.hasPrefix(Self.mark), QuickSum.answer(words) == nil {
+            // (1.3.136, 1.3.152) as the web box does: from the second letter what the index holds answers at once, and
+            // everything in the school after a pause — assignments, announcements, pages, discussions, files, people
+            let kinds = scope?.kinds
+            if words.count >= 2, !words.hasPrefix(Self.mark), QuickSum.answer(words) == nil, kinds != [] {
                 let base = built.sections
+                searching = true
+                fast = Task { [weak self] in
+                    guard let self, let d = try? await engine.call("searchLocal", ["q": words], as: SearchData.self) else { return }
+                    guard !Task.isCancelled, self.seq == mine, self.searching else { return }
+                    self.found = Self.kindSections(d, kinds: kinds, limit: 5)
+                    self.publish(Self.compose(base, self.found))
+                }
                 lookup = Task { [weak self] in
                     guard let self else { return }
-                    let found = await self.everything(words, engine: engine)
-                    guard !Task.isCancelled, self.seq == mine, !found.isEmpty else { return }
-                    var out = base
-                    let shown = Set(base.map(\.title))
-                    let fresh = found.filter { !shown.contains($0.title) } // (the courses and groups the app holds, listed already)
-                    guard !fresh.isEmpty else { return }
-                    let at = out.firstIndex(where: { $0.title == "Search" }) ?? out.endIndex
-                    out.insert(contentsOf: fresh, at: at)
+                    try? await Task.sleep(nanoseconds: 280_000_000) // (a pause in the typing before the school is asked)
+                    guard !Task.isCancelled, self.seq == mine else { return }
+                    let d = try? await engine.call("search", ["q": words], as: SearchData.self)
+                    guard !Task.isCancelled, self.seq == mine else { return }
+                    self.searching = false
+                    if let d { self.found = Self.kindSections(d, kinds: kinds, limit: 5) }
+                    var out = Self.compose(base, self.found)
+                    if out.isEmpty || (kinds != nil && self.found.isEmpty) {
+                        out.append(PaletteSection(title: "No Results", items: [Self.hint("Nothing for “\(words)”", "magnifyingglass")]))
+                    }
                     self.publish(out)
                 }
             }
@@ -202,6 +237,47 @@ final class SearchPalette: ObservableObject {
             let extra = await self.run(job, engine: engine)
             guard !Task.isCancelled, self.seq == mine, let extra else { return }
             self.publish(SearchPalette.merge(base, extra))
+        }
+    }
+
+    /// (1.3.152) The search's kinds in the order the web box shows them, each its own section (five rows at most), those
+    /// of the kind searched in alone; never Courses (the app's own rows, listed already).
+    private static let kindOrder = ["Assignments", "Announcements", "Pages", "Discussions", "Files", "People"]
+    private static func kindSections(_ d: SearchData, kinds: [String]?, limit: Int) -> [PaletteSection] {
+        kindOrder.compactMap { k in
+            guard kinds?.contains(k) ?? true, let g = d.groups.first(where: { $0.title == k }) else { return nil }
+            let items = g.rows.prefix(limit).enumerated().map { i, r in
+                PaletteItem(id: "r.\(g.title).\(i).\(r.id)", title: r.title, sub: r.sub, symbol: SearchGlyph.of(g.title), color: r.color, trailing: r.external == true ? "↗" : nil, action: .open(url: r.url, title: r.title, external: r.external == true))
+            }
+            return items.isEmpty ? nil : PaletteSection(title: k, items: Array(items))
+        }
+    }
+
+    private static func compose(_ base: [PaletteSection], _ found: [PaletteSection]) -> [PaletteSection] {
+        let shown = Set(base.map(\.title))
+        return base + found.filter { !shown.contains($0.title) }
+    }
+
+    /// (1.3.152) Before anything is typed: the four kinds to search in, or the kind's own things — your courses (the
+    /// sidebar's, in its order), what is due this week, the files and pages changed last, every command.
+    private func emptySections(_ engine: Engine) -> (sections: [PaletteSection], job: Job?) {
+        guard let scope else {
+            let rows = SearchScope.allCases.map { k in
+                PaletteItem(id: "scope.\(k.rawValue)", title: k.title, sub: k.hint, symbol: k.symbol, trailing: k.key, action: .scope(k.rawValue))
+            }
+            return ([PaletteSection(title: "Search In", items: rows)], nil)
+        }
+        switch scope {
+        case .courses:
+            let items = Self.courseItems("", engine, limit: 12)
+            return ([PaletteSection(title: "Courses", items: items.isEmpty ? [Self.hint("No courses yet", "book")] : items)], nil)
+        case .work:
+            return ([PaletteSection(title: "Due This Week", items: [Self.looking])], .due(title: "Due This Week", q: "week", overdue: false))
+        case .files:
+            return ([PaletteSection(title: "Recent Files", items: [Self.looking])], .recent)
+        case .actions:
+            let all = Self.catalog(engine).filter { $0.name != "help" }
+            return ([PaletteSection(title: "Commands", items: all.map(\.plainRow))], nil)
         }
     }
 
@@ -240,13 +316,21 @@ final class SearchPalette: ObservableObject {
             engine.query = text // (the field keeps the cursor, listing what the command takes)
             SearchField.focus(engine)
             return
+        case .search(let q):
+            // (1.3.152) everything for the words, in the search itself: no screen of its own
+            engine.query = q
+            SearchField.focus(engine)
+            return
+        case .scope(let raw):
+            FloatingSearch.shared.setScope(SearchScope(rawValue: raw), engine: engine)
+            return
         case .nothing:
             return
         default:
             break
         }
         if fromField {
-            if case .search(let q) = action { engine.query = q } else { engine.query = "" }
+            engine.query = ""
             SearchField.resign(engine)
         }
         switch action {
@@ -254,7 +338,6 @@ final class SearchPalette: ObservableObject {
         case .open(let url, let title, let external): engine.openFromSearch(url, title: title, external: external)
         case .work(let url, let title):
             if let url, !url.isEmpty { engine.openWeb(url, title: title) } else { engine.go(.todo) }
-        case .search(let q): engine.search(q)
         case .newTask: engine.newTask = true
         case .addTask(let title):
             Task {
@@ -279,7 +362,12 @@ final class SearchPalette: ObservableObject {
         case .browser: NSWorkspace.shared.open(engine.web.baseURL)
         case .copy(let text): copyToPasteboard(text)
         case .tool(let kind): ToolsCenter.shared.popUp(kind, engine: engine)
-        case .fill, .nothing: break
+        case .toolPlace(let tool, let course, let kind, let item):
+            guard let t = toolsShown?.rows.first(where: { $0.id == tool }), let c = t.courses.first(where: { $0.id == course }) else { return }
+            let it = c.items?.first(where: { $0.kind == kind && $0.id == item })
+            if let a = ToolOpening.altaLaunch(t, in: c, item: it) { engine.askAlta(a) }
+            ToolOpening.open(t, in: c, item: it, engine: engine)
+        case .fill, .search, .scope, .nothing: break
         }
     }
 
@@ -299,7 +387,7 @@ final class SearchPalette: ObservableObject {
             c.append(PaletteCommand(name: "inbox", aliases: ["messages", "mail", "conversations"], title: "Inbox", hint: "Your messages", symbol: "tray", key: "⌘6", action: .go(.inbox)))
         }
         c.append(PaletteCommand(name: "courses", aliases: ["classes"], title: "All Courses", hint: "Every course you are in", symbol: "books.vertical", action: .go(.courses)))
-        c.append(PaletteCommand(name: "course", aliases: ["class", "go", "open"], title: "Open a Course", hint: "A course — or one of its sections: /course bio files", symbol: "book", takes: "a course, then a section", lists: .courses))
+        c.append(PaletteCommand(name: "course", aliases: ["class", "go"], title: "Open a Course", hint: "A course — or one of its sections: /course bio files", symbol: "book", takes: "a course, then a section", lists: .courses))
         if canvas {
             c.append(PaletteCommand(name: "groups", title: "Groups", hint: "Your groups", symbol: "person.2", action: .go(.groups)))
             c.append(PaletteCommand(name: "group", aliases: ["team"], title: "Open a Group", hint: "One of your groups", symbol: "person.2.fill", takes: "a group", lists: .groups))
@@ -328,6 +416,8 @@ final class SearchPalette: ObservableObject {
         c.append(PaletteCommand(name: "plan", aliases: ["study plan", "study planner", "schedule", "study time", "exam prep", "study"], title: ToolKind.plan.name, hint: "Study blocks from your due dates, a week at a glance", symbol: ToolKind.plan.symbol, action: .tool(.plan)))
         c.append(PaletteCommand(name: "verbs", aliases: ["verb", "conjugate", "conjugation", "spanish", "french", "german", "italian", "portuguese", "tense"], title: ToolKind.verbs.name, hint: "Any verb's tenses in Spanish, French, German, Italian or Portuguese", symbol: ToolKind.verbs.symbol, action: .tool(.verbs)))
         c.append(PaletteCommand(name: "external", aliases: ["external tools", "lti", "apps"], title: "External Tools", hint: "Every tool your courses use", symbol: "puzzlepiece.extension", action: .go(.externalTools)))
+        // (1.3.152) as the web box's /open: a tool used through assignments asks which of them to open
+        c.append(PaletteCommand(name: "open", aliases: ["launch"], title: "Open a Tool", hint: "Knewton Alta, Macmillan… — on the assignment you choose", symbol: "arrow.up.forward.app", takes: "a tool", lists: .tools))
         c.append(PaletteCommand(name: "due", aliases: ["upcoming", "soon", "week"], title: "Due", hint: "What is due: today, tomorrow, this week, or by name", symbol: "clock", takes: "today, tomorrow, week or a name", lists: .due))
         c.append(PaletteCommand(name: "overdue", aliases: ["late", "missing"], title: "Overdue", hint: "Past its date and not handed in", symbol: "exclamationmark.circle", takes: "a name (or nothing)", lists: .overdue))
         c.append(PaletteCommand(name: "assignment", aliases: ["hw", "homework", "assignments"], title: "Assignments", hint: "Find an assignment", symbol: "doc.text", takes: "an assignment", lists: .kinds(["Assignments"])))
@@ -421,6 +511,8 @@ final class SearchPalette: ObservableObject {
         case kinds(title: String, kinds: [String], q: String)
         case due(title: String, q: String, overdue: Bool)
         case grades(q: String)
+        case recent // (1.3.152) the files and pages changed last
+        case tools(q: String) // (1.3.152) /open
     }
 
     // MARK: - Words typed
@@ -429,6 +521,19 @@ final class SearchPalette: ObservableObject {
         let words = t.raw.trimmingCharacters(in: .whitespacesAndNewlines)
         let q = words.lowercased()
         guard !q.isEmpty, !q.hasPrefix(Self.mark) else { return [] }
+        // (1.3.152) a kind searched in: its own things alone (Work's and Files' come from the search)
+        switch scope {
+        case .courses:
+            let items = Self.courseItems(q, engine, limit: 12)
+            return [PaletteSection(title: "Courses", items: items.isEmpty ? [Self.hint("No course by that name", "book")] : items)]
+        case .actions:
+            let list = Self.matching(Self.catalog(engine), q, strict: false).filter { $0.name != "help" }
+            return [PaletteSection(title: "Commands", items: list.isEmpty ? [Self.hint("No command by that name", "command")] : list.map(\.plainRow))]
+        case .work, .files:
+            return []
+        case nil:
+            break
+        }
         var out: [PaletteSection] = []
         if let a = QuickSum.answer(words) {
             out.append(PaletteSection(title: "Answer", items: [PaletteItem(id: "answer", title: a.value, sub: a.sub, symbol: "equal.circle.fill", trailing: "Copy", action: .copy(a.value))]))
@@ -443,7 +548,6 @@ final class SearchPalette: ObservableObject {
             let groups = Self.groupItems(q, engine, limit: 3)
             if !groups.isEmpty { out.append(PaletteSection(title: "Groups", items: groups)) }
         }
-        out.append(PaletteSection(title: "Search", items: [Self.searchRow(words, engine)]))
         return out
     }
 
@@ -502,6 +606,12 @@ final class SearchPalette: ObservableObject {
         case .commands:
             let list = Self.matching(all, q, strict: false).filter { $0.name != "help" }
             return ([PaletteSection(title: "Commands", items: list.map(\.slashRow))], nil)
+        case .tools:
+            if let d = toolsCache?.data, Date().timeIntervalSince(toolsCache!.at) < 300 {
+                Self.toolsShown = d
+                return ([Self.toolSection(d, arg)], nil)
+            }
+            return ([PaletteSection(title: "Open a Tool", items: [Self.looking])], .tools(q: arg))
         }
     }
 
@@ -641,7 +751,73 @@ final class SearchPalette: ObservableObject {
         case .grades(let q):
             guard await grades(engine) != nil else { return nil } // (the sidebar's scores stay)
             return PaletteSection(title: "Grades", items: gradeItems(q, engine))
+        case .recent:
+            guard let d = try? await engine.call("searchRecent", as: SearchData.self) else {
+                return PaletteSection(title: "Recent Files", items: [Self.hint("Your files could not be read just now.", "exclamationmark.triangle")])
+            }
+            let items = d.groups.flatMap { g in g.rows.map { r in PaletteItem(id: "f.\(r.id)", title: r.title, sub: r.sub, symbol: SearchGlyph.of(g.title), color: r.color, action: .open(url: r.url, title: r.title, external: r.external == true)) } }
+            return PaletteSection(title: "Recent Files", items: items.isEmpty ? [Self.hint("No files in your courses yet.", "folder")] : Array(items.prefix(16)))
+        case .tools(let q):
+            guard let d = await tools(engine) else {
+                return PaletteSection(title: "Open a Tool", items: [Self.hint("Your courses’ tools could not be read just now.", "exclamationmark.triangle")])
+            }
+            Self.toolsShown = d
+            return Self.toolSection(d, q)
         }
+    }
+
+    /// (1.3.152) /open's list: the tools whose names hold what is typed — one used through assignments or module items asks
+    /// which of them next ("/open Knewton Alta › "); one that is a course's own tab opens there, a row for each course. After
+    /// the ›, that tool's assignments and module items in every course — what is still to do first, the soonest first —
+    /// narrowed by what is typed after it.
+    private static func toolSection(_ d: ExternalToolsData, _ raw: String) -> PaletteSection {
+        if let bar = raw.range(of: "›") {
+            let name = raw[..<bar.lowerBound].trimmingCharacters(in: .whitespaces).lowercased()
+            let q = raw[bar.upperBound...].trimmingCharacters(in: .whitespaces).lowercased()
+            guard let t = d.rows.first(where: { $0.name.lowercased() == name }) else {
+                return PaletteSection(title: "Open a Tool", items: [hint("No tool by that name in your courses", "puzzlepiece.extension")])
+            }
+            var places: [(c: ExternalToolsData.Course, it: ExternalToolsData.Item, n: Int)] = []
+            var n = 0
+            for c in t.courses {
+                for it in c.items ?? [] {
+                    n += 1
+                    guard q.isEmpty || it.title.lowercased().contains(q) || c.name.lowercased().contains(q) else { continue }
+                    places.append((c, it, n))
+                }
+            }
+            // (each course's list is in its order already: still to do, soonest first; the courses' merged the same way)
+            places.sort { a, b in
+                let ua = a.it.upcoming == true, ub = b.it.upcoming == true
+                if ua != ub { return ua }
+                if ua, let da = PaletteDates.parse(a.it.due), let db = PaletteDates.parse(b.it.due), da != db { return da < db }
+                return a.n < b.n
+            }
+            let items = places.map { p in
+                PaletteItem(id: "tp.\(p.c.id).\(p.it.kind).\(p.it.id)", title: p.it.title, sub: [p.c.name, p.it.sub ?? ""].filter { !$0.isEmpty }.joined(separator: " · "), symbol: p.it.kind == "moduleItem" ? "square.stack.3d.up" : "doc.text", color: p.c.color, trailing: p.it.status?.word, action: .toolPlace(tool: t.id, course: p.c.id, kind: p.it.kind, item: p.it.id))
+            }
+            return PaletteSection(title: "\(t.name): Which Assignment?", items: items.isEmpty ? [hint("Nothing by that name in \(t.name)", "doc.text")] : items)
+        }
+        let q = raw.trimmingCharacters(in: .whitespaces).lowercased()
+        var items: [PaletteItem] = []
+        for t in d.rows where q.isEmpty || t.name.lowercased().contains(q) || t.host.lowercased().contains(q) {
+            if (t.instances ?? 0) > 0 {
+                let line = [t.courses.count == 1 ? t.courses[0].name : "\(t.courses.count) courses", "\(t.instances ?? 0) \(t.instances == 1 ? "assignment" : "assignments")"].joined(separator: " · ")
+                items.append(PaletteItem(id: "tool.\(t.id)", title: t.name, sub: line, symbol: "puzzlepiece.extension", trailing: "Choose…", action: .fill("/open \(t.name) › ")))
+            } else {
+                for c in t.courses {
+                    items.append(PaletteItem(id: "tool.\(t.id).\(c.id)", title: t.name, sub: c.name, symbol: "puzzlepiece.extension", color: c.color, trailing: "↗", action: .toolPlace(tool: t.id, course: c.id, kind: nil, item: nil)))
+                }
+            }
+        }
+        return PaletteSection(title: "Open a Tool", items: items.isEmpty ? [hint("No tool by that name in your courses", "puzzlepiece.extension")] : items)
+    }
+
+    private func tools(_ engine: Engine) async -> ExternalToolsData? {
+        if let c = toolsCache, Date().timeIntervalSince(c.at) < 300 { return c.data }
+        guard let d = try? await engine.call("externalTools", as: ExternalToolsData.self) else { return nil }
+        toolsCache = (Date(), d)
+        return d
     }
 
     /// (1.3.136) The school searched for what is typed, each kind its own section under the field (five rows at most).
@@ -755,22 +931,6 @@ private enum PaletteDates {
 }
 
 // MARK: - The suggestions
-
-/// The field's suggestions: each section under its heading, each row picked as a whole.
-struct PaletteSuggestions: View {
-    @ObservedObject var palette: SearchPalette
-
-    var body: some View {
-        ForEach(palette.sections) { section in
-            Section(section.title) {
-                ForEach(section.items) { item in
-                    PaletteRow(item: item)
-                        .searchCompletion(item.token)
-                }
-            }
-        }
-    }
-}
 
 /// A suggestion: its symbol, what it is and the line after it, a shortcut or a score at its end.
 struct PaletteRow: View {
@@ -979,43 +1139,17 @@ private struct SumParser {
 
 // MARK: - The field itself, and the app's look
 
-/// The main window's toolbar search field, from outside it (SwiftUI has no way to focus a toolbar search field before
-/// macOS 15): focused for Search Commands, let go of once a suggestion has run.
+/// The search, from outside it: (1.3.152) the floating search (FloatingSearch.swift) brought up with the cursor in its
+/// field — Search Commands, a command completed — or put away once a row has run.
 @MainActor
 enum SearchField {
     static func focus(_ engine: Engine) {
-        DispatchQueue.main.async {
-            guard let window = engine.hostView.window else { return }
-            if !window.isKeyWindow { window.makeKeyAndOrderFront(nil) }
-            if let item = searchItem(window) {
-                item.beginSearchInteraction()
-            } else if let field = find(in: window.toolbar?.items.compactMap(\.view) ?? []) ?? window.contentView?.superview.flatMap({ find(in: [$0]) }) {
-                window.makeFirstResponder(field)
-            }
-        }
+        if let window = engine.hostView.window, !window.isKeyWindow { window.makeKeyAndOrderFront(nil) }
+        FloatingSearch.shared.show(engine)
     }
 
     static func resign(_ engine: Engine) {
-        DispatchQueue.main.async {
-            guard let window = engine.hostView.window else { return }
-            if let item = searchItem(window) { item.endSearchInteraction() }
-            if let editor = window.firstResponder as? NSText, editor.isFieldEditor { window.makeFirstResponder(nil) }
-        }
-    }
-
-    private static func searchItem(_ window: NSWindow) -> NSSearchToolbarItem? {
-        for item in window.toolbar?.items ?? [] {
-            if let s = item as? NSSearchToolbarItem { return s }
-        }
-        return nil
-    }
-
-    private static func find(in views: [NSView]) -> NSSearchField? {
-        for v in views {
-            if let f = v as? NSSearchField { return f }
-            if let f = find(in: v.subviews) { return f }
-        }
-        return nil
+        FloatingSearch.shared.hide(engine)
     }
 }
 

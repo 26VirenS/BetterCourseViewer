@@ -479,6 +479,21 @@ try {
   const sMath = await nc('search', { q: 'math' });
   const flat = (x) => x.groups.map((g) => `${g.title}:${g.rows.map((r) => r.url).join(',')}`).join(' | ');
   check(flat(srch1) === flat(srch2) && sMath.groups.find((g) => g.title === 'Courses')?.rows[0]?.title === 'F26-MATH 021 20' && srch1.groups.flatMap((g) => g.rows).every((r) => !/MATH-021-20|PHYS-008-01/.test(r.sub)), `search answers in one order, run after run, each course by the sidebar's name: ${JSON.stringify(srch1.groups.map((g) => `${g.title}:${g.rows.map((r) => r.title).join('|')}`))}`);
+  // (Mac 1.3.152, Windows 0.3.56) the apps' search as fast as the box's: searchLocal answers at once from the courses and the index (warmed by
+  // searchWarm), the same rows as the full search's for the kinds the index holds, never Canvas's search; searchRecent
+  // lists the files and pages changed last, newest first
+  await nc('searchWarm');
+  let local34 = null;
+  for (let i = 0; i < 40 && !(local34?.groups || []).some((g) => g.title === 'Assignments'); i++) { local34 = await nc('searchLocal', { q: 'lab' }); if (!(local34?.groups || []).some((g) => g.title === 'Assignments')) await new Promise((r) => setTimeout(r, 250)); }
+  const localT0 = Date.now();
+  const localAgain = await nc('searchLocal', { q: 'lab' });
+  const localMs = Date.now() - localT0;
+  const fullAsg = (srch1.groups.find((g) => g.title === 'Assignments')?.rows || []).map((r) => r.url).join(',');
+  const localAsg = (localAgain.groups.find((g) => g.title === 'Assignments')?.rows || []).map((r) => r.url).join(',');
+  const recent34 = await nc('searchRecent');
+  const recentAt = (recent34.groups || []).flatMap((g) => g.rows);
+  check(localAsg && localAsg === fullAsg && !localAgain.groups.some((g) => g.title === 'People') && localMs < 1500 && recentAt.length > 0 && recentAt.every((r) => /\/(files|pages)\//.test(r.url)),
+    `the apps' instant search (searchLocal) answers from the courses and the index at once — the full search's assignments, no people — in ${localMs} ms; searchRecent lists the files and pages changed last: ${JSON.stringify({ localAsg, fullAsg, recent: recentAt.slice(0, 3).map((r) => r.title) })}`);
   // a file to a message: uploaded, named on the message, and there when the conversation is read
   const up34 = await nc('messageUpload', { name: 'notes.txt', type: 'text/plain', data: Buffer.from('Lab notes').toString('base64') });
   const sent34 = await nc('sendMessage', { recipients: ['12'], subject: 'With a file', body: 'See the file', attachments: [up34.id] });

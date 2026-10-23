@@ -428,6 +428,27 @@
     return ORDER.filter((k) => groups.get(k)?.length).map((k) => [k, groups.get(k)]);
   }
 
+  /** (Mac 1.3.152, Windows 0.3.56) The apps' search as fast as the box's (Mac, Windows: their own floating search): what the box shows at
+   *  once — your courses and, from the second letter, the index's — in the same order, never waiting on Canvas; the
+   *  index taken meanwhile when it is not fresh, for the next letters. `find` answers the rest after the typing pauses. */
+  async function findLocal(raw) {
+    const q = norm(raw);
+    if (!q) return [];
+    if (!fresh()) warm().catch(() => {});
+    const groups = new Map([['Courses', await courseHits(q)]]);
+    if (q.length >= NET_MIN) for (const k of IX_KINDS) { const local = lookup(k, q, PER); if (local?.length) groups.set(k, local); }
+    return ORDER.filter((k) => groups.get(k)?.length).map((k) => [k, groups.get(k)]);
+  }
+  /** (Mac 1.3.152, Windows 0.3.56) The index taken now (an app's search opening), so its first letters answer from it. */
+  function warmUp() { if (!fresh()) warm().catch(() => {}); }
+  /** (Mac 1.3.152, Windows 0.3.56) The files and pages changed last, newest first (the box's Files kind before anything is typed). */
+  async function recents(n = RECENTS) {
+    warm().catch(() => {});
+    await Promise.race([Promise.all([kindReady('Files'), kindReady('Pages')]), new Promise((r) => setTimeout(r, 8000))]);
+    const kept = (k) => (ix?.kinds[k]?.ready ? ix.kinds[k].items : []);
+    return [...kept('Files'), ...kept('Pages')].sort((a, b) => (b.at ?? 0) - (a.at ?? 0)).slice(0, n);
+  }
+
   // ---- a search: what the page holds at once, the index at once, the rest after a pause, each group painted as it answers ----
   function run(raw) {
     if (!ui) return;
@@ -1015,5 +1036,5 @@
     summon();
   });
 
-  BCV.search = { field, dock, close, summon, float, unfloat, afloat, find };
+  BCV.search = { field, dock, close, summon, float, unfloat, afloat, find, findLocal, warmUp, recents };
 })();

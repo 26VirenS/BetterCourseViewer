@@ -1312,7 +1312,29 @@
   async function search({ q = '' } = {}) {
     const S = BCV.search?.find;
     if (!S) return { groups: [] };
-    const [groups, all, sel] = await Promise.all([S(String(q || '')), store.courses().catch(() => []), selection()]);
+    return shapeSearch(await S(String(q || '')), q);
+  }
+  /** (Mac 1.3.152, Windows 0.3.56) What the search box shows at once (search.js findLocal): your courses and the index's, never waiting on
+   *  Canvas — the apps' search answers each letter with it, then `search` once the typing pauses. */
+  async function searchLocal({ q = '' } = {}) {
+    const S = BCV.search?.findLocal;
+    if (!S) return { groups: [] };
+    return shapeSearch(await S(String(q || '')), q);
+  }
+  /** (Mac 1.3.152, Windows 0.3.56) The index taken now, as an app's search opens: its first letters answer from it. */
+  async function searchWarm() {
+    BCV.search?.warmUp?.();
+    return { ok: true };
+  }
+  /** (Mac 1.3.152, Windows 0.3.56) The files and pages changed last (the search's Files, before anything is typed), as search rows. */
+  async function searchRecent() {
+    const R = BCV.search?.recents;
+    if (!R) return { groups: [] };
+    const rows = await R(24);
+    return shapeSearch([['Files', rows.filter((r) => /\/files\//.test(r.href || ''))], ['Pages', rows.filter((r) => /\/pages\//.test(r.href || ''))]].filter(([, r]) => r.length), '');
+  }
+  async function shapeSearch(groups, q) {
+    const [all, sel] = await Promise.all([store.courses().catch(() => []), selection()]);
     const byId = new Map((all || []).map((c) => [String(c.id), c]));
     const labelOf = (c) => sel.list.find((f) => String(f.id) === String(c.id))?.shortName || c.name || c.code || '';
     const courseIn = (u) => { const m = /\/courses\/(\d+)(?:\/|$)/.exec(String(u || '')); return m ? byId.get(m[1]) || null : null; };
@@ -1337,7 +1359,7 @@
         const rest = sub.startsWith(`${was} · `) ? sub.slice(was.length + 3) : sub === was ? '' : null;
         if (rest !== null) sub = [labelOf(c), r.assignment ? (r.assignment.due_at ? dueText(r.assignment.due_at) : 'Assignment') : rest].filter(Boolean).join(' · ');
       }
-      return { title, sub, url, color: r.tint || r.course?.color || c?.color || null, external: !!r.url && !r.href, kind };
+      return { title, sub, url, color: r.tint || r.course?.color || c?.color || null, external: !!r.url && !r.href, kind, at: Number.isFinite(r.at) ? r.at : null };
     };
     return {
       groups: groups.map(([title, rows]) => ({
@@ -3034,7 +3056,7 @@
     return { ok: true };
   }
 
-  const CALLS = { setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, setColor, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, appointments, reserveAppointment, cancelReservation, notifications, notifMark, search, appearance, whatsNew, whatsNewSeen, refresh,
+  const CALLS = { setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, setColor, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, appointments, reserveAppointment, cancelReservation, notifications, notifMark, search, searchLocal, searchWarm, searchRecent, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, fileInfo, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage, messageUpload,
     toolLaunch, externalTools, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizAssignment, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback, neighbours };
   // (Mac 1.2) Grade needed: a course's score now (by the student's own weights where set, as the Grades screen) and each

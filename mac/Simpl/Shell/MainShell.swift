@@ -11,7 +11,7 @@ struct MainShell: View {
     @ObservedObject private var focus = FocusTimer.shared
     /// (1.3.79) How many pins the toolbar has room for, measured as it is laid out (Tools/PinnedTools.swift): the search
     /// field gives its room first.
-    @StateObject private var fit = ToolbarFit(searching: true)
+    @StateObject private var fit = ToolbarFit(searching: false) // (1.3.152: no search field in the toolbar — its pill is a button)
     // (the screenshot suite: -SimplSidebar hidden opens the window with the sidebar folded away)
     @State private var columns: NavigationSplitViewVisibility = UserDefaults.standard.string(forKey: "SimplSidebar") == "hidden" ? .detailOnly : .all
     /// (1.3) The window was last wide enough for the sidebar beside the screen: crossing below folds it away, crossing
@@ -48,27 +48,12 @@ struct MainShell: View {
         .overlay { WorkPreviewOverlay() } // (1.2.3) a piece of work's quick look, grown out of its row (Shell/WorkPreviewOverlay.swift)
         // (1.3.79) a tool opened whole, the rubric ring, Hand In and the rest are popups over the window that never block
         // it (Shell/FloatingPopup.swift: ToolsCenter.popUp, RubricPopup.show, EngineSheets)
-        // (1.2) the field finds and does: its suggestions are the web search box's — a sum, commands, courses and their
-        // sections, groups — and "/" (or ">") lists every command (Shell/SearchCommands.swift); one picked runs.
-        // (home-29) Its prompt short enough to show whole in the field on every school ("Search Brightspa…" was cut).
-        .searchable(text: $engine.query, placement: .toolbar, prompt: "Search or type /")
-        .searchSuggestions { PaletteSuggestions(palette: palette) }
-        .onSubmit(of: .search) {
-            if palette.take(engine.query, engine: engine) { return }
-            palette.submit(engine.query, engine: engine)
-        }
-        .onChange(of: engine.query) { _, q in
-            if palette.take(q, engine: engine) { return }
-            palette.update(q, engine: engine)
-            // (home-13) What is typed is answered in the suggestions only — a sum, a command, a course — and the page
-            // stays where it is: everything is searched on Return, or "Search for …" picked. (Emptied on the results,
-            // the field goes back to where it was.)
-            let t = q.trimmingCharacters(in: .whitespacesAndNewlines)
-            if t.isEmpty, case .search = engine.nav.current.place {
-                engine.goBack()
-            }
-        }
+        // (1.3.152) the search as the web's box afloat: the toolbar's pill (or ⌘K) brings a large field over the window
+        // with its results under it — what the field finds and does is the web box's (Shell/SearchCommands.swift) — and
+        // no screen of its own (Shell/FloatingSearch.swift)
+        .overlay { FloatingSearchOverlay(palette: palette) }
         .onAppear {
+            FloatingSearch.shared.palette = palette
             palette.launch(engine)
             engine.popups.sidebarMoved(shown: columns != .detailOnly) // (1.3.79: whether a tool's popup keeps clear of it)
             if engine.primary == nil { tools.openLaunchTool(engine) } // (the screenshot suite's -SimplTool, over the main window)
@@ -121,6 +106,12 @@ struct MainShell: View {
                             .toolbarFit(fit, .more)
                     }
                 }
+            }
+            // (1.3.152) the search's pill, at the toolbar's end: pressed (or ⌘K), the floating search comes up (the tour's
+            // search step among the rest: it asks for something typed in it)
+            ToolbarItem(placement: .primaryAction) {
+                SearchPill()
+                    .tourSpot(.searchPill)
             }
         }
         // (1.3.79) another screen (its own toolbar buttons) or the sidebar shown or hidden: the pins' room measured afresh
