@@ -4704,6 +4704,18 @@ try {
   const gtitle = () => page.$eval('.bcv-omni__gtitle', (e) => e.textContent);
   const knewRows = await findRows('/open knew');
   const knewTitle = await gtitle();
+  // (2.99.102) Enter on the tool asks which of its assignments: the box reads "/open Knewton Alta › ", and every assignment
+  // the tool is used through is listed — in both courses, what is still to hand in first, the nearest due first, what is
+  // handed in after — narrowed by what is typed after the ›; Enter on one opens the tool on it
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.querySelector('#bcv-omni').value === '/open Knewton Alta › ', null, { timeout: 10000 });
+  await eventually(async () => !(await page.$('.bcv-omni__more')) && (await gtitle()) === 'Knewton Alta: which assignment?', 10000);
+  const drillRows = await rowsOf();
+  check(drillRows.map((r) => r.t).join(' | ') === 'Knewton Alta: Unit 2 | Knewton Alta: Limits Practice | Knewton Alta: Unit 3 | Knewton Alta: Unit 4 | Knewton Alta: Unit 1' && drillRows.every((r) => r.acts.join() === 'Open tool,Assignment')
+    && /^SPRK-010-103 · due /.test(drillRows[0].s) && /^MATH-021-20 · due /.test(drillRows[1].s) && /· handed in$/.test(drillRows[4].s),
+    `picking a tool used through assignments lists them, to choose the one to open — what is still to hand in first: ${JSON.stringify(drillRows)}`);
+  await page.type('#bcv-omni', 'limits');
+  await eventually(async () => (await rowsOf()).length === 1, 10000);
   const [knewTab] = await Promise.all([context.waitForEvent('page', { timeout: 10000 }), page.keyboard.press('Enter')]);
   await knewTab.waitForLoadState('domcontentloaded').catch(() => {});
   // (Knewton Alta is in two courses: a row for the tool in each, each through that course's assignment nearest its due — SPRK's

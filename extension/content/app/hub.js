@@ -369,8 +369,9 @@
     for (const [key, { name, icon, c, a }] of named) {
       if (tabbed.has(key) || !hit(`${name} ${nameOf(c)}`, q)) continue;
       const open = (from) => launchTool(a, c.id, from);
+      // (2.99.102) picked in /open, a tool used through assignments asks which of them (`drill`: toolAssignmentItems)
       add({
-        icon: (icon && IC[icon]) || IC.external, title: name, sub: `${nameOf(c)} · Tool · via ${a.name}`, tint: c.color || null, course: c, at: a.due_at ? U.parse(a.due_at)?.getTime() ?? null : null, done: !!a.submission?.submitted_at, run: open, external: true, assignment: a, tool: true,
+        icon: (icon && IC[icon]) || IC.external, title: name, sub: `${nameOf(c)} · Tool · via ${a.name}`, tint: c.color || null, course: c, at: a.due_at ? U.parse(a.due_at)?.getTime() ?? null : null, done: !!a.submission?.submitted_at, run: open, external: true, assignment: a, tool: true, drill: name, fill: `/open ${name} › `,
         actions: [{ label: 'Open tool', icon: IC.external, run: open }, { label: 'Assignment', icon: IC.doc, run: () => app().go(`/courses/${c.id}/assignments/${a.id}`) }],
       }, `t:${key}`);
     }
@@ -406,6 +407,30 @@
       add({ icon: IC.external, title: it.label, sub: 'School tool', run: (from) => BCV.exttool?.openLink({ title: it.label, href: it.href, from }), external: true }, `s:${it.href}`);
     }
     return out.slice(0, limit);
+  }
+  /**
+   * (2.99.102) "/open Knewton Alta › …": every assignment the tool is used through, in every course, for the one to open —
+   * what is still to hand in first, the nearest due date first (as the tool's own row opens by), then what is handed in;
+   * narrowed by what is typed after the ›. Each opens the tool on that assignment; its Assignment action, the assignment.
+   */
+  async function toolAssignmentItems(tool, q, cs, lane) {
+    const aLists = await eachCourse(cs, lane, (c) => store().assignments(c.id).then((rows) => (rows || []).filter((a) => isToolAssignment(a)).map((a) => ({ a, c }))));
+    const tooled = aLists.flat().map(({ a, c }) => ({ a, c, p: providerOf({ url: a.external_tool_tag_attributes?.url, title: a.name }) })).filter((x) => x.p);
+    const nameFor = siteNames(tooled.map((x) => x.p));
+    const now = Date.now();
+    const stand = (a) => { const at = a.due_at ? U.parse(a.due_at)?.getTime() ?? null : null; return [a.submission?.submitted_at ? 1 : 0, at === null ? Infinity : at < now ? now - at + 365 * 864e5 : at - now]; };
+    const mine = tooled.filter((x) => norm(nameFor(x.p)) === norm(tool) && hit(`${x.a.name} ${nameOf(x.c)}`, q));
+    mine.sort((x, y) => { const [d1, t1] = stand(x.a), [d2, t2] = stand(y.a); return d1 - d2 || t1 - t2 || String(x.a.name).localeCompare(String(y.a.name), undefined, { numeric: true }); });
+    const items = mine.map(({ a, c }) => {
+      const open = (from) => launchTool(a, c.id, from);
+      const at = a.due_at ? U.parse(a.due_at)?.getTime() ?? null : null;
+      return {
+        icon: IC.doc, title: a.name, sub: [nameOf(c), a.due_at ? dueLabel(U.parse(a.due_at)) : 'No due date', a.submission?.submitted_at ? 'handed in' : null].filter(Boolean).join(' · '), tint: c.color || null, course: c, at, done: !!a.submission?.submitted_at, run: open, external: true, assignment: a,
+        actions: [{ label: 'Open tool', icon: IC.external, run: open }, { label: 'Assignment', icon: IC.doc, run: () => app().go(`/courses/${c.id}/assignments/${a.id}`) }],
+      };
+    });
+    items.label = `${tool}: which assignment?`;
+    return items;
   }
   async function courseItems(q) {
     const cs = await store().courses().catch(() => []);
@@ -881,8 +906,10 @@
       args: async (q, ctx) => [{ icon: IC.convert, title: 'A file from this device…', sub: 'Opens the converter', run: (from) => BCV.tools?.open('conv', { from, over: true }) }, ...(await fileItems(q, ctx.cs, ctx.lane))],
       run: (it, ctx) => { if (!it) return; ctx.close(); if (it.file) convertFile(it.file, ctx.from); else it.run?.(ctx.from); } },
     { name: 'open', aliases: ['launch'], hint: 'Open a tool in its own tab', label: 'Open a tool', icon: IC.external, takes: 'a tool',
-      args: nl('tool', (q, ctx) => toolItems(q, ctx.cs, ctx.lane)), empty: 'No tool by that name in your courses.',
-      run: (it, ctx) => { if (it?.run) { ctx.close(); it.run(ctx.from); } } },
+      args: (q, ctx) => { const m = /^(.*?)\s*›\s*(.*)$/.exec(q); return m ? toolAssignmentItems(m[1].trim(), m[2].trim(), ctx.cs, ctx.lane) : nl('tool', (x, c2) => toolItems(x, c2.cs, c2.lane))(q, ctx); },
+      empty: 'No tool by that name in your courses.',
+      // (2.99.102) a tool used through assignments: its assignments listed, for the one to open
+      run: (it, ctx) => { if (it?.drill && !/›/.test(ctx.q || '')) { ctx.fill(`/open ${it.drill} › `); return; } if (it?.run) { ctx.close(); it.run(ctx.from); } } },
     { name: 'page', aliases: ['wiki'], hint: 'Find a page in your courses', label: 'Pages', icon: IC.page, takes: 'a page', net: true,
       args: (q, ctx) => pageItems(q, ctx.cs, ctx.lane), empty: 'Type part of a page’s title.', run: (it, ctx) => { if (it?.href) { ctx.close(); app().go(it.href); } } },
     { name: 'module', aliases: ['modules', 'unit'], hint: 'Find a module, or something in one', label: 'Modules', icon: IC.modules, takes: 'a module or an item',
