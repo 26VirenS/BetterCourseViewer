@@ -259,6 +259,13 @@ private struct FloatingPopupShown<V: View>: ViewModifier {
 final class FloatingPopups {
     private weak var engine: Engine?
     private var panels: [String: PopupPanel] = [:]
+    /// (1.3.155) The keys in the order their popups came up: the last a large one's is the one New Window takes.
+    private var order: [String] = []
+    /// (1.3.155) Popups made windows of their own (New Window): no longer over the window, closed with it still.
+    private var outside: [PopupPanel] = []
+
+    /// (1.3.155) Posted (object: these popups) as a popup comes up, goes, or is made a window of its own.
+    static let changed = Notification.Name("SimplPopupsChanged")
     private var watches: [NSObjectProtocol] = []
     private weak var watched: NSWindow?
 
@@ -299,13 +306,50 @@ final class FloatingPopups {
     /// up told.
     func close(_ key: String, animated: Bool = true) {
         guard let panel = panels.removeValue(forKey: key) else { return }
+        order.removeAll { $0 == key }
+        panel.goOut(animated: animated)
+        panel.onClose?()
+        said()
+    }
+
+    /// Every popup of the window closed (the window closing) — those made windows of their own too.
+    func closeAll() {
+        for key in Array(panels.keys) { close(key, animated: false) }
+        for panel in outside { closedOutside(panel, animated: false) }
+    }
+
+    // MARK: New Window (1.3.155)
+
+    /// The large popup up last (a tool, an Alta or Macmillan assignment, the feedback, the rubric), which New Window
+    /// makes a window of its own.
+    private var frontLarge: PopupPanel? {
+        order.reversed().lazy.compactMap { self.panels[$0] }.first { $0.popupLayout.isLarge }
+    }
+
+    /// A large popup is up: the menu bar's tab (Shell/MenuBarTab.swift) offers New Window.
+    var canOpenInWindow: Bool { frontLarge != nil }
+
+    /// New Window: the large popup up last made a window of its own, as it is — what it shows goes on where it was (an
+    /// Alta session, a tool part-way) — no longer over the window or moving with it, in the window list, in its own
+    /// full-screen space when the window is in full screen.
+    func openFrontInWindow() {
+        guard let panel = frontLarge, let over = panel.over else { return }
+        panels.removeValue(forKey: panel.popupKey)
+        order.removeAll { $0 == panel.popupKey }
+        outside.append(panel)
+        panel.becomeWindow(fullScreen: over.styleMask.contains(.fullScreen))
+        said()
+    }
+
+    /// A popup made a window of its own closed (its Close, ⌘W, its window's ×, or the window it came from closing).
+    fileprivate func closedOutside(_ panel: PopupPanel, animated: Bool = true) {
+        outside.removeAll { $0 === panel }
         panel.goOut(animated: animated)
         panel.onClose?()
     }
 
-    /// Every popup of the window closed (the window closing).
-    func closeAll() {
-        for key in Array(panels.keys) { close(key, animated: false) }
+    private func said() {
+        NotificationCenter.default.post(name: Self.changed, object: self)
     }
 
     private func put(_ key: String, title: String, layout: PopupLayout, ground: Bool, anchor: UnitPoint, sizeKey: String,
@@ -356,6 +400,8 @@ final class FloatingPopups {
         }
         panel.contentView = holder
         panels[key] = panel
+        order.append(key)
+        said()
         watch(window)
         if layout.isLarge {
             // (one large popup over another opens a step down and along, so both are seen — (1.3.80) that much smaller,
@@ -566,6 +612,9 @@ final class PopupPanel: NSPanel {
     private var chosen: PopupSizes.Chosen
     /// (1.3.80) Being resized by an edge or a corner: which, and where the pointer and the popup were as it began.
     private var resizing: (side: PopupEdges.Side, mouse: NSPoint, frame: NSRect)?
+    /// (1.3.155) Made a window of its own (New Window): placed and sized by the student, as any window.
+    fileprivate private(set) var detached = false
+    private var resizeWatch: NSObjectProtocol?
 
     init(key: String, layout: PopupLayout, title: String, sizeKey: String) {
         popupKey = key
@@ -588,7 +637,7 @@ final class PopupPanel: NSPanel {
     }
 
     override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { false }
+    override var canBecomeMain: Bool { detached }
 
     /// Escape — while it has the keys, and nothing in it took the key for itself — closes it.
     override func cancelOperation(_ sender: Any?) { closePopup() }
@@ -602,7 +651,39 @@ final class PopupPanel: NSPanel {
             NSSound.beep()
             return
         }
-        if let owner { owner.close(popupKey) } else { goOut(animated: true) }
+        if detached, let owner { owner.closedOutside(self) } else if let owner { owner.close(popupKey) } else { goOut(animated: true) }
+    }
+
+    /// (1.3.155) Made a window of its own, where it is and as it is (FloatingPopups.openFrontInWindow): out of the window
+    /// it was over, a titled window — its title bar unseen under the popup's own head, which keeps its Close — resized by
+    /// its edges as any window, and in the window list. In full screen, in a full-screen space of its own, as a new
+    /// Safari window is.
+    fileprivate func becomeWindow(fullScreen: Bool) {
+        guard !detached, !closing else { return }
+        detached = true
+        dragEnded()
+        resizing = nil
+        parent?.removeChildWindow(self)
+        styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+        titlebarAppearsTransparent = true
+        titleVisibility = .hidden
+        for b in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] { standardWindowButton(b)?.isHidden = true }
+        level = .normal
+        collectionBehavior = [.managed, .participatesInCycle, .fullScreenPrimary]
+        isExcludedFromWindowsMenu = false
+        minSize = Self.least
+        // (a step down and along from where it was, so it is seen to have come away)
+        setFrameOrigin(NSPoint(x: frame.minX + 24, y: frame.minY - 24))
+        model.size = frame.size
+        resizeWatch = NotificationCenter.default.addObserver(forName: NSWindow.didResizeNotification, object: self, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.detached, self.popupLayout.isLarge else { return }
+                if self.model.size != self.frame.size { self.model.size = self.frame.size }
+            }
+        }
+        makeKeyAndOrderFront(nil)
+        invalidateShadow()
+        if fullScreen { DispatchQueue.main.async { [weak self] in self?.toggleFullScreen(nil) } }
     }
 
     // MARK: Placing
@@ -611,7 +692,7 @@ final class PopupPanel: NSPanel {
     /// across the screen's side of the window a little above its middle, one at a point with its top left there — or,
     /// already placed, sized again with its top and its middle kept where they are.
     fileprivate func place(fitting size: CGSize? = nil) {
-        guard let over else { return }
+        guard let over, !detached else { return } // (1.3.155: a window of its own is where its student puts it)
         let m = FloatingPopups.margin
         var f: NSRect
         switch popupLayout {
@@ -745,6 +826,8 @@ final class PopupPanel: NSPanel {
         closing = true
         dragEnded()
         resizing = nil
+        if let resizeWatch { NotificationCenter.default.removeObserver(resizeWatch) }
+        resizeWatch = nil
         let wasKey = isKeyWindow
         let gone = { [self] in
             model.content = AnyView(EmptyView())
@@ -804,7 +887,7 @@ final class PopupPanel: NSPanel {
 
     /// An edge or a corner of a large popup taken: where the pointer and the popup are, kept for the drag.
     fileprivate func resizeBegan(_ side: PopupEdges.Side) {
-        guard popupLayout.isLarge, !closing, drag == nil else { return }
+        guard popupLayout.isLarge, !closing, drag == nil, !detached else { return } // (1.3.155: a window resizes as windows do)
         userMoved = true
         resizing = (side, NSEvent.mouseLocation, frame)
     }

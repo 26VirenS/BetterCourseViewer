@@ -43,9 +43,9 @@ struct MainShell: View {
                     .onChange(of: g.size.width) { _, w in fit(w) }
             }
         }
-        // (1.3.153) the little black tab hanging from the menu bar in full screen — a full-screen button otherwise
-        //  (Shell/MenuBarTab.swift)
-        .background { MenuBarTabProbe(sidebarShown: columns != .detailOnly) }
+        // (1.3.153, 1.3.155) New Window, while a large popup is up: a little black tab hanging from the menu bar in full
+        //  screen, a black button beside the window's buttons otherwise (Shell/MenuBarTab.swift)
+        .background { MenuBarTabProbe(sidebarShown: columns != .detailOnly, popups: engine.popups) }
         .overlay { TourOverlay(columns: $columns) } // (1.2) the Mac tour (Shell/Tour.swift)
         .overlay { AppearanceOverlay(columns: $columns) } // (1.3.113) Appearance, from the ⋯ menu (Shell/AppearanceMode.swift)
         .overlay { WorkPreviewOverlay() } // (1.2.3) a piece of work's quick look, grown out of its row (Shell/WorkPreviewOverlay.swift)
