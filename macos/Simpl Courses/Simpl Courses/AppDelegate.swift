@@ -24,7 +24,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(windowClosed(_:)), name: NSWindow.willCloseNotification, object: nil)
         LoginItem.applyDefaultOnce()
         Updater.shared.start()
+        if Placement.takeQuietLaunch() {
+            // (2.99.104) opened again by an update that came by itself: back to keeping watch from the menu bar, its
+            // window not shown (the window the storyboard opens, put away now and once more as the launch settles)
+            stayOutOfSight()
+            DispatchQueue.main.async { self.stayOutOfSight() }
+            return
+        }
         if !ViewController.welcomeDue(SharedStore()) { Placement.offerMoveIfNeeded() } // (the first screen's button does the move)
+    }
+
+    private func stayOutOfSight() {
+        for window in NSApp.windows where window.contentViewController is ViewController { window.orderOut(nil) }
+        NSApp.setActivationPolicy(.accessory)
     }
 
     /// The hourly check needs the app running: the window closing does not end it.
@@ -55,6 +67,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func showWindow() {
         NSApp.setActivationPolicy(.regular)
+        NSApp.unhide(nil) // (2.99.104: a quiet relaunch opens hidden)
         NSApp.activate(ignoringOtherApps: true)
         if let window = NSApp.windows.first(where: { $0.contentViewController is ViewController }) {
             window.makeKeyAndOrderFront(nil)
@@ -253,13 +266,31 @@ enum Placement {
         return own
     }
 
-    /// The copy at `url` opens once this one has quit (-n: started afresh rather than this one found).
-    static func relaunch(_ url: URL) {
+    /// The copy at `url` opens once this one has quit (-n: started afresh rather than this one found). (2.99.104)
+    /// `quietly` (an update that came by itself) while the app is not the one in front: it opens hidden and behind
+    /// (-g -j), and keeps its window shut (`takeQuietLaunch`), so an update never pulls it over what the student is doing.
+    static func relaunch(_ url: URL, quietly: Bool = false) {
+        let quiet = quietly && !NSApp.isActive
+        if quiet {
+            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: quietLaunchKey)
+            UserDefaults.standard.synchronize()
+        }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/sh")
-        p.arguments = ["-c", "sleep 1; /usr/bin/open -n \"$0\"", url.path]
+        p.arguments = ["-c", "sleep 1; /usr/bin/open \(quiet ? "-n -g -j" : "-n") \"$0\"", url.path]
         try? p.run()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { NSApp.terminate(nil) }
+    }
+
+    private static let quietLaunchKey = "quietRelaunch"
+
+    /// (2.99.104) Whether this launch is a quiet relaunch's: the mark read once and cleared, and only a fresh one
+    /// (a relaunch that never happened leaves no window shut the next time the app is opened by hand).
+    static func takeQuietLaunch() -> Bool {
+        let d = UserDefaults.standard
+        let at = d.double(forKey: quietLaunchKey)
+        d.removeObject(forKey: quietLaunchKey)
+        return at > 0 && abs(Date().timeIntervalSince1970 - at) < 60
     }
 }
 

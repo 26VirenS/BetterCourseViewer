@@ -26,6 +26,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.104', date: '2026-10-23', notes: [
+      { kind: 'improved', title: 'Quiet Updates', body: 'The Safari app updates in the background, out of sight.', icon: P.sparkle },
+    ] },
     { version: '2.99.103', date: '2026-10-23', notes: [
       { kind: 'improved', title: "This week's betas", body: 'Everything from the betas since 2.99.92, for everyone.', icon: P.sparkle },
     ] },

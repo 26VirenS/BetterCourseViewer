@@ -80,6 +80,8 @@ final class Updater {
     var onChange: ((State) -> Void)?
     private var timer: Timer?
     private var progressObservation: NSKeyValueObservation?
+    /// (2.99.104) The install under way was asked for (Update now, a version put back), not one that came by itself.
+    private var asked = false
 
     /// (2.99.35) The version a version put back (the Developer section's rollback) replaced, while this copy is older
     /// than it: the app stays on this one, and a version found up to that one is offered (Update now) but never
@@ -159,7 +161,7 @@ final class Updater {
                 if Updater.isNewer(version, than: self.currentVersion) {
                     let release = Release(version: version, url: url, sha256: json["sha256"] as? String, notes: json["notes"] as? String, size: json["size"] as? Int)
                     self.state = .available(release)
-                    if !self.waitsForUpdateNow(release) { self.begin() }
+                    if !self.waitsForUpdateNow(release) { self.asked = false; self.begin() }
                 } else {
                     self.state = .upToDate(Date())
                 }
@@ -184,6 +186,7 @@ final class Updater {
     func install() {
         guard case .available = state else { return }
         endHold()
+        asked = true
         begin()
     }
 
@@ -290,7 +293,7 @@ final class Updater {
         if !inPlace { try? FileManager.default.trashItem(at: current, resultingItemURL: nil) } // (a temporary copy cannot be trashed: it stays)
         Shell.run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", target.path]) // (no quarantine mark: macOS runs it in place, where Safari sees it)
         _ = LSRegisterURL(target as CFURL, true)
-        Placement.relaunch(target) // the new copy opens once this one has quit
+        Placement.relaunch(target, quietly: !asked) // the new copy opens once this one has quit (2.99.104: one that came by itself, out of sight)
     }
 
     /// The releases published on GitHub, newest first, each with its Mac zip: for the Developer
@@ -335,6 +338,7 @@ final class Updater {
         // ones forget it as they open)
         defaults.set(false, forKey: Self.oldAutomaticKey)
         state = .available(Release(version: version, url: url, sha256: (sha256 ?? "").isEmpty ? nil : sha256, notes: nil, size: nil))
+        asked = true
         begin()
     }
 
