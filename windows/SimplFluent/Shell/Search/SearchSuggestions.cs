@@ -619,11 +619,13 @@ public sealed partial class SearchPalette
         Screens.ExternalToolsScreen.Open(engine, tool, course, it);
     }
 
-    /// <summary>A section that answered later in the place of the one that waited for it (or after the rest).</summary>
+    /// <summary>A section that answered later in the place of the one that waited for it — the same title, or (0.3.56:
+    /// /open's "Looking…" answered as "Knewton Alta: which assignment?") the one that held "Looking…" — or after the rest.</summary>
     private static List<PaletteSection> Merge(List<PaletteSection> based, PaletteSection extra)
     {
         var outList = based.ToList();
         var i = outList.FindIndex(s => s.Title == extra.Title);
+        if (i < 0) i = outList.FindIndex(s => s.Items.Any(it => it.Id == Looking.Id));
         if (i >= 0) outList[i] = extra; else outList.Add(extra);
         return outList;
     }
