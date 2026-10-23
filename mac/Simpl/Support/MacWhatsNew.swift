@@ -9,6 +9,9 @@ import Foundation
 /// seen); a first run sees none (its setup comes instead). Help ▸ What's New shows them all.
 enum MacWhatsNew {
     static let releases: [Release] = [
+        Release(version: "1.3.159", date: "2026-10-23", notes: [
+            ReleaseNote(kind: "improved", title: "Tab in Menu Bar Type", body: "New Window's tab uses the menu bar's own font and size."),
+        ]),
         Release(version: "1.3.158", date: "2026-10-23", notes: [
             ReleaseNote(kind: "improved", title: "Wider New Window Tab", body: "In full screen the tab grows into the room it has."),
         ]),

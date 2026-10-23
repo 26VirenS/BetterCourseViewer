@@ -101,7 +101,7 @@ final class MenuBarTabProbeView: NSView {
             // (1.3.158) as wide as the room before the toolbar's first button (the sidebar's) allows, up to its most —
             // the room moves with the sidebar's width; not found, the least
             let room = toolbarStart(in: bar).map { $0 - 12 - x } ?? size.width
-            let width = min(max(room, size.width), MenuBarTabView.tabMost).rounded()
+            let width = min(max(room, MenuBarTabView.tabLeast), max(MenuBarTabView.tabMost, MenuBarTabView.tabLeast)).rounded()
             frame = NSRect(x: x, y: bar.isFlipped ? 0 : bar.bounds.height - size.height, width: width, height: size.height)
             tab.autoresizingMask = bar.isFlipped ? [.maxYMargin] : [.minYMargin]
         } else {
@@ -146,9 +146,16 @@ final class MenuBarTabProbeView: NSView {
 /// (the shape of the screen's notch); out of full screen, a black capsule. Either says New Window.
 final class MenuBarTabView: NSView {
     static let tabLeading: CGFloat = 76
-    static let tabSize = CGSize(width: 88, height: 24)
+    static let tabSize = CGSize(width: 88, height: 28)
+    /// (1.3.159) In full screen the label is in the menu bar's own font and size (File, Edit, View…), so the tab is as
+    /// tall as it needs and never narrower than its words with room round them.
+    static let menuFont = NSFont.menuBarFont(ofSize: 0)
+    static var tabLeast: CGFloat {
+        let words = (label as NSString).size(withAttributes: [.font: menuFont]).width
+        return max(tabSize.width, (words + 2 * 6 + 28).rounded(.up))
+    }
     /// (1.3.158) The widest the tab grows in full screen, given the room.
-    static let tabMost: CGFloat = 140
+    static let tabMost: CGFloat = 150
     static let buttonSize = CGSize(width: 90, height: 20)
     private static let label = "New Window"
 
@@ -189,7 +196,7 @@ final class MenuBarTabView: NSView {
         } else {
             NSBezierPath(roundedRect: bounds, xRadius: h / 2, yRadius: h / 2).fill()
         }
-        let font = NSFont.systemFont(ofSize: 11, weight: .semibold)
+        let font = full ? Self.menuFont : NSFont.systemFont(ofSize: 11, weight: .semibold)
         let words = NSAttributedString(string: Self.label, attributes: [.font: font, .foregroundColor: down ? NSColor.lightGray : NSColor.white])
         let s = words.size()
         words.draw(at: NSPoint(x: text.midX - s.width / 2, y: text.midY - s.height / 2))
