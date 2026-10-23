@@ -97,7 +97,12 @@ final class MenuBarTabProbeView: NSView {
         let zoom = (window.standardWindowButton(.zoomButton) ?? close).frame
         if full {
             let size = MenuBarTabView.tabSize
-            frame = NSRect(x: max(MenuBarTabView.tabLeading, zoom.maxX + 16), y: bar.isFlipped ? 0 : bar.bounds.height - size.height, width: size.width, height: size.height)
+            let x = max(MenuBarTabView.tabLeading, zoom.maxX + 16)
+            // (1.3.158) as wide as the room before the toolbar's first button (the sidebar's) allows, up to its most —
+            // the room moves with the sidebar's width; not found, the least
+            let room = toolbarStart(in: bar).map { $0 - 12 - x } ?? size.width
+            let width = min(max(room, size.width), MenuBarTabView.tabMost).rounded()
+            frame = NSRect(x: x, y: bar.isFlipped ? 0 : bar.bounds.height - size.height, width: width, height: size.height)
             tab.autoresizingMask = bar.isFlipped ? [.maxYMargin] : [.minYMargin]
         } else {
             let size = MenuBarTabView.buttonSize
@@ -109,6 +114,24 @@ final class MenuBarTabProbeView: NSView {
         if tab.full != full { tab.full = full }
         let hidden = !sidebarShown || !popups.hasLarge
         if tab.isHidden != hidden { tab.isHidden = hidden }
+    }
+
+    /// (1.3.158) Where the toolbar's first item starts across the title bar (the sidebar's button, past the window's
+    /// buttons), in the title bar's own points: the most the tab may reach, less a margin.
+    private func toolbarStart(in bar: NSView) -> CGFloat? {
+        var start: CGFloat?
+        func walk(_ v: NSView) {
+            for s in v.subviews where s !== tab && !s.isHidden {
+                if String(describing: type(of: s)).contains("ToolbarItemViewer") {
+                    let r = s.convert(s.bounds, to: bar)
+                    if r.width > 0, r.minX > 40 { start = min(start ?? r.minX, r.minX) }
+                } else {
+                    walk(s)
+                }
+            }
+        }
+        walk(bar.superview ?? bar)
+        return start
     }
 
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -124,6 +147,8 @@ final class MenuBarTabProbeView: NSView {
 final class MenuBarTabView: NSView {
     static let tabLeading: CGFloat = 76
     static let tabSize = CGSize(width: 88, height: 24)
+    /// (1.3.158) The widest the tab grows in full screen, given the room.
+    static let tabMost: CGFloat = 140
     static let buttonSize = CGSize(width: 90, height: 20)
     private static let label = "New Window"
 
