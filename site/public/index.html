@@ -130,6 +130,21 @@ section { position: relative; }
 .macdl__tick { width: 16px; height: 16px; margin-left: auto; flex: none; opacity: 0; }
 .macdl__opt.is-auto { background: var(--mr); }
 .macdl__opt.is-auto .macdl__tick { opacity: 1; }
+/* (the hero's) on a wide screen it opens out to both sides of the button and down, its choices side by side in one row */
+@media (min-width: 720px) {
+  .macdl--wide .macdl__float { left: 50%; right: auto; width: min(880px, calc(100vw - 32px)); translate: -50% 0; }
+  .macdl--wide .macdl__panel { clip-path: inset(0 calc((100% - var(--w, 300px)) / 2) calc(100% - var(--h, 50px)) round calc(var(--h, 50px) / 2)); }
+  .macdl--wide[data-dir="up"] .macdl__panel { clip-path: inset(calc(100% - var(--h, 50px)) calc((100% - var(--w, 300px)) / 2) 0 round calc(var(--h, 50px) / 2)); }
+  .macdl--wide[data-open] .macdl__panel { clip-path: inset(0 0 0 0 round 25px); }
+  .macdl--wide .macdl__opts { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+  .macdl--wide .macdl__opt { position: relative; flex-direction: column; justify-content: flex-start; gap: 9px; margin: 0; padding: 16px 8px 14px; text-align: center; }
+  .macdl--wide .macdl__ic, .macdl--wide .macdl__ic img { width: 44px; height: 44px; border-radius: 11px; }
+  .macdl--wide .macdl__ic svg { width: 24px; height: 24px; }
+  .macdl--wide .macdl__ic--safari svg { width: 28px; height: 28px; }
+  .macdl--wide .macdl__t { justify-items: center; text-align: center; }
+  .macdl--wide .macdl__t small { text-wrap: balance; }
+  .macdl--wide .macdl__tick { position: absolute; top: 9px; right: 9px; margin: 0; }
+}
 .macdl__rec { display: inline-block; margin-left: 6px; padding: 2px 6px; border-radius: 999px; background: var(--mr); color: var(--mt); font: 600 10.5px/1.3 var(--font); letter-spacing: .01em; vertical-align: 1px; }
 .link { display: inline-flex; align-items: center; gap: 5px; font-size: 19px; color: var(--link); text-decoration: none; }
 .link svg { width: 13px; height: 13px; transition: transform 200ms var(--ease-out); }
@@ -354,7 +369,7 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
 @media (prefers-reduced-motion: reduce) {
   .js .reveal { opacity: 0; transition: opacity 300ms ease; }
   .js .reveal.is-in { opacity: 1; }
-  .macdl__panel, .macdl[data-dir="up"] .macdl__panel { clip-path: inset(0 0 0 0 round 25px); opacity: 0; transition: opacity 160ms ease, visibility 0s linear 160ms; }
+  .macdl__panel, .macdl[data-dir="up"] .macdl__panel, .macdl--wide .macdl__panel, .macdl--wide[data-dir="up"] .macdl__panel { clip-path: inset(0 0 0 0 round 25px); opacity: 0; transition: opacity 160ms ease, visibility 0s linear 160ms; }
   .macdl[data-open] .macdl__panel { opacity: 1; transition: opacity 160ms ease, visibility 0s; }
   .macdl__opt, .macdl[data-dir="up"] .macdl__opt { transform: none; transition: opacity 160ms ease, background-color 160ms ease; }
   .macdl[data-open] .macdl__opt { transition-delay: 0s; }
@@ -399,7 +414,7 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
       <h1 class="hero__title"><span class="w" style="--i:0">Make<span class="sr"> learning</span></span> <span class="w rot" style="--i:1" aria-hidden="true" data-rot><span class="rot__size">Learning</span><span class="rot__word is-on" style="--c:#d97a00;--cd:#ffb340">Learning</span><span class="rot__word" style="--c:#5856d6;--cd:#7d7aff">Math</span><span class="rot__word" style="--c:#1f9d48;--cd:#30d158">Science</span><span class="rot__word" style="--c:#a05a1c;--cd:#e0a66a">History</span><span class="rot__word" style="--c:#d70f4f;--cd:#ff6482">English</span><span class="rot__word" style="--c:#0a84b8;--cd:#64d2ff">Chemistry</span><span class="rot__word" style="--c:#4d8c0c;--cd:#a3e635">Biology</span><span class="rot__word" style="--c:#8a3fb5;--cd:#c77dff">Physics</span><span class="rot__word" style="--c:#d4380d;--cd:#ff7a45">Spanish</span><span class="rot__word" style="--c:#0f8f84;--cd:#40c8b4">Homework</span></span> <span class="w" style="--i:2"><span class="accent">Simpl.</span></span></h1>
       <p class="sub">Canvas and Brightspace, made simple.</p>
       <div class="cta">
-        <div class="macdl macdl--blue macdl--one" data-macdl data-dl>
+        <div class="macdl macdl--blue macdl--one macdl--wide" data-macdl data-dl>
           <button class="btn btn--blue macdl__btn" type="button" aria-expanded="false" aria-haspopup="true" aria-controls="macdl-hero"><svg aria-hidden="true"><use href="#i-laptop" data-dl-ic/></svg><span data-dl-label>Download for Mac</span><svg class="macdl__chev" aria-hidden="true"><use href="#i-chev"/></svg></button>
           <div class="macdl__float">
             <div class="macdl__panel" id="macdl-hero">
@@ -769,7 +784,8 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
     dl.querySelectorAll('.macdl__opt').forEach((a, i) => a.style.setProperty('--i', String(i))); // (their entrance, one after another)
   }
 
-  // Download: the button opens into its choices — downward when the page has room below it, else upward
+  // Download: the button opens into its choices — downward when the page has room below it, else upward (the hero's, on a
+  // wide screen, out to both sides of the button too: --w is the button's width it grows from)
   const choosers = [...document.querySelectorAll('[data-macdl]')];
   const close = (root, { focus = false } = {}) => {
     if (!root.hasAttribute('data-open')) return;
@@ -783,6 +799,7 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
     const panel = root.querySelector('.macdl__panel');
     const r = btn.getBoundingClientRect();
     root.style.setProperty('--h', `${r.height}px`);
+    root.style.setProperty('--w', `${r.width}px`);
     const need = panel.offsetHeight + 12;
     const below = innerHeight - r.top, above = r.bottom;
     root.dataset.dir = below >= need || below >= above ? 'down' : 'up';
@@ -798,9 +815,9 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
     root.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && root.hasAttribute('data-open')) { e.preventDefault(); close(root, { focus: true }); return; }
       const i = opts.indexOf(document.activeElement);
-      if (i < 0 || !['ArrowDown', 'ArrowUp'].includes(e.key)) return;
+      if (i < 0 || !['ArrowDown', 'ArrowUp', 'ArrowRight', 'ArrowLeft'].includes(e.key)) return;
       e.preventDefault();
-      opts[(i + (e.key === 'ArrowDown' ? 1 : opts.length - 1)) % opts.length].focus();
+      opts[(i + (e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : opts.length - 1)) % opts.length].focus();
     });
     root.addEventListener('focusout', (e) => { if (!root.contains(e.relatedTarget)) close(root); });
     // a choice is taken: the download starts, and the panel closes once the press has shown
