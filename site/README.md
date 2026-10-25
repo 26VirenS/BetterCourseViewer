@@ -11,9 +11,9 @@ nothing kept); everything else is a file served as it is. The landing page's "Do
 reads `/data/schools.json`, the extension's own school list (`extension/data/schools.json`), which
 `scripts/publish-site.sh` copies in at every publish.
 
-The landing page leads with the problem it fixes and Canvas's own Dashboard beside Simpl's (the slider), then the
-features grouped by when a student needs them, one download button picked for the device (Mac, Windows, Chrome,
-iPhone waitlist), the short comparison and the trust facts. Its claims are kept to what the code does: change the
+The landing page leads with "Make ___ Simpl." (the subject turning over), the three download buttons (Download for
+Mac opens into the Mac app and the Safari extension) and Canvas's own Dashboard beside Simpl's (the slider), then the
+features grouped by when a student needs them, the iPhone waitlist, the short comparison and the trust facts. Its claims are kept to what the code does: change the
 comparison or the trust page when the apps change. There are no student quotes or user numbers on it yet: add them
 only when they are real.
 
