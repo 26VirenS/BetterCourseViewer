@@ -393,6 +393,7 @@ struct Sidebar: View {
             AccountBar()
         }
         .plainPhotoWords(appearance.isPlain(.side)) // (1.3.164: its photo's Ink off — dark words, a white border round them)
+        .background { ColumnAppearance(light: appearance.isPlain(.side)) } // (and the list's own words, drawn natively, in the light look)
         .background { SidebarGround() } // (1.3.1) the sidebar's photo, frosted, behind its rows
         // (1.3.113) Appearance on: its photo button, in its middle
         .overlay {

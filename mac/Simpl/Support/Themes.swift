@@ -635,8 +635,8 @@ struct SidebarGround: View {
 }
 
 /// (1.3.164) The words on a photo with its Ink switch off (the web's .bcv-side--plain): the light look's dark words in
-/// either look, each with a gentle white border — a hairline of white round every letter, softening out — so they read
-/// on any photo. Where the photo is inked nothing changes.
+/// either look, each with a gentle white border — a ring of white round every letter (four sharp copies a hair out each
+/// way, as the web's ring is), softening out — so they read on any photo. Where the photo is inked nothing changes.
 struct PlainPhotoWords: ViewModifier {
     let on: Bool
 
@@ -645,11 +645,51 @@ struct PlainPhotoWords: ViewModifier {
         if on {
             content
                 .environment(\.colorScheme, .light)
-                .shadow(color: .white, radius: 0.5)
-                .shadow(color: .white, radius: 0.5)
-                .shadow(color: .white.opacity(0.7), radius: 2.5)
+                .shadow(color: .white, radius: 0, x: 0.8, y: 0)
+                .shadow(color: .white, radius: 0, x: -0.8, y: 0)
+                .shadow(color: .white, radius: 0, x: 0, y: 0.8)
+                .shadow(color: .white, radius: 0, x: 0, y: -0.8)
+                .shadow(color: .white.opacity(0.75), radius: 3)
         } else {
             content
+        }
+    }
+}
+
+/// (1.3.164) The native views of the window's column it sits in drawn in the light look, or given the window's own back.
+/// The sidebar's list draws its words in the window's look whatever SwiftUI's colour scheme says, so over a photo with
+/// its Ink off in the dark look they were light on it; with the column in the light look they are the light look's, dark.
+struct ColumnAppearance: NSViewRepresentable {
+    let light: Bool
+
+    func makeNSView(context: Context) -> Probe { Probe() }
+    func updateNSView(_ view: Probe, context: Context) {
+        view.light = light
+        view.apply()
+    }
+
+    final class Probe: NSView {
+        var light = false
+        private var owned = false
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            apply()
+        }
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        /// The column: the view under the split view that holds this one.
+        func apply() {
+            var view: NSView = self
+            while let up = view.superview, !(up is NSSplitView) { view = up }
+            guard view.superview is NSSplitView else { return }
+            if light {
+                view.appearance = NSAppearance(named: .aqua)
+                owned = true
+            } else if owned {
+                view.appearance = nil // (given back only where it was set here)
+                owned = false
+            }
         }
     }
 }

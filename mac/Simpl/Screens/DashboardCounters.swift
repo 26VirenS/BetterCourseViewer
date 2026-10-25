@@ -175,13 +175,14 @@ struct DashCounterTile: View {
         Button(action: { if !appearanceMode.on { action() } }) {
             VStack(alignment: .leading, spacing: 6) {
                 head
-                DashCount(value: value, alert: alert, stale: stale)
+                // (1.3.164: over a photo with its Ink off, the words solid — a faint number or a grey line is lost on a photo)
+                DashCount(value: value, alert: alert, stale: stale && !plain)
                 Text(shownNote ?? " ")
                     .font(.sCaption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(plain ? AnyShapeStyle(Color.primary) : AnyShapeStyle(.secondary))
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
-                    .opacity(stale ? 0.6 : 1)
+                    .opacity(stale && !plain ? 0.6 : 1)
             }
             .plainPhotoWords(plain)
             .padding(.horizontal, Self.padding(style))
