@@ -382,6 +382,9 @@ jobs:
           Shot 'calendar' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'calendar'))
           Shot 'calendar-wide' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'calendar'))
           Shot 'calendar-week' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'calendar', '--cal-view', 'week'))
+          # (0.3.62) the week over its hours in dark, and a plan put on it and moved an hour on by planMove (the log says so)
+          Shot 'calendar-week-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'calendar', '--cal-view', 'week'))
+          Shot 'calendar-week-plan' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'calendar', '--cal-view', 'week', '--open', 'cal-plan'))
           Shot 'calendar-list' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'calendar', '--cal-view', 'list'))
           Shot 'calendar-preview' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'calendar', '--open', 'preview'))
           # (0.3.53) Find Appointment over the calendar, light and dark
@@ -1420,6 +1423,13 @@ jobs:
             $l = PhoneLog $pl
             Write-Host "${pl}: $((@($l -split "`n" | Where-Object { $_ -match 'plan: ' }) -join ' | '))"
             if ($l -notmatch 'plan: shows [1-9]\d* blocks for [1-9]\d* items over \d+ days') { Write-Host "::error::${pl}: no study blocks were planned before the picture (shots/profile-$pl.log)"; exit 1 }
+          }
+          # (0.3.62) the plan on the week: put at its first free time, then moved an hour on by planMove before the picture
+          # (Screens/Calendar/CalendarScreen.cs ShotPlanMoved: "calendar: plan put …, moved to …")
+          if ($script:mine -contains 'calendar-week-plan') {
+            $l = PhoneLog 'calendar-week-plan'
+            Write-Host "calendar-week-plan: $((@($l -split "`n" | Where-Object { $_ -match 'calendar: ' }) -join ' | '))"
+            if ($l -notmatch 'calendar: plan put .+, moved to ') { Write-Host "::error::calendar-week-plan: no plan was put and moved before the picture (shots/profile-calendar-week-plan.log)"; exit 1 }
           }
           # (tools) Verb conjugations: the verb the launch asked for was conjugated and shown (Tools/Study/Verbs/VerbsTool.cs)
           foreach ($vb in @(@('tool-verbs', 'verbs: shows es tener'), @('tool-verbs-dark', 'verbs: shows fr manger'), @('pin-verbs', 'verbs: shows es ser'))) {
