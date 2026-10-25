@@ -308,6 +308,12 @@ try {
   const plEv = plCal.events.find((e) => e.layer === 'plan' && e.planId === plWork.id);
   const plLinked = plCal.events.filter((e) => e.layer === 'linked').map((e) => e.title);
   check(plEv?.kind === 'Plan' && plEv.date === plSlots.slots[0].at && !!plEv.end && plLinked.includes('Shift at the library') && plLinked.includes('Trip home') && !plLinked.some((t) => /Cancelled/.test(t)), `the calendar lays the plan and the linked calendar's events over Canvas's: ${JSON.stringify({ plan: plEv, linked: [...new Set(plLinked)] })}`);
+  // (2.99.109) moved as it is, an hour on (its block dragged on the apps' week)
+  const plTo = new Date(Date.parse(plSlots.slots[0].at) + 3600e3).toISOString();
+  const plMove = await nc('planMove', { id: plWork.id, at: plTo });
+  const plBad = await nc('planMove', { id: 'assignment:nope', at: plTo });
+  const plRow4 = (await nc('todo')).sections.flatMap((x) => x.rows).find((r) => r.id === plWork.id);
+  check(plMove.ok && plRow4?.plan?.at === plTo && plRow4.plan.mins === 60 && !!plBad.error, `a plan moved by its id keeps its length; one that is not there is refused: ${JSON.stringify({ plan: plRow4?.plan, bad: plBad })}`);
   const plClear = await nc('planClear', { id: plWork.id });
   await nc('calUnlink', { id: plSync2.links[0].id });
   const plSync3 = await nc('calSync');

@@ -1505,9 +1505,20 @@ try {
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-pv'), null, { timeout: 5000 });
   await page.click('.bcv-seg__btn[data-value="week"]');
-  await page.waitForSelector('.bcv-week__grid', { timeout: 5000 });
+  await page.waitForSelector('.bcv-week__body', { timeout: 5000 });
   check((await page.$$('.bcv-week__hour')).length === 16 && (await page.$('.bcv-week__col--today')), 'week view: 8a–11p rows, today column');
   check((await texts('.bcv-wev')).some((t) => /11:59p.*Dis01/.test(t)), 'week view events with times');
+  // (2.99.109) a time grid: each block where its time is (the hour 48 px tall, from 8 am), a red line across today at the
+  // time it is now (shown from 8 am on), the title naming the week's month with the week's days under it
+  const weekGeo = await page.evaluate(() => {
+    const at = (e) => ({ top: parseFloat(e.style.top), h: parseFloat(e.style.height), t: e.textContent });
+    const q = [...document.querySelectorAll('.bcv-wev')].find((e) => /Lec06-PreQuiz/.test(e.textContent));
+    const now = document.querySelector('.bcv-week__day--today .bcv-week__now');
+    const hr = new Date().getHours();
+    return { quiz: q ? at(q) : null, now: !!now, nowShown: now ? !now.hidden : false, hr, title: document.querySelector('.bcv-h1').textContent, sub: document.querySelector('.bcv-cal__sub')?.textContent || '', abs: [...document.querySelectorAll('.bcv-wev')].every((e) => getComputedStyle(e).position === 'absolute') };
+  });
+  check((!weekGeo.quiz || (weekGeo.quiz.top === 120 && weekGeo.quiz.h >= 20 && /^(Due )?10:30a/.test(weekGeo.quiz.t))) && weekGeo.now && weekGeo.nowShown === (weekGeo.hr >= 8) && weekGeo.abs && /^[A-Z][a-z]+ \d{4}$|^[A-Z][a-z]{2} – [A-Z][a-z]{2} \d{4}$/.test(weekGeo.title) && /^[A-Z][a-z]{2} \d+ – [A-Z][a-z]{2} \d+ · \d+ items?/.test(weekGeo.sub),
+    `week as a time grid: blocks placed by their time, the now line on today, the week named by its month: ${JSON.stringify(weekGeo)}`);
   await shot(page, '07-calendar-week');
   await page.click('.bcv-seg__btn[data-value="agenda"]');
   await page.waitForSelector('.bcv-agenda', { timeout: 5000 });
@@ -1586,7 +1597,7 @@ try {
   const linkTry = async (url) => {
     await page.fill('.bcv-sync__input', url);
     await page.press('.bcv-sync__input', 'Enter');
-    return untilV(() => page.evaluate(() => { const m = document.querySelector('.bcv-sync__msg, .bcv-sync__ask'); return m && !document.querySelector('.bcv-sync__add[disabled]') ? m.textContent.trim() : null; }), 10000);
+    return untilV(() => page.evaluate(() => { const m = document.querySelector('.bcv-sync__status:not(.is-busy), .bcv-sync__ask'); return m && !document.querySelector('.bcv-sync__add[disabled]') ? m.textContent.trim() : null; }), 10000);
   };
   const notLink = await linkTry('not a calendar link');
   check(/^That is not a calendar link\./.test(notLink || ''), `words that are no address are refused: "${notLink}"`);
@@ -1607,6 +1618,8 @@ try {
   // a calendar of the student's own, as Google serves its private address
   const linked = await linkTry(`${BASE}/__mock/ics/personal.ics`);
   check(linked === 'Sam\'s calendar is linked: 5 events read.', `a private address pasted: read, named from the calendar, its events counted (the cancelled lunch left out): "${linked}"`);
+  const inline = await page.evaluate(() => { const st = document.querySelector('.bcv-sync__status'); return { inCard: !!st?.closest('.bcv-sync__links'), ok: !!st?.classList.contains('is-ok'), tick: !!st?.querySelector('svg') }; });
+  check(inline.inCard && inline.ok && inline.tick, `(2.99.109) what came of the link is said under its field, in its card, with a tick: ${JSON.stringify(inline)}`);
   const linkRow = await untilV(() => page.evaluate(() => { const r = document.querySelector('.bcv-sync__link'); return r ? { name: r.querySelector('.bcv-calrow__name').textContent, sub: r.querySelector('.bcv-sync__sub').textContent, on: !!r.querySelector('.bcv-switch.is-on') } : null; }));
   const count = (await texts('.bcv-cal__synccount'))[0];
   const stored = await sw.evaluate(async () => { const l = (await self.BCV.api.storage.local.get('cal:links'))['cal:links'] || []; const a = await chrome.alarms.get('simpl:cal-sync'); return { n: l.length, url: l[0]?.url, alarm: a?.periodInMinutes || null }; });
@@ -1657,10 +1670,15 @@ try {
   const rail = await page.evaluate(() => {
     const bar = document.querySelector('.bcv-planbar');
     const r = document.querySelector('.bcv-row.is-pulling');
-    return { slots: [...bar.querySelectorAll('.bcv-planbar__slot')].map((s) => Number(s.dataset.at)), on: [...bar.querySelectorAll('.bcv-planbar__slot')].findIndex((s) => s.classList.contains('is-on')), status: bar.querySelector('.bcv-planbar__status').textContent, due: bar.querySelector('.bcv-planbar__due')?.textContent || '', moved: r ? new DOMMatrix(getComputedStyle(r).transform).m41 : 0, len: bar.querySelector('.bcv-planbar__lenbtn.is-on')?.textContent };
+    const chipsEl = [...bar.querySelectorAll('.bcv-planbar__slot')];
+    return { slots: chipsEl.map((s) => Number(s.dataset.at)), on: chipsEl.findIndex((s) => s.classList.contains('is-on')), status: bar.querySelector('.bcv-planbar__status').textContent, due: bar.querySelector('.bcv-planbar__due')?.textContent || '', moved: r ? new DOMMatrix(getComputedStyle(r).transform).m41 : 0, len: bar.querySelector('.bcv-planbar__lenbtn.is-on')?.textContent,
+      // (2.99.109) the day said once over its first time; the clock uncovered behind the row, filled once a time is chosen
+      days: chipsEl.map((c) => c.querySelector('.bcv-planbar__day').textContent), reveal: !!r?.querySelector('.bcv-pullreveal') && r.classList.contains('is-armed') };
   });
   const nowMs = Date.now();
   const okSlot = (t) => { const d = new Date(t); const end = t + 60 * 60000; const endD = new Date(end); return (d.getMinutes() === 0 || d.getMinutes() === 30) && d.getHours() >= 8 && (endD.getHours() < 23 || (endD.getHours() === 23 && endD.getMinutes() === 0)) && endD.getDate() === d.getDate() && t >= nowMs + 14 * 60000 && !(t < shift.b + 10 * 60000 && end > shift.a - 10 * 60000); };
+  const sameDayAs = (i) => i > 0 && new Date(rail.slots[i]).toDateString() === new Date(rail.slots[i - 1]).toDateString();
+  check(rail.days.every((d, i) => (sameDayAs(i) ? d === '' : d.length > 0)) && rail.reveal, `(2.99.109) each day said once, over its first time, and what the pull does uncovered behind the row: ${JSON.stringify({ days: rail.days.slice(0, 8), reveal: rail.reveal })}`);
   check(rail.slots.length >= 2 && rail.slots.every(okSlot) && rail.slots.every((t, i) => !i || t > rail.slots[i - 1]) && rail.on === 1 && /^Let go to plan /.test(rail.status) && rail.moved > 10 && rail.moved < 64 && rail.len === '1h',
     `pulled right, the row follows and then resists, and a rail of free times hangs under it — on the half hour, 8 am to 11 pm, a quarter of an hour on at least, clear of the shift; the time under the lens is chosen: ${JSON.stringify({ n: rail.slots.length, first: rail.slots.slice(0, 4).map((t) => new Date(t).toString().slice(0, 21)), on: rail.on, status: rail.status, due: rail.due, moved: rail.moved, len: rail.len })}`);
   await shot(page, '06f-plan-rail');
@@ -1738,6 +1756,33 @@ try {
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-cal__sheet'), null, { timeout: 3000 });
   await shot(page, '06g-calendar-plans');
+  // (2.99.109) on the week, the plan's block dragged an hour (a quarter of an hour at a time): the plan moves with it
+  await page.click('.bcv-seg__btn[data-value="week"]');
+  await page.waitForSelector('.bcv-week__body', { timeout: 5000 });
+  const planBlock = await page.$('.bcv-wev.bcv-ev--plan');
+  if (planBlock) {
+    const before = (await prefPlans())[target.id];
+    const at0 = new Date(before.at);
+    const dir = at0.getHours() >= 12 ? -1 : 1;
+    const b = await planBlock.boundingBox();
+    const x = b.x + b.width / 2;
+    const y = b.y + Math.min(14, b.height / 2);
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x, y + dir * 24, { steps: 4 });
+    const midTime = await page.$eval('.bcv-wev.bcv-ev--plan.is-dragging .bcv-wev__time', (e) => e.textContent).catch(() => null);
+    await page.mouse.move(x, y + dir * 48, { steps: 4 });
+    await shot(page, '07b-calendar-week-plan-drag');
+    await page.mouse.up();
+    const want = Date.parse(before.at) + dir * 3600e3;
+    const after = await untilV(async () => { const p = (await prefPlans())[target.id]; return p && Date.parse(p.at) === want ? p : null; });
+    const sheetOpened = !!(await page.$('.bcv-evsheet'));
+    check(!!after && after.mins === before.mins && !!midTime && !sheetOpened && /\/calendar/.test(page.url()),
+      `a plan's block dragged an hour on the week: it moves a quarter of an hour at a time (half way: ${midTime}), kept an hour ${dir > 0 ? 'later' : 'earlier'} as it is let go, its length kept, nothing opened: ${JSON.stringify({ before: before.at, after: after?.at })}`);
+    await shot(page, '07c-calendar-week-plan');
+  }
+  await page.click('.bcv-seg__btn[data-value="month"]');
+  await page.waitForSelector('.bcv-cal__grid', { timeout: 5000 });
   await page.click('.bcv-ev--plan');
   await page.waitForSelector('.bcv-evsheet', { timeout: 5000 });
   const planSheet = await page.evaluate(() => { const sh = document.querySelector('.bcv-evsheet'); return { kicker: sh.querySelector('.bcv-evsheet__kicker').textContent, rows: [...sh.querySelectorAll('.bcv-evsheet__k')].map((k) => k.textContent), btns: [...sh.querySelectorAll('.bcv-evsheet__foot button')].map((b) => b.textContent) }; });

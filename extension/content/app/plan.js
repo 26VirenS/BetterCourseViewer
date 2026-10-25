@@ -78,6 +78,17 @@
     sendOut(it.id).catch(() => {});
     return plan;
   }
+  /** (2.99.109) A plan moved to another time, as it is (its block dragged on the Calendar's week). */
+  async function move(id, at) {
+    const p = plans[id];
+    if (!p) return null;
+    const next = { ...p, at: new Date(at).toISOString() };
+    plans = { ...plans, [id]: next };
+    changed();
+    await store.mergePref('plans', { [id]: next });
+    sendOut(id).catch(() => {});
+    return next;
+  }
   async function clear(id) {
     const prev = plans[id];
     if (!prev) return;
@@ -274,10 +285,12 @@
     function paint() {
       for (const b of lenBtns) { const on = Number(b.dataset.mins) === mins; b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); }
       if (!slots) { track.replaceChildren(U.el('bcv-planbar__wait', 'Finding free time…')); status.textContent = ''; return; }
+      // (2.99.109) the day said once, over the first of its times, and a little more room before each new day: the times
+      // read as a day's handful, not "Today" four times over
       const chips = slots.map((s, i) => {
         const prevDay = i && U.sameDay(new Date(slots[i - 1].at), new Date(s.at));
         return h('button', { type: 'button', class: `bcv-planbar__slot ${i === sel ? 'is-on' : ''} ${prevDay ? '' : 'is-day'} ${planned === s.at ? 'is-current' : ''}`, dataset: { at: String(s.at) }, tabIndex: mode === 'pick' ? (i === sel ? 0 : -1) : -1, 'aria-label': `${whenWords(s.at)}, ${lenWord(mins)}`, onclick: () => commit(i) }, [
-          h('span', { class: 'bcv-planbar__day', text: dayWord(s.at) }),
+          h('span', { class: 'bcv-planbar__day', text: prevDay ? '' : dayWord(s.at), 'aria-hidden': prevDay ? 'true' : null }),
           h('span', { class: 'bcv-planbar__time', text: U.fmtTime(s.at) }),
         ]);
       });
@@ -295,7 +308,11 @@
       if (!slots?.length) return;
       const f = Math.max(-1, Math.min(slots.length - 1, (pulled - LEAD) / STEP));
       const next = f < -0.5 ? -1 : Math.round(f);
-      track.style.transform = `translateX(${(1 - next) * CHIP}px)`;
+      // (by where the chip is: a new day has a little more room before it)
+      const chipEls = track.querySelectorAll('.bcv-planbar__slot');
+      const x = next < 0 ? -CHIP : chipEls[next]?.offsetLeft ?? next * CHIP;
+      track.style.transform = `translateX(${CHIP - x}px)`;
+      if (rowEl.classList.contains('is-pulling')) rowEl.classList.toggle('is-armed', next >= 0);
       if (next !== sel) {
         sel = next;
         for (const [i, c] of [...track.querySelectorAll('.bcv-planbar__slot')].entries()) c.classList.toggle('is-on', i === sel);
@@ -416,6 +433,7 @@
     const pid = e.pointerId;
     let engaged = false;
     let rail = null;
+    let reveal = null;
     const move = (ev) => {
       if (ev.pointerId !== pid) return;
       const dx = ev.clientX - x0;
@@ -428,10 +446,17 @@
         try { window.getSelection()?.removeAllRanges(); } catch { /* none */ }
         rowEl.classList.add('is-pulling');
         rowEl.style.transition = 'none';
+        // (2.99.109) what the pull will do, uncovered behind the row as it moves: a clock that grows with the pull and
+        // fills once a time is chosen (as a list's swipe shows its action under the row)
+        reveal = U.el('bcv-pullreveal', U.svg(IC.clock, { size: 16, stroke: 'currentColor', width: 2.3 }), { 'aria-hidden': 'true' });
+        rowEl.prepend(reveal);
         rail = openBar(rowEl, it, { mode: 'pull' });
       }
       ev.preventDefault();
-      rowEl.style.transform = `translateX(${rubber(dx - ENGAGE).toFixed(1)}px)`;
+      const shift = rubber(dx - ENGAGE);
+      rowEl.style.transform = `translateX(${shift.toFixed(1)}px)`;
+      rowEl.style.setProperty('--bcv-pull', `${shift.toFixed(1)}px`);
+      rowEl.style.setProperty('--bcv-pull-k', Math.min(1, shift / 40).toFixed(3));
       rail.pull(dx - ENGAGE);
     };
     const up = (ev) => { if (ev.pointerId === pid) finish(ev.type === 'pointerup'); };
@@ -447,9 +472,12 @@
       if (!engaged) return;
       swallowUntil = performance.now() + 1000;
       const pick = letGo ? rail.chosen() : null;
-      rowEl.classList.remove('is-pulling');
+      rowEl.classList.remove('is-pulling', 'is-armed');
       rowEl.style.transition = ''; // (springs home: the stylesheet's transition on .bcv-pullable)
       rowEl.style.transform = '';
+      rowEl.style.removeProperty('--bcv-pull');
+      rowEl.style.removeProperty('--bcv-pull-k');
+      reveal?.remove();
       if (pick) rail.commit(pick.i); else rail.close();
     }
     window.addEventListener('pointermove', move, { capture: true, passive: false });
@@ -477,5 +505,5 @@
     return rowEl;
   }
 
-  BCV.plan = { ready, get, all, onChange, put, clear, attach, pill, open: openBar, close: closeBar, freeSlots, slotsFor, linked, linkedEvents, sending, setSending, canSend, whenWords, dayWord, lenWord, lengthFor };
+  BCV.plan = { ready, get, all, onChange, put, move, clear, attach, pill, open: openBar, close: closeBar, freeSlots, slotsFor, linked, linkedEvents, sending, setSending, canSend, whenWords, dayWord, lenWord, lengthFor };
 })();

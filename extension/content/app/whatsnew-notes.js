@@ -27,6 +27,11 @@
     cal: 'M5 6h14v14H5zM5 10h14M9 3v4M15 3v4',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.109', date: '2026-10-25', notes: [
+      { kind: 'improved', title: 'Week by the Hour', body: 'The week shows each event at its time, with a line for now.', icon: P.cal },
+      { kind: 'new', title: 'Drag Plans to Move', body: 'On the week, drag a plan to another time or day.', icon: P.clock },
+      { kind: 'improved', title: 'Calmer Time Picker', body: 'Plan times are grouped by day, the day said once.', icon: P.clock },
+    ] },
     { version: '2.99.108', date: '2026-10-25', notes: [
       { kind: 'new', title: 'Place Your Photo', body: 'A photo opens on its card: drag, zoom and set it there.', icon: P.pic },
       { kind: 'improved', title: 'Solid Photo Borders', body: 'Words on a photo with Ink off have a solid white edge.', icon: P.pic },

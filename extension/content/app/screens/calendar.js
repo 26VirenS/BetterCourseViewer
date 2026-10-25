@@ -14,6 +14,11 @@
   const HOURS = [];
   for (let i = 8; i <= 23; i++) HOURS.push(i);
   const hourLabel = (hh) => (hh === 12 ? '12p' : hh < 12 ? `${hh}a` : `${hh - 12}p`);
+  // (2.99.109) the week as a time grid, as a calendar app draws it: each hour this tall, the day from 8 am to midnight
+  const HOUR_PX = 48;
+  const DAY_A = HOURS[0] * 60;
+  const DAY_B = 24 * 60;
+  const SNAP = 15; // minutes a plan moves by as it is dragged
   const sundayStart = (d) => U.addDays(U.startOfDay(d), -U.startOfDay(d).getDay());
 
   async function render(ctx) {
@@ -278,12 +283,15 @@
       syncBtn.classList.toggle('has-error', linkState.links.some((l) => linkState.feeds[l.id] && !linkState.feeds[l.id].ok));
     }
 
+    // (2.99.109) a title as wide in every view, so the bar beside it never wraps as the view changes: the week named by
+    // its month as a calendar app names it ("October 2026", "Oct – Nov 2026"), the agenda's range with its year under it
     function title() {
       if (view === 'week') {
         const s = sundayStart(anchor), e = U.addDays(s, 6);
-        return s.getMonth() === e.getMonth() ? `${U.MONTHS[s.getMonth()]} ${s.getDate()} – ${e.getDate()}, ${e.getFullYear()}` : `${U.fmtShort(s)} – ${U.fmtShort(e)}, ${e.getFullYear()}`;
+        if (s.getMonth() === e.getMonth()) return `${U.MONTHS_LONG[s.getMonth()]} ${s.getFullYear()}`;
+        return `${U.MONTHS[s.getMonth()]}${s.getFullYear() !== e.getFullYear() ? ` ${s.getFullYear()}` : ''} – ${U.MONTHS[e.getMonth()]} ${e.getFullYear()}`;
       }
-      if (view === 'agenda') return `${U.fmtShort(range.start)} – ${range.end ? U.fmtShort(range.end) : '…'}, ${(range.end || range.start).getFullYear()}`;
+      if (view === 'agenda') return `${U.fmtShort(range.start)} – ${range.end ? U.fmtShort(range.end) : '…'}`;
       return `${U.MONTHS_LONG[anchor.getMonth()]} ${anchor.getFullYear()}`;
     }
 
@@ -314,7 +322,7 @@
         cells.push(U.el(`bcv-cal__day ${today ? 'bcv-cal__day--today' : inMonth ? '' : 'bcv-cal__day--off'}`, [
           U.el('bcv-cal__num-row', h('span', { class: 'bcv-cal__num', text: String(d.getDate()) })),
           ...evs.slice(0, 4).map((ev) => chip(ev)),
-          evs.length > 4 ? h('button', { type: 'button', class: 'bcv-cal__more', text: `+${evs.length - 4} more`, style: { border: '0', background: 'transparent', textAlign: 'left', cursor: 'pointer' }, onclick: () => { view = 'agenda'; range = { start: d, end: d, picking: false }; miniMonth = new Date(d.getFullYear(), d.getMonth(), 1); load(); } }) : null,
+          evs.length > 4 ? h('button', { type: 'button', class: 'bcv-cal__more', text: `${evs.length - 4} more`, title: `Everything on ${U.fmtDow(d)}`, onclick: () => { view = 'agenda'; range = { start: d, end: d, picking: false }; miniMonth = new Date(d.getFullYear(), d.getMonth(), 1); load(); } }) : null,
         ]));
       }
       // (2.99.44) as the Mac lays the month out: one ruled grid, each item a line of text by a bar of its course's colour
@@ -324,25 +332,190 @@
       ]);
     }
 
+    /**
+     * (2.99.109) The week as a time grid (a calendar app's): each day a column of hours, each event a block from its
+     * start to its end — side by side where they overlap — a piece of work due at a moment a short block at that time,
+     * and today's column crossed by a red line at the time it is now. A plan is moved by dragging its block, a quarter
+     * of an hour at a time and from one day to another; let go, it is kept there (a press alone opens it).
+     */
     function weekGrid() {
       const s = sundayStart(anchor);
       const days = [];
       for (let i = 0; i < 7; i++) days.push(U.addDays(s, i));
       const head = U.el('bcv-week__head', [h('div'), ...days.map((d) => U.el(`bcv-week__col ${U.sameDay(d, now) ? 'bcv-week__col--today' : ''}`, [U.text('bcv-week__dow', U.DAYS[d.getDay()]), U.text('bcv-week__n', String(d.getDate()))]))]);
       const allDay = U.el('bcv-week__allday', [U.text('bcv-week__allday-label', 'all-day'), ...days.map((d) => U.el('bcv-week__allday-cell', eventsOn(d).filter((ev) => ev.allDay).map((ev) => chip(ev))))]);
-      const grid = U.el('bcv-week__grid');
-      for (const hh of HOURS) {
-        grid.append(U.text('bcv-week__hour', hourLabel(hh)));
-        for (const d of days) {
-          const evs = eventsOn(d).filter((ev) => !ev.allDay && (ev.date.getHours() === hh || (hh === 8 && ev.date.getHours() < 8)));
-          grid.append(U.el(`bcv-week__cell ${U.sameDay(d, now) ? 'bcv-week__cell--today' : ''}`, evs.map((ev) => h('a', { class: `bcv-wev ${kindCls(ev)}`, href: ev.url, dataset: { ev: ev.id }, style: { background: ev.tint, '--bcv-ev-bar': ev.color }, title: [ev.title, ev.contextName, ...facts(ev), ev.missing ? 'Missing' : ''].filter(Boolean).join(' · '), onclick: onEvent(ev) }, [
-            h('div', { class: 'bcv-wev__time', style: { color: ev.color }, text: U.fmtTimeLower(ev.date).replace(/m$/, '') }),
-            h('div', { class: `bcv-wev__title ${ev.done ? 'bcv-strike' : ''}`, style: { color: ev.color }, text: ev.title }),
-            facts(ev).length ? h('div', { class: 'bcv-wev__facts', style: { color: ev.color }, text: facts(ev).join(' · ') }) : null,
-          ]))));
-        }
+      const gutter = U.el('bcv-week__gutter', HOURS.map((hh, i) => h('span', { class: 'bcv-week__hour', dataset: { m: String(hh * 60) }, style: { top: `${i * HOUR_PX}px` }, text: hourLabel(hh) })));
+      const cols = days.map((d) => dayColumn(d));
+      const body = U.el('bcv-week__body', [gutter, ...cols], { style: { '--bcv-hour': `${HOUR_PX}px`, height: `${HOURS.length * HOUR_PX}px` } });
+      const todayCol = cols.find((c) => c.classList.contains('bcv-week__day--today'));
+      if (todayCol) {
+        todayCol.append(U.el('bcv-week__now', null, { 'aria-hidden': 'true' }));
+        gutter.append(h('span', { class: 'bcv-week__nowtime', 'aria-hidden': 'true' }));
       }
-      return U.el('bcv-cal', [head, allDay, grid]);
+      paintNow(body);
+      return U.el('bcv-cal bcv-cal--week', [head, allDay, body]);
+    }
+
+    /** A day's column: its timed events laid out in lanes where they overlap. */
+    function dayColumn(d) {
+      const items = [];
+      for (const ev of eventsOn(d)) {
+        if (ev.allDay) continue;
+        const startM = ev.date.getHours() * 60 + ev.date.getMinutes();
+        const endM = ev.end && ev.end > ev.date ? (U.sameDay(ev.end, d) ? ev.end.getHours() * 60 + ev.end.getMinutes() : DAY_B) : startM + (ev.isAssignment ? 30 : 60);
+        const len = Math.max(30, endM - startM);
+        const a = Math.max(DAY_A, Math.min(startM, DAY_B - 30)); // (before 8 am: at the top; due at 11:59 pm: kept on the grid)
+        items.push({ ev, a, b: Math.min(DAY_B, Math.max(a + 30, a + len)) });
+      }
+      const col = U.el(`bcv-week__day ${U.sameDay(d, now) ? 'bcv-week__day--today' : ''}`, null, { dataset: { day: String(d.getTime()) } });
+      for (const it of lanes(items)) col.append(weekBlock(it));
+      return col;
+    }
+
+    /** Overlapping events side by side: each a lane, the lanes of a run of overlaps sharing the column's width. */
+    function lanes(items) {
+      items.sort((x, y) => x.a - y.a || y.b - x.b);
+      const out = [];
+      let run = [];
+      let runEnd = -1;
+      const flush = () => {
+        const ends = [];
+        for (const it of run) {
+          let l = ends.findIndex((e) => e <= it.a);
+          if (l < 0) { l = ends.length; ends.push(it.b); } else ends[l] = it.b;
+          it.lane = l;
+        }
+        for (const it of run) it.lanes = ends.length;
+        out.push(...run);
+        run = [];
+      };
+      for (const it of items) {
+        if (run.length && it.a >= runEnd) flush();
+        run.push(it);
+        runEnd = Math.max(runEnd, it.b);
+      }
+      if (run.length) flush();
+      return out;
+    }
+
+    function weekBlock({ ev, a, b, lane, lanes: n }) {
+      const top = ((a - DAY_A) / 60) * HOUR_PX;
+      const hgt = Math.max(20, ((b - a) / 60) * HOUR_PX - 2);
+      const roomy = hgt >= 44;
+      const tiny = hgt < 32;
+      const timeWord = (U.fmtTimeLower(ev.date) || '').replace(/m$/, '');
+      const el = h('a', {
+        class: `bcv-wev ${kindCls(ev)} ${ev.done ? 'is-done' : ''} ${ev.missing ? 'is-missing' : ''} ${tiny ? 'is-tiny' : ''}`,
+        href: ev.url, dataset: { ev: ev.id },
+        style: { top: `${top}px`, height: `${hgt}px`, left: `calc(${(lane / n) * 100}% + 1px)`, width: `calc(${100 / n}% - 3px)`, background: ev.tint, '--bcv-ev-bar': ev.color },
+        title: [ev.kind === 'plan' ? 'Planned' : '', ev.title, ev.contextName, ...facts(ev), ev.missing ? 'Missing' : '', ev.kind === 'plan' ? 'drag to move it' : ''].filter(Boolean).join(' · '),
+        onclick: onEvent(ev),
+      }, [
+        tiny ? null : h('div', { class: 'bcv-wev__time', style: { color: ev.color }, text: ev.isAssignment ? `Due ${timeWord}` : timeWord }),
+        h('div', { class: `bcv-wev__title ${ev.done ? 'bcv-strike' : ''}`, style: { color: ev.color }, text: tiny ? `${timeWord} ${ev.title}` : ev.title }),
+        roomy && facts(ev).length ? h('div', { class: 'bcv-wev__facts', style: { color: ev.color }, text: facts(ev).join(' · ') }) : null,
+      ]);
+      if (ev.kind === 'plan') {
+        el.setAttribute('draggable', 'false'); // (a link would otherwise be dragged off as a link)
+        el.addEventListener('dragstart', (e) => e.preventDefault());
+        el.addEventListener('pointerdown', (e) => dragPlan(e, el, ev, a, b - a));
+      }
+      return el;
+    }
+
+    /** The red line across today at the time it is now, and the time in the hours beside it (the hour it falls near left out). */
+    function paintNow(root) {
+      const line = root.querySelector('.bcv-week__now');
+      const tag = root.querySelector('.bcv-week__nowtime');
+      if (!line || !tag) return;
+      const t = new Date();
+      const m = t.getHours() * 60 + t.getMinutes();
+      const on = m >= DAY_A && m < DAY_B;
+      line.hidden = tag.hidden = !on;
+      if (!on) return;
+      const y = ((m - DAY_A) / 60) * HOUR_PX;
+      line.style.top = tag.style.top = `${y}px`;
+      tag.textContent = U.fmtTime(t).replace(/\s?[AP]M$/i, '');
+      for (const hr of root.querySelectorAll('.bcv-week__hour')) hr.classList.toggle('is-near', Math.abs(Number(hr.dataset.m) - m) < 15);
+    }
+    const nowTimer = setInterval(() => {
+      if (!ctx.alive()) { clearInterval(nowTimer); return; }
+      if (view === 'week') { const b = mainCol.querySelector('.bcv-week__body'); if (b) paintNow(b); }
+    }, 30000);
+
+    /**
+     * A plan's block dragged to another time: it follows the pointer a quarter of an hour at a time (the time on it
+     * saying where it would go) and across to another day; let go and the plan is kept there. Escape, or a drop off the
+     * grid, puts it back. A press without a drag is the block's own: its sheet opens.
+     */
+    function dragPlan(e, el, ev, a0, len) {
+      if (e.button !== 0 || !e.isPrimary || !ev.planId) return;
+      const body = el.closest('.bcv-week__body');
+      const col0 = el.closest('.bcv-week__day');
+      if (!body || !col0) return;
+      const cols = [...body.querySelectorAll('.bcv-week__day')];
+      const i0 = cols.indexOf(col0);
+      const x0 = e.clientX;
+      const y0 = e.clientY;
+      const pid = e.pointerId;
+      const timeEl = el.querySelector('.bcv-wev__time');
+      const timeWas = timeEl?.textContent || '';
+      let engaged = false;
+      let at = { i: i0, m: a0 };
+      const dayOf = (x) => {
+        for (const [i, c] of cols.entries()) { const r = c.getBoundingClientRect(); if (x >= r.left - 2 && x <= r.right + 2) return i; }
+        return x < cols[0].getBoundingClientRect().left ? 0 : cols.length - 1;
+      };
+      const move = (m) => {
+        if (m.pointerId !== pid) return;
+        const dx = m.clientX - x0;
+        const dy = m.clientY - y0;
+        if (!engaged) {
+          if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+          engaged = true;
+          try { el.setPointerCapture(pid); } catch { /* the window still hears it */ }
+          el.classList.add('is-dragging');
+          body.classList.add('is-dragging');
+        }
+        m.preventDefault();
+        const mins = Math.round((a0 + (dy / HOUR_PX) * 60) / SNAP) * SNAP;
+        const next = { i: dayOf(m.clientX), m: Math.max(DAY_A, Math.min(DAY_B - Math.min(len, DAY_B - DAY_A), mins)) };
+        if (next.i === at.i && next.m === at.m) return;
+        at = next;
+        const shiftX = cols[at.i].getBoundingClientRect().left - col0.getBoundingClientRect().left;
+        el.style.transform = `translate(${shiftX}px, ${((at.m - a0) / 60) * HOUR_PX}px)`;
+        const when = new Date(Number(cols[at.i].dataset.day) + at.m * 60000);
+        if (timeEl) timeEl.textContent = (U.fmtTimeLower(when) || '').replace(/m$/, '');
+        el.setAttribute('aria-label', `Move to ${U.fmtDow(when)} ${U.fmtTimeLower(when)}`);
+        U.haptic?.('select');
+      };
+      const end = (letGo) => {
+        window.removeEventListener('pointermove', move, true);
+        window.removeEventListener('pointerup', up, true);
+        window.removeEventListener('pointercancel', cancelUp, true);
+        window.removeEventListener('keydown', key, true);
+        if (!engaged) return;
+        // the click a drag ends with opens nothing
+        el.addEventListener('click', (c) => { c.preventDefault(); c.stopPropagation(); }, { capture: true, once: true });
+        body.classList.remove('is-dragging');
+        const moved = at.i !== i0 || at.m !== a0;
+        if (!letGo || !moved) { // back where it was
+          el.classList.remove('is-dragging');
+          el.style.transform = '';
+          if (timeEl) timeEl.textContent = timeWas;
+          return;
+        }
+        el.classList.add('is-dropped'); // (it stays where it was let go: the grid is drawn again around it)
+        const when = Number(cols[at.i].dataset.day) + at.m * 60000;
+        BCV.plan?.move(ev.planId, when).then(() => U.haptic?.('success')).catch((err) => { U.toast(`Could not move the plan: ${err.message}`, { error: true }); merge(); draw(); });
+      };
+      const up = (u) => { if (u.pointerId === pid) end(true); };
+      const cancelUp = (u) => { if (u.pointerId === pid) end(false); };
+      const key = (k) => { if (k.key === 'Escape' && engaged) { k.preventDefault(); k.stopPropagation(); end(false); } };
+      window.addEventListener('pointermove', move, { capture: true, passive: false });
+      window.addEventListener('pointerup', up, true);
+      window.addEventListener('pointercancel', cancelUp, true);
+      window.addEventListener('keydown', key, true);
     }
 
     function agendaList() {
@@ -841,7 +1014,7 @@
         const f = linkState.feeds[l.id];
         const sub = !f ? 'Not read yet' : f.ok ? `Read ${agoWords(f.at)} · ${U.plural((f.events || []).length, 'event')}` : f.error;
         return U.row([
-          U.dot(l.color || '#8e8e93', 'bcv-dot--sq'),
+          U.dot(l.color || '#8e8e93', 'bcv-sync__swatch'), // (2.99.109: round, as a calendar app marks its calendars)
           h('div', { class: 'bcv-row__body' }, [U.text('bcv-calrow__name bcv-pretty', l.name, 'div'), U.text(`bcv-sync__sub ${f && !f.ok ? 'is-error' : ''}`, sub, 'div')]),
           U.switchEl(l.on !== false, async (on) => { await callCal({ op: 'set', id: l.id, on }); }, `Show ${l.name} on the calendar`),
           U.iconbtn(IC.close, { size: 26, title: `Unlink ${l.name}`, onClick: async () => { if (!window.confirm(`Unlink ${l.name}? Its events leave Simpl's Calendar; the calendar itself is not touched.`)) return; await callCal({ op: 'remove', id: l.id }); } }),
@@ -851,13 +1024,20 @@
       const add = U.btn(syncUi.busy ? 'Linking…' : 'Link', { kind: 'xs', cls: 'bcv-sync__add', disabled: syncUi.busy, onClick: () => linkCalendar(input.value) });
       input.addEventListener('input', () => { syncUi.draft = input.value; });
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); linkCalendar(input.value); } });
-      out.push(U.card([...rows, U.el('bcv-sync__paste', [input, add])], 'bcv-card--list bcv-sync__links'));
+      // (2.99.109) what came of a link, said under the field it came from — reading it, linked (a tick), or why not (a
+      // warning, in red) — rather than in a line of its own below the card
+      const TICK = 'M5 12.5l4.5 4.5L19 7.5';
+      const status = syncUi.busy ? U.el('bcv-sync__status is-busy', [h('span', { class: 'bcv-sync__spin', 'aria-hidden': 'true' }), h('span', { text: 'Reading that calendar…' })], { role: 'status' })
+        : syncUi.ask ? null
+          : syncUi.msg ? U.el(`bcv-sync__status ${syncUi.msg.error ? 'is-error' : 'is-ok'}`, [U.svg(syncUi.msg.error ? IC.warn : TICK, { size: 13, stroke: 'currentColor', width: 2.4 }), h('span', { text: syncUi.msg.text })], { role: syncUi.msg.error ? 'alert' : 'status' })
+            : null;
+      out.push(U.card([...rows, U.el('bcv-sync__paste', [input, add]), status], 'bcv-card--list bcv-sync__links'));
       if (syncUi.ask) {
         out.push(U.el('bcv-sync__ask', [
           h('span', { text: `Your browser asks before Simpl reads ${syncUi.ask.host}.` }),
           U.btn('Allow…', { kind: 'xs', cls: 'bcv-sync__allow', onClick: async () => { await callCal({ op: 'allow', url: syncUi.ask.url }); syncUi.ask = null; syncUi.msg = { text: 'Allow it in the tab that opened, and the calendar is linked.' }; paintSync(); } }),
         ]));
-      } else if (syncUi.msg) out.push(U.el(`bcv-sync__msg ${syncUi.msg.error ? 'is-error' : ''}`, syncUi.msg.text, { role: syncUi.msg.error ? 'alert' : 'status' }));
+      }
       const where = h('details', { class: 'bcv-sync__where' }, [
         h('summary', { text: 'Where is my calendar\'s link?' }),
         h('ul', {}, [
@@ -948,9 +1128,13 @@
         : !notice ? null : notice.kind === 'error' ? U.errorBox(notice.text) : U.el(`bcv-cal__notice bcv-cal__notice--${notice.kind}`, notice.text);
       mainCol.replaceChildren(...[noticeEl, view === 'week' ? weekGrid() : view === 'agenda' ? agendaList() : monthGrid()].filter(Boolean));
       // (2.99.44) what the month holds and how much of it is missing, under its name, as the Mac says it
-      const inMonth = view === 'month' ? shown.filter((ev) => ev.date.getMonth() === anchor.getMonth() && ev.date.getFullYear() === anchor.getFullYear()) : [];
-      const missingN = inMonth.filter((ev) => ev.missing).length;
-      subEl.textContent = view === 'month' && !loading ? `${U.plural(inMonth.length, 'item')}${missingN ? ` · ${missingN} missing` : ''}` : '';
+      // (2.99.109) and the week's, under its month; the agenda's year under its range
+      const wk = sundayStart(anchor);
+      const inView = view === 'month' ? shown.filter((ev) => ev.date.getMonth() === anchor.getMonth() && ev.date.getFullYear() === anchor.getFullYear())
+        : view === 'week' ? shown.filter((ev) => ev.date >= wk && ev.date < U.addDays(wk, 7)) : [];
+      const missingN = inView.filter((ev) => ev.missing).length;
+      subEl.textContent = loading ? '' : view === 'agenda' ? String((range.end || range.start).getFullYear())
+        : `${view === 'week' ? `${U.fmtShort(wk)} – ${U.fmtShort(U.addDays(wk, 6))} · ` : ''}${U.plural(inView.length, 'item')}${missingN ? ` · ${missingN} missing` : ''}`;
       subEl.hidden = !subEl.textContent;
       sideCol.hidden = view !== 'agenda';
       sideCol.replaceChildren(...[view === 'agenda' ? miniCalendar() : null].filter(Boolean));

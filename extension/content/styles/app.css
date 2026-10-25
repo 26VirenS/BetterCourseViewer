@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.108"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.109"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -1282,7 +1282,11 @@ html[data-bcv-theme="dark"] .bcv-mring__track { stroke: rgba(255,255,255,.1); }
 .bcv-cal__day--today .bcv-cal__num { background: var(--bcv-blue); color: #fff; }
 .bcv-ev { border-radius: 7px; padding: 3px 6px; display: flex; gap: 4px; align-items: center; cursor: pointer; border: 0; width: 100%; text-align: left; min-width: 0; }
 .bcv-ev__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 10.5px/1.3 var(--bcv-font); }
-.bcv-cal__more { font: 500 10.5px/1.3 var(--bcv-font); color: var(--bcv-ink3); padding: 0 6px; }
+/* (2.99.109) the rest of a full day: a quiet pill, pressed for the day's whole list */
+.bcv-cal__more { align-self: flex-start; margin-top: 1px; height: 18px; padding: 0 7px; border: 0; border-radius: 9px; background: var(--bcv-fill); color: var(--bcv-ink2); font: 600 10.5px/18px var(--bcv-font); cursor: pointer; transition: background-color var(--bcv-t-fast) ease, transform .1s var(--bcv-ease-out); }
+.bcv-cal__more:active { transform: scale(.96); }
+.bcv-cal__more:focus-visible { outline: 2px solid var(--bcv-blue); outline-offset: 1px; }
+@media (hover: hover) and (pointer: fine) { .bcv-cal__more:hover { background: var(--bcv-fill2); color: var(--bcv-ink); } }
 /* (2.99.44) the month as the Mac draws it: one ruled grid in a card, the day's number at the top right, each item a line
    of text by a bar of its course's colour (done ones faded, a missing one in red) */
 .bcv-cal--month { padding: 0; overflow: hidden; }
@@ -1299,23 +1303,46 @@ html[data-bcv-theme="dark"] .bcv-mring__track { stroke: rgba(255,255,255,.1); }
 .bcv-cal--month .bcv-ev.is-done { opacity: .5; }
 .bcv-cal--month .bcv-ev.is-missing .bcv-ev__label { color: #ff3b30 !important; font-weight: 600; }
 .bcv-cal__sub[hidden] { display: none; }
-.bcv-week__head { display: grid; grid-template-columns: 50px repeat(7, minmax(0, 1fr)); gap: 4px; padding: 0 2px 6px; }
-.bcv-week__col { text-align: center; padding-bottom: 6px; border-bottom: 2px solid var(--bcv-sep); }
-.bcv-week__col--today { border-bottom-color: var(--bcv-blue); }
+/* (2.99.109) the week as a time grid, a calendar app's: the hours down the side, each day a column ruled by the hour, each
+   event a block from its start to its end (side by side where they overlap), today's date in a filled circle and a red
+   line across its column at the time it is now. A plan's block is dragged to move it. */
+.bcv-week__head { display: grid; grid-template-columns: 50px repeat(7, minmax(0, 1fr)); gap: 0; padding: 0 0 8px; }
+.bcv-week__col { display: flex; flex-direction: column; align-items: center; gap: 4px; padding-bottom: 2px; }
 .bcv-week__dow { font: 600 10.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); text-transform: uppercase; letter-spacing: .05em; }
-.bcv-week__n { margin-top: 3px; font: 700 15px/1 var(--bcv-display); color: var(--bcv-ink); }
-.bcv-week__col--today .bcv-week__n { color: var(--bcv-blue); }
-.bcv-week__allday { display: grid; grid-template-columns: 50px repeat(7, minmax(0, 1fr)); gap: 4px; }
-.bcv-week__allday-label { font: 500 10.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); padding-top: 7px; }
-.bcv-week__allday-cell { min-height: 26px; border-radius: 8px; background: var(--bcv-fill2); display: flex; flex-direction: column; gap: 2px; padding: 2px; }
-.bcv-week__grid { margin-top: 4px; display: grid; grid-template-columns: 50px repeat(7, minmax(0, 1fr)); gap: 4px; }
-.bcv-week__hour { grid-column: 1; font: 500 10.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); padding-top: 4px; }
-.bcv-week__cell { min-height: 40px; border-top: 1px solid var(--bcv-sep); padding: 2px 1px; display: flex; flex-direction: column; gap: 2px; background: transparent; }
-.bcv-week__cell--today { background: var(--bcv-fill2); }
-.bcv-wev { border-radius: 7px; padding: 3px 6px; cursor: pointer; min-width: 0; border: 0; text-align: left; width: 100%; }
-.bcv-wev__time { font: 600 9.5px/1.2 var(--bcv-font); }
+.bcv-week__n { min-width: 28px; height: 28px; padding: 0 6px; box-sizing: border-box; border-radius: 14px; display: flex; align-items: center; justify-content: center; font: 600 16px/1 var(--bcv-display); letter-spacing: -.01em; color: var(--bcv-ink); }
+.bcv-week__col--today .bcv-week__dow { color: var(--bcv-blue); }
+.bcv-week__col--today .bcv-week__n { background: var(--bcv-blue); color: #fff; }
+.bcv-week__allday { display: grid; grid-template-columns: 50px repeat(7, minmax(0, 1fr)); gap: 0; border-top: var(--bcv-line, 1px) solid var(--bcv-sep); border-bottom: var(--bcv-line, 1px) solid var(--bcv-sep); }
+.bcv-week__allday-label { font: 500 10.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); padding: 8px 0 0; }
+.bcv-week__allday-cell { min-height: 28px; display: flex; flex-direction: column; gap: 2px; padding: 3px 2px; border-left: var(--bcv-line, 1px) solid var(--bcv-sep); }
+.bcv-week__body { position: relative; display: grid; grid-template-columns: 50px repeat(7, minmax(0, 1fr)); margin-top: 8px; }
+.bcv-week__gutter { position: relative; }
+.bcv-week__hour { position: absolute; right: 8px; transform: translateY(-50%); font: 500 10.5px/1 var(--bcv-font); font-variant-numeric: tabular-nums; color: var(--bcv-ink3); transition: opacity var(--bcv-t-fast) ease; }
+.bcv-week__hour:first-child { transform: none; }
+.bcv-week__hour.is-near { opacity: 0; }
+.bcv-week__day { position: relative; border-left: var(--bcv-line, 1px) solid var(--bcv-sep);
+  background-image: repeating-linear-gradient(to bottom, var(--bcv-sep) 0 var(--bcv-line, 1px), transparent var(--bcv-line, 1px) var(--bcv-hour, 48px)); }
+.bcv-week__day--today { background-color: color-mix(in srgb, var(--bcv-blue) 4%, transparent); }
+.bcv-week__now { position: absolute; left: -4px; right: 0; height: 2px; margin-top: -1px; background: #ff3b30; z-index: 3; pointer-events: none; }
+.bcv-week__now::before { content: ''; position: absolute; left: 0; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: #ff3b30; }
+.bcv-week__now[hidden], .bcv-week__nowtime[hidden] { display: none; }
+.bcv-week__nowtime { position: absolute; right: 6px; transform: translateY(-50%); padding: 2px 4px; border-radius: 5px; background: var(--bcv-card); font: 700 10.5px/1 var(--bcv-font); font-variant-numeric: tabular-nums; color: #ff3b30; z-index: 3; }
+.bcv-wev { position: absolute; box-sizing: border-box; display: flex; flex-direction: column; justify-content: flex-start; overflow: hidden; border-radius: 6px; padding: 3px 6px 3px 8px; cursor: pointer; min-width: 0; border: 0; text-align: left; text-decoration: none !important; box-shadow: inset 3px 0 0 var(--bcv-ev-bar); z-index: 1; transition: transform .1s var(--bcv-ease-out), box-shadow .12s ease, opacity .12s ease; }
+.bcv-wev:focus-visible { outline: 2px solid var(--bcv-blue); outline-offset: 1px; z-index: 2; }
+.bcv-wev.is-tiny { justify-content: center; padding-top: 0; padding-bottom: 0; }
+.bcv-wev.is-done { opacity: .55; }
+.bcv-wev.is-missing { box-shadow: inset 3px 0 0 #ff3b30; }
+.bcv-wev.is-missing .bcv-wev__title { color: #ff3b30 !important; font-weight: 600; }
+.bcv-wev__time { font: 600 9.5px/1.2 var(--bcv-font); font-variant-numeric: tabular-nums; }
 .bcv-wev__title { margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 10.5px/1.25 var(--bcv-font); }
+.bcv-wev:not(.is-tiny) .bcv-wev__title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .bcv-wev__facts { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 9.5px/1.25 var(--bcv-font); opacity: .78; }
+/* a plan: dashed, and dragged to move it — lifted while it moves, a quarter of an hour at a time */
+.bcv-wev.bcv-ev--plan { cursor: grab; touch-action: none; -webkit-user-select: none; user-select: none; }
+.bcv-wev.is-dragging { cursor: grabbing; z-index: 4; opacity: .96; box-shadow: inset 3px 0 0 var(--bcv-ev-bar), 0 10px 26px rgba(0,0,0,.2); transition: transform .08s var(--bcv-ease-out), box-shadow .12s ease; }
+.bcv-wev.is-dropped { z-index: 4; transition: none; }
+.bcv-week__body.is-dragging { cursor: grabbing; }
+.bcv-week__body.is-dragging .bcv-wev:not(.is-dragging) { pointer-events: none; }
 .bcv-agenda__title + .bcv-status { flex: none; }
 .bcv-agenda { flex: 1 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
 .bcv-agenda__due { flex: none; font: 500 12.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); min-width: 104px; }
@@ -1349,6 +1376,15 @@ html[data-bcv-theme="dark"] .bcv-mring__track { stroke: rgba(255,255,255,.1); }
 .bcv-sync__ask > span { flex: 1; min-width: 0; }
 .bcv-sync__msg { font: 500 13px/1.4 var(--bcv-font); color: var(--bcv-ink2); padding: 0 4px; }
 .bcv-sync__msg.is-error { color: #ff3b30; }
+/* (2.99.109) a link's outcome under its field: reading, linked, or why not */
+.bcv-sync__status { display: flex; align-items: flex-start; gap: 7px; padding: 0 16px 12px; margin-top: -4px; font: 500 12.5px/1.4 var(--bcv-font); color: var(--bcv-ink2); animation: bcv-fade-in .18s var(--bcv-ease-out) both; }
+.bcv-sync__status > svg { flex: none; margin-top: 2px; }
+.bcv-sync__status.is-ok { color: #1f9d55; }
+.bcv-sync__status.is-error { color: #ff3b30; }
+.bcv-sync__spin { flex: none; width: 12px; height: 12px; margin-top: 2px; border-radius: 50%; border: 2px solid var(--bcv-fill); border-top-color: var(--bcv-blue); animation: bcv-sync-spin .8s linear infinite; }
+.bcv-sync__swatch { width: 12px; height: 12px; flex: none; }
+@keyframes bcv-sync-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .bcv-sync__spin { animation-duration: 2.4s; } }
 .bcv-sync__where { font: 400 12.5px/1.45 var(--bcv-font); color: var(--bcv-ink2); padding: 0 4px; }
 .bcv-sync__where summary { cursor: pointer; color: var(--bcv-blue); font-weight: 600; }
 .bcv-sync__where ul { margin: 8px 0 6px; padding-left: 18px; }
@@ -1361,6 +1397,7 @@ html[data-bcv-theme="dark"] .bcv-mring__track { stroke: rgba(255,255,255,.1); }
 .bcv-cal--month .bcv-ev--plan { border-left-style: dashed; }
 .bcv-cal--month .bcv-ev--plan > svg { display: block; }
 .bcv-wev.bcv-ev--plan { outline: 1.5px dashed var(--bcv-ev-bar); outline-offset: -1.5px; }
+.bcv-wev.bcv-ev--plan.is-dragging { outline-style: solid; }
 .bcv-wev.bcv-ev--ext { opacity: .85; }
 .bcv-row.bcv-ev--plan .bcv-agenda__due { color: var(--bcv-blue); font-weight: 600; }
 .bcv-mini__nav { display: flex; align-items: center; gap: 8px; padding: 0 2px 10px; }
@@ -6284,6 +6321,11 @@ html.bcv-noblur .bcv-spot:not(.is-far) .bcv-omni__box.bcv-squircle, html.bcv-nob
    its own, fixed under the row (above it near the bottom of the window), so nothing in the list moves. */
 .bcv-pullable { touch-action: pan-y; -webkit-user-select: none; user-select: none; transition: transform var(--bcv-t-snappy) var(--bcv-spring-snappy); }
 .bcv-pullable.is-pulling { position: relative; z-index: 2; background: var(--bcv-card); box-shadow: 0 6px 22px rgba(0,0,0,.14); border-radius: 12px; cursor: grabbing; }
+/* (2.99.109) uncovered as the row moves: what the pull does — a clock growing with the pull, filled once a time is chosen */
+.bcv-pullreveal { position: absolute; top: 0; bottom: 0; right: 100%; width: var(--bcv-pull, 0px); display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 12px 0 0 12px; background: color-mix(in srgb, var(--bcv-blue) 12%, transparent); color: var(--bcv-blue); pointer-events: none; }
+.bcv-pullreveal > svg { opacity: var(--bcv-pull-k, 0); transform: scale(calc(.55 + .45 * var(--bcv-pull-k, 0))); transition: color .12s ease; }
+.bcv-pullable.is-armed .bcv-pullreveal { background: var(--bcv-blue); color: #fff; }
+.bcv-pullable.is-armed .bcv-pullreveal > svg { animation: bcv-plan-pop var(--bcv-t-snappy) var(--bcv-spring-snappy) both; }
 .bcv-planpill { display: inline-flex; align-items: center; gap: 4px; flex: none; height: 20px; padding: 0 8px; border-radius: 10px; border: 0; background: rgba(10,132,255,.12); color: var(--bcv-blue); font: 600 11px/1 var(--bcv-font); white-space: nowrap; cursor: pointer; }
 .bcv-planpill[hidden] { display: none; }
 .bcv-planpill.is-past { background: var(--bcv-fill); color: var(--bcv-ink3); }
@@ -6294,8 +6336,9 @@ html.bcv-noblur .bcv-spot:not(.is-far) .bcv-omni__box.bcv-squircle, html.bcv-nob
 .bcv-planbar { position: fixed; z-index: var(--bcv-z-picker); box-sizing: border-box; padding: 10px 12px 10px; border-radius: 18px; background: var(--bcv-glass-ground, var(--bcv-glass)); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); border: 1px solid var(--bcv-edge); box-shadow: var(--bcv-shadow-glass); color: var(--bcv-ink); display: flex; flex-direction: column; gap: 8px; transform-origin: 24px 0; animation: bcv-plan-in .2s var(--bcv-ease-out) both; }
 .bcv-planbar.is-above { transform-origin: 24px 100%; }
 .bcv-planbar.is-closing { animation: bcv-plan-out .15s var(--bcv-ease-out) both; pointer-events: none; }
-@keyframes bcv-plan-in { from { opacity: 0; transform: translateY(-4px) scale(.97); } to { opacity: 1; transform: none; } }
-@keyframes bcv-plan-out { to { opacity: 0; transform: scale(.98); } }
+@keyframes bcv-plan-in { from { opacity: 0; transform: translateY(var(--bcv-plan-y, -6px)) scale(.96); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes bcv-plan-out { to { opacity: 0; transform: translateY(var(--bcv-plan-y, -6px)) scale(.97); filter: blur(2px); } }
+.bcv-planbar.is-above { --bcv-plan-y: 6px; } /* (above its row: it comes from below, toward the row, and leaves the same way) */
 .bcv-planbar__head { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .bcv-planbar__head > svg { flex: none; }
 .bcv-planbar__title { flex: 1; min-width: 0; font: 600 13px/1.2 var(--bcv-font); }
@@ -6312,6 +6355,7 @@ html.bcv-noblur .bcv-spot:not(.is-far) .bcv-omni__box.bcv-squircle, html.bcv-nob
 .bcv-planbar__day { font: 600 10.5px/1 var(--bcv-font); color: var(--bcv-ink3); text-transform: uppercase; letter-spacing: .02em; }
 .bcv-planbar__time { font: 700 14px/1 var(--bcv-display, var(--bcv-font)); letter-spacing: -.01em; }
 .bcv-planbar__slot.is-day .bcv-planbar__day { color: var(--bcv-blue); }
+.bcv-planbar__slot.is-day:not(:first-child) { margin-left: 8px; } /* (2.99.109) a little more room before each new day */
 .bcv-planbar__slot.is-current { box-shadow: inset 0 0 0 1.5px var(--bcv-blue); }
 .bcv-planbar__slot.is-on { background: var(--bcv-blue); color: #fff; }
 .bcv-planbar__slot.is-on .bcv-planbar__day { color: rgba(255,255,255,.82); }
@@ -6326,6 +6370,7 @@ html.bcv-noblur .bcv-spot:not(.is-far) .bcv-omni__box.bcv-squircle, html.bcv-nob
 .bcv-planbar.is-armed .bcv-planbar__status { color: var(--bcv-blue); }
 @media (prefers-reduced-motion: reduce) {
   .bcv-pullable { transition: none; }
+  .bcv-pullreveal > svg, .bcv-pullable.is-armed .bcv-pullreveal > svg { animation: none; transform: none; }
   .bcv-planbar, .bcv-planbar.is-closing { animation: bcv-fade-in .15s ease both; }
   .bcv-planbar.is-closing { animation-direction: reverse; }
   .bcv-planbar__track { transition: none; }
