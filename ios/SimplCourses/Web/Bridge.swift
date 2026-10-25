@@ -14,6 +14,13 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
     static let handlerName = "bcv"
     /// (2.99.107) Where a linked calendar's file is read for the page: no cookies, nothing kept.
     private static let calendarSession = URLSession(configuration: .ephemeral)
+    /// (2.99.110) Where Simpl's own calendar may be sent: simplcourses.com's place for them, or this computer's (the
+    /// picture suite's stand-in).
+    static func feedAddress(_ url: URL) -> Bool {
+        let scheme = url.scheme?.lowercased() ?? "", host = url.host?.lowercased() ?? ""
+        guard url.path.hasPrefix("/api/feed/") else { return false }
+        return (scheme == "https" && host == "simplcourses.com") || (scheme == "http" && (host == "localhost" || host == "127.0.0.1"))
+    }
 
     private let store = BridgeStore()
     private var views: [ObjectIdentifier: (view: WeakBox<WKWebView>, world: WKContentWorld)] = [:]
@@ -211,6 +218,38 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
                         replyHandler(["status": status, "text": String(decoding: data, as: UTF8.self)], nil)
                     } else {
                         replyHandler(["status": 0, "error": "That calendar is too big to read."], nil)
+                    }
+                }
+            }.resume()
+        case "feedSend":
+            // (2.99.110) Simpl's own calendar, sealed on the page, sent to simplcourses.com or taken back (background.js
+            // feedSend): the page cannot send to another site. There only (and, for the picture suite, this computer), PUT
+            // or DELETE, the sealed bytes as base64, a megabyte at most; no cookies. The status, or status 0 and why.
+            guard let address = body["url"] as? String, let url = URL(string: address), Bridge.feedAddress(url),
+                  let method = (body["method"] as? String)?.uppercased(), method == "PUT" || method == "DELETE",
+                  let token = body["token"] as? String, !token.isEmpty else {
+                replyHandler(["status": 0, "error": "That is not a Simpl calendar address."], nil)
+                return
+            }
+            var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
+            request.httpMethod = method
+            request.httpShouldHandleCookies = false
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            if method == "PUT" {
+                guard let sealed = Data(base64Encoded: body["body"] as? String ?? ""), !sealed.isEmpty, sealed.count <= 1024 * 1024 else {
+                    replyHandler(["status": 0, "error": "Your Simpl calendar is too big to send."], nil)
+                    return
+                }
+                request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+                request.httpBody = sealed
+            }
+            Bridge.calendarSession.dataTask(with: request) { _, response, error in
+                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                DispatchQueue.main.async {
+                    if let error = error {
+                        replyHandler(["status": 0, "error": error.localizedDescription], nil)
+                    } else {
+                        replyHandler(["status": status], nil)
                     }
                 }
             }.resume()

@@ -777,7 +777,11 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
   // key: the site opens the copy with it when a calendar app asks, and keeps nothing it could read it with. A copy is
   // sent only when what it holds has changed, or once in six hours to keep it.
   // (dev:feedBase: the suites point it at the mock, scripts/dev/mock-feed.mjs)
-  const feedSite = async () => `${(await api.storage.local.get('dev:feedBase').catch(() => ({})))['dev:feedBase'] || 'https://simplcourses.com'}/api/feed`;
+  // (a Canvas on this computer is only ever a test school — the apps' picture suites' mock: its own /api/feed stands in)
+  const feedSite = async (host) => {
+    const dev = (await api.storage.local.get('dev:feedBase').catch(() => ({})))['dev:feedBase'];
+    return `${dev || (/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host) ? `http://${host}` : 'https://simplcourses.com')}/api/feed`;
+  };
   const FEED_KEEP = 6 * 60 * 60 * 1000;
   const feedKey = (host) => `feed:${String(host || '').toLowerCase()}`;
   const feedRead = async (host) => (await api.storage.local.get(feedKey(host)).catch(() => ({})))[feedKey(host)] || null;
@@ -804,7 +808,7 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
     const host = String(msg.host || '').toLowerCase();
     if (!/^[a-z0-9.-]+(:\d+)?$/.test(host)) throw new Error('Not here');
     const st = await feedRead(host);
-    const site = await feedSite();
+    const site = await feedSite(host);
     if (msg.op === 'state') return feedPublic(st, site);
     if (msg.op === 'on') { // made (a new id, key and token), or made again after it was stopped
       const next = st?.on ? st : { id: BCV.ics.secret(16), key: BCV.ics.secret(32), token: BCV.ics.secret(32), on: true, at: 0, hash: '', count: 0, error: '' };

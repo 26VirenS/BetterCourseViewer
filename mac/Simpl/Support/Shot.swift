@@ -179,7 +179,7 @@ enum Shot {
                 // and then until what it reads again as it opens has come (the plan rail's free times: its dark picture
                 // was taken as it was still finding them)
                 if popover && !again && NSApp.isActive {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { whenIdle(file, until: Date().addingTimeInterval(8)) }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { whenIdle(file, until: Date().addingTimeInterval(8), popover: true) }
                 } else {
                     capture(file)
                 }
@@ -193,13 +193,24 @@ enum Shot {
 
     /// (1.3.168) Pictured once nothing is being waited for and nothing has come for half a second (what came has
     /// finished arriving), or at `until` whatever is still under way.
-    private static func whenIdle(_ file: String, until: Date) {
-        if (busy == 0 && Date().timeIntervalSince(lastActivity) >= 0.5) || Date() >= until {
+    /// (1.3.169) `popover`: and once the popover is open — another copy taking the front in the meantime closed it (the
+    /// dark plan rail was pictured without its rail, its times read and the rail gone), so the app is brought forward
+    /// again, a second apart at most, and the popover waited for as it opens again.
+    private static func whenIdle(_ file: String, until: Date, popover: Bool = false) {
+        let open = !popover || NSApp.windows.contains { $0.isVisible && String(describing: type(of: $0)).contains("Popover") }
+        if (busy == 0 && Date().timeIntervalSince(lastActivity) >= 0.5 && open) || Date() >= until {
             capture(file)
             return
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { whenIdle(file, until: until) }
+        if popover, !NSApp.isActive, Date().timeIntervalSince(lastFront) >= 1 {
+            NSLog("[Simpl] shot: another copy of the app is in front; brought forward again")
+            lastFront = Date()
+            front()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { whenIdle(file, until: until, popover: popover) }
     }
+
+    nonisolated(unsafe) private static var lastFront = Date.distantPast
 
     /// (1.3.78) The windows that were in front of the one pictured, over it, when its picture was asked for.
     nonisolated(unsafe) private static var lifted: [NSWindow] = []

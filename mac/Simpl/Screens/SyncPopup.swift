@@ -2,11 +2,12 @@ import SwiftUI
 import AppKit
 
 /// (1.3.165) Sync, as the web's sheet has it (extension/content/app/screens/calendar.js), read through the page
-/// (native-app.js `calSync`): Canvas's own calendar feed handed to a calendar app — Apple's Calendar subscribes to it
-/// straight away (webcal), Google's and Outlook's add-by-address pages open in the browser, or the link is copied; the
-/// student's own calendars linked by their private address (the app reads the file, the page parses it: background.js
-/// and lib/ics.js), each shown or hidden on the Calendar; and Send plans, which puts each plan on the Canvas calendar so
-/// the feed carries it out to the calendar app with everything else.
+/// (native-app.js `calSync`): (1.3.169) Simpl's own calendar — the work, the student's own tasks and the plans, as one
+/// calendar named Simpl, sealed and kept on simplcourses.com (the app sends it: Web/Bridge.swift feedSend) — handed to a
+/// calendar app: Apple's Calendar subscribes to it straight away (webcal), Google's and Outlook's add-by-address pages
+/// open in the browser, or the private link is copied; and the student's own calendars linked by their private address
+/// (the app reads the file, the page parses it: background.js and lib/ics.js), each shown or hidden on the Calendar.
+/// Canvas's own feed and Send plans are gone: the plans are in Simpl's calendar of themselves.
 struct SyncPopup: View {
     let changed: () -> Void
     @EnvironmentObject private var engine: Engine
@@ -20,6 +21,9 @@ struct SyncPopup: View {
     @State private var linkBad = false
     @State private var unlinking: SyncLink?
     @State private var showWhere = false
+    /// (1.3.169) Simpl's calendar being made or stopped, and the stop asked about first.
+    @State private var turning = false
+    @State private var stopping = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -39,6 +43,11 @@ struct SyncPopup: View {
         } message: { _ in
             Text("Its events leave Simpl's Calendar. The calendar itself is not touched.")
         }
+        .confirmationDialog("Stop sharing your Simpl calendar?", isPresented: $stopping) {
+            Button("Stop Sharing", role: .destructive) { Task { await stopSimpl() } }
+        } message: {
+            Text("Its private link stops working, and calendar apps that have it show nothing more from Simpl. You can make a new one at any time.")
+        }
     }
 
     private var header: some View {
@@ -47,7 +56,7 @@ struct SyncPopup: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Sync")
                     .font(.sTitle3.weight(.semibold))
-                Text("Your Canvas work in your calendar app, and your calendars here")
+                Text("Simpl in your calendar app, and your calendars here")
                     .font(.sCallout)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -65,7 +74,7 @@ struct SyncPopup: View {
     private var content: some View {
         if let d = data {
             VStack(alignment: .leading, spacing: 18) {
-                section("Your Canvas work, in your calendar app") { feedCard(d.feed) }
+                section("Simpl, in your calendar app") { simplCard(d.simpl) }
                 section("Your calendars, in Simpl") { linksCard(d.links) }
                 DisclosureGroup("Where is my calendar's link?", isExpanded: $showWhere) {
                     VStack(alignment: .leading, spacing: 6) {
@@ -80,36 +89,9 @@ struct SyncPopup: View {
                     .padding(.top, 6)
                 }
                 .font(.sCallout)
-                if d.canSend {
-                    section("Plans") {
-                        HStack(alignment: .center, spacing: 12) {
-                            IconTile(symbol: "clock", color: Theme.accent, size: 30)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Send plans to your calendar app").font(.sBody)
-                                Text("Each plan goes on your \(engine.lmsName) calendar too, so the feed above carries it out with everything else.")
-                                    .font(.sCaption)
-                                    .foregroundStyle(.secondary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            Spacer(minLength: 8)
-                            Toggle("Send plans to your calendar app", isOn: Binding(get: { data?.send ?? false }, set: { on in
-                                data?.send = on
-                                Task {
-                                    _ = try? await engine.call("planSend", ["on": on], as: ActReply.self)
-                                    say(on ? "Plans go to your calendar now." : "Plans stay in Simpl now.", bad: false)
-                                    changed()
-                                }
-                            }))
-                            .toggleStyle(.switch)
-                            .labelsHidden()
-                        }
-                        .padding(14)
-                        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.05)))
-                    }
-                }
-                // (1.3.167) what Send plans did, under it (a link's outcome is said under its field)
+                // (1.3.167) what the copy did, said under it (a link's outcome is said under its field)
                 if let said { saidLine(said) }
-                Text("Pull any piece of work to the right on To Do or the Dashboard to plan a time for it.")
+                Text("Drag work from To Do beside the week onto a time to plan it, or pull it to the right on To Do or the Dashboard.")
                     .font(.sCaption)
                     .foregroundStyle(.secondary)
             }
@@ -134,39 +116,103 @@ struct SyncPopup: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    // MARK: Canvas out
+    // MARK: Simpl out
 
     @ViewBuilder
-    private func feedCard(_ feed: String?) -> some View {
-        if let feed, let links = FeedLinks(feed, name: "\(engine.lmsName) (Simpl)") {
+    private func simplCard(_ f: SimplFeed) -> some View {
+        if f.on, let link = f.link {
             VStack(alignment: .leading, spacing: 10) {
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                    appButton("Apple Calendar", symbol: "calendar.badge.plus") { NSWorkspace.shared.open(links.apple) }
-                    appButton("Google Calendar", symbol: "calendar.badge.plus") { NSWorkspace.shared.open(links.google) }
+                    appButton("Apple Calendar", symbol: "calendar.badge.plus") { open(f.apple) }
+                    appButton("Google Calendar", symbol: "calendar.badge.plus") { open(f.google) }
                     // (a button like the others, its two accounts a menu under the pointer: a SwiftUI Menu would not fill its cell)
                     appButton("Outlook", symbol: "calendar.badge.plus") {
                         ChoiceMenu.show([
-                            ("School or Work Account (Microsoft 365)", { NSWorkspace.shared.open(links.office) }),
-                            ("Personal Account (Outlook.com)", { NSWorkspace.shared.open(links.outlook) }),
+                            ("School or Work Account (Microsoft 365)", { open(f.office) }),
+                            ("Personal Account (Outlook.com)", { open(f.outlook) }),
                         ])
                     }
                     appButton("Copy Link", symbol: "doc.on.doc") {
-                        copyToPasteboard(links.https.absoluteString)
-                        say("Calendar link copied. Paste it where your calendar app adds one by address.", bad: false)
+                        copyToPasteboard(link)
+                        say("Your Simpl calendar's link is copied. Paste it where your calendar app adds one by address.", bad: false)
                     }
                 }
-                Text("Every course's work and events, kept up to date: new work and moved due dates follow on their own. Google and Outlook look for changes every few hours.")
+                simplStatus(f)
+                Text("Your work, your own tasks and your plans, sent again while Simpl is open. It is sealed: only this private link opens it, so keep it to yourself. Google and Outlook look for changes every few hours.")
                     .font(.sCaption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                Divider()
+                Button("Stop Sharing This Calendar…", role: .destructive) { stopping = true }
+                    .buttonStyle(.plain)
+                    .font(.sCallout)
+                    .foregroundStyle(.red)
+                    .disabled(turning)
             }
             .padding(14)
             .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.05)))
         } else {
-            Text("\(engine.lmsName) has no calendar feed for your account here.")
-                .font(.sCallout)
-                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 12) {
+                    IconTile(symbol: "calendar.badge.plus", color: Theme.accent, size: 36)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Your work, your tasks and your plans").font(.sBody.weight(.semibold))
+                        Text("As one calendar, Simpl, in Apple Calendar, Google Calendar or Outlook, kept up to date. It is sealed: only your private link opens it.")
+                            .font(.sCallout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                Button {
+                    Task { await makeSimpl() }
+                } label: {
+                    HStack(spacing: 7) {
+                        if turning { ProgressView().controlSize(.small) }
+                        Text(turning ? "Making It…" : "Make My Simpl Calendar")
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .disabled(turning)
+                if !f.error.isEmpty { statusLine(f.error, symbol: "exclamationmark.triangle.fill", color: .red) }
+            }
+            .padding(14)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.05)))
         }
+    }
+
+    /// Sent and when, how many events it held; or why it could not be sent; or that it is being sent.
+    @ViewBuilder
+    private func simplStatus(_ f: SimplFeed) -> some View {
+        if !f.error.isEmpty {
+            statusLine(f.error, symbol: "exclamationmark.triangle.fill", color: .red)
+        } else if let sent = f.sent, let at = ISO8601DateFormatter.simplPageTime.date(from: sent) ?? ISO8601DateFormatter().date(from: sent) {
+            let ago = Date().timeIntervalSince(at) < 60 ? "just now" : RelativeDateTimeFormatter().localizedString(for: at, relativeTo: Date())
+            statusLine("Up to date · sent \(ago) · \(f.count == 1 ? "1 event" : "\(f.count) events")", symbol: "checkmark", color: .green)
+        } else {
+            HStack(spacing: 7) {
+                ProgressView().controlSize(.mini)
+                Text("Sending it…")
+            }
+            .font(.sCaption)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private func statusLine(_ text: String, symbol: String, color: Color) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 7) {
+            Image(systemName: symbol).font(.system(size: 11, weight: .bold))
+            Text(text).fixedSize(horizontal: false, vertical: true)
+        }
+        .font(.sCaption.weight(.medium))
+        .foregroundStyle(color)
+        .transition(.opacity)
+    }
+
+    private func open(_ address: String?) {
+        guard let address, let url = URL(string: address) else { return }
+        NSWorkspace.shared.open(url)
     }
 
     private func appButton(_ title: String, symbol: String, _ act: @escaping () -> Void) -> some View {
@@ -293,7 +339,30 @@ struct SyncPopup: View {
 
     private func load() async {
         let got = try? await engine.call("calSync", as: SyncData.self)
-        withAnimation(Motion.snappy) { data = got ?? SyncData(feed: nil, send: false, canSend: false, links: []) }
+        withAnimation(Motion.snappy) { data = got ?? SyncData(simpl: .off, links: []) }
+        // (the screenshot suite's -SimplMakeFeed YES: Simpl's calendar made, against the mock's own /api/feed)
+        if UserDefaults.standard.bool(forKey: "SimplMakeFeed"), got?.simpl.on == false { await makeSimpl() }
+    }
+
+    /// (1.3.169) Simpl's calendar made — a new private link — and sent at once; or why not.
+    private func makeSimpl() async {
+        guard !turning else { return }
+        turning = true
+        let f = try? await engine.call("feedOn", as: SimplFeed.self)
+        turning = false
+        withAnimation(Motion.snappy) {
+            data?.simpl = f ?? SimplFeed(on: false, link: nil, apple: nil, google: nil, office: nil, outlook: nil, sent: nil, count: 0, error: "Simpl could not reach simplcourses.com. Try again in a moment.")
+        }
+        if f?.on == true, f?.error.isEmpty == true { say("Your Simpl calendar is made. Add it to your calendar app above.", bad: false) }
+    }
+
+    /// (1.3.169) Simpl's calendar forgotten on simplcourses.com: its link opens nothing any more.
+    private func stopSimpl() async {
+        turning = true
+        let f = try? await engine.call("feedOff", as: SimplFeed.self)
+        turning = false
+        withAnimation(Motion.snappy) { data?.simpl = f ?? .off }
+        say("Your Simpl calendar is no longer shared.", bad: false)
     }
 
     private func link() async {
@@ -350,30 +419,6 @@ struct CalLinkReply: Codable {
     var name: String?
     var count: Int?
     var error: String?
-}
-
-/// Canvas's calendar feed as each calendar app takes one: Apple's by webcal, Google's and Outlook's add-by-address pages.
-struct FeedLinks {
-    let https: URL
-    let apple: URL
-    let google: URL
-    let office: URL
-    let outlook: URL
-
-    init?(_ feed: String, name: String) {
-        let plain = feed.replacingOccurrences(of: "^webcal:", with: "https:", options: .regularExpression)
-        let webcal = plain.replacingOccurrences(of: "^https?:", with: "webcal:", options: .regularExpression)
-        let enc = { (s: String) in s.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? s }
-        guard let h = URL(string: plain), let a = URL(string: webcal),
-              let g = URL(string: "https://calendar.google.com/calendar/r?cid=\(enc(webcal))"),
-              let o = URL(string: "https://outlook.office.com/calendar/0/addfromweb?url=\(enc(plain))&name=\(enc(name))"),
-              let l = URL(string: "https://outlook.live.com/calendar/0/addfromweb?url=\(enc(plain))&name=\(enc(name))") else { return nil }
-        https = h
-        apple = a
-        google = g
-        office = o
-        outlook = l
-    }
 }
 
 extension ISO8601DateFormatter {

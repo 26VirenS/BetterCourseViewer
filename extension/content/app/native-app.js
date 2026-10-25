@@ -893,12 +893,13 @@
     return out;
   }
 
-  async function todo({ group = null, showDone = null, age = NO_AGE } = {}) {
-    if (group && ['date', 'priority', 'course'].includes(group)) await store.setPref('todoGroup', group);
-    if (showDone !== null && showDone !== undefined) await store.setPref('todoShowDone', !!showDone);
-    let g = await store.pref('todoGroup', 'date');
+  // (2.99.110) `side`: To Do beside the Calendar's week — by date, open work only, whatever To Do itself is set to
+  async function todo({ group = null, showDone = null, side = false, age = NO_AGE } = {}) {
+    if (!side && group && ['date', 'priority', 'course'].includes(group)) await store.setPref('todoGroup', group);
+    if (!side && showDone !== null && showDone !== undefined) await store.setPref('todoShowDone', !!showDone);
+    let g = side ? 'date' : await store.pref('todoGroup', 'date');
     if (!['date', 'priority', 'course'].includes(g)) g = 'date';
-    const done = !!(await store.pref('todoShowDone', false));
+    const done = side ? false : !!(await store.pref('todoShowDone', false));
     const [priPref, repPref] = await Promise.all([store.pref('todoPriority', {}), store.pref('todoRepeat', {})]);
     const pri = priPref && typeof priPref === 'object' ? priPref : {};
     const rep = repPref && typeof repPref === 'object' ? repPref : {};
@@ -3063,10 +3064,10 @@
   }
 
   // ---- (2.99.107) Calendar → Sync and pull to plan, for the apps ------------------------------------------------
-  // The same as the web's (screens/calendar.js, content/app/plan.js): Canvas's calendar feed for a calendar app, the
-  // student's own calendars linked by their private address (the background reads them: in the apps the app fetches the
-  // file for it, its page being unable to read another site — bridge.js fetchText), and the plans: the free times a piece
-  // of work could go in, put there, moved, cleared, and sent on to the Canvas calendar when Send plans is on.
+  // The same as the web's (screens/calendar.js, content/app/plan.js): Simpl's own calendar for a calendar app (2.99.110;
+  // the app sends it — bridge.js feedSend), the student's own calendars linked by their private address (the background
+  // reads them: in the apps the app fetches the file for it, its page being unable to read another site — bridge.js
+  // fetchText), and the plans: the free times a piece of work could go in, put there, moved and cleared.
   function planInfo(id) {
     const p = BCV.plan?.get(String(id));
     if (!p) return null;
@@ -3075,11 +3076,21 @@
     return { at: p.at, mins: p.mins, past, words: `${past ? 'Was planned' : 'Planned'} ${BCV.plan.whenWords(at)}` };
   }
   const askCal = (m) => Promise.resolve(BCV.api.runtime.sendMessage({ type: 'cal', ...m })).catch((e) => ({ ok: false, message: e?.message || String(e) }));
+  // (2.99.110) Simpl's own calendar (content/app/feed.js) in place of Canvas's feed: whether it is on, its private link as
+  // each calendar app takes it, when it was last sent and how many events it held, or why it could not be
+  function feedOut(st) {
+    const L = st?.on && st.link ? BCV.feed.links(st.link) : null;
+    return { on: !!st?.on, link: L?.https || null, apple: L?.apple || null, google: L?.google || null, office: L?.office || null, outlook: L?.outlook || null, sent: st?.at ? new Date(st.at).toISOString() : null, count: st?.count || 0, error: st?.error || '' };
+  }
+  const feedState = async () => feedOut(await BCV.feed.state());
+  const feedOn = async () => feedOut(await BCV.feed.turnOn());
+  const feedOff = async () => feedOut(await BCV.feed.turnOff());
+  const feedSend = async () => feedOut(await BCV.feed.publish({ force: true }));
   async function calSync() {
-    const [me, linked, send] = await Promise.all([store.me().catch(() => null), BCV.plan.linked(), BCV.plan.sending()]);
+    const [linked, simpl] = await Promise.all([BCV.plan.linked(), feedState()]);
     if (linked.links.length) askCal({ op: 'sync' }); // (what was read more than half an hour ago, read again: the answer follows in storage)
     return {
-      feed: me?.calendarFeed || null, send, canSend: BCV.plan.canSend(),
+      simpl,
       links: linked.links.map((l) => { const f = linked.feeds[l.id]; return { id: l.id, name: l.name, color: l.color || GRAY, on: l.on !== false, read: f?.at ? new Date(f.at).toISOString() : null, count: (f?.events || []).length, error: f && !f.ok ? f.error || 'Could not be read.' : '' }; }),
     };
   }
@@ -3126,7 +3137,6 @@
     return { ok: true, plan: planInfo(String(id)) };
   }
   async function planClear({ id } = {}) { await BCV.plan.clear(String(id)); return { ok: true }; }
-  async function planSend({ on } = {}) { await BCV.plan.setSending(!!on); return { ok: true, send: !!on }; }
   /** What the Calendar lays over Canvas's own between two days: the linked calendars' events (only the calendars shown) and
    *  the plans, shaped as its events are; and the Canvas events that are plans sent there (drawn as the plan instead). */
   async function calLayer(s, e) {
@@ -3149,7 +3159,7 @@
     return { events: out, sent: new Set(Object.values(BCV.plan.all()).map((p) => p.ev).filter(Boolean)) };
   }
 
-  const CALLS = { calSync, calLink, calShow, calUnlink, calRefresh, planSlots, planPut, planMove, planClear, planSend, setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, setColor, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, appointments, reserveAppointment, cancelReservation, notifications, notifMark, search, searchLocal, searchWarm, searchRecent, appearance, whatsNew, whatsNewSeen, refresh,
+  const CALLS = { calSync, feedState, feedOn, feedOff, feedSend, calLink, calShow, calUnlink, calRefresh, planSlots, planPut, planMove, planClear, setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, setColor, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, appointments, reserveAppointment, cancelReservation, notifications, notifMark, search, searchLocal, searchWarm, searchRecent, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, fileInfo, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage, messageUpload,
     toolLaunch, externalTools, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizAssignment, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback, neighbours };
   // (Mac 1.2) Grade needed: a course's score now (by the student's own weights where set, as the Grades screen) and each

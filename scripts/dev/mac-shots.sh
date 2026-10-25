@@ -505,15 +505,20 @@ ui_review() {
   # (a two-page reading, for the annotator and Merge & Split: one PDF opens Split)
   MODE=light shoot light-58-tool-annotate 14 -SimplPlace tools -SimplTool mark -SimplToolFile "$PWD/scripts/dev/fixtures/reading.pdf"
   MODE=light shoot light-58b-tool-split 14 -SimplPlace tools -SimplTool pdfx -SimplToolFile "$PWD/scripts/dev/fixtures/reading.pdf"
+  # (1.3.169) the week with To Do beside it, and a row of To Do held over Wednesday at 1 PM: where it would be planned
   MODE=light shoot light-05w-calendar-week 12 -SimplPlace calendar -SimplCalView week
+  MODE=dark shoot dark-05w-calendar-week 12 -SimplPlace calendar -SimplCalView week
+  MODE=light shoot light-05t-calendar-week-todo-drop 12 -SimplPlace calendar -SimplCalView week -SimplTodoDrop 3,780
   MODE=light shoot light-05l-calendar-list 12 -SimplPlace calendar -SimplCalView list
   # (1.3.151) Find Appointment's popup over the calendar: the class, the group's card, a day open to its times
   MODE=light shoot light-05f-find-appointment 16 -SimplPlace calendar -SimplFindAppointment YES
   MODE=dark shoot dark-05f-find-appointment 16 -SimplPlace calendar -SimplFindAppointment YES
-  # (1.3.165) Sync's popup over the calendar: Canvas's feed for a calendar app, the calendars linked, Send plans; and the
-  # plan rail under a piece of work on To Do: its free times, the one chosen lit
+  # (1.3.165) Sync's popup over the calendar: (1.3.169) Simpl's own calendar, before it is made and once it is (against the
+  # mock's /api/feed), and the calendars linked; and the plan rail under a piece of work on To Do: its free times, the one
+  # chosen lit
   MODE=light shoot light-05s-calendar-sync 16 -SimplPlace calendar -SimplSync YES
   MODE=dark shoot dark-05s-calendar-sync 16 -SimplPlace calendar -SimplSync YES
+  MODE=light shoot light-05u-calendar-sync-simpl 20 -SimplPlace calendar -SimplSync YES -SimplMakeFeed YES
   MODE=light shoot light-03p-todo-plan-rail 16 -SimplPlace todo -SimplPlanFirst YES
   MODE=dark shoot dark-03p-todo-plan-rail 16 -SimplPlace todo -SimplPlanFirst YES
   MODE=light shoot light-11w-course-grades-whatif 16 -SimplPlace section:courses/101:grades -SimplWhatIf YES

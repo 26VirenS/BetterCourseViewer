@@ -74,13 +74,27 @@ struct WorkPlan: Codable, Hashable {
     var words: String
 }
 
-/// (2.99.107) Calendar → Sync as native-app.js `calSync` reads it: Canvas's calendar feed for a calendar app, the student's
-/// own calendars linked by their private address, and whether plans go on to the Canvas calendar.
+/// (2.99.107) Calendar → Sync as native-app.js `calSync` reads it: Simpl's own calendar for a calendar app (2.99.110, in
+/// place of Canvas's feed and Send plans) and the student's own calendars linked by their private address.
 struct SyncData: Codable {
-    var feed: String?
-    var send: Bool
-    var canSend: Bool
+    var simpl: SimplFeed
     var links: [SyncLink]
+}
+
+/// (2.99.110) Simpl's own calendar as native-app.js `feedState` (`feedOn`, `feedOff`, `feedSend`) says it: whether it is
+/// on, its private link as each calendar app takes it, when it was last sent and how many events it held, or why not.
+struct SimplFeed: Codable, Equatable {
+    var on: Bool
+    var link: String?
+    var apple: String?
+    var google: String?
+    var office: String?
+    var outlook: String?
+    var sent: String?
+    var count: Int
+    var error: String
+
+    static let off = SimplFeed(on: false, link: nil, apple: nil, google: nil, office: nil, outlook: nil, sent: nil, count: 0, error: "")
 }
 
 struct SyncLink: Codable, Identifiable, Hashable {

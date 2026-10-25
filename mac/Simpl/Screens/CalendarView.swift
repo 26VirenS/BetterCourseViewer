@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Calendar: a month as a calendar's grid — each day's work and events on it in their calendar's colour, today marked —
 /// with the day picked listed beside it (and a task of your own added to it); a week day by day; or the next three weeks
@@ -51,6 +52,14 @@ struct CalendarView: View {
     /// (1.3.167) A plan's block being dragged on the week: by how many days and minutes (a quarter of an hour at a time);
     /// `dropped`, let go and on its way to the page — it stays where it was let go until the week is read again.
     @State private var planDrag: PlanDrag?
+    /// (1.3.169) To Do beside the week (the web's 2.99.110): on unless turned off; what it lists (native-app.js `todo`,
+    /// side: open work by date); a row being dragged over a day — the day and the minute it would be planned for; and
+    /// what came of the last one let go.
+    @AppStorage("SimplCalTodo") private var todoOn = true
+    @State private var todoSide: TodoData?
+    @State private var todoFailed = false
+    @State private var todoDrop: TodoDrop? = CalendarView.shotDrop
+    @State private var todoSaid: String?
     /// The width of a day of the week's grid, for a drag to say which day it is over.
     @State private var weekColumn: CGFloat = 0
 
@@ -146,6 +155,17 @@ struct CalendarView: View {
     @ToolbarContentBuilder
     private var toolbarItems: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
+            // (1.3.169) To Do beside the week, shown or hidden (the week alone has it)
+            if mode == "week" {
+                Button {
+                    withAnimation(reduceMotion ? nil : Motion.snappy) { todoOn.toggle() }
+                } label: {
+                    Label(todoOn ? "Hide To Do" : "Show To Do", systemImage: "sidebar.left")
+                }
+                .help(todoOn ? "Hide To Do beside the week" : "Show To Do beside the week, to drag work onto a time")
+            }
+        }
+        ToolbarItem(placement: .primaryAction) {
             Picker("View", selection: Binding(get: { mode }, set: { setMode($0) })) {
                 Text("Month").tag("month")
                 Text("Week").tag("week")
@@ -172,7 +192,7 @@ struct CalendarView: View {
             } label: {
                 Label("Sync", systemImage: "arrow.triangle.2.circlepath")
             }
-            .help("Your Canvas work in Apple, Google or Outlook, and your own calendars here")
+            .help("Simpl in Apple, Google or Outlook, and your own calendars here")
         }
         ToolbarItem(placement: .primaryAction) {
             Button {
@@ -656,6 +676,7 @@ struct CalendarView: View {
     /// another.
     private func weekView(_ byDay: [String: [CalEvent]]) -> some View {
         let days = (0..<7).compactMap { cal.date(byAdding: .day, value: $0, to: weekStart) }
+        let side = todoBeside
         return ZStack {
             Group {
                 if room >= 520 {
@@ -674,6 +695,262 @@ struct CalendarView: View {
         }
         .clipped()
         .padding(-6)
+        // (1.3.169) To Do beside it, as tall as the week (an overlay is given the week's own height), its list scrolling
+        .padding(.leading, side ? Self.todoWidth + 16 : 0)
+        .overlay(alignment: .topLeading) {
+            if side {
+                todoPanel
+                    .frame(width: Self.todoWidth)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+            }
+        }
+        .animation(reduceMotion ? nil : Motion.snappy, value: side)
+        .task(id: side ? engine.dataVersion : -1) { if side { await loadTodo() } }
+    }
+
+    // MARK: To Do beside the week
+
+    /// The screenshot suite's -SimplTodoDrop "3,780": a row held over the week's fourth day at 1 PM, where it would go.
+    private static var shotDrop: TodoDrop? {
+        let parts = (UserDefaults.standard.string(forKey: "SimplTodoDrop") ?? "").split(separator: ",").compactMap { Int($0) }
+        return parts.count == 2 ? TodoDrop(day: parts[0], minutes: parts[1]) : nil
+    }
+
+    /// (1.3.169) To Do's width beside the week, shown from a page wide enough to keep the week's grid its 520 points.
+    private static let todoWidth: CGFloat = 248
+    private var todoBeside: Bool { mode == "week" && todoOn && room >= 520 + Self.todoWidth + 16 }
+
+    private func loadTodo() async {
+        do {
+            let d = try await engine.call("todo", ["side": true], as: TodoData.self)
+            withAnimation(todoSide == nil || reduceMotion ? nil : Motion.gentle) {
+                todoSide = d
+                todoFailed = false
+            }
+        } catch {
+            if todoSide == nil { todoFailed = true }
+        }
+    }
+
+    /// What is open over the next seven days, by day (Overdue first), each row ticked off where it is, opened with a
+    /// click, and dragged onto a time on the week to plan it there.
+    private var todoPanel: some View {
+        let sections = todoSide?.sections ?? []
+        let open = sections.reduce(0) { $0 + $1.rows.count }
+        return VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("To Do").font(.sHeadline)
+                    Spacer(minLength: 6)
+                    if todoSide != nil {
+                        Text("\(open) open")
+                            .font(.sCaption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Text("Drag a row onto a time to plan it.")
+                    .font(.sCaption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 12)
+            .padding(.bottom, 10)
+            Divider()
+            if todoSide == nil {
+                Group {
+                    if todoFailed {
+                        Text("To Do could not be read.")
+                            .font(.sCallout)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ProgressView().controlSize(.small)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 24)
+                Spacer(minLength: 0)
+            } else if sections.isEmpty {
+                Text(todoSide?.empty ?? "Nothing to do in the next seven days.")
+                    .font(.sCallout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(14)
+                Spacer(minLength: 0)
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
+                        ForEach(sections) { s in
+                            Section {
+                                ForEach(s.rows) { todoRow($0) }
+                            } header: {
+                                todoHeader(s)
+                            }
+                        }
+                    }
+                    .padding(.bottom, 8)
+                }
+            }
+            if let todoSaid {
+                Divider()
+                Label(todoSaid, systemImage: "checkmark.circle.fill")
+                    .font(.sCaption.weight(.medium))
+                    .foregroundStyle(.green)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .transition(.opacity)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .card()
+        .animation(reduceMotion ? nil : Motion.snappy, value: todoSaid)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("To Do")
+    }
+
+    private func todoHeader(_ s: TodoSection) -> some View {
+        HStack {
+            Text(s.title.uppercased())
+                .font(.sCaption2.weight(.semibold))
+                .tracking(0.5)
+                .foregroundStyle(s.title == "Overdue" ? Color.red : Color.secondary)
+            Spacer(minLength: 6)
+            Text("\(s.rows.count)")
+                .font(.sCaption2.monospacedDigit())
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 10)
+        .padding(.bottom, 4)
+        .background(Theme.card)
+    }
+
+    private func todoRow(_ r: WorkRow) -> some View {
+        HStack(alignment: .top, spacing: 9) {
+            Button {
+                Task { if await engine.act("complete", ["id": r.id, "done": !r.done]) { await loadTodo() } }
+            } label: {
+                Image(systemName: r.done ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 15))
+                    .foregroundStyle(r.done ? Theme.accent : Color.secondary)
+                    .frame(width: 18, height: 18)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 1)
+            .help(r.done ? "Mark as Not Done" : "Mark as Done")
+            PreviewLink(item: .work(r, engine: engine, toggle: nil), padded: false, radius: 8, inline: false) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(r.title)
+                        .font(.sCallout.weight(.medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    HStack(spacing: 5) {
+                        Circle().fill(Color(hex: r.color)).frame(width: 6, height: 6)
+                        Text([r.courseName, r.time].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · "))
+                            .font(.sCaption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    if let p = r.plan {
+                        Label(p.words, systemImage: "clock")
+                            .font(.sCaption2.weight(.semibold))
+                            .foregroundStyle(p.past == true ? Color.secondary : Theme.accent)
+                            .lineLimit(1)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.tertiary)
+                .padding(.top, 4)
+                .accessibilityHidden(true)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .contentShape(Rectangle())
+        .onDrag {
+            TodoDragging.id = r.id
+            return NSItemProvider(object: "simpl-work:\(r.id)" as NSString)
+        } preview: {
+            todoDragPreview(r)
+        }
+        .help("Drag onto a time on the week to plan it")
+    }
+
+    /// What follows the pointer: the work's name on a small card, its course's colour beside it.
+    private func todoDragPreview(_ r: WorkRow) -> some View {
+        HStack(spacing: 8) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(Color(hex: r.color))
+                .frame(width: 3)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(r.title).font(.sCallout.weight(.semibold)).lineLimit(1)
+                Text("Drop on a time to plan it").font(.sCaption2).foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .frame(width: 220, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.card))
+    }
+
+    /// Where a row dragged over a day would be planned: an hour's block at that time, its times on it.
+    private func todoDropBlock(_ d: TodoDrop, first: Int) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text("\(clock(d.minutes)) – \(clock(d.minutes + 60))")
+                .font(.system(size: 10.5, weight: .bold).monospacedDigit())
+            Text(d.placed ? "Planning it…" : "Plan it here")
+                .font(.sCaption2)
+        }
+        .foregroundStyle(Theme.accent)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(height: Self.hourHeight - 2, alignment: .top)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Theme.accent.opacity(0.16)))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.accent, style: StrokeStyle(lineWidth: 1.5, dash: d.placed ? [] : [4, 3])))
+        .padding(.horizontal, 3)
+        .offset(y: Self.weekY(d.minutes, from: first))
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.08), value: d.minutes)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    /// A time of day, `minutes` into it, as the Mac writes one ("4:15 PM").
+    private func clock(_ minutes: Int) -> String {
+        let m = min(24 * 60 - 1, max(0, minutes))
+        let at = cal.date(bySettingHour: m / 60, minute: m % 60, second: 0, of: Date()) ?? Date()
+        return at.formatted(.dateTime.hour().minute())
+    }
+
+    /// A row let go on a day of the week: planned there for an hour (the page's planPut); the block stays where it was
+    /// let go until the week is read again, and what came of it is said under To Do.
+    private func planFromTodo(_ id: String, day: Int, minutes: Int) {
+        guard let date = cal.date(byAdding: .day, value: day, to: weekStart),
+              let at = cal.date(bySettingHour: minutes / 60, minute: minutes % 60, second: 0, of: date) else {
+            todoDrop = nil
+            return
+        }
+        todoDrop = TodoDrop(day: day, minutes: minutes, placed: true)
+        NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
+        Task {
+            let r = try? await engine.call("planPut", ["id": id, "at": ISO8601DateFormatter().string(from: at), "mins": 60], as: ActReply.self)
+            if r?.ok == true {
+                withAnimation(reduceMotion ? nil : Motion.snappy) { todoSaid = "Planned \(at.formatted(.dateTime.weekday(.wide).hour().minute()))" }
+                engine.changed()
+                try? await Task.sleep(nanoseconds: 4_000_000_000)
+                withAnimation(reduceMotion ? nil : Motion.snappy) { todoSaid = nil }
+            } else {
+                withAnimation(reduceMotion ? nil : Motion.snappy) {
+                    todoDrop = nil
+                    failure = r?.error ?? "That time could not be planned."
+                }
+            }
+        }
     }
 
     /// How far down the week's hours a time of day is: `minutes` into the day, the hours drawn from `first`.
@@ -773,6 +1050,12 @@ struct CalendarView: View {
                         if cal.isDateInToday(day) { nowLine(from: first) }
                     }
                     .overlay(alignment: .leading) { Self.line.frame(width: 1) }
+                    .overlay(alignment: .top) { // (1.3.169) where a row of To Do dragged over this day would be planned
+                        if let d = todoDrop, d.day == i { todoDropBlock(d, first: first) }
+                    }
+                    .onDrop(of: [.text], delegate: TodoDropDelegate(day: i, first: first, hourHeight: Self.hourHeight, enabled: todoBeside, drop: $todoDrop) { id, mins in
+                        planFromTodo(id, day: i, minutes: mins)
+                    })
                     .zIndex(timed[i].contains(where: { $0.ev.id == planDrag?.id }) ? 1 : 0) // (a dragged plan over the days beside)
                 }
             }
@@ -1192,6 +1475,7 @@ struct CalendarView: View {
                     data = d
                     failure = nil
                     if planDrag?.dropped == true { planDrag = nil } // (1.3.167: the plan dragged, now where the page has it)
+                    if todoDrop?.placed == true { todoDrop = nil } // (1.3.169: the row let go, now a plan on the week)
                 }
             } else {
                 withAnimation(Motion.gentle) {
@@ -1199,6 +1483,7 @@ struct CalendarView: View {
                     failure = nil
                 }
                 if planDrag?.dropped == true { planDrag = nil }
+                if todoDrop?.placed == true { todoDrop = nil }
             }
             error = nil
         } catch {
@@ -1689,6 +1974,62 @@ private struct WeekAt: LayoutValueKey {
 /// (1.3.167) How tall an item's block is for the time it lasts (0: as tall as its name needs).
 private struct WeekLength: LayoutValueKey {
     static let defaultValue: CGFloat = 0
+}
+
+/// (1.3.169) A row of To Do dragged over a day of the week: the minute it would be planned for; let go, on its way.
+struct TodoDrop: Equatable {
+    var day: Int
+    var minutes: Int
+    var placed = false
+}
+
+/// (1.3.169) The row of To Do being dragged, by its id: set as the drag starts (onDrag), read where it is let go.
+enum TodoDragging {
+    nonisolated(unsafe) static var id: String?
+}
+
+/// (1.3.169) A day of the week taking a row of To Do: where it would go follows the pointer a quarter of an hour at a time
+/// (the hour's block centred under it), and let go, the work is planned there.
+private struct TodoDropDelegate: DropDelegate {
+    let day: Int
+    let first: Int
+    let hourHeight: CGFloat
+    let enabled: Bool
+    @Binding var drop: TodoDrop?
+    let put: (String, Int) -> Void
+
+    func validateDrop(info: DropInfo) -> Bool { enabled && TodoDragging.id != nil && info.hasItemsConforming(to: [.text]) }
+    func dropEntered(info: DropInfo) { follow(info) }
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        follow(info)
+        return DropProposal(operation: .copy)
+    }
+    func dropExited(info: DropInfo) {
+        if drop?.day == day, drop?.placed != true { drop = nil }
+    }
+    func performDrop(info: DropInfo) -> Bool {
+        guard enabled, let id = TodoDragging.id else {
+            drop = nil
+            return false
+        }
+        TodoDragging.id = nil
+        put(id, minutes(info))
+        return true
+    }
+
+    private func minutes(_ info: DropInfo) -> Int {
+        let into = Double(info.location.y / hourHeight) * 60 + Double(first * 60) - 30
+        let snapped = Int((into / 15).rounded()) * 15
+        return min(23 * 60, max(first * 60, snapped))
+    }
+
+    private func follow(_ info: DropInfo) {
+        guard enabled, TodoDragging.id != nil else { return }
+        let next = TodoDrop(day: day, minutes: minutes(info))
+        guard next != drop else { return }
+        drop = next
+        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+    }
 }
 
 /// (1.3.167) A plan's block dragged on the week: by how many days and minutes; dropped, on its way to the page.
