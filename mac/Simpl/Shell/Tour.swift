@@ -56,6 +56,7 @@ enum TourSpot: Hashable {
     case overlay, sidebar, account, dashboardRow, gradesRow, toolsRow, firstCourse, counters
     case gradeRing, gradeDetails, whatIfSwitch, whatIfScore, toolPin, counterNext, counterPanel
     case preview // (1.2.3) a piece of work's quick look (Shell/WorkPreviewOverlay.swift)
+    case photo(PhotoSlot) // (1.3.166) a Dashboard card that takes a photo, for its photo placed where it is (Shell/PhotoInPlace.swift)
 }
 
 // MARK: - Where each part is

@@ -236,14 +236,16 @@ final class AppearanceStore: ObservableObject {
         savePhotos()
     }
 
-    /// A photo of the student's own chosen for a place (an Open panel), kept on this Mac at a sensible size.
-    func upload(to slot: PhotoSlot) {
+    /// A photo of the student's own chosen for a place (an Open panel), kept on this Mac at a sensible size; whether one
+    /// was (1.3.166: Appearance then opens it where it went, to place it).
+    @discardableResult
+    func upload(to slot: PhotoSlot) -> Bool {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.image]
         panel.allowsMultipleSelection = false
         panel.message = slot.isSide ? "Choose a photo for the sidebar" : "Choose a photo for the \(slot.title) card"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        take(url, into: slot)
+        guard panel.runModal() == .OK, let url = panel.url else { return false }
+        return take(url, into: slot)
     }
 
     /// A picture file put in a place (an upload, or a file dropped on the editor).
@@ -635,8 +637,9 @@ struct SidebarGround: View {
 }
 
 /// (1.3.164) The words on a photo with its Ink switch off (the web's .bcv-side--plain): the light look's dark words in
-/// either look, each with a gentle white border — a ring of white round every letter (four sharp copies a hair out each
-/// way, as the web's ring is), softening out — so they read on any photo. Where the photo is inked nothing changes.
+/// either look, each with a white border — a ring of white round every letter (four sharp copies a hair out each way, as
+/// the web's ring is), solid (1.3.166: no soft glow round it) — so they read on any photo. Where the photo is inked
+/// nothing changes.
 struct PlainPhotoWords: ViewModifier {
     let on: Bool
 
@@ -645,11 +648,11 @@ struct PlainPhotoWords: ViewModifier {
         if on {
             content
                 .environment(\.colorScheme, .light)
-                .shadow(color: .white, radius: 0, x: 0.8, y: 0)
-                .shadow(color: .white, radius: 0, x: -0.8, y: 0)
-                .shadow(color: .white, radius: 0, x: 0, y: 0.8)
-                .shadow(color: .white, radius: 0, x: 0, y: -0.8)
-                .shadow(color: .white.opacity(0.75), radius: 3)
+                // (1.3.166: a solid white edge, each shadow hard and each over the last — no glow fading out of it)
+                .shadow(color: .white, radius: 0, x: 1, y: 0)
+                .shadow(color: .white, radius: 0, x: -1, y: 0)
+                .shadow(color: .white, radius: 0, x: 0, y: 1)
+                .shadow(color: .white, radius: 0, x: 0, y: -1)
         } else {
             content
         }

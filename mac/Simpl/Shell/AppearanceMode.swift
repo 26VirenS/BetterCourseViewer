@@ -10,6 +10,8 @@ import SwiftUI
 final class AppearanceMode: ObservableObject {
     static let shared = AppearanceMode()
     @Published private(set) var on = false
+    /// (1.3.166) The place whose photo is being placed where it is (Shell/PhotoInPlace.swift), if one is.
+    @Published private(set) var editing: PhotoSlot?
 
     /// Turned on over the Dashboard (where its cards are). The screenshot suite's -SimplAppearanceMode YES turns it on
     /// as the window opens (MainShell).
@@ -19,7 +21,19 @@ final class AppearanceMode: ObservableObject {
     }
 
     func end() {
-        withAnimation(Motion.gentle) { on = false }
+        withAnimation(Motion.gentle) {
+            editing = nil
+            on = false
+        }
+    }
+
+    /// (1.3.166) A place's photo opened where it is, to move and zoom it (uploaded, or Move and Zoom…).
+    func edit(_ slot: PhotoSlot) {
+        withAnimation(Motion.snappy) { editing = slot }
+    }
+
+    func endEdit() {
+        withAnimation(Motion.snappy) { editing = nil }
     }
 
     static var launchOn: Bool { UserDefaults.standard.bool(forKey: "SimplAppearanceMode") }
@@ -28,17 +42,17 @@ final class AppearanceMode: ObservableObject {
 // MARK: - A place's photo button
 
 /// The photo button on the sidebar and on each Dashboard card while Appearance is on: a photo of your own, a drawing,
-/// the photo moved and zoomed (its editor, in a popup), or taken away.
+/// the photo moved and zoomed (1.3.166: where it is, its settings round it), or taken away.
 struct PhotoBadge: View {
     let slot: PhotoSlot
-    let adjust: () -> Void
     @ObservedObject private var store = AppearanceStore.shared
     @State private var shown = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Menu {
-            Button("Upload Photo…") { store.upload(to: slot) }
+            // (1.3.166) a photo uploaded opens where it went, to place it
+            Button("Upload Photo…") { if store.upload(to: slot) { AppearanceMode.shared.edit(slot) } }
             Menu("Drawing") {
                 ForEach(AppearanceStore.scenes, id: \.self) { s in
                     Button(s) { store.setScene(s, in: slot) }
@@ -50,7 +64,7 @@ struct PhotoBadge: View {
                 if case .upload? = store.photos[slot]?.source {
                     Toggle("Ink Photo", isOn: Binding(get: { !store.isPlain(slot) }, set: { store.setInk($0, in: slot) }))
                 }
-                Button("Move and Zoom…", action: adjust)
+                Button("Move and Zoom…") { AppearanceMode.shared.edit(slot) }
                 Button("Remove Photo", role: .destructive) { store.remove(slot) }
             }
         } label: {
@@ -96,10 +110,21 @@ struct AppearanceOverlay: View {
                             .onTapGesture {} // (the darkened part takes presses, and does nothing with them)
                     }
                     .transition(.opacity)
-                    AppearanceBar(done: { mode.end() })
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 22)
-                        .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+                    if let slot = mode.editing {
+                        // (1.3.166) a photo placed where it is: the place outlined, its settings round it, kept on it
+                        TimelineView(.periodic(from: .now, by: 0.2)) { _ in
+                            if let frame = editFrame(slot, size: proxy.size) {
+                                PhotoEditLayer(slot: slot, frame: frame, bounds: proxy.size, done: { mode.endEdit() })
+                            }
+                        }
+                        .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
+                        .transition(.opacity)
+                    } else {
+                        AppearanceBar(done: { mode.end() })
+                            .padding(.horizontal, 24)
+                            .padding(.bottom, 22)
+                            .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+                    }
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
@@ -114,13 +139,31 @@ struct AppearanceOverlay: View {
             guard AppearanceMode.launchOn else { return }
             try? await Task.sleep(nanoseconds: 900_000_000)
             mode.begin(engine)
+            // (the screenshot suite: -SimplPhotoEdit today opens that place's photo where it is)
+            if let raw = UserDefaults.standard.string(forKey: "SimplPhotoEdit"), let slot = PhotoSlot(rawValue: raw) {
+                try? await Task.sleep(nanoseconds: 900_000_000)
+                mode.edit(slot)
+            }
         }
+    }
+
+    /// (1.3.166) The place whose photo is being placed, where it is in this overlay.
+    private func editFrame(_ slot: PhotoSlot, size: CGSize) -> CGRect? {
+        guard let window = engine.hostView.window, let me = TourFrames.shared.rect(.overlay, in: window),
+              let r = TourFrames.shared.rect(slot.isSide ? .sidebar : .photo(slot), in: window) else { return nil }
+        let f = r.offsetBy(dx: -me.minX, dy: -me.minY)
+        return CGRect(origin: .zero, size: size).intersects(f) ? f : nil
     }
 
     /// The sidebar and the Dashboard's cards, where they are in this overlay.
     private func holes(size: CGSize) -> [CGRect] {
         guard let window = engine.hostView.window, let me = TourFrames.shared.rect(.overlay, in: window) else { return [] }
         let bounds = CGRect(origin: .zero, size: size)
+        // (1.3.166) a photo being placed: its place the only one lit (a card's, just outside its edge)
+        if let slot = mode.editing {
+            guard let f = editFrame(slot, size: size) else { return [] }
+            return [slot.isSide ? f : f.insetBy(dx: -6, dy: -6)]
+        }
         return [TourSpot.sidebar, .counters].compactMap { spot in
             TourFrames.shared.rect(spot, in: window)
                 .map { $0.offsetBy(dx: -me.minX, dy: -me.minY).insetBy(dx: spot == .counters ? -8 : 0, dy: spot == .counters ? -8 : 0) }

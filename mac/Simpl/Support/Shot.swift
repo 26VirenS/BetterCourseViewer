@@ -174,7 +174,13 @@ enum Shot {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
             let waited = Date().timeIntervalSince(since)
             if NSApp.isActive || (popover ? waited > 8 : (!again || waited > 2)) {
-                capture(file)
+                // (1.3.166) a popover's app just brought back in front: a moment more for the popover to open again as it
+                // came back — the plan rail's dark picture was taken as it was still opening, the window alone
+                if popover && !again && NSApp.isActive {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { capture(file) }
+                } else {
+                    capture(file)
+                }
             } else {
                 NSLog("[Simpl] shot: another copy of the app is in front; brought forward again")
                 front()

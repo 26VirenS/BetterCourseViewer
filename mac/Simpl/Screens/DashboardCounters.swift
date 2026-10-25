@@ -204,9 +204,10 @@ struct DashCounterTile: View {
             }
         }
         .buttonStyle(CardButtonStyle(radius: 18))
+        .tourSpot(PhotoSlot.card(counter.key).map { .photo($0) }) // (1.3.166: where it is, for its photo placed on it)
         .overlay {
-            if appearanceMode.on, let slot = PhotoSlot.card(counter.key) {
-                PhotoBadge(slot: slot) { editing = true }
+            if appearanceMode.on, appearanceMode.editing == nil, let slot = PhotoSlot.card(counter.key) {
+                PhotoBadge(slot: slot) // (1.3.166: none while a photo is being placed)
             }
         }
         .contextMenu {

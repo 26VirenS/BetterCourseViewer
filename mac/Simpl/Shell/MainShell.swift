@@ -330,8 +330,6 @@ struct Sidebar: View {
     @ObservedObject private var appearanceMode = AppearanceMode.shared
     /// (1.3.164) Whether its photo has its Ink switch off: the words over it then dark, with a white border.
     @ObservedObject private var appearance = AppearanceStore.shared
-    /// (1.3.113) The sidebar's photo moved and zoomed, from its photo button.
-    @State private var adjusting = false
 
     /// A course's sections before its home has said which it has.
     static let defaultSections: [SectionLink] = [
@@ -395,14 +393,11 @@ struct Sidebar: View {
         .plainPhotoWords(appearance.isPlain(.side)) // (1.3.164: its photo's Ink off — dark words, a white border round them)
         .background { ColumnAppearance(light: appearance.isPlain(.side)) } // (and the list's own words, drawn natively, in the light look)
         .background { SidebarGround() } // (1.3.1) the sidebar's photo, frosted, behind its rows
-        // (1.3.113) Appearance on: its photo button, in its middle
+        // (1.3.113) Appearance on: its photo button, in its middle (1.3.166: none while a photo is being placed)
         .overlay {
-            if appearanceMode.on {
-                PhotoBadge(slot: .side) { adjusting = true }
+            if appearanceMode.on && appearanceMode.editing == nil {
+                PhotoBadge(slot: .side)
             }
-        }
-        .floatingPopup("card-photo:side", title: "Sidebar Photo", isPresented: $adjusting) {
-            PhotoSlotSheet(slot: .side)
         }
     }
 

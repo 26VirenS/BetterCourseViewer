@@ -1003,6 +1003,8 @@ push_set() {
   shoot light-50e-theme-photo-plain 12 -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg" -SimplThemePlain YES
   # (1.3.113) Appearance, from the ⋯ menu: the window darkened but the sidebar and the cards, their photo buttons, the bar
   shoot light-51-appearance-mode 16 -SimplAppearanceMode YES -SimplTheme Ocean
+  # (1.3.166) a photo placed where it is: a card's settings under it, the sidebar's beside it
+  shoot light-51p-appearance-photo-card 18 -SimplAppearanceMode YES -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg" -SimplPhotoEdit today
   shoot light-51c-appearance-courses 16 -SimplAppearanceMode YES -SimplAppearanceTab courses
   shoot light-12b-hand-in-preview 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplHandInPreview "$PWD/docs/screenshots/calendar.png"
   # (1.3.145) a preview scrolled by a posted wheel: the console says whether it reached the preview (SimplScrollProbe)
@@ -1055,6 +1057,7 @@ push_set() {
   shoot dark-50d-theme-photo 12 -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg"
   shoot dark-50e-theme-photo-plain 12 -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg" -SimplThemePlain YES
   shoot dark-51-appearance-mode 16 -SimplAppearanceMode YES
+  shoot dark-51p-appearance-photo-side 18 -SimplAppearanceMode YES -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg" -SimplThemePlain YES -SimplPhotoEdit side
   # (1.3.80) Overdue's panel at 1024 points, the first tile of the second row grown over the page under it; Graded's,
   # the last tile, half-way through growing
   SIZE=1024x820 shoot dark-01n-counter-1024-overdue 30 -SimplSheet overdue
