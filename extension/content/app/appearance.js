@@ -104,7 +104,7 @@
     st.file = h('input', { type: 'file', accept: 'image/*', hidden: true, 'aria-label': 'Upload a photo', onchange: (e) => { const f = e.target.files?.[0]; if (f && st?.target) readFile(f, st.target); e.target.value = ''; } });
     st.bar = h('div', { class: 'bcv-ap-bar', role: 'dialog', 'aria-label': 'Appearance' });
     document.body.append(st.veil, st.file, st.bar);
-    st.onKey = (e) => { if (e.key === 'Escape' && !document.querySelector('.bcv-menu:not(.is-closing)')) { e.preventDefault(); e.stopPropagation(); if (!st.setup) close(); } }; // (the setup's run is ended by its Done)
+    st.onKey = (e) => { if (e.key === 'Escape' && !document.querySelector('.bcv-menu:not(.is-closing)')) { e.preventDefault(); e.stopPropagation(); if (st.edit) endEdit(); else if (!st.setup) close(); } }; // (the setup's run is ended by its Done; a photo being placed, by its own)
     document.addEventListener('keydown', st.onKey, true);
     paintBar();
     follow();
@@ -113,6 +113,7 @@
   }
   function close() {
     if (!st) return;
+    endEdit(false);
     const s = st;
     st = null;
     clearTimeout(s.timer);
@@ -135,13 +136,14 @@
       if (rail && rail.getBoundingClientRect().width > 40) out.push({ key: 'rail', el: rail, title: 'Course sidebar', bare: true });
       return out.map((p) => ({ ...p, bare: true }));
     }
-    document.querySelectorAll('.bcv-stats .bcv-stat[data-stat]').forEach((el) => out.push({ key: el.dataset.stat, el, title: el.querySelector('.bcv-stat__label')?.textContent || 'Counter' }));
+    document.querySelectorAll('.bcv-stats .bcv-stat[data-stat]').forEach((el) => out.push({ key: el.dataset.stat, el, title: el.querySelector('.bcv-stat__head .bcv-label')?.textContent.trim() || 'Counter' })); // (2.99.108: its label, as the card says it — not 'Counter')
     return out;
   }
   function follow() {
     if (!st) return;
     const W = innerWidth, H = innerHeight;
-    const list = places();
+    // (2.99.108) a photo being placed: its place the only one lit, and no photo buttons
+    const list = st.edit ? places().filter((p) => p.key === st.edit.key).map((p) => ({ ...p, bare: true })) : places();
     const holes = list.map((p) => { const r = p.el.getBoundingClientRect(); return p.key === 'side' || p.key === 'rail' ? { left: r.left, top: r.top, right: r.right, bottom: r.bottom, k: 0.01 } : { left: r.left - 8, top: r.top - 8, right: r.right + 8, bottom: r.bottom + 8, k: 18 }; });
     st.veil.style.clipPath = `path(evenodd, '${`M0 0H${W}V${H}H0Z`} ${holes.map((r) => roundRect(r, r.k)).join(' ')}')`;
     // a photo button on each, kept in step with it (none while the sidebar is being chosen)
@@ -181,6 +183,7 @@
       const inked = !st.images.plain?.[key];
       items.push({ label: 'Ink Photo', sub: inked ? 'On · drawn in two tones' : 'Off · the photo as it is', active: inked, onSelect: () => { st.images.plain = st.images.plain || {}; if (inked) st.images.plain[key] = true; else delete st.images.plain[key]; keepImages(); } });
     }
+    if (photoAt(key)) items.push({ label: 'Move and Zoom…', onSelect: () => edit(key) });
     if (photoAt(key)) items.push({ label: 'Remove Photo', onSelect: () => { setPhoto(key, null); keepImages(); } });
     U.menu(anchor, items);
   }
@@ -190,7 +193,167 @@
       if (!st) return;
       setPhoto(key, data, tone);
       keepImages();
+      edit(key); // (2.99.108) the photo just uploaded, opened where it went, to place it
     } catch { U.toast(`That picture could not be read${/heic|heif/i.test(file?.name || file?.type || '') ? ' — HEIC photos need converting to JPEG first' : ''}.`, { error: true, ms: 4200 }); }
+  }
+
+  // ---- (2.99.108) a photo edited where it is: its place the preview, its settings round it -----------------
+  // Uploaded (or Move and Zoom… from its menu), the place a photo went on is the only one lit, outlined: the photo dragged
+  // on it moves, the wheel or a pinch zooms it, and the arrow keys nudge it. A tip hangs over it and its settings under it
+  // (over it where there is no room under; beside the sidebar): the zoom, Ink (a photo of one's own), Reset, Replace…,
+  // Remove and Done. The bar at the foot steps aside meanwhile. Done or Escape ends it, the photo kept as it was left.
+  const AR = new Map(); // a picture's width over its height (a drawn scene is 16:9)
+  const aspectOf = (pic) => {
+    if (AR.has(pic)) return AR.get(pic);
+    AR.set(pic, 16 / 9);
+    try { const img = new Image(); img.onload = () => { if (img.naturalWidth && img.naturalHeight) AR.set(pic, img.naturalWidth / img.naturalHeight); }; img.src = pic; } catch { /* the guess serves */ }
+    return 16 / 9;
+  };
+  const clampN = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  /** The element a place's photo is drawn on (its variables: lib/theme.js placeVars), and the box it covers. */
+  const picEl = (key) => (key === 'side' ? document.querySelector('.bcv-side__pic') : document.querySelector(`.bcv-stats .bcv-stat[data-stat="${key}"]`));
+  const placeAt = (key) => T().placeOf(st.images, key);
+  function setPlace(key, p) {
+    st.images.place = st.images.place || {};
+    if (p && !T().isDefaultPlace(key, p)) st.images.place[key] = { x: p.x, y: p.y, z: p.z }; else delete st.images.place[key];
+  }
+  /** Drawn at once on the page (kept as the drag or the zoom ends: keepPlace). */
+  const showPlace = (key, p) => { const el = picEl(key); if (el) for (const [k, v] of Object.entries(T().placeVars(p))) el.style.setProperty(k, v); };
+  function keepPlace(key, p) { setPlace(key, p); showPlace(key, placeAt(key)); keepImages(); paintEdit(); }
+
+  function edit(key) {
+    if (!st || !photoAt(key)) return;
+    if (st.edit) endEdit(false);
+    U.closeMenus();
+    const title = key === 'side' ? 'Sidebar' : places().find((p) => p.key === key)?.title || 'Card';
+    const ring = h('div', { class: 'bcv-ap-ed-ring', tabindex: '0', role: 'img', 'aria-label': `${title} photo: drag to move it, the wheel to zoom, the arrow keys to nudge it` });
+    const tip = h('div', { class: 'bcv-ap-ed-tip', 'aria-hidden': 'true' }, [U.svg('M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20', { size: 13, width: 2 }), h('span', { text: 'Drag to move · scroll to zoom' })]);
+    const bar = h('div', { class: 'bcv-ap-ed', role: 'dialog', 'aria-label': `${title} photo` });
+    st.edit = { key, title, ring, tip, bar, raf: 0 };
+    document.body.append(ring, tip, bar);
+    st.bar.classList.add('is-aside');
+    armEdit(key, ring);
+    paintEdit();
+    const track = () => { if (!st?.edit || st.edit.ring !== ring) return; placeEditUi(); st.edit.raf = requestAnimationFrame(track); };
+    track();
+    setTimeout(() => bar.querySelector('.bcv-ap-done')?.focus({ preventScroll: true }), 30);
+  }
+  function endEdit(animate = true) {
+    const e = st?.edit;
+    if (!e) return;
+    st.edit = null;
+    cancelAnimationFrame(e.raf);
+    st.bar.classList.remove('is-aside');
+    for (const el of [e.ring, e.tip, e.bar]) { if (!animate || reduced()) el.remove(); else { el.classList.add('is-closing'); setTimeout(() => el.remove(), 180); } }
+  }
+  /** The outline on the place, the tip over it and the settings under it (over it where there is no room; beside the
+   *  sidebar), kept on the place as the page moves. */
+  function placeEditUi() {
+    const e = st.edit;
+    const p = places().find((x) => x.key === e.key);
+    if (!p) { endEdit(); return; }
+    const r = p.el.getBoundingClientRect();
+    const W = innerWidth, H = innerHeight, M = 12, G = 10;
+    const side = e.key === 'side';
+    const o = side ? 0 : 3; // (round a card, just outside it; the sidebar, inside its own edge)
+    Object.assign(e.ring.style, { left: `${r.left - o}px`, top: `${r.top - o}px`, width: `${r.width + 2 * o}px`, height: `${r.height + 2 * o}px` });
+    e.ring.classList.toggle('is-side', side);
+    const bw = e.bar.offsetWidth, bh = e.bar.offsetHeight, tw = e.tip.offsetWidth, th = e.tip.offsetHeight;
+    let bx, by, below = true;
+    if (side) { bx = r.right + 16; by = clampN(r.top + r.height / 2 - bh / 2, M, H - bh - M); }
+    else {
+      bx = r.left + r.width / 2 - bw / 2;
+      below = r.bottom + G + bh + M <= H || r.top - G - bh - th - G < M;
+      by = below ? r.bottom + G : r.top - G - bh;
+    }
+    bx = clampN(bx, M, W - bw - M);
+    by = clampN(by, M, H - bh - M);
+    Object.assign(e.bar.style, { left: `${Math.round(bx)}px`, top: `${Math.round(by)}px` });
+    e.bar.classList.toggle('is-above', !side && !below);
+    e.bar.classList.toggle('is-beside', side);
+    // (the tip: over the place, or under it when the settings took the room over it; for the sidebar, over its settings)
+    const tx = side ? clampN(bx, M, W - tw - M) : clampN(r.left + r.width / 2 - tw / 2, M, W - tw - M);
+    const ty = side ? by - 8 - th : below ? r.top - G - th : r.bottom + G;
+    Object.assign(e.tip.style, { left: `${Math.round(tx)}px`, top: `${Math.round(clampN(ty, M, H - th - M))}px` });
+  }
+  function paintEdit() {
+    const e = st?.edit;
+    if (!e) return;
+    const key = e.key;
+    const t = T();
+    const p = placeAt(key);
+    const own = photoAt(key) && !t.sceneNameOf(photoAt(key));
+    const zoom = h('input', { type: 'range', class: 'bcv-ap-ed__zoom', min: String(t.ZOOM_MIN), max: String(t.ZOOM_MAX), step: '0.01', value: String(p.z), 'aria-label': 'Zoom' });
+    zoom.addEventListener('input', () => showPlace(key, { ...placeAt(key), z: Number(zoom.value) }));
+    zoom.addEventListener('change', () => keepPlace(key, { ...placeAt(key), z: Number(zoom.value) }));
+    const nudgeZoom = (k) => keepPlace(key, { ...placeAt(key), z: clampN(placeAt(key).z * k, t.ZOOM_MIN, t.ZOOM_MAX) });
+    const small = (path, label, act, extra = '') => h('button', { type: 'button', class: `bcv-ap-ed__ic ${extra}`, title: label, 'aria-label': label, onclick: act }, U.svg(path, { size: 15, width: 2 }));
+    const group = (kids, cls = '') => h('div', { class: `bcv-ap-ed__group ${cls}` }, kids.filter(Boolean));
+    const words = (text, act, cls = '') => h('button', { type: 'button', class: `bcv-ap-ed__btn ${cls}`, onclick: act, text });
+    const inked = !st.images.plain?.[key];
+    e.bar.replaceChildren(...[
+      h('div', { class: 'bcv-ap-ed__title' }, [h('b', { text: e.title }), h('span', { text: own ? (inked ? 'Your photo, inked' : 'Your photo, as it is') : 'A drawing' })]),
+      group([small('M5 12h14', 'Zoom out', () => nudgeZoom(1 / 1.15)), zoom, small('M12 5v14M5 12h14', 'Zoom in', () => nudgeZoom(1.15))], 'is-zoom'),
+      own ? group([h('span', { class: 'bcv-ap-ed__lab', text: 'Ink' }), U.switchEl(inked, (on) => { st.images.plain = st.images.plain || {}; if (on) delete st.images.plain[key]; else st.images.plain[key] = true; keepImages(); paintEdit(); }, 'Ink photo')]) : null,
+      group([
+        words('Reset', () => keepPlace(key, null), t.isDefaultPlace(key, p) ? 'is-off' : ''),
+        words('Replace…', () => { st.target = key; st.file.click(); }),
+        words('Remove', () => { endEdit(); setPhoto(key, null); keepImages(); }, 'is-danger'),
+      ]),
+      h('button', { type: 'button', class: 'bcv-ap-done', text: 'Done', onclick: () => endEdit() }),
+    ].filter(Boolean)); // (no Ink for a drawing)
+    e.bar.querySelector('.bcv-ap-ed__btn.is-off')?.setAttribute('disabled', '');
+    e.bar.onkeydown = (ev) => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); endEdit(); } };
+  }
+  /** The place dragged to move its photo (the picture's pin runs against the drag where it is larger than its place,
+   *  with it where it is zoomed out smaller), the wheel or a pinch to zoom it about its pin, the arrows to nudge it. */
+  function armEdit(key, ring) {
+    ring.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      const el = picEl(key);
+      if (!el) return;
+      const p0 = placeAt(key);
+      const r = el.getBoundingClientRect();
+      const ar = aspectOf(photoAt(key));
+      const cw = Math.max(r.width, r.height * ar) * p0.z, ch = Math.max(r.height, r.width / ar) * p0.z; // the picture as drawn, in the box's own pixels
+      const x0 = e.clientX, y0 = e.clientY;
+      let last = p0;
+      try { ring.setPointerCapture(e.pointerId); } catch { /* not held */ }
+      ring.classList.add('is-dragging');
+      const move = (ev) => {
+        const dx = ev.clientX - x0, dy = ev.clientY - y0;
+        last = { x: Math.abs(cw - r.width) > 0.5 ? clampN(p0.x - (dx * 100) / (cw - r.width), 0, 100) : p0.x, y: Math.abs(ch - r.height) > 0.5 ? clampN(p0.y - (dy * 100) / (ch - r.height), 0, 100) : p0.y, z: p0.z };
+        showPlace(key, last);
+      };
+      const up = () => {
+        ring.removeEventListener('pointermove', move); ring.removeEventListener('pointerup', up); ring.removeEventListener('pointercancel', up);
+        ring.classList.remove('is-dragging');
+        if (last !== p0) keepPlace(key, last);
+      };
+      ring.addEventListener('pointermove', move); ring.addEventListener('pointerup', up); ring.addEventListener('pointercancel', up);
+    });
+    let wheelKeep = 0;
+    ring.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const p = placeAt(key);
+      const next = { ...p, z: clampN(p.z * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0025)), T().ZOOM_MIN, T().ZOOM_MAX) };
+      setPlace(key, next);
+      showPlace(key, placeAt(key));
+      const zoom = st.edit?.bar.querySelector('.bcv-ap-ed__zoom');
+      if (zoom) zoom.value = String(placeAt(key).z);
+      clearTimeout(wheelKeep);
+      wheelKeep = setTimeout(() => { if (st) keepPlace(key, placeAt(key)); }, 260); // (kept once the wheel rests)
+    }, { passive: false });
+    ring.addEventListener('keydown', (e) => {
+      const p = placeAt(key);
+      const step = e.shiftKey ? 10 : 2;
+      const moves = { ArrowLeft: [step, 0], ArrowRight: [-step, 0], ArrowUp: [0, step], ArrowDown: [0, -step] };
+      if (moves[e.key]) { e.preventDefault(); keepPlace(key, { ...p, x: clampN(p.x + moves[e.key][0], 0, 100), y: clampN(p.y + moves[e.key][1], 0, 100) }); return; }
+      if (e.key === '+' || e.key === '=') { e.preventDefault(); keepPlace(key, { ...p, z: clampN(p.z * 1.1, T().ZOOM_MIN, T().ZOOM_MAX) }); return; }
+      if (e.key === '-') { e.preventDefault(); keepPlace(key, { ...p, z: clampN(p.z / 1.1, T().ZOOM_MIN, T().ZOOM_MAX) }); return; }
+      if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); endEdit(); }
+    });
   }
 
   // ---- the bar at the foot ----------------------------------------------------------------------

@@ -5272,13 +5272,55 @@ try {
   const [chooser] = await Promise.all([page.waitForEvent('filechooser', { timeout: 5000 }), page.click('.bcv-menu__item >> text=Upload Photo…')]);
   await chooser.setFiles(join(root, 'scripts', 'dev', 'fixtures', 'photo.jpg'));
   const ownInked = await eventually(() => page.evaluate(() => !!document.querySelector('.bcv-side.bcv-side--ink .bcv-side__pic.has-ink:not(.is-scene)')), 10000);
+  // (2.99.108) the photo just uploaded opens where it went: its place outlined, a tip over it and its settings beside it
+  // (the sidebar's), the photo buttons and the bar at the foot out of the way meanwhile
+  let ed = null;
+  await eventually(async () => (ed = await page.evaluate(() => {
+    const ring = document.querySelector('.bcv-ap-ed-ring'), bar = document.querySelector('.bcv-ap-ed'), tip = document.querySelector('.bcv-ap-ed-tip');
+    const side = document.querySelector('.bcv-side')?.getBoundingClientRect();
+    if (!ring || !bar || !tip || !side || !bar.querySelector('.bcv-ap-done')) return null;
+    const rr = ring.getBoundingClientRect(), br = bar.getBoundingClientRect(), tr = tip.getBoundingClientRect();
+    return { ringOnSide: Math.abs(rr.left - side.left) < 2 && Math.abs(rr.width - side.width) < 2 && Math.abs(rr.height - side.height) < 2, beside: br.left >= side.right - 1 && br.top >= 0 && br.bottom <= innerHeight, tipOver: tr.bottom <= br.top && tr.left >= side.right - 1, badges: document.querySelectorAll('.bcv-ap-badge').length, aside: !!document.querySelector('.bcv-ap-bar.is-aside'), title: bar.querySelector('.bcv-ap-ed__title b')?.textContent, zoom: !!bar.querySelector('.bcv-ap-ed__zoom'), ink: !!bar.querySelector('.bcv-switch.is-on'), btns: [...bar.querySelectorAll('.bcv-ap-ed__btn, .bcv-ap-done')].map((x) => x.textContent).join('|') };
+  })), 8000);
+  check(ed && ed.ringOnSide && ed.beside && ed.tipOver && ed.badges === 0 && ed.aside && ed.title === 'Sidebar' && ed.zoom && ed.ink && ed.btns === 'Reset|Replace…|Remove|Done', `a photo uploaded opens where it went: the sidebar outlined, its settings beside it with a tip over them (zoom, Ink, Reset, Replace…, Remove, Done), the photo buttons and the bar away: ${JSON.stringify(ed)}`);
+  // dragged on its place the photo moves (kept as the drag ends); the zoom zooms it, drawn at once; Done puts it all away
+  const keptPlace = () => sw.evaluate(async () => (await self.BCV.api.storage.local.get('theme:images'))['theme:images']?.place?.side || null);
+  const rc = await page.$eval('.bcv-ap-ed-ring', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+  await page.mouse.move(rc.x, rc.y);
+  await page.mouse.down();
+  await page.mouse.move(rc.x + 40, rc.y + 30, { steps: 6 });
+  await page.mouse.up();
+  let movedTo = null, zoomedTo = null, drawnZ = null;
+  const moved = await eventually(async () => { movedTo = await keptPlace(); return movedTo && (movedTo.x !== 50 || movedTo.y !== 100) && movedTo.z === 1; }, 5000); // (off the sidebar's own place, 50% 100%: across or up, as the photo overhangs it)
+  await page.$eval('.bcv-ap-ed__zoom', (z) => { z.value = '1.6'; z.dispatchEvent(new Event('input', { bubbles: true })); z.dispatchEvent(new Event('change', { bubbles: true })); });
+  const zoomed = await eventually(async () => { zoomedTo = await keptPlace(); return zoomedTo?.z === 1.6; }, 5000);
+  await eventually(async () => (drawnZ = await page.evaluate(() => document.querySelector('.bcv-side__pic')?.style.getPropertyValue('--bcv-pic-z'))) === '1.6', 5000);
+  await shot(page, '27c0-appearance-photo-placed');
+  await page.click('.bcv-ap-ed .bcv-ap-done');
+  const edGone = await eventually(() => page.evaluate(() => !document.querySelector('.bcv-ap-ed, .bcv-ap-ed-ring, .bcv-ap-ed-tip') && document.querySelectorAll('.bcv-ap-badge').length > 0 && !document.querySelector('.bcv-ap-bar.is-aside')), 3000);
+  check(moved && zoomed && drawnZ === '1.6' && edGone, `the photo dragged on its place moves and is kept, the zoom drawn at once and kept, and Done puts the settings away (the photo buttons and the bar back): ${JSON.stringify({ movedTo, zoomedTo, drawnZ, edGone })}`);
   const ownMenu = await menuOf('side');
   await page.click('.bcv-menu__item >> text=Ink Photo');
   let plainSide = null;
-  await eventually(async () => { const v = await page.evaluate(() => { const s = document.querySelector('.bcv-side'); const vis = (el) => !!el && getComputedStyle(el).display !== 'none'; const row = s.querySelector('.bcv-nav__item'); return { plain: s.classList.contains('bcv-side--plain'), ink: s.classList.contains('bcv-side--ink'), veil: vis(s.querySelector('.bcv-side__pic-veil')), blur: vis(s.querySelector('.bcv-side__pic-blur')), pic: (s.querySelector('.bcv-side__pic')?.style.getPropertyValue('--bcv-pic') || '').slice(0, 15), color: getComputedStyle(row).color, shadow: getComputedStyle(row).textShadow.slice(0, 30) }; }); plainSide = v; return v.plain; }, 6000);
+  await eventually(async () => { const v = await page.evaluate(() => { const s = document.querySelector('.bcv-side'); const vis = (el) => !!el && getComputedStyle(el).display !== 'none'; const row = s.querySelector('.bcv-nav__item'); return { plain: s.classList.contains('bcv-side--plain'), ink: s.classList.contains('bcv-side--ink'), veil: vis(s.querySelector('.bcv-side__pic-veil')), blur: vis(s.querySelector('.bcv-side__pic-blur')), pic: (s.querySelector('.bcv-side__pic')?.style.getPropertyValue('--bcv-pic') || '').slice(0, 15), color: getComputedStyle(row).color, shadow: getComputedStyle(row).textShadow.slice(0, 30), solid: getComputedStyle(row).textShadow.split(/,(?![^(]*\))/).every((x) => /\s0px$/.test(x.trim())) }; }); plainSide = v; return v.plain; }, 6000);
   const keptPlain = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('theme:images'))['theme:images']?.plain || null);
-  check(!drawnMenu.some((t) => t.startsWith('Ink Photo')) && ownInked && ownMenu.some((t) => t.startsWith('Ink PhotoOn')) && !!plainSide && !plainSide.ink && !plainSide.veil && !plainSide.blur && plainSide.pic === 'url("data:image' && plainSide.color === 'rgb(28, 28, 30)' && /^rgb\(255, 255, 255\) 0\.8px 0px 0/.test(plainSide.shadow) && keptPlain?.side === true && Object.keys(keptPlain).length === 1, `Ink Photo: none on a drawing; a photo of one's own inked, and with Ink off shown as it is — no blur or veil, dark words with a white border — kept for the sidebar alone: ${JSON.stringify({ drawnMenu, ownInked, ownMenu, plainSide, keptPlain })}`);
+  check(!drawnMenu.some((t) => t.startsWith('Ink Photo')) && ownInked && ownMenu.some((t) => t.startsWith('Ink PhotoOn')) && !!plainSide && !plainSide.ink && !plainSide.veil && !plainSide.blur && plainSide.pic === 'url("data:image' && plainSide.color === 'rgb(28, 28, 30)' && /^rgb\(255, 255, 255\) 1\.15px 0px/.test(plainSide.shadow) && plainSide.solid && keptPlain?.side === true && Object.keys(keptPlain).length === 1, `Ink Photo: none on a drawing; a photo of one's own inked, and with Ink off shown as it is — no blur or veil, dark words with a white border — kept for the sidebar alone; (2.99.108) the border solid, no glow fading out: ${JSON.stringify({ drawnMenu, ownInked, ownMenu, plainSide, keptPlain })}`);
   await shot(page, '27c1-appearance-ink-off');
+  // (2.99.108) a counter's photo, Move and Zoom… from its menu: the card outlined, a tip over it, its settings in a row
+  // under it, centred on it; Escape puts them away and leaves Appearance open
+  await menuOf('today');
+  await page.click('.bcv-menu__item >> text=Move and Zoom…');
+  let edCard = null;
+  await eventually(async () => (edCard = await page.evaluate(() => {
+    const card = document.querySelector('.bcv-stats .bcv-stat[data-stat="today"]')?.getBoundingClientRect(), ring = document.querySelector('.bcv-ap-ed-ring')?.getBoundingClientRect(), bar = document.querySelector('.bcv-ap-ed'), tip = document.querySelector('.bcv-ap-ed-tip')?.getBoundingClientRect();
+    if (!card || !ring || !bar || !tip) return null;
+    const br = bar.getBoundingClientRect();
+    return { round: ring.left < card.left && ring.right > card.right && ring.top < card.top && ring.bottom > card.bottom, under: br.top >= card.bottom && br.top - card.bottom < 24, row: !bar.classList.contains('is-beside'), tipOver: tip.bottom <= card.top && tip.top >= 0, title: bar.querySelector('.bcv-ap-ed__title b')?.textContent, ink: !!bar.querySelector('.bcv-switch'), stray: /null|undefined/.test(bar.textContent) };
+  })) && edCard.round && edCard.under, 6000);
+  await shot(page, '27c2-appearance-card-placed');
+  await page.keyboard.press('Escape');
+  const cardEdGone = await eventually(() => page.evaluate(() => !document.querySelector('.bcv-ap-ed') && !!document.querySelector('.bcv-ap-bar:not(.is-aside)') && document.documentElement.classList.contains('bcv-appear')), 3000);
+  check(edCard && edCard.round && edCard.under && edCard.row && edCard.tipOver && edCard.title === 'Due today' && !edCard.ink && !edCard.stray && cardEdGone, `a counter's Move and Zoom…: the card outlined, its settings in a row under it (no Ink for a drawing) and a tip over it; Escape puts them away, Appearance still open: ${JSON.stringify({ edCard, cardEdGone })}`);
   // (2.99.77) under a colour of your own the six counters are that colour alone, a shade of it each
   const tones = await eventually(async () => { const v = await page.evaluate(() => ({ accent: getComputedStyle(document.documentElement).getPropertyValue('--bcv-accent').trim().toLowerCase(), tones: [...document.querySelectorAll('.bcv-stats > .bcv-stat[data-stat]')].map((c) => getComputedStyle(c).getPropertyValue('--bcv-stat-tone').trim().toLowerCase()) })); return v.accent && v.tones.length === 6 && new Set(v.tones).size === 6 && v.tones.every((t) => t.includes(v.accent)) ? v : null; }, 6000);
   check(!!tones, `the counters take the theme's colour, six shades of it: ${JSON.stringify(tones)}`);
@@ -5929,10 +5971,18 @@ try {
   await sw.evaluate(async (port) => { const k = `prefs:localhost:${port}`; const all = await self.BCV.api.storage.local.get(k); const p = all[k] || {}; for (const key of ['gpaGoal', 'gpaTracking', 'gradeTargets', 'setupDone', 'tour']) delete p[key]; await self.BCV.api.storage.local.set({ [k]: p }); await self.BCV.api.storage.local.remove(['setup:done', 'welcome:pending']); }, PORT);
   await page.goto(`${BASE}/?bcv=setup`);
   await page.waitForSelector(su('.row'), { timeout: 20000 });
-  const setupDot = await dotOf('#bcv-setup');
   const introUp = (await page.$(su('.intro:not([hidden])'))) !== null;
+  // (under load the word-mark's words are laid out a moment after it shows, and the dashboard and the rail come a beat
+  //  later: measured, and looked for, once they are there)
+  await page.waitForFunction(() => { const t = document.querySelector('#bcv-setup')?.shadowRoot?.querySelector('.intro text'); return !!t && t.getBBox().width > 0; }, null, { timeout: 10000 }).catch(() => {});
+  const setupDot = await dotOf('#bcv-setup');
+  let setupOpen = null;
+  await eventually(async () => {
+    setupOpen = { url: page.url() === `${BASE}/`, stat: (await page.$('.bcv-stat')) !== null, rail: (await page.$$(su('.rail__item'))).length, step: await sStep(), body: await page.$eval('body', (e) => getComputedStyle(e).overflow), html: await page.$eval('html', (e) => getComputedStyle(e).overflow) };
+    return setupOpen.url && setupOpen.stat && setupOpen.rail === 3 && setupOpen.step === '1 of 3' && setupOpen.body === 'hidden' && setupOpen.html === 'visible';
+  }, 8000);
   // the word-mark plays first (about two seconds), then the setup rises under it
-  check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && introUp && (await page.$$(su('.rail__item'))).length === 3 && (await sStep()) === '1 of 3' && (await page.$eval('body', (e) => getComputedStyle(e).overflow)) === 'hidden' && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'visible', 'the setup opens over the dashboard on its own ground: the address cleaned, a word-mark, a rail of three steps (2.99.74: no step for where the courses live), the page held still');
+  check(introUp && setupOpen.url && setupOpen.stat && setupOpen.rail === 3 && setupOpen.step === '1 of 3' && setupOpen.body === 'hidden' && setupOpen.html === 'visible', `the setup opens over the dashboard on its own ground: the address cleaned, a word-mark, a rail of three steps (2.99.74: no step for where the courses live), the page held still: ${JSON.stringify({ introUp, ...setupOpen })}`);
   check(setupDot.gap >= 10 && setupDot.gap <= 18 && setupDot.fits, `the dot after Simpl sits just past the word as drawn here, inside the drawing: ${JSON.stringify(setupDot)}`);
   await page.waitForFunction(() => document.querySelector('#bcv-setup')?.shadowRoot.querySelector('.intro')?.hidden === true, null, { timeout: 8000 });
   await page.waitForTimeout(500);

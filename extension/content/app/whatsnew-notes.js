@@ -27,6 +27,10 @@
     cal: 'M5 6h14v14H5zM5 10h14M9 3v4M15 3v4',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.108', date: '2026-10-25', notes: [
+      { kind: 'new', title: 'Place Your Photo', body: 'A photo opens on its card: drag, zoom and set it there.', icon: P.pic },
+      { kind: 'improved', title: 'Solid Photo Borders', body: 'Words on a photo with Ink off have a solid white edge.', icon: P.pic },
+    ] },
     { version: '2.99.107', date: '2026-10-25', notes: [
       { kind: 'new', title: 'Calendar Sync', body: 'Your work in Apple, Google or Outlook, and theirs in Simpl.', icon: P.cal },
       { kind: 'new', title: 'Pull to Plan', body: 'Pull work to the right to plan a free time for it.', icon: P.clock },
