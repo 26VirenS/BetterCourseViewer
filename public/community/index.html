@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Simpl Community</title>
+<meta name="description" content="Themes for Simpl Courses, made by students: colours, drawings and photos for the sidebar and the Dashboard. Preview any of them.">
+<meta name="theme-color" content="#fbfbfd" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta property="og:title" content="Simpl Community">
+<meta property="og:description" content="Themes for Simpl Courses, made by students.">
+<meta property="og:image" content="https://simplcourses.com/img/og.png">
+<link rel="canonical" href="https://simplcourses.com/community">
+<link rel="icon" href="/img/icon-128.png">
+<link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+<style>
+:root {
+  color-scheme: light dark;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+  --bg: #fff; --bg-2: #f5f5f7; --tile: #f5f5f7; --text: #1d1d1f; --text-2: #6e6e73; --text-3: #86868b;
+  --hair: rgba(0, 0, 0, .08); --blue: #0071e3; --blue-hover: #0077ed; --link: #0066cc; --soft: #e8e8ed; --soft-hover: #dedee3;
+  --shadow: 0 0 0 .5px rgba(0, 0, 0, .12), 0 24px 60px -30px rgba(0, 20, 60, .35);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #000; --bg-2: #0e0e10; --tile: #161618; --text: #f5f5f7; --text-2: #a1a1a6; --text-3: #86868b; --hair: rgba(255, 255, 255, .1); --link: #2997ff; --soft: #2c2c2e; --soft-hover: #3a3a3c; --shadow: 0 0 0 .5px rgba(255, 255, 255, .14), 0 24px 60px -30px rgba(0, 0, 0, .9); }
+}
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 400 17px/1.5 var(--font); letter-spacing: -.01em; -webkit-font-smoothing: antialiased; }
+a { color: var(--link); }
+:focus-visible { outline: 3px solid color-mix(in srgb, var(--blue) 60%, transparent); outline-offset: 3px; }
+.wrap { width: min(1120px, 100% - 32px); margin-inline: auto; }
+.top { display: flex; align-items: center; height: 52px; border-bottom: 1px solid var(--hair); }
+.brand { display: inline-flex; align-items: center; gap: 9px; color: var(--text); text-decoration: none; font: 600 17px/1 var(--font-display); letter-spacing: -.02em; }
+.brand img { width: 26px; height: 26px; border-radius: 7px; }
+.top nav { margin-left: auto; display: flex; gap: 20px; font-size: 14px; }
+.top nav a { color: var(--text-2); text-decoration: none; }
+.top nav a[aria-current] { color: var(--text); font-weight: 600; }
+@media (max-width: 560px) { .top nav a:not([aria-current]):not(:last-child) { display: none; } }
+h1 { margin: 64px 0 0; font: 700 clamp(36px, 5.4vw, 60px)/1.05 var(--font-display); letter-spacing: -.035em; }
+.lead { margin: 14px 0 0; max-width: 640px; font: 500 clamp(18px, 2vw, 21px)/1.4 var(--font-display); color: var(--text-2); letter-spacing: -.015em; }
+.btn { --h: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: var(--h); padding: 0 18px; border: 0; border-radius: 999px; font: 500 15px/1 var(--font); letter-spacing: -.01em; cursor: pointer; text-decoration: none; white-space: nowrap; -webkit-tap-highlight-color: transparent; transition: transform 140ms var(--ease-out), background-color 160ms ease; }
+.btn:active { transform: scale(.97); }
+.btn--blue { background: var(--blue); color: #fff; }
+.btn--soft { background: var(--soft); color: var(--text); }
+@media (hover: hover) and (pointer: fine) { .btn--blue:hover { background: var(--blue-hover); } .btn--soft:hover { background: var(--soft-hover); } }
+.btn[disabled] { opacity: .5; cursor: default; }
+
+.grid { margin-top: 44px; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 22px; }
+.theme { display: flex; flex-direction: column; gap: 12px; }
+.theme .sp-box { box-shadow: var(--shadow); cursor: pointer; transition: transform 200ms var(--ease-out); }
+@media (hover: hover) and (pointer: fine) { .theme .sp-box:hover { transform: translateY(-2px); } }
+.theme__row { display: flex; align-items: center; gap: 10px; }
+.theme__name { min-width: 0; flex: 1; }
+.theme__name b { display: block; font: 600 17px/1.25 var(--font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.theme__name span { font-size: 14px; color: var(--text-3); }
+.theme .btn { --h: 32px; padding: 0 13px; font-size: 14px; }
+.state { margin-top: 44px; padding: 40px 28px; border-radius: 22px; background: var(--tile); text-align: center; color: var(--text-2); }
+.state b { display: block; font: 600 21px/1.3 var(--font-display); color: var(--text); margin-bottom: 6px; }
+
+.share { margin-top: 72px; display: grid; grid-template-columns: 1fr auto; gap: 18px 28px; align-items: center; padding: 30px 32px; border-radius: 22px; background: var(--tile); }
+.share h2 { margin: 0; font: 700 26px/1.2 var(--font-display); letter-spacing: -.025em; }
+.share p { margin: 8px 0 0; color: var(--text-2); font-size: 16px; }
+@media (max-width: 640px) { .share { grid-template-columns: 1fr; } }
+
+/* Preview: the theme full size, in light or dark */
+dialog.pv { width: min(1180px, 100% - 32px); max-height: calc(100% - 32px); padding: 0; border: 0; border-radius: 22px; background: var(--bg); color: var(--text); box-shadow: 0 40px 120px -20px rgba(0, 0, 0, .5); overflow: auto; }
+dialog.pv::backdrop { background: rgba(0, 0, 0, .45); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.pv__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 16px 18px; }
+.pv__title { flex: 1; min-width: 180px; }
+.pv__title b { display: block; font: 700 21px/1.2 var(--font-display); letter-spacing: -.02em; }
+.pv__title span { font-size: 14px; color: var(--text-3); }
+.seg { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--soft); }
+.seg button { border: 0; background: none; color: var(--text); font: 500 13px/1 var(--font); padding: 8px 13px; border-radius: 999px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--bg); box-shadow: 0 1px 3px rgba(0, 0, 0, .15); }
+.pv__stage { padding: 0 18px 18px; }
+.pv__stage .sp-box { border-radius: 14px; box-shadow: var(--shadow); }
+.pv__note { margin: 0; padding: 0 18px 18px; font-size: 14px; color: var(--text-2); }
+.note[data-kind="ok"] { color: #1f9d48; } .note[data-kind="bad"] { color: #d70015; }
+@media (prefers-reduced-motion: reduce) { .btn, .theme .sp-box { transition: none; } }
+
+footer { margin-top: 96px; padding: 22px 0 40px; background: var(--bg-2); font-size: 12px; color: var(--text-3); }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 10px 22px; }
+footer nav { margin-left: auto; display: flex; gap: 18px; }
+footer a { color: var(--text-2); text-decoration: none; }
+</style>
+</head>
+<body>
+<header class="wrap top">
+  <a class="brand" href="/"><img src="/img/icon-128.png" alt="" width="26" height="26"> Simpl Courses</a>
+  <nav aria-label="Pages"><a href="/#moments">Features</a><a href="/community" aria-current="page">Community</a><a href="/compare">Compare</a><a href="/trust">Trust</a><a href="/#get">Get Simpl</a></nav>
+</header>
+
+<main class="wrap">
+  <h1>Simpl Community</h1>
+  <p class="lead">Themes made by students: a colour, drawings and photos for the sidebar and the Dashboard. Preview any of them here. Add one in Simpl, under Appearance.</p>
+
+  <div class="grid" data-grid aria-live="polite"></div>
+  <div class="state" data-state hidden></div>
+
+  <section class="share">
+    <div>
+      <h2>Made one you like?</h2>
+      <p>In Simpl, open Appearance, make your theme, then choose Community and Share. Every theme is looked at before it shows up here.</p>
+    </div>
+    <a class="btn btn--blue" href="/#get">Get Simpl</a>
+  </section>
+</main>
+
+<dialog class="pv" data-pv aria-labelledby="pv-name">
+  <div class="pv__bar">
+    <div class="pv__title"><b id="pv-name"></b><span data-pv-maker></span></div>
+    <div class="seg" role="group" aria-label="Look"><button type="button" data-look="light" aria-pressed="true">Light</button><button type="button" data-look="dark" aria-pressed="false">Dark</button></div>
+    <button class="btn btn--blue" type="button" data-pv-add hidden>Add to Simpl</button>
+    <button class="btn btn--soft" type="button" data-pv-close>Close</button>
+  </div>
+  <div class="pv__stage" data-pv-stage></div>
+  <p class="pv__note note" data-pv-note role="status"></p>
+</dialog>
+
+<footer>
+  <div class="wrap">
+    <span>Simpl Courses is independent. Not affiliated with Instructure, D2L or BetterCampus. Themes are their makers’ own.</span>
+    <nav aria-label="More"><a href="/">Home</a><a href="/trust">Trust</a><a href="/privacy">Privacy</a><a href="/report/">Report a theme</a></nav>
+  </div>
+</footer>
+
+<script src="/js/theme.js"></script>
+<script src="/community/preview.js"></script>
+<script>
+(() => {
+  const grid = document.querySelector('[data-grid]');
+  const state = document.querySelector('[data-state]');
+  const pv = document.querySelector('[data-pv]');
+  const pvStage = document.querySelector('[data-pv-stage]');
+  const pvAdd = document.querySelector('[data-pv-add]');
+  const pvNote = document.querySelector('[data-pv-note]');
+  const darkNow = matchMedia('(prefers-color-scheme: dark)').matches;
+  let themes = [];
+  let open = null, look = darkNow ? 'dark' : 'light';
+
+  // ---- Simpl in this browser (the extension marks the page and listens): Add beside Preview ----------------------
+  const hasSimpl = () => document.documentElement.dataset.simplExtension === '1';
+  const pending = new Map();
+  const add = (theme, note) => {
+    note.textContent = 'Adding…';
+    delete note.dataset.kind;
+    pending.set(theme.id, note);
+    window.postMessage({ source: 'simpl-community', type: 'add', id: theme.id }, location.origin);
+    setTimeout(() => { if (pending.get(theme.id) === note) { pending.delete(theme.id); note.textContent = 'Simpl did not answer. Open a Canvas page once, then try again.'; note.dataset.kind = 'bad'; } }, 15000);
+  };
+  window.addEventListener('message', (e) => {
+    if (e.source !== window || e.origin !== location.origin || !e.data || e.data.source !== 'simpl-extension') return;
+    if (e.data.type === 'ready') { document.documentElement.dataset.simplExtension = '1'; showAdds(); return; }
+    if (e.data.type !== 'added') return;
+    const note = pending.get(e.data.id);
+    if (!note) return;
+    pending.delete(e.data.id);
+    note.textContent = e.data.ok ? 'Added. It’s on in Simpl now; Appearance has it under Community.' : (e.data.message || 'That did not work. Try again.');
+    note.dataset.kind = e.data.ok ? 'ok' : 'bad';
+  });
+  const showAdds = () => { for (const b of document.querySelectorAll('[data-add]')) b.hidden = !hasSimpl(); if (open) pvAdd.hidden = !hasSimpl(); };
+
+  // ---- the gallery ----------------------------------------------------------------------------------------------
+  const card = (t) => {
+    const box = document.createElement('div');
+    box.className = 'sp-box';
+    box.setAttribute('role', 'img');
+    box.setAttribute('aria-label', `${t.name}, on Simpl’s Dashboard`);
+    box.append(SimplPreview.draw(t, { dark: darkNow, wide: 260 }));
+    box.addEventListener('click', () => preview(t));
+    const name = document.createElement('div');
+    name.className = 'theme__name';
+    const b = document.createElement('b'); b.textContent = t.name;
+    const s = document.createElement('span'); s.textContent = t.maker ? `by ${t.maker}` : 'by a Simpl student';
+    name.append(b, s);
+    const pBtn = document.createElement('button'); pBtn.type = 'button'; pBtn.className = 'btn btn--soft'; pBtn.textContent = 'Preview'; pBtn.addEventListener('click', () => preview(t));
+    const aBtn = document.createElement('button'); aBtn.type = 'button'; aBtn.className = 'btn btn--blue'; aBtn.textContent = 'Add'; aBtn.dataset.add = ''; aBtn.hidden = !hasSimpl();
+    const note = document.createElement('p'); note.className = 'note'; note.setAttribute('role', 'status'); note.style.margin = '0'; note.style.fontSize = '13px';
+    aBtn.addEventListener('click', () => add(t, note));
+    const row = document.createElement('div'); row.className = 'theme__row'; row.append(name, pBtn, aBtn);
+    const art = document.createElement('article'); art.className = 'theme'; art.append(box, row, note);
+    grid.append(art);
+    SimplPreview.fit(box);
+  };
+  const say = (title, text) => { state.hidden = false; state.innerHTML = ''; const b = document.createElement('b'); b.textContent = title; state.append(b, text); };
+
+  // ---- Preview: the theme full size -------------------------------------------------------------------------------
+  const drawOpen = () => {
+    pvStage.innerHTML = '';
+    const box = document.createElement('div');
+    box.className = 'sp-box';
+    box.append(SimplPreview.draw(open, { dark: look === 'dark' }));
+    pvStage.append(box);
+    SimplPreview.fit(box);
+    for (const b of pv.querySelectorAll('[data-look]')) b.setAttribute('aria-pressed', String(b.dataset.look === look));
+  };
+  function preview(t) {
+    open = t;
+    look = t.look || (darkNow ? 'dark' : 'light');
+    document.getElementById('pv-name').textContent = t.name;
+    pv.querySelector('[data-pv-maker]').textContent = t.maker ? `by ${t.maker}` : 'by a Simpl student';
+    pvAdd.hidden = !hasSimpl();
+    pvNote.textContent = hasSimpl() ? '' : 'Like it? Get Simpl, then add it from Appearance → Community.';
+    delete pvNote.dataset.kind;
+    pv.showModal();
+    drawOpen();
+  }
+  pv.querySelectorAll('[data-look]').forEach((b) => b.addEventListener('click', () => { look = b.dataset.look; drawOpen(); }));
+  pv.querySelector('[data-pv-close]').addEventListener('click', () => pv.close());
+  pv.addEventListener('click', (e) => { if (e.target === pv) pv.close(); });
+  pvAdd.addEventListener('click', () => open && add(open, pvNote));
+
+  fetch('/api/community/themes').then((r) => r.json().then((b) => [r, b])).then(([r, b]) => {
+    if (!r.ok) { say('Simpl Community opens soon.', 'Themes will be here once the first ones are in.'); return; }
+    themes = b.themes || [];
+    if (!themes.length) { say('No themes yet.', 'Be the first: make one in Appearance and share it.'); return; }
+    themes.forEach(card);
+    const id = new URLSearchParams(location.search).get('theme');
+    const t = id && themes.find((x) => x.id === id);
+    if (t) preview(t);
+  }).catch(() => say('The themes could not be loaded.', 'Check your connection and reload the page.'));
+})();
+</script>
+</body>
+</html>

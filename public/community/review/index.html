@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Community Review</title>
+<link rel="icon" href="/img/icon-128.png">
+<style>
+:root {
+  color-scheme: light dark;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+  --bg: #fff; --tile: #f5f5f7; --text: #1d1d1f; --text-2: #6e6e73; --text-3: #86868b; --hair: rgba(0, 0, 0, .08);
+  --blue: #0071e3; --soft: #e8e8ed; --green: #1f9d48; --red: #d70015;
+  --shadow: 0 0 0 .5px rgba(0, 0, 0, .12), 0 18px 40px -24px rgba(0, 20, 60, .35);
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #000; --tile: #161618; --text: #f5f5f7; --text-2: #a1a1a6; --hair: rgba(255, 255, 255, .1); --soft: #2c2c2e; --green: #30d158; --red: #ff6961; --shadow: 0 0 0 .5px rgba(255, 255, 255, .14), 0 18px 40px -24px rgba(0, 0, 0, .9); }
+}
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 400 16px/1.5 var(--font); -webkit-font-smoothing: antialiased; }
+.wrap { width: min(1120px, 100% - 32px); margin: 0 auto; padding: 32px 0 80px; }
+h1 { margin: 0; font: 700 34px/1.1 var(--font); letter-spacing: -.03em; }
+h2 { margin: 40px 0 0; font: 700 22px/1.2 var(--font); letter-spacing: -.02em; }
+.sub { margin: 6px 0 0; color: var(--text-2); }
+.btn { display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border: 0; border-radius: 999px; font: 500 14px/1 var(--font); cursor: pointer; }
+.btn--blue { background: var(--blue); color: #fff; } .btn--soft { background: var(--soft); color: var(--text); }
+.btn--green { background: var(--green); color: #fff; } .btn--red { background: var(--red); color: #fff; }
+.btn[disabled] { opacity: .5; cursor: default; }
+.login { margin-top: 28px; max-width: 380px; padding: 24px; border-radius: 18px; background: var(--tile); display: grid; gap: 12px; }
+.login input { height: 44px; padding: 0 14px; border: 1px solid var(--hair); border-radius: 12px; background: var(--bg); color: var(--text); font: 400 16px var(--font); }
+.note { margin: 0; font-size: 14px; color: var(--text-2); } .note[data-kind="bad"] { color: var(--red); } .note[data-kind="ok"] { color: var(--green); }
+.bar { display: flex; align-items: center; gap: 12px; }
+.bar .btn { margin-left: auto; }
+.grid { margin-top: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+.card { display: grid; gap: 10px; padding: 12px; border-radius: 18px; background: var(--tile); }
+.card .sp-box { box-shadow: var(--shadow); }
+.card b { font-size: 16px; } .card small { display: block; color: var(--text-3); font-size: 13px; }
+.card .acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.seg { display: inline-flex; gap: 6px; }
+.empty { margin-top: 12px; color: var(--text-3); }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div class="bar"><div><h1>Community Review</h1><p class="sub">Themes sent in from Appearance. Nothing shows in the gallery until it’s approved here.</p></div><button class="btn btn--soft" type="button" data-out hidden>Sign out</button></div>
+
+  <form class="login" data-login hidden>
+    <label for="key"><b>Passcode</b></label>
+    <input id="key" type="password" autocomplete="current-password" required>
+    <button class="btn btn--blue" type="submit">Open the review</button>
+    <p class="note" data-login-note role="status"></p>
+  </form>
+
+  <section data-desk hidden>
+    <h2>Waiting <span data-count></span></h2>
+    <div class="grid" data-pending></div>
+    <p class="empty" data-pending-empty hidden>Nothing waiting.</p>
+    <h2>In the gallery</h2>
+    <div class="grid" data-approved></div>
+    <p class="empty" data-approved-empty hidden>No themes approved yet.</p>
+  </section>
+</main>
+
+<script src="/js/theme.js"></script>
+<script src="/community/preview.js"></script>
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const login = $('[data-login]'), desk = $('[data-desk]'), out = $('[data-out]');
+  const api = (path, opts = {}) => fetch(`/api/community/${path}`, { credentials: 'same-origin', ...opts, headers: { 'x-simpl-review': '1', ...(opts.body ? { 'content-type': 'application/json' } : {}), ...(opts.headers || {}) } }).then(async (r) => [r, await r.json().catch(() => ({}))]);
+  const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+
+  const card = (t, acts) => {
+    const c = document.createElement('div'); c.className = 'card';
+    const box = document.createElement('div'); box.className = 'sp-box';
+    let look = t.look === 'dark' || (!t.look && dark);
+    const draw = () => { box.innerHTML = ''; box.append(SimplPreview.draw(t, { dark: look })); };
+    draw();
+    const who = document.createElement('div');
+    const b = document.createElement('b'); b.textContent = t.name;
+    const s = document.createElement('small'); s.textContent = `${t.maker ? `by ${t.maker}` : 'no name given'} · ${t.created} · ${t.accent || 'no colour'} · ${Object.keys(t.places || {}).length} pictures`;
+    who.append(b, s);
+    const row = document.createElement('div'); row.className = 'acts';
+    const flip = document.createElement('button'); flip.type = 'button'; flip.className = 'btn btn--soft'; flip.textContent = 'Light / Dark';
+    flip.addEventListener('click', () => { look = !look; draw(); });
+    row.append(flip, ...acts.map(([label, kind, run]) => { const x = document.createElement('button'); x.type = 'button'; x.className = `btn btn--${kind}`; x.textContent = label; x.addEventListener('click', async () => { row.querySelectorAll('button').forEach((y) => (y.disabled = true)); await run(); }); return x; }));
+    c.append(box, who, row);
+    requestAnimationFrame(() => SimplPreview.fit(box));
+    return c;
+  };
+
+  async function load() {
+    const [r, b] = await api('review');
+    if (r.status === 401) { desk.hidden = true; out.hidden = true; login.hidden = false; $('#key').focus(); return; }
+    if (!r.ok) { login.hidden = false; $('[data-login-note]').textContent = `${b.message || 'The review is not available.'}${b.code ? ` (${b.code})` : ''}`; return; }
+    login.hidden = true; desk.hidden = false; out.hidden = false;
+    const decide = (id, decision) => async () => { await api('decide', { method: 'POST', body: JSON.stringify({ id, decision }) }); load(); };
+    const remove = (t) => async () => { if (confirm(`Take “${t.name}” out of the gallery? Its photos are deleted.`)) await api('remove', { method: 'POST', body: JSON.stringify({ id: t.id }) }); load(); };
+    const pend = $('[data-pending]'), appr = $('[data-approved]');
+    pend.innerHTML = ''; appr.innerHTML = '';
+    b.pending.forEach((t) => pend.append(card(t, [['Approve', 'green', decide(t.id, 'approve')], ['Deny', 'red', decide(t.id, 'deny')]])));
+    b.approved.forEach((t) => appr.append(card(t, [['Take down', 'red', remove(t)]])));
+    $('[data-count]').textContent = b.pending.length ? `(${b.pending.length})` : '';
+    $('[data-pending-empty]').hidden = !!b.pending.length;
+    $('[data-approved-empty]').hidden = !!b.approved.length;
+  }
+
+  login.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const note = $('[data-login-note]');
+    note.textContent = 'Checking…'; delete note.dataset.kind;
+    const [r, b] = await api('login', { method: 'POST', body: JSON.stringify({ key: $('#key').value }) });
+    $('#key').value = '';
+    if (!r.ok) { note.textContent = `${b.message || 'That did not work.'}${b.code ? ` (${b.code})` : ''}`; note.dataset.kind = 'bad'; return; }
+    note.textContent = '';
+    load();
+  });
+  out.addEventListener('click', async () => { await api('logout', { method: 'POST' }); load(); });
+  load();
+})();
+</script>
+</body>
+</html>
