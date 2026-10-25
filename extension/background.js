@@ -532,6 +532,12 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
       case 'load': // one of the interface's own on-demand modules (content/app/lazy.js), into the page that asks
         reply(injectLazy(sender, msg.files));
         return true;
+      case 'community': // (2.99.106) Simpl Community from Appearance: its themes, a photo of one, or this one shared (content/app/appearance.js)
+        reply(community(msg));
+        return true;
+      case 'communityKit': // (2.99.106) Simpl Community's page: the theme code, to wear a theme added there (content/sniff.js)
+        reply(communityKit(sender));
+        return true;
       case 'canvasSeen': // the Chrome build's sniffer found Canvas on a site of the school's own
         reply(canvasSeen(sender, msg));
         return true;
@@ -592,6 +598,49 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
     if (!sender?.tab?.id || !api.scripting?.executeScript) throw new Error('Not available here');
     await api.scripting.executeScript({ target: { tabId: sender.tab.id, frameIds: [sender.frameId || 0] }, files: list });
     return { ok: true, files: list };
+  }
+  // (2.99.106) Simpl Community, asked from Appearance in a Canvas page and fetched here (a school's Canvas may not let its
+  // page reach other sites): the approved themes; one theme's photo, given back as its bytes (only the Community's own
+  // photos); or this theme shared — its theme as the site takes it and its photos — for the Community to look at.
+  // Nothing of the student's goes but what they share, and no cookie is sent. (dev:communityBase: the suites point it at the mock.)
+  const communityBase = async () => (await api.storage.local.get('dev:communityBase'))['dev:communityBase'] || 'https://simplcourses.com';
+  const toB64 = (buf) => { const u = new Uint8Array(buf); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(s); };
+  const fromB64 = (b64) => { const s = atob(String(b64 || '')); const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; };
+  async function community(msg) {
+    const base = await communityBase();
+    const api_ = `${base}/api/community/`;
+    if (msg.what === 'themes') {
+      const r = await fetch(`${api_}themes`, { cache: 'no-store', credentials: 'omit' });
+      const body = await r.json().catch(() => ({}));
+      return r.ok ? { ok: true, themes: Array.isArray(body.themes) ? body.themes : [] } : { ok: false, off: r.status === 503, message: body.message || '' };
+    }
+    if (msg.what === 'photo') {
+      const url = String(msg.url || '');
+      const own = /^https:\/\/(www\.)?simplcourses\.com\/api\/community\/photo\/[a-z0-9]+\/[a-z]+$/.test(url) || (url.startsWith(`${api_}photo/`) && /\/photo\/[a-z0-9]+\/[a-z]+$/.test(url));
+      if (!own) throw new Error('Not a photo of the Community');
+      const r = await fetch(url, { credentials: 'omit' });
+      if (!r.ok) throw new Error('A photo of the theme could not be read.');
+      return { ok: true, type: r.headers.get('content-type') || 'image/jpeg', data: toB64(await r.arrayBuffer()) };
+    }
+    if (msg.what === 'share') {
+      const f = new FormData();
+      f.set('theme', JSON.stringify(msg.theme || {}));
+      for (const [key, p] of Object.entries(msg.photos || {})) f.set(`photo-${key}`, new Blob([fromB64(p.data)], { type: p.type || 'image/jpeg' }), `${key}.jpg`);
+      const r = await fetch(`${api_}submit`, { method: 'POST', body: f, credentials: 'omit' });
+      const body = await r.json().catch(() => ({}));
+      return r.ok && body.ok ? { ok: true, id: body.id } : { ok: false, message: body.message || 'That did not go through. Try again later.' };
+    }
+    throw new Error('Nothing here');
+  }
+  // (2.99.106) Simpl Community on simplcourses.com: the settings and the theme code put into that page alone, when an Add
+  // there asks for them (content/sniff.js) — the same files every Canvas page has, and nothing else, and only there.
+  async function communityKit(sender) {
+    let u = null;
+    try { u = new URL(sender?.url || sender?.tab?.url || ''); } catch { /* none */ }
+    if (!u || u.protocol !== 'https:' || !/^(www\.)?simplcourses\.com$/.test(u.hostname) || !/^\/community(\/|$)/.test(u.pathname)) throw new Error('Not here');
+    if (!sender?.tab?.id || !api.scripting?.executeScript) throw new Error('Not available here');
+    await api.scripting.executeScript({ target: { tabId: sender.tab.id, frameIds: [sender.frameId || 0] }, files: ['lib/settings.js', 'lib/theme.js'] });
+    return { ok: true };
   }
   // The interface's own on-demand modules (content/app/lazy.js): a page may ask for the files that
   // content/app/lazy-modules.js names, and nothing outside that list. The source manifest lists the

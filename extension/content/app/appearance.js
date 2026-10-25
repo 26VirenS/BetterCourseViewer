@@ -13,6 +13,11 @@
  * guided setup (setup.js arms it, the page loaded afresh opens it: app.js), the bar has Next in Done's place: Theme and
  * Courses, then Next to the sidebar, then Done, which brings the guided tour. Owed until that Done (a key in the
  * extension's storage), so a reload — a new look is one — comes back into it.
+ *
+ * (2.99.106) Community: themes students made and shared (simplcourses.com/community), each worn in full with a press —
+ * its colour, its look, its drawings and photos where it pinned them, a photo's Ink as it was — and this theme shared
+ * there, named and signed as the student likes, shown once it has been looked at. The background asks the site
+ * (background.js community), so a school's Canvas need not let its page reach it.
  */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
@@ -44,6 +49,13 @@
     const raw = (v) => T().rawOf(kept, v);
     const map = (o) => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [k, raw(v)]).filter(([, v]) => v));
     return { side: raw(kept.side), cards: map(kept.cards), headers: map(kept.headers), tones: { ...(kept.tones || {}) }, place: { ...(kept.place || {}) }, plain: { ...(kept.plain || {}) } };
+  };
+  /** The theme worn, as the bar holds it: its colour's name, and the wheel's hue, saturation and depth. */
+  const themeOf = (settings) => {
+    const th = settings.appearance?.theme || {};
+    const name = th.name && (th.name === 'Regular' || th.name === 'Custom' || T().PRESETS.some(([, n]) => n === th.name)) ? th.name : (th.accent ? 'Custom' : 'Regular');
+    const ctl = th.h != null ? { h: Number(th.h) || 0, s: Number(th.s) || 0, depth: Number(th.depth) || 0 } : th.accent ? T().controlsOf(th.accent) : { h: 211, s: 1, depth: 40 };
+    return { name, ...ctl };
   };
   const accentOf = (th) => (th.name === 'Regular' ? REGULAR : th.name === 'Custom' ? T().customHex(th.h, th.s, th.depth) : (T().PRESETS.find(([, n]) => n === th.name) || [REGULAR])[0]);
 
@@ -77,17 +89,14 @@
   // ---- open / close ----------------------------------------------------------------------------------
   /** `setup`: the guided setup's run (Next to the sidebar, then Done; Escape does not put it away), `onDone` called
    *  once its Done has put it away. */
-  async function open(app, { setup = false, onDone = null } = {}) {
+  async function open(app, { setup = false, onDone = null, tab = 'theme' } = {}) {
     if (st) return;
     if (BCV.phone?.active?.()) { app.go('/?bcv=personalize'); return; } // (a phone keeps its own Personalize)
     try { sessionStorage.removeItem(AGAIN); } catch { /* private window */ }
     if ((app.state.route || app.parseRoute()).screen !== 'dashboard') app.go('/');
     const [settings, kept] = await Promise.all([S.get(), T().loadImages().catch(() => null)]);
     if (st) return; // (opened twice while the first was reading)
-    const th = settings.appearance?.theme || {};
-    const name = th.name && (th.name === 'Regular' || th.name === 'Custom' || T().PRESETS.some(([, n]) => n === th.name)) ? th.name : (th.accent ? 'Custom' : 'Regular');
-    const ctl = th.h != null ? { h: Number(th.h) || 0, s: Number(th.s) || 0, depth: Number(th.depth) || 0 } : th.accent ? T().controlsOf(th.accent) : { h: 211, s: 1, depth: 40 };
-    st = { app, images: unpack(kept || T().emptyImages()), theme: { name, ...ctl }, look: settings.appearance?.darkMode || 'system', tab: 'theme', courses: [], badges: [], target: null,
+    st = { app, images: unpack(kept || T().emptyImages()), theme: themeOf(settings), look: settings.appearance?.darkMode || 'system', tab: !setup && tab === 'community' ? 'community' : 'theme', courses: [], badges: [], target: null,
       sidebar: settings.appearance?.sidebar === 'one' ? 'one' : 'two', setup, onDone }; // (not chosen yet: two, as the page draws it — app.js oneBar)
     document.documentElement.classList.add('bcv-appear');
     document.documentElement.classList.toggle('bcv-appear-setup', setup);
@@ -99,6 +108,7 @@
     document.addEventListener('keydown', st.onKey, true);
     paintBar();
     follow();
+    if (st.tab === 'community') loadCommunity();
     st.coursesRead = store.favorites().then((favs) => { if (!st) return; st.courses = (favs || []).map((c) => ({ id: String(c.id), name: c.nickname || c.shortName || c.code || c.name, color: (c.color || '#8e8e93').toLowerCase() })); paintBar(); }).catch(() => {});
   }
   function close() {
@@ -199,7 +209,7 @@
         h('button', { type: 'button', class: 'bcv-ap-done', id: 'bcv-ap-done', text: 'Done', onclick: finish }),
       ]
       : [
-        seg('bcv-ap-tabs', st.setup ? [['theme', 'Theme'], ['courses', 'Courses']] : [['theme', 'Theme'], ['courses', 'Courses'], ['sidebar', 'Sidebar']], st.tab, setTab),
+        seg('bcv-ap-tabs', st.setup ? [['theme', 'Theme'], ['courses', 'Courses']] : [['theme', 'Theme'], ['courses', 'Courses'], ['sidebar', 'Sidebar'], ['community', 'Community']], st.tab, setTab),
         h('span', { class: 'bcv-ap-bar__gap' }),
         seg('bcv-ap-looks', LOOKS, st.look, setLook),
         st.setup
@@ -209,7 +219,7 @@
     st.bar.classList.toggle('is-sides', st.tab === 'sidebar');
     st.bar.replaceChildren(
       h('div', { class: 'bcv-ap-bar__top' }, top),
-      h('div', { class: 'bcv-ap-bar__row' }, [st.tab === 'theme' ? themeRow() : st.tab === 'courses' ? coursesRow() : sidesRow()]),
+      h('div', { class: 'bcv-ap-bar__row' }, [st.tab === 'theme' ? themeRow() : st.tab === 'courses' ? coursesRow() : st.tab === 'community' ? communityRow() : sidesRow()]),
     );
   }
   /** A tab of the bar: the sidebar's is chosen on a course (the first one listed), the others over the Dashboard. */
@@ -218,6 +228,7 @@
     const was = st.tab;
     st.tab = k;
     paintBar();
+    if (k === 'community' && (!st.community || st.community.state !== 'ready')) loadCommunity();
     if (k === 'sidebar') await toCourse();
     else if (was === 'sidebar') toDashboard();
   }
@@ -423,6 +434,102 @@
     Object.assign(el.style, { left: `${Math.round(left)}px`, top: `${Math.round(top)}px`, transformOrigin: `${Math.round(r.left + r.width / 2 - left)}px ${Math.round(r.top + r.height / 2 - top)}px` });
     paint();
   }
+  // ---- (2.99.106) Simpl Community -------------------------------------------------------------------
+  const ask = (m) => BCV.api.runtime.sendMessage({ type: 'community', ...m });
+  /** The Community's themes, asked for once each time the tab is opened afresh, and which of them is worn. */
+  async function loadCommunity() {
+    const s = st;
+    s.community = { state: 'loading', themes: [], worn: s.community?.worn || null };
+    paintBar();
+    let r = null, worn = null;
+    try { [r, worn] = await Promise.all([ask({ what: 'themes' }), BCV.api.storage.local.get('community:worn').then((x) => x?.['community:worn']?.id || null).catch(() => null)]); } catch { r = null; }
+    if (st !== s) return;
+    s.community = r?.ok ? { state: 'ready', themes: r.themes.slice(0, 80), worn } : { state: r?.off ? 'off' : 'error', themes: [], worn };
+    paintBar();
+  }
+  /** A photo of a Community theme, through the background, as wearCommunity reads one. */
+  const photoVia = async (url) => {
+    const r = await ask({ what: 'photo', url }).catch(() => null);
+    if (!r?.ok) return { ok: false };
+    const bin = atob(r.data);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return { ok: true, blob: async () => new Blob([bytes], { type: r.type }) };
+  };
+  /** A Community theme worn in full (lib/theme.js wearCommunity); the bar then holds what it set. One in another look
+   *  loads the page afresh in it, and Appearance comes back on this tab. */
+  async function wearShared(t) {
+    const s = st;
+    if (!s.community || s.community.busy) return;
+    s.community.busy = t.id;
+    paintBar();
+    try {
+      const look = t.look === 'dark' ? 'on' : t.look === 'light' ? 'off' : null;
+      if (look && look !== s.look) { try { sessionStorage.setItem(AGAIN, 'community'); } catch { /* private window */ } }
+      await saving; // (a photo being kept first)
+      const images = await T().wearCommunity(t, { fetchImpl: photoVia, photoOk: (u) => typeof u === 'string' });
+      const settings = await S.get();
+      if (st !== s) return;
+      s.images = unpack(images);
+      s.theme = themeOf(settings);
+      s.look = settings.appearance?.darkMode || s.look;
+      s.community.worn = t.id;
+      U.toast(`${t.name} is on.`);
+    } catch (e) {
+      try { sessionStorage.removeItem(AGAIN); } catch { /* private window */ }
+      U.toast(e?.message || 'That theme could not be put on.', { error: true, ms: 4200 });
+    }
+    if (st !== s) return;
+    s.community.busy = null;
+    paintBar();
+  }
+  /** This theme shared: named, and signed as the student likes; sent for the Community to look at. */
+  function shareSheet(from) {
+    let by = null;
+    const sheet = U.promptSheet({
+      title: 'Share this theme', label: 'Share this theme', placeholder: 'Its name', maxLength: 40, saveLabel: 'Share', from,
+      note: 'Its colour, its look and its pictures go to Simpl Community, and show there once they’ve been looked at. Nothing about you or your courses goes with them.',
+      onSave: async (name) => {
+        if (!name) throw new Error('give it a name first.');
+        const [settings, kept] = await Promise.all([S.get(), T().loadImages()]);
+        const { theme, photos } = T().communityOf(kept, settings, { name, maker: by?.value.trim() || '' });
+        if (!theme.accent && !Object.keys(theme.places).length) throw new Error('pick a colour or a picture first.');
+        const r = await ask({ what: 'share', theme, photos }).catch((e) => ({ ok: false, message: e?.message }));
+        if (!r?.ok) throw new Error(r?.message || 'it did not go through. Try again later.');
+        U.toast('Shared. It shows in Simpl Community once it’s been looked at.', { ms: 4200 });
+      },
+    });
+    by = h('input', { class: 'bcv-input bcv-prompt__input bcv-ap-share__by', type: 'text', placeholder: 'Signed as (optional)', maxlength: '30', 'aria-label': 'Signed as' });
+    sheet.input.after(by);
+  }
+  function communityRow() {
+    const c = st.community || { state: 'loading', themes: [] };
+    const t = T();
+    const share = h('button', { type: 'button', class: 'bcv-ap-ready bcv-ap-cm bcv-ap-cm--share', id: 'bcv-ap-share', title: 'Share this theme with Simpl Community', onclick: (e) => shareSheet(e.currentTarget) }, [
+      h('i', { class: 'bcv-ap-ready__pic bcv-ap-cm__plus' }, U.svg('M12 5v14M5 12h14', { size: 18, stroke: 'currentColor', width: 2.2 })),
+      h('span', { class: 'bcv-ap-ready__name', text: 'Share yours' }),
+    ]);
+    const tile = (th) => {
+      const p = th.places?.side || th.places?.today || Object.values(th.places || {})[0] || null;
+      const side = !!th.places?.side && p === th.places.side;
+      const pic = p?.photo ? (/^https:\/\/(www\.)?simplcourses\.com\/api\/community\/photo\/[a-z0-9]+\/[a-z]+$/.test(p.photo) ? p.photo : null) : p?.scene ? t.sceneUrl(p.scene, side ? 0 : 1, side ? 'side' : 'card') : null; // (only the Community's own photos)
+      const hex = /^#[0-9a-f]{6}$/i.test(th.accent || '') ? th.accent : REGULAR;
+      const on = c.worn === th.id, busy = c.busy === th.id;
+      return h('button', { type: 'button', class: `bcv-ap-ready bcv-ap-cm ${on ? 'is-on' : ''} ${busy ? 'is-busy' : ''}`, dataset: { community: th.id }, disabled: !!c.busy, 'aria-pressed': on ? 'true' : 'false', title: `${th.name}${th.maker ? ` by ${th.maker}` : ''}: put it on`, onclick: () => wearShared(th) }, [
+        h('i', { class: 'bcv-ap-ready__pic', style: { background: pic ? `center / cover no-repeat url("${pic}"), ${hex}` : `linear-gradient(135deg, ${hex}, ${hex}cc)` } }, [h('b', { class: 'bcv-ap-cm__dot', style: { background: hex } })]),
+        h('span', { class: 'bcv-ap-ready__name bcv-ellip', text: th.name }),
+      ]);
+    };
+    const say = { loading: 'Loading Simpl Community…', off: 'Simpl Community opens soon.', error: 'Simpl Community could not be reached. Try again in a moment.' }[c.state];
+    const list = c.state !== 'ready' ? [h('div', { class: 'bcv-ap-empty', text: say })]
+      : c.themes.length ? c.themes.map(tile) : [h('div', { class: 'bcv-ap-empty', text: 'No themes yet. Be the first: share yours.' })];
+    return h('div', { class: 'bcv-ap-theme bcv-ap-community' }, [
+      share,
+      h('i', { class: 'bcv-ap-sep', 'aria-hidden': 'true' }),
+      h('div', { class: 'bcv-ap-readies bcv-ap-cms' }, list),
+      h('a', { class: 'bcv-ap-cm__all', href: `${t.COMMUNITY}/community/`, target: '_blank', rel: 'noopener', text: 'See all' }),
+    ]);
+  }
   function coursesRow() {
     if (!st.courses.length) return h('div', { class: 'bcv-ap-empty', text: 'Your courses show here once they have loaded.' });
     return h('div', { class: 'bcv-ap-courses' }, st.courses.map((c) => h('button', { type: 'button', class: 'bcv-ap-course', dataset: { course: c.id }, title: `${c.name}'s colour`, onclick: (e) => {
@@ -437,9 +544,9 @@
 
   /** The page loaded again for a new look while Appearance was open: back into it. */
   function resume(app) {
-    let again = false;
-    try { again = sessionStorage.getItem(AGAIN) === '1'; } catch { /* private window */ }
-    if (again) setTimeout(() => open(app), 400);
+    let again = null;
+    try { again = sessionStorage.getItem(AGAIN); } catch { /* private window */ }
+    if (again) setTimeout(() => open(app, { tab: again === 'community' ? 'community' : 'theme' }), 400); // (back on the tab it was on: a Community theme in another look is a fresh load)
   }
 
   /** (2.99.74) The guided setup's run: armed by setup.js before its reload, owed until its Done (app.js asks). */

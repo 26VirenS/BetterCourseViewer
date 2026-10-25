@@ -14,6 +14,7 @@
  * page; Brightspace's own domain (*.brightspace.com) is built in like Canvas's. */
 (function () {
   if (window.self !== window.top) return; // a framed page is someone else's
+  if (/^(www\.)?simplcourses\.com$/.test(location.hostname) && /^\/community(\/|$)/.test(location.pathname)) { community(); return; }
   if (self.BCV) return; // the interface is on for this site already
   const doc = document;
   const app = doc.getElementById('application');
@@ -55,4 +56,36 @@
     const rt = (self.browser || self.chrome).runtime;
     Promise.resolve(rt.sendMessage({ type: 'canvasSeen', origin: location.origin, signedIn })).catch(() => {});
   } catch { /* no runtime here */ }
+  /* (2.99.106) Simpl Community (simplcourses.com/community): Simpl in this browser marks the page, which then puts an Add
+   * beside each Preview, and answers that Add — the theme read from the Community's own list (only its id comes from the
+   * page), worn in full by the theme code every Canvas page has (lib/theme.js wearCommunity, put into this page by the
+   * background when first needed), and the page told how it went. Nothing else is read or kept here. */
+  function community() {
+    const say = (m) => window.postMessage({ source: 'simpl-extension', ...m }, location.origin);
+    document.documentElement.dataset.simplExtension = '1';
+    say({ type: 'ready' });
+    let busy = false;
+    window.addEventListener('message', async (e) => {
+      const d = e.data;
+      if (e.source !== window || e.origin !== location.origin || !d || d.source !== 'simpl-community' || d.type !== 'add') return;
+      const id = String(d.id || '');
+      if (!/^[a-z0-9]{4,24}$/.test(id)) return;
+      if (busy) { say({ type: 'added', id, ok: false, message: 'Another theme is being added. Try again in a moment.' }); return; }
+      busy = true;
+      try {
+        if (!self.BCV?.theme?.wearCommunity) {
+          const r = await (self.browser || self.chrome).runtime.sendMessage({ type: 'communityKit' });
+          if (!r?.ok || !self.BCV?.theme?.wearCommunity) throw new Error('Simpl could not get ready on this page. Reload it and try again.');
+        }
+        const res = await fetch(`${location.origin}/api/community/themes`, { cache: 'no-store' });
+        const theme = res.ok ? ((await res.json()).themes || []).find((t) => t.id === id) : null;
+        if (!theme) throw new Error('That theme is not in the Community any more.');
+        await self.BCV.theme.wearCommunity(theme);
+        say({ type: 'added', id, ok: true });
+      } catch (err) {
+        say({ type: 'added', id, ok: false, message: String(err?.message || 'That did not work. Try again.') });
+      }
+      busy = false;
+    });
+  }
 })();

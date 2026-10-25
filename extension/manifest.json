@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Simpl Courses",
-  "version": "2.99.105",
+  "version": "2.99.106",
   "description": "Canvas with navigation that actually makes sense and a UI that you can actually use.",
   "author": "Simpl Courses contributors",
   "icons": {
@@ -48,7 +48,9 @@
   ],
   "host_permissions": [
     "*://*.instructure.com/*",
-    "*://*.brightspace.com/*"
+    "*://*.brightspace.com/*",
+    "https://simplcourses.com/*",
+    "https://www.simplcourses.com/*"
   ],
   "optional_host_permissions": [
     "*://*/*"

@@ -206,7 +206,7 @@ try {
   // the setup counts as done for the rest of the suite (until it is done, every page opens the card
   // — the guided-setup sections below clear the flag when that is what they are checking)
   await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'welcome:search': true, 'tips:rubricRing': true, 'whatsnew:seen': v }), manifest.version);
-  await sw.evaluate((base) => self.BCV.api.storage.local.set({ 'dev:wikiBase': base }), BASE); // (Wikipedia stands in the mock)
+  await sw.evaluate((base) => self.BCV.api.storage.local.set({ 'dev:wikiBase': base, 'dev:communityBase': base }), BASE); // (Wikipedia and Simpl Community stand in the mock)
 
   page = await context.newPage();
   // a page is ready to poke once it is drawn and nothing painted from the cache is still waiting on Canvas
@@ -5055,7 +5055,7 @@ try {
       readies: document.querySelectorAll('.bcv-ap-ready').length,
     };
   });
-  check(ap.veil && ap.veilBg === 'rgba(0, 0, 0, 0)' && ap.badges === ap.stats + 1 && ap.litStat && ap.litSide && ap.dim && ap.tabs === 'Theme|Courses|Sidebar' && ap.looks === 'Light|Dark|System' && ap.readies === 7, `Appearance over the Dashboard: the page held but for the sidebar and the counters — not darkened (2.99.97) — a photo button on each, Theme / Courses / Sidebar and Light / Dark / System at the foot: ${JSON.stringify(ap)}`);
+  check(ap.veil && ap.veilBg === 'rgba(0, 0, 0, 0)' && ap.badges === ap.stats + 1 && ap.litStat && ap.litSide && ap.dim && ap.tabs === 'Theme|Courses|Sidebar|Community' && ap.looks === 'Light|Dark|System' && ap.readies === 7, `Appearance over the Dashboard: the page held but for the sidebar and the counters — not darkened (2.99.97) — a photo button on each, Theme / Courses / Sidebar / Community and Light / Dark / System at the foot: ${JSON.stringify(ap)}`);
   await shot(page, '27c-appearance');
   await page.click('.bcv-ap-ready[data-ready="Ocean"]');
   const worn = await eventually(() => sw.evaluate(async () => { const s = await self.BCV.settings.get(); const im = (await self.BCV.api.storage.local.get('theme:images'))['theme:images']; return s.appearance?.theme?.name === 'Teal' && !!im?.side; }), 8000);
@@ -5095,6 +5095,71 @@ try {
   check(/^#[0-9a-f]{6}$/.test(codeShown) && !!typedKept && await eventually(() => page.evaluate(() => !document.querySelector('.bcv-ap-wheel') && !document.querySelector('.bcv-ap-wheel__done')), 2000), `the middle shows the colour's code (${codeShown}); a code typed there is the colour, kept with nothing pressed (${JSON.stringify(typedKept)}); Return puts the picker away`);
   await page.click('.bcv-ap-tabs [data-k="courses"]');
   check(await eventually(() => page.$$('.bcv-ap-course').then((r) => r.length > 0), 6000), 'Courses: each course with its colour');
+  // (2.99.106) Community: the students' themes (two sent in to the mock's Simpl Community and approved), each put on in full
+  // with a press — its colour, its drawings or photos where they were pinned, a photo's Ink as it was — and this one shared
+  const until = async (fn, ms) => { let got = null; await eventually(async () => { const v = await fn(); if (v) got = v; return !!v; }, ms); return got; }; // (eventually says whether; this, what)
+  const photoFixture = join(root, 'scripts', 'dev', 'fixtures', 'photo.jpg');
+  const seedTheme = async (theme, photos = {}) => { const f = new FormData(); f.set('theme', JSON.stringify(theme)); for (const [k, file] of Object.entries(photos)) f.set(`photo-${k}`, new Blob([readFileSync(file)], { type: 'image/jpeg' }), 'p.jpg'); return (await (await fetch(`${BASE}/api/community/submit`, { method: 'POST', body: f })).json()).id; };
+  const duskId = await seedTheme({ name: 'Mock Dusk', maker: 'Maya', accent: '#ff375f', places: { side: { scene: 'Dusk' }, today: { scene: 'Dusk' } } });
+  const benchId = await seedTheme({ name: 'Bench Photo', accent: '#30d158', places: { side: { photo: true, ink: false, x: 40, y: 60, z: 1.2 }, next: { photo: true } } }, { side: photoFixture, next: photoFixture });
+  await fetch(`${BASE}/__mock/community/approve-all`, { method: 'POST' });
+  await page.click('.bcv-ap-tabs [data-k="community"]');
+  const cmTiles = await until(() => page.$$eval('.bcv-ap-cm[data-community]', (b) => b.map((x) => x.textContent)).then((t) => (t.length === 2 ? t : null)), 8000);
+  const cmShare = await page.$eval('#bcv-ap-share', (b) => b.textContent).catch(() => null);
+  check(!!cmTiles && cmTiles.includes('Mock Dusk') && cmTiles.includes('Bench Photo') && cmShare === 'Share yours', `Community: the approved themes, and Share yours before them: ${JSON.stringify({ cmTiles, cmShare })}`);
+  await shot(page, '27c2-appearance-community');
+  const wornNow = (id) => sw.evaluate(async (id) => { const s = await self.BCV.settings.get(); const im = (await self.BCV.api.storage.local.get('theme:images'))['theme:images']; const w = (await self.BCV.api.storage.local.get('community:worn'))['community:worn']; return { name: s.appearance?.theme?.name, accent: s.appearance?.theme?.accent, side: im?.side || null, cards: Object.keys(im?.cards || {}).sort(), plain: im?.plain || {}, place: im?.place || {}, worn: w?.id === id }; }, id);
+  await page.click(`.bcv-ap-cm[data-community="${duskId}"]`);
+  const duskOn = await until(async () => { const v = await wornNow(duskId); return v.worn && v.name === 'Pink' && /^asset:/.test(v.side || '') && v.cards.join() === 'today' ? v : null; }, 15000);
+  check(!!duskOn, `a Community theme of drawings put on: its colour (Pink), its drawings on the sidebar and Due today, nothing else: ${JSON.stringify(duskOn || await wornNow(duskId))}`);
+  await page.click(`.bcv-ap-cm[data-community="${benchId}"]`);
+  const benchOn = await until(async () => { const v = await wornNow(benchId); return v.worn && v.name === 'Green' && /^asset:/.test(v.side || '') && v.cards.join() === 'week' && v.plain.side === true && !v.plain.week && v.place.side?.x === 40 && v.place.side?.z === 1.2 ? v : null; }, 15000);
+  const benchTile = await until(() => page.$eval(`.bcv-ap-cm[data-community="${benchId}"]`, (b) => b.classList.contains('is-on')).catch(() => false), 4000); // (the bar draws it once the theme is kept: after the storage this waited on)
+  const benchSide = await until(() => page.evaluate(() => document.querySelector('.bcv-side')?.classList.contains('bcv-side--plain')), 6000);
+  check(!!benchOn && benchTile && benchSide, `a Community theme of photos put on: Green, its photos read through the background onto the sidebar and Next 7 days ('next' on the site) where it pinned them, the sidebar's with its Ink off as shared — the page shows it so, the tile is marked: ${JSON.stringify({ benchOn: benchOn || await wornNow(benchId), benchTile, benchSide })}`);
+  await shot(page, '27c3-appearance-community-worn');
+  // Share yours: named and signed, sent for the Community to look at — its colour, its photos (Ink as it is) and where they sit
+  await page.click('#bcv-ap-share');
+  await page.waitForSelector('.bcv-sheet--prompt .bcv-ap-share__by', { timeout: 3000 });
+  await page.fill('.bcv-sheet--prompt .bcv-prompt__input:not(.bcv-ap-share__by)', 'My shared theme');
+  await page.fill('.bcv-ap-share__by', 'Sam');
+  await page.click('.bcv-prompt__save');
+  const shared = await until(async () => { const r = await (await fetch(`${BASE}/__mock/community/pending`)).json(); return r.pending?.find((t) => t.name === 'My shared theme') || null; }, 10000);
+  check(!!shared && shared.maker === 'Sam' && shared.accent === '#30d158' && shared.places.side?.photo === true && shared.places.side.ink === false && shared.places.side.x === 40 && shared.places.next?.photo === true && !shared.places.today && shared.photos?.join() === 'next,side', `Share yours: the theme worn sent to the Community, waiting to be looked at — named and signed, its colour, its photos where they sit (the sidebar's Ink off): ${JSON.stringify(shared)}`);
+  // the website: Simpl in this browser marks simplcourses.com/community (content/sniff.js), every theme gets an Add beside
+  // its Preview, and an Add puts the theme on in full — the theme code put into that page by the background for it
+  // (communityKit); its photos read from the site itself. (The site served from here, its API the mock's.)
+  const sitePub = join(root, 'site', 'public');
+  const siteRoute = async (route) => {
+    const req = route.request();
+    const u = new URL(req.url());
+    if (u.pathname.startsWith('/api/community/')) {
+      const r = await fetch(`${BASE}${u.pathname}${u.search}`, { method: req.method(), headers: { 'content-type': req.headers()['content-type'] || '' }, body: req.method() === 'GET' ? undefined : req.postDataBuffer() || undefined });
+      let body = Buffer.from(await r.arrayBuffer());
+      if (/json/.test(r.headers.get('content-type') || '')) body = Buffer.from(body.toString().split(BASE).join('https://simplcourses.com')); // (its photos at the site's own address, as the site gives them)
+      return route.fulfill({ status: r.status, headers: { 'content-type': r.headers.get('content-type') || 'application/octet-stream' }, body });
+    }
+    const file = u.pathname === '/js/theme.js' ? join(root, 'extension', 'lib', 'theme.js') : /^\/community(\/|$)/.test(u.pathname) ? join(sitePub, u.pathname.endsWith('/') ? `${u.pathname}index.html` : u.pathname) : null;
+    if (!file) return route.fallback();
+    try { return route.fulfill({ status: 200, contentType: file.endsWith('.js') ? 'text/javascript' : 'text/html; charset=utf-8', body: readFileSync(file) }); } catch { return route.fulfill({ status: 404, body: '' }); }
+  };
+  await context.route('https://simplcourses.com/**', siteRoute);
+  const site = await context.newPage();
+  await site.goto('https://simplcourses.com/community/', { waitUntil: 'domcontentloaded' });
+  const siteAdds = await until(() => site.locator('[data-add]:visible').count().then((n) => (n === 2 ? n : null)), 10000);
+  const addOn = async (name) => {
+    const card = site.locator('.theme', { hasText: name });
+    await card.locator('[data-add]').click();
+    return until(() => card.locator('.note').evaluate((n) => (n.dataset.kind ? { kind: n.dataset.kind, text: n.textContent } : null)).catch(() => null), 20000);
+  };
+  const siteDusk = await addOn('Mock Dusk');
+  const duskAgain = await until(async () => { const v = await wornNow(duskId); return v.worn && v.name === 'Pink' && v.cards.join() === 'today' && !v.plain.side ? v : null; }, 8000);
+  const siteBench = await addOn('Bench Photo');
+  const benchAgain = await until(async () => { const v = await wornNow(benchId); return v.worn && v.name === 'Green' && v.cards.join() === 'week' && v.plain.side === true && v.place.side?.x === 40 ? v : null; }, 15000);
+  check(siteAdds === 2 && siteDusk?.kind === 'ok' && /Added/.test(siteDusk.text) && !!duskAgain && siteBench?.kind === 'ok' && !!benchAgain, `the website: with Simpl here, an Add on each theme, and Add puts it on in full — drawings, and photos read from the site with their Ink as shared: ${JSON.stringify({ siteAdds, siteDusk, duskAgain: !!duskAgain, siteBench, benchAgain: !!benchAgain })}`);
+  await site.close();
+  await context.unroute('https://simplcourses.com/**', siteRoute);
+  await page.click('.bcv-ap-tabs [data-k="theme"]');
   // (2.99.74) Sidebar: the first course opens behind the bar, its sidebars lit and no photo buttons, and one sidebar or two
   // is picked with the page itself as the preview — kept at once; Theme again goes back to the Dashboard
   const sideWas = await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.sidebar);

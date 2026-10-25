@@ -646,6 +646,78 @@
     const gone = before.filter((id) => !ids.includes(id));
     if (gone.length) await BCV.api.storage.local.remove(gone.map(ASSET_KEY)).catch(() => {});
   }
+  // ---- Simpl Community (2.99.106) ----------------------------------------------------------------
+  // A theme shared on simplcourses.com/community: its colour, its look, and its places — the sidebar and the six
+  // counters, by the website's names (its 'next' is the counters' 'week') — each one of Simpl's drawings by name, or
+  // a photo (an address on the site), pinned and zoomed as here, a photo with its Ink switch as here.
+  const COMMUNITY = 'https://simplcourses.com';
+  const COMMUNITY_SLOTS = { side: 'side', today: 'today', tomorrow: 'tomorrow', next: 'week', overdue: 'overdue', unread: 'unread', graded: 'graded' };
+  const COMMUNITY_PHOTO = /^https:\/\/(www\.)?simplcourses\.com\/api\/community\/photo\/[a-z0-9]+\/[a-z]+$/;
+  const sceneFor = (name, slot) => (slot === 'side' ? sceneUrl(name, 0, 'side') : sceneUrl(name, CARD_SLOTS.indexOf(slot) + 1, 'card'));
+  /** The settings' theme for an accent: a ready-made colour by its name, any other as Custom, none as Regular. */
+  const themeFor = (accent) => {
+    const hex = /^#[0-9a-f]{6}$/i.test(accent || '') ? accent.toLowerCase() : null;
+    if (!hex) return { name: 'Regular', accent: '' };
+    const ready = PRESETS.find(([h]) => h.toLowerCase() === hex);
+    const c = controlsOf(hex);
+    return { name: ready ? ready[1] : 'Custom', accent: hex, h: Math.round(c.h * 10) / 10, s: Math.round(c.s * 1000) / 1000, depth: Math.round(c.depth * 10) / 10 };
+  };
+  /** A Community theme worn in full: its photos read from the site and scaled as an upload is, its drawings drawn,
+   *  each where it was pinned, all kept (inked here: needs a document), and its colour and its look set. What was worn
+   *  before is replaced, headers too (a drawn sidebar brings its drawing to the headers, as a ready-made theme does). */
+  async function wearCommunity(theme, { fetchImpl = (u) => fetch(u), photoOk = (u) => COMMUNITY_PHOTO.test(u) } = {}) { // (photoOk: Appearance's photos come through the background, which checks them itself)
+    if (!theme || typeof theme !== 'object') throw new Error('That theme could not be read.');
+    const images = emptyImages();
+    for (const [key, slot] of Object.entries(COMMUNITY_SLOTS)) {
+      const p = theme.places?.[key];
+      if (!p || typeof p !== 'object') continue;
+      let value = null, tone = null;
+      if (p.scene && SCENE_NAMES.includes(p.scene)) {
+        value = sceneFor(p.scene, slot);
+        tone = SCENE_TONES[p.scene];
+        if (slot === 'side') for (const [k] of HEADER_SLOTS) { images.headers[k] = sceneUrl(p.scene, 0, 'head'); images.tones[`head:${k}`] = tone; }
+      } else if (typeof p.photo === 'string' && photoOk(p.photo)) {
+        const res = await fetchImpl(p.photo);
+        if (!res.ok) throw new Error('A photo of the theme could not be read.');
+        ({ data: value, tone } = await readImage(await res.blob(), slot === 'side' ? 1280 : 900));
+        if (p.ink === false) images.plain[slot] = true;
+      }
+      if (!value) continue;
+      if (slot === 'side') images.side = value; else images.cards[slot] = value;
+      if (tone) images.tones[slot] = tone;
+      const d = PLACE_DEFAULT(slot);
+      const at = { x: numIn(p.x, 0, 100, d.x), y: numIn(p.y, 0, 100, d.y), z: numIn(p.z, ZOOM_MIN, ZOOM_MAX, 1) };
+      if (!isDefaultPlace(slot, at)) images.place[slot] = roundPlace(at);
+    }
+    await saveImages(images);
+    const look = theme.look === 'dark' ? { darkMode: 'on' } : theme.look === 'light' ? { darkMode: 'off' } : {};
+    await BCV.settings.update({ appearance: { theme: themeFor(theme.accent), ...look } });
+    await BCV.api.storage.local.set({ 'community:worn': { id: String(theme.id || ''), name: String(theme.name || ''), at: Date.now() } }).catch(() => {});
+    return images;
+  }
+  /** What is worn now, as a Community theme to share: { theme, photos } — the theme as the site takes it (its places
+   *  each a drawing's name, or a photo sent beside it) and the photos by place, each { type, data } (its bytes in
+   *  base64, read off the picture kept). A place showing a drawing of Simpl's is sent by name; one whose picture is not
+   *  a kept JPEG, PNG or WebP is left out. `images` with its pictures read in (loadImages()). */
+  function communityOf(images, settings, { name = '', maker = '' } = {}) {
+    const places = {}, photos = {};
+    for (const [key, slot] of Object.entries(COMMUNITY_SLOTS)) {
+      const v = slot === 'side' ? images?.side : images?.cards?.[slot];
+      const p = v ? picOf(images, v) : null;
+      if (!p?.sharp) continue;
+      const at = placeOf(images, slot);
+      const scene = sceneBaseOf(p.scene);
+      if (scene) { places[key] = { scene, ...at }; continue; }
+      const m = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(p.sharp);
+      if (!m) continue;
+      photos[key] = { type: m[1], data: m[2] };
+      places[key] = { photo: true, ...at, ...(images.plain?.[slot] ? { ink: false } : {}) };
+    }
+    const th = settings?.appearance?.theme || {};
+    const dark = settings?.appearance?.darkMode;
+    return { theme: { name, maker, accent: th.accent || null, look: dark === 'on' ? 'dark' : dark === 'off' ? 'light' : null, places }, photos };
+  }
+
   // ---- whether this browser draws the glass's blur ----------------------------------------------
   // Chrome without graphics acceleration (switched off in its settings, or its GPU refused) draws
   // the page in software, and software skips every backdrop-filter while CSS.supports still says
@@ -684,6 +756,7 @@
     palette, shades, shadeSet, cssVars, apply, readable, readableOn, fillFor, mix, tint, customHex, controlsOf, veilBase, picCss, band, nearest,
     readImage, imageTone, fillTones, loadImages, ensureAssets, saveImages, emptyImages, packImages, picOf, picAt, rawOf, CAST, INK_LIFT, inkOn, SCENE_INK, sceneInkOn, inkFor, inkCached,
     blurDrawn, checkBlur, BLUR_KEY,
+    COMMUNITY, COMMUNITY_SLOTS, wearCommunity, communityOf,
     get PRESET_PHOTOS() { return presetPhotosOf(); }, // (the drawings, made on the first ask)
   };
 })();

@@ -26,6 +26,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.106', date: '2026-10-25', notes: [
+      { kind: 'new', title: 'Simpl Community', body: 'Put on themes students made, or share yours, in Appearance.', icon: P.sparkle },
+    ] },
     { version: '2.99.105', date: '2026-10-25', notes: [
       { kind: 'new', title: 'Photos Without Ink', body: 'Ink off shows a photo as it is, its words bordered in white.', icon: P.pic },
     ] },
