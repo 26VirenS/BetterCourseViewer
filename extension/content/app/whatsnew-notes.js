@@ -24,8 +24,13 @@
     clock: 'M12 5a8 8 0 100 16 8 8 0 000-16zM12 9v4l3 2',
     tool: 'M14.5 3.5a5 5 0 0 0-6 6l-5 5V20h4l5-5a5 5 0 0 0 6-6l-3 3-3-3z',
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
+    cal: 'M5 6h14v14H5zM5 10h14M9 3v4M15 3v4',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.107', date: '2026-10-25', notes: [
+      { kind: 'new', title: 'Calendar Sync', body: 'Your work in Apple, Google or Outlook, and theirs in Simpl.', icon: P.cal },
+      { kind: 'new', title: 'Pull to Plan', body: 'Pull work to the right to plan a free time for it.', icon: P.clock },
+    ] },
     { version: '2.99.106', date: '2026-10-25', notes: [
       { kind: 'new', title: 'Simpl Community', body: 'Put on themes students made, or share yours, in Appearance.', icon: P.sparkle },
     ] },

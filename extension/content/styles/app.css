@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.106"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.107"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -1330,6 +1330,39 @@ html[data-bcv-theme="dark"] .bcv-mring__track { stroke: rgba(255,255,255,.1); }
 .bcv-cal__calcount { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--bcv-blue); color: #fff; font: 700 11px/18px var(--bcv-font); text-align: center; box-sizing: border-box; }
 .bcv-cal__sheet { width: 480px; }
 .bcv-cal__sheet .bcv-sheet__list { padding: 14px 18px 18px; display: flex; flex-direction: column; gap: 10px; }
+/* (2.99.107) Sync: the Canvas feed handed to a calendar app, the student's own calendars linked, plans sent out */
+.bcv-cal__syncbtn { gap: 7px; }
+.bcv-cal__syncbtn.has-error .bcv-cal__synccount { background: #ff3b30; }
+.bcv-sync__apps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.bcv-sync__app { display: flex; align-items: center; gap: 9px; height: 42px; padding: 0 14px; border-radius: 12px; border: 0; background: var(--bcv-fill); color: var(--bcv-ink) !important; font: 600 13.5px/1 var(--bcv-font); text-decoration: none !important; cursor: pointer; transition: background-color var(--bcv-t-fast) ease, transform .12s var(--bcv-ease-out); }
+.bcv-sync__app > svg { color: var(--bcv-blue); flex: none; }
+.bcv-sync__app:active { transform: scale(.97); }
+.bcv-sync__app:focus-visible { outline: 2px solid var(--bcv-blue); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) { .bcv-sync__app:hover { background: var(--bcv-fill2); } }
+.bcv-sync__note { margin: 10px 2px 0; }
+.bcv-sync__sub { font: 400 12px/1.35 var(--bcv-font); color: var(--bcv-ink3); margin-top: 2px; }
+.bcv-sync__sub.is-error { color: #ff3b30; }
+.bcv-sync__link .bcv-row__body { flex: 1; min-width: 0; }
+.bcv-sync__paste { display: flex; gap: 8px; align-items: center; padding: 12px 16px; }
+.bcv-sync__paste .bcv-input { flex: 1; min-width: 0; }
+.bcv-sync__ask { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px; background: rgba(255,149,0,.14); font: 500 13px/1.35 var(--bcv-font); color: var(--bcv-ink); }
+.bcv-sync__ask > span { flex: 1; min-width: 0; }
+.bcv-sync__msg { font: 500 13px/1.4 var(--bcv-font); color: var(--bcv-ink2); padding: 0 4px; }
+.bcv-sync__msg.is-error { color: #ff3b30; }
+.bcv-sync__where { font: 400 12.5px/1.45 var(--bcv-font); color: var(--bcv-ink2); padding: 0 4px; }
+.bcv-sync__where summary { cursor: pointer; color: var(--bcv-blue); font-weight: 600; }
+.bcv-sync__where ul { margin: 8px 0 6px; padding-left: 18px; }
+.bcv-sync__where li { margin: 3px 0; }
+.bcv-sync__where p { margin: 6px 0 0; color: var(--bcv-ink3); }
+.bcv-sync__send .bcv-row__body { flex: 1; min-width: 0; }
+/* the linked calendars and the plans on the grid: a linked calendar's events lighter than Canvas's own, a plan with a
+   dashed edge and its clock (it is a time set aside, not something set) */
+.bcv-cal--month .bcv-ev--ext .bcv-ev__label { color: var(--bcv-ink2) !important; }
+.bcv-cal--month .bcv-ev--plan { border-left-style: dashed; }
+.bcv-cal--month .bcv-ev--plan > svg { display: block; }
+.bcv-wev.bcv-ev--plan { outline: 1.5px dashed var(--bcv-ev-bar); outline-offset: -1.5px; }
+.bcv-wev.bcv-ev--ext { opacity: .85; }
+.bcv-row.bcv-ev--plan .bcv-agenda__due { color: var(--bcv-blue); font-weight: 600; }
 .bcv-mini__nav { display: flex; align-items: center; gap: 8px; padding: 0 2px 10px; }
 .bcv-mini__title { flex: 1; text-align: center; font: 600 13.5px/1 var(--bcv-font); }
 .bcv-mini__arrow { border: 0; background: transparent; padding: 0; cursor: pointer; display: flex; }
@@ -5375,8 +5408,8 @@ html[data-bcv-theme="light"] .bcv-spot { --bcv-spot-shade: .24; }
 .bcv-head__row--center { row-gap: 8px; }
 @container bcv-main (max-width: 1080px) {
   .bcv-cal__tools { gap: 6px; }
-  .bcv-cal__calbtn > span:not(.bcv-cal__calcount) { display: none; } /* (2.99.77: Find appointment keeps its words) */
-  .bcv-cal__calbtn { padding: 0 8px 0 10px; gap: 6px; }
+  .bcv-cal__calbtn > span:not(.bcv-cal__calcount), .bcv-cal__syncbtn > span:not(.bcv-cal__calcount) { display: none; } /* (2.99.77: Find appointment keeps its words) */
+  .bcv-cal__calbtn, .bcv-cal__syncbtn { padding: 0 8px 0 10px; gap: 6px; }
 }
 @container bcv-main (max-width: 640px) {
   .bcv-cal__apptbtn > span:not(.bcv-cal__calcount) { display: none; }
@@ -6212,3 +6245,57 @@ html.bcv-noblur .bcv-spot:not(.is-far) .bcv-omni__box.bcv-squircle, html.bcv-nob
 .bcv-ann__note { padding: 2px 0; }
 .bcv-ann__entries > .bcv-entry:first-child { border-top: 0; padding-top: 4px; }
 @media (prefers-reduced-motion: reduce) { .bcv-ann { animation: none; } }
+
+/* ---- (2.99.107) Pull to plan (content/app/plan.js) -----------------------------------------------------------------
+   A row of work pulled right: it follows the pointer and then resists, and a rail of free times hangs under it, the
+   time under the lens the one chosen. Let go and it springs home with its plan on it. The rail is a glass panel of
+   its own, fixed under the row (above it near the bottom of the window), so nothing in the list moves. */
+.bcv-pullable { touch-action: pan-y; -webkit-user-select: none; user-select: none; transition: transform var(--bcv-t-snappy) var(--bcv-spring-snappy); }
+.bcv-pullable.is-pulling { position: relative; z-index: 2; background: var(--bcv-card); box-shadow: 0 6px 22px rgba(0,0,0,.14); border-radius: 12px; cursor: grabbing; }
+.bcv-planpill { display: inline-flex; align-items: center; gap: 4px; flex: none; height: 20px; padding: 0 8px; border-radius: 10px; border: 0; background: rgba(10,132,255,.12); color: var(--bcv-blue); font: 600 11px/1 var(--bcv-font); white-space: nowrap; cursor: pointer; }
+.bcv-planpill[hidden] { display: none; }
+.bcv-planpill.is-past { background: var(--bcv-fill); color: var(--bcv-ink3); }
+.bcv-planpill:focus-visible { outline: 2px solid var(--bcv-blue); outline-offset: 1px; }
+.bcv-planpill.is-new { animation: bcv-plan-pop var(--bcv-t-snappy) var(--bcv-spring-snappy) both; }
+@keyframes bcv-plan-pop { from { opacity: 0; transform: scale(.9); } to { opacity: 1; transform: none; } }
+.bcv-row__over--flags .bcv-planpill { height: 18px; font-size: 10.5px; }
+.bcv-planbar { position: fixed; z-index: var(--bcv-z-picker); box-sizing: border-box; padding: 10px 12px 10px; border-radius: 18px; background: var(--bcv-glass-ground, var(--bcv-glass)); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); border: 1px solid var(--bcv-edge); box-shadow: var(--bcv-shadow-glass); color: var(--bcv-ink); display: flex; flex-direction: column; gap: 8px; transform-origin: 24px 0; animation: bcv-plan-in .2s var(--bcv-ease-out) both; }
+.bcv-planbar.is-above { transform-origin: 24px 100%; }
+.bcv-planbar.is-closing { animation: bcv-plan-out .15s var(--bcv-ease-out) both; pointer-events: none; }
+@keyframes bcv-plan-in { from { opacity: 0; transform: translateY(-4px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes bcv-plan-out { to { opacity: 0; transform: scale(.98); } }
+.bcv-planbar__head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.bcv-planbar__head > svg { flex: none; }
+.bcv-planbar__title { flex: 1; min-width: 0; font: 600 13px/1.2 var(--bcv-font); }
+.bcv-planbar__len { display: flex; flex: none; padding: 2px; border-radius: 9px; background: var(--bcv-fill); }
+.bcv-planbar__lenbtn { height: 22px; min-width: 34px; padding: 0 7px; border: 0; border-radius: 7px; background: transparent; color: var(--bcv-ink2); font: 600 11.5px/1 var(--bcv-font); cursor: pointer; }
+.bcv-planbar__lenbtn.is-on { background: var(--bcv-card); color: var(--bcv-ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.bcv-planbar--pull .bcv-planbar__lenbtn { pointer-events: none; }
+.bcv-planbar__rail { position: relative; overflow: hidden; border-radius: 13px; padding: 2px 0; }
+.bcv-planbar--pick .bcv-planbar__rail { overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; }
+.bcv-planbar--pick .bcv-planbar__rail::-webkit-scrollbar { display: none; }
+.bcv-planbar__track { display: flex; gap: 6px; width: max-content; will-change: transform; transition: transform .16s var(--bcv-ease-out); }
+.bcv-planbar--pull .bcv-planbar__track { transform: translateX(208px); } /* (before the first time is reached: the lens empty) */
+.bcv-planbar__slot { flex: none; width: 98px; height: 50px; box-sizing: border-box; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; padding: 0 11px; border-radius: 12px; border: 0; background: var(--bcv-fill); color: var(--bcv-ink); text-align: left; cursor: pointer; scroll-snap-align: start; transition: background-color .12s ease, color .12s ease, transform .12s var(--bcv-ease-out); }
+.bcv-planbar__day { font: 600 10.5px/1 var(--bcv-font); color: var(--bcv-ink3); text-transform: uppercase; letter-spacing: .02em; }
+.bcv-planbar__time { font: 700 14px/1 var(--bcv-display, var(--bcv-font)); letter-spacing: -.01em; }
+.bcv-planbar__slot.is-day .bcv-planbar__day { color: var(--bcv-blue); }
+.bcv-planbar__slot.is-current { box-shadow: inset 0 0 0 1.5px var(--bcv-blue); }
+.bcv-planbar__slot.is-on { background: var(--bcv-blue); color: #fff; }
+.bcv-planbar__slot.is-on .bcv-planbar__day { color: rgba(255,255,255,.82); }
+.bcv-planbar__slot:active { transform: scale(.97); }
+.bcv-planbar__slot:focus-visible { outline: 2px solid var(--bcv-blue); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) { .bcv-planbar--pick .bcv-planbar__slot:not(.is-on):hover { background: var(--bcv-fill2); } }
+.bcv-planbar__due { flex: none; display: flex; align-items: center; height: 50px; padding: 0 12px; border-radius: 12px; box-shadow: inset 0 0 0 1.5px rgba(255,59,48,.45); color: #ff3b30; font: 600 12px/1.2 var(--bcv-font); white-space: nowrap; }
+.bcv-planbar__lens { position: absolute; left: 104px; top: 2px; width: 98px; height: 50px; box-sizing: border-box; border-radius: 12px; border: 2px dashed var(--bcv-ink4, rgba(128,128,128,.5)); pointer-events: none; transition: border-color .12s ease; }
+.bcv-planbar.is-armed .bcv-planbar__lens { border-style: solid; border-color: var(--bcv-blue); }
+.bcv-planbar__wait { height: 50px; display: flex; align-items: center; padding: 0 4px; font: 500 13px/1 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-planbar__status { font: 500 12px/1.3 var(--bcv-font); color: var(--bcv-ink3); min-height: 15px; padding: 0 2px; }
+.bcv-planbar.is-armed .bcv-planbar__status { color: var(--bcv-blue); }
+@media (prefers-reduced-motion: reduce) {
+  .bcv-pullable { transition: none; }
+  .bcv-planbar, .bcv-planbar.is-closing { animation: bcv-fade-in .15s ease both; }
+  .bcv-planbar.is-closing { animation-direction: reverse; }
+  .bcv-planbar__track { transition: none; }
+  .bcv-planpill.is-new { animation: bcv-fade-in .15s ease both; }
+}

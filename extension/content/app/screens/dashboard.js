@@ -221,6 +221,7 @@
     const part = today.getHours() < 12 ? 'morning' : today.getHours() < 17 ? 'afternoon' : 'evening';
     const hello = h('h1', { class: 'bcv-h1 bcv-dash__hello', text: `Good ${part}` });
     store.me().then((me) => { const first = String(me?.shortName || me?.name || '').trim().split(/\s+/)[0]; if (first && first !== 'Account') hello.textContent = `Good ${part}, ${first}`; }).catch(() => {});
+    BCV.plan?.ready(); // (2.99.107) the plans, for the pills on the rows (they paint when it lands)
     const newTask = U.btn('New Task', { kind: 'xs', icon: IC.plus, cls: 'bcv-dash__new', title: 'Add a task of your own to To Do', onClick: () => { BCV.todoAddNext = true; app.go('/#todo'); } });
     screen.append(
       U.el('bcv-head bcv-head--hello', U.el('bcv-head__in', [
@@ -999,7 +1000,7 @@
         U.el('bcv-row__body', [
           // the course and the kind, then where the work stands (Missing, Late, Graded, Feedback, New) in the same words as To Do
           // (a task of your own: the course it was given, or just "My task" — never "My task · My task")
-          h('div', { class: 'bcv-row__over bcv-row__over--flags' }, [h('span', { text: it.custom ? (it.course ? `${it.course.shortName || it.courseName} · My task` : 'My task') : `${it.courseName} · ${it.kind}${it.isDue ? '' : ' · to-do date'}` }), ...store.workFlags(it).map((st) => U.statusBadge(st))]),
+          h('div', { class: 'bcv-row__over bcv-row__over--flags' }, [h('span', { text: it.custom ? (it.course ? `${it.course.shortName || it.courseName} · My task` : 'My task') : `${it.courseName} · ${it.kind}${it.isDue ? '' : ' · to-do date'}` }), ...store.workFlags(it).map((st) => U.statusBadge(st)), BCV.plan?.pill(it)]),
           U.text('bcv-row__title bcv-ellip', it.title),
         ]),
         U.el('bcv-row__right', [
@@ -1009,6 +1010,7 @@
         U.chev(),
       ], { mod: 'bcv-row--p14', href: it.url });
       paint(isDone());
+      BCV.plan?.attach(rowEl, it); // (2.99.107) pulled to the right, it is planned (content/app/plan.js)
       return rowEl;
     }
 

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Link a calendar to Simpl</title>
+  <style>
+    /* (2.99.107) A calendar linked in Calendar → Sync whose site the browser has not let Simpl read yet: the browser asks
+       only from a press on a page of the extension's own, so the Calendar opens this one with the address after the #.
+       Black, like the setup's splash and the page after an update. */
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body { background: #000; color: #fff; font: 16px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; display: flex; align-items: center; justify-content: center; padding: 24px; animation: fadeIn .4s ease both; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+    .text { display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 600px; text-align: center; }
+    .word { font: 700 22px/1 -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.03em; color: rgba(255,255,255,.55); animation: fadeUp .5s ease both; }
+    h1 { margin: 0; font: 700 48px/1.05 -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.04em; animation: fadeUp .5s ease .1s both; overflow-wrap: anywhere; }
+    .where { margin: 0; font: 500 16px/1.45 inherit; color: rgba(255,255,255,.66); max-width: 470px; animation: fadeUp .5s ease .2s both; }
+    .btn { margin-top: 10px; height: 44px; padding: 0 22px; border: 0; border-radius: 22px; background: #0a84ff; color: #fff; font: 600 16px/1 inherit; cursor: pointer; animation: fadeUp .5s ease .3s both; transition: background .2s ease, transform .16s ease; }
+    .btn:hover { background: #2b93ff; }
+    .btn:active { transform: scale(.97); }
+    .btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+    .btn:disabled { opacity: .5; cursor: default; }
+    .msg { margin: 0; min-height: 20px; font: 500 14px/1.45 inherit; color: rgba(255,255,255,.72); max-width: 470px; }
+    html[data-state="ok"] .btn { background: rgba(255,255,255,.14); }
+    html[data-state="ok"] .btn:hover { background: rgba(255,255,255,.22); }
+    @media (prefers-reduced-motion: reduce) { body, .word, h1, .where, .btn { animation: none; } }
+  </style>
+</head>
+<body>
+  <main class="text">
+    <div class="word">Simpl.</div>
+    <h1 id="title">Link your calendar</h1>
+    <p class="where" id="where">Your browser asks before Simpl reads a new site. Allow it, and Simpl reads this calendar every half hour. The link stays in this browser.</p>
+    <button class="btn" id="allow" type="button">Allow and link</button>
+    <p class="msg" id="msg" aria-live="polite"></p>
+  </main>
+  <script src="calendar.js"></script>
+</body>
+</html>

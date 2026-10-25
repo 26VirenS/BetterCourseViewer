@@ -25,6 +25,28 @@ const ago = (ms) => new Date(now.getTime() - ms).toISOString();
 const past = (iso) => (iso && new Date(iso) > now && new Date(iso) - now < 24 * 3600e3 ? ago(3600e3) : iso);
 // a day as Canvas names an all-day event's day (all_day_date), local to the maker
 const ymd = (dayOffset) => { const d = new Date(now); d.setDate(d.getDate() + dayOffset); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+// (2.99.107) a calendar file's times: an instant in UTC, a day as written
+const icsTime = (iso) => new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+const icsDay = (dayOffset) => ymd(dayOffset).replace(/-/g, '');
+const icsEsc = (s) => String(s).replace(/[\\;,]/g, (c) => `\\${c}`).replace(/\n/g, '\\n');
+function canvasFeedIcs() {
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Instructure//Canvas//EN', 'X-WR-CALNAME:Sam Student Calendar (Canvas)'];
+  for (const c of courses) for (const a of allAssignments(c.id)) {
+    if (!a.due_at) continue;
+    lines.push('BEGIN:VEVENT', `UID:event-assignment-${a.id}`, `DTSTAMP:${icsTime(now.toISOString())}`, `DTSTART:${icsTime(a.due_at)}`, `DTEND:${icsTime(a.due_at)}`, `SUMMARY:${icsEsc(`${a.name} [${c.course_code || c.name}]`)}`, `URL:${a.html_url}`, 'END:VEVENT');
+  }
+  return [...lines, 'END:VCALENDAR', ''].join('\r\n');
+}
+function personalIcs() {
+  return [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Google Inc//Google Calendar 70.9054//EN', 'X-WR-CALNAME:Sam\'s calendar', 'X-WR-TIMEZONE:UTC',
+    'BEGIN:VEVENT', 'UID:shift@mock', `DTSTART:${icsTime(at(1, 16, 0))}`, `DTEND:${icsTime(at(1, 20, 0))}`, 'RRULE:FREQ=WEEKLY;COUNT=3', 'SUMMARY:Shift at the library', 'LOCATION:Kolligian Library', 'END:VEVENT',
+    'BEGIN:VEVENT', 'UID:gym@mock', `DTSTART:${icsTime(at(1, 9, 0))}`, `DTEND:${icsTime(at(1, 10, 0))}`, 'TRANSP:TRANSPARENT', 'SUMMARY:Gym (maybe)', 'END:VEVENT',
+    'BEGIN:VEVENT', 'UID:trip@mock', `DTSTART;VALUE=DATE:${icsDay(3)}`, `DTEND;VALUE=DATE:${icsDay(5)}`, 'SUMMARY:Trip home', 'END:VEVENT',
+    'BEGIN:VEVENT', 'UID:lunch@mock', `DTSTART:${icsTime(at(2, 12, 0))}`, `DTEND:${icsTime(at(2, 13, 0))}`, 'STATUS:CANCELLED', 'SUMMARY:Cancelled lunch', 'END:VEVENT',
+    'END:VCALENDAR', '',
+  ].join('\r\n');
+}
 // the session's CSRF token, as Canvas keeps it: in the _csrf_token cookie, URL-encoded (base64 has + / =)
 const CSRF = 'mock+csrf/token=';
 
@@ -850,7 +872,7 @@ const filterDates = (list, url, field) => {
 
 on('GET', /^\/api\/v1\/users\/self$/, () => ({ id: '7', name: 'Sam Student', short_name: 'Sam', avatar_url: null, pronouns: 'they/them' }));
 // the profile is where Canvas keeps the e-mail and the login (the user record carries neither)
-on('GET', /^\/api\/v1\/users\/self\/profile$/, () => ({ id: '7', name: 'Sam Student', short_name: 'Sam', sortable_name: 'Student, Sam', primary_email: 'sstudent@ucmerced.edu', login_id: 'sstudent', pronouns: 'they/them', avatar_url: null, time_zone: 'America/Los_Angeles', locale: null }));
+on('GET', /^\/api\/v1\/users\/self\/profile$/, (url) => ({ id: '7', name: 'Sam Student', short_name: 'Sam', sortable_name: 'Student, Sam', primary_email: 'sstudent@ucmerced.edu', login_id: 'sstudent', pronouns: 'they/them', avatar_url: null, time_zone: 'America/Los_Angeles', locale: null, calendar: { ics: `${url.origin}/feeds/calendars/user_7mockfeed.ics` } })); // (2.99.107: the calendar feed Calendar → Sync hands to a calendar app)
 on('GET', /^\/api\/v1\/accounts\/1$/, () => ({ id: '1', name: 'Example University' }));
 let dashboardView = 'planner';
 on('GET', /^\/dashboard\/view$/, () => ({ dashboard_view: dashboardView }));
@@ -1033,7 +1055,7 @@ function signInGate(req, res, path, raw) {
   }
   if (cookiesOf(req).mock_session === '1') return false;
   if (path.startsWith('/api/')) { res.writeHead(401, { 'content-type': 'application/json; charset=utf-8' }); res.end(JSON.stringify({ status: 'unauthenticated', errors: [{ message: 'user authorization required' }] })); return true; }
-  if (req.method === 'GET' && !path.startsWith('/dist/') && !path.startsWith('/images/') && !path.startsWith('/__mock/')) return go('/login/canvas');
+  if (req.method === 'GET' && !path.startsWith('/dist/') && !path.startsWith('/images/') && !path.startsWith('/__mock/') && !path.startsWith('/feeds/')) return go('/login/canvas'); // (a calendar feed carries its own key, as Canvas's does)
   return false;
 }
 // ({"forgetSubmissions": true}: what was handed in and the quizzes begun since the start are forgotten — a picture taken
@@ -1091,12 +1113,33 @@ on('POST', /^\/api\/v1\/calendar_events\/(\w+)\/reservations$/, (url, m) => {
   return apptChildJson(s, t);
 });
 on('DELETE', /^\/api\/v1\/calendar_events\/(\w+)$/, (url, m) => {
+  const own = ownEvents.findIndex((x) => x.id === m[1]);
+  if (own >= 0) { const [e] = ownEvents.splice(own, 1); return { ...ownJson(e), workflow_state: 'deleted' }; }
   for (const s of apptSlots) {
     const i = s.taken.findIndex((t) => t.id === m[1] && t.user === '7');
     if (i >= 0) { const [t] = s.taken.splice(i, 1); return { ...apptChildJson(s, t), workflow_state: 'deleted' }; }
   }
   return { __status: 404, errors: [{ message: 'The specified resource does not exist.' }] };
 });
+// (2.99.107) events on the student's own calendar, as Canvas keeps them: a plan sent out from Simpl (Calendar → Sync → Send plans) lands here
+const ownEvents = [];
+let ownSeq = 0;
+const ownJson = (e) => ({ ...e, all_day: false, context_code: 'user_7', context_name: 'Sam Student', type: 'event', html_url: `/calendar?event_id=${e.id}` });
+on('POST', /^\/api\/v1\/calendar_events$/, (url, m, body) => {
+  const ce = body?.calendar_event || {};
+  if (ce.context_code !== 'user_7') return { __status: 401, errors: [{ message: 'user not authorized to perform that action' }] };
+  if (!ce.title || !ce.start_at) return { __status: 400, errors: [{ message: 'start_at and title are required' }] };
+  const e = { id: `own${++ownSeq}`, title: String(ce.title), start_at: ce.start_at, end_at: ce.end_at || ce.start_at, description: ce.description || '' };
+  ownEvents.push(e);
+  return ownJson(e);
+});
+on('PUT', /^\/api\/v1\/calendar_events\/(own\d+)$/, (url, m, body) => {
+  const e = ownEvents.find((x) => x.id === m[1]);
+  if (!e) return { __status: 404, errors: [{ message: 'The specified resource does not exist.' }] };
+  Object.assign(e, Object.fromEntries(Object.entries(body?.calendar_event || {}).filter(([k]) => ['title', 'start_at', 'end_at', 'description'].includes(k))));
+  return ownJson(e);
+});
+on('GET', /^\/__mock\/own-events$/, () => ownEvents.map(ownJson));
 on('GET', /^\/api\/v1\/calendar_events$/, (url) => {
   const codes = url.searchParams.getAll('context_codes[]');
   const type = url.searchParams.get('type') || 'event';
@@ -1115,6 +1158,7 @@ on('GET', /^\/api\/v1\/calendar_events$/, (url) => {
     if (codes.includes('course_101')) out.push({ id: 'ev6', title: 'Reading day', start_at: at(3, 20, 0), end_at: at(4, 19, 59), all_day: true, all_day_date: ymd(4), context_code: 'course_101', context_name: 'F26-MATH 021 20', type: 'event', html_url: '/calendar?event_id=ev6' });
     // like Canvas: a reservation is the student's own event, returned with the course it is for (effective_context_code) as well as with the personal calendar
     if (codes.includes('course_101') || codes.includes('user_7')) for (const [s2, t] of ownReservations()) out.push(apptChildJson(s2, t));
+    if (codes.includes('user_7')) for (const e of ownEvents) out.push(ownJson(e));
     if (codes.includes('user_7')) out.push({ id: 'ev4', title: 'Dentist', start_at: at(2, 15, 0), end_at: at(2, 16, 0), all_day: false, context_code: 'user_7', context_name: 'Sam Student', type: 'event', html_url: '/calendar?event_id=ev4' });
   }
   return filterDates(out, url, 'start_at');
@@ -1712,6 +1756,13 @@ if (sample === 'right' || sample === 'wrong') window.mockVerdict(sample === 'rig
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       return res.end(MACMILLAN_SAC_HTML);
     }
+    // (2.99.107) Calendar → Sync: Canvas's calendar feed (every course's work, as the profile's calendar.ics serves it), and a
+    // calendar of the student's own to link, as Google serves a private address — a weekly shift, a maybe-gym marked free, two
+    // whole days away, a cancelled lunch — with a missing one (404) and a sign-in page where a calendar should be
+    if (/^\/feeds\/calendars\/user_\w+\.ics$/.test(path)) { res.writeHead(200, { 'content-type': 'text/calendar; charset=utf-8' }); return res.end(canvasFeedIcs()); }
+    if (path === '/__mock/ics/personal.ics') { res.writeHead(200, { 'content-type': 'text/calendar; charset=utf-8' }); return res.end(personalIcs()); }
+    if (path === '/__mock/ics/page.ics') { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); return res.end('<!DOCTYPE html><html><body>Sign in to see this calendar</body></html>'); }
+    if (path === '/__mock/ics/missing.ics') { res.writeHead(404, { 'content-type': 'text/plain' }); return res.end('Not found'); }
     if (path === '/mock-alta/chat') { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); return res.end('<!DOCTYPE html><html><body><button>Chat</button></body></html>'); }
     if (path.startsWith('/mock-alta/')) {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });

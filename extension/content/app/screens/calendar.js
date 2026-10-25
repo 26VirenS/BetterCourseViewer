@@ -1,5 +1,9 @@
 /* Calendar: Week / Month / Agenda views over the Canvas calendar_events
- * API, a start–end range picker for the agenda, and per-calendar switches. */
+ * API, a start–end range picker for the agenda, and per-calendar switches.
+ * (2.99.107) Sync: Canvas's own calendar feed handed to Apple, Google or Outlook
+ * with a press, the student's own calendars linked by their private address
+ * and laid over the month (background.js reads them), and the plans made by
+ * pulling a piece of work (content/app/plan.js) shown where they were put. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h, htmlToText } = BCV.utils;
@@ -41,6 +45,10 @@
     const apptCount = h('span', { class: 'bcv-cal__calcount bcv-cal__apptcount', text: '' });
     apptCount.hidden = true;
     const apptBtn = h('button', { type: 'button', class: 'bcv-roundbtn bcv-cal__apptbtn', title: 'Office hours, conferences and sign-ups with a time to reserve', 'aria-haspopup': 'dialog', onclick: (e) => openAppointments(e.currentTarget) }, [U.svg(IC.calendarPlus, { size: 13, stroke: 'var(--bcv-blue)', width: 2.1 }), h('span', { text: 'Find appointment' }), apptCount]);
+    // (2.99.107) Sync: this calendar in the student's calendar app, and theirs in this one
+    const syncCount = h('span', { class: 'bcv-cal__calcount bcv-cal__synccount', text: '' });
+    syncCount.hidden = true;
+    const syncBtn = h('button', { type: 'button', class: 'bcv-roundbtn bcv-cal__syncbtn', title: 'Your Canvas work in Apple, Google or Outlook, and your own calendars here', 'aria-haspopup': 'dialog', onclick: (e) => openSync(e.currentTarget) }, [U.svg(IC.link, { size: 13, stroke: 'var(--bcv-blue)', width: 2.1 }), h('span', { text: 'Sync' }), syncCount]);
     const body = U.el('bcv-body bcv-body--cols bcv-body--cal');
     const mainCol = h('div', { class: 'bcv-cal__main', style: { flex: '1 1 720px', minWidth: '0' } });
     const sideCol = U.el('bcv-cal__side'); // the agenda's range picker; nothing else lives beside the grid now
@@ -54,7 +62,7 @@
           U.iconbtn(IC.chevron, { size: 30, iconSize: 14, stroke: 'var(--bcv-blue)', width: 2.1, title: 'Next', onClick: () => shift(1) }),
           h('button', { type: 'button', class: 'bcv-roundbtn', text: 'Today', onclick: () => { anchor = U.startOfDay(now); miniMonth = new Date(now.getFullYear(), now.getMonth(), 1); if (view === 'agenda') range = { start: U.startOfDay(now), end: U.addDays(U.startOfDay(now), 20), picking: false }; load(); } }),
         ]),
-        U.el('bcv-cal__tools bcv-ml-auto', [BCV.lms?.d2l ? null : apptBtn, calBtn, segWrap]), // (Brightspace has no Scheduler)
+        U.el('bcv-cal__tools bcv-ml-auto', [BCV.lms?.d2l ? null : apptBtn, syncBtn, calBtn, segWrap]), // (Brightspace has no Scheduler)
       ]))),
       body,
     );
@@ -70,7 +78,9 @@
     let selected = await store.selectedContexts(contexts);
     if (wantCourse && contexts.some((c) => c.code === wantCourse) && !selected.includes(wantCourse)) selected = [...selected.slice(0, 9), wantCourse];
     const ctxMap = new Map(contexts.map((c) => [c.code, c]));
-    let events = [];
+    let events = []; // Canvas's own, as the grid draws them
+    let shown = []; // what the grid draws: those, less the plans sent to Canvas, with the linked calendars and the plans
+    let linkState = { links: [], feeds: {} }; // the calendars linked in Sync (background.js keeps them)
     let loadedRange = null;
     let loadSeq = 0; // the load asked for last: an earlier one still answering paints nothing
     let refused = new Set(); // calendars Canvas would not return (401/403)
@@ -81,7 +91,7 @@
       const ids = new Set(items.filter((it) => it.submitted).map((it) => `${it.type}:${it.raw.plannable_id}`));
       if (!ids.size || !ctx.alive()) return;
       submittedIds = ids;
-      if (events.length) { events = markSubmitted(events); draw(); }
+      if (events.length) { events = markSubmitted(events); merge(); draw(); }
     });
 
     function shift(dir) {
@@ -225,8 +235,47 @@
         loadedRange = key;
         loading = false;
       }
+      merge();
       draw();
       warmNeighbours();
+    }
+
+    // ---- the linked calendars and the plans, over Canvas's own (2.99.107) ----------------------------
+    /** The linked calendars' events and the plans in the range on screen, shaped as the grid's events. */
+    function layerList() {
+      const [s, e] = visibleRange();
+      const out = [];
+      for (const l of linkState.links) {
+        if (l.on === false) continue;
+        const pal = U.palette(l.color || '#8e8e93', dark);
+        for (const x of linkState.feeds[l.id]?.events || []) {
+          if (x.end <= s.getTime() || x.start >= e.getTime()) continue;
+          const base = { title: x.title, allDay: !!x.allDay, isAssignment: false, icon: IC.cal, kind: 'external', contextName: l.name, contextColor: l.color || '#8e8e93', color: pal.text, tint: pal.tint, location: x.location || '', url: '#', free: !!x.free, points: null };
+          if (x.allDay) { // a whole day (or several): on each of its days
+            const [y, mo, d] = String(x.day).split('-').map(Number);
+            for (let i = 0; i < Math.min(x.days || 1, 31); i++) { const date = new Date(y, mo - 1, d + i); out.push({ ...base, id: `ext:${l.id}:${x.id}:${i}`, date, end: null, done: U.addDays(date, 1) < now }); }
+          } else out.push({ ...base, id: `ext:${l.id}:${x.id}`, date: new Date(x.start), end: new Date(x.end), done: new Date(x.end) < now });
+        }
+      }
+      for (const [pid, p] of Object.entries(BCV.plan?.all() || {})) {
+        const at = new Date(p.at);
+        if (Number.isNaN(at.getTime()) || at < s || at >= e) continue;
+        const end = new Date(at.getTime() + p.mins * 60000);
+        const pal = U.palette(p.color || '#0a84ff', dark);
+        out.push({ id: `plan:${pid}`, planId: pid, title: p.title, date: at, end, allDay: false, isAssignment: false, icon: IC.clock, kind: 'plan', contextName: p.course || '', contextColor: p.color || '#0a84ff', color: pal.text, tint: pal.tint, url: p.url || '#', done: end < now, due: p.due ? new Date(p.due) : null, mins: p.mins, points: null });
+      }
+      return out;
+    }
+    /** What the grid draws: Canvas's events (less the plans sent there: the plan itself is drawn) and the layers, in order. */
+    function merge() {
+      const sent = new Set(Object.values(BCV.plan?.all() || {}).map((p) => p.ev).filter(Boolean));
+      shown = [...events.filter((ev) => !sent.has(ev.id)), ...layerList()].sort((x, y) => x.date - y.date);
+    }
+    async function readLinks() {
+      linkState = (await BCV.plan?.linked()) || { links: [], feeds: {} };
+      syncCount.textContent = String(linkState.links.length);
+      syncCount.hidden = !linkState.links.length;
+      syncBtn.classList.toggle('has-error', linkState.links.some((l) => linkState.feeds[l.id] && !linkState.feeds[l.id].ok));
     }
 
     function title() {
@@ -238,15 +287,16 @@
       return `${U.MONTHS_LONG[anchor.getMonth()]} ${anchor.getFullYear()}`;
     }
 
-    const eventsOn = (d) => events.filter((ev) => U.sameDay(ev.date, d));
+    const eventsOn = (d) => shown.filter((ev) => U.sameDay(ev.date, d));
 
     /** A press on an event (not an assignment: the preview panel takes those) opens its sheet rather than
      *  following its Canvas address, which is the calendar page itself and would only draw it again. */
     const onEvent = (ev) => (ev.isAssignment ? null : (e) => { e.preventDefault(); e.stopPropagation(); openEvent(ev, e.currentTarget); });
     /** What a row says after the course: the points an assignment is worth, where an event is. */
     const facts = (ev) => [ev.points !== null && ev.points !== undefined ? `${store.fmtPts(ev.points)} pts` : '', ev.location || ''].filter(Boolean);
+    const kindCls = (ev) => (ev.kind === 'plan' ? 'bcv-ev--plan' : ev.kind === 'external' ? 'bcv-ev--ext' : '');
     function chip(ev, small = true) {
-      return h('a', { class: `bcv-ev ${ev.done ? 'is-done' : ''} ${ev.missing ? 'is-missing' : ''}`, href: ev.url, style: { background: ev.tint, color: ev.color, '--bcv-ev-bar': ev.color }, title: [ev.title, ev.contextName, ...facts(ev), ev.missing ? 'Missing' : ''].filter(Boolean).join(' · '), onclick: onEvent(ev) }, [
+      return h('a', { class: `bcv-ev ${ev.done ? 'is-done' : ''} ${ev.missing ? 'is-missing' : ''} ${kindCls(ev)}`, href: ev.url, dataset: { ev: ev.id }, style: { background: ev.tint, color: ev.color, '--bcv-ev-bar': ev.color }, title: [ev.kind === 'plan' ? 'Planned' : '', ev.title, ev.contextName, ...facts(ev), ev.missing ? 'Missing' : ''].filter(Boolean).join(' · '), onclick: onEvent(ev) }, [
         U.svg(ev.icon, { size: 10, stroke: ev.color, width: 2.1, style: { flex: 'none' } }),
         h('span', { class: `bcv-ev__label ${ev.done ? 'bcv-strike' : ''}`, style: { color: ev.color }, text: ev.title }),
       ]);
@@ -285,7 +335,7 @@
         grid.append(U.text('bcv-week__hour', hourLabel(hh)));
         for (const d of days) {
           const evs = eventsOn(d).filter((ev) => !ev.allDay && (ev.date.getHours() === hh || (hh === 8 && ev.date.getHours() < 8)));
-          grid.append(U.el(`bcv-week__cell ${U.sameDay(d, now) ? 'bcv-week__cell--today' : ''}`, evs.map((ev) => h('a', { class: 'bcv-wev', href: ev.url, style: { background: ev.tint }, title: [ev.title, ev.contextName, ...facts(ev), ev.missing ? 'Missing' : ''].filter(Boolean).join(' · '), onclick: onEvent(ev) }, [
+          grid.append(U.el(`bcv-week__cell ${U.sameDay(d, now) ? 'bcv-week__cell--today' : ''}`, evs.map((ev) => h('a', { class: `bcv-wev ${kindCls(ev)}`, href: ev.url, dataset: { ev: ev.id }, style: { background: ev.tint, '--bcv-ev-bar': ev.color }, title: [ev.title, ev.contextName, ...facts(ev), ev.missing ? 'Missing' : ''].filter(Boolean).join(' · '), onclick: onEvent(ev) }, [
             h('div', { class: 'bcv-wev__time', style: { color: ev.color }, text: U.fmtTimeLower(ev.date).replace(/m$/, '') }),
             h('div', { class: `bcv-wev__title ${ev.done ? 'bcv-strike' : ''}`, style: { color: ev.color }, text: ev.title }),
             facts(ev).length ? h('div', { class: 'bcv-wev__facts', style: { color: ev.color }, text: facts(ev).join(' · ') }) : null,
@@ -298,7 +348,7 @@
     function agendaList() {
       const end = range.end || U.addDays(range.start, 20);
       const days = new Map();
-      for (const ev of events) {
+      for (const ev of shown) {
         if (ev.date < range.start || ev.date >= U.addDays(end, 1)) continue;
         const k = U.startOfDay(ev.date).getTime();
         if (!days.has(k)) days.set(k, []);
@@ -313,11 +363,11 @@
           U.groupHead(U.fmtDow(d), `${rel}${U.plural(evs.length, 'item')}`),
           U.card(evs.map((ev) => U.row([
             U.tile(ev.icon, { color: ev.color, tint: ev.tint }),
-            U.text('bcv-agenda__due', ev.allDay ? 'All day' : `${ev.isAssignment ? 'Due' : 'At'} ${U.fmtTimeLower(ev.date)}`, 'span'),
+            U.text('bcv-agenda__due', ev.allDay ? 'All day' : `${ev.isAssignment ? 'Due' : ev.kind === 'plan' ? 'Plan' : 'At'} ${U.fmtTimeLower(ev.date)}`, 'span'),
             h('span', { class: `bcv-agenda__title bcv-pretty ${ev.done ? 'bcv-strike' : ''}`, text: ev.title }),
             ev.missing ? U.statusBadge({ word: 'Missing', kind: 'bad' }) : ev.excused ? U.statusBadge({ word: 'Excused', kind: 'muted' }) : null,
             U.text('bcv-agenda__course', [ev.contextName, ...facts(ev)].filter(Boolean).join(' · '), 'span'),
-          ], ev.isAssignment ? { href: ev.url } : { onClick: (e) => openEvent(ev, e.currentTarget) })), 'bcv-card--list'),
+          ], ev.isAssignment ? { href: ev.url, cls: kindCls(ev) } : { onClick: (e) => openEvent(ev, e.currentTarget), cls: kindCls(ev) })), 'bcv-card--list'),
         ]));
       }
       return wrap;
@@ -326,7 +376,7 @@
     function miniCalendar() {
       const first = new Date(miniMonth.getFullYear(), miniMonth.getMonth(), 1);
       const gridStart = sundayStart(first);
-      const busy = new Set(events.map((ev) => U.startOfDay(ev.date).getTime()));
+      const busy = new Set(shown.map((ev) => U.startOfDay(ev.date).getTime()));
       const cells = [];
       for (let i = 0; i < 42; i++) {
         const d = U.addDays(gridStart, i);
@@ -383,6 +433,7 @@
       ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
       ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
       const appt = ev.kind === 'appointment';
+      const plan = ev.kind === 'plan';
       const when = ev.allDay ? `${U.fmtDow(ev.date)} · all day` : `${U.fmtDow(ev.date)} · ${U.fmtTimeLower(ev.date)}${ev.end && ev.end > ev.date ? ` – ${U.fmtTimeLower(ev.end)}` : ''}`;
       const row = (k, v) => (v == null || v === '' || (Array.isArray(v) && !v.length) ? null : U.el('bcv-evsheet__row', [U.text('bcv-evsheet__k', k, 'span'), h('span', { class: 'bcv-evsheet__v' }, v)]));
       const prose = ev.description ? BCV.screens.course?.prose?.(ev.description, { cls: 'bcv-evsheet__prose' }) || h('p', { text: htmlToText(ev.description, 2000) }) : null;
@@ -406,17 +457,27 @@
         load();
         loadAppointments({ force: true });
       };
+      // a plan: the work it is for, moved to another free time (the rail, from its block on the grid) or cleared
+      const planItem = plan ? { id: ev.planId, title: ev.title, url: ev.url === '#' ? '' : ev.url, date: ev.due, courseName: ev.contextName, course: { color: ev.contextColor, name: ev.contextName }, type: '' } : null;
       const foot = appt
         ? [U.btn('Un-reserve', { kind: 'danger', cls: 'bcv-evsheet__unreserve', onClick: (e) => unreserve(e.currentTarget) }), U.btn('Other times', { cls: 'bcv-evsheet__times', onClick: (e) => { close(); openAppointments(e.currentTarget); } })]
-        : [];
+        : plan
+          ? [
+            planItem.url ? U.btn('Open', { cls: 'bcv-evsheet__open', onClick: () => { close(); app.go(planItem.url); } }) : null,
+            U.btn('Move', { cls: 'bcv-evsheet__move', onClick: () => { close(); const at = mainCol.querySelector(`[data-ev="${CSS.escape(ev.id)}"]`) || syncBtn; BCV.plan?.open(at, planItem, { mode: 'pick' }); } }),
+            U.btn('Clear plan', { kind: 'danger', cls: 'bcv-evsheet__clear', onClick: () => { close(); BCV.plan?.clear(ev.planId); } }),
+          ].filter(Boolean)
+          : [];
       ov.append(U.el('bcv-sheet bcv-evsheet', [
         U.el('bcv-sheet__head', [
-          h('div', { style: { flex: '1', minWidth: '0' } }, [U.text('bcv-evsheet__kicker', appt ? 'Appointment' : 'Event'), U.text('bcv-sheet__title bcv-evsheet__title bcv-pretty', ev.title)]),
+          h('div', { style: { flex: '1', minWidth: '0' } }, [U.text('bcv-evsheet__kicker', appt ? 'Appointment' : plan ? 'Plan' : ev.kind === 'external' ? 'Your calendar' : 'Event'), U.text('bcv-sheet__title bcv-evsheet__title bcv-pretty', ev.title)]),
           h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
         ]),
         U.el('bcv-sheet__list bcv-evsheet__list', [
           row('When', when),
-          row('Calendar', [U.dot(ev.contextColor, 'bcv-dot--9'), h('span', { text: ev.contextName || '—' })]),
+          row(plan ? 'For' : 'Calendar', [U.dot(ev.contextColor, 'bcv-dot--9'), h('span', { text: ev.contextName || '—' })]),
+          plan && ev.due ? row('Due', `${U.fmtDow(ev.due)} · ${U.fmtTimeLower(ev.due)}`) : null,
+          ev.kind === 'external' && ev.free ? row('Shows as', 'Free') : null,
           row('Where', [ev.location ? linkify(ev.location) : null, ev.location && ev.address ? ' ' : null, ev.address ? h('span', { class: 'bcv-evsheet__addr', text: ev.address }) : null].flat().filter(Boolean)),
           prose ? row('Details', prose) : null,
         ].filter(Boolean)),
@@ -731,12 +792,163 @@
       loadAppointments({ force: groups !== null }); // asked afresh on every open: a time can be taken meanwhile
     }
 
+    // ---- Sync (2.99.107) -----------------------------------------------------------------------------
+    // Two ways and a switch. Canvas's own calendar feed (the profile's calendar.ics: every course's work and events, kept
+    // up to date by Canvas) handed to the student's calendar app with a press — Apple's as a webcal:// subscription,
+    // Google's and Outlook's add-by-address pages. The student's own calendars linked by their private address, read by
+    // the background every half hour and laid over the month, a switch each. And Send plans: each plan also put on the
+    // student's Canvas calendar, so the feed carries it out to the calendar app with everything else.
+    let syncSheet = null; // { ov, list } while the sheet is up
+    const syncUi = { busy: false, msg: null, ask: null, draft: '', feed: undefined, send: false };
+    const callCal = (m) => Promise.resolve(BCV.api.runtime.sendMessage({ type: 'cal', ...m })).catch((e) => ({ ok: false, message: e?.message || String(e) }));
+    const agoWords = (ms) => { const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 48 * 60 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
+    function feedLinks(href) {
+      const https = href.replace(/^webcal:/i, 'https:');
+      const webcal = https.replace(/^https?:/i, 'webcal:');
+      const name = encodeURIComponent(`${BCV.lms?.name || 'Canvas'} (Simpl)`);
+      return {
+        apple: webcal,
+        google: `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcal)}`,
+        office: `https://outlook.office.com/calendar/0/addfromweb?url=${encodeURIComponent(https)}&name=${name}`,
+        outlook: `https://outlook.live.com/calendar/0/addfromweb?url=${encodeURIComponent(https)}&name=${name}`,
+        https,
+      };
+    }
+    function syncBody() {
+      const out = [];
+      // Canvas in the student's calendar app
+      out.push(U.label('Your Canvas work, in your calendar app'));
+      if (syncUi.feed === undefined) out.push(U.card(U.loading('inset', 1), 'bcv-card--pad-14'));
+      else if (!syncUi.feed) out.push(U.emptyCard(`${BCV.lms?.name || 'Canvas'} has no calendar feed for your account here.`));
+      else {
+        const L = feedLinks(syncUi.feed);
+        const app_ = (label, href, cls) => h('a', { class: `bcv-sync__app ${cls}`, href, target: cls === 'is-apple' ? null : '_blank', rel: 'noopener' }, [U.svg(IC.calendarPlus, { size: 15, stroke: 'currentColor', width: 2 }), h('span', { text: label })]);
+        const outlook = h('button', { type: 'button', class: 'bcv-sync__app is-outlook', 'aria-haspopup': 'menu', onclick: (e) => U.menu(e.currentTarget, [
+          { label: 'School or work account', sub: 'Microsoft 365', onSelect: () => window.open(L.office, '_blank', 'noopener') },
+          { label: 'Personal account', sub: 'Outlook.com', onSelect: () => window.open(L.outlook, '_blank', 'noopener') },
+        ]) }, [U.svg(IC.calendarPlus, { size: 15, stroke: 'currentColor', width: 2 }), h('span', { text: 'Outlook' })]);
+        const copy = h('button', { type: 'button', class: 'bcv-sync__app is-copy', onclick: async () => {
+          try { await navigator.clipboard.writeText(L.https); U.toast('Calendar link copied. Paste it where your calendar app adds one by address.'); } catch { window.prompt('Your Canvas calendar link:', L.https); }
+        } }, [U.svg(IC.copy, { size: 15, stroke: 'currentColor', width: 2 }), h('span', { text: 'Copy link' })]);
+        out.push(U.card([
+          U.el('bcv-sync__apps', [app_('Apple Calendar', L.apple, 'is-apple'), app_('Google Calendar', L.google, 'is-google'), outlook, copy]),
+          U.hint('Every course\'s work and events, kept up to date: new work and moved due dates follow on their own. Google and Outlook look for changes every few hours.', 'bcv-sync__note'),
+        ], 'bcv-card--pad-14 bcv-sync__feed'));
+      }
+      // the student's own calendars, here
+      out.push(U.label('Your calendars, in Simpl'));
+      const rows = linkState.links.map((l) => {
+        const f = linkState.feeds[l.id];
+        const sub = !f ? 'Not read yet' : f.ok ? `Read ${agoWords(f.at)} · ${U.plural((f.events || []).length, 'event')}` : f.error;
+        return U.row([
+          U.dot(l.color || '#8e8e93', 'bcv-dot--sq'),
+          h('div', { class: 'bcv-row__body' }, [U.text('bcv-calrow__name bcv-pretty', l.name, 'div'), U.text(`bcv-sync__sub ${f && !f.ok ? 'is-error' : ''}`, sub, 'div')]),
+          U.switchEl(l.on !== false, async (on) => { await callCal({ op: 'set', id: l.id, on }); }, `Show ${l.name} on the calendar`),
+          U.iconbtn(IC.close, { size: 26, title: `Unlink ${l.name}`, onClick: async () => { if (!window.confirm(`Unlink ${l.name}? Its events leave Simpl's Calendar; the calendar itself is not touched.`)) return; await callCal({ op: 'remove', id: l.id }); } }),
+        ], { mod: 'bcv-row--p12-16 bcv-sync__link', cls: f && !f.ok ? 'is-error' : '' });
+      });
+      const input = h('input', { type: 'url', class: 'bcv-input bcv-sync__input', placeholder: 'Paste a calendar link (.ics or webcal://)', 'aria-label': 'A calendar\'s private link', spellcheck: 'false', autocomplete: 'off', value: syncUi.draft });
+      const add = U.btn(syncUi.busy ? 'Linking…' : 'Link', { kind: 'xs', cls: 'bcv-sync__add', disabled: syncUi.busy, onClick: () => linkCalendar(input.value) });
+      input.addEventListener('input', () => { syncUi.draft = input.value; });
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); linkCalendar(input.value); } });
+      out.push(U.card([...rows, U.el('bcv-sync__paste', [input, add])], 'bcv-card--list bcv-sync__links'));
+      if (syncUi.ask) {
+        out.push(U.el('bcv-sync__ask', [
+          h('span', { text: `Your browser asks before Simpl reads ${syncUi.ask.host}.` }),
+          U.btn('Allow…', { kind: 'xs', cls: 'bcv-sync__allow', onClick: async () => { await callCal({ op: 'allow', url: syncUi.ask.url }); syncUi.ask = null; syncUi.msg = { text: 'Allow it in the tab that opened, and the calendar is linked.' }; paintSync(); } }),
+        ]));
+      } else if (syncUi.msg) out.push(U.el(`bcv-sync__msg ${syncUi.msg.error ? 'is-error' : ''}`, syncUi.msg.text, { role: syncUi.msg.error ? 'alert' : 'status' }));
+      const where = h('details', { class: 'bcv-sync__where' }, [
+        h('summary', { text: 'Where is my calendar\'s link?' }),
+        h('ul', {}, [
+          h('li', {}, [h('b', { text: 'Google: ' }), 'Settings → your calendar → Integrate calendar → Secret address in iCal format.']),
+          h('li', {}, [h('b', { text: 'iCloud: ' }), 'Calendar → the share button beside the calendar → Public Calendar → Copy Link.']),
+          h('li', {}, [h('b', { text: 'Outlook: ' }), 'Settings → Calendar → Shared calendars → Publish a calendar → the ICS link.']),
+        ]),
+        h('p', { text: 'The link stays in this browser, and Simpl reads it every half hour. Anyone with a private link can read that calendar, so keep it to yourself.' }),
+      ]);
+      out.push(where);
+      // plans
+      if (BCV.plan?.canSend()) {
+        out.push(U.label('Plans'));
+        out.push(U.card([U.row([
+          U.tile(IC.clock, { color: 'var(--bcv-blue)', tint: 'var(--bcv-blue-tint, rgba(10,132,255,.12))' }),
+          h('div', { class: 'bcv-row__body' }, [U.text('bcv-calrow__name', 'Send plans to your calendar app', 'div'), U.text('bcv-sync__sub', `Each plan goes on your ${BCV.lms?.name || 'Canvas'} calendar too, so the feed above carries it out with everything else.`, 'div')]),
+          U.switchEl(syncUi.send, async (on) => { syncUi.send = on; await BCV.plan.setSending(on); U.toast(on ? 'Plans go to your calendar now.' : 'Plans stay in Simpl now.'); }, 'Send plans to your calendar app'),
+        ], { mod: 'bcv-row--p12-16 bcv-sync__send' })], 'bcv-card--list'));
+      }
+      out.push(U.hint('Pull any piece of work to the right on To Do or the Dashboard to plan a time for it.'));
+      return out;
+    }
+    function paintSync() {
+      if (!syncSheet) return;
+      const had = syncSheet.ov.contains(document.activeElement) ? document.activeElement.className : null;
+      syncSheet.list.replaceChildren(...syncBody());
+      if (had && /bcv-sync__input/.test(had)) syncSheet.list.querySelector('.bcv-sync__input')?.focus();
+      else if (!syncSheet.ov.contains(document.activeElement)) syncSheet.ov.focus();
+    }
+    async function linkCalendar(raw) {
+      const url = String(raw || '').trim();
+      if (!url || syncUi.busy) return;
+      syncUi.busy = true;
+      syncUi.msg = null;
+      syncUi.ask = null;
+      paintSync();
+      const r = await callCal({ op: 'add', url });
+      syncUi.busy = false;
+      if (r?.ok) { syncUi.draft = ''; syncUi.msg = { text: `${r.link.name} is linked: ${U.plural(r.count, 'event')} read.` }; }
+      else if (r?.ask) syncUi.ask = { host: r.host, url };
+      else syncUi.msg = { text: r?.message || 'That calendar could not be linked.', error: true };
+      await readLinks();
+      merge();
+      draw();
+      paintSync();
+    }
+    async function openSync(from = null) {
+      document.querySelector('.bcv-sheet-ov')?.remove();
+      const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': 'Sync' });
+      const close = () => { BCV.ui.dismiss(ov); syncSheet = null; syncUi.msg = null; syncUi.ask = null; };
+      ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+      ov.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !e.target.closest?.('.bcv-menu')) close(); });
+      const list = U.el('bcv-sheet__list', []);
+      const sheet = U.el('bcv-sheet bcv-cal__sheet bcv-sync', [
+        U.el('bcv-sheet__head', [
+          U.el('bcv-sheet__titles', [U.text('bcv-sheet__line', 'Sync'), U.text('bcv-sheet__note', 'Your Canvas work in your calendar app, and your calendars here.')]),
+          h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
+        ]),
+        list,
+      ]);
+      ov.append(sheet);
+      syncSheet = { ov, list };
+      syncUi.send = !!(await BCV.plan?.sending());
+      paintSync();
+      document.body.append(ov);
+      U.morphFrom(sheet, from);
+      ov.tabIndex = -1;
+      ov.focus();
+      if (syncUi.feed === undefined) {
+        let me = await store.me().catch(() => null);
+        if (me && me.calendarFeed === undefined) me = await store.me({ force: true }).catch(() => me); // (an account read before 2.99.107 kept no feed)
+        syncUi.feed = me?.calendarFeed || null;
+        paintSync();
+      }
+    }
+    // the linked calendars read again elsewhere (the background's half hour, a link added or a switch pressed), and the
+    // plans changed (here, or a pull on another screen or tab): the grid and the sheet follow
+    const onStorage = (changes, area) => {
+      if (!ctx.alive()) { try { BCV.api.storage.onChanged.removeListener(onStorage); } catch { /* gone */ } return; }
+      if (area !== 'local' || !Object.keys(changes).some((k) => k === 'cal:links' || k.startsWith('cal:feed:'))) return;
+      readLinks().then(() => { merge(); draw(); paintSync(); });
+    };
+    try { BCV.api.storage.onChanged.addListener(onStorage); } catch { /* no change events: a reload shows them */ }
+    const offPlans = BCV.plan?.onChange(() => { if (!ctx.alive()) { offPlans?.(); return; } merge(); draw(); });
+
     function draw() {
       const noticeEl = loading ? U.el('bcv-cal__notice bcv-cal__notice--hint', 'Loading events…')
         : !notice ? null : notice.kind === 'error' ? U.errorBox(notice.text) : U.el(`bcv-cal__notice bcv-cal__notice--${notice.kind}`, notice.text);
       mainCol.replaceChildren(...[noticeEl, view === 'week' ? weekGrid() : view === 'agenda' ? agendaList() : monthGrid()].filter(Boolean));
       // (2.99.44) what the month holds and how much of it is missing, under its name, as the Mac says it
-      const inMonth = view === 'month' ? events.filter((ev) => ev.date.getMonth() === anchor.getMonth() && ev.date.getFullYear() === anchor.getFullYear()) : [];
+      const inMonth = view === 'month' ? shown.filter((ev) => ev.date.getMonth() === anchor.getMonth() && ev.date.getFullYear() === anchor.getFullYear()) : [];
       const missingN = inMonth.filter((ev) => ev.missing).length;
       subEl.textContent = view === 'month' && !loading ? `${U.plural(inMonth.length, 'item')}${missingN ? ` · ${missingN} missing` : ''}` : '';
       subEl.hidden = !subEl.textContent;
@@ -775,6 +987,8 @@
     // answers. Waiting here would keep the whole month behind the slowest calendar request.
     load().catch(() => {});
     loadAppointments(); // in its own time: the button's count fills in when Canvas answers
+    // (2.99.107) the linked calendars as last read, then read again if that was more than half an hour ago, and the plans
+    Promise.all([readLinks(), BCV.plan?.ready()]).then(() => { if (!ctx.alive()) return; merge(); draw(); if (linkState.links.length) callCal({ op: 'sync' }); }).catch(() => {});
     return screen;
   }
 

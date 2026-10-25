@@ -131,11 +131,11 @@
       try {
         // the user record, and the profile beside it: the e-mail and the login are only on the profile
         const [u, p] = await Promise.all([C.get('/api/v1/users/self'), C.get('/api/v1/users/self/profile').catch(() => null)]);
-        return { id: String(u.id), name: u.name || u.short_name, shortName: u.short_name || u.name, avatar: u.avatar_url || p?.avatar_url || null, pronouns: u.pronouns || p?.pronouns || null, email: p?.primary_email || u.email || null, loginId: p?.login_id || u.login_id || null };
+        return { id: String(u.id), name: u.name || u.short_name, shortName: u.short_name || u.name, avatar: u.avatar_url || p?.avatar_url || null, pronouns: u.pronouns || p?.pronouns || null, email: p?.primary_email || u.email || null, loginId: p?.login_id || u.login_id || null, calendarFeed: p?.calendar?.ics || null }; // (2.99.107: the feed Calendar → Sync offers to calendar apps)
       } catch {
         const e = env();
         const cu = e.current_user || {};
-        return { id: String(e.current_user_id || ''), name: cu.display_name || 'Account', shortName: cu.display_name || 'Account', avatar: cu.avatar_image_url || null, pronouns: null, email: null, loginId: null };
+        return { id: String(e.current_user_id || ''), name: cu.display_name || 'Account', shortName: cu.display_name || 'Account', avatar: cu.avatar_image_url || null, pronouns: null, email: null, loginId: null, calendarFeed: null };
       }
     }, { force, refresh });
   }

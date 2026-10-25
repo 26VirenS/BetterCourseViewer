@@ -57,7 +57,7 @@
     body.append(U.loading());
 
     // the courses a task can be given: the favourites (every current course until one is starred), in dashboard order
-    let [items, courseList] = await Promise.all([store.todoWindow().catch(() => null), store.favorites().catch(() => [])]);
+    let [items, courseList] = await Promise.all([store.todoWindow().catch(() => null), store.favorites().catch(() => []), BCV.plan?.ready()]);
     if (!ctx.alive()) return screen;
 
     const isOpen = (it) => !it.complete && !it.dismissed && !it.submitted && !it.excused; // (excused work is nothing to do)
@@ -172,6 +172,7 @@
         bodyEl,
         // where the work stands — Missing, Late, Submitted, Graded, Excused; Feedback, New — in the same words as everywhere else
         ...store.workFlags(it).map((st) => U.statusBadge(st)),
+        BCV.plan?.pill(it), // (2.99.107) when it is planned: pull the row right to plan it (content/app/plan.js)
         priChip(it),
         it.dismissed ? U.badge('Dismissed') : U.badge(U.whenShort(it.date)),
         // plain assignments hand in from here; the assignment page hosts the block
@@ -184,6 +185,7 @@
       ], { mod: done || it.dismissed || it.excused ? 'bcv-row--done' : '' });
       rowEl.dataset.item = it.id;
       rowEl.dataset.flip = it.id;
+      if (!it.dismissed) BCV.plan?.attach(rowEl, it);
       if (r) rowEl.dataset.series = r.series;
       return rowEl;
     }

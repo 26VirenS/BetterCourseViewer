@@ -1550,6 +1550,211 @@ try {
   await page.click('.bcv-cal__nav .bcv-roundbtn');
   await page.waitForFunction(() => !document.querySelector('.bcv-cal__notice--warn'), null, { timeout: 10000 });
   } // calendar
+  if (on('sync and plans')) {
+
+  // ---- (2.99.107) Calendar → Sync, and pull to plan --------------------------------------------------
+  // Canvas's calendar feed handed to a calendar app (Apple's webcal, Google's and Outlook's add-by-address pages); a
+  // calendar of the student's own linked by its private address, read by the background and laid over the month (a
+  // weekly shift, a free gym, two whole days, a cancelled lunch left out); the ways a link fails, and the browser's own
+  // question for a site not yet allowed. Then a piece of work pulled right on To Do: a rail of free times between now
+  // and its due date, clear of the shift; let go on one and it is planned; P from the keyboard, the pill to move or
+  // clear it, the Dashboard's rows the same; the plan on the Calendar; Send plans putting it on the Canvas calendar.
+  console.log('sync and plans');
+  const untilV = async (fn, ms = 8000) => { let got = null; await eventually(async () => { const v = await fn(); if (v) got = v; return !!v; }, ms); return got; };
+  const prefPlans = () => sw.evaluate(async (k) => ((await self.BCV.api.storage.local.get(k))[k] || {}).plans || {}, `prefs:${new URL(BASE).host}`); // (this Canvas's preferences, as the page keeps them)
+  const ownEvents = async () => JSON.parse((await (await fetch(`${BASE}/__mock/own-events`)).text()).replace(/^while\(1\);/, '')); // (the mock answers as Canvas does, guard and all)
+  await nav('calendar');
+  await page.waitForSelector('.bcv-cal__grid', { timeout: 10000 });
+  check((await texts('.bcv-cal__syncbtn'))[0] === 'Sync' && !!(await page.$('.bcv-cal__synccount[hidden]')), 'Sync sits beside Calendars, counting no linked calendars yet');
+  const openSync = async () => { await page.click('.bcv-cal__syncbtn'); await page.waitForSelector('.bcv-sync .bcv-sync__app', { timeout: 8000 }); await page.waitForTimeout(300); };
+  const closeSync = async () => { await page.keyboard.press('Escape'); await page.waitForFunction(() => !document.querySelector('.bcv-sync'), null, { timeout: 3000 }); };
+  await openSync();
+  const feed = `${BASE}/feeds/calendars/user_7mockfeed.ics`;
+  const webcal = feed.replace(/^https?:/, 'webcal:');
+  const apps = await page.$$eval('.bcv-sync__app', (els) => els.map((e) => ({ t: e.textContent.trim(), href: e.getAttribute('href') })));
+  check(apps.map((a) => a.t).join('|') === 'Apple Calendar|Google Calendar|Outlook|Copy link' && apps[0].href === webcal && apps[1].href === `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcal)}`,
+    `Canvas's own feed, the profile's calendar.ics, handed to a calendar app: Apple's as webcal, Google's add-by-address page, Outlook, Copy link: ${JSON.stringify(apps)}`);
+  await page.click('.bcv-sync__app.is-outlook');
+  const outlookMenu = await untilV(() => texts('.bcv-menu .bcv-menu__item').then((t) => (t.length ? t : null)), 4000);
+  check((outlookMenu || []).join('|') === 'School or work account Microsoft 365|Personal account Outlook.com', `Outlook asks which account: ${JSON.stringify(outlookMenu)}`);
+  await page.mouse.click(5, 5);
+  await page.waitForFunction(() => !document.querySelector('.bcv-menu'), null, { timeout: 3000 }).catch(() => {});
+  if (!(await page.$('.bcv-sync'))) await openSync();
+  const sheetLabels = await page.$$eval('.bcv-sync .bcv-label', (els) => els.map((e) => e.textContent));
+  check(sheetLabels.join('|') === 'Your Canvas work, in your calendar app|Your calendars, in Simpl|Plans' && !!(await page.$('.bcv-sync__send .bcv-switch:not(.is-on)')), `the sheet: Canvas out, your calendars in, and Send plans, off to begin with: ${JSON.stringify(sheetLabels)}`);
+  // the ways a link fails, each said in the sheet
+  const linkTry = async (url) => {
+    await page.fill('.bcv-sync__input', url);
+    await page.press('.bcv-sync__input', 'Enter');
+    return untilV(() => page.evaluate(() => { const m = document.querySelector('.bcv-sync__msg, .bcv-sync__ask'); return m && !document.querySelector('.bcv-sync__add[disabled]') ? m.textContent.trim() : null; }), 10000);
+  };
+  const notLink = await linkTry('not a calendar link');
+  check(/^That is not a calendar link\./.test(notLink || ''), `words that are no address are refused: "${notLink}"`);
+  const gone = await linkTry(`${BASE}/__mock/ics/missing.ics`);
+  check(/^That calendar link no longer works/.test(gone || ''), `a link that answers 404 says it no longer works: "${gone}"`);
+  const page2 = await linkTry(`${BASE}/__mock/ics/page.ics`);
+  check(page2 === 'That is not a calendar file.', `a sign-in page where a calendar should be is not read as one: "${page2}"`);
+  const asked = await linkTry('https://calendar.example.invalid/private-1/basic.ics');
+  check(asked === 'Your browser asks before Simpl reads calendar.example.invalid.Allow…', `a site the browser has not let Simpl read: asked for from a press (${asked})`);
+  const [grant] = await Promise.all([context.waitForEvent('page', { timeout: 8000 }), page.click('.bcv-sync__allow')]);
+  await grant.waitForSelector('#title', { timeout: 8000 });
+  await grant.waitForFunction(() => /^Let Simpl read /.test(document.getElementById('title').textContent), null, { timeout: 5000 }).catch(() => {});
+  const grantPage = await grant.evaluate(() => ({ title: document.getElementById('title').textContent, btn: document.getElementById('allow').textContent, url: location.pathname + location.hash }));
+  check(grantPage.title === 'Let Simpl read calendar.example.invalid' && grantPage.btn === 'Allow and link' && grantPage.url === `/setup/calendar.html#${encodeURIComponent('https://calendar.example.invalid/private-1/basic.ics')}`,
+    `Allow… opens Simpl's own page, where the browser's question can be asked from a press: ${JSON.stringify(grantPage)}`);
+  await grant.close();
+  await page.bringToFront();
+  // a calendar of the student's own, as Google serves its private address
+  const linked = await linkTry(`${BASE}/__mock/ics/personal.ics`);
+  check(linked === 'Sam\'s calendar is linked: 5 events read.', `a private address pasted: read, named from the calendar, its events counted (the cancelled lunch left out): "${linked}"`);
+  const linkRow = await untilV(() => page.evaluate(() => { const r = document.querySelector('.bcv-sync__link'); return r ? { name: r.querySelector('.bcv-calrow__name').textContent, sub: r.querySelector('.bcv-sync__sub').textContent, on: !!r.querySelector('.bcv-switch.is-on') } : null; }));
+  const count = (await texts('.bcv-cal__synccount'))[0];
+  const stored = await sw.evaluate(async () => { const l = (await self.BCV.api.storage.local.get('cal:links'))['cal:links'] || []; const a = await chrome.alarms.get('simpl:cal-sync'); return { n: l.length, url: l[0]?.url, alarm: a?.periodInMinutes || null }; });
+  check(linkRow?.name === 'Sam\'s calendar' && linkRow.sub === 'Read just now · 5 events' && linkRow.on && count === '1' && stored.n === 1 && stored.url === `${BASE}/__mock/ics/personal.ics` && stored.alarm === 30,
+    `it is listed with when it was read, shown, the button counting it; kept in this browser, read again every half hour: ${JSON.stringify({ linkRow, count, stored })}`);
+  await shot(page, '06e-calendar-sync');
+  await closeSync();
+  const extChips = await untilV(() => page.$$eval('.bcv-ev--ext', (els) => els.map((e) => e.textContent.trim())).then((t) => (t.length >= 4 ? t : null)));
+  check(!!extChips && extChips.filter((t) => t === 'Shift at the library').length >= 1 && extChips.filter((t) => t === 'Trip home').length === 2 && extChips.includes('Gym (maybe)') && !extChips.some((t) => /Cancelled/.test(t)),
+    `its events on the month: the shift, two whole days away (on each), the free gym; the cancelled lunch not: ${JSON.stringify(extChips)}`);
+  await page.click('.bcv-ev--ext:has-text("Shift at the library")');
+  await page.waitForSelector('.bcv-evsheet', { timeout: 5000 });
+  const extSheet = await page.evaluate(() => { const sh = document.querySelector('.bcv-evsheet'); return { kicker: sh.querySelector('.bcv-evsheet__kicker').textContent, rows: Object.fromEntries([...sh.querySelectorAll('.bcv-evsheet__row')].map((r) => [r.querySelector('.bcv-evsheet__k').textContent, r.querySelector('.bcv-evsheet__v').textContent.trim()])) }; });
+  check(extSheet.kicker === 'Your calendar' && extSheet.rows.Calendar === 'Sam\'s calendar' && extSheet.rows.Where === 'Kolligian Library' && /4:00pm – 8:00pm$/.test(extSheet.rows.When), `a press on one opens its sheet: ${JSON.stringify(extSheet)}`);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-evsheet'), null, { timeout: 3000 });
+  await openSync();
+  await page.click('.bcv-sync__link .bcv-switch');
+  check(await eventually(() => page.$$eval('.bcv-ev--ext', (els) => els.length === 0)), 'its switch off: its events leave the month');
+  await page.click('.bcv-sync__link .bcv-switch');
+  check(await eventually(() => page.$$eval('.bcv-ev--ext', (els) => els.length >= 4)), 'and on again: back');
+  await closeSync();
+
+  // ---- pull to plan, on To Do ----
+  await nav('todo');
+  await page.waitForSelector('.bcv-row.bcv-pullable', { timeout: 10000 });
+  const pickRow = () => page.evaluate(() => {
+    const rows = [...document.querySelectorAll('.bcv-row.bcv-pullable[data-plan-id^="assignment:"]')].filter((r) => !r.classList.contains('bcv-row--done') && r.querySelector('.bcv-planpill[hidden]'));
+    const r = rows[rows.length - 1]; // (the last: the furthest due, with the most room before it)
+    if (!r) return null;
+    r.scrollIntoView({ block: 'center' });
+    const b = (r.querySelector('.bcv-row__body') || r).getBoundingClientRect(); // (the words: not the circle or a chip)
+    return { id: r.dataset.planId, x: Math.round(b.left + 30), y: Math.round(b.top + b.height / 2), title: r.querySelector('.bcv-row__title').textContent };
+  });
+  const target = await pickRow();
+  check(!!target, `a row of work to pull: ${JSON.stringify(target)}`);
+  const sel = (id) => `.bcv-row[data-plan-id="${id}"]`;
+  const urlBefore = page.url();
+  await page.mouse.move(target.x, target.y);
+  await page.mouse.down();
+  await page.mouse.move(target.x + 20, target.y + 1, { steps: 4 });
+  await page.waitForSelector('.bcv-planbar--pull .bcv-planbar__slot', { timeout: 8000 });
+  await page.mouse.move(target.x + 20 + 26 + 26, target.y + 1, { steps: 8 }); // (past the lead, and one time on: the second)
+  await page.waitForSelector('.bcv-planbar.is-armed', { timeout: 3000 }).catch(() => {});
+  const tmr = new Date();
+  tmr.setDate(tmr.getDate() + 1);
+  const shift = { a: new Date(tmr.getFullYear(), tmr.getMonth(), tmr.getDate(), 16, 0).getTime(), b: new Date(tmr.getFullYear(), tmr.getMonth(), tmr.getDate(), 20, 0).getTime() }; // (the linked calendar's shift tomorrow)
+  const rail = await page.evaluate(() => {
+    const bar = document.querySelector('.bcv-planbar');
+    const r = document.querySelector('.bcv-row.is-pulling');
+    return { slots: [...bar.querySelectorAll('.bcv-planbar__slot')].map((s) => Number(s.dataset.at)), on: [...bar.querySelectorAll('.bcv-planbar__slot')].findIndex((s) => s.classList.contains('is-on')), status: bar.querySelector('.bcv-planbar__status').textContent, due: bar.querySelector('.bcv-planbar__due')?.textContent || '', moved: r ? new DOMMatrix(getComputedStyle(r).transform).m41 : 0, len: bar.querySelector('.bcv-planbar__lenbtn.is-on')?.textContent };
+  });
+  const nowMs = Date.now();
+  const okSlot = (t) => { const d = new Date(t); const end = t + 60 * 60000; const endD = new Date(end); return (d.getMinutes() === 0 || d.getMinutes() === 30) && d.getHours() >= 8 && (endD.getHours() < 23 || (endD.getHours() === 23 && endD.getMinutes() === 0)) && endD.getDate() === d.getDate() && t >= nowMs + 14 * 60000 && !(t < shift.b + 10 * 60000 && end > shift.a - 10 * 60000); };
+  check(rail.slots.length >= 2 && rail.slots.every(okSlot) && rail.slots.every((t, i) => !i || t > rail.slots[i - 1]) && rail.on === 1 && /^Let go to plan /.test(rail.status) && rail.moved > 10 && rail.moved < 64 && rail.len === '1h',
+    `pulled right, the row follows and then resists, and a rail of free times hangs under it — on the half hour, 8 am to 11 pm, a quarter of an hour on at least, clear of the shift; the time under the lens is chosen: ${JSON.stringify({ n: rail.slots.length, first: rail.slots.slice(0, 4).map((t) => new Date(t).toString().slice(0, 21)), on: rail.on, status: rail.status, due: rail.due, moved: rail.moved, len: rail.len })}`);
+  await shot(page, '06f-plan-rail');
+  await page.mouse.up();
+  await page.waitForFunction(() => !document.querySelector('.bcv-planbar'), null, { timeout: 3000 });
+  const planned = await untilV(async () => { const p = (await prefPlans())[target.id]; return p || null; });
+  const pillText = await untilV(() => page.$eval(`${sel(target.id)} .bcv-planpill:not([hidden])`, (e) => e.textContent).catch(() => null));
+  check(!!planned && Date.parse(planned.at) === rail.slots[1] && planned.mins === 60 && planned.title === target.title && (!planned.due || Date.parse(planned.due) >= rail.slots[1] + 3600e3) && /^Planned (Today|Tomorrow|Sun|Mon|Tue|Wed|Thu|Fri|Sat|[A-Z][a-z]{2}, [A-Z][a-z]{2} \d+) \d{1,2}:\d{2} [AP]M$/.test(pillText || '') && page.url() === urlBefore,
+    `let go, it is planned at that time (kept with this Canvas's preferences), the row says so, and the press that ended the pull opened nothing: ${JSON.stringify({ planned, pillText })}`);
+  // the same from the keyboard: P, the arrows, Enter; up for longer
+  await page.focus(`${sel(target.id)} .bcv-row__body`);
+  await page.keyboard.press('p');
+  await page.waitForSelector('.bcv-planbar--pick .bcv-planbar__slot.is-on', { timeout: 8000 });
+  const pickAt = await page.evaluate(() => ({ on: Number(document.querySelector('.bcv-planbar__slot.is-on').dataset.at), current: Number(document.querySelector('.bcv-planbar__slot.is-current')?.dataset.at || 0), focused: document.activeElement?.classList.contains('bcv-planbar__slot'), clear: !!document.querySelector('.bcv-planbar__clear') }));
+  check(pickAt.on === Date.parse(planned.at) && pickAt.current === pickAt.on && pickAt.focused && pickAt.clear, `P on the row opens the rail at its plan, the time focused, Clear beside it: ${JSON.stringify(pickAt)}`);
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowUp');
+  await page.waitForFunction(() => document.querySelector('.bcv-planbar__lenbtn.is-on')?.textContent === '1½h' && document.querySelector('.bcv-planbar__slot.is-on'), null, { timeout: 8000 });
+  const keyPick = await page.evaluate(() => Number(document.querySelector('.bcv-planbar__slot.is-on').dataset.at));
+  await page.keyboard.press('Enter');
+  const moved = await untilV(async () => { const p = (await prefPlans())[target.id]; return p && p.mins === 90 ? p : null; });
+  check(!!moved && Date.parse(moved.at) === keyPick, `up makes it an hour and a half, the times found again; Enter plans the one chosen: ${JSON.stringify(moved)}`);
+  // the plan on the Dashboard's rows too, and a pull there
+  await nav('dashboard');
+  await page.waitForSelector('.bcv-row.bcv-pullable', { timeout: 10000 }).catch(() => {});
+  const dashPill = await page.$eval(`${sel(target.id)} .bcv-planpill`, (e) => (e.hidden ? null : e.textContent)).catch(() => 'no row');
+  check(dashPill === 'no row' || /^Planned /.test(dashPill || ''), `the Dashboard's row for it says so too: ${dashPill}`);
+  const dashTarget = await pickRow();
+  if (dashTarget) {
+    await page.mouse.move(dashTarget.x, dashTarget.y);
+    await page.mouse.down();
+    await page.mouse.move(dashTarget.x + 20, dashTarget.y, { steps: 4 });
+    await page.waitForSelector('.bcv-planbar--pull .bcv-planbar__slot', { timeout: 8000 });
+    await page.mouse.move(dashTarget.x + 20 + 26 + 4, dashTarget.y, { steps: 6 });
+    await page.mouse.up();
+    const dashPlan = await untilV(async () => (await prefPlans())[dashTarget.id] || null);
+    const stillHome = await page.evaluate(() => !!document.querySelector('.bcv-dash__hello'));
+    check(!!dashPlan && stillHome && !!(await page.$(`${sel(dashTarget.id)} .bcv-planpill:not([hidden])`)), `a Dashboard row pulls the same way, and the link under it is not followed: ${JSON.stringify(dashPlan)}`);
+    // pulled back short of the first time: nothing
+    await page.mouse.move(dashTarget.x, dashTarget.y);
+    await page.mouse.down();
+    await page.mouse.move(dashTarget.x + 20, dashTarget.y, { steps: 4 });
+    await page.waitForSelector('.bcv-planbar--pull', { timeout: 8000 });
+    await page.mouse.move(dashTarget.x + 22, dashTarget.y, { steps: 2 });
+    const short = await page.$eval('.bcv-planbar__status', (e) => e.textContent);
+    await page.mouse.up();
+    check(short === 'Pull further to choose a time' && Date.parse((await prefPlans())[dashTarget.id].at) === Date.parse(dashPlan.at), `let go short of the first time, nothing changes: "${short}"`);
+    // its pill: the rail with Clear
+    await page.click(`${sel(dashTarget.id)} .bcv-planpill`);
+    await page.waitForSelector('.bcv-planbar--pick .bcv-planbar__clear', { timeout: 8000 });
+    await page.click('.bcv-planbar__clear');
+    check(await eventually(async () => !(await prefPlans())[dashTarget.id] && !!(await page.$(`${sel(dashTarget.id)} .bcv-planpill[hidden]`))), 'its pill opens the rail, and Clear takes the plan away');
+  }
+
+  // ---- the plan on the Calendar, and Send plans ----
+  await nav('calendar');
+  await page.waitForSelector('.bcv-cal__grid', { timeout: 10000 });
+  const planChip = await untilV(() => page.$$eval('.bcv-ev--plan', (els) => els.map((e) => ({ t: e.textContent.trim(), tip: e.title }))).then((t) => (t.length ? t : null)));
+  check(planChip?.length === 1 && planChip[0].t === target.title && /^Planned · /.test(planChip[0].tip), `the plan is on the month, as a plan: ${JSON.stringify(planChip)}`);
+  await openSync();
+  await page.click('.bcv-sync__send .bcv-switch');
+  const sent = await untilV(async () => { const ev = await ownEvents(); return ev.length === 1 ? ev[0] : null; }, 10000);
+  const sentPlan = (await prefPlans())[target.id];
+  check(!!sent && sent.title === `Plan: ${target.title}` && Date.parse(sent.start_at) === Date.parse(moved.at) && Date.parse(sent.end_at) - Date.parse(sent.start_at) === 90 * 60000 && sentPlan?.ev === sent.id && /Planned in Simpl for <a href=/.test(sent.description),
+    `Send plans on: the plan goes on the student's Canvas calendar (so the feed carries it out), the event kept with the plan: ${JSON.stringify({ sent, ev: sentPlan?.ev })}`);
+  await closeSync();
+  // with the personal calendar shown, Canvas's copy of the plan is not drawn twice
+  await page.click('.bcv-cal__calbtn');
+  await page.waitForSelector('.bcv-cal__sheet .bcv-cal__other', { timeout: 5000 });
+  const others = await texts('.bcv-cal__sheet .bcv-cal__other .bcv-calrow__name');
+  await (await page.$$('.bcv-cal__sheet .bcv-cal__other .bcv-switch'))[others.indexOf('Sam Student')].click();
+  await page.waitForFunction(() => [...document.querySelectorAll('.bcv-ev')].some((e) => /Dentist/.test(e.textContent)), null, { timeout: 10000 });
+  check(!(await texts('.bcv-ev')).some((t) => /^Plan: /.test(t)) && (await page.$$('.bcv-ev--plan')).length === 1, 'with the personal calendar on, the plan sent there is drawn once, as the plan');
+  await (await page.$$('.bcv-cal__sheet .bcv-cal__other .bcv-switch'))[others.indexOf('Sam Student')].click();
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-cal__sheet'), null, { timeout: 3000 });
+  await shot(page, '06g-calendar-plans');
+  await page.click('.bcv-ev--plan');
+  await page.waitForSelector('.bcv-evsheet', { timeout: 5000 });
+  const planSheet = await page.evaluate(() => { const sh = document.querySelector('.bcv-evsheet'); return { kicker: sh.querySelector('.bcv-evsheet__kicker').textContent, rows: [...sh.querySelectorAll('.bcv-evsheet__k')].map((k) => k.textContent), btns: [...sh.querySelectorAll('.bcv-evsheet__foot button')].map((b) => b.textContent) }; });
+  check(planSheet.kicker === 'Plan' && planSheet.rows.slice(0, 2).join('|') === 'When|For' && planSheet.btns.join('|') === 'Open|Move|Clear plan', `a press on the plan: its sheet, with Open, Move and Clear plan: ${JSON.stringify(planSheet)}`);
+  await page.click('.bcv-evsheet__clear');
+  check(await eventually(async () => !(await page.$('.bcv-ev--plan')) && !(await prefPlans())[target.id] && (await ownEvents()).length === 0, 10000), 'Clear plan: off the month, out of the preferences, and off the Canvas calendar');
+  // put back as it was: Send plans off, the calendar unlinked
+  await openSync();
+  await page.click('.bcv-sync__send .bcv-switch');
+  page.once('dialog', (d) => d.accept());
+  await page.click('.bcv-sync__link .bcv-iconbtn');
+  check(await eventually(async () => !(await page.$('.bcv-sync__link')) && !!(await page.$('.bcv-cal__synccount[hidden]'))), 'Unlink takes the calendar out of the sheet and the count');
+  const after = await sw.evaluate(async () => ({ links: ((await self.BCV.api.storage.local.get('cal:links'))['cal:links'] || []).length, feeds: Object.keys(await self.BCV.api.storage.local.get(null)).filter((k) => k.startsWith('cal:feed:')).length, alarm: !!(await chrome.alarms.get('simpl:cal-sync')) }));
+  check(after.links === 0 && after.feeds === 0 && !after.alarm, `and out of the browser's storage, its half-hourly read stopped: ${JSON.stringify(after)}`);
+  await closeSync();
+  check(await eventually(() => page.$$eval('.bcv-ev--ext', (els) => els.length === 0)), 'its events gone from the month');
+  } // sync and plans
   if (on('inbox')) {
 
   // ---- inbox --------------------------------------------------------------------------------
@@ -7021,9 +7226,10 @@ try {
   await closeTool();
   // (2.98.99) the same Word document opened in the file viewer: the PDF made of it on this device, drawn page by page
   await inPage({ view: { name: 'Lab report.docx', type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', b64: docxFixture.toString('base64') } });
-  const wordShown = await page.waitForFunction(() => document.querySelectorAll('.bcv-viewer .bcv-dv__page').length === 2 && document.querySelector('.bcv-viewer .bcv-dv__page .bcv-dv__text span'), null, { timeout: 20000 }).then(() => true).catch(() => false);
+  // (waits on the first page's own words, the ones read below: under load the second page's can land first)
+  const wordShown = await page.waitForFunction(() => document.querySelectorAll('.bcv-viewer .bcv-dv__page').length === 2 && /Lab Report One/.test(document.querySelector('.bcv-viewer .bcv-dv__page .bcv-dv__text')?.textContent || ''), null, { timeout: 20000 }).then(() => true).catch(() => false);
   const wv = await page.evaluate(() => ({ of: document.querySelector('.bcv-dv__of')?.textContent, note: document.querySelector('.bcv-dv__note')?.textContent, words: document.querySelector('.bcv-dv__page .bcv-dv__text')?.textContent, none: document.querySelector('.bcv-viewer__none')?.textContent }));
-  check(wordShown && wv.of === 'of 2' && wv.note === 'Made into a PDF on this device' && /Lab Report One/.test(wv.words), `a Word document opens in the viewer as the PDF made of it on this device — two pages, its words over them: ${JSON.stringify(wv)}`);
+  check(wordShown && wv.of === 'of 2' && wv.note === 'Made into a PDF on this device' && /Lab Report One/.test(wv.words), `a Word document opens in the viewer as the PDF made of it on this device — two pages, its words over them: ${JSON.stringify({ wordShown, ...wv })}`);
   await shot(page, '20e-word-viewer');
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-viewer-ov'), null, { timeout: 5000 });
