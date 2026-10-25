@@ -260,12 +260,12 @@ phone_check() {
   : > "$out"
   ok() { if eval "$2"; then echo "ok   $1" >> "$out"; else echo "FAIL $1" >> "$out"; fi; }
   ok "the page opened (200) and a wrong key did not (404): $(grep 12d "$t" 2>/dev/null)" "grep -q '12d-hand-in-phone-connected: page 200, wrong key 404, uploads 200 200' '$t'"
-  ok "the page has the assignment's name in it" "grep -q 'Composition of Functions' '$OUT_ABS/phone-page-light-12d-hand-in-phone-connected.html'"
+  ok "the page has the assignment's name in it" "grep -q 'Composing functions' '$OUT_ABS/phone-page-light-12d-hand-in-phone-connected.html'"
   ok "the phone was seen to connect" "grep -q 'SimplPhone opened' '$OUT_ABS/console-light-12d-hand-in-phone-connected.txt'"
   ok "the photo is in the hand-in" "grep -q 'SimplHandIn added Photo from phone.jpg' '$OUT_ABS/console-light-12d-hand-in-phone-connected.txt'"
   ok "the notes are in the hand-in" "grep -q 'SimplHandIn added Notes.txt' '$OUT_ABS/console-light-12d-hand-in-phone-connected.txt'"
   ok "a PDF-only assignment's photos were taken and an mp3 refused (415): $(grep 12e "$t" 2>/dev/null)" "grep -q '12e-hand-in-phone-photos: page 200, wrong key 404, uploads 200 200 415' '$t'"
-  ok "its two photos became one PDF in the hand-in" "[ \"\$(grep -c 'SimplHandIn added project01.pdf (1 files)' '$OUT_ABS/console-dark-12e-hand-in-phone-photos.txt')\" -ge 2 ]"
+  ok "its two photos became one PDF in the hand-in" "[ \"\$(grep -c 'SimplHandIn added Group project.pdf (1 files)' '$OUT_ABS/console-dark-12e-hand-in-phone-photos.txt')\" -ge 2 ]"
   ok "(1.3.146) four files added one after another, each previewed: all four in, the app still up" "grep -q 'SimplHandIn added file 4 of 4: 4 in' '$OUT_ABS/console-light-12f-hand-in-one-by-one.txt'"
   cat "$out"
 }
