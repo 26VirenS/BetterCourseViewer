@@ -183,6 +183,7 @@ draw();
 </script></body></html>`;
 
 // (node:http: stood in for above)
+const renameNames = (text) => text; // (site-names.mjs: the website's pictures only)
 
 const port = Number(process.argv[2] || process.env.PORT || 8787);
 const simPort = Number(process.argv[3] || process.env.SIM_PORT || 8791);
@@ -1210,7 +1211,17 @@ function signInGate(req, res, path, raw) {
   if (req.method === 'GET' && !path.startsWith('/dist/') && !path.startsWith('/images/') && !path.startsWith('/__mock/')) return go('/login/canvas');
   return false;
 }
-on('POST', /^\/__mock\/config$/, (url, m, body) => Object.assign(mockConfig, body));
+// ({"forgetSubmissions": true}: what was handed in and the quizzes begun since the start are forgotten — a picture taken
+//  twice, in light and in dark, starts from the same place each time)
+const seededQuizSubs = [...quizSubs].map(([k, v]) => [k, [...v]]);
+on('POST', /^\/__mock\/config$/, (url, m, { forgetSubmissions, ...body }) => {
+  if (forgetSubmissions) {
+    apiSubmissions.clear();
+    quizSubs.clear();
+    for (const [k, v] of seededQuizSubs) quizSubs.set(k, [...v]);
+  }
+  return Object.assign(mockConfig, body);
+});
 // test-only: the last API request as it arrived (its headers say whether the extension asked for a fresh answer)
 let lastApi = null;
 on('GET', /^\/__mock\/last-api$/, () => lastApi);
@@ -1598,7 +1609,27 @@ function ccMock(req, res, path, raw) {
   return ccJson(res, { message: 'Not found.' }, 404);
 }
 
+// POST /__mock/config {"siteNames": true}: every page and answer in text names the made-up school the website's pictures
+// show (scripts/dev/site-names.mjs) — its courses, work and people — instead of the ones this mock was modelled on
+const renaming = (res) => {
+  const text = (type) => /json|text|javascript/.test(type);
+  let type = '';
+  const head = res.writeHead.bind(res);
+  res.writeHead = (status, ...rest) => {
+    const h = rest.find((x) => x && typeof x === 'object' && !Array.isArray(x));
+    if (h) for (const k of Object.keys(h)) {
+      if (k.toLowerCase() === 'content-type') type = String(h[k]);
+      if (k.toLowerCase() === 'content-length' && text(type)) delete h[k]; // (the renamed body's length differs)
+    }
+    return head(status, ...rest);
+  };
+  const end = res.end.bind(res);
+  // (every page and answer in text is sent as a string; a file's bytes are left alone)
+  res.end = (body, ...rest) => end(typeof body === 'string' && text(type) ? renameNames(body) : body, ...rest);
+};
+
 const server = http.createServer((req, res) => {
+  if (mockConfig.siteNames) renaming(res);
   const url = new URL(req.url, `http://localhost:${port}`);
   const path = url.pathname.replace(/\/+$/, '') || '/';
   let raw = '';

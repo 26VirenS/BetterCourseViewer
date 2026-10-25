@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 // The website's pictures of the interface (site/public/img/): the extension in Chromium at 2×, on the mock Canvas and
 // the mock Brightspace, signed in as their made-up students at a made-up school ("Lakeside University", a plain crest
-// for its logo), in light and in dark. Each picture is written as a 2× WebP and a 1× WebP for the page's srcset.
+// for its logo, its courses, work and classmates made up too: scripts/dev/site-names.mjs), in light and in dark. Each
+// picture is written as a 2× WebP and a 1× WebP for the page's srcset; the four moments (search, quiz, phone, grades)
+// are filmed as well, each a looping animated WebP (<name>-motion.webp); each browser tool is pictured once, at 1×
+// (web-tool-<key>), for the tool chips' previews.
 //   node scripts/dev/site-shots.mjs [out-dir]        (default: site/public/img)
 //   SITE_SHOTS=search,phone,tools node scripts/dev/site-shots.mjs   (only those; the names below, without web- or -dark)
 // Requires Playwright (project or global install) and Python's Pillow (WebP).
@@ -12,6 +15,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { launchExtension, afterMigration } from './harness.mjs';
+import { renameNames } from './site-names.mjs';
 
 const require = createRequire(import.meta.url);
 let chromium;
@@ -39,11 +43,12 @@ const canvas = spawn(process.execPath, [join(root, 'scripts', 'dev', 'mock-canva
 const d2l = spawn(process.execPath, [join(root, 'scripts', 'dev', 'mock-brightspace.mjs'), String(D2L), '--open'], { stdio: 'ignore' });
 process.on('exit', () => { canvas.kill(); d2l.kill(); });
 for (const u of [`${BASE}/`, `${D2L_BASE}/d2l/login`]) for (let i = 0; i < 60; i++) { try { await fetch(u); break; } catch { await new Promise((r) => setTimeout(r, 100)); } }
-await fetch(`${BASE}/__mock/config`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ richQuestions: true }) }).catch(() => {});
+await fetch(`${BASE}/__mock/config`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ richQuestions: true, siteNames: true }) }).catch(() => {});
+const forget = () => fetch(`${BASE}/__mock/config`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ forgetSubmissions: true }) }).catch(() => {});
 
 const userDataDir = join(tmpdir(), `bcv-site-profile-${process.pid}`);
 const { context, sw } = await launchExtension(chromium, userDataDir, extDir, { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
-const made = [];
+const made = [], films = [], once = []; // (once: a single 1× picture, a tool's preview)
 try {
   await afterMigration(sw);
   for (const p of context.pages()) if (p.url().includes('/setup/')) await p.close().catch(() => {});
@@ -58,14 +63,6 @@ try {
   }, `prefs:localhost:${PORT}`);
   const settings = (patch) => sw.evaluate(async (p) => self.BCV.settings.update(p), patch);
   await settings({ appearance: { siteName: 'Lakeside University', logoUrl: crest, darkMode: 'off', sidebar: 'one' } }); // (the one sidebar, as a new install has it)
-  // (the mock's student signs in with a real school's address; the pictures are of a made-up one, so every answer the
-  //  interface reads says Lakeside's instead)
-  await context.route(/^http:\/\/localhost:\d+\/(api|d2l\/api)\//, async (route) => {
-    const res = await route.fetch();
-    const type = res.headers()['content-type'] || '';
-    if (!/json|text/.test(type)) return route.fulfill({ response: res });
-    route.fulfill({ response: res, body: (await res.text()).replaceAll('ucmerced.edu', 'lakeside.edu').replaceAll('UC Merced', 'Lakeside University').replaceAll('Yue Lei', 'Dana Reyes') });
-  });
   const page = await context.newPage();
   const settle = async () => {
     await page.waitForFunction(() => { const c = document.documentElement.classList; return c.contains('bcv-settled'); }, null, { timeout: 20000 }).catch(() => {});
@@ -75,23 +72,56 @@ try {
     await page.waitForTimeout(300);
   };
   const shot = async (name) => { await settle(); const f = join(raw, `${name}.png`); await page.screenshot({ path: f }); made.push(name); console.log('  shot', name); };
+  // film(name, act): the page filmed while act() runs — Chromium's screencast, a frame each time the page paints — still
+  // for a moment at each end, so the loop rests before it starts again. The frames go in raw/<name>/, made into an
+  // animated WebP at the end (each frame shown for as long as it was on screen).
+  const film = async (name, act, hold = 1400) => {
+    await settle();
+    const cdp = await context.newCDPSession(page);
+    const frames = [];
+    cdp.on('Page.screencastFrame', (f) => { frames.push([f.data, f.metadata.timestamp]); cdp.send('Page.screencastFrameAck', { sessionId: f.sessionId }).catch(() => {}); });
+    await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 92, maxWidth: 1440, maxHeight: 900, everyNthFrame: 1 });
+    await page.waitForTimeout(hold);
+    await act();
+    await page.waitForTimeout(hold);
+    const end = Date.now() / 1000;
+    await cdp.send('Page.stopScreencast').catch(() => {});
+    await cdp.detach().catch(() => {});
+    const dir = join(raw, name);
+    mkdirSync(dir, { recursive: true });
+    const list = frames.map(([data, t], i) => { const f = join(dir, `${String(i).padStart(4, '0')}.jpg`); writeFileSync(f, Buffer.from(data, 'base64')); return [f, t]; });
+    writeFileSync(join(dir, 'frames.json'), JSON.stringify({ list, end }));
+    films.push(name);
+    console.log('  film', name, frames.length, 'frames');
+  };
+  const pause = (ms) => page.waitForTimeout(ms);
   const look = async (dark) => { await settings({ appearance: { darkMode: dark ? 'on' : 'off' } }); await page.waitForTimeout(250); };
   // (SITE_SHOTS: a comma list of the pictures to make — dashboard, grades, course, calendar, quiz, brightspace, search,
-  //  phone, tools, canvas — else every one)
+  //  phone, tools, tool-previews, canvas — else every one)
   const only = new Set(String(process.env.SITE_SHOTS || '').split(',').map((x) => x.trim()).filter(Boolean));
   const want = (name) => !only.size || only.has(name);
 
   for (const dark of [false, true]) {
     const sfx = dark ? '-dark' : '';
     await look(dark);
+    await forget(); // (each pass hands in and begins the quiz afresh)
     if (want('dashboard')) {
       await page.goto(`${BASE}/`);
       await page.waitForSelector('.bcv-stat', { timeout: 20000 });
       await shot(`web-dashboard${sfx}`);
     }
     if (want('grades')) {
-      await page.goto(`${BASE}/grades`);
-      await page.waitForSelector('.bcv-gpa__value', { timeout: 20000 });
+      // when grades come back: from the Dashboard to Grades, the term GPA and the rings filling, then a course's ring
+      // looked at for its breakdown
+      await page.goto(`${BASE}/`);
+      await page.waitForSelector('.bcv-stat', { timeout: 20000 });
+      await film(`web-grades${sfx}`, async () => {
+        await page.locator('#bcv-side .bcv-nav__item[data-nav="gpa"], #bcv-side .bcv-nav__item[data-nav="grades"]').first().click();
+        await page.waitForSelector('.bcv-gpa__value', { timeout: 20000 });
+        await pause(2800);
+        const ring = page.locator('.bcv-rings__svg').first();
+        if (await ring.count()) { await ring.hover(); await pause(1800); await page.mouse.move(1430, 890); }
+      });
       await shot(`web-grades${sfx}`);
     }
     if (want('course')) {
@@ -111,8 +141,17 @@ try {
       await page.click('.bcv-qz__begin');
       await page.waitForSelector('.bcv-qz__opt', { timeout: 20000 });
       await page.waitForTimeout(900);
-      await page.click('.bcv-qz__opt >> nth=3');
-      await page.waitForSelector('.bcv-qz__opt.is-selected', { timeout: 8000 }).catch(() => {});
+      // filmed: an answer picked, on to the next question, one picked there and flagged for later
+      await film(`web-quiz${sfx}`, async () => {
+        await page.click('.bcv-qz__opt >> nth=3');
+        await pause(1100);
+        await page.getByRole('button', { name: /^Next\b/ }).first().click();
+        await pause(1100);
+        await page.click('.bcv-qz__opt >> nth=1').catch(() => {});
+        await pause(900);
+        await page.getByRole('button', { name: /Flag/ }).first().click().catch(() => {});
+        await pause(900);
+      });
       await shot(`web-quiz${sfx}`);
     }
     if (want('brightspace')) {
@@ -126,10 +165,15 @@ try {
       await page.goto(`${BASE}/`);
       await page.waitForSelector('#bcv-omni', { timeout: 20000 });
       await settle();
-      await page.click('#bcv-omni');
-      await page.keyboard.type('lab', { delay: 60 });
-      await page.waitForSelector('#bcv-omni-panel [role="option"]', { timeout: 15000 }).catch(() => {});
-      await page.waitForTimeout(1200);
+      // filmed: the box opened, a word typed, its results under it by kind, the arrow keys going down them
+      await film(`web-search${sfx}`, async () => {
+        await page.click('#bcv-omni');
+        await pause(600);
+        await page.keyboard.type('lab', { delay: 260 });
+        await page.waitForSelector('#bcv-omni-panel [role="option"]', { timeout: 15000 }).catch(() => {});
+        await pause(1300);
+        for (let i = 0; i < 2; i++) { await page.keyboard.press('ArrowDown'); await pause(700); }
+      });
       await shot(`web-search${sfx}`);
       await page.keyboard.press('Escape');
     }
@@ -143,6 +187,17 @@ try {
       await page.waitForTimeout(700);
       await shot(`web-handin-phone${sfx}`);
       await page.keyboard.press('Escape');
+      // filmed: the code asked for, then the phone hands in (posted here as the phone's page posts it) and the receipt lands
+      await page.goto(`${BASE}/courses/104/assignments/4002?bcv=submit`);
+      await page.waitForSelector('.bcv-sb__phonego', { timeout: 20000 });
+      await film(`web-handin-phone${sfx}`, async () => {
+        await page.click('.bcv-sb__phonego');
+        await page.waitForSelector('.bcv-phone-ov .bcv-phone__row', { timeout: 15000 });
+        await pause(2600);
+        await fetch(`${BASE}/api/v1/courses/104/assignments/4002/submissions`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-csrf-token': 'mock+csrf/token=' }, body: JSON.stringify({ submission: { submission_type: 'online_text_entry', body: '<p>Sent from the phone.</p>' } }) });
+        await page.waitForSelector('.bcv-sb__done', { timeout: 15000 }).catch(() => {});
+        await pause(1200);
+      }, 1600);
     }
     if (want('tools')) {
       // the tools: their page, then the periodic table opened over it
@@ -154,6 +209,22 @@ try {
       await page.waitForTimeout(1500);
       await shot(`web-ptable${sfx}`);
     }
+    if (want('tool-previews')) {
+      // each browser tool, opened from the Tools page, for its chip's preview on the website
+      for (const key of ['calc', 'graph', 'stats', 'matrix', 'units', 'ptable', 'balance', 'moles', 'fc', 'pomo', 'cite', 'need', 'mark', 'conv']) {
+        await page.goto(`${BASE}/#tools`);
+        await page.waitForSelector(`.bcv-tool-card[data-tool="${key}"]`, { timeout: 20000 });
+        await settle();
+        await page.click(`.bcv-tool-card[data-tool="${key}"]`);
+        await page.waitForTimeout(['calc', 'graph'].includes(key) ? 6000 : 1500); // (GeoGebra and Desmos load from their makers)
+        if (key === 'stats') { await page.locator('textarea').last().fill('72 85 91 64 88 79 95 70 83 77').catch(() => {}); await page.waitForTimeout(800); } // (a set of scores, so its numbers show)
+        await settle();
+        const f = join(raw, `web-tool-${key}${sfx}.png`);
+        await page.screenshot({ path: f });
+        once.push(`web-tool-${key}${sfx}`);
+        console.log('  tool', key);
+      }
+    }
   }
   // the same student's Dashboard as Canvas itself draws it, with no extension: the "before" under the hero's slider. The
   // mock's own page is a bare stand-in, so Canvas's stock Dashboard is drawn here — its dark global nav, the course cards,
@@ -161,7 +232,7 @@ try {
   const plain = want('canvas') ? await chromium.launch() : null;
   if (plain) try {
     const pp = await (await plain.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 })).newPage();
-    await pp.setContent(canvasDashboard(crest));
+    await pp.setContent(renameNames(canvasDashboard(crest)));
     await pp.waitForTimeout(400);
     await pp.screenshot({ path: join(raw, 'web-canvas.png') });
     made.push('web-canvas');
@@ -222,6 +293,41 @@ for name in sys.argv[3:]:
     im.resize((im.width // 2, im.height // 2), Image.LANCZOS).save(f"{out}/{name}.webp", "WEBP", quality=84, method=6)
     print("  webp", name, im.size)
 `, raw, outDir, ...made], { stdio: 'inherit' });
+}
+// the tools' previews: 1× only (the chips' preview is never wider than 640 points)
+if (once.length) {
+  execFileSync('python3', ['-c', `
+import sys
+from PIL import Image
+raw, out = sys.argv[1], sys.argv[2]
+for name in sys.argv[3:]:
+    im = Image.open(f"{raw}/{name}.png").convert("RGB")
+    im.resize((im.width // 2, im.height // 2), Image.LANCZOS).save(f"{out}/{name}.webp", "WEBP", quality=84, method=6)
+    print("  webp", name)
+`, raw, outDir, ...once], { stdio: 'inherit' });
+}
+// the films: an animated WebP each, looping, its frames thinned to at most 25 a second (a frame painted sooner than that
+// after the last is shown instead of it), each shown for as long as it was on screen
+if (films.length) {
+  execFileSync('python3', ['-c', `
+import sys, json, os
+from PIL import Image
+raw, out = sys.argv[1], sys.argv[2]
+for name in sys.argv[3:]:
+    meta = json.load(open(f"{raw}/{name}/frames.json"))
+    kept = []  # [file, start]
+    for f, t in meta["list"]:
+        if kept and t - kept[-1][1] < 0.04:
+            kept[-1][0] = f
+        else:
+            kept.append([f, t])
+    times = [t for _, t in kept] + [meta["end"]]
+    durations = [max(40, round((times[i + 1] - times[i]) * 1000)) for i in range(len(kept))]
+    frames = [Image.open(f).convert("RGB") for f, _ in kept]
+    path = f"{out}/{name}-motion.webp"
+    frames[0].save(path, "WEBP", save_all=True, append_images=frames[1:], duration=durations, loop=0, quality=72, method=4)
+    print("  motion", name, len(frames), "frames", round(sum(durations) / 1000, 1), "s", os.path.getsize(path) // 1024, "KB")
+`, raw, outDir, ...films], { stdio: 'inherit' });
 }
 console.log(`raw PNGs in ${raw}`);
 process.exit(process.exitCode || 0);

@@ -12,8 +12,9 @@ OUT="${OUT:-shots}"
 mkdir -p "$OUT"
 BID=com.simplcourses.app
 xcrun simctl status_bar booted override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3 >/dev/null 2>&1 || true
-# every kind of quiz question in the mock's quizzes (matching, blanks, essay, formula, file upload), for the quiz pictures
-curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"richQuestions":true,"moreTypes":true}' http://localhost:8800/__mock/config || true
+# every kind of quiz question in the mock's quizzes (matching, blanks, essay, formula, file upload), for the quiz pictures;
+# and the website's made-up school's names (scripts/dev/site-names.mjs), so any picture can go on simplcourses.com
+curl -s -o /dev/null -X POST -H 'content-type: application/json' -d '{"richQuestions":true,"moreTypes":true,"siteNames":true}' http://localhost:8800/__mock/config || true
 
 # launch <name> <wait> [args…]: the app afresh with the mock as its Canvas (as a student who has used it:
 # -SimplDemo), then a picture once the app says it has settled — "[Simpl Courses] shot: settled" on its console

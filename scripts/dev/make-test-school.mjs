@@ -51,6 +51,10 @@ if (src.includes(MM_IMPORT)) {
   const mm = readFileSync(join(root, 'scripts', 'dev', 'mock-macmillan.mjs'), 'utf8').replace(/\r\n/g, '\n').replace(/^export const /gm, 'const ');
   src = src.replace(MM_IMPORT, () => `// (mock-macmillan.mjs, put in here)\n${mm}`);
 }
+// (the website's made-up names, scripts/dev/site-names.mjs, are for the website's pictures: the test school never turns
+// them on, so it gets a stand-in that leaves every answer as it is)
+const SN_IMPORT = "import { renameNames } from './site-names.mjs';";
+src = src.replace(SN_IMPORT, () => 'const renameNames = (text) => text; // (site-names.mjs: the website\'s pictures only)');
 // (the test school is no real school: the mock's few words of the university it was first drawn from — an address, a
 // notice's title, a mascot's greeting — are made the test school's own, here only; CI's mock keeps them)
 src = src.replaceAll('ucmerced.edu', 'test.simpl.com').replaceAll('UC Merced', 'Simpl Test School').replaceAll('Hello Bobcat!', 'Hello!').replaceAll('Bobcat', 'Student');

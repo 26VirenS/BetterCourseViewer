@@ -214,6 +214,10 @@ mock_config() {
   [ -z "$PLANNING" ] || return 0
   curl -s -o /dev/null -X POST -H 'content-type: application/json' -d "$1" "http://localhost:${2:-8800}/__mock/config" || true
 }
+# (the mock schools name the website's made-up one — its courses, work and classmates: scripts/dev/site-names.mjs — so
+#  any picture can go on simplcourses.com)
+mock_config '{"siteNames":true}'
+mock_config '{"siteNames":true}' 8802
 
 # (1.3.78) Send from Phone, tried as a phone would: phone_send <name> <file>… waits for the picture <name>'s app to say
 # its server's address on the console (-SimplPhoneTest), opens the page there, asks for a wrong key's, then posts each
@@ -795,6 +799,7 @@ live_shots() {
     node scripts/dev/mock-canvas.mjs 8810 8811 > "$HOMES/mock-live.log" 2>&1 &
     mock=$!
     for i in $(seq 1 50); do curl -s -o /dev/null http://localhost:8810/ && break; sleep 0.1; done
+    mock_config '{"siteNames":true}' 8810
   fi
   # (each picture waited for by its own worker's pid: a bare `wait` would wait for the mock above too, which never ends)
   PART=$LIVE_PART MODE=light BASE=http://localhost:8810 shoot light-48a-live-dashboard 50 "${live[@]}" -SimplLiveChange done:6
