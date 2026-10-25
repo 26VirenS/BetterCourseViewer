@@ -544,6 +544,9 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
       case 'cal': // (2.99.107) the calendars linked in Calendar → Sync: add, allow, remove, show or hide, read again (content/app/screens/calendar.js)
         reply(cal(msg));
         return true;
+      case 'feed': // (2.99.110) Simpl's own calendar: made, sent (sealed) to simplcourses.com, or stopped (content/app/feed.js)
+        reply(feed(msg));
+        return true;
       case 'canvasSeen': // the Chrome build's sniffer found Canvas on a site of the school's own
         reply(canvasSeen(sender, msg));
         return true;
@@ -766,6 +769,74 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
   }
   if (api.alarms?.onAlarm) api.alarms.onAlarm.addListener((a) => { if (a?.name === CAL_ALARM) calSync().catch(() => {}); });
   calArm();
+  // (2.99.110) Simpl's own calendar feed: the student's work, their own tasks and their plans, as one calendar named
+  // Simpl in Apple Calendar, Google Calendar or Outlook — in place of Canvas's own feed. The page puts its events
+  // together (content/app/feed.js) and hands them here; here they are written as an .ics (lib/ics.js write), sealed
+  // with a key made here and kept in this browser's storage (feed:<the Canvas host>, with the feed's id and the token
+  // that may replace it), and the sealed copy sent to simplcourses.com (site/src/feed.js). The private link carries the
+  // key: the site opens the copy with it when a calendar app asks, and keeps nothing it could read it with. A copy is
+  // sent only when what it holds has changed, or once in six hours to keep it.
+  // (dev:feedBase: the suites point it at the mock, scripts/dev/mock-feed.mjs)
+  const feedSite = async () => `${(await api.storage.local.get('dev:feedBase').catch(() => ({})))['dev:feedBase'] || 'https://simplcourses.com'}/api/feed`;
+  const FEED_KEEP = 6 * 60 * 60 * 1000;
+  const feedKey = (host) => `feed:${String(host || '').toLowerCase()}`;
+  const feedRead = async (host) => (await api.storage.local.get(feedKey(host)).catch(() => ({})))[feedKey(host)] || null;
+  const feedPublic = (st, site) => (st ? { on: !!st.on, link: st.on && st.id && st.key ? `${site}/${st.id}/${st.key}.ics` : null, at: st.at || 0, count: st.count || 0, error: st.error || '' } : { on: false, link: null, at: 0, count: 0, error: '' });
+  /** A request to simplcourses.com with the feed's token: in the apps the app sends it (their page, a Canvas page, may
+   *  not reach another site: bridge.js feedSend); here, the background itself. Its status, or a throw with why not. */
+  async function feedSend(method, url, token, bytes = null) {
+    const viaApp = self.BCVBridge?.native?.feedSend;
+    if (viaApp) {
+      let body = '';
+      if (bytes) { let t = ''; for (let i = 0; i < bytes.length; i += 0x8000) t += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); body = btoa(t); }
+      const r = await viaApp({ method, url, token, body });
+      if (!r || !r.status) throw new Error(r?.error || 'Simpl could not reach simplcourses.com.');
+      return r.status;
+    }
+    const res = await fetch(url, { method, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/octet-stream' }, body: bytes, credentials: 'omit', cache: 'no-store' });
+    return res.status;
+  }
+  async function feedHash(events) {
+    const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(events)));
+    return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
+  }
+  async function feed(msg) {
+    const host = String(msg.host || '').toLowerCase();
+    if (!/^[a-z0-9.-]+(:\d+)?$/.test(host)) throw new Error('Not here');
+    const st = await feedRead(host);
+    const site = await feedSite();
+    if (msg.op === 'state') return feedPublic(st, site);
+    if (msg.op === 'on') { // made (a new id, key and token), or made again after it was stopped
+      const next = st?.on ? st : { id: BCV.ics.secret(16), key: BCV.ics.secret(32), token: BCV.ics.secret(32), on: true, at: 0, hash: '', count: 0, error: '' };
+      await api.storage.local.set({ [feedKey(host)]: next });
+      return feedPublic(next, site);
+    }
+    if (msg.op === 'off') { // forgotten on the site (its link stops working), and here
+      if (st?.id && st?.token) { try { await feedSend('DELETE', `${site}/${st.id}`, st.token); } catch { /* the site keeps it 120 days at most */ } }
+      await api.storage.local.remove(feedKey(host)).catch(() => {});
+      return feedPublic(null, site);
+    }
+    if (msg.op === 'publish') {
+      if (!st?.on) return { ...feedPublic(st, site), sent: false };
+      const events = Array.isArray(msg.events) ? msg.events.slice(0, 3000) : [];
+      const hash = await feedHash(events);
+      if (!msg.force && hash === st.hash && Date.now() - (st.at || 0) < FEED_KEEP) return { ...feedPublic(st, site), sent: false };
+      const text = BCV.ics.write({ name: String(msg.name || 'Simpl').slice(0, 60), description: 'Your work, your own tasks and your plans, from Simpl.', color: '#0A84FF', refreshMinutes: 60, events });
+      let next;
+      try {
+        const sealed = await BCV.ics.seal(text, st.key, st.id);
+        const status = await feedSend('PUT', `${site}/${st.id}`, st.token, sealed);
+        next = status >= 200 && status < 300
+          ? { ...st, at: Date.now(), hash, count: events.length, error: '' }
+          : { ...st, error: status === 403 ? 'simplcourses.com would not take this calendar. Stop it and make it again.' : status === 503 ? 'Simpl calendars are not switched on at simplcourses.com yet.' : `simplcourses.com answered ${status}.` };
+      } catch (e) {
+        next = { ...st, error: e?.message || 'Simpl could not reach simplcourses.com.' };
+      }
+      await api.storage.local.set({ [feedKey(host)]: next });
+      return { ...feedPublic(next, site), sent: !next.error };
+    }
+    throw new Error('Nothing here');
+  }
   // The interface's own on-demand modules (content/app/lazy.js): a page may ask for the files that
   // content/app/lazy-modules.js names, and nothing outside that list. The source manifest lists the
   // same files in a content-script group whose match never fires — Safari parses none of them until

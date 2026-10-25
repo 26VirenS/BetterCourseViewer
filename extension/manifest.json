@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Simpl Courses",
-  "version": "2.99.109",
+  "version": "2.99.110",
   "description": "Canvas with navigation that actually makes sense and a UI that you can actually use.",
   "author": "Simpl Courses contributors",
   "icons": {
@@ -105,6 +105,7 @@
         "content/app/ui.js",
         "content/app/store.js",
         "content/app/plan.js",
+        "content/app/feed.js",
         "content/app/lazy-modules.js",
         "content/app/lazy.js",
         "content/app/search.js",

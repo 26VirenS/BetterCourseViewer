@@ -288,7 +288,7 @@ try {
   // (here the page reads it: this harness has no native fetch); a piece of work's free times, one planned — said on its row, laid
   // on the calendar beside the linked calendar's events — then cleared, and the calendar unlinked
   const plSync = await nc('calSync');
-  check(/\/feeds\/calendars\/user_\w+\.ics$/.test(plSync.feed || '') && plSync.links.length === 0 && plSync.canSend === true && plSync.send === false, `Sync: the account's calendar feed, nothing linked, Send plans off: ${JSON.stringify(plSync)}`);
+  check(/\/feeds\/calendars\/user_\w+\.ics$/.test(plSync.feed || '') && plSync.links.length === 0 && plSync.canSend === false && plSync.send === false, `Sync: the account's calendar feed, nothing linked, Send plans retired (2.99.110: Simpl's own calendar has the plans): ${JSON.stringify(plSync)}`);
   const plLink = await nc('calLink', { url: `${BASE}/__mock/ics/personal.ics` });
   const plSync2 = await nc('calSync');
   check(plLink.ok && plLink.count === 5 && plLink.name === "Sam's calendar" && plSync2.links.length === 1 && plSync2.links[0].count === 5 && plSync2.links[0].on && !plSync2.links[0].error && !!plSync2.links[0].read, `a calendar linked by its address: read and listed: ${JSON.stringify({ plLink, links: plSync2.links })}`);

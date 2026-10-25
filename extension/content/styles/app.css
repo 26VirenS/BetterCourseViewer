@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.109"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.110"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -5449,6 +5449,11 @@ html[data-bcv-theme="light"] .bcv-spot { --bcv-spot-shade: .24; }
   .bcv-cal__calbtn > span:not(.bcv-cal__calcount), .bcv-cal__syncbtn > span:not(.bcv-cal__calcount) { display: none; } /* (2.99.77: Find appointment keeps its words) */
   .bcv-cal__calbtn, .bcv-cal__syncbtn { padding: 0 8px 0 10px; gap: 6px; }
 }
+@container bcv-main (max-width: 1180px) { /* (2.99.110) the week, with To Do's button too */
+  .bcv-cal__tools.has-todo-btn { gap: 6px; }
+  .has-todo-btn > .bcv-cal__calbtn > span:not(.bcv-cal__calcount), .has-todo-btn > .bcv-cal__syncbtn > span:not(.bcv-cal__calcount) { display: none; }
+  .has-todo-btn > .bcv-cal__calbtn, .has-todo-btn > .bcv-cal__syncbtn { padding: 0 8px 0 10px; gap: 6px; }
+}
 @container bcv-main (max-width: 640px) {
   .bcv-cal__apptbtn > span:not(.bcv-cal__calcount) { display: none; }
   .bcv-cal__apptbtn { padding: 0 8px 0 10px; gap: 6px; }
@@ -6376,3 +6381,60 @@ html.bcv-noblur .bcv-spot:not(.is-far) .bcv-omni__box.bcv-squircle, html.bcv-nob
   .bcv-planbar__track { transition: none; }
   .bcv-planpill.is-new { animation: bcv-fade-in .15s ease both; }
 }
+/* (2.99.110) To Do beside the week: what is still to do, grouped by when it is due, each piece dragged onto a time to
+ * plan it. The column stays in view as the hours scroll (sticky, scrolling itself); a piece taken hold of lifts out of
+ * the list (a copy of it, the ghost, follows the pointer from where it was held, a little larger, with a shadow), the
+ * place it left dims; over a day a block as long as the plan shows where it would go; let go elsewhere, the ghost goes
+ * back into its place. */
+.bcv-body--cal > .bcv-cal__todo { flex: 0 0 272px; min-width: 0; position: sticky; top: calc(var(--bcv-cal-head, 96px) + 12px); align-self: flex-start; }
+.bcv-cal__todo[hidden], .bcv-cal__todobtn[hidden] { display: none; }
+.bcv-cal__todobtn { width: 34px; padding: 0; justify-content: center; }
+.bcv-cal__todobtn.is-on { background: var(--bcv-blue-tint, rgba(10,132,255,.14)); }
+.bcv-todo-side { display: flex; flex-direction: column; max-height: calc(100vh - var(--bcv-cal-head, 96px) - var(--bcv-bar-h, 0px) - 36px); border-radius: 16px; background: var(--bcv-card); box-shadow: var(--bcv-shadow-card, 0 1px 3px rgba(0,0,0,.08)); overflow: hidden; }
+.bcv-todo-side__head { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px; border-bottom: 1px solid var(--bcv-sep, rgba(60,60,67,.12)); }
+.bcv-todo-side__titles { flex: 1; min-width: 0; }
+.bcv-todo-side__title { font: 700 15px/1.25 var(--bcv-font); letter-spacing: -.01em; color: var(--bcv-ink); }
+.bcv-todo-side__sub { font: 400 12px/1.35 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-todo-side__count { flex: none; min-width: 22px; height: 22px; padding: 0 7px; box-sizing: border-box; border-radius: 11px; background: var(--bcv-fill2); color: var(--bcv-ink2); font: 600 12px/22px var(--bcv-font); text-align: center; font-variant-numeric: tabular-nums; }
+.bcv-todo-side__list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 8px 10px; }
+.bcv-todo-side__group + .bcv-todo-side__group { margin-top: 6px; }
+.bcv-todo-side__day { position: sticky; top: 0; z-index: 1; padding: 8px 8px 4px; background: var(--bcv-card); font: 600 11.5px/1.3 var(--bcv-font); letter-spacing: .02em; text-transform: uppercase; color: var(--bcv-ink3); }
+.bcv-todo-side__group.is-late .bcv-todo-side__day { color: #ff3b30; }
+.bcv-todo-side__empty { display: flex; align-items: center; gap: 8px; padding: 18px 10px; font: 500 13px/1.4 var(--bcv-font); color: var(--bcv-ink2); }
+.bcv-tdrag { position: relative; display: flex; align-items: flex-start; gap: 10px; padding: 8px 8px 8px 10px; border-radius: 10px; color: inherit; text-decoration: none !important; cursor: grab; touch-action: pan-y; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; transition: background .15s ease, opacity .2s ease, scale .16s var(--bcv-spring-snappy); }
+.bcv-tdrag::before { content: ''; position: absolute; left: 3px; top: 9px; bottom: 9px; width: 3px; border-radius: 2px; background: var(--bcv-tdrag-c, #8e8e93); }
+.bcv-tdrag:hover { background: var(--bcv-fill2); }
+.bcv-tdrag:active:not(.is-ghost) { scale: .985; }
+.bcv-tdrag:focus-visible { outline: 2px solid var(--bcv-blue); outline-offset: -2px; }
+.bcv-tdrag__done { margin-top: 1px; width: 18px; height: 18px; margin-left: 4px; }
+.bcv-tdrag__body { flex: 1; min-width: 0; }
+.bcv-tdrag__title { font: 500 13px/1.3 var(--bcv-font); color: var(--bcv-ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.bcv-tdrag__meta { margin-top: 2px; font: 400 11.5px/1.35 var(--bcv-font); color: var(--bcv-ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bcv-tdrag.is-late .bcv-tdrag__meta { color: #ff3b30; }
+.bcv-tdrag__plan { display: inline-flex; align-items: center; gap: 4px; margin-top: 5px; padding: 2px 7px 2px 6px; border-radius: 8px; background: var(--bcv-tdrag-tint, rgba(10,132,255,.12)); color: var(--bcv-tdrag-c, var(--bcv-blue)); font: 600 11px/1.3 var(--bcv-font); font-variant-numeric: tabular-nums; }
+.bcv-tdrag__grip { flex: none; align-self: center; color: var(--bcv-ink4, rgba(60,60,67,.3)); opacity: 0; transition: opacity .15s ease; }
+.bcv-tdrag:hover .bcv-tdrag__grip, .bcv-tdrag:focus-visible .bcv-tdrag__grip { opacity: 1; }
+.bcv-tdrag.is-lifted { opacity: .35; }
+.bcv-tdrag.is-leaving { opacity: 0; scale: .97; transition: opacity .2s var(--bcv-ease-out), scale .2s var(--bcv-ease-out); }
+.bcv-tdrag.is-ghost { position: fixed; left: 0; top: 0; z-index: 2147483000; margin: 0; pointer-events: none; cursor: grabbing; background: var(--bcv-card); box-shadow: 0 14px 34px rgba(0,0,0,.22), 0 2px 8px rgba(0,0,0,.12); transform-origin: var(--bcv-grab-x, 30%) var(--bcv-grab-y, 50%); transition: transform .12s var(--bcv-ease-out), opacity .15s ease; will-change: transform; }
+.bcv-tdrag.is-ghost.is-over { opacity: .18; }
+.bcv-tdrag.is-ghost.is-returning { transition: transform .26s var(--bcv-spring-settle), opacity .26s ease; opacity: 1; }
+.bcv-tdrag.is-ghost .bcv-tdrag__grip { opacity: 1; }
+html.bcv-dragging-plan, html.bcv-dragging-plan * { cursor: grabbing !important; }
+html.bcv-dragging-plan .bcv-week__body .bcv-wev:not(.bcv-wev--drop) { pointer-events: none; }
+.bcv-wev--drop { left: 1px; width: calc(100% - 3px); z-index: 3; pointer-events: none; box-shadow: inset 3px 0 0 var(--bcv-ev-bar), 0 6px 18px rgba(0,0,0,.14); outline-style: solid !important; transition: top .1s var(--bcv-ease-out), height .1s var(--bcv-ease-out); animation: bcv-fade-in .12s var(--bcv-ease-out) both; }
+.bcv-wev--drop .bcv-wev__time, .bcv-wev--drop .bcv-wev__title { color: var(--bcv-ev-bar); }
+.bcv-wev--drop.is-dropped { animation: none; }
+@container bcv-main (max-width: 980px) { .bcv-body--cal.has-todo { flex-wrap: wrap; } .bcv-body--cal > .bcv-cal__todo { flex-basis: 100%; position: static; } .bcv-todo-side { max-height: 260px; } }
+@media (prefers-reduced-motion: reduce) {
+  .bcv-tdrag.is-ghost, .bcv-tdrag.is-ghost.is-returning, .bcv-wev--drop { transition: none; animation: none; }
+}
+/* (2.99.110) Sync: Simpl's own calendar, made with a press, stopped with another */
+.bcv-sync__intro { display: flex; align-items: flex-start; gap: 12px; }
+.bcv-sync__make { margin-top: 12px; width: 100%; justify-content: center; }
+.bcv-sync__feed--off .bcv-sync__status { padding: 10px 0 0; margin: 0; }
+.bcv-sync__feed .bcv-sync__status { padding: 10px 0 0; margin: 0; }
+.bcv-sync__stopline { margin-top: 10px; display: flex; justify-content: flex-end; }
+.bcv-sync__stop { border: 0; background: none; padding: 4px 2px; font: 500 12.5px/1.3 var(--bcv-font); color: #ff3b30; cursor: pointer; }
+.bcv-sync__stop:hover { text-decoration: underline; }
+.bcv-sync__stop:disabled { opacity: .5; cursor: default; }

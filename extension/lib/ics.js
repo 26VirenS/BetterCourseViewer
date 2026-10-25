@@ -331,5 +331,80 @@
     }
   }
 
-  BCV.ics = { parse, feedHref, zoneOf };
+  // ---- (2.99.110) Simpl's own calendar, written ----------------------------------------------------------------
+  // What background.js feedPublish sends to simplcourses.com (site/src/feed.js), sealed: every time in UTC, a whole
+  // day as dates, text escaped and lines folded at 75 bytes as RFC 5545 has them, the calendar's name and how often to
+  // look for changes said in the words Apple, Google and Outlook each read.
+
+  const esc = (s) => String(s ?? '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+  const pad = (n) => String(n).padStart(2, '0');
+  const utc = (ms) => { const d = new Date(ms); return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`; };
+  const dateOf = (day, plus = 0) => { const [y, m, d] = String(day).split('-').map(Number); const t = new Date(Date.UTC(y, m - 1, d + plus)); return `${t.getUTCFullYear()}${pad(t.getUTCMonth() + 1)}${pad(t.getUTCDate())}`; };
+  /** A line folded at 75 bytes (never inside a character), each part after the first begun with a space. */
+  function fold(line) {
+    const enc = new TextEncoder();
+    if (enc.encode(line).length <= 75) return line;
+    const out = [];
+    let part = '';
+    let bytes = 0;
+    for (const ch of line) {
+      const n = enc.encode(ch).length;
+      if (bytes + n > (out.length ? 74 : 75)) { out.push(part); part = ''; bytes = 0; }
+      part += ch;
+      bytes += n;
+    }
+    out.push(part);
+    return out.join('\r\n ');
+  }
+  /**
+   * A calendar as an .ics file. events: [{ uid, title, start, end?, allDay?, day?, days?, description?, url?, location?,
+   * free?, categories? }] — start and end in ms (a moment with no length, end the same as start: a due time); a whole
+   * day by day ("2026-10-25") and how many days.
+   */
+  function write({ name = 'Simpl', description = '', color = '', refreshMinutes = 60, events = [], now = Date.now() } = {}) {
+    const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Simpl Courses//Simpl calendar//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+      `X-WR-CALNAME:${esc(name)}`, `NAME:${esc(name)}`];
+    if (description) L.push(`X-WR-CALDESC:${esc(description)}`);
+    if (color) L.push(`X-APPLE-CALENDAR-COLOR:${color}`, `COLOR:${color}`);
+    L.push(`REFRESH-INTERVAL;VALUE=DURATION:PT${refreshMinutes}M`, `X-PUBLISHED-TTL:PT${refreshMinutes}M`);
+    const stamp = utc(now);
+    for (const ev of events) {
+      L.push('BEGIN:VEVENT', `UID:${esc(ev.uid)}`, `DTSTAMP:${stamp}`);
+      if (ev.allDay && /^\d{4}-\d{2}-\d{2}$/.test(String(ev.day || ''))) L.push(`DTSTART;VALUE=DATE:${dateOf(ev.day)}`, `DTEND;VALUE=DATE:${dateOf(ev.day, Math.max(1, ev.days || 1))}`);
+      else L.push(`DTSTART:${utc(ev.start)}`, `DTEND:${utc(ev.end && ev.end > ev.start ? ev.end : ev.start)}`);
+      L.push(`SUMMARY:${esc(ev.title)}`);
+      if (ev.description) L.push(`DESCRIPTION:${esc(ev.description)}`);
+      if (ev.location) L.push(`LOCATION:${esc(ev.location)}`);
+      if (ev.url) L.push(`URL:${String(ev.url).replace(/[\r\n]/g, '')}`);
+      if (ev.categories?.length) L.push(`CATEGORIES:${ev.categories.map(esc).join(',')}`);
+      L.push(`TRANSP:${ev.free ? 'TRANSPARENT' : 'OPAQUE'}`, 'END:VEVENT');
+    }
+    L.push('END:VCALENDAR');
+    return `${L.map(fold).join('\r\n')}\r\n`;
+  }
+
+  /** n random bytes, base64url (an id, a key, a token). */
+  function secret(n) {
+    const b = new Uint8Array(n);
+    root.crypto.getRandomValues(b);
+    let s = '';
+    for (const x of b) s += String.fromCharCode(x);
+    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  const unb64 = (s) => { const t = atob(String(s).replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (String(s).length % 4)) % 4)); const out = new Uint8Array(t.length); for (let i = 0; i < t.length; i++) out[i] = t.charCodeAt(i); return out; };
+  /** The calendar sealed for simplcourses.com: a fresh 12-byte nonce, then the text under AES-256-GCM with the key
+   *  (base64url, 32 bytes), bound to the feed's id. The site opens it only with the key in the private link. */
+  async function seal(text, keyB64, id) {
+    const subtle = root.crypto.subtle;
+    const key = await subtle.importKey('raw', unb64(keyB64), { name: 'AES-GCM' }, false, ['encrypt']);
+    const iv = new Uint8Array(12);
+    root.crypto.getRandomValues(iv);
+    const body = new Uint8Array(await subtle.encrypt({ name: 'AES-GCM', iv, additionalData: new TextEncoder().encode(id) }, key, new TextEncoder().encode(text)));
+    const out = new Uint8Array(12 + body.length);
+    out.set(iv, 0);
+    out.set(body, 12);
+    return out;
+  }
+
+  BCV.ics = { parse, feedHref, zoneOf, write, secret, seal };
 })(typeof self !== 'undefined' ? self : globalThis);

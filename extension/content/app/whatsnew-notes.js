@@ -25,8 +25,14 @@
     tool: 'M14.5 3.5a5 5 0 0 0-6 6l-5 5V20h4l5-5a5 5 0 0 0 6-6l-3 3-3-3z',
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
     cal: 'M5 6h14v14H5zM5 10h14M9 3v4M15 3v4',
+    lock: 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.110', date: '2026-10-25', notes: [
+      { kind: 'new', title: 'Plan From To Do', body: 'Drag work from To Do beside the week onto a time.', icon: P.cal },
+      { kind: 'new', title: 'Your Simpl Calendar', body: 'Your work and plans in Apple, Google or Outlook.', icon: P.cal },
+      { kind: 'improved', title: 'Sealed and Private', body: 'Only your private link can open your Simpl calendar.', icon: P.lock },
+    ] },
     { version: '2.99.109', date: '2026-10-25', notes: [
       { kind: 'improved', title: 'Week by the Hour', body: 'The week shows each event at its time, with a line for now.', icon: P.cal },
       { kind: 'new', title: 'Drag Plans to Move', body: 'On the week, drag a plan to another time or day.', icon: P.clock },

@@ -3,7 +3,9 @@
  * (2.99.107) Sync: Canvas's own calendar feed handed to Apple, Google or Outlook
  * with a press, the student's own calendars linked by their private address
  * and laid over the month (background.js reads them), and the plans made by
- * pulling a piece of work (content/app/plan.js) shown where they were put. */
+ * pulling a piece of work (content/app/plan.js) shown where they were put.
+ * (2.99.110) Sync hands over Simpl's own calendar (content/app/feed.js) in place of Canvas's feed, and the week keeps
+ * To Do beside it: a piece of work dragged from there onto a time is planned for that time. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h, htmlToText } = BCV.utils;
@@ -53,12 +55,20 @@
     // (2.99.107) Sync: this calendar in the student's calendar app, and theirs in this one
     const syncCount = h('span', { class: 'bcv-cal__calcount bcv-cal__synccount', text: '' });
     syncCount.hidden = true;
-    const syncBtn = h('button', { type: 'button', class: 'bcv-roundbtn bcv-cal__syncbtn', title: 'Your Canvas work in Apple, Google or Outlook, and your own calendars here', 'aria-haspopup': 'dialog', onclick: (e) => openSync(e.currentTarget) }, [U.svg(IC.link, { size: 13, stroke: 'var(--bcv-blue)', width: 2.1 }), h('span', { text: 'Sync' }), syncCount]);
+    const syncBtn = h('button', { type: 'button', class: 'bcv-roundbtn bcv-cal__syncbtn', title: 'Simpl in Apple, Google or Outlook, and your own calendars here', 'aria-haspopup': 'dialog', onclick: (e) => openSync(e.currentTarget) }, [U.svg(IC.link, { size: 13, stroke: 'var(--bcv-blue)', width: 2.1 }), h('span', { text: 'Sync' }), syncCount]);
     const body = U.el('bcv-body bcv-body--cols bcv-body--cal');
     const mainCol = h('div', { class: 'bcv-cal__main', style: { flex: '1 1 720px', minWidth: '0' } });
-    const sideCol = U.el('bcv-cal__side'); // the agenda's range picker; nothing else lives beside the grid now
+    const sideCol = U.el('bcv-cal__side'); // the agenda's range picker
     sideCol.hidden = true;
-    body.append(mainCol, sideCol);
+    // (2.99.110) the week's To Do: what is still to do beside the hours, each piece dragged onto a time to plan it
+    const todoCol = U.el('bcv-cal__todo', null, { role: 'region', 'aria-label': 'To Do' });
+    todoCol.hidden = true;
+    let todoOn = (await store.pref('calTodo', true)) !== false;
+    let todoItems = null; // what To Do lists, open (store.todo), once read
+    body.append(todoCol, mainCol, sideCol);
+    // (a glyph alone, as Calendar's own sidebar button: the bar beside the title keeps to one line)
+    const todoBtn = h('button', { type: 'button', class: 'bcv-roundbtn bcv-cal__todobtn', title: 'Show To Do beside the week, to drag work onto a time', 'aria-label': 'To Do beside the week', 'aria-pressed': String(todoOn), onclick: () => { todoOn = !todoOn; todoBtn.setAttribute('aria-pressed', String(todoOn)); todoBtn.classList.toggle('is-on', todoOn); store.setPref('calTodo', todoOn); draw(); } }, U.svg('M4 5h16v14H4zM9.5 5v14', { size: 15, stroke: 'var(--bcv-blue)', width: 1.9 }));
+    todoBtn.classList.toggle('is-on', todoOn);
     screen.append(
       U.el('bcv-head bcv-head--tight', U.el('bcv-head__in', U.el('bcv-head__row bcv-head__row--center', [
         h('div', {}, [titleEl, subEl]),
@@ -67,11 +77,18 @@
           U.iconbtn(IC.chevron, { size: 30, iconSize: 14, stroke: 'var(--bcv-blue)', width: 2.1, title: 'Next', onClick: () => shift(1) }),
           h('button', { type: 'button', class: 'bcv-roundbtn', text: 'Today', onclick: () => { anchor = U.startOfDay(now); miniMonth = new Date(now.getFullYear(), now.getMonth(), 1); if (view === 'agenda') range = { start: U.startOfDay(now), end: U.addDays(U.startOfDay(now), 20), picking: false }; load(); } }),
         ]),
-        U.el('bcv-cal__tools bcv-ml-auto', [BCV.lms?.d2l ? null : apptBtn, syncBtn, calBtn, segWrap]), // (Brightspace has no Scheduler)
+        U.el('bcv-cal__tools bcv-ml-auto', [todoBtn, BCV.lms?.d2l ? null : apptBtn, syncBtn, calBtn, segWrap]), // (Brightspace has no Scheduler)
       ]))),
       body,
     );
     mainCol.append(U.loading());
+    // (2.99.110) the header's height, for the To Do beside the week to stay in view under it (the header wraps to two
+    // lines in a narrow window)
+    try {
+      const headEl = screen.querySelector('.bcv-head');
+      const ro = new ResizeObserver(() => { if (!ctx.alive()) { ro.disconnect(); return; } screen.style.setProperty('--bcv-cal-head', `${headEl.offsetHeight}px`); });
+      ro.observe(headEl);
+    } catch { /* no observer: the usual height is assumed */ }
     BCV.preview?.attach(screen); // an assignment, quiz or discussion on the grid opens in the preview panel, not away from the month
 
     // Only the calendars are waited for: they say which events to ask Canvas for. The planner is a
@@ -966,46 +983,54 @@
     }
 
     // ---- Sync (2.99.107) -----------------------------------------------------------------------------
-    // Two ways and a switch. Canvas's own calendar feed (the profile's calendar.ics: every course's work and events, kept
-    // up to date by Canvas) handed to the student's calendar app with a press — Apple's as a webcal:// subscription,
-    // Google's and Outlook's add-by-address pages. The student's own calendars linked by their private address, read by
-    // the background every half hour and laid over the month, a switch each. And Send plans: each plan also put on the
-    // student's Canvas calendar, so the feed carries it out to the calendar app with everything else.
+    // Two ways. (2.99.110) Simpl's own calendar — the student's work, their own tasks and their plans, as one calendar
+    // named Simpl (content/app/feed.js), sealed on simplcourses.com and opened only by its private link — handed to the
+    // student's calendar app with a press: Apple's as a webcal:// subscription, Google's and Outlook's add-by-address
+    // pages. In place of Canvas's own feed, and of Send plans (a copy of each plan on Canvas's calendar for that feed to
+    // carry): the plans are in Simpl's calendar of themselves. And the student's own calendars linked by their private
+    // address, read by the background every half hour and laid over the month, a switch each.
     let syncSheet = null; // { ov, list } while the sheet is up
-    const syncUi = { busy: false, msg: null, ask: null, draft: '', feed: undefined, send: false };
+    const syncUi = { busy: false, msg: null, ask: null, draft: '', simpl: undefined, turning: false };
     const callCal = (m) => Promise.resolve(BCV.api.runtime.sendMessage({ type: 'cal', ...m })).catch((e) => ({ ok: false, message: e?.message || String(e) }));
     const agoWords = (ms) => { const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 48 * 60 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
-    function feedLinks(href) {
-      const https = href.replace(/^webcal:/i, 'https:');
-      const webcal = https.replace(/^https?:/i, 'webcal:');
-      const name = encodeURIComponent(`${BCV.lms?.name || 'Canvas'} (Simpl)`);
-      return {
-        apple: webcal,
-        google: `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcal)}`,
-        office: `https://outlook.office.com/calendar/0/addfromweb?url=${encodeURIComponent(https)}&name=${name}`,
-        outlook: `https://outlook.live.com/calendar/0/addfromweb?url=${encodeURIComponent(https)}&name=${name}`,
-        https,
-      };
-    }
     function syncBody() {
       const out = [];
-      // Canvas in the student's calendar app
-      out.push(U.label('Your Canvas work, in your calendar app'));
-      if (syncUi.feed === undefined) out.push(U.card(U.loading('inset', 1), 'bcv-card--pad-14'));
-      else if (!syncUi.feed) out.push(U.emptyCard(`${BCV.lms?.name || 'Canvas'} has no calendar feed for your account here.`));
-      else {
-        const L = feedLinks(syncUi.feed);
+      // (2.99.110) Simpl in the student's calendar app
+      out.push(U.label('Simpl, in your calendar app'));
+      const st = syncUi.simpl;
+      const TICK = 'M5 12.5l4.5 4.5L19 7.5';
+      if (st === undefined) out.push(U.card(U.loading('inset', 1), 'bcv-card--pad-14'));
+      else if (!st?.on) {
+        out.push(U.card([
+          U.el('bcv-sync__intro', [
+            U.tile(IC.calendarPlus, { color: 'var(--bcv-blue)', tint: 'var(--bcv-blue-tint, rgba(10,132,255,.12))' }),
+            h('div', { class: 'bcv-row__body' }, [
+              U.text('bcv-calrow__name', 'Your work, your tasks and your plans', 'div'),
+              U.text('bcv-sync__sub', 'As one calendar, Simpl, in Apple Calendar, Google Calendar or Outlook, kept up to date. It is sealed: only your private link opens it.', 'div'),
+            ]),
+          ]),
+          U.btn(syncUi.turning ? 'Making it…' : 'Make my Simpl calendar', { kind: 'primary', cls: 'bcv-sync__make', disabled: syncUi.turning, onClick: makeSimpl }),
+          st?.error ? U.el('bcv-sync__status is-error', [U.svg(IC.warn, { size: 13, stroke: 'currentColor', width: 2.4 }), h('span', { text: st.error })], { role: 'alert' }) : null,
+        ], 'bcv-card--pad-14 bcv-sync__feed bcv-sync__feed--off'));
+      } else {
+        const L = BCV.feed.links(st.link);
         const app_ = (label, href, cls) => h('a', { class: `bcv-sync__app ${cls}`, href, target: cls === 'is-apple' ? null : '_blank', rel: 'noopener' }, [U.svg(IC.calendarPlus, { size: 15, stroke: 'currentColor', width: 2 }), h('span', { text: label })]);
         const outlook = h('button', { type: 'button', class: 'bcv-sync__app is-outlook', 'aria-haspopup': 'menu', onclick: (e) => U.menu(e.currentTarget, [
           { label: 'School or work account', sub: 'Microsoft 365', onSelect: () => window.open(L.office, '_blank', 'noopener') },
           { label: 'Personal account', sub: 'Outlook.com', onSelect: () => window.open(L.outlook, '_blank', 'noopener') },
         ]) }, [U.svg(IC.calendarPlus, { size: 15, stroke: 'currentColor', width: 2 }), h('span', { text: 'Outlook' })]);
         const copy = h('button', { type: 'button', class: 'bcv-sync__app is-copy', onclick: async () => {
-          try { await navigator.clipboard.writeText(L.https); U.toast('Calendar link copied. Paste it where your calendar app adds one by address.'); } catch { window.prompt('Your Canvas calendar link:', L.https); }
+          try { await navigator.clipboard.writeText(L.https); U.toast('Your Simpl calendar link is copied. Paste it where your calendar app adds one by address.'); } catch { window.prompt('Your Simpl calendar link:', L.https); }
         } }, [U.svg(IC.copy, { size: 15, stroke: 'currentColor', width: 2 }), h('span', { text: 'Copy link' })]);
+        const said = st.error
+          ? U.el('bcv-sync__status is-error', [U.svg(IC.warn, { size: 13, stroke: 'currentColor', width: 2.4 }), h('span', { text: st.error })], { role: 'alert' })
+          : st.at ? U.el('bcv-sync__status is-ok', [U.svg(TICK, { size: 13, stroke: 'currentColor', width: 2.4 }), h('span', { text: `Up to date · sent ${agoWords(st.at)} · ${U.plural(st.count || 0, 'event')}` })], { role: 'status' })
+            : U.el('bcv-sync__status is-busy', [h('span', { class: 'bcv-sync__spin', 'aria-hidden': 'true' }), h('span', { text: 'Sending it…' })], { role: 'status' });
         out.push(U.card([
           U.el('bcv-sync__apps', [app_('Apple Calendar', L.apple, 'is-apple'), app_('Google Calendar', L.google, 'is-google'), outlook, copy]),
-          U.hint('Every course\'s work and events, kept up to date: new work and moved due dates follow on their own. Google and Outlook look for changes every few hours.', 'bcv-sync__note'),
+          said,
+          U.hint('Kept up to date while Simpl is open: new work, moved due dates and your plans follow. Google and Outlook look for changes every few hours. Anyone with the link can read the calendar, so keep it to yourself.', 'bcv-sync__note'),
+          U.el('bcv-sync__stopline', [h('button', { type: 'button', class: 'bcv-sync__stop', text: syncUi.turning ? 'Stopping…' : 'Stop sharing this calendar', disabled: syncUi.turning || null, onclick: stopSimpl })]),
         ], 'bcv-card--pad-14 bcv-sync__feed'));
       }
       // the student's own calendars, here
@@ -1026,7 +1051,6 @@
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); linkCalendar(input.value); } });
       // (2.99.109) what came of a link, said under the field it came from — reading it, linked (a tick), or why not (a
       // warning, in red) — rather than in a line of its own below the card
-      const TICK = 'M5 12.5l4.5 4.5L19 7.5';
       const status = syncUi.busy ? U.el('bcv-sync__status is-busy', [h('span', { class: 'bcv-sync__spin', 'aria-hidden': 'true' }), h('span', { text: 'Reading that calendar…' })], { role: 'status' })
         : syncUi.ask ? null
           : syncUi.msg ? U.el(`bcv-sync__status ${syncUi.msg.error ? 'is-error' : 'is-ok'}`, [U.svg(syncUi.msg.error ? IC.warn : TICK, { size: 13, stroke: 'currentColor', width: 2.4 }), h('span', { text: syncUi.msg.text })], { role: syncUi.msg.error ? 'alert' : 'status' })
@@ -1048,16 +1072,7 @@
         h('p', { text: 'The link stays in this browser, and Simpl reads it every half hour. Anyone with a private link can read that calendar, so keep it to yourself.' }),
       ]);
       out.push(where);
-      // plans
-      if (BCV.plan?.canSend()) {
-        out.push(U.label('Plans'));
-        out.push(U.card([U.row([
-          U.tile(IC.clock, { color: 'var(--bcv-blue)', tint: 'var(--bcv-blue-tint, rgba(10,132,255,.12))' }),
-          h('div', { class: 'bcv-row__body' }, [U.text('bcv-calrow__name', 'Send plans to your calendar app', 'div'), U.text('bcv-sync__sub', `Each plan goes on your ${BCV.lms?.name || 'Canvas'} calendar too, so the feed above carries it out with everything else.`, 'div')]),
-          U.switchEl(syncUi.send, async (on) => { syncUi.send = on; await BCV.plan.setSending(on); U.toast(on ? 'Plans go to your calendar now.' : 'Plans stay in Simpl now.'); }, 'Send plans to your calendar app'),
-        ], { mod: 'bcv-row--p12-16 bcv-sync__send' })], 'bcv-card--list'));
-      }
-      out.push(U.hint('Pull any piece of work to the right on To Do or the Dashboard to plan a time for it.'));
+      out.push(U.hint('Drag work from To Do beside the week onto a time to plan it, or pull it to the right on To Do or the Dashboard.'));
       return out;
     }
     function paintSync() {
@@ -1066,6 +1081,23 @@
       syncSheet.list.replaceChildren(...syncBody());
       if (had && /bcv-sync__input/.test(had)) syncSheet.list.querySelector('.bcv-sync__input')?.focus();
       else if (!syncSheet.ov.contains(document.activeElement)) syncSheet.ov.focus();
+    }
+    // (2.99.110) Simpl's calendar made (and sent at once), or stopped (its link stops working; a new one next time)
+    async function makeSimpl() {
+      if (syncUi.turning) return;
+      syncUi.turning = true;
+      paintSync();
+      try { syncUi.simpl = await BCV.feed.turnOn(); } catch (e) { syncUi.simpl = { on: false, error: e?.message || 'Simpl could not make your calendar.' }; }
+      syncUi.turning = false;
+      paintSync();
+    }
+    async function stopSimpl() {
+      if (syncUi.turning || !window.confirm('Stop sharing your Simpl calendar? Its link stops working, and calendar apps subscribed to it lose it. You can make a new one at any time.')) return;
+      syncUi.turning = true;
+      paintSync();
+      try { syncUi.simpl = await BCV.feed.turnOff(); U.toast('Your Simpl calendar is no longer shared.'); } catch (e) { U.toast(`Could not stop it: ${e.message}`, { error: true }); }
+      syncUi.turning = false;
+      paintSync();
     }
     async function linkCalendar(raw) {
       const url = String(raw || '').trim();
@@ -1093,25 +1125,21 @@
       const list = U.el('bcv-sheet__list', []);
       const sheet = U.el('bcv-sheet bcv-cal__sheet bcv-sync', [
         U.el('bcv-sheet__head', [
-          U.el('bcv-sheet__titles', [U.text('bcv-sheet__line', 'Sync'), U.text('bcv-sheet__note', 'Your Canvas work in your calendar app, and your calendars here.')]),
+          U.el('bcv-sheet__titles', [U.text('bcv-sheet__line', 'Sync'), U.text('bcv-sheet__note', 'Simpl in your calendar app, and your calendars here.')]),
           h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
         ]),
         list,
       ]);
       ov.append(sheet);
       syncSheet = { ov, list };
-      syncUi.send = !!(await BCV.plan?.sending());
       paintSync();
       document.body.append(ov);
       U.morphFrom(sheet, from);
       ov.tabIndex = -1;
       ov.focus();
-      if (syncUi.feed === undefined) {
-        let me = await store.me().catch(() => null);
-        if (me && me.calendarFeed === undefined) me = await store.me({ force: true }).catch(() => me); // (an account read before 2.99.107 kept no feed)
-        syncUi.feed = me?.calendarFeed || null;
-        paintSync();
-      }
+      syncUi.simpl = (await BCV.feed?.state().catch(() => null)) || { on: false };
+      paintSync();
+      const offFeed = BCV.feed?.onChange((st) => { if (!syncSheet) { offFeed?.(); return; } syncUi.simpl = st; paintSync(); });
     }
     // the linked calendars read again elsewhere (the background's half hour, a link added or a switch pressed), and the
     // plans changed (here, or a pull on another screen or tab): the grid and the sheet follow
@@ -1122,6 +1150,221 @@
     };
     try { BCV.api.storage.onChanged.addListener(onStorage); } catch { /* no change events: a reload shows them */ }
     const offPlans = BCV.plan?.onChange(() => { if (!ctx.alive()) { offPlans?.(); return; } merge(); draw(); });
+
+    // ---- (2.99.110) To Do beside the week ------------------------------------------------------------------------
+    // What is still to do (the To Do list: late work, the next seven days, the student's own tasks), grouped by when it
+    // is due, beside the week's hours. A piece of work is dragged onto a time to plan it there: it lifts out of the list
+    // and follows the pointer where it was taken hold of; over a day, a block as long as the plan shows where it would
+    // go, a quarter of an hour at a time; let go, it is planned (content/app/plan.js put) and its block stays; let go
+    // anywhere else, or Escape, and it goes back to its place in the list. A press opens it; its circle marks it done;
+    // P offers it the free times instead (the plan rail). A planned one says when, and dragged again, moves.
+    async function readTodo({ force = false } = {}) {
+      try { todoItems = (await store.todo({ force })).filter((it) => !it.dismissed); } catch { todoItems = todoItems || []; }
+      if (ctx.alive() && view === 'week' && todoOn) paintTodo();
+    }
+    function todoGroups(list) {
+      const today = U.startOfDay(new Date());
+      const groups = new Map();
+      for (const it of list) {
+        const d = it.date ? U.startOfDay(it.date) : null;
+        const key = !d ? 'none' : d < today ? 'late' : String(d.getTime());
+        if (!groups.has(key)) groups.set(key, { key, d, items: [] });
+        groups.get(key).items.push(it);
+      }
+      const order = [...groups.values()].sort((a, b) => (a.key === 'late' ? -1 : b.key === 'late' ? 1 : a.key === 'none' ? 1 : b.key === 'none' ? -1 : a.d - b.d));
+      for (const g of order) {
+        g.items.sort((x, y) => (x.date || 0) - (y.date || 0));
+        g.title = g.key === 'late' ? 'Overdue' : g.key === 'none' ? 'No date' : BCV.plan?.dayWord(g.d.getTime()) || U.fmtDow(g.d);
+      }
+      return order;
+    }
+    function paintTodo() {
+      const scrollWas = todoCol.querySelector('.bcv-todo-side__list')?.scrollTop || 0;
+      const list = todoItems ? todoItems.filter((it) => !it.complete && !it.submitted && !it.excused) : null;
+      const head = U.el('bcv-todo-side__head', [
+        U.el('bcv-todo-side__titles', [U.text('bcv-todo-side__title', 'To Do', 'div'), U.text('bcv-todo-side__sub', list && list.length ? 'Drag onto a time to plan it' : '', 'div')]),
+        list && list.length ? U.text('bcv-todo-side__count', String(list.length), 'span') : null,
+      ]);
+      const body_ = U.el('bcv-todo-side__list');
+      if (!list) body_.append(U.loading('inset', 3));
+      else if (!list.length) body_.append(U.el('bcv-todo-side__empty', [U.svg(IC.check, { size: 18, stroke: 'var(--bcv-green, #34c759)', width: 2.2 }), U.text('', 'Nothing left to do this week.', 'span')]));
+      else {
+        for (const g of todoGroups(list)) {
+          body_.append(U.el(`bcv-todo-side__group ${g.key === 'late' ? 'is-late' : ''}`, [
+            U.text('bcv-todo-side__day', g.title, 'div'),
+            ...g.items.map((it) => todoRow(it)),
+          ]));
+        }
+      }
+      todoCol.replaceChildren(U.el('bcv-todo-side', [head, body_]));
+      body_.scrollTop = scrollWas;
+    }
+    function todoRow(it) {
+      const p = BCV.plan?.get(it.id);
+      const color = it.course?.color || (it.custom ? '#0a84ff' : '#8e8e93');
+      const pal = U.palette(color, dark);
+      const late = it.date && it.date < new Date() && it.isDue;
+      const due = it.date ? `${it.custom ? '' : late ? 'Was due ' : 'Due '}${BCV.plan?.whenWords(it.date.getTime()) || U.fmtDow(it.date)}` : '';
+      const meta = [it.custom ? 'Your task' : it.courseName, due].filter(Boolean).join(' · ');
+      const circle = h('button', { type: 'button', class: 'bcv-circle bcv-tdrag__done', title: 'Mark done', 'aria-label': `Mark done: ${it.title}`, onclick: async (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const row = e.currentTarget.closest('.bcv-tdrag');
+        row?.classList.add('is-leaving');
+        try { await store.setComplete(it, true); U.haptic?.('success'); } catch (err) { row?.classList.remove('is-leaving'); U.toast(`Could not mark it done: ${err.message}`, { error: true }); return; }
+        setTimeout(() => readTodo(), 220);
+      } });
+      const row = h('a', { class: `bcv-tdrag ${p ? 'is-planned' : ''} ${late ? 'is-late' : ''}`, href: it.url, draggable: 'false', dataset: { item: it.id }, style: { '--bcv-tdrag-c': pal.text, '--bcv-tdrag-tint': pal.tint },
+        'aria-label': `${it.title}${meta ? `, ${meta}` : ''}${p ? `, planned ${BCV.plan.whenWords(Date.parse(p.at))}` : ''}. Drag onto the week to plan it, or press P for free times.` }, [
+        circle,
+        U.el('bcv-tdrag__body', [
+          U.text('bcv-tdrag__title', it.title, 'div'),
+          meta ? U.text('bcv-tdrag__meta', meta, 'div') : null,
+          p ? U.el('bcv-tdrag__plan', [U.svg(IC.clock, { size: 10, stroke: 'currentColor', width: 2.2 }), h('span', { text: `Planned ${BCV.plan.whenWords(Date.parse(p.at))}` })]) : null,
+        ]),
+        h('span', { class: 'bcv-tdrag__grip', 'aria-hidden': 'true' }, U.svg('M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01', { size: 14, stroke: 'currentColor', width: 2.6 })),
+      ]);
+      row.addEventListener('dragstart', (e) => e.preventDefault()); // (a link would otherwise be dragged off as a link)
+      row.addEventListener('pointerdown', (e) => dragTodo(e, row, it));
+      row.addEventListener('keydown', (e) => {
+        if ((e.key === 'p' || e.key === 'P') && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); BCV.plan?.open(row, it, { mode: 'pick' }); }
+      });
+      return row;
+    }
+    /** The page's scroller: where the grid scrolls, for a drag held near its top or bottom edge. */
+    function scrollerOf(el) {
+      for (let n = el; n && n !== document.body; n = n.parentElement) {
+        const o = getComputedStyle(n).overflowY;
+        if ((o === 'auto' || o === 'scroll') && n.scrollHeight > n.clientHeight + 2) return n;
+      }
+      return document.scrollingElement || document.documentElement;
+    }
+    function dragTodo(e, row, it) {
+      if (e.button !== 0 || !e.isPrimary || e.target.closest('.bcv-circle')) return;
+      const x0 = e.clientX;
+      const y0 = e.clientY;
+      const pid = e.pointerId;
+      const touch = e.pointerType === 'touch';
+      const had = BCV.plan?.get(it.id);
+      const mins = had?.mins || BCV.plan?.lengthFor(it) || 60;
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let engaged = false;
+      let ghost = null;
+      let drop = null;
+      let at = null; // { day, m, col }
+      let grab = { x: 0, y: 0 };
+      let last = { x: x0, y: y0 };
+      let raf = 0;
+      const gridBody = () => mainCol.querySelector('.bcv-week__body');
+      const cols = () => [...(gridBody()?.querySelectorAll('.bcv-week__day') || [])];
+      const hitCol = (x, y) => {
+        for (const c of cols()) { const r = c.getBoundingClientRect(); if (x >= r.left && x < r.right && y >= r.top - 6 && y <= r.bottom + 6) return { c, r }; }
+        return null;
+      };
+      const label = (day, m) => { const a = new Date(day + m * 60000); const b = new Date(a.getTime() + mins * 60000); return `${U.fmtTimeLower(a).replace(/m$/, '')} – ${U.fmtTimeLower(b).replace(/m$/, '')}`; };
+      function paintDrop(col) {
+        if (!drop) {
+          drop = h('div', { class: 'bcv-wev bcv-ev--plan bcv-wev--drop', 'aria-hidden': 'true', style: { background: row.style.getPropertyValue('--bcv-tdrag-tint'), '--bcv-ev-bar': row.style.getPropertyValue('--bcv-tdrag-c') } }, [
+            h('div', { class: 'bcv-wev__time' }), h('div', { class: 'bcv-wev__title', text: it.title }),
+          ]);
+        }
+        if (drop.parentElement !== col) col.append(drop);
+        drop.style.top = `${((at.m - DAY_A) / 60) * HOUR_PX}px`;
+        drop.style.height = `${Math.max(20, (mins / 60) * HOUR_PX - 2)}px`;
+        drop.querySelector('.bcv-wev__time').textContent = label(at.day, at.m);
+      }
+      function place(x, y) {
+        last = { x, y };
+        ghost.style.transform = `translate3d(${x - grab.x}px, ${y - grab.y}px, 0) scale(${at ? 0.92 : 1.03})`;
+        const hit = hitCol(x, y);
+        if (!hit) {
+          if (at) { at = null; drop?.remove(); ghost.classList.remove('is-over'); ghost.style.transform = `translate3d(${x - grab.x}px, ${y - grab.y}px, 0) scale(1.03)`; }
+          return;
+        }
+        // (the block starts a little above the pointer, so the pointer sits in its first quarter hour)
+        let m = Math.round((DAY_A + ((y - hit.r.top - 10) / HOUR_PX) * 60) / SNAP) * SNAP;
+        m = Math.max(DAY_A, Math.min(DAY_B - Math.min(mins, DAY_B - DAY_A), m));
+        const day = Number(hit.c.dataset.day);
+        if (at && at.day === day && at.m === m) return;
+        at = { day, m };
+        ghost.classList.add('is-over');
+        paintDrop(hit.c);
+        U.haptic?.('select');
+      }
+      // held near the top or the bottom of the view, the page scrolls on under it
+      function edge() {
+        raf = 0;
+        if (!engaged) return;
+        const sc = scrollerOf(gridBody() || mainCol);
+        const r = sc === document.scrollingElement || sc === document.documentElement ? { top: 0, bottom: innerHeight } : sc.getBoundingClientRect();
+        const zone = 56;
+        const v = last.y < r.top + zone ? -Math.ceil((r.top + zone - last.y) / 4) : last.y > r.bottom - zone ? Math.ceil((last.y - (r.bottom - zone)) / 4) : 0;
+        if (v) { sc.scrollTop += v; place(last.x, last.y); }
+        raf = requestAnimationFrame(edge);
+      }
+      const move = (m) => {
+        if (m.pointerId !== pid) return;
+        const dx = m.clientX - x0;
+        const dy = m.clientY - y0;
+        if (!engaged) {
+          if (Math.hypot(dx, dy) < 5) return;
+          if (touch && Math.abs(dy) > Math.abs(dx)) { end(false); return; } // (a finger going up or down is a scroll of the list)
+          engaged = true;
+          try { row.setPointerCapture(pid); } catch { /* the window still hears it */ }
+          const r = row.getBoundingClientRect();
+          grab = { x: x0 - r.left, y: y0 - r.top };
+          ghost = row.cloneNode(true);
+          ghost.classList.add('is-ghost');
+          ghost.removeAttribute('href');
+          ghost.setAttribute('aria-hidden', 'true');
+          Object.assign(ghost.style, { width: `${r.width}px`, transform: `translate3d(${r.left}px, ${r.top}px, 0)` });
+          document.body.append(ghost);
+          row.classList.add('is-lifted');
+          document.documentElement.classList.add('bcv-dragging-plan');
+          raf = requestAnimationFrame(edge);
+          U.haptic?.('select');
+        }
+        m.preventDefault();
+        place(m.clientX, m.clientY);
+      };
+      const finish = () => {
+        window.removeEventListener('pointermove', move, true);
+        window.removeEventListener('pointerup', up, true);
+        window.removeEventListener('pointercancel', cancel, true);
+        window.removeEventListener('keydown', key, true);
+        cancelAnimationFrame(raf);
+        document.documentElement.classList.remove('bcv-dragging-plan');
+      };
+      function end(letGo) {
+        finish();
+        if (!engaged) return;
+        // the click a drag ends with opens nothing
+        row.addEventListener('click', (c) => { c.preventDefault(); c.stopPropagation(); }, { capture: true, once: true });
+        if (letGo && at) {
+          const when = at.day + at.m * 60000;
+          drop?.classList.add('is-dropped');
+          ghost.remove();
+          row.classList.remove('is-lifted');
+          BCV.plan.put(it, when, mins).then(() => { U.haptic?.('success'); U.toast(`Planned ${BCV.plan.whenWords(when)}.`); }).catch((err) => { drop?.remove(); U.toast(`Could not plan it: ${err.message}`, { error: true }); });
+          return;
+        }
+        // back where it came from
+        drop?.remove();
+        const r = row.getBoundingClientRect();
+        const done = () => { ghost.remove(); row.classList.remove('is-lifted'); };
+        if (reduce) { done(); return; }
+        ghost.classList.add('is-returning');
+        ghost.style.transform = `translate3d(${r.left}px, ${r.top}px, 0) scale(1)`;
+        ghost.addEventListener('transitionend', done, { once: true });
+        setTimeout(done, 400);
+      }
+      const up = (u) => { if (u.pointerId === pid) end(true); };
+      const cancel = (u) => { if (u.pointerId === pid) end(false); };
+      const key = (k) => { if (k.key === 'Escape' && engaged) { k.preventDefault(); k.stopPropagation(); end(false); } };
+      window.addEventListener('pointermove', move, { capture: true, passive: false });
+      window.addEventListener('pointerup', up, true);
+      window.addEventListener('pointercancel', cancel, true);
+      window.addEventListener('keydown', key, true);
+    }
 
     function draw() {
       const noticeEl = loading ? U.el('bcv-cal__notice bcv-cal__notice--hint', 'Loading events…')
@@ -1138,6 +1381,11 @@
       subEl.hidden = !subEl.textContent;
       sideCol.hidden = view !== 'agenda';
       sideCol.replaceChildren(...[view === 'agenda' ? miniCalendar() : null].filter(Boolean));
+      todoBtn.hidden = view !== 'week';
+      todoBtn.parentElement?.classList.toggle('has-todo-btn', !todoBtn.hidden); // (one more button: the words give way sooner)
+      todoCol.hidden = !(view === 'week' && todoOn);
+      body.classList.toggle('has-todo', !todoCol.hidden);
+      if (!todoCol.hidden) paintTodo();
       calCount.textContent = String(selected.length);
       if (calSheet) { // the sheet is up: its rows and its count follow the switch just pressed
         calSheet.list.replaceChildren(...calendarsBody());
@@ -1173,6 +1421,7 @@
     loadAppointments(); // in its own time: the button's count fills in when Canvas answers
     // (2.99.107) the linked calendars as last read, then read again if that was more than half an hour ago, and the plans
     Promise.all([readLinks(), BCV.plan?.ready()]).then(() => { if (!ctx.alive()) return; merge(); draw(); if (linkState.links.length) callCal({ op: 'sync' }); }).catch(() => {});
+    readTodo(); // (2.99.110) the week's To Do, in its own time
     return screen;
   }
 

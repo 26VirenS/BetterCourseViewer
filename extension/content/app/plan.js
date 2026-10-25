@@ -10,8 +10,8 @@
  *
  * The same rail comes up from the keyboard (P on a row: arrows to choose, up and down for how long, Enter, Escape) and
  * from the plan's own pill, where it can be cleared. A plan is this Canvas's own, kept with the other preferences;
- * with Send plans on (Calendar → Sync) each also goes on the student's Canvas calendar, so the calendar feed they
- * subscribed to carries it to Apple, Google or Outlook. */
+ * (2.99.110) Simpl's own calendar (content/app/feed.js) carries it to Apple, Google or Outlook — no longer a copy on
+ * Canvas's calendar (the Send plans of 2.99.107: retireSending takes those copies off). */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
@@ -75,7 +75,6 @@
     plans = Object.fromEntries(Object.entries({ ...plans, ...patch }).filter(([, v]) => v));
     changed();
     await store.mergePref('plans', patch);
-    sendOut(it.id).catch(() => {});
     return plan;
   }
   /** (2.99.109) A plan moved to another time, as it is (its block dragged on the Calendar's week). */
@@ -86,7 +85,6 @@
     plans = { ...plans, [id]: next };
     changed();
     await store.mergePref('plans', { [id]: next });
-    sendOut(id).catch(() => {});
     return next;
   }
   async function clear(id) {
@@ -99,37 +97,14 @@
     if (prev.ev) C.del(`/api/v1/calendar_events/${prev.ev}`).catch(() => {});
   }
 
-  // ---- plans on the student's Canvas calendar (Send plans) ---------------------------------------------
-  const canSend = () => !BCV.lms?.d2l; // (Brightspace's stand-in has no calendar of the student's own to write to)
-  const sending = async () => canSend() && !!(await store.pref(SEND, false));
-  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  async function sendOut(id) {
-    if (!(await sending())) return;
-    const p = plans[id];
-    if (!p) return;
-    const me = await store.me();
-    if (!me?.id) return;
-    const href = p.url ? new URL(p.url, location.origin).href : '';
-    const body = { calendar_event: {
-      context_code: `user_${me.id}`, title: `Plan: ${p.title}`, start_at: p.at, end_at: new Date(Date.parse(p.at) + p.mins * MIN).toISOString(),
-      description: `<p>Planned in Simpl for ${href ? `<a href="${esc(href)}">${esc(p.title)}</a>` : esc(p.title)}${p.due ? `, due ${esc(U.fmtDow(p.due))} at ${esc(U.fmtTimeLower(p.due))}` : ''}.</p>`,
-    } };
-    try {
-      const r = p.ev ? await C.put(`/api/v1/calendar_events/${p.ev}`, body) : await C.post('/api/v1/calendar_events', body);
-      if (r?.id != null && String(r.id) !== String(p.ev) && plans[id]) {
-        plans[id] = { ...plans[id], ev: String(r.id) };
-        await store.mergePref('plans', { [id]: plans[id] });
-      }
-    } catch (e) {
-      if (p.ev && /404|not exist/i.test(e?.message || '')) { plans[id] = { ...p, ev: null }; await store.mergePref('plans', { [id]: plans[id] }); return sendOut(id); } // (deleted in Canvas meanwhile: made again)
-      U.toast(`Planned here, but ${BCV.lms?.name || 'Canvas'} would not put it on your calendar: ${e.message}`, { error: true });
-    }
-  }
-  /** Send plans switched: on, every plan still ahead goes on the Canvas calendar; off, those sent come off it. */
-  async function setSending(on) {
-    await store.setPref(SEND, !!on);
-    const ahead = Object.keys(plans).filter((k) => Date.parse(plans[k].at) + plans[k].mins * MIN > Date.now());
-    if (on) { for (const k of ahead) await sendOut(k).catch(() => {}); return; }
+  // ---- (2.99.110) Send plans, retired --------------------------------------------------------------------------
+  // Plans went on the student's Canvas calendar with Send plans on (2.99.107), for Canvas's feed to carry them out.
+  // Simpl's own calendar carries them now: the copies Simpl put on Canvas's calendar come off it, once.
+  const canSend = () => false;
+  const sending = async () => false;
+  async function retireSending() {
+    if (!(await store.pref(SEND, false))) return;
+    await store.setPref(SEND, false);
     const patch = {};
     for (const k of Object.keys(plans)) {
       if (!plans[k].ev) continue;
@@ -139,6 +114,7 @@
     }
     if (Object.keys(patch).length) await store.mergePref('plans', patch);
   }
+  const setSending = async () => retireSending();
 
   // ---- the calendars linked in Calendar → Sync (read by the background: background.js cal) -------------
   async function linked() {
@@ -505,5 +481,5 @@
     return rowEl;
   }
 
-  BCV.plan = { ready, get, all, onChange, put, move, clear, attach, pill, open: openBar, close: closeBar, freeSlots, slotsFor, linked, linkedEvents, sending, setSending, canSend, whenWords, dayWord, lenWord, lengthFor };
+  BCV.plan = { ready, get, all, onChange, put, move, clear, attach, pill, open: openBar, close: closeBar, freeSlots, slotsFor, linked, linkedEvents, sending, setSending, canSend, retireSending, whenWords, dayWord, lenWord, lengthFor };
 })();

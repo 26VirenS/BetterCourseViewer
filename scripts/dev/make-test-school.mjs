@@ -58,6 +58,9 @@ src = src.replace(SN_IMPORT, () => 'const renameNames = (text) => text; // (site
 // (Simpl Community's stand-in, scripts/dev/mock-community.mjs, is the website's: the test school has none)
 const CM_IMPORT = "import { communityMock } from './mock-community.mjs'; // (2.99.106: Simpl Community, as simplcourses.com has it)";
 src = src.replace(CM_IMPORT, () => 'const communityMock = null; // (mock-community.mjs: the website\'s Simpl Community, not the test school\'s)');
+// (2.99.110: and the stand-in for Simpl's calendar feed, scripts/dev/mock-feed.mjs, the website's too)
+const FD_IMPORT = "import { feedMock } from './mock-feed.mjs'; // (2.99.110: Simpl's own calendar feed, as simplcourses.com has it)";
+src = src.replace(FD_IMPORT, () => 'const feedMock = null; // (mock-feed.mjs: the website\'s calendar feed, not the test school\'s)');
 // (the test school is no real school: the mock's few words of the university it was first drawn from — an address, a
 // notice's title, a mascot's greeting — are made the test school's own, here only; CI's mock keeps them)
 src = src.replaceAll('ucmerced.edu', 'test.simpl.com').replaceAll('UC Merced', 'Simpl Test School').replaceAll('Hello Bobcat!', 'Hello!').replaceAll('Bobcat', 'Student');
