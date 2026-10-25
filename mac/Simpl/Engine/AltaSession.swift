@@ -1558,7 +1558,6 @@ final class AltaGraphWindow: NSObject, NSWindowDelegate {
         weak var session: AltaSession?
     }
 
-    /// (1.3.122) Macmillan's pictures open here too (no Alta session: on white, as Macmillan draws them).
     func show(_ image: NSImage, title: String, session: AltaSession?) {
         model.image = image
         model.session = session

@@ -889,7 +889,7 @@ private struct AltaMasteryBar: View {
 /// popup is dimmed or held.
 struct AltaDialogLayer: View {
     let dialog: AltaDialog
-    /// (1.3.123) Whose pop-up it is: Knewton Alta's, or Macmillan's (MacmillanScreen) — the card's name, glyph and its page.
+    /// (1.3.123) Whose pop-up it is: Knewton Alta's — the card's name, glyph and its page.
     var brand = AltaDialogCard.Brand.alta
     let press: (Int) -> Void
     let link: (Int) -> Void
@@ -931,7 +931,6 @@ struct AltaDialogCard: View {
         let color: Color
         let page: String
         static let alta = Brand(name: "Knewton Alta", symbol: "brain.head.profile", color: Theme.accent, page: "Alta's Page")
-        static let macmillan = Brand(name: "Macmillan Learning", symbol: "books.vertical", color: .red, page: "Macmillan's Page")
     }
     let dialog: AltaDialog
     var brand = Brand.alta

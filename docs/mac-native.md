@@ -535,6 +535,9 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   (`MacmillanScreen`, `MacmillanSession`): the launch through Canvas, Macmillan's page as it draws it, and Save Page Code
   (`AltaSession.collect`, every frame's code too) — the start of laying it out as the app's own, from its saved code.
   `-SimplOpen macmillan:104:4005` opens the mock's (the screenshot suite's `21d`).
+  (1.3.163) Taken out again: the popup, its skin (1.3.114–1.3.123) and its Save Page Code are gone, and a Macmillan
+  assignment opens in the tool window like any other tool, as Macmillan draws it — steadier than a second implementation
+  of a page that changes under it. `-SimplOpen macmillan:104:4005` now opens that tool window.
   (1.3.67) External Tools, in the sidebar under Tools (Canvas only): every external tool in the student's current
   courses — each course's own tabs, and the tools found only in its assignments and module items (native-app.js
   `externalTools`: one row a tool, named as the web's search names it, hub.js `toolNameOf`, else by its site) — a card a

@@ -75,7 +75,7 @@ struct RootView: View {
     }
 }
 
-/// A window's popups and sheets — What's New, a quiz, an Alta or a Macmillan assignment, the setup, a new task or
+/// A window's popups and sheets — What's New, a quiz, an Alta assignment, the setup, a new task or
 /// message — and the tool windows it opens: the main window's and (1.3.69) each window more's, over its own window.
 /// (1.3.79) Only a quiz being taken and the setup are sheets, blocking the window; the rest are popups over it that
 /// never do (Shell/FloatingPopup.swift).
@@ -96,10 +96,6 @@ struct EngineSheets: ViewModifier {
             .floatingPopup("alta", title: "Knewton Alta", item: $engine.alta, layout: .large, engine: engine) { a in
                 AltaQuizScreen(launch: a, engine: engine)
                     .modifier(UpdateHold()) // (nor while an Alta assignment is open)
-            }
-            .floatingPopup("macmillan", title: "Macmillan Learning", item: $engine.macmillan, layout: .large, engine: engine) { a in
-                MacmillanScreen(launch: a)
-                    .modifier(UpdateHold()) // (1.3.66: nor while a Macmillan assignment is open)
             }
             .sheet(isPresented: $engine.setup) {
                 SetupScreen()

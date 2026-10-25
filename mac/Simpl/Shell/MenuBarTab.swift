@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-// (1.3.153, 1.3.155, 1.3.157) New Window: while a large popup is up over the window — a tool, a Knewton Alta or Macmillan
+// (1.3.153, 1.3.155, 1.3.157) New Window: while a large popup is up over the window — a tool, a Knewton Alta
 // assignment, the feedback, the rubric — a little black tab hangs from the menu bar over the empty start of the toolbar,
 // as if the menu bar went on down there, and says New Window; pressed, another Simpl window opens on the screen this one
 // shows (File ▸ New Window's), the popup staying where it is — something else looked up while the assignment waits. It lives in the window's own title bar, which in full screen is the bar that slides

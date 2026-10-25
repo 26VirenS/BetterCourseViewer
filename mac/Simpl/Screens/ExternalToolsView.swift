@@ -57,7 +57,7 @@ struct ExternalToolsData: Codable {
 
 /// (1.3.67) External Tools, in the sidebar: every tool the school provides in the student's courses — a course's own
 /// (its navigation's) and those found only in its assignments and modules — a card a tool: its name, its site, where it
-/// is found, and each course it is in, a press away (Knewton Alta and Macmillan in their own popups, the rest in the
+/// is found, and each course it is in, a press away (Knewton Alta in its own popup, the rest in the
 /// tool window). A filter narrows them by name, site or course.
 ///
 /// (1.3.77) The cards stand in columns of their own heights (`ExternalToolColumns`), each in the shortest column so far, so a short
@@ -246,7 +246,8 @@ enum ToolOpening {
         return AltaLaunch(course: p.course, assignment: a, title: p.title, dueLine: due)
     }
 
-    /// Opened in that course: Knewton Alta's and Macmillan's assignments in their own popups, the rest in the tool window.
+    /// Opened in that course: Knewton Alta's assignments in their own popup, the rest (1.3.163: Macmillan's too, as
+    /// Macmillan draws them) in the tool window.
     /// Without `item`, as the course's chip opens it (its tab, else its first assignment or module item there); (1.3.77)
     /// with one, that assignment or module item itself, under its own title.
     /// (1.3.101) `alta`: the Alta launch already asked for as the place was chosen.
@@ -255,14 +256,7 @@ enum ToolOpening {
             engine.alta = a
             return
         }
-        let (course, args, title) = place(t, in: c, item: item)
-        let label = (t.name + " " + t.host).lowercased()
-        if let a = args["assignment"] {
-            if label.contains("macmillan") || label.contains("sapling") || label.contains("achieve.") {
-                engine.macmillan = AltaLaunch(course: course, assignment: a, title: title)
-                return
-            }
-        }
+        let (_, args, title) = place(t, in: c, item: item)
         engine.openTool(ToolLaunch(title: title, args: args))
     }
 }

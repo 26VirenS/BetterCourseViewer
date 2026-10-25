@@ -140,7 +140,7 @@ struct QuizScreen: View {
 
     /// The sheet's own bar, on the page with no band behind it (1.2): the quiz and where it stands, and during an attempt
     /// the clock and the instructions in glass; the quiz on Canvas in its menu. Submit is at the foot of the attempt,
-    /// with Next. (1.3.78) Close at the right end, where every full popup has it (the quiz, Knewton Alta, Macmillan, the
+    /// with Next. (1.3.78) Close at the right end, where every full popup has it (the quiz, Knewton Alta, the
     /// feedback on a file) — and the feedback's way back to the quiz a chevron by the title, apart from it.
     private var topBar: some View {
         HStack(spacing: 14) {

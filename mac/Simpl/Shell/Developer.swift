@@ -4,12 +4,12 @@ import SwiftUI
 /// (1.3.72) Developer mode: hidden until it is asked for — seven clicks on the app's icon in Settings ▸ About, or
 /// Control-Option-Shift-Command-D anywhere in the app (again to leave it). Unlocked, the Simpl menu has a Developer
 /// menu and the Developer window opens: what the app is running on, its updates, its engine (a console that calls it),
-/// Knewton Alta and Macmillan (Save Page Code lives here now, and Alta's Error Logs), the interface's first-run steps
+/// Knewton Alta (Save Page Code lives here now, and Alta's Error Logs), the interface's first-run steps
 /// and its window, and every preference it keeps.
 /// (1.3.109) And its live pages (Shell/DeveloperTools.swift): Logs — the app's own log, filtered, followed, copied or saved;
 /// System — processor, memory and threads charted over two minutes, the Mac's thermal state, the storage the app uses;
-/// Stats — every call the engine made, how often, how long, how many failed. Save Page Code is in Alta's and Macmillan's
-/// popups too while developer mode is on.
+/// Stats — every call the engine made, how often, how long, how many failed. Save Page Code is in Alta's
+/// popup too while developer mode is on.
 @MainActor
 final class DevMode: ObservableObject {
     static let shared = DevMode()
@@ -65,11 +65,6 @@ final class DevMode: ObservableObject {
         Task { if let f = await s.savePageCode(withLogs: withLogs) { NSWorkspace.shared.activateFileViewerSelecting([f]) } else { NSSound.beep() } }
     }
 
-    static func saveMacmillanCode() {
-        guard let s = MacmillanSession.current else { NSSound.beep(); return }
-        Task { if let f = await s.savePageCode() { NSWorkspace.shared.activateFileViewerSelecting([f]) } else { NSSound.beep() } }
-    }
-
     /// Everything about this copy and where it runs, for a bug report.
     static func diagnostics() -> String {
         let os = ProcessInfo.processInfo.operatingSystemVersionString
@@ -119,7 +114,6 @@ struct DeveloperMenu: View {
             Divider()
             Button("Save Alta Page Code") { DevMode.saveAltaCode(withLogs: false) }
             Button("Save Alta Page Code with Error Logs") { DevMode.saveAltaCode(withLogs: true) }
-            Button("Save Macmillan Page Code") { DevMode.saveMacmillanCode() }
             Divider()
             Button("Refresh Data") { engine?.refresh() }.disabled(engine == nil)
             Button("Reload \(engine?.lmsName ?? "School") Page") { engine?.reload() }.disabled(engine == nil)
@@ -150,7 +144,7 @@ struct DeveloperView: View {
             case .stats: return "Stats"
             case .updates: return "Updates"
             case .engine: return "Engine"
-            case .popups: return "Alta & Macmillan"
+            case .popups: return "Knewton Alta"
             case .interface: return "Interface"
             case .preferences: return "Preferences"
             }
@@ -346,7 +340,7 @@ private struct DevEngine: View {
     }
 }
 
-/// Knewton Alta's and Macmillan's popups: their page code, Alta's state and Error Logs.
+/// Knewton Alta's popup: its page code, its state and Error Logs.
 private struct DevPopups: View {
     @AppStorage("SimplAltaGraphsLight") private var graphsLight = false
     @State private var now = Date()
@@ -354,7 +348,6 @@ private struct DevPopups: View {
 
     var body: some View {
         let alta = AltaSession.current
-        let mac = MacmillanSession.current
         Form {
             Section("Knewton Alta") {
                 if let a = alta {
@@ -384,15 +377,6 @@ private struct DevPopups: View {
                         Button("Clear Error Logs") { a.clearErrorLogs() }
                     }
                 }
-            }
-            Section("Macmillan Learning") {
-                if let m = mac {
-                    LabeledContent("Assignment", value: m.launch.title)
-                } else {
-                    Text("No Macmillan assignment is open.").foregroundStyle(.secondary)
-                }
-                Button("Save Page Code") { DevMode.saveMacmillanCode() }
-                    .disabled(mac == nil)
             }
         }
         .formStyle(.grouped)

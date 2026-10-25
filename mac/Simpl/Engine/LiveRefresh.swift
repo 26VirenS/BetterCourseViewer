@@ -343,7 +343,7 @@ final class LiveRefresh {
 
 /// (1.3.80) What holds a live check back, and the check resumes when it ends: the window put away (minimized, covered,
 /// the app not in front), nobody at the Mac (1.3.85: its screen locked, its displays or itself asleep, another user's
-/// session in front), no network, the page not ready or a screen's own read under way; a quiz, an Alta or a Macmillan
+/// session in front), no network, the page not ready or a screen's own read under way; a quiz or an Alta
 /// assignment open; the student typing (a text field being edited, or a key pressed in the last 5 seconds); What-If on;
 /// any sheet, dialog, popover, popup (Hand In and Send from Phone among them — a tool's own popup aside, and (1.3.85)
 /// History's and Help's, only there to be read), menu or the tour up; the mouse held down (a drag); a counter's panel or
@@ -409,7 +409,7 @@ final class LiveHolds {
         if engine.phase != .native || !engine.pageReady { out.append("page") }
         if (engine.primary ?? engine).waiting > 0 { out.append("loading") } // (a screen's own read under way goes first)
         if engine.quiz != nil { out.append("quiz") }
-        if engine.alta != nil || engine.macmillan != nil { out.append("assignment popup") }
+        if engine.alta != nil { out.append("assignment popup") }
         if typing { out.append("typing") }
         out += on.filter { !$0.value.isEmpty }.keys.sorted()
         if dialog(engine, window) { out.append("dialog") }

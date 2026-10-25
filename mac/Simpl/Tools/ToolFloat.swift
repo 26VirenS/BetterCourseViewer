@@ -384,7 +384,7 @@ struct PullOutGrip: View {
     }
 }
 
-/// The tools pinned to the toolbar, on a popup's own bar (a quiz, an Alta or a Macmillan assignment): the window's
+/// The tools pinned to the toolbar, on a popup's own bar (a quiz, an Alta assignment): the window's
 /// toolbar is under a quiz's sheet, so its pins come here — (1.3.79) and stay on an assignment's popup, by the work —
 /// each opening its quick panel over the popup; pulled out they float over it. (tools-6) As in the toolbar, the pins past
 /// the bar's room in the Tools pull-down — (1.3.79) only those: every pin that fits in the bar is shown, the popup's name

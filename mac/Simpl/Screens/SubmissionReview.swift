@@ -93,7 +93,7 @@ struct SubmissionReview: View {
                 .fixedSize()
                 .help("More for \(f.name)")
             }
-            // (1.3.78) Close, as the quiz, Knewton Alta and Macmillan popups have it: the same word in the same place
+            // (1.3.78) Close, as the quiz and Knewton Alta popups have it: the same word in the same place
             Button("Close") { dismiss() }
                 .glassButton()
                 .keyboardShortcut(.cancelAction)

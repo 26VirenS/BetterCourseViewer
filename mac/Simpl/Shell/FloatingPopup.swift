@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 // (1.3.79) Popups over the window that never stand in its way — every popup but a quiz being taken. A whole tool, a
-// Knewton Alta or Macmillan assignment, the feedback on a piece of work, the rubric ring, What's New, Hand In, a new
+// Knewton Alta assignment, the feedback on a piece of work, the rubric ring, What's New, Hand In, a new
 // task or message, a counter's list and the app's short forms each come up in a window of their own over the main
 // window (a child panel, `FloatingPopups`), not a sheet: nothing round it is dimmed or caught, so the sidebar, the
 // toolbar, the search and the screen under it are used as ever, and going to another screen leaves it where it is,
@@ -18,7 +18,7 @@ import SwiftUI
 enum PopupLayout {
     /// (1.3.80) The window's whole content — under the toolbar, over the sidebar — less a margin all round, centred and
     /// sized again as the window is; dragged by its edges and corners, it takes the size the student gives it, kept for
-    /// next time under its size key (a tool's own): a whole tool, an Alta or Macmillan assignment, the feedback, the
+    /// next time under its size key (a tool's own): a whole tool, an Alta assignment, the feedback, the
     /// rubric. (1.3.79 kept it clear of the sidebar while the sidebar was out: a tool had 740 points of a window 970 wide.)
     case large
     /// As large as what it shows asks (as a sheet is), (1.3.82) in the middle of the whole window: What's New, Hand In, a
@@ -311,7 +311,7 @@ final class FloatingPopups {
         for key in Array(panels.keys) { close(key, animated: false) }
     }
 
-    /// (1.3.155) A large popup is up (a tool, an Alta or Macmillan assignment, the feedback, the rubric): the menu bar's
+    /// (1.3.155) A large popup is up (a tool, an Alta assignment, the feedback, the rubric): the menu bar's
     /// tab (Shell/MenuBarTab.swift) offers New Window.
     var hasLarge: Bool { panels.values.contains { $0.popupLayout.isLarge } }
 
@@ -878,7 +878,7 @@ final class PopupPanel: NSPanel {
 }
 
 /// (1.3.80) The sizes students gave large popups by their edges, kept in the app's settings by size key (a tool's own,
-/// `tool.dna`; "alta", "macmillan", "feedback", "rubric") and used each time one opens, within the window's room. A
+/// `tool.dna`; "alta", "feedback", "rubric") and used each time one opens, within the window's room. A
 /// launch's `-SimplPopupSize tool.dna=700x500` (several joined by commas) gives a popup a size for that launch alone:
 /// the screenshot suite's picture of a tool reopened at the size it was left at.
 enum PopupSizes {
