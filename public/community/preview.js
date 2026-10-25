@@ -89,9 +89,11 @@
       el('div', 'sp-who', [el('i', 'sp-face'), el('div', null, [el('b', null, 'Sam Student'), el('small', null, 'sstudent@lakeside.edu')])]),
     ]);
     lay(side, picture(theme, 'side', 0), ink('side'));
-    const cards = el('div', 'sp-cards', CARDS.map(([key, label, n, sub], i) => {
+    // (a counter's drawing the variation Simpl draws there: its place among Simpl's counters, the site's 'next' its 'week')
+    const variation = (key) => (T() && T().CARD_SLOTS ? T().CARD_SLOTS.indexOf(key === 'next' ? 'week' : key) + 1 : 1);
+    const cards = el('div', 'sp-cards', CARDS.map(([key, label, n, sub]) => {
       const card = el('div', `sp-card sp-card--${key}`, [el('div', 'sp-card__in', [el('small', null, label), el('b', null, n), el('span', null, sub)])]);
-      lay(card, picture(theme, key, i), ink('card'));
+      lay(card, picture(theme, key, variation(key)), ink('card'));
       return card;
     }));
     const list = el('div', 'sp-list', [
