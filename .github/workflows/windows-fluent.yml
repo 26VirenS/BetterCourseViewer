@@ -540,6 +540,10 @@ jobs:
           Shot 'theme-photo' '1366x778' 45 ($mock + @('--appearance', 'light', '--theme-photo', $themePhoto))
           Shot 'theme-photo-plain' '1366x778' 45 ($mock + @('--appearance', 'light', '--theme-photo', $themePhoto, '--theme-plain', 'yes'))
           Shot 'theme-photo-plain-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--theme-photo', $themePhoto, '--theme-plain', 'yes'))
+          # (0.3.61) a photo in its place: Due today's lit and outlined, its settings under it — and the pane's, Ink off, in
+          # dark, its settings beside it
+          Shot 'appearance-photo-card' '1366x778' 45 ($mock + @('--appearance', 'light', '--appearance-mode', 'yes', '--theme-photo', $themePhoto, '--photo-edit', 'today'))
+          Shot 'appearance-photo-side-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--appearance-mode', 'yes', '--theme-photo', $themePhoto, '--theme-plain', 'yes', '--photo-edit', 'side'))
           # (General's foot, below the fold: This PC's Uninstall Simpl, and the question it asks)
           Shot 'settings-general-end' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', 'general', '--settings-scroll', '4000'))
           Shot 'settings-uninstall' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'settings', '--settings-tab', 'general', '--settings-scroll', '4000', '--settings-sheet', 'uninstall'))
