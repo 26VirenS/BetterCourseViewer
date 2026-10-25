@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Simpl Courses — What's due, on one screen</title>
+<title>Simpl Courses — Learning made Simpl.</title>
 <meta name="description" content="See what’s due, what’s overdue and how you’re doing on one screen. Simpl redraws Canvas and Brightspace. Free, no account.">
 <meta name="theme-color" content="#fbfbfd" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://simplcourses.com/">
-<meta property="og:title" content="Simpl Courses — What's due, on one screen">
+<meta property="og:title" content="Simpl Courses — Learning made Simpl.">
 <meta property="og:description" content="See what’s due, what’s overdue and how you’re doing on one screen. Free for Canvas and Brightspace.">
 <meta property="og:image" content="https://simplcourses.com/img/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -89,11 +89,42 @@ section { position: relative; }
 .btn__tag { padding: 3px 8px; border-radius: 999px; background: var(--soft-row); color: var(--soft-sub); font: 600 11px/1.25 var(--font); letter-spacing: .01em; }
 .btn--blue .btn__tag { background: rgba(255, 255, 255, .18); color: #fff; }
 @media (hover: hover) and (pointer: fine) { .btn--blue:hover { background: var(--blue-hover); } .btn--soft:hover { background: var(--soft-hover); } }
-.cta { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
-@media (max-width: 560px) { .cta { flex-direction: column; align-items: stretch; width: 100%; max-width: 340px; margin-inline: auto; } }
-.cta__alt { margin: 14px 0 0; font-size: 15px; color: var(--text-2); letter-spacing: 0; }
-.cta__alt a { color: var(--link); text-decoration: none; }
-@media (hover: hover) and (pointer: fine) { .cta__alt a:hover { text-decoration: underline; } }
+.cta { position: relative; z-index: 5; display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
+.cta > .btn, .cta > .macdl { width: 260px; }
+@media (max-width: 560px) { .cta { flex-direction: column; align-items: stretch; width: 100%; max-width: 330px; margin-inline: auto; } .cta > .btn, .cta > .macdl { width: 100%; } }
+
+/* ---- Download for Mac: the button opens into its two choices, up or down as there is room --------------- */
+.macdl { --mb: var(--soft); --mt: var(--soft-text); --ms: var(--soft-sub); --mr: var(--soft-row); --ml: var(--soft-line); position: relative; display: inline-block; }
+.macdl--blue { --mb: var(--blue); --mt: #fff; --ms: rgba(255, 255, 255, .72); --mr: rgba(255, 255, 255, .14); --ml: rgba(255, 255, 255, .2); }
+.macdl__btn { width: 100%; }
+.macdl__chev { width: 15px !important; height: 15px !important; margin-left: 1px; opacity: .65; transition: transform 260ms var(--ease-out); }
+.macdl[data-open] .macdl__chev { transform: rotate(180deg); }
+/* the panel lies over the button and is clipped to it; opening unclips it toward the room the page has */
+.macdl__float { position: absolute; left: 0; right: 0; top: 0; z-index: 40; pointer-events: none; filter: drop-shadow(0 18px 30px rgba(0, 0, 0, .22)) drop-shadow(0 2px 6px rgba(0, 0, 0, .1)); }
+.macdl[data-dir="up"] .macdl__float { top: auto; bottom: 0; }
+.macdl__panel { display: flex; flex-direction: column; background: var(--mb); color: var(--mt); border-radius: 25px; padding: 0 6px 6px; visibility: hidden;
+  clip-path: inset(0 0 calc(100% - var(--h, 50px)) 0 round calc(var(--h, 50px) / 2));
+  transition: clip-path 240ms var(--ease-out), visibility 0s linear 240ms; }
+.macdl[data-dir="up"] .macdl__panel { flex-direction: column-reverse; padding: 6px 6px 0; clip-path: inset(calc(100% - var(--h, 50px)) 0 0 0 round calc(var(--h, 50px) / 2)); }
+.macdl[data-open] .macdl__panel { visibility: visible; pointer-events: auto; clip-path: inset(0 0 0 0 round 25px); transition: clip-path 300ms var(--ease-out), visibility 0s; }
+.macdl__head { height: var(--h, 50px); display: flex; align-items: center; justify-content: center; gap: 9px; margin: 0 -6px; font: 500 17px/1 var(--font); letter-spacing: -.015em; cursor: pointer; }
+.macdl__head svg { width: 19px; height: 19px; }
+.macdl__opts { display: grid; gap: 2px; border-top: 1px solid var(--ml); margin: 0 6px; padding: 6px 0 0; }
+.macdl[data-dir="up"] .macdl__opts { border-top: 0; border-bottom: 1px solid var(--ml); padding: 0 0 6px; }
+.macdl__opt { display: flex; align-items: center; gap: 12px; padding: 9px 12px; margin: 0 -6px; border-radius: 18px; text-decoration: none; color: inherit; -webkit-tap-highlight-color: transparent;
+  opacity: 0; transform: translateY(-6px); transition: opacity 120ms ease, transform 160ms var(--ease-out), background-color 160ms ease; }
+.macdl[data-dir="up"] .macdl__opt { transform: translateY(6px); }
+.macdl[data-open] .macdl__opt { opacity: 1; transform: none; transition: opacity 200ms var(--ease-out), transform 260ms var(--ease-out), background-color 160ms ease; transition-delay: calc(70ms + var(--i, 0) * 45ms), calc(70ms + var(--i, 0) * 45ms), 0s; }
+.macdl__opt:active { background: var(--mr); }
+@media (hover: hover) and (pointer: fine) { .macdl__opt:hover { background: var(--mr); } }
+.macdl__opt:focus-visible { outline: 2px solid color-mix(in srgb, var(--mt) 70%, transparent); outline-offset: -2px; background: var(--mr); }
+.macdl__ic { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; flex: none; }
+.macdl__ic--safari { background: linear-gradient(160deg, #1fb6ff, #0a6cff); color: #fff; }
+.macdl__ic--safari svg { width: 22px; height: 22px; }
+.macdl__ic img { width: 34px; height: 34px; border-radius: 8px; }
+.macdl__t { display: grid; gap: 2px; text-align: left; }
+.macdl__t b { font: 600 15px/1.15 var(--font); letter-spacing: -.01em; white-space: nowrap; }
+.macdl__rec { display: inline-block; margin-left: 6px; padding: 2px 6px; border-radius: 999px; background: var(--mr); color: var(--mt); font: 600 10.5px/1.3 var(--font); letter-spacing: .01em; vertical-align: 1px; }
 .link { display: inline-flex; align-items: center; gap: 5px; font-size: 19px; color: var(--link); text-decoration: none; }
 .link svg { width: 13px; height: 13px; transition: transform 200ms var(--ease-out); }
 @media (hover: hover) and (pointer: fine) { .link:hover { text-decoration: underline; } .link:hover svg { transform: translateX(2px); } }
@@ -105,12 +136,27 @@ section { position: relative; }
 .center { text-align: center; }
 .center .sub { margin-inline: auto; max-width: 660px; }
 
-/* ---- hero: the problem, named, and the before and after ----------------------------------------------- */
-.hero { position: relative; padding: calc(112px + env(safe-area-inset-top)) 0 0; text-align: center; isolation: isolate; overflow-x: clip; }
-.hero__title { margin: 12px auto 0; max-width: 980px; font: 700 clamp(38px, 6.2vw, 76px)/1.04 var(--font-display); letter-spacing: -.04em; text-wrap: balance; }
+/* ---- hero ----------------------------------------------------------------------------------------------- */
+.hero { position: relative; padding: calc(118px + env(safe-area-inset-top)) 0 0; text-align: center; isolation: isolate; overflow-x: clip; }
+.hero__new { display: inline-flex; align-items: center; gap: 6px; font: 500 17px/1.2 var(--font); color: var(--link); text-decoration: none; }
+.hero__new b { font-weight: 600; color: #f56300; }
+.hero__new svg { width: 13px; height: 13px; transition: transform 200ms var(--ease-out); }
+@media (hover: hover) and (pointer: fine) { .hero__new:hover { text-decoration: underline; } .hero__new:hover svg { transform: translateX(2px); } }
+.hero__title { margin: 18px auto 0; font: 700 clamp(56px, 10.2vw, 116px)/1 var(--font-display); letter-spacing: -.045em; text-wrap: balance; }
+.hero__title .w { display: inline-block; }
+.hero__title .w + .w { margin-left: .22em; }
+/* "Make ___ Simpl.": the middle word turns over through subjects, each its own colour; its box eases to each word's
+   width (set by the script) so the words either side glide rather than jump */
+.hero__title { font-size: clamp(50px, 7.8vw, 98px); }
+.rot { position: relative; text-align: center; white-space: nowrap; }
+.rot__size { visibility: hidden; }
+.rot__word { position: absolute; left: 50%; top: 0; transform: translateX(-50%); color: var(--c); opacity: 0; }
+.rot__word.is-on { opacity: 1; }
+@media (prefers-color-scheme: dark) { .rot__word { color: var(--cd); } }
+@media (max-width: 720px) { .hero__title .w.rot { display: block; margin: 0 auto; } .hero__title .rot + .w { margin-left: 0; } }
 .hero .sub { margin-top: 18px; }
-.hero .cta { margin-top: 32px; }
-.hero__fine { margin: 14px 0 0; font-size: 14px; color: var(--text-3); letter-spacing: 0; }
+.hero .cta { margin-top: 34px; }
+.hero__fine { margin: 18px 0 0; font-size: 14px; color: var(--text-3); letter-spacing: 0; }
 .stage { position: relative; margin-top: 56px; perspective: 2000px; }
 .stage__tilt { transform-origin: 50% 0; }
 .stage__glow { position: absolute; inset: 14% 10% -4%; z-index: -1; border-radius: 40px; background: #0a84ff; opacity: .16; filter: blur(80px); }
@@ -172,34 +218,22 @@ section { position: relative; }
 .chip--app::after { content: "App"; padding: 1px 6px; border-radius: 999px; background: var(--soft-row); color: var(--text-3); font: 600 10.5px/1.4 var(--font); letter-spacing: .02em; }
 .tools__key { margin: 4px 0 0; font-size: 13px; color: var(--text-3); letter-spacing: 0; }
 
-/* ---- everywhere: Mac, Windows, iPhone, Brightspace --------------------------------------------------------- */
-.mac { margin-top: 140px; padding: 120px 0 0; background: #000; color: #f5f5f7; overflow: hidden; --text-2: #a1a1a6; --text-3: #86868b; }
-.mac::before { content: ""; position: absolute; inset: auto -20% -30% -20%; height: 75%; background: radial-gradient(50% 50% at 50% 50%, rgba(10, 132, 255, .28), transparent 70%); pointer-events: none; }
-.mac .cta { margin-top: 30px; }
-.mac .btn--soft { --soft: #2c2c2e; --soft-text: #f5f5f7; --soft-row: rgba(255, 255, 255, .1); --soft-sub: #a1a1a6; }
-.mac__shot { position: relative; margin: 64px auto 0; width: min(940px, 100% - 32px); }
-.mac__shot .win { border-radius: 12px 12px 0 0; box-shadow: 0 0 0 .5px rgba(255, 255, 255, .18), 0 -10px 80px -20px rgba(10, 132, 255, .35); }
-.mac__shot picture { -webkit-mask-image: linear-gradient(#000 76%, transparent); mask-image: linear-gradient(#000 76%, transparent); }
-@media (max-width: 760px) { .mac { margin-top: 100px; padding-top: 90px; } }
-
+/* ---- iPhone, coming soon --------------------------------------------------------------------------------- */
 .duo { padding: 120px 0 0; }
-.duo__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+.duo__grid { display: grid; gap: 22px; }
 .tile { position: relative; display: flex; flex-direction: column; border-radius: 30px; background: var(--tile); overflow: hidden; padding: 48px 40px 44px; }
 .tile h3 { margin: 6px 0 0; font: 700 clamp(28px, 3.2vw, 38px)/1.08 var(--font-display); letter-spacing: -.03em; text-wrap: balance; }
 .tile p { margin: 10px 0 0; font: 500 17px/1.4 var(--font-display); letter-spacing: -.01em; color: var(--text-2); }
-.tile .btn { align-self: flex-start; margin-top: 24px; }
-.tile__shot { margin: 34px -40px -44px 40px; }
-.tile__shot .win { border-radius: 12px 0 0 0; box-shadow: 0 0 0 .5px var(--hair-2), 0 20px 50px -24px rgba(0, 20, 60, .3); }
-.tile--phone { flex-direction: row; gap: 32px; align-items: center; grid-column: span 2; padding: 48px 48px 0; }
+.tile--phone { flex-direction: row; gap: 32px; align-items: center; padding: 48px 48px 0; }
 .tile--phone .tile__text { flex: 1; padding-bottom: 48px; }
 .tile__phones { display: flex; gap: 18px; height: 380px; overflow: hidden; -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
 .tile__phones .phone { width: 220px; padding: 8px; border-radius: 42px; }
 .tile__phones .phone img { border-radius: 34px; }
 .tile__phones .phone:last-child { margin-top: 50px; }
 @media (max-width: 860px) {
-  .duo { padding-top: 90px; } .duo__grid { grid-template-columns: 1fr; }
-  .tile { padding: 40px 26px 36px; } .tile__shot { margin: 28px -26px -36px 26px; }
-  .tile--phone { grid-column: auto; flex-direction: column; align-items: stretch; padding: 40px 26px 0; } .tile--phone .tile__text { padding-bottom: 0; }
+  .duo { padding-top: 90px; }
+  .tile { padding: 40px 26px 36px; }
+  .tile--phone { flex-direction: column; align-items: stretch; padding: 40px 26px 0; } .tile--phone .tile__text { padding-bottom: 0; }
   .tile__phones { justify-content: center; height: 330px; } .tile__phones .phone { width: 170px; padding: 6px; border-radius: 34px; } .tile__phones .phone img { border-radius: 28px; }
 }
 
@@ -244,12 +278,12 @@ section { position: relative; }
 .get__icon { width: 88px; height: 88px; margin: 0 auto 24px; border-radius: 20px; box-shadow: 0 22px 40px -20px rgba(10, 80, 220, .6); }
 .get .cta { margin-top: 30px; }
 .opts { margin-top: 48px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
-.opt { display: flex; flex-direction: column; gap: 4px; padding: 18px 18px 20px; border-radius: 20px; background: var(--tile-on-2); text-decoration: none; transition: transform 140ms var(--ease-out); }
+.opt { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 22px 16px 20px; border-radius: 20px; background: var(--tile-on-2); text-decoration: none; transition: transform 140ms var(--ease-out); }
 .opt:active { transform: scale(.98); }
-.opt svg { width: 26px; height: 26px; margin-bottom: 8px; color: var(--blue); }
+.opt svg { width: 24px; height: 24px; margin-bottom: 10px; color: var(--blue); }
 .opt b { font: 600 16px/1.25 var(--font); letter-spacing: -.01em; }
-.opt small { font-size: 13px; line-height: 1.35; color: var(--text-2); letter-spacing: 0; }
-.opt[data-here] { box-shadow: 0 0 0 2px var(--blue); }
+.opt small { font-size: 13px; line-height: 1.35; color: var(--text-2); letter-spacing: 0; white-space: nowrap; }
+.get__req { margin: 16px 0 0; font-size: 12.5px; color: var(--text-3); letter-spacing: 0; }
 @media (hover: hover) and (pointer: fine) { .opt:hover { background: color-mix(in srgb, var(--tile-on-2) 92%, var(--blue)); } }
 @media (max-width: 1000px) { .opts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 480px) { .opts { grid-template-columns: 1fr; } }
@@ -278,13 +312,21 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
 
 /* ---- motion --------------------------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: no-preference) {
-  .hero__kicker, .hero__title, .hero .sub, .hero .cta, .hero .cta__alt, .hero__fine { animation: rise 800ms var(--ease-out) both; }
-  .hero__title { animation-delay: 60ms; }
-  .hero .sub { animation-delay: 160ms; }
-  .hero .cta, .hero .cta__alt { animation-delay: 240ms; }
-  .hero__fine { animation-delay: 300ms; }
-  .stage { animation: stage-in 1100ms var(--ease-out) 300ms both; }
-  @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+  /* the hero arrives once: the words, then what they offer, then the window */
+  .hero__new, .hero__title .w, .hero .sub, .hero .cta, .hero__fine { animation: rise 900ms var(--ease-out) both; }
+  .hero__new { animation-delay: 60ms; }
+  .hero__title .w { animation-delay: calc(140ms + var(--i) * 80ms); }
+  .hero .sub { animation-delay: 420ms; }
+  .hero .cta { animation-delay: 500ms; }
+  .hero__fine { animation-delay: 580ms; }
+  .stage { animation: stage-in 1100ms var(--ease-out) 520ms both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(16px); } }
+  /* the word turning over: the old one lifts away and blurs, the new one rises in; the box eases between widths */
+  .js .rot { transition: width 480ms var(--ease-in-out); clip-path: inset(-1em -.06em -1em -.06em); }
+  .js .rot.is-resizing { transition: none; }
+  .rot__word { transition: opacity 380ms var(--ease-out), transform 460ms var(--ease-out), filter 380ms var(--ease-out); }
+  .rot__word.is-in { transform: translate(-50%, .32em); filter: blur(6px); transition: none; }
+  .rot__word.is-out { opacity: 0; transform: translate(-50%, -.32em); filter: blur(6px); transition-duration: 280ms; }
   @keyframes stage-in { from { opacity: 0; transform: translateY(48px); } }
   @supports (animation-timeline: scroll()) {
     .stage__tilt { animation: flatten linear both; animation-timeline: scroll(root); animation-range: 0 60vh; }
@@ -298,7 +340,11 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
 @media (prefers-reduced-motion: reduce) {
   .js .reveal { opacity: 0; transition: opacity 300ms ease; }
   .js .reveal.is-in { opacity: 1; }
-  .btn, .link svg { transition: none; }
+  .macdl__panel, .macdl[data-dir="up"] .macdl__panel { clip-path: inset(0 0 0 0 round 25px); opacity: 0; transition: opacity 160ms ease, visibility 0s linear 160ms; }
+  .macdl[data-open] .macdl__panel { opacity: 1; transition: opacity 160ms ease, visibility 0s; }
+  .macdl__opt, .macdl[data-dir="up"] .macdl__opt { transform: none; transition: opacity 160ms ease, background-color 160ms ease; }
+  .macdl[data-open] .macdl__opt { transition-delay: 0s; }
+  .macdl__chev, .btn, .link svg, .hero__new svg { transition: none; }
 }
 </style>
 </head>
@@ -313,6 +359,7 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
   <symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M15.9 8.1l-2.4 5.4-5.4 2.4 2.4-5.4z" fill="currentColor"/></symbol>
   <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10.5 18.3h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
   <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 3v12M7.5 7.5L12 3l4.5 4.5M5 12v7.2c0 .99.81 1.8 1.8 1.8h10.4c.99 0 1.8-.81 1.8-1.8V12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 16 16"><path d="M3.5 6l4.5 4.5L12.5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-fwd" viewBox="0 0 16 16"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-lock" viewBox="0 0 12 12"><rect x="2" y="5.2" width="8" height="5.8" rx="1.4" fill="currentColor"/><path d="M3.8 5.4V4a2.2 2.2 0 0 1 4.4 0v1.4" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M15.5 15.5L20 20" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
@@ -323,7 +370,6 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
     <a class="brand" href="/" aria-label="Simpl Courses, home"><img src="/img/icon-128.png" alt="" width="26" height="26"> Simpl Courses</a>
     <nav class="nav__links" aria-label="Sections">
       <a href="#moments">Features</a>
-      <a href="#everywhere">Apps</a>
       <a href="/compare">Compare</a>
       <a href="/trust">Trust</a>
     </nav>
@@ -332,19 +378,29 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
 </header>
 
 <main id="main">
-  <!-- ---- hero: the problem in one line, then Canvas and Simpl side by side ---------------------------- -->
+  <!-- ---- hero ---------------------------------------------------------------------------------------- -->
   <section class="hero">
     <div class="wrap">
-      <p class="kicker hero__kicker">Simpl Courses, for Canvas and Brightspace</p>
-      <h1 class="hero__title">See what’s due, what’s overdue and how you’re doing. <span class="accent">On one screen.</span></h1>
-      <p class="sub">Simpl redraws your school’s Canvas so the answer is the first thing you see.</p>
-      <div class="cta" data-smart>
+      <a class="hero__new" href="#school"><b>New</b> Simpl for Brightspace <svg aria-hidden="true"><use href="#i-fwd"/></svg></a>
+      <h1 class="hero__title"><span class="w" style="--i:0">Make<span class="sr"> learning</span></span> <span class="w rot" style="--i:1" aria-hidden="true" data-rot><span class="rot__size">Learning</span><span class="rot__word is-on" style="--c:#d97a00;--cd:#ffb340">Learning</span><span class="rot__word" style="--c:#5856d6;--cd:#7d7aff">Math</span><span class="rot__word" style="--c:#1f9d48;--cd:#30d158">Science</span><span class="rot__word" style="--c:#a05a1c;--cd:#e0a66a">History</span><span class="rot__word" style="--c:#d70f4f;--cd:#ff6482">English</span><span class="rot__word" style="--c:#0a84b8;--cd:#64d2ff">Chemistry</span><span class="rot__word" style="--c:#4d8c0c;--cd:#a3e635">Biology</span><span class="rot__word" style="--c:#8a3fb5;--cd:#c77dff">Physics</span><span class="rot__word" style="--c:#d4380d;--cd:#ff7a45">Spanish</span><span class="rot__word" style="--c:#0f8f84;--cd:#40c8b4">Homework</span></span> <span class="w" style="--i:2"><span class="accent">Simpl.</span></span></h1>
+      <p class="sub">Canvas and Brightspace, made simple.</p>
+      <div class="cta">
         <a class="btn btn--blue" href="https://chromewebstore.google.com/detail/simpl-courses/ljhgbneclhamffmdhpokmfhkooabgcgp"><svg aria-hidden="true"><use href="#i-puzzle"/></svg>Add to Chrome</a>
-        <a class="btn btn--blue" href="/download/mac-app"><svg aria-hidden="true"><use href="#i-laptop"/></svg>Download for Mac</a>
-        <a class="btn btn--soft" href="/download/windows"><svg aria-hidden="true"><use href="#i-windows"/></svg>Windows<span class="btn__tag">Beta</span></a>
+        <div class="macdl macdl--blue" data-macdl>
+          <button class="btn btn--blue macdl__btn" type="button" aria-expanded="false" aria-controls="macdl-hero"><svg aria-hidden="true"><use href="#i-laptop"/></svg>Download for Mac<svg class="macdl__chev" aria-hidden="true"><use href="#i-chev"/></svg></button>
+          <div class="macdl__float">
+            <div class="macdl__panel" id="macdl-hero">
+              <div class="macdl__head" aria-hidden="true"><svg><use href="#i-laptop"/></svg>Download for Mac<svg class="macdl__chev"><use href="#i-chev"/></svg></div>
+              <div class="macdl__opts">
+                <a class="macdl__opt" href="/download/mac-app" style="--i:0"><span class="macdl__ic"><img src="/img/icon-128.png" alt="" width="34" height="34"></span><span class="macdl__t"><b>Mac App<span class="macdl__rec">Recommended</span></b><small>macOS 14+</small></span></a>
+                <a class="macdl__opt" href="/download/mac" style="--i:1"><span class="macdl__ic macdl__ic--safari"><svg aria-hidden="true"><use href="#i-compass"/></svg></span><span class="macdl__t"><b>Safari Extension</b><small>macOS 13+</small></span></a>
+              </div>
+            </div>
+          </div>
+        </div>
+        <a class="btn btn--soft" href="/download/windows" title="Download Simpl for Windows (beta) — Windows 10 or 11, 64-bit"><svg aria-hidden="true"><use href="#i-windows"/></svg>Windows<span class="btn__tag">Beta</span></a>
       </div>
-      <p class="cta__alt" data-smart-alt hidden></p>
-      <p class="hero__fine">Free. No account. One switch turns it off and Canvas is back as it was.</p>
+      <p class="hero__fine">Free. No account needed.</p>
     </div>
     <div class="wrap stage">
       <div class="stage__tilt">
@@ -377,20 +433,20 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
   <section class="moments" id="moments">
     <div class="wrap center reveal">
       <p class="kicker">Built for your week</p>
-      <h2 class="h2">Every moment, one step shorter.</h2>
+      <h2 class="h2">Simpl helps you do more, faster.</h2>
     </div>
 
     <div class="wrap">
       <article class="moment" id="every-day" style="--k:#0a84ff">
         <div class="moment__text reveal">
           <p class="moment__when">Every day</p>
-          <h3>Find anything, in every course, from one box.</h3>
-          <p class="moment__lead">The Dashboard answers “what now?” and the search answers everything else.</p>
+          <h3>Find anything, from one box.</h3>
+          <p class="moment__lead">What’s due, and a search across every course.</p>
           <ul class="ticks">
-            <li><b>Six counters:</b> due today, the next 7 days, overdue, graded this week, unread announcements, classes today. Each opens exactly what it counted.</li>
-            <li><b>One search across every course:</b> assignments, pages, files and announcements as you type.</li>
-            <li><b>Type / for commands:</b> open a tool, add a task, jump to a course.</li>
-            <li><b>Notifications, To Do and the Calendar</b> in one sidebar, updated every minute in the Mac and Windows apps.</li>
+            <li><b>Six counters</b> for due, overdue and graded.</li>
+            <li><b>One search</b> across every course.</li>
+            <li><b>Type /</b> to open a tool or add a task.</li>
+            <li><b>To Do and the Calendar</b> one click away.</li>
           </ul>
         </div>
         <div class="moment__shot reveal" style="--d:80ms">
@@ -407,13 +463,13 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
         <div class="moment__text reveal">
           <p class="moment__when">Before a quiz</p>
           <h3>Quizzes, without the clutter.</h3>
-          <p class="moment__lead">The question, the answers and where you are. Nothing else.</p>
+          <p class="moment__lead">Just the question and your answers.</p>
           <ul class="ticks">
-            <li><b>One question at a time</b>, or the whole quiz in one scroll.</li>
-            <li><b>A map of every question:</b> jump to any one, flag one for later.</li>
-            <li><b>Review every answer</b> before you submit.</li>
-            <li><b>Never reloaded under you.</b> Simpl doesn’t reload a quiz you’re taking, and Canvas keeps each answer as you go.</li>
-            <li><b>Knewton Alta inside Simpl</b> in the Mac and Windows apps: its objectives, mastery and questions without a second tab.</li>
+            <li><b>One at a time</b>, or all in one scroll.</li>
+            <li><b>Jump to or flag</b> any question.</li>
+            <li><b>Review</b> before you submit.</li>
+            <li><b>Never reloads</b> mid-quiz.</li>
+            <li><b>Knewton Alta</b> inside the Mac and Windows apps.</li>
           </ul>
         </div>
         <div class="moment__shot reveal" style="--d:80ms">
@@ -430,12 +486,12 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
         <div class="moment__text reveal">
           <p class="moment__when">Turning in work</p>
           <h3>Hand in from your phone.</h3>
-          <p class="moment__lead">Worksheet on paper? Scan the code on your screen, take a photo, done.</p>
+          <p class="moment__lead">Scan the code, snap a photo, done.</p>
           <ul class="ticks">
-            <li><b>Scan, snap, hand in.</b> Your computer shows the receipt when it lands.</li>
-            <li><b>Several files or a whole folder</b> handed in as one .zip.</li>
-            <li><b>Preview a file</b> before you submit it.</li>
-            <li><b>The rubric and your feedback</b> beside the grade, not three clicks away.</li>
+            <li><b>A receipt</b> on your computer when it lands.</li>
+            <li><b>Whole folders</b> as one .zip.</li>
+            <li><b>Preview</b> before you submit.</li>
+            <li><b>Rubric and feedback</b> beside the grade.</li>
           </ul>
         </div>
         <div class="moment__shot reveal" style="--d:80ms">
@@ -452,12 +508,12 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
         <div class="moment__text reveal">
           <p class="moment__when">When grades come back</p>
           <h3>Know where you stand.</h3>
-          <p class="moment__lead">Every course’s grade, your term GPA and what each one needs from here.</p>
+          <p class="moment__lead">Every grade, your GPA and what’s left to hit your goal.</p>
           <ul class="ticks">
-            <li><b>A term GPA</b> worked out from your Canvas scores, against a goal you set.</li>
-            <li><b>What-if:</b> try a score before it lands, or add a made-up assignment.</li>
-            <li><b>A target for each course</b>, and what you need from here to hit it.</li>
-            <li><b>How the class did</b> on each assignment, with your score on it.</li>
+            <li><b>Term GPA</b> against your goal.</li>
+            <li><b>What-if</b> scores before they land.</li>
+            <li><b>A target</b> for each course.</li>
+            <li><b>Class stats</b> beside your score.</li>
           </ul>
         </div>
         <div class="moment__shot reveal" style="--d:80ms">
@@ -474,7 +530,7 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
         <div class="moment__text reveal">
           <p class="moment__when">Studying</p>
           <h3>Study tools, built in.</h3>
-          <p class="moment__lead">17 in the browser and nearly 40 in the Mac and Windows apps. Each opens over your work and closes back to it.</p>
+          <p class="moment__lead">17 in the browser, nearly 40 in the apps.</p>
           <div class="tools">
             <div class="tools__row"><p class="tools__subj">Math</p><span class="chip">GeoGebra calculator</span><span class="chip">Graphing</span><span class="chip">Statistics</span><span class="chip">Matrices</span><span class="chip">Unit converter</span></div>
             <div class="tools__row"><p class="tools__subj">Chemistry</p><span class="chip">Periodic table</span><span class="chip">Equation balancer</span><span class="chip">Moles</span><span class="chip chip--app">3D molecules</span><span class="chip chip--app">Lewis structures</span><span class="chip chip--app">Gas laws</span><span class="chip chip--app">Solutions &amp; pH</span></div>
@@ -495,45 +551,9 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
     </div>
   </section>
 
-  <!-- ---- everywhere --------------------------------------------------------------------------------------- -->
-  <section class="mac" id="everywhere">
-    <div class="wrap center reveal" style="--k:#2997ff">
-      <p class="kicker">Simpl for Mac</p>
-      <h2 class="h2">A real Mac app.</h2>
-      <p class="sub">Your courses in their own window, with every tool and Knewton Alta inside.</p>
-      <div class="cta">
-        <a class="btn btn--blue" href="/download/mac-app"><svg aria-hidden="true"><use href="#i-laptop"/></svg>Download for Mac</a>
-        <a class="btn btn--soft" href="/download/mac"><svg aria-hidden="true"><use href="#i-compass"/></svg>Safari extension</a>
-      </div>
-    </div>
-    <div class="mac__shot reveal" style="--d:100ms">
-      <figure class="win">
-        <picture>
-          <img src="/img/mac-dark-01-dashboard.webp" width="1024" height="630" loading="lazy" decoding="async" alt="Simpl for Mac in dark mode: a sidebar of places and courses, and the Dashboard’s counters and tonight’s work.">
-        </picture>
-      </figure>
-    </div>
-  </section>
-
-  <section class="duo">
+  <!-- ---- iPhone, coming soon ----------------------------------------------------------------------------- -->
+  <section class="duo" id="everywhere">
     <div class="wrap duo__grid">
-      <div class="tile reveal" style="--k:#0a84ff">
-        <p class="kicker">Simpl for Windows · Beta</p>
-        <h3>The same Simpl, on Windows.</h3>
-        <p>A Windows 11 app with the Dashboard, quizzes, Knewton Alta and the study tools. Windows 10 or 11, 64-bit.</p>
-        <a class="btn btn--blue" href="/download/windows"><svg aria-hidden="true"><use href="#i-windows"/></svg>Download for Windows</a>
-      </div>
-      <div class="tile reveal" style="--k:#12a4c9; --d:80ms">
-        <p class="kicker">Brightspace</p>
-        <h3>Brightspace too.</h3>
-        <p>The same Dashboard, To Do and grades over your school’s Brightspace, in the browser and the Mac app.</p>
-        <div class="tile__shot"><figure class="win">
-          <picture>
-            <source media="(prefers-color-scheme: dark)" srcset="/img/web-brightspace-dark.webp 1440w, /img/web-brightspace-dark@2x.webp 2880w" sizes="(min-width: 1152px) 505px, (min-width: 860px) 45vw, calc(100vw - 58px)">
-            <img src="/img/web-brightspace.webp" srcset="/img/web-brightspace.webp 1440w, /img/web-brightspace@2x.webp 2880w" sizes="(min-width: 1152px) 505px, (min-width: 860px) 45vw, calc(100vw - 58px)" width="1440" height="900" loading="lazy" decoding="async" alt="Simpl on a Brightspace site: the same Dashboard, with each course’s grade, the week’s workload and the work coming up.">
-          </picture>
-        </figure></div>
-      </div>
       <div class="tile tile--phone reveal" id="iphone" style="--k:#30b45a">
         <div class="tile__text">
           <p class="kicker">Simpl for iPhone · Coming soon</p>
@@ -561,7 +581,7 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
       <div class="center reveal">
         <p class="kicker">Compared</p>
         <h2 class="h2">Simpl, BetterCampus and plain Canvas.</h2>
-        <p class="sub">Where we’re ahead, and where we’re not.</p>
+        <p class="sub">Where Simpl is ahead.</p>
       </div>
       <div class="scroll-x reveal">
         <table class="vs__table">
@@ -571,8 +591,6 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
             <tr><th scope="row">Mac and Windows apps</th><td class="yes">Yes (Windows in beta)</td><td>No</td><td>No, phone apps only</td></tr>
             <tr><th scope="row">Hand in by scanning a code with your phone</th><td class="yes">Yes</td><td>No</td><td>Submit in the Canvas phone app</td></tr>
             <tr><th scope="row">Price and account</th><td class="yes">Free, no account</td><td>Free tier; Pro $19/month. Newer features need an account</td><td>Free for students</td></tr>
-            <tr><th scope="row">Two-way Google and Outlook calendar sync</th><td>No</td><td class="yes">Yes (Pro)</td><td>A calendar feed to subscribe to</td></tr>
-            <tr><th scope="row">Community themes and AI study notes</th><td>No</td><td class="yes">Yes</td><td>No</td></tr>
           </tbody>
         </table>
       </div>
@@ -603,12 +621,13 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
       <h2 class="h2 reveal">Try it this term.</h2>
       <p class="sub reveal">Free for Canvas and Brightspace.</p>
       <div class="opts reveal">
-        <a class="opt" data-dev="mac" href="/download/mac-app"><svg aria-hidden="true"><use href="#i-laptop"/></svg><b>Mac app</b><small>Recommended on a Mac · macOS 14 or later</small></a>
-        <a class="opt" data-dev="safari" href="/download/mac"><svg aria-hidden="true"><use href="#i-compass"/></svg><b>Safari extension</b><small>macOS 13 or later</small></a>
-        <a class="opt" data-dev="chrome" href="https://chromewebstore.google.com/detail/simpl-courses/ljhgbneclhamffmdhpokmfhkooabgcgp"><svg aria-hidden="true"><use href="#i-puzzle"/></svg><b>Chrome or Edge</b><small>Any computer</small></a>
-        <a class="opt" data-dev="windows" href="/download/windows"><svg aria-hidden="true"><use href="#i-windows"/></svg><b>Windows app</b><small>Beta · Windows 10 or 11, 64-bit</small></a>
-        <a class="opt" data-dev="iphone" href="#iphone"><svg aria-hidden="true"><use href="#i-phone"/></svg><b>iPhone</b><small>Coming soon · join the waitlist</small></a>
+        <a class="opt" href="/download/mac-app"><svg aria-hidden="true"><use href="#i-laptop"/></svg><b>Mac app</b><small>Recommended</small></a>
+        <a class="opt" href="/download/mac"><svg aria-hidden="true"><use href="#i-compass"/></svg><b>Safari extension</b><small>Inside Safari</small></a>
+        <a class="opt" href="https://chromewebstore.google.com/detail/simpl-courses/ljhgbneclhamffmdhpokmfhkooabgcgp"><svg aria-hidden="true"><use href="#i-puzzle"/></svg><b>Chrome or Edge</b><small>Any computer</small></a>
+        <a class="opt" href="/download/windows"><svg aria-hidden="true"><use href="#i-windows"/></svg><b>Windows app</b><small>Beta</small></a>
+        <a class="opt" href="#iphone"><svg aria-hidden="true"><use href="#i-phone"/></svg><b>iPhone</b><small>Coming soon</small></a>
       </div>
+      <p class="get__req reveal">Mac app: macOS 14 or later · Safari: macOS 13 or later · Windows: 10 or 11, 64-bit</p>
 
       <div class="school reveal" id="school">
         <h3>Does it work with my school?</h3>
@@ -646,7 +665,6 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
 
 <script>
 (() => {
-  const STORE = 'https://chromewebstore.google.com/detail/simpl-courses/ljhgbneclhamffmdhpokmfhkooabgcgp';
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // the bar gets its material once the page has moved under it
@@ -673,29 +691,81 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
     img.addEventListener('error', done, { once: true });
   }
 
-  // ---- one button for the device you're on -------------------------------------------------------------------
-  // (the user agent's platform token, which browsers keep even in their reduced strings; an iPad asking for the desktop
-  //  site says Macintosh, and only its touch screen tells it apart)
-  const ua = navigator.userAgent;
-  const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
-  const device = ios ? 'iphone' : /Android/.test(ua) ? 'android' : /Macintosh|Mac OS X/.test(ua) ? 'mac' : /Windows/.test(ua) ? 'windows' : 'chrome';
-  const icon = (id) => `<svg aria-hidden="true"><use href="#${id}"/></svg>`;
-  const PRIMARY = {
-    mac: [`<a class="btn btn--blue" href="/download/mac-app">${icon('i-laptop')}Download for Mac</a>`, 'The Mac app. Prefer Safari or Chrome? <a href="#get">Every way to get it</a>'],
-    windows: [`<a class="btn btn--blue" href="/download/windows">${icon('i-windows')}Download for Windows<span class="btn__tag">Beta</span></a>`, `Or <a href="${STORE}">add it to Chrome or Edge</a>. <a href="#get">Every way to get it</a>`],
-    chrome: [`<a class="btn btn--blue" href="${STORE}">${icon('i-puzzle')}Add to Chrome</a>`, 'Works in Chrome and Edge. <a href="#get">Every way to get it</a>'],
-    iphone: [`<a class="btn btn--blue" href="#iphone">${icon('i-phone')}Join the iPhone waitlist</a>`, 'Simpl runs on Mac, Windows and Chrome today. <a href="#share">Send it to your computer</a>'],
-    android: [`<a class="btn btn--blue" href="#share">${icon('i-send')}Send it to my computer</a>`, 'Simpl runs on Mac, Windows and Chrome. <a href="#get">Every way to get it</a>'],
-  };
-  const smart = document.querySelector('[data-smart]');
-  const alt = document.querySelector('[data-smart-alt]');
-  if (smart && PRIMARY[device]) {
-    smart.innerHTML = PRIMARY[device][0];
-    alt.innerHTML = PRIMARY[device][1];
-    alt.hidden = false;
+  // "Make ___ Simpl.": every 1.7s the next subject rises in as the last lifts away, the box easing to its width;
+  // still for reduced motion, paused while the page is hidden or the title is off screen
+  const rot = document.querySelector('[data-rot]');
+  if (rot && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const words = [...rot.querySelectorAll('.rot__word')];
+    const size = rot.querySelector('.rot__size');
+    let at = 0, seen = true, timer = 0;
+    const fit = () => { rot.style.width = `${words[at].offsetWidth}px`; };
+    const turn = () => {
+      const from = words[at];
+      at = (at + 1) % words.length;
+      const to = words[at];
+      from.classList.remove('is-on');
+      from.classList.add('is-out');
+      to.classList.remove('is-out');
+      to.classList.add('is-in');
+      to.getBoundingClientRect(); // (the start position takes before the move to it)
+      to.classList.remove('is-in');
+      to.classList.add('is-on');
+      size.textContent = to.textContent;
+      fit();
+    };
+    const tick = () => { if (seen && !document.hidden) turn(); timer = setTimeout(tick, 1700); };
+    fit();
+    // (while the window is being resized the box follows at once, then eases again)
+    let settle = 0;
+    addEventListener('resize', () => {
+      rot.classList.add('is-resizing');
+      fit();
+      clearTimeout(settle);
+      settle = setTimeout(() => rot.classList.remove('is-resizing'), 150);
+    }, { passive: true });
+    if (document.fonts) document.fonts.ready.then(fit);
+    if ('IntersectionObserver' in window) new IntersectionObserver(([e]) => { seen = e.isIntersecting; }).observe(rot);
+    timer = setTimeout(tick, 1500);
   }
-  const here = document.querySelector(`.opt[data-dev="${device === 'android' ? 'chrome' : device}"]`);
-  if (here) here.setAttribute('data-here', '');
+
+  // Download for Mac: the button opens into its two choices — downward when the page has room below it, else upward
+  const choosers = [...document.querySelectorAll('[data-macdl]')];
+  const close = (root, { focus = false } = {}) => {
+    if (!root.hasAttribute('data-open')) return;
+    root.removeAttribute('data-open');
+    root.querySelector('.macdl__btn').setAttribute('aria-expanded', 'false');
+    if (focus) root.querySelector('.macdl__btn').focus({ preventScroll: true });
+  };
+  const open = (root, viaKeyboard) => {
+    choosers.forEach((r) => r !== root && close(r));
+    const btn = root.querySelector('.macdl__btn');
+    const panel = root.querySelector('.macdl__panel');
+    const r = btn.getBoundingClientRect();
+    root.style.setProperty('--h', `${r.height}px`);
+    const need = panel.offsetHeight + 12;
+    const below = innerHeight - r.top, above = r.bottom;
+    root.dataset.dir = below >= need || below >= above ? 'down' : 'up';
+    root.setAttribute('data-open', '');
+    btn.setAttribute('aria-expanded', 'true');
+    if (viaKeyboard) root.querySelector('.macdl__opt').focus({ preventScroll: true });
+  };
+  for (const root of choosers) {
+    const btn = root.querySelector('.macdl__btn');
+    const opts = [...root.querySelectorAll('.macdl__opt')];
+    btn.addEventListener('click', (e) => (root.hasAttribute('data-open') ? close(root) : open(root, e.detail === 0)));
+    root.querySelector('.macdl__head').addEventListener('click', () => close(root, { focus: true }));
+    root.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && root.hasAttribute('data-open')) { e.preventDefault(); close(root, { focus: true }); return; }
+      const i = opts.indexOf(document.activeElement);
+      if (i < 0 || !['ArrowDown', 'ArrowUp'].includes(e.key)) return;
+      e.preventDefault();
+      opts[(i + (e.key === 'ArrowDown' ? 1 : opts.length - 1)) % opts.length].focus();
+    });
+    root.addEventListener('focusout', (e) => { if (!root.contains(e.relatedTarget)) close(root); });
+    // a choice is taken: the download starts, and the panel closes once the press has shown
+    opts.forEach((a) => a.addEventListener('click', () => setTimeout(() => close(root), 180)));
+  }
+  document.addEventListener('pointerdown', (e) => choosers.forEach((root) => { if (!root.contains(e.target)) close(root); }));
 
   // ---- send it on: the phone's share sheet, else the link copied ----------------------------------------------
   const shareNote = document.querySelector('[data-share-note]');
@@ -712,11 +782,6 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
     }
   };
   for (const b of document.querySelectorAll('[data-share]')) b.addEventListener('click', share);
-  // (the hero's "Send it to my computer" on a phone opens the same sheet)
-  document.addEventListener('click', (e) => {
-    const a = e.target.closest('a[href="#share"]');
-    if (a && (device === 'android' || device === 'iphone') && a.closest('[data-smart]')) { e.preventDefault(); share(); }
-  });
 
   // ---- the iPhone waitlist -------------------------------------------------------------------------------------
   const wl = document.querySelector('[data-waitlist]');
@@ -731,7 +796,7 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
       const res = await fetch('/api/waitlist', { method: 'POST', body: new FormData(wl) });
       const body = await res.json().catch(() => ({}));
       if (res.ok && body.ok) {
-        wlNote.textContent = 'You’re on the list. One email when Simpl for iPhone is out, nothing else.';
+        wlNote.textContent = 'You’re on the list.';
         wlNote.dataset.kind = 'ok';
         wl.reset();
       } else {
