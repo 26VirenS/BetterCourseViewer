@@ -529,6 +529,12 @@ jobs:
           # buttons, the bar at the foot — the themes in light, the courses' colours in dark
           Shot 'appearance-mode' '1366x778' 45 ($mock + @('--appearance', 'light', '--theme', 'Ocean', '--appearance-mode', 'yes'))
           Shot 'appearance-courses-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--appearance-mode', 'yes', '--appearance-tab', 'courses'))
+          # (0.3.59) the fixture photo in every place: inked, and with its Ink off — shown as it is, the words on it dark
+          # with a white border — in light and dark
+          $themePhoto = (Resolve-Path scripts/dev/fixtures/photo.jpg).Path
+          Shot 'theme-photo' '1366x778' 45 ($mock + @('--appearance', 'light', '--theme-photo', $themePhoto))
+          Shot 'theme-photo-plain' '1366x778' 45 ($mock + @('--appearance', 'light', '--theme-photo', $themePhoto, '--theme-plain', 'yes'))
+          Shot 'theme-photo-plain-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--theme-photo', $themePhoto, '--theme-plain', 'yes'))
           # (General's foot, below the fold: This PC's Uninstall Simpl, and the question it asks)
           Shot 'settings-general-end' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', 'general', '--settings-scroll', '4000'))
           Shot 'settings-uninstall' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'settings', '--settings-tab', 'general', '--settings-scroll', '4000', '--settings-sheet', 'uninstall'))
