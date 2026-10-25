@@ -33,6 +33,8 @@ final class PlanRailModel: ObservableObject {
     static let lengths = [30, 60, 90, 120]
 
     func load(_ id: String, mins: Int?, engine: Engine) async {
+        Shot.began() // (1.3.168: the screenshot suite's picture of the rail waits for its times, Support/Shot.swift)
+        defer { Shot.ended() }
         var args: [String: Any] = ["id": id]
         if let mins { args["mins"] = mins }
         let r = try? await engine.call("planSlots", args, as: PlanSlots.self)

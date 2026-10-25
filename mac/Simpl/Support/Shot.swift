@@ -175,9 +175,11 @@ enum Shot {
             let waited = Date().timeIntervalSince(since)
             if NSApp.isActive || (popover ? waited > 8 : (!again || waited > 2)) {
                 // (1.3.166) a popover's app just brought back in front: a moment more for the popover to open again as it
-                // came back — the plan rail's dark picture was taken as it was still opening, the window alone
+                // came back — the plan rail's dark picture was taken as it was still opening, the window alone; (1.3.168)
+                // and then until what it reads again as it opens has come (the plan rail's free times: its dark picture
+                // was taken as it was still finding them)
                 if popover && !again && NSApp.isActive {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { capture(file) }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { whenIdle(file, until: Date().addingTimeInterval(8)) }
                 } else {
                     capture(file)
                 }
@@ -187,6 +189,16 @@ enum Shot {
                 settle(file, again: false, since: since)
             }
         }
+    }
+
+    /// (1.3.168) Pictured once nothing is being waited for and nothing has come for half a second (what came has
+    /// finished arriving), or at `until` whatever is still under way.
+    private static func whenIdle(_ file: String, until: Date) {
+        if (busy == 0 && Date().timeIntervalSince(lastActivity) >= 0.5) || Date() >= until {
+            capture(file)
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { whenIdle(file, until: until) }
     }
 
     /// (1.3.78) The windows that were in front of the one pictured, over it, when its picture was asked for.
