@@ -227,11 +227,13 @@
     const barWas = root.querySelector('#pzPhotoBar')?.dataset.for;
     const panelAt = kind === 'full' ? 0 : root.querySelector('#pzPanel')?.scrollTop || 0; // (a swatch pressed low in the panel: the panel stays where it was)
     root.replaceChildren(...[top(), st.done ? doneScreen() : stage(), st.done ? null : foot()].filter(Boolean));
+    // the colours before anything lays the new tree out (the panel's scroll put back does): drawn first in the old
+    // colours, its rows, tile and Continue would fade over from them instead of being the new ones at once
+    paintVars();
     const bar = root.querySelector('#pzPhotoBar');
     if (bar && bar.dataset.for === barWas) bar.classList.add('is-kept'); // (the bar that was open stays put: no pop again)
     const panel = root.querySelector('#pzPanel');
     if (panel && panelAt) panel.scrollTop = panelAt;
-    paintVars();
     armOutside();
     measure();
     requestAnimationFrame(() => measure());
