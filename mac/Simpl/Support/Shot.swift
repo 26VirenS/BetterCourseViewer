@@ -169,7 +169,8 @@ enum Shot {
     /// for longer: brought forward again until the app is in front, for up to eight seconds (it is five pictures of the
     /// full set; with only one more try, Hardy–Weinberg's was pictured closed).
     private static func settle(_ file: String, again: Bool = true, since: Date = Date()) {
-        let popover = UserDefaults.standard.string(forKey: "SimplPinOpen") != nil
+        // (1.3.165: the plan rail on To Do, -SimplPlanFirst, is a popover too)
+        let popover = UserDefaults.standard.string(forKey: "SimplPinOpen") != nil || UserDefaults.standard.bool(forKey: "SimplPlanFirst")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
             let waited = Date().timeIntervalSince(since)
             if NSApp.isActive || (popover ? waited > 8 : (!again || waited > 2)) {

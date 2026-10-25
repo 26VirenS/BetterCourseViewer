@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// To Do: the next seven days of work and your own tasks, grouped by date, priority or course. A tick marks one done (it
@@ -18,6 +19,8 @@ struct TodoView: View {
     @State private var expectingTask = false
     /// (1.3.165) The screenshot suite's plan rail, opened once.
     @State private var planShown = false
+    /// The work the screenshot suite's rail is open on (-SimplPlanFirst), to open it again as the app comes back in front.
+    @State private var planShownID: String?
     /// (1.3) Where the list's first card starts, down its scrolling column: the side column starts level with it.
     @State private var firstCardTop: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -72,9 +75,15 @@ struct TodoView: View {
             if UserDefaults.standard.bool(forKey: "SimplPlanFirst"), !planShown,
                let row = model.data?.sections.filter({ $0.title != "Overdue" }).flatMap(\.rows).first(where: { !$0.done && $0.custom != true }) {
                 planShown = true
+                planShownID = row.id
                 try? await Task.sleep(nanoseconds: 600_000_000)
                 PlanAsk.shared.id = row.id
             }
+        }
+        // (the suite runs several copies at once: a popover closes as its app goes behind another, so the rail is opened
+        //  again each time this one comes back in front — as it is for its picture)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            if let id = planShownID { PlanAsk.shared.id = id }
         }
         .liveChecks(model) // (1.3.80: checked every minute while it is on show; only what changed moves)
         .onChange(of: engine.newTask) { _, open in
