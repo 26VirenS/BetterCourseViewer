@@ -216,6 +216,19 @@ section { position: relative; }
 .tools__subj { width: 100%; margin: 0; font: 600 13px/1.2 var(--font); letter-spacing: .02em; text-transform: uppercase; color: var(--text-3); }
 .chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: var(--tile); font-size: 14px; line-height: 1.2; letter-spacing: -.005em; }
 .chip--app::after { content: "App"; padding: 1px 6px; border-radius: 999px; background: var(--soft-row); color: var(--text-3); font: 600 10.5px/1.4 var(--font); letter-spacing: .02em; }
+/* each chip shows its tool in the picture beside it */
+button.chip { border: 0; color: inherit; font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background-color 160ms ease, color 160ms ease, transform 140ms var(--ease-out); }
+button.chip:active { transform: scale(.96); }
+@media (hover: hover) and (pointer: fine) { button.chip:hover { background: var(--soft-hover); } }
+.chip[aria-pressed="true"], .chip[aria-pressed="true"]:hover { background: var(--blue); color: #fff; }
+.chip--app[aria-pressed="true"]::after { background: rgba(255, 255, 255, .22); color: #fff; }
+.tprev img { aspect-ratio: 1440 / 900; object-fit: contain; transition: opacity 180ms ease; }
+.tprev.is-swapping img { opacity: 0; }
+/* (an app's tool is pictured as its Mac window, which brings its own frame) */
+.tprev.is-app { background: none; box-shadow: none; border-radius: 0; overflow: visible; }
+.tprev.is-app img { filter: drop-shadow(0 18px 28px rgba(0, 20, 60, .22)); }
+.tprev__cap { margin: 14px 0 0; font-size: 14px; color: var(--text-3); letter-spacing: 0; text-align: center; }
+.tprev__cap b { color: var(--text); font-weight: 600; }
 .tools__key { margin: 4px 0 0; font-size: 13px; color: var(--text-3); letter-spacing: 0; }
 
 /* ---- iPhone, coming soon --------------------------------------------------------------------------------- */
@@ -452,8 +465,10 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
         <div class="moment__shot reveal" style="--d:80ms">
           <figure class="win">
             <picture>
-              <source media="(prefers-color-scheme: dark)" srcset="/img/web-search-dark.webp 1440w, /img/web-search-dark@2x.webp 2880w" sizes="(min-width: 1152px) 640px, (min-width: 900px) 56vw, calc(100vw - 32px)">
-              <img src="/img/web-search.webp" srcset="/img/web-search.webp 1440w, /img/web-search@2x.webp 2880w" sizes="(min-width: 1152px) 640px, (min-width: 900px) 56vw, calc(100vw - 32px)" width="1440" height="900" loading="lazy" decoding="async" alt="Simpl’s search over the Dashboard: “lab” typed, and lab assignments and pages from two physics courses listed under it.">
+              <source media="(prefers-reduced-motion: reduce) and (prefers-color-scheme: dark)" srcset="/img/web-search-dark.webp 1440w, /img/web-search-dark@2x.webp 2880w" sizes="(min-width: 1152px) 640px, (min-width: 900px) 56vw, calc(100vw - 32px)">
+              <source media="(prefers-reduced-motion: reduce)" srcset="/img/web-search.webp 1440w, /img/web-search@2x.webp 2880w" sizes="(min-width: 1152px) 640px, (min-width: 900px) 56vw, calc(100vw - 32px)">
+              <source media="(prefers-color-scheme: dark)" srcset="/img/web-search-dark-motion.webp">
+              <img src="/img/web-search-motion.webp" width="1440" height="900" loading="lazy" decoding="async" alt="Simpl’s search over the Dashboard: “lab” typed, and the lab assignments and pages from the physics courses listed under it, by kind.">
             </picture>
           </figure>
         </div>
@@ -475,8 +490,10 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
         <div class="moment__shot reveal" style="--d:80ms">
           <figure class="win">
             <picture>
-              <source media="(prefers-color-scheme: dark)" srcset="/img/web-quiz-dark.webp 1440w, /img/web-quiz-dark@2x.webp 2880w" sizes="(min-width: 1152px) 640px, (min-width: 900px) 56vw, calc(100vw - 32px)">
-              <img src="/img/web-quiz.webp" srcset="/img/web-quiz.webp 1440w, /img/web-quiz@2x.webp 2880w" sizes="(min-width: 1152px) 640px, (min-width: 900px) 56vw, calc(100vw - 32px)" width="1440" height="900" loading="lazy" decoding="async" alt="A quiz in Simpl: question 1 of 7 with five answers, one picked and saved, the question map on the left and Next, Back and Flag for review on the right.">
+              <source media="(prefers-reduced-motion: reduce) and (prefers-color-scheme: dark)" srcset="/img/web-quiz-dark.webp 1440w, /img/web-quiz-dark@2x.webp 2880w" sizes="(min-width: 1152px) 640px, (min-width: 900px) 56vw, calc(100vw - 32px)">
+              <source media="(prefers-reduced-motion: reduce)" srcset="/img/web-quiz.webp 1440w, /img/web-quiz@2x.webp 2880w" sizes="(min-width: 1152px) 640px, (min-width: 900px) 56vw, calc(100vw - 32px)">
+              <source media="(prefers-color-scheme: dark)" srcset="/img/web-quiz-dark-motion.webp">
+              <img src="/img/web-quiz-motion.webp" width="1440" height="900" loading="lazy" decoding="async" alt="A quiz in Simpl: an answer picked and saved, on to question 2, an answer picked there and the question flagged for review.">
             </picture>
           </figure>
         </div>
@@ -497,8 +514,10 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
         <div class="moment__shot reveal" style="--d:80ms">
           <figure class="win">
             <picture>
-              <source media="(prefers-color-scheme: dark)" srcset="/img/web-handin-phone-dark.webp 1440w, /img/web-handin-phone-dark@2x.webp 2880w" sizes="(min-width: 1152px) 640px, (min-width: 900px) 56vw, calc(100vw - 32px)">
-              <img src="/img/web-handin-phone.webp" srcset="/img/web-handin-phone.webp 1440w, /img/web-handin-phone@2x.webp 2880w" sizes="(min-width: 1152px) 640px, (min-width: 900px) 56vw, calc(100vw - 32px)" width="1440" height="900" loading="lazy" decoding="async" alt="An assignment in Simpl with a “Hand in from your phone” card: a QR code and three steps — point your camera, it opens the assignment, take a photo and hand it in.">
+              <source media="(prefers-reduced-motion: reduce) and (prefers-color-scheme: dark)" srcset="/img/web-handin-phone-dark.webp 1440w, /img/web-handin-phone-dark@2x.webp 2880w" sizes="(min-width: 1152px) 640px, (min-width: 900px) 56vw, calc(100vw - 32px)">
+              <source media="(prefers-reduced-motion: reduce)" srcset="/img/web-handin-phone.webp 1440w, /img/web-handin-phone@2x.webp 2880w" sizes="(min-width: 1152px) 640px, (min-width: 900px) 56vw, calc(100vw - 32px)">
+              <source media="(prefers-color-scheme: dark)" srcset="/img/web-handin-phone-dark-motion.webp">
+              <img src="/img/web-handin-phone-motion.webp" width="1440" height="900" loading="lazy" decoding="async" alt="Hand in from your phone: the assignment’s code shown for the phone’s camera, then the receipt once the phone has handed it in.">
             </picture>
           </figure>
         </div>
@@ -519,8 +538,10 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
         <div class="moment__shot reveal" style="--d:80ms">
           <figure class="win">
             <picture>
-              <source media="(prefers-color-scheme: dark)" srcset="/img/web-grades-dark.webp 1440w, /img/web-grades-dark@2x.webp 2880w" sizes="(min-width: 1152px) 640px, (min-width: 900px) 56vw, calc(100vw - 32px)">
-              <img src="/img/web-grades.webp" srcset="/img/web-grades.webp 1440w, /img/web-grades@2x.webp 2880w" sizes="(min-width: 1152px) 640px, (min-width: 900px) 56vw, calc(100vw - 32px)" width="1440" height="900" loading="lazy" decoding="async" alt="Simpl’s Grades page: a 3.42 term GPA, a trend since August, and a ring for each course with its grade and what it needs from here.">
+              <source media="(prefers-reduced-motion: reduce) and (prefers-color-scheme: dark)" srcset="/img/web-grades-dark.webp 1440w, /img/web-grades-dark@2x.webp 2880w" sizes="(min-width: 1152px) 640px, (min-width: 900px) 56vw, calc(100vw - 32px)">
+              <source media="(prefers-reduced-motion: reduce)" srcset="/img/web-grades.webp 1440w, /img/web-grades@2x.webp 2880w" sizes="(min-width: 1152px) 640px, (min-width: 900px) 56vw, calc(100vw - 32px)">
+              <source media="(prefers-color-scheme: dark)" srcset="/img/web-grades-dark-motion.webp">
+              <img src="/img/web-grades-motion.webp" width="1440" height="900" loading="lazy" decoding="async" alt="From the Dashboard to Grades: the 3.42 term GPA counting up, its trend since August, and a ring for each course with its grade.">
             </picture>
           </figure>
         </div>
@@ -532,20 +553,21 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
           <h3>Study tools, built in.</h3>
           <p class="moment__lead">17 in the browser, nearly 40 in the apps.</p>
           <div class="tools">
-            <div class="tools__row"><p class="tools__subj">Math</p><span class="chip">GeoGebra calculator</span><span class="chip">Graphing</span><span class="chip">Statistics</span><span class="chip">Matrices</span><span class="chip">Unit converter</span></div>
-            <div class="tools__row"><p class="tools__subj">Chemistry</p><span class="chip">Periodic table</span><span class="chip">Equation balancer</span><span class="chip">Moles</span><span class="chip chip--app">3D molecules</span><span class="chip chip--app">Lewis structures</span><span class="chip chip--app">Gas laws</span><span class="chip chip--app">Solutions &amp; pH</span></div>
-            <div class="tools__row"><p class="tools__subj">Biology and physics</p><span class="chip chip--app">3D cell explorer</span><span class="chip chip--app">DNA &amp; RNA</span><span class="chip chip--app">Genetics crosses</span><span class="chip chip--app">Projectiles</span><span class="chip chip--app">Circuits</span></div>
-            <div class="tools__row"><p class="tools__subj">Study and files</p><span class="chip">Flashcards</span><span class="chip">Focus timer</span><span class="chip">Citations</span><span class="chip">Grade needed</span><span class="chip">PDF annotator</span><span class="chip">File converter</span><span class="chip chip--app">Study planner</span></div>
-            <p class="tools__key">“App” marks a tool in the Mac and Windows apps only.</p>
+            <div class="tools__row"><p class="tools__subj">Math</p><button type="button" class="chip" data-tool="calc" aria-pressed="false">GeoGebra calculator</button><button type="button" class="chip" data-tool="graph" aria-pressed="false">Graphing</button><button type="button" class="chip" data-tool="stats" aria-pressed="false">Statistics</button><button type="button" class="chip" data-tool="matrix" aria-pressed="false">Matrices</button><button type="button" class="chip" data-tool="units" aria-pressed="false">Unit converter</button></div>
+            <div class="tools__row"><p class="tools__subj">Chemistry</p><button type="button" class="chip" data-tool="ptable" aria-pressed="true">Periodic table</button><button type="button" class="chip" data-tool="balance" aria-pressed="false">Equation balancer</button><button type="button" class="chip" data-tool="moles" aria-pressed="false">Moles</button><button type="button" class="chip chip--app" data-tool="mol3d" data-app aria-pressed="false">3D molecules</button><button type="button" class="chip chip--app" data-tool="lewis" data-app aria-pressed="false">Lewis structures</button><button type="button" class="chip chip--app" data-tool="gas" data-app aria-pressed="false">Gas laws</button><button type="button" class="chip chip--app" data-tool="solution" data-app aria-pressed="false">Solutions &amp; pH</button></div>
+            <div class="tools__row"><p class="tools__subj">Biology and physics</p><button type="button" class="chip chip--app" data-tool="cell" data-app aria-pressed="false">3D cell explorer</button><button type="button" class="chip chip--app" data-tool="dna" data-app aria-pressed="false">DNA &amp; RNA</button><button type="button" class="chip chip--app" data-tool="cross" data-app aria-pressed="false">Genetics crosses</button><button type="button" class="chip chip--app" data-tool="projectile" data-app aria-pressed="false">Projectiles</button><button type="button" class="chip chip--app" data-tool="circuit" data-app aria-pressed="false">Circuits</button></div>
+            <div class="tools__row"><p class="tools__subj">Study and files</p><button type="button" class="chip" data-tool="fc" aria-pressed="false">Flashcards</button><button type="button" class="chip" data-tool="pomo" aria-pressed="false">Focus timer</button><button type="button" class="chip" data-tool="cite" aria-pressed="false">Citations</button><button type="button" class="chip" data-tool="need" aria-pressed="false">Grade needed</button><button type="button" class="chip" data-tool="mark" aria-pressed="false">PDF annotator</button><button type="button" class="chip" data-tool="conv" aria-pressed="false">File converter</button><button type="button" class="chip chip--app" data-tool="plan" data-app aria-pressed="false">Study planner</button></div>
+            <p class="tools__key">Pick one to see it. “App” marks a tool in the Mac and Windows apps only.</p>
           </div>
         </div>
         <div class="moment__shot reveal" style="--d:80ms">
-          <figure class="win">
+          <figure class="win tprev" data-tprev>
             <picture>
               <source media="(prefers-color-scheme: dark)" srcset="/img/web-ptable-dark.webp 1440w, /img/web-ptable-dark@2x.webp 2880w" sizes="(min-width: 1152px) 640px, (min-width: 900px) 56vw, calc(100vw - 32px)">
               <img src="/img/web-ptable.webp" srcset="/img/web-ptable.webp 1440w, /img/web-ptable@2x.webp 2880w" sizes="(min-width: 1152px) 640px, (min-width: 900px) 56vw, calc(100vw - 32px)" width="1440" height="900" loading="lazy" decoding="async" alt="The periodic table tool open over the Tools page: all 118 elements coloured by kind, with a search box.">
             </picture>
           </figure>
+          <p class="tprev__cap" data-tprev-cap aria-live="polite"><b>Periodic table</b> · in the browser and the apps</p>
         </div>
       </article>
     </div>
@@ -766,6 +788,42 @@ footer { background: var(--bg-2); padding: 22px 0 calc(30px + env(safe-area-inse
     opts.forEach((a) => a.addEventListener('click', () => setTimeout(() => close(root), 180)));
   }
   document.addEventListener('pointerdown', (e) => choosers.forEach((root) => { if (!root.contains(e.target)) close(root); }));
+
+  // ---- the tools: a chip shows its tool in the picture beside it — the browser's for a tool there, the Mac app's
+  // window for one in the apps only. The picture fades out, the next is fetched, and it fades in once it has come.
+  const tprev = document.querySelector('[data-tprev]');
+  if (tprev) {
+    const img = tprev.querySelector('img');
+    const darkSrc = tprev.querySelector('source');
+    const cap = document.querySelector('[data-tprev-cap]');
+    const chips = [...document.querySelectorAll('.tools .chip[data-tool]')];
+    const darkMode = matchMedia('(prefers-color-scheme: dark)');
+    let want = '';
+    const show = (chip) => {
+      const app = chip.hasAttribute('data-app');
+      const base = `/img/${app ? 'mac' : 'web'}-tool-${chip.dataset.tool}`;
+      if (base === want) return;
+      want = base;
+      chips.forEach((c) => c.setAttribute('aria-pressed', String(c === chip)));
+      cap.innerHTML = `<b>${chip.textContent}</b> · ${app ? 'in the Mac and Windows apps' : 'in the browser and the apps'}`;
+      tprev.classList.add('is-swapping');
+      const next = new Image();
+      next.onload = next.onerror = () => {
+        if (want !== base) return; // (another chip was picked meanwhile)
+        darkSrc.removeAttribute('sizes');
+        darkSrc.srcset = `${base}-dark.webp`;
+        img.removeAttribute('sizes');
+        img.removeAttribute('srcset');
+        img.src = `${base}.webp`;
+        img.alt = `${chip.textContent}, open in Simpl${app ? ' for Mac' : ''}.`;
+        tprev.classList.toggle('is-app', app);
+        const reveal = () => tprev.classList.remove('is-swapping');
+        if (img.complete) requestAnimationFrame(reveal); else img.addEventListener('load', reveal, { once: true });
+      };
+      next.src = `${base}${darkMode.matches ? '-dark' : ''}.webp`;
+    };
+    chips.forEach((c) => c.addEventListener('click', () => show(c)));
+  }
 
   // ---- send it on: the phone's share sheet, else the link copied ----------------------------------------------
   const shareNote = document.querySelector('[data-share-note]');
