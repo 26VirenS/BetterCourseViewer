@@ -8,7 +8,7 @@ import { mkdirSync, cpSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
-import { TIMERS, shortenTimers, keptOff, secs, reportSlow, afterMigration, motionAt, realMotion, MOTION_RATE, launchExtension } from './harness.mjs';
+import { TIMERS, shortenTimers, keptOff, secs, reportSlow, afterMigration, motionAt, realMotion, MOTION_RATE, launchExtension, glassCuts } from './harness.mjs';
 import { SMOKE_SHARDS, SMOKE_PARTS } from './smoke-shards.mjs';
 
 const require = createRequire(import.meta.url);
@@ -113,7 +113,15 @@ const pageHeld = async (page, x = 40, y = 300) => {
 // a ring slice's middle: the first point of its middle piece's outline (outer edge) and the last (inner edge) — each slice is filled pieces, an even number of them
 // a ring slice's middle: the first point of its middle piece's outline (the outer edge) and the last (the inner edge) — a slice is filled pieces, an even number of them
 const ringEdges = (page) => page.evaluate(() => { const gs = [...document.querySelectorAll('.bcv-rr__ring > g[data-k]')].sort((a, b) => a.dataset.k - b.dataset.k); return gs.map((g) => { const ps = g.querySelectorAll('path.bcv-rr__band'); const pts = ps[ps.length / 2].getAttribute('d').replace('Z', '').split(/[ML]/).filter(Boolean).map((q) => q.trim().split(/\s+/).map(Number)); const o = pts[0], i = pts[pts.length - 1]; const r = Math.hypot(o[0] - 380, o[1] - 280), w = Math.hypot(o[0] - i[0], o[1] - i[1]); return { outer: Math.round(r * 10) / 10, w: Math.round(w * 10) / 10 }; }); });
-const shot = async (page, name) => { if (process.env.BCV_NO_SHOTS) return; await settleShot(page); await page.screenshot({ path: join(out, `${name}.png`) }); };
+// (2.99.111) at every picture, every glass panel shown sees the page through its blur on Chrome (harness.mjs glassCuts):
+// each one cut is kept with the first picture it was seen at, and checked once at the end
+const glassCut = new Map();
+const shot = async (page, name) => {
+  for (const c of await glassCuts(page)) if (!glassCut.has(c)) glassCut.set(c, name);
+  if (process.env.BCV_NO_SHOTS) return;
+  await settleShot(page);
+  await page.screenshot({ path: join(out, `${name}.png`) });
+};
 
 // the copy this suite loads runs the product's longest timers short; every shipped value it rewrites
 // has to be there, exactly, or a timer changed under the suite without the table in harness.mjs
@@ -9386,6 +9394,7 @@ try {
 }
 const until = [...sectionStarts.slice(1), Date.now()];
 console.log(`\ntime by section: ${sectionStarts.length ? `start ${secs(sectionStarts[0] - startedAt)} · ` : ''}${sectionsRun.map((n, i) => `${n} ${secs(until[i] - sectionStarts[i])}`).join(' · ')}`);
+check(!glassCut.size, `every glass panel shown blurs the page behind it on Chrome (none under a clear ancestor holding an opacity, a filter or a clip, or an entrance's last frame): ${JSON.stringify([...glassCut].map(([c, at]) => `${c} (${at})`))}`);
 console.log(failures.length ? `\n${failures.length} check(s) failed:\n - ${failures.join('\n - ')}` : '\nAll checks passed.');
 console.log(`(${secs(Date.now() - startedAt)})`);
 process.exit(failures.length ? 1 : 0);

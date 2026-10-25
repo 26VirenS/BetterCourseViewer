@@ -28,6 +28,9 @@
     lock: 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.111', date: '2026-10-25', notes: [
+      { kind: 'fixed', title: 'Frosted Popups', body: 'Popups blur the page behind them in Chrome again.', icon: P.layers },
+    ] },
     { version: '2.99.110', date: '2026-10-25', notes: [
       { kind: 'new', title: 'Plan From To Do', body: 'Drag work from To Do beside the week onto a time.', icon: P.cal },
       { kind: 'new', title: 'Your Simpl Calendar', body: 'Your work and plans in Apple, Google or Outlook.', icon: P.cal },

@@ -12,7 +12,7 @@ import { spawn, execSync } from 'node:child_process';
 import { cpSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { afterMigration, launchExtension } from './harness.mjs';
+import { afterMigration, launchExtension, glassCuts } from './harness.mjs';
 const require = createRequire(import.meta.url);
 let chromium;
 try { ({ chromium } = require('playwright')); } catch { const p = execSync('npm root -g').toString().trim(); ({ chromium } = createRequire(join(p, 'x.js'))('playwright')); }
@@ -81,6 +81,8 @@ try {
   check(sheet.d === d && sheet.box === `0 0 ${n + 8} ${n + 8}`, `the code is this assignment's hand-in, ${want}, with its quiet margin (${n} modules)`);
   check(sheet.fill.join() === '#fff,#000' && sheet.w === 168 && sheet.h === 168, `drawn dark on white, 168 px square: ${JSON.stringify({ fill: sheet.fill, w: sheet.w, h: sheet.h })}`);
   check(sheet.title === 'Hand in from your phone' && sheet.steps.length === 3 && /Canvas/.test(sheet.steps[1]) && sheet.wait === 'Waiting for your phone…', `the sheet says what to do and that it is waiting: ${JSON.stringify(sheet.steps)}`);
+  const cut = await glassCuts(page);
+  check(!cut.length, `the sheet's glass blurs the page behind it on Chrome, over the hand-in panel too (2.99.111): ${JSON.stringify(cut)}`);
   await page.screenshot({ path: join(OUT, '36-phone-handin.png') });
 
   // the phone hands in (a text entry, as the school's own page would send it, with its own session's token)

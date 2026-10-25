@@ -157,3 +157,59 @@ export async function afterMigration(sw, flow = 3) {
   }
   return false;
 }
+
+// Glass that cannot see the page (2.99.111). Chrome blurs only what lies inside a glass panel's nearest "backdrop
+// root": an ancestor with opacity, a filter, a clip, a mask, a blend, a view-transition name, a will-change of one —
+// or an entrance animation of one that has ended but still holds its last frame (fill both/forwards). Under a clear
+// such ancestor the glass sees nothing and draws as a faint tint, the page sharp through it (Safari has no such limit).
+// Every visible glass panel is walked up to the first ground that hides what is behind it (or other glass, which it is
+// meant to blur), as the glass would draw were blur drawn (html.bcv-noblur off for the look, at once put back).
+// → ['glass ← ancestor: why', ...]
+export const glassCuts = (page) => page.evaluate(() => {
+  const html = document.documentElement;
+  const noblur = html.classList.contains('bcv-noblur');
+  html.classList.remove('bcv-noblur');
+  const out = new Set();
+  const CUTS = /^(opacity|filter|clipPath|clip-path|maskImage|mask|webkitMask|mixBlendMode|backdropFilter)$/;
+  const nm = (el) => `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ''}${[...el.classList].slice(0, 3).map((c) => `.${c}`).join('')}`;
+  const alpha = (c) => { const m = String(c).match(/rgba?\(([^)]*)\)/); if (!m) return 1; const p = m[1].split(/[\s,/]+/).filter(Boolean); return p.length > 3 ? parseFloat(p[3]) : 1; };
+  const up = (el) => el.parentElement || (el.parentNode instanceof ShadowRoot ? el.parentNode.host : null);
+  const why = (a, t) => {
+    const r = [];
+    const held = (a.getAnimations?.() || []).filter((x) => x.playState === 'finished' && /forwards|both/.test(x.effect?.getComputedTiming?.().fill || '')
+      && (x.effect.getKeyframes?.() || []).some((k) => Object.keys(k).some((p) => CUTS.test(p))));
+    if (held.length) r.push(`held ${held.map((x) => x.animationName || 'animation').join(',')}`);
+    if (parseFloat(t.opacity) < 1) r.push(`opacity ${t.opacity}`);
+    if (t.filter !== 'none') r.push('filter');
+    if (t.clipPath !== 'none') r.push('clip-path');
+    if ((t.maskImage || t.webkitMaskImage || 'none') !== 'none') r.push('mask');
+    if (t.mixBlendMode !== 'normal') r.push(`blend ${t.mixBlendMode}`);
+    if (t.viewTransitionName && t.viewTransitionName !== 'none') r.push('view-transition-name');
+    if (/opacity|filter|clip-path|mask/.test(t.willChange)) r.push(`will-change ${t.willChange}`);
+    return r;
+  };
+  try {
+    const visit = (root) => {
+      for (const el of root.querySelectorAll('*')) {
+        if (el.shadowRoot) visit(el.shadowRoot);
+        const s = getComputedStyle(el);
+        if (s.backdropFilter === 'none' || s.visibility === 'hidden' || !el.getClientRects().length) continue;
+        const r = el.getBoundingClientRect();
+        if (r.width < 8 || r.height < 8 || r.bottom < 0 || r.top > innerHeight) continue;
+        const cuts = [];
+        let seen = true;
+        for (let a = up(el); a && a !== html && a !== document.body; a = up(a)) {
+          const t = getComputedStyle(a);
+          if (parseFloat(t.opacity) === 0 || t.visibility === 'hidden') { seen = false; break; } // (not shown at all)
+          if (t.backdropFilter !== 'none' || alpha(t.backgroundColor) >= 0.5 || t.backgroundImage !== 'none') break; // (what it shows is this)
+          for (const w of why(a, t)) cuts.push(`${nm(a)}: ${w}`);
+        }
+        if (seen) for (const c of cuts) out.add(`${nm(el)} ← ${c}`);
+      }
+    };
+    visit(document);
+  } finally {
+    if (noblur) html.classList.add('bcv-noblur');
+  }
+  return [...out];
+}).catch(() => []);
