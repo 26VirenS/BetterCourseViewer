@@ -320,7 +320,7 @@ try {
   const fdOn = await nc('feedOn');
   const fdSent = await sp.evaluate(() => (self.__nativeCalls || []).filter((c) => c.op === 'feedSend').length);
   const fdText = fdOn.link ? await (await fetch(fdOn.link)).text() : '';
-  check(fdOn.on && /\/api\/feed\/[\w-]{22}\/[\w-]{43}\.ics$/.test(fdOn.link || '') && /^webcal:/.test(fdOn.apple || '') && /calendar\.google\.com/.test(fdOn.google || '') && fdOn.count > 0 && !!fdOn.sent && !fdOn.error && fdSent > 0,
+  check(fdOn.on && /\/api\/feed\/[\w-]{22}\/[\w-]{43}\.ics$/.test(fdOn.link || '') && /^webcal:/.test(fdOn.apple || '') && /calendar\.google\.com/.test(fdOn.google || '') && fdOn.count > 0 && !!fdOn.sent && !fdOn.problem && !('error' in fdOn) && fdSent > 0,
     `Simpl's calendar made, and sent by the app: ${JSON.stringify({ ...fdOn, fdSent })}`);
   check(/X-WR-CALNAME:Simpl/.test(fdText) && fdText.replace(/\r\n[ \t]/g, '').includes(`SUMMARY:Work on ${plWork.title.replace(/[,;]/g, (c) => `\\${c}`)}`), 'its link opens the calendar, the plan in it');
   const fdOff = await nc('feedOff');

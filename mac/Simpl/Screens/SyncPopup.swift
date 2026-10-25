@@ -175,7 +175,7 @@ struct SyncPopup: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .disabled(turning)
-                if !f.error.isEmpty { statusLine(f.error, symbol: "exclamationmark.triangle.fill", color: .red) }
+                if !f.problem.isEmpty { statusLine(f.problem, symbol: "exclamationmark.triangle.fill", color: .red) }
             }
             .padding(14)
             .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.05)))
@@ -185,8 +185,8 @@ struct SyncPopup: View {
     /// Sent and when, how many events it held; or why it could not be sent; or that it is being sent.
     @ViewBuilder
     private func simplStatus(_ f: SimplFeed) -> some View {
-        if !f.error.isEmpty {
-            statusLine(f.error, symbol: "exclamationmark.triangle.fill", color: .red)
+        if !f.problem.isEmpty {
+            statusLine(f.problem, symbol: "exclamationmark.triangle.fill", color: .red)
         } else if let sent = f.sent, let at = ISO8601DateFormatter.simplPageTime.date(from: sent) ?? ISO8601DateFormatter().date(from: sent) {
             let ago = Date().timeIntervalSince(at) < 60 ? "just now" : RelativeDateTimeFormatter().localizedString(for: at, relativeTo: Date())
             statusLine("Up to date · sent \(ago) · \(f.count == 1 ? "1 event" : "\(f.count) events")", symbol: "checkmark", color: .green)
@@ -359,10 +359,10 @@ struct SyncPopup: View {
         var why: String?
         do { f = try await engine.call("feedOn", as: SimplFeed.self) } catch { why = error.localizedDescription }
         turning = false
-        let made = f?.on == true && f?.error.isEmpty == true
-        NSLog("[Simpl] sync: simpl calendar %@", made ? "made, \(f?.count ?? 0) events sent" : "not made: \(why ?? f?.error ?? "")")
+        let made = f?.on == true && f?.problem.isEmpty == true
+        NSLog("[Simpl] sync: simpl calendar %@", made ? "made, \(f?.count ?? 0) events sent" : "not made: \(why ?? f?.problem ?? "")")
         withAnimation(Motion.snappy) {
-            data?.simpl = f ?? SimplFeed(on: false, link: nil, apple: nil, google: nil, office: nil, outlook: nil, sent: nil, count: 0, error: why ?? "Simpl could not reach simplcourses.com. Try again in a moment.")
+            data?.simpl = f ?? SimplFeed(on: false, link: nil, apple: nil, google: nil, office: nil, outlook: nil, sent: nil, count: 0, problem: why ?? "Simpl could not reach simplcourses.com. Try again in a moment.")
         }
         if made { say("Your Simpl calendar is made. Add it to your calendar app above.", bad: false) }
         return made

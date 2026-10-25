@@ -82,7 +82,8 @@ struct SyncData: Codable {
 }
 
 /// (2.99.110) Simpl's own calendar as native-app.js `feedState` (`feedOn`, `feedOff`, `feedSend`) says it: whether it is
-/// on, its private link as each calendar app takes it, when it was last sent and how many events it held, or why not.
+/// on, its private link as each calendar app takes it, when it was last sent and how many events it held, or why not
+/// (`problem`: an answer's own `error` would be taken for the call failing).
 struct SimplFeed: Codable, Equatable {
     var on: Bool
     var link: String?
@@ -92,9 +93,9 @@ struct SimplFeed: Codable, Equatable {
     var outlook: String?
     var sent: String?
     var count: Int
-    var error: String
+    var problem: String
 
-    static let off = SimplFeed(on: false, link: nil, apple: nil, google: nil, office: nil, outlook: nil, sent: nil, count: 0, error: "")
+    static let off = SimplFeed(on: false, link: nil, apple: nil, google: nil, office: nil, outlook: nil, sent: nil, count: 0, problem: "")
 }
 
 struct SyncLink: Codable, Identifiable, Hashable {
