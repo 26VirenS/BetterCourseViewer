@@ -184,6 +184,7 @@ draw();
 
 // (node:http: stood in for above)
 const renameNames = (text) => text; // (site-names.mjs: the website's pictures only)
+const communityMock = null; // (mock-community.mjs: the website's Simpl Community, not the test school's)
 
 const port = Number(process.argv[2] || process.env.PORT || 8787);
 const simPort = Number(process.argv[3] || process.env.SIM_PORT || 8791);
@@ -1629,8 +1630,9 @@ const renaming = (res) => {
 };
 
 const server = http.createServer((req, res) => {
-  if (mockConfig.siteNames) renaming(res);
   const url = new URL(req.url, `http://localhost:${port}`);
+  if (communityMock && /^\/(api|__mock)\/community\//.test(url.pathname)) return void communityMock(req, res, url).catch((e) => { res.writeHead(500); res.end(String(e?.message || e)); }); // (bytes, not text: before the reading below)
+  if (mockConfig.siteNames) renaming(res);
   const path = url.pathname.replace(/\/+$/, '') || '/';
   let raw = '';
   req.on('data', (c) => (raw += c));

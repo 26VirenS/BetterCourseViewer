@@ -55,6 +55,9 @@ if (src.includes(MM_IMPORT)) {
 // them on, so it gets a stand-in that leaves every answer as it is)
 const SN_IMPORT = "import { renameNames } from './site-names.mjs';";
 src = src.replace(SN_IMPORT, () => 'const renameNames = (text) => text; // (site-names.mjs: the website\'s pictures only)');
+// (Simpl Community's stand-in, scripts/dev/mock-community.mjs, is the website's: the test school has none)
+const CM_IMPORT = "import { communityMock } from './mock-community.mjs'; // (2.99.106: Simpl Community, as simplcourses.com has it)";
+src = src.replace(CM_IMPORT, () => 'const communityMock = null; // (mock-community.mjs: the website\'s Simpl Community, not the test school\'s)');
 // (the test school is no real school: the mock's few words of the university it was first drawn from — an address, a
 // notice's title, a mascot's greeting — are made the test school's own, here only; CI's mock keeps them)
 src = src.replaceAll('ucmerced.edu', 'test.simpl.com').replaceAll('UC Merced', 'Simpl Test School').replaceAll('Hello Bobcat!', 'Hello!').replaceAll('Bobcat', 'Student');
