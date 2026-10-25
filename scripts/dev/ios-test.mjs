@@ -248,7 +248,7 @@ try {
   // (here the page reads it: this harness has no native fetch); a piece of work's free times, one planned — said on its row, laid
   // on the calendar beside the linked calendar's events — then cleared, and the calendar unlinked
   const plSync = await nc('calSync');
-  check(/\/feeds\/calendars\/user_\w+\.ics$/.test(plSync.feed || '') && plSync.links.length === 0 && plSync.canSend === true && plSync.send === false, `Sync: the account's calendar feed, nothing linked, Send plans off: ${JSON.stringify(plSync)}`);
+  check(plSync.links.length === 0 && plSync.simpl?.on === false && !('canSend' in plSync), `Sync: nothing linked, Simpl's own calendar off, Send plans gone (2.99.110): ${JSON.stringify(plSync)}`);
   const plLink = await nc('calLink', { url: `${BASE}/__mock/ics/personal.ics` });
   const plSync2 = await nc('calSync');
   check(plLink.ok && plLink.count === 5 && plLink.name === "Sam's calendar" && plSync2.links.length === 1 && plSync2.links[0].count === 5 && plSync2.links[0].on && !plSync2.links[0].error && !!plSync2.links[0].read, `a calendar linked by its address: read and listed: ${JSON.stringify({ plLink, links: plSync2.links })}`);
@@ -268,6 +268,24 @@ try {
   const plEv = plCal.events.find((e) => e.layer === 'plan' && e.planId === plWork.id);
   const plLinked = plCal.events.filter((e) => e.layer === 'linked').map((e) => e.title);
   check(plEv?.kind === 'Plan' && plEv.date === plSlots.slots[0].at && !!plEv.end && plLinked.includes('Shift at the library') && plLinked.includes('Trip home') && !plLinked.some((t) => /Cancelled/.test(t)), `the calendar lays the plan and the linked calendar's events over Canvas's: ${JSON.stringify({ plan: plEv, linked: [...new Set(plLinked)] })}`);
+  // (2.99.109) moved as it is, an hour on (its block dragged on the apps' week)
+  const plTo = new Date(Date.parse(plSlots.slots[0].at) + 3600e3).toISOString();
+  const plMove = await nc('planMove', { id: plWork.id, at: plTo });
+  const plBad = await nc('planMove', { id: 'assignment:nope', at: plTo });
+  const plRow4 = (await nc('todo')).sections.flatMap((x) => x.rows).find((r) => r.id === plWork.id);
+  check(plMove.ok && plRow4?.plan?.at === plTo && plRow4.plan.mins === 60 && !!plBad.error, `a plan moved by its id keeps its length; one that is not there is refused: ${JSON.stringify({ plan: plRow4?.plan, bad: plBad })}`);
+  // (2.99.110) Simpl's own calendar for the apps: made, sent by the app (its feedSend — here the stand-in's fetch), the plan in
+  // it, its link as each calendar app takes it; then stopped, and its link opens nothing
+  // (no dev:feedBase: a Canvas on this computer is a test school, its own /api/feed stands in — background.js feedSite)
+  const fdOn = await nc('feedOn');
+  const fdSent = await sp.evaluate(() => (self.__nativeCalls || []).filter((c) => c.op === 'feedSend').length);
+  const fdText = fdOn.link ? await (await fetch(fdOn.link)).text() : '';
+  check(fdOn.on && /\/api\/feed\/[\w-]{22}\/[\w-]{43}\.ics$/.test(fdOn.link || '') && /^webcal:/.test(fdOn.apple || '') && /calendar\.google\.com/.test(fdOn.google || '') && fdOn.count > 0 && !!fdOn.sent && !fdOn.error && fdSent > 0,
+    `Simpl's calendar made, and sent by the app: ${JSON.stringify({ ...fdOn, fdSent })}`);
+  check(/X-WR-CALNAME:Simpl/.test(fdText) && fdText.replace(/\r\n[ \t]/g, '').includes(`SUMMARY:Work on ${plWork.title.replace(/[,;]/g, (c) => `\\${c}`)}`), 'its link opens the calendar, the plan in it');
+  const fdOff = await nc('feedOff');
+  const fdGone = fdOn.link ? (await fetch(fdOn.link)).status : 0;
+  check(!fdOff.on && !fdOff.link && fdGone === 404, `stopped: its link opens nothing (${fdGone})`);
   const plClear = await nc('planClear', { id: plWork.id });
   await nc('calUnlink', { id: plSync2.links[0].id });
   const plSync3 = await nc('calSync');

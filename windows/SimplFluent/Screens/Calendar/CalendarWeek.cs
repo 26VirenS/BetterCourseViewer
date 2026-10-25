@@ -196,12 +196,14 @@ public sealed partial class CalendarScreen
             foreach (var s in DaySlots(days[i], evs[i], first)) panel.Children.Add(WeekBlock(s, days[i], i, cell, columns, first));
             cell.Children.Add(panel);
             cell.Children.Add(Hairline(false));
+            TodoDrops(cell, days[i], first); // (0.3.63: a row of To Do dragged onto it is planned there)
             columns.Add(cell);
             body.Children.Add(cell.Col(i + 1));
         }
         rows.Children.Add(body);
 
         if (todayAt >= 0) NowOn(columns[todayAt], gutter, names, first);
+        ShotTodoDrop(columns, days, first);
         return K.Card(rows, new Thickness(0), 12);
     }
 

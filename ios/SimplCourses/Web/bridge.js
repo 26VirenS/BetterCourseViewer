@@ -187,6 +187,8 @@
       inject: (files) => call({ op: 'inject', files: (files || []).map(String) }).then((r) => !!(r && r.ok)),
       // (2.99.107) a linked calendar's file (its private .ics address), read by the app: this page cannot read another site
       fetchText: (url) => call({ op: 'fetchText', url: String(url || '') }).catch((e) => ({ status: 0, error: e?.message || String(e) })),
+      // (2.99.110) Simpl's own calendar, sealed, sent to simplcourses.com (or taken back) by the app: this page cannot send there
+      feedSend: (o) => call({ op: 'feedSend', method: String(o?.method || ''), url: String(o?.url || ''), token: String(o?.token || ''), body: String(o?.body || '') }).catch((e) => ({ status: 0, error: e?.message || String(e) })),
     } : null,
     storageChanged: (changes) => emitChanged(changes),
   };

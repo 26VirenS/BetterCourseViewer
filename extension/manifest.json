@@ -103,6 +103,7 @@
         "content/app/ui.js",
         "content/app/store.js",
         "content/app/plan.js",
+        "content/app/feed.js",
         "content/app/lazy-modules.js",
         "content/app/lazy.js",
         "content/app/search.js",

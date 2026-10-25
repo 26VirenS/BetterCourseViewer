@@ -134,7 +134,8 @@ public sealed partial class CalendarScreen : Screen
     }
 
     protected override bool LayoutChanges(double before, double now) =>
-        (before >= MonthBeside) != (now >= MonthBeside) || (before >= WeekColumnsFrom) != (now >= WeekColumnsFrom);
+        (before >= MonthBeside) != (now >= MonthBeside) || (before >= WeekColumnsFrom) != (now >= WeekColumnsFrom)
+        || (before >= TodoBesideFrom) != (now >= TodoBesideFrom);
 
     // ---- the commands (the Mac's toolbar) ----
 
@@ -169,13 +170,15 @@ public sealed partial class CalendarScreen : Screen
             System.Windows.Automation.AutomationProperties.SetName(calendars, "Calendars");
             // (0.3.53) Canvas's Scheduler: office hours and sign-ups with a time to reserve
             var finder = K.IconButton(SymbolRegular.CalendarClock24, FindAppointment, "Find Appointment", 16, 32);
-            // (0.3.60) Sync: Canvas's calendar into a calendar app, and the student's own calendars in here
-            var sync = K.IconButton(SymbolRegular.ArrowSync24, OpenSync, "Sync with your calendar app", 16, 32);
+            // (0.3.60) Sync: (0.3.63) Simpl's own calendar into a calendar app, and the student's own calendars in here
+            var sync = K.IconButton(SymbolRegular.ArrowSync24, OpenSync, "Simpl in Outlook, Google or your calendar app, and your own calendars here", 16, 32);
+            // (0.3.63) To Do beside the week, shown or hidden (the week alone has it)
+            todoButton = K.IconButton(SymbolRegular.PanelLeft24, ToggleTodo, "Hide To Do beside the week", 16, 32);
             System.Windows.Automation.AutomationProperties.SetName(sync, "Sync");
             Button? more = null;
             more = K.IconButton(SymbolRegular.MoreHorizontal24, () => MoreMenu(more!), "More", 16, 32);
-            foreach (var e in new FrameworkElement[] { spinner, today, finder, sync, calendars, more }) e.VerticalAlignment = VerticalAlignment.Center;
-            commands = K.H(8, spinner, selector, nav, finder, sync, calendars, more);
+            foreach (var e in new FrameworkElement[] { spinner, today, todoButton, finder, sync, calendars, more }) e.VerticalAlignment = VerticalAlignment.Center;
+            commands = K.H(8, spinner, selector, nav, todoButton, finder, sync, calendars, more);
             PaintCommands();
             return commands;
         }
@@ -196,6 +199,11 @@ public sealed partial class CalendarScreen : Screen
         Words(prevButton, week ? "Previous week" : "Previous month", week ? "Previous week (←)" : "Previous month (←)");
         Words(nextButton, week ? "Next week" : "Next month", week ? "Next week (→)" : "Next month (→)");
         if (pager != null) pager.Visibility = mode == "list" ? Visibility.Collapsed : Visibility.Visible;
+        if (todoButton != null)
+        {
+            todoButton.Visibility = week ? Visibility.Visible : Visibility.Collapsed;
+            Words(todoButton, TodoOn ? "Hide To Do" : "Show To Do", TodoOn ? "Hide To Do beside the week" : "Show To Do beside the week, to drag work onto a time");
+        }
         if (spinner != null) spinner.Visibility = cal.Loading ? Visibility.Visible : Visibility.Hidden;
         selector?.Select(Array.IndexOf(Modes, mode), false);
     }
@@ -617,6 +625,9 @@ public sealed partial class CalendarScreen : Screen
         // (0.3.53) the screenshot suite's Find Appointment (--open appointments), over the calendar once it is drawn
         if (cal.Data != null && !cal.Loading && Launch.Take("appointments") != null)
             page.Dispatcher.BeginInvoke(FindAppointment, DispatcherPriority.Background);
+        // (0.3.63) and its Sync with Simpl's calendar made as it opens (--open sync-simpl), against the mock's /api/feed
+        if (cal.Data != null && !cal.Loading && Launch.Take("sync-simpl") != null)
+            page.Dispatcher.BeginInvoke(() => SyncSheet.Show(engine, Read, Window.GetWindow(page), make: true), DispatcherPriority.Background);
         // (0.3.60) and its Sync (--open sync)
         if (cal.Data != null && !cal.Loading && Launch.Take("sync") != null)
             page.Dispatcher.BeginInvoke(OpenSync, DispatcherPriority.Background);

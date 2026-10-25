@@ -126,6 +126,49 @@ public sealed class Bridge
         }
     }
 
+    private const int FeedMost = 1024 * 1024;
+
+    /// <summary>(0.3.63) Where Simpl's own calendar may be sent: simplcourses.com's place for them, or this computer's (the
+    /// picture suite's stand-in).</summary>
+    internal static bool FeedAddress(Uri u) =>
+        u.AbsolutePath.StartsWith("/api/feed/", StringComparison.Ordinal)
+        && ((u.Scheme == Uri.UriSchemeHttps && u.Host.Equals("simplcourses.com", StringComparison.OrdinalIgnoreCase))
+            || (u.Scheme == Uri.UriSchemeHttp && u.IsLoopback));
+
+    /// <summary>(0.3.63) Simpl's own calendar, sealed on the page, sent to simplcourses.com or taken back (background.js
+    /// feedSend): the page cannot send to another site. There only, PUT or DELETE, the sealed bytes as base64, a megabyte
+    /// at most, no cookies; its status, or status 0 and why not (the Mac's Bridge.swift feedSend).</summary>
+    private static async Task<JsonNode> FeedSend(JsonObject body)
+    {
+        var address = body["url"]?.ToString() ?? "";
+        var method = (body["method"]?.ToString() ?? "").ToUpperInvariant();
+        var token = body["token"]?.ToString() ?? "";
+        if (!Uri.TryCreate(address, UriKind.Absolute, out var u) || !FeedAddress(u) || (method != "PUT" && method != "DELETE") || token.Length == 0)
+            return new JsonObject { ["status"] = 0, ["error"] = "That is not a Simpl calendar address." };
+        try
+        {
+            using var req = new System.Net.Http.HttpRequestMessage(method == "PUT" ? System.Net.Http.HttpMethod.Put : System.Net.Http.HttpMethod.Delete, u);
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            if (method == "PUT")
+            {
+                byte[] sealedCopy;
+                try { sealedCopy = Convert.FromBase64String(body["body"]?.ToString() ?? ""); }
+                catch (FormatException) { sealedCopy = Array.Empty<byte>(); }
+                if (sealedCopy.Length == 0 || sealedCopy.Length > FeedMost)
+                    return new JsonObject { ["status"] = 0, ["error"] = "Your Simpl calendar is too big to send." };
+                req.Content = new System.Net.Http.ByteArrayContent(sealedCopy);
+                req.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+            }
+            using var res = await Calendars.SendAsync(req);
+            return new JsonObject { ["status"] = (int)res.StatusCode };
+        }
+        catch (Exception e)
+        {
+            Log.Write("calendar send: " + e.Message);
+            return new JsonObject { ["status"] = 0, ["error"] = e is TaskCanceledException ? "simplcourses.com took too long to answer." : "Simpl could not reach simplcourses.com." };
+        }
+    }
+
     /// <summary>A message from bridge.js; its answer (or null), or an exception for an error.</summary>
     public async Task<JsonNode?> Handle(JsonObject body, Microsoft.Web.WebView2.Wpf.WebView2 from)
     {
@@ -182,6 +225,8 @@ public sealed class Bridge
             }
             case "fetchText":
                 return await FetchText(body["url"]?.ToString() ?? "");
+            case "feedSend":
+                return await FeedSend(body);
             case "previewFile":
             {
                 var url = body["url"]?.ToString() ?? "";

@@ -296,9 +296,10 @@ public sealed partial class CalendarScreen
     // ---- Week ----
 
     /// <summary>The week over its hours on a wide page (<see cref="WeekGrid"/>), as seven days one under another on a
-    /// narrow one.</summary>
+    /// narrow one; (0.3.63) To Do beside it on a page wide enough for both (<see cref="WithTodo"/>).</summary>
     private FrameworkElement WeekView(Dictionary<string, List<CalEvent>> byDay, bool slide)
     {
+        HideDrop(); // (the days are drawn afresh: a row still dragged over one shows where it would go again as it moves)
         var days = Enumerable.Range(0, 7).Select(i => weekStart.AddDays(i)).ToList();
         FrameworkElement view;
         if (Width >= WeekColumnsFrom) view = WeekGrid(days, byDay);
@@ -309,7 +310,7 @@ public sealed partial class CalendarScreen
             view = v;
         }
         if (slide) Motion.SlideIn(view, dir > 0);
-        return new Border { Child = view, ClipToBounds = true };
+        return WithTodo(new Border { Child = view, ClipToBounds = true });
     }
 
     // ---- List ----

@@ -74,14 +74,27 @@ public sealed class WorkPlan
     public string Words { get; set; } = "";
 }
 
-// (2.99.107) Calendar → Sync as native-app.js `calSync` reads it: Canvas's calendar feed for a calendar app, the
-// student's own calendars linked by their private address, and whether plans go on to the Canvas calendar
+// (2.99.107) Calendar → Sync as native-app.js `calSync` reads it: Simpl's own calendar for a calendar app (2.99.110, in
+// place of Canvas's feed and Send plans) and the student's own calendars linked by their private address
 public sealed class SyncData
 {
-    public string? Feed { get; set; }
-    public bool Send { get; set; }
-    public bool CanSend { get; set; }
+    public SimplFeed Simpl { get; set; } = new();
     public List<SyncLink> Links { get; set; } = new();
+}
+
+// (2.99.110) Simpl's own calendar as native-app.js `feedState` (feedOn, feedOff, feedSend) says it: whether it is on, its
+// private link as each calendar app takes it, when it was last sent and how many events it held, or why not
+public sealed class SimplFeed
+{
+    public bool On { get; set; }
+    public string? Link { get; set; }
+    public string? Apple { get; set; }
+    public string? Google { get; set; }
+    public string? Office { get; set; }
+    public string? Outlook { get; set; }
+    public string? Sent { get; set; }
+    public int Count { get; set; }
+    public string Error { get; set; } = "";
 }
 
 public sealed class SyncLink

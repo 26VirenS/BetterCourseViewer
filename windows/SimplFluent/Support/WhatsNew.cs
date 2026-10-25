@@ -26,6 +26,10 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.63", "2026-10-25",
+            ("new", "Plan From To Do", "To Do sits beside the week: drag work onto a time."),
+            ("new", "Your Simpl Calendar", "Your work and plans in Outlook, Google or your calendar."),
+            ("improved", "Sealed and Private", "Only your private link can open your Simpl calendar.")),
         R("0.3.62", "2026-10-25",
             ("new", "Week by the Hour", "The week shows each item at its time, as long as it lasts."),
             ("new", "Drag Plans to Move", "Drag a plan on the week to move it to another time."),

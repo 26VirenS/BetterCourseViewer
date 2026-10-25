@@ -7,6 +7,7 @@
 //   smoke suite serves beside the mock)
 import { MACMILLAN_HUB_HTML, MACMILLAN_SAC_HTML } from './mock-macmillan.mjs';
 import http from 'node:http';
+import { feedMock } from './mock-feed.mjs'; // (2.99.110: Simpl's own calendar feed, as simplcourses.com has it)
 
 const port = Number(process.argv[2] || process.env.PORT || 8787);
 const simPort = Number(process.argv[3] || process.env.SIM_PORT || 8791);
@@ -1466,6 +1467,7 @@ function ccMock(req, res, path, raw) {
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${port}`);
+  if (feedMock && /^\/(api\/feed|__mock\/feed)(\/|$)/.test(url.pathname)) return void feedMock(req, res, url).catch((e) => { res.writeHead(500); res.end(String(e?.message || e)); }); // (2.99.110: Simpl's calendar feed, its bytes sealed)
   const path = url.pathname.replace(/\/+$/, '') || '/';
   let raw = '';
   req.on('data', (c) => (raw += c));

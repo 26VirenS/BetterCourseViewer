@@ -6,6 +6,7 @@ using System.Windows.Media;
 using Simpl.Kit;
 using Simpl.Models;
 using Simpl.Shell;
+using Simpl.Support;
 using Wpf.Ui.Controls;
 using Button = System.Windows.Controls.Button;
 using TextBlock = System.Windows.Controls.TextBlock;
@@ -14,18 +15,22 @@ using TextBox = Wpf.Ui.Controls.TextBox;
 namespace Simpl.Screens;
 
 /// <summary>
-/// (0.3.60) Sync (the Mac's SyncPopup, the web's sheet), read through the page (native-app.js <c>calSync</c>): Canvas's
-/// own calendar feed handed to a calendar app — Outlook's and Google's add-by-address pages open in the browser, the
-/// calendar app Windows opens webcal links in subscribes straight away, or the link is copied; the student's own
-/// calendars linked by their private address (the app reads the file, the page parses it: background.js and
-/// lib/ics.js), each shown or hidden on the Calendar or unlinked; and Send plans, which puts each plan on the Canvas
-/// calendar so the feed carries it out with everything else. What changes here is read again behind it (<c>changed</c>).
+/// (0.3.60) Sync (the Mac's SyncPopup, the web's sheet), read through the page (native-app.js <c>calSync</c>): (0.3.63)
+/// Simpl's own calendar — the work, the student's own tasks and the plans, as one calendar named Simpl, sealed and kept on
+/// simplcourses.com (the app sends it: Engine/Bridge.cs feedSend) — handed to a calendar app: Outlook's and Google's
+/// add-by-address pages open in the browser, the calendar app Windows opens webcal links in subscribes straight away, or
+/// the private link is copied; and the student's own calendars linked by their private address (the app reads the file,
+/// the page parses it: background.js and lib/ics.js), each shown or hidden on the Calendar or unlinked. Canvas's own feed
+/// and Send plans are gone: the plans are in Simpl's calendar of themselves. What changes here is read again behind it
+/// (<c>changed</c>). <c>make</c>: the screenshot suite's (--open sync-simpl), Simpl's calendar made as it opens.
 /// </summary>
 internal static class SyncSheet
 {
-    public static void Show(Engine.Engine engine, Action changed, Window? over)
+    public static void Show(Engine.Engine engine, Action changed, Window? over, bool make = false)
     {
         SyncData? data = null;
+        var turning = false;
+        var stopping = false;
         string? said = null;
         var saidBad = false;
         var linking = false;
@@ -67,10 +72,23 @@ internal static class SyncSheet
             return b;
         }
 
-        FrameworkElement FeedCard(string? feed)
+        FrameworkElement SimplCard(SimplFeed f)
         {
-            if (FeedLinks.From(feed, $"{engine.LmsName} (Simpl)") is not { } links)
-                return K.Wrapped($"{engine.LmsName} has no calendar feed for your account here.", Ty.Body, B.Text2);
+            if (!f.On || FeedLinks.From(f.Link, "Simpl") is not { } links)
+            {
+                var tile = K.IconTile(SymbolRegular.CalendarAdd24, Support.Appearance.Accent, 36);
+                var words = K.V(3,
+                    K.Text("Your work, your tasks and your plans", Ty.BodyStrong),
+                    K.Wrapped("As one calendar, Simpl, in Outlook, Google Calendar or your calendar app, kept up to date. It is sealed: only your private link opens it.", Ty.Body, B.Text2));
+                var intro = K.Columns("auto, *", tile.Margin(0, 0, 12, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Top).Col(0), words.Col(1));
+                var make_ = K.Button(turning ? "Making It…" : "Make My Simpl Calendar", () => _ = Make(), accent: true);
+                make_.IsEnabled = !turning;
+                make_.HorizontalAlignment = HorizontalAlignment.Stretch;
+                make_.MinHeight = 36;
+                var off = K.V(12, intro, make_);
+                if (f.Error.Length > 0) off.Children.Add(Status(f.Error, SymbolRegular.Warning24, B.Critical));
+                return K.Card(off, new Thickness(14), 8);
+            }
             Button? outlook = null;
             outlook = AppButton("Outlook", SymbolRegular.CalendarAdd24, () =>
             {
@@ -94,17 +112,85 @@ internal static class SyncSheet
             var copy = AppButton("Copy Link", SymbolRegular.Copy24, () =>
             {
                 CalendarKit.Copy(links.Https);
-                Say("Calendar link copied. Paste it where your calendar app adds one by address.", false);
+                Say("Your Simpl calendar's link is copied. Paste it where your calendar app adds one by address.", false);
                 Paint();
-            }, "Copy the feed's address");
+            }, "Copy your Simpl calendar's private link");
             var grid = new UniformGrid { Columns = 2, Margin = new Thickness(0, 0, -8, -8) };
             foreach (var b in new[] { outlook, google, app, copy })
             {
                 b.Margin = new Thickness(0, 0, 8, 8);
                 grid.Children.Add(b);
             }
-            var note = K.Wrapped("Every course's work and events, kept up to date: new work and moved due dates follow on their own. Google and Outlook look for changes every few hours.", Ty.Caption, B.Text2);
-            return K.Card(K.V(10, grid, note), new Thickness(14), 8);
+            FrameworkElement status = f.Error.Length > 0 ? Status(f.Error, SymbolRegular.Warning24, B.Critical)
+                : CalendarKit.Date(f.Sent) is { } at ? Status($"Up to date · sent {Ago(at)} · {(f.Count == 1 ? "1 event" : $"{f.Count} events")}", SymbolRegular.CheckmarkCircle24, B.Success)
+                : K.H(8, K.Spinner(14), K.Text("Sending it…", Ty.Caption, B.Text2));
+            var note = K.Wrapped("Your work, your own tasks and your plans, sent again while Simpl is open. It is sealed: only this private link opens it, so keep it to yourself. Google and Outlook look for changes every few hours.", Ty.Caption, B.Text2);
+            FrameworkElement stop;
+            if (stopping)
+            {
+                var yes = K.Button("Stop Sharing", () => _ = Stop());
+                yes.Foreground = K.Brush(K.Tone("red"));
+                yes.IsEnabled = !turning;
+                var no = K.Button("Cancel", () => { stopping = false; Paint(); });
+                stop = K.V(8,
+                    K.Wrapped("Stop sharing your Simpl calendar? Its private link stops working, and calendar apps that have it show nothing more from Simpl. You can make a new one at any time.", Ty.Body),
+                    K.H(8, yes, no));
+            }
+            else
+            {
+                var ask = K.Subtle(K.Text("Stop Sharing This Calendar…", Ty.Body, B.Critical), () => { stopping = true; Paint(); }, new Thickness(4, 4, 8, 4), 6);
+                ask.HorizontalAlignment = HorizontalAlignment.Left;
+                System.Windows.Automation.AutomationProperties.SetName(ask, "Stop sharing this calendar");
+                stop = ask;
+            }
+            return K.Card(K.V(10, grid, status, note, K.Divider(0), stop), new Thickness(14), 8);
+        }
+
+        FrameworkElement Status(string text, SymbolRegular icon, string color)
+        {
+            var words = K.Wrapped(text, Ty.Caption, color);
+            words.VerticalAlignment = VerticalAlignment.Center;
+            return K.Columns("auto, *", K.Icon(icon, 15, color, filled: true).Margin(2, 0, 8, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(0), words.Col(1));
+        }
+
+        static string Ago(DateTime at)
+        {
+            var ago = DateTime.Now - at;
+            return ago.TotalSeconds < 60 ? "just now"
+                : ago.TotalMinutes < 60 ? $"{(int)ago.TotalMinutes} min ago"
+                : ago.TotalHours < 24 ? $"{(int)ago.TotalHours} hr ago"
+                : CalendarKit.DateWords(at.Date);
+        }
+
+        // (0.3.63) Simpl's calendar made — a new private link — and sent at once; or why not
+        async Task Make()
+        {
+            if (turning) return;
+            turning = true;
+            Paint();
+            SimplFeed? f = null;
+            try { f = await engine.Call<SimplFeed>("feedOn"); }
+            catch (Exception e) { Log.Write("sync: simpl calendar " + e.Message); }
+            Log.Write(f is { On: true, Error.Length: 0 } ? $"sync: simpl calendar made, {f.Count} events sent" : $"sync: simpl calendar not made: {f?.Error}");
+            turning = false;
+            if (data != null) data.Simpl = f ?? new SimplFeed { Error = "Simpl could not reach simplcourses.com. Try again in a moment." };
+            if (f is { On: true, Error.Length: 0 }) Say("Your Simpl calendar is made. Add it to your calendar app above.", false);
+            Paint();
+        }
+
+        // (0.3.63) Simpl's calendar forgotten on simplcourses.com: its link opens nothing any more
+        async Task Stop()
+        {
+            turning = true;
+            Paint();
+            SimplFeed? f = null;
+            try { f = await engine.Call<SimplFeed>("feedOff"); }
+            catch (Exception e) { Log.Write("sync: simpl calendar off " + e.Message); }
+            turning = false;
+            stopping = false;
+            if (data != null) data.Simpl = f ?? new SimplFeed();
+            Say("Your Simpl calendar is no longer shared.", false);
+            Paint();
         }
 
         // ---- calendars in ----
@@ -211,28 +297,6 @@ internal static class SyncSheet
                     K.Wrapped("The link stays on this PC, and Simpl reads it every half hour. Anyone with a private link can read that calendar, so keep it to yourself.", Ty.Caption, B.Text2)).Margin(24, 0, 0, 0));
         }
 
-        FrameworkElement Plans(SyncData d)
-        {
-            var tile = K.IconTile(SymbolRegular.Clock24, Support.Appearance.Accent, 30);
-            var words = K.V(2,
-                K.Text("Send plans to your calendar app", Ty.Body),
-                K.Wrapped($"Each plan goes on your {engine.LmsName} calendar too, so the feed above carries it out with everything else.", Ty.Caption, B.Text2));
-            words.VerticalAlignment = VerticalAlignment.Center;
-            var send = new ToggleSwitch { IsChecked = d.Send, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
-            System.Windows.Automation.AutomationProperties.SetName(send, "Send plans to your calendar app");
-            send.Click += async (_, _) =>
-            {
-                var on = send.IsChecked == true;
-                d.Send = on;
-                await engine.Act("planSend", new { on });
-                Say(on ? "Plans go to your calendar now." : "Plans stay in Simpl now.", false);
-                Paint();
-                changed();
-            };
-            var row = K.Columns("auto, *, auto", tile.Margin(0, 0, 12, 0).Col(0), words.Col(1), send.Col(2));
-            return K.Card(row, new Thickness(14), 8);
-        }
-
         void Paint()
         {
             if (data == null)
@@ -241,12 +305,11 @@ internal static class SyncSheet
                 return;
             }
             var list = K.V(18,
-                Section("Your Canvas work, in your calendar app", FeedCard(data.Feed)),
+                Section("Simpl, in your calendar app", SimplCard(data.Simpl)),
                 Section("Your calendars, in Simpl", LinksCard(data.Links)));
             if (said != null) list.Children.Add(Said(said, saidBad));
             list.Children.Add(Where());
-            if (data.CanSend) list.Children.Add(Section("Plans", Plans(data)));
-            list.Children.Add(K.Wrapped("Pull any piece of work to the right on To Do or the Dashboard to plan a time for it.", Ty.Caption, B.Text2));
+            list.Children.Add(K.Wrapped("Drag work from To Do beside the week onto a time to plan it, or pull it to the right on To Do or the Dashboard.", Ty.Caption, B.Text2));
             host.Child = list;
         }
 
@@ -255,6 +318,7 @@ internal static class SyncSheet
             try { data = await engine.Call<SyncData>("calSync"); }
             catch { data ??= new SyncData(); }
             Paint();
+            if (make && !data.Simpl.On) { make = false; await Make(); }
         }
 
         async Task Link()
@@ -292,7 +356,7 @@ internal static class SyncSheet
             await Load();
         }
 
-        var lede = K.Text("Your Canvas work in your calendar app, and your calendars here", Ty.Body, B.Text2).Align(HorizontalAlignment.Left, VerticalAlignment.Bottom);
+        var lede = K.Text("Simpl in your calendar app, and your calendars here", Ty.Body, B.Text2).Align(HorizontalAlignment.Left, VerticalAlignment.Bottom);
         var body = new ScrollViewer
         {
             Content = host, MaxHeight = 600, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
@@ -306,8 +370,8 @@ internal static class SyncSheet
     }
 }
 
-/// <summary>Canvas's calendar feed as each calendar app takes one: Windows' own by webcal, Google's and Outlook's
-/// add-by-address pages (the Mac's FeedLinks).</summary>
+/// <summary>A calendar's address (0.3.63: Simpl's own calendar's private link) as each calendar app takes one: Windows'
+/// own by webcal, Google's and Outlook's add-by-address pages.</summary>
 internal sealed record FeedLinks(Uri Https, Uri Webcal, Uri Google, Uri Office, Uri Outlook)
 {
     public static FeedLinks? From(string? feed, string name)

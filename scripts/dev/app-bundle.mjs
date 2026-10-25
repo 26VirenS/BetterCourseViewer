@@ -84,6 +84,13 @@ export function appBundle({ root, host }) {
         .then(function (texts) { texts.forEach(function (t) { (0, eval)(t); }); return { ok: true }; }).catch(function () { return { ok: false }; });
       // (2.99.107) a linked calendar's file, as the app reads it for the page (Bridge.swift fetchText): no cookies
       case 'fetchText': return fetch(msg.url, { credentials: 'omit', cache: 'no-store' }).then(function (r) { return r.text().then(function (t) { return { status: r.status, text: t }; }); }).catch(function (e) { return { status: 0, error: String(e && e.message || e) }; });
+      // (2.99.110) Simpl's own calendar, sealed, sent as the app sends it (Bridge.swift feedSend): its place only, PUT or DELETE
+      case 'feedSend': {
+        if (String(msg.url || '').split('/').slice(3, 5).join('/') !== 'api/feed' || !/^(PUT|DELETE)$/.test(msg.method || '') || !msg.token) return Promise.resolve({ status: 0, error: 'That is not a Simpl calendar address.' });
+        var bytes = null;
+        if (msg.method === 'PUT') { var bin = atob(msg.body || ''); bytes = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); }
+        return fetch(msg.url, { method: msg.method, headers: { authorization: 'Bearer ' + msg.token, 'content-type': 'application/octet-stream' }, body: bytes, credentials: 'omit', cache: 'no-store' }).then(function (r) { return { status: r.status }; }).catch(function (e) { return { status: 0, error: String(e && e.message || e) }; });
+      }
       default: return Promise.resolve(null);
     }
   } } } };
