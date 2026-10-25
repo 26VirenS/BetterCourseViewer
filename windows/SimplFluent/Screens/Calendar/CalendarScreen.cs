@@ -283,24 +283,36 @@ public sealed partial class CalendarScreen : Screen
         HeaderChange();
     }
 
-    /// <summary>"October 2026", "Oct 4 – 10, 2026", "Upcoming".</summary>
+    /// <summary>"October 2026", "Upcoming"; (0.3.62) a week named by its month, as a calendar app names one ("October
+    /// 2026", "Oct – Nov 2026"): the title as wide in every view, its days in the line under it.</summary>
     private string PeriodTitle => mode switch
     {
         "list" => "Upcoming",
-        "week" => WeekSpan(weekStart, weekStart.AddDays(6)),
+        "week" => WeekMonths(weekStart, weekStart.AddDays(6)),
         _ => anchor.ToString("MMMM yyyy", Culture),
     };
 
-    private static string WeekSpan(DateTime a, DateTime b)
+    private static string WeekMonths(DateTime a, DateTime b)
     {
-        if (a.Year != b.Year) return $"{a.ToString("MMM d, yyyy", Culture)} – {b.ToString("MMM d, yyyy", Culture)}";
-        if (a.Month != b.Month) return $"{a.ToString("MMM d", Culture)} – {b.ToString("MMM d", Culture)}, {b.Year}";
-        return $"{a.ToString("MMM d", Culture)} – {b.Day}, {b.Year}";
+        if (a.Month == b.Month && a.Year == b.Year) return a.ToString("MMMM yyyy", Culture);
+        if (a.Year == b.Year) return $"{a.ToString("MMM", Culture)} – {b.ToString("MMM yyyy", Culture)}";
+        return $"{a.ToString("MMM yyyy", Culture)} – {b.ToString("MMM yyyy", Culture)}";
     }
+
+    /// <summary>A week's days, without their year: "Oct 4 – 10", "Sep 28 – Oct 4".</summary>
+    private static string WeekDays(DateTime a, DateTime b) =>
+        a.Month == b.Month ? $"{a.ToString("MMM d", Culture)} – {b.Day}" : $"{a.ToString("MMM d", Culture)} – {b.ToString("MMM d", Culture)}";
 
     private string PeriodLine(CalendarData d)
     {
         if (mode == "list") return "The next three weeks";
+        // (0.3.62) the week's days before what it holds ("Oct 25 – 31 · 16 items")
+        if (mode == "week") return $"{WeekDays(weekStart, weekStart.AddDays(6))} · {PeriodCount(d)}";
+        return PeriodCount(d);
+    }
+
+    private string PeriodCount(CalendarData d)
+    {
         var month = anchor.ToString("yyyy-MM", CultureInfo.InvariantCulture);
         var shown = mode == "month" ? d.Events.Where(e => e.Day.StartsWith(month, StringComparison.Ordinal)).ToList() : d.Events;
         if (shown.Count == 0) return mode == "month" ? "Nothing this month" : "Nothing this week";
@@ -574,6 +586,31 @@ public sealed partial class CalendarScreen : Screen
         engine.AskNewTask();
     }
 
+    /// <summary>
+    /// (0.3.62) The screenshot suite's plan on the week (--open cal-plan): the first piece of work still to do planned at
+    /// its first free time, then moved an hour on by the page's planMove (what letting go of a dragged block asks), and the
+    /// week read again — its block pictured where the move put it; the log says both steps.
+    /// </summary>
+    private async Task ShotPlanMoved()
+    {
+        Shot.Began();
+        try
+        {
+            var todo = await engine.Call<TodoData>("todo");
+            if (todo.Sections.SelectMany(s => s.Rows).FirstOrDefault(r => !r.Done && r.Custom != true) is not { } row) { Log.Write("calendar: no work to plan"); return; }
+            var slots = await engine.Call<PlanSlots>("planSlots", new { id = row.Id, mins = 60 });
+            if (slots.Slots is not { Count: > 0 } list || CalendarKit.Date(list[0].At) is not { } at) { Log.Write("calendar: no free time to plan"); return; }
+            await engine.Call<OK>("planPut", new { id = row.Id, at = list[0].At, mins = 60 });
+            var moved = at.AddHours(1);
+            var ok = await engine.Act("planMove", new { id = row.Id, at = moved.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture) });
+            Log.Write($"calendar: plan put {at:ddd h:mm tt}, {(ok ? "moved" : "not moved")} to {moved:ddd h:mm tt}");
+            Read();
+            await Task.Delay(2500);
+        }
+        catch (Exception e) { Log.Write("calendar: plan " + e.Message); }
+        finally { Shot.Ended(); }
+    }
+
     /// <summary>The screenshot suite's preview (--open preview): the first item on screen opens its preview, once.</summary>
     private void PreviewShot()
     {
@@ -583,6 +620,8 @@ public sealed partial class CalendarScreen : Screen
         // (0.3.60) and its Sync (--open sync)
         if (cal.Data != null && !cal.Loading && Launch.Take("sync") != null)
             page.Dispatcher.BeginInvoke(OpenSync, DispatcherPriority.Background);
+        // (0.3.62) and a plan on the week, moved an hour on as a drag moves one (--open cal-plan)
+        if (cal.Data != null && !cal.Loading && Launch.Take("cal-plan") != null) _ = ShotPlanMoved();
         if (!shotAsked || cal.Data == null || cal.Loading || firstItem == null) return;
         shotAsked = false;
         if (Launch.Take("preview") == null) return;

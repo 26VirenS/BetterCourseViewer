@@ -29,6 +29,9 @@ internal static class SyncSheet
         string? said = null;
         var saidBad = false;
         var linking = false;
+        // (0.3.62) what came of a link, said under its field (reading it, linked, or why not)
+        string? linkSaid = null, linkFaded = null;
+        var linkBad = false;
         string? unlinking = null;
         var showWhere = false;
         var draft = "";
@@ -120,7 +123,7 @@ internal static class SyncSheet
 
         FrameworkElement LinkRow(SyncLink l)
         {
-            var swatch = new Border { Width = 12, Height = 12, CornerRadius = new CornerRadius(3), Background = K.Brush(K.Hex(l.Color)), Margin = new Thickness(0, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
+            var swatch = new Border { Width = 12, Height = 12, CornerRadius = new CornerRadius(6), Background = K.Brush(K.Hex(l.Color)), Margin = new Thickness(0, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
             var words = K.V(2, K.Text(l.Name, Ty.Body), K.Wrapped(SubLine(l), Ty.Caption, l.Error.Length > 0 ? B.Critical : B.Text2, 2));
             words.VerticalAlignment = VerticalAlignment.Center;
             if (unlinking == l.Id)
@@ -164,9 +167,25 @@ internal static class SyncSheet
             var go = K.Button(linking ? "Linking…" : "Link", () => _ = Link(), accent: true);
             go.IsEnabled = !linking;
             go.Margin = new Thickness(8, 0, 0, 0);
-            v.Children.Add(new Border { Child = K.Columns("*, auto", box.Col(0), go.Col(1)), Padding = new Thickness(14) });
+            var field = K.V(8, K.Columns("*, auto", box.Col(0), go.Col(1)));
+            if (linking || linkSaid != null) field.Children.Add(LinkStatus());
+            v.Children.Add(new Border { Child = field, Padding = new Thickness(14) });
             if (list.Count == 0) v.Children.Insert(0, K.Wrapped("Link Google, iCloud or Outlook to see your own events beside your classes, and plan around them.", Ty.Body, B.Text2).Margin(14, 12, 14, 0));
             return K.Card(v, new Thickness(0), 8);
+        }
+
+        // reading it (a spinner), linked (a tick), or why not (in red), in the card under the field
+        FrameworkElement LinkStatus()
+        {
+            FrameworkElement mark = linking
+                ? K.Spinner(14)
+                : K.Icon(linkBad ? SymbolRegular.Warning24 : SymbolRegular.CheckmarkCircle24, 15, linkBad ? B.Critical : B.Success, filled: true);
+            var words = K.Wrapped(linking ? "Reading the calendar…" : linkSaid ?? "", Ty.Caption, linking ? B.Text2 : linkBad ? B.Critical : B.Text);
+            words.VerticalAlignment = VerticalAlignment.Center;
+            var line = K.Columns("auto, *", mark.Margin(2, 0, 8, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Center).Col(0), words.Col(1));
+            if (!linking && linkFaded != linkSaid) Motion.FadeIn(line); // (once, as it is said: not again as the sheet is drawn again)
+            linkFaded = linking ? null : linkSaid;
+            return line;
         }
 
         FrameworkElement Where()
@@ -243,17 +262,25 @@ internal static class SyncSheet
             var url = draft.Trim();
             if (url.Length == 0 || linking) return;
             linking = true;
+            linkSaid = null;
             Paint();
             CalLinkReply? r = null;
-            try { r = await engine.Call<CalLinkReply>("calLink", new { url }); } catch { }
+            string? why = null;
+            try { r = await engine.Call<CalLinkReply>("calLink", new { url }); }
+            catch (Exception e) { why = e.Message; }
             linking = false;
             if (r?.Ok == true)
             {
                 draft = "";
-                Say($"{r.Name ?? "Your calendar"} is linked: {(r.Count == 1 ? "1 event" : $"{r.Count ?? 0} events")} read.", false);
+                linkSaid = $"{r.Name ?? "Your calendar"} is linked: {(r.Count == 1 ? "1 event" : $"{r.Count ?? 0} events")} read.";
+                linkBad = false;
                 changed();
             }
-            else Say(r?.Error ?? "That calendar could not be linked.", true);
+            else
+            {
+                linkSaid = r?.Error ?? (string.IsNullOrWhiteSpace(why) ? "That calendar could not be linked." : why);
+                linkBad = true;
+            }
             await Load();
         }
 

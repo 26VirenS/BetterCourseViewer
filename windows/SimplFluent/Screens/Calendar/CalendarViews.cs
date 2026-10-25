@@ -295,12 +295,13 @@ public sealed partial class CalendarScreen
 
     // ---- Week ----
 
-    /// <summary>The week as seven columns on a wide page, as seven days one under another on a narrow one.</summary>
+    /// <summary>The week over its hours on a wide page (<see cref="WeekGrid"/>), as seven days one under another on a
+    /// narrow one.</summary>
     private FrameworkElement WeekView(Dictionary<string, List<CalEvent>> byDay, bool slide)
     {
         var days = Enumerable.Range(0, 7).Select(i => weekStart.AddDays(i)).ToList();
         FrameworkElement view;
-        if (Width >= WeekColumnsFrom) view = WeekColumns(days, byDay);
+        if (Width >= WeekColumnsFrom) view = WeekGrid(days, byDay);
         else
         {
             var v = new Stack { Orientation = Orientation.Vertical, Spacing = 18 };
@@ -309,86 +310,6 @@ public sealed partial class CalendarScreen
         }
         if (slide) Motion.SlideIn(view, dir > 0);
         return new Border { Child = view, ClipToBounds = true };
-    }
-
-    /// <summary>Seven columns in one card, a hairline between them, each as tall as the fullest.</summary>
-    private FrameworkElement WeekColumns(List<DateTime> days, Dictionary<string, List<CalEvent>> byDay)
-    {
-        var g = new Grid();
-        for (var i = 0; i < days.Count; i++)
-        {
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            if (i > 0) g.Children.Add(new Border { Width = 1, HorizontalAlignment = HorizontalAlignment.Left, SnapsToDevicePixels = true }.Bg(B.Divider).Col(i));
-            g.Children.Add(WeekColumn(days[i], EventsOn(byDay, days[i])).Col(i));
-        }
-        return K.Card(g, new Thickness(0));
-    }
-
-    /// <summary>A day of the week: its name and number (today on the accent, the day picked ringed in it), then its items.</summary>
-    private FrameworkElement WeekColumn(DateTime day, List<CalEvent> evs)
-    {
-        var isToday = day == DateTime.Today;
-        var isSel = day == selected;
-        var name = K.Text(Culture.DateTimeFormat.GetAbbreviatedDayName(day.DayOfWeek).ToUpper(Culture), Ty.Caption, B.Text2).Strong().Center();
-        var num = K.Text(day.Day.ToString(Culture), Ty.BodyLarge, isToday ? B.OnAccent : isSel ? B.AccentText : B.Text);
-        num.FontWeight = isToday || isSel ? FontWeights.Bold : FontWeights.Medium;
-        num.HorizontalAlignment = HorizontalAlignment.Center;
-        num.VerticalAlignment = VerticalAlignment.Center;
-        var circle = new Grid { Width = 34, Height = 34, HorizontalAlignment = HorizontalAlignment.Center };
-        if (isToday) circle.Children.Add(new Ellipse().Bg(B.Accent));
-        else if (isSel)
-        {
-            var ring = new Ellipse { StrokeThickness = 2 };
-            ring.SetResourceReference(Shape.StrokeProperty, B.Accent);
-            circle.Children.Add(ring);
-        }
-        circle.Children.Add(num);
-        var head = K.Subtle(K.V(3, name, circle), () => Pick(day), new Thickness(0, 6, 0, 6), 8);
-        head.HorizontalContentAlignment = HorizontalAlignment.Center;
-        AutomationProperties.SetName(head, Spoken(day, evs.Count));
-        if (isSel) AutomationProperties.SetItemStatus(head, "Selected");
-        var v = new Stack { Orientation = Orientation.Vertical, Spacing = 6, Margin = new Thickness(6), MinHeight = 380 };
-        v.Children.Add(head);
-        foreach (var ev in evs) v.Children.Add(WeekBlock(ev));
-        return v;
-    }
-
-    /// <summary>The Mac's CalendarWeekBlock: (1.2) its name beside a bar in its calendar's colour, flat in the column (struck
-    /// through only once handed in, greyed once over — as on the month's grid), its time, and whether it is missing or
-    /// excused.</summary>
-    private FrameworkElement WeekBlock(CalEvent ev)
-    {
-        var missing = ev.Missing == true;
-        var plan = CalendarKit.IsPlan(ev);
-        var linked = CalendarKit.IsLinked(ev);
-        var title = K.Wrapped(ev.Title, Ty.Body, (CalendarKit.IsPast(ev) || linked) && !missing ? B.Text2 : B.Text, 3);
-        title.FontWeight = FontWeights.Medium;
-        if (CalendarKit.IsStruck(ev) && !missing) title.Struck();
-        var words = K.V(3, title);
-        var meta = new WrapPanel { Orientation = Orientation.Horizontal };
-        // (0.3.60) a plan's time after its clock
-        if (plan) meta.Children.Add(K.Icon(SymbolRegular.Clock24, 11, K.Hex(ev.Color)).Margin(0, 2, 4, 1));
-        if (!string.IsNullOrEmpty(ev.Time)) meta.Children.Add(K.Text(ev.Time!, Ty.Caption, B.Text2).Margin(0, 1, 6, 1));
-        if (Flag(ev) is { } f) meta.Children.Add(K.Chip(f.Word, CalendarKit.Tone(f.Kind)));
-        if (meta.Children.Count > 0) words.Children.Add(meta);
-        var bar = new Border { Width = 3.5, CornerRadius = new CornerRadius(1.75), Background = K.Brush(K.WithAlpha(K.Hex(ev.Color), linked ? 0.55 : 1)), Margin = new Thickness(0, 0, 8, 0) };
-        var g = K.Columns("auto, *", bar.Col(0), words.Col(1));
-        // (0.3.60) a plan's block has a dashed edge in its colour: time set aside, not Canvas's own
-        if (plan)
-        {
-            var edge = new Rectangle
-            {
-                RadiusX = 8, RadiusY = 8, StrokeThickness = 1.25, StrokeDashArray = new DoubleCollection { 3, 2.5 },
-                Stroke = K.Brush(K.WithAlpha(K.Hex(ev.Color), 0.7)), Margin = new Thickness(-3, -6, -6, -6), IsHitTestVisible = false,
-            };
-            Grid.SetColumnSpan(edge, 2);
-            g.Children.Add(edge);
-        }
-        var b = K.Subtle(g, null, new Thickness(3, 6, 6, 6), 8);
-        b.Click += (_, _) => peek.Press(ev, b);
-        b.ToolTip = ev.Sub ?? ev.Title;
-        Item(b, ev, menu: true);
-        return b;
     }
 
     // ---- List ----

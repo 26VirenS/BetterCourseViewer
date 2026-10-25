@@ -26,6 +26,10 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.62", "2026-10-25",
+            ("new", "Week by the Hour", "The week shows each item at its time, as long as it lasts."),
+            ("new", "Drag Plans to Move", "Drag a plan on the week to move it to another time."),
+            ("improved", "Calmer Time Picker", "Pull to plan says each day once and shows what it does.")),
         R("0.3.61", "2026-10-25",
             ("new", "Place Your Photo", "A photo opens on its card: drag, zoom and set it there."),
             ("improved", "Solid Photo Borders", "Words on a photo with Ink off have a solid white edge.")),

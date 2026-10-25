@@ -29,6 +29,7 @@ internal static class PlanRail
     private const double Step = 26; // px of pull a time
     private const double Chip = 98;
     private const double Gap = 6;
+    private const double DayGap = 8; // (0.3.62) a little more room before each new day's first time
     private const double Most = 64; // the furthest the row goes, however far it is pulled (it resists)
     private static readonly int[] Lengths = { 30, 60, 90, 120 };
 
@@ -72,10 +73,12 @@ internal static class PlanRail
 
         double Rubber(double x) => x <= 0 ? 0 : Most * x / (x + Most);
 
-        void Back()
+        PullReveal? reveal = null;
+
+        void Back(Action? done = null)
         {
-            if (Motion.On) Motion.To(shift, TranslateTransform.XProperty, 0, Motion.Medium, Motion.Out);
-            else { shift.BeginAnimation(TranslateTransform.XProperty, null); shift.X = 0; }
+            if (Motion.On) Motion.To(shift, TranslateTransform.XProperty, 0, Motion.Medium, Motion.Out, done: done);
+            else { shift.BeginAnimation(TranslateTransform.XProperty, null); shift.X = 0; done?.Invoke(); }
         }
 
         void End(bool commit)
@@ -84,7 +87,10 @@ internal static class PlanRail
             if (pull is not { } r) return;
             pull = null;
             if (row.IsMouseCaptured) row.ReleaseMouseCapture();
-            Back();
+            var gone = reveal;
+            reveal = null;
+            gone?.Follow();
+            Back(() => gone?.Remove());
             if (commit && r.Chosen is { } s) r.Plan(s);
             else r.Close();
         }
@@ -114,10 +120,12 @@ internal static class PlanRail
                 row.CaptureMouse();
                 shift.BeginAnimation(TranslateTransform.XProperty, null);
                 pull = Rail.Open(row, id, title, engine, RailKind.Pull, planned);
+                reveal = PullReveal.On(row, shift);
             }
             var pulled = Math.Max(0, dx - Engage);
             shift.X = Rubber(pulled);
             pull.Pulled(pulled);
+            reveal?.Chose(pull.Chosen != null);
             e.Handled = true;
         };
         row.PreviewMouseLeftButtonUp += (_, e) =>
@@ -180,6 +188,8 @@ internal static class PlanRail
         private readonly TranslateTransform stripShift = new();
         private readonly List<Border> chips = new();
         private readonly List<Button> chipButtons = new();
+        /// <summary>(0.3.62) Where each time is along the rail: the days are not all one gap apart.</summary>
+        private readonly List<double> lefts = new();
         private ScrollViewer? scroller;
 
         public PlanSlot? Chosen => slots is { } s && sel >= 0 && sel < s.Count ? s[sel] : null;
@@ -373,16 +383,25 @@ internal static class PlanRail
                 return;
             }
             var row = new StackPanel { Orientation = Orientation.Horizontal };
+            lefts.Clear();
+            var left = 0.0;
             for (var i = 0; i < slots.Count; i++)
             {
                 var s = slots[i];
-                var face = ChipFace(s, i == 0 || slots[i - 1].Day != s.Day);
+                // (0.3.62) the day said once, over the first of its times, and a little more room before each new day:
+                // the times read as a day's handful, not "Today" four times over
+                var newDay = i == 0 || slots[i - 1].Day != s.Day;
+                var lead = newDay && i > 0 ? DayGap : 0;
+                left += lead;
+                lefts.Add(left);
+                left += Chip + Gap;
+                var face = ChipFace(s, newDay);
                 chips.Add(face);
                 if (Kind == RailKind.Pick)
                 {
                     var n = i;
                     var b = K.Subtle(face, () => Plan(s), new Thickness(0), 12);
-                    b.Margin = new Thickness(0, 0, Gap, 0);
+                    b.Margin = new Thickness(lead, 0, Gap, 0);
                     b.ToolTip = $"{s.Day} {s.Time}, {LengthWord(mins)}";
                     b.GotKeyboardFocus += (_, _) => { if (sel != n) { sel = n; Move(); } };
                     AutomationProperties.SetName(b, $"{s.Day} {s.Time}");
@@ -391,7 +410,7 @@ internal static class PlanRail
                 }
                 else
                 {
-                    face.Margin = new Thickness(0, 0, Gap, 0);
+                    face.Margin = new Thickness(lead, 0, Gap, 0);
                     row.Children.Add(face);
                 }
             }
@@ -439,6 +458,7 @@ internal static class PlanRail
             var day = K.Text(s.Day.ToUpperInvariant(), Ty.Caption);
             day.FontSize = 10.5;
             day.FontWeight = FontWeights.SemiBold;
+            if (!newDay) day.Visibility = Visibility.Hidden; // (its line kept, so every time sits as low)
             var time = K.Text(s.Time, Ty.Body);
             time.FontSize = 14;
             time.FontWeight = FontWeights.Bold;
@@ -478,7 +498,8 @@ internal static class PlanRail
             {
                 lens.BorderBrush = sel >= 0 ? K.Brush(accent) : K.Brush(K.WithAlpha(K.Tone("gray"), 0.5));
                 lens.BorderThickness = new Thickness(2);
-                var x = (1 - Math.Max(sel, -1)) * (Chip + Gap);
+                // (the chosen one in the second place along; before any is, the first one place further on)
+                var x = sel < 0 || sel >= lefts.Count ? 2 * (Chip + Gap) : Chip + Gap - lefts[sel];
                 if (animate && Motion.On) Motion.To(stripShift, TranslateTransform.XProperty, x, 160, Motion.Out);
                 else { stripShift.BeginAnimation(TranslateTransform.XProperty, null); stripShift.X = x; }
             }
@@ -511,6 +532,74 @@ internal static class PlanRail
             else words = "← → to choose · ↑ ↓ for how long · Enter to plan";
             status.Text = words;
             if (lit) status.Foreground = K.Brush(K.Darkened(Support.Appearance.Accent)); else status.SetResourceReference(TextBlock.ForegroundProperty, B.Text2);
+        }
+    }
+
+    /// <summary>
+    /// (0.3.62) What a pull uncovers behind its row (the web's and the Mac's): a rounded well in the accent with a clock in
+    /// it, the clock growing with the pull and filling once a time is chosen — so a pull says what it does before it is let
+    /// go. Drawn on the row's adorner layer in the room the row has moved out of, kept to it as the row slides back.
+    /// </summary>
+    private sealed class PullReveal : Adorner
+    {
+        private readonly TranslateTransform shift;
+        private readonly AdornerLayer layer;
+        private bool chosen;
+
+        private PullReveal(UIElement row, TranslateTransform shift, AdornerLayer layer) : base(row)
+        {
+            this.shift = shift;
+            this.layer = layer;
+            IsHitTestVisible = false;
+            shift.Changed += Moved;
+        }
+
+        public static PullReveal? On(UIElement row, TranslateTransform shift)
+        {
+            if (AdornerLayer.GetAdornerLayer(row) is not { } layer) return null;
+            var r = new PullReveal(row, shift, layer);
+            layer.Add(r);
+            return r;
+        }
+
+        public void Chose(bool on)
+        {
+            if (on == chosen) return;
+            chosen = on;
+            InvalidateVisual();
+        }
+
+        /// <summary>Drawn again each frame while the row slides back over it.</summary>
+        public void Follow() => CompositionTarget.Rendering += Moved;
+
+        public void Remove()
+        {
+            shift.Changed -= Moved;
+            CompositionTarget.Rendering -= Moved;
+            layer.Remove(this);
+        }
+
+        private void Moved(object? sender, EventArgs e) => InvalidateVisual();
+
+        protected override void OnRender(DrawingContext dc)
+        {
+            var w = shift.X;
+            var h = AdornedElement.RenderSize.Height;
+            if (w < 10 || h < 16) return;
+            var k = Math.Clamp(w / Most, 0, 1);
+            var accent = Support.Appearance.Accent;
+            // (the row has moved w to the right, and this layer with it: the room it left is left of 0)
+            var well = new Rect(-w + 3, 3, w - 7, h - 6);
+            dc.DrawRoundedRectangle(K.Brush(K.WithAlpha(accent, 0.1 + 0.14 * k)), null, well, 10, 10);
+            var r = Math.Min(9.5, well.Height / 2 - 3) * (0.6 + 0.4 * k);
+            if (r < 4 || well.Width < 2 * r + 4) return;
+            var c = new Point(well.Left + well.Width / 2, well.Top + well.Height / 2);
+            var ink = K.Brush(K.WithAlpha(accent, 0.45 + 0.55 * k));
+            var face = new Pen(chosen ? Brushes.White : ink, 1.6) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+            if (chosen) dc.DrawEllipse(K.Brush(accent), null, c, r + 1, r + 1);
+            else dc.DrawEllipse(null, face, c, r, r);
+            dc.DrawLine(face, c, new Point(c.X, c.Y - r * 0.55));
+            dc.DrawLine(face, c, new Point(c.X + r * 0.42, c.Y + r * 0.18));
         }
     }
 }

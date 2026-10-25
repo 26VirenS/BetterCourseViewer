@@ -78,6 +78,17 @@
     sendOut(it.id).catch(() => {});
     return plan;
   }
+  /** (2.99.109) A plan moved to another time, as it is (its block dragged on the Calendar's week). */
+  async function move(id, at) {
+    const p = plans[id];
+    if (!p) return null;
+    const next = { ...p, at: new Date(at).toISOString() };
+    plans = { ...plans, [id]: next };
+    changed();
+    await store.mergePref('plans', { [id]: next });
+    sendOut(id).catch(() => {});
+    return next;
+  }
   async function clear(id) {
     const prev = plans[id];
     if (!prev) return;
@@ -477,5 +488,5 @@
     return rowEl;
   }
 
-  BCV.plan = { ready, get, all, onChange, put, clear, attach, pill, open: openBar, close: closeBar, freeSlots, slotsFor, linked, linkedEvents, sending, setSending, canSend, whenWords, dayWord, lenWord, lengthFor };
+  BCV.plan = { ready, get, all, onChange, put, move, clear, attach, pill, open: openBar, close: closeBar, freeSlots, slotsFor, linked, linkedEvents, sending, setSending, canSend, whenWords, dayWord, lenWord, lengthFor };
 })();

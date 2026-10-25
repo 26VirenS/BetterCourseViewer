@@ -3118,6 +3118,13 @@
     await BCV.plan.put(it, t, Number(mins) || 60);
     return { ok: true, plan: planInfo(id) };
   }
+  /** (2.99.109) A plan moved to another time as it is (its block dragged on the apps' week): no work needed to hand. */
+  async function planMove({ id, at } = {}) {
+    const t = Date.parse(at);
+    if (!t || !BCV.plan.get(String(id))) return { error: 'That plan could not be moved.' };
+    await BCV.plan.move(String(id), t);
+    return { ok: true, plan: planInfo(String(id)) };
+  }
   async function planClear({ id } = {}) { await BCV.plan.clear(String(id)); return { ok: true }; }
   async function planSend({ on } = {}) { await BCV.plan.setSending(!!on); return { ok: true, send: !!on }; }
   /** What the Calendar lays over Canvas's own between two days: the linked calendars' events (only the calendars shown) and
@@ -3142,7 +3149,7 @@
     return { events: out, sent: new Set(Object.values(BCV.plan.all()).map((p) => p.ev).filter(Boolean)) };
   }
 
-  const CALLS = { calSync, calLink, calShow, calUnlink, calRefresh, planSlots, planPut, planClear, planSend, setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, setColor, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, appointments, reserveAppointment, cancelReservation, notifications, notifMark, search, searchLocal, searchWarm, searchRecent, appearance, whatsNew, whatsNewSeen, refresh,
+  const CALLS = { calSync, calLink, calShow, calUnlink, calRefresh, planSlots, planPut, planMove, planClear, planSend, setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, setColor, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, appointments, reserveAppointment, cancelReservation, notifications, notifMark, search, searchLocal, searchWarm, searchRecent, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, fileInfo, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage, messageUpload,
     toolLaunch, externalTools, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizAssignment, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback, neighbours };
   // (Mac 1.2) Grade needed: a course's score now (by the student's own weights where set, as the Grades screen) and each
