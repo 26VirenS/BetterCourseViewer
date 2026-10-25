@@ -46,6 +46,10 @@ struct PhotoBadge: View {
             }
             if store.photos[slot] != nil {
                 Divider()
+                // (1.3.164) a photo of one's own: inked, or (off) shown as it is, the words on it white-bordered
+                if case .upload? = store.photos[slot]?.source {
+                    Toggle("Ink Photo", isOn: Binding(get: { !store.isPlain(slot) }, set: { store.setInk($0, in: slot) }))
+                }
                 Button("Move and Zoom…", action: adjust)
                 Button("Remove Photo", role: .destructive) { store.remove(slot) }
             }

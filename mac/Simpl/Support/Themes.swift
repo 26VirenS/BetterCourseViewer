@@ -70,6 +70,9 @@ enum PhotoSource: Codable, Equatable {
 struct SlotPhoto: Codable, Equatable {
     var source: PhotoSource
     var place: PhotoPlace
+    /// (1.3.164) A photo of the student's own with its Ink switch off: shown as it is, nothing over it, the words on it
+    /// dark with a gentle white border (the web's plain[key]); nil, inked. A drawn scene is always inked.
+    var plain: Bool? = nil
 }
 
 @MainActor
@@ -144,11 +147,14 @@ final class AppearanceStore: ObservableObject {
                 photos = Dictionary(uniqueKeysWithValues: kept.compactMap { k, v in PhotoSlot(rawValue: k).map { ($0, v) } })
             }
         }
-        // (the screenshot suite: -SimplThemePhoto <file> puts that picture, inked, in every place for that run, nothing kept)
+        // (the screenshot suite: -SimplThemePhoto <file> puts that picture, inked, in every place for that run, nothing kept;
+        // with -SimplThemePlain YES, its Ink off)
         if let path = d.string(forKey: "SimplThemePhoto"), let raw = NSImage(contentsOfFile: path),
            let mask = Self.inkMask(raw), let ink = NSImage(data: mask) {
             images["shot" + Self.inkSuffix] = ink
-            photos = Dictionary(uniqueKeysWithValues: PhotoSlot.allCases.map { ($0, SlotPhoto(source: .upload("shot"), place: $0.defaultPlace)) })
+            images["shot"] = raw
+            let plain: Bool? = d.bool(forKey: "SimplThemePlain") ? true : nil
+            photos = Dictionary(uniqueKeysWithValues: PhotoSlot.allCases.map { ($0, SlotPhoto(source: .upload("shot"), place: $0.defaultPlace, plain: plain)) })
         }
         Self.accentNow = accentHex.map { NSColor(Color(hex: $0)) }
     }
@@ -216,6 +222,20 @@ final class AppearanceStore: ObservableObject {
 
     func commitPlace() { savePhotos() }
 
+    /// (1.3.164) Whether a place's photo is shown as it is: one of the student's own, its Ink switch off.
+    func isPlain(_ slot: PhotoSlot) -> Bool {
+        guard let p = photos[slot], case .upload = p.source else { return false }
+        return p.plain == true
+    }
+
+    /// (1.3.164) A photo of the student's own inked (on) or shown as it is (off); a drawn scene is always inked.
+    func setInk(_ on: Bool, in slot: PhotoSlot) {
+        guard var p = photos[slot], case .upload = p.source else { return }
+        p.plain = on ? nil : true
+        photos[slot] = p
+        savePhotos()
+    }
+
     /// A photo of the student's own chosen for a place (an Open panel), kept on this Mac at a sensible size.
     func upload(to slot: PhotoSlot) {
         let panel = NSOpenPanel()
@@ -238,10 +258,11 @@ final class AppearanceStore: ObservableObject {
 
     /// What a photo's ink is coloured in: a drawn scene in the accent (lib/theme.js SCENE_INK), a photo of the student's
     /// in the ground lifted a shade (INK_LIFT) — tone on tone, close to what it sits on.
-    enum InkKind { case scene, photo }
+    /// (`original`: no ink at all — a photo of the student's own with its Ink switch off, drawn as it is.)
+    enum InkKind { case scene, photo, original }
 
     /// The ink a photo shows (a mask: white where the ink goes): a drawn scene's from the asset catalogue, a photo's made
-    /// from it as the web makes it (`inkMask`), kept beside it.
+    /// from it as the web makes it (`inkMask`), kept beside it — or, its Ink switch off, the photo itself.
     func image(_ photo: SlotPhoto, in slot: PhotoSlot) -> (image: NSImage, kind: InkKind)? {
         switch photo.source {
         case .scene(let name):
@@ -250,6 +271,11 @@ final class AppearanceStore: ObservableObject {
             guard let i = NSImage(named: id) else { return nil }
             images[id] = i
             return (i, .scene)
+        case .upload(let file) where photo.plain == true:
+            if let i = images[file] { return (i, .original) }
+            guard let i = NSImage(contentsOf: Self.folder.appendingPathComponent(file)) else { return nil }
+            images[file] = i
+            return (i, .original)
         case .upload(let file):
             let inkFile = file + Self.inkSuffix
             if let i = images[inkFile] { return (i, .photo) }
@@ -530,7 +556,7 @@ struct SlotPhotoView: View {
         if let photo = store.photos[slot], let pic = store.image(photo, in: slot) {
             GeometryReader { g in
                 PhotoLayer(image: pic.image, kind: pic.kind, place: photo.place, size: g.size, fade: fade)
-                    .blur(radius: frost ? 1 : 0, opaque: true)
+                    .blur(radius: frost && pic.kind != .original ? 1 : 0, opaque: true) // (Ink off: the photo as it is)
                     .overlay { if frost && pic.kind == .scene { Theme.page.opacity(0.22) } }
                     .frame(width: g.size.width, height: g.size.height)
                     .clipped()
@@ -557,19 +583,30 @@ struct PhotoLayer: View {
         let ox = place.x / 100 * (size.width - dw), oy = place.y / 100 * (size.height - dh)
         ZStack(alignment: .topLeading) {
             Theme.page
-            ZStack(alignment: .topLeading) {
-                Image(nsImage: image)
-                    .resizable()
-                    .renderingMode(.template)
-                    .foregroundStyle(kind == .scene ? Theme.ink : Theme.photoInk)
-                    .frame(width: dw, height: dh)
-                    .offset(x: ox, y: oy)
+            if kind == .original {
+                // (1.3.164) Ink off: the photo itself, whole, nothing faded over it (the words on it take the white border)
+                ZStack(alignment: .topLeading) {
+                    Image(nsImage: image)
+                        .resizable()
+                        .frame(width: dw, height: dh)
+                        .offset(x: ox, y: oy)
+                }
+                .frame(width: size.width, height: size.height, alignment: .topLeading)
+            } else {
+                ZStack(alignment: .topLeading) {
+                    Image(nsImage: image)
+                        .resizable()
+                        .renderingMode(.template)
+                        .foregroundStyle(kind == .scene ? Theme.ink : Theme.photoInk)
+                        .frame(width: dw, height: dh)
+                        .offset(x: ox, y: oy)
+                }
+                .frame(width: size.width, height: size.height, alignment: .topLeading)
+                .mask { inkMask }
+                // (a drawn scene's ink is a third of the way to the accent: kept to under half of that behind the sidebar's
+                // words; a photo's is already a shade off its paper)
+                .opacity(fade == .side && kind == .scene ? 0.45 : 1)
             }
-            .frame(width: size.width, height: size.height, alignment: .topLeading)
-            .mask { inkMask }
-            // (a drawn scene's ink is a third of the way to the accent: kept to under half of that behind the sidebar's
-            // words; a photo's is already a shade off its paper)
-            .opacity(fade == .side && kind == .scene ? 0.45 : 1)
         }
         .frame(width: size.width, height: size.height, alignment: .topLeading)
         .clipped()
@@ -595,6 +632,31 @@ struct SidebarGround: View {
         SlotPhotoView(slot: .side, fade: .side)
             .ignoresSafeArea()
     }
+}
+
+/// (1.3.164) The words on a photo with its Ink switch off (the web's .bcv-side--plain): the light look's dark words in
+/// either look, each with a gentle white border — a hairline of white round every letter, softening out — so they read
+/// on any photo. Where the photo is inked nothing changes.
+struct PlainPhotoWords: ViewModifier {
+    let on: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if on {
+            content
+                .environment(\.colorScheme, .light)
+                .shadow(color: .white, radius: 0.5)
+                .shadow(color: .white, radius: 0.5)
+                .shadow(color: .white.opacity(0.7), radius: 2.5)
+        } else {
+            content
+        }
+    }
+}
+
+extension View {
+    /// (1.3.164) The words of a place whose photo has its Ink switch off: dark, with a gentle white border.
+    func plainPhotoWords(_ on: Bool) -> some View { modifier(PlainPhotoWords(on: on)) }
 }
 
 /// (1.3.1) The sidebar's rows in a colour worn. (home-16) Their words in the Mac's own colours, as every sidebar's —

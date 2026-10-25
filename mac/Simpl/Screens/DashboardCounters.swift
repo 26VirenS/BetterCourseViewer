@@ -162,10 +162,13 @@ struct DashCounterTile: View {
     @State private var editing = false
     /// (1.3.113) Appearance on: its photo button over it, and a press on it opens nothing else.
     @ObservedObject private var appearanceMode = AppearanceMode.shared
+    /// (1.3.164) Whether its photo has its Ink switch off: shown as it is, no wash over it, its words dark with a white border.
+    @ObservedObject private var appearance = AppearanceStore.shared
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var alert: Bool { counter.tone == "red" && (value ?? 0) > 0 }
+    private var plain: Bool { PhotoSlot.card(counter.key).map { appearance.isPlain($0) } ?? false }
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -180,6 +183,7 @@ struct DashCounterTile: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .opacity(stale ? 0.6 : 1)
             }
+            .plainPhotoWords(plain)
             .padding(.horizontal, Self.padding(style))
             .padding(.vertical, 14)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -194,7 +198,8 @@ struct DashCounterTile: View {
                 // something late, a stronger red one — both drawn here, not as the glass's tint, which macOS mutes in a
                 // window in the background — whatever is worn
                 // (1.3.81: no coloured edge round it — the owner: "remove the unnecessary border"; the wash alone says it)
-                shape.fill(alert ? DashCounterTile.alertWash : wash)
+                // (1.3.164: over a photo with its Ink off, the photo as it is — only the red of something late over it)
+                shape.fill(alert ? DashCounterTile.alertWash : plain ? Color.clear : wash)
             }
         }
         .buttonStyle(CardButtonStyle(radius: 18))

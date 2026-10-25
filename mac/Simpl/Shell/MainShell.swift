@@ -328,6 +328,8 @@ struct Sidebar: View {
     @Environment(\.openWindow) private var openWindow
     @State private var open: Set<String> = []
     @ObservedObject private var appearanceMode = AppearanceMode.shared
+    /// (1.3.164) Whether its photo has its Ink switch off: the words over it then dark, with a white border.
+    @ObservedObject private var appearance = AppearanceStore.shared
     /// (1.3.113) The sidebar's photo moved and zoomed, from its photo button.
     @State private var adjusting = false
 
@@ -390,6 +392,7 @@ struct Sidebar: View {
             }
             AccountBar()
         }
+        .plainPhotoWords(appearance.isPlain(.side)) // (1.3.164: its photo's Ink off — dark words, a white border round them)
         .background { SidebarGround() } // (1.3.1) the sidebar's photo, frosted, behind its rows
         // (1.3.113) Appearance on: its photo button, in its middle
         .overlay {

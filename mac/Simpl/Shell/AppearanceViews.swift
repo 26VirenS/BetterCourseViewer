@@ -335,6 +335,13 @@ struct PhotoSlotEditor: View {
                         Image(systemName: "plus.magnifyingglass").foregroundStyle(.secondary)
                     }
                     .help("Zoom the photo (or pinch it)")
+                    // (1.3.164) a photo of one's own: inked, or (off) shown as it is, the words on it white-bordered
+                    if case .upload? = photo?.source {
+                        Toggle("Ink photo", isOn: Binding(get: { !store.isPlain(slot) }, set: { store.setInk($0, in: slot) }))
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                            .help("On: the photo drawn in two tones of the page. Off: the photo as it is, the words on it bordered in white.")
+                    }
                     HStack(spacing: 8) {
                         Button("Reset") {
                             store.setPlace(slot.defaultPlace, in: slot)
