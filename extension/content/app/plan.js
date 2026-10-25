@@ -477,5 +477,5 @@
     return rowEl;
   }
 
-  BCV.plan = { ready, get, all, onChange, put, clear, attach, pill, open: openBar, close: closeBar, freeSlots, slotsFor, linked, linkedEvents, sending, setSending, canSend, whenWords, lenWord };
+  BCV.plan = { ready, get, all, onChange, put, clear, attach, pill, open: openBar, close: closeBar, freeSlots, slotsFor, linked, linkedEvents, sending, setSending, canSend, whenWords, dayWord, lenWord, lengthFor };
 })();

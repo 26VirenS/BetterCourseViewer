@@ -663,11 +663,22 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
   const calKey = (id) => `cal:feed:${id}`;
   const calLinks = async () => { const v = (await api.storage.local.get(CAL_LINKS).catch(() => ({})))[CAL_LINKS]; return Array.isArray(v) ? v : []; };
   const calHostName = (href) => { const h = new URL(href).hostname; return /google\.com$/.test(h) ? 'Google Calendar' : /icloud\.com$/.test(h) ? 'iCloud Calendar' : /(outlook|office365|office|live)\.com$/.test(h) ? 'Outlook' : h.replace(/^www\./, ''); };
-  async function calRead(href) {
+  /** The file at a calendar's address: { status, text }. In the apps the app reads it (their page, a Canvas page, cannot
+   *  read another site: bridge.js fetchText); here, the background itself. */
+  async function calFile(href) {
+    const viaApp = self.BCVBridge?.native?.fetchText;
+    if (viaApp) {
+      const r = await viaApp(href);
+      if (!r || !r.status) throw new Error(r?.error || 'The calendar could not be reached.');
+      return { status: r.status, text: String(r.text || '') };
+    }
     const res = await fetch(href, { credentials: 'omit', cache: 'no-store', redirect: 'follow' });
-    if (!res.ok) throw new Error(res.status === 404 || res.status === 410 ? 'That calendar link no longer works. Paste its private address again.' : res.status === 401 || res.status === 403 ? 'That calendar is private to its owner: use its secret (private) address.' : `The calendar's site answered ${res.status}.`);
-    if (Number(res.headers.get('content-length') || 0) > CAL_MAX) throw new Error('That calendar is too big to read.');
-    const text = await res.text();
+    if (res.ok && Number(res.headers.get('content-length') || 0) > CAL_MAX) throw new Error('That calendar is too big to read.');
+    return { status: res.status, text: res.ok ? await res.text() : '' };
+  }
+  async function calRead(href) {
+    const { status, text } = await calFile(href);
+    if (status < 200 || status > 299) throw new Error(status === 404 || status === 410 ? 'That calendar link no longer works. Paste its private address again.' : status === 401 || status === 403 ? 'That calendar is private to its owner: use its secret (private) address.' : `The calendar's site answered ${status}.`);
     if (text.length > CAL_MAX) throw new Error('That calendar is too big to read.');
     const now = Date.now();
     return BCV.ics.parse(text, { from: now - 60 * 86400000, to: now + 400 * 86400000, max: 4000 });

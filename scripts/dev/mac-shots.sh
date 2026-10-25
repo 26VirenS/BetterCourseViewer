@@ -510,6 +510,12 @@ ui_review() {
   # (1.3.151) Find Appointment's popup over the calendar: the class, the group's card, a day open to its times
   MODE=light shoot light-05f-find-appointment 16 -SimplPlace calendar -SimplFindAppointment YES
   MODE=dark shoot dark-05f-find-appointment 16 -SimplPlace calendar -SimplFindAppointment YES
+  # (1.3.165) Sync's popup over the calendar: Canvas's feed for a calendar app, the calendars linked, Send plans; and the
+  # plan rail under a piece of work on To Do: its free times, the one chosen lit
+  MODE=light shoot light-05s-calendar-sync 16 -SimplPlace calendar -SimplSync YES
+  MODE=dark shoot dark-05s-calendar-sync 16 -SimplPlace calendar -SimplSync YES
+  MODE=light shoot light-03p-todo-plan-rail 16 -SimplPlace todo -SimplPlanFirst YES
+  MODE=dark shoot dark-03p-todo-plan-rail 16 -SimplPlace todo -SimplPlanFirst YES
   MODE=light shoot light-11w-course-grades-whatif 16 -SimplPlace section:courses/101:grades -SimplWhatIf YES
   MODE=light shoot light-25b-compose-attached 16 -SimplPlace inbox -SimplOpen compose -SimplAttach "$PWD/docs/screenshots/calendar.png"
   MODE=light SIZE=1720x1040 shoot light-45-wide-grades 14 -SimplPlace grades

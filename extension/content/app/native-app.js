@@ -207,6 +207,7 @@
     // (2.99.33) the facts one by one, for one row design on every Dashboard list (course · kind over the title, points and
     // due time on the right — the counters' sheets carry the same: sheetRow)
     kind: it.custom ? 'My task' : (it.kind || ''), pts: it.points !== null && it.points !== undefined ? ptsOf(it.points) : '',
+    plan: planInfo(it.id), // (2.99.107) the time it is planned for, pulled to (content/app/plan.js)
   });
   const meOf = (me) => (me ? { name: me.name || '', email: me.email || me.loginId || '', pronouns: me.pronouns || '', initials: U.initials(me.name || '') || '', avatar: me.avatar && !/avatar-50|no_pic|dotted_pic/.test(me.avatar) ? me.avatar : null } : null);
 
@@ -649,6 +650,7 @@
       points: it.points !== null && it.points !== undefined ? ptsOf(it.points) : '',
       due: it.graded ? 'Graded' : it.submitted && it.isDue ? 'Submitted' : `${it.isDue ? 'Due' : 'At'} ${U.fmtTime(it.date)}`,
       time: U.fmtTime(it.date), done: doneOf(it), url: it.url || null, custom: !!it.custom,
+      plan: planInfo(it.id), // (2.99.107) the time it is planned for
     });
     const days = [];
     const at = new Map();
@@ -1163,6 +1165,10 @@
         reservationId: !isA && ev.appointment_group_id ? String(ev.id) : null, // (2.99.95: a time reserved is the student's own event — Un-reserve gives it back)
       });
     }
+    // (2.99.107) the linked calendars and the plans over them; a plan sent to the Canvas calendar drawn once, as the plan
+    const layer = await calLayer(s, e).catch(() => ({ events: [], sent: new Set() }));
+    for (let i = out.length - 1; i >= 0; i--) if (layer.sent.has(out[i].id)) out.splice(i, 1);
+    out.push(...layer.events);
     // (2.99.35) events at the same time by their id: Canvas's answers for several calendars arrive in any order, and the same
     // events are always the same answer (a live check compares them)
     out.sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : 0) || (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
@@ -3056,7 +3062,87 @@
     return { ok: true };
   }
 
-  const CALLS = { setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, setColor, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, appointments, reserveAppointment, cancelReservation, notifications, notifMark, search, searchLocal, searchWarm, searchRecent, appearance, whatsNew, whatsNewSeen, refresh,
+  // ---- (2.99.107) Calendar → Sync and pull to plan, for the apps ------------------------------------------------
+  // The same as the web's (screens/calendar.js, content/app/plan.js): Canvas's calendar feed for a calendar app, the
+  // student's own calendars linked by their private address (the background reads them: in the apps the app fetches the
+  // file for it, its page being unable to read another site — bridge.js fetchText), and the plans: the free times a piece
+  // of work could go in, put there, moved, cleared, and sent on to the Canvas calendar when Send plans is on.
+  function planInfo(id) {
+    const p = BCV.plan?.get(String(id));
+    if (!p) return null;
+    const at = Date.parse(p.at);
+    const past = at + p.mins * 60000 < Date.now();
+    return { at: p.at, mins: p.mins, past, words: `${past ? 'Was planned' : 'Planned'} ${BCV.plan.whenWords(at)}` };
+  }
+  const askCal = (m) => Promise.resolve(BCV.api.runtime.sendMessage({ type: 'cal', ...m })).catch((e) => ({ ok: false, message: e?.message || String(e) }));
+  async function calSync() {
+    const [me, linked, send] = await Promise.all([store.me().catch(() => null), BCV.plan.linked(), BCV.plan.sending()]);
+    if (linked.links.length) askCal({ op: 'sync' }); // (what was read more than half an hour ago, read again: the answer follows in storage)
+    return {
+      feed: me?.calendarFeed || null, send, canSend: BCV.plan.canSend(),
+      links: linked.links.map((l) => { const f = linked.feeds[l.id]; return { id: l.id, name: l.name, color: l.color || GRAY, on: l.on !== false, read: f?.at ? new Date(f.at).toISOString() : null, count: (f?.events || []).length, error: f && !f.ok ? f.error || 'Could not be read.' : '' }; }),
+    };
+  }
+  async function calLink({ url } = {}) {
+    const r = await askCal({ op: 'add', url: String(url || '') });
+    return r?.ok ? { ok: true, name: r.link.name, count: r.count } : { ok: false, error: r?.message || (r?.ask ? `Simpl could not read ${r.host}.` : 'That calendar could not be linked.') };
+  }
+  const calShow = async ({ id, on } = {}) => askCal({ op: 'set', id: String(id), on: !!on });
+  const calUnlink = async ({ id } = {}) => askCal({ op: 'remove', id: String(id) });
+  const calRefresh = async () => askCal({ op: 'sync', force: true });
+  /** A piece of work by its id: the one a screen was last given, else what its plan kept of it (a plan on the Calendar). */
+  function workOf(id) {
+    const key = String(id);
+    const it = items.get(key);
+    if (it) return it;
+    const p = BCV.plan?.get(key);
+    return p ? { id: key, title: p.title, url: p.url, date: p.due ? new Date(p.due) : null, courseName: p.course, course: p.color ? { color: p.color, name: p.course } : null, type: key.split(':')[0] } : null;
+  }
+  async function planSlots({ id, mins } = {}) {
+    const it = workOf(id);
+    if (!it) return { error: 'That piece of work is not on a list any more.' };
+    const had = BCV.plan.get(String(id));
+    const m = [30, 60, 90, 120].includes(Number(mins)) ? Number(mins) : had?.mins || BCV.plan.lengthFor(it);
+    const list = await BCV.plan.slotsFor(it, m);
+    const due = it.date ? new Date(it.date) : null;
+    return {
+      title: it.title, mins: m, lengths: [30, 60, 90, 120], planned: had?.at || null,
+      due: due ? iso(due) : null, dueWords: due ? (due > new Date() ? `Due ${BCV.plan.dayWord(due.getTime())} ${U.fmtTime(due)}` : 'Past due') : '',
+      slots: list.map((x) => ({ at: new Date(x.at).toISOString(), day: BCV.plan.dayWord(x.at), time: U.fmtTime(x.at) })),
+    };
+  }
+  async function planPut({ id, at, mins } = {}) {
+    const it = workOf(id);
+    const t = Date.parse(at);
+    if (!it || !t) return { error: 'That time could not be planned.' };
+    await BCV.plan.put(it, t, Number(mins) || 60);
+    return { ok: true, plan: planInfo(id) };
+  }
+  async function planClear({ id } = {}) { await BCV.plan.clear(String(id)); return { ok: true }; }
+  async function planSend({ on } = {}) { await BCV.plan.setSending(!!on); return { ok: true, send: !!on }; }
+  /** What the Calendar lays over Canvas's own between two days: the linked calendars' events (only the calendars shown) and
+   *  the plans, shaped as its events are; and the Canvas events that are plans sent there (drawn as the plan instead). */
+  async function calLayer(s, e) {
+    const now = new Date();
+    const out = [];
+    const dayOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    for (const ev of await BCV.plan.linkedEvents(s.getTime(), e.getTime())) {
+      const base = { title: ev.title, kind: ev.link.name, layer: 'linked', color: ev.link.color || GRAY, url: null, missing: false, excused: false, struck: false, done: false, reservationId: null, sub: [ev.link.name, ev.location, ev.free ? 'Free' : ''].filter(Boolean).join(' · ') };
+      if (ev.allDay) {
+        const [y, mo, d] = String(ev.day).split('-').map(Number);
+        for (let i = 0; i < Math.min(ev.days || 1, 31); i++) { const date = new Date(y, mo - 1, d + i); out.push({ ...base, id: `ext:${ev.link.id}:${ev.id}:${i}`, date: iso(date), day: dayOf(date), allDay: true, time: 'All day', past: U.addDays(date, 1) <= now }); }
+      } else { const date = new Date(ev.start); out.push({ ...base, id: `ext:${ev.link.id}:${ev.id}`, date: iso(date), day: dayOf(date), allDay: false, time: U.fmtTime(date), end: iso(new Date(ev.end)), past: new Date(ev.end) <= now }); }
+    }
+    for (const [pid, p] of Object.entries(BCV.plan.all())) {
+      const date = new Date(p.at);
+      if (Number.isNaN(date.getTime()) || date < s || date >= e) continue;
+      const end = new Date(date.getTime() + p.mins * 60000);
+      out.push({ id: `plan:${pid}`, planId: pid, title: p.title, kind: 'Plan', layer: 'plan', date: iso(date), day: dayOf(date), allDay: false, time: U.fmtTime(date), end: iso(end), done: false, missing: false, excused: false, struck: false, past: end <= now, sub: [p.course, `${BCV.plan.lenWord(p.mins)} planned`, p.due ? `due ${U.fmtDow(p.due)}` : ''].filter(Boolean).join(' · '), color: p.color || '#0a84ff', url: p.url || null, reservationId: null });
+    }
+    return { events: out, sent: new Set(Object.values(BCV.plan.all()).map((p) => p.ev).filter(Boolean)) };
+  }
+
+  const CALLS = { calSync, calLink, calShow, calUnlink, calRefresh, planSlots, planPut, planClear, planSend, setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, setColor, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, appointments, reserveAppointment, cancelReservation, notifications, notifMark, search, searchLocal, searchWarm, searchRecent, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, fileInfo, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage, messageUpload,
     toolLaunch, externalTools, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizAssignment, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback, neighbours };
   // (Mac 1.2) Grade needed: a course's score now (by the student's own weights where set, as the Grades screen) and each
@@ -3158,6 +3244,7 @@
     if (!fn) return { error: `No such call: ${name}` };
     const { maxAge, known, ...rest } = args && typeof args === 'object' ? args : {};
     try {
+      await BCV.plan?.ready(); // (the plans, for the rows' pills: read once)
       const r = await fn({ ...rest, age: ageOf(maxAge) });
       const text = JSON.stringify(r ?? null);
       if (typeof known !== 'string') return JSON.parse(text);

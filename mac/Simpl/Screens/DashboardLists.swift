@@ -111,10 +111,12 @@ struct DashWorkLine: View {
                 DashWorkText(context: [row.course, row.kind].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "),
                              flags: row.flags ?? [], title: row.title, done: row.done)
                 Spacer(minLength: 8)
+                if let plan = row.plan, !row.done { PlanPill(plan: plan) } // (1.3.165) the time it is planned for
                 DashWorkFigures(time: row.due ?? row.time, points: row.points, stacked: false, wide: wide)
             }
             .animation(Motion.snappy, value: row.done)
         }
+        .pullToPlan(id: row.id, title: row.title, enabled: !row.done) // (1.3.165) pulled right, it is planned
         .workMenu(WorkAction(row.workRow), engine: engine)
     }
 }

@@ -82,6 +82,8 @@ export function appBundle({ root, host }) {
       // (Mac 1.2.13) a converter library from the app's copy of the extension: here, from the suite's own address for it
       case 'inject': return Promise.all((msg.files || []).map(function (f) { return fetch('https://simpl-vendor.test/' + f).then(function (r) { return r.ok ? r.text() : Promise.reject(new Error(f)); }); }))
         .then(function (texts) { texts.forEach(function (t) { (0, eval)(t); }); return { ok: true }; }).catch(function () { return { ok: false }; });
+      // (2.99.107) a linked calendar's file, as the app reads it for the page (Bridge.swift fetchText): no cookies
+      case 'fetchText': return fetch(msg.url, { credentials: 'omit', cache: 'no-store' }).then(function (r) { return r.text().then(function (t) { return { status: r.status, text: t }; }); }).catch(function (e) { return { status: 0, error: String(e && e.message || e) }; });
       default: return Promise.resolve(null);
     }
   } } } };

@@ -28,6 +28,8 @@ struct CalendarView: View {
     @State private var choosing = false
     /// (1.3.151) Find Appointment's popup (Appointments.swift); the screenshot suite's -SimplFindAppointment YES opens it.
     @State private var finding = UserDefaults.standard.bool(forKey: "SimplFindAppointment")
+    /// (1.3.165) Sync's popup (SyncPopup.swift); the screenshot suite's -SimplSync YES opens it.
+    @State private var syncing = UserDefaults.standard.bool(forKey: "SimplSync")
     /// (1.3.78) Where what is shown first came from, for the console's open line (OpenClock).
     @State private var source = "fetched"
     /// (1.3.80) What the live checks know of the span shown (its fingerprint: LiveRefresh).
@@ -105,6 +107,10 @@ struct CalendarView: View {
         .navigationSubtitle(periodTitle)
         .openTimed("Calendar", ready: data != nil, source: source)
         .toolbar { toolbarItems }
+        .floatingPopup("sync", title: "Sync", isPresented: $syncing, engine: engine) {
+            SyncPopup { Task { await load(animated: true) } } // (a calendar linked, shown or hidden: the calendar shows it)
+                .environmentObject(engine)
+        }
         .floatingPopup("appointments", title: "Find Appointment", isPresented: $finding, engine: engine) {
             AppointmentsPopup { Task { await load(animated: true) } } // (a time reserved or given back: the calendar shows it)
                 .environmentObject(engine)
@@ -154,6 +160,14 @@ struct CalendarView: View {
                 CalendarsPopover(choices: data?.calendars ?? []) { Task { await load(animated: true) } }
                     .environmentObject(engine)
             }
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                syncing = true
+            } label: {
+                Label("Sync", systemImage: "arrow.triangle.2.circlepath")
+            }
+            .help("Your Canvas work in Apple, Google or Outlook, and your own calendars here")
         }
         ToolbarItem(placement: .primaryAction) {
             Button {
@@ -592,6 +606,16 @@ struct CalendarView: View {
             Divider()
             Button("Open in \(engine.lmsName)") { engine.openWebScreen(url, title: ev.title) }
             Button("Copy Link") { if let u = engine.absolute(url) { copyToPasteboard(u.absoluteString) } }
+        }
+        // (1.3.165) a plan: cleared from here (moved from its work's row)
+        if ev.layer == "plan", let pid = ev.planId {
+            Divider()
+            Button("Clear Plan") {
+                Task {
+                    _ = try? await engine.call("planClear", ["id": pid], as: ActReply.self)
+                    engine.changed()
+                }
+            }
         }
         // (1.3.151) a time reserved off Find Appointment: given back from here too, or other times found
         if let res = ev.reservationId {
@@ -1345,6 +1369,12 @@ private struct CalendarChip: View {
                     .foregroundStyle(.red)
                     .frame(width: 8)
             }
+            if event.layer == "plan" { // (1.3.165) a time set aside for a piece of work: its clock before its name
+                Image(systemName: "clock")
+                    .font(.sCaption2.weight(.semibold))
+                    .foregroundStyle(c)
+                    .padding(.leading, 7)
+            }
             // (a name on two lines only where each of its words fits a line: a word wider than the day — "Composition" —
             // was broken in the middle, "Compositio / n"; such a name keeps to one line, cut at its end)
             ViewThatFits(in: .horizontal) {
@@ -1354,10 +1384,10 @@ private struct CalendarChip: View {
                 }
                 title(lines: 1)
             }
-            .foregroundStyle(grey ? Color.secondary : (missing ? Color.red : Color.primary))
-            .padding(.leading, missing ? 0 : 7)
+            .foregroundStyle(grey || event.layer == "linked" ? Color.secondary : (missing ? Color.red : Color.primary))
+            .padding(.leading, missing || event.layer == "plan" ? 0 : 7)
                 .overlay(alignment: .leading) {
-                    if !missing {
+                    if !missing && event.layer != "plan" {
                         Capsule()
                             .fill(c.opacity(grey ? 0.55 : 1))
                             .frame(width: 3)
@@ -1431,6 +1461,7 @@ private struct CalendarEventLine: View {
         case "Quiz": return "questionmark.square" // (courses-8: a quiz's own symbol everywhere; the checklist is To Do's)
         case "Discussion": return "bubble.left.and.bubble.right"
         case "Appointment": return "person.2"
+        case "Plan": return "clock" // (1.3.165)
         default: return "calendar"
         }
     }
@@ -1483,6 +1514,12 @@ private struct CalendarWeekBlock: View {
                 .frame(width: 3)
                 .padding(.vertical, 3)
                 .padding(.leading, 2)
+        }
+        .overlay { // (1.3.165) a plan: a dashed edge, a time set aside rather than something set
+            if event.layer == "plan" {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(c.opacity(0.8), style: StrokeStyle(lineWidth: 1.2, dash: [4, 3]))
+            }
         }
         .contentShape(Rectangle())
     }

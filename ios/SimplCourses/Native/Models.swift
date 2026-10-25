@@ -62,6 +62,54 @@ struct WorkRow: Codable, Identifiable, Hashable {
     /// task") and its points ("10 pts", "1 pt", "").
     var kind: String?
     var pts: String?
+    /// (2.99.107) The time it is planned for, pulled to (content/app/plan.js): "Planned Tue 4:00 PM".
+    var plan: WorkPlan?
+}
+
+/// (2.99.107) A piece of work's plan: when, for how long, and the words its pill says.
+struct WorkPlan: Codable, Hashable {
+    var at: String
+    var mins: Int
+    var past: Bool?
+    var words: String
+}
+
+/// (2.99.107) Calendar → Sync as native-app.js `calSync` reads it: Canvas's calendar feed for a calendar app, the student's
+/// own calendars linked by their private address, and whether plans go on to the Canvas calendar.
+struct SyncData: Codable {
+    var feed: String?
+    var send: Bool
+    var canSend: Bool
+    var links: [SyncLink]
+}
+
+struct SyncLink: Codable, Identifiable, Hashable {
+    var id: String
+    var name: String
+    var color: String?
+    var on: Bool
+    var read: String?
+    var count: Int
+    var error: String
+}
+
+/// (2.99.107) The free times a piece of work could be planned in (native-app.js `planSlots`).
+struct PlanSlots: Codable {
+    var title: String?
+    var mins: Int?
+    var lengths: [Int]?
+    var planned: String?
+    var due: String?
+    var dueWords: String?
+    var slots: [PlanSlot]?
+    var error: String?
+}
+
+struct PlanSlot: Codable, Hashable, Identifiable {
+    var at: String
+    var day: String
+    var time: String
+    var id: String { at }
 }
 
 struct Counter: Codable, Identifiable, Hashable {
@@ -332,6 +380,11 @@ struct CalEvent: Codable, Identifiable, Hashable {
     var past: Bool?
     /// (2.99.95) A time reserved off Find Appointment: its reservation, which Give Back hands to Canvas.
     var reservationId: String?
+    /// (2.99.107) "plan" for a time set aside for a piece of work (planId: the work's), "linked" for an event of a calendar
+    /// linked in Sync; nil for Canvas's own. A timed one's end.
+    var layer: String?
+    var planId: String?
+    var end: String?
 }
 
 /// (2.99.95) Find Appointment: Canvas's Scheduler as native-app.js `appointments` reads it — the classes with something to

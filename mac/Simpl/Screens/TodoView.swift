@@ -16,6 +16,8 @@ struct TodoView: View {
     @State private var regrouping = 0
     /// A new task's sheet went up: what is read next is its answer, and arrives on the house spring.
     @State private var expectingTask = false
+    /// (1.3.165) The screenshot suite's plan rail, opened once.
+    @State private var planShown = false
     /// (1.3) Where the list's first card starts, down its scrolling column: the side column starts level with it.
     @State private var firstCardTop: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -65,6 +67,13 @@ struct TodoView: View {
             let animated = expectingTask && model.data != nil
             expectingTask = false
             await load(animated: animated)
+            // (1.3.165: the screenshot suite's -SimplPlanFirst YES opens the plan rail on the last piece of work open)
+            if UserDefaults.standard.bool(forKey: "SimplPlanFirst"), !planShown,
+               let row = model.data?.sections.flatMap(\.rows).last(where: { !$0.done && $0.custom != true }) {
+                planShown = true
+                try? await Task.sleep(nanoseconds: 600_000_000)
+                PlanAsk.shared.id = row.id
+            }
         }
         .liveChecks(model) // (1.3.80: checked every minute while it is on show; only what changed moves)
         .onChange(of: engine.newTask) { _, open in
@@ -557,6 +566,7 @@ private struct TodoTaskRow: View {
             TodoPriorityMenu(level: row.pri ?? 0, short: row.priShort, hovering: hover, set: setPriority, slot: slot)
         }
         .onHover { hover = $0 }
+        .pullToPlan(id: row.id, title: row.title, enabled: !row.done) // (1.3.165) pulled right, it is planned
         .contextMenu { menu }
     }
 
@@ -579,6 +589,7 @@ private struct TodoTaskRow: View {
         }
         Button(row.done ? "Mark Not Done" : "Mark Done") { toggle(!row.done) }
         Menu("Priority") { todoPriorityChoices(level: row.pri ?? 0, set: setPriority) }
+        planMenu(id: row.id, planned: row.plan != nil, done: row.done, engine: engine)
         if row.custom == true {
             Divider()
             Button("Delete Task…", role: .destructive) { delete() }

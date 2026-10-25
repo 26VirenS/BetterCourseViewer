@@ -185,6 +185,8 @@
       navState: (o) => call({ op: 'navState', canSwipeBack: !!o?.canSwipeBack }).then(noop),
       // (Mac 1.2.13) a library the converter draws on, from the app's own copy of the extension (lib/vendor/…)
       inject: (files) => call({ op: 'inject', files: (files || []).map(String) }).then((r) => !!(r && r.ok)),
+      // (2.99.107) a linked calendar's file (its private .ics address), read by the app: this page cannot read another site
+      fetchText: (url) => call({ op: 'fetchText', url: String(url || '') }).catch((e) => ({ status: 0, error: e?.message || String(e) })),
     } : null,
     storageChanged: (changes) => emitChanged(changes),
   };

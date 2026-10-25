@@ -157,6 +157,7 @@ struct WorkRowView: View {
                 }
             }
             Spacer(minLength: 6)
+            if let plan = row.plan, !row.done { PlanPill(plan: plan) } // (1.3.165) the time it is planned for
             if let flag = row.flag { FlagBadge(flag: flag) }
             if showCourse, let course = row.course, !course.isEmpty { CourseChip(text: course, color: row.color) }
             if let time = row.time, !time.isEmpty {

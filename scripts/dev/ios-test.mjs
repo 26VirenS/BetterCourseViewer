@@ -284,6 +284,35 @@ try {
   const back = await nc('cancelReservation', { id: held.reservationId });
   const ap3 = await nc('appointments', { force: true });
   check(back.ok && ap3.groups[0].mine.length === 0 && ap3.groups[0].days.flatMap((d) => d.slots).filter((x) => x.open).length === 11, 'and given back, the time is open again');
+  // (2.99.107, Mac 1.3.165) Calendar → Sync and pull to plan for the apps: Canvas's feed; a calendar linked by its private address
+  // (here the page reads it: this harness has no native fetch); a piece of work's free times, one planned — said on its row, laid
+  // on the calendar beside the linked calendar's events — then cleared, and the calendar unlinked
+  const plSync = await nc('calSync');
+  check(/\/feeds\/calendars\/user_\w+\.ics$/.test(plSync.feed || '') && plSync.links.length === 0 && plSync.canSend === true && plSync.send === false, `Sync: the account's calendar feed, nothing linked, Send plans off: ${JSON.stringify(plSync)}`);
+  const plLink = await nc('calLink', { url: `${BASE}/__mock/ics/personal.ics` });
+  const plSync2 = await nc('calSync');
+  check(plLink.ok && plLink.count === 5 && plLink.name === "Sam's calendar" && plSync2.links.length === 1 && plSync2.links[0].count === 5 && plSync2.links[0].on && !plSync2.links[0].error && !!plSync2.links[0].read, `a calendar linked by its address: read and listed: ${JSON.stringify({ plLink, links: plSync2.links })}`);
+  const plTodo = await nc('todo');
+  const plWork = plTodo.sections.flatMap((x) => x.rows).filter((r) => !r.done && !r.custom).pop();
+  const plSlots = await nc('planSlots', { id: plWork.id });
+  const plTmr = new Date(); plTmr.setDate(plTmr.getDate() + 1);
+  const plShiftA = new Date(plTmr.getFullYear(), plTmr.getMonth(), plTmr.getDate(), 16).getTime() - 10 * 60000;
+  const plShiftB = new Date(plTmr.getFullYear(), plTmr.getMonth(), plTmr.getDate(), 20).getTime() + 10 * 60000;
+  check(!plSlots.error && plSlots.mins === 60 && plSlots.lengths.join() === '30,60,90,120' && plSlots.slots.length > 0 && plSlots.slots.every((x) => x.at && x.day && /\d:\d\d [AP]M/.test(x.time) && !(Date.parse(x.at) < plShiftB && Date.parse(x.at) + 3600e3 > plShiftA)) && !plSlots.planned,
+    `a piece of work's free times, an hour each, clear of the linked calendar's shift: ${JSON.stringify({ title: plSlots.title, n: plSlots.slots.length, first: plSlots.slots.slice(0, 3), due: plSlots.dueWords, error: plSlots.error })}`);
+  const plSlots30 = await nc('planSlots', { id: plWork.id, mins: 30 });
+  const plPut = await nc('planPut', { id: plWork.id, at: plSlots.slots[0].at, mins: 60 });
+  const plRow2 = (await nc('todo')).sections.flatMap((x) => x.rows).find((r) => r.id === plWork.id);
+  check(plSlots30.mins === 30 && plPut.ok && /^Planned /.test(plRow2?.plan?.words || '') && plRow2.plan.at === plSlots.slots[0].at && plRow2.plan.mins === 60, `planned: the row says so (its pill), half an hour asked for gives half-hour times: ${JSON.stringify({ plan: plRow2?.plan, mins30: plSlots30.mins })}`);
+  const plCal = await nc('calendar', { from: new Date(Date.now() - 864e5).toISOString(), to: new Date(Date.now() + 16 * 864e5).toISOString() });
+  const plEv = plCal.events.find((e) => e.layer === 'plan' && e.planId === plWork.id);
+  const plLinked = plCal.events.filter((e) => e.layer === 'linked').map((e) => e.title);
+  check(plEv?.kind === 'Plan' && plEv.date === plSlots.slots[0].at && !!plEv.end && plLinked.includes('Shift at the library') && plLinked.includes('Trip home') && !plLinked.some((t) => /Cancelled/.test(t)), `the calendar lays the plan and the linked calendar's events over Canvas's: ${JSON.stringify({ plan: plEv, linked: [...new Set(plLinked)] })}`);
+  const plClear = await nc('planClear', { id: plWork.id });
+  await nc('calUnlink', { id: plSync2.links[0].id });
+  const plSync3 = await nc('calSync');
+  const plRow3 = (await nc('todo')).sections.flatMap((x) => x.rows).find((r) => r.id === plWork.id);
+  check(plClear.ok && !plRow3?.plan && plSync3.links.length === 0, 'Clear takes the plan away, and Unlink the calendar');
   const nf = await nc('notifications');
   check(!nf.error && nf.total > 0 && nf.days.length > 0 && nf.days[0].rows.every((r) => r.id && r.catLabel && r.title), `Notifications: grouped by day, each with its category: ${JSON.stringify({ total: nf.total, unread: nf.unread, days: nf.days.map((d) => `${d.title}:${d.rows.length}`), cats: nf.cats.map((c) => c.key) })}`);
   const one = nf.days[0].rows[0];

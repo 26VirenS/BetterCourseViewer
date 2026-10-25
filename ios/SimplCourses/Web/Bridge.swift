@@ -12,6 +12,8 @@ import WebKit
 final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
     static let shared = Bridge()
     static let handlerName = "bcv"
+    /// (2.99.107) Where a linked calendar's file is read for the page: no cookies, nothing kept.
+    private static let calendarSession = URLSession(configuration: .ephemeral)
 
     private let store = BridgeStore()
     private var views: [ObjectIdentifier: (view: WeakBox<WKWebView>, world: WKContentWorld)] = [:]
@@ -191,6 +193,27 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
                 return
             }
             Bridge.run(source, in: view, frame: message.frameInfo, world: message.world) { ok in replyHandler(["ok": ok], nil) }
+        case "fetchText":
+            // (2.99.107) a linked calendar's file (its private .ics address), read for the page, which cannot read another
+            // site: http and https only, no cookies, eight megabytes at most; its status and its text, or status 0 and why
+            guard let address = body["url"] as? String, let url = URL(string: address), ["http", "https"].contains(url.scheme?.lowercased() ?? "") else {
+                replyHandler(["status": 0, "error": "That is not a web address."], nil)
+                return
+            }
+            var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
+            request.httpShouldHandleCookies = false
+            Bridge.calendarSession.dataTask(with: request) { data, response, error in
+                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                DispatchQueue.main.async {
+                    if let error = error {
+                        replyHandler(["status": 0, "error": error.localizedDescription], nil)
+                    } else if let data = data, data.count <= 8 * 1024 * 1024 {
+                        replyHandler(["status": status, "text": String(decoding: data, as: UTF8.self)], nil)
+                    } else {
+                        replyHandler(["status": 0, "error": "That calendar is too big to read."], nil)
+                    }
+                }
+            }.resume()
         case "previewFile":
             // a file in the phone's own viewer, fetched with the page's own session (or, the test school's, from the school)
             #if os(iOS)

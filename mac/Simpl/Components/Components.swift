@@ -680,6 +680,9 @@ struct WorkAction {
     let kind: String?
     let handedIn: Bool
     let open: Bool
+    /// (1.3.165) The work's id where it can be planned (To Do's and the Dashboard's rows), and whether it is.
+    var planID: String? = nil
+    var planned = false
 
     init(_ r: ARow) {
         url = r.url
@@ -697,6 +700,8 @@ struct WorkAction {
         kind = w.type
         handedIn = w.done
         open = true
+        planID = w.done ? nil : w.id
+        planned = w.plan != nil
     }
 
     var label: (String, String) {
@@ -723,6 +728,25 @@ extension View {
                 Divider()
                 Button("Open in \(engine.lmsName)") { engine.openWebScreen(url, title: w.title) }
                 Button("Copy Link") { if let u = engine.absolute(url) { copyToPasteboard(u.absoluteString) } }
+            }
+            if let id = w.planID { planMenu(id: id, planned: w.planned, done: false, engine: engine) }
+        }
+    }
+}
+
+/// (1.3.165) A piece of work's plan in its menu: Plan a Time… (the rail under its row, its times to press), and once
+/// planned, Move Plan… and Clear Plan.
+@MainActor @ViewBuilder
+func planMenu(id: String, planned: Bool, done: Bool, engine: Engine) -> some View {
+    if !done {
+        Divider()
+        Button(planned ? "Move Plan…" : "Plan a Time…") { PlanAsk.shared.id = id }
+        if planned {
+            Button("Clear Plan") {
+                Task {
+                    _ = try? await engine.call("planClear", ["id": id], as: ActReply.self)
+                    engine.changed()
+                }
             }
         }
     }

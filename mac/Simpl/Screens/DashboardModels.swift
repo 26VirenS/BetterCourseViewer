@@ -88,10 +88,12 @@ struct DashRow: Codable, Identifiable, Hashable {
     var done: Bool
     var url: String?
     var custom: Bool?
+    /// (2.99.107) The time it is planned for.
+    var plan: WorkPlan?
 
     /// The row as To Do's shape, for the work's own context menu (WorkAction).
     var workRow: WorkRow {
-        WorkRow(id: id, title: title, done: done, url: url, custom: custom, type: type)
+        WorkRow(id: id, title: title, done: done, url: url, custom: custom, type: type, plan: plan)
     }
 }
 
