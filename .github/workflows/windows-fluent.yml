@@ -387,6 +387,11 @@ jobs:
           # (0.3.53) Find Appointment over the calendar, light and dark
           Shot 'find-appointment' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'calendar', '--open', 'appointments'))
           Shot 'find-appointment-dark' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'calendar', '--open', 'appointments'))
+          # (0.3.60) Sync over the calendar, and the plan rail under a row of To Do, light and dark
+          Shot 'calendar-sync' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'calendar', '--open', 'sync'))
+          Shot 'calendar-sync-dark' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'calendar', '--open', 'sync'))
+          Shot 'todo-plan' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'todo', '--open', 'plan'))
+          Shot 'todo-plan-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'todo', '--open', 'plan'))
           Shot 'notifications' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'notifications'))
           Shot 'notifications-narrow' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'notifications'))
           # Grades, a course's grades and What-If
