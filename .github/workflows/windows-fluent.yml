@@ -385,6 +385,8 @@ jobs:
           # (0.3.62) the week over its hours in dark, and a plan put on it and moved an hour on by planMove (the log says so)
           Shot 'calendar-week-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'calendar', '--cal-view', 'week'))
           Shot 'calendar-week-plan' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'calendar', '--cal-view', 'week', '--open', 'cal-plan'))
+          # (0.3.63) the week with To Do beside it and a row of To Do held over Wednesday at 1 PM, where it would be planned
+          Shot 'calendar-week-todo-drop' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'calendar', '--cal-view', 'week', '--open', 'cal-todo-drop'))
           Shot 'calendar-list' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'calendar', '--cal-view', 'list'))
           Shot 'calendar-preview' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'calendar', '--open', 'preview'))
           # (0.3.53) Find Appointment over the calendar, light and dark
@@ -393,6 +395,8 @@ jobs:
           # (0.3.60) Sync over the calendar, and the plan rail under a row of To Do, light and dark
           Shot 'calendar-sync' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'calendar', '--open', 'sync'))
           Shot 'calendar-sync-dark' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'calendar', '--open', 'sync'))
+          # (0.3.63) and Sync with Simpl's own calendar made as it opens, sent through the app to the mock's /api/feed
+          Shot 'calendar-sync-simpl' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'calendar', '--open', 'sync-simpl'))
           Shot 'todo-plan' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'todo', '--open', 'plan'))
           Shot 'todo-plan-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'todo', '--open', 'plan'))
           Shot 'notifications' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'notifications'))
@@ -1426,6 +1430,11 @@ jobs:
           }
           # (0.3.62) the plan on the week: put at its first free time, then moved an hour on by planMove before the picture
           # (Screens/Calendar/CalendarScreen.cs ShotPlanMoved: "calendar: plan put …, moved to …")
+          if ($script:mine -contains 'calendar-sync-simpl') {
+            $l = PhoneLog 'calendar-sync-simpl'
+            Write-Host "calendar-sync-simpl: $((@($l -split "`n" | Where-Object { $_ -match 'sync: ' }) -join ' | '))"
+            if ($l -notmatch 'sync: simpl calendar made, [1-9]') { Write-Host "::error::calendar-sync-simpl: Simpl's calendar was not made and sent before the picture (shots/profile-calendar-sync-simpl.log)"; exit 1 }
+          }
           if ($script:mine -contains 'calendar-week-plan') {
             $l = PhoneLog 'calendar-week-plan'
             Write-Host "calendar-week-plan: $((@($l -split "`n" | Where-Object { $_ -match 'calendar: ' }) -join ' | '))"
