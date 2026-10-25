@@ -48,6 +48,11 @@ struct CalendarView: View {
     /// under a sidebar the window draws over its content.
     @State private var roomWidth: CGFloat?
     private var room: CGFloat { roomWidth ?? pageWidth ?? 1000 }
+    /// (1.3.167) A plan's block being dragged on the week: by how many days and minutes (a quarter of an hour at a time);
+    /// `dropped`, let go and on its way to the page — it stays where it was let go until the week is read again.
+    @State private var planDrag: PlanDrag?
+    /// The width of a day of the week's grid, for a drag to say which day it is over.
+    @State private var weekColumn: CGFloat = 0
 
     private static let modes = ["month", "week", "list"]
     private static let line = Color(nsColor: .separatorColor)
@@ -243,6 +248,16 @@ struct CalendarView: View {
     /// missing"); the list's span.
     private func periodLine(_ d: CalendarData) -> String {
         if mode == "list" && agenda.isStandard { return "The next three weeks" }
+        // (1.3.167) the week's days before what it holds ("Oct 25 – 31 · 16 items"): its title names only its month
+        if mode == "week" {
+            let end = cal.date(byAdding: .day, value: 6, to: weekStart) ?? weekStart
+            let days = "\(weekStart.formatted(.dateTime.month(.abbreviated).day())) – \(cal.isDate(weekStart, equalTo: end, toGranularity: .month) ? end.formatted(.dateTime.day()) : end.formatted(.dateTime.month(.abbreviated).day()))"
+            return "\(days) · \(periodCount(d))"
+        }
+        return periodCount(d)
+    }
+
+    private func periodCount(_ d: CalendarData) -> String {
         let month = String(Self.dayKey.string(from: anchor).prefix(7))
         let shown = mode == "month" ? d.events.filter { $0.day.hasPrefix(month) } : d.events
         guard !shown.isEmpty else { return mode == "month" ? "Nothing this month" : mode == "week" ? "Nothing this week" : "Nothing in these days" }
@@ -262,11 +277,12 @@ struct CalendarView: View {
             f.timeStyle = .none
             return f.string(from: agenda.start, to: agenda.last)
         case "week":
+            // (1.3.167) named by its month, as Calendar names a week ("October 2026", "Oct – Nov 2026"): the title as
+            // wide in every view, its days in the line under it
             let end = cal.date(byAdding: .day, value: 6, to: weekStart) ?? weekStart
-            let f = DateIntervalFormatter()
-            f.dateStyle = .medium
-            f.timeStyle = .none
-            return f.string(from: weekStart, to: end)
+            if cal.isDate(weekStart, equalTo: end, toGranularity: .month) { return weekStart.formatted(.dateTime.month(.wide).year()) }
+            let from = cal.isDate(weekStart, equalTo: end, toGranularity: .year) ? weekStart.formatted(.dateTime.month(.abbreviated)) : weekStart.formatted(.dateTime.month(.abbreviated).year())
+            return "\(from) – \(end.formatted(.dateTime.month(.abbreviated).year()))"
         default:
             return anchor.formatted(.dateTime.month(.wide).year())
         }
@@ -732,20 +748,32 @@ struct CalendarView: View {
                             .frame(width: Self.gutter, height: Self.hourHeight, alignment: .topTrailing)
                     }
                 }
+                .overlay(alignment: .topTrailing) {
+                    if days.contains(where: { cal.isDateInToday($0) }) { nowTime(from: first) }
+                }
                 ForEach(Array(days.enumerated()), id: \.element) { i, day in
                     WeekDayStack {
                         ForEach(timed[i]) { item in
-                            weekBlock(item.ev)
+                            planDraggable(item, day: i, first: first)
                                 .layoutValue(key: WeekAt.self, value: Self.weekY(item.at, from: first))
+                                .layoutValue(key: WeekLength.self, value: length(item.ev).map { CGFloat($0) / 60 * Self.hourHeight - 2 } ?? 0)
                         }
                     }
                     .padding(.horizontal, 3)
                     .frame(maxWidth: .infinity, minHeight: span, maxHeight: .infinity, alignment: .top)
                     .background(Theme.accent.opacity(cal.isDateInToday(day) ? 0.045 : 0))
+                    .background { // (the day's width, for a dragged plan to say which day it is over)
+                        GeometryReader { g in
+                            Color.clear
+                                .onAppear { weekColumn = g.size.width }
+                                .onChange(of: g.size.width) { _, w in weekColumn = w }
+                        }
+                    }
                     .overlay(alignment: .top) {
                         if cal.isDateInToday(day) { nowLine(from: first) }
                     }
                     .overlay(alignment: .leading) { Self.line.frame(width: 1) }
+                    .zIndex(timed[i].contains(where: { $0.ev.id == planDrag?.id }) ? 1 : 0) // (a dragged plan over the days beside)
                 }
             }
             .fixedSize(horizontal: false, vertical: true) // (every day as tall as the hours, or the fullest day)
@@ -785,6 +813,95 @@ struct CalendarView: View {
         }
     }
 
+    /// (1.3.167) The time it is now, in red beside the hours at the red line (as Calendar shows it), over the hour it
+    /// falls near.
+    private func nowTime(from first: Int) -> some View {
+        TimelineView(.everyMinute) { context in
+            let c = cal.dateComponents([.hour, .minute], from: context.date)
+            let minutes: Int = (c.hour ?? 0) * 60 + (c.minute ?? 0)
+            let at: CGFloat = Self.weekY(minutes, from: first)
+            if at >= 0 {
+                Text(context.date.formatted(.dateTime.hour(.defaultDigits(amPM: .omitted)).minute()))
+                    .font(.system(size: 10.5, weight: .bold).monospacedDigit())
+                    .foregroundStyle(Color.red)
+                    .padding(.horizontal, 3)
+                    .padding(.vertical, 1)
+                    .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Theme.card))
+                    .padding(.trailing, 5)
+                    .offset(y: at - 8)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+
+    /// How long an item lasts, in minutes, when it says (a plan, a linked calendar's event): its block that tall.
+    private func length(_ ev: CalEvent) -> Int? {
+        guard let e = ev.end, let end = PreviewFormat.date(e), let start = PreviewFormat.date(ev.date) else { return nil }
+        let m = Int(end.timeIntervalSince(start) / 60)
+        return m > 0 ? max(m, 20) : nil
+    }
+
+    /// (1.3.167) A plan's block, dragged to move it: it follows the pointer a quarter of an hour at a time — the time it
+    /// would go to on a tag over it — and across to another day; let go, the plan is moved there (the page's planMove).
+    /// A click without a drag is the block's own. Anything else on the grid is as it was.
+    @ViewBuilder
+    private func planDraggable(_ item: WeekItem, day: Int, first: Int) -> some View {
+        if item.ev.layer == "plan", let pid = item.ev.planId {
+            let d = planDrag?.id == item.ev.id ? planDrag : nil
+            let len = length(item.ev) ?? 60
+            weekBlock(item.ev, fill: true)
+                .offset(x: CGFloat(d?.days ?? 0) * weekColumn, y: CGFloat(d?.minutes ?? 0) / 60 * Self.hourHeight)
+                .shadow(color: .black.opacity(d != nil && d?.dropped == false ? 0.22 : 0), radius: 10, y: 5)
+                .overlay(alignment: .top) {
+                    if let d, !d.dropped { dragTime(item.at + d.minutes, day: day + d.days).offset(x: CGFloat(d.days) * weekColumn, y: CGFloat(d.minutes) / 60 * Self.hourHeight - 12) }
+                }
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.08), value: d)
+                .highPriorityGesture(
+                    DragGesture(minimumDistance: 4)
+                        .onChanged { g in
+                            let mins = Int(((g.translation.height / Self.hourHeight) * 60 / 15).rounded()) * 15
+                            let lo = first * 60 - item.at, hi = max(lo, 24 * 60 - len - item.at)
+                            let days = weekColumn > 0 ? min(6 - day, max(-day, Int((g.translation.width / weekColumn).rounded()))) : 0
+                            let next = PlanDrag(id: item.ev.id, days: days, minutes: min(hi, max(lo, mins)))
+                            guard next != planDrag else { return }
+                            planDrag = next
+                            NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                        }
+                        .onEnded { _ in
+                            guard let d = planDrag, d.id == item.ev.id else { return }
+                            guard d.days != 0 || d.minutes != 0, let start = PreviewFormat.date(item.ev.date),
+                                  let moved = cal.date(byAdding: .minute, value: d.days * 24 * 60 + d.minutes, to: start) else {
+                                planDrag = nil
+                                return
+                            }
+                            planDrag?.dropped = true
+                            Task {
+                                let r = try? await engine.call("planMove", ["id": pid, "at": ISO8601DateFormatter().string(from: moved)], as: ActReply.self)
+                                if r?.ok != true { withAnimation(Motion.snappy) { planDrag = nil } }
+                                engine.changed()
+                            }
+                        }
+                )
+                .accessibilityHint("Drag to move the plan")
+        } else {
+            weekBlock(item.ev, fill: length(item.ev) != nil)
+        }
+    }
+
+    /// The time a dragged plan would go to, on a tag over it.
+    private func dragTime(_ minutes: Int, day: Int) -> some View {
+        let at = cal.date(bySettingHour: min(23, max(0, minutes / 60)), minute: max(0, minutes % 60), second: 0, of: cal.date(byAdding: .day, value: day, to: weekStart) ?? weekStart) ?? weekStart
+        return Text(at.formatted(.dateTime.weekday(.abbreviated).hour().minute()))
+            .font(.system(size: 10.5, weight: .semibold).monospacedDigit())
+            .foregroundStyle(.white)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(Theme.accent))
+            .fixedSize()
+            .allowsHitTesting(false)
+    }
+
     /// A day's name and number over its column; a click picks the day (its month, when Month is chosen).
     private func weekHeader(_ day: Date, count: Int) -> some View {
         let isToday = cal.isDateInToday(day)
@@ -819,10 +936,11 @@ struct CalendarView: View {
         .accessibilityAddTraits(isSel ? .isSelected : [])
     }
 
-    private func weekBlock(_ ev: CalEvent) -> some View {
+    /// `fill`: as tall as the grid makes it (an item that says how long it lasts), rather than as its name needs.
+    private func weekBlock(_ ev: CalEvent, fill: Bool = false) -> some View {
         withEventMenu(ev) {
             PreviewLink(item: .event(ev, engine: engine), padded: false, radius: 8, inline: false) {
-                CalendarWeekBlock(event: ev)
+                CalendarWeekBlock(event: ev, fill: fill)
             }
         }
         .help(ev.sub ?? ev.title)
@@ -1073,12 +1191,14 @@ struct CalendarView: View {
                 withTransaction(t) {
                     data = d
                     failure = nil
+                    if planDrag?.dropped == true { planDrag = nil } // (1.3.167: the plan dragged, now where the page has it)
                 }
             } else {
                 withAnimation(Motion.gentle) {
                     data = d
                     failure = nil
                 }
+                if planDrag?.dropped == true { planDrag = nil }
             }
             error = nil
         } catch {
@@ -1472,6 +1592,7 @@ private struct CalendarEventLine: View {
 /// struck through only once handed in. The names wrap to three lines in a narrow day.
 private struct CalendarWeekBlock: View {
     let event: CalEvent
+    var fill = false
 
     var body: some View {
         let c = Color(hex: event.color)
@@ -1503,7 +1624,7 @@ private struct CalendarWeekBlock: View {
         .padding(.leading, 8)
         .padding(.trailing, 4)
         .padding(.vertical, 4)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: fill ? .infinity : nil, alignment: .topLeading) // (1.3.167: as tall as it lasts)
         .background {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .fill(c.opacity(grey ? 0.07 : 0.15))
@@ -1544,7 +1665,8 @@ private struct WeekDayStack: Layout {
     private func frames(_ subviews: Subviews, width: CGFloat) -> [CGRect] {
         var out: [CGRect] = []
         for s in subviews {
-            let h = s.sizeThatFits(ProposedViewSize(width: width, height: nil)).height
+            // (1.3.167: as tall as it lasts, when it says — a plan, a linked calendar's event — and never less than its name needs)
+            let h = max(s.sizeThatFits(ProposedViewSize(width: width, height: nil)).height, s[WeekLength.self])
             let y = max(s[WeekAt.self], (out.last?.maxY ?? -gap) + gap)
             out.append(CGRect(x: 0, y: y, width: width, height: h))
         }
@@ -1562,6 +1684,19 @@ private struct WeekItem: Identifiable {
 /// Where an item's time puts it in its day of the week's grid.
 private struct WeekAt: LayoutValueKey {
     static let defaultValue: CGFloat = 0
+}
+
+/// (1.3.167) How tall an item's block is for the time it lasts (0: as tall as its name needs).
+private struct WeekLength: LayoutValueKey {
+    static let defaultValue: CGFloat = 0
+}
+
+/// (1.3.167) A plan's block dragged on the week: by how many days and minutes; dropped, on its way to the page.
+struct PlanDrag: Equatable {
+    var id: String
+    var days: Int
+    var minutes: Int
+    var dropped = false
 }
 
 /// The calendars shown, each with its colour: your own courses on, the rest off until turned on — ten at most, as Canvas

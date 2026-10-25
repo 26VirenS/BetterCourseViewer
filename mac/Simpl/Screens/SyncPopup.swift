@@ -15,6 +15,9 @@ struct SyncPopup: View {
     @State private var linking = false
     @State private var said: String?
     @State private var saidBad = false
+    /// (1.3.167) What came of a link, said under its field (the web's 2.99.109): linked, or why not.
+    @State private var linkSaid: String?
+    @State private var linkBad = false
     @State private var unlinking: SyncLink?
     @State private var showWhere = false
 
@@ -64,7 +67,6 @@ struct SyncPopup: View {
             VStack(alignment: .leading, spacing: 18) {
                 section("Your Canvas work, in your calendar app") { feedCard(d.feed) }
                 section("Your calendars, in Simpl") { linksCard(d.links) }
-                if let said { saidLine(said) }
                 DisclosureGroup("Where is my calendar's link?", isExpanded: $showWhere) {
                     VStack(alignment: .leading, spacing: 6) {
                         whereLine("Google", "Settings → your calendar → Integrate calendar → Secret address in iCal format.")
@@ -105,6 +107,8 @@ struct SyncPopup: View {
                         .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.05)))
                     }
                 }
+                // (1.3.167) what Send plans did, under it (a link's outcome is said under its field)
+                if let said { saidLine(said) }
                 Text("Pull any piece of work to the right on To Do or the Dashboard to plan a time for it.")
                     .font(.sCaption)
                     .foregroundStyle(.secondary)
@@ -183,7 +187,7 @@ struct SyncPopup: View {
         VStack(spacing: 0) {
             ForEach(links) { l in
                 HStack(spacing: 12) {
-                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    Circle() // (1.3.167: round, as Calendar marks its calendars)
                         .fill(Color(hex: l.color))
                         .frame(width: 12, height: 12)
                     VStack(alignment: .leading, spacing: 2) {
@@ -223,7 +227,37 @@ struct SyncPopup: View {
                     .disabled(linking || draft.trimmingCharacters(in: .whitespaces).isEmpty)
             }
             .padding(14)
+            // (1.3.167) what came of it, under the field it came from: reading, linked (a tick), or why not (in red)
+            if linking {
+                HStack(spacing: 7) {
+                    ProgressView().controlSize(.mini)
+                    Text("Reading that calendar…")
+                }
+                .font(.sCaption)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 14)
+                .padding(.top, -6)
+                .padding(.bottom, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .transition(.opacity)
+            } else if let linkSaid {
+                HStack(alignment: .firstTextBaseline, spacing: 7) {
+                    Image(systemName: linkBad ? "exclamationmark.triangle.fill" : "checkmark")
+                        .font(.system(size: 11, weight: .bold))
+                    Text(linkSaid)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .font(.sCaption.weight(.medium))
+                .foregroundStyle(linkBad ? Color.red : Color.green)
+                .padding(.horizontal, 14)
+                .padding(.top, -6)
+                .padding(.bottom, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .transition(.opacity)
+            }
         }
+        .animation(Motion.snappy, value: linking)
+        .animation(Motion.snappy, value: linkSaid)
         .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.05)))
     }
 
@@ -266,14 +300,17 @@ struct SyncPopup: View {
         let url = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !url.isEmpty, !linking else { return }
         linking = true
+        linkSaid = nil
         let r = try? await engine.call("calLink", ["url": url], as: CalLinkReply.self)
         linking = false
         if r?.ok == true {
             draft = ""
-            say("\(r?.name ?? "Your calendar") is linked: \(r?.count == 1 ? "1 event" : "\(r?.count ?? 0) events") read.", bad: false)
+            linkSaid = "\(r?.name ?? "Your calendar") is linked: \(r?.count == 1 ? "1 event" : "\(r?.count ?? 0) events") read."
+            linkBad = false
             changed()
         } else {
-            say(r?.error ?? "That calendar could not be linked.", bad: true)
+            linkSaid = r?.error ?? "That calendar could not be linked."
+            linkBad = true
         }
         await load()
     }

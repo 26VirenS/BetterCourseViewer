@@ -79,6 +79,15 @@ struct PlanRailView: View {
 
     private static let chip: CGFloat = 98
     private static let gap: CGFloat = 6
+    /// (1.3.167) A little more room before each new day's first time (the web's 2.99.109).
+    private static let dayGap: CGFloat = 8
+
+    /// Where the `i`th time starts along the rail: a chip and a gap each, and a day's room before each new day.
+    private static func x(of i: Int, in slots: [PlanSlot]) -> CGFloat {
+        guard i > 0, i < slots.count else { return CGFloat(i) * (chip + gap) }
+        let newDays = (1...min(i, slots.count - 1)).filter { slots[$0].day != slots[$0 - 1].day }.count
+        return CGFloat(i) * (chip + gap) + CGFloat(newDays) * dayGap
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -150,10 +159,14 @@ struct PlanRailView: View {
                 // the chosen time slides into the lens (the second place along: the time before it still in view)
                 ZStack(alignment: .leading) {
                     HStack(spacing: Self.gap) {
-                        ForEach(Array(slots.enumerated()), id: \.element.id) { i, s in chipView(s, on: i == model.sel, newDay: i == 0 || slots[i - 1].day != s.day) }
+                        ForEach(Array(slots.enumerated()), id: \.element.id) { i, s in
+                            chipView(s, on: i == model.sel, newDay: i == 0 || slots[i - 1].day != s.day)
+                                .padding(.leading, i > 0 && slots[i - 1].day != s.day ? Self.dayGap : 0)
+                        }
                         dueChip
                     }
-                    .offset(x: CGFloat(1 - model.sel) * (Self.chip + Self.gap))
+                    // (the chosen time under the lens, the second place along; short of the first, the lens empty)
+                    .offset(x: (Self.chip + Self.gap) - (model.sel < 0 ? -(Self.chip + Self.gap) : Self.x(of: model.sel, in: slots)))
                     .animation(.easeOut(duration: 0.16), value: model.sel)
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .strokeBorder(model.sel >= 0 ? Theme.accent : Color.secondary.opacity(0.5), style: StrokeStyle(lineWidth: 2, dash: model.sel >= 0 ? [] : [5, 4]))
@@ -170,6 +183,7 @@ struct PlanRailView: View {
                             ForEach(Array(slots.enumerated()), id: \.element.id) { i, s in
                                 Button { commit(s) } label: { chipView(s, on: i == model.sel, newDay: i == 0 || slots[i - 1].day != s.day) }
                                     .buttonStyle(.plain)
+                                    .padding(.leading, i > 0 && slots[i - 1].day != s.day ? Self.dayGap : 0)
                                     .id(s.id)
                                     .help("\(s.day) \(s.time), \(PlanRailModel.lengthWord(model.mins))")
                             }
@@ -193,11 +207,14 @@ struct PlanRailView: View {
         }
     }
 
+    /// A time: (1.3.167) its day said once, over the first of the day's times — the rest keep the line, blank, so the
+    /// times sit level.
     private func chipView(_ s: PlanSlot, on: Bool, newDay: Bool) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(s.day.uppercased())
+            Text(newDay ? s.day.uppercased() : " ")
                 .font(.system(size: 10.5, weight: .semibold))
-                .foregroundStyle(on ? Color.white.opacity(0.85) : (newDay ? Theme.accent : Color.secondary))
+                .foregroundStyle(on ? Color.white.opacity(0.85) : Theme.accent)
+                .accessibilityHidden(!newDay)
             Text(s.time)
                 .font(.system(size: 14, weight: .bold).monospacedDigit())
                 .foregroundStyle(on ? Color.white : Color.primary)
@@ -265,6 +282,7 @@ struct PullToPlan: ViewModifier {
     func body(content: Content) -> some View {
         content
             .offset(x: rubber(dx))
+            .background(alignment: .leading) { reveal }
             .simultaneousGesture(drag, including: enabled ? .all : .subviews)
             .popover(isPresented: $shown, arrowEdge: .bottom) {
                 PlanRailView(id: id, title: title, model: model, commit: { s in plan(s) }, clear: { clearPlan() })
@@ -275,6 +293,30 @@ struct PullToPlan: ViewModifier {
                 ask.id = nil
                 open(.pick)
             }
+    }
+
+    /// (1.3.167) What the pull does, uncovered behind the row as it moves (as a list's swipe shows its action under the
+    /// row; the web's 2.99.109): a clock that grows with the pull, filled once a time is chosen.
+    @ViewBuilder
+    private var reveal: some View {
+        let w = rubber(dx)
+        if w > 0.5 {
+            let k = min(1, w / 40)
+            let armed = model.mode == .pull && model.chosen != nil
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(armed ? Theme.accent : Theme.accent.opacity(0.12))
+                .overlay {
+                    Image(systemName: armed ? "clock.fill" : "clock")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(armed ? Color.white : Theme.accent)
+                        .scaleEffect(0.55 + 0.45 * k)
+                        .opacity(k)
+                }
+                .frame(width: w)
+                .animation(reduceMotion ? nil : Motion.snappy, value: armed)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
     }
 
     private func rubber(_ x: CGFloat) -> CGFloat {

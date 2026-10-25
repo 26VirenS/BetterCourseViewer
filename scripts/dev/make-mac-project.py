@@ -21,7 +21,7 @@ PROJ = os.path.join(MAC, 'Simpl.xcodeproj')
 
 NAME = 'Simpl'
 BUNDLE_ID = 'com.simplcourses.mac'
-MARKETING_VERSION = '1.3.166' # Simpl for Mac's own version line (scripts/release-mac-native.sh releases it as mac-v<this>)
+MARKETING_VERSION = '1.3.167' # Simpl for Mac's own version line (scripts/release-mac-native.sh releases it as mac-v<this>)
 BUILD = '101' # raised with every release
 DEPLOYMENT = '14.0'
 
