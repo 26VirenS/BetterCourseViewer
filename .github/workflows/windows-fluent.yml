@@ -270,10 +270,13 @@ jobs:
       matrix:
         shard: [0, 1, 2, 3, 4, 5, 6, 7]
     steps:
-      # (the mock Canvas is all the pictures take from the repository; Node is on the image)
+      # (the mock Canvas is all the pictures take from the repository; Node is on the image) — (0.3.63) with the site's own
+      # calendar handler, which its /api/feed answers with (scripts/dev/mock-feed.mjs)
       - uses: actions/checkout@v4
         with:
-          sparse-checkout: scripts/dev
+          sparse-checkout: |
+            scripts/dev
+            site/src
       - uses: actions/download-artifact@v4
         with:
           name: release
@@ -1523,7 +1526,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          sparse-checkout: scripts/dev
+          sparse-checkout: |
+            scripts/dev
+            site/src
       - uses: actions/download-artifact@v4
         with:
           name: release
