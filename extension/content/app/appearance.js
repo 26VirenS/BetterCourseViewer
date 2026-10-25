@@ -43,7 +43,7 @@
   const unpack = (kept) => {
     const raw = (v) => T().rawOf(kept, v);
     const map = (o) => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [k, raw(v)]).filter(([, v]) => v));
-    return { side: raw(kept.side), cards: map(kept.cards), headers: map(kept.headers), tones: { ...(kept.tones || {}) }, place: { ...(kept.place || {}) } };
+    return { side: raw(kept.side), cards: map(kept.cards), headers: map(kept.headers), tones: { ...(kept.tones || {}) }, place: { ...(kept.place || {}) }, plain: { ...(kept.plain || {}) } };
   };
   const accentOf = (th) => (th.name === 'Regular' ? REGULAR : th.name === 'Custom' ? T().customHex(th.h, th.s, th.depth) : (T().PRESETS.find(([, n]) => n === th.name) || [REGULAR])[0]);
 
@@ -52,8 +52,9 @@
   function setPhoto(key, value, tone) {
     st.images.tones = st.images.tones || {};
     st.images.place = st.images.place || {};
-    if (key === 'head') { for (const [k] of T().HEADER_SLOTS) { const hk = `head:${k}`; if (value) st.images.headers[k] = value; else delete st.images.headers[k]; if (value && tone) st.images.tones[hk] = tone; else delete st.images.tones[hk]; delete st.images.place[hk]; } return; }
-    if (photoAt(key) !== value) delete st.images.place[key]; // (a new picture starts at its place's own default)
+    st.images.plain = st.images.plain || {};
+    if (key === 'head') { for (const [k] of T().HEADER_SLOTS) { const hk = `head:${k}`; if (value) st.images.headers[k] = value; else delete st.images.headers[k]; if (value && tone) st.images.tones[hk] = tone; else delete st.images.tones[hk]; delete st.images.place[hk]; delete st.images.plain[hk]; } return; }
+    if (photoAt(key) !== value) { delete st.images.place[key]; delete st.images.plain[key]; } // (a new picture starts at its place's own default, inked)
     if (key === 'side') st.images.side = value; else if (value) st.images.cards[key] = value; else delete st.images.cards[key];
     if (value && tone) st.images.tones[key] = tone; else delete st.images.tones[key];
   }
@@ -165,6 +166,11 @@
       { label: 'Upload Photo…', onSelect: () => { st.target = key; st.file.click(); } },
       ...READY.filter((r) => r.scene).map((r) => ({ label: `Drawing: ${r.scene}`, active: photoAt(key) === scenePic(r.scene), onSelect: () => { setPhoto(key, scenePic(r.scene), tone(r.scene)); keepImages(); } })),
     ];
+    // (2.99.105) a photo of the student's own is inked unless its Ink switch is off: then it is shown as it is, the words on it white-bordered (lib/theme.js picAt)
+    if (photoAt(key) && !t.sceneNameOf(photoAt(key))) {
+      const inked = !st.images.plain?.[key];
+      items.push({ label: 'Ink Photo', sub: inked ? 'On · drawn in two tones' : 'Off · the photo as it is', active: inked, onSelect: () => { st.images.plain = st.images.plain || {}; if (inked) st.images.plain[key] = true; else delete st.images.plain[key]; keepImages(); } });
+    }
     if (photoAt(key)) items.push({ label: 'Remove Photo', onSelect: () => { setPhoto(key, null); keepImages(); } });
     U.menu(anchor, items);
   }

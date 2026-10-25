@@ -5060,6 +5060,20 @@ try {
   await page.click('.bcv-ap-ready[data-ready="Ocean"]');
   const worn = await eventually(() => sw.evaluate(async () => { const s = await self.BCV.settings.get(); const im = (await self.BCV.api.storage.local.get('theme:images'))['theme:images']; return s.appearance?.theme?.name === 'Teal' && !!im?.side; }), 8000);
   check(worn, 'a ready-made theme is worn as it is picked: Ocean, its colour (Teal) and its drawings kept');
+  // (2.99.105) a photo of one's own has an Ink switch, a drawing none; off, the photo is shown as it is — no blur, no veil
+  // over it — and the words on it are dark with a white border, kept for that place alone
+  const menuOf = async (slot) => { await page.click(`.bcv-ap-badge[data-slot="${slot}"]`); await page.waitForSelector('.bcv-menu', { timeout: 3000 }); return page.$$eval('.bcv-menu__item', (els) => els.map((e) => e.textContent)); };
+  const drawnMenu = await menuOf('side');
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser', { timeout: 5000 }), page.click('.bcv-menu__item >> text=Upload Photo…')]);
+  await chooser.setFiles(join(root, 'scripts', 'dev', 'fixtures', 'photo.jpg'));
+  const ownInked = await eventually(() => page.evaluate(() => !!document.querySelector('.bcv-side.bcv-side--ink .bcv-side__pic.has-ink:not(.is-scene)')), 10000);
+  const ownMenu = await menuOf('side');
+  await page.click('.bcv-menu__item >> text=Ink Photo');
+  let plainSide = null;
+  await eventually(async () => { const v = await page.evaluate(() => { const s = document.querySelector('.bcv-side'); const vis = (el) => !!el && getComputedStyle(el).display !== 'none'; const row = s.querySelector('.bcv-nav__item'); return { plain: s.classList.contains('bcv-side--plain'), ink: s.classList.contains('bcv-side--ink'), veil: vis(s.querySelector('.bcv-side__pic-veil')), blur: vis(s.querySelector('.bcv-side__pic-blur')), pic: (s.querySelector('.bcv-side__pic')?.style.getPropertyValue('--bcv-pic') || '').slice(0, 15), color: getComputedStyle(row).color, shadow: getComputedStyle(row).textShadow.slice(0, 30) }; }); plainSide = v; return v.plain; }, 6000);
+  const keptPlain = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('theme:images'))['theme:images']?.plain || null);
+  check(!drawnMenu.some((t) => t.startsWith('Ink Photo')) && ownInked && ownMenu.some((t) => t.startsWith('Ink PhotoOn')) && !!plainSide && !plainSide.ink && !plainSide.veil && !plainSide.blur && plainSide.pic === 'url("data:image' && plainSide.color === 'rgb(28, 28, 30)' && /^rgb\(255, 255, 255\) 0\.8px 0px 0/.test(plainSide.shadow) && keptPlain?.side === true && Object.keys(keptPlain).length === 1, `Ink Photo: none on a drawing; a photo of one's own inked, and with Ink off shown as it is — no blur or veil, dark words with a white border — kept for the sidebar alone: ${JSON.stringify({ drawnMenu, ownInked, ownMenu, plainSide, keptPlain })}`);
+  await shot(page, '27c1-appearance-ink-off');
   // (2.99.77) under a colour of your own the six counters are that colour alone, a shade of it each
   const tones = await eventually(async () => { const v = await page.evaluate(() => ({ accent: getComputedStyle(document.documentElement).getPropertyValue('--bcv-accent').trim().toLowerCase(), tones: [...document.querySelectorAll('.bcv-stats > .bcv-stat[data-stat]')].map((c) => getComputedStyle(c).getPropertyValue('--bcv-stat-tone').trim().toLowerCase()) })); return v.accent && v.tones.length === 6 && new Set(v.tones).size === 6 && v.tones.every((t) => t.includes(v.accent)) ? v : null; }, 6000);
   check(!!tones, `the counters take the theme's colour, six shades of it: ${JSON.stringify(tones)}`);

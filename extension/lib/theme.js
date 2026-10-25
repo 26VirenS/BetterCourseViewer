@@ -542,7 +542,7 @@
   /** Every raw picture in `images` (a data URL: an upload, or a drawn scene) becomes an asset, kept once;
    *  assets nothing wears any more go. Needs a document (a canvas): elsewhere the pictures are kept as they are. */
   async function packImages(images) {
-    const out = { side: null, cards: {}, headers: {}, tones: { ...(images?.tones || {}) }, place: { ...(images?.place || {}) }, assets: { ...(images?.assets || {}) } };
+    const out = { side: null, cards: {}, headers: {}, tones: { ...(images?.tones || {}) }, place: { ...(images?.place || {}) }, plain: { ...(images?.plain || {}) }, assets: { ...(images?.assets || {}) } };
     const canDraw = typeof document !== 'undefined' && !!document.createElement;
     const put = async (v) => {
       if (!v) return null;
@@ -579,13 +579,18 @@
     if (ASSET.test(v)) { const a = images?.assets?.[v.slice(6)]; return a?.sharp ? { sharp: a.sharp, ink: a.ink || null, inkBlur: a.inkBlur || null, scene: a.scene || null } : null; }
     return { sharp: v, ink: null, inkBlur: null, scene: sceneNameOf(v) };
   };
+  /** (2.99.105) What the place `key` shows ('side', a counter's slot, 'head:<screen>'): its picture resolved, and — a photo of
+   *  the student's own with its Ink switch off (plain[key]) — that photo as it is, its ink left off: the page then draws no
+   *  blur and no veil over it, and the words on it take a gentle white border instead (app.css .bcv-side--plain). A drawn
+   *  scene is always inked. */
+  const picAt = (images, key) => { const p = images ? picOf(images, imageAt(images, key)) : null; return p && !p.scene && images.plain?.[key] ? { ...p, ink: null, inkBlur: null, plain: true } : p; };
   /** The raw value a slot stands for, for editing: a scene's own drawing, or the picture itself. */
   const rawOf = (images, v) => { const p = picOf(images, v); if (!p) return null; return p.scene ? sceneUrlOf(p.scene) || p.sharp : p.sharp; };
   /** Is anything still raw — a picture not packed into an asset, or an asset in hand that has no ink and
    *  did not fail to take one? (an asset not read into memory is taken as packed: it was, to be kept) */
   const hasRaw = (images) => [images?.side, ...Object.values(images?.cards || {}), ...Object.values(images?.headers || {})].some((v) => { if (!v) return false; if (!ASSET.test(v)) return true; const a = images?.assets?.[v.slice(6)]; return !!a && !a.ink && !a.inkFailed; });
 
-  const emptyImages = () => ({ side: null, cards: {}, headers: {}, tones: {}, place: {}, assets: {} });
+  const emptyImages = () => ({ side: null, cards: {}, headers: {}, tones: {}, place: {}, plain: {}, assets: {} });
   // ---- kept in storage: the index under theme:images, the pictures under a key each --------------
   // A tab used to read the whole set at boot — every picture, sharp and inked, for every slot: a few
   // megabytes held by every Canvas tab for the one or two pictures its page shows. The index says
@@ -609,14 +614,14 @@
     return images;
   }
   /** The index as written: the slots, the tones, the ids of the pictures kept (those go under their keys). */
-  const indexOf = (p) => ({ side: p.side, cards: p.cards, headers: p.headers, tones: Object.fromEntries(toneKeys(p).filter((k) => p.tones?.[k]).map((k) => [k, p.tones[k]])), place: Object.fromEntries(toneKeys(p).filter((k) => p.place?.[k] && !isDefaultPlace(k, placeOf(p, k))).map((k) => [k, roundPlace(placeOf(p, k))])), assetIds: Object.keys(p.assets || {}), ...(hasRaw(p) ? { packStuck: true } : {}) }); // (a place kept only where a photo sits, and only off its default)
+  const indexOf = (p) => ({ side: p.side, cards: p.cards, headers: p.headers, tones: Object.fromEntries(toneKeys(p).filter((k) => p.tones?.[k]).map((k) => [k, p.tones[k]])), place: Object.fromEntries(toneKeys(p).filter((k) => p.place?.[k] && !isDefaultPlace(k, placeOf(p, k))).map((k) => [k, roundPlace(placeOf(p, k))])), plain: Object.fromEntries(toneKeys(p).filter((k) => p.plain?.[k]).map((k) => [k, true])), assetIds: Object.keys(p.assets || {}), ...(hasRaw(p) ? { packStuck: true } : {}) }); // (a place kept only where a photo sits, and only off its default)
   /** The set, with the pictures of `need` (an array of slots) read in — or of every slot ('all'). */
   async function loadImages({ need = 'all' } = {}) {
     try {
       const r = await BCV.api.storage.local.get(IMAGES_KEY);
       const v = r?.[IMAGES_KEY];
       if (!v || typeof v !== 'object') return emptyImages();
-      const images = { side: v.side || null, cards: { ...(v.cards || {}) }, headers: { ...(v.headers || {}) }, tones: { ...(v.tones || {}) }, place: { ...(v.place || {}) }, assets: {}, ...(v.packStuck ? { packStuck: true } : {}) };
+      const images = { side: v.side || null, cards: { ...(v.cards || {}) }, headers: { ...(v.headers || {}) }, tones: { ...(v.tones || {}) }, place: { ...(v.place || {}) }, plain: { ...(v.plain || {}) }, assets: {}, ...(v.packStuck ? { packStuck: true } : {}) };
       if (v.assets && typeof v.assets === 'object' && Object.keys(v.assets).length) {
         // kept as one blob until 2.90: the pictures are moved out to a key each, once
         images.assets = { ...v.assets };
@@ -677,7 +682,7 @@
     hexToRgb, rgbToHex, rgbToHsl, hslToRgb, hslToHex, luminance, contrast, normalize,
     GROUND, MIN_SAT, ICON_RATIO, PRESETS, REGULAR, SCENE_VARIANTS, SCENE_PLACES: PLACES, sceneUrl, sceneNameOf, sceneParts, sceneBaseOf, CARD_SLOTS, HEADER_SLOTS, IMAGES_KEY, PLACE_DEFAULT, placeOf, placeVars, isDefaultPlace, ZOOM_MIN, ZOOM_MAX,
     palette, shades, shadeSet, cssVars, apply, readable, readableOn, fillFor, mix, tint, customHex, controlsOf, veilBase, picCss, band, nearest,
-    readImage, imageTone, fillTones, loadImages, ensureAssets, saveImages, emptyImages, packImages, picOf, rawOf, CAST, INK_LIFT, inkOn, SCENE_INK, sceneInkOn, inkFor, inkCached,
+    readImage, imageTone, fillTones, loadImages, ensureAssets, saveImages, emptyImages, packImages, picOf, picAt, rawOf, CAST, INK_LIFT, inkOn, SCENE_INK, sceneInkOn, inkFor, inkCached,
     blurDrawn, checkBlur, BLUR_KEY,
     get PRESET_PHOTOS() { return presetPhotosOf(); }, // (the drawings, made on the first ask)
   };

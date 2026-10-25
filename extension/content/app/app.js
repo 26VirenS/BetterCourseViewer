@@ -842,9 +842,11 @@
       return;
     }
     // (filtered: a null left by a section that is not drawn would land as the text "null")
-    const sidePic = BCV.theme.picOf(state.themeImages, state.themeImages?.side); // { sharp, blur } (lib/theme.js assets)
+    const sidePic = BCV.theme.picAt(state.themeImages, 'side'); // { sharp, blur } (lib/theme.js assets)
     side.classList.toggle('bcv-side--pic', !!sidePic);
     side.classList.toggle('bcv-side--ink', !!sidePic?.ink); // (the paper: the complement of the colour, app.css)
+    side.classList.toggle('bcv-side--plain', !!sidePic?.plain); // (its Ink switch off: the photo as it is, white-bordered words)
+    html.classList.toggle('bcv-side-plain', !!sidePic?.plain); // (the sidebar's button over it, outside the sidebar: app.css)
     const wasOpen = new Map([...side.querySelectorAll('.bcv-ctabs[data-course]')].map((e) => [e.dataset.course, e]));
     side.replaceChildren(...[
       // the theme's photo, under everything: sharp at the foot, blurred up the side (app.css: .bcv-side__pic)
@@ -1623,12 +1625,14 @@
   const picSlots = (screen) => ['side', `head:${screen}`, ...(screen === 'dashboard' ? (BCV.theme?.CARD_SLOTS || []).map((k) => `card:${k}`) : [])];
   function dressHead(el, screen) {
     const head = el?.querySelector?.('.bcv-head:not(.bcv-head--course)');
-    const pic = head ? BCV.theme.picOf(state.themeImages, state.themeImages?.headers?.[screen]) : null; // { sharp, blur }
+    const pic = head ? BCV.theme.picAt(state.themeImages, `head:${screen}`) : null; // { sharp, blur }
     html.classList.toggle('bcv-head-pic', !!pic); // (the widgets' bar goes clear and the photo runs up under it: app.css)
+    html.classList.toggle('bcv-head-plain', !!pic?.plain); // (and over a plain photo, the bar's controls go light: app.css)
     if (!head) return;
     head.querySelector('.bcv-head__pic')?.remove();
     head.classList.toggle('bcv-head--pic', !!pic);
     head.classList.toggle('bcv-head--ink', !!pic?.ink);
+    head.classList.toggle('bcv-head--plain', !!pic?.plain);
     for (const k of ['--bcv-pic', '--bcv-pic-ink', '--bcv-pic-ink-blur', '--bcv-pic-x', '--bcv-pic-y', '--bcv-pic-z']) head.style.removeProperty(k);
     if (!pic) return;
     if (pic.ink) { head.style.setProperty('--bcv-pic-ink', BCV.theme.picCss(pic.ink)); head.style.setProperty('--bcv-pic-ink-blur', BCV.theme.picCss(pic.inkBlur)); } else head.style.setProperty('--bcv-pic', BCV.theme.picCss(pic.sharp));

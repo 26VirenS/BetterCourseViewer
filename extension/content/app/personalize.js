@@ -105,10 +105,17 @@
     if (key === 'head') { for (const [k] of T().HEADER_SLOTS) setPlace(`head:${k}`, p); return; }
     if (p && !T().isDefaultPlace(key, p)) st.images.place[key] = { x: p.x, y: p.y, z: p.z }; else delete st.images.place[key];
   };
+  // (2.99.105) a photo of the student's own is inked unless its Ink switch is off (lib/theme.js picAt): 'head' reads the Dashboard's and writes every page's
+  const plainAt = (key) => !!st.images.plain?.[placeKey(key)] && !!photoAt(key) && !T().sceneNameOf(photoAt(key));
+  const setPlain = (key, on) => {
+    st.images.plain = st.images.plain || {};
+    if (key === 'head') { for (const [k] of T().HEADER_SLOTS) setPlain(`head:${k}`, on); return; }
+    if (on) st.images.plain[key] = true; else delete st.images.plain[key];
+  };
   const setPhoto = (key, value, tone) => {
     st.images.tones = st.images.tones || {};
     if (key === 'head') { for (const [k] of T().HEADER_SLOTS) setPhoto(`head:${k}`, value, tone); return; } // (the one header: every page's, the same picture — kept once, as one asset)
-    if (photoAt(key) !== value) setPlace(key, null); // (a new picture starts at its place's own default)
+    if (photoAt(key) !== value) { setPlace(key, null); setPlain(key, false); } // (a new picture starts at its place's own default, inked)
     if (key === 'side') st.images.side = value; else if (key.startsWith('head:')) { if (value) st.images.headers[key.slice(5)] = value; else delete st.images.headers[key.slice(5)]; } else if (value) st.images.cards[key] = value; else delete st.images.cards[key];
     if (value && tone) st.images.tones[key] = tone; else delete st.images.tones[key];
   };
@@ -124,7 +131,7 @@
   const unpack = (kept) => {
     const raw = (v) => T().rawOf(kept, v);
     const map = (o) => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [k, raw(v)]).filter(([, v]) => v));
-    return { side: raw(kept.side), cards: map(kept.cards), headers: map(kept.headers), tones: { ...(kept.tones || {}) }, place: { ...(kept.place || {}) } };
+    return { side: raw(kept.side), cards: map(kept.cards), headers: map(kept.headers), tones: { ...(kept.tones || {}) }, place: { ...(kept.place || {}) }, plain: { ...(kept.plain || {}) } };
   };
   async function open({ app, host, page, onDone, standalone = false }) {
     const settings = await S.get();
@@ -255,9 +262,10 @@
   function photoSlots() {
     const cardKeys = CARDS.map(([k]) => k);
     const slot = (key, title, pic, on) => {
-      const ink = pic ? inkOf(pic, true) : null;
+      const plain = !!pic && plainAt(key); // (its Ink switch off: the photo itself on the tile)
+      const ink = pic && !plain ? inkOf(pic, true) : null;
       return h('button', { type: 'button', class: `pz__slot ${pic ? 'has-pic' : ''} ${on ? 'is-on' : ''}`, dataset: { slot: key }, onclick: () => { st.target = key; render(); } }, [
-        h('i', { class: `pz__slotpic ${ink ? 'is-inked' : ''} ${pic && T().sceneNameOf(pic) ? 'is-scene' : ''}`, style: ink ? { '--ink': T().picCss(ink.ink) } : null }, pic ? [] : [svg(IC.plus, { size: 20, width: 2.4 })]),
+        h('i', { class: `pz__slotpic ${ink ? 'is-inked' : ''} ${pic && T().sceneNameOf(pic) ? 'is-scene' : ''}`, style: ink ? { '--ink': T().picCss(ink.ink) } : plain ? { background: `${T().picCss(pic)} center / cover no-repeat` } : null }, pic ? [] : [svg(IC.plus, { size: 20, width: 2.4 })]),
         h('span', { class: 'pz__slotname', text: title }),
         h('span', { class: 'pz__slotdo' }, [svg(pic ? IC.camera : IC.plus, { size: 11, width: 2.4 }), h('span', { text: pic ? 'Change' : 'Add photo' })]),
       ]);
@@ -409,9 +417,11 @@
     }
     return ink;
   };
-  /** A photo's layers: the paper (the surface), the ink (its mask) a shade off it — in the colour for a ready-made drawing — the blurred ink under the fade, the veil — or the paper alone while its ink is drawn. */
-  const layers = (pic, veilVar) => {
+  /** A photo's layers: the paper (the surface), the ink (its mask) a shade off it — in the colour for a ready-made drawing — the blurred ink under the fade, the veil — or the paper alone while its ink is drawn.
+   *  `plain` (its Ink switch off): the photo as it is, nothing over it (app.css .bcv-side--plain). */
+  const layers = (pic, veilVar, plain = false) => {
     if (!pic) return [];
+    if (plain) return [h('i', { class: 'pz__pic pz__pic--sharp', style: { '--pic': T().picCss(pic) } })];
     const ink = inkOf(pic);
     const scene = !!T().sceneNameOf(pic); // (a ready-made drawing: inked in the colour, not grey)
     return ink ? [
@@ -515,8 +525,8 @@
     const pickable = st.step === 0 && !phone();
     const pick = (target) => () => { if (pickable && !st.dragged) { st.target = target; render(); } };
     const placed = (key) => T().placeVars(placeAt(key), '--pic'); // (where its photo sits: the page's own variables, on the part)
-    const side = h('div', { class: `pz__side ${sidePic ? 'has-pic' : ''} ${st.target === 'side' ? 'is-target' : ''} ${pickable ? 'is-pickable' : ''}`, dataset: { target: 'side' }, style: placed('side'), onclick: pick('side') }, [
-      ...layers(sidePic, 'side'),
+    const side = h('div', { class: `pz__side ${sidePic ? 'has-pic' : ''} ${plainAt('side') ? 'is-plain' : ''} ${st.target === 'side' ? 'is-target' : ''} ${pickable ? 'is-pickable' : ''}`, dataset: { target: 'side' }, style: placed('side'), onclick: pick('side') }, [
+      ...layers(sidePic, 'side', plainAt('side')),
       h('div', { class: 'pz__sidein' }, [
         h('span', { class: 'pz__pvbrand' }, [h('i', { class: 'pz__pvtile' }), h('b', { text: 'Simpl' })]),
         ...NAV.map(([label, d], i) => h('span', { class: `pz__row ${i === 0 ? 'is-on' : ''}`, style: { '--row': `var(--s${i})`, '--row-lit': `var(--s${i}-lit)` } }, [svg(d, { size: 15, cls: 'pz__rowic' }), h('span', { text: label })])),
@@ -528,8 +538,8 @@
     armPlace(side, 'side', sidePic);
     const cards = CARDS.map(([slot, label, n, note, d, colour], i) => {
       const pic = st.images.cards[slot] || null;
-      const card = h('div', { class: `pz__card ${pic ? 'has-pic' : ''} ${st.target === slot ? 'is-target' : ''} ${pickable ? 'is-pickable' : ''}`, dataset: { target: slot, veilCard: slot }, style: { '--ic': st.theme.name === 'Regular' ? colour : 'var(--A-icon)', ...placed(slot) }, onclick: pick(slot) }, [
-        ...layers(pic, 'card'),
+      const card = h('div', { class: `pz__card ${pic ? 'has-pic' : ''} ${plainAt(slot) ? 'is-plain' : ''} ${st.target === slot ? 'is-target' : ''} ${pickable ? 'is-pickable' : ''}`, dataset: { target: slot, veilCard: slot }, style: { '--ic': st.theme.name === 'Regular' ? colour : 'var(--A-icon)', ...placed(slot) }, onclick: pick(slot) }, [
+        ...layers(pic, 'card', plainAt(slot)),
         h('div', { class: 'pz__cardin' }, [
           h('span', { class: 'pz__chead' }, [svg(d, { size: 10, width: 1.9, cls: 'pz__cic' }), h('span', { class: 'pz__clabel', text: label }), h('span', { class: 'pz__cn', text: n })]),
           h('span', { class: 'pz__cnote' }, [h('span', { class: 'pz__cnotet', text: note }), svg(IC.chevron, { size: 9, width: 2, cls: 'pz__cchev' })]),
@@ -543,8 +553,8 @@
     const rows = [['Lab report draft', 0], ['Essay outline', 1], ['Problem set 4', 2]].map(([t, i]) => { const c = cs[i] || cs[0]; return h('span', { class: 'pz__lrow' }, [h('i', { class: 'pz__ring' }), h('span', { class: 'pz__lt', text: t }), c ? h('span', { class: 'pz__chip', style: { '--c': `var(--course-${c.id})`, '--c-read': `var(--course-${c.id}-read)` }, text: c.name }) : null]); });
     // the header: one photo for every page's, pressed here like the sidebar and the counters — drawn as the Dashboard's
     // own row is (the title, the search box, the view switcher: no date line, which the page does not have)
-    const head = h('div', { class: `pz__phead ${headPic ? 'has-pic' : ''} ${st.target === 'head' ? 'is-target' : ''} ${pickable ? 'is-pickable' : ''}`, dataset: { target: 'head', veilHead: 'dashboard' }, style: placed('head'), onclick: pick('head') }, [
-      ...layers(headPic, 'head'),
+    const head = h('div', { class: `pz__phead ${headPic ? 'has-pic' : ''} ${plainAt('head') ? 'is-plain' : ''} ${st.target === 'head' ? 'is-target' : ''} ${pickable ? 'is-pickable' : ''}`, dataset: { target: 'head', veilHead: 'dashboard' }, style: placed('head'), onclick: pick('head') }, [
+      ...layers(headPic, 'head', plainAt('head')),
       h('div', { class: 'pz__pheadin' }, [
         h('span', { class: 'pz__title', text: 'Dashboard' }),
         h('span', { class: 'pz__search' }, [svg(IC.search, { size: 11, width: 2, cls: 'pz__searchic' }), h('span', { text: 'Search everything' })]),
@@ -601,6 +611,8 @@
         h('span', { class: 'pz__placehint' }, [svg(IC.move, { size: 12, width: 2 }), h('span', { text: 'Drag the photo on the preview to move it' })]),
         h('label', { class: 'pz__zoom' }, [svg(IC.zoom, { size: 12, width: 2 }), h('span', { text: 'Zoom' }), h('input', { type: 'range', id: 'pzZoom', min: String(T().ZOOM_MIN), max: String(T().ZOOM_MAX), step: '0.01', value: String(placeAt(key).z), 'aria-label': 'Zoom', oninput: (e) => applyPlace(key, { ...placeAt(key), z: clampN(Number(e.target.value) || 1, T().ZOOM_MIN, T().ZOOM_MAX) }) })]),
         h('button', { type: 'button', class: 'pz__textbtn', id: 'pzPlaceReset', disabled: T().isDefaultPlace(placeKey(key), placeAt(key)) || null, text: 'Reset', onclick: () => applyPlace(key, null) }),
+        // (2.99.105) a photo of the student's own: inked, or (off) shown as it is with the words white-bordered on it
+        T().sceneNameOf(photoAt(key)) ? null : h('button', { type: 'button', role: 'switch', class: 'pz__inksw', id: 'pzInk', 'aria-checked': plainAt(key) ? 'false' : 'true', title: plainAt(key) ? 'Ink is off: the photo as it is, the words white-bordered on it' : 'Ink is on: the photo drawn in two tones of the page', onclick: () => { setPlain(key, !plainAt(key)); render('photo'); } }, [h('span', { text: 'Ink photo' }), h('i', { 'aria-hidden': 'true' })]),
       ]) : null,
     ]);
   }
