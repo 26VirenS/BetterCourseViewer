@@ -86,23 +86,6 @@ that those looks never count against GitHub's API limit for a network. `scripts/
 writes it at every run of the Site workflow (a release published, edited or deleted, and every
 hour).
 
-## Simpl calendars
-
-(2.99.110) Simpl's own calendar — a student's work, tasks and plans, sealed on their device — is kept at
-`/api/feed/<id>` and opened by a calendar app at `/api/feed/<id>/<key>.ics` (`src/feed.js`). Each one is a Durable
-Object, `FeedStore` (`src/feed-store.js`). `https://<your-domain>/api/feed` says whether the store is attached:
-`{"ok":true,"store":true}`.
-
-**On Workers** nothing is needed: `wrangler.jsonc` defines `FeedStore` and its migration, and the deploy makes it.
-
-**On Pages** the store lives in a small Worker of its own, which the Pages project binds:
-
-1. Workers & Pages → Create → Workers → Import a repository → `26VirenS/BetterCourseViewer`. Name it `simpl-feeds`;
-   branch `site`; build command empty; deploy command `npx wrangler deploy -c feeds.jsonc`. Deploy.
-2. The Pages project → Settings → Bindings → Add → **Durable Object namespace**: variable name `FEEDS`, the
-   namespace `simpl-feeds` → `FeedStore`. Save.
-3. The Pages project → Deployments → the newest → ⋯ → Retry deployment (a binding takes effect from the next one).
-
 ## Report a bug
 
 The page at `/report/` takes a kind (Bug, Error, Crash, Reason to disable, Missing feature,
