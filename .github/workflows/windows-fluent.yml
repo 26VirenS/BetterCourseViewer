@@ -517,12 +517,10 @@ jobs:
           Shot 'quiz-feedback' '1366x778' 45 ($mock + @('--appearance', 'light', '--open', 'quiz:101:9001:feedback'))
           Shot 'quiz-code' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'quiz:102:10019'))
           Shot 'quiz-narrow' '860x681' 45 ($mock + @('--appearance', 'light', '--open', 'quiz:101:9011:take'))
-          # Knewton Alta and Macmillan Achieve, in the app's own popups
+          # Knewton Alta, in the app's own popup; (0.3.58) Macmillan Achieve in the tool window, as Macmillan draws it
           Shot 'alta-overview' '1366x778' 50 ($mock + @('--appearance', 'light', '--open', 'alta:104:4003'))
           Shot 'alta-start' '1366x778' 50 ($mock + @('--appearance', 'dark', '--open', 'alta:104:4004'))
           Shot 'macmillan' '1366x778' 50 ($mock + @('--appearance', 'light', '--open', 'macmillan:104:4005'))
-          # (0.3.32) Macmillan skinned as Alta is: the cover as a start screen above, a question with the rail and the bar here
-          Shot 'macmillan-question' '1366x778' 50 ($mock + @('--appearance', 'light', '--open', 'macmillan:104:4005', '--macmillan-open', 'yes'))
           # Settings, as Windows 11's own Settings app, on each of its categories
           foreach ($tab in @('general', 'notifications', 'grades', 'data', 'updates', 'about')) {
             Shot "settings-$tab" '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', $tab))
