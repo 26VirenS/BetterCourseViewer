@@ -1,0 +1,16 @@
+{
+  // (2.99.110) The site on Cloudflare Pages: a Worker of its own that only keeps Simpl's calendars — the FeedStore Durable
+  // Object (src/feed-store.js), which a Pages project cannot define itself. The Pages project binds it as FEEDS (Settings →
+  // Bindings → Durable Object namespace) and its Functions (functions/api/feed*) answer /api/feed with src/feed.js.
+  // Deployed from the site branch: Workers & Pages → Create → Workers → Import a repository, the Worker named
+  // simpl-feeds, deploy command `npx wrangler deploy -c feeds.jsonc` (README.md, "Simpl calendars on Pages").
+  // On the Workers path (wrangler.jsonc) the site's own Worker defines FeedStore itself, and this one is not needed.
+  "name": "simpl-feeds",
+  "main": "src/feeds-worker.js",
+  "compatibility_date": "2026-09-12",
+  "workers_dev": false,
+  "durable_objects": {
+    "bindings": [{ "name": "FEEDS", "class_name": "FeedStore" }]
+  },
+  "migrations": [{ "tag": "feeds-v1", "new_sqlite_classes": ["FeedStore"] }]
+}
