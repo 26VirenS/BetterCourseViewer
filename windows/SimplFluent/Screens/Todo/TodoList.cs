@@ -16,6 +16,8 @@ public sealed partial class TodoScreen
 {
     /// <summary>The row ids drawn last time, and how the list was grouped: what is new arrives, a regrouping enters anew.</summary>
     private readonly HashSet<string> known = new();
+    /// <summary>(0.3.60) Each row as drawn, for the rail its menu opens under it.</summary>
+    private readonly Dictionary<string, FrameworkElement> planRows = new();
     private string? lastShape;
     private bool listDrawn;
 
@@ -109,6 +111,8 @@ public sealed partial class TodoScreen
         if (row.Done) title.Struck();
         var words = K.V(1, title);
         if (sub != null) words.Children.Add(K.Text(sub, Ty.Caption, B.Text2));
+        // (0.3.60) the time it is planned for, pulled to
+        if (row.Plan is { } plan && !row.Done) words.Children.Add(PlanRail.Pill(plan).Margin(0, 3, 0, 1));
         words.VerticalAlignment = VerticalAlignment.Center;
         var line = K.Columns("auto, *, auto, auto, auto", check.Margin(4, 0, 12, 0).Col(0), words.Col(1));
         if (row.Flag is { } f && f.Word.Length > 0) line.Children.Add(K.Chip(f.Word, TodoWords.Tone(f.Kind), true).Margin(8, 0, 0, 0).Col(2));
@@ -145,6 +149,9 @@ public sealed partial class TodoScreen
         var menu = new ContextMenu();
         unit.ContextMenu = menu;
         unit.ContextMenuOpening += (_, _) => FillMenu(menu, row);
+        // (0.3.60) pulled to the right, the free times hang under it, and letting go on one plans it (P too)
+        if (!row.Done) PlanRail.Attach(unit, row.Id, row.Title, engine);
+        planRows[row.Id] = unit;
 
         rowButtons[row.Id] = press;
         return unit;
@@ -228,6 +235,16 @@ public sealed partial class TodoScreen
         var priority = Item("Priority", SymbolRegular.Flag24, null);
         foreach (var choice in PriorityChoices(row.Pri ?? 0, l => SetPriority(row, l))) priority.Items.Add(choice);
         menu.Items.Add(priority);
+        // (0.3.60) a time set aside for it: the rail under the row, or the plan cleared
+        if (!row.Done)
+        {
+            menu.Items.Add(new Separator());
+            var planned = row.Plan != null;
+            var plan = Item(planned ? "Move Plan…" : "Plan a Time…", SymbolRegular.Clock24, () => { if (planRows.TryGetValue(row.Id, out var at) && at.IsLoaded) PlanRail.Open(at, row.Id, row.Title, engine); });
+            plan.InputGestureText = "P";
+            menu.Items.Add(plan);
+            if (planned) menu.Items.Add(Item("Clear Plan", SymbolRegular.CalendarCancel24, () => PlanRail.Clear(row.Id, engine)));
+        }
         if (row.Custom == true)
         {
             menu.Items.Add(new Separator());

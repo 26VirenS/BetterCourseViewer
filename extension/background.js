@@ -10,6 +10,9 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
 if (typeof importScripts === 'function' && !self.BCV?.devcode) {
   importScripts('lib/devcode.js');
 }
+if (typeof importScripts === 'function' && !self.BCV?.ics) {
+  importScripts('lib/ics.js'); // (2.99.107) the calendars a student links, read here
+}
 if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
   importScripts('content/app/lazy-modules.js'); // the on-demand modules' files: what a page may ask to have loaded
 }
@@ -531,6 +534,9 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
       case 'load': // one of the interface's own on-demand modules (content/app/lazy.js), into the page that asks
         reply(injectLazy(sender, msg.files));
         return true;
+      case 'cal': // (2.99.107) the calendars linked in Calendar → Sync: add, allow, remove, show or hide, read again (content/app/screens/calendar.js)
+        reply(cal(msg));
+        return true;
       case 'canvasSeen': // the Chrome build's sniffer found Canvas on a site of the school's own
         reply(canvasSeen(sender, msg));
         return true;
@@ -592,6 +598,124 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
     await api.scripting.executeScript({ target: { tabId: sender.tab.id, frameIds: [sender.frameId || 0] }, files: list });
     return { ok: true, files: list };
   }
+  // (2.99.107) The calendars a student links to Simpl — a Google, iCloud or Outlook calendar's private .ics address,
+  // pasted in Calendar → Sync — read here, never by the page: a school's Canvas need not let its page reach them, and
+  // the address (a secret: anyone holding it reads the calendar) stays in this browser's own storage. Each is read when
+  // linked, then every half hour (an alarm), and when the Calendar opens on one read more than half an hour ago; what
+  // it holds from two months back to a year on is kept beside it (cal:feed:<id>) for the Calendar and the planner to
+  // read. A calendar's site is asked for once, at the link: the browser's own question, from a press where it needs one
+  // (setup/calendar.html). No cookie goes with a read.
+  const CAL_LINKS = 'cal:links';
+  const CAL_ALARM = 'simpl:cal-sync';
+  const CAL_STALE = 30 * 60 * 1000;
+  const CAL_COLORS = ['#ff9500', '#34c759', '#af52de', '#ff2d55', '#5ac8fa', '#a2845e'];
+  const CAL_MAX = 8 * 1024 * 1024;
+  const calKey = (id) => `cal:feed:${id}`;
+  const calLinks = async () => { const v = (await api.storage.local.get(CAL_LINKS).catch(() => ({})))[CAL_LINKS]; return Array.isArray(v) ? v : []; };
+  const calHostName = (href) => { const h = new URL(href).hostname; return /google\.com$/.test(h) ? 'Google Calendar' : /icloud\.com$/.test(h) ? 'iCloud Calendar' : /(outlook|office365|office|live)\.com$/.test(h) ? 'Outlook' : h.replace(/^www\./, ''); };
+  /** The file at a calendar's address: { status, text }. In the apps the app reads it (their page, a Canvas page, cannot
+   *  read another site: bridge.js fetchText); here, the background itself. */
+  async function calFile(href) {
+    const viaApp = self.BCVBridge?.native?.fetchText;
+    if (viaApp) {
+      const r = await viaApp(href);
+      if (!r || !r.status) throw new Error(r?.error || 'The calendar could not be reached.');
+      return { status: r.status, text: String(r.text || '') };
+    }
+    const res = await fetch(href, { credentials: 'omit', cache: 'no-store', redirect: 'follow' });
+    if (res.ok && Number(res.headers.get('content-length') || 0) > CAL_MAX) throw new Error('That calendar is too big to read.');
+    return { status: res.status, text: res.ok ? await res.text() : '' };
+  }
+  async function calRead(href) {
+    const { status, text } = await calFile(href);
+    if (status < 200 || status > 299) throw new Error(status === 404 || status === 410 ? 'That calendar link no longer works. Paste its private address again.' : status === 401 || status === 403 ? 'That calendar is private to its owner: use its secret (private) address.' : `The calendar's site answered ${status}.`);
+    if (text.length > CAL_MAX) throw new Error('That calendar is too big to read.');
+    const now = Date.now();
+    return BCV.ics.parse(text, { from: now - 60 * 86400000, to: now + 400 * 86400000, max: 4000 });
+  }
+  async function calFetch(link) {
+    let feed;
+    try {
+      const cal = await calRead(link.url);
+      feed = { at: Date.now(), ok: true, error: '', name: cal.name, events: cal.events.map(({ id, title, start, end, allDay, day, days, location, free }) => ({ id, title, start, end, allDay, day, days, location, free })) };
+    } catch (e) {
+      const had = (await api.storage.local.get(calKey(link.id)).catch(() => ({})))[calKey(link.id)];
+      feed = { ...(had || { events: [] }), at: Date.now(), ok: false, error: e?.message || 'The calendar could not be read.' }; // (what it held last stays shown)
+    }
+    await api.storage.local.set({ [calKey(link.id)]: feed });
+    return feed;
+  }
+  async function calArm() {
+    const links = await calLinks();
+    if (!api.alarms) return;
+    try {
+      if (!links.length) { await api.alarms.clear(CAL_ALARM); return; }
+      if (!(await api.alarms.get(CAL_ALARM))) api.alarms.create(CAL_ALARM, { delayInMinutes: 30, periodInMinutes: 30 });
+    } catch { /* no alarms here: the Calendar's own opening reads them */ }
+  }
+  let calSyncing = null;
+  async function calSync({ force = false } = {}) {
+    if (calSyncing) return calSyncing;
+    calSyncing = (async () => {
+      const links = await calLinks();
+      const feeds = await api.storage.local.get(links.map((l) => calKey(l.id))).catch(() => ({}));
+      let read = 0;
+      for (const link of links) {
+        const f = feeds[calKey(link.id)];
+        if (!force && f && Date.now() - (f.at || 0) < CAL_STALE) continue;
+        await calFetch(link);
+        read++;
+      }
+      return { ok: true, read };
+    })().finally(() => { calSyncing = null; });
+    return calSyncing;
+  }
+  async function cal(msg) {
+    if (msg.op === 'sync') return calSync({ force: !!msg.force });
+    if (msg.op === 'remove') {
+      const links = (await calLinks()).filter((l) => l.id !== msg.id);
+      await api.storage.local.set({ [CAL_LINKS]: links });
+      await api.storage.local.remove(calKey(msg.id)).catch(() => {});
+      await calArm();
+      return { ok: true };
+    }
+    if (msg.op === 'set') { // { on } a calendar shown or hidden on the Calendar, { name } renamed
+      const links = await calLinks();
+      const l = links.find((x) => x.id === msg.id);
+      if (!l) return { ok: false };
+      if (typeof msg.on === 'boolean') l.on = msg.on;
+      if (typeof msg.name === 'string' && msg.name.trim()) l.name = msg.name.trim().slice(0, 60);
+      await api.storage.local.set({ [CAL_LINKS]: links });
+      return { ok: true };
+    }
+    if (msg.op === 'allow') { // the site's question needs a press: a page of Simpl's own asks it (setup/calendar.html)
+      const href = BCV.ics.feedHref(msg.url);
+      if (!href) return { ok: false, message: 'That is not a calendar link.' };
+      await api.tabs.create({ url: `${api.runtime.getURL('setup/calendar.html')}#${encodeURIComponent(href)}`, active: true });
+      return { ok: true };
+    }
+    if (msg.op === 'add') {
+      const href = BCV.ics.feedHref(msg.url);
+      if (!href) return { ok: false, message: 'That is not a calendar link. Paste the address that ends in .ics (Google calls it the secret address in iCal format).' };
+      const links = await calLinks();
+      if (links.some((l) => l.url === href)) return { ok: false, message: 'That calendar is linked already.' };
+      const site = `${new URL(href).origin}/*`;
+      let allowed = false;
+      try { allowed = await api.permissions.contains({ origins: [site] }); } catch { allowed = false; }
+      if (!allowed) { try { allowed = await api.permissions.request({ origins: [site] }); } catch { allowed = false; } } // (a browser that asks without a press)
+      if (!allowed) return { ok: false, ask: true, host: new URL(href).hostname };
+      let cal;
+      try { cal = await calRead(href); } catch (e) { return { ok: false, message: e?.message || 'That calendar could not be read.' }; }
+      const used = new Set(links.map((l) => l.color));
+      const link = { id: `c${Date.now().toString(36)}`, url: href, name: String(msg.name || '').trim().slice(0, 60) || cal.name || calHostName(href), color: cal.color || CAL_COLORS.find((c) => !used.has(c)) || CAL_COLORS[links.length % CAL_COLORS.length], on: true, added: new Date().toISOString() };
+      await api.storage.local.set({ [CAL_LINKS]: [...links, link], [calKey(link.id)]: { at: Date.now(), ok: true, error: '', name: cal.name, events: cal.events.map(({ id, title, start, end, allDay, day, days, location, free }) => ({ id, title, start, end, allDay, day, days, location, free })) } });
+      await calArm();
+      return { ok: true, link: { id: link.id, name: link.name, color: link.color }, count: cal.events.length };
+    }
+    throw new Error('Nothing here');
+  }
+  if (api.alarms?.onAlarm) api.alarms.onAlarm.addListener((a) => { if (a?.name === CAL_ALARM) calSync().catch(() => {}); });
+  calArm();
   // The interface's own on-demand modules (content/app/lazy.js): a page may ask for the files that
   // content/app/lazy-modules.js names, and nothing outside that list. The source manifest lists the
   // same files in a content-script group whose match never fires — Safari parses none of them until

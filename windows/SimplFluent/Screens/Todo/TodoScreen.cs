@@ -92,6 +92,7 @@ public sealed partial class TodoScreen : Screen
         var width = Math.Max(320, Width);
         var pad = Pad(width);
         rowButtons.Clear();
+        planRows.Clear();
         firstCard = null;
         side = null;
         var root = new Grid();
@@ -121,6 +122,7 @@ public sealed partial class TodoScreen : Screen
             root.Children.Add(Adopt(listScroller));
         }
         ShotPreview(d);
+        ShotPlan(d);
         return root;
     }
 
@@ -243,6 +245,23 @@ public sealed partial class TodoScreen : Screen
                 }
             }
             break;
+        }
+    }
+
+    /// <summary>(0.3.60) The screenshot suite (--open plan): the rail of free times under the last piece of work still to
+    /// do, once the page has settled.</summary>
+    private async void ShotPlan(TodoData d)
+    {
+        if (shotAsked || Launch.Get("open") != "plan") return;
+        if (d.Sections.SelectMany(s => s.Rows).LastOrDefault(r => !r.Done && r.Custom != true) is not { } last) return;
+        shotAsked = true;
+        await Task.Delay(1500);
+        if (Launch.Take("plan") == null) return;
+        if (planRows.TryGetValue(last.Id, out var at) && at.IsLoaded)
+        {
+            at.BringIntoView();
+            await Task.Delay(400); // (scrolled to first: the rail hangs where the row is)
+            if (at.IsLoaded) PlanRail.Open(at, last.Id, last.Title, engine);
         }
     }
 

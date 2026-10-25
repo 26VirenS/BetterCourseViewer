@@ -38,6 +38,12 @@ internal static class CalendarKit
     public static bool IsStruck(Models.CalEvent ev) =>
         ev.Struck ?? (ev.Missing != true && (ev.Excused == true || (ev.Done == true && IsWork(ev.Kind))));
 
+    /// <summary>(0.3.60) A time set aside for a piece of work (pulled to plan), not Canvas's own.</summary>
+    public static bool IsPlan(Models.CalEvent ev) => ev.Layer == "plan";
+
+    /// <summary>(0.3.60) An event of a calendar linked in Sync: drawn quieter than Canvas's own.</summary>
+    public static bool IsLinked(Models.CalEvent ev) => ev.Layer == "linked";
+
     /// <summary>Greyed: over (its due time or its end gone by), or struck.</summary>
     public static bool IsPast(Models.CalEvent ev) => (ev.Past ?? ev.Done == true) || IsStruck(ev);
 
@@ -77,6 +83,7 @@ internal static class CalendarKit
         "Quiz" => Simpl.Kit.Glyph.Work("quiz"),
         "Discussion" => SymbolRegular.ChatMultiple24,
         "Appointment" => SymbolRegular.People24,
+        "Plan" => SymbolRegular.Clock24, // (0.3.60) a time set aside for a piece of work
         _ => SymbolRegular.CalendarLtr24,
     };
 

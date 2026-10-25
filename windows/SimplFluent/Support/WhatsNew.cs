@@ -26,6 +26,10 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.60", "2026-10-25",
+            ("new", "Calendar Sync", "Calendar's Sync puts your work in Outlook or Google."),
+            ("new", "Your Calendars Here", "Link Google, iCloud or Outlook to see your own events."),
+            ("new", "Pull to Plan", "Pull work to the right to plan a free time for it.")),
         R("0.3.59", "2026-10-25",
             ("new", "Photos Without Ink", "Ink off shows a photo as it is, its words bordered in white.")),
         R("0.3.58", "2026-10-25",

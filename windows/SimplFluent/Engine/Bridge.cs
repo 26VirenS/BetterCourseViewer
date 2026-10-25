@@ -85,6 +85,47 @@ public sealed class Bridge
         if (fixedItems["settings"]!.ToJsonString() != s.ToJsonString()) store.Set(fixedItems);
     }
 
+    /// <summary>(0.3.60) The calendars linked in Calendar → Sync: their files read for the page, which cannot read another
+    /// site (background.js calFile). No cookies, and nothing of Simpl's own goes with a read.</summary>
+    private static readonly System.Net.Http.HttpClient Calendars = new(new System.Net.Http.HttpClientHandler { UseCookies = false, AllowAutoRedirect = true })
+    {
+        Timeout = TimeSpan.FromSeconds(20),
+    };
+
+    private const int CalendarMost = 8 * 1024 * 1024;
+
+    /// <summary>A linked calendar's file (its private .ics address): http and https only, eight megabytes at most; its
+    /// status and its text, or status 0 and why not (the Mac's Bridge.swift fetchText).</summary>
+    private static async Task<JsonNode> FetchText(string address)
+    {
+        if (!Uri.TryCreate(address, UriKind.Absolute, out var u) || (u.Scheme != Uri.UriSchemeHttp && u.Scheme != Uri.UriSchemeHttps))
+            return new JsonObject { ["status"] = 0, ["error"] = "That is not a web address." };
+        try
+        {
+            using var req = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, u);
+            req.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue { NoCache = true };
+            using var res = await Calendars.SendAsync(req, System.Net.Http.HttpCompletionOption.ResponseHeadersRead);
+            var status = (int)res.StatusCode;
+            if (res.Content.Headers.ContentLength is long n && n > CalendarMost)
+                return new JsonObject { ["status"] = 0, ["error"] = "That calendar is too big to read." };
+            await using var stream = await res.Content.ReadAsStreamAsync();
+            using var kept = new System.IO.MemoryStream();
+            var buf = new byte[81920];
+            int got;
+            while ((got = await stream.ReadAsync(buf)) > 0)
+            {
+                kept.Write(buf, 0, got);
+                if (kept.Length > CalendarMost) return new JsonObject { ["status"] = 0, ["error"] = "That calendar is too big to read." };
+            }
+            return new JsonObject { ["status"] = status, ["text"] = System.Text.Encoding.UTF8.GetString(kept.GetBuffer(), 0, (int)kept.Length) };
+        }
+        catch (Exception e)
+        {
+            Log.Write("calendar read: " + e.Message);
+            return new JsonObject { ["status"] = 0, ["error"] = e is TaskCanceledException ? "The calendar took too long to answer." : "The calendar could not be reached." };
+        }
+    }
+
     /// <summary>A message from bridge.js; its answer (or null), or an exception for an error.</summary>
     public async Task<JsonNode?> Handle(JsonObject body, Microsoft.Web.WebView2.Wpf.WebView2 from)
     {
@@ -139,6 +180,8 @@ public sealed class Bridge
                 }
                 return new JsonObject { ["ok"] = true };
             }
+            case "fetchText":
+                return await FetchText(body["url"]?.ToString() ?? "");
             case "previewFile":
             {
                 var url = body["url"]?.ToString() ?? "";

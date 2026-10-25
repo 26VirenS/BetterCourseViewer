@@ -94,7 +94,7 @@ public sealed partial class DashboardScreen
     /// is narrow (the rail beside the view).
     /// </summary>
     internal static Grid WorkFace(Color color, SymbolRegular symbol, string? course, string? kind, IEnumerable<WorkFlag>? flags, TextBlock title,
-        string? points, string? when, bool stacked, double tileSize = 32, double whenWidth = 0)
+        string? points, string? when, bool stacked, double tileSize = 32, double whenWidth = 0, WorkPlan? plan = null)
     {
         var tile = K.IconTile(symbol, color, tileSize);
         tile.VerticalAlignment = VerticalAlignment.Center;
@@ -108,6 +108,8 @@ public sealed partial class DashboardScreen
         foreach (var f in flags ?? Enumerable.Empty<WorkFlag>()) meta.Children.Add(K.Chip(f.Word, K.Tone(f.Kind)).Margin(0, 0, 6, 0));
         var words = K.V(2, title);
         if (meta.Children.Count > 0) words.Children.Insert(0, meta);
+        // (0.3.60) the time it is planned for, pulled to
+        if (plan != null) words.Children.Add(PlanRail.Pill(plan).Margin(0, 2, 0, 0));
         words.VerticalAlignment = VerticalAlignment.Center;
         if (stacked)
         {
@@ -138,7 +140,8 @@ public sealed partial class DashboardScreen
         check.Toggled += on => Tick(row.Id, on);
         var title = K.Wrapped(row.Title, Ty.Body, done ? B.Text2 : B.Text, 2);
         if (done) title.Struck();
-        var face = WorkFace(K.Hex(row.Color), Glyph.Work(row.Type ?? row.Kind), row.Course, row.Kind, row.Flags, title, row.Points, row.Due ?? row.Time, stacked: false, whenWidth: wide ? 112 : 90);
+        var face = WorkFace(K.Hex(row.Color), Glyph.Work(row.Type ?? row.Kind), row.Course, row.Kind, row.Flags, title, row.Points, row.Due ?? row.Time, stacked: false, whenWidth: wide ? 112 : 90,
+            plan: done ? null : row.Plan);
         var g = K.Columns("auto, *", check.Margin(6, 0, 12, 0).Col(0), face.Col(1));
         // (a click: its quick look, grown out of the row; a double-click: the work whole)
         var b = K.Subtle(g, null, new Thickness(4, 10, 4, 10));
@@ -166,7 +169,21 @@ public sealed partial class DashboardScreen
                 };
             }
         }
-        return b;
+        if (done) return b;
+        // (0.3.60) pulled to the right, the free times hang under it, and letting go on one plans it: the row held in a
+        // holder that takes the mouse from it, so a pull is never also its click
+        var holder = new Grid { Background = Brushes.Transparent, Children = { b } };
+        PlanRail.Attach(holder, row.Id, row.Title, engine);
+        var menu = new ContextMenu();
+        holder.ContextMenu = menu;
+        holder.ContextMenuOpening += (_, _) =>
+        {
+            menu.Items.Clear();
+            var planned = row.Plan != null;
+            menu.Items.Add(CalendarKit.Item(planned ? "Move Plan…" : "Plan a Time…", SymbolRegular.Clock24, () => PlanRail.Open(holder, row.Id, row.Title, engine)));
+            if (planned) menu.Items.Add(CalendarKit.Item("Clear Plan", SymbolRegular.CalendarCancel24, () => PlanRail.Clear(row.Id, engine)));
+        };
+        return holder;
     }
 
     // ---- Cards: the courses (the Mac's DashCourseCard, as Windows 11 cards) ----

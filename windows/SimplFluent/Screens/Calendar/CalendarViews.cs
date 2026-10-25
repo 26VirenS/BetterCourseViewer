@@ -166,10 +166,14 @@ public sealed partial class CalendarScreen
     {
         var missing = ev.Missing == true;
         var grey = CalendarKit.IsPast(ev) && !missing;
+        // (0.3.60) a plan has its clock for a mark; a linked calendar's event is quieter than Canvas's own
+        var quiet = grey || CalendarKit.IsLinked(ev);
         FrameworkElement mark = missing
             ? (FrameworkElement)K.Icon(SymbolRegular.ErrorCircle24, 10, B.Critical, filled: true).Margin(0, 3, 4, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Top)
-            : new Border { Width = 3, CornerRadius = new CornerRadius(1.5), Margin = new Thickness(0, 2, 6, 2), Background = K.Brush(K.WithAlpha(K.Hex(ev.Color), grey ? 0.55 : 1)) };
-        var title = lines > 1 ? K.Wrapped(ev.Title, Ty.Caption, grey ? B.Text2 : missing ? B.Critical : B.Text, lines) : K.Text(ev.Title, Ty.Caption, grey ? B.Text2 : missing ? B.Critical : B.Text);
+            : CalendarKit.IsPlan(ev)
+                ? K.Icon(SymbolRegular.Clock24, 10, K.WithAlpha(K.Hex(ev.Color), grey ? 0.55 : 1)).Margin(0, 3, 4, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Top)
+                : new Border { Width = 3, CornerRadius = new CornerRadius(1.5), Margin = new Thickness(0, 2, 6, 2), Background = K.Brush(K.WithAlpha(K.Hex(ev.Color), quiet ? 0.55 : 1)) };
+        var title = lines > 1 ? K.Wrapped(ev.Title, Ty.Caption, quiet ? B.Text2 : missing ? B.Critical : B.Text, lines) : K.Text(ev.Title, Ty.Caption, quiet ? B.Text2 : missing ? B.Critical : B.Text);
         if (lines <= 1) title.TextTrimming = TextTrimming.CharacterEllipsis;
         // (two lines broken between words only: a word too long for the line ends in "…", never split — "Composition"
         //  rather than "Compositi / on")
@@ -258,7 +262,8 @@ public sealed partial class CalendarScreen
         AutomationProperties.SetName(b, string.IsNullOrEmpty(ev.Time) ? ev.Title : $"{ev.Title}, {ev.Time}");
         AutomationProperties.SetHelpText(b, "Shows a preview; a double-click opens it");
         var held = CalendarKit.Text(ev.ReservationId);
-        if (menu && (CalendarKit.Text(ev.Url) is { } || held != null))
+        var planned = CalendarKit.IsPlan(ev) ? CalendarKit.Text(ev.PlanId) : null;
+        if (menu && (CalendarKit.Text(ev.Url) is { } || held != null || planned != null))
         {
             var m = new ContextMenu();
             if (CalendarKit.Text(ev.Url) is { } url)
@@ -274,6 +279,13 @@ public sealed partial class CalendarScreen
                 if (m.Items.Count > 0) m.Items.Add(new Separator());
                 m.Items.Add(CalendarKit.Item("Give Back This Time", SymbolRegular.CalendarCancel24, () => _ = GiveBack(held)));
                 m.Items.Add(CalendarKit.Item("Find Another Time…", SymbolRegular.CalendarClock24, FindAppointment));
+            }
+            // (0.3.60) a plan: moved (the rail under it) or cleared
+            if (planned != null)
+            {
+                if (m.Items.Count > 0) m.Items.Add(new Separator());
+                m.Items.Add(CalendarKit.Item("Move Plan…", SymbolRegular.Clock24, () => PlanRail.Open(b, planned, ev.Title, engine, Read)));
+                m.Items.Add(CalendarKit.Item("Clear Plan", SymbolRegular.CalendarCancel24, () => PlanRail.Clear(planned, engine, Read)));
             }
             b.ContextMenu = m;
         }
@@ -347,16 +359,31 @@ public sealed partial class CalendarScreen
     private FrameworkElement WeekBlock(CalEvent ev)
     {
         var missing = ev.Missing == true;
-        var title = K.Wrapped(ev.Title, Ty.Body, CalendarKit.IsPast(ev) && !missing ? B.Text2 : B.Text, 3);
+        var plan = CalendarKit.IsPlan(ev);
+        var linked = CalendarKit.IsLinked(ev);
+        var title = K.Wrapped(ev.Title, Ty.Body, (CalendarKit.IsPast(ev) || linked) && !missing ? B.Text2 : B.Text, 3);
         title.FontWeight = FontWeights.Medium;
         if (CalendarKit.IsStruck(ev) && !missing) title.Struck();
         var words = K.V(3, title);
         var meta = new WrapPanel { Orientation = Orientation.Horizontal };
+        // (0.3.60) a plan's time after its clock
+        if (plan) meta.Children.Add(K.Icon(SymbolRegular.Clock24, 11, K.Hex(ev.Color)).Margin(0, 2, 4, 1));
         if (!string.IsNullOrEmpty(ev.Time)) meta.Children.Add(K.Text(ev.Time!, Ty.Caption, B.Text2).Margin(0, 1, 6, 1));
         if (Flag(ev) is { } f) meta.Children.Add(K.Chip(f.Word, CalendarKit.Tone(f.Kind)));
         if (meta.Children.Count > 0) words.Children.Add(meta);
-        var bar = new Border { Width = 3.5, CornerRadius = new CornerRadius(1.75), Background = K.Brush(K.Hex(ev.Color)), Margin = new Thickness(0, 0, 8, 0) };
+        var bar = new Border { Width = 3.5, CornerRadius = new CornerRadius(1.75), Background = K.Brush(K.WithAlpha(K.Hex(ev.Color), linked ? 0.55 : 1)), Margin = new Thickness(0, 0, 8, 0) };
         var g = K.Columns("auto, *", bar.Col(0), words.Col(1));
+        // (0.3.60) a plan's block has a dashed edge in its colour: time set aside, not Canvas's own
+        if (plan)
+        {
+            var edge = new Rectangle
+            {
+                RadiusX = 8, RadiusY = 8, StrokeThickness = 1.25, StrokeDashArray = new DoubleCollection { 3, 2.5 },
+                Stroke = K.Brush(K.WithAlpha(K.Hex(ev.Color), 0.7)), Margin = new Thickness(-3, -6, -6, -6), IsHitTestVisible = false,
+            };
+            Grid.SetColumnSpan(edge, 2);
+            g.Children.Add(edge);
+        }
         var b = K.Subtle(g, null, new Thickness(3, 6, 6, 6), 8);
         b.Click += (_, _) => peek.Press(ev, b);
         b.ToolTip = ev.Sub ?? ev.Title;

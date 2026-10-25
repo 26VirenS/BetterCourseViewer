@@ -61,6 +61,67 @@ public sealed class WorkRow
     public int? Series { get; set; }
     public string? Kind { get; set; }
     public string? Pts { get; set; }
+    // (2.99.107) the time it is planned for, pulled to (content/app/plan.js): "Planned Tue 4:00 PM"
+    public WorkPlan? Plan { get; set; }
+}
+
+// (2.99.107) a piece of work's plan: when, for how long, and the words its pill says
+public sealed class WorkPlan
+{
+    public string At { get; set; } = "";
+    public int Mins { get; set; }
+    public bool? Past { get; set; }
+    public string Words { get; set; } = "";
+}
+
+// (2.99.107) Calendar → Sync as native-app.js `calSync` reads it: Canvas's calendar feed for a calendar app, the
+// student's own calendars linked by their private address, and whether plans go on to the Canvas calendar
+public sealed class SyncData
+{
+    public string? Feed { get; set; }
+    public bool Send { get; set; }
+    public bool CanSend { get; set; }
+    public List<SyncLink> Links { get; set; } = new();
+}
+
+public sealed class SyncLink
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string? Color { get; set; }
+    public bool On { get; set; }
+    public string? Read { get; set; }
+    public int Count { get; set; }
+    public string Error { get; set; } = "";
+}
+
+// (2.99.107) what linking a calendar answers: its name and how many events it holds, or why not
+public sealed class CalLinkReply
+{
+    public bool? Ok { get; set; }
+    public string? Name { get; set; }
+    public int? Count { get; set; }
+    public string? Error { get; set; }
+}
+
+// (2.99.107) the free times a piece of work could be planned in (native-app.js `planSlots`)
+public sealed class PlanSlots
+{
+    public string? Title { get; set; }
+    public int? Mins { get; set; }
+    public List<int>? Lengths { get; set; }
+    public string? Planned { get; set; }
+    public string? Due { get; set; }
+    public string? DueWords { get; set; }
+    public List<PlanSlot>? Slots { get; set; }
+    public string? Error { get; set; }
+}
+
+public sealed class PlanSlot
+{
+    public string At { get; set; } = "";
+    public string Day { get; set; } = "";
+    public string Time { get; set; } = "";
 }
 
 public sealed class Counter
@@ -327,6 +388,11 @@ public sealed class CalEvent
     public bool? Past { get; set; }
     // (2.99.95) a time reserved off Find Appointment: its reservation, which Give Back hands to Canvas
     public string? ReservationId { get; set; }
+    // (2.99.107) "plan" for a time set aside for a piece of work (PlanId: the work's), "linked" for an event of a calendar
+    // linked in Sync; null for Canvas's own. A timed one's end.
+    public string? Layer { get; set; }
+    public string? PlanId { get; set; }
+    public string? End { get; set; }
 }
 
 // (2.99.95) Find Appointment: Canvas's Scheduler as native-app.js `appointments` reads it — the classes with something to
@@ -1114,6 +1180,8 @@ public sealed class DashRow
     public bool Done { get; set; }
     public string? Url { get; set; }
     public bool? Custom { get; set; }
+    // (2.99.107) its plan, as To Do's rows have it
+    public WorkPlan? Plan { get; set; }
 }
 
 public sealed class DashDay

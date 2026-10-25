@@ -169,10 +169,13 @@ public sealed partial class CalendarScreen : Screen
             System.Windows.Automation.AutomationProperties.SetName(calendars, "Calendars");
             // (0.3.53) Canvas's Scheduler: office hours and sign-ups with a time to reserve
             var finder = K.IconButton(SymbolRegular.CalendarClock24, FindAppointment, "Find Appointment", 16, 32);
+            // (0.3.60) Sync: Canvas's calendar into a calendar app, and the student's own calendars in here
+            var sync = K.IconButton(SymbolRegular.ArrowSync24, OpenSync, "Sync with your calendar app", 16, 32);
+            System.Windows.Automation.AutomationProperties.SetName(sync, "Sync");
             Button? more = null;
             more = K.IconButton(SymbolRegular.MoreHorizontal24, () => MoreMenu(more!), "More", 16, 32);
-            foreach (var e in new FrameworkElement[] { spinner, today, finder, calendars, more }) e.VerticalAlignment = VerticalAlignment.Center;
-            commands = K.H(8, spinner, selector, nav, finder, calendars, more);
+            foreach (var e in new FrameworkElement[] { spinner, today, finder, sync, calendars, more }) e.VerticalAlignment = VerticalAlignment.Center;
+            commands = K.H(8, spinner, selector, nav, finder, sync, calendars, more);
             PaintCommands();
             return commands;
         }
@@ -212,6 +215,9 @@ public sealed partial class CalendarScreen : Screen
 
     /// <summary>(0.3.53) Find Appointment (the Mac's popup): a time reserved or given back there read again behind it.</summary>
     private void FindAppointment() => AppointmentsSheet.Show(engine, Read, Window.GetWindow(page));
+
+    /// <summary>(0.3.60) Sync (the Mac's popup): a calendar linked, shown, hidden or unlinked there read again behind it.</summary>
+    private void OpenSync() => SyncSheet.Show(engine, Read, Window.GetWindow(page));
 
     /// <summary>(0.3.53) A reserved time given back from its menu, the calendar read again after.</summary>
     private async Task GiveBack(string reservation)
@@ -574,6 +580,9 @@ public sealed partial class CalendarScreen : Screen
         // (0.3.53) the screenshot suite's Find Appointment (--open appointments), over the calendar once it is drawn
         if (cal.Data != null && !cal.Loading && Launch.Take("appointments") != null)
             page.Dispatcher.BeginInvoke(FindAppointment, DispatcherPriority.Background);
+        // (0.3.60) and its Sync (--open sync)
+        if (cal.Data != null && !cal.Loading && Launch.Take("sync") != null)
+            page.Dispatcher.BeginInvoke(OpenSync, DispatcherPriority.Background);
         if (!shotAsked || cal.Data == null || cal.Loading || firstItem == null) return;
         shotAsked = false;
         if (Launch.Take("preview") == null) return;

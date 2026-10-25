@@ -32,6 +32,7 @@
     "scripts": [
       "lib/settings.js",
       "lib/devcode.js",
+      "lib/ics.js",
       "content/app/lazy-modules.js",
       "background.js"
     ],
@@ -101,6 +102,7 @@
         "content/app/motion.js",
         "content/app/ui.js",
         "content/app/store.js",
+        "content/app/plan.js",
         "content/app/lazy-modules.js",
         "content/app/lazy.js",
         "content/app/search.js",
