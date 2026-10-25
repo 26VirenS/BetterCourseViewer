@@ -340,20 +340,32 @@ struct SyncPopup: View {
     private func load() async {
         let got = try? await engine.call("calSync", as: SyncData.self)
         withAnimation(Motion.snappy) { data = got ?? SyncData(simpl: .off, links: []) }
-        // (the screenshot suite's -SimplMakeFeed YES: Simpl's calendar made, against the mock's own /api/feed)
-        if UserDefaults.standard.bool(forKey: "SimplMakeFeed"), got?.simpl.on == false { await makeSimpl() }
+        // (the screenshot suite's -SimplMakeFeed YES: Simpl's calendar made, against the mock's own /api/feed — tried again
+        //  while the page is still settling, as the Calendar under the popup is read, three times at most)
+        if UserDefaults.standard.bool(forKey: "SimplMakeFeed"), got?.simpl.on == false {
+            for _ in 0..<3 {
+                if await makeSimpl() { break }
+                try? await Task.sleep(nanoseconds: 4_000_000_000)
+            }
+        }
     }
 
-    /// (1.3.169) Simpl's calendar made — a new private link — and sent at once; or why not.
-    private func makeSimpl() async {
-        guard !turning else { return }
+    /// (1.3.169) Simpl's calendar made — a new private link — and sent at once; or why not, as the page or the site says it.
+    @discardableResult
+    private func makeSimpl() async -> Bool {
+        guard !turning else { return false }
         turning = true
-        let f = try? await engine.call("feedOn", as: SimplFeed.self)
+        var f: SimplFeed?
+        var why: String?
+        do { f = try await engine.call("feedOn", as: SimplFeed.self) } catch { why = error.localizedDescription }
         turning = false
+        let made = f?.on == true && f?.error.isEmpty == true
+        NSLog("[Simpl] sync: simpl calendar %@", made ? "made, \(f?.count ?? 0) events sent" : "not made: \(why ?? f?.error ?? "")")
         withAnimation(Motion.snappy) {
-            data?.simpl = f ?? SimplFeed(on: false, link: nil, apple: nil, google: nil, office: nil, outlook: nil, sent: nil, count: 0, error: "Simpl could not reach simplcourses.com. Try again in a moment.")
+            data?.simpl = f ?? SimplFeed(on: false, link: nil, apple: nil, google: nil, office: nil, outlook: nil, sent: nil, count: 0, error: why ?? "Simpl could not reach simplcourses.com. Try again in a moment.")
         }
-        if f?.on == true, f?.error.isEmpty == true { say("Your Simpl calendar is made. Add it to your calendar app above.", bad: false) }
+        if made { say("Your Simpl calendar is made. Add it to your calendar app above.", bad: false) }
+        return made
     }
 
     /// (1.3.169) Simpl's calendar forgotten on simplcourses.com: its link opens nothing any more.
