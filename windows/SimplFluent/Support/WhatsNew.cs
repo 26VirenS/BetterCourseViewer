@@ -26,6 +26,9 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.61", "2026-10-25",
+            ("new", "Place Your Photo", "A photo opens on its card: drag, zoom and set it there."),
+            ("improved", "Solid Photo Borders", "Words on a photo with Ink off have a solid white edge.")),
         R("0.3.60", "2026-10-25",
             ("new", "Calendar Sync", "Calendar's Sync puts your work in Outlook or Google."),
             ("new", "Your Calendars Here", "Link Google, iCloud or Outlook to see your own events."),

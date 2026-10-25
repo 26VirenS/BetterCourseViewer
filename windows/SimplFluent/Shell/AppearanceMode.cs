@@ -19,6 +19,10 @@ namespace Simpl.Shell;
 // Dashboard shown, the whole window darkened but for the navigation pane and the Dashboard's cards — each of those with a
 // photo button on it — and a bar risen from the foot of the window, in its middle, for the theme's colours and the
 // courses' colours. Done, or Escape, puts it away.
+// (0.3.61, the web's 2.99.108 and the Mac's 1.3.166) A photo uploaded opens where it went: its place the only one lit,
+// outlined, the photo dragged on it to move it and the wheel to zoom it, a tip over it and its settings round it (under a
+// card, over it where there is no room under; beside the pane) — the zoom, Ink (a photo of one's own), Reset, Replace…,
+// Remove and Done. The bar at the foot steps aside meanwhile. Done or Escape ends it, the photo kept as it was left.
 
 /// <summary>Appearance on or off, and the places that take a photo (the pane and each Dashboard card), as they say where
 /// they are.</summary>
@@ -73,6 +77,27 @@ public sealed class AppearanceOverlay : Grid
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(200) };
     private string tab = Launch.Get("appearance-tab") == "courses" ? "courses" : "theme";
 
+    // (0.3.61) the photo in its place: the place edited, its outline (taking the drag and the wheel), its tip and its settings
+    private string? editing;
+    private Rect? editAt;
+    private readonly Canvas editLayer = new() { Visibility = Visibility.Collapsed };
+    private readonly Border halo = new() { IsHitTestVisible = false, BorderThickness = new Thickness(6) };
+    private readonly Border ring = new() { Background = Brushes.Transparent, BorderThickness = new Thickness(2), Cursor = Cursors.SizeAll, Focusable = true };
+    private readonly Border tip = new() { IsHitTestVisible = false, CornerRadius = new CornerRadius(13), Padding = new Thickness(11, 4, 12, 5) };
+    private readonly Border editBar = new() { CornerRadius = new CornerRadius(12), BorderThickness = new Thickness(1), Padding = new Thickness(14, 10, 14, 10) };
+    private (double X, double Y) pan;
+    private double zoom = 1;
+    private Point? dragFrom;
+    private (double X, double Y) panFrom;
+    private Slider? zoomSlider;
+    private Wpf.Ui.Controls.Button? resetButton;
+    /// <summary>What the settings were drawn for (the place, a photo of one's own, its Ink off): drawn again only when that
+    /// changes — else only the zoom and Reset follow, the slider kept under the pointer that holds it.</summary>
+    private (string Slot, bool Own, bool Plain)? paintedFor;
+    private bool syncing;
+    /// <summary>The wheel, the slider and the arrow keys: the picture kept once they rest (the web's 260 ms).</summary>
+    private readonly DispatcherTimer rest = new() { Interval = TimeSpan.FromMilliseconds(260) };
+
     public bool On { get; private set; }
 
     public AppearanceOverlay(Engine.Engine engine, MainWindow window)
@@ -88,6 +113,8 @@ public sealed class AppearanceOverlay : Grid
         layer.Children.Add(veil);
         Children.Add(layer);
         Children.Add(badges);
+        Children.Add(editLayer);
+        BuildEditor();
         bar.HorizontalAlignment = HorizontalAlignment.Center;
         bar.VerticalAlignment = VerticalAlignment.Bottom;
         bar.Margin = new Thickness(24, 0, 24, 22);
@@ -101,13 +128,24 @@ public sealed class AppearanceOverlay : Grid
         bar.Child = barBody;
         Children.Add(bar);
         timer.Tick += (_, _) => Tick();
-        PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape && On) { End(); e.Handled = true; } };
+        PreviewKeyDown += (_, e) =>
+        {
+            if (!On) return;
+            if (editing != null) { EditKey(e); return; }
+            if (e.Key == Key.Escape) { End(); e.Handled = true; }
+        };
         Focusable = true;
         Appearance.Changed += () => Dispatcher.BeginInvoke(() =>
         {
             if (!On) return;
             veil.Fill = Dim();
             Build();
+            if (editing is { } slot)
+            {
+                // (the picture as kept, unless it is being dragged or zoomed still)
+                if (dragFrom == null && !rest.IsEnabled) { pan = Appearance.Pan(slot); zoom = Appearance.Zoom(slot); }
+                if (paintedFor == Painted(slot)) SyncEdit(); else PaintEdit();
+            }
             Tick(force: true);
         });
         engine.PropertyChanged += (_, e) => { if (On && e.PropertyName == nameof(Engine.Engine.Courses) && tab == "courses") Dispatcher.BeginInvoke(Build); };
@@ -133,11 +171,14 @@ public sealed class AppearanceOverlay : Grid
         Dispatcher.BeginInvoke(() => Focus(), DispatcherPriority.Input);
         Log.Write("appearance: on");
         Shot.Moved();
+        // (the screenshot suite: --photo-edit today opens that place's photo in its place)
+        if (Launch.Take("", "photo-edit") is { Length: > 0 } slot) Dispatcher.BeginInvoke(() => Edit(slot), DispatcherPriority.ApplicationIdle);
     }
 
     public void End()
     {
         if (!On) return;
+        EndEdit(quiet: true);
         On = false;
         timer.Stop();
         Visibility = Visibility.Collapsed;
@@ -155,6 +196,11 @@ public sealed class AppearanceOverlay : Grid
     {
         if (!On) return;
         whole.Rect = new Rect(0, 0, ActualWidth, ActualHeight);
+        if (editing != null)
+        {
+            TickEdit(force);
+            return;
+        }
         var pane = Tour.Find(TourSpot.Pane, this);
         var cards = Tour.Find(TourSpot.Counters, this) is { } c ? Rect.Inflate(c, 8, 8) : (Rect?)null;
         if (force || pane != lastPane || cards != lastCards)
@@ -223,9 +269,8 @@ public sealed class AppearanceOverlay : Grid
         if (Scenes.Of(slot) != null)
         {
             menu.Items.Add(new Separator());
-            menu.Items.Add(Item("Zoom in", SymbolRegular.ZoomIn24, () => Appearance.SetZoom(slot, Math.Min(3, Math.Round(Appearance.Zoom(slot) + 0.25, 2)))));
-            menu.Items.Add(Item("Zoom out", SymbolRegular.ZoomOut24, () => Appearance.SetZoom(slot, Math.Max(0.5, Math.Round(Appearance.Zoom(slot) - 0.25, 2)))));
-            menu.Items.Add(Item("Put back", SymbolRegular.ArrowReset24, () => Appearance.ResetPicture(slot)));
+            // (0.3.61) moved and zoomed in its place, its settings round it
+            menu.Items.Add(Item("Move and zoom…", SymbolRegular.ArrowMove24, () => Edit(slot)));
             // (0.3.59) a photo of one's own: inked, or (off) shown as it is, the words on it white-bordered
             if (Appearance.PhotoKind(slot) == "photo" && Appearance.Photo(slot) != null)
             {
@@ -243,7 +288,296 @@ public sealed class AppearanceOverlay : Grid
         var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "Pictures|*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.heic;*.webp|All files|*.*" };
         if (dlg.ShowDialog(window) != true) return;
         Scenes.Forget();
-        if (!Appearance.SetPhoto(slot, dlg.FileName)) Log.Write("appearance: the picture could not be read");
+        if (!Appearance.SetPhoto(slot, dlg.FileName)) { Log.Write("appearance: the picture could not be read"); return; }
+        // (0.3.61) and it opens where it went, to be placed
+        Edit(slot);
+    }
+
+    // ---- (0.3.61) the photo in its place ----
+
+    private void BuildEditor()
+    {
+        halo.SetResourceReference(Border.BorderBrushProperty, B.Accent);
+        halo.Opacity = 0.22;
+        ring.SetResourceReference(Border.BorderBrushProperty, B.Accent);
+        ring.FocusVisualStyle = null;
+        tip.Background = K.Brush(Color.FromArgb(220, 28, 28, 28));
+        tip.Effect = K.Shadow(14, 3, 0.22);
+        var words = K.Text("Drag to move · scroll to zoom", Ty.Caption);
+        words.Foreground = Brushes.White;
+        words.FontWeight = FontWeights.SemiBold;
+        tip.Child = K.H(6, K.Icon(SymbolRegular.ArrowMove24, 14, Colors.White), words);
+        editBar.SetResourceReference(Border.BackgroundProperty, B.Flyout);
+        editBar.SetResourceReference(Border.BorderBrushProperty, B.FlyoutStroke);
+        editBar.Effect = K.Shadow(32, 10, 0.3);
+        editLayer.Children.Add(halo);
+        editLayer.Children.Add(ring);
+        editLayer.Children.Add(tip);
+        editLayer.Children.Add(editBar);
+
+        // the photo follows the pointer, a share of the place for each step of it (Scenes.Preview), kept as it is let go
+        ring.MouseLeftButtonDown += (_, e) =>
+        {
+            if (editing == null) return;
+            e.Handled = true;
+            ring.Focus();
+            dragFrom = e.GetPosition(this);
+            panFrom = pan;
+            ring.CaptureMouse();
+        };
+        ring.MouseMove += (_, e) =>
+        {
+            if (dragFrom is not { } from || editAt is not { } at || editing is not { } slot) return;
+            var p = e.GetPosition(this);
+            pan = (Math.Clamp(panFrom.X + (p.X - from.X) / Math.Max(1, at.Width), -0.5, 0.5),
+                   Math.Clamp(panFrom.Y + (p.Y - from.Y) / Math.Max(1, at.Height), -0.5, 0.5));
+            Scenes.Preview(slot, zoom, pan);
+        };
+        ring.MouseLeftButtonUp += (_, e) =>
+        {
+            if (dragFrom == null) return;
+            e.Handled = true;
+            dragFrom = null;
+            ring.ReleaseMouseCapture();
+            Keep();
+        };
+        ring.LostMouseCapture += (_, _) =>
+        {
+            if (dragFrom == null) return;
+            dragFrom = null;
+            Keep();
+        };
+        ring.MouseWheel += (_, e) =>
+        {
+            e.Handled = true;
+            ZoomTo(zoom * Math.Pow(1.1, e.Delta / 120.0));
+        };
+        rest.Tick += (_, _) => Keep();
+    }
+
+    /// <summary>A place's photo opened in its place: only it lit, outlined; its settings round it.</summary>
+    private void Edit(string slot)
+    {
+        if (!On || !Appearance.Slots.Any(s => s.Key == slot)) return;
+        if (editing != null && editing != slot) EndEdit(quiet: true);
+        var fresh = editing == null;
+        editing = slot;
+        editAt = null;
+        pan = Appearance.Pan(slot);
+        zoom = Appearance.Zoom(slot);
+        PaintEdit();
+        badges.Visibility = Visibility.Collapsed;
+        bar.Visibility = Visibility.Hidden; // (the bar at the foot steps aside)
+        editLayer.Visibility = Visibility.Visible;
+        UpdateLayout();
+        Tick(force: true);
+        if (fresh)
+        {
+            Motion.Pop(editBar);
+            Motion.FadeIn(tip, Motion.Medium);
+            Motion.FadeIn(ring, Motion.Fast);
+        }
+        Dispatcher.BeginInvoke(() => ring.Focus(), DispatcherPriority.Input);
+        Log.Write($"appearance: {slot} photo in its place");
+        Shot.Moved();
+    }
+
+    /// <summary>The place let go: the photo kept as it was left, the other places and the bar back.</summary>
+    private void EndEdit(bool quiet = false)
+    {
+        if (editing == null) return;
+        if (rest.IsEnabled || dragFrom != null) { dragFrom = null; Keep(); }
+        editing = null;
+        editAt = null;
+        paintedFor = null;
+        editLayer.Visibility = Visibility.Collapsed;
+        badges.Visibility = Visibility.Visible;
+        bar.Visibility = Visibility.Visible;
+        if (quiet) return;
+        Motion.Pop(bar);
+        Tick(force: true);
+        Focus();
+    }
+
+    /// <summary>The picture kept where it is and as large (once: the look is worn again for it).</summary>
+    private void Keep()
+    {
+        rest.Stop();
+        if (editing is not { } slot) return;
+        var (x, y) = Appearance.Pan(slot);
+        if (Math.Abs(x - pan.X) < 0.0005 && Math.Abs(y - pan.Y) < 0.0005 && Math.Abs(Appearance.Zoom(slot) - zoom) < 0.0005) return;
+        Appearance.SetPlace(slot, pan.X, pan.Y, zoom);
+    }
+
+    private void ZoomTo(double z)
+    {
+        if (editing is not { } slot) return;
+        zoom = Math.Round(Math.Clamp(z, 0.5, 3), 3);
+        Scenes.Preview(slot, zoom, pan);
+        SyncEdit();
+        rest.Stop();
+        rest.Start();
+    }
+
+    /// <summary>The settings following the picture: the slider at its zoom, Reset there while it is moved or zoomed.</summary>
+    private void SyncEdit()
+    {
+        if (zoomSlider != null && Math.Abs(zoomSlider.Value - zoom) > 0.0005) { syncing = true; zoomSlider.Value = zoom; syncing = false; }
+        if (resetButton != null) resetButton.IsEnabled = Math.Abs(pan.X) > 0.0005 || Math.Abs(pan.Y) > 0.0005 || Math.Abs(zoom - 1) > 0.0005;
+    }
+
+    private static (string, bool, bool) Painted(string slot) =>
+        (slot, Appearance.PhotoKind(slot) == "photo" && Appearance.Photo(slot) != null, Appearance.Plain(slot));
+
+    /// <summary>Escape or Enter ends it; the arrows nudge the photo (Shift: further), + and − zoom it.</summary>
+    private void EditKey(KeyEventArgs e)
+    {
+        if (editing is not { } slot) return;
+        switch (e.Key)
+        {
+            case Key.Escape:
+                EndEdit();
+                e.Handled = true;
+                return;
+            case Key.Enter when Keyboard.FocusedElement is not System.Windows.Controls.Primitives.ButtonBase:
+                EndEdit();
+                e.Handled = true;
+                return;
+            case Key.OemPlus or Key.Add:
+                ZoomTo(zoom * 1.1);
+                e.Handled = true;
+                return;
+            case Key.OemMinus or Key.Subtract:
+                ZoomTo(zoom / 1.1);
+                e.Handled = true;
+                return;
+        }
+        if (Keyboard.FocusedElement is Slider) return;
+        var step = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) ? 0.05 : 0.01;
+        (double X, double Y)? by = e.Key switch { Key.Left => (-step, 0), Key.Right => (step, 0), Key.Up => (0, -step), Key.Down => (0, step), _ => null };
+        if (by is not { } d) return;
+        e.Handled = true;
+        pan = (Math.Clamp(pan.X + d.X, -0.5, 0.5), Math.Clamp(pan.Y + d.Y, -0.5, 0.5));
+        Scenes.Preview(slot, zoom, pan);
+        SyncEdit();
+        rest.Stop();
+        rest.Start();
+    }
+
+    /// <summary>The settings: the place's name and what it wears, the zoom, Ink (a photo of one's own), Reset, Replace…,
+    /// Remove and Done — in a row under a card, in a column beside the pane.</summary>
+    private void PaintEdit()
+    {
+        if (editing is not { } slot) return;
+        var side = slot == "side";
+        paintedFor = Painted(slot);
+        var own = paintedFor.Value.Own;
+        var name = side ? "Navigation pane" : Appearance.Slots.FirstOrDefault(s => s.Key == slot).Name ?? slot;
+        var title = K.V(1, K.Text(name, Ty.BodyStrong),
+            K.Text(own ? (Appearance.Plain(slot) ? "Your photo, as it is" : "Your photo, inked") : "A drawing", Ty.Caption, B.Text2));
+        title.VerticalAlignment = VerticalAlignment.Center;
+
+        var slider = new Slider { Minimum = 0.5, Maximum = 3, Value = zoom, Width = side ? 150 : 110, VerticalAlignment = VerticalAlignment.Center, SmallChange = 0.05, LargeChange = 0.25 };
+        System.Windows.Automation.AutomationProperties.SetName(slider, "Zoom");
+        slider.ValueChanged += (_, e) => { if (!syncing) ZoomTo(e.NewValue); };
+        zoomSlider = slider;
+        Button Glyph(SymbolRegular icon, string what, Action act)
+        {
+            var b = K.Subtle(K.Icon(icon, 16), act, new Thickness(6), 4);
+            b.ToolTip = what;
+            System.Windows.Automation.AutomationProperties.SetName(b, what);
+            return b;
+        }
+        var zoomRow = K.H(4, Glyph(SymbolRegular.ZoomOut24, "Zoom out", () => ZoomTo(zoom / 1.15)), slider, Glyph(SymbolRegular.ZoomIn24, "Zoom in", () => ZoomTo(zoom * 1.15)));
+        zoomRow.VerticalAlignment = VerticalAlignment.Center;
+
+        FrameworkElement? ink = null;
+        if (own)
+        {
+            var toggle = new ToggleSwitch { Content = "Ink", IsChecked = !Appearance.Plain(slot), VerticalAlignment = VerticalAlignment.Center };
+            toggle.ToolTip = "On: the photo drawn in two tones of the page. Off: the photo as it is, the words on it bordered in white.";
+            toggle.Click += (_, _) => { Keep(); Appearance.SetPlain(slot, toggle.IsChecked != true); };
+            ink = toggle;
+        }
+
+        var reset = K.Button("Reset", () => { rest.Stop(); Appearance.ResetPicture(slot); });
+        reset.ToolTip = "Put the photo back where it started";
+        resetButton = reset;
+        var replace = K.Button("Replace…", () => { Keep(); Choose(slot); });
+        var remove = K.Button("Remove", () =>
+        {
+            EndEdit();
+            Appearance.RemovePhoto(slot);
+            Appearance.SetKind(slot, "none");
+            Scenes.Forget();
+        });
+        var acts = K.H(8, reset, replace, remove);
+        acts.VerticalAlignment = VerticalAlignment.Center;
+        var done = K.Button("Done", () => EndEdit(), accent: true);
+        done.VerticalAlignment = VerticalAlignment.Center;
+
+        FrameworkElement Rule() => side
+            ? new Border { Height = 1, Margin = new Thickness(0, 2, 0, 2) }.Bg(B.Divider)
+            : new Border { Width = 1, Height = 24, VerticalAlignment = VerticalAlignment.Center }.Bg(B.Divider);
+        if (side)
+        {
+            done.HorizontalAlignment = HorizontalAlignment.Right;
+            editBar.Child = K.V(10, title, Rule(), zoomRow, ink == null ? null : Rule(), ink, Rule(), acts, done);
+        }
+        else editBar.Child = K.H(12, title, Rule(), zoomRow, ink == null ? null : Rule(), ink, Rule(), acts, done);
+        SyncEdit();
+    }
+
+    /// <summary>The edited place found again (it moves with the window and is built again with the look): only it lit,
+    /// its outline on it and its settings and tip round it, kept inside the window.</summary>
+    private void TickEdit(bool force)
+    {
+        if (editing is not { } slot) return;
+        var side = slot == "side";
+        foreach (var (s, at) in AppearanceMode.Where(this)) if (s == slot) { editAt = at; break; }
+        if (editAt is not { } r) return;
+        holes.Children.Clear();
+        holes.Children.Add(side ? new RectangleGeometry(r) : new RectangleGeometry(Rect.Inflate(r, 6, 6), 14, 14));
+        lastPane = lastCards = null;
+
+        // (just outside a card; on the pane's own edge)
+        var o = side ? 0 : 3;
+        PutAt(ring, Rect.Inflate(r, o, o));
+        ring.CornerRadius = new CornerRadius(side ? 0 : 8 + o);
+        PutAt(halo, Rect.Inflate(r, o + 4, o + 4));
+        halo.CornerRadius = new CornerRadius(side ? 0 : 8 + o + 4);
+        halo.Visibility = side ? Visibility.Collapsed : Visibility.Visible;
+
+        editBar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        tip.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        double W = ActualWidth, H = ActualHeight, m = 12, g = 12;
+        double bw = editBar.DesiredSize.Width, bh = editBar.DesiredSize.Height, tw = tip.DesiredSize.Width, th = tip.DesiredSize.Height;
+        double X(double x, double w) => Math.Min(Math.Max(x, m), Math.Max(m, W - w - m));
+        double Y(double y, double h) => Math.Min(Math.Max(y, m), Math.Max(m, H - h - m));
+        if (side)
+        {
+            var bx = X(r.Right + 16, bw);
+            var by = Y(r.Top + r.Height / 2 - bh / 2, bh);
+            Canvas.SetLeft(editBar, bx);
+            Canvas.SetTop(editBar, by);
+            Canvas.SetLeft(tip, X(bx, tw));
+            Canvas.SetTop(tip, Y(by - 8 - th, th));
+            return;
+        }
+        // (under the card, centred on it — over it where there is no room under; the tip on its other side)
+        var below = r.Bottom + g + bh + m <= H || r.Top - g - bh < m;
+        Canvas.SetLeft(editBar, X(r.Left + r.Width / 2 - bw / 2, bw));
+        Canvas.SetTop(editBar, Y(below ? r.Bottom + g : r.Top - g - bh, bh));
+        Canvas.SetLeft(tip, X(r.Left + r.Width / 2 - tw / 2, tw));
+        Canvas.SetTop(tip, Y(below ? r.Top - g - th : r.Bottom + g, th));
+    }
+
+    private static void PutAt(FrameworkElement e, Rect r)
+    {
+        Canvas.SetLeft(e, r.X);
+        Canvas.SetTop(e, r.Y);
+        e.Width = Math.Max(0, r.Width);
+        e.Height = Math.Max(0, r.Height);
     }
 
     // ---- the bar ----

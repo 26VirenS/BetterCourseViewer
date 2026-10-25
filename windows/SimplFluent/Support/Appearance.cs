@@ -180,9 +180,23 @@ public static class Appearance
 
     public static void SetPan(string slot, double x, double y)
     {
+        KeepPan(slot, x, y);
+        Changed?.Invoke();
+    }
+
+    /// <summary>(0.3.61) Where a place's picture is and how large, kept at once (the photo in its place, let go): the look
+    /// worn again once, not for each.</summary>
+    public static void SetPlace(string slot, double x, double y, double zoom)
+    {
+        KeepPan(slot, x, y);
+        Prefs.Set($"photo:{slot}:zoom", Math.Round(Math.Clamp(zoom, 0.5, 3), 3));
+        Changed?.Invoke();
+    }
+
+    private static void KeepPan(string slot, double x, double y)
+    {
         Prefs.Set($"photo:{slot}:x", Math.Abs(x) < 0.001 ? null : Math.Round(Math.Clamp(x, -0.5, 0.5), 3));
         Prefs.Set($"photo:{slot}:y", Math.Abs(y) < 0.001 ? null : Math.Round(Math.Clamp(y, -0.5, 0.5), 3));
-        Changed?.Invoke();
     }
 
     /// <summary>A place's picture back where it is pinned, at its own size.</summary>

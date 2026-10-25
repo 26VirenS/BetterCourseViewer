@@ -81,23 +81,51 @@ public static class Scenes
         if (Appearance.Plain(slot) && Appearance.Photo(slot) is { } file && Original(file) is { } photo)
         {
             var o = new Grid { IsHitTestVisible = false, ClipToBounds = true };
-            o.Children.Add(new Rectangle { Fill = Placed(photo, side ? AlignmentX.Center : AlignmentX.Right, zoom, side ? 0.5 : 1, pan ?? Appearance.Pan(slot)), IsHitTestVisible = false });
+            var fill = Placed(photo, side ? AlignmentX.Center : AlignmentX.Right, zoom, side ? 0.5 : 1, pan ?? Appearance.Pan(slot));
+            Keep(slot, fill);
+            o.Children.Add(new Rectangle { Fill = fill, IsHitTestVisible = false });
             return o;
         }
         if (Of(slot) is not { } pic) return null;
         var g = new Grid { IsHitTestVisible = false, ClipToBounds = true };
-        g.Children.Add(Drawn(pic.Mask, pic.Scene ? SceneInk : PhotoInk, side ? AlignmentX.Center : AlignmentX.Right, zoom, side ? 0.5 : 1, pan ?? Appearance.Pan(slot)));
+        var drawn = Drawn(pic.Mask, pic.Scene ? SceneInk : PhotoInk, side ? AlignmentX.Center : AlignmentX.Right, zoom, side ? 0.5 : 1, pan ?? Appearance.Pan(slot));
+        if ((drawn.OpacityMask ?? drawn.Fill) is ImageBrush placed) Keep(slot, placed);
+        g.Children.Add(drawn);
         if (frost && pic.Scene) g.Children.Add(new Rectangle { Fill = K.Brush(Color.FromArgb(56, Page.R, Page.G, Page.B)) });
         return g;
     }
 
+    /// <summary>Each place's pictures as they are drawn now (its card, the panel it grows into, the pane), to move as
+    /// they are dragged (<see cref="Preview"/>).</summary>
+    private static readonly Dictionary<string, List<WeakReference<ImageBrush>>> Shown = new();
+
+    private static void Keep(string slot, ImageBrush brush)
+    {
+        if (!Shown.TryGetValue(slot, out var list)) Shown[slot] = list = new();
+        list.RemoveAll(w => !w.TryGetTarget(out _));
+        list.Add(new WeakReference<ImageBrush>(brush));
+    }
+
+    /// <summary>
+    /// (0.3.61) A place's picture moved and zoomed where it is drawn, as it is dragged or zoomed in Appearance (the photo
+    /// in its place, AppearanceOverlay's editor) — nothing built again, nothing kept: as it is let go, Appearance.SetPan
+    /// and SetZoom keep it, and every place is drawn again once.
+    /// </summary>
+    public static void Preview(string slot, double zoom, (double X, double Y) pan)
+    {
+        if (!Shown.TryGetValue(slot, out var list)) return;
+        var side = slot == "side";
+        foreach (var w in list)
+            if (w.TryGetTarget(out var brush) && !brush.IsFrozen) brush.RelativeTransform = Move(Math.Clamp(zoom, 0.5, 3), side ? 0.5 : 1, pan);
+    }
+
     /// <summary>
     /// (0.3.59) The words on a photo with its Ink switch off (the web's .bcv-side--plain, the Mac's PlainPhotoWords):
-    /// dark in either look, with a gentle white border round them — a soft white edge, close in — so they read on any
-    /// photo. The theme's text brushes are given again for this part alone; off, it is as it was.
-    /// One shadow round a thin letter is too faint over a dark photo, so the white is built up: a close shadow on each
-    /// of its parts and on each of theirs, under the soft one round the whole — near solid at the letters, soft beyond
-    /// (the web's ring of white and its glow). A part's own effect is left as it is.
+    /// dark in either look, with a white border round them — (0.3.61) solid, a hard edge with nothing fading out of it
+    /// (Kit/SolidEdge.cs) — so they read on any photo. The theme's text brushes are given again for this part alone; off, it is as it was.
+    /// Where that edge cannot be drawn the white is built up as before: a close shadow on each of its parts and on each
+    /// of theirs, under the soft one round the whole — near solid at the letters, soft beyond. A part's own effect is
+    /// left as it is.
     /// </summary>
     public static void PlainWords(FrameworkElement words, bool on)
     {
@@ -105,6 +133,18 @@ public static class Scenes
         {
             if (on) words.Resources[key] = K.Brush(color);
             else words.Resources.Remove(key);
+        }
+        // (0.3.61) the border solid: one hard white edge round everything the part draws (Kit/SolidEdge.cs), where it can
+        // be drawn — the close shadows on the parts let go; else the softer border below, built up as before
+        if (SolidEdge.Available)
+        {
+            words.Effect = on ? new SolidEdge() : null;
+            foreach (var part in Parts(words))
+            {
+                if (part.Effect == HaloClose) part.Effect = null;
+                foreach (var inner in Parts(part)) if (inner.Effect == HaloClose) inner.Effect = null;
+            }
+            return;
         }
         words.Effect = on ? HaloSoft : null;
         foreach (var part in Parts(words))
@@ -210,11 +250,18 @@ public static class Scenes
     private static ImageBrush Placed(ImageSource img, AlignmentX x, double zoom = 1, double originX = 1, (double X, double Y) pan = default)
     {
         var brush = new ImageBrush(img) { Stretch = Stretch.UniformToFill, AlignmentX = x, AlignmentY = AlignmentY.Bottom };
-        var moved = Math.Abs(pan.X) > 0.001 || Math.Abs(pan.Y) > 0.001;
-        if (Math.Abs(zoom - 1) > 0.001 && moved) brush.RelativeTransform = new TransformGroup { Children = { new ScaleTransform(zoom, zoom, originX, 1), new TranslateTransform(pan.X, pan.Y) } };
-        else if (Math.Abs(zoom - 1) > 0.001) brush.RelativeTransform = new ScaleTransform(zoom, zoom, originX, 1);
-        else if (moved) brush.RelativeTransform = new TranslateTransform(pan.X, pan.Y);
+        brush.RelativeTransform = Move(zoom, originX, pan);
         return brush;
+    }
+
+    /// <summary>A picture zoomed from its pin and moved by a share of its place; nothing (the identity) when neither.</summary>
+    private static Transform Move(double zoom, double originX, (double X, double Y) pan)
+    {
+        var moved = Math.Abs(pan.X) > 0.001 || Math.Abs(pan.Y) > 0.001;
+        if (Math.Abs(zoom - 1) > 0.001 && moved) return new TransformGroup { Children = { new ScaleTransform(zoom, zoom, originX, 1), new TranslateTransform(pan.X, pan.Y) } };
+        if (Math.Abs(zoom - 1) > 0.001) return new ScaleTransform(zoom, zoom, originX, 1);
+        if (moved) return new TranslateTransform(pan.X, pan.Y);
+        return Transform.Identity;
     }
 
     /// <summary>A mask in a colour: the ink where the mask is, as much as the mask is there (premultiplied), frozen.</summary>
