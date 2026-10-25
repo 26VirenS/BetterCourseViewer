@@ -139,17 +139,13 @@ struct SyncPopup: View {
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                     appButton("Apple Calendar", symbol: "calendar.badge.plus") { NSWorkspace.shared.open(links.apple) }
                     appButton("Google Calendar", symbol: "calendar.badge.plus") { NSWorkspace.shared.open(links.google) }
-                    Menu {
-                        Button("School or Work Account (Microsoft 365)") { NSWorkspace.shared.open(links.office) }
-                        Button("Personal Account (Outlook.com)") { NSWorkspace.shared.open(links.outlook) }
-                    } label: {
-                        Label("Outlook", systemImage: "calendar.badge.plus")
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                    // (a button like the others, its two accounts a menu under the pointer: a SwiftUI Menu would not fill its cell)
+                    appButton("Outlook", symbol: "calendar.badge.plus") {
+                        ChoiceMenu.show([
+                            ("School or Work Account (Microsoft 365)", { NSWorkspace.shared.open(links.office) }),
+                            ("Personal Account (Outlook.com)", { NSWorkspace.shared.open(links.outlook) }),
+                        ])
                     }
-                    .menuStyle(.borderlessButton)
-                    .padding(.horizontal, 14)
-                    .frame(height: 40)
-                    .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.07)))
                     appButton("Copy Link", symbol: "doc.on.doc") {
                         copyToPasteboard(links.https.absoluteString)
                         say("Calendar link copied. Paste it where your calendar app adds one by address.", bad: false)
@@ -287,6 +283,27 @@ struct SyncPopup: View {
         unlinking = nil
         changed()
         await load()
+    }
+}
+
+/// A menu of choices under the pointer, each a closure (Sync's Outlook: which account).
+@MainActor
+enum ChoiceMenu {
+    private final class Item: NSMenuItem {
+        let act: () -> Void
+        init(_ title: String, _ act: @escaping () -> Void) {
+            self.act = act
+            super.init(title: title, action: #selector(run), keyEquivalent: "")
+            target = self
+        }
+        required init(coder: NSCoder) { fatalError("not from a nib") }
+        @objc private func run() { act() }
+    }
+
+    static func show(_ choices: [(String, () -> Void)]) {
+        let menu = NSMenu()
+        for (title, act) in choices { menu.addItem(Item(title, act)) }
+        _ = menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
     }
 }
 

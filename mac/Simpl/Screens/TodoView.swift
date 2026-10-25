@@ -67,9 +67,10 @@ struct TodoView: View {
             let animated = expectingTask && model.data != nil
             expectingTask = false
             await load(animated: animated)
-            // (1.3.165: the screenshot suite's -SimplPlanFirst YES opens the plan rail on the last piece of work open)
+            // (1.3.165: the screenshot suite's -SimplPlanFirst YES opens the plan rail on the first piece of work open that is
+            //  not late — in view, near the top, so the rail hangs on screen)
             if UserDefaults.standard.bool(forKey: "SimplPlanFirst"), !planShown,
-               let row = model.data?.sections.flatMap(\.rows).last(where: { !$0.done && $0.custom != true }) {
+               let row = model.data?.sections.filter({ $0.title != "Overdue" }).flatMap(\.rows).first(where: { !$0.done && $0.custom != true }) {
                 planShown = true
                 try? await Task.sleep(nanoseconds: 600_000_000)
                 PlanAsk.shared.id = row.id
