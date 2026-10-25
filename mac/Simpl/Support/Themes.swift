@@ -675,21 +675,32 @@ struct ColumnAppearance: NSViewRepresentable {
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             apply()
+            // (SwiftUI puts the column under its split view after this one is in the window: asked again once it has)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.window != nil else { return }
+                if !self.apply() && self.light { NSLog("ColumnAppearance: no split view above the sidebar") }
+            }
+        }
+        override func layout() {
+            super.layout()
+            apply()
         }
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
-        /// The column: the view under the split view that holds this one.
-        func apply() {
+        /// The column: the view under the split view that holds this one. Whether it was found.
+        @discardableResult
+        func apply() -> Bool {
             var view: NSView = self
             while let up = view.superview, !(up is NSSplitView) { view = up }
-            guard view.superview is NSSplitView else { return }
+            guard view.superview is NSSplitView else { return false }
             if light {
-                view.appearance = NSAppearance(named: .aqua)
+                if view.appearance?.name != .aqua { view.appearance = NSAppearance(named: .aqua) }
                 owned = true
             } else if owned {
                 view.appearance = nil // (given back only where it was set here)
                 owned = false
             }
+            return true
         }
     }
 }
