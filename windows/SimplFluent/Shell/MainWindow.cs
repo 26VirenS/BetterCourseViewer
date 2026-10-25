@@ -82,7 +82,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
             : LargePopupRoom;
 
     /// <summary>
-    /// Where a large popup goes (a tool, Knewton Alta, Macmillan, feedback, a rubric), in the window's content's terms:
+    /// Where a large popup goes (a tool, Knewton Alta, feedback, a rubric), in the window's content's terms:
     /// everything under the title bar — over the pane too, so a tool has the window's whole width (the owner's choice: in
     /// 0.3.1 it kept to the page beside the pane, and a tool on a 1024 window was 688 wide). The title bar stays in sight
     /// over it.
@@ -234,7 +234,6 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         engine.ToolRequested += t => { if (engine is { } e) new WebWindow(e, t, this).Show(); };
         engine.QuizRequested += q => Simpl.Screens.QuizPopup.Show(engine, q, this);
         engine.AltaRequested += a => Simpl.Screens.AltaPopup.Show(engine, a, this);
-        engine.MacmillanRequested += a => Simpl.Screens.MacmillanPopup.Show(engine, a, this);
         engine.SettingsRequested += OpenSettings;
         engine.WhatsNewRequested += d => { WhatsNew.MarkSeen(); WhatsNewSheet.Show(d, this); };
         engine.SetupRequested += () => SetupSheet.Show(engine, this);

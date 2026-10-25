@@ -595,8 +595,7 @@ public sealed partial class AssignmentScreen : Screen
         else if (d.ToolUrl != null)
         {
             if (d.Alta == true) engine.OpenAlta(new AltaLaunch(course, id, d.Title) { Due = d.DueLine ?? "" }); // (Knewton Alta, as a quiz; its due line as this page has it)
-            else if (d.Macmillan == true) engine.OpenMacmillan(new AltaLaunch(course, id, d.Title)); // (Macmillan Learning)
-            else engine.OpenTool(ToolLaunch.Assignment(course, id, d.Title));
+            else engine.OpenTool(ToolLaunch.Assignment(course, id, d.Title)); // (0.3.58: Macmillan Learning too, as Macmillan draws it)
         }
     }
 

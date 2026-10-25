@@ -400,8 +400,8 @@ public sealed class WebWindow : FluentWindow
 }
 
 /// <summary>
-/// An outside tool's page in light, whatever Simpl's appearance or Windows' (the tool windows, Macmillan Learning's
-/// popup): the tools are made for light, and a page with a dark look of its own came out unreadable in dark mode. The
+/// An outside tool's page in light, whatever Simpl's appearance or Windows' (the tool windows, Macmillan
+/// Learning's page among them): the tools are made for light, and a page with a dark look of its own came out unreadable in dark mode. The
 /// page — and each frame of it in a process of its own, a tool framed in the school's page or the tool's own frames — is
 /// told the student prefers light (prefers-color-scheme: light), on the white its web view already has; Simpl's own title
 /// bar and buttons round it stay as the app is. Told per web view, through the browser's own DevTools protocol: the

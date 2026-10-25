@@ -91,7 +91,7 @@ public class Sheet
     /// </summary>
     public bool Floats { get; set; }
     /// <summary>Floating, as large as the window under its title bar less a margin — over the navigation pane too —
-    /// resized with the window, and sized by its edges and corners (a tool, Knewton Alta, Macmillan, feedback, a
+    /// resized with the window, and sized by its edges and corners (a tool, Knewton Alta, feedback, a
     /// rubric).</summary>
     public bool Large { get; set; }
     /// <summary>Large, the most it opens at on a big window (a rubric's ring, feedback's file and comments), the size the

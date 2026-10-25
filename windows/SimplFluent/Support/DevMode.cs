@@ -6,7 +6,7 @@ namespace Simpl.Support;
 /// <summary>
 /// (0.3.27, the Mac's DevMode) The developer tools, kept hidden: in with seven clicks on Settings ▸ About ▸ Version within
 /// four seconds, or Ctrl+Alt+Shift+D anywhere in the main window (which takes them away again). Once in, the Developer
-/// window (Shell/DeveloperWindow), Save Page Code in Alta's and Macmillan's popups, and Alta's Error logs. Not
+/// window (Shell/DeveloperWindow), Save Page Code in Alta's popup, and Alta's Error logs. Not
 /// <see cref="Launch.IsDevelopment"/>, which is a test run's.
 /// </summary>
 public static class DevMode

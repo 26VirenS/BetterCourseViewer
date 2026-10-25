@@ -87,7 +87,6 @@ public sealed partial class Engine : Observable, IShellListener
     // the window's popups: whoever shows the window shows them (MainWindow)
     public event Action<QuizLaunch>? QuizRequested;
     public event Action<AltaLaunch>? AltaRequested;
-    public event Action<AltaLaunch>? MacmillanRequested;
     public event Action<ToolLaunch>? ToolRequested;
     public event Action? SetupRequested;
     public event Action<WhatsNewData>? WhatsNewRequested;
@@ -498,7 +497,8 @@ public sealed partial class Engine : Observable, IShellListener
         else if (Launch.Take("macmillan:") is { } mm)
         {
             var parts = mm.Split(':');
-            if (parts.Length == 2) MacmillanRequested?.Invoke(new AltaLaunch(parts[0], parts[1], "Macmillan Learning"));
+            // (0.3.58: in the tool window, as Macmillan draws it — the screenshot suite's macmillan shot)
+            if (parts.Length == 2) OpenTool(ToolLaunch.Assignment(parts[0], parts[1], "Macmillan Learning"));
         }
         else if (Launch.Take("newtask") != null) NewTaskRequested?.Invoke();
         else if (Launch.Take("compose") != null) NewMessageRequested?.Invoke();
@@ -1088,8 +1088,6 @@ public sealed partial class Engine : Observable, IShellListener
     public void OpenQuiz(QuizLaunch q) => QuizRequested?.Invoke(q);
 
     public void OpenAlta(AltaLaunch a) => AltaRequested?.Invoke(a);
-
-    public void OpenMacmillan(AltaLaunch a) => MacmillanRequested?.Invoke(a);
 
     public void AskSetup() => SetupRequested?.Invoke();
 

@@ -610,7 +610,7 @@ public sealed partial class SearchPalette
         return new PaletteSection("Open a tool", rows.Count == 0 ? [Hint("No tool by that name in your courses", SymbolRegular.PuzzlePiece24)] : rows);
     }
 
-    /// <summary>A place /open listed, opened as External Tools opens it (Knewton Alta's and Macmillan's in their own windows).</summary>
+    /// <summary>A place /open listed, opened as External Tools opens it (Knewton Alta's in its own window).</summary>
     private void OpenToolPlace(ToolPick pick)
     {
         if (toolsShown?.Rows.FirstOrDefault(t => t.Id == pick.Tool) is not { } tool) return;

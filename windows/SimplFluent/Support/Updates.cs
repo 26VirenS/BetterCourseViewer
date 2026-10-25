@@ -24,7 +24,7 @@ namespace Simpl.Support;
 /// automatically is no longer a setting): it downloads the new version's installer by itself (picked up where it
 /// stopped, tried again a while later when it fails; checked against the size and SHA-256 published, and — when this
 /// copy is signed — signed by the same publisher) and puts it in at once, unless
-/// something is open that an update must not cut off (<see cref="HeldBy"/>: a quiz, an Alta or a Macmillan assignment,
+/// something is open that an update must not cut off (<see cref="HeldBy"/>: a quiz, an Alta assignment,
 /// a page of the school's own or a tool's, a dialog, a hand-in, the sign-in, the tour; or the student working in the
 /// window that moment) — then it waits, and goes in as soon as all of it is closed. Going in, it notes where the window
 /// was (<see cref="Resume"/>), Simpl quits as Quit Simpl does, and the installer, run quietly, puts the new version in
@@ -919,7 +919,7 @@ public static partial class Updates
     public static Func<Holding?>? Watch { get; set; }
 
     /// <summary>Something open that an update must not cut off (the Mac's UpdateHold): held from now until the holding
-    /// is disposed — the quiz, an Alta or a Macmillan assignment, a page of the school's in the window.</summary>
+    /// is disposed — the quiz, an Alta assignment, a page of the school's in the window.</summary>
     public static Holding Hold(string what, string? when)
     {
         var h = new Holding(what, when);
@@ -927,7 +927,7 @@ public static partial class Updates
         return h;
     }
 
-    /// <summary>Something by this name holds updates now (the quiz, Knewton Alta, Macmillan Learning): the live check
+    /// <summary>Something by this name holds updates now (the quiz, Knewton Alta): the live check
     /// waits for it too (Shell/LiveCheck.cs).</summary>
     public static bool Holds(string what) => holds.Any(h => h.What == what);
 
@@ -940,7 +940,7 @@ public static partial class Updates
     }
 
     /// <summary>
-    /// What holds an update back now, the first of: what was held (<see cref="Hold"/>: a quiz, an Alta or a Macmillan
+    /// What holds an update back now, the first of: what was held (<see cref="Hold"/>: a quiz, an Alta
     /// assignment, a page of the school's in the window); what the window has open (<see cref="Watch"/>); a Windows
     /// dialog over Simpl (opening or saving a file). Null: nothing.
     /// </summary>

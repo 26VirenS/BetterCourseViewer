@@ -10,7 +10,7 @@ using TextBlock = System.Windows.Controls.TextBlock;
 namespace Simpl.Screens;
 
 /// <summary>
-/// What the Knewton Alta and Macmillan Learning popups share (the Mac's quiz-style popup): a popup floating over the
+/// What the Knewton Alta popup is drawn with (the Mac's quiz-style popup): a popup floating over the
 /// window (Shell/FloatPopup.cs: homework, not a quiz — the rest of the window stays at hand while it is open), as large as
 /// the window under its title bar less a margin — over the pane too — and sized by its edges, the size kept for the next
 /// time (each vendor's apart), its own header row — the vendor's tile, the assignment's name over a line

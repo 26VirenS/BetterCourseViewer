@@ -869,7 +869,7 @@ public static class ToolHeader
 /// the tool's quickest use under its name — (0.3.5) Open full screen at its top right opens the whole tool with what was
 /// begun in it. A running focus timer is live in its pin (it borrows a pin while it runs if the timer is not pinned). A
 /// pin's menu opens it, pops it out — the quick version in a small window of its own (ToolFloat) — moves or unpins it.
-/// The same pins sit in the heading of a popup (a quiz, which covers the title bar, Knewton Alta, Macmillan: inPopup),
+/// The same pins sit in the heading of a popup (a quiz, which covers the title bar, Knewton Alta: inPopup),
 /// their flyouts over it; the whole tool opens in its popup over the window either way, above them (ToolPopup).
 /// </summary>
 public sealed class PinBar : StackPanel

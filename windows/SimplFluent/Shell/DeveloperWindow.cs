@@ -27,8 +27,8 @@ namespace Simpl.Shell;
 /// out), Logs (simpl.log and page-errors.log as they are written: found in, the problems alone, followed, copied, saved,
 /// cleared), System (Simpl's processor and memory, and WebView2's, a second at a time for two minutes, drawn; threads,
 /// handles, .NET's heap, the window's stalls, what is kept on disk), Stats (every call into the page: how many, failed,
-/// how long; the screens' switches and builds), Engine (a call made by hand, its answer shown), Updates, Alta &
-/// Macmillan (Save Page Code) and Preferences (every key and its value). One window at a time.
+/// how long; the screens' switches and builds), Engine (a call made by hand, its answer shown), Updates, Knewton
+/// Alta (Save Page Code) and Preferences (every key and its value). One window at a time.
 /// </summary>
 public sealed class DeveloperWindow : FluentWindow
 {
@@ -52,7 +52,7 @@ public sealed class DeveloperWindow : FluentWindow
         ("stats", "Stats", SymbolRegular.DataBarVertical24, Color.FromRgb(0x88, 0x64, 0xd8)),
         ("engine", "Engine", SymbolRegular.Code24, Color.FromRgb(0xe3, 0x6c, 0x0a)),
         ("updates", "Updates", SymbolRegular.ArrowSync24, Color.FromRgb(0x00, 0x99, 0xbc)),
-        ("popups", "Alta & Macmillan", SymbolRegular.Library24, Color.FromRgb(0xd1, 0x34, 0x3b)),
+        ("popups", "Knewton Alta", SymbolRegular.Library24, Color.FromRgb(0xd1, 0x34, 0x3b)),
         ("prefs", "Preferences", SymbolRegular.List24, Color.FromRgb(0xd1, 0x34, 0x8b)),
     };
 
@@ -811,7 +811,7 @@ public sealed class DeveloperWindow : FluentWindow
         return Scrolled(v);
     }
 
-    // ---- Alta & Macmillan ----
+    // ---- Knewton Alta ----
 
     private FrameworkElement PopupsPage()
     {
@@ -831,7 +831,7 @@ public sealed class DeveloperWindow : FluentWindow
         }
         var v = K.V(0,
             K.SectionHeader("Save Page Code", 0),
-            K.Wrapped("With the developer tools on, Knewton Alta’s and Macmillan Learning’s popups have Save Page Code at the top: the page, every frame in it, and the scripts and style sheets they load, in one text file in Downloads (addresses without their queries). Alta’s Error logs show there too whenever its page was not recognised.", Ty.Body, B.Text2),
+            K.Wrapped("With the developer tools on, Knewton Alta’s popup has Save Page Code at the top: the page, every frame in it, and the scripts and style sheets they load, in one text file in Downloads (addresses without their queries). Alta’s Error logs show there too whenever its page was not recognised.", Ty.Body, B.Text2),
             K.SectionHeader("Saved"),
             files,
             K.H(8, K.Button("Open Downloads", () => OpenFolder(Screens.AltaSession.Downloads()), icon: SymbolRegular.Folder24), K.Button("Look again", List, icon: SymbolRegular.ArrowClockwise24)).Margin(0, 12, 0, 0));

@@ -21,7 +21,7 @@ namespace Simpl.Screens;
 /// name, its site and where it is found. A tool used in work — Knewton Alta's assignments, a publisher's module items —
 /// is a button whole: it says the next of them still to do, and a press opens the list of every place it is used, to
 /// choose the one to open (ExternalToolsList.cs). A tool that is only a course's tab has each course it is in a press
-/// away, as its chips. Knewton Alta and Macmillan open in their own windows, the rest in the tool window. The filter
+/// away, as its chips. Knewton Alta opens in its own window, the rest in the tool window. The filter
 /// beside the title narrows the tools by name, site or course.
 /// </summary>
 public sealed partial class ExternalToolsScreen : Screen
@@ -352,13 +352,12 @@ public sealed partial class ExternalToolsScreen : Screen
 
     // ---- opening ----
 
-    /// <summary>The window a tool's assignments open in: Knewton Alta's or Macmillan's own (Sapling, Achieve), else null —
-    /// the tool window.</summary>
+    /// <summary>The window a tool's assignments open in: Knewton Alta's own, else null — the tool window (0.3.58: Macmillan's
+    /// too, as Macmillan draws them).</summary>
     private static string? WindowOf(Tool t)
     {
         var label = (t.Name + " " + t.Host).ToLowerInvariant();
         if (label.Contains("knewton")) return "alta";
-        if (label.Contains("macmillan") || label.Contains("sapling") || label.Contains("achieve.")) return "macmillan";
         return null;
     }
 
@@ -367,20 +366,19 @@ public sealed partial class ExternalToolsScreen : Screen
     internal static void Open(Engine.Engine engine, Tool t, Course c, Item? it = null)
     {
         if (it != null) { OpenItem(engine, t, c, it); return; }
-        // (Knewton Alta's and Macmillan's assignments in their own windows, the rest — a course's tab first — in the tool window)
+        // (Knewton Alta's assignments in their own window, the rest — a course's tab first — in the tool window)
         if (c.Open.TryGetValue("assignment", out var a) && c.Open.TryGetValue("course", out var course))
         {
             switch (WindowOf(t))
             {
                 case "alta": engine.OpenAlta(new AltaLaunch(course, a, t.Name)); return;
-                case "macmillan": engine.OpenMacmillan(new AltaLaunch(course, a, t.Name)); return;
             }
         }
         engine.OpenTool(new ToolLaunch(t.Name, c.Open));
     }
 
     /// <summary>One place the tool is used, opened (a row of its list): a module item in the tool window, as the course's
-    /// Modules opens it; an assignment of Knewton Alta's or Macmillan's in its own window, any other in the tool window.</summary>
+    /// Modules opens it; an assignment of Knewton Alta's in its own window, any other in the tool window.</summary>
     private static void OpenItem(Engine.Engine engine, Tool t, Course c, Item it)
     {
         var course = c.Open.GetValueOrDefault("course") is { Length: > 0 } id ? id : c.Id;
@@ -388,7 +386,6 @@ public sealed partial class ExternalToolsScreen : Screen
         switch (WindowOf(t))
         {
             case "alta": engine.OpenAlta(new AltaLaunch(course, it.Id, it.Title) { Due = DueOf(it) }); return;
-            case "macmillan": engine.OpenMacmillan(new AltaLaunch(course, it.Id, it.Title)); return;
         }
         engine.OpenTool(ToolLaunch.Assignment(course, it.Id, it.Title));
     }

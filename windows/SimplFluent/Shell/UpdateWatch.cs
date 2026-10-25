@@ -103,7 +103,7 @@ public static class UpdateWatch
 
     // ---- what holds an update back ----
 
-    /// <summary>What the window has open that an update waits for (Updates.HeldBy asks; the quiz, Alta, Macmillan and a
+    /// <summary>What the window has open that an update waits for (Updates.HeldBy asks; the quiz, Alta and a
     /// page of the school's in the window hold by themselves).</summary>
     private static Updates.Holding? Holding(MainWindow main, Engine.Engine? e, bool touring)
     {

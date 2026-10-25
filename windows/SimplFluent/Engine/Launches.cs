@@ -20,7 +20,7 @@ public sealed record QuizLaunch(string Course, string Quiz, string Title)
     public bool Review { get; init; }
 }
 
-/// <summary>A Knewton Alta or Macmillan Learning assignment in its popup (the Mac's AltaLaunch).</summary>
+/// <summary>A Knewton Alta assignment in its popup (the Mac's AltaLaunch).</summary>
 public sealed record AltaLaunch(string Course, string Assignment, string Title, string? Page = null)
 {
     public Guid Id { get; } = Guid.NewGuid();

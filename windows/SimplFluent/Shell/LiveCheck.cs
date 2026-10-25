@@ -18,8 +18,8 @@ namespace Simpl.Shell;
 /// the keyboard where they were), a new one is shown in place (the Dashboard's parts, one by one). Nothing while the
 /// window is minimized or in the notification area (memory given back there stays given back), the PC is locked or its
 /// display off (<see cref="Presence"/>), offline, or while the page is not ready; back after more than a minute away, at
-/// once. It waits while the student is busy with something it would disturb (<see cref="Held"/>): a quiz, an Alta or
-/// Macmillan assignment, typing, What-If, Hand In, a dialog, a popup, a menu, the tour, a drag, a counter's panel or a
+/// once. It waits while the student is busy with something it would disturb (<see cref="Held"/>): a quiz, an Alta
+/// assignment, typing, What-If, Hand In, a dialog, a popup, a menu, the tour, a drag, a counter's panel or a
 /// quick look — and what it found waits with it. One check at a time for the whole app (a place in a window of its own
 /// checks its own screen; the main window, the pane's counts too). A check marks nothing read on Canvas unless the
 /// student is at the window (<see cref="Engine.Engine.LiveSeen"/>). One line in simpl.log a check: "live: dashboard
@@ -256,14 +256,14 @@ internal sealed class LiveCheck : IDisposable
     }
 
     /// <summary>
-    /// Why a check waits now, or null: a quiz, an Alta or Macmillan assignment open; the student typing (the keyboard in a
+    /// Why a check waits now, or null: a quiz, an Alta assignment open; the student typing (the keyboard in a
     /// box, or a key in the last five seconds); the screen's own (What-If, a counter's panel, a reply); Hand In or Send
     /// from Phone; a sheet, a dialog, a popup, a menu or the tour; a drag; a quick look.
     /// </summary>
     private string? Held(Screen? s)
     {
         if (Updates.Holds("quiz")) return "a quiz";
-        if (Updates.Holds("Knewton Alta") || Updates.Holds("Macmillan Learning")) return "an assignment's popup";
+        if (Updates.Holds("Knewton Alta")) return "an assignment's popup";
         var now = Environment.TickCount64;
         if (Keyboard.FocusedElement is FrameworkElement { IsVisible: true } focused)
         {

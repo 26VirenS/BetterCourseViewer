@@ -23,7 +23,7 @@ namespace Simpl.Shell;
 /// the title bar, the search and the page behind it all go on working, and a place opened under it leaves it where it
 /// was. It is moved by its heading (a press there that is not on a control), closed by its × (or its own Close), by
 /// Escape while it has the keyboard, or by Alt+F4. It opens in the middle of the window (0.3.4), and moves with the
-/// window, keeping the place it was moved to. A large one (a tool, Knewton Alta, Macmillan, feedback, a rubric) spans the
+/// window, keeping the place it was moved to. A large one (a tool, Knewton Alta, feedback, a rubric) spans the
 /// window under its title bar less a margin all round — over the pane too, the owner's choice — sized again with the
 /// window, one over another a step down and along (and that much smaller, inside the window); it is sized by its edges
 /// and corners too (Windows' own sizing), and the size the student gives it is kept for its kind (<see
@@ -59,7 +59,7 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
     private static readonly Size LeastLarge = new(480, 340);
 
     /// <summary>The band along a large one's edges that sizes it (WPF-UI's 4). A web view there — a window of its own —
-    /// takes the pointer instead, so a page shown edge to edge (Knewton Alta's, Macmillan's, feedback's file) keeps this
+    /// takes the pointer instead, so a page shown edge to edge (Knewton Alta's, feedback's file) keeps this
     /// far in from the popup's sides and foot.</summary>
     public const double EdgeRoom = 4;
 
