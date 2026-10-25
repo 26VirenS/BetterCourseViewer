@@ -326,6 +326,11 @@ try {
   const fdOff = await nc('feedOff');
   const fdGone = fdOn.link ? (await fetch(fdOn.link)).status : 0;
   check(!fdOff.on && !fdOff.link && fdGone === 404, `stopped: its link opens nothing (${fdGone})`);
+  // made while a quiet send is still on its way (a page sends its calendar on its own once it has settled): that send's
+  // answer, read while the calendar was off, does not stand for this one, and this one is still sent (Mac 1.3.169)
+  const fdRace = await sp.evaluate(async () => { const quiet = self.BCV.feed.publish(); const on = await self.BCVNative.call('feedOn', {}); await quiet; return on; });
+  check(fdRace.on && fdRace.count > 0 && !!fdRace.sent && !fdRace.problem, `made while a quiet send was on its way: still made, and sent: ${JSON.stringify(fdRace)}`);
+  await nc('feedOff');
   const plClear = await nc('planClear', { id: plWork.id });
   await nc('calUnlink', { id: plSync2.links[0].id });
   const plSync3 = await nc('calSync');

@@ -96,7 +96,9 @@
   let dirty = false; // (a plan changed since the last copy was sent)
   /** The calendar sent (when it is on, and something in it changed): what the background said. */
   async function publish({ force = false } = {}) {
-    if (sending) return sending;
+    if (sending && !force) return sending;
+    // (one sent on its own still on its way, read before the calendar was made: this one, forced, goes after it)
+    if (sending) { await sending.catch(() => {}); return publish({ force }); }
     sending = (async () => {
       const st = await state();
       if (!st?.on) return st;
