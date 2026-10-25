@@ -255,14 +255,20 @@ public sealed partial class TodoScreen : Screen
         if (shotAsked || Launch.Get("open") != "plan") return;
         if (d.Sections.SelectMany(s => s.Rows).LastOrDefault(r => !r.Done && r.Custom != true) is not { } last) return;
         shotAsked = true;
-        await Task.Delay(1500);
-        if (Launch.Take("plan") == null) return;
-        if (planRows.TryGetValue(last.Id, out var at) && at.IsLoaded)
+        // (the picture waits for the rail: it is not taken while this is under way)
+        Shot.Began();
+        try
         {
-            at.BringIntoView();
-            await Task.Delay(400); // (scrolled to first: the rail hangs where the row is)
-            if (at.IsLoaded) PlanRail.Open(at, last.Id, last.Title, engine);
+            await Task.Delay(1500);
+            if (Launch.Take("plan") == null) return;
+            if (planRows.TryGetValue(last.Id, out var at) && at.IsLoaded)
+            {
+                at.BringIntoView();
+                await Task.Delay(400); // (scrolled to first: the rail hangs where the row is)
+                if (at.IsLoaded) PlanRail.Open(at, last.Id, last.Title, engine);
+            }
         }
+        finally { Shot.Ended(); }
     }
 
     /// <summary>The screenshot suite (--open preview): the first row's quick look, once the page has settled.</summary>
