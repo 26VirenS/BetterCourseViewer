@@ -167,5 +167,25 @@ try {
   site.close();
   hook.close();
 }
+// (the landing page's iPhone waitlist, src/waitlist.js: the same webhook, one short message)
+{
+  const W = await import(join(root, 'site', 'src', 'waitlist.js'));
+  const sent = [];
+  const fake = async (url, init) => { sent.push(init.body); return new Response('ok'); };
+  const post = (fields, env = { REPORT_WEBHOOK: 'https://hooks.slack.com/services/x' }) => {
+    const f = new FormData(); for (const [k, v] of Object.entries(fields)) f.set(k, v);
+    return W.handleWaitlist(new Request('https://simplcourses.com/api/waitlist', { method: 'POST', body: f }), env, fake);
+  };
+  const bad = await post({ email: 'nope' });
+  check(bad.status === 400 && (await bad.json()).code === 'SC-W-EMAIL', 'waitlist: a bad email is refused (SC-W-EMAIL)');
+  const off = await post({ email: 'sam@lakeside.edu' }, {});
+  check(off.status === 503 && (await off.json()).code === 'SC-W-503', 'waitlist: no webhook set says so (SC-W-503)');
+  const bot = await post({ email: 'sam@lakeside.edu', website: 'x' });
+  check(bot.ok && sent.length === 0, 'waitlist: the hidden field filled is dropped quietly');
+  const ok = await post({ email: 'sam@lakeside.edu' });
+  check(ok.ok && sent.length === 1 && /iPhone waitlist/.test(sent[0]) && /sam@lakeside\.edu/.test(sent[0]), 'waitlist: a sign-up reaches the webhook');
+  const get = await W.handleWaitlist(new Request('https://simplcourses.com/api/waitlist'), {}, fake);
+  check(get.status === 405, 'waitlist: only POST');
+}
 console.log(failures.length ? `\n${failures.length} check(s) failed:\n - ${failures.join('\n - ')}` : '\nAll checks passed.');
 process.exit(failures.length ? 1 : 0);

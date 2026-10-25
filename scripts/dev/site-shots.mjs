@@ -3,6 +3,7 @@
 // the mock Brightspace, signed in as their made-up students at a made-up school ("Lakeside University", a plain crest
 // for its logo), in light and in dark. Each picture is written as a 2× WebP and a 1× WebP for the page's srcset.
 //   node scripts/dev/site-shots.mjs [out-dir]        (default: site/public/img)
+//   SITE_SHOTS=search,phone,tools node scripts/dev/site-shots.mjs   (only those; the names below, without web- or -dark)
 // Requires Playwright (project or global install) and Python's Pillow (WebP).
 import { createRequire } from 'node:module';
 import { spawn, execSync, execFileSync } from 'node:child_process';
@@ -57,6 +58,14 @@ try {
   }, `prefs:localhost:${PORT}`);
   const settings = (patch) => sw.evaluate(async (p) => self.BCV.settings.update(p), patch);
   await settings({ appearance: { siteName: 'Lakeside University', logoUrl: crest, darkMode: 'off', sidebar: 'one' } }); // (the one sidebar, as a new install has it)
+  // (the mock's student signs in with a real school's address; the pictures are of a made-up one, so every answer the
+  //  interface reads says Lakeside's instead)
+  await context.route(/^http:\/\/localhost:\d+\/(api|d2l\/api)\//, async (route) => {
+    const res = await route.fetch();
+    const type = res.headers()['content-type'] || '';
+    if (!/json|text/.test(type)) return route.fulfill({ response: res });
+    route.fulfill({ response: res, body: (await res.text()).replaceAll('ucmerced.edu', 'lakeside.edu').replaceAll('UC Merced', 'Lakeside University').replaceAll('Yue Lei', 'Dana Reyes') });
+  });
   const page = await context.newPage();
   const settle = async () => {
     await page.waitForFunction(() => { const c = document.documentElement.classList; return c.contains('bcv-settled'); }, null, { timeout: 20000 }).catch(() => {});
@@ -67,41 +76,90 @@ try {
   };
   const shot = async (name) => { await settle(); const f = join(raw, `${name}.png`); await page.screenshot({ path: f }); made.push(name); console.log('  shot', name); };
   const look = async (dark) => { await settings({ appearance: { darkMode: dark ? 'on' : 'off' } }); await page.waitForTimeout(250); };
+  // (SITE_SHOTS: a comma list of the pictures to make — dashboard, grades, course, calendar, quiz, brightspace, search,
+  //  phone, tools, canvas — else every one)
+  const only = new Set(String(process.env.SITE_SHOTS || '').split(',').map((x) => x.trim()).filter(Boolean));
+  const want = (name) => !only.size || only.has(name);
 
   for (const dark of [false, true]) {
     const sfx = dark ? '-dark' : '';
     await look(dark);
-    await page.goto(`${BASE}/`);
-    await page.waitForSelector('.bcv-stat', { timeout: 20000 });
-    await shot(`web-dashboard${sfx}`);
-    await page.goto(`${BASE}/grades`);
-    await page.waitForSelector('.bcv-gpa__value', { timeout: 20000 });
-    await shot(`web-grades${sfx}`);
-    await page.goto(`${BASE}/courses/101`);
-    await page.waitForSelector('.bcv-cmain, .bcv-course', { timeout: 20000 }).catch(() => {});
-    await shot(`web-course${sfx}`);
-    await page.goto(`${BASE}/calendar`);
-    await page.waitForTimeout(600);
-    await shot(`web-calendar${sfx}`);
-    // a quiz, a question at a time: begun, the first answer picked
-    await page.goto(`${BASE}/courses/101/quizzes/9011`);
-    await page.waitForSelector('.bcv-qz__begin', { timeout: 20000 }); // (the quiz opens on its intro)
-    await page.click('.bcv-qz__begin');
-    await page.waitForSelector('.bcv-qz__opt', { timeout: 20000 });
-    await page.waitForTimeout(900);
-    await page.click('.bcv-qz__opt >> nth=3');
-    await page.waitForSelector('.bcv-qz__opt.is-selected', { timeout: 8000 }).catch(() => {});
-    await shot(`web-quiz${sfx}`);
-    // and Brightspace's: the same interface over Lakeside's Brightspace
-    await page.goto(`${D2L_BASE}/d2l/home`);
-    await page.waitForSelector('.bcv-stat', { timeout: 20000 }).catch(() => {});
-    await shot(`web-brightspace${sfx}`);
+    if (want('dashboard')) {
+      await page.goto(`${BASE}/`);
+      await page.waitForSelector('.bcv-stat', { timeout: 20000 });
+      await shot(`web-dashboard${sfx}`);
+    }
+    if (want('grades')) {
+      await page.goto(`${BASE}/grades`);
+      await page.waitForSelector('.bcv-gpa__value', { timeout: 20000 });
+      await shot(`web-grades${sfx}`);
+    }
+    if (want('course')) {
+      await page.goto(`${BASE}/courses/101`);
+      await page.waitForSelector('.bcv-cmain, .bcv-course', { timeout: 20000 }).catch(() => {});
+      await shot(`web-course${sfx}`);
+    }
+    if (want('calendar')) {
+      await page.goto(`${BASE}/calendar`);
+      await page.waitForTimeout(600);
+      await shot(`web-calendar${sfx}`);
+    }
+    if (want('quiz')) {
+      // a quiz, a question at a time: begun, the first answer picked
+      await page.goto(`${BASE}/courses/101/quizzes/9011`);
+      await page.waitForSelector('.bcv-qz__begin', { timeout: 20000 }); // (the quiz opens on its intro)
+      await page.click('.bcv-qz__begin');
+      await page.waitForSelector('.bcv-qz__opt', { timeout: 20000 });
+      await page.waitForTimeout(900);
+      await page.click('.bcv-qz__opt >> nth=3');
+      await page.waitForSelector('.bcv-qz__opt.is-selected', { timeout: 8000 }).catch(() => {});
+      await shot(`web-quiz${sfx}`);
+    }
+    if (want('brightspace')) {
+      // and Brightspace's: the same interface over Lakeside's Brightspace
+      await page.goto(`${D2L_BASE}/d2l/home`);
+      await page.waitForSelector('.bcv-stat', { timeout: 20000 }).catch(() => {});
+      await shot(`web-brightspace${sfx}`);
+    }
+    if (want('search')) {
+      // one search across every course: a word typed, its results under the box by kind
+      await page.goto(`${BASE}/`);
+      await page.waitForSelector('#bcv-omni', { timeout: 20000 });
+      await settle();
+      await page.click('#bcv-omni');
+      await page.keyboard.type('lab', { delay: 60 });
+      await page.waitForSelector('#bcv-omni-panel [role="option"]', { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(1200);
+      await shot(`web-search${sfx}`);
+      await page.keyboard.press('Escape');
+    }
+    if (want('phone')) {
+      // hand in from your phone: the assignment's code for the phone's camera (Week 2, which takes a file)
+      await page.goto(`${BASE}/courses/104/assignments/4002?bcv=submit`);
+      await page.waitForSelector('.bcv-sb__phonego', { timeout: 20000 });
+      await settle();
+      await page.click('.bcv-sb__phonego');
+      await page.waitForSelector('.bcv-phone-ov .bcv-phone__row', { timeout: 15000 });
+      await page.waitForTimeout(700);
+      await shot(`web-handin-phone${sfx}`);
+      await page.keyboard.press('Escape');
+    }
+    if (want('tools')) {
+      // the tools: their page, then the periodic table opened over it
+      await page.goto(`${BASE}/#tools`);
+      await page.waitForSelector('.bcv-tool-card', { timeout: 20000 });
+      await shot(`web-tools${sfx}`);
+      await page.click('.bcv-tool-card[data-tool="ptable"]');
+      await page.waitForSelector('[data-tool="ptable"].bcv-tool-sheet, .bcv-tool-sheet[data-tool="ptable"], [data-tool="ptable"]:not(.bcv-tool-card)', { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(1500);
+      await shot(`web-ptable${sfx}`);
+    }
   }
   // the same student's Dashboard as Canvas itself draws it, with no extension: the "before" under the hero's slider. The
   // mock's own page is a bare stand-in, so Canvas's stock Dashboard is drawn here — its dark global nav, the course cards,
   // To Do down the right — from the mock school's own courses and work (Canvas has one look, so one picture)
-  const plain = await chromium.launch();
-  try {
+  const plain = want('canvas') ? await chromium.launch() : null;
+  if (plain) try {
     const pp = await (await plain.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 })).newPage();
     await pp.setContent(canvasDashboard(crest));
     await pp.waitForTimeout(400);

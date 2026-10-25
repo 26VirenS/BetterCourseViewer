@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Trust and Simpl</title>
+<meta name="description" content="What Simpl Courses can and can't see, where your data goes, how updates treat a quiz, and how to turn Simpl off. In plain language.">
+<meta name="theme-color" content="#fbfbfd" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta property="og:title" content="Trust and Simpl">
+<meta property="og:description" content="What Simpl can and can't see, in plain language.">
+<meta property="og:image" content="https://simplcourses.com/img/og.png">
+<link rel="canonical" href="https://simplcourses.com/trust">
+<link rel="icon" href="/img/icon-128.png">
+<link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+<style>
+:root {
+  color-scheme: light dark;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+  --bg: #fff; --bg-2: #f5f5f7; --tile: #f5f5f7; --text: #1d1d1f; --text-2: #6e6e73; --text-3: #86868b;
+  --hair: rgba(0, 0, 0, .08); --blue: #0071e3; --link: #0066cc; --green: #1f9d48; --red: #d70015;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #000; --bg-2: #0e0e10; --tile: #161618; --text: #f5f5f7; --text-2: #a1a1a6; --text-3: #86868b; --hair: rgba(255, 255, 255, .1); --link: #2997ff; --green: #30d158; --red: #ff6961; }
+}
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 400 17px/1.55 var(--font); letter-spacing: -.01em; -webkit-font-smoothing: antialiased; }
+a { color: var(--link); }
+:focus-visible { outline: 3px solid color-mix(in srgb, var(--blue) 60%, transparent); outline-offset: 3px; }
+.wrap { width: min(820px, 100% - 32px); margin-inline: auto; }
+.top { display: flex; align-items: center; height: 52px; border-bottom: 1px solid var(--hair); }
+.brand { display: inline-flex; align-items: center; gap: 9px; color: var(--text); text-decoration: none; font: 600 17px/1 var(--font-display); letter-spacing: -.02em; }
+.brand img { width: 26px; height: 26px; border-radius: 7px; }
+.top nav { margin-left: auto; display: flex; gap: 20px; font-size: 14px; }
+.top nav a { color: var(--text-2); text-decoration: none; }
+.top nav a[aria-current] { color: var(--text); font-weight: 600; }
+h1 { margin: 64px 0 0; font: 700 clamp(34px, 5vw, 54px)/1.06 var(--font-display); letter-spacing: -.035em; text-wrap: balance; }
+.lead { margin: 14px 0 0; font: 500 clamp(18px, 2vw, 21px)/1.4 var(--font-display); color: var(--text-2); letter-spacing: -.015em; }
+.asof { margin: 12px 0 0; font-size: 14px; color: var(--text-3); letter-spacing: 0; }
+.cols { margin-top: 44px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.col { padding: 24px 26px; border-radius: 22px; background: var(--tile); }
+.col h2 { margin: 0; font: 600 20px/1.25 var(--font-display); letter-spacing: -.02em; }
+.col ul { margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.col li { position: relative; padding-left: 26px; font-size: 15.5px; line-height: 1.45; color: var(--text-2); }
+.col li::before { position: absolute; left: 0; top: 0; font-weight: 700; }
+.col--can li::before { content: "✓"; color: var(--green); }
+.col--cant li::before { content: "✕"; color: var(--red); }
+.col li b { color: var(--text); font-weight: 600; }
+@media (max-width: 720px) { .cols { grid-template-columns: 1fr; } }
+section { margin-top: 52px; }
+section h2 { margin: 0; font: 700 26px/1.2 var(--font-display); letter-spacing: -.025em; }
+section p, section li { color: var(--text-2); font-size: 16.5px; }
+section p { margin: 10px 0 0; }
+section ul { margin: 10px 0 0; padding-left: 22px; }
+section li { margin: 6px 0; }
+section b { color: var(--text); font-weight: 600; }
+.box { margin-top: 56px; padding: 22px 24px; border-radius: 18px; background: var(--tile); font-size: 15px; color: var(--text-2); }
+footer { margin-top: 80px; padding: 22px 0 40px; background: var(--bg-2); font-size: 12px; color: var(--text-3); }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 10px 22px; width: min(1000px, 100% - 32px); }
+footer nav { margin-left: auto; display: flex; gap: 18px; }
+footer a { color: var(--text-2); text-decoration: none; }
+</style>
+</head>
+<body>
+<header class="wrap top" style="width:min(1000px, 100% - 32px)">
+  <a class="brand" href="/"><img src="/img/icon-128.png" alt="" width="26" height="26"> Simpl Courses</a>
+  <nav aria-label="Pages"><a href="/#moments">Features</a><a href="/compare">Compare</a><a href="/trust" aria-current="page">Trust</a><a href="/#get">Get Simpl</a></nav>
+</header>
+
+<main class="wrap">
+  <h1>What Simpl can see, and what it can’t.</h1>
+  <p class="lead">Simpl redraws your school’s Canvas on your own device. Here is exactly what that means for your account, your data and your quizzes.</p>
+  <p class="asof">Last updated October 25, 2026. The <a href="/privacy">privacy policy</a> has the formal version.</p>
+
+  <div class="cols">
+    <div class="col col--can">
+      <h2>Simpl can</h2>
+      <ul>
+        <li><b>See what you can see in Canvas</b>: your courses, work, grades and messages, through Canvas’s own student API, signed in as you.</li>
+        <li><b>Do what you could do in Canvas</b>: hand in, mark done, reply, star a course. Nothing a student can’t.</li>
+        <li><b>Keep a copy on your device</b> so screens open at once. In the Mac and Windows apps it’s encrypted, with the key in your Keychain or behind Windows Hello.</li>
+      </ul>
+    </div>
+    <div class="col col--cant">
+      <h2>Simpl can’t, and doesn’t</h2>
+      <ul>
+        <li><b>Make you sign up.</b> There is no Simpl account.</li>
+        <li><b>Send your courses to us.</b> We run no server that holds your data.</li>
+        <li><b>Track you.</b> No analytics, no ads, no trackers. The iPhone app even blocks Canvas’s own analytics scripts.</li>
+        <li><b>See what your teachers see.</b> It has your access, nothing more.</li>
+      </ul>
+    </div>
+  </div>
+
+  <section>
+    <h2>Your password</h2>
+    <p>You type your password on your school’s own sign-in page. <b>The browser extensions never see it.</b></p>
+    <p>The Mac, Windows and iPhone apps can remember your sign-in so you stay logged in. It stays on your device, in the Keychain on a Mac or iPhone and behind Windows Hello on Windows, and is never sent to us.</p>
+  </section>
+
+  <section>
+    <h2>What else reaches the internet</h2>
+    <p>Besides your school’s Canvas or Brightspace, only these, and each says what it is:</p>
+    <ul>
+      <li><b>Updates</b>, from simplcourses.com and GitHub for the Mac, Windows and Safari apps, or from the Chrome Web Store.</li>
+      <li><b>Wikipedia, in search.</b> Search shows Wikipedia articles too, so what you type in search is sent to Wikipedia. The switch in the search box turns it off.</li>
+      <li><b>Tools that come from their makers</b>, only when you open them: the calculator from GeoGebra, the graphing calculator from Desmos. The file converter uses CloudConvert only if you give it your own key.</li>
+      <li><b>A bug report</b>, only when you press Send on the report page.</li>
+      <li><b>Hand in from your phone.</b> In the Mac and Windows apps the photo goes from your phone to your computer over your own Wi-Fi. In the browser, your phone opens the assignment in Canvas and hands in there.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Quizzes and updates</h2>
+    <p><b>Simpl never reloads a quiz you’re taking</b>, and Canvas saves each answer as you go.</p>
+    <p>The Mac and Windows apps hold an update while a quiz or a Knewton Alta assignment is open, and an update that comes by itself installs in the background without pulling Simpl to the front.</p>
+    <p>One exception: a <b>critical update</b>, which we send only to fix something serious, installs at once, even during a quiz. Your answers are already saved with Canvas, so you pick up where you were.</p>
+  </section>
+
+  <section>
+    <h2>Turning it off</h2>
+    <p>A small switch sits at the top right of every Canvas page. <b>One click shows plain Canvas</b>, on the exact page you were on. Click again to bring Simpl back. If Simpl ever can’t draw a page, it shows Canvas’s own page instead.</p>
+  </section>
+
+  <section>
+    <h2>The code is public</h2>
+    <p>Anyone can read exactly what Simpl does: <a href="https://github.com/26VirenS/BetterCourseViewer">the code is on GitHub</a>. Found something wrong? <a href="/report/">Report it</a>.</p>
+  </section>
+
+  <section>
+    <h2>Removing Simpl</h2>
+    <p>Settings → Data &amp; about → <b>Reset everything</b> erases what Simpl kept. Then delete the app or remove the extension. Your Canvas account, grades and work are never touched.</p>
+  </section>
+
+  <div class="box">Simpl Courses is independent: it isn’t made or endorsed by Instructure (Canvas) or D2L (Brightspace), and your school doesn’t run it.</div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Simpl Courses is independent. Not affiliated with Instructure, D2L or BetterCampus.</span>
+    <nav aria-label="More"><a href="/">Home</a><a href="/compare">Compare</a><a href="/privacy">Privacy</a><a href="/report/">Report a bug</a></nav>
+  </div>
+</footer>
+</body>
+</html>

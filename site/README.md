@@ -1,10 +1,21 @@
 # Simpl Courses — the website
 
-Three pages, no build step, no dependencies: `public/index.html` (the landing page, its pictures in
-`public/img/`), `public/privacy.html` (the privacy policy, served at `/privacy`) and `public/report/` (Report a
-bug, served at `/report/`, where Simpl's purple button leads). Each is self-contained — the styles are inline and
-every icon is SVG. One small piece of code, `src/worker.js`, answers the report form at `/api/report`; everything
-else is a file served as it is.
+Five pages, no build step, no dependencies: `public/index.html` (the landing page, its pictures in
+`public/img/`), `public/compare.html` (Simpl, BetterCampus and plain Canvas side by side, every fact about the other
+two linked to its source, at `/compare`), `public/trust.html` (what Simpl can and can't see, in plain words, at
+`/trust`), `public/privacy.html` (the privacy policy, served at `/privacy`) and `public/report/` (Report a bug,
+served at `/report/`, where Simpl's purple button leads). Each is self-contained — the styles are inline and every
+icon is SVG. One small piece of code, `src/worker.js`, answers the report form at `/api/report` and the landing
+page's iPhone waitlist at `/api/waitlist` (`src/waitlist.js`: an email address handed to the same REPORT_WEBHOOK,
+nothing kept); everything else is a file served as it is. The landing page's "Does it work with my school?" box
+reads `/data/schools.json`, the extension's own school list (`extension/data/schools.json`), which
+`scripts/publish-site.sh` copies in at every publish.
+
+The landing page leads with the problem it fixes and Canvas's own Dashboard beside Simpl's (the slider), then the
+features grouped by when a student needs them, one download button picked for the device (Mac, Windows, Chrome,
+iPhone waitlist), the short comparison and the trust facts. Its claims are kept to what the code does: change the
+comparison or the trust page when the apps change. There are no student quotes or user numbers on it yet: add them
+only when they are real.
 
 The landing page's pictures of the interface are the real thing: `scripts/dev/site-shots.mjs` (on the development
 branch) renders the extension at 2× on the mock Canvas and the mock Brightspace, as a made-up school, in light and

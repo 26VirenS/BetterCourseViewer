@@ -17,6 +17,10 @@ rm -rf build/site-sync
 git worktree prune
 git worktree add build/site-sync origin/site
 cp -R site/. build/site-sync/
+# the landing page's "Does it work with my school?" box reads the extension's own school list (the same one its setup
+# searches), copied as it is at each publish so the two never drift
+mkdir -p build/site-sync/public/data
+cp extension/data/schools.json build/site-sync/public/data/schools.json
 # Simpl for Mac's download address (the landing page's Download for Mac → Mac App): the newest mac-v* release's zip,
 # beside the Safari app's /download/mac that scripts/release-mac-app.sh keeps; and its update feed, /app/mac-latest.json
 # (the app's Updater.swift reads it): that release's version, zip, SHA-256 and size. Asked of GitHub when a token is at
