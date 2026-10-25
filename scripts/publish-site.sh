@@ -21,6 +21,10 @@ cp -R site/. build/site-sync/
 # searches), copied as it is at each publish so the two never drift
 mkdir -p build/site-sync/public/data
 cp extension/data/schools.json build/site-sync/public/data/schools.json
+# Simpl Community's previews draw a theme with the extension's own theme code (its shades, its drawn scenes), copied
+# the same way, so a theme looks on the website as it will in Simpl
+mkdir -p build/site-sync/public/js
+cp extension/lib/theme.js build/site-sync/public/js/theme.js
 # Simpl for Mac's download address (the landing page's Download for Mac → Mac App): the newest mac-v* release's zip,
 # beside the Safari app's /download/mac that scripts/release-mac-app.sh keeps; and its update feed, /app/mac-latest.json
 # (the app's Updater.swift reads it): that release's version, zip, SHA-256 and size. Asked of GitHub when a token is at
