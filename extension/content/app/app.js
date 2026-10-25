@@ -112,13 +112,16 @@
     const params = url.searchParams;
     const hash = url.hash.replace(/^#/, '');
     const r = { url: url.pathname + url.search + url.hash, path, params, hash, screen: 'native', courseId: null, tab: null, arg: null, sub: null, uid: null };
-    if (path === '/' || path === '/dashboard') r.screen = hash === 'todo' ? 'todo' : hash === 'notifications' ? 'notifications' : hash === 'tools' && !self.BCVBridge?.native ? 'tools' : 'dashboard'; // (no Tools in the iPhone app yet)
+    // (2.99.112) on a computer To Do is the calendar's, beside it: its old address opens To Do & Calendar (the phone
+    // keeps To Do a tab of its own)
+    const todoAt = () => (BCV.phone?.active?.() ? 'todo' : 'calendar');
+    if (path === '/' || path === '/dashboard') r.screen = hash === 'todo' ? todoAt() : hash === 'notifications' ? 'notifications' : hash === 'tools' && !self.BCVBridge?.native ? 'tools' : 'dashboard'; // (no Tools in the iPhone app yet)
     else if (path === '/courses') r.screen = 'courses';
     else if (path === '/groups') r.screen = 'groups';
     else if (path === '/calendar' || path === '/calendar2') r.screen = 'calendar';
     else if (path === '/conversations') r.screen = 'inbox';
     else if (path === '/grades') r.screen = 'gpa'; // Canvas's own "Grades" page for all courses
-    else if (path === '/todo') r.screen = 'todo';
+    else if (path === '/todo') r.screen = todoAt();
     else {
       const m = path.match(/^\/(courses|groups)\/(\d+)(\/.*)?$/);
       if (m) {
@@ -157,9 +160,10 @@
   const readTrail = () => { try { const t = JSON.parse(sessionStorage.getItem(TRAIL_KEY) || '[]'); return Array.isArray(t) ? t : []; } catch { return []; } };
   const writeTrail = (t) => { try { sessionStorage.setItem(TRAIL_KEY, JSON.stringify(t.slice(-24))); } catch { /* no session storage: the fallbacks stand */ } };
   const TAB_NAMES = { home: 'Home', stream: 'Stream', announcements: 'Announcements', assignments: 'Assignments', discussions: 'Discussions', grades: 'Grades', people: 'People', pages: 'Pages', files: 'Files', folder: 'Files', file: 'Files', quizzes: 'Quizzes', modules: 'Modules', syllabus: 'Syllabus', announcement: 'Announcement', discussion: 'Discussion', assignment: 'Assignment', page: 'Page', quiz: 'Quiz' };
+  const TDC = 'To Do & Calendar'; // (2.99.112) To Do and the Calendar, one place on a computer
   /** What to call a screen on a Back button: a root screen's nav name, a course tab's name, the course itself for its home. */
   function labelFor(r) {
-    const root = { dashboard: BCV.phone?.active() ? 'Today' : 'Dashboard', courses: 'Courses', groups: 'Groups', todo: 'To Do', calendar: 'Calendar', inbox: 'Inbox', gpa: 'Grades', notifications: 'Notifications', tools: 'Tools' }[r.screen];
+    const root = { dashboard: BCV.phone?.active() ? 'Today' : 'Dashboard', courses: 'Courses', groups: 'Groups', todo: BCV.phone?.active() ? 'To Do' : TDC, calendar: BCV.phone?.active() ? 'Calendar' : TDC, inbox: 'Inbox', gpa: 'Grades', notifications: 'Notifications', tools: 'Tools' }[r.screen];
     if (root) return root;
     if (r.screen === 'course' || r.screen === 'group') {
       if (!r.tab || r.tab === 'home') {
@@ -585,8 +589,9 @@
     ...(BCV.lms?.d2l ? [] : [['groups', 'Groups', IC.people, '#30b0c7', '/groups', '']]),
     // the green, the indigo and the purple sit darker than the rest on black, so the dark appearance
     // lifts them (the glyphs are drawn at 62% until their row is active) to the others' visibility
-    ['todo', 'To Do', IC.check, state.dark ? '#4cd964' : '#34c759', '/#todo', state.todoCount ? String(state.todoCount) : ''],
-    ['calendar', 'Calendar', IC.cal, state.dark ? '#8c8aff' : '#5856d6', '/calendar', ''],
+    // (2.99.112) To Do and the Calendar are one place, To Do & Calendar: the calendar with To Do beside it — the row
+    // carries To Do's count (the phone keeps its own To Do tab: phone.js)
+    ['calendar', 'To Do & Calendar', IC.cal, state.dark ? '#8c8aff' : '#5856d6', '/calendar', state.todoCount ? String(state.todoCount) : ''],
     ['notifications', 'Notifications', IC.bell, '#ff453a', '/#notifications', state.notifCount ? String(state.notifCount) : ''],
     ...(BCV.lms?.d2l ? [] : [['inbox', 'Inbox', IC.mail, '#0a84ff', '/conversations', state.unread ? String(state.unread) : '']]),
     ['gpa', 'Grades', IC.chart, state.dark ? '#c874f5' : '#af52de', '/grades', ''], // purple: Calendar already has the indigo
@@ -753,13 +758,13 @@
 
   /** (2.99.53) One sidebar, as the Mac's: the app's own places first — Dashboard, To Do, Calendar, Grades, Notifications,
    *  Inbox, Tools — the courses (All Courses and Groups with them) in a section of their own under them. */
-  const SIDE_ORDER = ['dashboard', 'courses', 'groups', 'todo', 'calendar', 'gpa', 'notifications', 'inbox', 'tools']; // (2.99.60: All Courses and Groups back in their own places)
+  const SIDE_ORDER = ['dashboard', 'courses', 'groups', 'calendar', 'gpa', 'notifications', 'inbox', 'tools']; // (2.99.60: All Courses and Groups back in their own places)
   const sideNav = () => (oneBar() ? SIDE_ORDER.map((k) => navDef().find((d) => d[0] === k)).filter(Boolean) : navDef());
   /** A row of the sidebar's own places: its glyph in its colour, its name, its count. */
   function navButton([key, label, icon, glyphColor, href, count], i, all, r, extra = null) {
     return h('button', {
       type: 'button',
-      class: `bcv-nav__item ${r.screen === key || (key === 'groups' && r.screen === 'group') ? 'is-active' : ''}`,
+      class: `bcv-nav__item ${r.screen === key || (key === 'groups' && r.screen === 'group') || (key === 'calendar' && r.screen === 'todo') ? 'is-active' : ''}`,
       dataset: { nav: key, load: key, loadColor: glyphColor, href }, // (href: the pointer resting on the row reads its screen's data ahead, wireIntent)
       style: tabShades(all.length)[i] ? { '--bcv-tab-icon': tabShades(all.length)[i].icon, '--bcv-tab-text': tabShades(all.length)[i].text } : { '--bcv-tab-icon': glyphColor }, // (the glyph's colour as a variable either way: a photo behind the rail lightens it)
       onclick: () => { if (state.loadKey === key && !loadStuck()) return; progress(true, key); go(href, { motion: 'fade' }); }, // a second press on the loading row is a no-op, until that load is plainly stuck; a section crossfades
@@ -1027,7 +1032,7 @@
   // own icon colour until the screen is drawn; a fresh page lights the row for its route as soon as
   // the sidebar mounts. There is no separate bar: one indicator, attached to the thing that caused
   // the wait. state.loadKey names WHICH control is loading (a boolean would light every row).
-  const NAV_KEY = { dashboard: 'dashboard', todo: 'todo', notifications: 'notifications', courses: 'courses', groups: 'groups', group: 'groups', calendar: 'calendar', inbox: 'inbox', gpa: 'gpa', tools: 'tools' };
+  const NAV_KEY = { dashboard: 'dashboard', todo: 'calendar', notifications: 'notifications', courses: 'courses', groups: 'groups', group: 'groups', calendar: 'calendar', inbox: 'inbox', gpa: 'gpa', tools: 'tools' };
   /** Canvas's own page for the attempt on screen — where turning the look off mid-quiz should land. */
   function rawQuizUrl() {
     const r = state.route;
@@ -1682,7 +1687,7 @@
   }
 
   function titleFor(r) {
-    const base = { dashboard: 'Dashboard', courses: 'Courses', groups: 'Groups', todo: 'To Do', calendar: 'Calendar', inbox: 'Inbox', gpa: 'Grades', notifications: 'Notifications', tools: 'Tools' }[r.screen];
+    const base = { dashboard: 'Dashboard', courses: 'Courses', groups: 'Groups', todo: BCV.phone?.active() ? 'To Do' : TDC, calendar: BCV.phone?.active() ? 'Calendar' : TDC, inbox: 'Inbox', gpa: 'Grades', notifications: 'Notifications', tools: 'Tools' }[r.screen];
     return base ? `${base} · ${siteName()}` : document.title;
   }
 
@@ -1728,7 +1733,7 @@
   /** The badges, updated in place (a rebuilt nav would lose focus mid-keyboard-navigation). */
   function paintCounts() {
     if (phone() || !side || !side.querySelector('.bcv-nav')) { renderSide(); return; }
-    const counts = { todo: state.todoCount, notifications: state.notifCount, inbox: state.unread };
+    const counts = { calendar: state.todoCount, notifications: state.notifCount, inbox: state.unread }; // (2.99.112: To Do's count on To Do & Calendar)
     for (const [key, n] of Object.entries(counts)) {
       const el = side.querySelector(`.bcv-nav__item[data-nav="${key}"] .bcv-nav__count`);
       if (el) el.textContent = n ? String(n) : '';
@@ -1947,7 +1952,7 @@
     const course = c ? (c.shortName || c.name) : '';
     const item = main?.querySelector('.bcv-detail__title')?.textContent.trim();
     const head = main?.querySelector('.bcv-head .bcv-h1')?.textContent.trim();
-    const root = { dashboard: 'Dashboard', courses: 'Courses', groups: 'Groups', todo: 'To Do', calendar: 'Calendar', inbox: 'Inbox', gpa: 'Grades', notifications: 'Notifications', tools: 'Tools' }[r.screen];
+    const root = { dashboard: 'Dashboard', courses: 'Courses', groups: 'Groups', todo: BCV.phone?.active() ? 'To Do' : TDC, calendar: BCV.phone?.active() ? 'Calendar' : TDC, inbox: 'Inbox', gpa: 'Grades', notifications: 'Notifications', tools: 'Tools' }[r.screen];
     const t = item || root || (r.courseId && (!r.tab || r.tab === 'home') ? course : head) || (document.title || '').split(' · ')[0];
     const sub = r.courseId && t !== course ? course : '';
     el.querySelector('.bcv-toptitle__t').textContent = t || '';

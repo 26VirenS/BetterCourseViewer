@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.111"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.112"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -1308,16 +1308,32 @@ html[data-bcv-theme="dark"] .bcv-mring__track { stroke: rgba(255,255,255,.1); }
 /* (2.99.109) the week as a time grid, a calendar app's: the hours down the side, each day a column ruled by the hour, each
    event a block from its start to its end (side by side where they overlap), today's date in a filled circle and a red
    line across its column at the time it is now. A plan's block is dragged to move it. */
-.bcv-week__head { display: grid; grid-template-columns: 50px repeat(7, minmax(0, 1fr)); gap: 0; padding: 0 0 8px; }
+.bcv-week__head { display: grid; grid-template-columns: 50px repeat(var(--bcv-week-n, 7), minmax(0, 1fr)); gap: 0; padding: 0 0 8px; }
 .bcv-week__col { display: flex; flex-direction: column; align-items: center; gap: 4px; padding-bottom: 2px; }
 .bcv-week__dow { font: 600 10.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); text-transform: uppercase; letter-spacing: .05em; }
 .bcv-week__n { min-width: 28px; height: 28px; padding: 0 6px; box-sizing: border-box; border-radius: 14px; display: flex; align-items: center; justify-content: center; font: 600 16px/1 var(--bcv-display); letter-spacing: -.01em; color: var(--bcv-ink); }
 .bcv-week__col--today .bcv-week__dow { color: var(--bcv-blue); }
 .bcv-week__col--today .bcv-week__n { background: var(--bcv-blue); color: #fff; }
-.bcv-week__allday { display: grid; grid-template-columns: 50px repeat(7, minmax(0, 1fr)); gap: 0; border-top: var(--bcv-line, 1px) solid var(--bcv-sep); border-bottom: var(--bcv-line, 1px) solid var(--bcv-sep); }
+.bcv-week__allday { display: grid; grid-template-columns: 50px repeat(var(--bcv-week-n, 7), minmax(0, 1fr)); gap: 0; border-top: var(--bcv-line, 1px) solid var(--bcv-sep); border-bottom: var(--bcv-line, 1px) solid var(--bcv-sep); }
 .bcv-week__allday-label { font: 500 10.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); padding: 8px 0 0; }
 .bcv-week__allday-cell { min-height: 28px; display: flex; flex-direction: column; gap: 2px; padding: 3px 2px; border-left: var(--bcv-line, 1px) solid var(--bcv-sep); }
-.bcv-week__body { position: relative; display: grid; grid-template-columns: 50px repeat(7, minmax(0, 1fr)); margin-top: 8px; }
+.bcv-week__body { position: relative; display: grid; grid-template-columns: 50px repeat(var(--bcv-week-n, 7), minmax(0, 1fr)); }
+/* (2.99.112) the whole day's hours scroll inside the card, under the days (their head and all-day row keep the same
+   gutter as the scroller's bar, so the columns line up); a pinch changes the hour's height (calendar.js setupWeek) */
+.bcv-week__scroll { position: relative; margin-top: 8px; max-height: max(420px, calc(100vh - 230px)); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.bcv-week__head, .bcv-week__allday { overflow-y: hidden; scrollbar-gutter: stable; }
+/* (2.99.112) what lies above or below the hours in view waits squished at that edge of its day, a press scrolling to it */
+.bcv-week__day { display: flex; flex-direction: column; justify-content: space-between; }
+.bcv-week__edge { position: sticky; z-index: 4; height: 0; display: flex; flex-direction: column; gap: 2px; padding: 0 3px; pointer-events: none; }
+.bcv-week__edge--top { top: 0; padding-top: 3px; }
+.bcv-week__edge--bot { bottom: 0; justify-content: flex-end; padding-bottom: 3px; }
+.bcv-week__peek { flex: none; display: block; width: 100%; height: 6px; margin: 0; padding: 0; border: 0; border-radius: 3px; box-shadow: inset 3px 0 0 var(--bcv-ev-bar), 0 1px 3px rgba(0,0,0,.12); cursor: pointer; pointer-events: auto; transition: height .14s var(--bcv-ease-out); }
+@media (hover: hover) and (pointer: fine) { .bcv-week__peek:hover { height: 9px; } }
+.bcv-week__edge--top .bcv-week__peek { animation: bcv-peek-top .18s var(--bcv-ease-out) backwards; }
+.bcv-week__edge--bot .bcv-week__peek { animation: bcv-peek-bot .18s var(--bcv-ease-out) backwards; }
+@keyframes bcv-peek-top { from { opacity: 0; transform: translateY(-3px) scaleY(.5); } }
+@keyframes bcv-peek-bot { from { opacity: 0; transform: translateY(3px) scaleY(.5); } }
+@media (prefers-reduced-motion: reduce) { .bcv-week__edge .bcv-week__peek { animation: none; transition: none; } }
 .bcv-week__gutter { position: relative; }
 .bcv-week__hour { position: absolute; right: 8px; transform: translateY(-50%); font: 500 10.5px/1 var(--bcv-font); font-variant-numeric: tabular-nums; color: var(--bcv-ink3); transition: opacity var(--bcv-t-fast) ease; }
 .bcv-week__hour:first-child { transform: none; }
@@ -6392,6 +6408,16 @@ html.bcv-noblur .bcv-spot:not(.is-far) .bcv-omni__box.bcv-squircle, html.bcv-nob
 .bcv-cal__todo[hidden], .bcv-cal__todobtn[hidden] { display: none; }
 .bcv-cal__todobtn { width: 34px; padding: 0; justify-content: center; }
 .bcv-cal__todobtn.is-on { background: var(--bcv-blue-tint, rgba(10,132,255,.14)); }
+/* (2.99.112) the week's five days or seven: Week pressed again opens a menu of the two, a chevron saying so */
+.bcv-seg__btn:has(> .bcv-cal__weekchev) { display: inline-flex; align-items: center; }
+.bcv-cal__weekchev { flex: none; margin-left: 4px; opacity: .55; }
+/* (2.99.112) a piece of work held over a day of the month or the agenda: the day ringed in blue, "Plan here" in it; let go,
+   it is planned at that day's first free time (content/app/plan.js slotOn) */
+.bcv-cal__day, .bcv-agenda__dayblock { position: relative; }
+.bcv-cal__day.is-plan-drop { background: var(--bcv-blue-tint, rgba(10,132,255,.12)); box-shadow: inset 0 0 0 2px var(--bcv-blue); }
+.bcv-agenda__dayblock.is-plan-drop { border-radius: 14px; background: var(--bcv-blue-tint, rgba(10,132,255,.08)); box-shadow: 0 0 0 2px var(--bcv-blue); }
+.bcv-cal__droptag { position: absolute; left: 6px; bottom: 6px; padding: 2px 8px; border-radius: 999px; background: var(--bcv-blue); color: #fff; font: 600 11px/16px var(--bcv-font); pointer-events: none; white-space: nowrap; }
+.bcv-agenda__dayblock > .bcv-cal__droptag { top: 6px; right: 10px; bottom: auto; left: auto; }
 .bcv-todo-side { display: flex; flex-direction: column; max-height: calc(100vh - var(--bcv-cal-head, 96px) - var(--bcv-bar-h, 0px) - 36px); border-radius: 16px; background: var(--bcv-card); box-shadow: var(--bcv-shadow-card, 0 1px 3px rgba(0,0,0,.08)); overflow: hidden; }
 .bcv-todo-side__head { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px; border-bottom: 1px solid var(--bcv-sep, rgba(60,60,67,.12)); }
 .bcv-todo-side__titles { flex: 1; min-width: 0; }
@@ -6400,6 +6426,30 @@ html.bcv-noblur .bcv-spot:not(.is-far) .bcv-omni__box.bcv-squircle, html.bcv-nob
 .bcv-todo-side__count { flex: none; min-width: 22px; height: 22px; padding: 0 7px; box-sizing: border-box; border-radius: 11px; background: var(--bcv-fill2); color: var(--bcv-ink2); font: 600 12px/22px var(--bcv-font); text-align: center; font-variant-numeric: tabular-nums; }
 .bcv-todo-side__list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 8px 10px; }
 .bcv-todo-side__group + .bcv-todo-side__group { margin-top: 6px; }
+/* (2.99.112) To Do & Calendar: To Do lives here, beside the calendar — the summary's ring small at the top of the list,
+   a task added under it, the way to group the list behind the ⋯ in the head, and each row's own ⋯ (priorities, a time,
+   delete) shown on hover or focus, its flag when it has a priority */
+.bcv-todo-side__more { flex: none; color: var(--bcv-ink2); }
+.bcv-todo-side__n { margin-left: 6px; font-weight: 500; color: var(--bcv-ink4, var(--bcv-ink3)); letter-spacing: 0; }
+.bcv-todo-side__day { display: flex; align-items: baseline; }
+.bcv-todo__sum.is-compact { gap: 10px; margin: 6px 4px 8px; padding: 8px 10px; border-radius: 12px; background: var(--bcv-fill2); box-shadow: none; }
+.bcv-todo__sum.is-compact .bcv-todo__ring { width: 30px; height: 30px; }
+.bcv-todo__sum.is-compact .bcv-todo__ring circle { stroke-width: 8; }
+.bcv-todo__sum.is-compact .bcv-todo__sumhead { font: 650 14px/1.2 var(--bcv-font); letter-spacing: -.01em; }
+.bcv-todo__sum.is-compact .bcv-todo__sumsub { margin-top: 1px; font-size: 11.5px; }
+.bcv-todo__compwrap.is-compact { margin: 0 4px 6px; }
+.bcv-todo__compwrap.is-compact .bcv-todo__add { gap: 8px; padding: 8px 10px; border-radius: 10px; font-size: 13px; }
+.bcv-todo__compwrap.is-compact .bcv-todo__composer { padding: 10px 12px; gap: 10px; border-radius: 12px; box-shadow: 0 0 0 1px var(--bcv-sep), 0 4px 14px rgba(0,0,0,.06); }
+.bcv-todo__compwrap.is-compact .bcv-todo__title { font-size: 14px; }
+.bcv-todo__compwrap.is-compact .bcv-todo__ctl { gap: 6px; }
+.bcv-todo__compwrap.is-compact .bcv-todo__ctl .bcv-seg__btn { padding: 5px 9px; font-size: 12px; }
+.bcv-tdrag__pri { flex: none; align-self: center; display: inline-flex; }
+.bcv-tdrag__more { flex: none; align-self: center; width: 24px; height: 24px; margin: -2px -2px -2px 0; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--bcv-ink2); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transition: opacity .12s ease, background .12s ease; }
+.bcv-tdrag:hover .bcv-tdrag__more, .bcv-tdrag:focus-within .bcv-tdrag__more, .bcv-tdrag__more[aria-expanded="true"] { opacity: 1; }
+.bcv-tdrag__more:hover { background: var(--bcv-fill2); }
+.bcv-tdrag__more:focus-visible { opacity: 1; outline: 2px solid var(--bcv-blue); outline-offset: 0; }
+@media (hover: none) { .bcv-tdrag__more { opacity: 1; } }
+.bcv-tdrag.is-done .bcv-tdrag__title { color: var(--bcv-ink3); text-decoration: line-through; }
 .bcv-todo-side__day { position: sticky; top: 0; z-index: 1; padding: 8px 8px 4px; background: var(--bcv-card); font: 600 11.5px/1.3 var(--bcv-font); letter-spacing: .02em; text-transform: uppercase; color: var(--bcv-ink3); }
 .bcv-todo-side__group.is-late .bcv-todo-side__day { color: #ff3b30; }
 .bcv-todo-side__empty { display: flex; align-items: center; gap: 8px; padding: 18px 10px; font: 500 13px/1.4 var(--bcv-font); color: var(--bcv-ink2); }
@@ -6428,6 +6478,22 @@ html.bcv-dragging-plan .bcv-week__body .bcv-wev:not(.bcv-wev--drop) { pointer-ev
 .bcv-wev--drop .bcv-wev__time, .bcv-wev--drop .bcv-wev__title { color: var(--bcv-ev-bar); }
 .bcv-wev--drop.is-dropped { animation: none; }
 @container bcv-main (max-width: 980px) { .bcv-body--cal.has-todo { flex-wrap: wrap; } .bcv-body--cal > .bcv-cal__todo { flex-basis: 100%; position: static; } .bcv-todo-side { max-height: 260px; } }
+/* (2.99.112) The page holds still: the calendar and the To Do beside it fill the window (calendar.js fit sets the height
+   left under the bar), each scrolling inside itself — the week's hours, the month's weeks (stretched to fill it when they
+   fit), the agenda's days, the To Do's list. Too narrow or too short a window, and the phone: the page scrolls, as before. */
+.bcv-main:has(> .bcv-screen.is-fit) { padding-bottom: 0; }
+.bcv-screen.is-fit { height: var(--bcv-fit-h, 100vh); display: flex; flex-direction: column; overflow: hidden; }
+html.bcv-on .bcv-screen.is-fit > .bcv-head, html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-screen.is-fit > .bcv-head { flex: none; position: relative; top: auto; } /* (nothing scrolls under it: in place, not stuck below the bar) */
+.bcv-screen.is-fit > .bcv-body--cal { flex: 1 1 0; min-height: 0; width: 100%; flex-wrap: nowrap; align-items: stretch; padding-bottom: 18px; }
+.bcv-screen.is-fit .bcv-body--cal > .bcv-cal__todo { position: static; align-self: stretch; display: flex; flex-direction: column; min-height: 0; }
+.bcv-screen.is-fit .bcv-body--cal > .bcv-cal__todo[hidden] { display: none; }
+.bcv-screen.is-fit .bcv-todo-side { flex: 1 1 0; min-height: 0; max-height: none; }
+.bcv-screen.is-fit .bcv-body--cal > .bcv-cal__main { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: -6px -14px -18px; padding: 6px 14px 18px; }
+.bcv-screen.is-fit .bcv-body--cal > .bcv-cal__side { position: static; align-self: flex-start; max-height: 100%; overflow-y: auto; }
+.bcv-screen.is-fit .bcv-cal__main > .bcv-cal--week, .bcv-screen.is-fit .bcv-cal__main > .bcv-cal--month { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+.bcv-screen.is-fit .bcv-cal__main > .bcv-agenda, .bcv-screen.is-fit .bcv-cal__main > .bcv-cal__notice { flex: none; }
+.bcv-screen.is-fit .bcv-cal--week > .bcv-week__scroll { flex: 1 1 0; min-height: 0; max-height: none; }
+.bcv-screen.is-fit .bcv-cal--month > .bcv-cal__grid { flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 @media (prefers-reduced-motion: reduce) {
   .bcv-tdrag.is-ghost, .bcv-tdrag.is-ghost.is-returning, .bcv-wev--drop { transition: none; animation: none; }
 }

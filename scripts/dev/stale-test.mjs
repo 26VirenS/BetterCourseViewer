@@ -114,10 +114,10 @@ try {
     const note = await page.evaluate(() => [...document.querySelectorAll('.bcv-toast')].map((t) => `${t.textContent} ${t.dataset.code || ''}`).join(' | '));
     check(loads.n === 1 && /Simpl Courses was updated\. Reload the page to continue\./.test(note) && (await page.$eval('#bcv-omni', (e) => e.value)) === 'kinematics notes', `nothing typed is lost: no reload, a note says what happened and what to do (${note})`);
     await page.keyboard.press('Escape'); // (the search's list closed first, the text kept)
-    await page.click('#bcv-app .bcv-nav__item[data-nav="todo"]');
+    await page.click('#bcv-app .bcv-nav__item[data-nav="calendar"]'); // (2.99.112: To Do & Calendar)
     for (let i = 0; i < 40 && loads.n < 2; i++) await page.waitForTimeout(250);
-    await page.waitForFunction(() => document.querySelector('#bcv-app h1')?.textContent === 'To Do', null, { timeout: 15000 }).catch(() => {});
-    check(loads.n === 2 && (await page.evaluate(() => location.pathname + location.hash)) === '/#todo' && (await page.evaluate(() => document.querySelector('#bcv-app h1')?.textContent)) === 'To Do', `and the next page asked for is loaded for real (To Do, /#todo — the same page's screen is a load all the same), running the new version, rather than drawn by the old one (${loads.n} loads)`);
+    await page.waitForFunction(() => !!document.querySelector('#bcv-app .bcv-cal'), null, { timeout: 15000 }).catch(() => {});
+    check(loads.n === 2 && (await page.evaluate(() => location.pathname + location.hash)) === '/calendar' && (await page.evaluate(() => !!document.querySelector('#bcv-app .bcv-cal'))), `and the next page asked for is loaded for real (To Do & Calendar, /calendar — another's screen is a load all the same), running the new version, rather than drawn by the old one (${loads.n} loads)`);
     await page.close();
   }
 

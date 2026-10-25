@@ -28,6 +28,13 @@
     lock: 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.112', date: '2026-10-25', notes: [
+      { kind: 'new', title: 'To Do & Calendar', body: 'To Do and the calendar are now one tab.', icon: P.cal },
+      { kind: 'new', title: 'Pinch the Week', body: 'Pinch the hours to see more or less of the day.', icon: P.arrows },
+      { kind: 'improved', title: 'Five or Seven Days', body: 'Press Week again to show 5 or 7 days.', icon: P.cal },
+      { kind: 'improved', title: 'Peek Past the Hours', body: 'Events above or below the view wait at its edge.', icon: P.eye },
+      { kind: 'improved', title: 'The Page Holds Still', body: 'Only the calendar and To Do scroll.', icon: P.layers },
+    ] },
     { version: '2.99.111', date: '2026-10-25', notes: [
       { kind: 'fixed', title: 'Frosted Popups', body: 'Popups blur the page behind them in Chrome again.', icon: P.layers },
     ] },

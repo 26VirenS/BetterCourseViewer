@@ -460,8 +460,8 @@ try {
   await page.goto(`${BASE}/d2l/home?simpl=${encodeURIComponent('/calendar')}`);
   await drawn();
   await page.waitForTimeout(800);
-  const cal = await page.evaluate(() => ({ text: (document.querySelector('#bcv-main')?.innerText || ''), appt: !!document.querySelector('.bcv-cal__apptbtn') }));
-  check(!cal.appt && /Calendars/.test(cal.text), 'the Calendar, without Canvas’s appointments');
+  const cal = await page.evaluate(() => ({ calendars: !!document.querySelector('.bcv-cal__calbtn'), appt: !!document.querySelector('.bcv-cal__apptbtn') })); // (the button's word may give way to its glyph beside To Do)
+  check(!cal.appt && cal.calendars, `the Calendar, without Canvas’s appointments: ${JSON.stringify(cal)}`);
   await shot('calendar');
 
   // a student new to Simpl: the setup opens over the homepage, and the address it opened at is cleaned at once — on

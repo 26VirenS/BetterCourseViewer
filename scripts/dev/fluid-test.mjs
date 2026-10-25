@@ -54,7 +54,7 @@ const ms = (x) => (x === null || x === undefined ? '—' : `${Math.round(x)} ms`
 // Each screen's content, as it is once Canvas's answer is drawn (never the skeleton that holds its place)
 const SCREENS = {
   dashboard: { path: '/', nav: 'dashboard', sel: '.bcv-stats .bcv-stat' },
-  todo: { path: '/#todo', nav: 'todo', sel: '.bcv-todo__tools' },
+  todo: { path: '/#todo', nav: 'calendar', sel: '.bcv-cal__todo .bcv-tdrag' }, // (2.99.112: To Do beside the calendar in To Do & Calendar — its row, or To Do's old address)
   grades: { path: '/grades', nav: 'gpa', sel: '.bcv-gpa__card' },
   course: { path: '/courses/101', fav: '101', sel: '.bcv-cmain .bcv-col:first-child > :not(.bcv-skel)' }, // (its home's own column: the front page)
 };
@@ -181,7 +181,7 @@ try {
       const note = await fetch(`${BASE}/api/v1/planner_notes`, { method: 'POST', headers: asMe, body: JSON.stringify({ title, todo_date: due.toISOString() }) }).then((r) => r.text()).then((x) => JSON.parse(x.replace(/^while\(1\);/, ''))).catch(() => null);
       await mockConfig({ apiDelay: { '': 1500 } });
       await load('todo');
-      const kept = await page.evaluate((x) => ({ has: document.getElementById('bcv-main').innerText.includes(x), rows: document.querySelectorAll('#bcv-main .bcv-row').length }), title);
+      const kept = await page.evaluate((x) => ({ has: document.getElementById('bcv-main').innerText.includes(x), rows: document.querySelectorAll('#bcv-main .bcv-cal__todo .bcv-tdrag').length }), title); // (2.99.112: To Do's rows beside the calendar)
       const landed = await eventually(() => page.evaluate((x) => document.getElementById('bcv-main').innerText.includes(x), title), 8000);
       const how = await page.evaluate(() => ({ still: document.querySelector('#bcv-main > .bcv-screen')?.classList.contains('bcv-screen--still'), skel: !!document.querySelector('#bcv-main .bcv-skel') }));
       check(!!note?.id && !kept.has && kept.rows > 0 && landed && how.still && !how.skel, `To Do loaded again shows the kept list at once (${kept.rows} rows), and the task added since joins it in place when Canvas answers — drawn again still, no skeleton: ${JSON.stringify({ ...kept, landed, ...how })}`);
@@ -193,7 +193,7 @@ try {
       await inApp('lapse', 0.001); // (every lifetime a thousandth as long: the next answers lapse at once)
       await press('dashboard'); // (the screen on show pressed again: read afresh, under the short lifetimes)
       await quiet(page, 1500);
-      await press('todo');
+      await press('grades'); // (somewhere else, and back)
       await quiet(page, 1500);
       await mockConfig({ apiDelay: { '': 2000 } });
       const lapsedT = await press('dashboard');
@@ -285,7 +285,7 @@ try {
       const settle = async () => { await settled(page); await page.waitForTimeout(500); };
       const go = async (sel) => { const n = (await vts()).length; await page.evaluate(() => { for (const m of document.querySelectorAll('#bcv-main > *')) m.dataset.old = '1'; }); await page.click(sel); await settle(); return (await vts())[n] || null; };
       await motionAt(page, 1); // (the transitions are watched as they play)
-      const sec = await go('.bcv-nav__item[data-nav="todo"]');
+      const sec = await go('.bcv-nav__item[data-nav="calendar"]');
       check(sec?.k === 'fade' && sec.anims.join(',') === 'bcv-fade-in@new(bcv-screen),bcv-fade-out@old(bcv-screen)' && sec.rootAnim === 'none', `a section from the sidebar crossfades as one view transition of the main column, the screen's own entrance standing down: ${JSON.stringify(sec)}`);
       await go('.bcv-fav[data-load="fav:101"]');
       const tab = await go('.bcv-rail [data-tab="assignments"]');
