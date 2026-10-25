@@ -151,10 +151,21 @@ public static class Appearance
 
     public static string PhotosDir => System.IO.Path.Combine(AppPaths.Root, "Photos");
 
-    public static string? Photo(string slot) => Prefs.String("photo:" + slot) is { Length: > 0 } p && System.IO.File.Exists(p) ? p : null;
+    /// <summary>A place's photo of the student's own. (A screenshot run's --theme-photo &lt;file&gt;: that picture in every
+    /// place, nothing kept; with --theme-plain, its Ink off.)</summary>
+    public static string? Photo(string slot) =>
+        Launch.Get("theme-photo") is { Length: > 0 } shot && System.IO.File.Exists(shot) ? shot
+        : Prefs.String("photo:" + slot) is { Length: > 0 } p && System.IO.File.Exists(p) ? p : null;
 
     /// <summary>"drawing" (the theme's) or "photo" (your own): what a place shows.</summary>
-    public static string PhotoKind(string slot) => Prefs.String($"photo:{slot}:kind") ?? (Photo(slot) != null ? "photo" : "drawing");
+    public static string PhotoKind(string slot) => Launch.Get("theme-photo") is { Length: > 0 } ? "photo" : Prefs.String($"photo:{slot}:kind") ?? (Photo(slot) != null ? "photo" : "drawing");
+
+    /// <summary>(0.3.59) A photo of the student's own with its Ink switch off: shown as it is, nothing over it, the words on
+    /// it dark with a gentle white border (the web's plain[key], the Mac's SlotPhoto.plain). A drawing is always inked.</summary>
+    public static bool Plain(string slot) => PhotoKind(slot) == "photo" && Photo(slot) != null && (Launch.Flag("theme-plain") || Prefs.Bool($"photo:{slot}:plain"));
+
+    /// <summary>(0.3.59) A photo of the student's own inked (false) or shown as it is (true).</summary>
+    public static void SetPlain(string slot, bool plain) { Prefs.Set($"photo:{slot}:plain", plain ? true : null); Changed?.Invoke(); }
 
     public static double Zoom(string slot) => Prefs.Double($"photo:{slot}:zoom", 1);
 
@@ -213,6 +224,7 @@ public static class Appearance
             Prefs.Set($"photo:{slot}:zoom", 1.0);
             Prefs.Remove($"photo:{slot}:x");
             Prefs.Remove($"photo:{slot}:y");
+            Prefs.Remove($"photo:{slot}:plain"); // (a new photo starts inked)
             Changed?.Invoke();
             return true;
         }
@@ -227,6 +239,7 @@ public static class Appearance
         Prefs.Remove($"photo:{slot}:zoom");
         Prefs.Remove($"photo:{slot}:x");
         Prefs.Remove($"photo:{slot}:y");
+        Prefs.Remove($"photo:{slot}:plain");
         Prefs.Remove($"photo:{slot}:scene"); // (back to the worn theme's drawing, not one picked before the photo)
         Changed?.Invoke();
     }

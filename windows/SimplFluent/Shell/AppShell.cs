@@ -188,6 +188,7 @@ public sealed partial class AppShell : Grid, IDisposable
         Updates();
         Navigate();
         paneScene.Content = Scenes.Backdrop("side");
+        Scenes.PlainWords(pane, Appearance.Plain("side")); // (0.3.59: its photo's Ink off — dark words, a white border)
         more = engine.Kept<MoreNav>("moreFromCanvas");
         BuildPane();
         _ = engine.LoadSidebar();
@@ -264,6 +265,7 @@ public sealed partial class AppShell : Grid, IDisposable
     public void Retheme()
     {
         paneScene.Content = Scenes.Backdrop("side");
+        Scenes.PlainWords(pane, Appearance.Plain("side"));
         sceneMasked = null;
         MaskScene();
         accountDrawn = null;
@@ -620,7 +622,7 @@ public sealed partial class AppShell : Grid, IDisposable
     /// </summary>
     private void MaskScene()
     {
-        if (paneScene.Content == null) { paneScene.OpacityMask = null; sceneMasked = null; return; }
+        if (paneScene.Content == null || Appearance.Plain("side")) { paneScene.OpacityMask = null; sceneMasked = null; return; } // (0.3.59: a photo with its Ink off is whole)
         var h = paneHolder.ActualHeight;
         if (h < 1 || !paneScene.IsVisible) return;
         double rows, footTop;

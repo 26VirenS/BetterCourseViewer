@@ -75,13 +75,62 @@ public static class Scenes
     /// </summary>
     public static FrameworkElement? Backdrop(string slot, bool frost = true, (double X, double Y)? pan = null)
     {
-        if (Of(slot) is not { } pic) return null;
         var side = slot == "side";
         var zoom = Math.Clamp(Appearance.Zoom(slot), 0.5, 3);
+        // (0.3.59) a photo with its Ink switch off: the photo itself, whole, nothing over it
+        if (Appearance.Plain(slot) && Appearance.Photo(slot) is { } file && Original(file) is { } photo)
+        {
+            var o = new Grid { IsHitTestVisible = false, ClipToBounds = true };
+            o.Children.Add(new Rectangle { Fill = Placed(photo, side ? AlignmentX.Center : AlignmentX.Right, zoom, side ? 0.5 : 1, pan ?? Appearance.Pan(slot)), IsHitTestVisible = false });
+            return o;
+        }
+        if (Of(slot) is not { } pic) return null;
         var g = new Grid { IsHitTestVisible = false, ClipToBounds = true };
         g.Children.Add(Drawn(pic.Mask, pic.Scene ? SceneInk : PhotoInk, side ? AlignmentX.Center : AlignmentX.Right, zoom, side ? 0.5 : 1, pan ?? Appearance.Pan(slot)));
         if (frost && pic.Scene) g.Children.Add(new Rectangle { Fill = K.Brush(Color.FromArgb(56, Page.R, Page.G, Page.B)) });
         return g;
+    }
+
+    /// <summary>
+    /// (0.3.59) The words on a photo with its Ink switch off (the web's .bcv-side--plain, the Mac's PlainPhotoWords):
+    /// dark in either look, with a gentle white border round them — a soft white edge, close in — so they read on any
+    /// photo. The theme's text brushes are given again for this part alone; off, it is as it was.
+    /// </summary>
+    public static void PlainWords(FrameworkElement words, bool on)
+    {
+        foreach (var (key, color) in PlainInks)
+        {
+            if (on) words.Resources[key] = K.Brush(color);
+            else words.Resources.Remove(key);
+        }
+        words.Effect = on ? new System.Windows.Media.Effects.DropShadowEffect { Color = Colors.White, ShadowDepth = 0, BlurRadius = 4, Opacity = 1 } : null;
+    }
+
+    private static readonly (string Key, Color Color)[] PlainInks =
+    {
+        (B.Text, Color.FromRgb(0x1c, 0x1c, 0x1e)), (B.Text2, Color.FromRgb(0x3a, 0x3a, 0x3c)), (B.Text3, Color.FromRgb(0x48, 0x48, 0x4a)),
+    };
+
+    /// <summary>(0.3.59) A photo of the student's own as it is (for its Ink switch off), read once.</summary>
+    private static ImageSource? Original(string file)
+    {
+        if (Images.TryGetValue(file, out var have)) return have;
+        ImageSource? img = null;
+        try
+        {
+            var b = new BitmapImage();
+            b.BeginInit();
+            b.UriSource = new Uri(file);
+            b.CacheOption = BitmapCacheOption.OnLoad;
+            b.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+            b.DecodePixelWidth = 1600; // (no larger than a place shows it)
+            b.EndInit();
+            b.Freeze();
+            img = b;
+        }
+        catch (Exception e) { Log.Write("photo: " + e.Message); }
+        Images[file] = img;
+        return img;
     }
 
     /// <summary>
@@ -119,16 +168,23 @@ public static class Scenes
     private static Rectangle Drawn(ImageSource mask, Color ink, AlignmentX x, double zoom = 1, double originX = 1, (double X, double Y) pan = default)
     {
         var inked = Inked(mask, ink);
-        var brush = new ImageBrush(inked ?? mask) { Stretch = Stretch.UniformToFill, AlignmentX = x, AlignmentY = AlignmentY.Bottom };
-        // (zoomed from where it is pinned, then moved by a share of the place: the brush's own relative units)
-        var moved = Math.Abs(pan.X) > 0.001 || Math.Abs(pan.Y) > 0.001;
-        if (Math.Abs(zoom - 1) > 0.001 && moved) brush.RelativeTransform = new TransformGroup { Children = { new ScaleTransform(zoom, zoom, originX, 1), new TranslateTransform(pan.X, pan.Y) } };
-        else if (Math.Abs(zoom - 1) > 0.001) brush.RelativeTransform = new ScaleTransform(zoom, zoom, originX, 1);
-        else if (moved) brush.RelativeTransform = new TranslateTransform(pan.X, pan.Y);
+        var brush = Placed(inked ?? mask, x, zoom, originX, pan);
         // (were the inking to fail: the ink through the mask, as before)
         return inked != null
             ? new Rectangle { Fill = brush, IsHitTestVisible = false }
             : new Rectangle { Fill = K.Brush(ink), OpacityMask = brush, IsHitTestVisible = false };
+    }
+
+    /// <summary>A picture filling its place, pinned at the foot (and the side asked), zoomed from there and moved by a share
+    /// of the place (the brush's own relative units).</summary>
+    private static ImageBrush Placed(ImageSource img, AlignmentX x, double zoom = 1, double originX = 1, (double X, double Y) pan = default)
+    {
+        var brush = new ImageBrush(img) { Stretch = Stretch.UniformToFill, AlignmentX = x, AlignmentY = AlignmentY.Bottom };
+        var moved = Math.Abs(pan.X) > 0.001 || Math.Abs(pan.Y) > 0.001;
+        if (Math.Abs(zoom - 1) > 0.001 && moved) brush.RelativeTransform = new TransformGroup { Children = { new ScaleTransform(zoom, zoom, originX, 1), new TranslateTransform(pan.X, pan.Y) } };
+        else if (Math.Abs(zoom - 1) > 0.001) brush.RelativeTransform = new ScaleTransform(zoom, zoom, originX, 1);
+        else if (moved) brush.RelativeTransform = new TranslateTransform(pan.X, pan.Y);
+        return brush;
     }
 
     /// <summary>A mask in a colour: the ink where the mask is, as much as the mask is there (premultiplied), frozen.</summary>

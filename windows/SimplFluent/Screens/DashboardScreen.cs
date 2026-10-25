@@ -445,6 +445,7 @@ public sealed partial class DashboardScreen : Screen
     private Button TileButton(Counter c, FrameworkElement content, (int? Value, string? Note, bool Kept) n, bool alert, Color color)
     {
         var face = Face(c.Key, alert, color);
+        Scenes.PlainWords(content, Appearance.Plain(c.Key)); // (0.3.59: its photo's Ink off — dark words, a white border)
         face.Children.Add(content);
         var b = K.CardButton(face, () => SetOpen(openKey == c.Key ? null : c.Key), 8, new Thickness(0));
         var spoken = Spoken(c.Key, c.Label, n.Value);
@@ -463,12 +464,14 @@ public sealed partial class DashboardScreen : Screen
     private static Grid Face(string key, bool alert, Color color)
     {
         var face = new Grid();
+        var plain = Appearance.Plain(key); // (0.3.59: a photo with its Ink off — as it is, no veil or wash over it; only a late count's red)
         if (Scenes.Backdrop(key) is { } scene)
         {
             face.Children.Add(scene);
-            face.Children.Add(Scenes.WordsVeil());
+            if (!plain) face.Children.Add(Scenes.WordsVeil());
         }
-        face.Children.Add(alert ? AlertFace() : Wash(color));
+        if (alert) face.Children.Add(AlertFace());
+        else if (!plain) face.Children.Add(Wash(color));
         face.SizeChanged += (_, e) => face.Clip = new RectangleGeometry(new Rect(0, 0, e.NewSize.Width, e.NewSize.Height), 7, 7);
         return face;
     }

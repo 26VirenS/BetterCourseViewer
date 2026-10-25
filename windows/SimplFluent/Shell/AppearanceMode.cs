@@ -226,6 +226,13 @@ public sealed class AppearanceOverlay : Grid
             menu.Items.Add(Item("Zoom in", SymbolRegular.ZoomIn24, () => Appearance.SetZoom(slot, Math.Min(3, Math.Round(Appearance.Zoom(slot) + 0.25, 2)))));
             menu.Items.Add(Item("Zoom out", SymbolRegular.ZoomOut24, () => Appearance.SetZoom(slot, Math.Max(0.5, Math.Round(Appearance.Zoom(slot) - 0.25, 2)))));
             menu.Items.Add(Item("Put back", SymbolRegular.ArrowReset24, () => Appearance.ResetPicture(slot)));
+            // (0.3.59) a photo of one's own: inked, or (off) shown as it is, the words on it white-bordered
+            if (Appearance.PhotoKind(slot) == "photo" && Appearance.Photo(slot) != null)
+            {
+                var ink = new MenuItem { Header = "Ink photo", IsCheckable = true, IsChecked = !Appearance.Plain(slot), Icon = new SymbolIcon { Symbol = SymbolRegular.Image24 } };
+                ink.Click += (_, _) => Appearance.SetPlain(slot, !ink.IsChecked);
+                menu.Items.Add(ink);
+            }
             menu.Items.Add(Item("Remove photo", SymbolRegular.Delete24, () => { Appearance.RemovePhoto(slot); Appearance.SetKind(slot, "none"); Scenes.Forget(); }));
         }
         menu.IsOpen = true;
