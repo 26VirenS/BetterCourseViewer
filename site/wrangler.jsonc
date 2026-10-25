@@ -3,12 +3,20 @@
   // the code first — answered by src/worker.js (Report a bug's endpoint, src/report.js). This is what
   // the dashboard's "Import a repository" flow deploys with `npx wrangler deploy`.
   //
-  // No bindings on purpose: a binding needs a resource made first, and a deploy that cannot find
-  // one fails whole — the Mac app's update feed with it. Reports go where the REPORT_WEBHOOK secret
-  // points (Settings → Variables and Secrets → Add → Secret); a secret outlives every deploy.
+  // No bindings that need a resource made first: a deploy that cannot find one fails whole — the Mac
+  // app's update feed with it. Reports go where the REPORT_WEBHOOK secret points (Settings → Variables
+  // and Secrets → Add → Secret); a secret outlives every deploy.
+  //
+  // (2.99.110) The one binding is FEEDS, Simpl's own calendar feeds (src/feed.js): a Durable Object
+  // class this Worker defines itself (src/feed-store.js), which the deploy makes from the migration
+  // below — nothing to make first. SQLite-backed, the kind the Workers Free plan has.
   "name": "simpl-courses",
   "main": "src/worker.js",
   "compatibility_date": "2026-09-12",
+  "durable_objects": {
+    "bindings": [{ "name": "FEEDS", "class_name": "FeedStore" }]
+  },
+  "migrations": [{ "tag": "feeds-v1", "new_sqlite_classes": ["FeedStore"] }],
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
