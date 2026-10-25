@@ -95,6 +95,9 @@ public static class Scenes
     /// (0.3.59) The words on a photo with its Ink switch off (the web's .bcv-side--plain, the Mac's PlainPhotoWords):
     /// dark in either look, with a gentle white border round them — a soft white edge, close in — so they read on any
     /// photo. The theme's text brushes are given again for this part alone; off, it is as it was.
+    /// One shadow round a thin letter is too faint over a dark photo, so the white is built up: a close shadow on each
+    /// of its parts and on each of theirs, under the soft one round the whole — near solid at the letters, soft beyond
+    /// (the web's ring of white and its glow). A part's own effect is left as it is.
     /// </summary>
     public static void PlainWords(FrameworkElement words, bool on)
     {
@@ -103,8 +106,35 @@ public static class Scenes
             if (on) words.Resources[key] = K.Brush(color);
             else words.Resources.Remove(key);
         }
-        words.Effect = on ? new System.Windows.Media.Effects.DropShadowEffect { Color = Colors.White, ShadowDepth = 0, BlurRadius = 4, Opacity = 1 } : null;
+        words.Effect = on ? HaloSoft : null;
+        foreach (var part in Parts(words))
+        {
+            if (!Close(part, on)) continue;
+            foreach (var inner in Parts(part)) Close(inner, on);
+        }
     }
+
+    private static readonly System.Windows.Media.Effects.DropShadowEffect HaloClose = Halo(2), HaloSoft = Halo(5);
+    private static System.Windows.Media.Effects.DropShadowEffect Halo(double blur)
+    {
+        var e = new System.Windows.Media.Effects.DropShadowEffect { Color = Colors.White, ShadowDepth = 0, BlurRadius = blur, Opacity = 1 };
+        e.Freeze();
+        return e;
+    }
+    /// <summary>The close white shadow put on (or taken off) one part, unless it has an effect of its own.</summary>
+    private static bool Close(FrameworkElement part, bool on)
+    {
+        if (part.Effect != null && part.Effect != HaloClose) return false;
+        part.Effect = on ? HaloClose : null;
+        return true;
+    }
+    private static IEnumerable<FrameworkElement> Parts(FrameworkElement e) => e switch
+    {
+        Panel p => p.Children.OfType<FrameworkElement>().ToList(),
+        Decorator { Child: FrameworkElement c } => new[] { c },
+        ContentControl { Content: FrameworkElement c } => new[] { c },
+        _ => Array.Empty<FrameworkElement>(),
+    };
 
     private static readonly (string Key, Color Color)[] PlainInks =
     {
