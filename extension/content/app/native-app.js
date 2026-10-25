@@ -3077,10 +3077,11 @@
   }
   const askCal = (m) => Promise.resolve(BCV.api.runtime.sendMessage({ type: 'cal', ...m })).catch((e) => ({ ok: false, message: e?.message || String(e) }));
   // (2.99.110) Simpl's own calendar (content/app/feed.js) in place of Canvas's feed: whether it is on, its private link as
-  // each calendar app takes it, when it was last sent and how many events it held, or why it could not be
+  // each calendar app takes it, when it was last sent and how many events it held, or why it could not be (`problem`: an
+  // answer's own `error` is the apps' sign that the call failed)
   function feedOut(st) {
     const L = st?.on && st.link ? BCV.feed.links(st.link) : null;
-    return { on: !!st?.on, link: L?.https || null, apple: L?.apple || null, google: L?.google || null, office: L?.office || null, outlook: L?.outlook || null, sent: st?.at ? new Date(st.at).toISOString() : null, count: st?.count || 0, error: st?.error || '' };
+    return { on: !!st?.on, link: L?.https || null, apple: L?.apple || null, google: L?.google || null, office: L?.office || null, outlook: L?.outlook || null, sent: st?.at ? new Date(st.at).toISOString() : null, count: st?.count || 0, problem: st?.error || '' };
   }
   const feedState = async () => feedOut(await BCV.feed.state());
   const feedOn = async () => feedOut(await BCV.feed.turnOn());

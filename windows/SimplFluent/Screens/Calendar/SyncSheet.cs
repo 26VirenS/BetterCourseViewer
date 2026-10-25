@@ -86,7 +86,7 @@ internal static class SyncSheet
                 make_.HorizontalAlignment = HorizontalAlignment.Stretch;
                 make_.MinHeight = 36;
                 var off = K.V(12, intro, make_);
-                if (f.Error.Length > 0) off.Children.Add(Status(f.Error, SymbolRegular.Warning24, B.Critical));
+                if (f.Problem.Length > 0) off.Children.Add(Status(f.Problem, SymbolRegular.Warning24, B.Critical));
                 return K.Card(off, new Thickness(14), 8);
             }
             Button? outlook = null;
@@ -121,7 +121,7 @@ internal static class SyncSheet
                 b.Margin = new Thickness(0, 0, 8, 8);
                 grid.Children.Add(b);
             }
-            FrameworkElement status = f.Error.Length > 0 ? Status(f.Error, SymbolRegular.Warning24, B.Critical)
+            FrameworkElement status = f.Problem.Length > 0 ? Status(f.Problem, SymbolRegular.Warning24, B.Critical)
                 : CalendarKit.Date(f.Sent) is { } at ? Status($"Up to date · sent {Ago(at)} · {(f.Count == 1 ? "1 event" : $"{f.Count} events")}", SymbolRegular.CheckmarkCircle24, B.Success)
                 : K.H(8, K.Spinner(14), K.Text("Sending it…", Ty.Caption, B.Text2));
             var note = K.Wrapped("Your work, your own tasks and your plans, sent again while Simpl is open. It is sealed: only this private link opens it, so keep it to yourself. Google and Outlook look for changes every few hours.", Ty.Caption, B.Text2);
@@ -171,10 +171,10 @@ internal static class SyncSheet
             SimplFeed? f = null;
             try { f = await engine.Call<SimplFeed>("feedOn"); }
             catch (Exception e) { Log.Write("sync: simpl calendar " + e.Message); }
-            Log.Write(f is { On: true, Error.Length: 0 } ? $"sync: simpl calendar made, {f.Count} events sent" : $"sync: simpl calendar not made: {f?.Error}");
+            Log.Write(f is { On: true, Problem.Length: 0 } ? $"sync: simpl calendar made, {f.Count} events sent" : $"sync: simpl calendar not made: {f?.Problem}");
             turning = false;
-            if (data != null) data.Simpl = f ?? new SimplFeed { Error = "Simpl could not reach simplcourses.com. Try again in a moment." };
-            if (f is { On: true, Error.Length: 0 }) Say("Your Simpl calendar is made. Add it to your calendar app above.", false);
+            if (data != null) data.Simpl = f ?? new SimplFeed { Problem = "Simpl could not reach simplcourses.com. Try again in a moment." };
+            if (f is { On: true, Problem.Length: 0 }) Say("Your Simpl calendar is made. Add it to your calendar app above.", false);
             Paint();
         }
 

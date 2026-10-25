@@ -94,7 +94,8 @@ public sealed class SimplFeed
     public string? Outlook { get; set; }
     public string? Sent { get; set; }
     public int Count { get; set; }
-    public string Error { get; set; } = "";
+    // why it could not be made or sent (`problem`, as an answer's own `error` is how the apps know a call failed)
+    public string Problem { get; set; } = "";
 }
 
 public sealed class SyncLink
