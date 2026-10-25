@@ -77,7 +77,9 @@ private struct PhotoEditRing: View {
             .overlay(shape.strokeBorder(Theme.accent, lineWidth: 2))
             .background(slot.isSide ? nil : shape.inset(by: -4).stroke(Theme.accent.opacity(0.22), lineWidth: 6))
             .frame(width: frame.width + 2 * o, height: frame.height + 2 * o)
-            .offset(x: frame.minX - o, y: frame.minY - o)
+            // (1.3.168) the place's shape, the drag, the pinch and the hand set on the ring where it is laid out, and only
+            // then the ring moved onto the place: set after the move, they stayed where the ring was laid out — the
+            // overlay's top left corner — and a drag or a pinch on the place reached nothing
             .contentShape(shape)
             .gesture(move.simultaneously(with: pinch))
             .onHover { inside in
@@ -87,6 +89,7 @@ private struct PhotoEditRing: View {
             }
             .onDisappear { if hovering { NSCursor.pop() } }
             .accessibilityLabel(Text("\(slot.isSide ? "Sidebar" : slot.title) photo: drag to move it, pinch to zoom"))
+            .offset(x: frame.minX - o, y: frame.minY - o)
     }
 
     /// The photo follows the pointer: the point pinned moves the other way across the place as the photo is pulled
