@@ -139,9 +139,13 @@ internal static class PlanRail
         row.Unloaded += (_, _) => { if (pull != null) End(false); };
     }
 
-    /// <summary>The rail in the choosing kind, under <paramref name="at"/> (the menu's Plan a Time…, Move Plan…, and P).</summary>
-    public static void Open(FrameworkElement at, string id, string title, Engine.Engine engine, Action? planned = null) =>
-        Rail.Open(at, id, title, engine, RailKind.Pick, planned);
+    /// <summary>The rail in the choosing kind, under <paramref name="at"/> (the menu's Plan a Time…, Move Plan…, and P).
+    /// <paramref name="held"/>: kept open as the app goes behind another (the screenshot suite's picture).</summary>
+    public static void Open(FrameworkElement at, string id, string title, Engine.Engine engine, Action? planned = null, bool held = false)
+    {
+        var r = Rail.Open(at, id, title, engine, RailKind.Pick, planned);
+        if (held) r.Hold();
+    }
 
     /// <summary>A plan cleared (the menu's Clear Plan), and every screen read again.</summary>
     public static async void Clear(string id, Engine.Engine engine, Action? planned = null)
@@ -245,6 +249,8 @@ internal static class PlanRail
             _ = r.Load(null);
             return r;
         }
+
+        public void Hold() => popup.StaysOpen = true;
 
         public void Close()
         {

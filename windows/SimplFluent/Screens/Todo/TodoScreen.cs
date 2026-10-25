@@ -248,12 +248,13 @@ public sealed partial class TodoScreen : Screen
         }
     }
 
-    /// <summary>(0.3.60) The screenshot suite (--open plan): the rail of free times under the last piece of work still to
-    /// do, once the page has settled.</summary>
+    /// <summary>(0.3.60) The screenshot suite (--open plan): the rail of free times under the first piece of work still
+    /// to do that is not late, once the page has settled.</summary>
     private async void ShotPlan(TodoData d)
     {
         if (shotAsked || Launch.Get("open") != "plan") return;
-        if (d.Sections.SelectMany(s => s.Rows).LastOrDefault(r => !r.Done && r.Custom != true) is not { } last) return;
+        // (near the top, as the Mac's picture: the rail has room under it)
+        if (d.Sections.Where(s => s.Title != "Overdue").SelectMany(s => s.Rows).FirstOrDefault(r => !r.Done && r.Custom != true) is not { } row) return;
         shotAsked = true;
         // (the picture waits for the rail: it is not taken while this is under way)
         Shot.Began();
@@ -261,11 +262,13 @@ public sealed partial class TodoScreen : Screen
         {
             await Task.Delay(1500);
             if (Launch.Take("plan") == null) return;
-            if (planRows.TryGetValue(last.Id, out var at) && at.IsLoaded)
+            if (planRows.TryGetValue(row.Id, out var at) && at.IsLoaded)
             {
                 at.BringIntoView();
                 await Task.Delay(400); // (scrolled to first: the rail hangs where the row is)
-                if (at.IsLoaded) PlanRail.Open(at, last.Id, last.Title, engine);
+                // (held open: the suite starts other copies of Simpl beside this one, and their taking the focus would
+                //  close it, as SettingsWindow's find list for its picture)
+                if (at.IsLoaded) PlanRail.Open(at, row.Id, row.Title, engine, held: true);
             }
         }
         finally { Shot.Ended(); }
