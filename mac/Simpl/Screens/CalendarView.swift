@@ -1653,7 +1653,7 @@ struct CalendarView: View {
     /// (1.3.172, the web's 2.99.113) An item's own press: a plan's popover — when it is, what for, Edit and Delete Plan
     /// (PlanPopover) — and anything else's preview grown out of it.
     @ViewBuilder
-    private func eventLink<V: View>(_ ev: CalEvent, padded: Bool = true, radius: CGFloat = 10, @ViewBuilder label: () -> V) -> some View {
+    private func eventLink<V: View>(_ ev: CalEvent, padded: Bool = true, radius: CGFloat = 10, @ViewBuilder label: @escaping () -> V) -> some View {
         if ev.layer == "plan", ev.planId != nil {
             Button { planOpen = ev.id } label: { label().contentShape(Rectangle()) }
                 .buttonStyle(.plain)
