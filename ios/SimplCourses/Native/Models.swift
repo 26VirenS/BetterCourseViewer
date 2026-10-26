@@ -412,6 +412,11 @@ struct CalEvent: Codable, Identifiable, Hashable {
     var layer: String?
     var planId: String?
     var end: String?
+    /// (Mac 1.3.172) A plan's time this block is (a repeating plan's each), whether it repeats, and how many tasks its
+    /// group holds (1 for a plan alone).
+    var occurs: String?
+    var repeats: Bool?
+    var tasks: Int?
 }
 
 /// (2.99.95) Find Appointment: Canvas's Scheduler as native-app.js `appointments` reads it — the classes with something to

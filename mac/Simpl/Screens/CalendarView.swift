@@ -31,6 +31,8 @@ struct CalendarView: View {
     /// The screenshot suite's -SimplCalView looked at (each Calendar drawn looks once).
     @State private var launchViewRead = false
     @State private var choosing = false
+    /// (1.3.172) The screenshot suite's -SimplPlanEdit YES: a plan's popover opened at its Edit.
+    private static let shotPlanEdit = UserDefaults.standard.bool(forKey: "SimplPlanEdit")
     /// (1.3.151) Find Appointment's popup (Appointments.swift); the screenshot suite's -SimplFindAppointment YES opens it.
     @State private var finding = UserDefaults.standard.bool(forKey: "SimplFindAppointment")
     /// (1.3.165) Sync's popup (SyncPopup.swift); the screenshot suite's -SimplSync YES opens it.
@@ -56,6 +58,15 @@ struct CalendarView: View {
     /// (1.3.167) A plan's block being dragged on the week: by how many days and minutes (a quarter of an hour at a time);
     /// `dropped`, let go and on its way to the page — it stays where it was let go until the week is read again.
     @State private var planDrag: PlanDrag?
+    /// (1.3.172, the web's 2.99.113 and 2.99.114) A plan's block whose foot is being pulled: how long it would be;
+    /// `dropped`, let go and on its way to the page. The plan whose popover is up (its settings, Edit). The plan a dragged
+    /// block or a row of To Do is held over: let go there, it joins that plan's group. The foot the pointer is over.
+    @State private var planStretch: PlanStretch?
+    @State private var planOpen: String?
+    @State private var joinOnto: String?
+    @State private var gripHover: String?
+    /// (1.3.172) The screenshot suite's -SimplPlanPopover YES: a piece of work planned and its popover opened (once).
+    @State private var shotPlanned = false
     /// (1.3.169, 1.3.170 in every view) To Do beside the calendar, on unless turned off; a row of it being dragged over a
     /// day of the week — the day and the minute it would be planned for — or over a day of the month or the agenda; and
     /// what came of the last one let go.
@@ -316,7 +327,6 @@ struct CalendarView: View {
             }
         }
         .animation(Motion.gentle, value: loading)
-        .zIndex(1) // (a button's name, shown under it on a hover, is drawn over the calendar below)
     }
 
     @ViewBuilder
@@ -380,20 +390,18 @@ struct CalendarView: View {
                     shift(-1)
                 } label: {
                     Label(stepWords.back, systemImage: "chevron.left")
-                        .labelStyle(.iconOnly)
-                        .frame(minWidth: 14)
+                        .labelStyle(HoverWordsLabel())
                 }
                 .glassButton()
-                .hoverName("\(stepWords.back) (←)")
+                .hoverName(stepWords.back)
                 Button {
                     shift(1)
                 } label: {
                     Label(stepWords.on, systemImage: "chevron.right")
-                        .labelStyle(.iconOnly)
-                        .frame(minWidth: 14)
+                        .labelStyle(HoverWordsLabel())
                 }
                 .glassButton()
-                .hoverName("\(stepWords.on) (→)")
+                .hoverName(stepWords.on)
                 Button("Today") { goToday() }
                     .glassButton()
                     .keyboardShortcut("t", modifiers: .command)
@@ -412,8 +420,7 @@ struct CalendarView: View {
                     withAnimation(reduceMotion ? nil : Motion.snappy) { todoOn.toggle() }
                 } label: {
                     Label(todoOn ? "Hide To Do" : "Show To Do", systemImage: "sidebar.left")
-                        .labelStyle(.iconOnly)
-                        .frame(minWidth: 16)
+                        .labelStyle(HoverWordsLabel())
                 }
                 .glassButton(tint: todoOn ? Theme.accent : nil)
                 .hoverName(todoOn ? "Hide To Do" : "Show To Do")
@@ -756,7 +763,7 @@ struct CalendarView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     // (1.2.3) an item clicked on the grid grows its preview out of it; the rest of the day picks the day
                     ForEach(Array(shown.enumerated()), id: \.element.id) { i, ev in
-                        PreviewLink(item: .event(ev, engine: engine), padded: false, radius: 5, inline: false) {
+                        eventLink(ev, padded: false, radius: 5) {
                             CalendarChip(event: ev, lines: i < spare ? 2 : 1)
                         }
                         .help(ev.title)
@@ -927,7 +934,7 @@ struct CalendarView: View {
     /// (1.2.3) A press grows the item's preview out of its row (a double-click opens it where it lives).
     private func eventRow(_ ev: CalEvent) -> some View {
         withEventMenu(ev) {
-            PreviewLink(item: .event(ev, engine: engine), inline: false) {
+            eventLink(ev) {
                 CalendarEventLine(event: ev)
             }
         }
@@ -936,7 +943,7 @@ struct CalendarView: View {
     /// An item's own menu (open it, open it in Canvas, copy its link), where it has an address.
     @ViewBuilder
     private func withEventMenu<V: View>(_ ev: CalEvent, @ViewBuilder _ content: () -> V) -> some View {
-        if (ev.url ?? "").isEmpty && ev.reservationId == nil {
+        if (ev.url ?? "").isEmpty && ev.reservationId == nil && ev.layer != "plan" {
             content()
         } else {
             content().contextMenu { eventMenu(ev) }
@@ -951,12 +958,13 @@ struct CalendarView: View {
             Button("Open in \(engine.lmsName)") { engine.openWebScreen(url, title: ev.title) }
             Button("Copy Link") { if let u = engine.absolute(url) { copyToPasteboard(u.absoluteString) } }
         }
-        // (1.3.165) a plan: cleared from here (moved from its work's row)
+        // (1.3.165) a plan: cleared from here (moved from its work's row); (1.3.172) edited, or deleted with its group
         if ev.layer == "plan", let pid = ev.planId {
             Divider()
-            Button("Clear Plan") {
+            Button("Edit Plan…") { planOpen = ev.id }
+            Button("Delete Plan") {
                 Task {
-                    _ = try? await engine.call("planClear", ["id": pid], as: ActReply.self)
+                    _ = try? await engine.call("planClear", ["id": pid, "group": true], as: ActReply.self)
                     engine.changed()
                 }
             }
@@ -1030,24 +1038,26 @@ struct CalendarView: View {
         return parts.count == 2 ? TodoDrop(day: parts[0], minutes: parts[1]) : nil
     }
 
-    /// Where a row dragged over a day would be planned: an hour's block at that time, its times on it.
-    private func todoDropBlock(_ d: TodoDrop) -> some View {
+    /// Where a row dragged over a day would be planned: an hour's block at that time, its times on it. (1.3.172) Held
+    /// over a plan, that plan's block, ringed: let go there, the row joins its group.
+    private func todoDropBlock(_ d: TodoDrop, onto: WeekItem? = nil) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text("\(clock(d.minutes)) – \(clock(d.minutes + 60))")
+            Text(onto == nil ? "\(clock(d.minutes)) – \(clock(d.minutes + 60))" : "Group with")
                 .font(.system(size: 10.5, weight: .bold).monospacedDigit())
-            Text(d.placed ? "Planning it…" : "Plan it here")
+            Text(onto?.ev.title ?? (d.placed ? "Planning it…" : "Plan it here"))
                 .font(.sCaption2)
+                .lineLimit(2)
         }
         .foregroundStyle(Theme.accent)
         .padding(.horizontal, 6)
         .padding(.vertical, 4)
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .frame(height: max(20, hour - 2), alignment: .top)
+        .frame(height: max(20, onto.map { CGFloat(length($0.ev) ?? 60) / 60 * hour } ?? hour) - 2, alignment: .top)
         .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Theme.accent.opacity(0.16)))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.accent, style: StrokeStyle(lineWidth: 1.5, dash: d.placed ? [] : [4, 3])))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.accent, style: StrokeStyle(lineWidth: onto == nil ? 1.5 : 2, dash: d.placed || onto != nil ? [] : [4, 3])))
         .padding(.horizontal, 3)
-        .offset(y: weekY(d.minutes))
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.08), value: d.minutes)
+        .offset(y: weekY(onto?.at ?? d.minutes))
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.08), value: onto?.at ?? d.minutes)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
@@ -1061,7 +1071,22 @@ struct CalendarView: View {
 
     /// A row let go on a day of the week: planned there for an hour (the page's planPut); the block stays where it was
     /// let go until the week is read again, and what came of it is said under To Do.
-    private func planFromTodo(_ id: String, day: Int, minutes: Int) {
+    private func planFromTodo(_ id: String, day: Int, minutes: Int, onto: WeekItem? = nil) {
+        if let onto, let target = onto.ev.planId { // (1.3.172) let go over a plan: one block with it, the plan's group's
+            todoDrop = nil
+            NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
+            Task {
+                do {
+                    _ = try await engine.call("planJoin", ["id": id, "onto": target], as: ActReply.self)
+                    say("Grouped with \(onto.ev.title)")
+                    engine.changed()
+                } catch {
+                    let why = error.localizedDescription
+                    withAnimation(reduceMotion ? nil : Motion.snappy) { failure = why }
+                }
+            }
+            return
+        }
         guard let date = cal.date(byAdding: .day, value: day, to: weekStart),
               let at = cal.date(bySettingHour: minutes / 60, minute: minutes % 60, second: 0, of: date) else {
             todoDrop = nil
@@ -1099,6 +1124,29 @@ struct CalendarView: View {
                 withAnimation(reduceMotion ? nil : Motion.snappy) { failure = why }
             }
         }
+    }
+
+    /// (1.3.172) The screenshot suite's -SimplPlanPopover YES (in a home of its own: the plan is kept): the first piece
+    /// of Canvas's work still open on To Do planned tomorrow (today, on the week's last day) at its first free time, as
+    /// a row let go on that day is, then its block's popover opened — at its Edit with -SimplPlanEdit YES.
+    private func shotPlan() async {
+        struct Rows: Decodable {
+            struct Section: Decodable { var rows: [Row] }
+            struct Row: Decodable {
+                var id: String
+                var done: Bool?
+                var custom: Bool?
+            }
+            var sections: [Section]
+        }
+        let today = cal.startOfDay(for: Date())
+        let tomorrow = cal.date(byAdding: .day, value: 1, to: today) ?? today
+        let last = cal.date(byAdding: .day, value: weekDays - 1, to: weekStart) ?? weekStart
+        guard let rows = try? await engine.call("todo", ["panel": true], as: Rows.self),
+              let first = rows.sections.flatMap(\.rows).first(where: { $0.done != true && $0.custom != true && $0.id.hasPrefix("assignment:") }) else { return }
+        _ = try? await engine.call("planDay", ["id": first.id, "day": ISO8601DateFormatter().string(from: tomorrow > last ? today : tomorrow)], as: PlanDayReply.self)
+        await load(animated: false)
+        if let ev = data?.events.first(where: { $0.layer == "plan" && $0.planId == first.id }) { planOpen = ev.id }
     }
 
     /// What came of a row let go, under To Do for four seconds.
@@ -1209,9 +1257,9 @@ struct CalendarView: View {
                     ForEach(Array(days.enumerated()), id: \.element) { i, day in
                         WeekDayStack {
                             ForEach(timed[i]) { item in
-                                planDraggable(item, day: i)
+                                planDraggable(item, day: i, week: timed)
                                     .layoutValue(key: WeekAt.self, value: weekY(item.at))
-                                    .layoutValue(key: WeekLength.self, value: length(item.ev).map { CGFloat($0) / 60 * hour - 2 } ?? 0)
+                                    .layoutValue(key: WeekLength.self, value: shownLength(item.ev).map { CGFloat($0) / 60 * hour - 2 } ?? 0)
                             }
                         }
                         .padding(.horizontal, 3)
@@ -1229,10 +1277,10 @@ struct CalendarView: View {
                         }
                         .overlay(alignment: .leading) { Self.line.frame(width: 1) }
                         .overlay(alignment: .top) { // (1.3.169) where a row of To Do dragged over this day would be planned
-                            if let d = todoDrop, d.day == i { todoDropBlock(d) }
+                            if let d = todoDrop, d.day == i { todoDropBlock(d, onto: d.placed ? nil : planAt(timed[i], minute: d.minutes + 30, not: nil)) }
                         }
                         .onDrop(of: [.text], delegate: TodoDropDelegate(day: i, hourHeight: hour, enabled: todoOn, scroller: weekScroll, drop: $todoDrop) { id, mins in
-                            planFromTodo(id, day: i, minutes: mins)
+                            planFromTodo(id, day: i, minutes: mins, onto: planAt(timed[i], minute: mins + 30, not: nil))
                         })
                         .zIndex(timed[i].contains(where: { $0.ev.id == planDrag?.id }) ? 1 : 0) // (a dragged plan over the days beside)
                     }
@@ -1369,50 +1417,180 @@ struct CalendarView: View {
     }
 
     /// (1.3.167) A plan's block, dragged to move it: it follows the pointer a quarter of an hour at a time — the time it
-    /// would go to on a tag over it — and across to another day; let go, the plan is moved there (the page's planMove).
-    /// A click without a drag is the block's own. Anything else on the grid is as it was.
+    /// would go to on a tag over it — and across to another day; let go, the plan is moved there (the page's planMove;
+    /// 1.3.172: one of a repeating plan's times moves the series by as much). A click without a drag opens its popover.
+    /// (1.3.172, the web's 2.99.113 and 2.99.114) Its foot pulled makes it longer or shorter; held over another plan, that
+    /// plan is ringed and the tag says "Group with …" — let go there, it joins that plan's group (its own group with it).
+    /// Anything else on the grid is as it was.
     @ViewBuilder
-    private func planDraggable(_ item: WeekItem, day: Int) -> some View {
+    private func planDraggable(_ item: WeekItem, day: Int, week: [[WeekItem]]) -> some View {
         if item.ev.layer == "plan", let pid = item.ev.planId {
             let d = planDrag?.id == item.ev.id ? planDrag : nil
             let len = length(item.ev) ?? 60
-            weekBlock(item.ev, fill: true)
-                .offset(x: CGFloat(d?.days ?? 0) * weekColumn, y: CGFloat(d?.minutes ?? 0) / 60 * hour)
-                .shadow(color: .black.opacity(d != nil && d?.dropped == false ? 0.22 : 0), radius: 10, y: 5)
-                .overlay(alignment: .top) {
-                    if let d, !d.dropped { dragTime(item.at + d.minutes, day: day + d.days).offset(x: CGFloat(d.days) * weekColumn, y: CGFloat(d.minutes) / 60 * hour - 12) }
+            let onto = d.flatMap { d in d.dropped ? nil : planAt(dayOf(week, day + d.days), minute: item.at + d.minutes + d.grab, not: pid) }
+            ZStack(alignment: .bottom) {
+                weekBlock(item.ev, fill: true)
+                    .highPriorityGesture(
+                        DragGesture(minimumDistance: 4)
+                            .onChanged { g in
+                                let mins = Int(((g.translation.height / hour) * 60 / 15).rounded()) * 15
+                                let lo = -item.at, hi = max(lo, 24 * 60 - len - item.at)
+                                let days = weekColumn > 0 ? min(weekDays - 1 - day, max(-day, Int((g.translation.width / weekColumn).rounded()))) : 0
+                                let grab = max(0, Int(g.startLocation.y / hour * 60))
+                                let next = PlanDrag(id: item.ev.id, days: days, minutes: min(hi, max(lo, mins)), grab: grab)
+                                guard next != planDrag else { return }
+                                planDrag = next
+                                joinOnto = planAt(dayOf(week, day + days), minute: item.at + next.minutes + grab, not: pid)?.ev.id
+                                NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                            }
+                            .onEnded { _ in
+                                guard let d = planDrag, d.id == item.ev.id else { return }
+                                joinOnto = nil
+                                if let target = planAt(dayOf(week, day + d.days), minute: item.at + d.minutes + d.grab, not: pid), let onto = target.ev.planId {
+                                    planDrag?.dropped = true
+                                    Task {
+                                        let r = try? await engine.call("planJoin", ["id": pid, "onto": onto, "whole": true], as: ActReply.self)
+                                        if r?.ok == true { say("Grouped with \(target.ev.title)") } else { withAnimation(Motion.snappy) { planDrag = nil } }
+                                        engine.changed()
+                                    }
+                                    return
+                                }
+                                guard d.days != 0 || d.minutes != 0, let start = PreviewFormat.date(item.ev.date),
+                                      let moved = cal.date(byAdding: .minute, value: d.days * 24 * 60 + d.minutes, to: start) else {
+                                    planDrag = nil
+                                    return
+                                }
+                                planDrag?.dropped = true
+                                var args: [String: Any] = ["id": pid, "at": ISO8601DateFormatter().string(from: moved)]
+                                if let occurs = item.ev.occurs { args["occurs"] = occurs }
+                                Task {
+                                    let r = try? await engine.call("planMove", args, as: ActReply.self)
+                                    if r?.ok != true { withAnimation(Motion.snappy) { planDrag = nil } }
+                                    engine.changed()
+                                }
+                            }
+                    )
+                stretchGrip(item, pid: pid, len: len)
+            }
+            .overlay {
+                if joinOnto == item.ev.id { // (another plan held over this one: let go, they are one block)
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(Theme.accent, lineWidth: 2)
+                        .allowsHitTesting(false)
                 }
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.08), value: d)
-                .highPriorityGesture(
-                    DragGesture(minimumDistance: 4)
-                        .onChanged { g in
-                            let mins = Int(((g.translation.height / hour) * 60 / 15).rounded()) * 15
-                            let lo = -item.at, hi = max(lo, 24 * 60 - len - item.at)
-                            let days = weekColumn > 0 ? min(weekDays - 1 - day, max(-day, Int((g.translation.width / weekColumn).rounded()))) : 0
-                            let next = PlanDrag(id: item.ev.id, days: days, minutes: min(hi, max(lo, mins)))
-                            guard next != planDrag else { return }
-                            planDrag = next
-                            NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
-                        }
-                        .onEnded { _ in
-                            guard let d = planDrag, d.id == item.ev.id else { return }
-                            guard d.days != 0 || d.minutes != 0, let start = PreviewFormat.date(item.ev.date),
-                                  let moved = cal.date(byAdding: .minute, value: d.days * 24 * 60 + d.minutes, to: start) else {
-                                planDrag = nil
-                                return
-                            }
-                            planDrag?.dropped = true
-                            Task {
-                                let r = try? await engine.call("planMove", ["id": pid, "at": ISO8601DateFormatter().string(from: moved)], as: ActReply.self)
-                                if r?.ok != true { withAnimation(Motion.snappy) { planDrag = nil } }
-                                engine.changed()
-                            }
-                        }
-                )
-                .accessibilityHint("Drag to move the plan")
+            }
+            .overlay(alignment: .bottom) {
+                if let s = planStretch, s.id == item.ev.id, !s.dropped {
+                    Text("\(clock(item.at)) – \(clock(item.at + s.mins))")
+                        .font(.system(size: 10.5, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(Theme.accent))
+                        .fixedSize()
+                        .offset(y: 12)
+                        .allowsHitTesting(false)
+                }
+            }
+            .offset(x: CGFloat(d?.days ?? 0) * weekColumn, y: CGFloat(d?.minutes ?? 0) / 60 * hour)
+            .shadow(color: .black.opacity(d != nil && d?.dropped == false ? 0.22 : 0), radius: 10, y: 5)
+            .overlay(alignment: .top) {
+                if let d, !d.dropped {
+                    Group {
+                        if let onto { joinTag(onto.ev.title) } else { dragTime(item.at + d.minutes, day: day + d.days) }
+                    }
+                    .offset(x: CGFloat(d.days) * weekColumn, y: CGFloat(d.minutes) / 60 * hour - 12)
+                }
+            }
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.08), value: d)
+            .accessibilityHint("Drag to move the plan, or onto another plan to group them; drag its foot to make it longer or shorter")
         } else {
             weekBlock(item.ev, fill: length(item.ev) != nil)
         }
+    }
+
+    /// (1.3.172) The plan of a day of the week whose block holds a minute of it (other than the plan `not`): what a dragged
+    /// block, or a row of To Do, let go there joins.
+    private func planAt(_ items: [WeekItem], minute: Int, not: String?) -> WeekItem? {
+        items.first { it in
+            guard it.ev.layer == "plan", it.ev.allDay != true, let p = it.ev.planId, p != not else { return false }
+            return minute >= it.at && minute < it.at + (length(it.ev) ?? 60)
+        }
+    }
+
+    /// The items of a day of the week (none past its ends).
+    private func dayOf(_ week: [[WeekItem]], _ day: Int) -> [WeekItem] {
+        week.indices.contains(day) ? week[day] : []
+    }
+
+    /// (1.3.172) An item's length as drawn: a plan's whose foot is being pulled, as long as it is pulled.
+    private func shownLength(_ ev: CalEvent) -> Int? {
+        if let s = planStretch, s.id == ev.id { return s.mins }
+        return length(ev)
+    }
+
+    /// (1.3.172, the web's 2.99.113) A plan's foot: under the pointer a short bar shows on it and the pointer turns to
+    /// the up-and-down arrow; pulled, the block follows a quarter of an hour at a time (its times on a tag under it), a
+    /// quarter of an hour long at least and over by midnight; let go, the plan is that long (the page's planEdit), its
+    /// group's every task with it.
+    private func stretchGrip(_ item: WeekItem, pid: String, len: Int) -> some View {
+        let shown = gripHover == item.ev.id || planStretch?.id == item.ev.id
+        return Capsule()
+            .fill(Color.white.opacity(0.9))
+            .frame(width: 22, height: 3)
+            .shadow(color: .black.opacity(0.25), radius: 1)
+            .opacity(shown ? 1 : 0)
+            .frame(maxWidth: .infinity)
+            .frame(height: 9)
+            .contentShape(Rectangle())
+            .onHover { inside in
+                if inside {
+                    gripHover = item.ev.id
+                    NSCursor.resizeUpDown.push()
+                } else {
+                    if gripHover == item.ev.id { gripHover = nil }
+                    NSCursor.pop()
+                }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 2)
+                    .onChanged { g in
+                        let pulled = Double(len) + Double(g.translation.height / hour) * 60
+                        let mins = max(15, min(24 * 60 - item.at, Int((pulled / 15).rounded()) * 15))
+                        let next = PlanStretch(id: item.ev.id, mins: mins)
+                        guard next != planStretch else { return }
+                        planStretch = next
+                        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                    }
+                    .onEnded { _ in
+                        guard let st = planStretch, st.id == item.ev.id else { return }
+                        guard st.mins != len else {
+                            planStretch = nil
+                            return
+                        }
+                        planStretch?.dropped = true
+                        Task {
+                            let r = try? await engine.call("planEdit", ["id": pid, "mins": st.mins], as: ActReply.self)
+                            if r?.ok != true { withAnimation(Motion.snappy) { planStretch = nil } }
+                            engine.changed()
+                        }
+                    }
+            )
+            .accessibilityHidden(true)
+    }
+
+    /// (1.3.172) What a block dragged over another plan would do, on a tag over it.
+    private func joinTag(_ title: String) -> some View {
+        Text("Group with \(title)")
+            .font(.system(size: 10.5, weight: .semibold))
+            .lineLimit(1)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(Theme.accent))
+            .frame(maxWidth: 220)
+            .fixedSize()
+            .allowsHitTesting(false)
     }
 
     /// The time a dragged plan would go to, on a tag over it.
@@ -1465,11 +1643,28 @@ struct CalendarView: View {
     /// `fill`: as tall as the grid makes it (an item that says how long it lasts), rather than as its name needs.
     private func weekBlock(_ ev: CalEvent, fill: Bool = false) -> some View {
         withEventMenu(ev) {
-            PreviewLink(item: .event(ev, engine: engine), padded: false, radius: 8, inline: false) {
+            eventLink(ev, padded: false, radius: 8) {
                 CalendarWeekBlock(event: ev, fill: fill)
             }
         }
         .help(ev.sub ?? ev.title)
+    }
+
+    /// (1.3.172, the web's 2.99.113) An item's own press: a plan's popover — when it is, what for, Edit and Delete Plan
+    /// (PlanPopover) — and anything else's preview grown out of it.
+    @ViewBuilder
+    private func eventLink<V: View>(_ ev: CalEvent, padded: Bool = true, radius: CGFloat = 10, @ViewBuilder label: () -> V) -> some View {
+        if ev.layer == "plan", ev.planId != nil {
+            Button { planOpen = ev.id } label: { label().contentShape(Rectangle()) }
+                .buttonStyle(.plain)
+                .popover(isPresented: Binding(get: { planOpen == ev.id }, set: { if !$0, planOpen == ev.id { planOpen = nil } }), arrowEdge: .trailing) {
+                    PlanPopover(event: ev, startEditing: Self.shotPlanEdit) { planOpen = nil }
+                        .environmentObject(engine)
+                }
+                .accessibilityHint("Shows the plan, to edit it")
+        } else {
+            PreviewLink(item: .event(ev, engine: engine), padded: padded, radius: radius, inline: false) { label() }
+        }
     }
 
     // MARK: List
@@ -1735,6 +1930,7 @@ struct CalendarView: View {
                     data = d
                     failure = nil
                     if planDrag?.dropped == true { planDrag = nil } // (1.3.167: the plan dragged, now where the page has it)
+                    if planStretch?.dropped == true { planStretch = nil } // (1.3.172: the plan pulled, now as long as the page has it)
                     if todoDrop?.placed == true { todoDrop = nil } // (1.3.169: the row let go, now a plan on the week)
                 }
             } else {
@@ -1743,9 +1939,14 @@ struct CalendarView: View {
                     failure = nil
                 }
                 if planDrag?.dropped == true { planDrag = nil }
+                if planStretch?.dropped == true { planStretch = nil }
                 if todoDrop?.placed == true { todoDrop = nil }
             }
             error = nil
+            if !shotPlanned, UserDefaults.standard.bool(forKey: "SimplPlanPopover") {
+                shotPlanned = true
+                Task { await shotPlan() }
+            }
         } catch {
             guard asked == ask else { return }
             if data == nil {
@@ -2335,6 +2536,15 @@ struct PlanDrag: Equatable {
     var id: String
     var days: Int
     var minutes: Int
+    /// (1.3.172) How far into the block it was taken, in minutes: where the pointer is, for the plan it is held over.
+    var grab = 0
+    var dropped = false
+}
+
+/// (1.3.172) A plan's foot pulled on the week: how long the plan would be; let go, on its way to the page.
+struct PlanStretch: Equatable {
+    var id: String
+    var mins: Int
     var dropped = false
 }
 
@@ -2752,8 +2962,7 @@ private struct ToolLabel: LabelStyle {
                 configuration.title
             }
         } else {
-            configuration.icon
-                .frame(minWidth: 16)
+            HoverWordsBody(icon: configuration.icon) // (1.3.172: its name beside it while the pointer rests on it)
         }
     }
 }

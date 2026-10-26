@@ -366,7 +366,48 @@ try {
   const pdBad = await nc('planDay', { id: plWork.id, day: pdPast.toISOString() });
   check(pdPut.ok && pdAt.toDateString() === pdDay.toDateString() && pdAt.getHours() >= 8 && /^Planned /.test(pdPut.words || '') && pdRow?.plan?.at === pdPut.at && pdCal.events.some((e) => e.layer === 'plan' && e.planId === plWork.id) && /over/i.test(pdBad.error || ''),
     `a row let go on a day is planned at its first free time, and a day already over is refused: ${JSON.stringify({ put: pdPut, plan: pdRow?.plan, bad: pdBad })}`);
-  await nc('planClear', { id: plWork.id });
+  // (Mac 1.3.172, the web's 2.99.113 and 2.99.114) a plan as an event of its own, for the apps: its popover's settings and what
+  // Edit offers; Edit's Done (a name, a colour, every week, an alert, notes) on the calendar each week it comes round; one of
+  // the series dragged an hour on moves the series; its foot pulled (a length alone); a whole day; another piece of work
+  // dropped on it, one block named by both; a task taken out, a plan alone again; the group deleted
+  const peFrom = new Date(pdDay), peTo = new Date(pdDay.getTime() + 22 * 864e5);
+  const pePlans = async () => (await nc('calendar', { from: peFrom.toISOString(), to: peTo.toISOString() })).events.filter((e) => e.layer === 'plan' && e.planId === plWork.id).sort((x, y) => Date.parse(x.date) - Date.parse(y.date));
+  const peD0 = await nc('planDetail', { id: plWork.id });
+  check(!peD0.error && peD0.id === plWork.id && peD0.title === plWork.title && peD0.mins === 60 && !peD0.allDay && peD0.repeat === '' && peD0.alert === null && peD0.tasks.length === 0 && peD0.repeats.length === 5 && peD0.alerts.length === 8 && peD0.alerts[1].minutes === 0 && peD0.tints.length === 9,
+    `a plan's settings for its popover, and the repeats, alerts and colours Edit offers: ${JSON.stringify({ ...peD0, repeats: peD0.repeats?.length, alerts: peD0.alerts?.length, tints: peD0.tints?.length })}`);
+  const peEdit = await nc('planEdit', { id: plWork.id, name: '  Study session ', repeat: 'week', alert: 10, notes: 'Bring the notes', tint: '#af52de' });
+  const peBad = await nc('planEdit', { id: plWork.id, repeat: 'hourly' });
+  const peEvs = await pePlans();
+  const peD1 = await nc('planDetail', { id: plWork.id });
+  check(peEdit.ok && !!peBad.error && peEvs.length === 4 && peEvs.every((e) => e.title === 'Study session' && e.color === '#af52de' && e.repeats && e.tasks === 1 && /every week/.test(e.sub) && !!e.occurs) && peEvs[0].id === `plan:${plWork.id}` && new Set(peEvs.map((e) => e.id)).size === 4 && peD1.name === 'Study session' && peD1.alert === 10 && peD1.notes === 'Bring the notes' && peD1.repeat === 'week',
+    `Edit's Done: named, coloured, every week (four times in three weeks, each its own id), an alert and notes kept; a repeat Simpl does not know refused: ${JSON.stringify({ evs: peEvs.map((e) => [e.id, e.title, e.sub]), bad: peBad })}`);
+  const peMove = await nc('planMove', { id: plWork.id, occurs: peEvs[1].occurs, at: new Date(Date.parse(peEvs[1].occurs) + 3600e3).toISOString() });
+  const peD2 = await nc('planDetail', { id: plWork.id });
+  const peStretch = await nc('planEdit', { id: plWork.id, mins: 97 });
+  const peEvs2 = await pePlans();
+  check(peMove.ok && Date.parse(peD2.at) === Date.parse(pdPut.at) + 3600e3 && peStretch.ok && peEvs2.length === 4 && peEvs2.every((e) => Date.parse(e.end) - Date.parse(e.date) === 90 * 60000) && Date.parse(peEvs2[0].date) === Date.parse(pdPut.at) + 3600e3,
+    `the second week's block dragged an hour on moves the series from its first; its foot pulled, a quarter of an hour at a time: ${JSON.stringify({ at: peD2.at, was: pdPut.at, evs: peEvs2.map((e) => [e.date, e.end]) })}`);
+  const peDay = await nc('planEdit', { id: plWork.id, allDay: true, at: pdDay.toISOString(), occurs: peEvs2[0].occurs });
+  const peEvs3 = await pePlans();
+  check(peDay.ok && peEvs3.length === 4 && peEvs3.every((e) => e.allDay && e.time === 'All day' && !e.end) && new Date(peEvs3[0].date).toDateString() === pdDay.toDateString(), `a whole day: drawn as one, each week: ${JSON.stringify(peEvs3.map((e) => [e.date, e.time]))}`);
+  await nc('planEdit', { id: plWork.id, allDay: false, at: pdPut.at, name: '' });
+  const plWork2 = plTodo.sections.flatMap((x) => x.rows).filter((r) => !r.done && !r.custom && r.id !== plWork.id).pop();
+  const peJoin = await nc('planJoin', { id: plWork2.id, onto: plWork.id });
+  const peJoinAgain = await nc('planJoin', { id: plWork2.id, onto: plWork.id });
+  const peEvs4 = await pePlans();
+  const peD4 = await nc('planDetail', { id: plWork2.id });
+  const peRow2 = (await nc('todo', { panel: true })).sections.flatMap((x) => x.rows).find((r) => r.id === plWork2.id);
+  const peAll = (await nc('calendar', { from: peFrom.toISOString(), to: peTo.toISOString() })).events.filter((e) => e.layer === 'plan');
+  check(peJoin.ok && !!peJoinAgain.error && peEvs4.length === 4 && peEvs4.every((e) => e.tasks === 2 && e.title === `${plWork.title} + ${plWork2.title}` && e.color === '#af52de' && !e.url && /2 tasks/.test(e.sub)) && !peAll.some((e) => e.planId === plWork2.id) && peD4.id === plWork.id && peD4.tasks.map((t) => t.id).join() === `${plWork.id},${plWork2.id}` && peRow2?.plan?.at === peD4.at,
+    `another piece of work dropped on it: one block a week, named by both, the group's colour and time, its own row planned then too: ${JSON.stringify({ evs: peEvs4.map((e) => [e.title, e.sub]), tasks: peD4.tasks, again: peJoinAgain })}`);
+  const peOut = await nc('planClear', { id: plWork2.id });
+  const peD5 = await nc('planDetail', { id: plWork.id });
+  const peRow3 = (await nc('todo', { panel: true })).sections.flatMap((x) => x.rows).find((r) => r.id === plWork2.id);
+  await nc('planJoin', { id: plWork2.id, onto: plWork.id });
+  const peGone = await nc('planClear', { id: plWork.id, group: true });
+  const peRows = (await nc('todo', { panel: true })).sections.flatMap((x) => x.rows).filter((r) => r.id === plWork.id || r.id === plWork2.id);
+  check(peOut.ok && peD5.tasks.length === 0 && !peRow3?.plan && peGone.ok && peRows.length === 2 && peRows.every((r) => !r.plan) && !!(await nc('planDetail', { id: plWork.id })).error,
+    `a task taken out leaves a plan alone, itself unplanned; Delete plan lets the whole group go: ${JSON.stringify({ tasks: peD5.tasks, rows: peRows.map((r) => [r.id, r.plan]) })}`);
   const nf = await nc('notifications');
   check(!nf.error && nf.total > 0 && nf.days.length > 0 && nf.days[0].rows.every((r) => r.id && r.catLabel && r.title), `Notifications: grouped by day, each with its category: ${JSON.stringify({ total: nf.total, unread: nf.unread, days: nf.days.map((d) => `${d.title}:${d.rows.length}`), cats: nf.cats.map((c) => c.key) })}`);
   const one = nf.days[0].rows[0];

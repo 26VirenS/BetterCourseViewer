@@ -164,8 +164,11 @@ shoot() {
   case " $* " in *PickerConfirm*|*" tool:"*|*" more:tool "*|*" alta:"*|*" macmillan:"*|*" file:"*|*" modulefile:"*|*SimplHandInPreview*|*"SimplOpen whatsnew"*|*SimplPinGraph*|*SimplPinFull*) settle=NO ;; esac
   (
     rm -f "$OUT_ABS/$name.rect" "$OUT_ABS/$name.png" "$OUT_ABS/$name-app.png"
-    local start=$SECONDS took=0 sampled=""
-    CFFIXED_USER_HOME="$HOMES/home$slot" "$BIN" -SimplBaseURL "${BASE:-http://localhost:8800}" -SimplDemo YES -SimplAppearance "$MODE" \
+    local start=$SECONDS took=0 sampled="" home="$HOMES/home$slot"
+    # (1.3.172) OWN_HOME=1 shoot …: a picture that leaves something kept behind (a plan made for it) takes a copy of its
+    # worker's home, warm as it is, so no picture after it in that home shows what it made
+    if [ -n "${OWN_HOME:-}" ]; then home="$HOMES/own-$name"; rm -rf "$home"; cp -R "$HOMES/home$slot" "$home"; fi
+    CFFIXED_USER_HOME="$home" "$BIN" -SimplBaseURL "${BASE:-http://localhost:8800}" -SimplDemo YES -SimplAppearance "$MODE" \
       -SimplShotFile "$OUT_ABS/$name.png" -SimplShotAfter "$wait" -SimplShotSettle "$settle" -SimplWindowSize "${SIZE:-1280x820}" \
       -NSQuitAlwaysKeepsWindows NO "$@" > "$OUT_ABS/console-$name.txt" 2>&1 &
     local pid=$!
@@ -512,6 +515,10 @@ ui_review() {
   MODE=dark shoot dark-05w-calendar-week 22 -SimplPlace calendar -SimplCalView week -SimplSidebar hidden
   MODE=light shoot light-05t-calendar-week-todo-drop 22 -SimplPlace calendar -SimplCalView week -SimplSidebar hidden -SimplTodoDrop 3,780
   MODE=light shoot light-05l-calendar-list 22 -SimplPlace calendar -SimplCalView list # (1.3.170: its first read is slow on a loaded runner)
+  # (1.3.172) a plan's popover on the week (a piece of work planned for it, in a home of its own) and its Edit
+  OWN_HOME=1 MODE=light shoot light-05p-calendar-plan 26 -SimplPlace calendar -SimplCalView week -SimplSidebar hidden -SimplPlanPopover YES
+  OWN_HOME=1 MODE=light shoot light-05q-calendar-plan-edit 26 -SimplPlace calendar -SimplCalView week -SimplSidebar hidden -SimplPlanPopover YES -SimplPlanEdit YES
+  OWN_HOME=1 MODE=dark shoot dark-05q-calendar-plan-edit 26 -SimplPlace calendar -SimplCalView week -SimplSidebar hidden -SimplPlanPopover YES -SimplPlanEdit YES
   # (1.3.170) To Do & Calendar: the month with To Do beside it, light and dark, the head as the web lays it out; To Do's
   # ⋯ menu open (By Date, By Priority, By Course, Show Completed); the week of seven days; the week pinched to its least,
   # the whole day in view; and the week at a large hour scrolled to noon, what lies above and below waiting at its edges

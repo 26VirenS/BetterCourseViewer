@@ -70,16 +70,16 @@ extension View {
         }
     }
 
-    /// (1.3.171) A button drawn as its symbol alone says its name while the pointer rests on it: a small label under
-    /// it after a short pause, gone the moment the pointer leaves or presses (macOS's own tooltip waits much longer).
-    /// `when: false` (its word already shown beside the symbol) shows nothing.
+    /// (1.3.171, 1.3.172) A button drawn as its symbol alone says its name while the pointer rests on it: after a short
+    /// pause the button itself widens to show the name beside its symbol (its label drawn with `HoverWordsLabel`), and
+    /// narrows again as the pointer leaves or presses. Nothing floats over what is near it. `when: false` (its word
+    /// already shown beside the symbol) leaves it as it is.
     func hoverName(_ name: String, when shown: Bool = true) -> some View {
         modifier(HoverName(name: name, enabled: shown))
     }
 }
 
-/// The name under a symbol-only button (`hoverName`). Drawn over what is below the button (the heads it sits in are
-/// given a zIndex), never taking room of its own, and never in the way of a press.
+/// The pointer resting on a symbol-only button (`hoverName`): its name handed to its label, which widens to show it.
 private struct HoverName: ViewModifier {
     let name: String
     let enabled: Bool
@@ -89,39 +89,62 @@ private struct HoverName: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            .environment(\.hoverWord, shown ? name : nil)
             .onHover { inside in
                 wait?.cancel()
                 guard inside, enabled else { hide(); return }
                 wait = Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(400))
+                    try? await Task.sleep(for: .milliseconds(250))
                     guard !Task.isCancelled else { return }
-                    withAnimation(.easeOut(duration: 0.12)) { shown = true }
+                    withAnimation(reduceMotion ? nil : Motion.snappy) { shown = true }
                 }
             }
             .simultaneousGesture(TapGesture().onEnded { wait?.cancel(); hide() })
             .onChange(of: enabled) { _, on in if !on { wait?.cancel(); hide() } }
-            .overlay(alignment: .bottom) {
-                if shown {
-                    Text(name)
-                        .font(.system(size: 11, weight: .medium))
-                        .lineLimit(1)
-                        .fixedSize()
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(.regularMaterial, in: Capsule())
-                        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
-                        .shadow(color: .black.opacity(0.14), radius: 6, y: 2)
-                        .alignmentGuide(.bottom) { d in d[.top] - 6 } // (its top 6 points under the button)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true) // (the button's own label already names it)
-                        .transition(reduceMotion ? AnyTransition.opacity : AnyTransition.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
-                }
-            }
     }
 
     private func hide() {
         guard shown else { return }
-        withAnimation(.easeOut(duration: 0.08)) { shown = false }
+        withAnimation(reduceMotion ? nil : Motion.snappy) { shown = false }
+    }
+}
+
+private struct HoverWordKey: EnvironmentKey {
+    static let defaultValue: String? = nil
+}
+
+extension EnvironmentValues {
+    /// (1.3.172) The name a symbol-only button shows beside its symbol while the pointer rests on it (nil: the symbol alone).
+    var hoverWord: String? {
+        get { self[HoverWordKey.self] }
+        set { self[HoverWordKey.self] = newValue }
+    }
+}
+
+/// (1.3.172) A label drawn as its symbol alone, with its button's name beside it while the pointer rests on the button
+/// (`hoverName`): the button grows to hold it.
+struct HoverWordsLabel: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HoverWordsBody(icon: configuration.icon)
+    }
+}
+
+/// A symbol, and the name `hoverName` hands down beside it while it is shown.
+struct HoverWordsBody<Icon: View>: View {
+    let icon: Icon
+    @Environment(\.hoverWord) private var word
+
+    var body: some View {
+        HStack(spacing: 6) {
+            icon.frame(minWidth: 16)
+            if let word {
+                Text(word)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .transition(.opacity)
+                    .accessibilityHidden(true) // (the button's own label already names it)
+            }
+        }
     }
 }
 

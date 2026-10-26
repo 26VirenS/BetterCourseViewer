@@ -172,7 +172,7 @@ enum Shot {
         // (1.3.165: the plan rail on To Do, -SimplPlanFirst, is a popover too; 1.3.170: and To Do's ⋯ menu, -SimplTodoMenu,
         //  a menu, closes the same way)
         let d = UserDefaults.standard
-        let popover = d.string(forKey: "SimplPinOpen") != nil || d.bool(forKey: "SimplPlanFirst") || d.bool(forKey: "SimplTodoMenu")
+        let popover = d.string(forKey: "SimplPinOpen") != nil || d.bool(forKey: "SimplPlanFirst") || d.bool(forKey: "SimplTodoMenu") || d.bool(forKey: "SimplPlanPopover") // (1.3.172: a plan's)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
             let waited = Date().timeIntervalSince(since)
             if NSApp.isActive || (popover ? waited > 8 : (!again || waited > 2)) {

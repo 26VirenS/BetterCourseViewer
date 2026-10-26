@@ -3158,14 +3158,71 @@
     await BCV.plan.put(it, t, Number(mins) || 60);
     return { ok: true, plan: planInfo(id) };
   }
-  /** (2.99.109) A plan moved to another time as it is (its block dragged on the apps' week): no work needed to hand. */
-  async function planMove({ id, at } = {}) {
-    const t = Date.parse(at);
-    if (!t || !BCV.plan.get(String(id))) return { error: 'That plan could not be moved.' };
+  /** (2.99.109) A plan moved to another time as it is (its block dragged on the apps' week): no work needed to hand.
+   *  (Mac 1.3.172) `occurs`, the time of the block dragged: one of a repeating plan's moves the series by as much. */
+  async function planMove({ id, at, occurs = null } = {}) {
+    const p = BCV.plan.get(String(id));
+    let t = Date.parse(at);
+    if (!t || !p) return { error: 'That plan could not be moved.' };
+    const o = Date.parse(occurs || '');
+    if (p.repeat && o) t = Date.parse(p.at) + (t - o);
     await BCV.plan.move(String(id), t);
     return { ok: true, plan: planInfo(String(id)) };
   }
-  async function planClear({ id } = {}) { await BCV.plan.clear(String(id)); return { ok: true }; }
+  /** A plan let go; (Mac 1.3.172) `group`: its whole group (Delete plan), else the one task alone (out of its group). */
+  async function planClear({ id, group = false } = {}) { await BCV.plan.clear(String(id), { group: !!group }); return { ok: true }; }
+  // ---- (Mac 1.3.172, the web's 2.99.113 and 2.99.114) a plan as an event of its own, and plans grouped -------------------
+  const PLAN_TINTS = ['#ff3b30', '#ff9500', '#ffcc00', '#34c759', '#00c7be', '#0a84ff', '#5856d6', '#af52de', '#8e8e93']; // (the web's)
+  /** A plan's popover and its Edit: its settings, its group's tasks, and the choices Edit offers. */
+  async function planDetail({ id } = {}) {
+    const ids = BCV.plan.groupOf(String(id));
+    const p = ids.length ? BCV.plan.get(ids[0]) : null;
+    if (!p) return { error: 'That plan is not there any more.' };
+    const task = (k) => { const m = BCV.plan.get(k); return { id: k, title: m.title, course: m.course || '', color: m.color || GRAY, due: m.due || null, dueWords: m.due ? `Due ${U.fmtDow(new Date(m.due))}` : '', url: m.url || null }; };
+    return {
+      id: ids[0], name: p.name || '', title: p.title, course: p.course || '', color: p.color || '#0a84ff', tint: p.tint || null,
+      at: p.at, mins: p.mins, allDay: !!p.allDay, repeat: p.repeat || '', alert: Number.isFinite(p.alert) ? p.alert : null, notes: p.notes || '',
+      due: p.due || null, dueWords: p.due ? `${U.fmtDow(new Date(p.due))} · ${U.fmtTimeLower(new Date(p.due))}` : '', url: p.url || null,
+      tasks: ids.length > 1 ? ids.map(task) : [],
+      repeats: BCV.plan.REPEATS.map(([key, label]) => ({ key, label })), alerts: BCV.plan.ALERTS.map(([minutes, label]) => ({ minutes, label })), tints: PLAN_TINTS,
+    };
+  }
+  /** Edit's Done (and a block's foot pulled: `mins` alone): { name, at, mins, allDay, repeat, alert, notes, tint }, one left
+   *  empty taken off, its group changed with it. `occurs`, the time of the block it was opened on: one of a repeating plan's
+   *  given another day moves the series by as much. */
+  async function planEdit({ id, occurs = null, ...f } = {}) {
+    const p = BCV.plan.get(String(id));
+    if (!p) return { error: 'That plan is not there any more.' };
+    const fields = {};
+    for (const k of ['name', 'mins', 'allDay', 'repeat', 'alert', 'notes', 'tint']) if (k in f) fields[k] = typeof f[k] === 'string' ? f[k].trim() : f[k];
+    if ('alert' in fields && !Number.isFinite(fields.alert)) fields.alert = null;
+    if ('repeat' in fields && fields.repeat && !BCV.plan.REPEATS.some(([k]) => k === fields.repeat)) return { error: 'That repeat is not one Simpl knows.' };
+    if ('tint' in fields && fields.tint && !/^#[0-9a-f]{6}$/i.test(fields.tint)) return { error: 'That colour could not be read.' };
+    if ('mins' in fields) fields.mins = Math.round(Number(fields.mins) / 15) * 15 || p.mins;
+    if (f.at) {
+      let t = Date.parse(f.at);
+      if (!t) return { error: 'That time could not be read.' };
+      const o = Date.parse(occurs || '');
+      if (p.repeat && o && o !== Date.parse(p.at)) t = Date.parse(p.at) + (t - ((fields.allDay ?? p.allDay) ? U.startOfDay(new Date(o)).getTime() : o)); // (one after the first: the series moves by as much)
+      fields.at = t;
+    }
+    await BCV.plan.edit(String(id), fields);
+    return { ok: true, plan: planInfo(String(id)) };
+  }
+  /** A piece of work (a To Do row) or a plan dropped on another plan: one block now, the plan dropped on leading it.
+   *  `whole`: a plan's block, its whole group with it. */
+  async function planJoin({ id, onto, whole = false } = {}) {
+    const key = String(id || ''), to = String(onto || '');
+    if (!BCV.plan.get(to)) return { error: 'That plan is not there any more.' };
+    if (whole && BCV.plan.get(key)) {
+      for (const k of BCV.plan.groupOf(key)) await BCV.plan.join(k, to);
+      return { ok: true, plan: planInfo(to) };
+    }
+    const src = items.get(key) || (BCV.plan.get(key) ? key : null);
+    if (!src) return { error: 'That piece of work is not on a list any more.' };
+    if (!(await BCV.plan.join(src, to))) return { error: 'It is in that plan already.' };
+    return { ok: true, plan: planInfo(to) };
+  }
   /** (Mac 1.3.170, the web's 2.99.112) A piece of work let go on a day of the month or the agenda: planned at that day's
    *  first free time (plan.js slotOn) for as long as it would take; a day already over is refused. */
   async function planDay({ id, day, mins } = {}) {
@@ -3191,16 +3248,34 @@
         for (let i = 0; i < Math.min(ev.days || 1, 31); i++) { const date = new Date(y, mo - 1, d + i); out.push({ ...base, id: `ext:${ev.link.id}:${ev.id}:${i}`, date: iso(date), day: dayOf(date), allDay: true, time: 'All day', past: U.addDays(date, 1) <= now }); }
       } else { const date = new Date(ev.start); out.push({ ...base, id: `ext:${ev.link.id}:${ev.id}`, date: iso(date), day: dayOf(date), allDay: false, time: U.fmtTime(date), end: iso(new Date(ev.end)), past: new Date(ev.end) <= now }); }
     }
-    for (const [pid, p] of Object.entries(BCV.plan.all())) {
-      const date = new Date(p.at);
-      if (Number.isNaN(date.getTime()) || date < s || date >= e) continue;
-      const end = new Date(date.getTime() + p.mins * 60000);
-      out.push({ id: `plan:${pid}`, planId: pid, title: p.title, kind: 'Plan', layer: 'plan', date: iso(date), day: dayOf(date), allDay: false, time: U.fmtTime(date), end: iso(end), done: false, missing: false, excused: false, struck: false, past: end <= now, sub: [p.course, `${BCV.plan.lenWord(p.mins)} planned`, p.due ? `due ${U.fmtDow(p.due)}` : ''].filter(Boolean).join(' · '), color: p.color || '#0a84ff', url: p.url || null, reservationId: null });
+    // (Mac 1.3.172, the web's 2.99.113 and 2.99.114) a plan as Edit left it — its own name and colour, a whole day, each time
+    // a repeating one comes round (`occurs`: that time) — and a group of plans as one block, named by the group's name or
+    // theirs one after another (`tasks`: how many). A group's block is the group's first plan's (planId).
+    const groups = new Set();
+    for (const [key, p0] of Object.entries(BCV.plan.all())) {
+      if (p0.group && groups.has(p0.group)) continue;
+      if (p0.group) groups.add(p0.group);
+      const ids = p0.group ? BCV.plan.groupOf(key) : [key];
+      const pid = ids[0];
+      const p = BCV.plan.get(pid) || p0;
+      const members = ids.length > 1 ? ids.map((k) => BCV.plan.get(k)) : null;
+      const first = Date.parse(p.at);
+      const repeatWord = p.repeat ? (BCV.plan.REPEATS.find(([k]) => k === p.repeat)?.[1] || '').toLowerCase() : '';
+      for (const t of BCV.plan.occurrences(p, s.getTime(), e.getTime())) {
+        const date = p.allDay ? U.startOfDay(new Date(t)) : new Date(t);
+        const end = p.allDay ? U.addDays(date, 1) : new Date(t + p.mins * 60000);
+        out.push({
+          id: `plan:${pid}${t === first ? '' : `:${t}`}`, planId: pid, occurs: iso(new Date(t)), title: p.name || (members ? members.map((m) => m.title).join(' + ') : p.title), kind: 'Plan', layer: 'plan',
+          date: iso(date), day: dayOf(date), allDay: !!p.allDay, time: p.allDay ? 'All day' : U.fmtTime(date), end: p.allDay ? null : iso(end), done: false, missing: false, excused: false, struck: false, past: end <= now,
+          sub: [members ? `${members.length} tasks` : p.course, p.allDay ? '' : `${BCV.plan.lenWord(p.mins)} planned`, repeatWord, !members && p.due ? `due ${U.fmtDow(p.due)}` : ''].filter(Boolean).join(' · '),
+          color: p.tint || p.color || '#0a84ff', url: members ? null : p.url || null, reservationId: null, repeats: !!p.repeat, tasks: members ? members.length : 1,
+        });
+      }
     }
     return { events: out, sent: new Set(Object.values(BCV.plan.all()).map((p) => p.ev).filter(Boolean)) };
   }
 
-  const CALLS = { calSync, feedState, feedOn, feedOff, feedSend, calLink, calShow, calUnlink, calRefresh, planSlots, planPut, planMove, planClear, planDay, setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, setColor, todo, todoDismiss, todoRestore, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, appointments, reserveAppointment, cancelReservation, notifications, notifMark, search, searchLocal, searchWarm, searchRecent, appearance, whatsNew, whatsNewSeen, refresh,
+  const CALLS = { calSync, feedState, feedOn, feedOff, feedSend, calLink, calShow, calUnlink, calRefresh, planSlots, planPut, planMove, planClear, planDay, planDetail, planEdit, planJoin, setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, setColor, todo, todoDismiss, todoRestore, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, appointments, reserveAppointment, cancelReservation, notifications, notifMark, search, searchLocal, searchWarm, searchRecent, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, fileInfo, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage, messageUpload,
     toolLaunch, externalTools, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizAssignment, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback, neighbours };
   // (Mac 1.2) Grade needed: a course's score now (by the student's own weights where set, as the Grades screen) and each
