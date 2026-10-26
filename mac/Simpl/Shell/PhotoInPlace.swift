@@ -24,6 +24,8 @@ struct PhotoEditLayer: View {
     private static let margin: CGFloat = 12
     private static let gap: CGFloat = 12
     private static let space: CGFloat = 8
+    /// The window's title bar, with its buttons: what a control inside a place's top keeps under.
+    private static let titleBar: CGFloat = 56
 
     var body: some View {
         let at = placed()
@@ -79,7 +81,8 @@ struct PhotoEditLayer: View {
         let zoom = CGPoint(x: clampX(zx, zw), y: clampY(frame.midY - zoomSize.height / 2, zoomSize.height))
         let tw = tipSize.width, th = tipSize.height
         let tipOut = top - g - th >= m
-        let tip = CGPoint(x: clampX(frame.midX - tw / 2, tw), y: clampY(tipOut ? top - g - th : frame.minY + g, th))
+        // (inside, under the window's title bar: the sidebar runs up behind its buttons)
+        let tip = CGPoint(x: clampX(frame.midX - tw / 2, tw), y: clampY(tipOut ? top - g - th : max(frame.minY + g, Self.titleBar), th))
         let fw = footSize.width, fh = footSize.height
         var foot = CGPoint(x: frame.midX - fw / 2, y: bottom + g)
         if foot.y + fh > h - m {
