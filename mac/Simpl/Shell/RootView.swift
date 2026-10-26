@@ -88,6 +88,10 @@ struct EngineSheets: ViewModifier {
             .floatingPopup("whatsnew", title: "What’s New", item: $engine.whatsNew, engine: engine) { item in
                 WhatsNewSheet(data: item.data) { MacWhatsNew.markSeen() }
             }
+            .floatingPopup("mergedintro", title: "To Do & Calendar", item: $engine.mergedIntro, engine: engine) { _ in
+                // (seen once it is up, the update's What's New with it: Help ▸ What's New has those notes)
+                MergedIntroSheet(onShown: { MergedIntro.markSeen(); MacWhatsNew.markSeen() }, open: { engine.go(.calendar) })
+            }
             .sheet(item: $engine.quiz) { q in
                 QuizScreen(launch: q)
                     .environmentObject(engine)

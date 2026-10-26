@@ -536,6 +536,12 @@ extension Theme {
         AppearanceStore.readable(AppearanceStore.accentNow ?? .controlAccentColor, on: isDark(a) ? darkPage : lightPage, ratio: 4.5)
     })
 
+    /// (1.3.182) The accent as a filled button's ground (Done, Edit): a colour of the student's stepped darker until the
+    /// button's white words read on it (4.5:1) — a yellow or a pale one as much as a deep one; Regular, the Mac's own.
+    static let accentFill = Color(nsColor: NSColor(name: nil) { _ in
+        AppearanceStore.accentNow.map { AppearanceStore.readable($0, on: .white, ratio: 4.5) } ?? .controlAccentColor
+    })
+
     /// The accent as a glyph: readable (3:1) on a card.
     static let accentIcon = Color(nsColor: NSColor(name: nil) { a in
         let card = isDark(a) ? NSColor(srgbRed: 36 / 255, green: 36 / 255, blue: 38 / 255, alpha: 1) : NSColor.white

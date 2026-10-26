@@ -161,7 +161,7 @@ shoot() {
   # (What's New comes up once the page is loaded and the app is quiet — 20 s on, with four copies of the app at work: a
   # settled picture caught it on its way in, faint, so its picture waits its whole time)
   # ((1.3.83) Desmos in a pin's panel, and a pin's Open Full Screen pressed a few seconds in: their whole time too)
-  case " $* " in *PickerConfirm*|*" tool:"*|*" more:tool "*|*" alta:"*|*" macmillan:"*|*" file:"*|*" modulefile:"*|*SimplHandInPreview*|*"SimplOpen whatsnew"*|*SimplPinGraph*|*SimplPinFull*) settle=NO ;; esac
+  case " $* " in *PickerConfirm*|*" tool:"*|*" more:tool "*|*" alta:"*|*" macmillan:"*|*" file:"*|*" modulefile:"*|*SimplHandInPreview*|*"SimplOpen whatsnew"*|*"SimplOpen mergedintro"*|*SimplPinGraph*|*SimplPinFull*) settle=NO ;; esac
   (
     rm -f "$OUT_ABS/$name.rect" "$OUT_ABS/$name.png" "$OUT_ABS/$name-app.png"
     local start=$SECONDS took=0 sampled="" home="$HOMES/home$slot"
@@ -528,6 +528,9 @@ ui_review() {
   OWN_HOME=1 MODE=light shoot light-05p-calendar-plan 26 -SimplPlace calendar -SimplCalView week -SimplSidebar hidden -SimplPlanPopover YES
   OWN_HOME=1 MODE=light shoot light-05q-calendar-plan-edit 26 -SimplPlace calendar -SimplCalView week -SimplSidebar hidden -SimplPlanPopover YES -SimplPlanEdit YES
   OWN_HOME=1 MODE=dark shoot dark-05q-calendar-plan-edit 26 -SimplPlace calendar -SimplCalView week -SimplSidebar hidden -SimplPlanPopover YES -SimplPlanEdit YES
+  # (1.3.182) the editor in a theme's colour — a bright green in dark, a pale orange in light: its pickers and buttons read
+  OWN_HOME=1 MODE=dark shoot dark-05r-calendar-plan-edit-forest 26 -SimplPlace calendar -SimplCalView week -SimplSidebar hidden -SimplPlanPopover YES -SimplPlanEdit YES -SimplTheme Forest
+  OWN_HOME=1 MODE=light shoot light-05r-calendar-plan-edit-sand 26 -SimplPlace calendar -SimplCalView week -SimplSidebar hidden -SimplPlanPopover YES -SimplPlanEdit YES -SimplTheme Sand
   # (1.3.170) To Do & Calendar: the month with To Do beside it, light and dark, the head as the web lays it out; To Do's
   # ⋯ menu open (By Date, By Priority, By Course, Show Completed); the week of seven days; the week pinched to its least,
   # the whole day in view; and the week at a large hour scrolled to noon, what lies above and below waiting at its edges
@@ -1064,6 +1067,9 @@ push_set() {
   shoot light-12d-hand-in-phone-connected 40 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES -SimplPhoneTest YES
   phone_send light-12d-hand-in-phone-connected "$PWD/scripts/dev/fixtures/photo.jpg=Photo from phone.jpg" "$HOMES/phone-notes.txt=Notes.txt"
   shoot light-53-whats-new 32 -SimplOpen whatsnew
+  # (1.3.182) after an update, once: To Do and the calendar as one, and Quick Plan (its scene caught as it plays)
+  shoot light-53m-merged-intro 32 -SimplOpen mergedintro
+  MODE=dark shoot dark-53m-merged-intro 34 -SimplOpen mergedintro -SimplTheme Forest
   shoot light-54-pin-element 14 -SimplPinnedTools "ptable" -SimplPinOpen ptable -SimplPinElement 25 -SimplPTColour category
   # (1.3.52) the Periodic Table: coloured by electronegativity with its trend arrows; an element's page (1.3.80: its
   # shells drawn flat, and Open in Atoms & Orbitals where its 3D view was); (1.3.80) the chemistry tools that were its

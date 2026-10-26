@@ -167,6 +167,10 @@ final class Engine: ObservableObject, ShellListener {
     @Published var whatsNew: WhatsNewSheetItem? {
         didSet { if whatsNew == nil && oldValue != nil { schedulePopups() } }
     }
+    /// (1.3.182) To Do and the calendar as one, and Quick Plan: once, after an update (Shell/MergedIntro.swift).
+    @Published var mergedIntro: MergedIntroItem? {
+        didSet { if mergedIntro == nil && oldValue != nil { schedulePopups() } }
+    }
     /// (1.3.170) A new task asked for (File ▸ New Task, the Dashboard's, the search's, a day's on the calendar): To Do &
     /// Calendar, To Do shown beside the calendar and its composer open — on the day asked, if one was (the web's 2.99.112,
     /// todoAddNext). The panel takes it and lets it go (Screens/TodoPanel.swift); 1.3.79's popup is gone.
@@ -481,7 +485,7 @@ final class Engine: ObservableObject, ShellListener {
         // the first run: the app's own setup (the courses shown, the goals), before anything else — unless (onboarding-4)
         // it was put off with Set Up Later, when it waits for Settings ▸ General ▸ Courses shown and goals
         if (snapshot?.setupDone == false && !SetupLater.asked) || LaunchOpen.take("setup") != nil {
-            if snapshot?.setupDone == false { MacWhatsNew.markSeen() } // (a first run: nothing is new to it)
+            if snapshot?.setupDone == false { MacWhatsNew.markSeen(); MergedIntro.markSeen() } // (a first run: nothing is new to it)
             queuePopup(.setup)
             return
         }
@@ -490,10 +494,15 @@ final class Engine: ObservableObject, ShellListener {
             queuePopup(.whatsNew(MacWhatsNew.due() ?? MacWhatsNew.all))
             return
         }
+        if LaunchOpen.take("mergedintro") != nil {
+            queuePopup(.mergedIntro)
+            return
+        }
         // after an update: what changed in this app since the version last seen (1.3.3: the Mac's own notes, not the
         // web extension's; seen once its sheet is really up)
+        // (1.3.182: the first update to it brings up To Do and the calendar as one, and Quick Plan, in its place)
         if let wn = MacWhatsNew.due() {
-            queuePopup(.whatsNew(wn))
+            queuePopup(MergedIntro.due ? .mergedIntro : .whatsNew(wn))
         }
     }
 
@@ -546,6 +555,7 @@ final class Engine: ObservableObject, ShellListener {
     enum Popup {
         case setup
         case whatsNew(WhatsNewData)
+        case mergedIntro
     }
 
     func queuePopup(_ p: Popup) {
@@ -556,7 +566,7 @@ final class Engine: ObservableObject, ShellListener {
     /// Free for a popup: the app's own screens up, the page loaded, nothing of the sign-in on screen or still to come,
     /// and no other sheet over the window.
     private var popupFree: Bool {
-        phase == .native && !web.webView.isLoading && web.login.settled && !setup && whatsNew == nil && quiz == nil && !settingsOpen && !newMessage
+        phase == .native && !web.webView.isLoading && web.login.settled && !setup && whatsNew == nil && mergedIntro == nil && quiz == nil && !settingsOpen && !newMessage
     }
 
     func schedulePopups(after delay: Double = 0.7) {
@@ -576,6 +586,7 @@ final class Engine: ObservableObject, ShellListener {
         switch queuedPopups.removeFirst() {
         case .setup: setup = true
         case .whatsNew(let d): whatsNew = WhatsNewSheetItem(data: d)
+        case .mergedIntro: mergedIntro = MergedIntroItem()
         }
     }
 

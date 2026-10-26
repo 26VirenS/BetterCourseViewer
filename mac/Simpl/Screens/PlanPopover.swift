@@ -31,6 +31,10 @@ struct PlanPopover: View {
             }
         }
         .font(.sBody)
+        // (1.3.182) the theme's colour where the popover's controls take it, readable on its ground whatever it is — the
+        // window's own tint (RootView) is the colour as it is, and a deep one (Forest's green, by night) all but vanished
+        // in the pickers' and buttons' words
+        .tint(Theme.accentText)
         .padding(18)
         // (wider while editing: the two times and the ten colours each take a row's whole width beside the names)
         .frame(width: editing && detail != nil ? 384 : 340)
@@ -88,6 +92,7 @@ struct PlanPopover: View {
                 }
                 Button("Edit") { edit(d) }
                     .buttonStyle(.borderedProminent)
+                    .tint(Theme.accentFill) // (1.3.182: its white words readable on any colour)
                     .keyboardShortcut(.defaultAction)
             }
         }
@@ -192,6 +197,7 @@ struct PlanPopover: View {
                         .labelsHidden()
                         .toggleStyle(.switch)
                         .controlSize(.small)
+                        .tint(Theme.accentText) // (on, in the theme's colour, readable)
                 }
                 if !draft.allDay {
                     GridRow {
@@ -237,20 +243,30 @@ struct PlanPopover: View {
                     }
                 }
             }
+            // (1.3.182) the times, Repeat and Alert in the words' own colour, as the day and the notes are: the theme's
+            // colour put on what they say made them hard to read, by night above all
+            .tint(.primary)
             TextField("Notes", text: $draft.notes, axis: .vertical)
                 .lineLimit(3...6)
                 .textFieldStyle(.roundedBorder)
             if let problem { Text(problem).font(.sFootnote).foregroundStyle(.orange) }
             HStack {
+                // (1.3.182) Delete in red and Cancel in the words' own colour, each with its bezel — no longer the theme's
+                // colour on glass, too faint to read
                 Button("Delete Plan", role: .destructive) { Task { await delete(d) } }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
                 Spacer()
                 Button("Cancel") {
                     problem = nil
                     editing = false
                 }
+                .buttonStyle(.bordered)
+                .tint(.primary)
                 .keyboardShortcut(.cancelAction)
                 Button("Done") { Task { await save(d) } }
                     .buttonStyle(.borderedProminent)
+                    .tint(Theme.accentFill) // (its white words readable on any colour)
                     .keyboardShortcut(.defaultAction)
                     .disabled(saving)
             }
