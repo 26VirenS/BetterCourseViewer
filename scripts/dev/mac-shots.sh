@@ -511,7 +511,7 @@ ui_review() {
   MODE=light shoot light-05w-calendar-week 22 -SimplPlace calendar -SimplCalView week -SimplSidebar hidden
   MODE=dark shoot dark-05w-calendar-week 22 -SimplPlace calendar -SimplCalView week -SimplSidebar hidden
   MODE=light shoot light-05t-calendar-week-todo-drop 22 -SimplPlace calendar -SimplCalView week -SimplSidebar hidden -SimplTodoDrop 3,780
-  MODE=light shoot light-05l-calendar-list 12 -SimplPlace calendar -SimplCalView list
+  MODE=light shoot light-05l-calendar-list 22 -SimplPlace calendar -SimplCalView list # (1.3.170: its first read is slow on a loaded runner)
   # (1.3.170) To Do & Calendar: the month with To Do beside it, light and dark, the head as the web lays it out; To Do's
   # ⋯ menu open (By Date, By Priority, By Course, Show Completed); the week of seven days; the week pinched to its least,
   # the whole day in view; and the week at a large hour scrolled to noon, what lies above and below waiting at its edges
