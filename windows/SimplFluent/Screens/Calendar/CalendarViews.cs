@@ -34,7 +34,7 @@ public sealed partial class CalendarScreen
     private bool dayShown;
 
     /// <summary>(0.3.64) The calendar's own width: the page's, less To Do beside it.</summary>
-    private double CalWidth => Width - (TodoBeside ? TodoWidth + TodoGap : 0);
+    private double CalWidth => Width - (LeftBeside ? TodoWidth + TodoGap : 0);
 
     /// <summary>The month's grid with the day picked beside it where there is room, else — the page scrolling — under it;
     /// (0.3.64) the page holding still, the month alone where the day has no room beside it (To Do beside the month, as
@@ -378,7 +378,7 @@ public sealed partial class CalendarScreen
     {
         var v = new Stack { Orientation = Orientation.Vertical, Spacing = 22 };
         var keys = byDay.Keys.OrderBy(k => k, StringComparer.Ordinal).ToList();
-        if (keys.Count == 0) v.Children.Add(K.Card(K.Empty(SymbolRegular.CalendarLtr24, "Nothing in the next three weeks."), new Thickness(14, 4, 14, 4)));
+        if (keys.Count == 0) v.Children.Add(K.Card(K.Empty(SymbolRegular.CalendarLtr24, AgendaStandard ? "Nothing in the next three weeks." : "Nothing in these days."), new Thickness(14, 4, 14, 4)));
         foreach (var k in keys)
             if (DateTime.TryParseExact(k, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
                 v.Children.Add(DayCard(day, byDay[k]));

@@ -214,17 +214,21 @@ public sealed partial class CalendarScreen : Screen
             var nav = K.H(4, prevButton, today, nextButton);
             nav.VerticalAlignment = VerticalAlignment.Center;
             pager = nav;
-            var calendars = calendarsButton = K.IconButton(SymbolRegular.CalendarCheckmark24, ChooseCalendars, "Choose the calendars shown", 16, 32);
-            System.Windows.Automation.AutomationProperties.SetName(calendars, "Calendars");
-            // (0.3.53) Canvas's Scheduler: office hours and sign-ups with a time to reserve
-            var finder = finderButton = K.IconButton(SymbolRegular.CalendarClock24, FindAppointment, "Find Appointment", 16, 32);
+            // (0.3.65) each symbol-only button's tooltip is its name, shown soon (NameTip) — what it does is its help text
+            var calendars = calendarsButton = K.IconButton(SymbolRegular.CalendarCheckmark24, ChooseCalendars, "Calendars", 16, 32);
+            System.Windows.Automation.AutomationProperties.SetHelpText(calendars, "Choose the calendars shown");
+            // (0.3.53) Canvas's Scheduler: office hours and sign-ups with a time to reserve — (0.3.65) a person and a speech
+            // bubble, where the calendar with a clock was taken at a glance for the calendars' calendar with a tick
+            var finder = finderButton = K.IconButton(SymbolRegular.PersonChat24, FindAppointment, "Find Appointment", 16, 32);
+            System.Windows.Automation.AutomationProperties.SetHelpText(finder, "Office hours, conferences and sign-ups with a time to reserve");
             // (0.3.60) Sync: (0.3.63) Simpl's own calendar into a calendar app, and the student's own calendars in here
-            var sync = syncButton = K.IconButton(SymbolRegular.ArrowSync24, OpenSync, "Simpl in Outlook, Google or your calendar app, and your own calendars here", 16, 32);
+            var sync = syncButton = K.IconButton(SymbolRegular.ArrowSync24, OpenSync, "Sync", 16, 32);
+            System.Windows.Automation.AutomationProperties.SetHelpText(sync, "Simpl in Outlook, Google or your calendar app, and your own calendars here");
             // (0.3.63) To Do beside the week, shown or hidden — (0.3.64) beside every view
-            todoButton = K.IconButton(SymbolRegular.PanelLeft24, ToggleTodo, "Hide To Do beside the calendar", 16, 32);
-            System.Windows.Automation.AutomationProperties.SetName(sync, "Sync");
+            todoButton = K.IconButton(SymbolRegular.PanelLeft24, ToggleTodo, "Hide To Do", 16, 32);
             Button? more = null;
             more = K.IconButton(SymbolRegular.MoreHorizontal24, () => MoreMenu(more!), "More", 16, 32);
+            foreach (var b in new Button[] { prevButton!, nextButton!, todoButton!, finder, sync, calendars, more }) NameTip(b);
             foreach (var e in new FrameworkElement[] { spinner, today, todoButton, finder, sync, calendars, more }) e.VerticalAlignment = VerticalAlignment.Center;
             commands = K.H(8, spinner, selector, nav, todoButton, finder, sync, calendars, more);
             PaintCommands();
@@ -250,7 +254,8 @@ public sealed partial class CalendarScreen : Screen
         if (pager != null) pager.Visibility = mode == "list" ? Visibility.Collapsed : Visibility.Visible;
         if (todoButton != null)
         {
-            Words(todoButton, TodoOn ? "Hide To Do" : "Show To Do", TodoOn ? "Hide To Do beside the calendar" : "Show To Do beside the calendar, to drag work onto a day or a time");
+            todoButton.Visibility = mode == "list" ? Visibility.Collapsed : Visibility.Visible; // (0.3.65: the list's column is its month)
+            Words(todoButton, TodoOn ? "Hide To Do" : "Show To Do", TodoOn ? "Hide To Do" : "Show To Do");
             // (on: filled, as a toggle's on state is — the web's is-on)
             if (TodoOn) todoButton.SetResourceReference(Control.BackgroundProperty, B.Subtle);
             else todoButton.ClearValue(Control.BackgroundProperty);
@@ -265,6 +270,15 @@ public sealed partial class CalendarScreen : Screen
             week ? $"{WeekDays} days: press again for {(WeekDays == 5 ? "seven" : "five")}" : null);
     }
 
+    /// <summary>(0.3.65) A symbol-only button's name, as its tooltip, under it and soon: a quarter of a second's rest on it
+    /// rather than Windows' own wait, and gone as soon as the pointer leaves.</summary>
+    private static void NameTip(Button b)
+    {
+        ToolTipService.SetInitialShowDelay(b, 250);
+        ToolTipService.SetBetweenShowDelay(b, 0);
+        ToolTipService.SetPlacement(b, PlacementMode.Bottom);
+    }
+
     /// <summary>(0.3.64) The commands kept to the few on a narrow page.</summary>
     private bool Compact => Width < CommandsCompactBelow;
 
@@ -275,7 +289,7 @@ public sealed partial class CalendarScreen : Screen
         var menu = new ContextMenu { PlacementTarget = at, Placement = PlacementMode.Bottom };
         if (Compact)
         {
-            menu.Items.Add(CalendarKit.Item("Find Appointment…", SymbolRegular.CalendarClock24, FindAppointment));
+            menu.Items.Add(CalendarKit.Item("Find Appointment…", SymbolRegular.PersonChat24, FindAppointment));
             menu.Items.Add(CalendarKit.Item("Sync…", SymbolRegular.ArrowSync24, OpenSync));
             menu.Items.Add(CalendarKit.Item("Calendars…", SymbolRegular.CalendarCheckmark24, ChooseCalendars));
             menu.Items.Add(new Separator());
@@ -318,7 +332,7 @@ public sealed partial class CalendarScreen : Screen
 
     /// <summary>(0.3.64) The page holds still — the calendar and To Do filling the pane, each scrolling inside itself — when
     /// it is tall enough, and wide enough for To Do beside the calendar (or, To Do hidden, for the week's columns).</summary>
-    private bool Fits => (double.IsNaN(tall) || tall >= FitTall) && Width >= (TodoOn ? TodoBesideFrom : WeekColumnsFrom);
+    private bool Fits => (double.IsNaN(tall) || tall >= FitTall) && Width >= (LeftShown ? TodoBesideFrom : WeekColumnsFrom);
 
     /// <summary>The room at the page's sides (the shell's, for a page that scrolls with it).</summary>
     private double Pad => Width < 480 ? 20 : 40;
@@ -383,27 +397,28 @@ public sealed partial class CalendarScreen : Screen
             main.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             if (notice != null) main.Children.Add(notice.Margin(0, 0, 0, 12).Row(0));
             main.Children.Add(calendar.Row(1));
-            if (!TodoBeside) return main.Margin(pad, 0, pad, FitFoot);
-            var todoCol = TodoPanel();
+            if (!LeftBeside) return main.Margin(pad, 0, pad, FitFoot);
+            // (0.3.65) in the list, the month its days are picked on, at its own height
+            var todoCol = LeftPanel();
             todoCol.Height = double.NaN;
-            todoCol.VerticalAlignment = VerticalAlignment.Stretch;
+            todoCol.VerticalAlignment = mode == "list" ? VerticalAlignment.Top : VerticalAlignment.Stretch;
             return K.Columns($"{TodoWidth.ToString(CultureInfo.InvariantCulture)}, {TodoGap.ToString(CultureInfo.InvariantCulture)}, *", todoCol.Col(0), main.Col(2)).Margin(pad, 0, pad, FitFoot);
         }
         var v = new Stack { Orientation = Orientation.Vertical, Spacing = 22, Margin = new Thickness(0, 0, 0, pad) };
-        if (TodoOn && !TodoBeside)
+        if (LeftShown && !LeftBeside)
         {
-            var above = TodoPanel();
-            above.Height = TodoAbove;
+            var above = LeftPanel();
+            above.Height = mode == "list" ? double.NaN : TodoAbove;
             above.VerticalAlignment = VerticalAlignment.Top;
             v.Children.Add(above);
         }
         if (notice != null) v.Children.Add(notice);
-        if (TodoBeside)
+        if (LeftBeside)
         {
-            // (as tall as the calendar beside it, its list scrolling within)
-            var beside = TodoPanel();
+            // (as tall as the calendar beside it, its list scrolling within — the list's month at its own height)
+            var beside = LeftPanel();
             beside.VerticalAlignment = VerticalAlignment.Top;
-            beside.SetBinding(FrameworkElement.HeightProperty, new Binding(nameof(FrameworkElement.ActualHeight)) { Source = calendar });
+            if (mode != "list") beside.SetBinding(FrameworkElement.HeightProperty, new Binding(nameof(FrameworkElement.ActualHeight)) { Source = calendar });
             v.Children.Add(K.Columns($"{TodoWidth.ToString(CultureInfo.InvariantCulture)}, {TodoGap.ToString(CultureInfo.InvariantCulture)}, *", beside.Col(0), calendar.Col(2)));
         }
         else v.Children.Add(calendar);
@@ -457,7 +472,7 @@ public sealed partial class CalendarScreen : Screen
 
     private string PeriodLine(CalendarData d)
     {
-        if (mode == "list") return "The next three weeks";
+        if (mode == "list") return AgendaLine;
         // (0.3.62) the week's days before what it holds ("Oct 25 – 31 · 16 items")
         if (mode == "week") return $"{WeekDaysWords(weekStart, weekStart.AddDays(WeekDays - 1))} · {PeriodCount(d)}";
         return PeriodCount(d);
@@ -674,9 +689,8 @@ public sealed partial class CalendarScreen : Screen
             {
                 case "week":
                     return (weekStart, weekStart.AddDays(WeekDays));
-                case "list":
-                    var s = DateTime.Today;
-                    return (s, s.AddDays(21));
+                case "list": // (0.3.65) the days picked on the small month, or the next three weeks
+                    return (agenda.Start, agenda.Last.AddDays(1));
                 default:
                     var first = FirstOfWeek(anchor);
                     return (first, first.AddDays(7 * WeekCount(anchor)));
