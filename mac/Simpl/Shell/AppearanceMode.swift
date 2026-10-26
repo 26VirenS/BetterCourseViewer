@@ -13,6 +13,9 @@ final class AppearanceMode: ObservableObject {
     @Published private(set) var on = false
     /// (1.3.166) The place whose photo is being placed where it is (Shell/PhotoInPlace.swift), if one is.
     @Published private(set) var editing: PhotoSlot?
+    /// (1.3.179) The place whose Colour… is open (its photo button's popover), if one is: asked from its photo controls,
+    /// wherever they were shown.
+    @Published var colouring: PhotoSlot?
 
     /// Turned on over the Dashboard (where its cards are). The screenshot suite's -SimplAppearanceMode YES turns it on
     /// as the window opens (MainShell).
@@ -42,36 +45,19 @@ final class AppearanceMode: ObservableObject {
 
 // MARK: - A place's photo button
 
-/// The photo button on the sidebar and on each Dashboard card while Appearance is on: a photo of your own, a drawing,
-/// the photo moved and zoomed (1.3.166: where it is, its settings round it), or taken away.
+/// The photo button on the sidebar and on each Dashboard card while Appearance is on: its photo controls (a photo of
+/// your own, a drawing, its own colour, the photo moved and zoomed — 1.3.166: where it is, its settings round it — or
+/// taken away), as a menu by the button (1.3.179: `PhotoControls`, the same a press anywhere on the place shows).
 struct PhotoBadge: View {
     let slot: PhotoSlot
     @ObservedObject private var store = AppearanceStore.shared
+    @ObservedObject private var mode = AppearanceMode.shared
     @State private var shown = false
-    /// (1.3.177) Its Colour… open: the place's own colour, picked in a popover over the button.
-    @State private var colouring = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        Menu {
-            // (1.3.166) a photo uploaded opens where it went, to place it
-            Button("Upload Photo…") { if store.upload(to: slot) { AppearanceMode.shared.edit(slot) } }
-            Menu("Drawing") {
-                ForEach(AppearanceStore.scenes, id: \.self) { s in
-                    Button(s) { store.setScene(s, in: slot) }
-                }
-            }
-            // (1.3.177, as the web's 2.99.118) a colour of the place's own, in place of the theme's there
-            Button("Colour…") { colouring = true }
-            if store.photos[slot] != nil {
-                Divider()
-                // (1.3.164) a photo of one's own: inked, or (off) shown as it is, the words on it white-bordered
-                if case .upload? = store.photos[slot]?.source {
-                    Toggle("Ink Photo", isOn: Binding(get: { !store.isPlain(slot) }, set: { store.setInk($0, in: slot) }))
-                }
-                Button("Move and Zoom…") { AppearanceMode.shared.edit(slot) }
-                Button("Remove Photo", role: .destructive) { store.remove(slot) }
-            }
+        Button {
+            PhotoControls.show(slot)
         } label: {
             Image(systemName: store.photos[slot] == nil ? "photo.badge.plus" : "photo")
                 .font(.system(size: 17, weight: .semibold))
@@ -82,10 +68,10 @@ struct PhotoBadge: View {
                 .shadow(color: .black.opacity(0.3), radius: 8, y: 3)
                 .contentShape(Circle())
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
         .fixedSize()
-        .popover(isPresented: $colouring, arrowEdge: .bottom) {
+        // (1.3.177) its Colour…: the place's own colour, picked in a popover over the button
+        .popover(isPresented: Binding(get: { mode.colouring == slot }, set: { if !$0, mode.colouring == slot { mode.colouring = nil } }), arrowEdge: .bottom) {
             PlaceColourPicker(slot: slot)
         }
         .help(slot.isSide ? "Sidebar photo" : "\(slot.title) photo")
@@ -97,15 +83,68 @@ struct PhotoBadge: View {
             // (the screenshot suite: -SimplPlaceColour today — that place's Colour… open, once the button is in)
             if UserDefaults.standard.string(forKey: "SimplPlaceColour") == slot.rawValue,
                LaunchOpen.take(slot.rawValue, key: "SimplPlaceColour") != nil {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { colouring = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { mode.colouring = slot }
             }
         }
     }
 }
 
-/// (1.3.174, as the web's 2.99.117) The whole place a press to upload a photo there — or a photo dropped on it — which
-/// then opens where it went; the pointer over it says so, under the photo button in its middle (which keeps the
-/// drawings, Ink, Move and Zoom… and Remove).
+/// (1.3.179, as the web's 2.99.119) A place's photo controls, as a menu where the pointer is — from its photo button, or
+/// a press anywhere on the place (the owner: "show the controls first, then i can press upload from there"): Upload
+/// Photo… under the pointer, the drawings, Colour…, and for a photo Ink, Move and Zoom… and Remove.
+@MainActor
+enum PhotoControls {
+    static func show(_ slot: PhotoSlot) {
+        let store = AppearanceStore.shared
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        // (1.3.166) a photo uploaded opens where it went, to place it
+        menu.addItem(Item("Upload Photo…") { if store.upload(to: slot) { AppearanceMode.shared.edit(slot) } })
+        let drawing = NSMenuItem(title: "Drawing", action: nil, keyEquivalent: "")
+        let scenes = NSMenu()
+        for s in AppearanceStore.scenes {
+            let item = Item(s) { store.setScene(s, in: slot) }
+            if case .scene(s)? = store.photos[slot]?.source { item.state = .on }
+            scenes.addItem(item)
+        }
+        drawing.submenu = scenes
+        menu.addItem(drawing)
+        // (1.3.177, as the web's 2.99.118) a colour of the place's own, in place of the theme's there
+        menu.addItem(Item("Colour…") { AppearanceMode.shared.colouring = slot })
+        if store.photos[slot] != nil {
+            menu.addItem(.separator())
+            // (1.3.164) a photo of one's own: inked, or (off) shown as it is, the words on it white-bordered
+            if case .upload? = store.photos[slot]?.source {
+                let plain = store.isPlain(slot)
+                let ink = Item("Ink Photo") { store.setInk(plain, in: slot) }
+                ink.state = plain ? .off : .on
+                menu.addItem(ink)
+            }
+            menu.addItem(Item("Move and Zoom…") { AppearanceMode.shared.edit(slot) })
+            menu.addItem(Item("Remove Photo") { store.remove(slot) })
+        }
+        _ = menu.popUp(positioning: menu.items.first, at: NSEvent.mouseLocation, in: nil)
+    }
+
+    /// A menu item that runs what it is given.
+    private final class Item: NSMenuItem {
+        private let run: () -> Void
+
+        init(_ title: String, _ run: @escaping () -> Void) {
+            self.run = run
+            super.init(title: title, action: #selector(fire), keyEquivalent: "")
+            target = self
+        }
+
+        required init(coder: NSCoder) { fatalError("not from a nib") }
+
+        @objc private func fire() { run() }
+    }
+}
+
+/// (1.3.174, as the web's 2.99.117) The whole place a press — (1.3.179) showing its photo controls where the pointer is,
+/// Upload Photo… first (`PhotoControls`) — or a photo dropped on it, put there at once and opened where it went; the
+/// pointer over it says so, under the photo button in its middle.
 struct PhotoPlaceCatch: View {
     let slot: PhotoSlot
     @State private var hovering = false
@@ -117,7 +156,7 @@ struct PhotoPlaceCatch: View {
             .fill(Color.white.opacity(dropping ? 0.12 : hovering ? 0.06 : 0.001))
             .overlay(shape.strokeBorder(Theme.accent.opacity(dropping ? 1 : hovering ? 0.7 : 0), lineWidth: dropping ? 3 : 2))
             .overlay {
-                Text("Click to upload a photo")
+                Text("Click for photo options")
                     .font(.system(size: 11.5, weight: .semibold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 10)
@@ -129,9 +168,7 @@ struct PhotoPlaceCatch: View {
                     .accessibilityHidden(true)
             }
             .contentShape(shape)
-            .onTapGesture {
-                if AppearanceStore.shared.upload(to: slot) { AppearanceMode.shared.edit(slot) }
-            }
+            .onTapGesture { PhotoControls.show(slot) }
             .onHover { inside in withAnimation(.easeOut(duration: 0.15)) { hovering = inside } }
             .onDrop(of: [.fileURL], isTargeted: $dropping) { providers in
                 guard let item = providers.first else { return false }
