@@ -22,7 +22,8 @@ namespace Simpl.Support;
 /// and then Simpl quits. It only looks: New task and Settings are opened and closed with nothing saved. --perf-name
 /// (the files' suffix), --perf-course and --perf-assignment (what is opened; else the first course, and the first
 /// assignment To Do lists), --perf-minimized (how long the window stays minimized, 30 s; 0: not), --perf-timeout
-/// (240 s from the start: what was walked by then is written).
+/// (240 s from the start: what was walked by then is written), --perf-warmed (the walk begun once the main places'
+/// pages are built ahead, not as soon as the start has settled).
 /// </summary>
 public static class PerfWalk
 {
@@ -89,6 +90,14 @@ public static class PerfWalk
             await Perf.Quiet(2000, 20_000);
             if (finished) return;
             Remember("settled");
+            // (--perf-warmed: the main places' pages built ahead first, as they are for a student who reads the Dashboard
+            //  a few seconds before clicking — their rows then the pages' first opening after it; 30 s at most)
+            if (Launch.Flag("perf-warmed"))
+            {
+                stage = "the main places built ahead";
+                await Until(() => Shell.AppShell.WarmedUp, 30_000);
+                if (finished) return;
+            }
             Perf.Fast(true);
 
             await Go("To Do & Calendar", () => e.Go(Place.Todo)); // (0.3.64: one place, To Do beside the calendar)

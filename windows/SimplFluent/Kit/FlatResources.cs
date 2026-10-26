@@ -52,19 +52,25 @@ public static class FlatResources
             double busy = 0, atOnce = 0;
             int next = 0, count = 0, steps = 0;
             var done = false;
+            // (the dictionary being copied, and its keys not copied yet)
+            List<object>? keys = null;
+            var at = 0;
 
-            // (dictionaries copied until the time is up — at least one — or all are)
+            // (entries copied until the time is up — at least one — or all are: one at a time, not a dictionary at a time
+            //  as before 0.3.77, when a large one's styles, made as they were copied, held the window 25 to 45 ms a step)
             void Copy(double budgetMs)
             {
                 var t = Stopwatch.GetTimestamp();
                 do
                 {
-                    var d = parts[next++];
-                    foreach (var key in d.Keys.Cast<object>().ToList())
+                    if (keys == null) { keys = parts[next].Keys.Cast<object>().ToList(); at = 0; }
+                    if (at < keys.Count)
                     {
-                        flat[key] = d[key];
+                        var key = keys[at++];
+                        flat[key] = parts[next][key];
                         count++;
                     }
+                    if (at >= keys.Count) { keys = null; next++; }
                 } while (next < parts.Count && Perf.Ms(t, Stopwatch.GetTimestamp()) < budgetMs);
                 busy += Perf.Ms(t, Stopwatch.GetTimestamp());
                 steps++;

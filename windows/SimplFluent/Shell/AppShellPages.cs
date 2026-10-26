@@ -30,8 +30,13 @@ public sealed partial class AppShell
     /// <summary>How many screens besides the Dashboard and the main places keep their pages (the one showing among them).</summary>
     private const int KeptPages = 3;
 
-    /// <summary>(0.3.76) The places the pane leads to most, kept as the Dashboard is and built ahead (<see cref="WarmMainPages"/>).</summary>
-    private static readonly Place[] MainPlaces = { Place.Calendar, Place.Grades, Place.Notifications, Place.Inbox };
+    /// <summary>(0.3.76) The places the pane leads to most, kept as the Dashboard is and built ahead (<see cref="WarmMainPages"/>);
+    /// (0.3.77) Tools with them.</summary>
+    private static readonly Place[] MainPlaces = { Place.Calendar, Place.Grades, Place.Notifications, Place.Inbox, Place.Tools };
+
+    /// <summary>The main places' pages built ahead, as far as they will be (or never to be: pictures, --no-prefetch) — the
+    /// perf walk's --perf-warmed waits for it.</summary>
+    internal static bool WarmedUp { get; private set; }
 
     /// <summary>When something was last pressed, typed or moved over in the window.</summary>
     private long lastInput = Environment.TickCount64;
@@ -366,16 +371,19 @@ public sealed partial class AppShell
     private bool IsMain(Screen s) => placeScreens.Any(kv => kv.Value == s && MainPlaces.Contains(kv.Key));
 
     /// <summary>
-    /// (0.3.76) The main places — To Do &amp; Calendar, Grades, Notifications, the Inbox — built ahead and laid out, unseen,
-    /// one at a time once the start has settled: each only while nobody is using the window (nothing pressed, typed or
-    /// moved over for a second and a half), nothing asked of the page and nothing read ahead (Prefetcher, whose answers
-    /// they are built from). Their first opening is then a page shown, as a kept page is — not a page built and laid out
-    /// while the click waits (To Do &amp; Calendar's took 300 ms and more, the window still meanwhile). Not in the
-    /// screenshot suite's pictures, nor with --no-prefetch.
+    /// (0.3.76) The main places — To Do &amp; Calendar, Grades, Notifications, the Inbox, (0.3.77) Tools — built ahead and
+    /// laid out, unseen, one at a time once the start has settled: each as soon as its answers are in (Prefetcher reads
+    /// them ahead), and only while nobody is using the window — nothing pressed, typed or moved over for a second and a
+    /// half, no page coming in. Their first opening is then a page shown, as a kept page is — not a page built and laid
+    /// out while the click waits (To Do &amp; Calendar's took 300 ms and more, the window still meanwhile). (0.3.77) Reads
+    /// under way no longer hold it back: with the read-ahead's and the live check's going, 0.3.76's wait for none at all
+    /// seldom came in time, and the pages were left to be built as they were clicked. Not in the screenshot suite's
+    /// pictures, nor with --no-prefetch, nor in a perf walk but one given --perf-warmed (built while the walk times its
+    /// steps, a page would be counted in the step it fell in).
     /// </summary>
     private async void WarmMainPages()
     {
-        if (Shot.Asked || Launch.Flag("no-prefetch")) return;
+        if (Shot.Asked || Launch.Flag("no-prefetch") || Launch.Get("perf-walk") != null && !Launch.Flag("perf-warmed")) { WarmedUp = true; return; }
         try
         {
             InputManager.Current.PostProcessInput += (_, a) =>
@@ -384,31 +392,49 @@ public sealed partial class AppShell
             };
             while (!engine.CountsLive) await Task.Delay(250);
             await Task.Delay(1500);
-            var built = 0;
+            var built = new List<string>();
             var at = Environment.TickCount64;
             foreach (var place in MainPlaces)
             {
                 if (place == Place.Inbox && engine.OnBrightspace) continue;
                 // (a minute at most for a quiet moment: someone busy in the window has it as before)
-                for (var waited = 0; waited < 60_000 && !Quiet(); waited += 250) await Task.Delay(250);
-                if (engine.Phase != Phase.Native || !Quiet()) continue;
+                if (!await LeftAlone(60_000)) continue;
                 var s = ScreenAt(new Location(place), make: true)!;
                 if (s == current || leaves.ContainsKey(s)) continue;
                 s.SetWidth(ContentWidth, WindowActualWidth);
                 if (!s.Ready) s.Prefetch();
                 for (var i = 0; i < 40 && !s.Ready; i++) await Task.Delay(250);
-                if (!Quiet()) continue;
-                await Dispatcher.InvokeAsync(() => BuildAhead(s), DispatcherPriority.ApplicationIdle);
-                built++;
+                if (!await LeftAlone(30_000)) continue;
+                // (looked at again as it is built: a press may have come while it waited its turn)
+                var made = await Dispatcher.InvokeAsync(() =>
+                {
+                    if (!Alone() || s == current || leaves.ContainsKey(s)) return false;
+                    BuildAhead(s);
+                    return leaves.ContainsKey(s);
+                }, DispatcherPriority.ApplicationIdle);
+                if (made) built.Add(s.Title);
                 await Task.Delay(400);
             }
-            Log.Write($"warm: {built} main pages built ahead in {(Environment.TickCount64 - at) / 1000.0:0.0} s");
+            Log.Write($"warm: {built.Count} main pages built ahead in {(Environment.TickCount64 - at) / 1000.0:0.0} s{(built.Count > 0 ? " (" + string.Join(", ", built) + ")" : "")}");
         }
         catch (Exception e) { Log.Write("warm: " + e.Message); }
+        finally { WarmedUp = true; }
     }
 
-    /// <summary>Nobody using the window this moment, and nothing being read for it.</summary>
-    private bool Quiet() => Environment.TickCount64 - lastInput >= 1500 && engine.CallsInFlight == 0 && !PrefetchBusy && shownLeaf?.Turn is null or 0;
+    /// <summary>The app's own screens up, and nobody using the window this moment: nothing pressed, typed or moved over for
+    /// a second and a half, no page coming in.</summary>
+    private bool Alone() => engine.Phase == Phase.Native && Environment.TickCount64 - lastInput >= 1500 && shownLeaf?.Turn is null or 0;
+
+    /// <summary>Waits for <see cref="Alone"/>, <paramref name="limitMs"/> at most: whether it came.</summary>
+    private async Task<bool> LeftAlone(int limitMs)
+    {
+        for (var waited = 0; !Alone(); waited += 250)
+        {
+            if (waited >= limitMs) return false;
+            await Task.Delay(250);
+        }
+        return true;
+    }
 
     /// <summary>A screen let go: its page out of the deck, its tree and the screen itself — its title kept for the breadcrumb.</summary>
     private void Release(Screen s)
