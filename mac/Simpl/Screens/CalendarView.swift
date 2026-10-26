@@ -1423,11 +1423,13 @@ struct CalendarView: View {
         }
     }
 
-    /// (1.3.176) How tall an item's block is on the week: as long as it lasts — a plan, a linked calendar's event — and a
-    /// due time (a moment, which Canvas gives no end) half an hour, never taller for its name (cut short to fit) and
+    /// (1.3.176) How tall an item's block is on the week: as long as it lasts — a plan, a linked calendar's event, (1.3.180)
+    /// an event of Canvas's own, a class, from its start to its end — and a due time (a moment, which has no end) half an
+    /// hour; an event that says no end an hour (as Windows draws one). Never taller for its name (cut short to fit) and
     /// never too short to read a line.
     private func drawnHeight(_ ev: CalEvent) -> CGFloat {
-        max(Self.blockLeast, CGFloat(shownLength(ev) ?? Self.momentMinutes) / 60 * hour - 2)
+        let unsaid = ["Event", "Appointment"].contains(ev.kind ?? "") ? 60 : Self.momentMinutes
+        return max(Self.blockLeast, CGFloat(shownLength(ev) ?? unsaid) / 60 * hour - 2)
     }
     /// (1.3.176) A due time's block, in minutes; the least a block is, in points (a line of its name).
     private static let momentMinutes = 30

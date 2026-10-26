@@ -284,6 +284,12 @@ try {
   const from = new Date(now.getFullYear(), now.getMonth(), 1); from.setDate(from.getDate() - from.getDay());
   const cal = await nc('calendar', { from: from.toISOString(), to: new Date(from.getTime() + 42 * 864e5).toISOString() });
   check(!cal.error && cal.events.length > 0 && cal.events.every((e) => e.day && e.title && e.color) && cal.calendars.length > 0, `Calendar: a span's events with their day, colour and line, and the calendars to choose from: ${JSON.stringify({ events: cal.events.length, first: cal.events[0]?.title, calendars: cal.calendars.length })}`);
+  // (Mac 1.3.180 / Windows 0.3.73) an event of Canvas's — a class — carries its end, for the apps' week to draw it as long
+  // as it lasts; work, due at a moment, none
+  const sem = cal.events.find((e) => e.title === 'SPRK 010 seminar');
+  const due = cal.events.find((e) => e.kind === 'Assignment');
+  check(!!sem && !!sem.end && Date.parse(sem.end) - Date.parse(sem.date) === 75 * 60e3 && !!due && !due.end,
+    `Calendar: a class carries its end (an hour and a quarter), work none: ${JSON.stringify({ sem: sem && { date: sem.date, end: sem.end }, dueEnd: due?.end })}`);
   // (2.99.95) Find Appointment for the apps: the groups by class, the times by day; a time reserved is held (and is on the
   // calendar as an appointment carrying its reservation), a second one is Canvas's own refusal, and giving it back frees it
   const ap = await nc('appointments', { force: true });
