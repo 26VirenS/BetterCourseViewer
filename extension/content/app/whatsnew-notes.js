@@ -28,6 +28,10 @@
     lock: 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.114', date: '2026-10-26', notes: [
+      { kind: 'new', title: 'Group Your Tasks', body: 'Drop a task onto a plan to work on them together.', icon: P.layers },
+      { kind: 'new', title: 'Back to To Do', body: 'Drag a plan or a grouped task onto To Do to unplan it.', icon: P.arrows },
+    ] },
     { version: '2.99.113', date: '2026-10-26', notes: [
       { kind: 'new', title: 'Plans Are Events', body: 'Edit a plan: its name, time, repeat, alert and notes.', icon: P.cal },
       { kind: 'improved', title: 'Beside the Item', body: 'Popups on the calendar open next to what you pressed.', icon: P.layers },

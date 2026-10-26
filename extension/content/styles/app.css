@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.113"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.114"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -5544,6 +5544,26 @@ html[data-bcv-theme="light"] .bcv-spot { --bcv-spot-shade: .24; }
 .bcv-wev.is-stretching { z-index: 4; transition: none; box-shadow: inset 3px 0 0 var(--bcv-ev-bar), 0 8px 22px rgba(0,0,0,.16); }
 .bcv-wev.is-stretching .bcv-wev__grip::after { opacity: .8; }
 @media (prefers-reduced-motion: reduce) { .bcv-sheet-ov--pop > .bcv-evpop { animation: bcv-fade-in .15s ease backwards; } }
+/* (2.99.114) Plans grouped: a piece of work (or another plan) held over a plan rings it — let go, they are one block; a
+   plan held over To Do fades and To Do is ringed — let go, it is unplanned. A group's popover lists its tasks, each
+   opened with a press, taken out with × or by a drag back onto To Do */
+.bcv-wev.is-join, .bcv-ev.is-join { box-shadow: inset 3px 0 0 var(--bcv-ev-bar), 0 0 0 2px var(--bcv-blue) !important; z-index: 3; }
+.bcv-wev.is-join::after, .bcv-ev.is-join::after { content: 'Group'; position: absolute; right: 4px; bottom: 3px; padding: 1px 6px; border-radius: 999px; background: var(--bcv-blue); color: #fff; font: 600 10px/14px var(--bcv-font); pointer-events: none; }
+.bcv-ev.is-join { position: relative; }
+.bcv-wev.is-leaving { opacity: .45; }
+.bcv-cal__todo.is-unplan-drop .bcv-todo-side { box-shadow: 0 0 0 2px var(--bcv-blue), var(--bcv-shadow-card, 0 1px 3px rgba(0,0,0,.08)); }
+.bcv-evpop__tasks { display: flex; flex-direction: column; gap: 2px; margin: -4px 10px 6px; }
+.bcv-evpop__task { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 8px; border-radius: 9px; cursor: grab; touch-action: none; -webkit-user-select: none; user-select: none; background: var(--bcv-card, transparent); }
+.bcv-evpop__task:hover { background: var(--bcv-fill2); }
+.bcv-evpop__task.is-lifted { opacity: .35; }
+.bcv-evpop__task.is-ghost { position: fixed; z-index: 2147483000; margin: 0; pointer-events: none; cursor: grabbing; box-shadow: 0 12px 30px rgba(0,0,0,.22); background: var(--bcv-card); }
+.bcv-evpop__task.is-ghost.is-over { opacity: .6; }
+.bcv-evpop__taskbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; padding: 0; border: 0; background: none; text-align: left; color: var(--bcv-ink); cursor: inherit; }
+.bcv-evpop__tasktitle { font: 600 13px/1.3 var(--bcv-font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bcv-evpop__taskmeta { font: 400 11.5px/1.3 var(--bcv-font); color: var(--bcv-ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bcv-evpop__taskout { flex: none; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--bcv-ink3); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.bcv-evpop__taskout:hover { background: var(--bcv-fill2); color: var(--bcv-ink); }
+.bcv-evpop__hint { margin: 0 18px 10px; font: 400 11.5px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
 /* 2.84.0: Upload CSV on the GPA settings sheet, beside the two fields */
 .bcv-gpa-set__csv { flex: 1 1 100%; display: flex; align-items: flex-start; gap: 12px; }
 .bcv-gpa-set__csv .bcv-gpa-set__from { flex: 1; min-width: 0; margin: 0; padding-top: 4px; }

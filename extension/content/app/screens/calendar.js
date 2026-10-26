@@ -320,13 +320,21 @@
         }
       }
       // (2.99.113) a plan as Edit left it: its own name and colour, a whole day, each time a repeating one comes round
-      for (const [pid, p] of Object.entries(BCV.plan?.all() || {})) {
+      // (2.99.114) a group of plans is one block: the group's name, or theirs one after another
+      const seenGroups = new Set();
+      for (const [key, p0] of Object.entries(BCV.plan?.all() || {})) {
+        if (p0.group && seenGroups.has(p0.group)) continue;
+        if (p0.group) seenGroups.add(p0.group);
+        const ids = p0.group ? BCV.plan.groupOf(key) : [key];
+        const pid = ids[0];
+        const p = BCV.plan.get(pid) || p0;
+        const members = ids.length > 1 ? ids.map((k) => ({ id: k, ...BCV.plan.get(k) })) : null;
         const first = Date.parse(p.at);
         const pal = U.palette(p.tint || p.color || '#0a84ff', dark);
         for (const t of BCV.plan.occurrences(p, s.getTime(), e.getTime())) {
           const at = new Date(t);
           const end = new Date(t + p.mins * 60000);
-          out.push({ id: `plan:${pid}${t === first ? '' : `:${t}`}`, planId: pid, occurs: t, title: p.name || p.title, date: p.allDay ? U.startOfDay(at) : at, end: p.allDay ? null : end, allDay: !!p.allDay, isAssignment: false, icon: p.repeat ? IC.repeat : IC.clock, kind: 'plan', contextName: p.course || '', contextColor: p.tint || p.color || '#0a84ff', color: pal.text, tint: pal.tint, url: p.url || '#', done: (p.allDay ? U.addDays(U.startOfDay(at), 1) : end) < now, due: p.due ? new Date(p.due) : null, mins: p.mins, points: null });
+          out.push({ id: `plan:${pid}${t === first ? '' : `:${t}`}`, planId: pid, members, occurs: t, title: p.name || (members ? members.map((m) => m.title).join(' + ') : p.title), date: p.allDay ? U.startOfDay(at) : at, end: p.allDay ? null : end, allDay: !!p.allDay, isAssignment: false, icon: p.repeat ? IC.repeat : IC.clock, kind: 'plan', contextName: p.course || '', contextColor: p.tint || p.color || '#0a84ff', color: pal.text, tint: pal.tint, url: p.url || '#', done: (p.allDay ? U.addDays(U.startOfDay(at), 1) : end) < now, due: p.due ? new Date(p.due) : null, mins: p.mins, points: null });
         }
       }
       return out;
@@ -364,7 +372,7 @@
     const facts = (ev) => [ev.points !== null && ev.points !== undefined ? `${store.fmtPts(ev.points)} pts` : '', ev.location || ''].filter(Boolean);
     const kindCls = (ev) => (ev.kind === 'plan' ? 'bcv-ev--plan' : ev.kind === 'external' ? 'bcv-ev--ext' : '');
     function chip(ev, small = true) {
-      return h('a', { class: `bcv-ev ${ev.done ? 'is-done' : ''} ${ev.missing ? 'is-missing' : ''} ${kindCls(ev)}`, href: ev.url, dataset: { ev: ev.id }, style: { background: ev.tint, color: ev.color, '--bcv-ev-bar': ev.color }, title: [ev.kind === 'plan' ? 'Planned' : '', ev.title, ev.contextName, ...facts(ev), ev.missing ? 'Missing' : ''].filter(Boolean).join(' · '), onclick: onEvent(ev) }, [
+      return h('a', { class: `bcv-ev ${ev.done ? 'is-done' : ''} ${ev.missing ? 'is-missing' : ''} ${kindCls(ev)}`, href: ev.url, dataset: { ev: ev.id, ...(ev.planId ? { plan: ev.planId } : {}) }, style: { background: ev.tint, color: ev.color, '--bcv-ev-bar': ev.color }, title: [ev.kind === 'plan' ? 'Planned' : '', ev.title, ev.contextName, ...facts(ev), ev.missing ? 'Missing' : ''].filter(Boolean).join(' · '), onclick: onEvent(ev) }, [
         U.svg(ev.icon, { size: 10, stroke: ev.color, width: 2.1, style: { flex: 'none' } }),
         h('span', { class: `bcv-ev__label ${ev.done ? 'bcv-strike' : ''}`, style: { color: ev.color }, text: ev.title }),
       ]);
@@ -468,7 +476,7 @@
       const timeWord = (U.fmtTimeLower(ev.date) || '').replace(/m$/, '');
       const el = h('a', {
         class: `bcv-wev ${kindCls(ev)} ${ev.done ? 'is-done' : ''} ${ev.missing ? 'is-missing' : ''} ${tiny ? 'is-tiny' : ''}`,
-        href: ev.url, dataset: { ev: ev.id },
+        href: ev.url, dataset: { ev: ev.id, ...(ev.planId ? { plan: ev.planId } : {}) },
         style: { top: `calc(var(--bcv-hour) * ${(a - DAY_A) / 60})`, height: `max(20px, calc(var(--bcv-hour) * ${(b - a) / 60} - 2px))`, left: `calc(${(lane / n) * 100}% + 1px)`, width: `calc(${100 / n}% - 3px)`, background: ev.tint, '--bcv-ev-bar': ev.color },
         title: [ev.kind === 'plan' ? 'Planned' : '', ev.title, ev.contextName, ...facts(ev), ev.missing ? 'Missing' : '', ev.kind === 'plan' ? 'drag to move it' : ''].filter(Boolean).join(' · '),
         onclick: onEvent(ev),
@@ -476,6 +484,7 @@
         tiny ? null : h('div', { class: 'bcv-wev__time', style: { color: ev.color }, text: ev.isAssignment ? `Due ${timeWord}` : timeWord }),
         h('div', { class: `bcv-wev__title ${ev.done ? 'bcv-strike' : ''}`, style: { color: ev.color }, text: tiny ? `${timeWord} ${ev.title}` : ev.title }),
         roomy && facts(ev).length ? h('div', { class: 'bcv-wev__facts', style: { color: ev.color }, text: facts(ev).join(' · ') }) : null,
+        roomy && ev.members ? h('div', { class: 'bcv-wev__facts', style: { color: ev.color }, text: `${ev.members.length} tasks` }) : null,
         // (2.99.113) its foot pulled down or up, a plan is longer or shorter, a quarter of an hour at a time
         ev.kind === 'plan' ? h('span', { class: 'bcv-wev__grip', 'aria-hidden': 'true', title: 'Pull to make it longer or shorter' }) : null,
       ]);
@@ -589,6 +598,9 @@
       const timeWas = timeEl?.textContent || '';
       let engaged = false;
       let at = { i: i0, m: a0 };
+      let joinEl = null; // (2.99.114) another plan under it: let go, the two are one group
+      let toTodo = false; // and over To Do: let go, it is unplanned
+      const paintJoin = (j) => { if (joinEl === j) return; joinEl?.classList.remove('is-join'); joinEl = j; j?.classList.add('is-join'); };
       const dayOf = (x) => {
         for (const [i, c] of cols.entries()) { const r = c.getBoundingClientRect(); if (x >= r.left - 2 && x <= r.right + 2) return i; }
         return x < cols[0].getBoundingClientRect().left ? 0 : cols.length - 1;
@@ -605,6 +617,9 @@
           body.classList.add('is-dragging');
         }
         m.preventDefault();
+        paintJoin(planUnder(m.clientX, m.clientY, ev.planId));
+        const unplan = !joinEl && overTodo(m.clientX, m.clientY);
+        if (unplan !== toTodo) { toTodo = unplan; el.classList.toggle('is-leaving', unplan); todoCol.classList.toggle('is-unplan-drop', unplan); }
         const mins = Math.round((a0 + (dy / hourPx) * 60) / SNAP) * SNAP;
         const next = { i: dayOf(m.clientX), m: Math.max(DAY_A, Math.min(DAY_B - Math.min(len, DAY_B - DAY_A), mins)) };
         if (next.i === at.i && next.m === at.m) return;
@@ -625,6 +640,20 @@
         // the click a drag ends with opens nothing
         el.addEventListener('click', (c) => { c.preventDefault(); c.stopPropagation(); }, { capture: true, once: true });
         body.classList.remove('is-dragging');
+        const joinTo = joinEl?.dataset.plan;
+        paintJoin(null);
+        todoCol.classList.remove('is-unplan-drop');
+        if (letGo && joinTo) { // (2.99.114) onto another plan: this one (its group too) joins it
+          el.classList.add('is-dropped');
+          (async () => { for (const k of BCV.plan.groupOf(ev.planId)) await BCV.plan.join(k, joinTo); })().then(() => { U.haptic?.('success'); U.toast('Grouped.'); }).catch((err) => { U.toast(`Could not group it: ${err.message}`, { error: true }); merge(); draw(); });
+          return;
+        }
+        if (letGo && toTodo) { // back onto To Do: no longer planned
+          el.classList.add('is-dropped');
+          BCV.plan.clear(ev.planId, { group: true }).then(() => { U.haptic?.('success'); U.toast(ev.members ? 'Unplanned the group.' : 'Unplanned.'); }).catch((err) => { U.toast(`Could not unplan it: ${err.message}`, { error: true }); merge(); draw(); });
+          return;
+        }
+        el.classList.remove('is-leaving');
         const moved = at.i !== i0 || at.m !== a0;
         if (!letGo || !moved) { // back where it was
           el.classList.remove('is-dragging');
@@ -851,23 +880,82 @@
           ]);
           return;
         }
-        const p = BCV.plan?.get(ev.planId);
+        const ids = groupNow();
+        const p = BCV.plan?.get(ids[0]);
         if (!p) { close(); return; }
+        ev.planId = ids[0]; // (the group's first, should the one it opened on have been taken out)
         const url = p.url && p.url !== '#' ? p.url : '';
+        const group = ids.length > 1 ? ids.map((k) => ({ id: k, ...BCV.plan.get(k) })) : null;
         show([
-          head(p.repeat ? `Plan · ${repeatWord(p.repeat).toLowerCase()}` : 'Plan', p.name || p.title),
+          head(`${group ? `Plan · ${group.length} tasks` : 'Plan'}${p.repeat ? ` · ${repeatWord(p.repeat).toLowerCase()}` : ''}`, p.name || (group ? group.map((m) => m.title).join(' + ') : p.title)),
           U.el('bcv-sheet__list bcv-evsheet__list', [
             row('When', whenOf(ev.date, ev.end, ev.allDay)),
-            row('For', [U.dot(p.color || ev.contextColor, 'bcv-dot--9'), h('span', { text: p.name ? `${p.title}${p.course ? ` · ${p.course}` : ''}` : p.course || '—' })]),
-            p.due ? row('Due', `${U.fmtDow(new Date(p.due))} · ${U.fmtTimeLower(new Date(p.due))}`) : null,
+            group ? null : row('For', [U.dot(p.color || ev.contextColor, 'bcv-dot--9'), h('span', { text: p.name ? `${p.title}${p.course ? ` · ${p.course}` : ''}` : p.course || '—' })]),
+            !group && p.due ? row('Due', `${U.fmtDow(new Date(p.due))} · ${U.fmtTimeLower(new Date(p.due))}`) : null,
             Number.isFinite(p.alert) ? row('Alert', alertWord(p.alert)) : null,
             p.notes ? row('Notes', h('span', { class: 'bcv-evpop__notes', text: p.notes })) : null,
           ].filter(Boolean)),
+          group ? U.el('bcv-evpop__tasks', group.map(memberRow)) : null,
+          group ? U.text('bcv-evpop__hint', 'Drag a task back onto To Do to take it out.', 'div') : null,
           U.el('bcv-evsheet__foot', [
             U.btn('Edit', { kind: 'primary', cls: 'bcv-evsheet__edit', onClick: () => editView() }),
-            url ? U.btn('Open', { cls: 'bcv-evsheet__open', onClick: () => { close(); app.go(url); } }) : null,
+            url && !group ? U.btn('Open', { cls: 'bcv-evsheet__open', onClick: () => { close(); app.go(url); } }) : null,
           ].filter(Boolean)),
         ]);
+      }
+      // (2.99.114) a group's plans as they are now (one taken out as the popover was up: the others)
+      const groupIds = plan ? (BCV.plan?.groupOf(ev.planId) || [ev.planId]) : [];
+      const groupNow = () => { const left = groupIds.filter((k) => BCV.plan?.get(k)); return left.length ? BCV.plan.groupOf(left[0]) : []; };
+      /** A task of a group, in its popover: what it is and when it is due, opened with a press; × or a drag onto To Do takes it out. */
+      function memberRow(m) {
+        const out = () => BCV.plan.clear(m.id).then(() => { const left = groupNow(); if (left.length) view(); else close(); });
+        const el = h('div', { class: 'bcv-evpop__task', dataset: { plan: m.id }, role: 'listitem' }, [
+          U.dot(m.color || '#8e8e93', 'bcv-dot--9'),
+          h('button', { type: 'button', class: 'bcv-evpop__taskbody', disabled: !m.url || m.url === '#', onclick: () => { close(); app.go(m.url); } }, [
+            U.text('bcv-evpop__tasktitle', m.title, 'span'),
+            U.text('bcv-evpop__taskmeta', [m.course, m.due ? `Due ${U.fmtDow(new Date(m.due))}` : ''].filter(Boolean).join(' · '), 'span'),
+          ]),
+          h('button', { type: 'button', class: 'bcv-evpop__taskout', 'aria-label': `Take ${m.title} out of the group`, title: 'Take it out', onclick: out }, U.svg(IC.close, { size: 11, stroke: 'currentColor', width: 2.4 })),
+        ]);
+        // dragged back onto To Do (a ghost of the row following the pointer): out of the group, no longer planned
+        el.addEventListener('pointerdown', (e) => {
+          if (e.button !== 0 || e.target.closest('.bcv-evpop__taskout')) return;
+          const x0 = e.clientX, y0 = e.clientY, pid = e.pointerId;
+          let ghost = null;
+          let onTodo = false;
+          const move = (mv) => {
+            if (mv.pointerId !== pid) return;
+            if (!ghost) {
+              if (Math.hypot(mv.clientX - x0, mv.clientY - y0) < 5) return;
+              const r = el.getBoundingClientRect();
+              ghost = el.cloneNode(true);
+              ghost.classList.add('is-ghost');
+              Object.assign(ghost.style, { width: `${r.width}px`, left: `${r.left}px`, top: `${r.top}px` });
+              document.body.append(ghost);
+              el.classList.add('is-lifted');
+            }
+            mv.preventDefault();
+            ghost.style.transform = `translate(${mv.clientX - x0}px, ${mv.clientY - y0}px)`;
+            const over = overTodo(mv.clientX, mv.clientY);
+            if (over !== onTodo) { onTodo = over; todoCol.classList.toggle('is-unplan-drop', over); ghost.classList.toggle('is-over', over); }
+          };
+          const up = (u) => {
+            if (u.pointerId !== pid) return;
+            removeEventListener('pointermove', move, true);
+            removeEventListener('pointerup', up, true);
+            removeEventListener('pointercancel', up, true);
+            todoCol.classList.remove('is-unplan-drop');
+            if (!ghost) return;
+            el.addEventListener('click', (c) => { c.preventDefault(); c.stopPropagation(); }, { capture: true, once: true });
+            ghost.remove();
+            el.classList.remove('is-lifted');
+            if (onTodo && u.type === 'pointerup') { U.haptic?.('success'); U.toast(`${m.title} is back on To Do.`); out(); }
+          };
+          addEventListener('pointermove', move, { capture: true, passive: false });
+          addEventListener('pointerup', up, true);
+          addEventListener('pointercancel', up, true);
+        });
+        return el;
       }
 
       /** A plan's settings, in the popover: Done keeps them (a repeating one's day moved moves the series by as much). */
@@ -937,7 +1025,7 @@
             notes,
           ]),
           U.el('bcv-evsheet__foot bcv-evedit__foot', [
-            U.btn('Delete plan', { kind: 'danger', cls: 'bcv-evedit__del', onClick: () => { close(); BCV.plan?.clear(ev.planId); U.toast('Plan deleted'); } }),
+            U.btn('Delete plan', { kind: 'danger', cls: 'bcv-evedit__del', onClick: () => { close(); BCV.plan?.clear(ev.planId, { group: true }); U.toast('Plan deleted'); } }),
             h('span', { class: 'bcv-todo__spacer' }),
             U.btn('Cancel', { cls: 'bcv-evedit__cancel', onClick: () => view() }),
             U.btn('Done', { kind: 'primary', cls: 'bcv-evedit__done', onClick: save }),
@@ -1459,6 +1547,21 @@
         if ((e.key === 'p' || e.key === 'P') && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); BCV.plan?.open(row, it, { mode: 'pick' }); }
       });
     }
+    /**
+     * (2.99.114) The plan under the pointer — a block of the week, a chip of the month or the agenda — other than `not`'s
+     * own (or its group's): what a piece of work or another plan, dropped there, joins.
+     */
+    function planUnder(x, y, not = null) {
+      const mine = not ? new Set(BCV.plan?.groupOf(not) || [not]) : new Set();
+      for (const el of mainCol.querySelectorAll('[data-plan]:not(.bcv-wev--drop):not(.is-dragging)')) {
+        if (mine.has(el.dataset.plan)) continue;
+        const r = el.getBoundingClientRect();
+        if (x >= r.left && x < r.right && y >= r.top && y < r.bottom) return el;
+      }
+      return null;
+    }
+    /** (2.99.114) Over To Do beside the calendar: a plan let go there is unplanned. */
+    const overTodo = (x, y) => { if (todoCol.hidden) return false; const r = todoCol.getBoundingClientRect(); return x >= r.left && x < r.right && y >= r.top && y < r.bottom; };
     /** The page's scroller: where the grid scrolls, for a drag held near its top or bottom edge. */
     function scrollerOf(el) {
       for (let n = el; n && n !== document.body; n = n.parentElement) {
@@ -1506,6 +1609,14 @@
         dayTag ||= h('span', { class: 'bcv-cal__droptag', 'aria-hidden': 'true', text: 'Plan here' });
         cell.append(dayTag);
       }
+      // (2.99.114) held over a plan already on the calendar, it would join it — one block, the group's — the plan ringed
+      let joinEl = null;
+      function paintJoin(el) {
+        if (joinEl === el) return;
+        joinEl?.classList.remove('is-join');
+        joinEl = el;
+        el?.classList.add('is-join');
+      }
       const label = (day, m) => { const a = new Date(day + m * 60000); const b = new Date(a.getTime() + mins * 60000); return `${U.fmtTimeLower(a).replace(/m$/, '')} – ${U.fmtTimeLower(b).replace(/m$/, '')}`; };
       function paintDrop(col) {
         if (!drop) {
@@ -1520,7 +1631,13 @@
       }
       function place(x, y) {
         last = { x, y };
-        ghost.style.transform = `translate3d(${x - grab.x}px, ${y - grab.y}px, 0) scale(${at ? 0.92 : 1.03})`;
+        ghost.style.transform = `translate3d(${x - grab.x}px, ${y - grab.y}px, 0) scale(${at || joinEl ? 0.92 : 1.03})`;
+        const onto = planUnder(x, y, BCV.plan?.get(it.id) ? it.id : null);
+        if (onto) {
+          if (joinEl !== onto) { at = null; drop?.remove(); paintDay(null); paintJoin(onto); ghost.classList.add('is-over'); U.haptic?.('select'); }
+          return;
+        }
+        paintJoin(null);
         if (view !== 'week') {
           const cell = dayHit(x, y);
           if (!cell) {
@@ -1599,6 +1716,16 @@
         if (!engaged) return;
         // the click a drag ends with opens nothing
         row.addEventListener('click', (c) => { c.preventDefault(); c.stopPropagation(); }, { capture: true, once: true });
+        if (letGo && joinEl) { // (2.99.114) onto a plan: it joins it
+          const onto = joinEl.dataset.plan;
+          const name = joinEl.querySelector('.bcv-wev__title, .bcv-ev__label')?.textContent || 'the plan';
+          paintJoin(null);
+          ghost.remove();
+          row.classList.remove('is-lifted');
+          BCV.plan.join(it, onto).then((p) => { if (!p) return; U.haptic?.('success'); U.toast(`Grouped with ${name}.`); }).catch((err) => U.toast(`Could not group it: ${err.message}`, { error: true }));
+          return;
+        }
+        paintJoin(null);
         if (letGo && at && at.m === null) { // a day: its first free time (content/app/plan.js slotOn)
           const day = at.day;
           paintDay(null);

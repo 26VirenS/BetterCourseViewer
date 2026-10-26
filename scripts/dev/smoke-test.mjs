@@ -1976,6 +1976,52 @@ try {
   await page.waitForSelector('.bcv-evedit__del', { timeout: 3000 });
   await page.click('.bcv-evedit__del');
   check(await eventually(async () => !(await page.$('.bcv-ev--plan')) && !(await prefPlans())[target.id] && (await ownEvents()).length === 0, 10000), 'Delete plan: off the month, out of the preferences, and off the Canvas calendar');
+  // (2.99.114) groups: a piece of work dropped on a plan joins it — one block, the group's; a task taken out of the group's
+  // popover by a drag back onto To Do is no longer planned, and the one left is a plan alone again
+  await page.click('.bcv-seg__btn[data-value="week"]');
+  await page.waitForSelector('.bcv-week__body', { timeout: 5000 });
+  const gCol = await page.evaluate(() => {
+    const days = [...document.querySelectorAll('.bcv-week__day')];
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const col = days.find((d) => Number(d.dataset.day) > today.getTime()) || days[days.length - 1];
+    document.querySelector('.bcv-week__scroll').scrollTop = 9 * 48;
+    const c = col.getBoundingClientRect();
+    return { cx: c.left + c.width / 2, ctop: c.top };
+  });
+  const gRows = () => page.evaluate(() => [...document.querySelectorAll('.bcv-cal__todo .bcv-tdrag')].filter((x) => /^assignment:/.test(x.dataset.item) && !x.classList.contains('is-done') && !x.classList.contains('is-planned')).slice(0, 1).map((r) => { r.scrollIntoView({ block: 'center' }); const b = r.getBoundingClientRect(); return { id: r.dataset.item, x: b.left + b.width / 2, y: b.top + b.height / 2 }; })); // (the first unplanned one, in view: measured once it is)
+  const gDrag = async (from, x, y) => { await page.mouse.move(from.x, from.y); await page.mouse.down(); await page.mouse.move(from.x + 30, from.y, { steps: 3 }); await page.mouse.move(x, y, { steps: 14 }); };
+  let gr = await gRows();
+  const gA = gr[0];
+  await gDrag(gA, gCol.cx, gCol.ctop + 10 + 11 * 48 + 2);
+  await page.mouse.up();
+  await untilV(async () => (await prefPlans())[gA.id] || null);
+  gr = await gRows();
+  const gB = gr[0];
+  const gBlock = await untilV(() => page.$eval(`.bcv-wev[data-plan="${gA.id}"]`, (e) => { const b = e.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + Math.min(14, b.height / 2) }; }).catch(() => null));
+  await gDrag(gB, gBlock.x, gBlock.y);
+  const ringed = await page.$eval(`.bcv-wev[data-plan="${gA.id}"]`, (e) => e.classList.contains('is-join')).catch(() => false);
+  await shot(page, '07e-calendar-week-group-join');
+  await page.mouse.up();
+  const grouped = await untilV(async () => { const ps = await prefPlans(); return ps[gA.id]?.group && ps[gB.id]?.group === ps[gA.id].group && ps[gB.id].at === ps[gA.id].at ? ps : null; });
+  const gBlocks = await untilV(() => page.$$eval('.bcv-wev.bcv-ev--plan', (els) => (els.length === 1 && / \+ /.test(els[0].textContent) ? els.map((e) => e.textContent) : null)));
+  check(ringed && !!grouped && !!gBlocks, `a piece of work held over a plan rings it; let go, the two are one group at the plan's time — one block naming both: ${JSON.stringify({ ringed, blocks: gBlocks, a: gA.id, b: gB.id, plans: Object.fromEntries(Object.entries(await prefPlans()).map(([k, v]) => [k, [v.at, v.group]])) })}`);
+  await page.click('.bcv-wev.bcv-ev--plan', { position: { x: 20, y: 8 } });
+  await page.waitForSelector('.bcv-evpop__task', { timeout: 5000 });
+  const gPop = { kicker: await page.$eval('.bcv-evsheet__kicker', (e) => e.textContent), tasks: (await page.$$('.bcv-evpop__task')).length, btns: await texts('.bcv-evsheet__foot .bcv-btn') };
+  await shot(page, '07f-calendar-week-group-popover');
+  const gt = await page.locator(`.bcv-evpop__task[data-plan="${gB.id}"]`).boundingBox();
+  const gTodo = await page.locator('.bcv-cal__todo').boundingBox();
+  await page.mouse.move(gt.x + 60, gt.y + gt.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(gt.x + 40, gt.y + 20, { steps: 3 });
+  await page.mouse.move(gTodo.x + gTodo.width / 2, gTodo.y + 300, { steps: 14 });
+  const todoRinged = await page.$eval('.bcv-cal__todo', (e) => e.classList.contains('is-unplan-drop'));
+  await page.mouse.up();
+  const outDone = await untilV(async () => { const ps = await prefPlans(); return !ps[gB.id] && ps[gA.id] && !ps[gA.id].group ? ps : null; });
+  check(gPop.kicker === 'Plan · 2 tasks' && gPop.tasks === 2 && gPop.btns.join('|') === 'Edit' && todoRinged && !!outDone, `the group's popover lists its two tasks; one dragged back onto To Do (To Do ringed as it is held there) is no longer planned, and the other is a plan alone again: ${JSON.stringify({ ...gPop, todoRinged })}`);
+  await page.keyboard.press('Escape');
+  await sw.evaluate(async ({ k, id }) => { const all = (await self.BCV.api.storage.local.get(k))[k] || {}; const plans = { ...(all.plans || {}) }; delete plans[id]; await self.BCV.api.storage.local.set({ [k]: { ...all, plans } }); }, { k: `prefs:${new URL(BASE).host}`, id: gA.id });
+  await eventually(() => page.$$eval('.bcv-wev.bcv-ev--plan', (els) => els.length === 0));
   // put back as it was: Simpl's calendar stopped (its link no longer opens), the calendar unlinked
   await openSync();
   const stopId = (await feedState())?.id;
