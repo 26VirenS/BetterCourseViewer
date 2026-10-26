@@ -93,7 +93,7 @@ struct TodoPanel: View {
         //  again each time this one comes back in front — as it is for its picture)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             if let id = planShownID { PlanAsk.shared.id = id }
-            if Self.menuAsked && model.data != nil { openMenuSoon() }
+            if Self.menuAsked && model.data != nil { openMenuSoon(after: 0.4) }
         }
         .confirmationDialog(deleteQuestion, isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
             if let row = deleting {
@@ -167,12 +167,17 @@ struct TodoPanel: View {
     }
 
     /// (the screenshot suite's -SimplTodoMenu YES) The ⋯'s menu opened from the run loop's timer, not the main queue: a
-    /// menu holds what calls it until it closes, and the picture is taken from the main queue meanwhile.
-    private func openMenuSoon() {
+    /// menu holds what calls it until it closes, and the picture is taken from the main queue meanwhile. Only with the
+    /// app in front (a menu closes as its app goes behind another): until then, asked again every half second.
+    private func openMenuSoon(after delay: TimeInterval = 1.2, tries: Int = 40) {
         guard !PopMenu.isOpen else { return }
-        _ = Timer.scheduledTimer(withTimeInterval: 1.2, repeats: false) { _ in
+        _ = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { _ in
             MainActor.assumeIsolated {
-                guard !PopMenu.isOpen, NSApp.isActive else { return }
+                guard !PopMenu.isOpen else { return }
+                guard NSApp.isActive else {
+                    if tries > 0 { openMenuSoon(after: 0.5, tries: tries - 1) }
+                    return
+                }
                 openMenu()
             }
         }
@@ -508,11 +513,11 @@ private struct TodoPanelRow: View {
         .accessibilityLabel(row.done ? "Mark not done: \(row.title)" : "Mark done: \(row.title)")
     }
 
-    /// Its course, its repeat, when it is due: "BIO 101 · Due Fri 11:59 PM".
-    private var meta: String {
+    /// Its course and its repeat ("BIO 101", "My task · repeats weekly"), cut short before when it is due is.
+    private var course: String {
         let parts = row.meta?.components(separatedBy: " · ") ?? []
         let repeats = row.custom == true ? parts.first(where: { $0.hasPrefix("repeats") }) : nil
-        return [row.courseName, repeats, row.dueText].compactMap { PreviewFormat.text($0) }.joined(separator: " · ")
+        return [row.courseName, repeats].compactMap { PreviewFormat.text($0) }.joined(separator: " · ")
     }
 
     private var words: some View {
@@ -523,13 +528,19 @@ private struct TodoPanelRow: View {
                 .foregroundStyle(finished ? Color.secondary : Color.primary)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
-            HStack(spacing: 5) {
-                Circle().fill(Color(hex: row.color)).frame(width: 6, height: 6)
-                Text(meta)
-                    .font(.sCaption)
-                    .foregroundStyle(row.late == true ? Color.red : Color.secondary)
+            // ("MATH 140: Calc… · Due Today 11:59 PM": the course gives way, when it is due never does)
+            HStack(spacing: 0) {
+                Circle().fill(Color(hex: row.color)).frame(width: 6, height: 6).padding(.trailing, 5)
+                Text(course)
                     .lineLimit(1)
+                if let due = PreviewFormat.text(row.dueText) {
+                    Text(course.isEmpty ? due : " · \(due)")
+                        .lineLimit(1)
+                        .fixedSize()
+                }
             }
+            .font(.sCaption)
+            .foregroundStyle(row.late == true ? Color.red : Color.secondary)
             if let p = row.plan, !finished {
                 Label(p.words, systemImage: "clock")
                     .font(.sCaption2.weight(.semibold))

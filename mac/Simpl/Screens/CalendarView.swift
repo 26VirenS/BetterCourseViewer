@@ -1066,12 +1066,14 @@ struct CalendarView: View {
         dayDrop = nil
         NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
         Task {
-            let r = try? await engine.call("planDay", ["id": id, "day": ISO8601DateFormatter().string(from: cal.startOfDay(for: day))], as: PlanDayReply.self)
-            if r?.ok == true {
-                say(r?.words ?? "Planned")
+            do {
+                let r = try await engine.call("planDay", ["id": id, "day": ISO8601DateFormatter().string(from: cal.startOfDay(for: day))], as: PlanDayReply.self)
+                say(r.words ?? "Planned")
                 engine.changed()
-            } else {
-                withAnimation(reduceMotion ? nil : Motion.snappy) { failure = r?.error ?? "That day could not be planned." }
+            } catch {
+                // (the page's own reason — "That day is already over" — as its answer's error says it)
+                let why = error.localizedDescription
+                withAnimation(reduceMotion ? nil : Motion.snappy) { failure = why }
             }
         }
     }
@@ -1123,6 +1125,7 @@ struct CalendarView: View {
                 }
             }
             .padding(.vertical, 4)
+            .fixedSize(horizontal: false, vertical: true) // (1.3.170: as tall as the days' names, the hours given the rest)
             Self.line.frame(height: 1)
             if allDay.contains(where: { !$0.isEmpty }) {
                 HStack(alignment: .top, spacing: 0) {
@@ -1227,7 +1230,7 @@ struct CalendarView: View {
                 }
                 .background { WeekScrollProbe(scroller: weekScroll) }
             }
-            .scrollIndicators(.automatic)
+            .scrollIndicators(.never) // (the hours' columns as wide as the days' names over them, on every Mac)
             .overlay {
                 WeekPeeks(scroller: weekScroll, days: peeks, gutter: Self.gutter) { y in weekScroll.scroll(to: y - 28, animated: !reduceMotion) }
             }
@@ -2323,12 +2326,11 @@ private struct TodoDayDropDelegate: DropDelegate {
     }
 }
 
-/// (1.3.170) What planDay answers: when the work was planned, in words ("Planned Wed 8:00 AM"), or why not.
+/// (1.3.170) What planDay answers: when the work was planned, and in words ("Planned Wed 8:00 AM"). (Why not is its
+/// error, which the engine throws.)
 private struct PlanDayReply: Decodable {
-    var ok: Bool?
     var at: String?
     var words: String?
-    var error: String?
 }
 
 /// (1.3.167) A plan's block dragged on the week: by how many days and minutes; dropped, on its way to the page.

@@ -180,7 +180,9 @@ enum Shot {
                 // came back — the plan rail's dark picture was taken as it was still opening, the window alone; (1.3.168)
                 // and then until what it reads again as it opens has come (the plan rail's free times: its dark picture
                 // was taken as it was still finding them)
-                if popover && !again && NSApp.isActive {
+                if d.bool(forKey: "SimplTodoMenu") {
+                    menuOpen(file, until: Date().addingTimeInterval(8))
+                } else if popover && !again && NSApp.isActive {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { whenIdle(file, until: Date().addingTimeInterval(8)) }
                 } else {
                     capture(file)
@@ -191,6 +193,18 @@ enum Shot {
                 settle(file, again: false, since: since)
             }
         }
+    }
+
+    /// (1.3.170) To Do's ⋯ menu pictured once it is open (it opens a moment after its app is in front, and again each
+    /// time the app comes back in front), or at `until` whatever it is.
+    private static func menuOpen(_ file: String, until: Date) {
+        let open = MainActor.assumeIsolated { PopMenu.isOpen }
+        if open || Date() >= until {
+            DispatchQueue.main.asyncAfter(deadline: .now() + (open ? 0.5 : 0)) { capture(file) }
+            return
+        }
+        if !NSApp.isActive { front() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { menuOpen(file, until: until) }
     }
 
     /// (1.3.168) Pictured once nothing is being waited for and nothing has come for half a second (what came has
