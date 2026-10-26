@@ -245,7 +245,9 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         engine.QuizRequested += q => Simpl.Screens.QuizPopup.Show(engine, q, this);
         engine.AltaRequested += a => Simpl.Screens.AltaPopup.Show(engine, a, this);
         engine.SettingsRequested += OpenSettings;
-        engine.WhatsNewRequested += d => WhenInSight(() => { WhatsNew.MarkSeen(); WhatsNewSheet.Show(d, this); });
+        engine.WhatsNewRequested += d => WhenInSight(() => { WhatsNew.MarkSeen(); MergedIntro.MarkSeen(); WhatsNewSheet.Show(d, this); });
+        // (0.3.80: seen once it is up, the update's What's New with it — the account menu's What's new has those notes)
+        engine.MergedIntroRequested += () => WhenInSight(() => { MergedIntro.MarkSeen(); WhatsNew.MarkSeen(); MergedIntroSheet.Show(engine, this); });
         engine.SetupRequested += () => SetupSheet.Show(engine, this);
         engine.NewMessageRequested += () => Simpl.Screens.ComposeSheet.Show(engine, this);
         Simpl.Screens.CourseCompose.Hook = (to, context) => Simpl.Screens.ComposeSheet.Show(engine, this, new[] { to }, context);

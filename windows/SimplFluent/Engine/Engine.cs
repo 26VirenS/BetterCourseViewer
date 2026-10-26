@@ -94,6 +94,8 @@ public sealed partial class Engine : Observable, IShellListener
     public event Action<ToolLaunch>? ToolRequested;
     public event Action? SetupRequested;
     public event Action<WhatsNewData>? WhatsNewRequested;
+    /// <summary>(0.3.80) To Do and the calendar as one, and Quick Plan: once, after an update (Shell/MergedIntroSheet.cs).</summary>
+    public event Action? MergedIntroRequested;
     /// <summary>Settings asked for (the page's "open options", the account menu's Settings…, --open settings).</summary>
     public event Action? SettingsRequested;
     public event Action? NewTaskRequested;
@@ -516,8 +518,14 @@ public sealed partial class Engine : Observable, IShellListener
         if (Snapshot?.SetupDone == false && !later && !Launch.IsDevelopment) Prefs.Set(SetupPendingKey, true);
         if (((Snapshot?.SetupDone == false || Prefs.Bool(SetupPendingKey)) && !later) || Launch.Take("setup") != null) { SetupRequested?.Invoke(); return; }
         if (Launch.Take("whatsnew") != null) WhatsNewRequested?.Invoke(WhatsNew.All);
+        else if (Launch.Take("mergedintro") != null) MergedIntroRequested?.Invoke();
         else if (Launch.Take("settings") != null) SettingsRequested?.Invoke();
-        else if (WhatsNew.Due() is { } wn) WhatsNewRequested?.Invoke(wn);
+        // (0.3.80: the first update to it brings up To Do and the calendar as one, and Quick Plan, in its place)
+        else if (WhatsNew.Due() is { } wn)
+        {
+            if (MergedIntro.Due) MergedIntroRequested?.Invoke();
+            else WhatsNewRequested?.Invoke(wn);
+        }
     }
 
     /// <summary>The first setup not finished yet — quit halfway, or its save failed: asked again at the next start.</summary>

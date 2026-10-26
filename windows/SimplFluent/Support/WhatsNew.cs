@@ -26,6 +26,8 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.80", "2026-10-26",
+            ("new", "To Do Meets Calendar", "Your tasks and your week, together in one tab.")),
         R("0.3.79", "2026-10-26",
             ("fixed", "Back in Front", "After an update Simpl opens in front, with What's New."),
             ("improved", "Plan Popup Beside It", "A plan's popup opens next to it on the calendar.")),
@@ -318,6 +320,9 @@ public static class WhatsNew
 
     public static void MarkSeen() => Prefs.Set(SeenKey, Number);
 
+    /// <summary>(0.3.80) A What's New seen before, by some version of this app: it was here before this one.</summary>
+    public static bool SeenAny => Prefs.String(SeenKey) != null;
+
     /// <summary>1.10 is newer than 1.9; a missing part counts as 0.</summary>
     public static bool IsNewer(string a, string b)
     {
@@ -331,4 +336,21 @@ public static class WhatsNew
         }
         return false;
     }
+}
+
+/// <summary>
+/// (0.3.80, the Mac's 1.3.182 MergedIntro) After an update, once: To Do and the calendar are one place now (To Do &amp;
+/// Calendar), and Quick Plan — a task dragged from To Do onto the calendar is given time there (let go on a day, at its
+/// first free time). Shown in place of that update's What's New (the account menu's What's new has its notes), never
+/// after a first install (nothing was apart for it).
+/// </summary>
+public static class MergedIntro
+{
+    private const string SeenKey = "mergedIntro:seen";
+
+    /// <summary>After an update (a What's New seen before: an older version was here), not seen yet.</summary>
+    public static bool Due => WhatsNew.SeenAny && !Prefs.Bool(SeenKey);
+
+    /// <summary>Seen: its popup was up, or a What's New was (a first install's).</summary>
+    public static void MarkSeen() => Prefs.Set(SeenKey, true);
 }
