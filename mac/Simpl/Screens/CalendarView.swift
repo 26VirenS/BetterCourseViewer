@@ -65,8 +65,10 @@ struct CalendarView: View {
     @State private var planOpen: String?
     @State private var joinOnto: String?
     @State private var gripHover: String?
-    /// (1.3.172) The screenshot suite's -SimplPlanPopover YES: a piece of work planned and its popover opened (once).
+    /// (1.3.172) The screenshot suite's -SimplPlanPopover YES: a piece of work planned and its popover opened (once); the
+    /// plan whose popover it opened, opened again each time the app comes back in front.
     @State private var shotPlanned = false
+    @State private var shotPlanID: String?
     /// (1.3.169, 1.3.170 in every view) To Do beside the calendar, on unless turned off; a row of it being dragged over a
     /// day of the week — the day and the minute it would be planned for — or over a day of the month or the agenda; and
     /// what came of the last one let go.
@@ -172,6 +174,11 @@ struct CalendarView: View {
         }
         .onAppear(perform: seed)
         .onDisappear { weekScroll.detach() }
+        // (the suite runs several copies at once: a popover closes as its app goes behind another, so the picture's plan
+        //  popover is opened again each time this one comes back in front — as To Do's plan rail is)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            if let id = shotPlanID { planOpen = id }
+        }
         .task(id: engine.dataVersion) {
             // (the screenshot suite: -SimplCalView week|list opens on that view, in place of the one kept — the kept one
             // then not read at all, so a read still on its way when the task starts again cannot undo it; read by each
@@ -1146,7 +1153,10 @@ struct CalendarView: View {
               let first = rows.sections.flatMap(\.rows).first(where: { $0.done != true && $0.custom != true && $0.id.hasPrefix("assignment:") }) else { return }
         _ = try? await engine.call("planDay", ["id": first.id, "day": ISO8601DateFormatter().string(from: tomorrow > last ? today : tomorrow)], as: PlanDayReply.self)
         await load(animated: false)
-        if let ev = data?.events.first(where: { $0.layer == "plan" && $0.planId == first.id }) { planOpen = ev.id }
+        if let ev = data?.events.first(where: { $0.layer == "plan" && $0.planId == first.id }) {
+            shotPlanID = ev.id
+            planOpen = ev.id
+        }
     }
 
     /// What came of a row let go, under To Do for four seconds.
