@@ -81,6 +81,7 @@ final class CommunityStore: ObservableObject {
             }
             themes = Array(list.prefix(80))
             phase = .ready
+            NSLog("community: %ld themes read", themes.count)
             for t in themes { Task { await thumb(t) } }
         } catch {
             phase = .failed("Simpl Community could not be reached. Check your connection and try again.")
@@ -121,6 +122,13 @@ final class CommunityStore: ObservableObject {
         if t.look == "dark" { AppLook.set(.dark) } else if t.look == "light" { AppLook.set(.light) }
         worn = t.id
         UserDefaults.standard.set(t.id, forKey: Self.wornKey)
+        NSLog("community: wore %@", t.id)
+    }
+
+    /// The screenshot suite's -SimplCommunityWear <name>: a theme of the gallery worn by its name, as its tile's click would.
+    func wear(named name: String) async {
+        await load()
+        if let t = themes.first(where: { $0.name == name }) { await wear(t) } else { NSLog("community: no theme named %@", name) }
     }
 }
 

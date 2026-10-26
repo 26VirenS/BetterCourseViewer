@@ -136,6 +136,8 @@ struct AppearanceOverlay: View {
             if on && columns == .detailOnly { withAnimation(Motion.gentle) { columns = .all } }
         }
         .task {
+            // (1.3.173, the screenshot suite's -SimplCommunityWear <name>: that theme of Simpl Community worn at launch)
+            if let name = UserDefaults.standard.string(forKey: "SimplCommunityWear") { await CommunityStore.shared.wear(named: name) }
             guard AppearanceMode.launchOn else { return }
             try? await Task.sleep(nanoseconds: 900_000_000)
             mode.begin(engine)
