@@ -887,11 +887,12 @@ public sealed partial class CalendarScreen : Screen
         // (0.3.60) and its Sync (--open sync)
         if (cal.Data != null && !cal.Loading && Launch.Take("sync") != null)
             page.Dispatcher.BeginInvoke(OpenSync, DispatcherPriority.Background);
-        // (0.3.62) and a plan on the week, moved an hour on as a drag moves one (--open cal-plan)
-        if (cal.Data != null && !cal.Loading && Launch.Take("cal-plan") != null) _ = ShotPlanMoved();
-        // (0.3.66) and a plan's popup (--open cal-plan-popup), or its Edit (--open cal-plan-edit)
+        // (0.3.66) and a plan's popup (--open cal-plan-popup), or its Edit (--open cal-plan-edit) — asked before cal-plan, which
+        // (taken as a prefix) would take them too
         if (cal.Data != null && !cal.Loading && Launch.Take("cal-plan-popup") != null) _ = ShotPlanPopup(edit: false);
         if (cal.Data != null && !cal.Loading && Launch.Take("cal-plan-edit") != null) _ = ShotPlanPopup(edit: true);
+        // (0.3.62) and a plan on the week, moved an hour on as a drag moves one (--open cal-plan)
+        if (cal.Data != null && !cal.Loading && Launch.Take("cal-plan") != null) _ = ShotPlanMoved();
         // (0.3.64) and the menu of the week's five days or seven (--open cal-week-menu), under Week; and the week pinched to
         // the whole day (--open cal-pinch)
         if (cal.Data != null && !cal.Loading && mode == "week" && Launch.Take("cal-week-menu") != null) _ = ShotWeekMenu();
