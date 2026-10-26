@@ -391,6 +391,18 @@ jobs:
           # (0.3.63) the week with To Do beside it and a row of To Do held over Wednesday at 1 PM, where it would be planned
           Shot 'calendar-week-todo-drop' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'calendar', '--cal-view', 'week', '--open', 'cal-todo-drop'))
           Shot 'calendar-list' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'calendar', '--cal-view', 'list'))
+          # (0.3.64) To Do & Calendar: To Do opened (--place todo) is the calendar with To Do in its panel beside it — the month
+          # in light, the week in dark, the list — each scrolling inside itself, the page held still; To Do's ⋯ menu; the week
+          # at seven days, and Week's menu of five or seven; the week pinched to the whole day (the log says so); and one
+          # scrolled to the afternoon, what lies before and after its hours in view waiting at their edges (the log counts them)
+          Shot 'todo-calendar-month' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'todo', '--cal-view', 'month'))
+          Shot 'todo-calendar-week' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'todo', '--cal-view', 'week'))
+          Shot 'todo-calendar-list' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'todo', '--cal-view', 'list'))
+          Shot 'calendar-todo-menu' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'calendar', '--cal-view', 'month', '--open', 'cal-todo-menu'))
+          Shot 'calendar-week-7' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'calendar', '--cal-view', 'week', '--cal-days', '7'))
+          Shot 'calendar-week-menu' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'calendar', '--cal-view', 'week', '--open', 'cal-week-menu'))
+          Shot 'calendar-week-pinched' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'calendar', '--cal-view', 'week', '--open', 'cal-pinch'))
+          Shot 'calendar-week-peeks' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'calendar', '--cal-view', 'week', '--cal-hour-px', '64', '--open', 'cal-peeks'))
           Shot 'calendar-preview' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'calendar', '--open', 'preview'))
           # (0.3.53) Find Appointment over the calendar, light and dark
           Shot 'find-appointment' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'calendar', '--open', 'appointments'))
@@ -1442,6 +1454,18 @@ jobs:
             $l = PhoneLog 'calendar-week-plan'
             Write-Host "calendar-week-plan: $((@($l -split "`n" | Where-Object { $_ -match 'calendar: ' }) -join ' | '))"
             if ($l -notmatch 'calendar: plan put .+, moved to ') { Write-Host "::error::calendar-week-plan: no plan was put and moved before the picture (shots/profile-calendar-week-plan.log)"; exit 1 }
+          }
+          # (0.3.64) To Do & Calendar: To Do's menu and Week's menu open, the week pinched to the whole day, and the week
+          # scrolled with something waiting at its edges, before each picture (Screens/Calendar/CalendarTodo.cs TodoShots,
+          # CalendarWeek.cs ShotPinch and ShotPeeks: "calendar: …")
+          $calChecks = @(@('calendar-todo-menu', 'calendar: To Do.s menu open'), @('calendar-week-menu', 'calendar: the week.s menu open, 5 days'))
+          $calChecks += ,@('calendar-week-pinched', 'calendar: hours pinched to \d+ px, the whole day in view')
+          $calChecks += ,@('calendar-week-peeks', 'calendar: peeks: ([1-9]\d* above, \d+|\d+ above, [1-9]\d*) below')
+          foreach ($cs in $calChecks) {
+            if ($script:mine -notcontains $cs[0]) { continue }
+            $l = PhoneLog $cs[0]
+            Write-Host "$($cs[0]): $((@($l -split "`n" | Where-Object { $_ -match 'calendar: ' }) -join ' | '))"
+            if ($l -notmatch $cs[1]) { Write-Host "::error::$($cs[0]): the log does not say '$($cs[1])' before the picture (shots/profile-$($cs[0]).log)"; exit 1 }
           }
           # (tools) Verb conjugations: the verb the launch asked for was conjugated and shown (Tools/Study/Verbs/VerbsTool.cs)
           foreach ($vb in @(@('tool-verbs', 'verbs: shows es tener'), @('tool-verbs-dark', 'verbs: shows fr manger'), @('pin-verbs', 'verbs: shows es ser'))) {
