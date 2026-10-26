@@ -189,7 +189,7 @@ public sealed partial class CalendarScreen : Screen
     private SelectorBar? selector;
     private Button? prevButton, nextButton, finderButton, syncButton, calendarsButton;
     private FrameworkElement? pager;
-    private ProgressRing? spinner;
+    private Spinner? spinner;
 
     /// <summary>
     /// Beside the title: a spinner while the page is asked, Month · Week · List (Windows 11's SelectorBar; Week pressed

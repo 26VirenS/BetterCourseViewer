@@ -93,6 +93,8 @@ public static class PerfWalk
 
             await Go("To Do & Calendar", () => e.Go(Place.Todo)); // (0.3.64: one place, To Do beside the calendar)
             await Go("Grades", () => e.Go(Place.Grades));
+            // (To Do & Calendar's page kept out of view behind it: anything of it still moving shows here)
+            await IdleCpu("Idle (calendar kept)");
             if (e.OnBrightspace) Skip("Inbox", "Brightspace: no Inbox"); else await Go("Inbox", () => e.Go(Place.Inbox));
             var course = Launch.Get("perf-course") ?? e.Courses.FirstOrDefault()?.Id;
             if (course == null) Skip("Course", "no course to open");
@@ -110,6 +112,7 @@ public static class PerfWalk
             // a screen shown a while ago, its page let go since: made again from the answers kept
             await Go("Grades (again)", () => e.Go(Place.Grades));
             await Go("Dashboard (last)", () => e.Go(Place.Dashboard));
+            await IdleCpu("Idle (walked)");
             // memory after the walk, settled as the start was; then left alone a while; then after a while minimized,
             // and the window back
             stage = "the walk settling";
@@ -158,6 +161,28 @@ public static class PerfWalk
         var how = Perf.TakeOpen() is { } o ? $"opened {o.How}" : null;
         rows.Add(k.Row(name, Perf.Ms(k.T0, shown), settled is { } t ? Perf.Ms(k.T0, t) : null, settled == null ? (how != null ? how + "; " : "") + Late : how));
         await Task.Delay(250);
+    }
+
+    /// <summary>
+    /// (0.3.75) The app left alone three seconds, nothing moving and nothing asked: its own processor time meanwhile, in
+    /// ms (the ui column) — near none, unless something out of sight keeps WPF drawing the window (0.3.74 and before: a
+    /// busy ring hidden with its page, turning all the while). Frames are not counted: listening for them draws them.
+    /// </summary>
+    private static async Task IdleCpu(string name)
+    {
+        if (finished) return;
+        stage = name;
+        await Perf.Quiet(1000, 8000);
+        Perf.StallWindow();
+        var allocated = GC.GetTotalAllocatedBytes(false);
+        var me = System.Diagnostics.Process.GetCurrentProcess();
+        me.Refresh();
+        var cpu0 = me.TotalProcessorTime;
+        await Task.Delay(3000);
+        me.Refresh();
+        var cpu = (me.TotalProcessorTime - cpu0).TotalMilliseconds;
+        rows.Add(new Row(name, cpu, null, 0, 0, 0, 0, Perf.StallWindow(), null, null, (GC.GetTotalAllocatedBytes(false) - allocated) / MB,
+            Perf.Fmt($"left alone 3 s: ui is Simpl's own processor time meanwhile, {cpu / 30:0.0}% of one core")));
     }
 
     private static async Task NewTask(Shell.MainWindow m, Engine.Engine e)

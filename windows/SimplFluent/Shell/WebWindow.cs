@@ -106,6 +106,7 @@ public sealed class WebWindow : FluentWindow
         loading.Background = Brushes.Transparent;
         // (with Windows' animation effects off, a still line in place of the running one)
         if (!Motion.On) { loading.IsIndeterminate = false; loading.Value = 100; loading.Opacity = 0.6; }
+        else K.OnlyWhileShown(loading);
         var root = new Grid();
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(BarHeight) });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });

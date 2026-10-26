@@ -178,7 +178,7 @@ internal sealed class SubmissionReview : Grid
     /// <summary>The school's own page for the work, with the session (its viewer, its marks), a thin bar while it loads.</summary>
     private FrameworkElement CanvasViewer(Uri url)
     {
-        var bar = new ProgressBar { IsIndeterminate = true, Height = 2, VerticalAlignment = VerticalAlignment.Top, Visibility = Visibility.Collapsed };
+        var bar = K.OnlyWhileShown(new ProgressBar { IsIndeterminate = true, Height = 2, VerticalAlignment = VerticalAlignment.Top, Visibility = Visibility.Collapsed });
         var web = AssignKit.Web(url, async core =>
         {
             await core.AddScriptToExecuteOnDocumentCreatedAsync(AssignDocViewerSkin.Script());

@@ -381,7 +381,7 @@ internal sealed class HWSimulatePage : HWPageBase
     private readonly ContentControl chips = CrossKit.Host();
     private readonly TextBlock verdict = K.Wrapped("", Ty.BodyStrong);
     private readonly TextBlock readout = K.Text("", Ty.Caption, B.Text2).Tabular();
-    private readonly ProgressRing spinner = new() { IsIndeterminate = true, Width = 14, Height = 14 };
+    private readonly Spinner spinner = K.Spinner(14);
     private readonly HWChart chart = new();
     private readonly ContentControl bars = CrossKit.Host();
     private readonly ContentControl right = CrossKit.Host();

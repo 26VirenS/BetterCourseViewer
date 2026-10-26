@@ -496,7 +496,25 @@ public static class K
     }
 
     /// <summary>Windows 11's indeterminate progress ring.</summary>
-    public static ProgressRing Spinner(double size = 24) => new() { IsIndeterminate = true, Width = size, Height = size, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
+    /// <summary>(0.3.75) The busy ring: the app's own, turning only while it shows (<see cref="Kit.Spinner"/>).</summary>
+    public static Spinner Spinner(double size = 24) => new(size);
+
+    /// <summary>
+    /// (0.3.75) An indeterminate bar that moves only while it shows: folded away (between a window's loads), its
+    /// animation stopped, and started again as it shows — one left moving out of sight kept WPF drawing the window.
+    /// </summary>
+    public static T OnlyWhileShown<T>(T bar) where T : System.Windows.Controls.ProgressBar
+    {
+        var stopped = false;
+        void Update()
+        {
+            if (!bar.IsVisible && bar.IsIndeterminate) { bar.IsIndeterminate = false; stopped = true; }
+            else if (bar.IsVisible && stopped) { bar.IsIndeterminate = true; stopped = false; }
+        }
+        bar.IsVisibleChanged += (_, _) => Update();
+        Update();
+        return bar;
+    }
 
     /// <summary>A small spinner beside a line (a list still reading).</summary>
     public static FrameworkElement Reading(string text) => H(10, Spinner(16), Text(text, Ty.Body, B.Text2)).Margin(4, 8, 0, 8);

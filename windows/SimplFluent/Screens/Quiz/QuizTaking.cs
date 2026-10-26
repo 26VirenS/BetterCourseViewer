@@ -30,7 +30,7 @@ internal sealed class QuizTakePane : IQuizPane
     private QuizQuestionPage? page;
     private readonly List<QuizTile> tiles = new();
     private readonly TextBlock status = K.Text("", Ty.Body, B.Text2).Digits();
-    private readonly ProgressRing statusSpinner = K.Spinner(14);
+    private readonly Spinner statusSpinner = K.Spinner(14);
     private readonly Wpf.Ui.Controls.Button previous, submit, next;
     private Button? review;
     // the side column's bar of how much is answered (its count is the foot's)
@@ -322,7 +322,7 @@ internal sealed class QuizTile : Button
     private readonly TextBlock text;
     private readonly SymbolIcon flag = K.Icon(SymbolRegular.Flag24, 9, QuizUi.Orange, filled: true);
     private readonly SymbolIcon tick = new() { Symbol = SymbolRegular.Checkmark24, FontSize = 9, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 4, 3) };
-    private readonly ProgressRing spinner = K.Spinner(14);
+    private readonly Spinner spinner = K.Spinner(14);
 
     /// <summary>How strongly an answered tile is washed in the quiz's colour: on dark, enough to stand apart from a blank one.</summary>
     public static double DoneWash => Support.Appearance.Dark ? 0.42 : 0.2;

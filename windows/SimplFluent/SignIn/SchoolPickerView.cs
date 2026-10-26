@@ -42,7 +42,7 @@ public sealed class SchoolPickerView : Grid
     private readonly Image icon;
     private readonly TextBlock sub;
     private readonly FrameworkElement column;
-    private readonly ProgressRing asking = K.Spinner(16);
+    private readonly Spinner asking = K.Spinner(16);
     private readonly Dictionary<string, (Button Row, Border Pill, FrameworkElement Enter)> rows = new();
     private string? chosen;
     private bool confirmAsked;

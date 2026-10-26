@@ -7,10 +7,11 @@ using System.Windows.Threading;
 namespace Simpl.Support;
 
 /// <summary>
-/// Simpl giving memory back when it is not being used. Left alone a moment — nothing pressed or typed in its window for
-/// ten seconds, nothing asked of the page, a good deal made and thrown away since last time — .NET is asked to collect
-/// and hand its free memory back to Windows (once a minute at most; a fraction of a second, while nobody is using it).
-/// Minimized or in the notification area for twenty seconds (or the PC locked, its display off): the same, then the web view's page is asked to keep to
+/// Simpl giving memory back when it is not being used. Left alone a while — nothing pressed or typed in its window for
+/// thirty seconds, nothing asked of the page, a good deal made and thrown away since last time — .NET is asked to collect
+/// in the background (once a minute at most; 0.3.75: never a blocking, compacting collection on the window's own
+/// thread, which a click a moment later waited behind, and which gave back the room the next page is built in).
+/// Minimized or in the notification area for two minutes (or the PC locked, its display off): a full collection, then the web view's page is asked to keep to
 /// little memory (WebView2 hands its own back) and Windows takes the pages Simpl is not using out of RAM (its working
 /// set) — never sooner, so a window brought straight back has everything where it was; brought back later, the few
 /// pages it draws with come back from Windows' own standby memory, not the disk. Back in view, the page is asked for its
@@ -18,8 +19,10 @@ namespace Simpl.Support;
 /// </summary>
 public static class MemoryTidy
 {
-    /// <summary>How long the window must be left alone, and minimized, before memory is given back.</summary>
-    private const int IdleMs = 10_000, AwayMs = 20_000;
+    /// <summary>How long the window must be left alone, and minimized, before memory is given back. (0.3.75: 30 s and
+    /// two minutes, from 10 s and 20 s — a window minimized a moment and brought back had all it draws with taken out
+    /// of RAM, and the page slowed, and the next clicks paid for it.)</summary>
+    private const int IdleMs = 30_000, AwayMs = 120_000;
     /// <summary>At most once a minute while the window shows, and only after this much was made and thrown away.</summary>
     private const int EveryMs = 60_000;
     private const long Churn = 24L * 1024 * 1024;
@@ -111,17 +114,22 @@ public static class MemoryTidy
         return n;
     }
 
-    /// <summary>.NET's free memory handed back to Windows: a compacting collection that gives back all it can (and,
-    /// <paramref name="full"/>, what the finalizers then let go of — the native memory behind the trees let go).</summary>
+    /// <summary>.NET's free memory handed back to Windows. In view (<paramref name="full"/> false): a collection in the
+    /// background, the window's thread going on with it, nothing compacted. Away: a compacting collection that gives
+    /// back all it can, and what the finalizers then let go of — the native memory behind the trees let go.</summary>
     private static void Collect(bool full)
     {
+        if (!full)
+        {
+            GC.Collect(2, GCCollectionMode.Optimized, blocking: false, compacting: false);
+            lastTidy = Environment.TickCount64;
+            allocatedAt = GC.GetTotalAllocatedBytes(false);
+            return;
+        }
         GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
         GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
-        if (full)
-        {
-            GC.WaitForPendingFinalizers();
-            GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
-        }
+        GC.WaitForPendingFinalizers();
+        GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
         lastTidy = Environment.TickCount64;
         allocatedAt = GC.GetTotalAllocatedBytes(false);
     }

@@ -76,7 +76,7 @@ internal sealed class HandInSheet
     private readonly Stack filesList = new() { Orientation = Orientation.Vertical, Spacing = 4 };
     private readonly TextBlock filesFoot, error, hint;
     private readonly FrameworkElement errorRow, filesSection;
-    private readonly ProgressRing busy = K.Spinner(16);
+    private readonly Spinner busy = K.Spinner(16);
     private SelectorBar? kinds;
     private readonly Grid overlay = new() { IsHitTestVisible = false, Visibility = Visibility.Collapsed };
 
