@@ -26,6 +26,9 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.69", "2026-10-26",
+            ("improved", "Smoother Plan Dragging", "A plan follows the pointer as you drag it, then settles."),
+            ("improved", "Events at Their Length", "A short plan on the week is as short as it lasts.")),
         R("0.3.68", "2026-10-26",
             ("new", "Click a Card to Upload", "In Appearance, click any card or the pane for a photo."),
             ("improved", "Controls Round Photos", "Zoom, Ink and Done sit around the photo you're placing.")),

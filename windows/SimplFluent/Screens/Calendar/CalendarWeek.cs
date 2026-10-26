@@ -95,8 +95,9 @@ public sealed partial class CalendarScreen
         ev.AllDay != true && !string.IsNullOrEmpty(ev.Time) && CalendarKit.Date(ev.Date) is { } d ? d.Hour * 60 + d.Minute : null;
 
     /// <summary>
-    /// A day's timed items as drawn: from their start to their end (work half an hour, an event without one an hour), never
-    /// less than half an hour, one due at 11:59 pm kept on the grid; laid out in lanes where they overlap.
+    /// A day's timed items as drawn: from their start to their end (work half an hour, an event without one an hour) —
+    /// (0.3.69) as long as they last, a quarter of an hour at least (half an hour before) — one due at 11:59 pm kept on the
+    /// grid; laid out in lanes where they overlap.
     /// </summary>
     private static List<WeekSlot> DaySlots(DateTime day, List<CalEvent> evs)
     {
@@ -107,9 +108,9 @@ public sealed partial class CalendarScreen
             var end = CalendarKit.Date(ev.End) is { } e && CalendarKit.Date(ev.Date) is { } s && e > s
                 ? (e.Date == day.Date ? e.Hour * 60 + e.Minute : DayEnd)
                 : start + (CalendarKit.IsWork(ev.Kind) ? 30 : 60);
-            var len = Math.Max(30, end - start);
-            var a = Math.Max(0, Math.Min(start, DayEnd - 30));
-            items.Add(new WeekSlot(ev, a, Math.Min(DayEnd, Math.Max(a + 30, a + len))));
+            var len = Math.Max(15, end - start);
+            var a = Math.Max(0, Math.Min(start, DayEnd - len));
+            items.Add(new WeekSlot(ev, a, Math.Min(DayEnd, a + len)));
         }
         return Lanes(items);
     }
@@ -610,9 +611,9 @@ public sealed partial class CalendarScreen
     }
 
     /// <summary>
-    /// A plan's block dragged to another time: it follows the pointer a quarter of an hour at a time — the time on it
-    /// saying where it would go — and across to another day, lifted over the days beside; let go, the plan is moved there
-    /// and the week read again. Escape, or a drag back to where it was, puts it back. A click without a drag is the
+    /// A plan's block dragged to another time: (0.3.69, the Mac's 1.3.176) it follows the pointer to the point, lifted over
+    /// the days beside, the quarter hour and the day it would go to outlined under it and the time on it saying which;
+    /// let go, it settles there, the plan is moved there and the week read again. Escape, or a drag back to where it was, puts it back. A click without a drag is the
     /// block's own: its preview opens.
     /// </summary>
     private void Draggable(Button b, WeekSlot s, string pid, DateTime day, int dayIndex, Grid column, List<Grid> columns, Run time, string clock)
@@ -634,11 +635,42 @@ public sealed partial class CalendarScreen
             b.Effect = on ? new DropShadowEffect { BlurRadius = 16, ShadowDepth = 5, Direction = 270, Opacity = 0.28, Color = Colors.Black } : null;
             Mouse.OverrideCursor = on ? Cursors.SizeAll : null;
         }
+        // (0.3.69) where it would go, outlined in that day's column
+        Rectangle? ghost = null;
+        Grid? ghostIn = null;
+        void Ghost(int d, int at)
+        {
+            var cell = columns[dayIndex + d];
+            if (ghost == null)
+            {
+                var accent = Appearance.Accent;
+                ghost = new Rectangle
+                {
+                    RadiusX = 6, RadiusY = 6, StrokeThickness = 1.5, StrokeDashArray = new DoubleCollection { 3, 2.5 },
+                    Stroke = K.Brush(K.WithAlpha(accent, 0.75)), Fill = K.Brush(K.WithAlpha(accent, 0.1)),
+                    IsHitTestVisible = false, VerticalAlignment = VerticalAlignment.Top,
+                };
+            }
+            if (ghostIn != cell)
+            {
+                ghostIn?.Children.Remove(ghost);
+                cell.Children.Add(ghost);
+                ghostIn = cell;
+            }
+            ghost.Height = s.Height(hourPx);
+            ghost.Margin = new Thickness(4, GridInset + at / 60.0 * hourPx, 6, 0);
+        }
+        void NoGhost()
+        {
+            if (ghost != null) ghostIn?.Children.Remove(ghost);
+            ghostIn = null;
+        }
         void Back()
         {
             engaged = false;
             from = null;
             days = minutes = 0;
+            NoGhost();
             Lift(false);
             Motion.To(shift, TranslateTransform.XProperty, 0, Motion.Fast);
             Motion.To(shift, TranslateTransform.YProperty, 0, Motion.Fast);
@@ -667,22 +699,25 @@ public sealed partial class CalendarScreen
                 Lift(true);
             }
             e.Handled = true;
-            var at = (int)Math.Round((s.A + dy / hourPx * 60) / Snap) * Snap;
-            at = Math.Clamp(at, 0, Math.Max(0, DayEnd - Math.Min(len, DayEnd)));
-            var w = column.ActualWidth;
-            var d = w > 0 ? Math.Clamp((int)Math.Round(dx / w), -dayIndex, columns.Count - 1 - dayIndex) : 0;
-            if (d == days && at - s.A == minutes) return;
-            days = d;
-            minutes = at - s.A;
-            // (the shift to another day measured on the columns as they are: they are not all one width to the pixel)
-            var x = d == 0 ? 0 : columns[dayIndex + d].TranslatePoint(new Point(0, 0), column).X;
+            // (0.3.69) the block to the point under the pointer, kept to the week and the day's hours
+            var latest = Math.Max(0, DayEnd - Math.Min(len, DayEnd));
+            var xLo = columns[0].TranslatePoint(new Point(0, 0), column).X;
+            var xHi = columns[^1].TranslatePoint(new Point(0, 0), column).X;
             shift.BeginAnimation(TranslateTransform.XProperty, null);
             shift.BeginAnimation(TranslateTransform.YProperty, null);
-            shift.X = x;
-            shift.Y = minutes / 60.0 * hourPx;
+            shift.X = Math.Clamp(dx, xLo, xHi);
+            shift.Y = Math.Clamp(dy, -s.A / 60.0 * hourPx, (latest - s.A) / 60.0 * hourPx);
+            // (and the quarter hour and the day it would go to, from that)
+            var at = Math.Clamp((int)Math.Round((s.A + shift.Y / hourPx * 60) / Snap) * Snap, 0, latest);
+            var w = column.ActualWidth;
+            var d = w > 0 ? Math.Clamp((int)Math.Round(shift.X / w), -dayIndex, columns.Count - 1 - dayIndex) : 0;
+            if (d == days && at - s.A == minutes && ghostIn != null) return;
+            days = d;
+            minutes = at - s.A;
             var when = day.AddDays(d).AddMinutes(at);
             var onto = PlanAt(dayIndex + d, at + grab, pid);
             Ring(onto);
+            if (onto == null) Ghost(d, at); else NoGhost();
             time.Text = onto != null ? $"Group with {onto.Ev.Title}" : d == 0 ? ClockWords(when) : $"{when.ToString("ddd", CultureInfo.InvariantCulture)} {ClockWords(when)}";
             AutomationProperties.SetName(b, onto != null ? $"Group with {onto.Ev.Title}" : $"Move to {when.ToString("dddd", CultureInfo.InvariantCulture)} {ClockWords(when)}");
         };
@@ -695,6 +730,7 @@ public sealed partial class CalendarScreen
             from = null;
             b.ReleaseMouseCapture();
             // (0.3.66) let go over another plan: one block with it, its group's
+            NoGhost();
             if (PlanAt(dayIndex + days, s.A + minutes + grab, pid) is { } target && CalendarKit.Text(target.Ev.PlanId) is { } onto)
             {
                 Ring(null);
@@ -704,6 +740,10 @@ public sealed partial class CalendarScreen
             }
             if (days == 0 && minutes == 0) { Back(); return; }
             Lift(false);
+            // (0.3.69) settled into the quarter hour and the day it goes to (the shift to another day measured on the columns
+            // as they are: they are not all one width to the pixel)
+            Motion.To(shift, TranslateTransform.XProperty, days == 0 ? 0 : columns[dayIndex + days].TranslatePoint(new Point(0, 0), column).X, Motion.Fast);
+            Motion.To(shift, TranslateTransform.YProperty, minutes / 60.0 * hourPx, Motion.Fast);
             Panel.SetZIndex(column, 5); // (it stays where it was let go, over the days beside, until the week is drawn again)
             var moved = day.AddDays(days).AddMinutes(s.A + minutes);
             _ = Drop(moved);
