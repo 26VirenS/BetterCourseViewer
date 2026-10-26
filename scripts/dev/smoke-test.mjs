@@ -338,7 +338,14 @@ try {
   // the dot after "Simpl" sits where the word ends in this system's font (here a Windows-like one,
   // wider than the Mac's: drawn at the design's fixed place it would land on the l) — read while the
   // word-mark is still up (it is short here: harness.mjs)
-  const dotOf = (hostSel) => page.evaluate((sel) => { const r = document.querySelector(sel).shadowRoot; const t = r.querySelector('.intro text'); const d = r.querySelector('.intro__dot'); const b = t.getBBox(); const vb = r.querySelector('.intro svg').getAttribute('viewBox').split(' ').map(Number); return { gap: Math.round(Number(d.getAttribute('cx')) - (b.x + b.width)), end: Math.round(b.x + b.width), cx: Number(d.getAttribute('cx')), fits: vb[2] >= Number(d.getAttribute('cx')) + 9 }; }, hostSel);
+  // the word-mark is up for a moment only (700ms here): caught the frame its word is laid out, and measured in that frame —
+  // under load whatever else the test waits for can come after it has gone. null if it never showed.
+  const introDot = (hostSel) => page.waitForFunction((sel) => {
+    const r = document.querySelector(sel)?.shadowRoot; const t = r?.querySelector('.intro:not([hidden]) text'); const d = r?.querySelector('.intro__dot');
+    if (!t || !d || !(t.getBBox().width > 0)) return null;
+    const b = t.getBBox(); const vb = r.querySelector('.intro svg').getAttribute('viewBox').split(' ').map(Number);
+    return { gap: Math.round(Number(d.getAttribute('cx')) - (b.x + b.width)), end: Math.round(b.x + b.width), cx: Number(d.getAttribute('cx')), fits: vb[2] >= Number(d.getAttribute('cx')) + 9 };
+  }, hostSel, { timeout: 20000, polling: 'raf' }).then((h) => h.jsonValue()).catch(() => null);
   // Clear all leaves none ticked, whatever was: Continue is dead with a hint until one is picked
   const clearAll = async () => { if ((await texts(su('#selectAll')))[0] === 'Select all') await page.click(su('#selectAll')); await page.click(su('#selectAll')); };
   const pz = (sel) => su(`.pz ${sel}`);
@@ -6271,12 +6278,11 @@ try {
   // a fresh student: the Grades checks above left a goal and a record behind
   await sw.evaluate(async (port) => { const k = `prefs:localhost:${port}`; const all = await self.BCV.api.storage.local.get(k); const p = all[k] || {}; for (const key of ['gpaGoal', 'gpaTracking', 'gradeTargets', 'setupDone', 'tour']) delete p[key]; await self.BCV.api.storage.local.set({ [k]: p }); await self.BCV.api.storage.local.remove(['setup:done', 'welcome:pending']); }, PORT);
   await page.goto(`${BASE}/?bcv=setup`);
+  // (the word-mark caught as it shows, before the rows: under load the rows come after it has gone; the dashboard and
+  //  the rail come a beat later still, so they are looked for once they are there)
+  const setupDot = await introDot('#bcv-setup');
+  const introUp = !!setupDot;
   await page.waitForSelector(su('.row'), { timeout: 20000 });
-  const introUp = (await page.$(su('.intro:not([hidden])'))) !== null;
-  // (under load the word-mark's words are laid out a moment after it shows, and the dashboard and the rail come a beat
-  //  later: measured, and looked for, once they are there)
-  await page.waitForFunction(() => { const t = document.querySelector('#bcv-setup')?.shadowRoot?.querySelector('.intro text'); return !!t && t.getBBox().width > 0; }, null, { timeout: 10000 }).catch(() => {});
-  const setupDot = await dotOf('#bcv-setup');
   let setupOpen = null;
   await eventually(async () => {
     setupOpen = { url: page.url() === `${BASE}/`, stat: (await page.$('.bcv-stat')) !== null, rail: (await page.$$(su('.rail__item'))).length, step: await sStep(), body: await page.$eval('body', (e) => getComputedStyle(e).overflow), html: await page.$eval('html', (e) => getComputedStyle(e).overflow) };
@@ -6284,7 +6290,7 @@ try {
   }, 8000);
   // the word-mark plays first (about two seconds), then the setup rises under it
   check(introUp && setupOpen.url && setupOpen.stat && setupOpen.rail === 3 && setupOpen.step === '1 of 3' && setupOpen.body === 'hidden' && setupOpen.html === 'visible', `the setup opens over the dashboard on its own ground: the address cleaned, a word-mark, a rail of three steps (2.99.74: no step for where the courses live), the page held still: ${JSON.stringify({ introUp, ...setupOpen })}`);
-  check(setupDot.gap >= 10 && setupDot.gap <= 18 && setupDot.fits, `the dot after Simpl sits just past the word as drawn here, inside the drawing: ${JSON.stringify(setupDot)}`);
+  check(!!setupDot && setupDot.gap >= 10 && setupDot.gap <= 18 && setupDot.fits, `the dot after Simpl sits just past the word as drawn here, inside the drawing: ${JSON.stringify(setupDot)}`);
   await page.waitForFunction(() => document.querySelector('#bcv-setup')?.shadowRoot.querySelector('.intro')?.hidden === true, null, { timeout: 8000 });
   await page.waitForTimeout(500);
   await shot(page, '32-setup-over-page');
@@ -6923,9 +6929,9 @@ try {
   if (cur.invite) {
     // this version puts an invitation in the notes' place: try a theme, or change the colour — the
     // four scenes and the seven colours in a strip, Not now and Personalize; the notes wait in Settings
+    const wnDot = await introDot('#bcv-whatsnew'); // (caught as it shows: it is up for a moment only)
     await page.waitForSelector(wn('.inv'), { timeout: 20000 });
-    const wnDot = await dotOf('#bcv-whatsnew');
-    check(wnDot.gap >= 10 && wnDot.gap <= 18 && wnDot.fits, `its word-mark's dot sits just past the word too: ${JSON.stringify(wnDot)}`);
+    check(!!wnDot && wnDot.gap >= 10 && wnDot.gap <= 18 && wnDot.fits, `its word-mark's dot sits just past the word too: ${JSON.stringify(wnDot)}`);
     await introDone();
     await page.waitForTimeout(500);
     const inv = await page.evaluate(() => { const r = document.querySelector('#bcv-whatsnew').shadowRoot; return { notes: r.querySelectorAll('.wn__note, .wn__vh, #earlier').length, brand: r.querySelector('.fr__brand span').textContent, h1: r.querySelector('.fr__h1').textContent, blurb: r.querySelector('.fr__blurb').textContent, scenes: [...r.querySelectorAll('.inv__scene')].map((s) => s.title).join(','), scenePics: [...r.querySelectorAll('.inv__scene')].every((s) => /^url\("data:image\/svg\+xml/.test(getComputedStyle(s).backgroundImage) && s.getBoundingClientRect().width > 90), dots: [...r.querySelectorAll('.inv__dot')].map((d) => d.title).join(','), foot: [...r.querySelectorAll('.fr__foot button')].map((b) => `${b.id}:${b.textContent.trim()}`).join(',') }; });
