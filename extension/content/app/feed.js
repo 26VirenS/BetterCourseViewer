@@ -79,13 +79,22 @@
     }
     for (const [id, p] of Object.entries(BCV.plan?.all() || {})) {
       const a = Date.parse(p.at);
-      if (!a || a < from.getTime() || a > to.getTime()) continue;
+      if (!a || a > to.getTime() || (a < from.getTime() && !p.repeat)) continue; // (a repeating one, begun before, still runs)
+      // (2.99.114) a group is one event, the group's first plan's: the work of each of them in it
+      if (p.group && p.group !== id && BCV.plan.get(p.group)) continue;
+      const group = p.group ? BCV.plan.groupOf(id).map((k) => BCV.plan.get(k)).filter(Boolean) : null;
+      // (2.99.113) a plan as the student set it in Edit: its own name, a whole day, a repeat, an alert, their notes
+      const day = new Date(a);
       out.push({
         uid: `plan-${String(id).replace(/[^A-Za-z0-9_.-]/g, '-')}@simplcourses.com`,
-        title: `Work on ${p.title}`,
-        start: a, end: a + (p.mins || 60) * MIN,
+        title: p.name || `Work on ${group && group.length > 1 ? group.map((g) => g.title).join(' + ') : p.title}`,
+        ...(p.allDay ? { allDay: true, day: `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`, days: 1 } : { start: a, end: a + (p.mins || 60) * MIN }),
         url: abs(p.url),
-        description: [[p.course, `${BCV.plan.lenWord(p.mins || 60)} set aside`].filter(Boolean).join(' · '), p.due ? `Due ${when(Date.parse(p.due))}` : '', abs(p.url), 'Planned in Simpl'].filter(Boolean).join('\n'),
+        rrule: { day: 'FREQ=DAILY', week: 'FREQ=WEEKLY', '2week': 'FREQ=WEEKLY;INTERVAL=2', month: 'FREQ=MONTHLY' }[p.repeat] || '',
+        alarm: Number.isFinite(p.alert) ? p.alert : null,
+        description: group && group.length > 1
+          ? [p.notes || '', ...group.map((g) => [g.title, g.course, g.due ? `due ${when(Date.parse(g.due))}` : ''].filter(Boolean).join(' · ')), p.allDay ? '' : `${BCV.plan.lenWord(p.mins || 60)} set aside`, 'Planned in Simpl'].filter(Boolean).join('\n')
+          : [p.notes || '', [p.course, p.allDay ? '' : `${BCV.plan.lenWord(p.mins || 60)} set aside`].filter(Boolean).join(' · '), p.due ? `Due ${when(Date.parse(p.due))}` : '', abs(p.url), 'Planned in Simpl'].filter(Boolean).join('\n'),
       });
     }
     out.sort((x, y) => (x.start ?? Date.parse(x.day)) - (y.start ?? Date.parse(y.day)) || x.uid.localeCompare(y.uid));

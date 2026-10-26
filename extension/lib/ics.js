@@ -358,8 +358,9 @@
   }
   /**
    * A calendar as an .ics file. events: [{ uid, title, start, end?, allDay?, day?, days?, description?, url?, location?,
-   * free?, categories? }] — start and end in ms (a moment with no length, end the same as start: a due time); a whole
-   * day by day ("2026-10-25") and how many days.
+   * free?, categories?, rrule?, alarm? }] — start and end in ms (a moment with no length, end the same as start: a due
+   * time); a whole day by day ("2026-10-25") and how many days; rrule a repeat ("FREQ=WEEKLY"); alarm the minutes before
+   * it starts that the calendar app should say so.
    */
   function write({ name = 'Simpl', description = '', color = '', refreshMinutes = 60, events = [], now = Date.now() } = {}) {
     const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Simpl Courses//Simpl calendar//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
@@ -377,7 +378,10 @@
       if (ev.location) L.push(`LOCATION:${esc(ev.location)}`);
       if (ev.url) L.push(`URL:${String(ev.url).replace(/[\r\n]/g, '')}`);
       if (ev.categories?.length) L.push(`CATEGORIES:${ev.categories.map(esc).join(',')}`);
-      L.push(`TRANSP:${ev.free ? 'TRANSPARENT' : 'OPAQUE'}`, 'END:VEVENT');
+      if (ev.rrule && /^FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY)(;INTERVAL=\d{1,2})?$/.test(ev.rrule)) L.push(`RRULE:${ev.rrule}`);
+      L.push(`TRANSP:${ev.free ? 'TRANSPARENT' : 'OPAQUE'}`);
+      if (Number.isFinite(ev.alarm) && ev.alarm >= 0) L.push('BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${esc(ev.title)}`, `TRIGGER:${ev.alarm ? `-PT${Math.round(ev.alarm)}M` : 'PT0S'}`, 'END:VALARM');
+      L.push('END:VEVENT');
     }
     L.push('END:VCALENDAR');
     return `${L.map(fold).join('\r\n')}\r\n`;
