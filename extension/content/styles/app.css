@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.114"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.115"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -6552,6 +6552,8 @@ html.bcv-on .bcv-screen.is-fit > .bcv-head, html.bcv-on:not(.bcv-phone):not(.bcv
 .bcv-screen.is-fit .bcv-todo-side { flex: 1 1 0; min-height: 0; max-height: none; }
 .bcv-screen.is-fit .bcv-body--cal > .bcv-cal__main { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: -6px -14px -18px; padding: 6px 14px 18px; }
 .bcv-screen.is-fit .bcv-body--cal > .bcv-cal__side { position: static; align-self: flex-start; max-height: 100%; overflow-y: auto; }
+/* (2.99.115) the agenda's month in To Do's column, as wide as To Do (its list fills the rest) */
+.bcv-body--cal.is-agenda > .bcv-cal__side { flex: 0 0 272px; }
 .bcv-screen.is-fit .bcv-cal__main > .bcv-cal--week, .bcv-screen.is-fit .bcv-cal__main > .bcv-cal--month { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
 .bcv-screen.is-fit .bcv-cal__main > .bcv-agenda, .bcv-screen.is-fit .bcv-cal__main > .bcv-cal__notice { flex: none; }
 .bcv-screen.is-fit .bcv-cal--week > .bcv-week__scroll { flex: 1 1 0; min-height: 0; max-height: none; }

@@ -772,8 +772,8 @@
     const drawWork = (x) => {
       const files = x.attachments || [];
       const parts = [];
-      // (2.99.53) the Mac's seal, filled, and the when as the Mac says it
-      if (x.submitted_at) parts.push(h('div', { class: `bcv-asg__worksent${x.late ? ' is-late' : ''}` }, [h('span', { class: 'bcv-asg__seal', 'aria-hidden': 'true', html: '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 1.6l2.4 1.8 3-.2.9 2.9 2.5 1.7-.9 2.9.9 2.9-2.5 1.7-.9 2.9-3-.2L12 22.4 9.6 20.6l-3 .2-.9-2.9-2.5-1.7.9-2.9-.9-2.9 2.5-1.7.9-2.9 3 .2z"/><path d="M8 12.2l2.7 2.7L16.2 9.4" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>' }), h('span', { text: `Submitted ${macAt(D0(x.submitted_at))}${x.late ? ' · late' : ''}` })]));
+      // (2.99.53) the when as the Mac says it; (2.99.115) a filled circle with a tick — the scalloped seal read as a badge
+      if (x.submitted_at) parts.push(h('div', { class: `bcv-asg__worksent${x.late ? ' is-late' : ''}` }, [h('span', { class: 'bcv-asg__seal', 'aria-hidden': 'true', html: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="M8 12.2l2.7 2.7L16.2 9.4" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>' }), h('span', { text: `Submitted ${macAt(D0(x.submitted_at))}${x.late ? ' · late' : ''}` })]));
       for (const f of files) parts.push(h('div', { class: 'bcv-asg__workfile' }, [
         h('span', { class: 'bcv-asg__workicon', 'aria-hidden': 'true', html: '<svg viewBox="0 0 32 40" width="26" height="32"><path d="M3 3a3 3 0 013-3h14l9 9v28a3 3 0 01-3 3H6a3 3 0 01-3-3z" fill="#f2f2f7"/><path d="M20 0v6a3 3 0 003 3h6" fill="#d1d1d6"/><path d="M9 17h14M9 21h14M9 25h10" stroke="#aeaeb2" stroke-width="1.6" stroke-linecap="round"/></svg>' }),
         U.text('bcv-asg__workname bcv-ellip', f.display_name || f.filename || 'File', 'span'),

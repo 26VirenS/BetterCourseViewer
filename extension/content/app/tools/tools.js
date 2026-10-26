@@ -62,9 +62,21 @@
   const tintOf = (color, dark) => `color-mix(in srgb, ${color} ${dark ? 26 : 15}%, transparent)`;
 
   let stackNext = false; // (read by popup() on the way in: see open()'s `over`)
+  /** (2.99.115) Every pin's popover folded as a tool opens at full size (a pin's ⤢ or green light, the Tools page, the
+   *  search): its small copy is not left open over the big one. A widget pulled out of the bar stays where it was put. */
+  function foldPins() {
+    for (const item of document.querySelectorAll('#bcv-pins .bcv-quick.is-open:not(.is-free)')) {
+      item.querySelector(':focus')?.blur();
+      item.classList.remove('is-open');
+      item.setAttribute('aria-expanded', 'false');
+    }
+    const island = document.querySelector('#bcv-pins .bcv-island.is-open');
+    if (island) islandClose(island);
+  }
   function open(key, opts = {}) {
     const t = toolOf(key);
     if (!t) return false;
+    foldPins();
     // over: the tool rises over whatever sheet is already up rather than taking its place, and
     // closing it gives that back. It is how a widget's green light works: the page you were on —
     // an assignment, another tool — is still there underneath when you are done with the big one.

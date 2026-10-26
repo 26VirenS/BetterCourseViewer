@@ -28,6 +28,11 @@
     lock: 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.115', date: '2026-10-26', notes: [
+      { kind: 'improved', title: "Agenda's Own Month", body: 'In Agenda, pick its days on the month on the left.', icon: P.cal },
+      { kind: 'improved', title: 'A Plain Tick', body: 'Handed-in work shows a simple tick, not a badge.', icon: P.check },
+      { kind: 'improved', title: 'One Copy at a Time', body: 'Opening a pinned tool in full folds its small copy.', icon: P.pin },
+    ] },
     { version: '2.99.114', date: '2026-10-26', notes: [
       { kind: 'new', title: 'Group Your Tasks', body: 'Drop a task onto a plan to work on them together.', icon: P.layers },
       { kind: 'new', title: 'Back to To Do', body: 'Drag a plan or a grouped task onto To Do to unplan it.', icon: P.arrows },

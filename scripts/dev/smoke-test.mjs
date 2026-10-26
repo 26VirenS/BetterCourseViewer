@@ -1612,15 +1612,16 @@ try {
   // (the grid is the start's month: the end is marked when it falls inside, and otherwise the grid's last day is inside the range)
   const mini = await page.$$eval('.bcv-mini__day', (els) => ({ n: els.length, start: els.some((e) => e.classList.contains('bcv-mini__day--start')), end: els.some((e) => e.classList.contains('bcv-mini__day--end')), lastInside: !!els[els.length - 1]?.classList.contains('bcv-mini__day--inside') }));
   check(mini.n === 42 && mini.start && (mini.end || mini.lastInside), `agenda range picker mini calendar (${JSON.stringify(mini)})`);
-  // (2.99.77) the range picker stands to the right of the agenda, beside it, not under it — at a narrower window too
-  const sideAt = async () => page.evaluate(() => { const m = document.querySelector('.bcv-cal__main > .bcv-agenda').getBoundingClientRect(), first = document.querySelector('.bcv-cal__main > :first-child').getBoundingClientRect(), sd = document.querySelector('.bcv-cal__side').getBoundingClientRect(); return { right: sd.left >= m.right, top: Math.abs(sd.top - first.top) < 4, at: [Math.round(first.top), Math.round(sd.top), Math.round(m.right), Math.round(sd.left)] }; });
+  // (2.99.115) the range picker stands in To Do's column, left of the agenda and beside it, as wide as To Do — at a
+  // narrower window too — and neither To Do's list nor its button is there in the agenda (the agenda lists the work)
+  const sideAt = async () => page.evaluate(() => { const m = document.querySelector('.bcv-cal__main > .bcv-agenda').getBoundingClientRect(), first = document.querySelector('.bcv-cal__main > :first-child').getBoundingClientRect(), sd = document.querySelector('.bcv-cal__side').getBoundingClientRect(); return { left: sd.right <= m.left, top: Math.abs(sd.top - first.top) < 4, w: Math.round(sd.width), todo: !!document.querySelector('.bcv-cal__todo:not([hidden])'), todoBtn: !!document.querySelector('.bcv-cal__todobtn:not([hidden])'), at: [Math.round(first.top), Math.round(sd.top), Math.round(sd.right), Math.round(m.left)] }; });
   const sideWide = await sideAt();
   const vpWas = page.viewportSize();
   await page.setViewportSize({ width: 1040, height: vpWas.height });
   await page.waitForTimeout(300);
   const sideNarrow = await sideAt();
   await page.setViewportSize(vpWas);
-  check(sideWide.right && sideWide.top && sideNarrow.right && sideNarrow.top, `the agenda's range picker stands to its right, at 1040px too: ${JSON.stringify({ sideWide, sideNarrow })}`);
+  check(sideWide.left && sideWide.top && sideWide.w === 272 && !sideWide.todo && !sideWide.todoBtn && sideNarrow.left && sideNarrow.top, `the agenda's range picker stands in To Do's column, left of it, To Do and its button put away, at 1040px too: ${JSON.stringify({ sideWide, sideNarrow })}`);
   const agendaHeads = await texts('.bcv-agenda .bcv-group__head');
   check(agendaHeads[0].includes('Today ·') && /\d items?/.test(agendaHeads[0]), `agenda day heads: ${agendaHeads[0]}`);
   // a row says the course, then what the work is worth or where the event is
@@ -7915,6 +7916,11 @@ try {
   await page.click('#bcv-pins .bcv-island__mins');
   await page.waitForSelector('.bcv-tool[data-tool="pomo"]', { timeout: 5000 });
   check((await texts('.bcv-tool__title'))[0] === 'Focus timer' && (await texts('.bcv-pomo__time'))[0] === '10:00' && (await raw('.bcv-pomo__phasepill'))[0] === 'Short break', 'the minutes on the setter open the timer itself, at those minutes, on that phase');
+  // (2.99.115) and the setter folds as the timer opens: its small copy is not left open over the big one
+  check(await eventually(async () => page.$eval('#bcv-pins .bcv-island', (e) => !e.classList.contains('is-open')), 2000), 'the setter folds as the timer itself opens, not left over it');
+  // (2.99.115) the timer's symbol sits on the pins' middle line beside the others (it hung low): its outline's middle within half a unit of the box's
+  const glyphMids = await page.evaluate((ds) => ds.map((d) => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 24 24'); s.style.cssText = 'position:fixed;left:0;top:0;width:24px;height:24px'; const p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('d', d); s.append(p); document.body.append(s); const b = p.getBBox(); s.remove(); return Math.round((b.y + b.height / 2) * 10) / 10; }), ['timer', 'graph', 'table', 'cards'].map((k) => readFileSync(join(extDir, 'content', 'app', 'icons.js'), 'utf8').match(new RegExp(`\\b${k}: '([^']+)'`))[1]));
+  check(glyphMids.every((y) => Math.abs(y - 12) < 0.5), `the pins' symbols share a middle line, the timer's with them (their outlines' middles: ${glyphMids.join(', ')})`);
   await page.click('.bcv-pomo__phasebtn[data-value="focus"]');
   await eventually(async () => (await texts('.bcv-pomo__time'))[0] === '25:00', 3000);
   await closeTool();
@@ -8395,6 +8401,7 @@ try {
   await page.click(qpSel('.bcv-quick__light--full'));
   await page.waitForSelector('.bcv-tool[data-tool="ptable"]', { timeout: 5000 });
   check((await page.$('.bcv-pt__grid')) !== null, 'the green light is what opens the whole table');
+  check((await page.$$('#bcv-pins .bcv-quick.is-open:not(.is-free)')).length === 0, 'and the widget folds as the whole table opens (2.99.115: not left open over it)');
   await closeTool();
   // a widget handing over to its tool: the panel folds and the row closes up under a pointer standing
   // still on the green light, and no other widget opens for that (one used to, over the tool)

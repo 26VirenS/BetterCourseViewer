@@ -1784,9 +1784,15 @@
       subEl.hidden = !subEl.textContent;
       sideCol.hidden = view !== 'agenda';
       sideCol.replaceChildren(...[view === 'agenda' ? miniCalendar() : null].filter(Boolean));
-      todoBtn.hidden = phoneNow();
+      // (2.99.115) the agenda's days are picked on the month in To Do's column: the agenda lists the work already, so
+      // To Do's own list is not beside it (nor its button); the month comes before the list (over it, on a narrow page)
+      const agendaLeft = view === 'agenda';
+      if (agendaLeft && sideCol.nextElementSibling !== mainCol) body.insertBefore(sideCol, mainCol);
+      else if (!agendaLeft && body.lastElementChild !== sideCol) body.append(sideCol);
+      body.classList.toggle('is-agenda', agendaLeft);
+      todoBtn.hidden = phoneNow() || agendaLeft;
       todoBtn.parentElement?.classList.toggle('has-todo-btn', !todoBtn.hidden); // (one more button: the words give way sooner)
-      todoCol.hidden = !todoOn || phoneNow();
+      todoCol.hidden = !todoOn || phoneNow() || agendaLeft;
       body.classList.toggle('has-todo', !todoCol.hidden);
       if (!todoCol.hidden) mountTodo();
       calCount.textContent = String(selected.length);

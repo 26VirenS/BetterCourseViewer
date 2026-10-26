@@ -69,7 +69,8 @@
     task: 'M9 11l3 3 5-6M5 5h14v14H5z',
     // the Tools mockup: the sidebar row, the five tools and their popups
     tool: 'M14.5 3.5a5 5 0 0 0-6 6l-5 5V20h4l5-5a5 5 0 0 0 6-6l-3 3-3-3z',
-    timer: 'M12 7.5a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM12 11v3.5l2.5 1.5M9.5 3.5h5M12 3.5v4',
+    // (2.99.115) the dial a little smaller and higher, so the whole sits on the pill's middle line beside the others (it hung low)
+    timer: 'M12 7a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM12 10.5v3l2.2 1.4M9.5 3.5h5M12 3.5V7',
     graph: 'M4 20V4M4 20h16M7.5 16.5c2-8 4.5-9 6-4.5s3 5 4.5 1',
     calc: 'M7 3.5h10a1.5 1.5 0 011.5 1.5v14a1.5 1.5 0 01-1.5 1.5H7A1.5 1.5 0 015.5 19V5A1.5 1.5 0 017 3.5zM8.5 6.5h7v3.5h-7zM8.7 13.2h.1M12 13.2h.1M15.3 13.2h.1M8.7 16.6h.1M12 16.6h.1M15.3 16.6h.1',
     table: 'M4 5.5h4.5v4.5H4zM9.75 5.5h4.5v4.5h-4.5zM15.5 5.5H20v4.5h-4.5zM4 11.5h4.5V16H4zM9.75 11.5h4.5V16h-4.5zM15.5 11.5H20V16h-4.5zM7 19h10',
