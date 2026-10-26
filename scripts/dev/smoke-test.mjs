@@ -5660,6 +5660,28 @@ try {
   const wkGone = await eventually(() => page.evaluate(() => !document.querySelector('.bcv-ap-ed') && document.querySelectorAll('.bcv-ap-hit').length > 0), 3000);
   check(wkCap === 'Click to upload a photo' && wkEd && wkEd.round && wkEd.under && wkEd.label === 'Next 7 days photo' && wkEd.inkOn && wkKept && wkGone, `a pointer over Next 7 days says a press uploads a photo; a press anywhere on it asks for one, kept on that card and opened there, its settings round it with Ink on: ${JSON.stringify({ wkCap, wkEd, wkKept, wkGone })}`);
   page.off('filechooser', holdChoosers);
+  // (2.99.118) a card and the sidebar in colours of their own (each one's Colour…, from its photo button), kept; the
+  // theme's put back from the same place
+  const tintVia = async (slot, hex) => {
+    await eventually(() => page.evaluate(() => !document.querySelector('.bcv-menu')), 2000);
+    await menuOf(slot);
+    await page.click('.bcv-menu__item >> text=Colour…');
+    await page.waitForSelector('.bcv-menu--colors', { timeout: 3000 });
+    await page.click(hex ? `.bcv-menu--colors .bcv-swatch[data-color="${hex}"]` : '.bcv-menu--colors .bcv-swatch--reset');
+  };
+  await tintVia('today', '#E71F63');
+  await tintVia('side', '#009688');
+  let tinted = null;
+  await eventually(async () => {
+    tinted = await page.evaluate(() => ({ today: document.querySelector('.bcv-stats .bcv-stat[data-stat="today"]')?.style.getPropertyValue('--bcv-stat-tone'), tomorrow: document.querySelector('.bcv-stats .bcv-stat[data-stat="tomorrow"]')?.style.getPropertyValue('--bcv-stat-tone'), side: !!document.querySelector('.bcv-side.bcv-side--tint'), sideTint: document.querySelector('.bcv-side')?.style.getPropertyValue('--bcv-side-tint') }));
+    return tinted.today === '#e71f63' && tinted.side && tinted.sideTint === '#009688';
+  }, 5000);
+  const keptTints = await sw.evaluate(async () => (await self.BCV.settings.get()).appearance?.tints || null);
+  await shot(page, '27c2b-appearance-card-colours');
+  await tintVia('today', null);
+  await tintVia('side', null);
+  const untinted = await eventually(() => page.evaluate(() => !document.querySelector('.bcv-stats .bcv-stat[data-stat="today"]')?.style.getPropertyValue('--bcv-stat-tone') && !document.querySelector('.bcv-side.bcv-side--tint')), 5000);
+  check(tinted?.today === '#e71f63' && !tinted.tomorrow && tinted.side && keptTints?.today === '#e71f63' && keptTints?.side === '#009688' && untinted, `a card and the sidebar each take a colour of their own from their photo button's Colour…, kept; the theme's colour puts theirs back: ${JSON.stringify({ tinted, keptTints, untinted })}`);
   // (2.99.77) under a colour of your own the six counters are that colour alone, a shade of it each
   const tones = await eventually(async () => { const v = await page.evaluate(() => ({ accent: getComputedStyle(document.documentElement).getPropertyValue('--bcv-accent').trim().toLowerCase(), tones: [...document.querySelectorAll('.bcv-stats > .bcv-stat[data-stat]')].map((c) => getComputedStyle(c).getPropertyValue('--bcv-stat-tone').trim().toLowerCase()) })); return v.accent && v.tones.length === 6 && new Set(v.tones).size === 6 && v.tones.every((t) => t.includes(v.accent)) ? v : null; }, 6000);
   check(!!tones, `the counters take the theme's colour, six shades of it: ${JSON.stringify(tones)}`);

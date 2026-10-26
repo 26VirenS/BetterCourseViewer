@@ -190,6 +190,10 @@
       { label: 'Upload Photo…', onSelect: () => { st.target = key; st.file.click(); } },
       ...READY.filter((r) => r.scene).map((r) => ({ label: `Drawing: ${r.scene}`, active: photoAt(key) === scenePic(r.scene), onSelect: () => { setPhoto(key, scenePic(r.scene), tone(r.scene)); keepImages(); } })),
     ];
+    // (2.99.118) a colour of its own for this card (or the sidebar), the theme's own put back from the same place
+    const tint = st.app?.tintOf?.(key) || null;
+    const name = key === 'side' ? 'Sidebar' : places().find((p) => p.key === key)?.title || 'Card';
+    items.push({ label: 'Colour…', sub: tint ? 'Its own' : 'The theme’s', color: tint || 'var(--bcv-accent, #0a84ff)', onSelect: () => setTimeout(() => U.colorMenu(anchor, tint, (hex) => setTint(key, hex), { title: `${name} colour`, reset: { label: 'The theme’s colour', onPick: () => setTint(key, '') } }), 0) });
     // (2.99.105) a photo of the student's own is inked unless its Ink switch is off: then it is shown as it is, the words on it white-bordered (lib/theme.js picAt)
     if (photoAt(key) && !t.sceneNameOf(photoAt(key))) {
       const inked = !st.images.plain?.[key];
@@ -198,6 +202,11 @@
     if (photoAt(key)) items.push({ label: 'Move and Zoom…', onSelect: () => edit(key) });
     if (photoAt(key)) items.push({ label: 'Remove Photo', onSelect: () => { setPhoto(key, null); keepImages(); } });
     U.menu(anchor, items);
+  }
+  /** (2.99.118) A card's or the sidebar's own colour kept ('': the theme's again); the page puts it on as it is kept
+   *  (app.js applyTints). */
+  function setTint(key, hex) {
+    S.update({ appearance: { tints: { [key]: hex ? String(hex).toLowerCase() : '' } } }).catch(() => {});
   }
   async function readFile(file, key) {
     try {

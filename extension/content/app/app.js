@@ -852,10 +852,11 @@
     side.classList.toggle('bcv-side--ink', !!sidePic?.ink); // (the paper: the complement of the colour, app.css)
     side.classList.toggle('bcv-side--plain', !!sidePic?.plain); // (its Ink switch off: the photo as it is, white-bordered words)
     html.classList.toggle('bcv-side-plain', !!sidePic?.plain); // (the sidebar's button over it, outside the sidebar: app.css)
+    applyTints(); // (2.99.118: its own colour, and the cards')
     const wasOpen = new Map([...side.querySelectorAll('.bcv-ctabs[data-course]')].map((e) => [e.dataset.course, e]));
     side.replaceChildren(...[
       // the theme's photo, under everything: sharp at the foot, blurred up the side (app.css: .bcv-side__pic)
-      sidePic ? h('div', { class: `bcv-side__pic ${sidePic.ink ? 'has-ink' : ''} ${sidePic.scene ? 'is-scene' : ''}`, 'aria-hidden': 'true', style: { ...(sidePic.ink ? { '--bcv-pic-ink': BCV.theme.picCss(sidePic.ink), '--bcv-pic-ink-blur': BCV.theme.picCss(sidePic.inkBlur) } : { '--bcv-pic': BCV.theme.picCss(sidePic.sharp) }), '--bcv-veil': BCV.theme.veilBase(state.settings?.appearance?.theme?.accent || '', state.themeImages?.tones?.side, 0.66), ...BCV.theme.placeVars(BCV.theme.placeOf(state.themeImages, 'side')) } }, [h('i', { class: 'bcv-side__pic-sharp' }), h('i', { class: 'bcv-side__pic-blur' }), h('i', { class: 'bcv-side__pic-veil' })]) : null, // (the place: where the picture is pinned, and its zoom — lib/theme.js placeOf)
+      sidePic ? h('div', { class: `bcv-side__pic ${sidePic.ink ? 'has-ink' : ''} ${sidePic.scene ? 'is-scene' : ''}`, 'aria-hidden': 'true', style: { ...(sidePic.ink ? { '--bcv-pic-ink': BCV.theme.picCss(sidePic.ink), '--bcv-pic-ink-blur': BCV.theme.picCss(sidePic.inkBlur) } : { '--bcv-pic': BCV.theme.picCss(sidePic.sharp) }), '--bcv-veil': BCV.theme.veilBase(tintOf('side') || state.settings?.appearance?.theme?.accent || '', state.themeImages?.tones?.side, 0.66), ...BCV.theme.placeVars(BCV.theme.placeOf(state.themeImages, 'side')) } }, [h('i', { class: 'bcv-side__pic-sharp' }), h('i', { class: 'bcv-side__pic-blur' }), h('i', { class: 'bcv-side__pic-veil' })]) : null, // (the place: where the picture is pinned, and its zoom — lib/theme.js placeOf)
       brandRow(name),
       // mockup 11: the glyph in its own colour, no tile behind it; full strength on the active row, dimmed elsewhere
       // under a theme each row takes its own shade of the colour (lib/theme.js shades()), lighter at
@@ -2516,11 +2517,35 @@
         renderSide();
         render();
       } else if (st.skin) renderSide();
+      applyTints();
+    });
+  }
+
+  /** (2.99.118) A Dashboard card's or the sidebar's own colour, as Appearance gives it (settings.appearance.tints), or
+   *  null for the colour it has of its own. */
+  function tintOf(slot) {
+    const v = state.settings?.appearance?.tints?.[slot];
+    return typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : null;
+  }
+  /** Each card's and the sidebar's own colour put on where they are drawn now (a card drawn later takes its own: dashboard.js):
+   *  its wash, and the accent inside it — a drawing on it is inked in that colour, its chosen row lit in it. */
+  function applyTints() {
+    const put = (el, vars, on) => { for (const [k, v] of Object.entries(vars)) { if (on) el.style.setProperty(k, v); else el.style.removeProperty(k); } };
+    const side = document.querySelector('.bcv-side');
+    if (side) {
+      const t = tintOf('side');
+      side.classList.toggle('bcv-side--tint', !!t);
+      put(side, { '--bcv-side-tint': t, '--bcv-accent': t }, !!t);
+    }
+    document.querySelectorAll('.bcv-stats > .bcv-stat[data-stat]').forEach((c) => {
+      const t = tintOf(c.dataset.stat);
+      c.classList.toggle('bcv-stat--tint', !!t);
+      put(c, { '--bcv-stat-tone': t, '--bcv-accent': t }, !!t);
     });
   }
 
   BCV.app = {
-    state, go, render, renderSide, setCourseNav, oneBar, parseRoute, navState, refreshCounts, loadShellData, punchIn, punchOut, siteName, schoolLogo, toggleTheme, logout, backTo, nameHere, markBack,
+    state, go, render, renderSide, tintOf, applyTints, setCourseNav, oneBar, parseRoute, navState, refreshCounts, loadShellData, punchIn, punchOut, siteName, schoolLogo, toggleTheme, logout, backTo, nameHere, markBack,
     rawQuizUrl, // (the look switch turns the look off mid-quiz by going there, see early.js)
     isDark: () => state.dark,
     holds: () => !!(state.submitOpen || state.quizOpen), // something on the page would be lost by a reload (a hand-in being written, a quiz attempt): the layout tier waits (early.js)

@@ -634,14 +634,17 @@
 
   /** Canvas's own course colour palette (the picker on its dashboard cards), plus a custom colour. */
   const COURSE_COLORS = [['#BD3C14', 'Brick'], ['#FF2717', 'Red'], ['#E71F63', 'Magenta'], ['#8F3E97', 'Purple'], ['#65499D', 'Deep purple'], ['#4554A4', 'Indigo'], ['#1770AB', 'Blue'], ['#0B9BE3', 'Light blue'], ['#06A3B7', 'Cyan'], ['#009688', 'Teal'], ['#009606', 'Green'], ['#8D9900', 'Olive'], ['#D97900', 'Pumpkin'], ['#FD5D10', 'Orange'], ['#F06291', 'Pink']];
-  function colorMenu(anchor, current, onPick) {
+  /** (2.99.118) `title`: what it colours ("Course colour" by default); `reset`: { label, onPick } — a first swatch that
+   *  puts back the colour it had of its own (a card's or the sidebar's: the theme's), marked while nothing else is. */
+  function colorMenu(anchor, current, onPick, { title = 'Course colour', reset = null } = {}) {
     closeMenus();
     const cur = String(current || '').toLowerCase();
     const custom = h('input', { type: 'color', class: 'bcv-swatch__input', value: /^#[0-9a-f]{6}$/i.test(cur) ? cur : '#8e8e93', 'aria-label': 'Custom colour' });
     custom.addEventListener('change', () => { closeMenus(); onPick(custom.value.toUpperCase()); });
     const m = el('bcv-menu bcv-menu--colors', [
-      text('bcv-menu__title', 'Course colour'),
+      text('bcv-menu__title', title),
       el('bcv-swatches', [
+        reset ? h('button', { type: 'button', class: `bcv-swatch bcv-swatch--reset ${!cur ? 'is-current' : ''}`, title: reset.label, 'aria-label': reset.label, dataset: { color: '' }, onclick: () => { closeMenus(); reset.onPick(); } }, !cur ? svg('M20 6L9 17l-5-5', { size: 12, stroke: '#fff', width: 2.6 }) : null) : null,
         ...COURSE_COLORS.map(([hex, name]) => h('button', {
           type: 'button', class: `bcv-swatch ${hex.toLowerCase() === cur ? 'is-current' : ''}`, title: name, 'aria-label': name, dataset: { color: hex }, style: { background: hex },
           onclick: () => { closeMenus(); onPick(hex); },

@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.117"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.118"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -1519,6 +1519,7 @@ html[data-bcv-theme="dark"] .bcv-cal__notice--warn { color: #ffb44d; }
 .bcv-swatch { width: 26px; height: 26px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 0 var(--bcv-line) rgba(0,0,0,.1); box-sizing: border-box; transition: transform .16s var(--bcv-spring-snappy); }
 @media (hover: hover) and (pointer: fine) { .bcv-swatch:hover { transform: scale(1.12); } } /* (it grows under the pointer, not at once) */
 .bcv-swatch.is-current { box-shadow: 0 0 0 2px var(--bcv-card), 0 0 0 4px var(--bcv-ink); }
+.bcv-swatch--reset { background: var(--bcv-accent, #0a84ff); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--bcv-card) 70%, transparent); } /* (2.99.118) the theme's own colour, put back */
 .bcv-swatch--custom { position: relative; overflow: hidden; background: conic-gradient(#ff2717, #fd5d10, #8d9900, #009606, #06a3b7, #1770ab, #8f3e97, #e71f63, #ff2717); }
 .bcv-swatch__input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
 .bcv-colorbtn { border: 0; padding: 0; cursor: pointer; }
@@ -3003,6 +3004,9 @@ html.bcv-phone.bcv-punch #content { padding: 16px 16px !important; border-radius
 .bcv-qz.is-embedded { min-height: 0; }
 .bcv-qz.is-embedded .bcv-qz__head { display: none; }
 .bcv-side { transition: width .45s var(--bcv-ease), padding .45s var(--bcv-ease), opacity .25s ease; }
+/* (2.99.118) the sidebar in a colour of its own (Appearance: its photo button's Colour…), washed over its glass */
+.bcv-side.bcv-side--tint { background: linear-gradient(color-mix(in srgb, var(--bcv-side-tint) 16%, transparent), color-mix(in srgb, var(--bcv-side-tint) 16%, transparent)), var(--bcv-chrome-ground, var(--bcv-chrome)); }
+html[data-bcv-theme="dark"] .bcv-side.bcv-side--tint { background: linear-gradient(color-mix(in srgb, var(--bcv-side-tint) 22%, transparent), color-mix(in srgb, var(--bcv-side-tint) 22%, transparent)), var(--bcv-chrome-ground, var(--bcv-chrome)); }
 html.bcv-quiz .bcv-side { width: 0; padding-left: 0; padding-right: 0; opacity: 0; overflow: hidden; border-right-width: 0; pointer-events: none; }
 .bcv-head--course { max-height: 480px; transition: max-height .45s var(--bcv-ease), padding .45s var(--bcv-ease), opacity .2s ease; }
 html.bcv-quiz .bcv-screen--ctx .bcv-head--course { max-height: 0; padding-top: 0; padding-bottom: 0; opacity: 0; overflow: hidden; border-bottom-width: 0; pointer-events: none; }
@@ -3411,6 +3415,11 @@ html[data-bcv-theme="dark"] { --bcv-photo-wash: rgba(0,0,0,.3); --bcv-ink-lift: 
  * the same fade, so the words' side stays quiet. Nothing here is a filter. */
 .bcv-stat--pic.has-ink { background: var(--bcv-card); --bcv-paper: var(--bcv-card); }
 .bcv-side--ink { background: var(--bcv-bg); --bcv-paper: var(--bcv-bg); }
+/* (2.99.118) a card or the sidebar in a colour of its own: its drawing's paper washed in it too, the ink over it in it */
+.bcv-stat--pic.has-ink.bcv-stat--tint { background: color-mix(in srgb, var(--bcv-stat-tone) 13%, var(--bcv-card)); --bcv-paper: color-mix(in srgb, var(--bcv-stat-tone) 13%, var(--bcv-card)); }
+html[data-bcv-theme="dark"] .bcv-stat--pic.has-ink.bcv-stat--tint { background: color-mix(in srgb, var(--bcv-stat-tone) 22%, var(--bcv-card)); --bcv-paper: color-mix(in srgb, var(--bcv-stat-tone) 22%, var(--bcv-card)); }
+.bcv-side--ink.bcv-side--tint { background: color-mix(in srgb, var(--bcv-side-tint) 12%, var(--bcv-bg)); --bcv-paper: color-mix(in srgb, var(--bcv-side-tint) 12%, var(--bcv-bg)); }
+html[data-bcv-theme="dark"] .bcv-side--ink.bcv-side--tint { background: color-mix(in srgb, var(--bcv-side-tint) 20%, var(--bcv-bg)); --bcv-paper: color-mix(in srgb, var(--bcv-side-tint) 20%, var(--bcv-bg)); }
 .bcv-head__pic.has-ink { background: var(--bcv-bg); --bcv-paper: var(--bcv-bg); } /* (the container: it runs up through the widgets' bar, and the paper goes with it) */
 .bcv-stat--pic.has-ink > .bcv-stat__pic:not(.bcv-stat__pic--veil)::before, .bcv-side__pic.has-ink > .bcv-side__pic-sharp::before, .bcv-side__pic.has-ink > .bcv-side__pic-blur::before, .bcv-head__pic.has-ink > .bcv-head__pic-sharp::before, .bcv-head__pic.has-ink > .bcv-head__pic-blur::before { background: color-mix(in srgb, var(--bcv-paper) var(--bcv-ink-k), var(--bcv-ink-lift)); }
 .bcv-stat--pic.has-ink > .bcv-stat__pic--blur, .bcv-side__pic.has-ink > .bcv-side__pic-blur, .bcv-head__pic.has-ink > .bcv-head__pic-blur { filter: none; transform: none; } /* (the layer keeps its fade alone; the blurred mask is on its ::before, under it — no composite needed) */
