@@ -1703,6 +1703,9 @@ jobs:
           $log = Join-Path $baseProf 'simpl.log'
           if (Test-Path $log) { Copy-Item $log shots/profile-perf-base.log }
           Get-ChildItem shots
+      # (0.3.77: walked once the main places' pages are built ahead, --perf-warmed, as a student finds them who reads the
+      #  Dashboard a few seconds first — its rows show those pages' first opening then; the walks compared above begin
+      #  as soon as the start settles, with nothing built ahead, and time each page's first making)
       - name: Where the window's time goes (the warm walk under dotnet-trace)
         continue-on-error: true
         timeout-minutes: 10
@@ -1713,7 +1716,7 @@ jobs:
           New-Item -ItemType Directory -Force trace | Out-Null
           $prof = Join-Path $env:RUNNER_TEMP 'profile-perf'
           $argList = @('--base-url', 'http://localhost:8800', '--demo', '--appearance', 'light', '--profile', $prof, '--perf-walk', "$PWD/trace", '--perf-name', 'trace',
-            '--perf-course', '101', '--perf-assignment', '1001', '--perf-timeout', '240', '--perf-minimized', '0')
+            '--perf-course', '101', '--perf-assignment', '1001', '--perf-timeout', '240', '--perf-warmed', '--perf-minimized', '0')
           $p = Start-Process -FilePath dist/Simpl/Simpl.exe -ArgumentList $argList -PassThru
           Start-Sleep -Milliseconds 300
           # (the sampler and the runtime's own events, named outright: dotnet-trace 10 has no cpu-sampling profile)
@@ -1724,6 +1727,9 @@ jobs:
           if (Test-Path trace/simpl.nettrace) {
             & $tool convert "$PWD/trace/simpl.nettrace" --format Speedscope -o "$PWD/trace/simpl.speedscope.json" | Out-Host
           }
+          # (its log beside it: what was built ahead, and when)
+          $log = Join-Path $prof 'simpl.log'
+          if (Test-Path $log) { Copy-Item $log trace/simpl.log; Select-String -Path $log -Pattern 'warm:' | ForEach-Object { Write-Host $_.Line } }
           Get-ChildItem trace | Out-Host
       - name: Against the last green run, and each choice against the warm walk
         if: ${{ !cancelled() }}
