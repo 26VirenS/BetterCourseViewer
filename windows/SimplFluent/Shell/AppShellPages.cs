@@ -402,8 +402,11 @@ public sealed partial class AppShell
                 var s = ScreenAt(new Location(place), make: true)!;
                 if (s == current || leaves.ContainsKey(s)) continue;
                 s.SetWidth(ContentWidth, WindowActualWidth);
-                if (!s.Ready) s.Prefetch();
-                for (var i = 0; i < 40 && !s.Ready; i++) await Task.Delay(250);
+                // (its answers read, ten seconds at most — not Ready, which a page never shown is not until it is built:
+                //  0.3.76 waited out the ten seconds for every page)
+                s.Prefetch();
+                await Task.Delay(250); // (a read it asks for under way by then)
+                for (var i = 0; i < 40 && s.Reading; i++) await Task.Delay(250);
                 if (!await LeftAlone(30_000)) continue;
                 // (looked at again as it is built: a press may have come while it waited its turn)
                 var made = await Dispatcher.InvokeAsync(() =>
