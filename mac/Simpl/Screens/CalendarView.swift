@@ -1274,7 +1274,7 @@ struct CalendarView: View {
                             ForEach(timed[i]) { item in
                                 planDraggable(item, day: i, week: timed)
                                     .layoutValue(key: WeekAt.self, value: weekY(item.at))
-                                    .layoutValue(key: WeekLength.self, value: shownLength(item.ev).map { CGFloat($0) / 60 * hour - 2 } ?? 0)
+                                    .layoutValue(key: WeekLength.self, value: drawnHeight(item.ev))
                             }
                         }
                         .padding(.horizontal, 3)
@@ -1348,8 +1348,7 @@ struct CalendarView: View {
     /// lasts (or as tall as a block is at least).
     private func peek(_ item: WeekItem) -> WeekPeek {
         let start = weekY(item.at)
-        let tall = length(item.ev).map { CGFloat($0) / 60 * hour } ?? 0
-        return WeekPeek(id: item.ev.id, start: start, end: start + max(22, tall), color: Color(hex: item.ev.color), title: item.ev.title)
+        return WeekPeek(id: item.ev.id, start: start, end: start + drawnHeight(item.ev), color: Color(hex: item.ev.color), title: item.ev.title)
     }
 
     /// (1.3.170) Where the hours open, from their top: 7:30 in the morning — or, with today in the week and the afternoon
@@ -1424,6 +1423,18 @@ struct CalendarView: View {
         }
     }
 
+    /// (1.3.176) How tall an item's block is on the week: as long as it lasts — a plan, a linked calendar's event — and a
+    /// due time (a moment, which Canvas gives no end) half an hour, never taller for its name (cut short to fit) and
+    /// never too short to read a line.
+    private func drawnHeight(_ ev: CalEvent) -> CGFloat {
+        max(Self.blockLeast, CGFloat(shownLength(ev) ?? Self.momentMinutes) / 60 * hour - 2)
+    }
+    /// (1.3.176) A due time's block, in minutes; the least a block is, in points (a line of its name).
+    private static let momentMinutes = 30
+    /// (1.3.176) A dragged block settling into its place: quick, no bounce.
+    private static let settle = Animation.spring(response: 0.28, dampingFraction: 1)
+    private static let blockLeast: CGFloat = 18
+
     /// How long an item lasts, in minutes, when it says (a plan, a linked calendar's event): its block that tall.
     private func length(_ ev: CalEvent) -> Int? {
         guard let e = ev.end, let end = PreviewFormat.date(e), let start = PreviewFormat.date(ev.date) else { return nil }
@@ -1431,8 +1442,9 @@ struct CalendarView: View {
         return m > 0 ? max(m, 20) : nil
     }
 
-    /// (1.3.167) A plan's block, dragged to move it: it follows the pointer a quarter of an hour at a time — the time it
-    /// would go to on a tag over it — and across to another day; let go, the plan is moved there (the page's planMove;
+    /// (1.3.167) A plan's block, dragged to move it: (1.3.176) it follows the pointer to the point, lifted, the quarter hour
+    /// it would go to outlined under it with the time on a tag — and across to another day; let go, it settles into that
+    /// quarter hour and the plan is moved there (the page's planMove;
     /// 1.3.172: one of a repeating plan's times moves the series by as much). A click without a drag opens its popover.
     /// (1.3.172, the web's 2.99.113 and 2.99.114) Its foot pulled makes it longer or shorter; held over another plan, that
     /// plan is ringed and the tag says "Group with …" — let go there, it joins that plan's group (its own group with it).
@@ -1448,14 +1460,21 @@ struct CalendarView: View {
                     .highPriorityGesture(
                         DragGesture(minimumDistance: 4)
                             .onChanged { g in
-                                let mins = Int(((g.translation.height / hour) * 60 / 15).rounded()) * 15
+                                // (1.3.176) the block to the point under the pointer, kept to the week and the day's hours;
+                                // the quarter hour and the day it would go to, from that
                                 let lo = -item.at, hi = max(lo, 24 * 60 - len - item.at)
-                                let days = weekColumn > 0 ? min(weekDays - 1 - day, max(-day, Int((g.translation.width / weekColumn).rounded()))) : 0
+                                let dy = min(CGFloat(hi) / 60 * hour, max(CGFloat(lo) / 60 * hour, g.translation.height))
+                                let dx = weekColumn > 0 ? min(CGFloat(weekDays - 1 - day) * weekColumn, max(-CGFloat(day) * weekColumn, g.translation.width)) : 0
+                                let mins = min(hi, max(lo, Int((dy / hour * 60 / 15).rounded()) * 15))
+                                let days = weekColumn > 0 ? Int((dx / weekColumn).rounded()) : 0
                                 let grab = max(0, Int(g.startLocation.y / hour * 60))
-                                let next = PlanDrag(id: item.ev.id, days: days, minutes: min(hi, max(lo, mins)), grab: grab)
-                                guard next != planDrag else { return }
-                                planDrag = next
-                                joinOnto = planAt(dayOf(week, day + days), minute: item.at + next.minutes + grab, not: pid)?.ev.id
+                                let next = PlanDrag(id: item.ev.id, days: days, minutes: mins, dx: dx, dy: dy, grab: grab)
+                                let stepped = planDrag?.id != item.ev.id || planDrag?.days != days || planDrag?.minutes != mins
+                                var t = Transaction()
+                                t.disablesAnimations = true
+                                withTransaction(t) { planDrag = next }
+                                guard stepped else { return }
+                                joinOnto = planAt(dayOf(week, day + days), minute: item.at + mins + grab, not: pid)?.ev.id
                                 NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
                             }
                             .onEnded { _ in
@@ -1472,10 +1491,10 @@ struct CalendarView: View {
                                 }
                                 guard d.days != 0 || d.minutes != 0, let start = PreviewFormat.date(item.ev.date),
                                       let moved = cal.date(byAdding: .minute, value: d.days * 24 * 60 + d.minutes, to: start) else {
-                                    planDrag = nil
+                                    withAnimation(reduceMotion ? nil : Self.settle) { planDrag = nil } // (back where it was)
                                     return
                                 }
-                                planDrag?.dropped = true
+                                withAnimation(reduceMotion ? nil : Self.settle) { planDrag?.dropped = true } // (into its quarter hour)
                                 var args: [String: Any] = ["id": pid, "at": ISO8601DateFormatter().string(from: moved)]
                                 if let occurs = item.ev.occurs { args["occurs"] = occurs }
                                 Task {
@@ -1507,7 +1526,20 @@ struct CalendarView: View {
                         .allowsHitTesting(false)
                 }
             }
-            .offset(x: CGFloat(d?.days ?? 0) * weekColumn, y: CGFloat(d?.minutes ?? 0) / 60 * hour)
+            .background {
+                // (1.3.176) where it would go: its quarter hour and its day, outlined, while it is held elsewhere
+                if let d, !d.dropped, onto == nil {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Theme.accent.opacity(0.1))
+                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.accent.opacity(0.7), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])))
+                        .offset(x: CGFloat(d.days) * weekColumn - d.dx, y: CGFloat(d.minutes) / 60 * hour - d.dy)
+                        .allowsHitTesting(false)
+                        .animation(reduceMotion ? nil : .easeOut(duration: 0.1), value: d.minutes)
+                        .animation(reduceMotion ? nil : .easeOut(duration: 0.1), value: d.days)
+                }
+            }
+            .scaleEffect(d != nil && d?.dropped == false && !reduceMotion ? 1.02 : 1)
+            .offset(x: d.map { $0.dropped ? CGFloat($0.days) * weekColumn : $0.dx } ?? 0, y: d.map { $0.dropped ? CGFloat($0.minutes) / 60 * hour : $0.dy } ?? 0)
             .shadow(color: .black.opacity(d != nil && d?.dropped == false ? 0.22 : 0), radius: 10, y: 5)
             .overlay(alignment: .top) {
                 if let d, !d.dropped {
@@ -1515,12 +1547,12 @@ struct CalendarView: View {
                         if let onto { joinTag(onto.ev.title) } else { dragTime(item.at + d.minutes, day: day + d.days) }
                     }
                     .offset(x: CGFloat(d.days) * weekColumn, y: CGFloat(d.minutes) / 60 * hour - 12)
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.1), value: d.minutes)
                 }
             }
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.08), value: d)
             .accessibilityHint("Drag to move the plan, or onto another plan to group them; drag its foot to make it longer or shorter")
         } else {
-            weekBlock(item.ev, fill: length(item.ev) != nil)
+            weekBlock(item.ev, fill: true)
         }
     }
 
@@ -2360,32 +2392,33 @@ private struct CalendarWeekBlock: View {
         let missing = event.missing == true
         let grey = event.isPast && !missing
         let time = event.allDay == true ? nil : PreviewFormat.text(event.time)
-        VStack(alignment: .leading, spacing: 1) {
-            // (planning-24) struck through only once handed in, greyed once over: as on the month's grid
-            Text(event.title)
-                .font(.sCaption.weight(.semibold))
-                .strikethrough(event.isStruck && !missing, color: .secondary)
-                .foregroundStyle(grey ? Color.secondary : Color.primary)
-                .lineLimit(3)
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
-            if time != nil || missing || event.excused == true {
-                HStack(spacing: 3) {
-                    if missing {
-                        Image(systemName: "exclamationmark.circle.fill")
-                    }
-                    Text(time ?? (missing ? "Missing" : "Excused"))
-                        .monospacedDigit()
+        // (1.3.176) as much as its height holds: its name on up to three lines and its time under it; one line of name
+        // and its time; or, in the shortest, its name and its time on one line — never spilling out of it
+        ViewThatFits(in: .vertical) {
+            VStack(alignment: .leading, spacing: 1) {
+                name(lines: 3)
+                timeLine(time: time, missing: missing)
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                name(lines: 1)
+                timeLine(time: time, missing: missing)
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                name(lines: 1)
+                if let time {
+                    Text(time)
+                        .font(.sCaption2.monospacedDigit())
+                        .foregroundStyle(Color.secondary)
+                        .lineLimit(1)
+                        .layoutPriority(-1)
                 }
-                .font(.sCaption2)
-                .foregroundStyle(missing ? Color.red : Color.secondary)
-                .lineLimit(1)
             }
         }
         .padding(.leading, 8)
         .padding(.trailing, 4)
-        .padding(.vertical, 4)
+        .padding(.vertical, fill ? 2 : 4)
         .frame(maxWidth: .infinity, maxHeight: fill ? .infinity : nil, alignment: .topLeading) // (1.3.167: as tall as it lasts)
+        .clipped()
         .background {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .fill(c.opacity(grey ? 0.07 : 0.15))
@@ -2405,33 +2438,85 @@ private struct CalendarWeekBlock: View {
         }
         .contentShape(Rectangle())
     }
+
+    /// Its name, struck through once handed in, greyed once over (planning-24: as on the month's grid).
+    private func name(lines: Int) -> some View {
+        Text(event.title)
+            .font(.sCaption.weight(.semibold))
+            .strikethrough(event.isStruck && event.missing != true, color: .secondary)
+            .foregroundStyle(event.isPast && event.missing != true ? Color.secondary : Color.primary)
+            .lineLimit(lines)
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// Its time — or Missing, or Excused — under its name.
+    @ViewBuilder
+    private func timeLine(time: String?, missing: Bool) -> some View {
+        if time != nil || missing || event.excused == true {
+            HStack(spacing: 3) {
+                if missing {
+                    Image(systemName: "exclamationmark.circle.fill")
+                }
+                Text(time ?? (missing ? "Missing" : "Excused"))
+                    .monospacedDigit()
+            }
+            .font(.sCaption2)
+            .foregroundStyle(missing ? Color.red : Color.secondary)
+            .lineLimit(1)
+        }
+    }
 }
 
-/// (1.3.147) A day of the week's grid: each item at its time, the next one under it where they would meet (Canvas gives
-/// an item no end, so each takes the room its name needs); the day as tall as its last item reaches.
+/// (1.3.147) A day of the week's grid: each item at its time. (1.3.176) Each as tall as it lasts (WeekLength), never
+/// taller for its name; items whose times meet side by side, sharing the day's width, as Calendar lays them — none
+/// pushed down off its time. Kept inside the day's hours.
 private struct WeekDayStack: Layout {
     var gap: CGFloat = 2
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let width = proposal.width ?? 100
-        return CGSize(width: width, height: frames(subviews, width: width).last?.maxY ?? 0)
+        return CGSize(width: width, height: frames(subviews, width: width).map(\.maxY).max() ?? 0)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         for (s, f) in zip(subviews, frames(subviews, width: bounds.width)) {
-            s.place(at: CGPoint(x: bounds.minX, y: bounds.minY + f.minY), proposal: ProposedViewSize(width: bounds.width, height: f.height))
+            s.place(at: CGPoint(x: bounds.minX + f.minX, y: bounds.minY + f.minY), proposal: ProposedViewSize(width: f.width, height: f.height))
         }
     }
 
     private func frames(_ subviews: Subviews, width: CGFloat) -> [CGRect] {
-        var out: [CGRect] = []
-        for s in subviews {
-            // (1.3.167: as tall as it lasts, when it says — a plan, a linked calendar's event — and never less than its name needs)
-            let h = max(s.sizeThatFits(ProposedViewSize(width: width, height: nil)).height, s[WeekLength.self])
-            let y = max(s[WeekAt.self], (out.last?.maxY ?? -gap) + gap)
-            out.append(CGRect(x: 0, y: y, width: width, height: h))
+        // each item's time and length, in points
+        let spans = subviews.map { s -> (y: CGFloat, h: CGFloat) in
+            let h = s[WeekLength.self] > 0 ? s[WeekLength.self] : s.sizeThatFits(ProposedViewSize(width: width, height: nil)).height
+            return (s[WeekAt.self], h)
         }
-        return out
+        // the items in runs whose times meet, each run's items in the fewest columns (the first that is free by then)
+        var column = [Int](repeating: 0, count: spans.count)
+        var columns = [Int](repeating: 1, count: spans.count)
+        var run: [Int] = [], ends: [CGFloat] = [], runEnd: CGFloat = -.greatestFiniteMagnitude
+        func close() { for k in run { columns[k] = max(1, ends.count) } }
+        for (k, sp) in spans.enumerated() {
+            if sp.y >= runEnd - 0.5 {
+                close()
+                run = []
+                ends = []
+            }
+            if let free = ends.firstIndex(where: { $0 <= sp.y + 0.5 }) {
+                column[k] = free
+                ends[free] = sp.y + sp.h
+            } else {
+                column[k] = ends.count
+                ends.append(sp.y + sp.h)
+            }
+            run.append(k)
+            runEnd = max(runEnd, sp.y + sp.h)
+        }
+        close()
+        return spans.enumerated().map { k, sp in
+            let w = (width - gap * CGFloat(columns[k] - 1)) / CGFloat(columns[k])
+            return CGRect(x: CGFloat(column[k]) * (w + gap), y: sp.y, width: max(0, w), height: sp.h)
+        }
     }
 }
 
@@ -2547,10 +2632,14 @@ private struct PlanDayReply: Decodable {
 }
 
 /// (1.3.167) A plan's block dragged on the week: by how many days and minutes; dropped, on its way to the page.
+/// (1.3.176) And where the pointer has it, to the point (`dx`, `dy`): the block follows that, the quarter hour it would go
+/// to shown under it.
 struct PlanDrag: Equatable {
     var id: String
     var days: Int
     var minutes: Int
+    var dx: CGFloat = 0
+    var dy: CGFloat = 0
     /// (1.3.172) How far into the block it was taken, in minutes: where the pointer is, for the plan it is held over.
     var grab = 0
     var dropped = false
