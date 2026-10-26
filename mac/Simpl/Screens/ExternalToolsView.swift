@@ -392,8 +392,10 @@ private struct ToolCard: View {
     /// (1.3.178) Whether its list's popover is up — asked for is not up: a list asked for as its card was still coming
     /// into its window, or while another copy of the app had the front (the suite's), never came, and nothing asked
     /// again once the cards were held under it (1.3.178's dark-36b picture). `reasking` while it is asked for afresh;
-    /// `holding` while the screenshot suite's picture waits for it.
-    @State private var up = false
+    /// `holding` while the screenshot suite's picture waits for it. (Counted: a popover's list can come twice, the one
+    /// before going after the next has come.)
+    @State private var ups = 0
+    private var up: Bool { ups > 0 }
     @State private var reasking = false
     @State private var holding = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -446,6 +448,7 @@ private struct ToolCard: View {
         }
         .onChange(of: shown) { _, on in
             guard !reasking else { return }
+            if on, !up { holdPicture() }
             if on { checkUp(since: Date()) }
             if listed != on { listed = on }
         }
@@ -487,12 +490,12 @@ private struct ToolCard: View {
             ToolPlacesList(tool: tool, tint: tint, room: room, choose: choose, close: { shown = false })
                 // (the screenshot suite's console: when a list shows and goes)
                 .onAppear {
-                    up = true
+                    ups += 1
                     letPictureGo()
                     if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] tool list shown: %@", tool.name) }
                 }
                 .onDisappear {
-                    up = false
+                    ups = max(0, ups - 1)
                     if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] tool list closed: %@", tool.name) }
                 }
         }
@@ -511,10 +514,6 @@ private struct ToolCard: View {
                 return
             }
             NSLog("[Simpl] tool list: %@'s list asked for but not up; asked again", tool.name)
-            if UserDefaults.standard.string(forKey: "SimplShotFile") != nil, !holding {
-                holding = true
-                Shot.began()
-            }
             reckonRoom()
             // (closed and asked for again a few frames apart, so SwiftUI sees both; the page's `listed` left as it is)
             reasking = true
@@ -527,7 +526,15 @@ private struct ToolCard: View {
         }
     }
 
-    /// (1.3.178) The suite's picture, held while its list was asked for again, let go: the list up, or no longer asked for.
+    /// (1.3.178) The suite's picture held from when its list is asked for until it is up: a list asked for while the app
+    /// was behind was pictured as the app came in front, before it was asked for again (the light-36b picture).
+    private func holdPicture() {
+        guard !holding, UserDefaults.standard.string(forKey: "SimplShotFile") != nil else { return }
+        holding = true
+        Shot.began()
+    }
+
+    /// (1.3.178) The suite's picture let go: the list up, or no longer asked for.
     private func letPictureGo() {
         guard holding else { return }
         holding = false

@@ -56,7 +56,10 @@ struct GeoGebraWeb: NSViewRepresentable {
     /// The page from the extension the app carries, its look in the address's fragment (a file's query is not kept by
     /// every WebKit).
     private func load(_ w: WKWebView) {
-        guard let dir = Bundle.main.url(forResource: "extension", withExtension: nil) else { return }
+        guard let dir = Bundle.main.url(forResource: "extension", withExtension: nil) else {
+            NSLog("[Simpl] calculator: the app has no copy of the extension's pages")
+            return
+        }
         let page = dir.appendingPathComponent("tools/geogebra/index.html")
         var items = [URLQueryItem(name: "theme", value: dark ? "dark" : "light"), URLQueryItem(name: "accent", value: accent), URLQueryItem(name: "os", value: "mac"), URLQueryItem(name: "clear", value: "1")]
         if compact { items.append(URLQueryItem(name: "compact", value: "1")) }
@@ -88,6 +91,27 @@ struct GeoGebraWeb: NSViewRepresentable {
             case "offline": NSLog("[Simpl] calculator: GeoGebra could not be loaded"); arrived()
             default: break
             }
+        }
+
+        // (1.3.178) how its page loaded, on the console: the calculator was pictured blank, its page saying neither
+        // that GeoGebra was ready nor that it could not be loaded
+        func webView(_ w: WKWebView, didFinish n: WKNavigation!) {
+            NSLog("[Simpl] calculator: its page loaded")
+        }
+
+        func webView(_ w: WKWebView, didFail n: WKNavigation!, withError e: Error) {
+            NSLog("[Simpl] calculator: its page failed: %@", e.localizedDescription)
+            arrived()
+        }
+
+        func webView(_ w: WKWebView, didFailProvisionalNavigation n: WKNavigation!, withError e: Error) {
+            NSLog("[Simpl] calculator: its page could not be opened: %@", e.localizedDescription)
+            arrived()
+        }
+
+        func webViewWebContentProcessDidTerminate(_ w: WKWebView) {
+            NSLog("[Simpl] calculator: its page's process ended")
+            arrived()
         }
 
         /// A link GeoGebra shows (its help, its sign-in) opens in the browser, never in the calculator.

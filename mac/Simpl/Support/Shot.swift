@@ -194,6 +194,10 @@ enum Shot {
                     menuOpen(file, until: Date().addingTimeInterval(8))
                 } else if popover && !again && NSApp.isActive {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { whenIdle(file, until: Date().addingTimeInterval(8)) }
+                } else if popover && busy > 0 {
+                    // (1.3.178) a popover still waited for as its app came in front (a tool's list asked for again once
+                    // it is): until it has come
+                    whenIdle(file, until: Date().addingTimeInterval(8))
                 } else {
                     capture(file)
                 }
