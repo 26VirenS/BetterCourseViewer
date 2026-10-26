@@ -204,8 +204,14 @@ public sealed class InboxScreen : Screen
         if (listening) { InboxStore.DraftChanged -= OnDraft; listening = false; }
     }
 
-    /// <summary>Read ahead, unseen: the mailbox's conversations, nothing drawn (shown, the answer kept is taken up).</summary>
-    protected override void ReadAhead() => inbox.Ensure(engine, "inbox", new { scope });
+    /// <summary>Read ahead, unseen: the mailbox's conversations, nothing drawn (shown, the answer kept is taken up).
+    /// (0.3.78) An answer kept already is taken up now, unseen, so a page built ahead (the shell's main places) is built
+    /// with the mailbox, not with the spinner it shows while nothing has been read.</summary>
+    protected override void ReadAhead()
+    {
+        inbox.Ensure(engine, "inbox", new { scope });
+        if (inbox.Data is { } kept && !ReferenceEquals(kept, shown)) Adopt(kept, fresh: false, animate: false);
+    }
 
     private void OnDraft(string id)
     {
