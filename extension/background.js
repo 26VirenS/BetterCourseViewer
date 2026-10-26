@@ -936,6 +936,7 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
     const origin = normalizeOrigin(rawOrigin);
     if (!origin) return { ok: false, message: 'That does not look like a valid URL.' };
     if (BCV.settings.builtInHost(new URL(origin).hostname)) return { ok: true, origin, builtIn: true }; // (this build runs there already: registered again, its scripts would run twice)
+    if (BCV.settings.toolHost(new URL(origin).hostname)) return { ok: false, message: 'That is a school tool’s site, not a Canvas one: Simpl’s bar goes over it when the tool is opened from Simpl.' }; // (2.99.116)
     if (!api.scripting?.registerContentScripts) {
       return { ok: false, message: 'This browser cannot add extra sites (scripting API unavailable).' };
     }
@@ -996,6 +997,7 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
     try { origin = new URL(sender?.tab?.url || sender?.url || msg?.origin).origin; } catch { return { ok: false }; }
     if (!/^https?:$/.test(new URL(origin).protocol)) return { ok: false };
     if (BCV.settings.builtInHost(new URL(origin).hostname)) return { ok: true, builtIn: true };
+    if (BCV.settings.toolHost(new URL(origin).hostname)) return { ok: true, tool: true }; // (2.99.116) a tool's site: never the interface
     const r = await registerDomain(origin);
     if (r && r.ok === false) return r;
     if (!msg?.signedIn || tabId == null) return { ok: true, origin, reloaded: false };

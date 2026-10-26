@@ -28,6 +28,9 @@
     lock: 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.116', date: '2026-10-26', notes: [
+      { kind: 'new', title: 'School Tools Built In', body: "Simpl's bar works on Alta, McGraw Hill and more.", icon: P.tool },
+    ] },
     { version: '2.99.115', date: '2026-10-26', notes: [
       { kind: 'improved', title: "Agenda's Own Month", body: 'In Agenda, pick its days on the month on the left.', icon: P.cal },
       { kind: 'improved', title: 'A Plain Tick', body: 'Handed-in work shows a simple tick, not a badge.', icon: P.check },

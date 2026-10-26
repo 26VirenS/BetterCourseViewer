@@ -613,6 +613,10 @@
       msg.textContent = domain ? `${new URL(origin).hostname} is on already: every *${domain.toLowerCase()} site is built in.` : `${new URL(origin).hostname} is on already: it is built in.`;
       return;
     }
+    if (BCV.settings.toolHost(new URL(origin).hostname)) { // (2.99.116)
+      msg.textContent = `${new URL(origin).hostname} is a school tool’s site, not a Canvas one: Simpl’s bar goes over it when the tool is opened from Simpl.`;
+      return;
+    }
     msg.textContent = 'Asking for permission…';
     let granted = false;
     try {

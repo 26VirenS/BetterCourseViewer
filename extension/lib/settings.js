@@ -91,7 +91,7 @@
   // The scripts' own version, stamped: content/app/app.js compares it with the stylesheet's
   // (--bcv-version) and the manifest's, because Safari can run one version's script with
   // another's stylesheet after the Mac app has updated under it. Bumped with every release.
-  self.BCV_VERSION = '2.99.115';
+  self.BCV_VERSION = '2.99.116';
 
   const DEFAULTS = {
     version: 3, // (3: Away Refresh off unless turned on — settings written before carry it on, and the one-time step in getSettings turns it off for everyone)
@@ -202,34 +202,56 @@
 
   /** (2.99.21) Whether the interface runs on a host by the build itself: Canvas's own domain, Brightspace's where the build
    *  names it (2.99.22), and in the quiet Chrome build the schools' own Canvas addresses it names (scripts/canvas-domains.txt)
-   *  — read from this build's manifest, its host permissions and its scripts' matches, so a site there is never added again by
-   *  hand (its scripts would run twice). The full build's every-site access is not this. */
+   *  — read from this build's manifest, the matches of the interface's own scripts, so a site there is never added again by
+   *  hand (its scripts would run twice). The full build's every-site access is not this. (2.99.116) Nor are the school tools'
+   *  sites the manifest names among its host permissions (Knewton Alta, Macmillan, McGraw Hill …): the bar over a tool's tab
+   *  runs there, never the interface — they are toolHost's. */
   let builtIns = null;
   const builtInDomains = []; // (a whole domain, *://*.<domain>/*: Brightspace's own)
+  const toolDomains = []; // (2.99.116) the school tools' whole domains the manifest asks for, the interface not running there
+  const BAR_ONLY = ['content/toolbar.js', 'content/sniff.js']; // (scripts on every site the extension may look at: not the interface)
+  function readManifest() {
+    if (builtIns) return;
+    builtIns = new Set();
+    try {
+      const api = self.chrome?.runtime?.getManifest ? self.chrome : self.browser;
+      const m = api?.runtime?.getManifest?.() || {};
+      const host = (p) => ({ one: /^\*:\/\/([a-z0-9.-]+)\/\*$/i.exec(p)?.[1]?.toLowerCase(), all: /^\*:\/\/\*\.([a-z0-9.-]+)\/\*$/i.exec(p)?.[1]?.toLowerCase() });
+      for (const cs of m.content_scripts || []) {
+        if ((cs.js || []).some((f) => BAR_ONLY.includes(f))) continue;
+        for (const p of cs.matches || []) {
+          const { one, all } = host(p);
+          if (one) builtIns.add(one);
+          if (all && !builtInDomains.includes(all)) builtInDomains.push(all);
+        }
+      }
+      for (const p of m.host_permissions || []) {
+        const { all } = host(p);
+        if (all && all !== 'instructure.com' && !builtInDomains.includes(all) && !toolDomains.includes(all)) toolDomains.push(all);
+      }
+    } catch { /* Canvas's own domain alone */ }
+  }
+  const under = (h, domains) => domains.some((d) => h === d || h.endsWith(`.${d}`));
   function builtInHost(host) {
     const h = String(host || '').toLowerCase();
     if (!h) return false;
     if (/(^|\.)instructure\.com$/.test(h)) return true;
-    if (!builtIns) {
-      builtIns = new Set();
-      try {
-        const api = self.chrome?.runtime?.getManifest ? self.chrome : self.browser;
-        const m = api?.runtime?.getManifest?.() || {};
-        for (const p of [...(m.host_permissions || []), ...(m.content_scripts || []).flatMap((cs) => cs.matches || [])]) {
-          const one = /^\*:\/\/([a-z0-9.-]+)\/\*$/i.exec(p)?.[1]?.toLowerCase();
-          const all = /^\*:\/\/\*\.([a-z0-9.-]+)\/\*$/i.exec(p)?.[1]?.toLowerCase();
-          if (one) builtIns.add(one);
-          if (all && !builtInDomains.includes(all)) builtInDomains.push(all);
-        }
-      } catch { /* Canvas's own domain alone */ }
-    }
-    return builtIns.has(h) || builtInDomains.some((d) => h === d || h.endsWith(`.${d}`));
+    readManifest();
+    return builtIns.has(h) || under(h, builtInDomains);
+  }
+  /** (2.99.116) A school tool's site this build is allowed on from the start (a host permission of the manifest's): the
+   *  bar goes over a tool's tab there with nothing to ask, and the interface is never registered there. */
+  function toolHost(host) {
+    const h = String(host || '').toLowerCase();
+    if (!h || builtInHost(h)) return false;
+    return under(h, toolDomains);
   }
   /** The schools' own addresses this build has built in (none but in the quiet Chrome build). */
-  const builtInSchools = () => { builtInHost('x.instructure.com'); builtInHost('-'); return [...(builtIns || [])].filter((d) => !d.startsWith('*.')); };
+  const builtInSchools = () => { readManifest(); return [...builtIns].filter((d) => !d.startsWith('*.')); };
 
   BCV.settings = {
     builtInHost,
+    toolHost,
     builtInSchools,
     DEFAULTS,
     STORAGE_KEY,

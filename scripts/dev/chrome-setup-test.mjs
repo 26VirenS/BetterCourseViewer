@@ -17,6 +17,7 @@ import { cpSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import vm from 'node:vm';
 import { launchExtension } from './harness.mjs';
 const require = createRequire(import.meta.url);
 let chromium;
@@ -79,6 +80,24 @@ check(schoolSites.length > 400 && schoolSites.every((s) => /^\*:\/\/[a-z0-9-]+(\
 // Chrome switches every installed copy off until it is accepted. A Brightspace site is enabled there as any school's own site is.
 check(!quietHosts.some((h) => /brightspace/.test(h)) && quiet.content_scripts.some((cs) => (cs.js || []).includes('lib/d2l-api.js')), `the quiet build names no Brightspace host — nothing new to accept at an update — and carries the Brightspace layer for a site enabled by hand: ${JSON.stringify(quietHosts.filter((h) => /brightspace/.test(h)))}`);
 check(JSON.stringify(quiet.permissions) === '["storage","unlimitedStorage","scripting","activeTab","alarms"]' && JSON.stringify(quiet.host_permissions) === quietSites && JSON.stringify(quiet.optional_host_permissions) === '["*://*/*"]' && quietHosts.every((h) => JSON.parse(quietSites).includes(h)) && quiet.content_scripts.length === 3 && !quiet.content_scripts.some((cs) => (cs.js || []).includes('content/sniff.js')) && quiet.content_scripts.some((cs) => (cs.js || []).includes('content/toolbar.js')) && !quiet.background.scripts, `the quiet build asks for the same five permissions, Canvas's own domain and the listed schools alone (every other site optional, asked for one at a time), no sniffer, the bar over a tool's tab on those: ${JSON.stringify({ permissions: quiet.permissions, hosts: quiet.host_permissions.length })}`);
+
+// (2.99.116) The school tools' sites (Knewton Alta, Macmillan Learning, McGraw Hill's, Pearson's, Cengage's …): the source build
+// (Safari, Firefox) names them among its host permissions, so the bar goes over a tool's tab there with nothing to ask — and
+// lib/settings.js never takes one for a Canvas the build runs on (the interface registered there would run on a tool's page).
+// The Chrome builds' lists above are untouched by them: the full build has every site already, and a site the quiet build had
+// not named would switch every installed copy off at the update.
+const source = JSON.parse(readFileSync(join(root, 'extension', 'manifest.json'), 'utf8'));
+const settingsFor = (mf) => { const ctx = vm.createContext({}); ctx.self = ctx; ctx.chrome = { runtime: { getManifest: () => mf } }; vm.runInContext(readFileSync(join(root, 'extension', 'lib', 'settings.js'), 'utf8'), ctx); return ctx.BCV.settings; };
+const toolSites = source.host_permissions.filter((h) => !/instructure|brightspace|simplcourses/.test(h));
+const named = ['knewtonalta.com', 'macmillanlearning.com', 'saplinglearning.com', 'mheducation.com', 'aleks.com', 'mcgraw-hill.com', 'pearson.com', 'mathxl.com', 'cengage.com', 'webassign.net', 'wiley.com', 'zybooks.com', 'gradescope.com'];
+check(toolSites.length >= 40 && toolSites.every((h) => /^\*:\/\/\*\.[a-z0-9-]+(\.[a-z0-9-]+)+\/\*$/.test(h)) && new Set(toolSites).size === toolSites.length && named.every((d) => toolSites.includes(`*://*.${d}/*`)) && !source.content_scripts.some((cs) => !(cs.js || []).some((f) => /toolbar|sniff/.test(f)) && (cs.matches || []).some((m) => toolSites.includes(m))), `the source build names ${toolSites.length} school tools' sites (Knewton Alta, Macmillan, McGraw Hill …), each a whole domain, and runs no interface script there`);
+const src = settingsFor(source);
+const srcTool = ['www.mheducation.com', 'mheducation.com', 'learning.mheducation.com', 'student.knewtonalta.com', 'www.macmillanlearning.com', 'www-awu.aleks.com', 'www.webassign.net'];
+check(src.builtInHost('school.instructure.com') && src.builtInHost('school.brightspace.com') && srcTool.every((h) => !src.builtInHost(h) && src.toolHost(h)) && !src.toolHost('canvas.school.edu') && !src.toolHost('school.instructure.com') && !src.toolHost('notmheducation.com') && !src.toolHost('simplcourses.com') && src.builtInSchools().length === 0, 'there, a tool\u2019s site is a tool\u2019s and never a Canvas the build runs on; Canvas\u2019s and Brightspace\u2019s own domains still are, and a school\u2019s own address is neither');
+const full = settingsFor(manifest);
+check(full.builtInHost('school.instructure.com') && full.builtInHost('school.brightspace.com') && !full.builtInHost('www.mheducation.com') && !full.toolHost('www.mheducation.com') && full.builtInSchools().length === 0, 'the Chrome build has no tool site of its own to tell apart (it has every site), and the same built-in Canvas as before');
+const q = settingsFor(quiet);
+check(q.builtInHost('catcourses.ucmerced.edu') && q.builtInHost('school.instructure.com') && !q.builtInHost('school.brightspace.com') && !q.toolHost('www.mheducation.com') && JSON.stringify(q.builtInSchools()) === JSON.stringify(schoolSites.map((s) => s.slice(4, -2))), `the quiet build's built-in schools are still the ${schoolSites.length} listed, and no tool site`);
 
 // a site that is not Canvas — with a csrf meta and an #application of its own, as many sites have —
 // and, at /login/canvas, a page shaped like Canvas's sign-in page (Canvas's wrapper, no user in ENV)

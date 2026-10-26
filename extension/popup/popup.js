@@ -236,6 +236,12 @@
     $('tool-all').addEventListener('click', () => keep(true));
     return;
   }
+  // (2.99.116) A school tool's site this build names (McGraw Hill, Knewton Alta, Macmillan …) and not a tool's tab: the bar
+  // goes over a tool's tab there, never the interface, so there is nothing here to turn on (or to register).
+  if (self.BCV?.settings?.toolHost(url.hostname)) {
+    status.textContent = granted ? `Simpl’s bar is allowed on ${url.hostname}` : `Open this tool from Simpl for its bar`;
+    return;
+  }
   if (granted) {
     status.textContent = `On for ${url.hostname}`;
     // Self-heal: a saved custom site re-registers its scripts from the
