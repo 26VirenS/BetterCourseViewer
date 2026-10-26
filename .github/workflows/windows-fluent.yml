@@ -914,7 +914,7 @@ jobs:
           # profile prefers dark — the page's look at first, Light and Dark and Show browser above the objectives (its page
           # checked below to prefer light) —, in Dark, on a narrow window (Show browser said "Browser"), and with Show
           # browser on (Alta's own page as it is); and a pop-up of Alta's whose rich body comes in a second and a half after
-          # it opens, shown whole as the app's own dialog, light and dark (checked below)
+          # it opens — (0.3.71) shown in Alta's page as Alta draws it, light and dark (checked below)
           $altaPage = 'alta:104:4003:/mock-alta/learn/course/c1/assignment/a3?sample=1'
           $altaDialog = 'alta:104:4003:/mock-alta/learn/course/c1/assignment/a3?sample=dialog'
           Shot 'alta-question-light' '1366x778' 50 ($mock + @('--appearance', 'dark', '--web-scheme', 'dark', '--open', $altaPage))
@@ -1306,15 +1306,15 @@ jobs:
             if ("$line" -match 'capped\)') { Write-Host "::warning::${name}: Alta's page was shown only because the wait ran out ('$line')" }
             Write-Host "${name}: $line"
           }
-          # a pop-up of Alta's whose body comes in after it opens, shown whole as the app's own dialog: its words, both its
-          # formulas and both its pictures (Screens/Alta/AltaSession.cs writes "alta: a pop-up shown as the app's own: …"
-          # in a picture run; before 0.3.5 such a pop-up came up with its title and buttons round an empty body)
+          # (0.3.71) a pop-up of Alta's, shown in Alta's page as Alta draws it — never read into a dialog of the app's
+          # (Screens/Alta/AltaSession.cs writes "alta: a pop-up shown in Alta's page: "<its title>"" in a picture run; and
+          # "a pop-up shown as the app's own" no more)
           foreach ($name in @('alta-dialog', 'alta-dialog-dark')) {
             if ($script:mine -notcontains $name) { continue }
-            $said = @(Select-String -Path "shots/profile-$name.log" -Pattern 'alta: a pop-up shown as the app''s own: (.+)$' -ErrorAction SilentlyContinue | ForEach-Object { $_.Matches[0].Groups[1].Value }) | Select-Object -First 1
-            $whole = [regex]::Match("$said", '(\d+) words, (\d+) formulas, (\d+) pictures')
-            if (-not $whole.Success -or [int]$whole.Groups[1].Value -lt 40 -or [int]$whole.Groups[2].Value -lt 2 -or [int]$whole.Groups[3].Value -lt 2) { Write-Host "::error::${name}: Alta's pop-up was not shown whole as the app's own ('$said') (shots/profile-$name.log)"; exit 1 }
-            Write-Host "${name}: $said"
+            $log = Get-Content "shots/profile-$name.log" -Raw -ErrorAction SilentlyContinue
+            $said = [regex]::Match("$log", 'alta: a pop-up shown in Alta''s page: "([^"]*)"')
+            if (-not $said.Success -or $said.Groups[1].Value -ne 'Knewton Alta' -or "$log".Contains("a pop-up shown as the app's own")) { Write-Host "::error::${name}: Alta's pop-up was not shown in Alta's page ('$($said.Value)') (shots/profile-$name.log)"; exit 1 }
+            Write-Host "${name}: $($said.Value)"
           }
           # More from Canvas read from the mock's own menu, in its order, My Materials with the picture the page drew of its
           # icon; History's and Help's popups listing rows (Shell/MoreFromCanvas.cs writes "more from canvas: …" and "more
