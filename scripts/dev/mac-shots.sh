@@ -587,9 +587,9 @@ pins_pages() {
   MODE=dark shoot dark-21j-macmillan-light-page 26 -SimplOpen macmillan:104:4005
 }
 
-# (1.3.83) Alta's pop-ups read whole — the mock's "Knewton Alta" pop-up over its learn page, its body
-# coming 1.2 s after its box (a spinner first) with a list, a link, two formulas, a picture and a drawing, as the Mac's
-# own sheet in light and in dark; and one holding a video, given back to Alta's page, shown as it is
+# (1.3.83) Alta's pop-ups — the mock's "Knewton Alta" pop-up over its learn page, its body coming 1.2 s after its box
+# (a spinner first) with a list, a link, two formulas, a picture and a drawing, in light and in dark; and one holding a
+# video — (1.3.178) each shown in Alta's page as Alta draws it, the page as it is under it (no sheet of the app's)
 # (1.3.83) and Light or Dark above the objectives (-SimplAltaPageDark YES: Dark picked): the cover's start screen in Dark
 # Mode with Dark picked and with Light (the default, 1.3.79's), a question in Dark in both modes, and Alta's page as it
 # is (the overview) drawn dark

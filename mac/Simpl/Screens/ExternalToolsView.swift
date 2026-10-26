@@ -75,11 +75,19 @@ struct ExternalToolsView: View {
     /// (1.3.77) The screenshot suite's list, kept open for its picture: the suite runs several copies of the app at once,
     /// and another coming to the front closes a popover (its app no longer active), so it is opened again.
     @State private var keptOpen: String?
+    /// (1.3.178) The answer the cards were drawn from as a tool's list opened, held while it is open; a newer one (the
+    /// school's after the kept one, a live check) put in once it closes. A card drawn again under its open list — moved
+    /// to another column by the newer answer — had its popover presented afresh in the middle of laying the window out,
+    /// and AppKit stopped the app (more passes laying it out than it has views; 1.3.175's dark-36b picture).
+    @State private var held: ExternalToolsData?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// What the cards are drawn from: the latest answer, or while a list is open the one it opened from.
+    private var shownData: ExternalToolsData? { listed != nil ? held ?? model.data : model.data }
 
     var body: some View {
         Group {
-            if let d = model.data {
+            if let d = shownData {
                 if d.rows.isEmpty {
                     ContentUnavailableView("No External Tools", systemImage: "puzzlepiece.extension",
                                            description: Text(d.empty ?? "None of your courses has an external tool."))
@@ -130,7 +138,10 @@ struct ExternalToolsView: View {
             keptOpen = nil
             listed = nil
         }
-        .onChange(of: listed) { _, now in
+        .onChange(of: listed) { was, now in
+            // (1.3.178: the answer held while a list is open, the newest drawn as it closes)
+            if was == nil, now != nil { held = model.data }
+            if now == nil { held = nil }
             guard now == nil, let id = keptOpen else { return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { if keptOpen == id { listed = id } }
         }
@@ -167,7 +178,8 @@ struct ExternalToolsView: View {
 
     /// (1.3.82) The screenshot suite's `-SimplExternalToolReread YES`: a moment after the list is open, the tools read
     /// again and put in place under it, the card under the list drawn again — as the tools' answer coming in a second
-    /// time did in 1.3.81, when the list's popover was sized and sized again until AppKit stopped the app. The console
+    /// time did in 1.3.81, when the list's popover was sized and sized again until AppKit stopped the app (1.3.178: held
+    /// until the list closes, the cards under it left as they were). The console
     /// says whether the list is still open after it; the picture waits for it.
     private func readAgainAsked(_ t: ExternalToolsData.Tool) async {
         guard UserDefaults.standard.bool(forKey: "SimplExternalToolReread") else { return }

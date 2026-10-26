@@ -218,98 +218,73 @@ try {
   const sy1 = await page.evaluate(() => window.scrollY);
   check(sy0 > 0 && sy0 === sy1, `typing in the answer leaves the page where it was scrolled (${sy0} → ${sy1})`);
   await page.setViewportSize({ width: 1280, height: 720 });
-  // Alta's pop-ups over it stay in sight
+  // (1.3.178) Alta's pop-ups shown in its page as Alta draws them — every one, at once (the owner: "just punch through
+  // for them"), none read into a sheet of the app's as 1.3.51–1.3.177 did: Alta's page as it is, in sight under it, until
+  // it closes; the app told it is open (its title, for its logs) and when it closes
+  const asIsNow = () => page.evaluate(() => ({ q: document.documentElement.hasAttribute('data-simpl-q'), shown: document.documentElement.hasAttribute('data-simpl-shown'), hidden: document.documentElement.hasAttribute('data-simpl-native-dialog') }));
+  const nd = (await posts()).length;
   await page.evaluate(() => window.mockDialog());
-  await page.waitForTimeout(400);
-  check((await vis('#vi')) && (await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))), 'a pop-up of Alta’s (Having trouble?) is shown over the question');
-  // (1.3.51) Alta's pop-ups as the Mac's own: passed to the app — (1.3.83) once settled, its body as HTML and every one of its
-  // buttons — hidden in the page on the app's word, its buttons pressed from the app
-  const dlg = await waitFor((p) => p.kind === 'dialog' && p.open === true, 'the pop-up passed to the app');
-  check(/Having trouble/.test(dlg.html) && dlg.buttons.map((b) => b.label).join() === 'VIEW INSTRUCTION' && (await page.evaluate(() => document.getElementById('dlg').hasAttribute('data-simpl-dialog'))),
-    `an open pop-up of Alta's is passed to the app, its words and buttons (${JSON.stringify(dlg.buttons)})`);
-  check(await vis('#vi'), 'it stays in sight in the page until the app says it shows it');
-  await page.evaluate(() => window.__simplDialog.hide());
-  check((await page.evaluate(() => getComputedStyle(document.querySelector('#dlg [role=dialog]')).visibility)) === 'hidden', 'and is hidden in the page while the app shows it');
-  // (1.3.83) hidden, it still reads as it is: never passed again (before, its words read as nothing once hidden)
+  const dlg = await waitFor((p, k) => k >= nd && p.kind === 'dialog' && p.open === true, 'the pop-up shown in the page');
+  await page.waitForTimeout(300);
+  const a0 = await asIsNow();
+  check(dlg.inPage === true && dlg.why === '' && !('html' in dlg) && !a0.q && a0.shown && !a0.hidden && (await vis('#vi')) && (await vis('header')),
+    `an open pop-up of Alta's (Having trouble?) is shown in its page as Alta draws it, the page as it is under it, nothing in it read for the app (${JSON.stringify(dlg)})`);
   const nh = (await posts()).length;
   await page.waitForTimeout(1500);
-  const again = (await posts()).slice(nh).filter((p) => p.kind === 'dialog');
-  check(again.length === 0, `hidden in the page, it is not passed again, emptied (${again.length} more)`);
-  await page.evaluate(() => { document.getElementById('vi').onclick = () => document.getElementById('dlg').remove(); });
-  const np = (await posts()).length;
-  check(await page.evaluate(() => window.__simplDialog.press(0)), 'the app’s button presses Alta’s');
-  await waitFor((p, k) => k >= np && p.kind === 'dialog' && p.open === false, 'the pop-up gone');
-  check(!(await page.$('#dlg')) && !(await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-native-dialog'))), 'and when it closes, the app is told and the page left as it was');
-  // (1.3.83) Alta's "Knewton Alta" pop-up as Material draws it: fading in, a spinner until its body comes 1.2 s later — words
-  // in bold and italic, a list with a link, a formula as MathJax 2 sets one and one as KaTeX does, a picture that takes a
-  // moment, a drawing from the page's sprite sheet — an ×, Back (greyed) and Next. Passed once it has settled, whole.
+  check((await posts()).slice(nh).filter((p) => p.kind === 'dialog').length === 0, 'the app is told once, the pop-up never read again while it is open');
+  await page.evaluate(() => { const b = document.getElementById('vi'); b.onclick = () => document.getElementById('dlg').remove(); b.click(); });
+  await waitFor((p, k) => k >= nh && p.kind === 'dialog' && p.open === false, 'the pop-up gone');
+  await page.waitForTimeout(400);
+  check(!(await page.$('#dlg')) && !(await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-native-dialog'))) && (await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))) && !(await vis('header')) && (await vis('#asks')),
+    'its own button pressed in the page, it closes: the app is told, and the question is shown alone again');
+  // Alta's "Knewton Alta" pop-up as Material draws it — fading in, a spinner until its body comes 1.2 s later: shown at
+  // once, spinner and all (never waited for, as its sheet was), its Next and Got it its own, pressed in the page
   const nr0 = (await posts()).length;
   const t0 = Date.now();
   await page.evaluate(() => window.mockWelcomeDialog(1200));
-  const rd = await waitFor((p, k) => k >= nr0 && p.kind === 'dialog' && p.open, 'the rich pop-up', 80);
+  const rd = await waitFor((p, k) => k >= nr0 && p.kind === 'dialog' && p.open, 'the welcome pop-up', 40);
   const waited = Date.now() - t0;
-  check(waited >= 1500 && (await posts()).slice(nr0).filter((p) => p.kind === 'dialog').length === 1, `passed once, only when its body is in and its picture loaded (${waited} ms after it opened, its spinner first)`);
-  check(rd.title === 'Knewton Alta' && !/Knewton Alta/.test(rd.html), `its title from what names it, not again in its body (“${rd.title}”)`);
-  check(/<i>you<\/i>/.test(rd.html) && /<b>mastered<\/b>/.test(rd.html) && /<ul><li>Answer the question on screen\.<\/li><li>Stuck\? <a href="simpl-link:0">More Instruction<\/a> explains it\.<\/li><\/ul>/.test(rd.html),
-    'its words as they read: italic, bold, a list with its link');
-  check(rd.html.includes('\\(\\frac{d}{dx}x^2 = 2x\\)') && rd.html.includes("\\(f'(x) = 2x\\)") && rd.maths === 2 && !/MathJax|d\/dx x/.test(rd.html),
-    `its formulas as their TeX — MathJax's own script, KaTeX's annotation — never their drawn copies (${rd.maths})`);
-  check(/<img src="http:\/\/localhost:\d+\/mock-alta\/tangent\.svg" width="220" height="120" alt="A tangent line touching a curve">/.test(rd.html) && /<svg[^>]*class="simpl-drawing"><defs><symbol id="alta-bulb"/.test(rd.html) && rd.pics === 2,
-    'its picture by its address, its drawing as itself with the symbol it draws from');
-  check(JSON.stringify(rd.buttons) === JSON.stringify([{ label: 'Close', primary: false, enabled: true, close: true }, { label: 'Back', primary: false, enabled: false, close: false }, { label: 'Next', primary: true, enabled: true, close: false }]) && rd.ready === 'settled',
-    `every one of its buttons: its × as Close, Back greyed out, Next Alta's main one (${JSON.stringify(rd.buttons)})`);
-  check((await page.evaluate(() => window.__simplDialog.link(0))) === '' && (await page.evaluate(() => location.hash)) === '#more-instruction', 'a link in it is followed in Alta’s page');
-  await page.evaluate(() => window.__simplDialog.hide());
-  // (a next step: passed again as it comes, the same pop-up)
+  check(rd.inPage === true && rd.title === 'Knewton Alta' && waited < 1200 && (await vis('#rdlg .MuiDialog-paper')),
+    `shown in the page before its body is in (${waited} ms after it opened), titled for the app (“${rd.title}”)`);
+  await page.waitForTimeout(1400);
   const ns = (await posts()).length;
-  check(await page.evaluate(() => window.__simplDialog.press(2)), 'the app’s Next presses Alta’s');
-  const s2 = await waitFor((p, k) => k >= ns && p.kind === 'dialog' && p.open, 'the next step', 40);
-  check(/<h3>You are all set<\/h3>/.test(s2.html) && s2.buttons.map((b) => b.label + (b.enabled ? '' : '·off')).join() === 'Close,Back,Got it' && s2.buttons[2].primary,
-    `its next step is passed as it comes, its words and buttons (${s2.buttons.map((b) => b.label).join(', ')})`);
-  const ng = (await posts()).length;
-  await page.evaluate(() => window.__simplDialog.press(2));
-  await waitFor((p, k) => k >= ng && p.kind === 'dialog' && p.open === false, 'the rich pop-up closed');
+  await page.evaluate(() => document.getElementById('rnext').click());
+  await page.waitForTimeout(500);
+  check(/You are all set/.test(await page.evaluate(() => document.getElementById('rbody').innerText)) && !(await posts()).slice(ns).some((p) => p.kind === 'dialog'),
+    'its Next, pressed in the page, shows its next step there — nothing passed to the app');
+  await page.evaluate(() => document.getElementById('rnext').click());
+  await waitFor((p, k) => k >= ns && p.kind === 'dialog' && p.open === false, 'the welcome pop-up closed');
   check(!(await page.$('#rdlg')), 'Got it closes it');
-  // (1.3.83) a pop-up the app cannot draw as its own is given back to Alta's page — shown as it is, in sight, the focus
-  // lifted — and the app told why; once it closes, the question alone again
-  for (const [open, id, said, why] of [['mockVideoDialog', 'vdlg', 'Watch this first', /a video/], ['mockFrameDialog', 'fdlg', 'Chat with us', /a frame of another site/], ['mockBareDialog', 'bdlg', 'Are you still there?', /nothing in it could be read/]]) {
+  // and a pop-up holding a video, a frame of another site's, or nothing to read: the same — once it closes, the question
+  // alone again
+  for (const [open, id, said] of [['mockVideoDialog', 'vdlg', 'Watch this first'], ['mockFrameDialog', 'fdlg', 'Chat with us'], ['mockBareDialog', 'bdlg', 'Are you still there?']]) {
     const nv = (await posts()).length;
     await page.evaluate((f) => window[f](), open);
     const vp = await waitFor((p, k) => k >= nv && p.kind === 'dialog' && p.open, `the pop-up (${id})`, 50);
     await page.waitForTimeout(300);
-    const asIs = await page.evaluate(() => ({ q: document.documentElement.hasAttribute('data-simpl-q'), shown: document.documentElement.hasAttribute('data-simpl-shown'), hidden: document.documentElement.hasAttribute('data-simpl-native-dialog') }));
-    check(vp.inPage === true && why.test(vp.why) && vp.title === said && !asIs.q && asIs.shown && !asIs.hidden && (await vis('#' + id)) && (await vis('header')),
-      `a pop-up the app cannot show whole is given back to Alta’s page, shown as it is (“${vp.title}”: ${vp.why})`);
+    const asIs = await asIsNow();
+    check(vp.inPage === true && vp.title === said && !asIs.q && asIs.shown && !asIs.hidden && (await vis('#' + id)) && (await vis('header')),
+      `a pop-up (“${vp.title}”) is shown in Alta’s page as it is`);
     const nc = (await posts()).length;
     await page.evaluate((i) => document.querySelector('#' + i + ' .shut').click(), id);
     await waitFor((p, k) => k >= nc && p.kind === 'dialog' && p.open === false, `the pop-up (${id}) closed`);
     await page.waitForTimeout(400);
     check((await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))) && !(await vis('header')) && (await vis('#asks')), 'once it closes, the question is shown alone again');
   }
-  // (and the student's Show in Alta's Page: the same)
-  const na = (await posts()).length;
-  await page.evaluate(() => window.mockDialog());
-  await waitFor((p, k) => k >= na && p.kind === 'dialog' && p.open && !p.inPage && /Having trouble/.test(p.html || ''), 'the pop-up again');
-  const nb2 = (await posts()).length;
-  await page.evaluate(() => { window.__simplDialog.hide(); window.__simplDialog.giveBack(); });
-  const gb = await waitFor((p, k) => k >= nb2 && p.kind === 'dialog' && p.inPage, 'the pop-up given back');
-  check(gb.why === 'the student asked for it' && (await vis('#vi')) && !(await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))), 'Show in Alta’s Page gives it back to the page, in sight');
-  await page.evaluate(() => document.getElementById('dlg').remove());
-  await page.waitForTimeout(700);
   // (1.3.83) Show Browser: Alta's own page as Alta draws it — nothing hidden, its buttons and panels not the app's, never
-  // out of sight (not even between parts), its pop-ups its own and a pop-up the app was showing given back; Dark drawing
-  // it dark; off, the question shown alone again and its pop-ups the app's
+  // out of sight (not even between parts), its pop-ups its own; Dark drawing it dark; off, a pop-up still open shown in
+  // the page as before
   const nbr = (await posts()).length;
   await page.evaluate(() => window.mockDialog());
-  await waitFor((p, k) => k >= nbr && p.kind === 'dialog' && p.open && !p.inPage, 'a pop-up for the app');
-  await page.evaluate(() => { window.__simplDialog.hide(); window.__simplBrowser = true; window.__simplBrowserNow(); });
+  await waitFor((p, k) => k >= nbr && p.kind === 'dialog' && p.open && p.inPage, 'a pop-up shown in the page');
+  await page.evaluate(() => { window.__simplBrowser = true; window.__simplBrowserNow(); });
   await page.waitForTimeout(500);
   const br = await page.evaluate(() => ({ q: document.documentElement.hasAttribute('data-simpl-q'), shown: document.documentElement.hasAttribute('data-simpl-shown'), hidden: document.documentElement.hasAttribute('data-simpl-native-dialog'), bar: !!document.querySelector('[data-simpl-bar]') }));
   const brPosts = (await posts()).slice(nbr);
   const brLast = (kind) => brPosts.filter((p) => p.kind === kind).pop();
   check(!br.q && br.shown && !br.hidden && !br.bar && (await vis('header')) && (await vis('h1')) && (await vis('#submit')) && (await vis('#vi')) && brLast('dialog').open === false
     && brLast('buttons').items.length === 0 && brLast('panels').panels.length === 0,
-    'with Show Browser, Alta’s page is shown whole as Alta draws it — its header, its own buttons, its pop-up — and the app’s sheet, buttons and panels are put away');
+    'with Show Browser, Alta’s page is shown whole as Alta draws it — its header, its own buttons, its pop-up — and the app’s buttons and panels are put away');
   await page.evaluate(() => { window.__simplDark = true; window.__simplFocusDark(); });
   const brDark = await page.evaluate(() => getComputedStyle(document.documentElement).filter);
   await page.evaluate(() => { window.__simplDark = false; window.__simplFocusDark(); });
@@ -322,10 +297,10 @@ try {
   await page.evaluate(() => { document.querySelector('[class*="learn-flow-body"]').appendChild(window.__brq); });
   const nf = (await posts()).length;
   await page.evaluate(() => { window.__simplBrowser = false; window.__simplBrowserNow(); });
-  const backDlg = await waitFor((p, k) => k >= nf && p.kind === 'dialog' && p.open && !p.inPage, 'the pop-up the app’s again', 40);
+  const backDlg = await waitFor((p, k) => k >= nf && p.kind === 'dialog' && p.open && p.inPage, 'the pop-up shown in the page again', 40);
   await page.waitForTimeout(300);
-  check(!!backDlg && (await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))) && !(await vis('header')) && (await vis('#asks')),
-    'Show Browser off: the question shown alone again, the pop-up the app’s again');
+  check(!!backDlg && !(await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-q'))) && (await vis('#vi')),
+    'Show Browser off with the pop-up still open: it is shown in the page as Alta draws it, as before');
   await page.evaluate(() => document.getElementById('dlg').remove());
   await page.waitForTimeout(700);
   // (the page's sprite sheet — an svg of symbols its pictures, a pop-up's among them, draw from — is never hidden)
@@ -380,15 +355,16 @@ try {
   await page.waitForTimeout(1200);
   const ldShown = (await posts()).slice(nld).some((p) => p.kind === 'shown');
   check(!!ldh && !ldShown && !(await page.evaluate(() => document.documentElement.hasAttribute('data-simpl-shown'))), 'a loading part is recognised: kept out of sight, never shown');
-  // (1.3.83) the empty pop-up: Alta's pop-up coming while its page is out of sight (loading) — 1.3.51–1.3.82 pictured it
-  // see-through, the app's sheet empty — is passed whole all the same, its words read from the page as it is
+  // (1.3.83) Alta's pop-up coming while its page is out of sight (loading) — 1.3.51–1.3.82 pictured it see-through —
+  // (1.3.178) shown in the page as it is, the page brought into sight under it
   const nw = (await posts()).length;
   await page.evaluate(() => { const d = document.createElement('div'); d.id = 'wdlg'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-labelledby', 'wt'); d.style.cssText = 'position:fixed;top:20%;left:30%;width:420px;background:#fff;padding:20px'; d.innerHTML = '<h2 id="wt">Knewton Alta</h2><p>Your work is saved as you go.</p><button id="wgot">Got it</button>'; document.body.appendChild(d); document.getElementById('wgot').onclick = () => d.remove(); });
   const wd = await waitFor((p, k) => k >= nw && p.kind === 'dialog' && p.open, 'the pop-up over the loading page', 40);
-  const veiled = await page.evaluate(() => getComputedStyle(document.body).opacity);
-  check(!wd.inPage && wd.title === 'Knewton Alta' && /<p>Your work is saved as you go\.<\/p>/.test(wd.html) && wd.buttons.map((b) => b.label).join() === 'Got it' && veiled === '0',
-    `a pop-up over Alta’s page while it is out of sight is passed whole — its title, its words, its Got it (page opacity ${veiled}: ${wd.html})`);
-  await page.evaluate(() => window.__simplDialog.press(0));
+  await page.waitForTimeout(300);
+  const unveiled = await page.evaluate(() => getComputedStyle(document.body).opacity);
+  check(wd.inPage === true && wd.title === 'Knewton Alta' && unveiled === '1' && (await vis('#wdlg')),
+    `a pop-up over Alta’s page while it is out of sight is shown, the page brought into sight under it (page opacity ${unveiled})`);
+  await page.evaluate(() => document.getElementById('wgot').click());
   await waitFor((p, k) => k >= nw && p.kind === 'dialog' && p.open === false, 'the pop-up over the loading page closed');
   const nld2 = (await posts()).length;
   await page.evaluate(() => { document.getElementById('ldsec').remove(); window.__flow.appendChild(window.__q); });
@@ -859,7 +835,7 @@ try {
       setTimeout(() => customElements.define('simpl-late-tip', class extends HTMLElement { constructor() { super(); this.attachShadow({ mode: 'open' }).innerHTML = '<div role="dialog" aria-label="Tip" style="position:fixed;top:25%;left:30%;width:360px;background:#fff;padding:20px"><p>Words kept in its own tree.</p><button>OK</button></div>'; } }), 1500);
     });
     const tip = await after(nt, (p) => p.kind === 'dialog' && p.open && p.title === 'Tip', 6000);
-    check(!!tip && /Words kept in its own tree/.test(tip.html || ''), `${label}: a pop-up in a web component made after it was put in the page is found and passed (${tip ? 'passed' : 'not found'})`);
+    check(!!tip && tip.inPage === true, `${label}: a pop-up in a web component made after it was put in the page is found, and shown in the page (${tip ? 'found' : 'not found'})`);
     await dp.close();
   };
   if (/publishSoon/.test(source)) await demandChecks('the page script', source, false);

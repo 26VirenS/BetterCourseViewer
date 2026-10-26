@@ -1033,28 +1033,9 @@ enum AltaHook {
             if (dialogHolder && dialogHolder.isConnected) dialogHolder.removeAttribute('data-simpl-dialog');
             dialogEl = d; dialogHolder = holderOf(d); dialogDirty = Date.now(); dialogSaid = ''; dialogRead = ''; dialogWaiting = 0; dialogReadAt = 0;
           }
-          // (given back to the page: Alta's own there until it closes)
-          if (dialogInPage) return;
-          dialogStyle();
-          if (!dialogHolder.hasAttribute('data-simpl-dialog')) dialogHolder.setAttribute('data-simpl-dialog', '');
-          // (once passed, read again when the page has changed since — a next step — or every two seconds)
-          if (dialogSaid && lastChange < dialogReadAt && Date.now() - dialogReadAt < 2000) return;
-          dialogReadAt = Date.now();
-          var r = unhidden(function () { return readDialog(d); });
-          var sig = JSON.stringify([r.title, r.html, r.buttons, r.live]);
-          if (sig !== dialogRead) { dialogRead = sig; dialogDirty = Date.now(); }
-          if (sig === dialogSaid) { dialogWaiting = 0; return; }
-          if (!dialogWaiting) dialogWaiting = Date.now();
-          var settled = Date.now() - dialogDirty >= 350 && !r.busy && !r.loading && !unhidden(function () { return fading(dialogHolder) || opacityOf(d) < 0.97; });
-          if (!settled && Date.now() - dialogWaiting < 3000) return;
-          dialogSaid = sig;
-          dialogWaiting = 0;
-          var why = r.live ? 'it holds ' + r.live
-            : !(r.words || r.maths || r.pics) ? 'nothing in it could be read'
-            : !settled && (r.busy || r.loading) ? 'it was still loading after three seconds'
-            : r.html.length > 400000 ? 'it is too long' : '';
-          if (why) { giveBack(why); return; }
-          post({ kind: 'dialog', open: true, title: r.title.slice(0, 200), html: r.html, buttons: r.buttons, words: r.words, maths: r.maths, pics: r.pics, ready: settled ? 'settled' : 'after 3 s' });
+          // (1.3.178) every pop-up of Alta's shown in its page as Alta draws it, at once — nothing read into a sheet of
+          // the app's (the owner: "just punch through for them") — Alta's page as it is, in sight, until it closes
+          if (!dialogInPage) giveBack('');
         };
         setInterval(dialogTick, 300);
         window.__simplDialog = {
@@ -2361,7 +2342,10 @@ final class AltaSession: ObservableObject {
                     dialog = nil
                     dialogInPage = true
                 }
-                logShownAsIs("Alta's pop-up\(title.isEmpty ? "" : " “\(title)”") shown in Alta's page: \(head["why"] as? String ?? "")")
+                // (1.3.178: every pop-up is, now; only one given back for a reason — the student's Show in Alta's Page — logged)
+                if let why = head["why"] as? String, !why.isEmpty {
+                    logShownAsIs("Alta's pop-up\(title.isEmpty ? "" : " “\(title)”") shown in Alta's page: \(why)")
+                }
                 return
             }
             let html = head["html"] as? String ?? ""
