@@ -515,7 +515,7 @@
   async function planner({ force = false, refresh = false, days = 21, maxAge = 0 } = {}) {
     const [items, cs] = await Promise.all([rawPlanner(days, { force, refresh, maxAge }), courses({ maxAge }).catch(() => [])]);
     const map = new Map(cs.map((c) => [c.id, c]));
-    return (items || []).map((it) => classify(it, map)).filter((it) => it.date);
+    return (items || []).map((it) => sent(classify(it, map))).filter((it) => it.date);
   }
 
   /** The student's own planner items — tasks added here or in Canvas's planner, and personal
@@ -567,7 +567,7 @@
     // own To Do keeps it (the planner is read from a week back for it)
     const overdueOpen = (it) => it.isDue && it.date < start && !it.submitted && !it.complete && !it.dismissed && !it.excused;
     const seen = new Set(items.map((it) => it.id));
-    const mine = (mineRaw || []).map((it) => classify(it, map)).filter((it) => it.date && it.custom && !seen.has(it.id));
+    const mine = (mineRaw || []).map((it) => sent(classify(it, map))).filter((it) => it.date && it.custom && !seen.has(it.id));
     return [...items.filter((it) => it.type !== 'announcement' && (it.custom || inWindow(it) || overdueOpen(it))), ...mine].sort((a, b) => a.date - b.date);
   }
   /** Items still open on the To Do list: not done, not dismissed, not handed in, not excused. */
@@ -575,26 +575,40 @@
     return (await todoWindow(opts)).filter((it) => !it.complete && !it.dismissed && !it.submitted && !it.excused);
   }
 
+  // (2.99.114) a change on its way to Canvas, item id → the override's fields: a list read meanwhile (a screen
+  // drawn again while a tick is still being sent) wears it, rather than the cached list from before the tick
+  const sending = new Map();
+  function sent(it) {
+    const p = sending.get(it.id);
+    if (!p) return it;
+    return { ...it, ...('marked_complete' in p && { complete: !!p.marked_complete }), ...('dismissed' in p && { dismissed: !!p.dismissed }) };
+  }
   async function override(item, patch) {
     const ov = item.raw.planner_override;
+    const mark = { ...sending.get(item.id), ...patch };
+    sending.set(item.id, mark);
     let result;
-    if (ov?.id) result = await C.put(`/api/v1/planner/overrides/${ov.id}`, patch);
-    else {
-      try {
-        result = await C.post('/api/v1/planner/overrides', { plannable_type: item.type, plannable_id: item.raw.plannable_id, ...patch });
-      } catch (e) {
-        // Canvas keeps one override per item and refuses a second (one written before — undone, or from
-        // another device — the item did not carry): it is looked up and changed instead
-        const list = await plannerOverrides({ force: true }).catch(() => []);
-        const had = (Array.isArray(list) ? list : []).find((o) => o && String(o.plannable_type) === String(item.type) && String(o.plannable_id) === String(item.raw.plannable_id));
-        if (!had?.id) throw e;
-        result = await C.put(`/api/v1/planner/overrides/${had.id}`, patch);
+    try {
+      if (ov?.id) result = await C.put(`/api/v1/planner/overrides/${ov.id}`, patch);
+      else {
+        try {
+          result = await C.post('/api/v1/planner/overrides', { plannable_type: item.type, plannable_id: item.raw.plannable_id, ...patch });
+        } catch (e) {
+          // Canvas keeps one override per item and refuses a second (one written before — undone, or from
+          // another device — the item did not carry): it is looked up and changed instead
+          const list = await plannerOverrides({ force: true }).catch(() => []);
+          const had = (Array.isArray(list) ? list : []).find((o) => o && String(o.plannable_type) === String(item.type) && String(o.plannable_id) === String(item.raw.plannable_id));
+          if (!had?.id) throw e;
+          result = await C.put(`/api/v1/planner/overrides/${had.id}`, patch);
+        }
       }
+      item.raw.planner_override = result && result.id ? result : { ...(ov || {}), ...patch };
+      item.complete = !!item.raw.planner_override.marked_complete;
+      item.dismissed = !!item.raw.planner_override.dismissed;
+      await invalidatePlanner();
+    } finally {
+      if (sending.get(item.id) === mark) sending.delete(item.id); // (a later change to the same item, still on its way, stays)
     }
-    item.raw.planner_override = result && result.id ? result : { ...(ov || {}), ...patch };
-    item.complete = !!item.raw.planner_override.marked_complete;
-    item.dismissed = !!item.raw.planner_override.dismissed;
-    await invalidatePlanner();
     return result;
   }
   const setComplete = (item, complete) => override(item, { marked_complete: complete });
@@ -893,7 +907,7 @@
       ]);
       const map = new Map(cs.map((c) => [c.id, c]));
       return (items || []).map((it) => classify(it, map)).filter((it) => it.date);
-    }, { force, refresh });
+    }, { force, refresh }).then((list) => list.map(sent));
   }
 
   // ---- appointments (Canvas's Scheduler) ------------------------------------------------------

@@ -967,13 +967,15 @@ try {
   const segAt = () => page.evaluate(() => { const w = document.querySelector('.bcv-head .bcv-seg'); const t = w?.querySelector(':scope > .bcv-seg__thumb'); const on = w?.querySelector('.bcv-seg__btn.is-active'); const x = t ? new DOMMatrix(getComputedStyle(t).transform).m41 : null; return { thumb: !!t, last: w?.lastElementChild === t, x: x === null ? null : Math.round(x), w: t ? Math.round(t.getBoundingClientRect().width) : 0, on: on?.dataset.value, onX: on ? on.offsetLeft : null, onW: on ? on.offsetWidth : null, bg: on ? getComputedStyle(on).backgroundColor : '' }; });
   const segList = await segAt();
   await motionAt(page, 1); // (the glide is watched as it happens: real speed)
+  // the highlight's place read every frame from the press on (the slide starts once Cards has redrawn the Dashboard, later under load):
+  // somewhere along the way it is part way, between List and Cards
+  const glide = page.evaluate(() => new Promise((res) => { const xs = []; const t0 = performance.now(); const look = () => { const t = document.querySelector('.bcv-head .bcv-seg > .bcv-seg__thumb'); if (t) xs.push(Math.round(new DOMMatrix(getComputedStyle(t).transform).m41)); if (performance.now() - t0 < 900) requestAnimationFrame(look); else res(xs); }; look(); }));
   await page.click('.bcv-seg__btn[data-value="cards"]');
-  await page.waitForTimeout(90);
-  const segMid = await segAt();
-  await page.waitForTimeout(500);
+  const xs = await glide;
   const segCards = await segAt();
+  const segMid = { x: xs.find((x) => x < segList.x - 2 && x > segCards.x + 2) ?? null, frames: xs.length, seen: [...new Set(xs)].slice(0, 12) };
   await motionAt(page, MOTION_RATE);
-  check(segList.thumb && segList.last && segList.on === 'list' && Math.abs(segList.x - segList.onX) <= 1 && Math.abs(segList.w - segList.onW) <= 1 && segList.bg === 'rgba(0, 0, 0, 0)' && segMid.x < segList.x - 2 && segMid.x > segCards.x + 2 && segCards.on === 'cards' && Math.abs(segCards.x - segCards.onX) <= 1 && Math.abs(segCards.w - segCards.onW) <= 1, `the view switch's highlight slides from List to Cards — under List, part way, then under Cards — though Cards redraws the Dashboard: ${JSON.stringify({ segList, segMid, segCards })}`);
+  check(segList.thumb && segList.last && segList.on === 'list' && Math.abs(segList.x - segList.onX) <= 1 && Math.abs(segList.w - segList.onW) <= 1 && segList.bg === 'rgba(0, 0, 0, 0)' && segMid.x !== null && segCards.on === 'cards' && Math.abs(segCards.x - segCards.onX) <= 1 && Math.abs(segCards.w - segCards.onW) <= 1, `the view switch's highlight slides from List to Cards — under List, part way, then under Cards — though Cards redraws the Dashboard: ${JSON.stringify({ segList, segMid, segCards })}`);
   // cards view
   await page.waitForSelector('.bcv-ccard', { timeout: 5000 });
   await page.waitForFunction(() => document.querySelectorAll('.bcv-ccard .bcv-bar').length >= 5, null, { timeout: 10000 });
@@ -1189,6 +1191,11 @@ try {
   const flips = await page.evaluate(() => window.__unflip());
   const slides = flips.filter((f) => /translate/.test(f.keys)); // (a hover's colour fade on a row is not one of them)
   check(slides.length > 0 && slides.every((f) => f.keys === 'translate' && f.dur === 200 && /^0(px)? \d+(\.\d+)?px$/.test(f.from)), `the rows below slide up into the gap over 200ms, by translate alone, rather than jumping (${slides.length}: ${JSON.stringify(slides.slice(0, 3))})`);
+  // (2.99.114) the tick is held on its way to Canvas for a while, so the quiet redraw below lands while it is still being sent
+  const subTick = Number((await texts('.bcv-cal__todo .bcv-todo-side__sub'))[0].match(/^(\d+) open/)?.[1]);
+  let tickSent = null;
+  const holdTick = async (route) => { tickSent = new Promise((r) => setTimeout(r, 2000)); await tickSent; await route.continue().catch(() => {}); };
+  await page.route('**/api/v1/planner/overrides**', holdTick);
   await todayGroup.locator('.bcv-tdrag .bcv-circle').first().click();
   await page.waitForFunction((n) => document.querySelectorAll('.bcv-cal__todo .bcv-tdrag:not(.is-done)').length === n - 2, todoRows, { timeout: 5000 });
   // a redraw is not an arrival (ui.still): a tick draws the list again in place — no group vanishes and fades back in
@@ -1202,6 +1209,11 @@ try {
   await page.waitForSelector('.bcv-main > .bcv-screen.bcv-screen--still .bcv-todo__add', { timeout: 10000 });
   const quietDraw = await page.evaluate(() => ({ still: !!document.querySelector('.bcv-main > .bcv-screen.bcv-screen--still'), running: document.getAnimations().filter((a) => a.animationName === 'bcv-fade-up' && a.playState === 'running').length, entering: document.querySelectorAll('.bcv-main .bcv-enter').length }));
   check(quietDraw.still && quietDraw.running === 0 && quietDraw.entering === 0, `a quiet re-render lands the screen still — no rise, no stagger (${JSON.stringify(quietDraw)})`);
+  const midTick = await page.evaluate(() => ({ open: document.querySelectorAll('.bcv-cal__todo .bcv-tdrag:not(.is-done)').length, sub: document.querySelector('.bcv-cal__todo .bcv-todo-side__sub')?.textContent }));
+  check(!!tickSent && midTick.open === todoRows - 2 && midTick.sub === `${subTick - 1} open · drag onto the calendar to plan`, `drawn again while the tick is still on its way to Canvas, the ticked row stays done and the count without it (${subTick} → ${JSON.stringify(midTick)})`);
+  await tickSent;
+  await page.unroute('**/api/v1/planner/overrides**', holdTick);
+  await page.waitForTimeout(300); // (the held tick answered and the lists read afresh)
   } // to do
   if (on('to do: own tasks + priority')) {
   // ---- mockup 12: a task of your own (a Canvas planner note), priority on every row, By priority ----
