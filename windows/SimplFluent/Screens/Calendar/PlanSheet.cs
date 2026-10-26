@@ -37,10 +37,11 @@ internal static class PlanSheet
         var s = new Sheet { Title = "Plan", Body = K.V(12, holder, problem), Width = 420, Floats = true, Light = true, Name = "Plan" };
         var url = CalendarKit.Text(d.Url);
         var open = s.Add("Open", SheetButtonKind.Secondary, () => { if (url != null) engine.OpenWeb(url, d.Title); });
-        var delete = s.Add("Delete plan", SheetButtonKind.Secondary, () => _ = Delete(), closes: false);
-        var cancel = s.Add("Cancel", SheetButtonKind.Secondary, () => View(), closes: false);
-        var edit = s.Add("Edit", SheetButtonKind.Primary, () => Edit(), closes: false);
-        var done = s.Add("Done", SheetButtonKind.Primary, () => _ = Save(), closes: false);
+        // (what these do is set below, once everything it uses is made)
+        var delete = s.Add("Delete plan", SheetButtonKind.Secondary, closes: false);
+        var cancel = s.Add("Cancel", SheetButtonKind.Secondary, closes: false);
+        var edit = s.Add("Edit", SheetButtonKind.Primary, closes: false);
+        var done = s.Add("Done", SheetButtonKind.Primary, closes: false);
 
         // the settings as Edit changes them
         var day = DateTime.Today;
@@ -283,6 +284,10 @@ internal static class PlanSheet
             changed();
         }
 
+        delete.Click = () => _ = Delete();
+        cancel.Click = View;
+        edit.Click = Edit;
+        done.Click = () => _ = Save();
         if (editing) Edit(); else View();
         Dialogs.Show(s, over);
     }
