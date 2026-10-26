@@ -2027,8 +2027,8 @@ jobs:
           #     installer just made, played as the next version): found and downloaded at once, and checked; held while
           #     Simpl opens and while a quiz is open -- its window closed to the notification area meanwhile, as its close
           #     button does; the quiz closed, it notes where it was, quits, and the installer puts the version in place and
-          #     opens Simpl again. Opened again on that profile, Simpl comes back where it was: the Grades, out of sight in
-          #     the notification area as it was left, its engine running all the same
+          #     opens Simpl again. Opened again on that profile, Simpl comes back where it was, the Grades -- (0.3.79) in
+          #     front, its window shown, though it was left in the notification area: an update is seen to have gone in
           $prof3 = Join-Path $env:RUNNER_TEMP 'profile-update'
           $simplLogs['profile-update'] = $prof3
           $ulog = Join-Path $prof3 'simpl.log'
@@ -2072,11 +2072,11 @@ jobs:
           Stop-Process -Id $back.Id -Force -ErrorAction SilentlyContinue
           Start-Sleep -Seconds 2
           if (Test-Path $ulog) { Write-Host "--- opened again"; Get-Content $ulog | Select-Object -Skip $from | Select-String -Pattern 'update|perf: start|phase' | ForEach-Object { $_.Line } }
-          foreach ($s in @('update: back after updating to v\d+', 'update: opened again in the notification area', 'update: opened again at grades', 'perf: start .*engine ready \d')) {
+          foreach ($s in @('update: back after updating to v\d+', 'update: opened again in front', 'update: opened again at grades', 'perf: start .*engine ready \d')) {
             if (-not (Says $ulog $from $s)) { Fail "Simpl, opened again after the update, never logged '$s'" }
           }
-          if ($shown -ne '0') { Fail "Simpl, opened again after the update, showed a window ($shown), though it was left in the notification area" }
-          Write-Host "opened again after the update: at the Grades, in the notification area as it was left, its engine running"
+          if ($shown -eq '0' -or $shown -like 'none*') { Fail "Simpl, opened again after the update, showed no window ($shown): it opens in front" }
+          Write-Host "opened again after the update: at the Grades, in front (it was left in the notification area), its engine running"
 
           # 3. an update over a Simpl left open, exactly as Restart to Update runs it: Setup asks Simpl to quit (the quit
           #    event), Simpl takes it and goes, Setup sees it gone, puts the new version in place, and /LAUNCH opens it again
