@@ -1019,53 +1019,20 @@ internal static class AltaHook
                 }
                 return;
               }
-              var holder = holderOf(d);
               if (d !== dialogEl) {
-                // (a pop-up seen: out of sight at once — the app shows it as its own once it has settled, or gives it back —
-                // and the app told one is coming)
-                dialogEl = d; dialogSeen = dialogDirty = Date.now(); dialogSaid = dialogRead = ''; dialogWaiting = 0; dialogInPage = false; dialogGen++;
-                dialogStyle();
-                document.documentElement.setAttribute('data-simpl-native-dialog', '');
-                post({ kind: 'dialog', open: true, pending: true });
-              }
-              if (!holder.hasAttribute('data-simpl-dialog')) holder.setAttribute('data-simpl-dialog', '');
-              var r;
-              try { r = unhidden(function () { return readDialog(d); }); }
-              catch (e) {
-                // (never a pop-up of Alta's left out of sight: one the page script cannot read is given back to the page,
-                // the app told why)
+                // (0.3.71) a pop-up seen: shown in the page as Alta draws it, at once — every one of them (the owner: "just
+                // punch through for them"), none read into a dialog of the app's as 0.3.5–0.3.70 did — the page in sight
+                // under it until it closes; the app told it is open (by its title, for its logs) and when it closes
+                dialogEl = d; dialogSeen = dialogDirty = Date.now(); dialogSaid = dialogRead = ''; dialogWaiting = 0; dialogGen++;
                 if (!dialogInPage) {
                   dialogInPage = true;
-                  dialogGen++;
                   document.documentElement.removeAttribute('data-simpl-native-dialog');
-                  post({ kind: 'dialog', open: true, title: '', html: '', words: 0, maths: 0, pics: 0, missed: 0, buttons: [], ready: 'failed',
-                    live: 'what the page script could not read (' + String((e && e.message) || e).slice(0, 160) + ')' });
+                  reveal('dialog');
+                  var title = '';
+                  try { title = unhidden(function () { return titleOf(d).text; }); } catch (e) {}
+                  post({ kind: 'dialog', open: true, inPage: true, title: String(title || '').slice(0, 200) });
                 }
-                return;
               }
-              var sig = JSON.stringify([r.title, r.html, r.buttons, r.live]);
-              if (sig !== dialogRead) { dialogRead = sig; dialogDirty = Date.now(); }
-              // (given back to the page: Alta's own there, as Alta draws it, until it closes)
-              if (dialogInPage || sig === dialogSaid) { dialogWaiting = 0; return; }
-              if (!dialogWaiting) dialogWaiting = Date.now();
-              var empty = !r.words && !r.maths && !dialogPics.length;
-              var settled = Date.now() - dialogDirty >= 350 && !r.busy && !r.loading && !empty && !unhidden(function () { return fading(holder) || opacityOf(d) < 0.97; });
-              if (!settled && !r.live && Date.now() - dialogWaiting < (empty ? 5000 : 3000)) return;
-              dialogSaid = sig;
-              dialogWaiting = 0;
-              var gen = ++dialogGen, took = Date.now(), pics = dialogPics.slice();
-              Promise.all(pics.map(pictureOf)).then(function (made) {
-                if (gen !== dialogGen || d !== dialogEl) return;
-                var missed = 0;
-                var html = r.html.replace(/<img data-simpl-pic="(\d+)"([^>]*)>/g, function (all, i, rest) {
-                  if (made[+i]) return '<img src="' + esc(made[+i]) + '"' + rest + '>';
-                  missed++;
-                  var alt = /\salt="([^"]*)"/.exec(rest);
-                  return alt ? '<span>' + alt[1] + '</span>' : '';
-                });
-                post({ kind: 'dialog', open: true, title: r.title.slice(0, 200), html: html, words: r.words, maths: r.maths, pics: pics.length - missed, missed: missed,
-                  live: r.live, ready: settled ? 'settled' : 'after ' + (Math.round((took - dialogSeen) / 100) / 10) + ' s', buttons: r.buttons });
-              });
             };
             setInterval(dialogTick, 300);
             window.__simplDialog = {

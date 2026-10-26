@@ -737,6 +737,16 @@ internal sealed class AltaSession
                 // (0.3.5) one seen, out of sight in the page until it has settled: a picture waits for it — never while
                 // the browser is shown, where Alta's pop-ups are its own (one said just before it was asked for)
                 if (Browser) return;
+                // (0.3.71) every pop-up of Alta's shown in its page as Alta draws it (AltaHook's dialogTick gives each one
+                // straight back): the page in sight under it until it closes, nothing of it the app's
+                if (Bool(head["inPage"]) == true)
+                {
+                    HoldForDialog(false);
+                    if (Dialog != null || !DialogInPage) { Dialog = null; DialogInPage = true; DialogVersion++; }
+                    if (Shot.Asked) Log.Write($"alta: a pop-up shown in Alta's page: \"{Str(head["title"]) ?? ""}\"");
+                    Notify();
+                    return;
+                }
                 if (Bool(head["pending"]) == true) { HoldForDialog(true); return; }
                 HoldForDialog(false);
                 var d = new AltaDialog
