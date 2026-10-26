@@ -72,25 +72,31 @@ public sealed class AppearanceOverlay : Grid
     private readonly GeometryGroup holes = new() { FillRule = FillRule.Nonzero };
     private readonly Canvas badges = new();
     private readonly Dictionary<string, Button> badgeOf = new();
+    // (0.3.68) the whole of each lit place a press to upload a photo there (or a photo dropped on it), under its button
+    private readonly Canvas catches = new();
+    private readonly Dictionary<string, Border> catchOf = new();
     private readonly Border bar = new();
     private readonly ContentControl barBody = new();
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(200) };
     private string tab = Launch.Get("appearance-tab") is "courses" or "community" ? Launch.Get("appearance-tab")! : "theme";
 
     // (0.3.61) the photo in its place: the place edited, its outline (taking the drag and the wheel), its tip and its settings
+    // (0.3.68: round it — Reset, Replace… and Remove down its left, the zoom up its right, Ink and Done under it)
     private string? editing;
     private Rect? editAt;
     private readonly Canvas editLayer = new() { Visibility = Visibility.Collapsed };
     private readonly Border halo = new() { IsHitTestVisible = false, BorderThickness = new Thickness(6) };
     private readonly Border ring = new() { Background = Brushes.Transparent, BorderThickness = new Thickness(2), Cursor = Cursors.SizeAll, Focusable = true };
     private readonly Border tip = new() { IsHitTestVisible = false, CornerRadius = new CornerRadius(13), Padding = new Thickness(11, 4, 12, 5) };
-    private readonly Border editBar = new() { CornerRadius = new CornerRadius(12), BorderThickness = new Thickness(1), Padding = new Thickness(14, 10, 14, 10) };
+    private readonly Border editActs = new() { CornerRadius = new CornerRadius(14), BorderThickness = new Thickness(1), Padding = new Thickness(5) };
+    private readonly Border editZoom = new() { CornerRadius = new CornerRadius(14), BorderThickness = new Thickness(1), Padding = new Thickness(5) };
+    private readonly Border editFoot = new() { CornerRadius = new CornerRadius(14), BorderThickness = new Thickness(1), Padding = new Thickness(6) };
     private (double X, double Y) pan;
     private double zoom = 1;
     private Point? dragFrom;
     private (double X, double Y) panFrom;
     private Slider? zoomSlider;
-    private Wpf.Ui.Controls.Button? resetButton;
+    private Button? resetButton;
     /// <summary>What the settings were drawn for (the place, a photo of one's own, its Ink off): drawn again only when that
     /// changes — else only the zoom and Reset follow, the slider kept under the pointer that holds it.</summary>
     private (string Slot, bool Own, bool Plain)? paintedFor;
@@ -112,6 +118,7 @@ public sealed class AppearanceOverlay : Grid
         var layer = new Canvas();
         layer.Children.Add(veil);
         Children.Add(layer);
+        Children.Add(catches);
         Children.Add(badges);
         Children.Add(editLayer);
         BuildEditor();
@@ -185,6 +192,8 @@ public sealed class AppearanceOverlay : Grid
         Visibility = Visibility.Collapsed;
         badges.Children.Clear();
         badgeOf.Clear();
+        catches.Children.Clear();
+        catchOf.Clear();
         foreach (var p in FloatPopup.Over(window)) p.Show();
         Log.Write("appearance: off");
     }
@@ -226,11 +235,19 @@ public sealed class AppearanceOverlay : Grid
             }
             Canvas.SetLeft(b, at.X + at.Width / 2 - 21);
             Canvas.SetTop(b, at.Y + at.Height / 2 - 21);
+            if (!catchOf.TryGetValue(slot, out var hit))
+            {
+                hit = Catch(slot);
+                catchOf[slot] = hit;
+                catches.Children.Add(hit);
+            }
+            PutAt(hit, at);
         }
         foreach (var gone in badgeOf.Keys.Where(k => !seen.Contains(k)).ToList())
         {
             badges.Children.Remove(badgeOf[gone]);
             badgeOf.Remove(gone);
+            if (catchOf.Remove(gone, out var hit)) catches.Children.Remove(hit);
         }
     }
 
@@ -246,6 +263,54 @@ public sealed class AppearanceOverlay : Grid
         System.Windows.Automation.AutomationProperties.SetName(b, b.ToolTip.ToString()!);
         b.Click += (_, e) => { e.Handled = true; PhotoMenu(slot, b); };
         return b;
+    }
+
+    /// <summary>(0.3.68, as the web's 2.99.117) A lit place's catch: a press anywhere on it uploads a photo there — a photo
+    /// dropped on it too — which then opens in its place; the pointer over it says so, under the photo button in its
+    /// middle (which keeps the drawings, Ink, Move and zoom… and Remove).</summary>
+    private Border Catch(string slot)
+    {
+        var words = K.Text("Click to upload a photo", Ty.Caption);
+        words.Foreground = Brushes.White;
+        words.FontWeight = FontWeights.SemiBold;
+        var cap = new Border
+        {
+            CornerRadius = new CornerRadius(11), Padding = new Thickness(10, 4, 10, 5), Background = K.Brush(Color.FromArgb(220, 28, 28, 28)),
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false,
+            Opacity = 0, Child = words, RenderTransform = new TranslateTransform(0, 50),
+        };
+        var c = new Border
+        {
+            Background = Brushes.Transparent, BorderBrush = Brushes.Transparent, BorderThickness = new Thickness(2),
+            CornerRadius = new CornerRadius(slot == "side" ? 0 : 8), Cursor = Cursors.Hand, AllowDrop = true, Child = cap,
+        };
+        void Lit(bool on, bool drop = false)
+        {
+            if (on) c.SetResourceReference(Border.BorderBrushProperty, B.Accent); else c.BorderBrush = Brushes.Transparent;
+            c.BorderThickness = new Thickness(drop ? 3 : 2);
+            c.Background = on ? K.Brush(Color.FromArgb(drop ? (byte)30 : (byte)16, 255, 255, 255)) : Brushes.Transparent;
+            cap.BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(on && !drop ? 1 : 0, TimeSpan.FromMilliseconds(150)));
+        }
+        c.MouseEnter += (_, _) => Lit(true);
+        c.MouseLeave += (_, _) => Lit(false);
+        c.MouseLeftButtonDown += (_, e) => e.Handled = true;
+        c.MouseLeftButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            Lit(false);
+            Choose(slot);
+        };
+        c.DragEnter += (_, e) => { var file = e.Data.GetDataPresent(DataFormats.FileDrop); e.Effects = file ? DragDropEffects.Copy : DragDropEffects.None; if (file) Lit(true, drop: true); e.Handled = true; };
+        c.DragOver += (_, e) => { e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None; e.Handled = true; };
+        c.DragLeave += (_, _) => Lit(false);
+        c.Drop += (_, e) =>
+        {
+            e.Handled = true;
+            Lit(false);
+            if (e.Data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } files) Take(slot, files[0]);
+        };
+        System.Windows.Automation.AutomationProperties.SetName(c, slot == "side" ? "Upload a navigation pane photo" : "Upload a card photo");
+        return c;
     }
 
     private void PhotoMenu(string slot, FrameworkElement at)
@@ -288,8 +353,14 @@ public sealed class AppearanceOverlay : Grid
     {
         var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "Pictures|*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.heic;*.webp|All files|*.*" };
         if (dlg.ShowDialog(window) != true) return;
+        Take(slot, dlg.FileName);
+    }
+
+    /// <summary>A picture file put in a place (chosen, or dropped on it), opened where it went to be placed.</summary>
+    private void Take(string slot, string file)
+    {
         Scenes.Forget();
-        if (!Appearance.SetPhoto(slot, dlg.FileName)) { Log.Write("appearance: the picture could not be read"); return; }
+        if (!Appearance.SetPhoto(slot, file)) { Log.Write("appearance: the picture could not be read"); return; }
         // (0.3.61) and it opens where it went, to be placed
         Edit(slot);
     }
@@ -308,13 +379,18 @@ public sealed class AppearanceOverlay : Grid
         words.Foreground = Brushes.White;
         words.FontWeight = FontWeights.SemiBold;
         tip.Child = K.H(6, K.Icon(SymbolRegular.ArrowMove24, 14, Colors.White), words);
-        editBar.SetResourceReference(Border.BackgroundProperty, B.Flyout);
-        editBar.SetResourceReference(Border.BorderBrushProperty, B.FlyoutStroke);
-        editBar.Effect = K.Shadow(32, 10, 0.3);
+        foreach (var pill in new[] { editActs, editZoom, editFoot })
+        {
+            pill.SetResourceReference(Border.BackgroundProperty, B.Flyout);
+            pill.SetResourceReference(Border.BorderBrushProperty, B.FlyoutStroke);
+            pill.Effect = K.Shadow(24, 8, 0.28);
+        }
         editLayer.Children.Add(halo);
         editLayer.Children.Add(ring);
         editLayer.Children.Add(tip);
-        editLayer.Children.Add(editBar);
+        editLayer.Children.Add(editActs);
+        editLayer.Children.Add(editZoom);
+        editLayer.Children.Add(editFoot);
 
         // the photo follows the pointer, a share of the place for each step of it (Scenes.Preview), kept as it is let go
         ring.MouseLeftButtonDown += (_, e) =>
@@ -368,13 +444,16 @@ public sealed class AppearanceOverlay : Grid
         zoom = Appearance.Zoom(slot);
         PaintEdit();
         badges.Visibility = Visibility.Collapsed;
+        catches.Visibility = Visibility.Collapsed;
         bar.Visibility = Visibility.Hidden; // (the bar at the foot steps aside)
         editLayer.Visibility = Visibility.Visible;
         UpdateLayout();
         Tick(force: true);
         if (fresh)
         {
-            Motion.Pop(editBar);
+            Motion.Pop(editActs);
+            Motion.Pop(editZoom);
+            Motion.Pop(editFoot);
             Motion.FadeIn(tip, Motion.Medium);
             Motion.FadeIn(ring, Motion.Fast);
         }
@@ -393,6 +472,7 @@ public sealed class AppearanceOverlay : Grid
         paintedFor = null;
         editLayer.Visibility = Visibility.Collapsed;
         badges.Visibility = Visibility.Visible;
+        catches.Visibility = Visibility.Visible;
         bar.Visibility = Visibility.Visible;
         if (quiet) return;
         Motion.Pop(bar);
@@ -425,6 +505,8 @@ public sealed class AppearanceOverlay : Grid
     {
         if (zoomSlider != null && Math.Abs(zoomSlider.Value - zoom) > 0.0005) { syncing = true; zoomSlider.Value = zoom; syncing = false; }
         if (resetButton != null) resetButton.IsEnabled = Math.Abs(pan.X) > 0.0005 || Math.Abs(pan.Y) > 0.0005 || Math.Abs(zoom - 1) > 0.0005;
+        if (zoomIn != null) zoomIn.IsEnabled = zoom < 3 - 0.001;
+        if (zoomOut != null) zoomOut.IsEnabled = zoom > 0.5 + 0.001;
     }
 
     private static (string, bool, bool) Painted(string slot) =>
@@ -465,69 +547,75 @@ public sealed class AppearanceOverlay : Grid
         rest.Start();
     }
 
-    /// <summary>The settings: the place's name and what it wears, the zoom, Ink (a photo of one's own), Reset, Replace…,
-    /// Remove and Done — in a row under a card, in a column beside the pane.</summary>
+    /// <summary>(0.3.68, as the web's 2.99.117) The settings round the place: Reset, Replace… and Remove down its left; the
+    /// zoom standing up its right (+, the slider, −); Ink (a photo of one's own) and Done under it.</summary>
     private void PaintEdit()
     {
         if (editing is not { } slot) return;
-        var side = slot == "side";
         paintedFor = Painted(slot);
         var own = paintedFor.Value.Own;
-        var name = side ? "Navigation pane" : Appearance.Slots.FirstOrDefault(s => s.Key == slot).Name ?? slot;
-        var title = K.V(1, K.Text(name, Ty.BodyStrong),
-            K.Text(own ? (Appearance.Plain(slot) ? "Your photo, as it is" : "Your photo, inked") : "A drawing", Ty.Caption, B.Text2));
-        title.VerticalAlignment = VerticalAlignment.Center;
+        var name = slot == "side" ? "Navigation pane" : Appearance.Slots.FirstOrDefault(s => s.Key == slot).Name ?? slot;
 
-        var slider = new Slider { Minimum = 0.5, Maximum = 3, Value = zoom, Width = side ? 150 : 110, VerticalAlignment = VerticalAlignment.Center, SmallChange = 0.05, LargeChange = 0.25 };
-        System.Windows.Automation.AutomationProperties.SetName(slider, "Zoom");
-        slider.ValueChanged += (_, e) => { if (!syncing) ZoomTo(e.NewValue); };
-        zoomSlider = slider;
-        Button Glyph(SymbolRegular icon, string what, Action act)
+        Button Row(SymbolRegular icon, string text, Action act, bool danger = false)
         {
-            var b = K.Subtle(K.Icon(icon, 16), act, new Thickness(6), 4);
-            b.ToolTip = what;
-            System.Windows.Automation.AutomationProperties.SetName(b, what);
+            var label = K.Text(text, Ty.BodyStrong, danger ? B.Critical : B.Text);
+            var b = K.Subtle(K.H(8, K.Icon(icon, 16, danger ? B.Critical : B.Text), label), act, new Thickness(10, 6, 12, 6), 8);
+            b.HorizontalContentAlignment = HorizontalAlignment.Left;
+            b.HorizontalAlignment = HorizontalAlignment.Stretch;
             return b;
         }
-        var zoomRow = K.H(4, Glyph(SymbolRegular.ZoomOut24, "Zoom out", () => ZoomTo(zoom / 1.15)), slider, Glyph(SymbolRegular.ZoomIn24, "Zoom in", () => ZoomTo(zoom * 1.15)));
-        zoomRow.VerticalAlignment = VerticalAlignment.Center;
-
-        FrameworkElement? ink = null;
-        if (own)
-        {
-            var toggle = new ToggleSwitch { Content = "Ink", IsChecked = !Appearance.Plain(slot), VerticalAlignment = VerticalAlignment.Center };
-            toggle.ToolTip = "On: the photo drawn in two tones of the page. Off: the photo as it is, the words on it bordered in white.";
-            toggle.Click += (_, _) => { Keep(); Appearance.SetPlain(slot, toggle.IsChecked != true); };
-            ink = toggle;
-        }
-
-        var reset = K.Button("Reset", () => { rest.Stop(); Appearance.ResetPicture(slot); });
+        var reset = Row(SymbolRegular.ArrowCounterclockwise24, "Reset", () => { rest.Stop(); Appearance.ResetPicture(slot); });
         reset.ToolTip = "Put the photo back where it started";
         resetButton = reset;
-        var replace = K.Button("Replace…", () => { Keep(); Choose(slot); });
-        var remove = K.Button("Remove", () =>
+        var replace = Row(SymbolRegular.ImageMultiple24, "Replace…", () => { Keep(); Choose(slot); });
+        var remove = Row(SymbolRegular.Delete24, "Remove", () =>
         {
             EndEdit();
             Appearance.RemovePhoto(slot);
             Appearance.SetKind(slot, "none");
             Scenes.Forget();
-        });
-        var acts = K.H(8, reset, replace, remove);
-        acts.VerticalAlignment = VerticalAlignment.Center;
+        }, danger: true);
+        editActs.Child = K.V(2, reset, replace, remove);
+        System.Windows.Automation.AutomationProperties.SetName(editActs, $"{name} photo");
+
+        var slider = new Slider
+        {
+            Orientation = Orientation.Vertical, Minimum = 0.5, Maximum = 3, Value = zoom, Height = TrackLength(),
+            HorizontalAlignment = HorizontalAlignment.Center, SmallChange = 0.05, LargeChange = 0.25,
+        };
+        System.Windows.Automation.AutomationProperties.SetName(slider, "Zoom");
+        slider.ValueChanged += (_, e) => { if (!syncing) ZoomTo(e.NewValue); };
+        zoomSlider = slider;
+        Button Round(SymbolRegular icon, string what, Action act)
+        {
+            var b = K.Subtle(K.Icon(icon, 14), act, new Thickness(7), 14);
+            b.ToolTip = what;
+            b.HorizontalAlignment = HorizontalAlignment.Center;
+            System.Windows.Automation.AutomationProperties.SetName(b, what);
+            return b;
+        }
+        zoomIn = Round(SymbolRegular.Add24, "Zoom in", () => ZoomTo(zoom * 1.15));
+        zoomOut = Round(SymbolRegular.Subtract24, "Zoom out", () => ZoomTo(zoom / 1.15));
+        editZoom.Child = K.V(6, zoomIn, slider, zoomOut);
+
+        FrameworkElement? ink = null;
+        if (own)
+        {
+            var toggle = new ToggleSwitch { Content = "Ink", IsChecked = !Appearance.Plain(slot), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
+            toggle.ToolTip = "On: the photo drawn in two tones of the page. Off: the photo as it is, the words on it bordered in white.";
+            toggle.Click += (_, _) => { Keep(); Appearance.SetPlain(slot, toggle.IsChecked != true); };
+            ink = toggle;
+        }
         var done = K.Button("Done", () => EndEdit(), accent: true);
         done.VerticalAlignment = VerticalAlignment.Center;
-
-        FrameworkElement Rule() => side
-            ? new Border { Height = 1, Margin = new Thickness(0, 2, 0, 2) }.Bg(B.Divider)
-            : new Border { Width = 1, Height = 24, VerticalAlignment = VerticalAlignment.Center }.Bg(B.Divider);
-        if (side)
-        {
-            done.HorizontalAlignment = HorizontalAlignment.Right;
-            editBar.Child = K.V(10, title, Rule(), zoomRow, ink == null ? null : Rule(), ink, Rule(), acts, done);
-        }
-        else editBar.Child = K.H(12, title, Rule(), zoomRow, ink == null ? null : Rule(), ink, Rule(), acts, done);
+        editFoot.Child = K.H(14, ink, done);
         SyncEdit();
     }
+
+    private Button? zoomIn, zoomOut;
+
+    /// <summary>The zoom's slider as long as the place's height allows (its buttons and its pill take the rest).</summary>
+    private double TrackLength() => Math.Round(Math.Clamp((editAt?.Height ?? 200) - 96, 56, 120));
 
     /// <summary>The edited place found again (it moves with the window and is built again with the look): only it lit,
     /// its outline on it and its settings and tip round it, kept inside the window.</summary>
@@ -549,28 +637,47 @@ public sealed class AppearanceOverlay : Grid
         halo.CornerRadius = new CornerRadius(side ? 0 : 8 + o + 4);
         halo.Visibility = side ? Visibility.Collapsed : Visibility.Visible;
 
-        editBar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        tip.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        double W = ActualWidth, H = ActualHeight, m = 12, g = 12;
-        double bw = editBar.DesiredSize.Width, bh = editBar.DesiredSize.Height, tw = tip.DesiredSize.Width, th = tip.DesiredSize.Height;
+        // (0.3.68) its settings round it, each where there is room — kept inside the window
+        if (zoomSlider != null && Math.Abs(zoomSlider.Height - TrackLength()) > 0.5) zoomSlider.Height = TrackLength();
+        var inf = new Size(double.PositiveInfinity, double.PositiveInfinity);
+        foreach (var e in new FrameworkElement[] { editActs, editZoom, editFoot, tip }) e.Measure(inf);
+        double W = ActualWidth, H = ActualHeight, m = 12, g = 12, sp = 8;
+        double aw = editActs.DesiredSize.Width, ah = editActs.DesiredSize.Height, zw = editZoom.DesiredSize.Width, zh = editZoom.DesiredSize.Height;
+        double fw = editFoot.DesiredSize.Width, fh = editFoot.DesiredSize.Height, tw = tip.DesiredSize.Width, th = tip.DesiredSize.Height;
         double X(double x, double w) => Math.Min(Math.Max(x, m), Math.Max(m, W - w - m));
         double Y(double y, double h) => Math.Min(Math.Max(y, m), Math.Max(m, H - h - m));
-        if (side)
-        {
-            var bx = X(r.Right + 16, bw);
-            var by = Y(r.Top + r.Height / 2 - bh / 2, bh);
-            Canvas.SetLeft(editBar, bx);
-            Canvas.SetTop(editBar, by);
-            Canvas.SetLeft(tip, X(bx, tw));
-            Canvas.SetTop(tip, Y(by - 8 - th, th));
-            return;
-        }
-        // (under the card, centred on it — over it where there is no room under; the tip on its other side)
-        var below = r.Bottom + g + bh + m <= H || r.Top - g - bh < m;
-        Canvas.SetLeft(editBar, X(r.Left + r.Width / 2 - bw / 2, bw));
-        Canvas.SetTop(editBar, Y(below ? r.Bottom + g : r.Top - g - bh, bh));
+        double left = r.Left - o, right = r.Right + o, top = r.Top - o, bottom = r.Bottom + o;
+        double roomL = left - g - m, roomR = W - right - g - m, ax, zx;
+        // (Reset, Replace… and Remove to its left, the zoom to its right; a side with no room gives its own to the other,
+        // further out; with room on neither, each sits inside the place's edge)
+        if (roomL >= aw && roomR >= zw) { ax = left - g - aw; zx = right + g; }
+        else if (roomR >= zw + sp + aw) { zx = right + g; ax = zx + zw + sp; }
+        else if (roomL >= aw + sp + zw) { ax = left - g - aw; zx = ax - sp - zw; }
+        else { ax = r.Left + g; zx = r.Right - g - zw; }
+        var acts = new Rect(X(ax, aw), Y(r.Top + r.Height / 2 - ah / 2, ah), aw, ah);
+        var zoomAt = new Rect(X(zx, zw), Y(r.Top + r.Height / 2 - zh / 2, zh), zw, zh);
+        Canvas.SetLeft(editActs, acts.X);
+        Canvas.SetTop(editActs, acts.Y);
+        Canvas.SetLeft(editZoom, zoomAt.X);
+        Canvas.SetTop(editZoom, zoomAt.Y);
+        // (the tip over it, else inside its top)
+        var tipOut = top - g - th >= m;
         Canvas.SetLeft(tip, X(r.Left + r.Width / 2 - tw / 2, tw));
-        Canvas.SetTop(tip, Y(below ? r.Top - g - th : r.Bottom + g, th));
+        Canvas.SetTop(tip, Y(tipOut ? top - g - th : r.Top + g, th));
+        // (Ink and Done under it; else beside its foot, past what stands there, else inside it)
+        double fx = r.Left + r.Width / 2 - fw / 2, fy = bottom + g;
+        if (fy + fh > H - m)
+        {
+            fy = Y(r.Bottom - fh, fh);
+            var row = new[] { acts, zoomAt }.Where(b => b.Top < fy + fh && b.Bottom > fy).ToList();
+            var pastRight = row.Where(b => b.Right > right).Select(b => b.Right + sp).DefaultIfEmpty(right + g).Max();
+            var beforeLeft = row.Where(b => b.Left < left).Select(b => b.Left - sp - fw).DefaultIfEmpty(left - g - fw).Min();
+            if (pastRight + fw <= W - m) fx = pastRight;
+            else if (beforeLeft >= m) fx = beforeLeft;
+            else fy = r.Bottom - g - fh;
+        }
+        Canvas.SetLeft(editFoot, X(fx, fw));
+        Canvas.SetTop(editFoot, Y(fy, fh));
     }
 
     private static void PutAt(FrameworkElement e, Rect r)
