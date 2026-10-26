@@ -75,7 +75,7 @@ public sealed class AppearanceOverlay : Grid
     private readonly Border bar = new();
     private readonly ContentControl barBody = new();
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(200) };
-    private string tab = Launch.Get("appearance-tab") == "courses" ? "courses" : "theme";
+    private string tab = Launch.Get("appearance-tab") is "courses" or "community" ? Launch.Get("appearance-tab")! : "theme";
 
     // (0.3.61) the photo in its place: the place edited, its outline (taking the drag and the wheel), its tip and its settings
     private string? editing;
@@ -149,6 +149,7 @@ public sealed class AppearanceOverlay : Grid
             Tick(force: true);
         });
         engine.PropertyChanged += (_, e) => { if (On && e.PropertyName == nameof(Engine.Engine.Courses) && tab == "courses") Dispatcher.BeginInvoke(Build); };
+        Community.Changed += () => Dispatcher.BeginInvoke(() => { if (On && tab == "community") Build(); });
     }
 
     private static Brush Dim() => K.Brush(Color.FromArgb(Appearance.Dark ? (byte)150 : (byte)110, 0, 0, 0));
@@ -586,14 +587,15 @@ public sealed class AppearanceOverlay : Grid
     {
         var themeTab = Segment("Theme", tab == "theme", () => { tab = "theme"; Build(); });
         var coursesTab = Segment("Courses", tab == "courses", () => { tab = "courses"; Build(); });
-        var tabs = new Border { CornerRadius = new CornerRadius(6), Padding = new Thickness(2), Child = K.H(2, themeTab, coursesTab) }.Bg(B.Control2);
+        var communityTab = Segment("Community", tab == "community", () => { tab = "community"; Build(); });
+        var tabs = new Border { CornerRadius = new CornerRadius(6), Padding = new Thickness(2), Child = K.H(2, themeTab, coursesTab, communityTab) }.Bg(B.Control2);
         var look = new ComboBox { MinWidth = 150, ItemsSource = new[] { "Light", "Dark", "Use system setting" } };
         look.SelectedIndex = Appearance.Look switch { "light" => 0, "dark" => 1, _ => 2 };
         look.SelectionChanged += (_, _) => Appearance.Look = look.SelectedIndex switch { 0 => "light", 1 => "dark", _ => "system" };
         look.ToolTip = "Light, dark, or the mode Windows uses for apps";
         var done = K.Button("Done", End, accent: true);
         var head = K.Columns("auto, *, auto, 12, auto", tabs.Col(0), look.Col(2), done.Col(4));
-        var body = tab == "theme" ? ThemeRow() : CoursesRow();
+        var body = tab switch { "courses" => CoursesRow(), "community" => CommunityRow(), _ => ThemeRow() };
         var holder = new Border { MinHeight = 64, Child = body, Margin = new Thickness(0, 12, 0, 0) };
         barBody.Content = K.V(0, head, holder);
     }
@@ -672,6 +674,83 @@ public sealed class AppearanceOverlay : Grid
         }
         row.VerticalAlignment = VerticalAlignment.Center;
         return new ScrollViewer { Content = row, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled };
+    }
+
+    /// <summary>(0.3.67, the Mac's 1.3.173) Simpl Community: the themes students shared, side by side, each worn with a
+    /// click (the one worn ringed, the one being put on with a ring turning on it); while the gallery is read, a ring and
+    /// a line; when it cannot be, why, and Try again; with none shared yet, where to share one.</summary>
+    private FrameworkElement CommunityRow()
+    {
+        _ = Community.Load();
+        static Stack Line(params UIElement[] parts)
+        {
+            var l = K.H(10, parts);
+            l.VerticalAlignment = VerticalAlignment.Center;
+            return l;
+        }
+        if (Community.State is Community.Phase.Idle or Community.Phase.Loading)
+            return Line(K.Spinner(18), K.Text("Reading Simpl Community…", Ty.Body, B.Text2));
+        if (Community.State == Community.Phase.Failed)
+            return Line(K.Wrapped(Community.Why ?? "Simpl Community could not be reached.", Ty.Body, B.Text2, 2).Align(HorizontalAlignment.Left, VerticalAlignment.Center),
+                K.Button("Try again", () => _ = Community.Load(force: true)));
+        if (Community.Themes.Count == 0)
+            return Line(K.Text("No themes shared yet.", Ty.Body, B.Text2), K.Link("Simpl Community", () => engine.OpenBrowser(new Uri(Community.Site, "community"))));
+        var row = K.H(10);
+        foreach (var t in Community.Themes) row.Children.Add(CommunityTile(t));
+        var scroll = new ScrollViewer { Content = row, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, Padding = new Thickness(0, 2, 0, 2) };
+        if (Community.Problem is not { } problem) return scroll;
+        var why = K.Wrapped(problem, Ty.Caption, B.Caution, 3);
+        why.MaxWidth = 170;
+        why.VerticalAlignment = VerticalAlignment.Center;
+        return K.Columns("*, 12, auto", scroll.Col(0), why.Col(2));
+    }
+
+    private FrameworkElement CommunityTile(Community.Theme t)
+    {
+        var on = Community.Worn == t.Id;
+        var swatch = new Border { Width = 78, Height = 48, CornerRadius = new CornerRadius(6), ClipToBounds = true, Child = CommunitySwatch(t) };
+        swatch.Loaded += (_, _) => swatch.Clip = new RectangleGeometry(new Rect(0, 0, swatch.ActualWidth, swatch.ActualHeight), 6, 6);
+        var face = new Grid { Children = { swatch } };
+        if (Community.Busy == t.Id) face.Children.Add(K.Spinner(20));
+        var ring = new Border { Padding = new Thickness(2), CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(2), Child = face };
+        if (on) ring.SetResourceReference(Border.BorderBrushProperty, B.Accent); else ring.BorderBrush = Brushes.Transparent;
+        var label = K.Text(t.Name, Ty.Caption).Center();
+        label.MaxWidth = 86;
+        label.TextTrimming = TextTrimming.CharacterEllipsis;
+        if (on) label.FontWeight = FontWeights.SemiBold;
+        var b = K.Subtle(K.V(4, ring, label), () => _ = Community.Wear(t), new Thickness(2), 8);
+        b.IsEnabled = Community.Busy == null;
+        var by = string.IsNullOrEmpty(t.Maker) ? "" : $" · by {t.Maker}";
+        b.ToolTip = t.Name + by;
+        System.Windows.Automation.AutomationProperties.SetName(b, $"{t.Name} theme{(string.IsNullOrEmpty(t.Maker) ? "" : $", by {t.Maker}")}{(on ? ", worn" : "")}");
+        return b;
+    }
+
+    /// <summary>A Community theme's tile picture (the Mac's CommunitySwatch): its pane and two of its counters, each its
+    /// drawing inked in its colour, its photo, or its colour alone — in its own look.</summary>
+    private static FrameworkElement CommunitySwatch(Community.Theme t)
+    {
+        var dark = t.Look == "dark" || (t.Look != "light" && Appearance.Dark);
+        var accent = Appearance.Hex(t.Accent);
+        var page = dark ? Color.FromRgb(0x20, 0x20, 0x20) : Color.FromRgb(0xf3, 0xf3, 0xf3);
+        var paper = accent is { } a ? K.Mix(page, a, dark ? 0.1 : 0.12) : page;
+        FrameworkElement Part(string slot)
+        {
+            var cards = Array.IndexOf(Appearance.Slots.Select(s => s.Key).ToArray(), slot) - 1;
+            FrameworkElement? inner = null;
+            if (t.At(slot)?.Scene is { } scene && Appearance.ReadyThemes.Any(r => r.Scene == scene))
+                inner = Scenes.Swatch(scene, slot == "side" ? "Side" : $"Card{Math.Max(0, cards)}", accent ?? ColourKit.SystemAccent(), dark);
+            else if (Community.Thumb(t, slot) is { } photo)
+                inner = new System.Windows.Controls.Image { Source = photo, Stretch = Stretch.UniformToFill, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom };
+            var part = new Border { CornerRadius = new CornerRadius(3), ClipToBounds = true, Background = K.Brush(paper), Child = inner };
+            part.Loaded += (_, _) => part.Clip = new RectangleGeometry(new Rect(0, 0, part.ActualWidth, part.ActualHeight), 3, 3);
+            return part;
+        }
+        var counters = new Grid { RowDefinitions = { new RowDefinition(), new RowDefinition { Height = new GridLength(4) }, new RowDefinition() } };
+        counters.Children.Add(Part("today").Row(0));
+        counters.Children.Add(Part("overdue").Row(2));
+        var g = K.Columns("26, 4, *", Part("side").Col(0), counters.Col(2));
+        return new Border { Padding = new Thickness(5), Child = g, Background = K.Brush(K.Mix(paper, Colors.Black, dark ? 0.2 : 0.05)) };
     }
 
     /// <summary>Canvas's own course colours.</summary>

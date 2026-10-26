@@ -247,6 +247,12 @@ public static class Appearance
 
     public static void RemovePhoto(string slot)
     {
+        Clear(slot);
+        Changed?.Invoke();
+    }
+
+    private static void Clear(string slot)
+    {
         if (Prefs.String("photo:" + slot) is { } p) { try { System.IO.File.Delete(p); } catch { } }
         Prefs.Remove("photo:" + slot);
         Prefs.Remove($"photo:{slot}:kind");
@@ -255,6 +261,82 @@ public static class Appearance
         Prefs.Remove($"photo:{slot}:y");
         Prefs.Remove($"photo:{slot}:plain");
         Prefs.Remove($"photo:{slot}:scene"); // (back to the worn theme's drawing, not one picked before the photo)
-        Changed?.Invoke();
+    }
+
+    // ---- Simpl Community ----
+
+    /// <summary>(0.3.67) A photo read from Simpl Community for a place: its bytes, its file's extension, its width over
+    /// its height.</summary>
+    public readonly record struct Fetched(byte[] Bytes, string Extension, double Aspect);
+
+    /// <summary>
+    /// (0.3.67, the Mac's wearCommunity) A Community theme worn in full (Community.Wear): its colour and its look, and in
+    /// each of its places its drawing or its photo (kept as a photo of your own is, inked unless it was shared with its
+    /// Ink switch off), each where it was pinned; a place it leaves out shows nothing. What was worn before is replaced,
+    /// the photos chosen before with it. The look worn again once, at the end.
+    /// </summary>
+    public static void WearCommunity(Community.Theme t, IReadOnlyDictionary<string, Fetched> photos)
+    {
+        foreach (var (slot, _) in Slots)
+        {
+            Clear(slot);
+            if (t.At(slot) is not { } p) continue;
+            var at = (X: p.X ?? (slot == "side" ? 50 : 100), Y: p.Y ?? 100, Z: Math.Clamp(p.Z ?? 1, 0.5, 3));
+            double? aspect;
+            if (p.Scene is { } scene && ReadyThemes.Any(r => r.Scene == scene))
+            {
+                Prefs.Set($"photo:{slot}:scene", scene);
+                Prefs.Set($"photo:{slot}:kind", "drawing");
+                aspect = Kit.Scenes.Aspect(scene, slot);
+            }
+            else if (photos.TryGetValue(slot, out var f))
+            {
+                try
+                {
+                    System.IO.Directory.CreateDirectory(PhotosDir);
+                    var dest = System.IO.Path.Combine(PhotosDir, slot + f.Extension);
+                    System.IO.File.WriteAllBytes(dest, f.Bytes);
+                    Prefs.Set("photo:" + slot, dest);
+                }
+                catch (Exception e) { Log.Write("community photo: " + e.Message); continue; }
+                Prefs.Set($"photo:{slot}:kind", "photo");
+                if (p.Ink == false) Prefs.Set($"photo:{slot}:plain", true);
+                aspect = f.Aspect;
+            }
+            else continue;
+            var (x, y) = PanFrom(slot, at.X, at.Y, at.Z, aspect ?? 0);
+            KeepPan(slot, x, y);
+            Prefs.Set($"photo:{slot}:zoom", Math.Round(at.Z, 3));
+        }
+        Prefs.Set("theme", null); // (no ready theme's drawings where the Community theme has none)
+        Prefs.Set("accent", Hex(t.Accent) != null ? t.Accent!.ToLowerInvariant() : null);
+        if (t.Look is "light" or "dark") Prefs.Set("appearance", t.Look);
+        Kit.Scenes.Forget(); // (a place's photo replaced: its ink made again)
+        Apply();
+    }
+
+    /// <summary>A counter's usual shape, width over height, and the navigation pane's (304 wide, about 720 tall).</summary>
+    private const double CounterShape = 2.6, PaneShape = 304.0 / 720;
+
+    /// <summary>
+    /// (0.3.67) Where the web and the Mac put a place's picture — the point of it at x%, y% on the place's same point, as
+    /// CSS's object-position, zoomed z times, the picture first covering its place — as this app keeps it: moved from
+    /// where it is pinned (a counter's bottom right, the pane's bottom middle) by a share of the place. That share hangs
+    /// on how far the picture overflows its place, so on the picture's shape (<paramref name="aspect"/>, its width over
+    /// its height; 0 when not known) and the place's usual one. (0, 0) where it is pinned.
+    /// </summary>
+    public static (double X, double Y) PanFrom(string slot, double x, double y, double z, double aspect)
+    {
+        var side = slot == "side";
+        var place = side ? PaneShape : CounterShape;
+        if (!(aspect > 0) || !double.IsFinite(aspect)) aspect = place;
+        z = Math.Clamp(z, 0.5, 3);
+        // (how much wider and taller than its place the picture is drawn, as shares of it: none, drawn just so)
+        var overX = Math.Max(1, aspect / place) * z - 1;
+        var overY = Math.Max(1, place / aspect) * z - 1;
+        var px = overX * ((side ? 0.5 : 1) - Math.Clamp(x, 0, 100) / 100);
+        var py = overY * (1 - Math.Clamp(y, 0, 100) / 100);
+        static double Kept(double v) => Math.Abs(v) < 0.001 ? 0 : Math.Round(Math.Clamp(v, -0.5, 0.5), 3);
+        return (Kept(px), Kept(py));
     }
 }

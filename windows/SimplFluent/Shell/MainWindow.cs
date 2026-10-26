@@ -367,6 +367,8 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
                 // (the screenshot suite's --appearance-mode: Appearance on once the Dashboard has drawn)
                 if (Launch.Flag("appearance-mode")) { var a = appearanceMode; Dispatcher.BeginInvoke(() => a.Begin(), System.Windows.Threading.DispatcherPriority.ApplicationIdle); }
                 else tour.AutoStart();
+                // (the screenshot suite's --community-wear <name>: that theme of Simpl Community worn, as its tile's click would)
+                if (Launch.Get("community-wear") is { } wear) _ = Community.WearNamed(wear);
                 Taskbar.ShowIfAsked(this);
             }
             shell.WindowWidth(ActualWidth);

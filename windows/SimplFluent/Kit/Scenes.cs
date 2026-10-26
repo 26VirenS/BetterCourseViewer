@@ -49,6 +49,15 @@ public static class Scenes
         return Load(name) is { } img ? (img, true) : null;
     }
 
+    /// <summary>(0.3.67) A drawing's shape in a place (the one of the scene's drawings that place wears), its width over
+    /// its height; null when it cannot be read.</summary>
+    public static double? Aspect(string scene, string slot)
+    {
+        var i = Array.IndexOf(Cards, slot);
+        var name = slot == "side" ? $"Theme{scene}Side" : $"Theme{scene}Card{Math.Max(0, i)}";
+        return Load(name) is BitmapSource b && b.PixelHeight > 0 ? b.PixelWidth / (double)b.PixelHeight : null;
+    }
+
     private static ImageSource? Load(string name)
     {
         if (Images.TryGetValue(name, out var have)) return have;
@@ -220,11 +229,14 @@ public static class Scenes
     };
 
     /// <summary>A theme's drawing for its tile in Settings: its scene inked in the theme's own colour on its paper.</summary>
-    public static FrameworkElement? Swatch(string scene, string image, Color accent)
+    public static FrameworkElement? Swatch(string scene, string image, Color accent, bool? dark = null)
     {
         if (Load($"Theme{scene}{image}") is not { } img) return null;
-        var paper = K.Mix(Page, accent, Appearance.Dark ? 0.1 : 0.12);
-        var ink = K.Mix(paper, accent, Appearance.Dark ? 0.34 : 0.3);
+        // (0.3.67) in a look of its own, asked (a Community theme's), else the one worn
+        var d = dark ?? Appearance.Dark;
+        var page = d ? Color.FromRgb(0x20, 0x20, 0x20) : Color.FromRgb(0xf3, 0xf3, 0xf3);
+        var paper = K.Mix(page, accent, d ? 0.1 : 0.12);
+        var ink = K.Mix(paper, accent, d ? 0.34 : 0.3);
         var g = new Grid { Background = K.Brush(paper), ClipToBounds = true };
         g.Children.Add(Drawn(img, ink, AlignmentX.Right));
         return g;
