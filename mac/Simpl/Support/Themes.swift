@@ -296,6 +296,27 @@ final class AppearanceStore: ObservableObject {
 
     private static let inkSuffix = ".ink.png"
 
+    /// (1.3.173) A Community theme worn in full (CommunityStore.wear): its colour, and in each of its places its drawing or
+    /// its photo (read from the site, kept as an upload is, inked unless it was shared with its Ink switch off), each where
+    /// it was pinned. What was worn before is replaced.
+    func wearCommunity(_ t: CommunityTheme, photos fetched: [PhotoSlot: NSImage]) {
+        var next: [PhotoSlot: SlotPhoto] = [:]
+        for slot in PhotoSlot.allCases {
+            guard let p = t.place(slot) else { continue }
+            let d = slot.defaultPlace
+            let at = PhotoPlace(x: p.x ?? d.x, y: p.y ?? d.y, z: p.z ?? d.z).clamped
+            if let scene = p.scene, Self.scenes.contains(scene) {
+                next[slot] = SlotPhoto(source: .scene(scene), place: at)
+            } else if let image = fetched[slot], let name = Self.keep(image) {
+                if let mask = Self.inkMask(image) { try? mask.write(to: Self.folder.appendingPathComponent(name + Self.inkSuffix), options: .atomic) }
+                next[slot] = SlotPhoto(source: .upload(name), place: at, plain: p.ink == false ? true : nil)
+            }
+        }
+        setAccent(t.accent)
+        photos = next
+        savePhotos()
+    }
+
     private func savePhotos() {
         // (a screenshot's theme is not kept)
         guard UserDefaults.standard.string(forKey: "SimplTheme") == nil, UserDefaults.standard.string(forKey: "SimplThemePhoto") == nil else { return }

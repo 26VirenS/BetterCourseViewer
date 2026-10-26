@@ -203,12 +203,12 @@ private struct AppearanceVeil: View {
     }
 }
 
-/// The bar at the foot of the window: Theme (light or dark, a ready-made theme, the colour) or Courses (each course's
-/// colour), and Done.
+/// The bar at the foot of the window: Theme (light or dark, a ready-made theme, the colour), Courses (each course's
+/// colour) or (1.3.173) Community (themes other students shared), and Done.
 struct AppearanceBar: View {
     let done: () -> Void
-    enum Tab: Hashable { case theme, courses }
-    @State private var tab: Tab = UserDefaults.standard.string(forKey: "SimplAppearanceTab") == "courses" ? .courses : .theme
+    enum Tab: String, Hashable { case theme, courses, community }
+    @State private var tab: Tab = Tab(rawValue: UserDefaults.standard.string(forKey: "SimplAppearanceTab") ?? "") ?? .theme
     @State private var look = AppLook(rawValue: UserDefaults.standard.string(forKey: "SimplAppearance") ?? "") ?? .system
     @State private var picking = UserDefaults.standard.bool(forKey: "SimplPickerOpen")
     @ObservedObject private var store = AppearanceStore.shared
@@ -220,6 +220,7 @@ struct AppearanceBar: View {
                 Picker("", selection: $tab) {
                     Text("Theme").tag(Tab.theme)
                     Text("Courses").tag(Tab.courses)
+                    Text("Community").tag(Tab.community)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -243,6 +244,7 @@ struct AppearanceBar: View {
                 switch tab {
                 case .theme: themeRow
                 case .courses: AppearanceCourses()
+                case .community: AppearanceCommunity()
                 }
             }
             .frame(height: 74, alignment: .leading)

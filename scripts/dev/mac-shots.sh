@@ -221,6 +221,13 @@ mock_config() {
 #  any picture can go on simplcourses.com)
 mock_config '{"siteNames":true}'
 mock_config '{"siteNames":true}' 8802
+# (1.3.173) Simpl Community's gallery in the mock school (scripts/dev/mock-community.mjs, the site's own handler): two
+# themes shared and approved, for Appearance's Community
+if [ -z "$PLANNING" ]; then
+  curl -s -o /dev/null -F 'theme={"name":"Night Peaks","maker":"Sam","accent":"#5e5ce6","look":"dark","places":{"side":{"scene":"Peaks"},"today":{"scene":"Peaks"},"overdue":{"scene":"Peaks"}}}' http://localhost:8800/api/community/submit || true
+  curl -s -o /dev/null -F 'theme={"name":"Beach Day","maker":"Ana","accent":"#ff9f0a","look":"light","places":{"side":{"scene":"Sand"},"today":{"scene":"Ocean"},"overdue":{"scene":"Sand"}}}' http://localhost:8800/api/community/submit || true
+  curl -s -o /dev/null http://localhost:8800/__mock/community/approve-all || true
+fi
 
 # (1.3.78) Send from Phone, tried as a phone would: phone_send <name> <file>… waits for the picture <name>'s app to say
 # its server's address on the console (-SimplPhoneTest), opens the page there, asks for a wrong key's, then posts each
@@ -1031,6 +1038,8 @@ push_set() {
   # (1.3.166) a photo placed where it is: a card's settings under it, the sidebar's beside it
   shoot light-51p-appearance-photo-card 18 -SimplAppearanceMode YES -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg" -SimplPhotoEdit today
   shoot light-51c-appearance-courses 16 -SimplAppearanceMode YES -SimplAppearanceTab courses
+  # (1.3.173) Appearance's Community: the mock's gallery, two themes shared there
+  shoot light-51k-appearance-community 20 -SimplAppearanceMode YES -SimplAppearanceTab community -SimplCommunityBase http://localhost:8800
   shoot light-12b-hand-in-preview 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplHandInPreview "$PWD/docs/screenshots/calendar.png"
   # (1.3.145) a preview scrolled by a posted wheel: the console says whether it reached the preview (SimplScrollProbe)
   shoot light-12e-hand-in-preview-scroll 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplScrollProbe YES -SimplHandInPreview "$PWD/scripts/dev/fixtures/long-reading.pdf"
@@ -1082,6 +1091,7 @@ push_set() {
   shoot dark-50d-theme-photo 12 -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg"
   shoot dark-50e-theme-photo-plain 12 -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg" -SimplThemePlain YES
   shoot dark-51-appearance-mode 16 -SimplAppearanceMode YES
+  shoot dark-51k-appearance-community 20 -SimplAppearanceMode YES -SimplAppearanceTab community -SimplCommunityBase http://localhost:8800
   shoot dark-51p-appearance-photo-side 18 -SimplAppearanceMode YES -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg" -SimplThemePlain YES -SimplPhotoEdit side
   # (1.3.80) Overdue's panel at 1024 points, the first tile of the second row grown over the page under it; Graded's,
   # the last tile, half-way through growing
