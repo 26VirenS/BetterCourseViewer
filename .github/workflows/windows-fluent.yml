@@ -384,6 +384,9 @@ jobs:
           Shot 'course-open' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'course:101'))
           Shot 'account-menu' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'menu'))
           Shot 'whats-new' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'whatsnew'))
+          # (0.3.80) after an update, once: To Do and the calendar as one, and Quick Plan (its scene still in a picture)
+          Shot 'merged-intro' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'mergedintro'))
+          Shot 'merged-intro-dark' '1024x681' 45 ($mock + @('--appearance', 'dark', '--theme', 'Forest', '--open', 'mergedintro'))
           Shot 'setup' '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'setup'))
           # (setup run to its end and saved, as Start using Simpl does: its log is checked below for a save that failed)
           Shot 'setup-saved' '1024x681' 45 ($mock + @('--appearance', 'dark', '--open', 'setup', '--setup-save', 'yes'))
@@ -411,6 +414,8 @@ jobs:
           Shot 'calendar-plan-popup' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'calendar', '--cal-view', 'week', '--open', 'cal-plan-popup'))
           Shot 'calendar-plan-edit' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'calendar', '--cal-view', 'week', '--open', 'cal-plan-edit'))
           Shot 'calendar-plan-edit-dark' '1366x778' 50 ($mock + @('--appearance', 'dark', '--place', 'calendar', '--cal-view', 'week', '--open', 'cal-plan-edit'))
+          # (0.3.80) the editor in a theme's colour, a bright green by night: its pickers and buttons read
+          Shot 'calendar-plan-edit-forest' '1366x778' 50 ($mock + @('--appearance', 'dark', '--theme', 'Forest', '--place', 'calendar', '--cal-view', 'week', '--open', 'cal-plan-edit'))
           # (0.3.63) the week with To Do beside it and a row of To Do held over Wednesday at 1 PM, where it would be planned
           Shot 'calendar-week-todo-drop' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'calendar', '--cal-view', 'week', '--open', 'cal-todo-drop'))
           Shot 'calendar-list' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'calendar', '--cal-view', 'list'))
@@ -1494,11 +1499,17 @@ jobs:
             if ($l -notmatch 'calendar: plan put .+, moved to ') { Write-Host "::error::calendar-week-plan: no plan was put and moved before the picture (shots/profile-calendar-week-plan.log)"; exit 1 }
           }
           # (0.3.66) a plan's popup, and its Edit, opened before each picture (Screens/Calendar/CalendarScreen.cs ShotPlanPopup)
-          foreach ($p in @('calendar-plan-popup', 'calendar-plan-edit', 'calendar-plan-edit-dark')) {
+          foreach ($p in @('calendar-plan-popup', 'calendar-plan-edit', 'calendar-plan-edit-dark', 'calendar-plan-edit-forest')) {
             if ($script:mine -notcontains $p) { continue }
             $l = PhoneLog $p
             Write-Host "${p}: $((@($l -split "`n" | Where-Object { $_ -match 'calendar: ' }) -join ' | '))"
             if ($l -notmatch 'calendar: plan popup opened') { Write-Host "::error::${p}: the plan's popup was not opened before the picture (shots/profile-$p.log)"; exit 1 }
+          }
+          # (0.3.80) the To Do & Calendar intro up before each of its pictures (Shell/MergedIntroSheet.cs)
+          foreach ($p in @('merged-intro', 'merged-intro-dark')) {
+            if ($script:mine -notcontains $p) { continue }
+            $l = PhoneLog $p
+            if ($l -notmatch 'intro: To Do & Calendar shown') { Write-Host "::error::${p}: the To Do & Calendar intro was not shown before the picture (shots/profile-$p.log)"; exit 1 }
           }
           # (0.3.67) Simpl Community's gallery read before each of its pictures, and its photo theme worn before that one's
           # (Support/Community.cs)
