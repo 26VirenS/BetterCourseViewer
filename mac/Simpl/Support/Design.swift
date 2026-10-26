@@ -69,6 +69,60 @@ extension View {
             if prominent { self.buttonStyle(.borderedProminent) } else { self.buttonStyle(.bordered) }
         }
     }
+
+    /// (1.3.171) A button drawn as its symbol alone says its name while the pointer rests on it: a small label under
+    /// it after a short pause, gone the moment the pointer leaves or presses (macOS's own tooltip waits much longer).
+    /// `when: false` (its word already shown beside the symbol) shows nothing.
+    func hoverName(_ name: String, when shown: Bool = true) -> some View {
+        modifier(HoverName(name: name, enabled: shown))
+    }
+}
+
+/// The name under a symbol-only button (`hoverName`). Drawn over what is below the button (the heads it sits in are
+/// given a zIndex), never taking room of its own, and never in the way of a press.
+private struct HoverName: ViewModifier {
+    let name: String
+    let enabled: Bool
+    @State private var shown = false
+    @State private var wait: Task<Void, Never>?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .onHover { inside in
+                wait?.cancel()
+                guard inside, enabled else { hide(); return }
+                wait = Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(400))
+                    guard !Task.isCancelled else { return }
+                    withAnimation(.easeOut(duration: 0.12)) { shown = true }
+                }
+            }
+            .simultaneousGesture(TapGesture().onEnded { wait?.cancel(); hide() })
+            .onChange(of: enabled) { _, on in if !on { wait?.cancel(); hide() } }
+            .overlay(alignment: .bottom) {
+                if shown {
+                    Text(name)
+                        .font(.system(size: 11, weight: .medium))
+                        .lineLimit(1)
+                        .fixedSize()
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(.regularMaterial, in: Capsule())
+                        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
+                        .shadow(color: .black.opacity(0.14), radius: 6, y: 2)
+                        .alignmentGuide(.bottom) { d in d[.top] - 6 } // (its top 6 points under the button)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true) // (the button's own label already names it)
+                        .transition(reduceMotion ? AnyTransition.opacity : AnyTransition.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
+                }
+            }
+    }
+
+    private func hide() {
+        guard shown else { return }
+        withAnimation(.easeOut(duration: 0.08)) { shown = false }
+    }
 }
 
 /// Glass shapes near each other drawn as one (they blend and morph into each other on macOS 26); a plain stack before.

@@ -34,7 +34,7 @@ struct AppointmentsPopup: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            IconTile(symbol: "calendar.badge.clock", color: Theme.accent, size: 36)
+            IconTile(symbol: "person.badge.clock", color: Theme.accent, size: 36)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Find Appointment")
                     .font(.sTitle3.weight(.semibold))

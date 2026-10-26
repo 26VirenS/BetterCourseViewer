@@ -202,8 +202,12 @@ struct CalendarView: View {
     /// The page holds still — the calendar and To Do filling the window, each scrolling inside itself — once the window
     /// has the room for both side by side, and the height.
     private func fills(room: CGFloat, height: CGFloat) -> Bool {
-        height >= 500 && room >= calendarLeast + (todoOn ? TodoPanel.width + Self.todoGap : 0)
+        height >= 500 && room >= calendarLeast + (leftColumn ? TodoPanel.width + Self.todoGap : 0)
     }
+
+    /// (1.3.171) The column beside the calendar: To Do's (when shown), or in the agenda the days it lists, picked on
+    /// a month — the agenda being a list of the work already, To Do's own list is not shown beside it.
+    private var leftColumn: Bool { mode == "list" || todoOn }
 
     /// The page holding still: its head, then To Do and the calendar side by side, as tall as the window leaves them.
     private func filled(_ d: CalendarData, room: CGFloat, pad: CGFloat) -> some View {
@@ -213,7 +217,12 @@ struct CalendarView: View {
                 noticeBar(note.text, problem: note.problem)
             }
             HStack(alignment: .top, spacing: Self.todoGap) {
-                if todoOn {
+                if mode == "list" {
+                    agendaPicker
+                        .frame(width: TodoPanel.width)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .transition(.opacity)
+                } else if todoOn {
                     TodoPanel(said: todoSaid)
                         .frame(width: TodoPanel.width)
                         .frame(maxHeight: .infinity)
@@ -226,6 +235,7 @@ struct CalendarView: View {
             }
             .frame(maxHeight: .infinity)
             .animation(reduceMotion ? nil : Motion.snappy, value: todoOn)
+            .animation(reduceMotion ? nil : Motion.snappy, value: mode == "list")
         }
         .padding(.horizontal, pad)
         .padding(.top, 20)
@@ -242,7 +252,11 @@ struct CalendarView: View {
             if let note = notice(d) {
                 noticeBar(note.text, problem: note.problem)
             }
-            if todoOn {
+            if mode == "list" {
+                agendaPicker
+                    .frame(maxWidth: 380, alignment: .leading)
+                    .transition(.opacity)
+            } else if todoOn {
                 TodoPanel(said: todoSaid)
                     .frame(height: 340)
                     .transition(.opacity)
@@ -302,6 +316,7 @@ struct CalendarView: View {
             }
         }
         .animation(Motion.gentle, value: loading)
+        .zIndex(1) // (a button's name, shown under it on a hover, is drawn over the calendar below)
     }
 
     @ViewBuilder
@@ -369,7 +384,7 @@ struct CalendarView: View {
                         .frame(minWidth: 14)
                 }
                 .glassButton()
-                .help("\(stepWords.back) (←)")
+                .hoverName("\(stepWords.back) (←)")
                 Button {
                     shift(1)
                 } label: {
@@ -378,7 +393,7 @@ struct CalendarView: View {
                         .frame(minWidth: 14)
                 }
                 .glassButton()
-                .help("\(stepWords.on) (→)")
+                .hoverName("\(stepWords.on) (→)")
                 Button("Today") { goToday() }
                     .glassButton()
                     .keyboardShortcut("t", modifiers: .command)
@@ -392,25 +407,31 @@ struct CalendarView: View {
     private func tools(_ d: CalendarData, words: Bool) -> some View {
         let shown = d.calendars.filter(\.on).count
         return HStack(spacing: 8) {
-            Button {
-                withAnimation(reduceMotion ? nil : Motion.snappy) { todoOn.toggle() }
-            } label: {
-                Label(todoOn ? "Hide To Do" : "Show To Do", systemImage: "sidebar.left")
-                    .labelStyle(.iconOnly)
-                    .frame(minWidth: 16)
+            if mode != "list" { // (1.3.171: the agenda's column is its month, not To Do)
+                Button {
+                    withAnimation(reduceMotion ? nil : Motion.snappy) { todoOn.toggle() }
+                } label: {
+                    Label(todoOn ? "Hide To Do" : "Show To Do", systemImage: "sidebar.left")
+                        .labelStyle(.iconOnly)
+                        .frame(minWidth: 16)
+                }
+                .glassButton(tint: todoOn ? Theme.accent : nil)
+                .hoverName(todoOn ? "Hide To Do" : "Show To Do")
+                .accessibilityHint(todoOn ? "Hides To Do beside the calendar" : "Shows To Do beside the calendar, to drag work onto a day or a time")
+                .accessibilityAddTraits(todoOn ? .isSelected : [])
             }
-            .glassButton(tint: todoOn ? Theme.accent : nil)
-            .help(todoOn ? "Hide To Do beside the calendar" : "Show To Do beside the calendar, to drag work onto a day or a time")
-            .accessibilityAddTraits(todoOn ? .isSelected : [])
             if !engine.onBrightspace { // (Brightspace has no Scheduler)
                 Button {
                     finding = true
                 } label: {
-                    Label("Find Appointment", systemImage: "calendar.badge.clock")
+                    // (1.3.171) a person with a clock — office hours, a time with someone — where a calendar with a clock
+                    // was taken at a glance for Calendars' calendar with a tick
+                    Label("Find Appointment", systemImage: "person.badge.clock")
                         .labelStyle(ToolLabel(words: words))
                 }
                 .glassButton()
-                .help("Office hours, conferences and sign-ups with a time to reserve")
+                .hoverName("Find Appointment", when: !words)
+                .accessibilityHint("Office hours, conferences and sign-ups with a time to reserve")
             }
             Button {
                 syncing = true
@@ -419,7 +440,8 @@ struct CalendarView: View {
                     .labelStyle(ToolLabel(words: words))
             }
             .glassButton()
-            .help("Simpl in Apple, Google or Outlook, and your own calendars here")
+            .hoverName("Sync", when: !words)
+            .accessibilityHint("Simpl in Apple, Google or Outlook, and your own calendars here")
             Button {
                 choosing.toggle()
             } label: {
@@ -436,7 +458,8 @@ struct CalendarView: View {
                 }
             }
             .glassButton()
-            .help("Choose the calendars shown (\(shown) shown)")
+            .hoverName("Calendars", when: !words && !choosing)
+            .accessibilityHint("Choose the calendars shown (\(shown) shown)")
             .popover(isPresented: $choosing) {
                 CalendarsPopover(choices: data?.calendars ?? []) { Task { await load(animated: true) } }
                     .environmentObject(engine)
@@ -1452,46 +1475,20 @@ struct CalendarView: View {
     // MARK: List
 
     /// The list's days — the next three weeks, or the days picked — each day with something on it as a section of its
-    /// own; (1.3.147) the days' picker beside it on a page of 620 points or more, over it on a narrower one. (1.3.170) On
-    /// a page that holds still, the days scroll inside their column, the picker staying beside them where there is room.
+    /// own. (1.3.170) On a page that holds still, the days scroll inside their column. (1.3.171) The month they are
+    /// picked on is in To Do's column beside them (over them, on a page that scrolls).
     @ViewBuilder
     private func listView(_ byDay: [String: [CalEvent]], size: CGSize?) -> some View {
-        if let size {
-            if size.width >= 576 {
-                HStack(alignment: .top, spacing: 20) {
-                    ScrollView {
-                        listDays(byDay)
-                            .padding(6)
-                    }
-                    .padding(-6)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    agendaPicker
-                        .frame(width: 256)
-                }
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 22) {
-                        agendaPicker
-                            .frame(maxWidth: 380, alignment: .leading)
-                        listDays(byDay)
-                    }
+        if size != nil {
+            ScrollView {
+                listDays(byDay)
                     .padding(6)
-                }
-                .padding(-6)
             }
-        } else if room >= 620 {
-            HStack(alignment: .top, spacing: 20) {
-                listDays(byDay)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                agendaPicker
-                    .frame(width: 256)
-            }
+            .padding(-6)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         } else {
-            VStack(alignment: .leading, spacing: 22) {
-                agendaPicker
-                    .frame(maxWidth: 380, alignment: .leading)
-                listDays(byDay)
-            }
+            listDays(byDay)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
