@@ -912,7 +912,7 @@ try {
   const whatsNew = new Function('self', `${readFileSync(join(extDir, 'content', 'app', 'whatsnew-notes.js'), 'utf8')}; return self.BCV_WHATS_NEW;`)({});
   const introDone = () => page.waitForFunction(() => document.querySelector('#bcv-whatsnew')?.shadowRoot.querySelector('.intro')?.hidden === true, null, { timeout: 8000 });
   const flag = async (key) => (await sw.evaluate((k) => self.BCV.api.storage.local.get(k), key))[key];
-  await sw.evaluate(async () => { await self.BCV.api.storage.local.set({ 'whatsnew:from': '2.7.5' }); await self.BCV.api.storage.local.remove(['whatsnew:seen', 'welcome:appearance', 'themes:tried']); await self.BCV.settings.update({ appearance: { theme: { name: '' } } }); }); // (a theme not yet tried: the invitation is for those)
+  await sw.evaluate(async () => { await self.BCV.api.storage.local.set({ 'whatsnew:from': '2.7.5', 'intro:merged': true }); await self.BCV.api.storage.local.remove(['whatsnew:seen', 'welcome:appearance', 'themes:tried']); await self.BCV.settings.update({ appearance: { theme: { name: '' } } }); }); // (a theme not yet tried: the invitation is for those)
   await page.goto(`${BASE}/`);
   if (whatsNew[0].invite) {
     // this version puts an invitation in the notes' place: the four scenes across the phone's width
@@ -959,6 +959,17 @@ try {
     await page.waitForFunction(() => !document.querySelector('#bcv-whatsnew'), null, { timeout: 5000 });
     check(!(await page.$('#bcv-whatsnew')) && (await flag('whatsnew:seen')) === manifest.version, 'Done closes it and marks the version seen');
   }
+  // (2.99.120) the merged intro on a phone: its scene across the width, its words and buttons inside it
+  await sw.evaluate(async () => { await self.BCV.api.storage.local.set({ 'whatsnew:from': '2.99.110' }); await self.BCV.api.storage.local.remove(['whatsnew:seen', 'intro:merged']); });
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('#bcv-whatsnew .mi', { timeout: 20000 });
+  await page.waitForTimeout(600);
+  const mi = await page.evaluate(() => { const r = document.querySelector('#bcv-whatsnew').shadowRoot; const w = window.innerWidth; return { h1: r.querySelector('.fr__h1').textContent, scene: Math.round(r.querySelector('.mi__scene svg').getBoundingClientRect().width), w, fits: [...r.querySelectorAll('.mi__scene, .mi__card, .fr__foot, .fr__h1')].every((e) => e.getBoundingClientRect().right <= w + 1 && e.getBoundingClientRect().left >= -1), foot: [...r.querySelectorAll('.fr__foot button')].map((b) => b.textContent.trim()).join(',') }; });
+  check(mi.h1 === 'To Do and Calendar are one' && mi.scene >= mi.w * 0.7 && mi.fits && mi.foot === 'Open To Do & Calendar,Got it' && await noOverflow(), `the merged intro fits the phone: ${JSON.stringify(mi)}`);
+  await shot('13m-merged-intro');
+  await page.click('#bcv-whatsnew #dismiss');
+  await page.waitForFunction(() => !document.querySelector('#bcv-whatsnew'), null, { timeout: 5000 });
+  check((await flag('intro:merged')) === true && (await flag('whatsnew:seen')) === manifest.version, 'Got it closes it, it and the version seen');
 
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.slice(0, 3).join(' | ')}` : ''}`);
 } catch (e) {

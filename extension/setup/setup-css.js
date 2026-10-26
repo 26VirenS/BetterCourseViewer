@@ -871,6 +871,67 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
   .inv .fr__h1 { font-size: 30px; }
 }
 
+/* ==== (2.99.120) the merged intro (an update from before To Do and the calendar were one, in the
+ * notes' place): a scene of the two coming together and a task carried onto the week as a plan,
+ * played over and over — 6.4 s round; its resting state is its end, which reduced motion keeps —
+ * then a title, a line, Quick Plan's card, Open To Do & Calendar and Got it ==== */
+.mi { --mi-card: #fff; --mi-ink: #1c1c1e; }
+:host([data-theme="dark"]) .mi, html[data-theme="dark"] .mi { --mi-card: #1c1c1e; --mi-ink: #f2f2f7; }
+.wn.fr.mi { max-width: 520px; gap: 14px; }
+.mi .fr__body { display: block; }
+.mi__scene { width: 100%; max-width: 440px; margin: 0 auto 20px; animation: frRise .34s var(--ease) both; }
+.mi__svg { display: block; width: 100%; height: auto; overflow: visible; }
+.mi__card-bg { fill: var(--mi-card); stroke: var(--mi-ink); stroke-opacity: .1; }
+.mi__grid { stroke: var(--mi-ink); stroke-opacity: .08; }
+.mi__head { fill: var(--mi-ink); fill-opacity: .22; }
+.mi__rowbg { fill: var(--mi-ink); fill-opacity: .05; }
+.mi__tick { fill: none; stroke: var(--mi-ink); stroke-opacity: .35; stroke-width: 1.5; }
+.mi__bar { fill: var(--mi-ink); fill-opacity: .2; }
+.mi__lab { font: 600 11px/1 var(--font); fill: var(--ink3); text-anchor: middle; }
+.mi__planbg { fill: var(--blue); fill-opacity: .24; stroke: var(--blue); stroke-width: 1.2; stroke-dasharray: 3 2; }
+.mi__clock { fill: none; stroke: var(--blue); stroke-width: 1.2; stroke-linecap: round; }
+.mi__cursor { fill: #000; stroke: #fff; stroke-width: 1.2; stroke-linejoin: round; }
+.mi .fr__h1 { font-size: 30px; text-align: center; animation: frRise .34s var(--ease) .06s both; }
+.mi .fr__blurb { margin: 8px auto 0; text-align: center; font-size: 15.5px; animation: frRise .34s var(--ease) .1s both; }
+.mi__card { display: flex; align-items: flex-start; gap: 12px; margin-top: 22px; padding: 14px; border-radius: 14px; background: var(--fill); animation: frRise .34s var(--ease) .14s both; }
+.mi__ic { flex: none; width: 30px; height: 30px; border-radius: 8px; background: var(--accent-soft); color: var(--blue); display: flex; align-items: center; justify-content: center; }
+.mi__ic svg { display: block; }
+.mi__name { font: 600 14.5px/1.3 var(--font); color: var(--ink); }
+.mi__line { margin-top: 2px; font: 400 13.5px/1.45 var(--font); color: var(--ink3); text-wrap: pretty; }
+.mi .fr__foot { padding-top: 22px; }
+/* the scene at its end: one card, one name, the row set down on Wednesday as a plan */
+.mi__own, .mi__copy, .mi__cursor { opacity: 0; }
+.mi__taken { opacity: .25; }
+.mi__piece { transform: translate(265px, 90px); }
+@media (prefers-reduced-motion: no-preference) {
+  .mi__all { animation: miAll 6.4s linear infinite; }
+  .mi__whole { animation: miWhole 6.4s linear infinite; }
+  .mi__own { animation: miOwn 6.4s linear infinite; }
+  .mi__todo { animation: miTodo 6.4s linear infinite; }
+  .mi__cal { animation: miCal 6.4s linear infinite; }
+  .mi__taken { animation: miTaken 6.4s linear infinite; }
+  .mi__piece { animation: miPiece 6.4s linear infinite; }
+  .mi__lift { animation: miLift 6.4s linear infinite; }
+  .mi__copy { animation: miCopy 6.4s linear infinite; }
+  .mi__plan { animation: miPlan 6.4s linear infinite; }
+  .mi__cursor { animation: miCursor 6.4s linear infinite; }
+}
+@keyframes miAll { 0% { opacity: 0; } 4.7%, 90.6% { opacity: 1; } 98.4%, 100% { opacity: 0; } }
+@keyframes miWhole { 0%, 6.25% { opacity: 0; animation-timing-function: cubic-bezier(.65,0,.35,1); } 20.3%, 100% { opacity: 1; } }
+@keyframes miOwn { 0%, 6.25% { opacity: 1; animation-timing-function: cubic-bezier(.65,0,.35,1); } 20.3%, 100% { opacity: 0; } }
+@keyframes miTodo { 0%, 6.25% { transform: translateX(-22px); animation-timing-function: cubic-bezier(.65,0,.35,1); } 20.3%, 100% { transform: none; } }
+@keyframes miCal { 0%, 6.25% { transform: translateX(22px); animation-timing-function: cubic-bezier(.65,0,.35,1); } 20.3%, 100% { transform: none; } }
+@keyframes miTaken { 0%, 28.1% { opacity: 1; } 29.5%, 100% { opacity: .25; } }
+@keyframes miPiece { 0%, 32.8% { transform: translate(85px, 74px); animation-timing-function: cubic-bezier(.65,0,.35,1); } 48.4%, 100% { transform: translate(265px, 90px); } }
+@keyframes miLift { 0%, 28.1% { transform: none; animation-timing-function: cubic-bezier(.65,0,.35,1); } 32.8% { transform: scale(1.06); animation-timing-function: cubic-bezier(.33,1,.68,1); } 40.6% { transform: translateY(-24px) scale(1.06); animation-timing-function: cubic-bezier(.32,0,.67,0); } 48.4% { transform: scale(1.06); animation-timing-function: cubic-bezier(.65,0,.35,1); } 53.1%, 100% { transform: none; } }
+@keyframes miCopy { 0%, 27.9% { opacity: 0; } 28.1%, 48.4% { opacity: 1; animation-timing-function: cubic-bezier(.65,0,.35,1); } 53.1%, 100% { opacity: 0; } }
+@keyframes miPlan { 0%, 48.4% { opacity: 0; animation-timing-function: cubic-bezier(.65,0,.35,1); } 53.1%, 100% { opacity: 1; } }
+@keyframes miCursor { 0%, 28.1% { opacity: 0; } 32.8%, 48.4% { opacity: 1; } 53.1%, 100% { opacity: 0; } }
+@media (max-width: 700px) {
+  .mi .fr__h1 { font-size: 24px; }
+  .mi__scene { margin-bottom: 14px; }
+}
+
 @media (max-width: 700px) {
   .wn__list { max-height: 56vh; }
 }

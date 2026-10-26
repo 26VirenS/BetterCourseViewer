@@ -6986,7 +6986,8 @@ try {
   const wnPage = () => page.evaluate(() => { const r = document.querySelector('#bcv-whatsnew').shadowRoot; return { since: r.querySelector('.wn__since')?.textContent ?? null, versions: [...r.querySelectorAll('.wn__vh')].map((v) => v.querySelector('.wn__vnum').textContent), dates: [...r.querySelectorAll('.wn__vdate')].map((d) => d.textContent), notes: [...r.querySelectorAll('.wn__note')].map((n) => `${n.dataset.version} ${n.dataset.kind}: ${n.querySelector('.wn__title').textContent}`), clutter: r.querySelectorAll('.wn__kind, .wn__where, .wn__filter, .wn__rail, .wn__jump, .fr__hint').length, more: r.querySelector('#earlier')?.textContent ?? null, foot: [...r.querySelectorAll('.fr__foot button')].map((b) => b.textContent.trim()), scroll: (() => { const l = r.querySelector('#notes'); return { over: l.scrollHeight > l.clientHeight, bar: getComputedStyle(l, '::-webkit-scrollbar').width }; })() }; });
   // an update from 2.7.5 (the background notes the version left behind), this version not yet seen
   // (a theme not yet tried: the invitation is for those — the flag, and the name every save writes)
-  await sw.evaluate(async () => { await self.BCV.api.storage.local.set({ 'whatsnew:from': '2.7.5' }); await self.BCV.api.storage.local.remove(['whatsnew:seen', 'welcome:appearance', 'themes:tried']); await self.BCV.settings.update({ appearance: { theme: { name: '' } } }); });
+  // ((2.99.120) the merged intro, owed an update from before 2.99.120, seen here: it has its own test below)
+  await sw.evaluate(async () => { await self.BCV.api.storage.local.set({ 'whatsnew:from': '2.7.5', 'intro:merged': true }); await self.BCV.api.storage.local.remove(['whatsnew:seen', 'welcome:appearance', 'themes:tried']); await self.BCV.settings.update({ appearance: { theme: { name: '' } } }); });
   await page.goto(`${BASE}/`);
   const introDone = () => page.waitForFunction(() => document.querySelector('#bcv-whatsnew')?.shadowRoot.querySelector('.intro')?.hidden === true, null, { timeout: 8000 }); // the word-mark first
   const flags = (...keys) => sw.evaluate((k) => self.BCV.api.storage.local.get(k), keys);
@@ -7098,6 +7099,27 @@ try {
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('#bcv-whatsnew'), null, { timeout: 5000 });
   check(!(await page.$('#bcv-whatsnew')), 'Escape closes it too');
+  // (2.99.120) an update from before To Do and the calendar were one: the merged intro in the notes' place, once — its
+  // scene playing, a title, a line, Quick Plan's card, Open To Do & Calendar and Got it
+  await sw.evaluate(async () => { await self.BCV.api.storage.local.set({ 'whatsnew:from': '2.99.110' }); await self.BCV.api.storage.local.remove(['whatsnew:seen', 'intro:merged']); });
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector(wn('.mi'), { timeout: 20000 });
+  await page.waitForTimeout(2600); // (part way through the scene: the row on its way to the week)
+  const mi = await page.evaluate(() => { const r = document.querySelector('#bcv-whatsnew').shadowRoot; return { notes: r.querySelectorAll('.wn__note').length, brand: r.querySelector('.fr__brand span').textContent, h1: r.querySelector('.fr__h1').textContent, blurb: r.querySelector('.fr__blurb').textContent, card: r.querySelector('.mi__name')?.textContent, line: r.querySelector('.mi__line')?.textContent, scene: Math.round(r.querySelector('.mi__scene svg')?.getBoundingClientRect().width || 0), playing: getComputedStyle(r.querySelector('.mi__piece')).animationName, foot: [...r.querySelectorAll('.fr__foot button')].map((b) => `${b.id}:${b.textContent.trim()}`).join(',') }; });
+  check(mi.notes === 0 && mi.brand === 'New in Simpl' && mi.h1 === 'To Do and Calendar are one' && mi.blurb === 'Your tasks now sit beside your week, in one tab.' && mi.card === 'Quick Plan' && /^Drag a task onto the calendar/.test(mi.line || '') && mi.scene >= 380 && mi.playing === 'miPiece' && mi.foot === 'open:Open To Do & Calendar,dismiss:Got it', `an update from before the two were one shows the merged intro in the notes' place — its scene playing, Quick Plan, Open To Do & Calendar and Got it: ${JSON.stringify(mi)}`);
+  await shot(page, '33m-merged-intro');
+  check(await eventually(async () => { const f = await flags('whatsnew:seen', 'intro:merged'); return f['whatsnew:seen'] === manifest.version && f['intro:merged'] === true; }), 'opening it marks it, and this version, seen at once');
+  await page.click(wn('#open'));
+  await page.waitForFunction(() => !document.querySelector('#bcv-whatsnew') && location.pathname === '/calendar', null, { timeout: 10000 }).catch(() => {});
+  await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
+  check(!(await page.$('#bcv-whatsnew')) && new URL(page.url()).pathname === '/calendar', `Open To Do & Calendar lets it go and opens the place: ${page.url()}`);
+  // once is once: a later update from before 2.99.120 lists the notes instead
+  await sw.evaluate(async () => { await self.BCV.api.storage.local.set({ 'whatsnew:from': '2.99.110' }); await self.BCV.api.storage.local.remove('whatsnew:seen'); });
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector(wn('.wn__note'), { timeout: 20000 });
+  check(!(await page.$(wn('.mi'))), 'shown once, the merged intro does not come back: a later update lists the notes');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('#bcv-whatsnew'), null, { timeout: 5000 });
   } // what's new
   if (on('setup page')) {
 

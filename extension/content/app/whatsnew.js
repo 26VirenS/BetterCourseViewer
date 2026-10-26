@@ -14,7 +14,12 @@
  * after that update invites a theme — the six scenes and the colours in a strip, Personalize and
  * Not now — instead of listing what changed. Personalize opens the editor, whose Open Canvas then
  * brings the page back with the sidebar's Appearance button pointed out (welcome.js); the notes
- * wait in Settings. */
+ * wait in Settings.
+ *
+ * (2.99.120) An update from before To Do and the calendar were one place puts the merged intro in
+ * the notes' place, once: a short scene of the two coming together and a task dragged onto the
+ * week becoming a plan (Quick Plan), Got it and Open To Do & Calendar. Its own flag keeps it once,
+ * however many updates later it comes; a fresh install never sees it (nothing was apart for it). */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
@@ -24,7 +29,29 @@
   const EARLIER_MAX = 8; // how many more versions one press of Earlier versions brings in
   const SEEN_KEY = 'whatsnew:seen'; // the last version whose notes were shown
   const FROM_KEY = 'whatsnew:from'; // the version an update left behind (the background writes it; the oldest still unseen)
+  const MERGED_KEY = 'intro:merged'; // (2.99.120) the merged intro shown
+  const MERGED_IN = '2.99.120'; // an update from before this one is owed it
   const INTRO = '<svg viewBox="0 0 304 142" width="356" height="166" class="intro__svg"><defs><clipPath id="wnBandTop"><rect x="-20" y="6" width="400" height="33"/></clipPath><clipPath id="wnBandMid"><rect x="-20" y="42" width="400" height="28"/></clipPath><clipPath id="wnBandLow"><rect x="-20" y="73" width="400" height="62"/></clipPath></defs><g clip-path="url(#wnBandTop)" class="intro__band intro__band--a"><text x="4" y="98" class="intro__word intro__word--1">Simpl</text></g><g clip-path="url(#wnBandMid)" class="intro__band intro__band--b"><text x="4" y="98" class="intro__word intro__word--2">Simpl</text></g><g clip-path="url(#wnBandLow)" class="intro__band intro__band--c"><text x="4" y="98" class="intro__word intro__word--3">Simpl</text></g><circle cx="288" cy="90" r="9" class="intro__dot"/></svg>';
+  // (2.99.120) the merged intro's scene, 400 by 172: To Do and the week apart, then one card under one name, and a row
+  // of To Do carried onto Wednesday's morning, set down there as a plan (setup-css.js animates it: .mi__*)
+  const MERGE_SCENE = (() => {
+    const tones = ['#30d158', '#ff9f0a', '#0a84ff', '#ff375f'];
+    const lengths = [0.78, 0.62, 0.7, 0.5];
+    const row = (i, x, y, cls = '') => `<g class="${cls}"><rect x="${x}" y="${y}" width="110" height="20" rx="6" class="mi__rowbg"/><circle cx="${x + 11}" cy="${y + 10}" r="4.25" class="mi__tick"/><rect x="${x + 22}" y="${y + 7}" width="${Math.round(70 * lengths[i])}" height="6" rx="3" class="mi__bar"/><circle cx="${x + 101}" cy="${y + 10}" r="3" fill="${tones[i]}"/></g>`;
+    const rows = [0, 1, 2, 3].map((i) => row(i, 30, 36 + i * 28, i === 1 ? 'mi__taken' : '')).join('');
+    const heads = [0, 1, 2, 3, 4].map((c) => `<rect x="${150 + 46 * c + 14}" y="34" width="18" height="5" rx="2.5" class="mi__head"/>${c ? `<line x1="${150 + 46 * c}" y1="46" x2="${150 + 46 * c}" y2="160" class="mi__grid"/>` : ''}`).join('');
+    const hours = [0, 1, 2, 3].map((r) => `<line x1="156" y1="${50 + r * 26}" x2="374" y2="${50 + r * 26}" class="mi__grid"/>`).join('');
+    const events = [[0, 2, 0], [3, 0, 1], [4, 3, 2], [1, 3, 3]].map(([d, r, t]) => `<rect x="${150 + 46 * d + 3}" y="${50 + r * 26 + 3}" width="40" height="22" rx="5" fill="${tones[t]}" fill-opacity=".3"/>`).join('');
+    return `<svg viewBox="0 0 400 172" class="mi__svg" aria-hidden="true"><g class="mi__all">`
+      + '<rect x="20.5" y="22.5" width="359" height="145" rx="14" class="mi__card-bg mi__whole"/><line x1="150" y1="30" x2="150" y2="160" class="mi__grid mi__whole"/>'
+      + '<text x="200" y="15" class="mi__lab mi__whole">To Do &amp; Calendar</text>'
+      + `<g class="mi__todo"><rect x="20.5" y="22.5" width="129" height="145" rx="14" class="mi__card-bg mi__own"/><text x="85" y="15" class="mi__lab mi__own">To Do</text>${rows}</g>`
+      + `<g class="mi__cal"><rect x="150.5" y="22.5" width="229" height="145" rx="14" class="mi__card-bg mi__own"/><text x="265" y="15" class="mi__lab mi__own">Calendar</text>${heads}${hours}${events}</g>`
+      + `<g class="mi__piece"><g class="mi__lift"><g class="mi__copy"><rect x="-55" y="-10" width="110" height="20" rx="6" class="mi__card-bg"/>${row(1, -55, -10)}</g>`
+      + '<g class="mi__plan"><rect x="-20" y="-11" width="40" height="22" rx="5" class="mi__planbg"/><circle cx="-11" cy="0" r="4" class="mi__clock"/><path d="M-11 0v-2.4M-11 0h1.8" class="mi__clock"/></g>'
+      + '<path d="M8 2v14l3.6-3.4 2.6 5.4 2.2-1-2.5-5.2h4.5z" class="mi__cursor"/></g></g>'
+      + '</g></svg>';
+  })();
   const BRAND = '<svg viewBox="22.9 22.4 75 75" width="20" height="20" aria-hidden="true"><path d="M50.55 24.94L50.27 25.03L46.73 25.11L46.23 25.29L44.82 25.39L44.32 25.57L43.28 25.64L42.95 25.84L42.19 25.91L41.86 26.11L41.05 26.20L40.77 26.38L40.45 26.39L39.36 26.76L39.09 26.94L38.55 27.03L38.32 27.20L37.18 27.57L34.61 28.91L32.18 30.57L30.07 32.50L28.15 34.82L28.00 35.21L27.57 35.68L27.18 36.57L26.77 37.01L26.56 37.50L26.58 37.73L26.01 38.86L26.03 39.09L25.68 39.82L25.08 42.55L25.03 44.27L24.84 45.64L25.03 46.77L25.11 48.68L25.29 49.18L25.39 50.32L25.56 50.55L25.65 51.09L25.84 51.36L26.19 52.59L27.03 54.27L28.41 56.34L30.02 58.05L31.55 59.36L32.41 59.93L32.76 60.05L34.05 61.02L36.68 62.30L36.91 62.29L38.86 63.12L39.09 63.11L40.50 63.67L44.64 64.63L44.86 64.76L51.91 66.11L55.45 66.92L56.05 67.21L56.27 67.20L56.86 67.49L57.09 67.47L57.68 67.76L57.91 67.74L59.05 68.30L59.27 68.29L59.55 68.55L59.82 68.56L60.19 68.91L61.05 69.30L62.32 70.50L62.92 71.27L63.47 72.36L63.56 72.91L63.75 73.18L63.79 76.00L63.38 77.32L63.39 77.55L63.13 78.09L62.16 79.55L61.30 80.41L59.86 81.47L58.23 82.29L56.86 82.65L56.59 82.84L55.85 82.91L55.05 83.15L53.82 83.21L53.32 83.39L49.23 83.39L46.50 83.03L43.92 82.32L43.18 81.92L42.91 81.92L42.64 81.65L42.36 81.64L42.09 81.38L41.82 81.37L40.67 80.50L40.28 80.36L38.82 78.91L38.23 78.17L37.12 75.95L37.02 75.09L36.84 74.86L36.83 74.55L36.68 74.40L23.77 74.39L23.55 74.44L23.47 74.64L23.47 75.36L23.66 75.91L23.75 77.32L23.92 77.77L24.01 78.64L24.21 78.95L24.29 79.73L24.50 80.09L24.57 80.86L25.56 82.73L25.67 83.32L26.10 83.82L26.47 84.55L27.82 86.39L29.86 88.50L30.59 88.95L31.45 89.82L32.49 90.32L33.68 91.22L34.23 91.49L34.45 91.47L34.77 91.76L35.00 91.74L35.41 91.91L36.77 92.62L39.95 93.67L44.09 94.49L44.55 94.47L47.05 94.84L49.59 94.89L54.68 94.84L55.45 94.66L58.64 94.32L59.39 94.09L60.14 94.02L60.36 93.85L61.18 93.76L61.45 93.57L62.23 93.50L63.41 93.01L63.95 92.93L64.36 92.69L64.82 92.64L68.59 90.74L69.91 89.76L70.23 89.65L72.15 88.00L73.77 86.27L74.23 85.55L74.91 84.85L75.59 83.38L76.02 82.91L77.30 79.45L77.85 76.73L77.83 75.73L77.98 74.50L77.93 71.27L77.75 70.77L77.66 69.64L77.49 69.18L77.38 68.27L77.20 68.00L76.84 66.64L75.73 64.42L74.64 62.80L73.03 61.09L72.46 60.73L71.77 60.05L71.10 59.64L70.67 59.23L69.68 58.77L69.27 58.39L67.05 57.28L66.64 57.10L66.41 57.12L65.27 56.56L65.05 56.58L64.41 56.26L62.82 55.74L62.59 55.76L59.82 54.92L57.59 54.51L57.36 54.38L48.95 52.76L45.56 51.77L44.14 51.20L42.50 50.38L42.04 49.95L41.65 49.82L40.18 48.36L39.85 47.86L39.30 46.77L39.02 44.59L39.12 44.23L39.11 43.50L39.40 42.64L39.38 42.41L40.41 40.44L41.47 39.27L42.09 38.76L42.41 38.65L42.91 38.21L44.50 37.41L44.95 37.35L45.36 37.12L46.23 37.02L46.45 36.85L47.59 36.75L48.14 36.56L51.00 36.47L53.82 36.66L55.87 37.14L56.77 37.44L57.95 38.03L58.23 38.04L58.56 38.36L59.41 38.76L60.43 39.59L61.27 40.44L62.08 41.50L62.65 42.64L62.76 43.23L62.93 43.45L63.20 44.50L63.27 45.32L63.41 45.49L76.45 45.52L76.65 45.41L76.57 43.77L76.39 43.23L76.30 41.59L76.10 41.27L75.52 38.95L75.30 38.59L74.92 37.45L74.36 36.33L73.00 34.16L71.64 32.53L69.32 30.33L68.92 30.18L68.45 29.75L68.10 29.64L67.67 29.23L67.28 29.09L66.85 28.68L64.64 27.57L61.18 26.29L58.36 25.63L55.41 25.19Z" class="fr__mark"/><circle cx="89.73" cy="87.0" r="7.56" fill="#0A84FF"/></svg>';
 
   const version = () => { try { return BCV.api.runtime.getManifest().version || null; } catch { return null; } };
@@ -75,14 +102,15 @@
     const to = version();
     if (!to) return null;
     let flags = {};
-    try { flags = await BCV.api.storage.local.get(['setup:done', SEEN_KEY, FROM_KEY]); } catch { return null; }
+    try { flags = await BCV.api.storage.local.get(['setup:done', SEEN_KEY, FROM_KEY, MERGED_KEY]); } catch { return null; }
     if (!flags['setup:done']) return null; // a fresh install gets the setup, never both
     if (flags[SEEN_KEY] === to) return null;
     const from = flags[FROM_KEY] || flags[SEEN_KEY] || null;
     if (from === to) return null;
     if (!(await notesReady()) || !NOTES().some((v) => v.version === to)) return null;
     const invite = !!NOTES().find((v) => v.version === to)?.invite && !(await tried()); // (an invitation, unless a theme has been tried already)
-    return { from: from && cmp(from, to) < 0 ? from : null, to, invite };
+    const merged = !flags[MERGED_KEY] && !!from && cmp(from, MERGED_IN) < 0 && cmp(to, MERGED_IN) >= 0; // (from before the two were one)
+    return { from: from && cmp(from, to) < 0 ? from : null, to, invite, merged };
   }
 
   /** The versions the page lists, newest first: after an update, every one newer than the version
@@ -131,11 +159,13 @@
     markSeen(st.to);
   }
 
-  async function open(app, { from = null, to = version(), manual = false, invite: asked = false } = {}) {
+  async function open(app, { from = null, to = version(), manual = false, invite: asked = false, merged: owed = false } = {}) {
     if (ui) return;
     if (!(await notesReady()) || ui) return;
     const shown = since(from, to);
     if (!shown.length) return;
+    // (2.99.120) an update from before To Do and the calendar were one: the merged intro in the notes' place
+    if (!manual && owed) return mergedIntro(app, shown[0].version);
     // an update that due() says invites (the version carries an invitation, and no theme has been tried) shows it in the notes' place; Settings still opens the notes
     if (!manual && asked) return invite(app, shown[0].version);
     st = { app, from: from && shown.length > 1 ? from : null, to: shown[0].version, shown, oldest: shown[shown.length - 1].version, manual, closing: false };
@@ -166,6 +196,40 @@
       h('button', { type: 'button', class: 'btn fr__next', id: 'personalize', onclick: personalize }, [h('span', { text: 'Personalize' }), svg('M9 6l6 6-6 6', { size: 15, width: 2.4 })]),
     );
     playIntro();
+  }
+  /** (2.99.120) The merged intro: the scene (playing over and over; still, as it ends, under reduced
+   *  motion), a title, a line, Quick Plan's card, then Open To Do & Calendar and Got it. Shown once:
+   *  its flag, and this version, are seen the moment it is up. */
+  function mergedIntro(app, to) {
+    if (ui) return;
+    st = { app, from: null, to, shown: [], oldest: to, manual: false, closing: false, merged: true };
+    mount(app, { label: 'New in Simpl', kind: 'mi', ariaLabel: 'New in Simpl Courses: To Do and Calendar are one', quick: true });
+    try { BCV.api.storage.local.set({ [MERGED_KEY]: true }); } catch { /* it shows again next time, no worse */ }
+    ui.body.replaceChildren(
+      h('div', { class: 'mi__scene', role: 'img', 'aria-label': 'To Do and the calendar come together as one; a task dragged onto the calendar becomes a plan', html: MERGE_SCENE }),
+      h('h1', { class: 'fr__h1', text: 'To Do and Calendar are one' }),
+      h('p', { class: 'fr__blurb', text: 'Your tasks now sit beside your week, in one tab.' }),
+      h('div', { class: 'mi__card' }, [
+        h('span', { class: 'mi__ic' }, svg('M5 6h14v14H5zM5 10h14M9 3v4M15 3v4M9 15h6', { size: 16, width: 2 })),
+        h('div', { class: 'mi__words' }, [
+          h('div', { class: 'mi__name', text: 'Quick Plan' }),
+          h('div', { class: 'mi__line', text: 'Drag a task onto the calendar to set time aside for it. Drop it on a day and Simpl finds a free spot.' }),
+        ]),
+      ]),
+    );
+    ui.foot.replaceChildren(
+      h('button', { type: 'button', class: 'btn btn--ghost fr__back', id: 'open', text: 'Open To Do & Calendar', onclick: openCalendar }),
+      h('span', { class: 'fr__spacer' }),
+      h('button', { type: 'button', class: 'btn fr__next', id: 'dismiss', onclick: dismiss }, [h('span', { text: 'Got it' })]),
+    );
+  }
+  /** Open To Do & Calendar: the intro goes and the place opens. */
+  async function openCalendar() {
+    if (!st || st.closing) return;
+    st.closing = true;
+    const app = st.app;
+    await close();
+    app?.go?.('/calendar');
   }
   /** Personalize: the invitation goes and the editor opens over the page (?bcv=personalize is a real
    *  load of the page, on which content/app/setup.js opens the editor on its own); then=appearance
