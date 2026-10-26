@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -19,14 +20,21 @@ namespace Simpl.Shell;
 /// interrupts it. A page comes in with what it shows (built from the answers kept), never as an empty frame filled
 /// after; one with nothing read yet waits a moment for its first answer. Under Windows' "Animation effects" off,
 /// pages simply change.
-/// What is kept, against memory: the Dashboard's page always; of the rest, the last <see cref="KeptPages"/> shown, and
-/// any with something of the student's in it still. Every other screen is let go — its page, its tree, the screen —
+/// What is kept, against memory: the Dashboard's page always, and (0.3.76) the main places' (<see cref="MainPlaces"/>),
+/// built ahead while the window is left alone; of the rest, the last <see cref="KeptPages"/> shown, and any with
+/// something of the student's in it still. Every other screen is let go — its page, its tree, the screen —
 /// and made again from the answers kept (AnswerCache: in memory, and sealed on disk) when it is next shown.
 /// </summary>
 public sealed partial class AppShell
 {
-    /// <summary>How many screens besides the Dashboard keep their pages (the one showing among them).</summary>
+    /// <summary>How many screens besides the Dashboard and the main places keep their pages (the one showing among them).</summary>
     private const int KeptPages = 3;
+
+    /// <summary>(0.3.76) The places the pane leads to most, kept as the Dashboard is and built ahead (<see cref="WarmMainPages"/>).</summary>
+    private static readonly Place[] MainPlaces = { Place.Calendar, Place.Grades, Place.Notifications, Place.Inbox };
+
+    /// <summary>When something was last pressed, typed or moved over in the window.</summary>
+    private long lastInput = Environment.TickCount64;
 
     /// <summary>A screen's page in the deck: its scroller (or the screen itself, for one that scrolls its own parts),
     /// moved and faded as a whole.</summary>
@@ -348,11 +356,59 @@ public sealed partial class AppShell
         var now = Environment.TickCount64;
         foreach (var s in placeScreens.Values.Concat(routeScreens.Values).ToList())
         {
-            if (s == current || s is DashboardScreen || recent.Contains(s) || s.Busy) continue;
+            if (s == current || s is DashboardScreen || recent.Contains(s) || s.Busy || IsMain(s)) continue;
             if (leaves.TryGetValue(s, out var l) && (l.Turn != 0 || (l.PreparedAt != 0 && now - l.PreparedAt < 2000))) continue;
             Release(s);
         }
     }
+
+    /// <summary>One of the main places' screens (kept).</summary>
+    private bool IsMain(Screen s) => placeScreens.Any(kv => kv.Value == s && MainPlaces.Contains(kv.Key));
+
+    /// <summary>
+    /// (0.3.76) The main places — To Do &amp; Calendar, Grades, Notifications, the Inbox — built ahead and laid out, unseen,
+    /// one at a time once the start has settled: each only while nobody is using the window (nothing pressed, typed or
+    /// moved over for a second and a half), nothing asked of the page and nothing read ahead (Prefetcher, whose answers
+    /// they are built from). Their first opening is then a page shown, as a kept page is — not a page built and laid out
+    /// while the click waits (To Do &amp; Calendar's took 300 ms and more, the window still meanwhile). Not in the
+    /// screenshot suite's pictures, nor with --no-prefetch.
+    /// </summary>
+    private async void WarmMainPages()
+    {
+        if (Shot.Asked || Launch.Flag("no-prefetch")) return;
+        try
+        {
+            InputManager.Current.PostProcessInput += (_, a) =>
+            {
+                if (a.StagingItem.Input is MouseEventArgs or KeyboardEventArgs or TouchEventArgs or StylusEventArgs) lastInput = Environment.TickCount64;
+            };
+            while (!engine.CountsLive) await Task.Delay(250);
+            await Task.Delay(1500);
+            var built = 0;
+            var at = Environment.TickCount64;
+            foreach (var place in MainPlaces)
+            {
+                if (place == Place.Inbox && engine.OnBrightspace) continue;
+                // (a minute at most for a quiet moment: someone busy in the window has it as before)
+                for (var waited = 0; waited < 60_000 && !Quiet(); waited += 250) await Task.Delay(250);
+                if (engine.Phase != Phase.Native || !Quiet()) continue;
+                var s = ScreenAt(new Location(place), make: true)!;
+                if (s == current || leaves.ContainsKey(s)) continue;
+                s.SetWidth(ContentWidth, WindowActualWidth);
+                if (!s.Ready) s.Prefetch();
+                for (var i = 0; i < 40 && !s.Ready; i++) await Task.Delay(250);
+                if (!Quiet()) continue;
+                await Dispatcher.InvokeAsync(() => BuildAhead(s), DispatcherPriority.ApplicationIdle);
+                built++;
+                await Task.Delay(400);
+            }
+            Log.Write($"warm: {built} main pages built ahead in {(Environment.TickCount64 - at) / 1000.0:0.0} s");
+        }
+        catch (Exception e) { Log.Write("warm: " + e.Message); }
+    }
+
+    /// <summary>Nobody using the window this moment, and nothing being read for it.</summary>
+    private bool Quiet() => Environment.TickCount64 - lastInput >= 1500 && engine.CallsInFlight == 0 && !PrefetchBusy && shownLeaf?.Turn is null or 0;
 
     /// <summary>A screen let go: its page out of the deck, its tree and the screen itself — its title kept for the breadcrumb.</summary>
     private void Release(Screen s)

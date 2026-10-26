@@ -198,6 +198,7 @@ public sealed partial class AppShell : Grid, IDisposable
         _ = engine.LoadSidebar();
         _ = LoadMore();
         prefetch.Start();
+        WarmMainPages();
         // (the screenshot suite: --place-window section:courses/101:grades opens that place in a window of its own, over
         // the main one, once it is up)
         // (or a page of the school's by its address — --place-window /courses/101/assignments/1012 — on its own screen)
