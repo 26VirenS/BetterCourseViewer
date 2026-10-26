@@ -239,7 +239,7 @@ extension Engine {
         if d.string(forKey: "SimplShotFile") != nil && d.string(forKey: "SimplWalk") == nil { return }
         ahead.afterLaunch(self) { [weak self] in
             guard let self else { return [] }
-            var places: [Place] = [.dashboard, .todo, .calendar, .grades, .notifications]
+            var places: [Place] = [.dashboard, .calendar, .grades, .notifications]
             if !self.onBrightspace { places.append(.inbox) }
             places.append(.courses)
             places += self.courses.map { Place.home("courses/\($0.id)") }
@@ -255,10 +255,9 @@ extension Engine {
             return DashboardView.reads(engine)
         case .courses:
             return [.read("allCourses", AllCoursesData.self), .read("coursesProgress", ["all": true], [String: CourseProgress].self)]
-        case .todo:
-            return [.read("todo", TodoData.self)]
         case .calendar:
-            return [CalendarView.readAhead()]
+            // (1.3.170) To Do & Calendar: the calendar and the To Do beside it
+            return [CalendarView.readAhead(), TodoPanel.readAhead]
         case .grades:
             return [.read("grades", GradesData.self)]
         case .notifications:

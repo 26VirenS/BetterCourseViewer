@@ -29,6 +29,8 @@ struct Snapshot: Codable {
     var lms: String?
     /// (Mac 1.3.8) The school's logo, as the web's sidebar shows it.
     var logo: SchoolLogo?
+    /// (Mac 1.3.170) What is open on To Do over the next seven days, for To Do & Calendar's row.
+    var todoOpen: Int?
 }
 
 /// A school's logo: its address, whether it is a square mark (else a wide one, drawn whole on `bg`, the nav's colour).
@@ -64,6 +66,11 @@ struct WorkRow: Codable, Identifiable, Hashable {
     var pts: String?
     /// (2.99.107) The time it is planned for, pulled to (content/app/plan.js): "Planned Tue 4:00 PM".
     var plan: WorkPlan?
+    /// (Mac 1.3.170) To Do beside the calendar (native-app.js `todo` panel): when it is due in words ("Due Fri 11:59 PM",
+    /// "Was due …"), whether that is past, and whether it was dismissed (shown with what is done, to be restored).
+    var dueText: String?
+    var late: Bool?
+    var dismissed: Bool?
 }
 
 /// (2.99.107) A piece of work's plan: when, for how long, and the words its pill says.
@@ -284,6 +291,11 @@ struct TodoData: Codable {
     var group: String
     var showDone: Bool
     var sections: [TodoSection]
+    /// (Mac 1.3.170) The panel's small summary beside the calendar: its most pressing line ("1 overdue", "3 due today",
+    /// "5 to do", "All done") and its tone ("over", "done" or ""), and how many were dismissed (Show Completed's count).
+    var sumText: String?
+    var sumTone: String?
+    var dismissedN: Int?
     var empty: String?
     var courses: [NamedColor]?
     var repeats: [RepeatChoice]?

@@ -5,8 +5,9 @@ import SwiftUI
 // row of work — the Dashboard's day, its List, a counter's panel, its activity; the Calendar's days, week and list; To
 // Do — grows a card out of that row with what the work is: its kind and course, its title, when it is due, its points,
 // where it stands and the first words of what it says, with the way through to it (Open, or Return), Hand In or Take
-// Quiz where it waits on you, and Mark Done for a row with a tick. Escape or its ✕ folds it back into the row; (1.3.79) a
-// click round it, or going to another screen, leaves it up — it never blocks the window. A double-click (or a ⌘-click)
+// Quiz where it waits on you, and Mark Done for a row with a tick. Escape, its ✕ or (1.3.170) a click anywhere round it
+// folds it back into the row, quickly — the click still does what it does: the card never blocks the window; going to
+// another screen leaves it up. A double-click (or a ⌘-click)
 // on a row opens the work whole, as a click did before; the row's own menu is as it was. The card itself is drawn over
 // the window by WorkPreviewOverlay (Shell/WorkPreviewOverlay.swift).
 
@@ -79,6 +80,17 @@ final class WorkPreview: ObservableObject {
         NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? .easeInOut(duration: 0.2) : Motion.gentle
     }
 
+    /// (1.3.170) Folding back is quicker than growing out: a short ease in (a fade under Reduce Motion), about 0.13 s.
+    static var closing: Animation {
+        NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? .easeOut(duration: 0.12) : .easeIn(duration: 0.13)
+    }
+
+    /// (1.3.170) Where the card is in its window, from the window's top left, as the overlay last laid it out (nil while it
+    /// is in a popup of its own): a click there is the card's, anywhere else closes it.
+    var cardFrame: CGRect?
+    weak var cardWindow: NSWindow?
+    private var outside: Any?
+
     /// A row pressed: its preview — or, for a double-click or a ⌘-click, the work itself. The row whose card is out,
     /// pressed again, folds it back.
     func press(_ item: PreviewItem, from anchor: PreviewAnchor?) {
@@ -121,6 +133,7 @@ final class WorkPreview: ObservableObject {
             self.token += 1
             self.item = item
         }
+        watchOutside()
     }
 
     /// Out of its row to its place.
@@ -133,8 +146,9 @@ final class WorkPreview: ObservableObject {
     func close() {
         guard item != nil else { return }
         lastPress = nil // (a row pressed again after this is a press of its own, never a double-click's second)
+        unwatchOutside()
         let t = token
-        withAnimation(WorkPreview.motion) {
+        withAnimation(WorkPreview.closing) {
             shown = false
         } completion: { [weak self] in
             guard let self, self.token == t else { return }
@@ -146,6 +160,7 @@ final class WorkPreview: ObservableObject {
     /// Gone at once (the work opened whole, the window gone somewhere else).
     func dismiss() {
         closeInline(animated: false)
+        unwatchOutside()
         guard item != nil else { return }
         var t = Transaction()
         t.disablesAnimations = true
@@ -218,7 +233,7 @@ final class WorkPreview: ObservableObject {
         guard inlineID != nil else { return }
         lastPress = nil
         if animated {
-            withAnimation(WorkPreview.motion) {
+            withAnimation(WorkPreview.closing) {
                 inlineID = nil
                 inlineItem = nil
             }
@@ -255,6 +270,34 @@ final class WorkPreview: ObservableObject {
     private func unwatch() {
         if let m = monitor { NSEvent.removeMonitor(m) }
         monitor = nil
+    }
+
+    /// (1.3.170) While a card is up over the window: a press anywhere but on the card (or in its popup) and its own row
+    /// folds it back, and still does what it does — on another row, that row's card comes up. Its own row pressed again
+    /// closes it as before (`press`).
+    private func watchOutside() {
+        guard outside == nil else { return }
+        outside = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] e in
+            guard let self, self.item != nil, self.shown, !self.isOnCard(e) else { return e }
+            self.close()
+            return e
+        }
+    }
+
+    private func unwatchOutside() {
+        if let m = outside { NSEvent.removeMonitor(m) }
+        outside = nil
+    }
+
+    /// A press on the card (over the window, or in its own popup) or on the row it grew from.
+    private func isOnCard(_ e: NSEvent) -> Bool {
+        guard let w = e.window else { return false }
+        if let panel = w as? PopupPanel, panel.popupKey == "preview" { return true }
+        let h = w.contentView?.frame.height ?? w.frame.height
+        let p = CGPoint(x: e.locationInWindow.x, y: h - e.locationInWindow.y)
+        if w === cardWindow, let f = cardFrame, f.contains(p) { return true }
+        if let row = anchor?.view, row.window === w, TourFrames.flip(row.convert(row.bounds, to: nil), w).contains(p) { return true }
+        return false
     }
 }
 

@@ -13,6 +13,8 @@ import SwiftUI
 /// What a suggestion does when it is picked.
 enum PaletteAction: Hashable {
     case go(Place)
+    /// (1.3.170) To Do & Calendar with To Do shown beside the calendar (/todo, /calendar).
+    case todo
     case open(url: String, title: String, external: Bool)
     case work(url: String?, title: String)
     case search(String)
@@ -335,17 +337,18 @@ final class SearchPalette: ObservableObject {
         }
         switch action {
         case .go(let place): engine.go(place)
+        case .todo: engine.showTodo()
         case .open(let url, let title, let external): engine.openFromSearch(url, title: title, external: external)
         case .work(let url, let title):
-            if let url, !url.isEmpty { engine.openWeb(url, title: title) } else { engine.go(.todo) }
-        case .newTask: engine.newTask = true
+            if let url, !url.isEmpty { engine.openWeb(url, title: title) } else { engine.showTodo() }
+        case .newTask: engine.newTask()
         case .addTask(let title):
             Task {
                 if await engine.act("addTask", ["title": title]) {
                     engine.changed()
-                    engine.go(.todo)
+                    engine.showTodo()
                 } else {
-                    engine.newTask = true
+                    engine.newTask()
                 }
             }
         case .newMessage: engine.newMessage = true
@@ -379,8 +382,8 @@ final class SearchPalette: ObservableObject {
         let canvas = !engine.onBrightspace // (Brightspace has no Inbox or groups here)
         var c: [PaletteCommand] = []
         c.append(PaletteCommand(name: "dashboard", aliases: ["home", "today"], title: "Dashboard", hint: "What’s due and new, at a glance", symbol: "square.grid.2x2", key: "⌘1", action: .go(.dashboard)))
-        c.append(PaletteCommand(name: "todo", aliases: ["tasks", "planner"], title: "To Do", hint: "Everything to do this week", symbol: "checklist", key: "⌘2", action: .go(.todo)))
-        c.append(PaletteCommand(name: "calendar", aliases: ["cal", "schedule"], title: "Calendar", hint: "Your courses’ calendar", symbol: "calendar", key: "⌘3", action: .go(.calendar)))
+        // (1.3.170) To Do and the Calendar, one place: /todo and /calendar both open it, To Do shown beside the calendar
+        c.append(PaletteCommand(name: "calendar", aliases: ["todo", "tasks", "planner", "cal", "schedule"], title: "To Do & Calendar", hint: "This week’s work beside your courses’ calendar", symbol: "calendar", key: "⌘2", action: .todo))
         c.append(PaletteCommand(name: "grades", aliases: ["gpa", "grade", "marks"], title: "Grades", hint: "Your GPA and every course’s grade — or one: /grades bio", symbol: "chart.bar.xaxis", key: "⌘4", takes: "a course", lists: .grades, quick: true, action: .go(.grades)))
         c.append(PaletteCommand(name: "notifications", aliases: ["alerts", "activity"], title: "Notifications", hint: "What’s new in your courses", symbol: "bell", key: "⌘5", action: .go(.notifications)))
         if canvas {

@@ -179,7 +179,7 @@ struct CEMembranePage: View {
         }
         .onAppear(perform: applyLaunch)
         .onExitCommand { withAnimation(anim) { selection = nil } }
-        .floatingPopup("cell-popc", title: "POPC, a phospholipid", isPresented: $showPOPC) { CEPOPCSheet() } // (1.3.79: never blocking)
+        .floatingPopup("cell-popc", title: "POPC, a phospholipid", isPresented: $showPOPC, light: true) { CEPOPCSheet() } // (1.3.79: never blocking; 1.3.170: closed by a press outside it)
     }
 
     private func saved(_ b: Binding<Bool>, _ field: String) -> Binding<Bool> {

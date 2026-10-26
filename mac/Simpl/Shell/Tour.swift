@@ -454,7 +454,7 @@ struct TourOverlay: View {
     private var free: Bool {
         guard engine.phase == .native, let snap = engine.snapshot else { return false }
         let setUp = snap.setupDone != false || sawSetup || SetupLater.asked
-        return setUp && !engine.setup && engine.whatsNew == nil && engine.quiz == nil && !engine.newTask && !engine.newMessage
+        return setUp && !engine.setup && engine.whatsNew == nil && engine.quiz == nil && !engine.newMessage
             && !engine.settingsOpen && engine.query.isEmpty && preview.item == nil
     }
 }

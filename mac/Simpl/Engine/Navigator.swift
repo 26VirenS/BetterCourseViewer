@@ -1,13 +1,12 @@
 import Combine
 import Foundation
 
-/// A place in the sidebar: a root of the app (Dashboard, To Do …), a course's or a group's home, or one of its sections.
-/// A context (`ctx`) is "courses/<id>" or "groups/<id>", as in the iPhone app.
+/// A place in the sidebar: a root of the app (Dashboard, To Do & Calendar …), a course's or a group's home, or one of
+/// its sections. A context (`ctx`) is "courses/<id>" or "groups/<id>", as in the iPhone app.
 enum Place: Hashable {
     case dashboard
     case courses
-    case todo
-    case calendar
+    case calendar // (1.3.170) To Do & Calendar: To Do lives beside the calendar, its own place gone
     case grades
     case notifications
     case inbox

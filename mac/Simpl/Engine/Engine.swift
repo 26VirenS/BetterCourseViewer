@@ -167,11 +167,15 @@ final class Engine: ObservableObject, ShellListener {
     @Published var whatsNew: WhatsNewSheetItem? {
         didSet { if whatsNew == nil && oldValue != nil { schedulePopups() } }
     }
-    /// A new task (File → New Task, the + on To Do) and a new message (File → New Message): (1.3.79) their popups —
-    /// asked for again while up, brought to the front.
-    @Published var newTask = false {
-        didSet { if newTask && oldValue { popups.raise("newtask") } }
+    /// (1.3.170) A new task asked for (File ▸ New Task, the Dashboard's, the search's, a day's on the calendar): To Do &
+    /// Calendar, To Do shown beside the calendar and its composer open — on the day asked, if one was (the web's 2.99.112,
+    /// todoAddNext). The panel takes it and lets it go (Screens/TodoPanel.swift); 1.3.79's popup is gone.
+    @Published var taskAsked: TaskAsk?
+    struct TaskAsk: Equatable {
+        let serial: Int
+        let day: Date?
     }
+    /// A new message (File → New Message): (1.3.79) its popup — asked for again while up, brought to the front.
     @Published var newMessage = false {
         didSet { if newMessage && oldValue { popups.raise("compose") } }
     }
@@ -454,7 +458,7 @@ final class Engine: ObservableObject, ShellListener {
         } else if LaunchOpen.take("settings") != nil {
             NotificationCenter.default.post(name: .simplOpenSettings, object: nil)
         } else if LaunchOpen.take("newtask") != nil {
-            newTask = true
+            newTask()
         } else if LaunchOpen.take("compose") != nil {
             newMessage = true
         } else if let m = LaunchOpen.take("more:") {
@@ -498,7 +502,6 @@ final class Engine: ObservableObject, ShellListener {
         switch place {
         case .dashboard: return "dashboard"
         case .courses: return "courses"
-        case .todo: return "todo"
         case .calendar: return "calendar"
         case .grades: return "grades"
         case .notifications: return "notifications"
@@ -520,7 +523,9 @@ final class Engine: ObservableObject, ShellListener {
         switch parts.first ?? "" {
         case "dashboard", "today": return .dashboard
         case "courses": return .courses
-        case "todo": return .todo
+        case "todo": // (1.3.170) To Do's old name: To Do & Calendar, To Do shown beside the calendar
+            TodoShown.reveal()
+            return .calendar
         case "calendar": return .calendar
         case "grades": return .grades
         case "notifications": return .notifications
@@ -551,7 +556,7 @@ final class Engine: ObservableObject, ShellListener {
     /// Free for a popup: the app's own screens up, the page loaded, nothing of the sign-in on screen or still to come,
     /// and no other sheet over the window.
     private var popupFree: Bool {
-        phase == .native && !web.webView.isLoading && web.login.settled && !setup && whatsNew == nil && quiz == nil && !settingsOpen && !newTask && !newMessage
+        phase == .native && !web.webView.isLoading && web.login.settled && !setup && whatsNew == nil && quiz == nil && !settingsOpen && !newMessage
     }
 
     func schedulePopups(after delay: Double = 0.7) {
@@ -1087,13 +1092,26 @@ final class Engine: ObservableObject, ShellListener {
     func openNotifications() { go(.notifications) }
     func openCalendar() { go(.calendar) }
 
+    /// (1.3.170) Wherever To Do was gone to (Go ▸ To Do & Calendar, the search's /todo, a task added there): To Do &
+    /// Calendar, with To Do shown beside the calendar.
+    func showTodo() {
+        TodoShown.reveal()
+        go(.calendar)
+    }
+
+    /// (1.3.170) A new task: To Do & Calendar, its To Do shown and the composer open on `day` (today when none is given).
+    func newTask(on day: Date? = nil) {
+        showTodo()
+        taskAsked = TaskAsk(serial: (taskAsked?.serial ?? 0) + 1, day: day)
+    }
+
     /// A root by the name the router and the page use.
     func switchTab(_ name: String) {
         switch name {
         case "notifications": go(.notifications)
         case "calendar": go(.calendar)
         case "courses": go(.courses)
-        case "todo": go(.todo)
+        case "todo": showTodo()
         case "grades": go(.grades)
         case "inbox": go(.inbox)
         default: go(.dashboard)
@@ -1134,7 +1152,6 @@ final class Engine: ObservableObject, ShellListener {
         switch place {
         case .dashboard: return absolute("/")
         case .courses: return absolute("/courses")
-        case .todo: return absolute("/")
         case .calendar: return absolute("/calendar")
         case .grades: return absolute("/grades")
         case .notifications: return absolute("/profile/communication")

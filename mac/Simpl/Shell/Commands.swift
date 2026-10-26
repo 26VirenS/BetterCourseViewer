@@ -40,7 +40,7 @@ struct SimplCommands: Commands {
                 .keyboardShortcut("n", modifiers: [.command, .option])
                 .disabled(!ready)
             Divider()
-            Button("New Task") { engine?.newTask = true }
+            Button("New Task") { engine?.newTask() } // (1.3.170: To Do & Calendar, its composer open)
                 .keyboardShortcut("n")
                 .disabled(!ready)
             Button("New Message") { engine?.newMessage = true }
@@ -62,8 +62,7 @@ struct SimplCommands: Commands {
             GoBackForward(whereabouts: engine?.whereabouts ?? Whereabouts.nowhere, engine: engine)
             Divider()
             place("Dashboard", .dashboard, key: "1")
-            place("To Do", .todo, key: "2")
-            place("Calendar", .calendar, key: "3")
+            place("To Do & Calendar", .calendar, key: "2") // (1.3.170: one place)
             place("Grades", .grades, key: "4")
             place("Notifications", .notifications, key: "5")
             if !(engine?.onBrightspace ?? false) { place("Inbox", .inbox, key: "6") }

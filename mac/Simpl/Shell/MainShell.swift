@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The window once Canvas is ready: the sidebar (Simpl's own — Dashboard, To Do, Calendar, Grades, Notifications, the
+/// The window once Canvas is ready: the sidebar (Simpl's own — Dashboard, To Do & Calendar, Grades, Notifications, the
 /// Inbox, each course with its sections, the groups, and the account at its foot), the screen chosen there with what
 /// is pushed on it, and the toolbar: Back and Forward (a browser's, across the whole window), the screen's own title and
 /// buttons, and Search (whose suggestions run commands, 1.2). The tour, the first time, goes over all of it.
@@ -264,7 +264,6 @@ struct PlaceScreen: View {
         switch place {
         case .dashboard: DashboardChrome() // (1.3.78: the Dashboard itself is kept over the stack, DetailStack)
         case .courses: CoursesView()
-        case .todo: TodoView()
         case .calendar: CalendarView()
         case .grades: GradesView()
         case .notifications: NotificationsView()
@@ -408,9 +407,10 @@ struct Sidebar: View {
                     .tourSpot(.dashboardRow)
                     .tag(Place.dashboard)
                     .windowMenu(Place.dashboard)
-                Label("To Do", systemImage: "checklist").tag(Place.todo)
-                    .windowMenu(Place.todo)
-                Label("Calendar", systemImage: "calendar").tag(Place.calendar)
+                // (1.3.170) To Do and the Calendar, one place — To Do beside the calendar — with To Do's count
+                Label("To Do & Calendar", systemImage: "calendar")
+                    .badge(engine.countsLive ? (engine.snapshot?.todoOpen ?? 0) : 0)
+                    .tag(Place.calendar)
                     .windowMenu(Place.calendar)
                 Label("Grades", systemImage: "chart.bar.xaxis")
                     .tourSpot(.gradesRow)

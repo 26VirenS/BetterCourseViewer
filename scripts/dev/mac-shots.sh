@@ -505,13 +505,24 @@ ui_review() {
   # (a two-page reading, for the annotator and Merge & Split: one PDF opens Split)
   MODE=light shoot light-58-tool-annotate 14 -SimplPlace tools -SimplTool mark -SimplToolFile "$PWD/scripts/dev/fixtures/reading.pdf"
   MODE=light shoot light-58b-tool-split 14 -SimplPlace tools -SimplTool pdfx -SimplToolFile "$PWD/scripts/dev/fixtures/reading.pdf"
-  # (1.3.169) the week with To Do beside it, and a row of To Do held over Wednesday at 1 PM: where it would be planned
+  # (1.3.169) the week with To Do beside it, and a row of To Do held over Thursday at 1 PM: where it would be planned
   # (the runner's screen keeps every window 1024 points wide: the sidebar folded, so the week has room for To Do beside
   #  it; its first read is slow on a loaded runner)
   MODE=light shoot light-05w-calendar-week 22 -SimplPlace calendar -SimplCalView week -SimplSidebar hidden
   MODE=dark shoot dark-05w-calendar-week 22 -SimplPlace calendar -SimplCalView week -SimplSidebar hidden
   MODE=light shoot light-05t-calendar-week-todo-drop 22 -SimplPlace calendar -SimplCalView week -SimplSidebar hidden -SimplTodoDrop 3,780
   MODE=light shoot light-05l-calendar-list 12 -SimplPlace calendar -SimplCalView list
+  # (1.3.170) To Do & Calendar: the month with To Do beside it, light and dark, the head as the web lays it out; To Do's
+  # ⋯ menu open (By Date, By Priority, By Course, Show Completed); the week of seven days; the week pinched to its least,
+  # the whole day in view; and the week at a large hour scrolled to noon, what lies above and below waiting at its edges
+  # (-SimplCalWeekDays, -SimplCalHourHeight: the kept settings, given for the launch alone)
+  MODE=light shoot light-05m-calendar-month-todo 22 -SimplPlace calendar -SimplCalView month -SimplSidebar hidden
+  MODE=dark shoot dark-05m-calendar-month-todo 22 -SimplPlace calendar -SimplCalView month -SimplSidebar hidden
+  MODE=light shoot light-05k-calendar-todo-menu 24 -SimplPlace calendar -SimplCalView month -SimplSidebar hidden -SimplTodoMenu YES
+  MODE=light shoot light-05x-calendar-week-seven 22 -SimplPlace calendar -SimplCalView week -SimplCalWeekDays 7 -SimplSidebar hidden
+  MODE=light shoot light-05y-calendar-week-pinched 22 -SimplPlace calendar -SimplCalView week -SimplCalHourHeight 18 -SimplSidebar hidden
+  MODE=light shoot light-05z-calendar-week-peeks 22 -SimplPlace calendar -SimplCalView week -SimplCalHourHeight 90 -SimplCalScrollHour 12 -SimplSidebar hidden
+  MODE=dark shoot dark-05z-calendar-week-peeks 22 -SimplPlace calendar -SimplCalView week -SimplCalHourHeight 90 -SimplCalScrollHour 12 -SimplSidebar hidden
   # (1.3.151) Find Appointment's popup over the calendar: the class, the group's card, a day open to its times
   MODE=light shoot light-05f-find-appointment 16 -SimplPlace calendar -SimplFindAppointment YES
   MODE=dark shoot dark-05f-find-appointment 16 -SimplPlace calendar -SimplFindAppointment YES

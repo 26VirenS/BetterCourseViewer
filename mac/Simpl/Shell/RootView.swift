@@ -101,9 +101,6 @@ struct EngineSheets: ViewModifier {
                 SetupScreen()
                     .environmentObject(engine)
             }
-            .floatingPopup("newtask", title: "New Task", isPresented: $engine.newTask, engine: engine) {
-                NewTaskSheet()
-            }
             .floatingPopup("compose", title: "New Message", isPresented: $engine.newMessage, engine: engine) {
                 ComposeSheet()
             }
