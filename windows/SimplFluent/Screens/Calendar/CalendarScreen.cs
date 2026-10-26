@@ -42,6 +42,9 @@ public sealed partial class CalendarScreen : Screen
     private const double WeekColumnsFrom = 770;
     /// <summary>(0.3.64) The page holds still from this tall: shorter, it scrolls as before.</summary>
     private const double FitTall = 440;
+    /// <summary>(0.3.64) Below this wide, Find Appointment, Sync and the calendars go into More, so the title keeps its
+    /// room beside the commands (To Do's button is there in every view now).</summary>
+    private const double CommandsCompactBelow = 820;
     /// <summary>Room kept under the calendar and To Do when the page holds still.</summary>
     private const double FitFoot = 20;
 
@@ -176,21 +179,22 @@ public sealed partial class CalendarScreen : Screen
     protected override bool LayoutChanges(double before, double now)
     {
         bool Crossed(double at) => (before >= at) != (now >= at);
-        return Crossed(MonthBeside) || Crossed(MonthBeside + TodoWidth + TodoGap) || Crossed(WeekColumnsFrom) || Crossed(TodoBesideFrom) || Crossed(480);
+        return Crossed(MonthBeside) || Crossed(MonthBeside + TodoWidth + TodoGap) || Crossed(WeekColumnsFrom) || Crossed(TodoBesideFrom) || Crossed(480)
+            || Crossed(CommandsCompactBelow);
     }
 
     // ---- the commands (the Mac's toolbar) ----
 
     private FrameworkElement? commands;
     private SelectorBar? selector;
-    private Button? prevButton, nextButton;
+    private Button? prevButton, nextButton, finderButton, syncButton, calendarsButton;
     private FrameworkElement? pager;
     private ProgressRing? spinner;
 
     /// <summary>
     /// Beside the title: a spinner while the page is asked, Month · Week · List (Windows 11's SelectorBar; Week pressed
     /// again offers five days or seven), the chevrons round Today (a month's or a week's only), To Do shown or hidden, Find
-    /// Appointment, Sync, the calendars shown, and More (Open in Canvas, Copy link).
+    /// Appointment, Sync, the calendars shown, and More (Open in Canvas, Copy link — and, on a narrow page, the three before it).
     /// </summary>
     public override FrameworkElement? Commands
     {
@@ -210,12 +214,12 @@ public sealed partial class CalendarScreen : Screen
             var nav = K.H(4, prevButton, today, nextButton);
             nav.VerticalAlignment = VerticalAlignment.Center;
             pager = nav;
-            var calendars = K.IconButton(SymbolRegular.CalendarCheckmark24, ChooseCalendars, "Choose the calendars shown", 16, 32);
+            var calendars = calendarsButton = K.IconButton(SymbolRegular.CalendarCheckmark24, ChooseCalendars, "Choose the calendars shown", 16, 32);
             System.Windows.Automation.AutomationProperties.SetName(calendars, "Calendars");
             // (0.3.53) Canvas's Scheduler: office hours and sign-ups with a time to reserve
-            var finder = K.IconButton(SymbolRegular.CalendarClock24, FindAppointment, "Find Appointment", 16, 32);
+            var finder = finderButton = K.IconButton(SymbolRegular.CalendarClock24, FindAppointment, "Find Appointment", 16, 32);
             // (0.3.60) Sync: (0.3.63) Simpl's own calendar into a calendar app, and the student's own calendars in here
-            var sync = K.IconButton(SymbolRegular.ArrowSync24, OpenSync, "Simpl in Outlook, Google or your calendar app, and your own calendars here", 16, 32);
+            var sync = syncButton = K.IconButton(SymbolRegular.ArrowSync24, OpenSync, "Simpl in Outlook, Google or your calendar app, and your own calendars here", 16, 32);
             // (0.3.63) To Do beside the week, shown or hidden — (0.3.64) beside every view
             todoButton = K.IconButton(SymbolRegular.PanelLeft24, ToggleTodo, "Hide To Do beside the calendar", 16, 32);
             System.Windows.Automation.AutomationProperties.SetName(sync, "Sync");
@@ -251,6 +255,9 @@ public sealed partial class CalendarScreen : Screen
             if (TodoOn) todoButton.SetResourceReference(Control.BackgroundProperty, B.Subtle);
             else todoButton.ClearValue(Control.BackgroundProperty);
         }
+        // (0.3.64) a narrow page: Find Appointment, Sync and the calendars in More, the title's room kept
+        foreach (var b in new[] { finderButton, syncButton, calendarsButton })
+            if (b != null) b.Visibility = Compact ? Visibility.Collapsed : Visibility.Visible;
         if (spinner != null) spinner.Visibility = cal.Loading ? Visibility.Visible : Visibility.Hidden;
         selector?.Select(Array.IndexOf(Modes, mode), false);
         // (0.3.64) the week chosen: a chevron after its name — pressed again, it offers five days or seven
@@ -258,10 +265,21 @@ public sealed partial class CalendarScreen : Screen
             week ? $"{WeekDays} days: press again for {(WeekDays == 5 ? "seven" : "five")}" : null);
     }
 
-    /// <summary>The Mac's CanvasMenu: the calendar on the school's own site, and its link.</summary>
+    /// <summary>(0.3.64) The commands kept to the few on a narrow page.</summary>
+    private bool Compact => Width < CommandsCompactBelow;
+
+    /// <summary>The Mac's CanvasMenu: the calendar on the school's own site, and its link — and (0.3.64), on a narrow page,
+    /// Find Appointment, Sync and the calendars shown.</summary>
     private void MoreMenu(FrameworkElement at)
     {
         var menu = new ContextMenu { PlacementTarget = at, Placement = PlacementMode.Bottom };
+        if (Compact)
+        {
+            menu.Items.Add(CalendarKit.Item("Find Appointment…", SymbolRegular.CalendarClock24, FindAppointment));
+            menu.Items.Add(CalendarKit.Item("Sync…", SymbolRegular.ArrowSync24, OpenSync));
+            menu.Items.Add(CalendarKit.Item("Calendars…", SymbolRegular.CalendarCheckmark24, ChooseCalendars));
+            menu.Items.Add(new Separator());
+        }
         menu.Items.Add(CalendarKit.Item($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen("/calendar", "Calendar")));
         menu.Items.Add(CalendarKit.Item("Copy link", SymbolRegular.Link24, () => CalendarKit.Copy(engine.Absolute("/calendar"))));
         menu.IsOpen = true;

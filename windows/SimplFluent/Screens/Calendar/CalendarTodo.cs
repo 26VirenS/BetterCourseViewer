@@ -350,9 +350,9 @@ public sealed partial class CalendarScreen
     }
 
     /// <summary>The panel's ⋯: the grouping (by date, priority or course), then Show completed — with how many — or Hide.</summary>
-    private void TodoMenu(FrameworkElement at, bool held = false)
+    private ContextMenu? TodoMenu(FrameworkElement at, bool held = false)
     {
-        if (todo.Data is not { } d) return;
+        if (todo.Data is not { } d) return null;
         var group = pendingGroup ?? (string.IsNullOrEmpty(d.Group) ? "date" : d.Group);
         var showing = pendingShowDone ?? d.ShowDone;
         var menu = new ContextMenu { PlacementTarget = at, Placement = PlacementMode.Bottom, StaysOpen = held };
@@ -373,6 +373,7 @@ public sealed partial class CalendarScreen
         shown.Click += (_, _) => Regroup(showDone: !showing);
         menu.Items.Add(shown);
         menu.IsOpen = true;
+        return menu;
     }
 
     /// <summary>A row's own menu, filled as it opens from where the row stands then: the four priorities, Plan a time…,
@@ -688,10 +689,29 @@ public sealed partial class CalendarScreen
                 if (hidden || todo.Data is not { } d) return;
                 if (Launch.Take("cal-todo-menu") != null)
                 {
-                    if (todoMore is { IsLoaded: true } more)
+                    if (todoMore is { IsLoaded: true } more && TodoMenu(more, held: true) is { } menu)
                     {
-                        TodoMenu(more, held: true);
                         Log.Write($"calendar: To Do's menu open, grouped by {(string.IsNullOrEmpty(d.Group) ? "date" : d.Group)}");
+                        // (kept open for the picture: the calendar drawn again round the panel takes its ⋯ out and back,
+                        //  which closes a menu hung from it — opened again on the ⋯ there is now)
+                        var again = 0;
+                        void Reopen()
+                        {
+                            if (todoMore is not { } now || menu.IsOpen) return;
+                            if (!now.IsLoaded)
+                            {
+                                RoutedEventHandler? on = null;
+                                on = (_, _) => { now.Loaded -= on; Reopen(); };
+                                now.Loaded += on;
+                                return;
+                            }
+                            menu.PlacementTarget = now;
+                            menu.IsOpen = true;
+                        }
+                        menu.Closed += (_, _) =>
+                        {
+                            if (again++ < 20) menu.Dispatcher.BeginInvoke(Reopen, System.Windows.Threading.DispatcherPriority.Background);
+                        };
                     }
                     return;
                 }

@@ -191,6 +191,10 @@ public sealed partial class CalendarScreen
         if (off) b.SetResourceReference(Control.BackgroundProperty, B.Card2);
         AutomationProperties.SetName(b, Spoken(day, evs.Count));
         if (isSel) AutomationProperties.SetItemStatus(b, "Selected");
+        // (the screenshot suite's item to preview, folded into "1 done" with no day's list beside the month to find it in:
+        //  its quick look grows out of its day)
+        if (!dayShown && firstItem == null && PreviewOf is { } want && evs.FirstOrDefault(e => e.Title.Contains(want, StringComparison.OrdinalIgnoreCase)) is { } folded)
+            firstItem = (folded, b);
         var cell = new Grid { Children = { b } };
         if (isSel)
         {
