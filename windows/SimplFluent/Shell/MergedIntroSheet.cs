@@ -17,16 +17,16 @@ public static class MergedIntroSheet
 {
     public static void Show(Engine.Engine engine, Window over)
     {
-        var scene = new MergeScene { Height = 190, Margin = new Thickness(28, 30, 28, 0) };
+        var scene = new MergeScene { Height = 160, Margin = new Thickness(28, 24, 28, 0) };
         var sub = K.Wrapped("Your tasks now sit beside your week, in one tab.", Ty.Body, B.Text2);
         sub.TextAlignment = TextAlignment.Center;
         var head = K.V(6, K.Text("To Do and Calendar are one", Ty.Subtitle).Center(), sub);
-        head.Margin = new Thickness(28, 18, 28, 0);
+        head.Margin = new Thickness(28, 14, 28, 0);
         var words = K.V(2, K.Text("Quick Plan", Ty.BodyStrong),
                         K.Wrapped("Drag a task onto the calendar to set time aside for it. Drop it on a day and Simpl finds a free spot.", Ty.Body, B.Text2));
         var tile = K.IconTile(SymbolRegular.HandDraw24, MergeScene.AccentIcon, 32).Align(HorizontalAlignment.Left, VerticalAlignment.Top);
         var card = K.Card(K.Columns("auto, *", tile.Col(0), words.Margin(12, 0, 0, 0).Col(1)), new Thickness(14));
-        card.Margin = new Thickness(28, 18, 28, 4);
+        card.Margin = new Thickness(28, 14, 28, 18); // (all of it above the buttons in the smallest window)
         var s = new Sheet { Body = K.V(0, scene, head, card), Bare = true, Width = 460, HoldsUpdates = false, Floats = true, Light = true, Name = "To Do & Calendar" };
         s.Add("Got it", SheetButtonKind.Primary);
         s.Add("Open To Do & Calendar", SheetButtonKind.Secondary, () => engine.Go(Place.Calendar));
@@ -57,7 +57,7 @@ internal sealed class MergeScene : FrameworkElement
     };
 
     // layout, in pixels inside the scene
-    private const double Pad = 26, Top = 24, RowHeight = 20, RowStep = 28, RowsTop = 14, HourTop = 30, HourStep = 30;
+    private const double Pad = 26, Top = 24, RowHeight = 20, RowStep = 28, RowsTop = 14, HourTop = 28, HourStep = 25;
 
     private readonly Stopwatch clock = new();
     private bool running;
