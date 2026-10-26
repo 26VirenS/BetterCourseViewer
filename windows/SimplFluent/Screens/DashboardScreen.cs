@@ -276,13 +276,35 @@ public sealed partial class DashboardScreen : Screen
     /// today is Windows' blue whatever the theme's accent (a theme's pink or red would read as late), and Overdue says
     /// late work in full — its number red, its card the alert's — only while something is overdue. (0.3.70) A counter
     /// given a colour of its own in Appearance wears that one, Overdue too (a late count's number and card stay red).
+    /// (0.3.74) A colour worn (a ready theme's, or one picked): the six are that colour alone, a shade each (<see cref="Shade"/>).
     /// </summary>
-    private static Color CounterColor(string key) => Appearance.Tint(key) ?? key switch
+    private static Color CounterColor(string key) => Appearance.Tint(key) ?? (Appearance.Themed ? Shade(key) : key switch
     {
         "today" => Color.FromRgb(0x00, 0x78, 0xd4), "next" => Color.FromRgb(0x2f, 0xa8, 0x4f), "unread" => Color.FromRgb(0xf7, 0x8c, 0x1a),
         "overdue" => Color.FromRgb(0xe8, 0x4a, 0x3f), "tomorrow" => Color.FromRgb(0xf2, 0xa1, 0x00), "graded" => Color.FromRgb(0x6b, 0x5c, 0xe0),
         _ => Appearance.Accent,
-    };
+    });
+
+    /// <summary>
+    /// (0.3.74, the web's 2.99.77, the Mac's themed counters) A counter's shade of the colour worn — lightest first,
+    /// deepest last, as the web mixes them (in OKLab): Due today with white, Next 7 days the colour itself, Graded the
+    /// deepest. Overdue with something late still wears the alert's red face and number (<see cref="AlertFace"/>).
+    /// </summary>
+    private static Color Shade(string key)
+    {
+        var a = Appearance.Accent;
+        return key switch
+        {
+            "today" => Appearance.MixOk(a, Colors.White, 0.38), "tomorrow" => Appearance.MixOk(a, Colors.White, 0.2), "next" => a,
+            "overdue" => Appearance.MixOk(a, Colors.Black, 0.16), "unread" => Appearance.MixOk(a, Colors.Black, 0.32),
+            "graded" => Appearance.MixOk(a, Colors.Black, 0.48), _ => a,
+        };
+    }
+
+    /// <summary>(0.3.74) A counter's symbol in its colour, moved to stand 3 to 1 against its card (a light shade's glyph
+    /// on white, a deep one's on the dark card) — its wash keeps the shade as it is.</summary>
+    private static Color SymbolInk(string key, Color c) => Appearance.Themed || Appearance.Tint(key) != null
+        ? Appearance.Reach(c, Appearance.Dark ? Color.FromRgb(0x2b, 0x2b, 0x2b) : Colors.White, 3) : c;
 
     /// <summary>What a counter counts, in full: its panel's title until the panel's own comes.</summary>
     private static string FullName(string key, string label) => key switch
@@ -425,7 +447,7 @@ public sealed partial class DashboardScreen : Screen
         // (a name wider than its room — were there ever one, a school's own name for a counter — shrunk to fit rather
         //  than cut)
         var name = new Viewbox { Child = label, Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(gap, 0, 0, 0) };
-        var head = K.Columns("auto, *", K.IconTile(Glyph.Counter(c.Key), color, size).Col(0), name.Col(1));
+        var head = K.Columns("auto, *", K.IconTile(Glyph.Counter(c.Key), SymbolInk(c.Key, color), size).Col(0), name.Col(1));
         // (the number in a holder of its own, cut at its edges: a live check's new number rolls in there, the old out)
         var number = new Grid { ClipToBounds = true, Margin = new Thickness(0, cols == 6 ? 8 : 10, 0, 0) };
         number.Children.Add(Number(n, alert));

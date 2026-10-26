@@ -31,6 +31,9 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
     private readonly Grid pageArea = new();
     private readonly ContentControl cover = new() { Focusable = false };
     private readonly SheetHost sheets = new();
+    /// <summary>(0.3.74) The colour worn, cast faintly over the whole window under everything — the title bar, the pane,
+    /// the page; the cards, see-through, take it with the ground (the Mac's Theme.page, the web's cast grounds).</summary>
+    private readonly Border cast = new() { IsHitTestVisible = false, Focusable = false };
     private readonly TitleBar titleBar;
     private readonly System.Windows.Controls.Button back;
     private readonly System.Windows.Controls.Button refresh;
@@ -110,6 +113,8 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(TitleBarHeight) });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         Content = root;
+        Grid.SetRowSpan(cast, 2);
+        root.Children.Add(cast);
 
         // the title bar: Back and Refresh at its left (outside the drag area) — with the pane's button and Search while
         // the window is too narrow for the pane — then the app's icon and name, a Start over while the school's sign-in
@@ -174,7 +179,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         Presence.Watch(this);
         MemoryTidy.Watch(this, () => engine);
         SourceInitialized += (_, _) => Appearance.Apply();
-        Appearance.Changed += () => shell?.Retheme();
+        Appearance.Changed += () => { Cast(); shell?.Retheme(); };
         Loaded += (_, _) => Begin();
         ContentRendered += (_, _) => Fx.Decide(); // (the render tier is known once a frame is drawn)
         Closing += OnClosing;
@@ -204,6 +209,11 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
     }
 
     // ---- beginning: the school, then its engine ----
+
+    /// <summary>(0.3.74) The colour worn cast over the window (12% of it by day, 10% by night); none with Windows' own
+    /// accent.</summary>
+    private void Cast() =>
+        cast.Background = Appearance.Themed ? K.Brush(K.WithAlpha(Appearance.Accent, Appearance.CastShare)) : null;
 
     private void Begin()
     {

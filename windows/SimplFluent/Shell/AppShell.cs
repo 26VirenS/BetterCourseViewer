@@ -266,6 +266,22 @@ public sealed partial class AppShell : Grid, IDisposable
         }
     }
 
+    /// <summary>The app's own places in the pane (not a course, a group or a school's link, which keep their colours).</summary>
+    private static readonly HashSet<string> OwnPlaces = new() { "dashboard", "calendar", "grades", "notifications", "inbox", "tools", "externaltools", "courses", "groups" };
+
+    /// <summary>
+    /// (0.3.74, the web's tabShades, the Mac's themed sidebar) A colour worn — the pane's own (Appearance, its photo
+    /// button's Colour…), else the theme's — the app's places wear its shades, one each down the pane, each standing
+    /// 3 to 1 on the pane; with none, each its own colour as before.
+    /// </summary>
+    private static void ShadePlaces(List<NavEntry> list)
+    {
+        if ((Appearance.Tint("side") ?? (Appearance.Themed ? Appearance.Accent : null)) is not { } seed) return;
+        var places = list.Where(e => e.Key is { } k && OwnPlaces.Contains(k)).ToList();
+        var shades = Appearance.Shades(seed, places.Count, Appearance.Dark ? Color.FromRgb(0x20, 0x20, 0x20) : Color.FromRgb(0xf3, 0xf3, 0xf3));
+        for (var i = 0; i < places.Count; i++) places[i].Tint = shades[i];
+    }
+
     /// <summary>Light, dark or the accent changed: what is drawn with colours of its own is drawn again.</summary>
     private void TintPane() =>
         paneTint.Background = Appearance.Tint("side") is { } t && !Appearance.Plain("side") ? K.Brush(K.WithAlpha(t, Appearance.Dark ? 0.2 : 0.14)) : null;
@@ -397,6 +413,7 @@ public sealed partial class AppShell : Grid, IDisposable
         // (what the school added to Canvas's own navigation — History, its tools, Help —, under Simpl's own places as the
         //  extension's sidebar has it; nothing when it adds nothing)
         list.AddRange(MoreFromCanvas.Entries(more, it => { if (narrow) ClosePane(); MoreFromCanvas.Open(engine, it, window); }));
+        ShadePlaces(list);
         foreach (var e in list) Apart(e);
         if (redraw) nav.Set(list, SelectedKey(engine.Nav.Current.Place));
         else nav.Show(list, SelectedKey(engine.Nav.Current.Place));

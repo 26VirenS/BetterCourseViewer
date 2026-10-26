@@ -288,6 +288,126 @@ public static class Appearance
         Changed?.Invoke();
     }
 
+    // ---- (0.3.74) a colour worn, throughout ----
+
+    /// <summary>
+    /// (0.3.74, the web's html.bcv-themed, the Mac's Theme.themed) A colour of the student's own worn — a ready theme's,
+    /// or one picked; Windows' own accent is not one. Worn, it shows throughout as on the Mac and the web: the window's
+    /// ground a faint cast of it, the Dashboard's counters its shades, the pane's places their shades. Before, only the
+    /// accent's few places took it (a badge, the chosen row's mark), and a colour picked hardly showed.
+    /// </summary>
+    public static bool Themed => AccentHex is { } h && Hex(h) != null;
+
+    /// <summary>How much of the colour worn the window's ground takes (the web's CAST.bg, the Mac's Theme.page): 12% by
+    /// day, 10% by night. The cards, see-through, take it with the ground under them.</summary>
+    public static double CastShare => Dark ? 0.10 : 0.12;
+
+    /// <summary>Two colours mixed as CSS's color-mix(in oklab) mixes them: <paramref name="k"/> of <paramref name="b"/>
+    /// in <paramref name="a"/>, so a shade keeps its hue as it lightens or deepens (the web's counters' shades).</summary>
+    public static Color MixOk(Color a, Color b, double k)
+    {
+        var (l1, a1, b1) = OkLab(a);
+        var (l2, a2, b2) = OkLab(b);
+        k = Math.Clamp(k, 0, 1);
+        return FromOkLab(l1 + (l2 - l1) * k, a1 + (a2 - a1) * k, b1 + (b2 - b1) * k);
+    }
+
+    /// <summary>
+    /// The colour moved in lightness — darker on a light ground, lighter on a dark one — until it stands
+    /// <paramref name="ratio"/> against <paramref name="ground"/> (the web's reach(): 3 to 1 for a symbol, WCAG's
+    /// least for graphics); its hue and saturation kept. Already there: itself.
+    /// </summary>
+    public static Color Reach(Color c, Color ground, double ratio)
+    {
+        var (h, s, l) = ToHsl(c);
+        var dark = Kit.K.Luminance(ground) < 0.2;
+        var now = c;
+        for (var i = 0; i < 100 && Contrast(now, ground) < ratio; i++)
+        {
+            l = Math.Clamp(l + (dark ? 0.01 : -0.01), 0, 1);
+            now = FromHsl(h, s, l);
+        }
+        return now;
+    }
+
+    /// <summary>
+    /// (0.3.74, the web's shades()) <paramref name="n"/> shades of one colour, one per row, so a list of places is not
+    /// one flat colour: the colour, then lighter and deeper mixes of it in turn, each moved to stand 3 to 1 against
+    /// <paramref name="ground"/>.
+    /// </summary>
+    public static Color[] Shades(Color seed, int n, Color ground)
+    {
+        Color[] set =
+        {
+            seed, Kit.K.Mix(seed, Colors.White, 0.28), Kit.K.Mix(seed, Colors.Black, 0.22), Kit.K.Mix(seed, Colors.White, 0.5), Kit.K.Mix(seed, Colors.Black, 0.4),
+        };
+        return Enumerable.Range(0, Math.Max(0, n)).Select(i => Reach(set[i % set.Length], ground, 3)).ToArray();
+    }
+
+    /// <summary>WCAG's contrast between two colours, 1 to 21.</summary>
+    public static double Contrast(Color a, Color b)
+    {
+        double la = Kit.K.Luminance(a), lb = Kit.K.Luminance(b);
+        return (Math.Max(la, lb) + 0.05) / (Math.Min(la, lb) + 0.05);
+    }
+
+    private static double ToLinear(byte v) { var s = v / 255.0; return s <= 0.04045 ? s / 12.92 : Math.Pow((s + 0.055) / 1.055, 2.4); }
+
+    private static byte FromLinear(double v)
+    {
+        v = Math.Clamp(v, 0, 1);
+        var s = v <= 0.0031308 ? v * 12.92 : 1.055 * Math.Pow(v, 1 / 2.4) - 0.055;
+        return (byte)Math.Round(Math.Clamp(s, 0, 1) * 255);
+    }
+
+    private static (double L, double A, double B) OkLab(Color c)
+    {
+        double r = ToLinear(c.R), g = ToLinear(c.G), b = ToLinear(c.B);
+        var l = Math.Cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+        var m = Math.Cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+        var s = Math.Cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+        return (0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+                1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+                0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s);
+    }
+
+    private static Color FromOkLab(double L, double A, double B)
+    {
+        var l = Math.Pow(L + 0.3963377774 * A + 0.2158037573 * B, 3);
+        var m = Math.Pow(L - 0.1055613458 * A - 0.0638541728 * B, 3);
+        var s = Math.Pow(L - 0.0894841775 * A - 1.2914855480 * B, 3);
+        return Color.FromRgb(
+            FromLinear(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
+            FromLinear(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
+            FromLinear(-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s));
+    }
+
+    private static (double H, double S, double L) ToHsl(Color c)
+    {
+        double r = c.R / 255.0, g = c.G / 255.0, b = c.B / 255.0;
+        double max = Math.Max(r, Math.Max(g, b)), min = Math.Min(r, Math.Min(g, b));
+        var l = (max + min) / 2;
+        if (max == min) return (0, 0, l);
+        var d = max - min;
+        var s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        var h = max == r ? (g - b) / d + (g < b ? 6 : 0) : max == g ? (b - r) / d + 2 : (r - g) / d + 4;
+        return (h * 60, s, l);
+    }
+
+    private static Color FromHsl(double h, double s, double l)
+    {
+        h = ((h % 360) + 360) % 360 / 360;
+        if (s == 0) { var v = (byte)Math.Round(l * 255); return Color.FromRgb(v, v, v); }
+        var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        var p = 2 * l - q;
+        double F(double t)
+        {
+            t = ((t % 1) + 1) % 1;
+            return t < 1.0 / 6 ? p + (q - p) * 6 * t : t < 0.5 ? q : t < 2.0 / 3 ? p + (q - p) * (2.0 / 3 - t) * 6 : p;
+        }
+        return Color.FromRgb((byte)Math.Round(F(h + 1.0 / 3) * 255), (byte)Math.Round(F(h) * 255), (byte)Math.Round(F(h - 1.0 / 3) * 255));
+    }
+
     // ---- Simpl Community ----
 
     /// <summary>(0.3.67) A photo read from Simpl Community for a place: its bytes, its file's extension, its width over
