@@ -1040,6 +1040,10 @@ push_set() {
   # (1.3.166) a photo placed where it is: a card's settings under it, the sidebar's beside it
   shoot light-51p-appearance-photo-card 18 -SimplAppearanceMode YES -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg" -SimplPhotoEdit today
   shoot light-51c-appearance-courses 16 -SimplAppearanceMode YES -SimplAppearanceTab courses
+  # (1.3.177) a colour of a place's own: Due today's, Next 7 days' and the sidebar's over Ocean's drawings (each inked
+  # in its own colour); and Due today's Colour… open from its photo button
+  shoot light-50f-place-colours 12 -SimplTheme Ocean -SimplTints "today=#d97900,next=#65499d,side=#e71f63"
+  shoot light-51t-appearance-colour 18 -SimplAppearanceMode YES -SimplTheme Ocean -SimplTints "today=#d97900" -SimplPlaceColour today
   # (1.3.173) Appearance's Community: the mock's gallery, three themes shared there; and its photo theme worn (its photos
   # kept, so a home of its own)
   shoot light-51k-appearance-community 20 -SimplAppearanceMode YES -SimplAppearanceTab community -SimplCommunityBase http://localhost:8800
@@ -1094,6 +1098,8 @@ push_set() {
   shoot dark-50c-theme-dusk 12 -SimplTheme Dusk
   shoot dark-50d-theme-photo 12 -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg"
   shoot dark-50e-theme-photo-plain 12 -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg" -SimplThemePlain YES
+  # (1.3.177) colours of their own with no theme worn: Due today's, Overdue's and the sidebar's
+  shoot dark-50f-place-colours 12 -SimplTints "today=#e71f63,overdue=#0b9be3,side=#8f3e97"
   shoot dark-51-appearance-mode 16 -SimplAppearanceMode YES
   shoot dark-51k-appearance-community 20 -SimplAppearanceMode YES -SimplAppearanceTab community -SimplCommunityBase http://localhost:8800
   shoot dark-51p-appearance-photo-side 18 -SimplAppearanceMode YES -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg" -SimplThemePlain YES -SimplPhotoEdit side

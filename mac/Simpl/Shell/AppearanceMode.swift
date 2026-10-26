@@ -48,6 +48,8 @@ struct PhotoBadge: View {
     let slot: PhotoSlot
     @ObservedObject private var store = AppearanceStore.shared
     @State private var shown = false
+    /// (1.3.177) Its Colour… open: the place's own colour, picked in a popover over the button.
+    @State private var colouring = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -59,6 +61,8 @@ struct PhotoBadge: View {
                     Button(s) { store.setScene(s, in: slot) }
                 }
             }
+            // (1.3.177, as the web's 2.99.118) a colour of the place's own, in place of the theme's there
+            Button("Colour…") { colouring = true }
             if store.photos[slot] != nil {
                 Divider()
                 // (1.3.164) a photo of one's own: inked, or (off) shown as it is, the words on it white-bordered
@@ -81,11 +85,21 @@ struct PhotoBadge: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
+        .popover(isPresented: $colouring, arrowEdge: .bottom) {
+            PlaceColourPicker(slot: slot)
+        }
         .help(slot.isSide ? "Sidebar photo" : "\(slot.title) photo")
         .accessibilityLabel(Text(slot.isSide ? "Sidebar photo" : "\(slot.title) card photo"))
         .scaleEffect(shown || reduceMotion ? 1 : 0.6)
         .opacity(shown ? 1 : 0)
-        .onAppear { withAnimation(Motion.snappy) { shown = true } }
+        .onAppear {
+            withAnimation(Motion.snappy) { shown = true }
+            // (the screenshot suite: -SimplPlaceColour today — that place's Colour… open, once the button is in)
+            if UserDefaults.standard.string(forKey: "SimplPlaceColour") == slot.rawValue,
+               LaunchOpen.take(slot.rawValue, key: "SimplPlaceColour") != nil {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { colouring = true }
+            }
+        }
     }
 }
 
@@ -385,6 +399,67 @@ struct AppearanceBar: View {
             RadialColorPicker(value: store.custom, change: { store.setCustom($0) })
                 .padding(20)
         }
+    }
+}
+
+// MARK: - A place's own colour
+
+/// (1.3.177, as the web's 2.99.118) A counter's or the sidebar's own colour: the theme's (put back), the course colours,
+/// or any from the radial picker — worn as it is picked, and kept.
+private struct PlaceColourPicker: View {
+    let slot: PhotoSlot
+    @ObservedObject private var store = AppearanceStore.shared
+    @State private var custom = AppearanceStore.Custom(h: 211, s: 1, depth: 40)
+    @State private var any = false
+
+    /// The course colours but the near-black, which leaves a card murky: fifteen, and the theme's first.
+    private static let palette = CourseColourPicker.palette.filter { $0 != "#111111" }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(slot.isSide ? "Sidebar colour" : "\(slot.title) colour").font(.sHeadline)
+            LazyVGrid(columns: Array(repeating: GridItem(.fixed(30), spacing: 6), count: 8), spacing: 6) {
+                swatch(nil)
+                ForEach(Self.palette, id: \.self) { swatch($0) }
+            }
+            if any {
+                RadialColorPicker(value: custom, change: { c in
+                    custom = c
+                    store.setTint(c.hex, in: slot)
+                })
+                .frame(maxWidth: .infinity)
+                .padding(.top, 6)
+            } else {
+                Button("Any Colour…") { withAnimation(Motion.gentle) { any = true } }
+            }
+        }
+        .padding(16)
+        .frame(width: any ? 320 : 280)
+    }
+
+    /// A colour to wear there (nil: the theme's, put back — its accent, with a turned-back arrow on it).
+    private func swatch(_ hex: String?) -> some View {
+        let on = store.tints[slot] == hex.flatMap(AppearanceStore.normalize)
+        let name = hex ?? "The theme’s colour"
+        return Button {
+            withAnimation(Motion.snappy) { store.setTint(hex, in: slot) }
+        } label: {
+            ZStack {
+                Circle().fill(hex.map { Color(hex: $0) } ?? store.accentColor).frame(width: 24, height: 24)
+                if hex == nil {
+                    Image(systemName: "arrow.uturn.backward")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                if on { Circle().strokeBorder(Color.primary.opacity(0.85), lineWidth: 2).frame(width: 30, height: 30) }
+            }
+            .frame(width: 30, height: 30)
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .help(name)
+        .accessibilityLabel(Text(name))
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 }
 

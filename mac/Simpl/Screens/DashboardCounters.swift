@@ -23,8 +23,10 @@ enum DashCounterLook {
     }
 
     /// (1.3.1) A colour worn: every counter's glyph in it; Regular, each in its own. Red means late and nothing else:
-    /// Overdue keeps it whatever is worn, and Due today wears the accent.
+    /// Overdue keeps it whatever is worn, and Due today wears the accent. (1.3.177) A counter given a colour of its own
+    /// (Appearance, its photo button's Colour…) wears that one, Overdue too: a late count's number and wash stay red.
     static func color(_ key: String) -> Color {
+        if let own = tint(key) { return Theme.icon(own) }
         if key == "overdue" { return alert }
         if Theme.themed { return Theme.accentIcon }
         switch key {
@@ -36,6 +38,9 @@ enum DashCounterLook {
         default: return Theme.accent
         }
     }
+
+    /// (1.3.177) A counter's own colour, if Appearance gave it one.
+    static func tint(_ key: String) -> NSColor? { PhotoSlot.card(key).flatMap { AppearanceStore.tintsNow[$0] } }
 
     /// The red of something late: the system's, which reads on glass by day and by night.
     static let alert = Color(nsColor: .systemRed)
@@ -240,7 +245,11 @@ struct DashCounterTile: View {
     /// days green, Overdue red, Unread orange, Graded purple; a colour worn, that one), soft enough that its number and
     /// words read as plainly as on bare glass — a little more of it by night, where dark glass takes more to show it.
     private var wash: Color {
-        DashCounterLook.color(counter.key).opacity(scheme == .dark ? 0.18 : 0.12)
+        // (1.3.177: a colour of its own, as it is, and a little more of it — the card is that colour, not a hint of it)
+        if let slot = PhotoSlot.card(counter.key), appearance.tints[slot] != nil, let own = DashCounterLook.tint(counter.key) {
+            return Color(nsColor: own).opacity(scheme == .dark ? 0.24 : 0.16)
+        }
+        return DashCounterLook.color(counter.key).opacity(scheme == .dark ? 0.18 : 0.12)
     }
 
     /// Its count in words, and its line in full: "4 due today · 35 points total".

@@ -125,14 +125,19 @@ final class AppearanceStore: ObservableObject {
     @Published private(set) var custom: Custom
     /// The photo in each place that has one.
     @Published private(set) var photos: [PhotoSlot: SlotPhoto] = [:]
+    /// (1.3.177, the web's appearance.tints) A colour of a place's own — a counter's or the sidebar's — in place of the
+    /// theme's there: its wash, its glyph, and the ink of a drawing on it.
+    @Published private(set) var tints: [PhotoSlot: String] = [:]
     /// Raised at every change of colour: the screens drawn again in it.
     @Published private(set) var revision = 0
 
     /// The accent the dynamic colours read as they are drawn (nil: Regular).
     nonisolated(unsafe) static var accentNow: NSColor?
+    /// (1.3.177) Each place's own colour, for the colours worked out as they are drawn.
+    nonisolated(unsafe) static var tintsNow: [PhotoSlot: NSColor] = [:]
 
     private var images: [String: NSImage] = [:]
-    private static let accentKey = "themeAccent", photosKey = "appearancePhotos", customKey = "themeCustom"
+    private static let accentKey = "themeAccent", photosKey = "appearancePhotos", customKey = "themeCustom", tintsKey = "appearanceTints"
 
     private init() {
         let d = UserDefaults.standard
@@ -156,7 +161,20 @@ final class AppearanceStore: ObservableObject {
             let plain: Bool? = d.bool(forKey: "SimplThemePlain") ? true : nil
             photos = Dictionary(uniqueKeysWithValues: PhotoSlot.allCases.map { ($0, SlotPhoto(source: .upload("shot"), place: $0.defaultPlace, plain: plain)) })
         }
+        // (1.3.177) each place's own colour; the screenshot suite's -SimplTints "today=#e71f63,side=#009688" for that run,
+        // nothing kept
+        if let asked = d.string(forKey: "SimplTints") {
+            for pair in asked.split(separator: ",") {
+                let kv = pair.split(separator: "=", maxSplits: 1).map(String.init)
+                if kv.count == 2, let slot = PhotoSlot(rawValue: kv[0]), let hex = Self.normalize(kv[1]) { tints[slot] = hex }
+            }
+        } else if let kept = d.dictionary(forKey: Self.tintsKey) as? [String: String] {
+            tints = Dictionary(uniqueKeysWithValues: kept.compactMap { k, v in
+                PhotoSlot(rawValue: k).flatMap { slot in Self.normalize(v).map { (slot, $0) } }
+            })
+        }
         Self.accentNow = accentHex.map { NSColor(Color(hex: $0)) }
+        Self.tintsNow = tints.mapValues { NSColor(Color(hex: $0)) }
     }
 
     // MARK: - Choosing
@@ -200,6 +218,19 @@ final class AppearanceStore: ObservableObject {
 
     /// The accent as a colour to draw with: the theme's, or the Mac's own.
     var accentColor: Color { accentHex.map { Color(hex: $0) } ?? Color(nsColor: .controlAccentColor) }
+
+    // MARK: - A place's own colour
+
+    /// (1.3.177) A counter's or the sidebar's own colour (nil: the theme's, put back).
+    func setTint(_ hex: String?, in slot: PhotoSlot) {
+        let t = hex.flatMap(Self.normalize)
+        guard tints[slot] != t else { return }
+        tints[slot] = t
+        Self.tintsNow = tints.mapValues { NSColor(Color(hex: $0)) }
+        // (a screenshot's colours are not kept)
+        guard UserDefaults.standard.string(forKey: "SimplTints") == nil else { return }
+        UserDefaults.standard.set(Dictionary(uniqueKeysWithValues: tints.map { ($0.key.rawValue, $0.value) }), forKey: Self.tintsKey)
+    }
 
     // MARK: - Photos
 
@@ -533,19 +564,52 @@ extension Theme {
     /// A photo's ink (lib/theme.js INK_LIFT): the ground it sits on lifted a shade — a touch of white by night, of black
     /// by day — so the photo reads tone on tone in it.
     static let photoInk = Color(nsColor: NSColor(name: nil) { appearance in
-        let d = isDark(appearance)
-        let base = d ? darkPage : lightPage
-        let paper = AppearanceStore.accentNow.map { mix(base, $0, d ? 0.1 : 0.12) } ?? base
-        return mix(paper, d ? .white : .black, d ? 0.1 : 0.07)
+        liftedInk(on: castPaper(AppearanceStore.accentNow, dark: isDark(appearance)), dark: isDark(appearance))
     })
 
     /// A drawn scene's ink: the page a third of the way to the accent (lib/theme.js SCENE_INK); Regular, the Mac's own.
     static let ink = Color(nsColor: NSColor(name: nil) { appearance in
         let d = isDark(appearance)
         let a = AppearanceStore.accentNow ?? .controlAccentColor
-        let paper = mix(d ? darkPage : lightPage, a, d ? 0.1 : 0.12)
-        return mix(paper, a, d ? 0.34 : 0.3)
+        return mix(castPaper(a, dark: d), a, d ? 0.34 : 0.3)
     })
+
+    /// The page cast with a colour, as the page is with the accent (nil: the page as it is).
+    fileprivate static func castPaper(_ a: NSColor?, dark d: Bool) -> NSColor {
+        let base = d ? darkPage : lightPage
+        return a.map { mix(base, $0, d ? 0.1 : 0.12) } ?? base
+    }
+
+    fileprivate static func liftedInk(on paper: NSColor, dark d: Bool) -> NSColor {
+        mix(paper, d ? .white : .black, d ? 0.1 : 0.07)
+    }
+
+    /// (1.3.177) What a place with a colour of its own draws its photo with: the page cast with that colour under it, a
+    /// drawing's ink a third of the way to it, a photo's a shade off its paper — as the accent's are drawn.
+    struct PlaceInk {
+        let paper: Color
+        let scene: Color
+        let photo: Color
+    }
+
+    static func placeInk(_ tint: NSColor) -> PlaceInk {
+        PlaceInk(
+            paper: Color(nsColor: NSColor(name: nil) { castPaper(tint, dark: isDark($0)) }),
+            scene: Color(nsColor: NSColor(name: nil) { a in
+                let d = isDark(a)
+                return mix(castPaper(tint, dark: d), tint, d ? 0.34 : 0.3)
+            }),
+            photo: Color(nsColor: NSColor(name: nil) { a in liftedInk(on: castPaper(tint, dark: isDark(a)), dark: isDark(a)) })
+        )
+    }
+
+    /// (1.3.177) A colour as a glyph, readable (3:1) on a card by day and by night, as the accent's is (`accentIcon`).
+    static func icon(_ c: NSColor) -> Color {
+        Color(nsColor: NSColor(name: nil) { a in
+            let card = isDark(a) ? NSColor(srgbRed: 36 / 255, green: 36 / 255, blue: 38 / 255, alpha: 1) : NSColor.white
+            return AppearanceStore.readable(c, on: card, ratio: 3)
+        })
+    }
 }
 
 // MARK: - A place's photo
@@ -578,7 +642,8 @@ struct SlotPhotoView: View {
     var body: some View {
         if let photo = store.photos[slot], let pic = store.image(photo, in: slot) {
             GeometryReader { g in
-                PhotoLayer(image: pic.image, kind: pic.kind, place: photo.place, size: g.size, fade: fade)
+                PhotoLayer(image: pic.image, kind: pic.kind, place: photo.place, size: g.size, fade: fade,
+                           ink: store.tints[slot] != nil ? AppearanceStore.tintsNow[slot].map(Theme.placeInk) : nil)
                     .blur(radius: frost && pic.kind != .original ? 1 : 0, opaque: true) // (Ink off: the photo as it is)
                     .overlay { if frost && pic.kind == .scene { Theme.page.opacity(0.22) } }
                     .frame(width: g.size.width, height: g.size.height)
@@ -598,6 +663,8 @@ struct PhotoLayer: View {
     let place: PhotoPlace
     let size: CGSize
     var fade: SlotPhotoView.Fade = .plain
+    /// (1.3.177) The place's own colour's paper and inks (nil: the accent's).
+    var ink: Theme.PlaceInk? = nil
 
     var body: some View {
         let iw = max(image.size.width, 1), ih = max(image.size.height, 1)
@@ -605,7 +672,7 @@ struct PhotoLayer: View {
         let dw = iw * k, dh = ih * k
         let ox = place.x / 100 * (size.width - dw), oy = place.y / 100 * (size.height - dh)
         ZStack(alignment: .topLeading) {
-            Theme.page
+            ink?.paper ?? Theme.page
             if kind == .original {
                 // (1.3.164) Ink off: the photo itself, whole, nothing faded over it (the words on it take the white border)
                 ZStack(alignment: .topLeading) {
@@ -620,7 +687,7 @@ struct PhotoLayer: View {
                     Image(nsImage: image)
                         .resizable()
                         .renderingMode(.template)
-                        .foregroundStyle(kind == .scene ? Theme.ink : Theme.photoInk)
+                        .foregroundStyle(kind == .scene ? ink?.scene ?? Theme.ink : ink?.photo ?? Theme.photoInk)
                         .frame(width: dw, height: dh)
                         .offset(x: ox, y: oy)
                 }
@@ -649,11 +716,23 @@ struct PhotoLayer: View {
     }
 }
 
-/// The sidebar's ground: its photo, frosted, behind its rows — (home-26) a drawn scene kept faint behind them.
+/// The sidebar's ground: its photo, frosted, behind its rows — (home-26) a drawn scene kept faint behind them; (1.3.177)
+/// and its own colour, where Appearance gave it one, a wash over its glass and its photo (not over a photo with its Ink
+/// off, shown as it is).
 struct SidebarGround: View {
+    @ObservedObject private var store = AppearanceStore.shared
+    @Environment(\.colorScheme) private var scheme
+
     var body: some View {
-        SlotPhotoView(slot: .side, fade: .side)
-            .ignoresSafeArea()
+        ZStack {
+            SlotPhotoView(slot: .side, fade: .side)
+            if store.tints[.side] != nil, !store.isPlain(.side), let own = AppearanceStore.tintsNow[.side] {
+                Color(nsColor: own).opacity(scheme == .dark ? 0.2 : 0.14)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
+        .ignoresSafeArea()
     }
 }
 
@@ -748,12 +827,16 @@ private struct SidebarThemeLabelBody: View {
     @Environment(\.sidebarPlace) private var showing
     @Environment(\.sidebarRowPlace) private var row
 
+    @ObservedObject private var store = AppearanceStore.shared
+
     var body: some View {
-        if Theme.themed, let row, row == showing {
+        // (1.3.177: the sidebar's own colour, where it has one)
+        let own = store.tints[.side] != nil ? AppearanceStore.tintsNow[.side] : nil
+        if Theme.themed || own != nil, let row, row == showing {
             Label {
                 configuration.title
             } icon: {
-                configuration.icon.foregroundStyle(Theme.accentIcon)
+                configuration.icon.foregroundStyle(own.map(Theme.icon) ?? Theme.accentIcon)
             }
         } else {
             Label(configuration)
