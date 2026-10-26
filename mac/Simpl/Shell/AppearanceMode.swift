@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 // (1.3.113) Appearance, from the account's ⋯ menu (Settings ▸ Appearance is gone): the Dashboard shown, the whole window
 // darkened but for the sidebar and the Dashboard's cards — each of those with a photo button on it — and a bar risen from
@@ -85,6 +86,51 @@ struct PhotoBadge: View {
         .scaleEffect(shown || reduceMotion ? 1 : 0.6)
         .opacity(shown ? 1 : 0)
         .onAppear { withAnimation(Motion.snappy) { shown = true } }
+    }
+}
+
+/// (1.3.174, as the web's 2.99.117) The whole place a press to upload a photo there — or a photo dropped on it — which
+/// then opens where it went; the pointer over it says so, under the photo button in its middle (which keeps the
+/// drawings, Ink, Move and Zoom… and Remove).
+struct PhotoPlaceCatch: View {
+    let slot: PhotoSlot
+    @State private var hovering = false
+    @State private var dropping = false
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: slot.isSide ? 0 : 18, style: .continuous)
+        shape
+            .fill(Color.white.opacity(dropping ? 0.12 : hovering ? 0.06 : 0.001))
+            .overlay(shape.strokeBorder(Theme.accent.opacity(dropping ? 1 : hovering ? 0.7 : 0), lineWidth: dropping ? 3 : 2))
+            .overlay {
+                Text("Click to upload a photo")
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Capsule().fill(Color(white: 0.11).opacity(0.86)))
+                    .offset(y: hovering ? 42 : 46)
+                    .opacity(hovering ? 1 : 0)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+            .contentShape(shape)
+            .onTapGesture {
+                if AppearanceStore.shared.upload(to: slot) { AppearanceMode.shared.edit(slot) }
+            }
+            .onHover { inside in withAnimation(.easeOut(duration: 0.15)) { hovering = inside } }
+            .onDrop(of: [.fileURL], isTargeted: $dropping) { providers in
+                guard let item = providers.first else { return false }
+                let place = slot
+                _ = item.loadObject(ofClass: URL.self) { url, _ in
+                    guard let url else { return }
+                    DispatchQueue.main.async {
+                        if AppearanceStore.shared.take(url, into: place) { AppearanceMode.shared.edit(place) }
+                    }
+                }
+                return true
+            }
+            .accessibilityHidden(true) // (the photo button over it is what the keyboard and VoiceOver reach)
     }
 }
 

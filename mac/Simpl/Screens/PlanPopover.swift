@@ -202,7 +202,7 @@ struct PlanPopover: View {
                             }
                             .labelsHidden()
                             .fixedSize()
-                            Text("to").foregroundStyle(.secondary)
+                            Text("to").foregroundStyle(.secondary).fixedSize() // (1.3.174: whole, not "t" over "o" beside two wide pickers)
                             Picker("Ends", selection: Binding(get: { draft.start + draft.mins }, set: { draft.mins = max(15, $0 - draft.start) })) {
                                 ForEach(Array(stride(from: draft.start + 15, through: 1440, by: 15)), id: \.self) { end in
                                     Text("\(end == 1440 ? "Midnight" : Self.clock(end)) (\(Self.length(end - draft.start)))").tag(end)

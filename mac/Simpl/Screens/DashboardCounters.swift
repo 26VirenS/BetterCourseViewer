@@ -207,7 +207,11 @@ struct DashCounterTile: View {
         .tourSpot(PhotoSlot.card(counter.key).map { .photo($0) }) // (1.3.166: where it is, for its photo placed on it)
         .overlay {
             if appearanceMode.on, appearanceMode.editing == nil, let slot = PhotoSlot.card(counter.key) {
-                PhotoBadge(slot: slot) // (1.3.166: none while a photo is being placed)
+                // (1.3.174: a press anywhere on it uploads a photo; 1.3.166: none of this while a photo is being placed)
+                ZStack {
+                    PhotoPlaceCatch(slot: slot)
+                    PhotoBadge(slot: slot)
+                }
             }
         }
         .contextMenu {

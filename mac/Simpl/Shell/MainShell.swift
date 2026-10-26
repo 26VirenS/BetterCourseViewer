@@ -395,7 +395,10 @@ struct Sidebar: View {
         // (1.3.113) Appearance on: its photo button, in its middle (1.3.166: none while a photo is being placed)
         .overlay {
             if appearanceMode.on && appearanceMode.editing == nil {
-                PhotoBadge(slot: .side)
+                ZStack {
+                    PhotoPlaceCatch(slot: .side) // (1.3.174: a press anywhere on it uploads a photo)
+                    PhotoBadge(slot: .side)
+                }
             }
         }
     }
