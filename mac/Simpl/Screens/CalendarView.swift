@@ -69,6 +69,8 @@ struct CalendarView: View {
     @State private var planOpen: String?
     @State private var joinOnto: String?
     @State private var gripHover: String?
+    /// (1.3.181) The up-and-down pointer pushed for a plan's foot (popped once, when the pointer has left it and no pull is on).
+    @State private var stretchCursor = false
     /// (1.3.172) The screenshot suite's -SimplPlanPopover YES: a piece of work planned and its popover opened (once).
     @State private var shotPlanned = false
     /// (1.3.169, 1.3.170 in every view) To Do beside the calendar, on unless turned off; a row of it being dragged over a
@@ -1275,6 +1277,8 @@ struct CalendarView: View {
                                 planDraggable(item, day: i, week: timed)
                                     .layoutValue(key: WeekAt.self, value: weekY(item.at))
                                     .layoutValue(key: WeekLength.self, value: drawnHeight(item.ev))
+                                    .layoutValue(key: WeekLane.self, value: drawnHeight(item.ev, resting: true))
+                                    .zIndex(planStretch?.id == item.ev.id ? 1 : 0) // (a block being pulled over the next)
                             }
                         }
                         .padding(.horizontal, 3)
@@ -1427,9 +1431,10 @@ struct CalendarView: View {
     /// an event of Canvas's own, a class, from its start to its end — and a due time (a moment, which has no end) half an
     /// hour; an event that says no end an hour (as Windows draws one). Never taller for its name (cut short to fit) and
     /// never too short to read a line.
-    private func drawnHeight(_ ev: CalEvent) -> CGFloat {
+    /// (1.3.181) `resting`: as long as it is, a foot being pulled or not — the room it keeps among the day's other items.
+    private func drawnHeight(_ ev: CalEvent, resting: Bool = false) -> CGFloat {
         let unsaid = ["Event", "Appointment"].contains(ev.kind ?? "") ? 60 : Self.momentMinutes
-        return max(Self.blockLeast, CGFloat(shownLength(ev) ?? unsaid) / 60 * hour - 2)
+        return max(Self.blockLeast, CGFloat((resting ? length(ev) : shownLength(ev)) ?? unsaid) / 60 * hour - 2)
     }
     /// (1.3.176) A due time's block, in minutes; the least a block is, in points (a line of its name).
     private static let momentMinutes = 30
@@ -1582,6 +1587,10 @@ struct CalendarView: View {
     /// the up-and-down arrow; pulled, the block follows a quarter of an hour at a time (its times on a tag under it), a
     /// quarter of an hour long at least and over by midnight; let go, the plan is that long (the page's planEdit), its
     /// group's every task with it.
+    /// (1.3.181) Pulled steadily: the pull is measured in the window, not on the foot itself — the foot moves with the
+    /// block's end, so measured there each quarter hour taken undid itself and the block flickered between two lengths;
+    /// the up-and-down pointer is kept for the whole pull (it no longer flips back each time the pointer is a little
+    /// past the foot); and the day's other items stay where they are until it is let go (WeekLane).
     private func stretchGrip(_ item: WeekItem, pid: String, len: Int) -> some View {
         let shown = gripHover == item.ev.id || planStretch?.id == item.ev.id
         return Capsule()
@@ -1595,23 +1604,29 @@ struct CalendarView: View {
             .onHover { inside in
                 if inside {
                     gripHover = item.ev.id
-                    NSCursor.resizeUpDown.push()
+                    if !stretchCursor { NSCursor.resizeUpDown.push(); stretchCursor = true }
                 } else {
                     if gripHover == item.ev.id { gripHover = nil }
-                    NSCursor.pop()
+                    if stretchCursor, planStretch?.id != item.ev.id || planStretch?.dropped == true { NSCursor.pop(); stretchCursor = false }
                 }
             }
             .gesture(
-                DragGesture(minimumDistance: 2)
+                DragGesture(minimumDistance: 2, coordinateSpace: .global)
                     .onChanged { g in
                         let pulled = Double(len) + Double(g.translation.height / hour) * 60
                         let mins = max(15, min(24 * 60 - item.at, Int((pulled / 15).rounded()) * 15))
+                        if !stretchCursor { NSCursor.resizeUpDown.push(); stretchCursor = true }
                         let next = PlanStretch(id: item.ev.id, mins: mins)
                         guard next != planStretch else { return }
-                        planStretch = next
+                        // (each quarter hour at once, as the pointer reaches it: nothing eased in after it)
+                        var t = Transaction()
+                        t.disablesAnimations = true
+                        withTransaction(t) { planStretch = next }
                         NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
                     }
                     .onEnded { _ in
+                        // (the pointer let go away from the foot: the up-and-down pointer goes with the pull)
+                        if stretchCursor, gripHover != item.ev.id { NSCursor.pop(); stretchCursor = false }
                         guard let st = planStretch, st.id == item.ev.id else { return }
                         guard st.mins != len else {
                             planStretch = nil
@@ -2488,10 +2503,11 @@ private struct WeekDayStack: Layout {
     }
 
     private func frames(_ subviews: Subviews, width: CGFloat) -> [CGRect] {
-        // each item's time and length, in points
-        let spans = subviews.map { s -> (y: CGFloat, h: CGFloat) in
+        // each item's time and length, in points, and (1.3.181) the length it keeps its column by: a plan's foot being
+        // pulled moves nothing else of the day, and the block keeps its place, until it is let go
+        let spans = subviews.map { s -> (y: CGFloat, h: CGFloat, lane: CGFloat) in
             let h = s[WeekLength.self] > 0 ? s[WeekLength.self] : s.sizeThatFits(ProposedViewSize(width: width, height: nil)).height
-            return (s[WeekAt.self], h)
+            return (s[WeekAt.self], h, s[WeekLane.self] > 0 ? s[WeekLane.self] : h)
         }
         // the items in runs whose times meet, each run's items in the fewest columns (the first that is free by then)
         var column = [Int](repeating: 0, count: spans.count)
@@ -2506,13 +2522,13 @@ private struct WeekDayStack: Layout {
             }
             if let free = ends.firstIndex(where: { $0 <= sp.y + 0.5 }) {
                 column[k] = free
-                ends[free] = sp.y + sp.h
+                ends[free] = sp.y + sp.lane
             } else {
                 column[k] = ends.count
-                ends.append(sp.y + sp.h)
+                ends.append(sp.y + sp.lane)
             }
             run.append(k)
-            runEnd = max(runEnd, sp.y + sp.h)
+            runEnd = max(runEnd, sp.y + sp.lane)
         }
         close()
         return spans.enumerated().map { k, sp in
@@ -2536,6 +2552,12 @@ private struct WeekAt: LayoutValueKey {
 
 /// (1.3.167) How tall an item's block is for the time it lasts (0: as tall as its name needs).
 private struct WeekLength: LayoutValueKey {
+    static let defaultValue: CGFloat = 0
+}
+
+/// (1.3.181) How tall an item is as it rests, for the columns the day's items share: a plan whose foot is being pulled
+/// keeps its column, and the others theirs, until it is let go (0: as WeekLength).
+private struct WeekLane: LayoutValueKey {
     static let defaultValue: CGFloat = 0
 }
 
