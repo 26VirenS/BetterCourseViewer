@@ -60,6 +60,7 @@ struct PlanPopover: View {
                                 .alignmentGuide(.firstTextBaseline) { $0[.bottom] + 1 }
                             Text(forWords(d)).fixedSize(horizontal: false, vertical: true)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     if let due = d.dueWords, !due.isEmpty { fact("Due", due) }
                 }
@@ -117,7 +118,9 @@ struct PlanPopover: View {
     private func fact(_ k: String, _ v: String) -> some View {
         GridRow {
             key(k)
+            // (the rest of the row its own: the column is not left at what its words need least, wrapped at a third)
             Text(v).fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
