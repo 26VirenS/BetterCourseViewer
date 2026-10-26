@@ -107,12 +107,15 @@ def main():
     if a.expect:
         have = {f[:-4] for f in files}
         with open(a.expect, encoding="utf-8") as fh:
-            names = [ln.split()[0] for ln in fh if ln.strip() and not ln.startswith("#")]
+            # (a name, then how its copy of the app ended, when the job wrote that down)
+            lines = [ln.split(None, 1) for ln in fh if ln.strip() and not ln.startswith("#")]
+        names = [w[0] for w in lines]
+        ended = {w[0]: w[1].strip() for w in lines if len(w) > 1}
         for n in names:
             if n not in have and f"{n}-app" not in have and not (allowance(n)[1] or {}).get("missing"):
                 missing.append(n)
         for n in sorted(set(missing)):
-            problems.append(f"{n}: no picture (the app did not get there, or quit first)")
+            problems.append(f"{n}: no picture (the app did not get there, or quit first)" + (f" {ended[n]}" if n in ended else ""))
 
     if a.report:
         with open(a.report, "w", encoding="utf-8") as fh:

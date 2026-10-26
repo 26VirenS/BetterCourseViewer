@@ -310,6 +310,17 @@ jobs:
           New-Item -ItemType Directory -Force shots | Out-Null
           # (three at a time, each with a profile of its own: each copy of Simpl pictures its own window, then quits)
           $script:running = @()
+          # (how each picture's copy ended — quit, with its exit code, or still open when its wait ran out and stopped —
+          #  beside its name in the list the checks read: a missing picture then says whether Simpl crashed or hung)
+          $script:copies = @{}; $script:stopped = @{}
+          function Settle { foreach ($p in $script:running) { if (-not $p.WaitForExit(120000)) { $script:stopped[$p.Id] = $true; Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } } }
+          function Ended($name) {
+            $c = $script:copies[$name]
+            if (-not $c) { return '' }
+            if ($script:stopped.ContainsKey($c.Id)) { return '(still open when its wait ran out: stopped)' }
+            if ($c.HasExited) { return "(quit with code $($c.ExitCode) after $([int]($c.ExitTime - $c.StartTime).TotalSeconds) s)" }
+            return ''
+          }
           # (this job's share of the pictures: every SHARDS-th, from SHARD — eight jobs at once, each three at a time)
           $shard = [int]$env:SHARD; $shards = [int]$env:SHARDS
           $script:k = -1; $script:mine = @()
@@ -323,7 +334,9 @@ jobs:
             # (Start-Process joins its arguments with spaces as they are: one with a space in it — a cross typed as
             #  "AaBb x AaBb" — goes in quotes, or Simpl would read it as three)
             $argList = @($argList | ForEach-Object { if ("$_" -match '\s') { '"' + $_ + '"' } else { $_ } })
-            $script:running += Start-Process -FilePath dist/Simpl/Simpl.exe -ArgumentList $argList -PassThru
+            $c = Start-Process -FilePath dist/Simpl/Simpl.exe -ArgumentList $argList -PassThru
+            $null = $c.Handle   # (held from the start, or PowerShell has no exit code to give once it has quit)
+            $script:running += $c; $script:copies[$name] = $c
           }
           $mock = @('--base-url', 'http://localhost:8800', '--demo')
           $login = @('--base-url', 'http://localhost:8802', '--demo')
@@ -810,7 +823,7 @@ jobs:
           function PopupEdgeShots($part) {
             if ($shard -ne $part) { return }
             $script:mine += @('popup-move', 'popup-drag', 'popup-kept')
-            foreach ($p in $script:running) { if (-not $p.WaitForExit(120000)) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } }
+            Settle
             $moveProf = Join-Path $env:RUNNER_TEMP 'profile-popup-move'
             $argList = @('--shot', "$PWD/shots/popup-move.png", '--shot-after', '45', '--profile', $moveProf, '--window-size', '1366x778') + $mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'dna', '--shot-settle', 'no', '--popup-move', '-120,40')
             $alone = Start-Process -FilePath dist/Simpl/Simpl.exe -ArgumentList $argList -PassThru
@@ -1017,7 +1030,7 @@ jobs:
           function AloneShot($name, $part, $extra) {
             if ($shard -ne $part) { return }
             $script:mine += $name
-            foreach ($p in $script:running) { if (-not $p.WaitForExit(120000)) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } }
+            Settle
             $prof = Join-Path $env:RUNNER_TEMP "profile-$name"
             $argList = @('--shot', "$PWD/shots/$name.png", '--shot-after', '30', '--shot-settle', 'no', '--profile', $prof, '--window-size', '1366x778') + $mock + $extra
             $alone = Start-Process -FilePath dist/Simpl/Simpl.exe -ArgumentList $argList -PassThru
@@ -1032,7 +1045,7 @@ jobs:
           function PointerShot($name, $part, $extra) {
             if ($shard -ne $part) { return }
             $script:mine += $name
-            foreach ($p in $script:running) { if (-not $p.WaitForExit(120000)) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } }
+            Settle
             Add-Type -AssemblyName System.Windows.Forms
             $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
             [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point([int]($screen.Width / 2), [int]($screen.Height / 2))
@@ -1081,9 +1094,9 @@ jobs:
           if ($shard -eq 7) { Invoke-WebRequest -Uri http://localhost:8800/__mock/config -Method Post -ContentType 'application/json' -Body '{"ext":{"1013":["pdf"]}}' | Out-Null }
           PhoneTest 'hand-in-phone-photos' 7 @('--appearance', 'dark', '--place', 'course:101', '--push', '/courses/101/assignments/1013', '--open', 'handin') @(
             @{ Path = $photo; Type = 'image/jpeg'; Name = 'IMG_0001.jpg' }, @{ Path = $photo; Type = 'image/jpeg'; Name = 'IMG_0002.jpg' }, @{ Path = "$env:RUNNER_TEMP/phone-song.mp3"; Type = 'audio/mpeg'; Name = 'Song.mp3' })
-          foreach ($p in $script:running) { if (-not $p.WaitForExit(120000)) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } }
+          Settle
           # (the pictures this part was to take, for the checks: each must be there — scripts/dev/check-shots.py)
-          $script:mine | Set-Content "shots/expected-part-$shard.txt"
+          $script:mine | ForEach-Object { "$_ $(Ended $_)".TrimEnd() } | Set-Content "shots/expected-part-$shard.txt"
           Get-ChildItem shots -Filter *.png | ForEach-Object { Write-Host "shot $($_.BaseName)" }
           Get-ChildItem $env:RUNNER_TEMP -Filter 'profile-*' -Directory | ForEach-Object {
             $log = Join-Path $_.FullName 'simpl.log'
