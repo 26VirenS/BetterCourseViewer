@@ -64,6 +64,10 @@ public sealed partial class Engine : Observable, IShellListener
     private int dataVersion;
     /// <summary>Bumps when what the screens show may have changed (a tick, a hand-in, a refresh): they read again.</summary>
     public int DataVersion { get => dataVersion; private set => Set(ref dataVersion, value); }
+    private int? todoOpen;
+    /// <summary>(0.3.64) How much is still to do in the courses chosen: To Do &amp; Calendar's count in the pane (read beside
+    /// the snapshot, and set by To Do itself as it reads its list, so the two always agree). Null until it is known.</summary>
+    public int? TodoOpen { get => todoOpen; set => Set(ref todoOpen, value); }
     private bool countsLive, coursesLive;
     /// <summary>The counts are the school's word now, not what was kept from before: until they are, they are not shown.</summary>
     public bool CountsLive { get => countsLive; private set => Set(ref countsLive, value); }
@@ -531,8 +535,8 @@ public sealed partial class Engine : Observable, IShellListener
         {
             "dashboard" or "today" => Place.Dashboard,
             "courses" => Place.Courses,
-            "todo" => Place.Todo,
-            "calendar" => Place.Calendar,
+            // (0.3.64: To Do is To Do & Calendar's — and so where an update left a To Do of before)
+            "todo" or "calendar" => Place.Calendar,
             "grades" => Place.Grades,
             "notifications" => Place.Notifications,
             "inbox" => Place.Inbox,
@@ -549,6 +553,7 @@ public sealed partial class Engine : Observable, IShellListener
 
     public async Task RefreshSnapshot()
     {
+        _ = ReadTodoCount(); // (0.3.64: beside the counts, never holding them up)
         try
         {
             var (s, text) = await CallWithText<Snapshot>("snapshot");
@@ -558,6 +563,13 @@ public sealed partial class Engine : Observable, IShellListener
             if (s.Lms != null && s.Lms != Lms) Lms = s.Lms;
         }
         catch { /* the counts stay as they were */ }
+    }
+
+    /// <summary>(0.3.64) How much is still to do (native-app.js <c>todoCount</c>), for To Do &amp; Calendar's count in the pane.</summary>
+    private async Task ReadTodoCount()
+    {
+        try { if ((await Call<TodoCount>("todoCount")).Open is { } n) TodoOpen = n; }
+        catch { /* the count stays as it was */ }
     }
 
     /// <summary>The sidebar's courses and groups, read again.</summary>
@@ -927,9 +939,15 @@ public sealed partial class Engine : Observable, IShellListener
         NavVersion++;
     }
 
-    /// <summary>A place picked: shown at its root.</summary>
+    /// <summary>A place picked: shown at its root. (0.3.64) To Do is To Do &amp; Calendar's, beside the calendar (the web's
+    /// 2.99.112): going to To Do goes there, To Do shown.</summary>
     public void Go(Place place)
     {
+        if (place.Kind == PlaceKind.Todo)
+        {
+            Simpl.Screens.CalendarScreen.ShowTodo();
+            place = Place.Calendar;
+        }
         Nav.Go(place);
         Moved(NavMove.Go);
         if (place.Ctx is { } ctx) _ = LoadSections(ctx);

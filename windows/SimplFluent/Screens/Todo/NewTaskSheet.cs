@@ -12,8 +12,9 @@ namespace Simpl.Screens;
 
 /// <summary>
 /// A task of your own (a Canvas planner note; the Mac's NewTaskSheet), as a Windows 11 dialog over the window: what it
-/// is, its day, a course and a repeat if wanted (and until when), and its priority. The Dashboard's New task, To Do's,
-/// Ctrl+N and the Calendar's New task on a day put it up; Enter adds it, Escape puts it away.
+/// is, its day, a course and a repeat if wanted (and until when), and its priority. The Dashboard's New task (which opens
+/// To Do &amp; Calendar under it), To Do's Add a task, Ctrl+N and the Calendar's New task on a day put it up; Enter adds
+/// it, Escape puts it away.
 /// </summary>
 public sealed class NewTaskSheet
 {

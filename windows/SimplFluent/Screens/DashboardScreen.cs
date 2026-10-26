@@ -95,8 +95,9 @@ public sealed partial class DashboardScreen : Screen
                 Refresh();
                 Render();
             };
-            var add = K.Button("New task", () => engine.AskNewTask(), icon: SymbolRegular.Add24);
-            add.ToolTip = "New task (Ctrl+N)";
+            // (0.3.64: To Do is To Do & Calendar's — the task is added there, To Do showing, as the web's Dashboard has it)
+            var add = K.Button("New task", () => { engine.Go(Place.Todo); engine.AskNewTask(); }, icon: SymbolRegular.Add24);
+            add.ToolTip = "New task in To Do & Calendar (Ctrl+N)";
             return commands = K.H(12, selector, add);
         }
     }
@@ -979,7 +980,8 @@ public sealed partial class DashboardScreen : Screen
             // (opened again as it folded: its card stays hidden under the new panel)
             if (openKey == key) { Gone(); return; }
             CardBack();
-            Motion.Fade(f, f.Opacity, 0, Motion.Fast, Gone);
+            // (its card's own face back on it already: a breath of a cross-fade, not another fold's length)
+            Motion.Fade(f, f.Opacity, 0, look != null ? Motion.Away / 4 : Motion.Fast, Gone);
         }
         if (!Motion.Fades) { Gone(); CardBack(); return; }
         if (!Motion.On || tile.IsEmpty)
@@ -989,13 +991,14 @@ public sealed partial class DashboardScreen : Screen
             Motion.Fade(f, f.Opacity, 0, Motion.Fast, Gone);
             return;
         }
-        if (content != null) Motion.FadeOut(content, () => { }, Motion.Fast);
-        if (look != null) Motion.To(look, UIElement.OpacityProperty, 1, Motion.Medium, Motion.Standard);
+        // ((0.3.64, the owner's #241) folded in Motion.Away, its words gone in the first half of it)
+        if (content != null) Motion.FadeOut(content, () => { }, Motion.Away / 2);
+        if (look != null) Motion.To(look, UIElement.OpacityProperty, 1, Motion.Away, Motion.Standard);
         var from = new Rect(Canvas.GetLeft(f), Canvas.GetTop(f), f.ActualWidth, f.ActualHeight);
-        Motion.FromTo(f, Canvas.LeftProperty, from.X, tile.X, Motion.Medium, Motion.Standard);
-        Motion.FromTo(f, Canvas.TopProperty, from.Y, tile.Y, Motion.Medium, Motion.Standard);
-        Motion.FromTo(f, FrameworkElement.WidthProperty, from.Width, tile.Width, Motion.Medium, Motion.Standard);
-        Motion.FromTo(f, FrameworkElement.HeightProperty, from.Height, tile.Height, Motion.Medium, Motion.Standard, 0, Landed);
+        Motion.FromTo(f, Canvas.LeftProperty, from.X, tile.X, Motion.Away, Motion.Standard);
+        Motion.FromTo(f, Canvas.TopProperty, from.Y, tile.Y, Motion.Away, Motion.Standard);
+        Motion.FromTo(f, FrameworkElement.WidthProperty, from.Width, tile.Width, Motion.Away, Motion.Standard);
+        Motion.FromTo(f, FrameworkElement.HeightProperty, from.Height, tile.Height, Motion.Away, Motion.Standard, 0, Landed);
     }
 
     /// <summary>The list came (or changed) while the panel is open: its words again, the surface to its new height.</summary>

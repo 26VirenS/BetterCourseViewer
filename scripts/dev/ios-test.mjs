@@ -296,6 +296,32 @@ try {
   const plSync3 = await nc('calSync');
   const plRow3 = (await nc('todo')).sections.flatMap((x) => x.rows).find((r) => r.id === plWork.id);
   check(plClear.ok && !plRow3?.plan && plSync3.links.length === 0, 'Clear takes the plan away, and Unlink the calendar');
+  // (2.99.112) To Do & Calendar for the apps: a piece of work let go on a day of the month or the agenda is planned at that
+  // day's first free time (a day already over is refused); Canvas work dismissed off To Do is listed with what is completed,
+  // to restore, and put back; and how much is still to do, for the pane's row
+  const pdDay = new Date(); pdDay.setDate(pdDay.getDate() + 2); pdDay.setHours(0, 0, 0, 0);
+  const pdPut = await nc('planDay', { id: plWork.id, day: pdDay.toISOString() });
+  const pdAt = new Date(pdPut.at || 0);
+  const pdRow = (await nc('todo')).sections.flatMap((x) => x.rows).find((r) => r.id === plWork.id);
+  check(pdPut.ok && pdAt.toDateString() === pdDay.toDateString() && pdAt.getHours() >= 8 && pdAt.getHours() < 23 && pdRow?.plan?.at === pdPut.at && /\d:\d\d [AP]M/.test(pdPut.words || ''),
+    `let go on a day: planned at that day's first free time: ${JSON.stringify({ ...pdPut, row: pdRow?.plan })}`);
+  const pdGone = await nc('planDay', { id: plWork.id, day: new Date(Date.now() - 2 * 864e5).toISOString() });
+  check(!!pdGone.error, `a day already over is refused: ${JSON.stringify(pdGone)}`);
+  await nc('planClear', { id: plWork.id });
+  const tcBefore = await nc('todoCount');
+  const tdOpen = (await nc('todo', { panel: true })).left;
+  const tdOff = await nc('todoDismiss', { id: plWork.id });
+  const tdHid = await nc('todo', { panel: true });
+  const tdAll = await nc('todo', { panel: true, showDone: true });
+  const tdRow = tdAll.sections.flatMap((x) => x.rows).find((r) => r.id === plWork.id);
+  const tcOff = await nc('todoCount');
+  check(tdOff.ok && !tdHid.sections.flatMap((x) => x.rows).some((r) => r.id === plWork.id) && tdRow?.dismissed === true && tdAll.dismissed >= 1 && tcBefore.open === tdOpen && tcOff.open === tcBefore.open - 1,
+    `dismissed: off To Do, listed with what is completed to restore, one less to do: ${JSON.stringify({ count: [tcBefore.open, tdOpen, tcOff.open], row: tdRow?.dismissed, dismissed: tdAll.dismissed })}`);
+  const tdOn = await nc('todoRestore', { id: plWork.id });
+  const tdBack = await nc('todo', { panel: true, showDone: false });
+  const tcOn = await nc('todoCount');
+  check(tdOn.ok && tdBack.sections.flatMap((x) => x.rows).some((r) => r.id === plWork.id && r.dismissed === false) && tcOn.open === tcBefore.open && !('dismissed' in (await nc('todo')).sections[0].rows[0]),
+    `restored: back on To Do (and To Do's own answer as it was, without the panel's word): ${JSON.stringify({ count: tcOn.open })}`);
   const nf = await nc('notifications');
   check(!nf.error && nf.total > 0 && nf.days.length > 0 && nf.days[0].rows.every((r) => r.id && r.catLabel && r.title), `Notifications: grouped by day, each with its category: ${JSON.stringify({ total: nf.total, unread: nf.unread, days: nf.days.map((d) => `${d.title}:${d.rows.length}`), cats: nf.cats.map((c) => c.key) })}`);
   const one = nf.days[0].rows[0];

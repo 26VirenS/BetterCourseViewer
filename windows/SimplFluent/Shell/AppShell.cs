@@ -18,7 +18,7 @@ namespace Simpl.Shell;
 
 /// <summary>
 /// The app once the school is ready (the Mac's MainShell), laid out as Windows 11's Settings app: the navigation pane at
-/// the left — the search box at its head; the places (Dashboard, To Do, Calendar, Grades, Notifications, Inbox, Tools,
+/// the left — the search box at its head; the places (Dashboard, To Do & Calendar, Grades, Notifications, Inbox, Tools,
 /// External Tools), the courses (the one open with its sections under it), one Groups row that lists the groups and what
 /// the school added to Canvas's own navigation (More from Canvas: History, its tools, Help); and at its foot Settings,
 /// then who is signed in, where and as whom (the Mac's account bar, with the account menu) — and the page at the right:
@@ -217,6 +217,7 @@ public sealed partial class AppShell : Grid, IDisposable
         {
             case nameof(Engine.Engine.NavVersion): Navigate(); BuildPane(); break;
             case nameof(Engine.Engine.Courses) or nameof(Engine.Engine.Groups) or nameof(Engine.Engine.Sections) or nameof(Engine.Engine.Snapshot): BuildPane(); Header(); break;
+            case nameof(Engine.Engine.TodoOpen): BuildPane(); break;
             case nameof(Engine.Engine.DataVersion): current?.Refresh(); _ = LoadMore(); break;
             // (0.3.56: the pane's box only brings the search up, so it never holds the words typed — it names the school)
             case nameof(Engine.Engine.LmsName): searchBox.PlaceholderText = $"Search {engine.LmsName} or type /"; break;
@@ -277,7 +278,7 @@ public sealed partial class AppShell : Grid, IDisposable
 
     // ---- the pane ----
 
-    private static readonly Color Blue = Color.FromRgb(0x00, 0x78, 0xd4), Green = Color.FromRgb(0x10, 0x89, 0x3e), Red = Color.FromRgb(0xd1, 0x34, 0x38),
+    private static readonly Color Blue = Color.FromRgb(0x00, 0x78, 0xd4), Red = Color.FromRgb(0xd1, 0x34, 0x38),
         Purple = Color.FromRgb(0x88, 0x64, 0xd8), Orange = Color.FromRgb(0xe3, 0x6c, 0x0a), Teal = Color.FromRgb(0x00, 0x99, 0xbc), Gray = Color.FromRgb(0x76, 0x76, 0x7c),
         Gold = Color.FromRgb(0xc1, 0x8a, 0x00), Orchid = Color.FromRgb(0xc2, 0x39, 0xb3);
 
@@ -300,11 +301,13 @@ public sealed partial class AppShell : Grid, IDisposable
         Action<bool> Ready(Place p) => build => engine.Prepare(p, build);
         var notes = snap?.NotifUnread ?? 0;
         var mail = snap?.InboxUnread ?? 0;
+        var todo = engine.TodoOpen ?? 0;
         var list = new List<NavEntry>
         {
             new() { Key = "dashboard", Title = "Dashboard", Icon = SymbolRegular.Home24, Tint = Blue, Go = () => GoPlace(Place.Dashboard), Prepare = Ready(Place.Dashboard), Spot = TourSpot.DashboardRow },
-            new() { Key = "todo", Title = "To Do", Icon = SymbolRegular.TaskListLtr24, Tint = Green, Go = () => GoPlace(Place.Todo), Prepare = Ready(Place.Todo) },
-            new() { Key = "calendar", Title = "Calendar", Icon = SymbolRegular.CalendarLtr24, Tint = Red, Go = () => GoPlace(Place.Calendar), Prepare = Ready(Place.Calendar) },
+            // (0.3.64) To Do and the Calendar are one place, To Do & Calendar (the web's 2.99.112): the calendar with To Do
+            // beside it, in the Calendar's place, To Do's count on it
+            new() { Key = "calendar", Title = CalendarScreen.PlaceName, Icon = SymbolRegular.CalendarLtr24, Tint = Red, Badge = todo, BadgeLabel = todo == 1 ? "1 thing to do" : $"{todo} things to do", Go = () => GoPlace(Place.Calendar), Prepare = Ready(Place.Calendar) },
             new() { Key = "grades", Title = "Grades", Icon = SymbolRegular.DataBarVertical24, Tint = Purple, Go = () => GoPlace(Place.Grades), Prepare = Ready(Place.Grades), Spot = TourSpot.GradesRow },
             new() { Key = "notifications", Title = "Notifications", Icon = SymbolRegular.Alert24, Tint = Orange, Badge = notes, BadgeLabel = notes == 1 ? "1 new notification" : $"{notes} new notifications", Go = () => GoPlace(Place.Notifications), Prepare = Ready(Place.Notifications) },
             new() { Key = "inbox", Title = "Inbox", Icon = SymbolRegular.Mail24, Tint = Teal, Badge = mail, BadgeLabel = mail == 1 ? "1 unread message" : $"{mail} unread messages", Go = () => GoPlace(Place.Inbox), Prepare = Ready(Place.Inbox) },
@@ -592,9 +595,11 @@ public sealed partial class AppShell : Grid, IDisposable
         menu.IsOpen = true;
     }
 
-    /// <summary>A press anywhere in the window: the quick look and the screen's own panel fold back when it is outside them.</summary>
+    /// <summary>A press anywhere in the window: the quick look (0.3.64) and the screen's own panel fold back when it is
+    /// outside them.</summary>
     public void Pressed(MouseButtonEventArgs e)
     {
+        WorkPreview.Pressed(e);
         current?.Pressed(e);
     }
 

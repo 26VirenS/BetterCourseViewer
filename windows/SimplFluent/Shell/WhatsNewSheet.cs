@@ -46,7 +46,7 @@ public static class WhatsNewSheet
         list.Margin = new Thickness(0, 0, 0, 16); // (room at the foot that scrolls with the list)
         var scroll = new ScrollViewer { Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(32, 0, 32, 0) };
         var body = K.Rows("auto, *", head.Row(0), scroll.Row(1));
-        var s = new Sheet { Body = body, Bare = true, Width = 500, Height = 560, HoldsUpdates = false, Floats = true, Name = "What’s new" };
+        var s = new Sheet { Body = body, Bare = true, Width = 500, Height = 560, HoldsUpdates = false, Floats = true, Light = true, Name = "What’s new" };
         s.Add("Continue", SheetButtonKind.Primary);
         Motion.Stagger(list.Children.OfType<UIElement>(), 60, 16);
         Dialogs.Show(s, over);

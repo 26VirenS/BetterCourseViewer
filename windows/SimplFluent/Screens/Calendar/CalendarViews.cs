@@ -30,21 +30,34 @@ public sealed partial class CalendarScreen
 
     // ---- Month ----
 
-    /// <summary>The month's grid with the day picked beside it on a wide page, under it on a narrow one.</summary>
+    /// <summary>Whether the day picked is listed with the month this build (else a day's "more" opens its week).</summary>
+    private bool dayShown;
+
+    /// <summary>(0.3.64) The calendar's own width: the page's, less To Do beside it.</summary>
+    private double CalWidth => Width - (TodoBeside ? TodoWidth + TodoGap : 0);
+
+    /// <summary>The month's grid with the day picked beside it where there is room, else — the page scrolling — under it;
+    /// (0.3.64) the page holding still, the month alone where the day has no room beside it (To Do beside the month, as
+    /// the web's has it), a day's "more" opening its week.</summary>
     private FrameworkElement MonthView(Dictionary<string, List<CalEvent>> byDay, bool slide)
     {
-        var grid = MonthGrid(byDay, slide);
-        var panel = DayPanel(selected, EventsOn(byDay, selected));
-        if (Width >= MonthBeside) return K.Columns("*, 22, 340", grid.Col(0), panel.Col(2));
+        var fit = Fits;
+        var beside = CalWidth >= MonthBeside;
+        dayShown = beside || !fit;
+        var grid = MonthGrid(byDay, slide, fit);
+        if (!dayShown) return grid;
+        var panel = DayPanel(selected, EventsOn(byDay, selected), fit);
+        if (beside) return K.Columns("*, 22, 340", grid.Col(0), panel.Col(2));
         return K.V(22, grid, panel);
     }
 
     /// <summary>
     /// The days of the week over the weeks the month touches (five or six) from the first day of the week it starts in —
     /// the grid always as tall, its days taller when there are fewer weeks — each a rounded cell as Windows' CalendarView
-    /// has them; a new month slides in from the side the move went.
+    /// has them; a new month slides in from the side the move went. (0.3.64) The page holding still (<paramref name="fit"/>),
+    /// the weeks fill the height left them, scrolling inside it when they would be shorter than a day can be.
     /// </summary>
-    private FrameworkElement MonthGrid(Dictionary<string, List<CalEvent>> byDay, bool slide)
+    private FrameworkElement MonthGrid(Dictionary<string, List<CalEvent>> byDay, bool slide, bool fit)
     {
         var head = new Grid { Margin = new Thickness(0, 0, 0, 6) };
         var names = WeekdayNames();
@@ -58,9 +71,9 @@ public sealed partial class CalendarScreen
         var days = new Grid();
         var weeks = WeekCount(anchor);
         // (at most a six-week month's height; less where the page shows less, so the month's last week is in view, its
-        //  days never shorter than MinCell)
-        var most = Math.Floor(6 * CellHeight / weeks);
-        var height = most;
+        //  days never shorter than MinCell — the page holding still, as tall as the room left them)
+        var most = fit ? double.PositiveInfinity : Math.Floor(6 * CellHeight / weeks);
+        var height = Math.Floor(6 * CellHeight / weeks);
         for (var i = 0; i < 7; i++) days.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         for (var w = 0; w < weeks; w++) days.RowDefinitions.Add(new RowDefinition { Height = new GridLength(height) });
         var first = FirstOfWeek(anchor);
@@ -74,16 +87,32 @@ public sealed partial class CalendarScreen
             }
         }
         Cells();
-        // (the days as tall as the page shows from the grid's top down, measured on the page's own scroller — and again as
-        //  the window's height changes)
-        ScrollViewer? page = null;
+        // (the cells' own gaps at the grid's edges let go, so it lines up with what is under it; a month sliding in is
+        // seen inside it only)
+        var clip = new Border { Child = days, ClipToBounds = true, Margin = new Thickness(-2) };
+        if (slide) Motion.SlideIn(days, dir > 0);
+        // (the days as tall as the page shows from the grid's top down, measured on the page's own scroller — or, holding
+        //  still, the month's own — and again as the window's height changes)
+        var own = fit ? new ScrollViewer { Content = clip, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled } : null;
+        ScrollViewer? page = own;
         void Fit()
         {
-            if (page is not { ViewportHeight: > 0, Content: UIElement content } || !days.IsLoaded) return;
-            double top;
-            try { top = days.TranslatePoint(new Point(0, 0), content).Y; }
-            catch (InvalidOperationException) { return; }
-            var h = Math.Clamp(Math.Floor((page.ViewportHeight - top - MonthFoot) / weeks), MinCell, most);
+            double h;
+            // (holding still: as its own scroller is laid out, before anything is drawn — the weeks never shown a size and
+            //  then another)
+            if (own != null)
+            {
+                if (own.ActualHeight <= 0) return;
+                h = Math.Max(MinCell, Math.Floor((own.ActualHeight + 4) / weeks));
+            }
+            else
+            {
+                if (page is not { ViewportHeight: > 0, Content: UIElement content } || !days.IsLoaded) return;
+                double top;
+                try { top = days.TranslatePoint(new Point(0, 0), content).Y; }
+                catch (InvalidOperationException) { return; }
+                h = Math.Clamp(Math.Floor((page.ViewportHeight - top - MonthFoot) / weeks), MinCell, most);
+            }
             if (Math.Abs(h - height) < 1) return;
             height = h;
             foreach (var r in days.RowDefinitions) r.Height = new GridLength(h);
@@ -94,17 +123,16 @@ public sealed partial class CalendarScreen
         void Sized(object? s, SizeChangedEventArgs e) { if (e.HeightChanged) Fit(); }
         days.Loaded += (_, _) =>
         {
+            if (own != null) return;
             for (DependencyObject? d = days; d != null; d = VisualTreeHelper.GetParent(d)) if (d is ScrollViewer sv && !ReferenceEquals(sv, days)) { page = sv; break; }
             if (page == null) return;
             page.SizeChanged -= Sized;
             page.SizeChanged += Sized;
             days.Dispatcher.BeginInvoke(Fit, System.Windows.Threading.DispatcherPriority.Loaded);
         };
-        days.Unloaded += (_, _) => { if (page != null) page.SizeChanged -= Sized; };
-        // (the cells' own gaps at the grid's edges let go, so it lines up with what is under it; a month sliding in is
-        // seen inside it only)
-        var clip = new Border { Child = days, ClipToBounds = true, Margin = new Thickness(-2) };
-        if (slide) Motion.SlideIn(days, dir > 0);
+        days.Unloaded += (_, _) => { if (page != null && own == null) page.SizeChanged -= Sized; };
+        if (own != null) own.SizeChanged += Sized;
+        if (own != null) return K.Rows("auto, *", head.Row(0), own.Row(1));
         return K.V(0, head, clip);
     }
 
@@ -113,7 +141,8 @@ public sealed partial class CalendarScreen
     /// calendar's colour — (1.2) flat in the cell, no box round each. The open ones first, as many as the day has room
     /// for, a name taking a second line while there is room for it; work handed in folded into one line ("3 done", with
     /// what did not fit: "2 more · 3 done"), so the names still to do get the room. An item clicked opens its preview;
-    /// the rest of the day picks the day.
+    /// the rest of the day picks the day. (0.3.64) With no room for the day's own list beside the month, "2 more" opens
+    /// the day's week; and a row of To Do dragged onto a day is planned at its first free time.
     /// </summary>
     private FrameworkElement DayCell(DateTime day, List<CalEvent> evs, double height)
     {
@@ -144,7 +173,16 @@ public sealed partial class CalendarScreen
             var more = K.Text(rest, Ty.Caption, B.Text2);
             more.FontWeight = FontWeights.Medium;
             more.TextTrimming = TextTrimming.CharacterEllipsis;
-            lines.Children.Add(more.Margin(12, 0, 0, 0));
+            if (hidden > 0 && !dayShown)
+            {
+                var all = K.Subtle(more, () => OpenWeekOf(day), new Thickness(9, 0, 3, 1), 4);
+                all.HorizontalAlignment = HorizontalAlignment.Left;
+                all.HorizontalContentAlignment = HorizontalAlignment.Left;
+                all.MinHeight = 0;
+                all.ToolTip = $"Everything on {LongDay(day)}, in its week";
+                lines.Children.Add(all);
+            }
+            else lines.Children.Add(more.Margin(12, 0, 0, 0));
         }
         if (off) lines.Opacity = 0.6;
         var b = K.CardButton(K.V(2, badge, lines), () => Pick(day), 6, new Thickness(5, 4, 5, 4));
@@ -153,10 +191,15 @@ public sealed partial class CalendarScreen
         if (off) b.SetResourceReference(Control.BackgroundProperty, B.Card2);
         AutomationProperties.SetName(b, Spoken(day, evs.Count));
         if (isSel) AutomationProperties.SetItemStatus(b, "Selected");
-        if (!isSel) return b;
-        var ring = new Border { CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(2), Margin = new Thickness(2), IsHitTestVisible = false };
-        ring.SetResourceReference(Border.BorderBrushProperty, B.Accent);
-        return new Grid { Children = { b, ring } };
+        var cell = new Grid { Children = { b } };
+        if (isSel)
+        {
+            var ring = new Border { CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(2), Margin = new Thickness(2), IsHitTestVisible = false };
+            ring.SetResourceReference(Border.BorderBrushProperty, B.Accent);
+            cell.Children.Add(ring);
+        }
+        TodoDayDrops(cell, day, 6, 2); // (0.3.64: a row of To Do let go on it is planned that day)
+        return cell;
     }
 
     /// <summary>The Mac's CalendarChip: its name after a thin bar in its calendar's colour — a red mark when it is missing;
@@ -189,8 +232,9 @@ public sealed partial class CalendarScreen
 
     // ---- A day ----
 
-    /// <summary>The day picked beside the month: its name, how much is on it and New task over one card of its work and events.</summary>
-    private FrameworkElement DayPanel(DateTime day, List<CalEvent> evs)
+    /// <summary>The day picked beside the month: its name, how much is on it and New task over one card of its work and
+    /// events — (0.3.64) the page holding still (<paramref name="fit"/>), the card scrolling under its heading.</summary>
+    private FrameworkElement DayPanel(DateTime day, List<CalEvent> evs, bool fit)
     {
         var words = K.V(2,
             K.Text(day.ToString("dddd", Culture), Ty.Subtitle),
@@ -198,7 +242,11 @@ public sealed partial class CalendarScreen
         var add = K.Button("New task", () => NewTask(day), icon: SymbolRegular.Add24);
         add.ToolTip = "A task of your own, due this day (it shows in To Do)";
         var head = K.Columns("*, auto", words.Col(0), add.Margin(10, 0, 0, 0).Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(1));
-        return K.V(10, head, DayRows(evs));
+        if (!fit) return K.V(10, head, DayRows(evs));
+        var rows = DayRows(evs);
+        rows.VerticalAlignment = VerticalAlignment.Top;
+        var scroll = new ScrollViewer { Content = rows, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        return K.Rows("auto, *", head.Margin(0, 0, 0, 10).Row(0), scroll.Row(1));
     }
 
     /// <summary>A day's work and events in one card, each opening its preview (a double-click opens it where it lives).</summary>
@@ -215,9 +263,13 @@ public sealed partial class CalendarScreen
     }
 
     /// <summary>A day of the week or of the list: its name as the section's heading ("Tue, Oct 13"), its work and events in
-    /// one card under it.</summary>
-    private FrameworkElement DayCard(DateTime day, List<CalEvent> evs) =>
-        K.V(0, Heading.Section(CalendarKit.DateWords(day, weekday: true), CountLine(day, evs.Count)), DayRows(evs));
+    /// one card under it — (0.3.64) a row of To Do let go on it planned that day.</summary>
+    private FrameworkElement DayCard(DateTime day, List<CalEvent> evs)
+    {
+        var card = new Grid { Children = { K.V(0, Heading.Section(CalendarKit.DateWords(day, weekday: true), CountLine(day, evs.Count)), DayRows(evs)) } };
+        TodoDayDrops(card, day, 10);
+        return card;
+    }
 
     /// <summary>
     /// The Mac's CalendarEventLine: its kind's symbol in its calendar's colour, its name (struck through only once handed
@@ -295,27 +347,29 @@ public sealed partial class CalendarScreen
 
     // ---- Week ----
 
-    /// <summary>The week over its hours on a wide page (<see cref="WeekGrid"/>), as seven days one under another on a
-    /// narrow one; (0.3.63) To Do beside it on a page wide enough for both (<see cref="WithTodo"/>).</summary>
+    /// <summary>The week over its hours on a wide page (<see cref="WeekGrid"/>), as its days one under another on a narrow
+    /// one — (0.3.64) five days, Monday to Friday, or all seven (<see cref="WeekDays"/>).</summary>
     private FrameworkElement WeekView(Dictionary<string, List<CalEvent>> byDay, bool slide)
     {
         HideDrop(); // (the days are drawn afresh: a row still dragged over one shows where it would go again as it moves)
-        var days = Enumerable.Range(0, 7).Select(i => weekStart.AddDays(i)).ToList();
+        var days = Enumerable.Range(0, WeekDays).Select(i => weekStart.AddDays(i)).ToList();
         FrameworkElement view;
-        if (Width >= WeekColumnsFrom) view = WeekGrid(days, byDay);
+        if (Width >= WeekColumnsFrom) view = WeekGrid(days, byDay, Fits);
         else
         {
+            hours = null;
             var v = new Stack { Orientation = Orientation.Vertical, Spacing = 18 };
             foreach (var day in days) v.Children.Add(DayCard(day, EventsOn(byDay, day)));
             view = v;
         }
         if (slide) Motion.SlideIn(view, dir > 0);
-        return WithTodo(new Border { Child = view, ClipToBounds = true });
+        return new Border { Child = view, ClipToBounds = true };
     }
 
     // ---- List ----
 
-    /// <summary>The next three weeks, each day with something on it as a section of its own.</summary>
+    /// <summary>The next three weeks, each day with something on it as a section of its own — (0.3.64) the page holding
+    /// still, scrolling inside the room it has.</summary>
     private FrameworkElement ListView(Dictionary<string, List<CalEvent>> byDay)
     {
         var v = new Stack { Orientation = Orientation.Vertical, Spacing = 22 };
@@ -324,6 +378,8 @@ public sealed partial class CalendarScreen
         foreach (var k in keys)
             if (DateTime.TryParseExact(k, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
                 v.Children.Add(DayCard(day, byDay[k]));
-        return v;
+        if (!Fits) return v;
+        v.Margin = new Thickness(0, 0, 0, 12);
+        return new ScrollViewer { Content = v, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
     }
 }

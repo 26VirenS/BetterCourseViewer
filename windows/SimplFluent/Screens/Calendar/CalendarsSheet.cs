@@ -88,7 +88,7 @@ internal static class CalendarsSheet
         }
         var all = K.V(12, head, body, K.Divider(), foot);
         Paint();
-        var s = new Sheet { Title = "Calendars", Body = all, Width = 400, Floats = true };
+        var s = new Sheet { Title = "Calendars", Body = all, Width = 400, Floats = true, Light = true };
         s.Add("Done", SheetButtonKind.Primary);
         Dialogs.Show(s, over);
     }

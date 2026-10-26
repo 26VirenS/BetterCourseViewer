@@ -63,6 +63,8 @@ public sealed class WorkRow
     public string? Pts { get; set; }
     // (2.99.107) the time it is planned for, pulled to (content/app/plan.js): "Planned Tue 4:00 PM"
     public WorkPlan? Plan { get; set; }
+    // (2.99.112) in To Do & Calendar's panel (todo's `panel`): dismissed off To Do, listed with what is completed to restore
+    public bool? Dismissed { get; set; }
 }
 
 // (2.99.107) a piece of work's plan: when, for how long, and the words its pill says
@@ -129,6 +131,21 @@ public sealed class PlanSlots
     public string? DueWords { get; set; }
     public List<PlanSlot>? Slots { get; set; }
     public string? Error { get; set; }
+}
+
+// (2.99.112) a piece of work let go on a day of the month or the agenda (native-app.js `planDay`): when it was planned
+public sealed class PlanDay
+{
+    public bool? Ok { get; set; }
+    public string? At { get; set; }
+    public string? Words { get; set; }
+    public WorkPlan? Plan { get; set; }
+}
+
+// (2.99.112) how much is still to do in the courses chosen (native-app.js `todoCount`), for To Do & Calendar's row
+public sealed class TodoCount
+{
+    public int? Open { get; set; }
 }
 
 public sealed class PlanSlot
@@ -294,6 +311,8 @@ public sealed class TodoData
     public string? LeftText { get; set; }
     public string? DoneText { get; set; }
     public string? OverdueText { get; set; }
+    // (2.99.112) in To Do & Calendar's panel: how much Canvas work was dismissed this week (listed with Show completed)
+    public int? Dismissed { get; set; }
 }
 
 public sealed class GradeCategory

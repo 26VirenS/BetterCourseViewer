@@ -22,7 +22,8 @@ namespace Simpl.Shell;
 /// takes the window's clicks while it is up — no dimming, only the shadow Windows draws round a window — so the pane,
 /// the title bar, the search and the page behind it all go on working, and a place opened under it leaves it where it
 /// was. It is moved by its heading (a press there that is not on a control), closed by its × (or its own Close), by
-/// Escape while it has the keyboard, or by Alt+F4. It opens in the middle of the window (0.3.4), and moves with the
+/// Escape while it has the keyboard, or by Alt+F4 — and (0.3.64) a light one, with no form in it, by a click anywhere in
+/// the window it floats over (<see cref="Sheet.Light"/>). It opens in the middle of the window (0.3.4), and moves with the
 /// window, keeping the place it was moved to. A large one (a tool, Knewton Alta, feedback, a rubric) spans the
 /// window under its title bar less a margin all round — over the pane too, the owner's choice — sized again with the
 /// window, one over another a step down and along (and that much smaller, inside the window); it is sized by its edges
@@ -206,6 +207,7 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
         over.SizeChanged += OverSized;
         over.StateChanged += OverMoved;
         over.Closed += OverClosed;
+        over.PreviewMouseDown += OverPressed;
         if (over is MainWindow m) m.PopupRoomChanged += OverMoved;
         if (s.Large)
         {
@@ -410,6 +412,14 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
     }
 
     private void OverClosed(object? sender, EventArgs e) => End();
+
+    /// <summary>(0.3.64, the owner's #241) A press in the window it floats over: a light one (<see cref="Sheet.Light"/>)
+    /// closes, as its × would, and the press still does what it does there; one with a form, or its own question up, stays.</summary>
+    private void OverPressed(object sender, MouseButtonEventArgs e)
+    {
+        if (!sheet.Light || ended || sheets.IsOpen || e.ChangedButton is not (MouseButton.Left or MouseButton.Right)) return;
+        Dismiss();
+    }
 
     // ---- moved by its heading ----
 
@@ -696,6 +706,7 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
         over.SizeChanged -= OverSized;
         over.StateChanged -= OverMoved;
         over.Closed -= OverClosed;
+        over.PreviewMouseDown -= OverPressed;
         if (over is MainWindow m) m.PopupRoomChanged -= OverMoved;
         sheet.CloseFloat = null;
         sheet.SizeKeyChanged = null;

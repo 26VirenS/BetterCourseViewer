@@ -18,11 +18,15 @@ public sealed class SelectorBar : Grid
     private readonly Stack row = new() { Orientation = Orientation.Horizontal, Spacing = 2 };
     private readonly Canvas overlay = new() { IsHitTestVisible = false };
     private readonly Border bar = new() { Height = 3, Width = 16, CornerRadius = new CornerRadius(1.5) };
-    private readonly List<(Button B, TextBlock T, string Name)> items = new();
+    private readonly List<(Button B, TextBlock T, string Name, Border Mark)> items = new();
     private int selected;
     private double? barAt;
 
     public event Action<int>? Changed;
+
+    /// <summary>(0.3.64) The choice already chosen pressed again (the Calendar's Week: its five days or seven, in a menu
+    /// under it), with its button.</summary>
+    public event Action<int, FrameworkElement>? Again;
 
     public SelectorBar(IReadOnlyList<string> choices, int selected)
     {
@@ -33,9 +37,11 @@ public sealed class SelectorBar : Grid
         {
             var n = i;
             var t = K.Text(choices[i], Ty.Body);
-            var b = K.Subtle(t, () => Select(n, true), new Thickness(12, 6, 12, 9));
+            var mark = new Border { VerticalAlignment = VerticalAlignment.Center };
+            Button? b = null;
+            b = K.Subtle(K.H(0, t, mark), () => { if (n == this.selected) Again?.Invoke(n, b!); else Select(n, true); }, new Thickness(12, 6, 12, 9));
             b.MinWidth = 44;
-            items.Add((b, t, choices[i]));
+            items.Add((b, t, choices[i], mark));
             row.Children.Add(b);
         }
         Children.Add(row);
@@ -48,6 +54,21 @@ public sealed class SelectorBar : Grid
     }
 
     public int Selected => selected;
+
+    /// <summary>A choice's own button (where a menu it offers opens under).</summary>
+    public FrameworkElement Item(int i) => items[Math.Clamp(i, 0, items.Count - 1)].B;
+
+    /// <summary>(0.3.64) A small mark after a choice's words — a chevron saying that, chosen, it offers more when pressed
+    /// again — and what its button tells Narrator it does then; null, none.</summary>
+    public void Trail(int i, UIElement? mark, string? more = null)
+    {
+        if (i < 0 || i >= items.Count) return;
+        var (b, _, _, host) = items[i];
+        host.Child = mark;
+        host.Margin = mark == null ? new Thickness(0) : new Thickness(5, 1, 0, 0);
+        b.ToolTip = more;
+        System.Windows.Automation.AutomationProperties.SetHelpText(b, more ?? "");
+    }
 
     public void Select(int i, bool raise)
     {

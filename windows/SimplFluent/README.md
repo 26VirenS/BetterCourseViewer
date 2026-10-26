@@ -372,7 +372,7 @@ stalls (input kept waiting over 200 ms, probed twice a second while the window s
 utilities — each one's private bytes, working set and private working set, read in one call to Windows; and .NET's
 heap).
 
-`--perf-walk <folder>` walks one fixed route once the first answers are in — To Do, the Calendar, Grades, the Inbox, a
+`--perf-walk <folder>` walks one fixed route once the first answers are in — To Do & Calendar, Grades, the Inbox, a
 course, an assignment, Notifications, the New task sheet, Settings, Tools, a search typed a letter at a time, the
 window dragged and resized, the Dashboard again — writes `perf.json` and `perf.txt` there (and the table to
 simpl.log), and quits. Each step: drawn (`ui`), its answers in and shown (`data`), the builds and calls it took, the
@@ -444,22 +444,21 @@ never fails a run, and nothing waits for it but the pictures' merge.
 | `Shell/` | The window (`MainWindow`), the Settings-style shell (`AppShell`, its pages and their motion `AppShellPages`, reading ahead `Prefetch`, `NavPane`, what the school added to Canvas's own navigation `MoreFromCanvas`, the screen on
 show checked against the school while the window shows `LiveCheck`), the popups floating over the window (`FloatPopup`, Popups below), Settings, Setup, What's New, the tour (`Tour`), keeping Simpl on the taskbar (`Taskbar`: asked once, the third time Simpl is opened, at a calm moment, and from Settings ▸ General's Pin to taskbar…), dialogs, the tray, the web window, a place or a page in a window of its own (`PlaceWindow`: a pane row's or a list row's Open in new window, Shift+click on a pane row, a page's ⋯ ▸ Open in new window, or Ctrl+Shift+O for what shows), the window's side of updates (`UpdateWatch`: what holds one back, where the window is, the notice). `Shell/Search/`: the search box's suggestions and commands (`SearchPalette`, Ctrl+K). |
 | `SignIn/` | Finding the school, confirming it, the sign-in card, "Logging you in", the handoff bar. |
-| `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Todo/`, `Calendar/` (with Notifications), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In and its Send from Phone, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
+| `Screens/` | One class per screen, built on `Screen`; `ScreenFactory` says which screen shows a place or a route. A folder per area: `Calendar/` (To Do & Calendar — the calendar with To Do in its panel beside it, `CalendarTodo.cs`, since 0.3.64 the only To Do — with Notifications), `Todo/` (New task's sheet, To Do's words), `Grades/`, `Inbox/` (with Groups and New Message), `Course/` (All Courses, a course's home, its sections, pages, files), `Assignment/` (with Hand In and its Send from Phone, feedback, the rubric), `More/` (Search, External Tools, Tools, a discussion), `Quiz/`, `Alta/` (the Alta and Macmillan popups), `Preview/` (the quick look). |
 | `Tools/` | `ToolHost.cs` (the registry, the title bar's pins, their flyouts and pulled-out windows, a tool opened whole in its popup, the pieces tools are made of), then a folder per family: `Everyday/` (Focus timer, Calculator, Unit converter, Grade needed, Word Counter, Statistics, Matrix Calculator; `Model/` holds their counting and sums with no window in them, tested in `SimplFluent.Tests`), `Study/` (Citations, Flashcards), `Files/` (File converter, Merge & split PDFs, PDF annotator, Image to text, Compress files, Graphing calculator), `Elements/` (the Periodic Table, Atoms & Orbitals), `Chemistry/` (the Chemistry section's tools: `ChemTools.cs`, Lewis Structures, the Molecule Builder, and the calculators — the Equation Balancer, Molar Mass & Stoichiometry, Gas Laws, Solutions & pH — with their sums in `Chemistry/Model/`, plain .NET), `Physics/` (the Physics section's tools: `PhysTools.cs`, Kinematics & Projectiles, Vectors, the Circuit Builder; their maths in `Model/`, free of WPF), `Biology/` (the biology toolkit's ten tools on their shared foundation: data, 3D, labels, step-through; its own README). |
 
 ## A screen
 
 ```csharp
-public sealed class TodoScreen : Screen
+public sealed class GradesScreen : Screen
 {
-    private readonly Loader<TodoData> data;
-    public TodoScreen(Engine.Engine engine) : base(engine) { data = Watch(new Loader<TodoData>()); }
-    public override string Title => "To Do";
-    public override FrameworkElement? Commands => K.Button("New task", () => engine.AskNewTask(), icon: SymbolRegular.Add24);
-    public override void Refresh() => data.Ensure(engine, "todo");          // read (kept answer first, then the page's)
+    private readonly Loader<GradesData> data;
+    public GradesScreen(Engine.Engine engine) : base(engine) { data = Watch(new Loader<GradesData>()); }
+    public override string Title => "Grades";
+    public override void Refresh() => data.Ensure(engine, "grades");        // read (kept answer first, then the page's)
     protected override FrameworkElement Build()                             // built again as answers come
     {
-        if (data.Data is not { } d) return K.LoadState(data.Error, () => data.Reload(engine, "todo"));
+        if (data.Data is not { } d) return K.LoadState(data.Error, () => data.Reload(engine, "grades"));
         return K.V(28, ...);
     }
 }
@@ -565,7 +564,7 @@ answers are a minute old, as before); one the page gave less than 60 seconds ago
 is.
 
 Reading ahead (`Shell/Prefetch.cs`): once the start has settled — the counts live, nothing asked of the page for a
-moment — the root places (To Do, the Calendar, Grades, Notifications, the Inbox, All Courses) and each course's home
+moment — the root places (To Do & Calendar, Grades, Notifications, the Inbox, All Courses) and each course's home
 (the first twelve) are read, one screen at a time (two or three reads at once at most), a breath between, waiting
 whenever the student's own screens are asking: the school is asked at the pace of a student clicking through, not all
 at once. A pointer resting 90 ms on a pane's row, a course's card or a row of work has its screen read; pressed, the
@@ -666,7 +665,12 @@ their tests; the Mac's are the same):
 - **Pane** (`AppShell.BuildPane`, `NavPane`): the course open folds out its sections (as the Mac's sidebar does; the
   chevron folds out any other); a course's unread announcements are a badge like Notifications', its tooltip and screen
   reader saying what it counts ("2 unread announcements"); one Groups row opens the Groups page and its chevron lists
-  the groups. Under them, *More from Canvas* (`Shell/MoreFromCanvas.cs`): what the school added to Canvas's own
+  the groups. (0.3.64, the web's 2.99.112) To Do and the Calendar are one row, *To Do & Calendar*, in the Calendar's
+  place with To Do's count (`todoCount`, read beside the snapshot, and kept by To Do's own list as it reads): the
+  calendar with To Do in its panel beside it (`Screens/Calendar/CalendarTodo.cs`); whatever went to To Do — /todo, the
+  Dashboard's New task (its sheet over it), an address of To Do's, a To Do an update left open — goes there, To Do
+  shown. Ctrl+1 to Ctrl+6 are the places in order: Dashboard, To Do & Calendar, Grades, Notifications, Inbox, Tools.
+  Under them, *More from Canvas* (`Shell/MoreFromCanvas.cs`): what the school added to Canvas's own
   navigation that no list of Canvas's gives — History (a clock), its tools for every course such as My Materials or
   Studio, Help (a question mark), sometimes a link — as the extension's sidebar lists it, read by the engine from the
   school's page (`moreFromCanvas`; the last menu seen when a page has none, kept with the answers so it shows at once).
@@ -733,8 +737,10 @@ A row of work (the Dashboard's, To Do's, the Calendar's, a counter's panel) grow
 `WorkPreview.Press(item, row)`: build the `PreviewItem` with `WorkPreview.Dash`, `Work` or `Sheet`, or by hand (the
 Calendar's `CalendarPeek`). The card reads the work's details as it opens — the first words of what the work says, as
 plain lines, up to five — Mark done ticks it, a double-click or a Ctrl-click opens the work whole, and Close, Escape or
-its row pressed again folds it back into its row. It takes nothing from the window: nothing behind it is dimmed, a click
-elsewhere does what it does and leaves it up, and it stays over whatever place is opened under it until it is closed;
+its row pressed again folds it back into its row — and (0.3.64, the owner's #241) so does a click anywhere outside it, in
+`Motion.Away` (130 ms, quicker than it came: a counter's panel folds as fast). It takes nothing from the window: nothing
+behind it is dimmed, the click that closes it still does what it does, and it stays over whatever place is opened under
+it until it is closed;
 its heading moves it (`Kit/Drag.cs`: only once the pointer has gone Windows' drag distance — a click there is not a
 move). A counter's panel on the Dashboard is 0.2.9's, as the Mac's 1.3.77: pressed, the counter's card grows in place
 into its panel over the page (its place and size to the panel's, 400 ms on Windows' decelerate curve; the surface is
@@ -1206,7 +1212,9 @@ there takes the pointer); round a submission's file that room is painted in the 
 What each is now: a tool opened whole (its `ToolPopup`; a tool handing something to another turns into it there); Knewton Alta
 and Macmillan (homework, not quizzes); Hand In (with its Send from Phone panel and its files' preview); a submission's
 review; the rubric; New message (the Inbox's and a course's People's); New task; What's New; What-if assignment and
-Grading scale; the Calendar's Calendars; a course's Nickname; the pane's History and Help — popups. The quick look and
+Grading scale; the Calendar's Calendars; a course's Nickname; the pane's History and Help — popups; (0.3.64) the light
+ones, with no form in them (`Sheet.Light`: What's New, the Calendar's Calendars and Find Appointment, History and Help),
+close on a click anywhere in the window they float over, which still does what it does. The quick look and
 a counter's panel stay cards on the page that grow out of their rows and cards, taking nothing from the window either
 (The quick look, above). Pinned tools' flyouts and their pulled-out windows, menus and the search's suggestions are as they were.
 Staying sheets over the window, dimming it: a quiz being taken (`QuizPopup`: its integrity and its clock), the first

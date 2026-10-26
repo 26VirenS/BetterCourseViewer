@@ -90,6 +90,10 @@ public class Sheet
     /// first setup, the sign-in's questions and the questions that must be answered first ("Discard changes?").
     /// </summary>
     public bool Floats { get; set; }
+    /// <summary>(0.3.64, the owner's #241) Floating, a light one — something to read, or a switch or a button to press, no
+    /// form to fill (What's New, the Calendar's Calendars and Find Appointment, the pane's History and Help): a click
+    /// anywhere in the window it floats over closes it, and the click still does what it does there.</summary>
+    public bool Light { get; set; }
     /// <summary>Floating, as large as the window under its title bar less a margin — over the navigation pane too —
     /// resized with the window, and sized by its edges and corners (a tool, Knewton Alta, feedback, a
     /// rubric).</summary>

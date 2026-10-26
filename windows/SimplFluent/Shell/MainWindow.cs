@@ -545,13 +545,13 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         if (ctrl && shift && e.Key == Key.O) { if (engine != null) PlaceWindow.OpenCurrent(engine); e.Handled = true; return; }
         // (0.3.56) while the search is up, Ctrl+1 to Ctrl+4 are its kinds (the Mac's ⌘1–⌘4 there)
         if (ctrl && !shift && e.Key is >= Key.D1 and <= Key.D4 && shell?.SearchScopeKey(e.Key - Key.D1) == true) { e.Handled = true; return; }
-        // (the Mac's ⌘1–⌘7: the pane's places in order)
-        if (ctrl && !shift && engine != null && e.Key is >= Key.D1 and <= Key.D7)
+        // (the Mac's ⌘1–⌘7: the pane's places in order — 0.3.64: six, To Do & Calendar one of them)
+        if (ctrl && !shift && engine != null && e.Key is >= Key.D1 and <= Key.D6)
         {
             Place? p = (e.Key - Key.D1) switch
             {
-                0 => Place.Dashboard, 1 => Place.Todo, 2 => Place.Calendar, 3 => Place.Grades, 4 => Place.Notifications,
-                5 => engine.OnBrightspace ? null : Place.Inbox, _ => Place.Tools,
+                0 => Place.Dashboard, 1 => Place.Calendar, 2 => Place.Grades, 3 => Place.Notifications,
+                4 => engine.OnBrightspace ? null : Place.Inbox, _ => Place.Tools,
             };
             if (p != null) engine.Go(p);
             e.Handled = true;

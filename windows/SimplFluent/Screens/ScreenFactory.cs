@@ -11,8 +11,8 @@ public static class ScreenFactory
     public static Screen For(Engine.Engine engine, Place p) => p.Kind switch
     {
         PlaceKind.Dashboard => new DashboardScreen(engine),
-        PlaceKind.Todo => new TodoScreen(engine),
-        PlaceKind.Calendar => new CalendarScreen(engine),
+        // (0.3.64: To Do is To Do & Calendar's — a window of its own opened on To Do too)
+        PlaceKind.Todo or PlaceKind.Calendar => new CalendarScreen(engine),
         PlaceKind.Notifications => new NotificationsScreen(engine),
         PlaceKind.Grades => new GradesScreen(engine),
         PlaceKind.Courses => new CoursesScreen(engine),
@@ -58,8 +58,7 @@ public static class ScreenFactory
     {
         PlaceKind.Dashboard => "Dashboard",
         PlaceKind.Courses => "All courses",
-        PlaceKind.Todo => "To Do",
-        PlaceKind.Calendar => "Calendar",
+        PlaceKind.Todo or PlaceKind.Calendar => CalendarScreen.PlaceName,
         PlaceKind.Grades => "Grades",
         PlaceKind.Notifications => "Notifications",
         PlaceKind.Inbox => "Inbox",

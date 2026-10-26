@@ -47,7 +47,8 @@ public sealed class PreviewItem
 /// points, where it stands and the first words of what it says — with the way through to it (Open, or Enter), Hand In or
 /// Take Quiz where it waits on you, and Mark Done for a row with a tick. It takes nothing from the window round it — the
 /// page, the pane, the search all go on working, nothing dimmed — and stays where it is, over whatever place is opened
-/// under it, until Close, Escape or its row pressed again folds it back; its heading moves it (Kit/Drag.cs). A
+/// under it, until Close, Escape, its row pressed again or (0.3.64, the owner's #241) a click anywhere outside it folds it
+/// back, quickly (<see cref="Motion.Away"/>) — the click still doing what it does; its heading moves it (Kit/Drag.cs). A
 /// double-click (or a Ctrl+click) on a row opens the work whole. On Windows the card is a flyout surface over the page
 /// (the shell's overlay), rising out of its row as the Dashboard's counters do.
 /// </summary>
@@ -181,7 +182,8 @@ public static class WorkPreview
         e.Height = r.Height;
     }
 
-    /// <summary>Folded back into its row, then gone.</summary>
+    /// <summary>Folded back into its row, then gone — (0.3.64) in <see cref="Motion.Away"/>, its words gone in the first
+    /// half of it.</summary>
     public static void Close()
     {
         var c = card;
@@ -192,14 +194,29 @@ public static class WorkPreview
         lastPress = null;
         var to = row != null ? RowRect(row) : Rect.Empty;
         void Gone() => host?.Children.Remove(c);
+        c.IsHitTestVisible = false; // (going: a press meant for what is under it reaches it)
         if (!Motion.On || to.IsEmpty) { Gone(); return; }
-        if (c.Child is Canvas cv && cv.Children.Count > 0) Motion.FadeOut((UIElement)cv.Children[0], () => { }, Motion.Fast);
+        if (c.Child is Canvas cv && cv.Children.Count > 0) Motion.FadeOut((UIElement)cv.Children[0], () => { }, Motion.Away / 2);
         var from = new Rect(Canvas.GetLeft(c), Canvas.GetTop(c), c.ActualWidth, c.ActualHeight);
-        Motion.FromTo(c, Canvas.LeftProperty, from.X, to.X, Motion.Medium, Motion.Standard);
-        Motion.FromTo(c, Canvas.TopProperty, from.Y, to.Y, Motion.Medium, Motion.Standard);
-        Motion.FromTo(c, FrameworkElement.WidthProperty, from.Width, to.Width, Motion.Medium, Motion.Standard);
-        Motion.FromTo(c, FrameworkElement.HeightProperty, from.Height, to.Height, Motion.Medium, Motion.Standard, 0, Gone);
-        Motion.FadeOut(c, () => { }, Motion.Medium);
+        Motion.FromTo(c, Canvas.LeftProperty, from.X, to.X, Motion.Away, Motion.Standard);
+        Motion.FromTo(c, Canvas.TopProperty, from.Y, to.Y, Motion.Away, Motion.Standard);
+        Motion.FromTo(c, FrameworkElement.WidthProperty, from.Width, to.Width, Motion.Away, Motion.Standard);
+        Motion.FromTo(c, FrameworkElement.HeightProperty, from.Height, to.Height, Motion.Away, Motion.Standard, 0, Gone);
+        Motion.FadeOut(c, () => { }, Motion.Away);
+    }
+
+    /// <summary>
+    /// (0.3.64, the owner's #241: "clicking anywhere outside a preview thingy should auto close it") A press anywhere in
+    /// the window — the page, the pane, the header, the title bar — before it does what it does: outside the card, the
+    /// card folds back, and the press still does what it does (another row opens its own). A press on the card, or on the
+    /// row it grew from (whose own click folds it back), leaves it.
+    /// </summary>
+    public static void Pressed(MouseButtonEventArgs e)
+    {
+        if (card == null || e.ChangedButton is not (MouseButton.Left or MouseButton.Right)) return;
+        if (e.OriginalSource is DependencyObject o && Drag.Within(o, card)) return;
+        if (anchor is { IsMouseOver: true }) return;
+        Close();
     }
 
     /// <summary>Gone at once (the work opened whole, another screen shown).</summary>

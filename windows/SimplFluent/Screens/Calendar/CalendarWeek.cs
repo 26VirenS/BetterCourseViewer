@@ -10,6 +10,7 @@ using System.Windows.Shapes;
 using System.Windows.Threading;
 using Simpl.Kit;
 using Simpl.Models;
+using Simpl.Support;
 using Wpf.Ui.Controls;
 using Button = System.Windows.Controls.Button;
 using TextBlock = System.Windows.Controls.TextBlock;
@@ -17,23 +18,47 @@ using TextBlock = System.Windows.Controls.TextBlock;
 namespace Simpl.Screens;
 
 /// <summary>
-/// (0.3.62) The week as a calendar app draws one (the web's 2.99.109 and the Mac's 1.3.167): its seven days side by side
-/// over the hours, each item a block from its start to its end — side by side where they overlap — a piece of work due at
-/// a moment a short block at that time, the day-long ones in a strip over the hours, and today's column crossed by a red
-/// line at the time it is now, the time beside it in the hours. A plan's block is dragged to move it, a quarter of an
-/// hour at a time and from one day to another; let go, the plan is kept there (the page's planMove). A click alone still
-/// opens its preview.
+/// (0.3.62) The week as a calendar app draws one (the web's 2.99.109 and the Mac's 1.3.167): its days side by side over
+/// the hours, each item a block from its start to its end — side by side where they overlap — a piece of work due at a
+/// moment a short block at that time, the day-long ones in a strip over the hours, and today's column crossed by a red
+/// line at the time it is now, the time beside it in the hours. A plan's block is dragged to move it, a quarter of an hour
+/// at a time and from one day to another; let go, the plan is kept there (the page's planMove). A click alone still opens
+/// its preview.
+/// (0.3.64) As the web's 2.99.112 draws it: five days, Monday to Friday, or all seven from Sunday; the whole day, 12 AM to
+/// 11 PM, its hours scrolling inside the card under the days — first to the morning (or, later in today, to a little
+/// before now), then kept where they were as the week is drawn again. A pinch (a touchpad's, which Windows sends as Ctrl
+/// and the wheel, or Ctrl and the wheel itself) makes the hours taller or shorter about the time under the pointer, from
+/// a day that fits the card to a few hours that fill it, kept. And what lies above or below the hours in view waits
+/// squished at that edge of its day, a thin bar in its colour; a click on it scrolls to it.
 /// </summary>
 public sealed partial class CalendarScreen
 {
-    /// <summary>An hour of the week's grid (the web's 48), and the room for the hours' names before the days.</summary>
-    private const double HourPx = 48;
+    /// <summary>An hour of the week's grid as it first is (the web's 48), and the least and the most a pinch makes it.</summary>
+    private const double HourDefault = 48, HourLeast = 18, HourMost = 140;
     private const double Gutter = 56;
     /// <summary>Room over the first hour and under the last, so the hours' names on their lines are not cut.</summary>
     private const double GridInset = 8;
     private const int DayEnd = 24 * 60;
     /// <summary>The minutes a plan moves by as it is dragged.</summary>
     private const int Snap = 15;
+    /// <summary>The hours' window on a page that scrolls (too short to hold still).</summary>
+    private const double HoursTall = 480;
+    /// <summary>A peek at the edge of the hours: its height, and under the pointer.</summary>
+    private const double PeekTall = 6, PeekHover = 9;
+    private const string HourPref = "calHourPx", DaysPref = "calWeekDays";
+
+    /// <summary>(0.3.64) The week's days, kept: five, Monday to Friday, or seven from Sunday (the screenshot suite's own:
+    /// --cal-days 7).</summary>
+    private static int WeekDays => (Launch.Get("cal-days") is { } forced ? forced == "7" : Prefs.Double(DaysPref, 5) == 7) ? 7 : 5;
+
+    /// <summary>(0.3.64) An hour's height now — a pinch changes it — as last kept (the screenshot suite's own: --cal-hour-px 20).</summary>
+    private double hourPx = Math.Clamp(Launch.Number("cal-hour-px", Prefs.Double(HourPref, HourDefault)), HourLeast, HourMost);
+    /// <summary>Where the week's hours were scrolled to, kept as the week is drawn again (null: not shown yet).</summary>
+    private double? weekScroll;
+    /// <summary>The week's hours as drawn now (null: no week's hours on screen).</summary>
+    private WeekHours? hours;
+    /// <summary>A pinch's end: a moment with no more of it — the height kept, and the week drawn again for it.</summary>
+    private DispatcherTimer? pinchDone;
 
     /// <summary>A timed item of a day of the week: the minutes into the day it starts and ends at as drawn, and its lane
     /// among those it overlaps.</summary>
@@ -44,7 +69,23 @@ public sealed partial class CalendarScreen
         public int B { get; } = b;
         public int Lane { get; set; }
         public int Lanes { get; set; } = 1;
-        public double Height => Math.Max(20, (B - A) / 60.0 * HourPx - 2);
+        /// <summary>Its block's height with hours <paramref name="px"/> tall.</summary>
+        public double Height(double px) => Math.Max(20, (B - A) / 60.0 * px - 2);
+    }
+
+    /// <summary>(0.3.64) The week's hours as drawn: what a pinch changes in place — the hours' height, their lines and
+    /// names, each day's blocks, now's line — and what waits at their edges, over the hours' scroller.</summary>
+    private sealed class WeekHours(ScrollViewer scroller, Grid body)
+    {
+        public ScrollViewer Scroller { get; } = scroller;
+        public Grid Body { get; } = body;
+        public List<Border> Lines { get; } = new();
+        public List<(int Minute, TextBlock Text)> Names { get; } = new();
+        public List<WeekDayPanel> Panels { get; } = new();
+        /// <summary>Each day's timed items, and the two edges of its column (above the hours in view, and below).</summary>
+        public List<List<WeekSlot>> Slots { get; } = new();
+        public List<(StackPanel Up, StackPanel Down)> Edges { get; } = new();
+        public Action? PaintNow { get; set; }
     }
 
     /// <summary>The minutes into its day an item starts at; null for one that lasts the day (or has no time).</summary>
@@ -55,7 +96,7 @@ public sealed partial class CalendarScreen
     /// A day's timed items as drawn: from their start to their end (work half an hour, an event without one an hour), never
     /// less than half an hour, one due at 11:59 pm kept on the grid; laid out in lanes where they overlap.
     /// </summary>
-    private static List<WeekSlot> DaySlots(DateTime day, List<CalEvent> evs, int first)
+    private static List<WeekSlot> DaySlots(DateTime day, List<CalEvent> evs)
     {
         var items = new List<WeekSlot>();
         foreach (var ev in evs)
@@ -65,7 +106,7 @@ public sealed partial class CalendarScreen
                 ? (e.Date == day.Date ? e.Hour * 60 + e.Minute : DayEnd)
                 : start + (CalendarKit.IsWork(ev.Kind) ? 30 : 60);
             var len = Math.Max(30, end - start);
-            var a = Math.Max(first * 60, Math.Min(start, DayEnd - 30));
+            var a = Math.Max(0, Math.Min(start, DayEnd - 30));
             items.Add(new WeekSlot(ev, a, Math.Min(DayEnd, Math.Max(a + 30, a + len))));
         }
         return Lanes(items);
@@ -100,47 +141,42 @@ public sealed partial class CalendarScreen
         return items;
     }
 
-    /// <summary>How far down the hours a time of day is, the hours drawn from <paramref name="first"/>.</summary>
-    private static double WeekY(int minutes, int first) => (minutes - first * 60) / 60.0 * HourPx;
+    /// <summary>How far down the hours a time of day is.</summary>
+    private double WeekY(int minutes) => minutes / 60.0 * hourPx;
 
-    /// <summary>"8 AM", "Noon", "1 PM": an hour as the Calendar writes it.</summary>
+    /// <summary>"8 AM", "Noon", "1 PM": an hour as the Calendar writes it ("12 AM" for midnight).</summary>
     private static string HourName(int h) => h == 12 ? "Noon" : new DateTime(2000, 1, 1, h, 0, 0).ToString("h tt", CultureInfo.InvariantCulture);
 
     /// <summary>"10:30 AM", a time of day as every time in Simpl is written.</summary>
     private static string ClockWords(DateTime t) => t.ToString("h:mm tt", CultureInfo.InvariantCulture);
 
-    /// <summary>The week's seven days over the hours, in one card.</summary>
-    private FrameworkElement WeekGrid(List<DateTime> days, Dictionary<string, List<CalEvent>> byDay)
+    /// <summary>The week's days over the whole day's hours, in one card: the days' names and the day-long ones stay over
+    /// the hours, which scroll under them — (0.3.64) the page holding still (<paramref name="fit"/>), as tall as the room
+    /// left them, else in a window <see cref="HoursTall"/> tall.</summary>
+    private FrameworkElement WeekGrid(List<DateTime> days, Dictionary<string, List<CalEvent>> byDay, bool fit)
     {
+        var n = days.Count;
         var evs = days.Select(d => EventsOn(byDay, d)).ToList();
-        // (from 8 in the morning, or the hour of the week's earliest item, to midnight)
-        var earliest = evs.SelectMany(l => l).Select(StartMinutes).Where(m => m != null).Select(m => m!.Value / 60).DefaultIfEmpty(8).Min();
-        var first = Math.Min(8, earliest);
-        var hours = DayEnd / 60 - first;
-        var span = hours * HourPx;
         var todayAt = days.FindIndex(d => d == DateTime.Today);
 
         Grid Row()
         {
             var g = new Grid();
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Gutter) });
-            for (var i = 0; i < 7; i++) g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            for (var i = 0; i < n; i++) g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             return g;
         }
         Border Hairline(bool across) => across
             ? new Border { Height = 1, SnapsToDevicePixels = true }.Bg(B.Divider)
             : new Border { Width = 1, HorizontalAlignment = HorizontalAlignment.Left, SnapsToDevicePixels = true }.Bg(B.Divider);
 
-        // the days' names and numbers
+        // the days' names and numbers, and the day-long ones — over the hours, which scroll under them
         var head = Row();
         head.Margin = new Thickness(0, 4, 0, 4);
-        for (var i = 0; i < 7; i++) head.Children.Add(WeekHead(days[i], evs[i].Count).Col(i + 1));
-
-        var rows = new Stack { Orientation = Orientation.Vertical, Spacing = 0 };
-        rows.Children.Add(head);
-        rows.Children.Add(Hairline(true));
-
-        // the day-long ones, over the hours
+        for (var i = 0; i < n; i++) head.Children.Add(WeekHead(days[i], evs[i].Count).Col(i + 1));
+        var over = new Stack { Orientation = Orientation.Vertical, Spacing = 0 };
+        over.Children.Add(head);
+        over.Children.Add(Hairline(true));
         var allDay = evs.Select(l => l.Where(e => StartMinutes(e) == null).ToList()).ToList();
         if (allDay.Any(l => l.Count > 0))
         {
@@ -148,70 +184,266 @@ public sealed partial class CalendarScreen
             var label = K.Text("all-day", Ty.Caption, B.Text2);
             label.HorizontalAlignment = HorizontalAlignment.Right;
             strip.Children.Add(label.Margin(0, 6, 8, 6).Col(0));
-            for (var i = 0; i < 7; i++)
+            for (var i = 0; i < n; i++)
             {
                 var v = new Stack { Orientation = Orientation.Vertical, Spacing = 2, Margin = new Thickness(3) };
                 foreach (var ev in allDay[i]) v.Children.Add(Chip(ev));
                 strip.Children.Add(v.Col(i + 1));
                 strip.Children.Add(Hairline(false).Col(i + 1));
             }
-            rows.Children.Add(strip);
-            rows.Children.Add(Hairline(true));
+            over.Children.Add(strip);
+            over.Children.Add(Hairline(true));
         }
 
-        // the hours
+        // the hours, the whole day
         var body = Row();
-        body.Height = span + 2 * GridInset;
+        body.Height = 24 * hourPx + 2 * GridInset;
+        var scroller = new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, PanningMode = PanningMode.VerticalOnly };
+        var w = new WeekHours(scroller, body);
         var inner = new Thickness(0, GridInset, 0, GridInset);
         // (a hairline at each hour, past the hours' names)
         var lines = new Stack { Orientation = Orientation.Vertical, Spacing = 0, Margin = inner, IsHitTestVisible = false };
-        for (var h = 0; h < hours; h++)
+        for (var h = 0; h < 24; h++)
         {
-            var line = new Border { Height = HourPx, BorderThickness = new Thickness(0, 1, 0, 0), SnapsToDevicePixels = true, Opacity = 0.7 };
+            var line = new Border { Height = hourPx, BorderThickness = new Thickness(0, 1, 0, 0), SnapsToDevicePixels = true, Opacity = 0.7 };
             line.SetResourceReference(Border.BorderBrushProperty, B.Divider);
             lines.Children.Add(line);
+            w.Lines.Add(line);
         }
-        body.Children.Add(lines.Col(1, 7));
+        body.Children.Add(lines.Col(1, n));
         // the hours' names, each on its line
         var gutter = new Grid { Margin = inner, IsHitTestVisible = false };
-        var names = new List<(int Minute, TextBlock Text)>();
-        for (var h = 0; h < hours; h++)
+        for (var h = 0; h < 24; h++)
         {
-            var t = K.Text(HourName(first + h), Ty.Caption, B.Text2);
+            var t = K.Text(HourName(h), Ty.Caption, B.Text2);
             t.FontSize = 11;
             t.HorizontalAlignment = HorizontalAlignment.Right;
             t.VerticalAlignment = VerticalAlignment.Top;
-            t.Margin = new Thickness(0, h * HourPx - 8, 8, 0);
+            t.Margin = new Thickness(0, WeekY(h * 60) - 8, 8, 0);
             gutter.Children.Add(t);
-            names.Add(((first + h) * 60, t));
+            w.Names.Add((h * 60, t));
         }
         body.Children.Add(gutter.Col(0));
 
+        // what lies above or below the hours in view, at the edges of its day, over the scroller
+        var edges = Row();
         var columns = new List<Grid>();
-        for (var i = 0; i < 7; i++)
+        for (var i = 0; i < n; i++)
         {
             var cell = new Grid { ClipToBounds = false };
             if (i == todayAt) cell.Children.Add(new Border { Opacity = 0.05, IsHitTestVisible = false }.Bg(B.Accent));
-            var panel = new WeekDayPanel(first) { Margin = new Thickness(3, GridInset, 3, GridInset) };
-            foreach (var s in DaySlots(days[i], evs[i], first)) panel.Children.Add(WeekBlock(s, days[i], i, cell, columns, first));
+            var panel = new WeekDayPanel(() => hourPx) { Margin = new Thickness(3, GridInset, 3, GridInset) };
+            var slots = DaySlots(days[i], evs[i]);
+            foreach (var s in slots) panel.Children.Add(WeekBlock(s, days[i], i, cell, columns));
             cell.Children.Add(panel);
             cell.Children.Add(Hairline(false));
-            TodoDrops(cell, days[i], first); // (0.3.63: a row of To Do dragged onto it is planned there)
+            TodoDrops(cell, days[i]); // (0.3.63: a row of To Do dragged onto it is planned there)
             columns.Add(cell);
             body.Children.Add(cell.Col(i + 1));
+            w.Panels.Add(panel);
+            w.Slots.Add(slots);
+            var up = new StackPanel { VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(4, 2, 4, 0) };
+            var down = new StackPanel { VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(4, 0, 4, 2) };
+            edges.Children.Add(up.Col(i + 1));
+            edges.Children.Add(down.Col(i + 1));
+            w.Edges.Add((up, down));
         }
-        rows.Children.Add(body);
+        if (todayAt >= 0) w.PaintNow = NowOn(columns[todayAt], gutter, w.Names);
 
-        if (todayAt >= 0) NowOn(columns[todayAt], gutter, names, first);
-        ShotTodoDrop(columns, days, first);
-        return K.Card(rows, new Thickness(0), 12);
+        var area = new Grid { Children = { scroller, edges } };
+        if (!fit) area.Height = HoursTall;
+        hours = w;
+        StartHours(w, todayAt >= 0, over, edges);
+        ShotTodoDrop(columns, days);
+        FrameworkElement content = fit ? K.Rows("auto, *", over.Row(0), area.Row(1)) : K.V(0, over, area);
+        return K.Card(content, new Thickness(0), 12);
+    }
+
+    /// <summary>
+    /// (0.3.64) The week's hours set going: scrolled first to the morning — or, today in the week and past one o'clock, to
+    /// three hours before now — else to where they were; the days' names and the edges kept clear of the scroll bar, so the
+    /// columns line up; what lies past the hours in view painted at their edges as they scroll; a pinch over them; and, a
+    /// row of To Do held near their top or bottom, the hours scrolling on under it.
+    /// </summary>
+    private void StartHours(WeekHours w, bool todayShown, FrameworkElement over, FrameworkElement edges)
+    {
+        var sv = w.Scroller;
+        var now = DateTime.Now;
+        // (the screenshot suite: --open cal-peeks scrolls the hours to one in the afternoon, what lies past them at their edges)
+        if (weekScroll == null && Launch.Take("cal-peeks") != null)
+        {
+            weekScroll = GridInset + 13 * hourPx;
+            _ = ShotPeeks();
+        }
+        var want = weekScroll ?? GridInset + (todayShown && now.Hour >= 13 ? now.Hour - 3 : 7.5) * hourPx;
+        var placed = false;
+        sv.ScrollToVerticalOffset(want);
+        void BarRoom()
+        {
+            var bar = Math.Max(0, sv.ActualWidth - sv.ViewportWidth);
+            if (Math.Abs(over.Margin.Right - bar) < 0.5) return;
+            over.Margin = new Thickness(0, 0, bar, 0);
+            edges.Margin = new Thickness(0, 0, bar, 0);
+        }
+        sv.ScrollChanged += (_, _) =>
+        {
+            BarRoom();
+            PaintEdges(w);
+            // (the first layouts, before the place asked for is reached, say nothing of where the hours were scrolled)
+            if (!placed && sv.ExtentHeight > 0 && Math.Abs(sv.VerticalOffset - Math.Min(want, sv.ScrollableHeight)) <= 1) placed = true;
+            if (placed && ReferenceEquals(hours, w)) weekScroll = sv.VerticalOffset;
+        };
+        sv.Loaded += (_, _) => sv.Dispatcher.BeginInvoke(() => { if (!placed) sv.ScrollToVerticalOffset(want); }, DispatcherPriority.Loaded);
+        // (a pinch: Windows sends a touchpad's as Ctrl and the wheel)
+        sv.PreviewMouseWheel += (_, e) =>
+        {
+            if ((Keyboard.Modifiers & ModifierKeys.Control) == 0) return;
+            e.Handled = true;
+            ScaleHours(w, hourPx * Math.Exp(e.Delta * 0.0015), e.GetPosition(sv).Y);
+        };
+        sv.PreviewDragOver += (_, e) =>
+        {
+            var y = e.GetPosition(sv).Y;
+            const double zone = 40;
+            var step = y < zone ? -(zone - y) / 3 : y > sv.ViewportHeight - zone ? (y - (sv.ViewportHeight - zone)) / 3 : 0;
+            if (step != 0) sv.ScrollToVerticalOffset(sv.VerticalOffset + step);
+        };
+    }
+
+    /// <summary>
+    /// (0.3.64) A pinch: the hours made <paramref name="next"/> tall — never less than lets the whole day fit the card, nor
+    /// more than <see cref="HourMost"/> — about the time <paramref name="y"/> down the hours in view, which stays under the
+    /// pointer; the lines, the names, the blocks and now's line follow at once, and a moment after the pinch ends the
+    /// height is kept and the week drawn again, each block's words fitted to its new height.
+    /// </summary>
+    private void ScaleHours(WeekHours w, double next, double y)
+    {
+        var sv = w.Scroller;
+        var least = Math.Max(HourLeast, (sv.ViewportHeight - 2 * GridInset - 2) / 24);
+        var px = Math.Clamp(next, Math.Min(least, HourMost), HourMost);
+        if (Math.Abs(px - hourPx) < 0.05) return;
+        var at = (sv.VerticalOffset + y - GridInset) / hourPx;
+        hourPx = px;
+        HideDrop();
+        w.Body.Height = 24 * hourPx + 2 * GridInset;
+        foreach (var l in w.Lines) l.Height = hourPx;
+        foreach (var (minute, t) in w.Names) t.Margin = new Thickness(0, WeekY(minute) - 8, 8, 0);
+        foreach (var p in w.Panels)
+        {
+            p.InvalidateMeasure();
+            p.InvalidateArrange();
+        }
+        w.PaintNow?.Invoke();
+        sv.UpdateLayout();
+        sv.ScrollToVerticalOffset(Math.Max(0, at * hourPx + GridInset - y));
+        if (pinchDone == null)
+        {
+            pinchDone = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(350) };
+            pinchDone.Tick += (_, _) =>
+            {
+                pinchDone.Stop();
+                Prefs.Set(HourPref, Math.Round(hourPx));
+                Render();
+            };
+        }
+        pinchDone.Stop();
+        pinchDone.Start();
+    }
+
+    /// <summary>(0.3.64) The screenshot suite's week pinched (--open cal-pinch): once it has settled, its hours made as short
+    /// as they go about the middle of the view — the whole day in the card — kept, and the week drawn again; the log says
+    /// how tall they went and whether the whole day is in view.</summary>
+    private async Task ShotPinch()
+    {
+        Shot.Began();
+        try
+        {
+            await Task.Delay(2500);
+            if (hidden || hours is not { } w || !w.Scroller.IsLoaded) return;
+            ScaleHours(w, HourLeast, w.Scroller.ViewportHeight / 2);
+            await Task.Delay(1200); // (the pinch's end: its height kept, the week drawn again)
+            var whole = hours is { } now && now.Scroller.IsLoaded && now.Scroller.ScrollableHeight < 1;
+            Log.Write($"calendar: hours pinched to {hourPx:0} px, the whole day {(whole ? "in view" : "not in view")}");
+        }
+        finally { Shot.Ended(); }
+    }
+
+    /// <summary>(0.3.64) The screenshot suite's week scrolled to the afternoon (--open cal-peeks): once it has settled, the
+    /// log says how many items wait at the hours' edges.</summary>
+    private async Task ShotPeeks()
+    {
+        Shot.Began();
+        try
+        {
+            await Task.Delay(2500);
+            if (hidden || hours is not { } w || !w.Scroller.IsLoaded) return;
+            PaintEdges(w);
+            var up = w.Edges.Sum(e => e.Up.Children.Count);
+            var down = w.Edges.Sum(e => e.Down.Children.Count);
+            Log.Write(string.Create(CultureInfo.InvariantCulture, $"calendar: peeks: {up} above, {down} below, the hours from {(w.Scroller.VerticalOffset - GridInset) / hourPx:0.#}"));
+        }
+        finally { Shot.Ended(); }
+    }
+
+    /// <summary>(0.3.64) What lies above and below the hours in view, squished at the top or the bottom of its day: the
+    /// nearest four each way, painted again only when they change.</summary>
+    private void PaintEdges(WeekHours w)
+    {
+        var sv = w.Scroller;
+        var top = sv.VerticalOffset;
+        var bottom = top + sv.ViewportHeight;
+        if (sv.ViewportHeight <= 0) return;
+        for (var i = 0; i < w.Slots.Count && i < w.Edges.Count; i++)
+        {
+            var up = new List<WeekSlot>();
+            var down = new List<WeekSlot>();
+            foreach (var s in w.Slots[i])
+            {
+                var y = GridInset + WeekY(s.A);
+                if (y + s.Height(hourPx) <= top + PeekTall) up.Add(s);
+                else if (y >= bottom - PeekTall) down.Add(s);
+            }
+            Edge(w.Edges[i].Up, up.OrderBy(s => s.A).TakeLast(4).ToList(), sv);
+            Edge(w.Edges[i].Down, down.OrderBy(s => s.A).Take(4).ToList(), sv);
+        }
+    }
+
+    private void Edge(StackPanel edge, List<WeekSlot> list, ScrollViewer sv)
+    {
+        var key = string.Join("|", list.Select(s => s.Ev.Id));
+        if (edge.Tag as string == key) return;
+        edge.Tag = key;
+        edge.Children.Clear();
+        foreach (var s in list) edge.Children.Add(Peek(s, sv));
+    }
+
+    /// <summary>(0.3.64) An item past the hours in view, as a thin bar in its colour (its calendar's tint, its bar at the
+    /// left as its block has): a click scrolls to it.</summary>
+    private FrameworkElement Peek(WeekSlot s, ScrollViewer sv)
+    {
+        var color = K.Hex(s.Ev.Color);
+        var bar = new Grid { Height = PeekTall, Margin = new Thickness(0, 1, 0, 1), Cursor = Cursors.Hand, Background = Brushes.Transparent };
+        bar.Children.Add(new Border { CornerRadius = new CornerRadius(3) }.Bg(B.Solid).Stroke(B.CardStroke));
+        bar.Children.Add(new Border { CornerRadius = new CornerRadius(3), Background = K.Brush(K.WithAlpha(color, 0.35)) });
+        bar.Children.Add(new Border { Width = 3, CornerRadius = new CornerRadius(1.5), HorizontalAlignment = HorizontalAlignment.Left, Background = K.Brush(color) });
+        var when = CalendarKit.Date(s.Ev.Date) is { } at ? ClockWords(at) : s.Ev.Time;
+        bar.ToolTip = string.Join(" · ", new[] { when, s.Ev.Title }.Where(x => !string.IsNullOrEmpty(x)));
+        AutomationProperties.SetName(bar, $"Scroll to {s.Ev.Title}");
+        bar.MouseEnter += (_, _) => Motion.To(bar, FrameworkElement.HeightProperty, PeekHover, Motion.Fast);
+        bar.MouseLeave += (_, _) => Motion.To(bar, FrameworkElement.HeightProperty, PeekTall, Motion.Fast);
+        bar.MouseLeftButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            sv.ScrollToVerticalOffset(Math.Max(0, GridInset + WeekY(s.A) - 28));
+        };
+        return bar;
     }
 
     /// <summary>
     /// Now, on today's column: a red line at the minute, and the time beside it in the hours (the hour it falls near left
-    /// out) — kept there as the minutes go by, while the week is on screen.
+    /// out) — kept there as the minutes go by, while the week is on screen. What paints it, for a pinch.
     /// </summary>
-    private static void NowOn(Grid column, Grid gutter, List<(int Minute, TextBlock Text)> names, int first)
+    private Action NowOn(Grid column, Grid gutter, List<(int Minute, TextBlock Text)> names)
     {
         var red = K.Brush(K.Tone("red"));
         var line = new Grid { Height = 9, VerticalAlignment = VerticalAlignment.Top, IsHitTestVisible = false };
@@ -230,11 +462,9 @@ public sealed partial class CalendarScreen
         {
             var t = DateTime.Now;
             var m = t.Hour * 60 + t.Minute;
-            var on = m >= first * 60 && m < DayEnd;
-            line.Visibility = time.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
-            foreach (var (minute, text) in names) text.Visibility = on && Math.Abs(minute - m) < 15 ? Visibility.Hidden : Visibility.Visible;
-            if (!on) return;
-            var y = WeekY(m, first);
+            // (the hour's name within 12 of the time, at the hours' height now, gives way to it)
+            foreach (var (minute, text) in names) text.Visibility = Math.Abs(minute - m) < 12 / hourPx * 60 ? Visibility.Hidden : Visibility.Visible;
+            var y = WeekY(m);
             line.Margin = new Thickness(0, GridInset + y - 4.5, 0, 0);
             time.Margin = new Thickness(0, y - 8, 8, 0);
             time.Text = t.ToString("h:mm", CultureInfo.InvariantCulture);
@@ -244,6 +474,7 @@ public sealed partial class CalendarScreen
         column.Loaded += (_, _) => { Paint(); timer.Start(); };
         column.Unloaded += (_, _) => timer.Stop();
         Paint();
+        return Paint;
     }
 
     /// <summary>A day's name and number over its column (today in a filled circle, the day picked ringed in the accent);
@@ -279,10 +510,11 @@ public sealed partial class CalendarScreen
     /// "Due" at it) over its name — one line of both when it is short — struck through only once handed in, greyed once
     /// over; a plan's with a dashed edge, dragged to move it.
     /// </summary>
-    private Button WeekBlock(WeekSlot s, DateTime day, int dayIndex, Grid column, List<Grid> columns, int first)
+    private Button WeekBlock(WeekSlot s, DateTime day, int dayIndex, Grid column, List<Grid> columns)
     {
         var ev = s.Ev;
-        var tiny = s.Height < 32;
+        var height = s.Height(hourPx);
+        var tiny = height < 32;
         var missing = ev.Missing == true;
         var grey = CalendarKit.IsPast(ev) && !missing;
         var plan = CalendarKit.IsPlan(ev);
@@ -316,7 +548,7 @@ public sealed partial class CalendarScreen
             if (missing) when.Inlines.Add(new Run(" · Missing") { Foreground = K.Brush(K.Tone("red")) });
             else if (ev.Excused == true) when.Inlines.Add(new Run(" · Excused"));
             words.Children.Add(when);
-            var lines = Math.Max(1, (int)Math.Floor((s.Height - 22) / 16));
+            var lines = Math.Max(1, (int)Math.Floor((height - 22) / 16));
             var title = K.Wrapped(ev.Title, Ty.Caption, titleBrush, lines);
             title.FontWeight = FontWeights.SemiBold;
             title.TextWrapping = TextWrapping.WrapWithOverflow;
@@ -351,7 +583,7 @@ public sealed partial class CalendarScreen
         b.ToolTip = string.Join(" · ", new[] { plan ? "Planned" : null, ev.Title, ev.Sub, plan ? "drag to move it" : null }.Where(x => !string.IsNullOrEmpty(x)));
         WeekDayPanel.SetSlot(b, s);
         Item(b, ev, menu: true);
-        if (plan && CalendarKit.Text(ev.PlanId) is { } pid) Draggable(b, s, pid, day, dayIndex, column, columns, first, time, clock);
+        if (plan && CalendarKit.Text(ev.PlanId) is { } pid) Draggable(b, s, pid, day, dayIndex, column, columns, time, clock);
         return b;
     }
 
@@ -361,12 +593,11 @@ public sealed partial class CalendarScreen
     /// and the week read again. Escape, or a drag back to where it was, puts it back. A click without a drag is the
     /// block's own: its preview opens.
     /// </summary>
-    private void Draggable(Button b, WeekSlot s, string pid, DateTime day, int dayIndex, Grid column, List<Grid> columns, int first, Run time, string clock)
+    private void Draggable(Button b, WeekSlot s, string pid, DateTime day, int dayIndex, Grid column, List<Grid> columns, Run time, string clock)
     {
         var shift = new TranslateTransform();
         b.RenderTransform = shift;
         var len = s.B - s.A;
-        var top = first * 60;
         Point? from = null;
         var engaged = false;
         var days = 0;
@@ -407,10 +638,10 @@ public sealed partial class CalendarScreen
                 Lift(true);
             }
             e.Handled = true;
-            var at = (int)Math.Round((s.A + dy / HourPx * 60) / Snap) * Snap;
-            at = Math.Clamp(at, top, Math.Max(top, DayEnd - Math.Min(len, DayEnd - top)));
+            var at = (int)Math.Round((s.A + dy / hourPx * 60) / Snap) * Snap;
+            at = Math.Clamp(at, 0, Math.Max(0, DayEnd - Math.Min(len, DayEnd)));
             var w = column.ActualWidth;
-            var d = w > 0 ? Math.Clamp((int)Math.Round(dx / w), -dayIndex, 6 - dayIndex) : 0;
+            var d = w > 0 ? Math.Clamp((int)Math.Round(dx / w), -dayIndex, columns.Count - 1 - dayIndex) : 0;
             if (d == days && at - s.A == minutes) return;
             days = d;
             minutes = at - s.A;
@@ -419,7 +650,7 @@ public sealed partial class CalendarScreen
             shift.BeginAnimation(TranslateTransform.XProperty, null);
             shift.BeginAnimation(TranslateTransform.YProperty, null);
             shift.X = x;
-            shift.Y = minutes / 60.0 * HourPx;
+            shift.Y = minutes / 60.0 * hourPx;
             var when = day.AddDays(d).AddMinutes(at);
             time.Text = d == 0 ? ClockWords(when) : $"{when.ToString("ddd", CultureInfo.InvariantCulture)} {ClockWords(when)}";
             AutomationProperties.SetName(b, $"Move to {when.ToString("dddd", CultureInfo.InvariantCulture)} {ClockWords(when)}");
@@ -456,9 +687,9 @@ public sealed partial class CalendarScreen
         }
     }
 
-    /// <summary>A day of the week's grid: each block at its time and as tall as it lasts, side by side with those it
-    /// overlaps, the hours drawn from <see cref="first"/>.</summary>
-    private sealed class WeekDayPanel(int first) : Panel
+    /// <summary>A day of the week's grid: each block at its time and as tall as it lasts at the hours' height now (a pinch
+    /// changes it), side by side with those it overlaps.</summary>
+    private sealed class WeekDayPanel(Func<double> px) : Panel
     {
         public static readonly DependencyProperty SlotProperty = DependencyProperty.RegisterAttached(
             "Slot", typeof(WeekSlot), typeof(WeekDayPanel), new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsParentArrange));
@@ -469,17 +700,18 @@ public sealed partial class CalendarScreen
         {
             var w = double.IsInfinity(available.Width) ? 120 : available.Width;
             foreach (UIElement c in InternalChildren)
-                if (c.GetValue(SlotProperty) is WeekSlot s) c.Measure(new Size(Math.Max(0, w / s.Lanes - 3), s.Height));
+                if (c.GetValue(SlotProperty) is WeekSlot s) c.Measure(new Size(Math.Max(0, w / s.Lanes - 3), s.Height(px())));
             return new Size(0, 0);
         }
 
         protected override Size ArrangeOverride(Size final)
         {
+            var hour = px();
             foreach (UIElement c in InternalChildren)
             {
                 if (c.GetValue(SlotProperty) is not WeekSlot s) continue;
                 var lane = final.Width / s.Lanes;
-                c.Arrange(new Rect(s.Lane * lane + 1, WeekY(s.A, first), Math.Max(0, lane - 3), s.Height));
+                c.Arrange(new Rect(s.Lane * lane + 1, s.A / 60.0 * hour, Math.Max(0, lane - 3), s.Height(hour)));
             }
             return final;
         }

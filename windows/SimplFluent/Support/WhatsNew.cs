@@ -26,6 +26,13 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.64", "2026-10-26",
+            ("new", "To Do & Calendar", "To Do and the calendar are now one place."),
+            ("new", "Pinch the Week", "Pinch or Ctrl+scroll the hours to see more of the day."),
+            ("improved", "Five or Seven Days", "Press Week again to show 5 or 7 days."),
+            ("improved", "Peek Past the Hours", "Events above or below the view wait at its edge."),
+            ("improved", "The Page Holds Still", "Only the calendar and To Do scroll."),
+            ("improved", "Quicker Popups", "Click outside a preview to close it; it closes faster.")),
         R("0.3.63", "2026-10-25",
             ("new", "Plan From To Do", "To Do sits beside the week: drag work onto a time."),
             ("new", "Your Simpl Calendar", "Your work and plans in Outlook, Google or your calendar."),

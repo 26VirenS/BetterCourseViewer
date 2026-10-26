@@ -198,6 +198,20 @@
     for (const [k, p] of Object.entries(plans)) if (k !== it.id) { const a = Date.parse(p.at); busy.push({ a, b: a + p.mins * MIN }); }
     return freeSlots({ now, due, mins, busy });
   }
+  /** (2.99.112) A piece of work let go on a day (the Calendar's month or agenda): that day's first free time — from now on
+   *  if it is today — or, the day full, its first hour still to come. A day already over is refused. */
+  async function slotOn(it, day, mins) {
+    const d = new Date(day);
+    const dayA = atHour(d, DAY_FROM);
+    const dayB = atHour(d, DAY_TO);
+    const len = mins * MIN;
+    const soon = Math.ceil((Date.now() + 15 * MIN) / half) * half;
+    if (Math.max(dayA, soon) + len > dayB) throw new Error('That day is already over');
+    const busy = [...await busyTimes(dayA, dayB)];
+    for (const [k, p] of Object.entries(plans)) if (k !== it.id) { const a = Date.parse(p.at); busy.push({ a, b: a + p.mins * MIN }); }
+    const slot = freeSlots({ now: Math.max(Date.now(), dayA - 15 * MIN), due: dayB, mins, busy }).find((x) => x.at >= dayA && x.end <= dayB);
+    return slot ? slot.at : Math.max(dayA, soon);
+  }
 
   // ---- words -----------------------------------------------------------------------------------------------
   function dayWord(ms, now = new Date()) {
@@ -464,5 +478,5 @@
     return rowEl;
   }
 
-  BCV.plan = { ready, get, all, onChange, put, move, clear, attach, pill, open: openBar, close: closeBar, freeSlots, slotsFor, linked, linkedEvents, sending, setSending, canSend, retireSending, whenWords, dayWord, lenWord, lengthFor };
+  BCV.plan = { ready, get, all, onChange, put, move, clear, attach, pill, open: openBar, close: closeBar, freeSlots, slotsFor, slotOn, linked, linkedEvents, sending, setSending, canSend, retireSending, whenWords, dayWord, lenWord, lengthFor };
 })();

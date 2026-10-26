@@ -259,7 +259,7 @@ internal static class AppointmentsSheet
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Padding = new Thickness(0, 0, 4, 0),
         };
         Paint();
-        var sheet = new Sheet { Title = "Find Appointment", Body = K.V(12, lede, body), Width = 580, Floats = true };
+        var sheet = new Sheet { Title = "Find Appointment", Body = K.V(12, lede, body), Width = 580, Floats = true, Light = true };
         sheet.Add("Done", SheetButtonKind.Primary);
         Dialogs.Show(sheet, over);
         _ = Load();

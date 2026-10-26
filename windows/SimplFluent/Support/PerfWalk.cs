@@ -14,7 +14,7 @@ namespace Simpl.Support;
 
 /// <summary>
 /// --perf-walk &lt;folder&gt;: once the app's own screens are up and their first answers in, one fixed walk through
-/// it — the Dashboard, To Do, the Calendar, Grades, the Inbox, a course, an assignment, Notifications, New task,
+/// it — the Dashboard, To Do &amp; Calendar, Grades, the Inbox, a course, an assignment, Notifications, New task,
 /// Settings, Tools, a search typed, the window dragged and resized, the Dashboard again — each step timed with Perf's
 /// numbers (and how each screen came in: its page kept, built from the answers kept, or read); a screen shown a while
 /// ago again (Grades), its page let go since; memory read once the start has settled, after the walk, after it has
@@ -91,8 +91,7 @@ public static class PerfWalk
             Remember("settled");
             Perf.Fast(true);
 
-            await Go("To Do", () => e.Go(Place.Todo));
-            await Go("Calendar", () => e.Go(Place.Calendar));
+            await Go("To Do & Calendar", () => e.Go(Place.Todo)); // (0.3.64: one place, To Do beside the calendar)
             await Go("Grades", () => e.Go(Place.Grades));
             if (e.OnBrightspace) Skip("Inbox", "Brightspace: no Inbox"); else await Go("Inbox", () => e.Go(Place.Inbox));
             var course = Launch.Get("perf-course") ?? e.Courses.FirstOrDefault()?.Id;
@@ -132,11 +131,11 @@ public static class PerfWalk
     }
 
     /// <summary>The assignment opened: --perf-assignment (in --perf-course, else the first course), else the first To Do
-    /// lists (its kept answer: To Do was walked just before).</summary>
+    /// lists (its kept answer: To Do &amp; Calendar was walked just before).</summary>
     private static (string Course, string Id)? Assignment(Engine.Engine e, string? course)
     {
         if (Launch.Get("perf-assignment") is { Length: > 0 } id) return course != null ? (course, id) : null;
-        var todo = e.Kept<TodoData>("todo");
+        var todo = e.Kept<TodoData>("todo", Screens.CalendarScreen.TodoArgs);
         foreach (var row in todo?.Sections.SelectMany(s => s.Rows) ?? Enumerable.Empty<WorkRow>())
             if (Regex.Match(row.Url ?? "", @"/courses/(\d+)/assignments/(\d+)") is { Success: true } hit) return (hit.Groups[1].Value, hit.Groups[2].Value);
         return null;

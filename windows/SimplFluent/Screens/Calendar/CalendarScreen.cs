@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Threading;
 using Simpl.Kit;
@@ -10,6 +11,7 @@ using Simpl.Shell;
 using Simpl.Support;
 using Wpf.Ui.Controls;
 using Button = System.Windows.Controls.Button;
+using MenuItem = System.Windows.Controls.MenuItem;
 
 namespace Simpl.Screens;
 
@@ -21,20 +23,35 @@ namespace Simpl.Screens;
 /// been clicked — move a month or a week, sliding the way they go; Today (Ctrl+T) comes back. The list, always the three
 /// weeks from today, does not page: it has none of them. An item clicked, on the grid, in the day, the week or the list,
 /// opens its preview out of itself (<see cref="CalendarPeek"/>); a double-click opens it whole.
+/// (0.3.64) To Do &amp; Calendar, as the web's 2.99.112 has it: To Do and the Calendar one place, To Do in its panel beside
+/// the calendar in every view (<see cref="TodoPanel"/>). The page holds still — the calendar and To Do fill the pane, each
+/// scrolling inside itself (the week's hours, the month's weeks, the list's days, To Do's list) — unless the window is too
+/// narrow for both or too short, when the page scrolls as before, To Do over the calendar. The week is five days, Monday
+/// to Friday, or all seven from Sunday: Week pressed again offers them.
 /// </summary>
 public sealed partial class CalendarScreen : Screen
 {
     private static readonly string[] Modes = { "month", "week", "list" };
     private static readonly string[] ModeNames = { "Month", "Week", "List" };
-    /// <summary>The month with the day picked beside it (the Mac's 540 + 22 + 340), else the day under it.</summary>
+    /// <summary>(0.3.64) The place's name in the pane and the breadcrumb: To Do and the Calendar are one place.</summary>
+    public const string PlaceName = "To Do & Calendar";
+    /// <summary>The month with the day picked beside it (the Mac's 540 + 22 + 340), else the day under it — or, the page
+    /// holding still, the month alone.</summary>
     private const double MonthBeside = 902;
-    /// <summary>The week as seven columns (the Mac's 770), else as seven days one under another.</summary>
+    /// <summary>The week as its days' columns over the hours (the Mac's 770), else as its days one under another.</summary>
     private const double WeekColumnsFrom = 770;
+    /// <summary>(0.3.64) The page holds still from this tall: shorter, it scrolls as before.</summary>
+    private const double FitTall = 440;
+    /// <summary>Room kept under the calendar and To Do when the page holds still.</summary>
+    private const double FitFoot = 20;
 
     private readonly Loader<CalendarData> cal;
     private readonly CalendarPeek peek;
     /// <summary>What the screen shows, kept from build to build: ← and → reach it once the calendar has been clicked.</summary>
     private readonly Grid page = new() { Focusable = true, FocusVisualStyle = null };
+    /// <summary>The page's own scroller when it does scroll (a window too narrow or too short): kept from build to build,
+    /// so where it is scrolled to is kept too.</summary>
+    private readonly ScrollViewer pageScroller = new() { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
     /// <summary>Month, week or list, as the page keeps it (calView).</summary>
     private string mode = "month";
     private DateTime anchor, weekStart, selected;
@@ -47,10 +64,17 @@ public sealed partial class CalendarScreen : Screen
     private string? shownSpan;
     private string? toldTitle, toldSub, shownNotice;
     private Window? hooked;
-    private bool shotAsked = Launch.Get("open") == "preview";
+    private bool shotAsked = Launch.Get("open") == "preview" && !TodoAskedAtLaunch;
+    /// <summary>The page's height as last laid out (NaN until it is): whether it holds still.</summary>
+    private double tall = double.NaN;
+    /// <summary>Whether the last build had To Do in it.</summary>
+    private bool todoDrawn;
 
     /// <summary>The screenshot suite's item to preview, by (part of) its name (--preview-of); null: the first on screen.</summary>
     internal static string? PreviewOf => Launch.Get("preview-of") is { Length: > 0 } w ? w : null;
+
+    /// <summary>(0.3.64) The screenshot suite asked for To Do (--place todo): its pictures of To Do are the panel's.</summary>
+    private static bool TodoAskedAtLaunch => Launch.Get("place") == "todo";
 
     private bool previewDayPicked;
     private (CalEvent Ev, FrameworkElement At)? firstItem;
@@ -70,9 +94,10 @@ public sealed partial class CalendarScreen : Screen
     {
         cal = Watch(new Loader<CalendarData>());
         peek = new CalendarPeek(engine);
+        WatchTodo();
         var today = DateTime.Today;
         anchor = MonthStart(today);
-        weekStart = FirstOfWeek(today);
+        weekStart = WeekOf(today);
         selected = today;
         // the view kept last time at once (the page's answer follows); the screenshot suite's own (--cal-view week)
         var v = Launch.Get("cal-view") ?? engine.Kept<OK>("calView")?.View;
@@ -83,6 +108,14 @@ public sealed partial class CalendarScreen : Screen
         // (the page taking the keyboard is no reason to scroll to its top)
         page.RequestBringIntoView += (_, e) => { if (e.OriginalSource == page) e.Handled = true; };
         page.Loaded += (_, _) => HookWindow();
+        // (0.3.64: the page's height says whether it holds still — built again when that changes)
+        View.SizeChanged += (_, e) =>
+        {
+            if (!e.HeightChanged) return;
+            var was = Fits;
+            tall = e.NewSize.Height;
+            if (Fits != was) Render();
+        };
     }
 
     private static CultureInfo Culture => CalendarKit.Culture;
@@ -91,6 +124,9 @@ public sealed partial class CalendarScreen : Screen
 
     /// <summary>(1.2) How much the month or the week holds and how much of it is missing ("14 items · 2 missing"); the list's span.</summary>
     public override string? Subtitle => (cal.Data ?? last) is { } d ? PeriodLine(d) : null;
+
+    /// <summary>(0.3.64) The calendar and To Do scroll inside themselves, or the page in its own scroller.</summary>
+    public override bool Scrolls => false;
 
     public override void Refresh()
     {
@@ -101,6 +137,9 @@ public sealed partial class CalendarScreen : Screen
             ReadMode();
         }
         cal.Ensure(engine, "calendar", Args());
+        if (TodoOn) todo.Ensure(engine, "todo", TodoArgs);
+        // (To Do asked for while it was hidden — /todo, the Dashboard's New task: drawn again with it)
+        if (TodoOn != todoDrawn) Render();
     }
 
     public override void Hide()
@@ -109,7 +148,7 @@ public sealed partial class CalendarScreen : Screen
         hidden = true; // (a quick look stays over the place opened instead, until it is closed)
     }
 
-    /// <summary>Read ahead, unseen: the month (or week, or list) it would show, nothing else.</summary>
+    /// <summary>Read ahead, unseen: the month (or week, or list) it would show, and To Do beside it.</summary>
     protected override void ReadAhead()
     {
         if (!modeRead)
@@ -118,6 +157,7 @@ public sealed partial class CalendarScreen : Screen
             ReadMode();
         }
         cal.Ensure(engine, "calendar", Args());
+        if (TodoOn) todo.Ensure(engine, "todo", TodoArgs);
     }
 
     public override void Release()
@@ -133,9 +173,11 @@ public sealed partial class CalendarScreen : Screen
         return true;
     }
 
-    protected override bool LayoutChanges(double before, double now) =>
-        (before >= MonthBeside) != (now >= MonthBeside) || (before >= WeekColumnsFrom) != (now >= WeekColumnsFrom)
-        || (before >= TodoBesideFrom) != (now >= TodoBesideFrom);
+    protected override bool LayoutChanges(double before, double now)
+    {
+        bool Crossed(double at) => (before >= at) != (now >= at);
+        return Crossed(MonthBeside) || Crossed(MonthBeside + TodoWidth + TodoGap) || Crossed(WeekColumnsFrom) || Crossed(TodoBesideFrom) || Crossed(480);
+    }
 
     // ---- the commands (the Mac's toolbar) ----
 
@@ -146,8 +188,9 @@ public sealed partial class CalendarScreen : Screen
     private ProgressRing? spinner;
 
     /// <summary>
-    /// Beside the title: a spinner while the page is asked, Month · Week · List (Windows 11's SelectorBar), the chevrons
-    /// round Today (a month's or a week's only), the calendars shown, and More (Open in Canvas, Copy link).
+    /// Beside the title: a spinner while the page is asked, Month · Week · List (Windows 11's SelectorBar; Week pressed
+    /// again offers five days or seven), the chevrons round Today (a month's or a week's only), To Do shown or hidden, Find
+    /// Appointment, Sync, the calendars shown, and More (Open in Canvas, Copy link).
     /// </summary>
     public override FrameworkElement? Commands
     {
@@ -158,6 +201,7 @@ public sealed partial class CalendarScreen : Screen
             spinner.Visibility = Visibility.Hidden;
             selector = new SelectorBar(ModeNames, Array.IndexOf(Modes, mode)) { ToolTip = "A month, a week, or the next three weeks", VerticalAlignment = VerticalAlignment.Center };
             selector.Changed += i => SetMode(Modes[i]);
+            selector.Again += (i, at) => { if (Modes[i] == "week") WeekMenu(at); };
             prevButton = K.IconButton(SymbolRegular.ChevronLeft24, () => Shift(-1), "Previous month", 16, 32);
             nextButton = K.IconButton(SymbolRegular.ChevronRight24, () => Shift(1), "Next month", 16, 32);
             var today = K.Button("Today", GoToday);
@@ -172,8 +216,8 @@ public sealed partial class CalendarScreen : Screen
             var finder = K.IconButton(SymbolRegular.CalendarClock24, FindAppointment, "Find Appointment", 16, 32);
             // (0.3.60) Sync: (0.3.63) Simpl's own calendar into a calendar app, and the student's own calendars in here
             var sync = K.IconButton(SymbolRegular.ArrowSync24, OpenSync, "Simpl in Outlook, Google or your calendar app, and your own calendars here", 16, 32);
-            // (0.3.63) To Do beside the week, shown or hidden (the week alone has it)
-            todoButton = K.IconButton(SymbolRegular.PanelLeft24, ToggleTodo, "Hide To Do beside the week", 16, 32);
+            // (0.3.63) To Do beside the week, shown or hidden — (0.3.64) beside every view
+            todoButton = K.IconButton(SymbolRegular.PanelLeft24, ToggleTodo, "Hide To Do beside the calendar", 16, 32);
             System.Windows.Automation.AutomationProperties.SetName(sync, "Sync");
             Button? more = null;
             more = K.IconButton(SymbolRegular.MoreHorizontal24, () => MoreMenu(more!), "More", 16, 32);
@@ -185,7 +229,8 @@ public sealed partial class CalendarScreen : Screen
     }
 
     /// <summary>The commands as things are now: the chevrons' words for a month or a week — and for the list, which does
-    /// not page, no chevrons and no Today (it always starts today) — the spinner.</summary>
+    /// not page, no chevrons and no Today (it always starts today) — Week's chevron while it is chosen, To Do's button, the
+    /// spinner.</summary>
     private void PaintCommands()
     {
         if (commands == null) return;
@@ -201,11 +246,16 @@ public sealed partial class CalendarScreen : Screen
         if (pager != null) pager.Visibility = mode == "list" ? Visibility.Collapsed : Visibility.Visible;
         if (todoButton != null)
         {
-            todoButton.Visibility = week ? Visibility.Visible : Visibility.Collapsed;
-            Words(todoButton, TodoOn ? "Hide To Do" : "Show To Do", TodoOn ? "Hide To Do beside the week" : "Show To Do beside the week, to drag work onto a time");
+            Words(todoButton, TodoOn ? "Hide To Do" : "Show To Do", TodoOn ? "Hide To Do beside the calendar" : "Show To Do beside the calendar, to drag work onto a day or a time");
+            // (on: filled, as a toggle's on state is — the web's is-on)
+            if (TodoOn) todoButton.SetResourceReference(Control.BackgroundProperty, B.Subtle);
+            else todoButton.ClearValue(Control.BackgroundProperty);
         }
         if (spinner != null) spinner.Visibility = cal.Loading ? Visibility.Visible : Visibility.Hidden;
         selector?.Select(Array.IndexOf(Modes, mode), false);
+        // (0.3.64) the week chosen: a chevron after its name — pressed again, it offers five days or seven
+        selector?.Trail(1, week ? K.Icon(SymbolRegular.ChevronDown24, 10, B.Text2) : null,
+            week ? $"{WeekDays} days: press again for {(WeekDays == 5 ? "seven" : "five")}" : null);
     }
 
     /// <summary>The Mac's CanvasMenu: the calendar on the school's own site, and its link.</summary>
@@ -214,6 +264,19 @@ public sealed partial class CalendarScreen : Screen
         var menu = new ContextMenu { PlacementTarget = at, Placement = PlacementMode.Bottom };
         menu.Items.Add(CalendarKit.Item($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen("/calendar", "Calendar")));
         menu.Items.Add(CalendarKit.Item("Copy link", SymbolRegular.Link24, () => CalendarKit.Copy(engine.Absolute("/calendar"))));
+        menu.IsOpen = true;
+    }
+
+    /// <summary>(0.3.64) Week pressed again: its five days or seven, under it — the one shown checked.</summary>
+    private void WeekMenu(FrameworkElement at, bool held = false)
+    {
+        var menu = new ContextMenu { PlacementTarget = at, Placement = PlacementMode.Bottom, StaysOpen = held };
+        foreach (var (n, words) in new[] { (5, "5 days — Monday to Friday"), (7, "7 days — Sunday to Saturday") })
+        {
+            var mi = new MenuItem { Header = words, IsCheckable = true, IsChecked = WeekDays == n };
+            mi.Click += (_, _) => SetWeekDays(n);
+            menu.Items.Add(mi);
+        }
         menu.IsOpen = true;
     }
 
@@ -235,6 +298,13 @@ public sealed partial class CalendarScreen : Screen
 
     // ---- the page ----
 
+    /// <summary>(0.3.64) The page holds still — the calendar and To Do filling the pane, each scrolling inside itself — when
+    /// it is tall enough, and wide enough for To Do beside the calendar (or, To Do hidden, for the week's columns).</summary>
+    private bool Fits => (double.IsNaN(tall) || tall >= FitTall) && Width >= (TodoOn ? TodoBesideFrom : WeekColumnsFrom);
+
+    /// <summary>The room at the page's sides (the shell's, for a page that scrolls with it).</summary>
+    private double Pad => Width < 480 ? 20 : 40;
+
     protected override FrameworkElement Build()
     {
         var hadFocus = page.IsKeyboardFocusWithin;
@@ -244,18 +314,19 @@ public sealed partial class CalendarScreen : Screen
         PaintCommands();
         firstItem = null;
         page.Children.Clear();
+        todoDrawn = TodoOn;
         if (d == null)
         {
             shownSpan = null;
-            page.Children.Add(K.LoadState(cal.Error, Read));
+            page.Children.Add(K.LoadState(cal.Error, Read).Margin(Pad, 0, Pad, 0));
             return page;
         }
-        var span = $"{mode}|{(mode == "week" ? weekStart : anchor):yyyy-MM-dd}";
+        var span = $"{mode}|{(mode == "week" ? weekStart : anchor):yyyy-MM-dd}|{WeekDays}";
         var slide = mode != "list" && shownSpan != null && shownSpan != span && shownSpan.StartsWith(mode + "|", StringComparison.Ordinal);
         var modeChanged = shownSpan != null && !shownSpan.StartsWith(mode + "|", StringComparison.Ordinal);
         shownSpan = span;
-        var v = new Stack { Orientation = Orientation.Vertical, Spacing = 22 };
-        if (Notice(d) is { } n) v.Children.Add(NoticeBar(n.Text, n.Problem));
+        FrameworkElement? notice = null;
+        if (Notice(d) is { } n) notice = NoticeBar(n.Text, n.Problem);
         else shownNotice = null;
         var byDay = d.Events.GroupBy(e => e.Day).ToDictionary(g => g.Key, g => g.ToList());
         // (the screenshot suite: --preview-of Lec01-PreQuiz picks that item's day, so its row is in the day's panel — a
@@ -272,12 +343,67 @@ public sealed partial class CalendarScreen : Screen
             "list" => ListView(byDay),
             _ => MonthView(byDay, slide),
         };
-        v.Children.Add(content);
         if (modeChanged) Motion.FadeIn(content, Motion.Medium);
-        page.Children.Add(v);
+        page.Children.Add(Laid(notice, content));
         if (hadFocus) page.Dispatcher.BeginInvoke(() => { if (!page.IsKeyboardFocusWithin) page.Focus(); }, DispatcherPriority.Input);
         PreviewShot();
         return page;
+    }
+
+    /// <summary>
+    /// (0.3.64) The page as the web's 2.99.112 holds it: holding still (<see cref="Fits"/>), To Do beside the calendar and
+    /// both as tall as the pane, the notice over the calendar; else in its own scroller as before — To Do over the
+    /// calendar on a page too narrow for both, beside it and as tall as it on one too short.
+    /// </summary>
+    private FrameworkElement Laid(FrameworkElement? notice, FrameworkElement calendar)
+    {
+        var pad = Pad;
+        if (Fits)
+        {
+            var main = new Grid();
+            main.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            main.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            if (notice != null) main.Children.Add(notice.Margin(0, 0, 0, 12).Row(0));
+            main.Children.Add(calendar.Row(1));
+            if (!TodoBeside) return main.Margin(pad, 0, pad, FitFoot);
+            var todoCol = TodoPanel();
+            todoCol.Height = double.NaN;
+            todoCol.VerticalAlignment = VerticalAlignment.Stretch;
+            return K.Columns($"{TodoWidth.ToString(CultureInfo.InvariantCulture)}, {TodoGap.ToString(CultureInfo.InvariantCulture)}, *", todoCol.Col(0), main.Col(2)).Margin(pad, 0, pad, FitFoot);
+        }
+        var v = new Stack { Orientation = Orientation.Vertical, Spacing = 22, Margin = new Thickness(0, 0, 0, pad) };
+        if (TodoOn && !TodoBeside)
+        {
+            var above = TodoPanel();
+            above.Height = TodoAbove;
+            above.VerticalAlignment = VerticalAlignment.Top;
+            v.Children.Add(above);
+        }
+        if (notice != null) v.Children.Add(notice);
+        if (TodoBeside)
+        {
+            // (as tall as the calendar beside it, its list scrolling within)
+            var beside = TodoPanel();
+            beside.VerticalAlignment = VerticalAlignment.Top;
+            beside.SetBinding(FrameworkElement.HeightProperty, new Binding(nameof(FrameworkElement.ActualHeight)) { Source = calendar });
+            v.Children.Add(K.Columns($"{TodoWidth.ToString(CultureInfo.InvariantCulture)}, {TodoGap.ToString(CultureInfo.InvariantCulture)}, *", beside.Col(0), calendar.Col(2)));
+        }
+        else v.Children.Add(calendar);
+        pageScroller.Padding = new Thickness(pad, 0, pad, 0);
+        Adopt(pageScroller).Content = v;
+        return pageScroller;
+    }
+
+    /// <summary>Out of the page it was last in (an element has one parent): what is kept goes from build to build.</summary>
+    private static T Adopt<T>(T e) where T : FrameworkElement
+    {
+        switch (e.Parent)
+        {
+            case Panel p: p.Children.Remove(e); break;
+            case Decorator dc: dc.Child = null; break;
+            case ContentControl cc: cc.Content = null; break;
+        }
+        return e;
     }
 
     /// <summary>The title and the line under it, told to the shell when they change.</summary>
@@ -296,7 +422,7 @@ public sealed partial class CalendarScreen : Screen
     private string PeriodTitle => mode switch
     {
         "list" => "Upcoming",
-        "week" => WeekMonths(weekStart, weekStart.AddDays(6)),
+        "week" => WeekMonths(weekStart, weekStart.AddDays(WeekDays - 1)),
         _ => anchor.ToString("MMMM yyyy", Culture),
     };
 
@@ -308,14 +434,14 @@ public sealed partial class CalendarScreen : Screen
     }
 
     /// <summary>A week's days, without their year: "Oct 4 – 10", "Sep 28 – Oct 4".</summary>
-    private static string WeekDays(DateTime a, DateTime b) =>
+    private static string WeekDaysWords(DateTime a, DateTime b) =>
         a.Month == b.Month ? $"{a.ToString("MMM d", Culture)} – {b.Day}" : $"{a.ToString("MMM d", Culture)} – {b.ToString("MMM d", Culture)}";
 
     private string PeriodLine(CalendarData d)
     {
         if (mode == "list") return "The next three weeks";
         // (0.3.62) the week's days before what it holds ("Oct 25 – 31 · 16 items")
-        if (mode == "week") return $"{WeekDays(weekStart, weekStart.AddDays(6))} · {PeriodCount(d)}";
+        if (mode == "week") return $"{WeekDaysWords(weekStart, weekStart.AddDays(WeekDays - 1))} · {PeriodCount(d)}";
         return PeriodCount(d);
     }
 
@@ -364,12 +490,23 @@ public sealed partial class CalendarScreen : Screen
         if (v == mode) return;
         peek.Dismiss();
         // (the week or the month of the day picked)
-        if (v == "week") weekStart = FirstOfWeek(selected);
+        if (v == "week") weekStart = WeekOf(selected);
         if (v == "month") anchor = MonthStart(selected);
         mode = v;
         FocusPage();
         Render();
         _ = SaveMode(v);
+    }
+
+    /// <summary>(0.3.64) The week's five days or seven, kept: the week of the day picked, read for them.</summary>
+    private void SetWeekDays(int n)
+    {
+        if (n == WeekDays) return;
+        Prefs.Set(DaysPref, n);
+        weekStart = WeekOf(selected);
+        FocusPage();
+        Read();
+        Render();
     }
 
     /// <summary>The view kept by the page, then read for it.</summary>
@@ -438,7 +575,7 @@ public sealed partial class CalendarScreen : Screen
             {
                 var next = weekStart.AddDays(7 * way);
                 weekStart = next;
-                selected = today >= next && today < next.AddDays(7) ? today : next;
+                selected = today >= next && today < next.AddDays(WeekDays) ? today : next;
             }
             else
             {
@@ -453,7 +590,7 @@ public sealed partial class CalendarScreen : Screen
     {
         var today = DateTime.Today;
         var month = MonthStart(today);
-        var week = FirstOfWeek(today);
+        var week = WeekOf(today);
         var here = mode == "week" ? weekStart : anchor;
         var there = mode == "week" ? week : month;
         if (here == there)
@@ -489,6 +626,14 @@ public sealed partial class CalendarScreen : Screen
         Render();
     }
 
+    /// <summary>(0.3.64) A day's week opened, the day picked in it (a day of the month with more than it has room for,
+    /// To Do beside the month in place of the day's own list).</summary>
+    private void OpenWeekOf(DateTime day)
+    {
+        selected = day;
+        SetMode("week");
+    }
+
     /// <summary>A move to another month or week, sliding in from the side it went, then read afresh.</summary>
     private void Move(int way, Action change)
     {
@@ -510,7 +655,7 @@ public sealed partial class CalendarScreen : Screen
             switch (mode)
             {
                 case "week":
-                    return (weekStart, weekStart.AddDays(7));
+                    return (weekStart, weekStart.AddDays(WeekDays));
                 case "list":
                     var s = DateTime.Today;
                     return (s, s.AddDays(21));
@@ -542,12 +687,20 @@ public sealed partial class CalendarScreen : Screen
 
     private static DateTime MonthStart(DateTime d) => new(d.Year, d.Month, 1);
 
-    /// <summary>The first day of the week a day is in, as Windows is set (a Sunday, a Monday …).</summary>
+    /// <summary>The first day of the week a day is in, as Windows is set (a Sunday, a Monday …): the month's rows.</summary>
     private static DateTime FirstOfWeek(DateTime d)
     {
         var s = d.Date;
         var back = ((int)s.DayOfWeek - (int)CalendarKit.FirstDayOfWeek + 7) % 7;
         return s.AddDays(-back);
+    }
+
+    /// <summary>(0.3.64) The week's first day: Monday for its five days (on a Saturday, the next week's), the Sunday before
+    /// for all seven (the web's 2.99.112).</summary>
+    private static DateTime WeekOf(DateTime d)
+    {
+        var sunday = d.Date.AddDays(-(int)d.DayOfWeek);
+        return WeekDays == 7 ? sunday : d.DayOfWeek == DayOfWeek.Saturday ? sunday.AddDays(8) : sunday.AddDays(1);
     }
 
     /// <summary>How many weeks a month touches, counted from the first day of the week it starts in: five or six (four for
@@ -612,7 +765,10 @@ public sealed partial class CalendarScreen : Screen
             var moved = at.AddHours(1);
             var ok = await engine.Act("planMove", new { id = row.Id, at = moved.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture) });
             Log.Write($"calendar: plan put {at:ddd h:mm tt}, {(ok ? "moved" : "not moved")} to {moved:ddd h:mm tt}");
+            // (the week scrolled to it, so it is in the picture whatever time of day it went to)
+            weekScroll = GridInset + Math.Max(0, moved.Hour - 2) * hourPx;
             Read();
+            engine.DataChanged();
             await Task.Delay(2500);
         }
         catch (Exception e) { Log.Write("calendar: plan " + e.Message); }
@@ -633,6 +789,10 @@ public sealed partial class CalendarScreen : Screen
             page.Dispatcher.BeginInvoke(OpenSync, DispatcherPriority.Background);
         // (0.3.62) and a plan on the week, moved an hour on as a drag moves one (--open cal-plan)
         if (cal.Data != null && !cal.Loading && Launch.Take("cal-plan") != null) _ = ShotPlanMoved();
+        // (0.3.64) and the menu of the week's five days or seven (--open cal-week-menu), under Week; and the week pinched to
+        // the whole day (--open cal-pinch)
+        if (cal.Data != null && !cal.Loading && mode == "week" && Launch.Take("cal-week-menu") != null) _ = ShotWeekMenu();
+        if (cal.Data != null && !cal.Loading && mode == "week" && Launch.Take("cal-pinch") != null) _ = ShotPinch();
         if (!shotAsked || cal.Data == null || cal.Loading || firstItem == null) return;
         shotAsked = false;
         if (Launch.Take("preview") == null) return;
@@ -644,5 +804,20 @@ public sealed partial class CalendarScreen : Screen
             if (hidden || firstItem is not { } f || !f.At.IsLoaded) return;
             peek.Open(f.Ev, f.At);
         }
+    }
+
+    /// <summary>(0.3.64) The screenshot suite's menu of the week's days (--open cal-week-menu), once the page has settled —
+    /// held open, as the account menu's picture is, while the suite's other copies of Simpl take the focus.</summary>
+    private async Task ShotWeekMenu()
+    {
+        Shot.Began();
+        try
+        {
+            await Task.Delay(2500);
+            if (hidden || selector == null || !selector.IsLoaded) return;
+            WeekMenu(selector.Item(1), held: true);
+            Log.Write($"calendar: the week's menu open, {WeekDays} days shown");
+        }
+        finally { Shot.Ended(); }
     }
 }

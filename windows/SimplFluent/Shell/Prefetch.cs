@@ -6,7 +6,7 @@ namespace Simpl.Shell;
 
 /// <summary>
 /// Reading ahead, so a screen opens with everything it shows. Once the start has settled — the counts live, nothing
-/// asked of the page for a moment — the root places (To Do, the Calendar, Grades, Notifications, the Inbox, All Courses)
+/// asked of the page for a moment — the root places (To Do & Calendar, Grades, Notifications, the Inbox, All Courses)
 /// and each course's home are read, one screen at a time (two or three reads at once at most), a breath between them,
 /// and never while the student's own screens are asking: the school is asked at the pace of a student clicking
 /// through, not all at once. And a pointer resting on its way to a screen has that screen read meanwhile. Each is read
@@ -66,8 +66,7 @@ internal sealed class Prefetcher
 
     private IEnumerable<Place> Targets()
     {
-        yield return Place.Todo;
-        yield return Place.Calendar;
+        yield return Place.Calendar; // (0.3.64: To Do & Calendar, To Do's list with it)
         yield return Place.Grades;
         yield return Place.Notifications;
         if (!engine.OnBrightspace) yield return Place.Inbox;

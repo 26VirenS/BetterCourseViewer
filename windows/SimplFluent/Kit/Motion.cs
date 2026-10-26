@@ -67,6 +67,11 @@ public static class Motion
     /// <summary>How long a page takes to come in (and the pane's mark to reach its row).</summary>
     public const int Page = 220;
 
+    /// <summary>(0.3.64) How long a light popup takes to fold away — the quick look, a counter's panel — once a click
+    /// outside it, Escape or its Close puts it away: quicker than it came, so the press that closed it is never kept waiting
+    /// (the owner's #241, "make the closing of a popup faster").</summary>
+    public const int Away = 130;
+
     /// <summary>Windows' own "Animation effects" setting (Settings ▸ Accessibility ▸ Visual effects), where this PC can
     /// draw motion smoothly (Fx).</summary>
     public static bool On => SystemParameters.ClientAreaAnimation && Fx.Motion && Support.Launch.Get("shot") == null;

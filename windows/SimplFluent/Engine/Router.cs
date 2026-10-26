@@ -117,17 +117,19 @@ public sealed partial class Engine
         }
     }
 
-    /// <summary>A root's own address: the dashboard, the course list, the grades, the calendar, the notifications.</summary>
+    /// <summary>A root's own address: the dashboard, the course list, the grades, the calendar, the notifications — and
+    /// (0.3.64) To Do's (the interface's /todo, or the Dashboard's #todo), which is To Do &amp; Calendar's now.</summary>
     public string? TabName(string raw)
     {
         raw = InterfaceAddress(raw);
         if (Absolute(raw) is not { } url || !IsSchool(url)) return null;
         var p = Parts(url);
-        if (p.Length == 0) return "today";
+        if (p.Length == 0) return url.Fragment == "#todo" ? "todo" : "today";
         return p[0] switch
         {
             "courses" when p.Length == 1 => "courses",
             "grades" => "grades",
+            "todo" when p.Length == 1 => "todo",
             "calendar" or "calendar2" => "calendar",
             "profile" when p.Length >= 2 && p[1] == "communication" => "notifications",
             "courses" when p.Length >= 3 && p[2] == "calendar_events" => "calendar",

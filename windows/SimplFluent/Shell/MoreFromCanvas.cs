@@ -237,7 +237,7 @@ public static class MoreFromCanvas
         var help = kind == "help";
         var name = item.Label.Length > 0 ? item.Label : help ? "Help" : "History";
         var holder = new ContentControl { Focusable = false };
-        var sheet = new Sheet { Title = name, Body = holder, Width = 460, Floats = true, HoldsUpdates = false, Name = name };
+        var sheet = new Sheet { Title = name, Body = holder, Width = 460, Floats = true, Light = true, HoldsUpdates = false, Name = name };
         try
         {
             var list = await engine.Call<MoreList>(help ? "moreHelp" : "moreHistory", help ? null : new { maxAge = 1 });

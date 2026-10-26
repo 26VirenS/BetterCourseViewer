@@ -309,7 +309,7 @@ internal static class SyncSheet
                 Section("Your calendars, in Simpl", LinksCard(data.Links)));
             if (said != null) list.Children.Add(Said(said, saidBad));
             list.Children.Add(Where());
-            list.Children.Add(K.Wrapped("Drag work from To Do beside the week onto a time to plan it, or pull it to the right on To Do or the Dashboard.", Ty.Caption, B.Text2));
+            list.Children.Add(K.Wrapped("Drag work from To Do beside the calendar onto a day or a time to plan it, or pull it to the right on the Dashboard.", Ty.Caption, B.Text2));
             host.Child = list;
         }
 

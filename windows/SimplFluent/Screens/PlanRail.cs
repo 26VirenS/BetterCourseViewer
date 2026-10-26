@@ -21,6 +21,7 @@ namespace Simpl.Screens;
 /// Canvas's calendar and the other plans) — the further it is pulled the later the time, and let go on one, it is planned
 /// there. Pulled back short, or Escape, nothing. The same rail opens from the work's menu (Plan a Time…) and from P on a
 /// row, where the times are clicked, or chosen with the arrows and Enter; Move Plan… and Clear Plan once it is planned.
+/// (0.3.64: To Do's rows, beside the calendar, are dragged onto it instead; the rail opens from their menu and P.)
 /// </summary>
 internal static class PlanRail
 {

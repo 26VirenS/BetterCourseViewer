@@ -134,13 +134,14 @@ internal sealed class PaletteCommand
         var c = new List<PaletteCommand>
         {
             C("dashboard", ["home", "today"], "Dashboard", "What’s due and new, at a glance", SymbolRegular.Home24, PaletteAction.Go(Place.Dashboard), "Ctrl+1"),
-            C("todo", ["tasks", "planner"], "To Do", "Everything to do this week", SymbolRegular.TaskListLtr24, PaletteAction.Go(Place.Todo), "Ctrl+2"),
-            C("calendar", ["cal", "schedule"], "Calendar", "Your courses’ calendar", SymbolRegular.CalendarLtr24, PaletteAction.Go(Place.Calendar), "Ctrl+3"),
+            // (0.3.64: To Do and the Calendar one place, To Do & Calendar — /todo opens it with To Do shown)
+            C("todo", ["tasks", "planner"], "To Do", "Everything to do this week, beside the calendar", SymbolRegular.TaskListLtr24, PaletteAction.Go(Place.Todo), "Ctrl+2"),
+            C("calendar", ["cal", "schedule"], "To Do & Calendar", "Your courses’ calendar, To Do beside it", SymbolRegular.CalendarLtr24, PaletteAction.Go(Place.Calendar), "Ctrl+2"),
             C("grades", ["gpa", "grade", "marks"], "Grades", "Your GPA and every course’s grade — or one: /grades bio", SymbolRegular.DataBarVertical24,
-                PaletteAction.Go(Place.Grades), "Ctrl+4", "‹course›", PaletteLists.Grades, quick: true),
-            C("notifications", ["alerts", "activity"], "Notifications", "What’s new in your courses", SymbolRegular.Alert24, PaletteAction.Go(Place.Notifications), "Ctrl+5"),
+                PaletteAction.Go(Place.Grades), "Ctrl+3", "‹course›", PaletteLists.Grades, quick: true),
+            C("notifications", ["alerts", "activity"], "Notifications", "What’s new in your courses", SymbolRegular.Alert24, PaletteAction.Go(Place.Notifications), "Ctrl+4"),
         };
-        if (canvas) c.Add(C("inbox", ["messages", "mail", "conversations"], "Inbox", "Your messages", SymbolRegular.Mail24, PaletteAction.Go(Place.Inbox), "Ctrl+6"));
+        if (canvas) c.Add(C("inbox", ["messages", "mail", "conversations"], "Inbox", "Your messages", SymbolRegular.Mail24, PaletteAction.Go(Place.Inbox), "Ctrl+5"));
         c.Add(C("courses", ["classes"], "All courses", "Every course you are in", SymbolRegular.Library24, PaletteAction.Go(Place.Courses)));
         c.Add(C("course", ["class", "go"], "Open a course", "A course — or one of its sections: /course bio files", SymbolRegular.Book24,
             takes: "‹course› ‹section›", lists: PaletteLists.Courses));
@@ -149,7 +150,7 @@ internal sealed class PaletteCommand
             c.Add(C("groups", [], "Groups", "Your groups", SymbolRegular.People24, PaletteAction.Go(Place.Groups)));
             c.Add(C("group", ["team"], "Open a group", "One of your groups", SymbolRegular.PeopleTeam24, takes: "‹group›", lists: PaletteLists.Groups));
         }
-        c.Add(C("tools", ["tool", "widgets", "timer", "calculator"], "Tools", "Timer, calculator, flashcards and more", SymbolRegular.Toolbox24, PaletteAction.Go(Place.Tools), "Ctrl+7"));
+        c.Add(C("tools", ["tool", "widgets", "timer", "calculator"], "Tools", "Timer, calculator, flashcards and more", SymbolRegular.Toolbox24, PaletteAction.Go(Place.Tools), "Ctrl+6"));
         c.AddRange(ChemistryTools());
         c.AddRange(PhysicsTools());
         c.AddRange(EverydayTools());
