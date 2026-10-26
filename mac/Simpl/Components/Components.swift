@@ -348,10 +348,10 @@ struct CheckCircle: View {
 }
 
 /// (1.3.76) A finish line's mark (the tour done, a whole set learned): green, and it bounces once as it arrives, as the
-/// setup's seal and the quiz receipt's tick do. Its state is its own, so each time it arrives it bounces again; under
+/// setup's tick and the quiz receipt's do. Its state is its own, so each time it arrives it bounces again; under
 /// Reduce Motion it is simply there.
 struct FinishMark: View {
-    var symbol = "checkmark.seal.fill"
+    var symbol = "checkmark.circle.fill"
     let size: CGFloat
     var weight: Font.Weight = .regular
     /// How long it waits before it bounces, in nanoseconds (the tour's card glides to its place first).

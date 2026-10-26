@@ -34,7 +34,7 @@ enum DashGlyph {
         case "DiscussionTopic": return "bubble.left.and.bubble.right"
         case "Conversation": return "envelope"
         case "Message": return "bell"
-        case "Submission": return "checkmark.seal"
+        case "Submission": return "checkmark.circle"
         case "Conference", "WebConference": return "video"
         case "Collaboration", "AssessmentRequest": return "person.2"
         default: return "doc"

@@ -605,7 +605,7 @@ private struct TourCard: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: 8) {
             if last {
-                // (1.3.76) the setup's seal, bouncing once the card has glided to its place (Motion.gentle, above)
+                // (1.3.76) the setup's tick, bouncing once the card has glided to its place (Motion.gentle, above)
                 FinishMark(size: 28, weight: .semibold, delay: 300_000_000)
             }
             HStack(spacing: 8) {

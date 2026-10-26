@@ -200,7 +200,7 @@ struct AssignmentView: View {
         if (d.submitted ?? "").isEmpty == false || hasWork || (d.why ?? "").isEmpty == false {
             Section("Your work") {
                 if let sub = d.submitted, !sub.isEmpty {
-                    Label(sub, systemImage: "checkmark.seal.fill").foregroundStyle(.green)
+                    Label(sub, systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                         .symbolEffect(.bounce, value: handedIn)
                 }
                 if let t = s?.text, !t.isEmpty { Text(t).font(.subheadline).lineLimit(8) }

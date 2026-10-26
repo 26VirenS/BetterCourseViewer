@@ -283,7 +283,7 @@ struct SetupScreen: View {
     private func readBack(_ d: SetupChoices) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 6) {
-                Image(systemName: "checkmark.seal.fill")
+                Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 40, weight: .semibold))
                     .foregroundStyle(.green)
                     .symbolEffect(.bounce, value: finished)

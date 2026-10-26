@@ -238,7 +238,7 @@ struct AssignmentView: View {
             PageSection(title: "Your Work") {
                 VStack(alignment: .leading, spacing: 0) {
                     if !submitted.isEmpty {
-                        Label(submitted, systemImage: "checkmark.seal.fill")
+                        Label(submitted, systemImage: "checkmark.circle.fill")
                             .font(.sBody.weight(.semibold))
                             .foregroundStyle(.green)
                             .symbolEffect(.bounce, value: handedIn)

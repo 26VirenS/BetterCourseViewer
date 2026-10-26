@@ -457,7 +457,7 @@ struct PreviewCard: View {
             out.append(PreviewFact(symbol: "clock", text: PreviewFormat.text(d.due).map { "Due \($0)" } ?? "No due date", strong: true))
         }
         if let p = item.points ?? PreviewFormat.text(assignment?.points) { out.append(PreviewFact(symbol: "number.circle", text: p)) }
-        if let s = PreviewFormat.text(assignment?.submitted) { out.append(PreviewFact(symbol: "checkmark.seal", text: s)) }
+        if let s = PreviewFormat.text(assignment?.submitted) { out.append(PreviewFact(symbol: "checkmark.circle", text: s)) }
         if let a = PreviewFormat.text(assignment?.available) { out.append(PreviewFact(symbol: "lock.open", text: a)) }
         if let e = PreviewFormat.text(page?.edited) { out.append(PreviewFact(symbol: "pencil", text: e)) }
         // (1.3.79) the row's own line only until the work's own facts are read: a counter's row would say its due time,

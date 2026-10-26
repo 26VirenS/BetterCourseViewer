@@ -285,7 +285,7 @@ struct SetupScreen: View {
         List {
             Section {
                 VStack(alignment: .leading, spacing: 6) {
-                    Image(systemName: "checkmark.seal.fill")
+                    Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 40, weight: .semibold))
                         .foregroundStyle(.green)
                         .symbolEffect(.bounce, value: finished)

@@ -551,7 +551,7 @@ struct DevCrashesPage: View {
             .padding(10)
             Divider()
             if entries.isEmpty {
-                ContentUnavailableView("No crashes", systemImage: "checkmark.seal", description: Text("A run of Simpl that ends without quitting is kept here, with what stopped it and the last of its log, and so are the Mac’s own crash reports for Simpl."))
+                ContentUnavailableView("No crashes", systemImage: "checkmark.circle", description: Text("A run of Simpl that ends without quitting is kept here, with what stopped it and the last of its log, and so are the Mac’s own crash reports for Simpl."))
             } else {
                 HSplitView {
                     List(entries, selection: $picked) { e in
