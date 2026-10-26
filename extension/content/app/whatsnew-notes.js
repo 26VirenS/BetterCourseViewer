@@ -28,6 +28,10 @@
     lock: 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.117', date: '2026-10-26', notes: [
+      { kind: 'new', title: 'Click a Card to Upload', body: 'In Appearance, click any card or the sidebar for a photo.', icon: P.pic },
+      { kind: 'improved', title: 'Controls Round Photos', body: "Zoom, Ink and Done sit around the photo you're placing.", icon: P.pic },
+    ] },
     { version: '2.99.116', date: '2026-10-26', notes: [
       { kind: 'new', title: 'School Tools Built In', body: "Simpl's bar works on Alta, McGraw Hill and more.", icon: P.tool },
     ] },

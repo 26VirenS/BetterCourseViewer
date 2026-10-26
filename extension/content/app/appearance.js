@@ -121,7 +121,7 @@
     document.documentElement.classList.remove('bcv-appear', 'bcv-appear-setup');
     U.closeMenus();
     const gone = (el) => { if (!el) return; if (reduced()) { el.remove(); return; } el.classList.add('is-closing'); setTimeout(() => el.remove(), 260); };
-    gone(s.veil); gone(s.bar); s.badges.forEach((b) => gone(b.el)); s.file.remove();
+    gone(s.veil); gone(s.bar); s.badges.forEach((b) => { gone(b.el); gone(b.hit); }); s.file.remove();
   }
 
   // ---- the veil and the photo buttons: following the sidebar and the counters --------------------------
@@ -148,22 +148,34 @@
     st.veil.style.clipPath = `path(evenodd, '${`M0 0H${W}V${H}H0Z`} ${holes.map((r) => roundRect(r, r.k)).join(' ')}')`;
     // a photo button on each, kept in step with it (none while the sidebar is being chosen)
     const keys = new Set(list.filter((p) => !p.bare).map((p) => p.key));
-    st.badges = st.badges.filter((b) => { if (keys.has(b.key)) return true; b.el.remove(); return false; });
+    st.badges = st.badges.filter((b) => { if (keys.has(b.key)) return true; b.el.remove(); b.hit.remove(); return false; });
     for (const p of list) {
       if (p.bare) continue;
       let b = st.badges.find((x) => x.key === p.key);
       if (!b) {
         const el = h('button', { type: 'button', class: 'bcv-ap-badge', dataset: { slot: p.key }, title: p.key === 'side' ? 'Sidebar photo' : `${p.title} photo`, 'aria-label': p.key === 'side' ? 'Sidebar photo' : `${p.title} card photo`, onclick: (e) => { e.stopPropagation(); photoMenu(e.currentTarget, p.key); } });
-        b = { key: p.key, el };
+        // (2.99.117) the whole place takes a press (or a photo dropped on it) to upload a photo there; the button in its
+        // middle keeps the rest (the drawings, Ink, Move and Zoom…, Remove)
+        const hit = h('div', { class: 'bcv-ap-hit', dataset: { slot: p.key }, 'aria-hidden': 'true',
+          onclick: (e) => { e.stopPropagation(); if (!st) return; st.target = p.key; st.file.click(); },
+          ondragover: (e) => { if (![...(e.dataTransfer?.types || [])].includes('Files')) return; e.preventDefault(); hit.classList.add('is-drop'); },
+          ondragleave: () => hit.classList.remove('is-drop'),
+          ondrop: (e) => { e.preventDefault(); hit.classList.remove('is-drop'); const f = e.dataTransfer?.files?.[0]; if (f && st) readFile(f, p.key); } },
+        h('span', { class: 'bcv-ap-hit__cap', text: 'Click to upload a photo' }));
+        b = { key: p.key, el, hit };
         st.badges.push(b);
-        document.body.append(el);
+        document.body.append(hit, el); // (the button over its place's catch)
       }
       const has = !!photoAt(p.key);
       b.el.classList.toggle('has-pic', has);
       b.el.replaceChildren(U.svg(has ? 'M4 5h16v14H4zM4 15l5-5 4 4 3-3 4 4M15 9h.01' : 'M4 5h11M4 5v14h16v-6M4 15l5-5 4 4 3-3 4 4M19 3v6M16 6h6', { size: 18, stroke: '#fff', width: 2 }));
       const r = p.el.getBoundingClientRect();
+      const by = Math.round(p.key === 'side' ? Math.min(r.top + r.height / 2, H - 140) - 21 : r.top + r.height / 2 - 21);
       b.el.style.left = `${Math.round(r.left + r.width / 2 - 21)}px`;
-      b.el.style.top = `${Math.round(p.key === 'side' ? Math.min(r.top + r.height / 2, H - 140) - 21 : r.top + r.height / 2 - 21)}px`;
+      b.el.style.top = `${by}px`;
+      Object.assign(b.hit.style, { left: `${Math.round(r.left)}px`, top: `${Math.round(r.top)}px`, width: `${Math.round(r.width)}px`, height: `${Math.round(r.height)}px` });
+      b.hit.style.setProperty('--bcv-ap-cap-y', `${by + 52 - Math.round(r.top)}px`); // (its words under the button)
+      b.hit.classList.toggle('is-side', p.key === 'side');
     }
     st.timer = setTimeout(follow, 200); // (as the Mac's: the lit places read again five times a second)
   }
@@ -199,9 +211,11 @@
 
   // ---- (2.99.108) a photo edited where it is: its place the preview, its settings round it -----------------
   // Uploaded (or Move and Zoom… from its menu), the place a photo went on is the only one lit, outlined: the photo dragged
-  // on it moves, the wheel or a pinch zooms it, and the arrow keys nudge it. A tip hangs over it and its settings under it
-  // (over it where there is no room under; beside the sidebar): the zoom, Ink (a photo of one's own), Reset, Replace…,
-  // Remove and Done. The bar at the foot steps aside meanwhile. Done or Escape ends it, the photo kept as it was left.
+  // on it moves, the wheel or a pinch zooms it, and the arrow keys nudge it. (2.99.117) Its settings surround it, each on
+  // a side of its own: a tip over it, Reset, Replace… and Remove down its left, the zoom up its right, Ink (a photo of
+  // one's own) and Done under it. A side with no room gives what it holds to the other side, further out (Ink and Done go
+  // beside the place's foot), or else to the inside of the place's edge (the sidebar's tip sits inside its top). The bar at
+  // the foot steps aside meanwhile. Done or Escape ends it, the photo kept as it was left.
   const AR = new Map(); // a picture's width over its height (a drawn scene is 16:9)
   const aspectOf = (pic) => {
     if (AR.has(pic)) return AR.get(pic);
@@ -218,8 +232,10 @@
     if (p && !T().isDefaultPlace(key, p)) st.images.place[key] = { x: p.x, y: p.y, z: p.z }; else delete st.images.place[key];
   }
   /** Drawn at once on the page (kept as the drag or the zoom ends: keepPlace). */
-  const showPlace = (key, p) => { const el = picEl(key); if (el) for (const [k, v] of Object.entries(T().placeVars(p))) el.style.setProperty(k, v); };
+  const showPlace = (key, p) => { const el = picEl(key); if (el) for (const [k, v] of Object.entries(T().placeVars(p))) el.style.setProperty(k, v); syncZoom(); };
   function keepPlace(key, p) { setPlace(key, p); showPlace(key, placeAt(key)); keepImages(); paintEdit(); }
+  /** A zoom drawn at once (the wheel, the zoom's own drag), kept as it rests. */
+  const zoomTo = (key, z) => { setPlace(key, { ...placeAt(key), z: clampN(z, T().ZOOM_MIN, T().ZOOM_MAX) }); showPlace(key, placeAt(key)); };
 
   function edit(key) {
     if (!st || !photoAt(key)) return;
@@ -228,15 +244,18 @@
     const title = key === 'side' ? 'Sidebar' : places().find((p) => p.key === key)?.title || 'Card';
     const ring = h('div', { class: 'bcv-ap-ed-ring', tabindex: '0', role: 'img', 'aria-label': `${title} photo: drag to move it, the wheel to zoom, the arrow keys to nudge it` });
     const tip = h('div', { class: 'bcv-ap-ed-tip', 'aria-hidden': 'true' }, [U.svg('M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20', { size: 13, width: 2 }), h('span', { text: 'Drag to move · scroll to zoom' })]);
-    const bar = h('div', { class: 'bcv-ap-ed', role: 'dialog', 'aria-label': `${title} photo` });
-    st.edit = { key, title, ring, tip, bar, raf: 0 };
-    document.body.append(ring, tip, bar);
+    const pill = (k, label) => h('div', { class: `bcv-ap-ed bcv-ap-ed--${k}`, role: 'group', 'aria-label': label });
+    const acts = pill('acts', `${title} photo`), zoom = pill('zoom', `${title} photo zoom`), foot = pill('foot', `${title} photo`);
+    st.edit = { key, title, ring, tip, acts, zoom, foot, raf: 0, zoomH: 0 };
+    zoom.append(edIcon('M12 5v14M5 12h14', 'Zoom in', () => keepPlace(key, { ...placeAt(key), z: clampN(placeAt(key).z * 1.15, T().ZOOM_MIN, T().ZOOM_MAX) })), zoomSlider(key), edIcon('M5 12h14', 'Zoom out', () => keepPlace(key, { ...placeAt(key), z: clampN(placeAt(key).z / 1.15, T().ZOOM_MIN, T().ZOOM_MAX) })));
+    for (const el of [acts, zoom, foot]) el.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); endEdit(); } });
+    document.body.append(ring, tip, acts, zoom, foot);
     st.bar.classList.add('is-aside');
     armEdit(key, ring);
     paintEdit();
     const track = () => { if (!st?.edit || st.edit.ring !== ring) return; placeEditUi(); st.edit.raf = requestAnimationFrame(track); };
     track();
-    setTimeout(() => bar.querySelector('.bcv-ap-done')?.focus({ preventScroll: true }), 30);
+    setTimeout(() => foot.querySelector('.bcv-ap-done')?.focus({ preventScroll: true }), 30);
   }
   function endEdit(animate = true) {
     const e = st?.edit;
@@ -244,38 +263,55 @@
     st.edit = null;
     cancelAnimationFrame(e.raf);
     st.bar.classList.remove('is-aside');
-    for (const el of [e.ring, e.tip, e.bar]) { if (!animate || reduced()) el.remove(); else { el.classList.add('is-closing'); setTimeout(() => el.remove(), 180); } }
+    for (const el of [e.ring, e.tip, e.acts, e.zoom, e.foot]) { if (!animate || reduced()) el.remove(); else { el.classList.add('is-closing'); setTimeout(() => el.remove(), 180); } }
   }
-  /** The outline on the place, the tip over it and the settings under it (over it where there is no room; beside the
-   *  sidebar), kept on the place as the page moves. */
+  /** The outline on the place and its settings round it, kept on the place as the page moves: the tip over it, Reset,
+   *  Replace… and Remove to its left, the zoom to its right, Ink and Done under it — each side's where there is room. */
   function placeEditUi() {
     const e = st.edit;
     const p = places().find((x) => x.key === e.key);
     if (!p) { endEdit(); return; }
     const r = p.el.getBoundingClientRect();
-    const W = innerWidth, H = innerHeight, M = 12, G = 10;
+    const W = innerWidth, H = innerHeight, M = 12, G = 12, S = 8;
     const side = e.key === 'side';
     const o = side ? 0 : 3; // (round a card, just outside it; the sidebar, inside its own edge)
     Object.assign(e.ring.style, { left: `${r.left - o}px`, top: `${r.top - o}px`, width: `${r.width + 2 * o}px`, height: `${r.height + 2 * o}px` });
     e.ring.classList.toggle('is-side', side);
-    const bw = e.bar.offsetWidth, bh = e.bar.offsetHeight, tw = e.tip.offsetWidth, th = e.tip.offsetHeight;
-    let bx, by, below = true;
-    if (side) { bx = r.right + 16; by = clampN(r.top + r.height / 2 - bh / 2, M, H - bh - M); }
-    else {
-      bx = r.left + r.width / 2 - bw / 2;
-      below = r.bottom + G + bh + M <= H || r.top - G - bh - th - G < M;
-      by = below ? r.bottom + G : r.top - G - bh;
+    // (the zoom's track as long as the place's height allows: its buttons and the pill's padding take 80)
+    const zh = Math.round(clampN(r.height - 96, 56, 120));
+    if (zh !== e.zoomH) { e.zoomH = zh; e.zoom.style.setProperty('--bcv-ap-zoom-h', `${zh}px`); }
+    const L = r.left - o, R = r.right + o, Tp = r.top - o, B = r.bottom + o;
+    const aw = e.acts.offsetWidth, ah = e.acts.offsetHeight, zw = e.zoom.offsetWidth, zH = e.zoom.offsetHeight;
+    const fw = e.foot.offsetWidth, fh = e.foot.offsetHeight, tw = e.tip.offsetWidth, th = e.tip.offsetHeight;
+    const roomL = L - G - M, roomR = W - R - G - M;
+    let ax, zx, at; // at: where the left's and the right's ended up (their grow-from side)
+    if (roomL >= aw && roomR >= zw) { ax = L - G - aw; zx = R + G; at = 'sides'; }
+    else if (roomR >= zw + S + aw) { zx = R + G; ax = zx + zw + S; at = 'right'; }
+    else if (roomL >= aw + S + zw) { ax = L - G - aw; zx = ax - S - zw; at = 'left'; }
+    else { ax = r.left + G; zx = r.right - G - zw; at = 'in'; }
+    const midY = (hh) => clampN(r.top + r.height / 2 - hh / 2, M, H - hh - M);
+    const put = (el, x, y, from) => { Object.assign(el.style, { left: `${Math.round(x)}px`, top: `${Math.round(y)}px` }); if (el.dataset.from !== from) el.dataset.from = from; };
+    const boxes = [[clampN(ax, M, W - aw - M), midY(ah), aw, ah], [clampN(zx, M, W - zw - M), midY(zH), zw, zH]];
+    put(e.acts, boxes[0][0], boxes[0][1], at === 'sides' || at === 'left' ? 'right' : at === 'right' ? 'left' : 'in');
+    put(e.zoom, boxes[1][0], boxes[1][1], at === 'sides' || at === 'right' ? 'left' : at === 'left' ? 'right' : 'in');
+    // the tip over it, else inside its top
+    const tipOut = Tp - G - th >= M;
+    put(e.tip, clampN(r.left + r.width / 2 - tw / 2, M, W - tw - M), clampN(tipOut ? Tp - G - th : r.top + G, M, H - th - M), tipOut ? 'bottom' : 'in');
+    // Ink and Done under it; else beside its foot where there is room (past what stands beside it there), else inside it
+    let fx = r.left + r.width / 2 - fw / 2, fy = B + G, from = 'top';
+    if (fy + fh > H - M) {
+      fy = clampN(r.bottom - fh, M, H - fh - M);
+      const past = (x) => boxes.reduce((v, [bx, by, bw, bh]) => (bx + bw > R && by < fy + fh && by + bh > fy ? Math.max(v, bx + bw + S) : v), x); // (to the right of a pill it would sit on)
+      const before = (x) => boxes.reduce((v, [bx, by, bw, bh]) => (bx < L && by < fy + fh && by + bh > fy ? Math.min(v, bx - S - fw) : v), x);
+      if (past(R + G) + fw <= W - M) { fx = past(R + G); from = 'left'; }
+      else if (before(L - G - fw) >= M) { fx = before(L - G - fw); from = 'right'; }
+      else { fy = r.bottom - G - fh; from = 'in'; }
     }
-    bx = clampN(bx, M, W - bw - M);
-    by = clampN(by, M, H - bh - M);
-    Object.assign(e.bar.style, { left: `${Math.round(bx)}px`, top: `${Math.round(by)}px` });
-    e.bar.classList.toggle('is-above', !side && !below);
-    e.bar.classList.toggle('is-beside', side);
-    // (the tip: over the place, or under it when the settings took the room over it; for the sidebar, over its settings)
-    const tx = side ? clampN(bx, M, W - tw - M) : clampN(r.left + r.width / 2 - tw / 2, M, W - tw - M);
-    const ty = side ? by - 8 - th : below ? r.top - G - th : r.bottom + G;
-    Object.assign(e.tip.style, { left: `${Math.round(tx)}px`, top: `${Math.round(clampN(ty, M, H - th - M))}px` });
+    put(e.foot, clampN(fx, M, W - fw - M), clampN(fy, M, H - fh - M), from);
   }
+  const edIcon = (path, label, act) => h('button', { type: 'button', class: 'bcv-ap-ed__ic', title: label, 'aria-label': label, onclick: act }, U.svg(path, { size: 15, width: 2.2 }));
+  /** Reset, Replace… and Remove; Ink (a photo of one's own) and Done — drawn again as the photo changes, what had the
+   *  keyboard keeping it. */
   function paintEdit() {
     const e = st?.edit;
     if (!e) return;
@@ -283,27 +319,65 @@
     const t = T();
     const p = placeAt(key);
     const own = photoAt(key) && !t.sceneNameOf(photoAt(key));
-    const zoom = h('input', { type: 'range', class: 'bcv-ap-ed__zoom', min: String(t.ZOOM_MIN), max: String(t.ZOOM_MAX), step: '0.01', value: String(p.z), 'aria-label': 'Zoom' });
-    zoom.addEventListener('input', () => showPlace(key, { ...placeAt(key), z: Number(zoom.value) }));
-    zoom.addEventListener('change', () => keepPlace(key, { ...placeAt(key), z: Number(zoom.value) }));
-    const nudgeZoom = (k) => keepPlace(key, { ...placeAt(key), z: clampN(placeAt(key).z * k, t.ZOOM_MIN, t.ZOOM_MAX) });
-    const small = (path, label, act, extra = '') => h('button', { type: 'button', class: `bcv-ap-ed__ic ${extra}`, title: label, 'aria-label': label, onclick: act }, U.svg(path, { size: 15, width: 2 }));
-    const group = (kids, cls = '') => h('div', { class: `bcv-ap-ed__group ${cls}` }, kids.filter(Boolean));
-    const words = (text, act, cls = '') => h('button', { type: 'button', class: `bcv-ap-ed__btn ${cls}`, onclick: act, text });
+    const had = document.activeElement?.closest?.('.bcv-ap-ed') ? document.activeElement.dataset?.ed : null;
+    const act = (k, path, text, fn, cls = '') => h('button', { type: 'button', class: `bcv-ap-ed__btn ${cls}`, dataset: { ed: k }, onclick: fn }, [U.svg(path, { size: 14, width: 2 }), h('span', { text })]);
     const inked = !st.images.plain?.[key];
-    e.bar.replaceChildren(...[
-      h('div', { class: 'bcv-ap-ed__title' }, [h('b', { text: e.title }), h('span', { text: own ? (inked ? 'Your photo, inked' : 'Your photo, as it is') : 'A drawing' })]),
-      group([small('M5 12h14', 'Zoom out', () => nudgeZoom(1 / 1.15)), zoom, small('M12 5v14M5 12h14', 'Zoom in', () => nudgeZoom(1.15))], 'is-zoom'),
-      own ? group([h('span', { class: 'bcv-ap-ed__lab', text: 'Ink' }), U.switchEl(inked, (on) => { st.images.plain = st.images.plain || {}; if (on) delete st.images.plain[key]; else st.images.plain[key] = true; keepImages(); paintEdit(); }, 'Ink photo')]) : null,
-      group([
-        words('Reset', () => keepPlace(key, null), t.isDefaultPlace(key, p) ? 'is-off' : ''),
-        words('Replace…', () => { st.target = key; st.file.click(); }),
-        words('Remove', () => { endEdit(); setPhoto(key, null); keepImages(); }, 'is-danger'),
-      ]),
-      h('button', { type: 'button', class: 'bcv-ap-done', text: 'Done', onclick: () => endEdit() }),
+    e.acts.replaceChildren(
+      act('reset', 'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5', 'Reset', () => keepPlace(key, null), t.isDefaultPlace(key, p) ? 'is-off' : ''),
+      act('replace', 'M4 16l4.5-4.5 3.5 3.5 2.5-2.5L20 18M4 5h16v14H4zM15 9h.01', 'Replace…', () => { st.target = key; st.file.click(); }),
+      act('remove', 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3', 'Remove', () => { endEdit(); setPhoto(key, null); keepImages(); }, 'is-danger'),
+    );
+    e.acts.querySelector('.bcv-ap-ed__btn.is-off')?.setAttribute('disabled', '');
+    const ink = own ? U.switchEl(inked, (on) => { st.images.plain = st.images.plain || {}; if (on) delete st.images.plain[key]; else st.images.plain[key] = true; keepImages(); paintEdit(); }, 'Ink photo') : null;
+    if (ink) ink.dataset.ed = 'ink';
+    e.foot.replaceChildren(...[
+      ink ? h('label', { class: 'bcv-ap-ed__ink', title: 'On: the photo drawn in two tones of the page. Off: the photo as it is, the words on it bordered in white.' }, [h('span', { class: 'bcv-ap-ed__lab', text: 'Ink' }), ink]) : null,
+      h('button', { type: 'button', class: 'bcv-ap-done', dataset: { ed: 'done' }, text: 'Done', onclick: () => endEdit() }),
     ].filter(Boolean)); // (no Ink for a drawing)
-    e.bar.querySelector('.bcv-ap-ed__btn.is-off')?.setAttribute('disabled', '');
-    e.bar.onkeydown = (ev) => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); endEdit(); } };
+    syncZoom();
+    if (had) (e.acts.querySelector(`[data-ed="${had}"]`) || e.foot.querySelector(`[data-ed="${had}"]`))?.focus({ preventScroll: true });
+  }
+  /** The zoom, standing up the place's right side: dragged or pressed along, or the arrow keys; drawn as it goes and
+   *  kept as it is let go. */
+  function zoomSlider(key) {
+    const t = T();
+    const s = h('div', { class: 'bcv-ap-ed__zoom', role: 'slider', tabindex: '0', 'aria-label': 'Zoom', 'aria-orientation': 'vertical', 'aria-valuemin': String(t.ZOOM_MIN), 'aria-valuemax': String(t.ZOOM_MAX) }, [h('span', { class: 'bcv-ap-ed__fill' }), h('span', { class: 'bcv-ap-ed__knob' })]);
+    const zAt = (y) => { const r = s.getBoundingClientRect(); const f = clampN((r.bottom - 9 - y) / Math.max(1, r.height - 18), 0, 1); return Math.round((t.ZOOM_MIN + f * (t.ZOOM_MAX - t.ZOOM_MIN)) * 100) / 100; };
+    s.addEventListener('pointerdown', (ev) => {
+      if (ev.button !== 0) return;
+      ev.preventDefault();
+      s.focus({ preventScroll: true });
+      try { s.setPointerCapture(ev.pointerId); } catch { /* not held */ }
+      s.classList.add('is-dragging');
+      zoomTo(key, zAt(ev.clientY));
+      const move = (m) => zoomTo(key, zAt(m.clientY));
+      const up = () => {
+        s.removeEventListener('pointermove', move); s.removeEventListener('pointerup', up); s.removeEventListener('pointercancel', up);
+        s.classList.remove('is-dragging');
+        if (st?.edit) keepPlace(key, placeAt(key));
+      };
+      s.addEventListener('pointermove', move); s.addEventListener('pointerup', up); s.addEventListener('pointercancel', up);
+    });
+    s.addEventListener('keydown', (ev) => {
+      const z = placeAt(key).z;
+      const to = { ArrowUp: z * 1.1, ArrowRight: z * 1.1, ArrowDown: z / 1.1, ArrowLeft: z / 1.1, PageUp: z * 1.4, PageDown: z / 1.4, Home: t.ZOOM_MIN, End: t.ZOOM_MAX }[ev.key];
+      if (to == null) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      keepPlace(key, { ...placeAt(key), z: clampN(Math.round(to * 100) / 100, t.ZOOM_MIN, t.ZOOM_MAX) });
+    });
+    return s;
+  }
+  /** The zoom's knob where the photo's zoom is. */
+  function syncZoom() {
+    const e = st?.edit;
+    const s = e?.zoom.querySelector('.bcv-ap-ed__zoom');
+    if (!s) return;
+    const t = T(), z = placeAt(e.key).z;
+    s.style.setProperty('--f', String(clampN((z - t.ZOOM_MIN) / (t.ZOOM_MAX - t.ZOOM_MIN), 0, 1)));
+    s.setAttribute('aria-valuenow', String(Math.round(z * 100) / 100));
+    s.setAttribute('aria-valuetext', `${Math.round(z * 100)}%`);
+    for (const [label, off] of [['Zoom in', z >= t.ZOOM_MAX - 0.001], ['Zoom out', z <= t.ZOOM_MIN + 0.001]]) e.zoom.querySelector(`[aria-label="${label}"]`)?.toggleAttribute('disabled', off);
   }
   /** The place dragged to move its photo (the picture's pin runs against the drag where it is larger than its place,
    *  with it where it is zoomed out smaller), the wheel or a pinch to zoom it about its pin, the arrows to nudge it. */
@@ -336,12 +410,7 @@
     let wheelKeep = 0;
     ring.addEventListener('wheel', (e) => {
       e.preventDefault();
-      const p = placeAt(key);
-      const next = { ...p, z: clampN(p.z * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0025)), T().ZOOM_MIN, T().ZOOM_MAX) };
-      setPlace(key, next);
-      showPlace(key, placeAt(key));
-      const zoom = st.edit?.bar.querySelector('.bcv-ap-ed__zoom');
-      if (zoom) zoom.value = String(placeAt(key).z);
+      zoomTo(key, placeAt(key).z * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0025)));
       clearTimeout(wheelKeep);
       wheelKeep = setTimeout(() => { if (st) keepPlace(key, placeAt(key)); }, 260); // (kept once the wheel rests)
     }, { passive: false });

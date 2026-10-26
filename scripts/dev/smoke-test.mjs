@@ -5564,36 +5564,43 @@ try {
     const at = (x, y) => document.elementFromPoint(x, y);
     return {
       veil: !!veil && /path\(evenodd/.test(veil.style.clipPath), veilBg: veil && getComputedStyle(veil).backgroundColor,
-      badges: document.querySelectorAll('.bcv-ap-badge').length, stats: document.querySelectorAll('.bcv-stats .bcv-stat[data-stat]').length,
+      badges: document.querySelectorAll('.bcv-ap-badge').length, stats: document.querySelectorAll('.bcv-stats .bcv-stat[data-stat]').length, hits: [...document.querySelectorAll('.bcv-ap-hit')].map((e) => e.dataset.slot).sort().join(), badgeSlots: [...document.querySelectorAll('.bcv-ap-badge')].map((e) => e.dataset.slot).sort().join(),
       litStat: !at(stat.left + 10, stat.top + 10)?.closest('.bcv-ap-veil'), litSide: !at(side.left + 30, side.bottom - 200)?.closest('.bcv-ap-veil'),
       dim: !!at(innerWidth - 60, innerHeight / 2 - 120)?.closest('.bcv-ap-veil'),
       tabs: [...document.querySelectorAll('.bcv-ap-tabs .bcv-ap-seg__b')].map((b) => b.textContent).join('|'), looks: [...document.querySelectorAll('.bcv-ap-looks .bcv-ap-seg__b')].map((b) => b.textContent).join('|'),
       readies: document.querySelectorAll('.bcv-ap-ready').length,
     };
   });
-  check(ap.veil && ap.veilBg === 'rgba(0, 0, 0, 0)' && ap.badges === ap.stats + 1 && ap.litStat && ap.litSide && ap.dim && ap.tabs === 'Theme|Courses|Sidebar|Community' && ap.looks === 'Light|Dark|System' && ap.readies === 7, `Appearance over the Dashboard: the page held but for the sidebar and the counters — not darkened (2.99.97) — a photo button on each, Theme / Courses / Sidebar / Community and Light / Dark / System at the foot: ${JSON.stringify(ap)}`);
+  check(ap.veil && ap.veilBg === 'rgba(0, 0, 0, 0)' && ap.badges === ap.stats + 1 && ap.hits === ap.badgeSlots && ap.litStat && ap.litSide && ap.dim && ap.tabs === 'Theme|Courses|Sidebar|Community' && ap.looks === 'Light|Dark|System' && ap.readies === 7, `Appearance over the Dashboard: the page held but for the sidebar and the counters — not darkened (2.99.97) — a photo button on each and (2.99.117) the whole of each a press to upload, Theme / Courses / Sidebar / Community and Light / Dark / System at the foot: ${JSON.stringify(ap)}`);
   await shot(page, '27c-appearance');
   await page.click('.bcv-ap-ready[data-ready="Ocean"]');
   const worn = await eventually(() => sw.evaluate(async () => { const s = await self.BCV.settings.get(); const im = (await self.BCV.api.storage.local.get('theme:images'))['theme:images']; return s.appearance?.theme?.name === 'Teal' && !!im?.side; }), 8000);
   check(worn, 'a ready-made theme is worn as it is picked: Ocean, its colour (Teal) and its drawings kept');
   // (2.99.105) a photo of one's own has an Ink switch, a drawing none; off, the photo is shown as it is — no blur, no veil
   // over it — and the words on it are dark with a white border, kept for that place alone
+  // (a listener held for the whole of it keeps Playwright catching the page's file choosers: each first listener turns the
+  // catching on without waiting, and a press soon after could open a chooser before it was on — no event)
+  const holdChoosers = () => {};
+  page.on('filechooser', holdChoosers);
   const menuOf = async (slot) => { await page.click(`.bcv-ap-badge[data-slot="${slot}"]`); await page.waitForSelector('.bcv-menu', { timeout: 3000 }); return page.$$eval('.bcv-menu__item', (els) => els.map((e) => e.textContent)); };
   const drawnMenu = await menuOf('side');
   const [chooser] = await Promise.all([page.waitForEvent('filechooser', { timeout: 5000 }), page.click('.bcv-menu__item >> text=Upload Photo…')]);
   await chooser.setFiles(join(root, 'scripts', 'dev', 'fixtures', 'photo.jpg'));
   const ownInked = await eventually(() => page.evaluate(() => !!document.querySelector('.bcv-side.bcv-side--ink .bcv-side__pic.has-ink:not(.is-scene)')), 10000);
-  // (2.99.108) the photo just uploaded opens where it went: its place outlined, a tip over it and its settings beside it
-  // (the sidebar's), the photo buttons and the bar at the foot out of the way meanwhile
+  // (2.99.108) the photo just uploaded opens where it went: its place outlined, (2.99.117) its settings round it — the
+  // sidebar's left is the window's edge, so Reset, Replace… and Remove go beside the zoom on its right; the tip at its top
+  // and Ink and Done at its foot, inside it where there is no room outside — the photo buttons and the bar at the foot away
   let ed = null;
   await eventually(async () => (ed = await page.evaluate(() => {
-    const ring = document.querySelector('.bcv-ap-ed-ring'), bar = document.querySelector('.bcv-ap-ed'), tip = document.querySelector('.bcv-ap-ed-tip');
-    const side = document.querySelector('.bcv-side')?.getBoundingClientRect();
-    if (!ring || !bar || !tip || !side || !bar.querySelector('.bcv-ap-done')) return null;
-    const rr = ring.getBoundingClientRect(), br = bar.getBoundingClientRect(), tr = tip.getBoundingClientRect();
-    return { ringOnSide: Math.abs(rr.left - side.left) < 2 && Math.abs(rr.width - side.width) < 2 && Math.abs(rr.height - side.height) < 2, beside: br.left >= side.right - 1 && br.top >= 0 && br.bottom <= innerHeight, tipOver: tr.bottom <= br.top && tr.left >= side.right - 1, badges: document.querySelectorAll('.bcv-ap-badge').length, aside: !!document.querySelector('.bcv-ap-bar.is-aside'), title: bar.querySelector('.bcv-ap-ed__title b')?.textContent, zoom: !!bar.querySelector('.bcv-ap-ed__zoom'), ink: !!bar.querySelector('.bcv-switch.is-on'), btns: [...bar.querySelectorAll('.bcv-ap-ed__btn, .bcv-ap-done')].map((x) => x.textContent).join('|') };
+    const q = (sel) => document.querySelector(sel);
+    const ring = q('.bcv-ap-ed-ring'), acts = q('.bcv-ap-ed--acts'), zoom = q('.bcv-ap-ed--zoom'), foot = q('.bcv-ap-ed--foot'), tip = q('.bcv-ap-ed-tip');
+    const side = q('.bcv-side')?.getBoundingClientRect();
+    if (!ring || !acts || !zoom || !foot || !tip || !side || !foot.querySelector('.bcv-ap-done')) return null;
+    const [rr, ar, zr, fr, tr] = [ring, acts, zoom, foot, tip].map((e) => e.getBoundingClientRect());
+    const inWin = (b) => b.left >= 0 && b.top >= 0 && b.right <= innerWidth && b.bottom <= innerHeight;
+    return { ringOnSide: Math.abs(rr.left - side.left) < 2 && Math.abs(rr.width - side.width) < 2 && Math.abs(rr.height - side.height) < 2, beside: ar.left >= side.right - 1 && zr.left >= side.right - 1 && (ar.left >= zr.right || ar.right <= zr.left), inWin: [ar, zr, fr, tr].every(inWin), tipTop: tr.left >= side.left - 1 && tr.right <= side.right + 1 && tr.top < side.top + 60, footFoot: fr.left >= side.right - 1 && fr.bottom > side.bottom - 80 && [ar, zr].every((b) => b.bottom <= fr.top || b.top >= fr.bottom || b.right <= fr.left || b.left >= fr.right), badges: document.querySelectorAll('.bcv-ap-badge, .bcv-ap-hit').length, aside: !!q('.bcv-ap-bar.is-aside'), label: acts.getAttribute('aria-label'), zoom: !!zoom.querySelector('.bcv-ap-ed__zoom[role="slider"]'), ink: !!foot.querySelector('.bcv-switch.is-on'), btns: [...acts.querySelectorAll('.bcv-ap-ed__btn'), ...foot.querySelectorAll('.bcv-ap-done')].map((x) => x.textContent).join('|') };
   })), 8000);
-  check(ed && ed.ringOnSide && ed.beside && ed.tipOver && ed.badges === 0 && ed.aside && ed.title === 'Sidebar' && ed.zoom && ed.ink && ed.btns === 'Reset|Replace…|Remove|Done', `a photo uploaded opens where it went: the sidebar outlined, its settings beside it with a tip over them (zoom, Ink, Reset, Replace…, Remove, Done), the photo buttons and the bar away: ${JSON.stringify(ed)}`);
+  check(ed && ed.ringOnSide && ed.beside && ed.inWin && ed.tipTop && ed.footFoot && ed.badges === 0 && ed.aside && ed.label === 'Sidebar photo' && ed.zoom && ed.ink && ed.btns === 'Reset|Replace…|Remove|Done', `a photo uploaded opens where it went: the sidebar outlined, its settings round it — Reset, Replace…, Remove and the zoom beside it, the tip at its top, Ink and Done beside its foot — the photo buttons and the bar away: ${JSON.stringify(ed)}`);
   // dragged on its place the photo moves (kept as the drag ends); the zoom zooms it, drawn at once; Done puts it all away
   const keptPlace = () => sw.evaluate(async () => (await self.BCV.api.storage.local.get('theme:images'))['theme:images']?.place?.side || null);
   const rc = await page.$eval('.bcv-ap-ed-ring', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
@@ -5603,13 +5610,14 @@ try {
   await page.mouse.up();
   let movedTo = null, zoomedTo = null, drawnZ = null;
   const moved = await eventually(async () => { movedTo = await keptPlace(); return movedTo && (movedTo.x !== 50 || movedTo.y !== 100) && movedTo.z === 1; }, 5000); // (off the sidebar's own place, 50% 100%: across or up, as the photo overhangs it)
-  await page.$eval('.bcv-ap-ed__zoom', (z) => { z.value = '1.6'; z.dispatchEvent(new Event('input', { bubbles: true })); z.dispatchEvent(new Event('change', { bubbles: true })); });
-  const zoomed = await eventually(async () => { zoomedTo = await keptPlace(); return zoomedTo?.z === 1.6; }, 5000);
-  await eventually(async () => (drawnZ = await page.evaluate(() => document.querySelector('.bcv-side__pic')?.style.getPropertyValue('--bcv-pic-z'))) === '1.6', 5000);
+  await page.click('.bcv-ap-ed--zoom [aria-label="Zoom in"]');
+  const zoomed = await eventually(async () => { zoomedTo = await keptPlace(); return zoomedTo?.z === 1.15; }, 5000);
+  await eventually(async () => (drawnZ = await page.evaluate(() => document.querySelector('.bcv-side__pic')?.style.getPropertyValue('--bcv-pic-z'))) === '1.15', 5000);
+  const knobAt = await page.$eval('.bcv-ap-ed__zoom', (z) => z.getAttribute('aria-valuenow'));
   await shot(page, '27c0-appearance-photo-placed');
   await page.click('.bcv-ap-ed .bcv-ap-done');
   const edGone = await eventually(() => page.evaluate(() => !document.querySelector('.bcv-ap-ed, .bcv-ap-ed-ring, .bcv-ap-ed-tip') && document.querySelectorAll('.bcv-ap-badge').length > 0 && !document.querySelector('.bcv-ap-bar.is-aside')), 3000);
-  check(moved && zoomed && drawnZ === '1.6' && edGone, `the photo dragged on its place moves and is kept, the zoom drawn at once and kept, and Done puts the settings away (the photo buttons and the bar back): ${JSON.stringify({ movedTo, zoomedTo, drawnZ, edGone })}`);
+  check(moved && zoomed && drawnZ === '1.15' && knobAt === '1.15' && edGone, `the photo dragged on its place moves and is kept, the zoom's + drawn at once and kept (its knob following), and Done puts the settings away (the photo buttons and the bar back): ${JSON.stringify({ movedTo, zoomedTo, drawnZ, knobAt, edGone })}`);
   const ownMenu = await menuOf('side');
   await page.click('.bcv-menu__item >> text=Ink Photo');
   let plainSide = null;
@@ -5617,21 +5625,41 @@ try {
   const keptPlain = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('theme:images'))['theme:images']?.plain || null);
   check(!drawnMenu.some((t) => t.startsWith('Ink Photo')) && ownInked && ownMenu.some((t) => t.startsWith('Ink PhotoOn')) && !!plainSide && !plainSide.ink && !plainSide.veil && !plainSide.blur && plainSide.pic === 'url("data:image' && plainSide.color === 'rgb(28, 28, 30)' && /^rgb\(255, 255, 255\) 1\.15px 0px/.test(plainSide.shadow) && plainSide.solid && keptPlain?.side === true && Object.keys(keptPlain).length === 1, `Ink Photo: none on a drawing; a photo of one's own inked, and with Ink off shown as it is — no blur or veil, dark words with a white border — kept for the sidebar alone; (2.99.108) the border solid, no glow fading out: ${JSON.stringify({ drawnMenu, ownInked, ownMenu, plainSide, keptPlain })}`);
   await shot(page, '27c1-appearance-ink-off');
-  // (2.99.108) a counter's photo, Move and Zoom… from its menu: the card outlined, a tip over it, its settings in a row
-  // under it, centred on it; Escape puts them away and leaves Appearance open
+  // (2.99.108) a counter's photo, Move and Zoom… from its menu: the card outlined, (2.99.117) its settings round it — the
+  // tip over it, Reset, Replace… and Remove to its left, the zoom to its right, Done under it (no Ink for a drawing);
+  // Escape puts them away and leaves Appearance open
   await menuOf('today');
   await page.click('.bcv-menu__item >> text=Move and Zoom…');
+  const roundCard = (slot) => page.evaluate((slot) => {
+    const q = (sel) => document.querySelector(sel);
+    const card = q(`.bcv-stats .bcv-stat[data-stat="${slot}"]`)?.getBoundingClientRect(), ring = q('.bcv-ap-ed-ring'), acts = q('.bcv-ap-ed--acts'), zoom = q('.bcv-ap-ed--zoom'), foot = q('.bcv-ap-ed--foot'), tip = q('.bcv-ap-ed-tip');
+    if (!card || !ring || !acts || !zoom || !foot || !tip) return null;
+    const [rr, ar, zr, fr, tr] = [ring, acts, zoom, foot, tip].map((e) => e.getBoundingClientRect());
+    const near = (a, b) => a >= b && a - b < 24;
+    return { round: rr.left < card.left && rr.right > card.right && rr.top < card.top && rr.bottom > card.bottom, left: near(card.left, ar.right), right: near(zr.left, card.right), under: near(fr.top, card.bottom), over: near(card.top, tr.bottom), centred: Math.abs((fr.left + fr.right) / 2 - (card.left + card.right) / 2) < 2 && Math.abs((tr.left + tr.right) / 2 - (card.left + card.right) / 2) < 2, beside: Math.abs((zr.top + zr.bottom) / 2 - (card.top + card.bottom) / 2) < 2, label: acts.getAttribute('aria-label'), ink: !!foot.querySelector('.bcv-switch'), inkOn: !!foot.querySelector('.bcv-switch.is-on'), stray: /null|undefined/.test(acts.textContent + foot.textContent) };
+  }, slot);
   let edCard = null;
-  await eventually(async () => (edCard = await page.evaluate(() => {
-    const card = document.querySelector('.bcv-stats .bcv-stat[data-stat="today"]')?.getBoundingClientRect(), ring = document.querySelector('.bcv-ap-ed-ring')?.getBoundingClientRect(), bar = document.querySelector('.bcv-ap-ed'), tip = document.querySelector('.bcv-ap-ed-tip')?.getBoundingClientRect();
-    if (!card || !ring || !bar || !tip) return null;
-    const br = bar.getBoundingClientRect();
-    return { round: ring.left < card.left && ring.right > card.right && ring.top < card.top && ring.bottom > card.bottom, under: br.top >= card.bottom && br.top - card.bottom < 24, row: !bar.classList.contains('is-beside'), tipOver: tip.bottom <= card.top && tip.top >= 0, title: bar.querySelector('.bcv-ap-ed__title b')?.textContent, ink: !!bar.querySelector('.bcv-switch'), stray: /null|undefined/.test(bar.textContent) };
-  })) && edCard.round && edCard.under, 6000);
+  await eventually(async () => (edCard = await roundCard('today')) && edCard.round && edCard.under, 6000);
   await shot(page, '27c2-appearance-card-placed');
   await page.keyboard.press('Escape');
   const cardEdGone = await eventually(() => page.evaluate(() => !document.querySelector('.bcv-ap-ed') && !!document.querySelector('.bcv-ap-bar:not(.is-aside)') && document.documentElement.classList.contains('bcv-appear')), 3000);
-  check(edCard && edCard.round && edCard.under && edCard.row && edCard.tipOver && edCard.title === 'Due today' && !edCard.ink && !edCard.stray && cardEdGone, `a counter's Move and Zoom…: the card outlined, its settings in a row under it (no Ink for a drawing) and a tip over it; Escape puts them away, Appearance still open: ${JSON.stringify({ edCard, cardEdGone })}`);
+  check(edCard && edCard.round && edCard.left && edCard.right && edCard.under && edCard.over && edCard.centred && edCard.beside && edCard.label === 'Due today photo' && !edCard.ink && !edCard.stray && cardEdGone, `a counter's Move and Zoom…: the card outlined, its settings round it — the tip over it, Reset, Replace… and Remove to its left, the zoom to its right, Done under it (no Ink for a drawing); Escape puts them away, Appearance still open: ${JSON.stringify({ edCard, cardEdGone })}`);
+  // (2.99.117) a press anywhere on a card — off its photo button — asks for a photo, which goes on that card and opens there
+  const wkAt = await page.$eval('.bcv-ap-hit[data-slot="week"]', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + 24, y: r.bottom - 24 }; });
+  await page.mouse.move(wkAt.x, wkAt.y);
+  let wkCap = null;
+  await eventually(async () => (wkCap = await page.$eval('.bcv-ap-hit[data-slot="week"] .bcv-ap-hit__cap', (c) => getComputedStyle(c).opacity === '1' && c.textContent)), 2000);
+  await shot(page, '27c2a0-appearance-card-hover');
+  const [wkChooser] = await Promise.all([page.waitForEvent('filechooser', { timeout: 5000 }), page.mouse.click(wkAt.x, wkAt.y)]);
+  await wkChooser.setFiles(join(root, 'scripts', 'dev', 'fixtures', 'photo.jpg'));
+  let wkEd = null;
+  await eventually(async () => (wkEd = await roundCard('week')) && wkEd.round && wkEd.inkOn, 10000);
+  const wkKept = await sw.evaluate(async () => /^(data:image|asset:)/.test((await self.BCV.api.storage.local.get('theme:images'))['theme:images']?.cards?.week || ''));
+  await shot(page, '27c2a-appearance-card-own-photo');
+  await page.keyboard.press('Escape');
+  const wkGone = await eventually(() => page.evaluate(() => !document.querySelector('.bcv-ap-ed') && document.querySelectorAll('.bcv-ap-hit').length > 0), 3000);
+  check(wkCap === 'Click to upload a photo' && wkEd && wkEd.round && wkEd.under && wkEd.label === 'Next 7 days photo' && wkEd.inkOn && wkKept && wkGone, `a pointer over Next 7 days says a press uploads a photo; a press anywhere on it asks for one, kept on that card and opened there, its settings round it with Ink on: ${JSON.stringify({ wkCap, wkEd, wkKept, wkGone })}`);
+  page.off('filechooser', holdChoosers);
   // (2.99.77) under a colour of your own the six counters are that colour alone, a shade of it each
   const tones = await eventually(async () => { const v = await page.evaluate(() => ({ accent: getComputedStyle(document.documentElement).getPropertyValue('--bcv-accent').trim().toLowerCase(), tones: [...document.querySelectorAll('.bcv-stats > .bcv-stat[data-stat]')].map((c) => getComputedStyle(c).getPropertyValue('--bcv-stat-tone').trim().toLowerCase()) })); return v.accent && v.tones.length === 6 && new Set(v.tones).size === 6 && v.tones.every((t) => t.includes(v.accent)) ? v : null; }, 6000);
   check(!!tones, `the counters take the theme's colour, six shades of it: ${JSON.stringify(tones)}`);
