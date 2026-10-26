@@ -111,7 +111,8 @@ public sealed partial class CalendarScreen
         name.VerticalAlignment = VerticalAlignment.Center;
         var head = K.Columns("*, auto, auto", name.Col(0), prev.Col(1), next.Col(2));
 
-        var grid = new System.Windows.Controls.Primitives.UniformGrid { Columns = 7 };
+        // (whole pixels: the band's pieces meet edge to edge, where a seam showed between days at a width not a multiple of 7)
+        var grid = new System.Windows.Controls.Primitives.UniformGrid { Columns = 7, UseLayoutRounding = true, SnapsToDevicePixels = true };
         var first = FirstOfWeek(month);
         for (var i = 0; i < 7; i++)
         {
