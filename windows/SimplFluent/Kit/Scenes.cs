@@ -29,14 +29,18 @@ public static class Scenes
 
     private static Color Page => Appearance.Dark ? Color.FromRgb(0x20, 0x20, 0x20) : Color.FromRgb(0xf3, 0xf3, 0xf3);
 
-    /// <summary>The paper a picture is inked on: the ground cast with the accent.</summary>
-    private static Color Paper => K.Mix(Page, Appearance.Accent, Appearance.Dark ? 0.1 : 0.12);
+    /// <summary>The paper a picture is inked on: the ground cast with the accent (0.3.70: or with the place's own colour).</summary>
+    private static Color Paper(Color a) => K.Mix(Page, a, Appearance.Dark ? 0.1 : 0.12);
 
     /// <summary>A drawn scene's ink: the paper a third of the way to the accent (lib/theme.js SCENE_INK).</summary>
-    public static Color SceneInk => K.Mix(Paper, Appearance.Accent, Appearance.Dark ? 0.34 : 0.3);
+    public static Color SceneInk => SceneInkIn(Appearance.Accent);
+
+    private static Color SceneInkIn(Color a) => K.Mix(Paper(a), a, Appearance.Dark ? 0.34 : 0.3);
 
     /// <summary>A photo's ink: the paper lifted a shade (INK_LIFT).</summary>
-    public static Color PhotoInk => K.Mix(Paper, Appearance.Dark ? Colors.White : Colors.Black, Appearance.Dark ? 0.1 : 0.07);
+    public static Color PhotoInk => PhotoInkIn(Appearance.Accent);
+
+    private static Color PhotoInkIn(Color a) => K.Mix(Paper(a), Appearance.Dark ? Colors.White : Colors.Black, Appearance.Dark ? 0.1 : 0.07);
 
     /// <summary>The picture a place shows now and how it is inked, or null: its photo; else the drawing picked for it, or
     /// the worn theme's (Appearance.SceneFor).</summary>
@@ -97,7 +101,9 @@ public static class Scenes
         }
         if (Of(slot) is not { } pic) return null;
         var g = new Grid { IsHitTestVisible = false, ClipToBounds = true };
-        var drawn = Drawn(pic.Mask, pic.Scene ? SceneInk : PhotoInk, side ? AlignmentX.Center : AlignmentX.Right, zoom, side ? 0.5 : 1, pan ?? Appearance.Pan(slot));
+        // (0.3.70: in the place's own colour, where Appearance gave it one)
+        var a = Appearance.Tint(slot) ?? Appearance.Accent;
+        var drawn = Drawn(pic.Mask, pic.Scene ? SceneInkIn(a) : PhotoInkIn(a), side ? AlignmentX.Center : AlignmentX.Right, zoom, side ? 0.5 : 1, pan ?? Appearance.Pan(slot));
         if ((drawn.OpacityMask ?? drawn.Fill) is ImageBrush placed) Keep(slot, placed);
         g.Children.Add(drawn);
         if (frost && pic.Scene) g.Children.Add(new Rectangle { Fill = K.Brush(Color.FromArgb(56, Page.R, Page.G, Page.B)) });

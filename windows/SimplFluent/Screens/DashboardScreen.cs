@@ -274,9 +274,10 @@ public sealed partial class DashboardScreen : Screen
     /// Each counter's colour — the one its symbol wears, washed across its card and the panel it grows into: Due today
     /// blue, Tomorrow orange, Next 7 days green, Overdue red, Unread orange, Graded purple. Red is Overdue's alone: Due
     /// today is Windows' blue whatever the theme's accent (a theme's pink or red would read as late), and Overdue says
-    /// late work in full — its number red, its card the alert's — only while something is overdue.
+    /// late work in full — its number red, its card the alert's — only while something is overdue. (0.3.70) A counter
+    /// given a colour of its own in Appearance wears that one, Overdue too (a late count's number and card stay red).
     /// </summary>
-    private static Color CounterColor(string key) => key switch
+    private static Color CounterColor(string key) => Appearance.Tint(key) ?? key switch
     {
         "today" => Color.FromRgb(0x00, 0x78, 0xd4), "next" => Color.FromRgb(0x2f, 0xa8, 0x4f), "unread" => Color.FromRgb(0xf7, 0x8c, 0x1a),
         "overdue" => Color.FromRgb(0xe8, 0x4a, 0x3f), "tomorrow" => Color.FromRgb(0xf2, 0xa1, 0x00), "graded" => Color.FromRgb(0x6b, 0x5c, 0xe0),
@@ -552,7 +553,7 @@ public sealed partial class DashboardScreen : Screen
     /// </summary>
     private static Border AlertFace()
     {
-        var (c, near, far) = Appearance.Dark ? (Color.FromRgb(0xa0, 0x1c, 0x14), 0.46, 0.32) : (CounterColor("overdue"), 0.26, 0.16);
+        var (c, near, far) = Appearance.Dark ? (Color.FromRgb(0xa0, 0x1c, 0x14), 0.46, 0.32) : (Color.FromRgb(0xe8, 0x4a, 0x3f), 0.26, 0.16); // (Overdue's own red, whatever colour it was given)
         return new Border
         {
             Background = new LinearGradientBrush(K.WithAlpha(c, near), K.WithAlpha(c, far), new Point(0, 0), new Point(1, 1)),

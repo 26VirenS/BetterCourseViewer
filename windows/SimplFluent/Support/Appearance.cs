@@ -263,6 +263,31 @@ public static class Appearance
         Prefs.Remove($"photo:{slot}:scene"); // (back to the worn theme's drawing, not one picked before the photo)
     }
 
+    // ---- (0.3.70) a place's own colour ----
+
+    /// <summary>
+    /// (0.3.70, the web's appearance.tints, the Mac's AppearanceStore.tints) A counter's or the navigation pane's own
+    /// colour, in place of the theme's there — its wash, its symbol and the ink of a drawing on it — or null for the
+    /// theme's. (A screenshot run's --tints "today=#e71f63,side=#009688": those for that run.)
+    /// </summary>
+    public static Color? Tint(string slot)
+    {
+        if (Launch.Get("tints") is { } asked)
+        {
+            foreach (var pair in asked.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                if (pair.Split('=', 2) is [var key, var hex] && key == slot) return Hex(hex);
+            return null;
+        }
+        return Hex(Prefs.String("tint:" + slot));
+    }
+
+    /// <summary>A place's own colour (null: the theme's, put back), kept and worn at once.</summary>
+    public static void SetTint(string slot, string? hex)
+    {
+        Prefs.Set("tint:" + slot, Hex(hex) is { } c ? $"#{c.R:x2}{c.G:x2}{c.B:x2}" : null);
+        Changed?.Invoke();
+    }
+
     // ---- Simpl Community ----
 
     /// <summary>(0.3.67) A photo read from Simpl Community for a place: its bytes, its file's extension, its width over

@@ -41,6 +41,9 @@ public sealed partial class AppShell : Grid, IDisposable
     private readonly ScrollViewer navScroll;
     private readonly Border foot;
     private readonly ContentControl paneScene = new() { Focusable = false, IsHitTestVisible = false, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch };
+    /// <summary>(0.3.70) The pane's own colour, where Appearance gave it one: a wash over its ground and its photo, under its
+    /// rows (none over a photo with its Ink off, shown as it is).</summary>
+    private readonly Border paneTint = new() { IsHitTestVisible = false, Focusable = false };
     /// <summary>Where the pane's picture was last masked for: the foot of its rows and the top of its foot (MaskScene).</summary>
     private (double Rows, double Foot)? sceneMasked;
     private readonly ContentControl account = new() { Focusable = false };
@@ -133,7 +136,7 @@ public sealed partial class AppShell : Grid, IDisposable
         pane.Children.Add(searchBox.Row(0));
         pane.Children.Add(navScroll.Row(1));
         pane.Children.Add(foot.Row(2));
-        paneHolder.Child = new Grid { Children = { paneScene, pane } };
+        paneHolder.Child = new Grid { Children = { paneScene, paneTint, pane } };
         // (the picture behind the pane's words kept faint where the rows are: masked again as they move)
         nav.SizeChanged += (_, _) => MaskScene();
         navScroll.ScrollChanged += (_, _) => MaskScene();
@@ -189,6 +192,7 @@ public sealed partial class AppShell : Grid, IDisposable
         Navigate();
         paneScene.Content = Scenes.Backdrop("side");
         Scenes.PlainWords(pane, Appearance.Plain("side")); // (0.3.59: its photo's Ink off — dark words, a white border)
+        TintPane();
         more = engine.Kept<MoreNav>("moreFromCanvas");
         BuildPane();
         _ = engine.LoadSidebar();
@@ -263,10 +267,14 @@ public sealed partial class AppShell : Grid, IDisposable
     }
 
     /// <summary>Light, dark or the accent changed: what is drawn with colours of its own is drawn again.</summary>
+    private void TintPane() =>
+        paneTint.Background = Appearance.Tint("side") is { } t && !Appearance.Plain("side") ? K.Brush(K.WithAlpha(t, Appearance.Dark ? 0.2 : 0.14)) : null;
+
     public void Retheme()
     {
         paneScene.Content = Scenes.Backdrop("side");
         Scenes.PlainWords(pane, Appearance.Plain("side"));
+        TintPane();
         sceneMasked = null;
         MaskScene();
         accountDrawn = null;

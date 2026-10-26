@@ -181,6 +181,13 @@ public sealed class AppearanceOverlay : Grid
         Shot.Moved();
         // (the screenshot suite: --photo-edit today opens that place's photo in its place)
         if (Launch.Take("", "photo-edit") is { Length: > 0 } slot) Dispatcher.BeginInvoke(() => Edit(slot), DispatcherPriority.ApplicationIdle);
+        // (and --place-colour today that place's Colour…, once its photo button is in)
+        if (Launch.Take("", "place-colour") is { Length: > 0 } coloured)
+            Dispatcher.BeginInvoke(async () =>
+            {
+                for (var i = 0; i < 20 && !badgeOf.ContainsKey(coloured); i++) await Task.Delay(250);
+                if (badgeOf.TryGetValue(coloured, out var at)) PlaceColour(coloured, at);
+            }, DispatcherPriority.ApplicationIdle);
     }
 
     public void End()
@@ -332,6 +339,8 @@ public sealed class AppearanceOverlay : Grid
             drawing.Items.Add(mi);
         }
         menu.Items.Add(drawing);
+        // (0.3.70, as the web's 2.99.118) a colour of the place's own, in place of the theme's there
+        menu.Items.Add(Item("Colour…", SymbolRegular.Color24, () => PlaceColour(slot, at)));
         if (Scenes.Of(slot) != null)
         {
             menu.Items.Add(new Separator());
@@ -863,6 +872,38 @@ public sealed class AppearanceOverlay : Grid
     /// <summary>Canvas's own course colours.</summary>
     private static readonly string[] Palette = { "#BD3C14", "#FF2717", "#E71F63", "#8F3E97", "#65499D", "#4554A4", "#1770AB", "#0B9BE3",
                                                  "#06A3B7", "#009688", "#009606", "#8D9900", "#D97900", "#FD5D10", "#F06291", "#111111" };
+
+    /// <summary>
+    /// (0.3.70, as the web's 2.99.118 and the Mac's 1.3.177) A counter's or the navigation pane's own colour, under its
+    /// photo button: the theme's (put back), the course colours but the near-black (which leaves a card murky), or any
+    /// colour (Custom colour, worn as it is picked) — kept, and worn at once.
+    /// </summary>
+    private void PlaceColour(string slot, FrameworkElement at)
+    {
+        var name = slot == "side" ? "Navigation pane" : Appearance.Slots.FirstOrDefault(s => s.Key == slot).Name ?? slot;
+        var popup = new System.Windows.Controls.Primitives.Popup { PlacementTarget = at, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true, VerticalOffset = 8 };
+        var grid = new System.Windows.Controls.Primitives.UniformGrid { Columns = 8 };
+        var now = Appearance.Tint(slot);
+        var back = K.Icon(SymbolRegular.ArrowUndo24, 12, Colors.White);
+        grid.Children.Add(ColourKit.Dot(K.Brush(Appearance.Accent), now == null, "The theme’s colour", () => { popup.IsOpen = false; Appearance.SetTint(slot, null); }, back, size: 24));
+        foreach (var hex in Palette.Where(h => h != "#111111"))
+        {
+            var h = hex;
+            grid.Children.Add(ColourKit.Dot(K.Brush(K.Hex(h)), now == K.Hex(h), h, () => { popup.IsOpen = false; Appearance.SetTint(slot, h); }, size: 24));
+        }
+        var any = K.Button("Any colour…", () =>
+        {
+            popup.IsOpen = false;
+            ColourKit.Custom(window, now ?? Appearance.Accent, $"{name} colour", null, picked => Appearance.SetTint(slot, ColourKit.Code(picked)));
+        });
+        var card = new Border { Padding = new Thickness(14), CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), Effect = K.Shadow(24, 8, 0.28), Margin = new Thickness(12),
+            Child = K.V(10, K.Text($"{name} colour", Ty.BodyStrong), grid, any) };
+        card.SetResourceReference(Border.BackgroundProperty, B.Flyout);
+        card.SetResourceReference(Border.BorderBrushProperty, B.FlyoutStroke);
+        popup.Child = card;
+        popup.IsOpen = true;
+        Log.Write($"appearance: {slot}'s colour open ({(now is { } c ? ColourKit.Code(c) : "the theme's")})");
+    }
 
     private void CourseMenu(CourseRow course, FrameworkElement at)
     {
