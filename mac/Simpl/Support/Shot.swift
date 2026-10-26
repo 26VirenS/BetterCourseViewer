@@ -172,7 +172,7 @@ enum Shot {
         // (1.3.165: the plan rail on To Do, -SimplPlanFirst, is a popover too; 1.3.170: and To Do's ⋯ menu, -SimplTodoMenu,
         //  a menu, closes the same way)
         let d = UserDefaults.standard
-        let popover = d.string(forKey: "SimplPinOpen") != nil || d.bool(forKey: "SimplPlanFirst") || d.bool(forKey: "SimplTodoMenu") || d.bool(forKey: "SimplPlanPopover") // (1.3.172: a plan's)
+        let popover = d.string(forKey: "SimplPinOpen") != nil || d.bool(forKey: "SimplPlanFirst") || d.bool(forKey: "SimplTodoMenu")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
             let waited = Date().timeIntervalSince(since)
             if NSApp.isActive || (popover ? waited > 8 : (!again || waited > 2)) {
@@ -182,8 +182,6 @@ enum Shot {
                 // was taken as it was still finding them)
                 if d.bool(forKey: "SimplTodoMenu") {
                     menuOpen(file, until: Date().addingTimeInterval(8))
-                } else if d.bool(forKey: "SimplPlanPopover") {
-                    popoverUp(file, until: Date().addingTimeInterval(15))
                 } else if popover && !again && NSApp.isActive {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { whenIdle(file, until: Date().addingTimeInterval(8)) }
                 } else {
@@ -207,25 +205,6 @@ enum Shot {
         }
         if !NSApp.isActive { front() }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { menuOpen(file, until: until) }
-    }
-
-    /// (1.3.172) A plan's popover pictured once it is up over the window and what it reads has come (it closes as its
-    /// app goes behind another copy, and opens again as the app comes back in front — CalendarView), the app brought
-    /// forward meanwhile; or at `until` whatever is up. Both pictures of its Edit were once taken with it closed.
-    private static func popoverUp(_ file: String, until: Date, upSince: Date? = nil) {
-        let up = NSApp.windows.contains { $0.isVisible && $0.alphaValue > 0.5 && String(describing: type(of: $0)).contains("Popover") }
-        let since = up ? (upSince ?? Date()) : nil
-        if let since, Date().timeIntervalSince(since) >= 0.8, busy == 0, Date().timeIntervalSince(lastActivity) >= 0.5 {
-            capture(file)
-            return
-        }
-        if Date() >= until {
-            NSLog("[Simpl] shot: the plan's popover was %@ when pictured", up ? "up" : "not up")
-            capture(file)
-            return
-        }
-        if !NSApp.isActive { front() }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { popoverUp(file, until: until, upSince: since) }
     }
 
     /// (1.3.168) Pictured once nothing is being waited for and nothing has come for half a second (what came has
