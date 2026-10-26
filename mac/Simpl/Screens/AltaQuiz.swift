@@ -319,7 +319,7 @@ struct AltaQuizScreen: View {
             }
             // (1.3.60) while Alta's page loads, out of sight, the popup's own Loading in its place — (1.3.101) from the
             // moment the popup opens, while the launch goes through Canvas too (1.3.100 showed a spinner first, then this)
-            if session.failure == nil && (session.opening || (!session.pageShown && !session.asIs && session.cover == nil)) {
+            if session.skeletonUp { // (1.3.183: the session's own reckoning — a cover Alta has left never keeps it away)
                 ZStack {
                     PageGround()
                     AltaSkeleton()

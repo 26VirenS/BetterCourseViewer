@@ -78,6 +78,7 @@ enum AltaHook {
           if (!veils || !showing || dialogInPage || window.__simplBrowser) return;
           if (document.documentElement) document.documentElement.removeAttribute('data-simpl-shown');
           showing = false;
+          lookNow(); // (1.3.183: its look out of sight too — the whole page's turning over dropped while nothing shows)
           post({ kind: 'hidden' });
         };
         if (veils) {
@@ -531,7 +532,12 @@ enum AltaHook {
           if (!de) return;
           de.toggleAttribute('data-simpl-dark', !!window.__simplDark);
           de.toggleAttribute('data-simpl-pics-light', !!window.__simplPicsLight); // (1.3.70)
-          if (!window.__simplDark) { de.removeAttribute('data-simpl-whole-dark'); return; }
+          // (1.3.183) the whole page turned over only while it is in sight as it is: dropped as the question is shown
+          // alone or the page goes out of sight between parts — Alta's cover, turned over under the start screen, kept its
+          // filter on the page's root until the first question replaced it in sight, and WebKit could leave the question
+          // undrawn (a blank page until Light then Dark)
+          if (!window.__simplDark || de.hasAttribute('data-simpl-q') || !de.hasAttribute('data-simpl-shown')) de.removeAttribute('data-simpl-whole-dark');
+          if (!window.__simplDark) return;
           if (!document.getElementById('simpl-look')) { var st = document.createElement('style'); st.id = 'simpl-look'; st.textContent = LOOK; (document.head || de).appendChild(st); }
           if (!de.hasAttribute('data-simpl-whole-dark') && de.hasAttribute('data-simpl-shown') && !de.hasAttribute('data-simpl-q') && lightPage()) de.setAttribute('data-simpl-whole-dark', '');
         };
@@ -2068,8 +2074,10 @@ final class AltaSession: ObservableObject {
     /// page told its look, then laid out afresh).
     private var skeletonWatch: Task<Void, Never>?
 
-    /// The popup's skeleton up over the page, as AltaQuiz draws it.
-    private var skeletonUp: Bool { failure == nil && (opening || (!pageShown && !asIs && cover == nil)) }
+    /// The popup's skeleton up over the page — AltaQuiz draws it by this. (1.3.183) A cover still held once Alta's question
+    /// is on (its word that the cover had gone not come yet) no longer keeps it away: the start screen stands down for the
+    /// question, and with the page still out of sight the popup showed nothing at all.
+    var skeletonUp: Bool { failure == nil && (opening || (!pageShown && !asIs && (cover == nil || focused))) }
 
     private func watchSkeleton() {
         skeletonWatch?.cancel()
@@ -2088,12 +2096,13 @@ final class AltaSession: ObservableObject {
                     }
                     self.tellShown(["how": "in sight by the page's own account"])
                     NSLog("[Simpl] alta: the skeleton lifted %d s in: the page was in sight, the popup not told", k * 2)
+                    self.freshSoon()
                     return
                 }
                 // (the launch still on its way to Alta: its own `landed` decides)
                 guard !self.opening else { continue }
                 if k < 13 {
-                    if k % 2 == 1, k > 1 { self.pokePage() } // (6, 10, 14, 18 and 22 seconds in)
+                    if k % 2 == 1, k > 1 { self.drawAfresh() } // (6, 10, 14, 18 and 22 seconds in)
                     continue
                 }
                 // (shown as it is by the page script itself, so its focus is lifted and what it knows stays in step —
@@ -2103,6 +2112,32 @@ final class AltaSession: ObservableObject {
                 withAnimation(Motion.gentle) { self.pageShown = true }
                 if !byPage { self.logShownAsIs("Alta's page shown as it is: it was still out of sight after 26 seconds") }
             }
+        }
+    }
+
+    /// (1.3.183) What the student's Light then Dark did by hand for a page left blank, done by the popup: WebKit made to
+    /// draw the page afresh — its look turned and, a moment later, back (Alta's page has no dark look of its own, so
+    /// nothing of it changes to the eye) — and the page told its look and laid out again (`pokePage`).
+    private func drawAfresh() {
+        guard !closed else { return }
+        web.appearance = NSAppearance(named: pageDark ? .aqua : .darkAqua)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            guard let self else { return }
+            self.web.appearance = NSAppearance(named: self.pageDark ? .darkAqua : .aqua)
+            self.pokePage()
+        }
+    }
+
+    /// (1.3.183) The page drawn afresh a moment after it comes into sight, or its question is shown alone — the first
+    /// question after the start screen's Start (or Practice) could stay blank until Light then Dark were pressed.
+    private var freshTask: Task<Void, Never>?
+
+    private func freshSoon() {
+        freshTask?.cancel()
+        freshTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            guard !Task.isCancelled, let self, !self.closed, self.pageShown else { return }
+            self.drawAfresh()
         }
     }
 
@@ -2257,6 +2292,7 @@ final class AltaSession: ObservableObject {
         closePic()
         closed = true
         skeletonWatch?.cancel()
+        freshTask?.cancel()
         launching?.cancel()
         guard !timeline.told else { return }
         timeline.told = true
@@ -2370,7 +2406,9 @@ final class AltaSession: ObservableObject {
             guard frame.isMainFrame else { return }
             let state = head["state"] as? String ?? ""
             if timeline.first == nil, !opening { timeline.first = (state, timeline.ms(head)) }
+            let wasFocused = focused
             withAnimation(Motion.gentle) { focusState = state }
+            if !wasFocused, focused, pageShown { freshSoon() } // (1.3.183: the cover's page in sight gave way to the question)
             guard !["question", "lesson", "overview"].contains(state) else { return }
             var entry = "\(Date().formatted(date: .abbreviated, time: .standard)) — Alta's page shown as it is: \(head["reason"] as? String ?? "not recognised") [\(state)]"
             if let sh = head["shape"], !(sh is NSNull), let d = try? JSONSerialization.data(withJSONObject: sh, options: [.prettyPrinted, .sortedKeys]),
@@ -2384,8 +2422,10 @@ final class AltaSession: ObservableObject {
             // (1.3.101) a page on the way to Alta's (Canvas's launch, which sends its form on at once): kept behind the
             // skeleton, shown only if the launch ends there (`landed`)
             if opening { shownEarly = true; return }
+            let was = pageShown
             withAnimation(Motion.gentle) { pageShown = true }
             tellShown(head)
+            if !was { freshSoon() } // (1.3.183)
         case "hidden":
             guard frame.isMainFrame else { return }
             withAnimation(Motion.gentle) { pageShown = false }

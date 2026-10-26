@@ -390,6 +390,24 @@ try {
   const lt = await page.evaluate(() => getComputedStyle(document.documentElement).filter);
   check(!own.whole && own.f === 'none' && wdk.whole && /invert\(0\.92\)/.test(wdk.f) && /invert\(1\)/.test(wdk.img) && lt === 'none',
     `in Dark, Alta's page as it is is drawn dark, its pictures kept (${wdk.f} · ${wdk.img}), not a page dark of its own, and light again on Light`);
+  // (1.3.183) the whole page turned over only while it is in sight as it is: the question shown alone, or the page out of
+  // sight between parts, drops it — Alta's cover, turned over under the start screen, gave way to the first question in
+  // sight with its filter still on the page's root, and WebKit could leave the question blank until Light then Dark
+  const drop = await page.evaluate(() => {
+    const de = document.documentElement;
+    window.__simplDark = true; window.__simplFocusDark();
+    const before = de.hasAttribute('data-simpl-whole-dark');
+    de.setAttribute('data-simpl-q', ''); window.__simplFocusDark();
+    const focusDrop = !de.hasAttribute('data-simpl-whole-dark');
+    de.removeAttribute('data-simpl-q'); window.__simplFocusDark();
+    const back = de.hasAttribute('data-simpl-whole-dark');
+    de.removeAttribute('data-simpl-shown'); window.__simplFocusDark();
+    const veilDrop = !de.hasAttribute('data-simpl-whole-dark');
+    de.setAttribute('data-simpl-shown', ''); window.__simplDark = false; window.__simplFocusDark();
+    return { before, focusDrop, back, veilDrop };
+  });
+  check(drop.before && drop.focusDrop && drop.back && drop.veilDrop,
+    `in Dark, the whole page is turned over only while it is in sight as it is — dropped for the question alone and out of sight between parts (${JSON.stringify(drop)})`);
 
   // the student starts it on Alta's own page
   await page.click('#start');
