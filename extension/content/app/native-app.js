@@ -1187,6 +1187,9 @@
         sub: [cc?.name || ev.context_name || '', kind, a?.points_possible !== null && a?.points_possible !== undefined ? ptsOf(a.points_possible) : '', ev.location_name || ''].filter(Boolean).join(' · '),
         color: cc?.color || GRAY, url: ev.html_url || a?.html_url || null,
         reservationId: !isA && ev.appointment_group_id ? String(ev.id) : null, // (2.99.95: a time reserved is the student's own event — Un-reserve gives it back)
+        // (Mac 1.3.180 / Windows 0.3.73) an event's end — a class, an office hour — for the apps' week to draw it as long as
+        // it lasts (work is due at a moment: none)
+        end: !isA && !ev.all_day ? iso(U.parse(ev.end_at)) : null,
       });
     }
     // (2.99.107) the linked calendars and the plans over them; a plan sent to the Canvas calendar drawn once, as the plan
