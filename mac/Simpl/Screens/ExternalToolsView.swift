@@ -443,6 +443,9 @@ private struct ToolCard: View {
         .onHover { hover = $0 }
         .onChange(of: listed) { _, on in
             if !on { closedAt = Date() }
+            if on, UserDefaults.standard.string(forKey: "SimplShotFile") != nil {
+                NSLog("[Simpl] tool list: %@'s list asked for (card in a window: %@)", tool.name, spot.view?.window == nil ? "no" : "yes")
+            }
             if on && !shown { reckonRoom() }
             if shown != on { shown = on }
         }
@@ -456,6 +459,7 @@ private struct ToolCard: View {
             // (a card made again while its list is open — moved to another column by a new answer: its list opened again
             // a turn of the run loop later, once the card is in its window, for the room round it to be reckoned there)
             guard listed, !shown else { return }
+            if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] tool list: %@'s card made with its list asked for", tool.name) }
             DispatchQueue.main.async {
                 guard listed, !shown else { return }
                 reckonRoom()
@@ -503,14 +507,19 @@ private struct ToolCard: View {
 
     /// (1.3.178) Its list asked for and not up a second later: asked for afresh, from its card in its window, once the
     /// app is in front (a popover shows only for the app in front) — three times at most, and not past 30 seconds.
-    private func checkUp(since: Date, tries: Int = 0) {
+    private func checkUp(since: Date, tries: Int = 0, told: Bool = false) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             guard shown, listed, !up, tries < 3, Date().timeIntervalSince(since) < 30 else {
                 letPictureGo()
                 return
             }
             guard NSApp.isActive, spot.view?.window?.isVisible == true else {
-                checkUp(since: since, tries: tries)
+                // (1.3.179: the suite's console says what it waits for, once — the dark-36b list asked for and never up)
+                if !told, UserDefaults.standard.string(forKey: "SimplShotFile") != nil {
+                    NSLog("[Simpl] tool list: %@'s list waits (app in front: %@, card in a window: %@)", tool.name,
+                          NSApp.isActive ? "yes" : "no", spot.view?.window == nil ? "no" : "yes")
+                }
+                checkUp(since: since, tries: tries, told: true)
                 return
             }
             NSLog("[Simpl] tool list: %@'s list asked for but not up; asked again", tool.name)
@@ -521,7 +530,7 @@ private struct ToolCard: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 shown = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { reasking = false }
-                checkUp(since: since, tries: tries + 1)
+                checkUp(since: since, tries: tries + 1, told: told)
             }
         }
     }

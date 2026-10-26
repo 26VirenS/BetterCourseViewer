@@ -264,6 +264,18 @@ enum Shot {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { capture(file, attempt: attempt + 1) }
             return
         }
+        // (1.3.179) or all of one colour — the window white under To Do's ⋯ menu (1.3.178's light-05k): put behind
+        // another copy, it was not drawn again as it came back while the menu held the run loop. Drawn again now, and
+        // asked again half a second later, four times at most (the suite's own check is the same: 99% one colour)
+        if attempt < 4, let image, oneColour(image) {
+            NSLog("[Simpl] shot: the window came back all one colour; drawn again and asked again (%d)", attempt + 1)
+            for part in [w] + (w.childWindows ?? []) {
+                part.contentView?.needsDisplay = true
+                part.displayIfNeeded()
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { capture(file, attempt: attempt + 1) }
+            return
+        }
         if let image {
             let rep = NSBitmapImageRep(cgImage: image)
             if let png = rep.representation(using: .png, properties: [:]) {
@@ -271,6 +283,25 @@ enum Shot {
             }
         }
         try? spec.write(toFile: base + ".rect", atomically: true, encoding: .utf8)
+    }
+
+    /// (1.3.179) A picture all but one colour, as the suite's check sees it (scripts/dev/check-shots.py: seen small, each
+    /// channel cut to its top four bits, more than 99% of it one colour).
+    private static func oneColour(_ image: CGImage) -> Bool {
+        let w = 96, h = max(1, Int((Double(image.height) / Double(max(1, image.width)) * 96).rounded()))
+        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                  space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let data = ctx.data else { return false }
+        ctx.setFillColor(CGColor(gray: 1, alpha: 1))
+        ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        let bytes = data.bindMemory(to: UInt8.self, capacity: w * h * 4)
+        var counts: [UInt32: Int] = [:]
+        for i in 0..<(w * h) {
+            let key = UInt32(bytes[i * 4] >> 4) << 8 | UInt32(bytes[i * 4 + 1] >> 4) << 4 | UInt32(bytes[i * 4 + 2] >> 4)
+            counts[key, default: 0] += 1
+        }
+        return Double(counts.values.max() ?? 0) / Double(w * h) > 0.99
     }
 
     /// Nothing drawn in a picture: every pixel of it, seen small, transparent.
