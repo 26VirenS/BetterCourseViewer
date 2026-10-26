@@ -2079,18 +2079,40 @@ final class AltaSession: ObservableObject {
     /// the launch, no start screen, not Show Browser), the page is asked to look at itself again every few seconds — what
     /// the student's Light then Dark did by hand — and after 26 seconds, longer than any wait of the page script's own,
     /// it is shown as it is, said in the Error Logs. Begun again with each page and each time Alta goes between parts.
+    /// (1.3.175) The skeleton could still stay over Alta's question until Light then Dark were pressed: the page in sight by
+    /// its own account while the popup never heard so — its word come while the launch was still under way, and kept
+    /// back for good, or lost — and the watch standing down while the launch was. Now, while the skeleton is up (the
+    /// launch's included), the page is asked every two seconds whether it is in sight, and if it is — Alta's page, not
+    /// the launch on the way to it — the skeleton goes at once; and the look again is the same as Light then Dark's (the
+    /// page told its look, then laid out afresh).
     private var skeletonWatch: Task<Void, Never>?
+
+    /// The popup's skeleton up over the page, as AltaQuiz draws it.
+    private var skeletonUp: Bool { failure == nil && (opening || (!pageShown && !asIs && cover == nil)) }
 
     private func watchSkeleton() {
         skeletonWatch?.cancel()
         let page = documents
         skeletonWatch = Task { [weak self] in
-            for k in 1...6 {
-                try? await Task.sleep(nanoseconds: k == 1 ? 6_000_000_000 : 4_000_000_000)
-                guard !Task.isCancelled, let self, self.documents == page, !self.closed, !self.opening, !self.pageShown,
-                      !self.asIs, self.cover == nil, self.failure == nil else { return }
-                if k < 6 {
-                    _ = await self.run("return window.__simplBrowserNow ? window.__simplBrowserNow() : null", in: nil)
+            for k in 1...13 {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                guard !Task.isCancelled, let self, self.documents == page, !self.closed, self.skeletonUp else { return }
+                // (in sight by the page's own account, and Alta's: the popup shows it)
+                let said = await self.run("var d = document.documentElement; return { shown: !!(d && d.hasAttribute('data-simpl-shown')), alta: /knewton|alta/i.test(location.hostname + location.pathname) }", in: nil) as? [String: Any]
+                guard !Task.isCancelled, self.documents == page, !self.closed, self.skeletonUp else { return }
+                if said?["shown"] as? Bool == true, said?["alta"] as? Bool == true || !self.opening {
+                    withAnimation(Motion.gentle) {
+                        self.opening = false
+                        self.pageShown = true
+                    }
+                    self.tellShown(["how": "in sight by the page's own account"])
+                    NSLog("[Simpl] alta: the skeleton lifted %d s in: the page was in sight, the popup not told", k * 2)
+                    return
+                }
+                // (the launch still on its way to Alta: its own `landed` decides)
+                guard !self.opening else { continue }
+                if k < 13 {
+                    if k % 2 == 1, k > 1 { self.pokePage() } // (6, 10, 14, 18 and 22 seconds in)
                     continue
                 }
                 // (shown as it is by the page script itself, so its focus is lifted and what it knows stays in step —
@@ -2101,6 +2123,12 @@ final class AltaSession: ObservableObject {
                 if !byPage { self.logShownAsIs("Alta's page shown as it is: it was still out of sight after 26 seconds") }
             }
         }
+    }
+
+    /// (1.3.175) The page told its look and laid out afresh — what Light then Dark do (`tellPage`).
+    private func pokePage() {
+        let flags = "window.__simplDark = \(pageDark); window.__simplPicsLight = \(picsLight); window.__simplBrowser = \(browser);"
+        web.evaluateJavaScript(flags + " if (window.__simplFocusDark) window.__simplFocusDark(); if (window.__simplBrowserNow) window.__simplBrowserNow();", completionHandler: nil)
     }
 
     /// (1.3.83) Each time something of Alta's was shown as it is, for the Error Logs.
