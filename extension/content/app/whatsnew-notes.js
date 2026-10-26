@@ -28,6 +28,9 @@
     lock: 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.119', date: '2026-10-26', notes: [
+      { kind: 'improved', title: 'Photo Options First', body: 'Click a card or the sidebar for its options, then Upload.', icon: P.pic },
+    ] },
     { version: '2.99.118', date: '2026-10-26', notes: [
       { kind: 'new', title: 'Colour Each Card', body: 'Give any card or the sidebar a colour of its own.', icon: P.pic },
     ] },

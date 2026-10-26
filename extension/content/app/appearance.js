@@ -154,14 +154,14 @@
       let b = st.badges.find((x) => x.key === p.key);
       if (!b) {
         const el = h('button', { type: 'button', class: 'bcv-ap-badge', dataset: { slot: p.key }, title: p.key === 'side' ? 'Sidebar photo' : `${p.title} photo`, 'aria-label': p.key === 'side' ? 'Sidebar photo' : `${p.title} card photo`, onclick: (e) => { e.stopPropagation(); photoMenu(e.currentTarget, p.key); } });
-        // (2.99.117) the whole place takes a press (or a photo dropped on it) to upload a photo there; the button in its
-        // middle keeps the rest (the drawings, Ink, Move and Zoom…, Remove)
+        // (2.99.117) the whole place takes a press, or a photo dropped on it (uploaded there at once); (2.99.119) a press
+        // shows its controls first — its photo button's menu, Upload Photo… at its head — never the file chooser at once
         const hit = h('div', { class: 'bcv-ap-hit', dataset: { slot: p.key }, 'aria-hidden': 'true',
-          onclick: (e) => { e.stopPropagation(); if (!st) return; st.target = p.key; st.file.click(); },
+          onclick: (e) => { e.stopPropagation(); if (!st) return; const b = st.badges.find((x) => x.key === p.key); if (b) photoMenu(b.el, p.key); },
           ondragover: (e) => { if (![...(e.dataTransfer?.types || [])].includes('Files')) return; e.preventDefault(); hit.classList.add('is-drop'); },
           ondragleave: () => hit.classList.remove('is-drop'),
           ondrop: (e) => { e.preventDefault(); hit.classList.remove('is-drop'); const f = e.dataTransfer?.files?.[0]; if (f && st) readFile(f, p.key); } },
-        h('span', { class: 'bcv-ap-hit__cap', text: 'Click to upload a photo' }));
+        h('span', { class: 'bcv-ap-hit__cap', text: 'Click for photo options' }));
         b = { key: p.key, el, hit };
         st.badges.push(b);
         document.body.append(hit, el); // (the button over its place's catch)

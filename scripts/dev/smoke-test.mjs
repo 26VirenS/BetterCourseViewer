@@ -5644,13 +5644,23 @@ try {
   await page.keyboard.press('Escape');
   const cardEdGone = await eventually(() => page.evaluate(() => !document.querySelector('.bcv-ap-ed') && !!document.querySelector('.bcv-ap-bar:not(.is-aside)') && document.documentElement.classList.contains('bcv-appear')), 3000);
   check(edCard && edCard.round && edCard.left && edCard.right && edCard.under && edCard.over && edCard.centred && edCard.beside && edCard.label === 'Due today photo' && !edCard.ink && !edCard.stray && cardEdGone, `a counter's Move and Zoom…: the card outlined, its settings round it — the tip over it, Reset, Replace… and Remove to its left, the zoom to its right, Done under it (no Ink for a drawing); Escape puts them away, Appearance still open: ${JSON.stringify({ edCard, cardEdGone })}`);
-  // (2.99.117) a press anywhere on a card — off its photo button — asks for a photo, which goes on that card and opens there
+  // (2.99.117) a press anywhere on a card — off its photo button — (2.99.119) shows its controls first: its photo button's
+  // menu, under the button; Upload Photo… there asks for a photo, which goes on that card and opens there
   const wkAt = await page.$eval('.bcv-ap-hit[data-slot="week"]', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + 24, y: r.bottom - 24 }; });
   await page.mouse.move(wkAt.x, wkAt.y);
   let wkCap = null;
   await eventually(async () => (wkCap = await page.$eval('.bcv-ap-hit[data-slot="week"] .bcv-ap-hit__cap', (c) => getComputedStyle(c).opacity === '1' && c.textContent)), 2000);
   await shot(page, '27c2a0-appearance-card-hover');
-  const [wkChooser] = await Promise.all([page.waitForEvent('filechooser', { timeout: 5000 }), page.mouse.click(wkAt.x, wkAt.y)]);
+  let wkChosen = false;
+  const onWkChooser = () => { wkChosen = true; };
+  page.on('filechooser', onWkChooser);
+  await page.mouse.click(wkAt.x, wkAt.y);
+  await page.waitForSelector('.bcv-menu .bcv-menu__item', { timeout: 5000 }).catch(() => {});
+  await page.waitForTimeout(400);
+  const wkMenu = { items: await texts('.bcv-menu__item'), chose: wkChosen, under: await page.evaluate(() => { const m = document.querySelector('.bcv-menu'), b = document.querySelector('.bcv-ap-badge[data-slot="week"]'); if (!m || !b) return false; const mr = m.getBoundingClientRect(), br = b.getBoundingClientRect(); return Math.abs(mr.top - br.bottom) < 40 || Math.abs(mr.bottom - br.top) < 40; }) };
+  page.off('filechooser', onWkChooser);
+  await shot(page, '27c2a1-appearance-card-controls');
+  const [wkChooser] = await Promise.all([page.waitForEvent('filechooser', { timeout: 5000 }), page.locator('.bcv-menu__item', { hasText: /^Upload Photo/ }).first().click()]);
   await wkChooser.setFiles(join(root, 'scripts', 'dev', 'fixtures', 'photo.jpg'));
   let wkEd = null;
   await eventually(async () => (wkEd = await roundCard('week')) && wkEd.round && wkEd.inkOn, 10000);
@@ -5658,7 +5668,8 @@ try {
   await shot(page, '27c2a-appearance-card-own-photo');
   await page.keyboard.press('Escape');
   const wkGone = await eventually(() => page.evaluate(() => !document.querySelector('.bcv-ap-ed') && document.querySelectorAll('.bcv-ap-hit').length > 0), 3000);
-  check(wkCap === 'Click to upload a photo' && wkEd && wkEd.round && wkEd.under && wkEd.label === 'Next 7 days photo' && wkEd.inkOn && wkKept && wkGone, `a pointer over Next 7 days says a press uploads a photo; a press anywhere on it asks for one, kept on that card and opened there, its settings round it with Ink on: ${JSON.stringify({ wkCap, wkEd, wkKept, wkGone })}`);
+  check(wkCap === 'Click for photo options' && !wkMenu.chose && wkMenu.items[0] === 'Upload Photo…' && wkMenu.items.some((t) => /^Colour…/.test(t)) && wkMenu.under && wkEd && wkEd.round && wkEd.under && wkEd.label === 'Next 7 days photo' && wkEd.inkOn && wkKept && wkGone,
+    `a pointer over Next 7 days offers its photo options; a press anywhere on it shows its controls by its photo button (no file chooser yet), and their Upload Photo… asks for one, kept on that card and opened there, its settings round it with Ink on: ${JSON.stringify({ wkCap, wkMenu, wkEd, wkKept, wkGone })}`);
   page.off('filechooser', holdChoosers);
   // (2.99.118) a card and the sidebar in colours of their own (each one's Colour…, from its photo button), kept; the
   // theme's put back from the same place
