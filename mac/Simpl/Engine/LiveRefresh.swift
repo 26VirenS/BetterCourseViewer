@@ -441,11 +441,11 @@ final class LiveHolds {
 
     /// A sheet or a dialog over the window, a popover (a pinned tool's quick version, a picker's), a popup of its own (a
     /// tool's popup aside: the screen beside a tool is checked; (1.3.85) History's and Help's too), the Settings window,
-    /// the setup, What's New, a new task or message.
+    /// the setup, What's New, a new message.
     private func dialog(_ engine: Engine, _ window: NSWindow) -> Bool {
         if window.attachedSheet != nil || NSApp.modalWindow != nil { return true }
         if NSApp.windows.contains(where: { $0.isVisible && String(describing: type(of: $0)).contains("Popover") }) { return true }
-        if engine.setup || engine.whatsNew != nil || engine.newTask || engine.newMessage || engine.settingsOpen { return true }
+        if engine.setup || engine.whatsNew != nil || engine.newMessage || engine.settingsOpen { return true }
         // (a row's preview card is a popup too, "preview": it holds checks as the preview it is. (1.3.85) History's and
         // Help's popup, "more", holds none, as in the Windows app: a list only there to be read, which nothing a check
         // puts in place moves — left up, it kept the screen under it from ever being checked)

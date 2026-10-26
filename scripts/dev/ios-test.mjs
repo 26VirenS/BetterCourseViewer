@@ -259,6 +259,25 @@ try {
   check(byPri.sections[0]?.title === 'High priority' && byPri.sections[0].rows.some((r) => r.id === firstRow.id && r.pri === 3), `a priority set from the app groups the row under it: ${JSON.stringify(byPri.sections.map((s) => s.title))}`);
   await nc('setPriority', { id: firstRow.id, level: 0 });
   await nc('todo', { group: 'date' });
+  // (Mac 1.3.170, the web's 2.99.112) To Do beside the calendar: its small summary's most pressing line, each row's due words;
+  // a piece of Canvas work dismissed — gone from the list, there under Show completed to be restored — and restored; and
+  // To Do's count for To Do & Calendar's row, the panel's own
+  const pn = await nc('todo', { panel: true, group: 'date', showDone: false });
+  const pnRows = pn.sections.flatMap((s) => s.rows);
+  const pnWork = pnRows.find((r) => !r.custom && !r.done);
+  check(/^(\d+ overdue|\d+ due today|\d+ to do|All done)$/.test(pn.sumText || '') && ['over', 'done', ''].includes(pn.sumTone) && pnRows.length > 0 && pnRows.every((r) => r.dismissed === false && typeof r.late === 'boolean' && (r.custom || /^(Due|Was due) /.test(r.dueText || ''))) && Number.isInteger(pn.dismissedN),
+    `To Do beside the calendar: its summary's line and each row's due words: ${JSON.stringify({ sum: [pn.sumText, pn.sumTone, pn.doneText], rows: pnRows.slice(0, 4).map((r) => `${r.title} · ${r.dueText}`) })}`);
+  const pnGone = await nc('todoDismiss', { id: pnWork.id });
+  const pnAfter = await nc('todo', { panel: true });
+  const pnShown = await nc('todo', { panel: true, showDone: true });
+  const pnHeld = pnShown.sections.flatMap((s) => s.rows).find((r) => r.id === pnWork.id);
+  const pnBack = await nc('todoRestore', { id: pnWork.id });
+  const pnAgain = await nc('todo', { panel: true, showDone: false });
+  const pnAgainRow = pnAgain.sections.flatMap((s) => s.rows).find((r) => r.id === pnWork.id);
+  check(pnGone.ok && !pnAfter.sections.flatMap((s) => s.rows).some((r) => r.id === pnWork.id) && pnAfter.left === pn.left - 1 && pnHeld?.dismissed === true && pnShown.dismissedN === pn.dismissedN + 1 && pnBack.ok && pnAgainRow && pnAgainRow.dismissed === false && !pnAgainRow.done && pnAgain.left === pn.left,
+    `a piece of work dismissed beside the calendar leaves the list, waits under Show completed, and is restored: ${JSON.stringify({ title: pnWork.title, left: [pn.left, pnAfter.left, pnAgain.left], held: pnHeld && [pnHeld.dismissed, pnHeld.dueText], dismissed: [pn.dismissedN, pnShown.dismissedN] })}`);
+  const pnSnap = await nc('snapshot');
+  check(pnSnap.todoOpen === pnAgain.left, `To Do's count for To Do & Calendar's row is the panel's open work: ${JSON.stringify({ snapshot: pnSnap.todoOpen, panel: pnAgain.left })}`);
   const gr = await nc('grades');
   check(!gr.error && gr.rows.length > 0 && gr.rows.some((r) => r.pct !== null && r.letter) && gr.scale?.length === 11 && Number.isFinite(gr.goal), `Grades: the term GPA, each course's score, letter and categories, the scale for what-if: ${JSON.stringify({ gpa: gr.gpa, goal: gr.goal, rows: gr.rows.map((r) => `${r.code} ${r.pctText} ${r.letter || ''} cats:${r.cats.length}`), items: gr.items.length })}`);
   const now = new Date();
@@ -336,6 +355,18 @@ try {
   const plSync3 = await nc('calSync');
   const plRow3 = (await nc('todo')).sections.flatMap((x) => x.rows).find((r) => r.id === plWork.id);
   check(plClear.ok && !plRow3?.plan && plSync3.links.length === 0, 'Clear takes the plan away, and Unlink the calendar');
+  // (Mac 1.3.170, the web's 2.99.112) a row of To Do let go on a day of the month or the agenda: planned at that day's first
+  // free time (plan.js slotOn), said on its row and laid on the calendar; a day already over is refused
+  const pdDay = new Date(); pdDay.setHours(0, 0, 0, 0); pdDay.setDate(pdDay.getDate() + 2);
+  const pdPut = await nc('planDay', { id: plWork.id, day: pdDay.toISOString() });
+  const pdAt = new Date(pdPut.at || 0);
+  const pdRow = (await nc('todo', { panel: true })).sections.flatMap((x) => x.rows).find((r) => r.id === plWork.id);
+  const pdCal = await nc('calendar', { from: pdDay.toISOString(), to: new Date(pdDay.getTime() + 864e5).toISOString() });
+  const pdPast = new Date(); pdPast.setHours(0, 0, 0, 0); pdPast.setDate(pdPast.getDate() - 1);
+  const pdBad = await nc('planDay', { id: plWork.id, day: pdPast.toISOString() });
+  check(pdPut.ok && pdAt.toDateString() === pdDay.toDateString() && pdAt.getHours() >= 8 && /^Planned /.test(pdPut.words || '') && pdRow?.plan?.at === pdPut.at && pdCal.events.some((e) => e.layer === 'plan' && e.planId === plWork.id) && /over/i.test(pdBad.error || ''),
+    `a row let go on a day is planned at its first free time, and a day already over is refused: ${JSON.stringify({ put: pdPut, plan: pdRow?.plan, bad: pdBad })}`);
+  await nc('planClear', { id: plWork.id });
   const nf = await nc('notifications');
   check(!nf.error && nf.total > 0 && nf.days.length > 0 && nf.days[0].rows.every((r) => r.id && r.catLabel && r.title), `Notifications: grouped by day, each with its category: ${JSON.stringify({ total: nf.total, unread: nf.unread, days: nf.days.map((d) => `${d.title}:${d.rows.length}`), cats: nf.cats.map((c) => c.key) })}`);
   const one = nf.days[0].rows[0];

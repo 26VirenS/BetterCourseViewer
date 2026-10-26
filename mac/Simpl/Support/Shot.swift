@@ -169,8 +169,10 @@ enum Shot {
     /// for longer: brought forward again until the app is in front, for up to eight seconds (it is five pictures of the
     /// full set; with only one more try, Hardy–Weinberg's was pictured closed).
     private static func settle(_ file: String, again: Bool = true, since: Date = Date()) {
-        // (1.3.165: the plan rail on To Do, -SimplPlanFirst, is a popover too)
-        let popover = UserDefaults.standard.string(forKey: "SimplPinOpen") != nil || UserDefaults.standard.bool(forKey: "SimplPlanFirst")
+        // (1.3.165: the plan rail on To Do, -SimplPlanFirst, is a popover too; 1.3.170: and To Do's ⋯ menu, -SimplTodoMenu,
+        //  a menu, closes the same way)
+        let d = UserDefaults.standard
+        let popover = d.string(forKey: "SimplPinOpen") != nil || d.bool(forKey: "SimplPlanFirst") || d.bool(forKey: "SimplTodoMenu")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
             let waited = Date().timeIntervalSince(since)
             if NSApp.isActive || (popover ? waited > 8 : (!again || waited > 2)) {
@@ -217,13 +219,16 @@ enum Shot {
         parts += over.filter { s in !parts.contains(where: { $0 === s }) }
         var seen = Set<Int>()
         parts = parts.filter { seen.insert($0.windowNumber).inserted }
+        var layers = parts.filter { $0.alphaValue > 0.01 }.map { (number: $0.windowNumber, frame: $0.frame) }
+        // (1.3.170) a menu open over it (To Do's ⋯, -SimplTodoMenu): no window of AppKit's list, found in the window server's
+        layers += menus(over: w.frame, primary: primary).filter { m in !seen.contains(m.number) }
         var rect = w.frame
-        for p in parts { rect = rect.union(p.frame) }
+        for l in layers { rect = rect.union(l.frame) }
         // (AppKit counts from the bottom left of the first screen; screencapture from its top left)
         let top = primary.frame.maxY - rect.maxY
         let spec = "\(Int(rect.minX.rounded())),\(Int(top.rounded())),\(Int(rect.width.rounded())),\(Int(rect.height.rounded()))"
         let base = file.hasSuffix(".png") ? String(file.dropLast(4)) : file
-        let image = composite(parts, rect, scale: w.backingScaleFactor)
+        let image = composite(layers, rect, scale: w.backingScaleFactor)
         // (1.3.78) the window server now and then gives a window back empty — nothing at all of it drawn: asked again,
         // half a second later, four times at most, before an empty picture is kept
         if attempt < 4, image.map(empty) ?? true {
@@ -252,11 +257,27 @@ enum Shot {
         return true
     }
 
+    /// (1.3.170) This app's menus open on the screen over `rect` (AppKit's coordinates): the window server's windows of
+    /// this process at the pop-up menus' level, each by its number and its frame.
+    private static func menus(over rect: CGRect, primary: NSScreen) -> [(number: Int, frame: CGRect)] {
+        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else { return [] }
+        let me = Int(getpid())
+        let level = Int(NSWindow.Level.popUpMenu.rawValue)
+        return list.compactMap { info -> (number: Int, frame: CGRect)? in
+            guard (info[kCGWindowOwnerPID as String] as? Int) == me, (info[kCGWindowLayer as String] as? Int) == level,
+                  let n = info[kCGWindowNumber as String] as? Int, let b = info[kCGWindowBounds as String] as? NSDictionary,
+                  let r = CGRect(dictionaryRepresentation: b as CFDictionary) else { return nil }
+            // (the window server counts from the first screen's top left)
+            let f = CGRect(x: r.minX, y: primary.frame.maxY - r.maxY, width: r.width, height: r.height)
+            return f.intersects(rect) ? (n, f) : nil
+        }
+    }
+
     /// The window and its own over it, in `rect` (AppKit's coordinates), each pictured on its own and laid in order — so
     /// another copy of the app, or anything else on the screen, never shows in the picture (1.3.1: the suite runs
     /// several copies at once). CGWindowListCreateImage is gone from the SDK's headers since macOS 15; it is looked up
     /// at run time, and its absence is only a missing picture.
-    private static func composite(_ windows: [NSWindow], _ rect: CGRect, scale: CGFloat) -> CGImage? {
+    private static func composite(_ windows: [(number: Int, frame: CGRect)], _ rect: CGRect, scale: CGFloat) -> CGImage? {
         typealias Capture = @convention(c) (CGRect, UInt32, UInt32, UInt32) -> Unmanaged<CGImage>?
         guard let handle = dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", RTLD_NOW),
               let symbol = dlsym(handle, "CGWindowListCreateImage") else { return nil }
@@ -268,8 +289,8 @@ enum Shot {
               let ctx = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
                                   space: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
-        for win in windows where win.alphaValue > 0.01 {
-            guard let image = capture(.null, including, UInt32(win.windowNumber), options)?.takeRetainedValue() else { continue }
+        for win in windows {
+            guard let image = capture(.null, including, UInt32(win.number), options)?.takeRetainedValue() else { continue }
             let f = win.frame
             ctx.draw(image, in: CGRect(x: (f.minX - rect.minX) * scale, y: (f.minY - rect.minY) * scale, width: f.width * scale, height: f.height * scale))
         }

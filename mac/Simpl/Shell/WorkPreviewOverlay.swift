@@ -7,8 +7,9 @@ import SwiftUI
 // under the row (1.2.20), or just over it when there is no room under, else in the middle of the screen's side of the
 // window. (home-28) Nothing is dimmed behind it, as Windows' flyout is (it dimmed the page but not the toolbar, and
 // Windows dims nothing). (1.3.79) Nor is anything round it caught: it never blocks the window — a press round it does
-// what it does and leaves the card up, and going to another screen leaves it where it is — until its ✕, Escape (while
-// it has the keys) or its row pressed again closes it; dragged, it moves. It folds back into the row when it closes.
+// what it does, and going to another screen leaves it where it is. Its ✕, Escape (while it has the keys), its row
+// pressed again or (1.3.170) a press anywhere round it closes it; dragged, it moves. It folds back into the row when it
+// closes, (1.3.170) quickly (WorkPreview.closing).
 // Under Reduce Motion it fades in and out in its place. (1.3.79) A row in a popup over the window — a popup of its own
 // above this overlay — has its card come up in a popup over that one, just under the row (PopupPreviewCard), never
 // hidden under it. (1.3.80: a counter's list, the popup 1.3.79 did this for, grows in the page again — its rows' cards
@@ -105,6 +106,7 @@ struct WorkPreviewOverlay: View {
         let lines = room >= 640 ? 8 : (room >= 460 ? 5 : (room >= 340 ? 3 : 2))
         popped = t
         poppedOut = -1
+        preview.cardFrame = nil // (its popup is its own window: a press in it is the card's)
         engine.popups.present(PopupPreviewCard.key, title: preview.item?.title ?? "Preview", layout: .under(onScreen), ground: false,
                               anchor: .top, onClose: { if WorkPreview.shared.token == t { WorkPreview.shared.close() } }) {
             PopupPreviewCard(lines: lines).id(t)
@@ -160,6 +162,12 @@ struct WorkPreviewOverlay: View {
         .frame(width: size.width, height: size.height, alignment: .topLeading)
         .onChange(of: g.target.origin, initial: true) { _, o in
             if held == nil { following = o }
+        }
+        // (1.3.170: where the card is in the window, for a press round it to close it)
+        .onChange(of: g.target, initial: true) { _, r in
+            let me = origin.rect() ?? .zero
+            preview.cardFrame = r.offsetBy(dx: me.minX, dy: me.minY)
+            preview.cardWindow = origin.view?.window
         }
     }
 

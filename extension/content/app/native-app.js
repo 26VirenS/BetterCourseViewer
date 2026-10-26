@@ -212,11 +212,14 @@
   const meOf = (me) => (me ? { name: me.name || '', email: me.email || me.loginId || '', pronouns: me.pronouns || '', initials: U.initials(me.name || '') || '', avatar: me.avatar && !/avatar-50|no_pic|dotted_pic/.test(me.avatar) ? me.avatar : null } : null);
 
   async function snapshot({ age = NO_AGE } = {}) {
-    const [me, notifs, unread, done] = await Promise.all([store.me().catch(() => null), store.notifUnread(age).catch(() => null), store.unreadCount(age).catch(() => null), setupDone()]);
+    const [me, notifs, unread, done, week, sel] = await Promise.all([store.me().catch(() => null), store.notifUnread(age).catch(() => null), store.unreadCount(age).catch(() => null), setupDone(),
+      store.todoWindow(age).catch(() => null), selection(age).catch(() => null)]);
+    // (Mac 1.3.170) To Do's count, on To Do & Calendar's row: what is open over the next seven days in the courses shown
+    const todoOpen = week && sel ? week.filter((it) => !it.complete && !it.dismissed && !it.submitted && !it.excused && inSelection(sel, it)).length : null;
     // (Mac 1.3.8) the school's logo, as the web's sidebar finds it (app.js schoolLogo): a square mark, or a wide one on its colour
     const lg = (() => { try { return app()?.schoolLogo?.() || null; } catch { return null; } })();
     const logo = lg?.url ? { url: absUrl(lg.url), square: !!lg.square, bg: lg.bg || null } : null;
-    return { me: meOf(me), notifUnread: notifs || 0, inboxUnread: unread || 0, dark: !!app()?.isDark?.(), site: app()?.siteName?.() || location.hostname, host: location.host, version: self.BCV_VERSION || '', setupDone: done, lms: BCV.lms?.kind || 'canvas', logo };
+    return { me: meOf(me), notifUnread: notifs || 0, inboxUnread: unread || 0, todoOpen, dark: !!app()?.isDark?.(), site: app()?.siteName?.() || location.hostname, host: location.host, version: self.BCV_VERSION || '', setupDone: done, lms: BCV.lms?.kind || 'canvas', logo };
   }
 
   // ---- Simpl's own settings, in the app's Settings (1.4.3) ------------------------------------------------------
@@ -893,13 +896,15 @@
     return out;
   }
 
-  // (2.99.110) `side`: To Do beside the Calendar's week — by date, open work only, whatever To Do itself is set to
-  async function todo({ group = null, showDone = null, side = false, age = NO_AGE } = {}) {
-    if (!side && group && ['date', 'priority', 'course'].includes(group)) await store.setPref('todoGroup', group);
-    if (!side && showDone !== null && showDone !== undefined) await store.setPref('todoShowDone', !!showDone);
-    let g = side ? 'date' : await store.pref('todoGroup', 'date');
+  // (Mac 1.3.170, the web's 2.99.112) `panel`: To Do beside the calendar in To Do & Calendar — To Do's own grouping and
+  // Show completed, which there shows what was dismissed too (to be restored), each row saying when it is due ("Due Fri
+  // 11:59 PM", "Was due …") and whether it was dismissed
+  async function todo({ group = null, showDone = null, panel = false, age = NO_AGE } = {}) {
+    if (group && ['date', 'priority', 'course'].includes(group)) await store.setPref('todoGroup', group);
+    if (showDone !== null && showDone !== undefined) await store.setPref('todoShowDone', !!showDone);
+    let g = await store.pref('todoGroup', 'date');
     if (!['date', 'priority', 'course'].includes(g)) g = 'date';
-    const done = side ? false : !!(await store.pref('todoShowDone', false));
+    const done = !!(await store.pref('todoShowDone', false));
     const [priPref, repPref] = await Promise.all([store.pref('todoPriority', {}), store.pref('todoRepeat', {})]);
     const pri = priPref && typeof priPref === 'object' ? priPref : {};
     const rep = repPref && typeof repPref === 'object' ? repPref : {};
@@ -919,11 +924,17 @@
     const openN = all.filter(isOpen).length;
     const real = new Set(all.filter((i) => !i.custom).map((i) => i.courseId)).size;
     const seriesN = (it) => { const s = repeatOf(it)?.series; return s ? list.filter((x) => x.custom && x.id !== it.id && rep[x.id]?.series === s).length : 0; };
+    // (Mac 1.3.170) beside the calendar, a row's due words as the web's panel writes them ("Due Fri 11:59 PM", "Was due …";
+    // a task of your own its day alone) and whether it was dismissed
+    const lateOf = (it) => !!it.date && it.date < now && !!it.isDue && !isDone(it) && !it.dismissed;
+    const dueOf = (it) => (it.date ? `${it.custom ? '' : lateOf(it) ? 'Was due ' : 'Due '}${BCV.plan?.whenWords(it.date.getTime()) || U.fmtDow(it.date)}` : '');
     const row = (it, withCourse = true) => ({
       ...workRow(it), sub: withCourse ? `${courseOf(it)} · ${metaOf(it)}` : metaOf(it), courseName: courseOf(it), meta: metaOf(it), when: rowWhen(it.date),
       pri: priOf(it), priShort: priOf(it) ? PRI[priOf(it)][1] : '', type: it.type || '', series: seriesN(it),
+      ...(panel ? { dueText: dueOf(it), late: lateOf(it), dismissed: !!it.dismissed } : {}),
     });
-    const shown = all.filter((it) => done || isOpen(it));
+    // (Mac 1.3.170) beside the calendar Show completed shows what was dismissed too, "Done and dismissed, this week"
+    const shown = [...all.filter((it) => done || isOpen(it)), ...(panel && done ? list.filter((it) => it.dismissed && inSelection(sel, it)) : [])];
     const sections = [];
     const block = (title, rows, withCourse = true) => { if (rows.length) sections.push({ title, note: U.plural(rows.length, 'item'), rows: rows.map((it) => row(it, withCourse)) }); };
     if (g === 'priority') for (const lv of [3, 2, 1, 0]) block(lv ? `${PRI[lv][0]} priority` : 'Unprioritised', shown.filter((it) => priOf(it) === lv).sort(byDate));
@@ -945,11 +956,17 @@
     }
     // (2.99.33) what is left and what is late, for the progress card's big figure ("17 left", "1 overdue" in red)
     const overdueN = all.filter((it) => isOpen(it) && !it.custom && it.isDue && it.date && it.date < now).length;
+    // (Mac 1.3.170) the panel's small summary: the most pressing number, as the web's (todo.js summary) — overdue (red),
+    // else due today, else still to do, else all done
+    const openAll = all.filter(isOpen);
+    const overN = openAll.filter((it) => it.date && U.dayDiff(it.date, now) < 0).length;
+    const todayN = openAll.filter((it) => it.date && U.dayDiff(it.date, now) === 0).length;
+    const [sumText, sumTone] = overN ? [`${overN} overdue`, 'over'] : todayN ? [`${todayN} due today`, ''] : openAll.length ? [`${openAll.length} to do`, ''] : ['All done', 'done'];
     return {
       sub: `${openN} open across ${U.plural(real, 'course')}${all.some((i) => i.custom) ? ' · with your own tasks' : ''}`,
       pct: all.length ? roundHalfUp((doneN / all.length) * 100, 0) : 0, done: doneN, total: all.length,
       left: openN, overdue: overdueN, leftText: `${openN} left`, doneText: `${doneN} of ${all.length} done`, overdueText: overdueN ? `${overdueN} overdue` : '',
-      group: g, showDone: done, sections,
+      group: g, showDone: done, sections, sumText, sumTone, dismissedN: list.filter((it) => it.dismissed && inSelection(sel, it)).length,
       empty: done ? 'Nothing in the next seven days.' : 'Nothing to do in the next seven days.',
       courses: sel.list.map((c) => ({ id: String(c.id), name: c.shortName || c.name, color: c.color || GRAY })),
       repeats: store.REPEATS.map((x) => ({ key: x.key, label: x.label })),
@@ -961,6 +978,17 @@
     await store.setComplete(it, !!done);
     app()?.refreshCounts?.();
     return { ok: true, done: !!(it.complete || it.submitted) };
+  }
+  /** (Mac 1.3.170) Off To Do and not done (Canvas's planner keeps it dismissed), and back again, as the web's panel row's ⋯. */
+  async function todoDismiss({ id } = {}) {
+    await store.dismiss(itemOf(id));
+    app()?.refreshCounts?.();
+    return { ok: true };
+  }
+  async function todoRestore({ id } = {}) {
+    await store.restore(itemOf(id));
+    app()?.refreshCounts?.();
+    return { ok: true };
   }
   async function setPriority({ id, level = 0 } = {}) {
     const lv = Math.max(0, Math.min(3, Number(level) || 0));
@@ -3138,6 +3166,18 @@
     return { ok: true, plan: planInfo(String(id)) };
   }
   async function planClear({ id } = {}) { await BCV.plan.clear(String(id)); return { ok: true }; }
+  /** (Mac 1.3.170, the web's 2.99.112) A piece of work let go on a day of the month or the agenda: planned at that day's
+   *  first free time (plan.js slotOn) for as long as it would take; a day already over is refused. */
+  async function planDay({ id, day, mins } = {}) {
+    const it = workOf(id);
+    const d = Date.parse(day);
+    if (!it || !d) return { error: 'That day could not be planned.' };
+    const m = [30, 60, 90, 120].includes(Number(mins)) ? Number(mins) : BCV.plan.get(String(id))?.mins || BCV.plan.lengthFor(it);
+    let at;
+    try { at = await BCV.plan.slotOn(it, d, m); } catch (e) { return { error: e?.message || 'That day could not be planned.' }; }
+    await BCV.plan.put(it, at, m);
+    return { ok: true, at: new Date(at).toISOString(), words: `Planned ${BCV.plan.whenWords(at)}`, plan: planInfo(id) };
+  }
   /** What the Calendar lays over Canvas's own between two days: the linked calendars' events (only the calendars shown) and
    *  the plans, shaped as its events are; and the Canvas events that are plans sent there (drawn as the plan instead). */
   async function calLayer(s, e) {
@@ -3160,7 +3200,7 @@
     return { events: out, sent: new Set(Object.values(BCV.plan.all()).map((p) => p.ev).filter(Boolean)) };
   }
 
-  const CALLS = { calSync, feedState, feedOn, feedOff, feedSend, calLink, calShow, calUnlink, calRefresh, planSlots, planPut, planMove, planClear, setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, setColor, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, appointments, reserveAppointment, cancelReservation, notifications, notifMark, search, searchLocal, searchWarm, searchRecent, appearance, whatsNew, whatsNewSeen, refresh,
+  const CALLS = { calSync, feedState, feedOn, feedOff, feedSend, calLink, calShow, calUnlink, calRefresh, planSlots, planPut, planMove, planClear, planDay, setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, setColor, todo, todoDismiss, todoRestore, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, appointments, reserveAppointment, cancelReservation, notifications, notifMark, search, searchLocal, searchWarm, searchRecent, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, fileInfo, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage, messageUpload,
     toolLaunch, externalTools, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizAssignment, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback, neighbours };
   // (Mac 1.2) Grade needed: a course's score now (by the student's own weights where set, as the Grades screen) and each

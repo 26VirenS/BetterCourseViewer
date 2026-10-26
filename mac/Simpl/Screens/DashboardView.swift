@@ -181,7 +181,7 @@ struct DashboardView: View {
             .labelsHidden()
             .fixedSize()
             .help("Cards, a list by day, or recent activity")
-            Button { engine.newTask = true } label: {
+            Button { engine.newTask() } label: {
                 Label("New Task", systemImage: "plus")
             }
             .glassButton()

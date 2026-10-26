@@ -134,7 +134,7 @@ extension Engine {
             MoreReads.showing = list
             MoreReads.shown += 1
             let shown = MoreReads.shown
-            popups.present(Engine.morePopup, title: list.title, onClose: { MoreReads.showing = nil }) {
+            popups.present(Engine.morePopup, title: list.title, light: true, onClose: { MoreReads.showing = nil }) { // (1.3.170: a list, closed by a press outside it)
                 MorePopup(list: list, read: read, failure: failure)
                     .id(shown) // (each time what was just read, never what the popup held before)
             }

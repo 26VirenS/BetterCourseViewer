@@ -777,23 +777,53 @@ private struct AltaLookSwitch: View {
     }
 }
 
-/// (1.3.83) Beside Light / Dark (1.3.131: in the popup's bar): Show Browser — Knewton Alta's own page on the right, as Alta draws it, in place of the
-/// app's view of it — a glass chip filled while it is on.
+/// (1.3.83) Beside Light / Dark (1.3.131: in the popup's bar): Show Browser — Knewton Alta's own page on the right, as Alta
+/// draws it, in place of the app's view of it. (1.3.170) A toggle that still says Browser: a glass pill holding the
+/// globe, the word and a small switch — its knob sliding over, its track filled in the accent while it is on — as the
+/// Light / Dark switch beside it has them.
 private struct AltaBrowserToggle: View {
     @Binding var on: Bool
     let label: String
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private let track = CGSize(width: 30, height: 18), inset: CGFloat = 2
 
     var body: some View {
+        let knob = track.height - inset * 2
         Button {
-            withAnimation(Motion.gentle) { on.toggle() }
+            withAnimation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.3, dampingFraction: 0.85)) { on.toggle() }
         } label: {
-            Label(label, systemImage: "globe").labelStyle(.titleAndIcon)
+            HStack(spacing: 7) {
+                Image(systemName: "globe")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(on ? Theme.accent : Color.secondary)
+                Text(label)
+                    .font(.sCallout.weight(.semibold))
+                    .foregroundStyle(.primary)
+                ZStack {
+                    Capsule(style: .continuous)
+                        .fill(on ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(Color.primary.opacity(0.16)))
+                    Circle()
+                        .fill(Color.white)
+                        .shadow(color: .black.opacity(0.22), radius: 1.5, y: 1)
+                        .frame(width: knob, height: knob)
+                        .frame(maxWidth: .infinity, alignment: on ? .trailing : .leading)
+                        .padding(inset)
+                }
+                .frame(width: track.width, height: track.height)
+            }
+            .padding(.leading, 11)
+            .padding(.trailing, 6)
+            .frame(height: 30)
+            .glassCapsule(tint: on ? Theme.accent.opacity(0.18) : nil)
+            .contentShape(Capsule())
         }
-        .glassChip(Theme.accent, on: on)
+        .buttonStyle(.plain)
         .fixedSize()
         .help(on ? "Back to Simpl's view of the assignment" : "Show Knewton Alta's own page, as Alta draws it")
-        .accessibilityLabel("Show Browser")
-        .accessibilityAddTraits(on ? .isSelected : [])
+        .accessibilityLabel(label)
+        .accessibilityValue(on ? "On" : "Off")
+        .accessibilityAddTraits(.isToggle)
     }
 }
 

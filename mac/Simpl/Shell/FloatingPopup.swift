@@ -6,11 +6,13 @@ import SwiftUI
 // task or message, a counter's list and the app's short forms each come up in a window of their own over the main
 // window (a child panel, `FloatingPopups`), not a sheet: nothing round it is dimmed or caught, so the sidebar, the
 // toolbar, the search and the screen under it are used as ever, and going to another screen leaves it where it is,
-// over the window, until it is closed — its ×, Escape while it has the keys, ⌘W, or its own Done. Dragged by its head
-// (`popupHeader()`) it moves; it goes with the window when the window moves, and a large one is sized again as the
-// window is. It comes in a little smaller and faded on a short ease-out (a fade alone under Reduce Motion) and goes the
-// same way, a soft shadow under it. Still sheets, blocking the window: a quiz being taken (its timer and its
-// integrity), the first run's setup, the sign-in, the tour, and the Mac's own confirmations.
+// over the window, until it is closed — its ×, Escape while it has the keys, ⌘W, or its own Done; (1.3.170) a light one
+// (History and Help, a short note) by a press anywhere outside it too. Dragged by its head (`popupHeader()`) it moves; it
+// goes with the window when the window moves, and a large one is sized again as the window is. It comes in a little
+// smaller and faded on a short ease-out (a fade alone under Reduce Motion) and goes the same way, (1.3.170) quicker, a
+// soft shadow under it; every popover goes quicker too (`PopoverQuickClose`). Still sheets, blocking the window: a quiz
+// being taken (its timer and its integrity), the first run's setup, the sign-in, the tour, and the Mac's own
+// confirmations.
 // (1.3.80) A large one spans the window's whole content, over the sidebar too, and its edges and corners drag it larger
 // or smaller — the size picked kept for next time, a tool's for that tool (`PopupSizes`).
 
@@ -128,9 +130,12 @@ extension View {
 
     /// (1.3.79) A popup over the window while `isPresented`, as `.sheet(isPresented:)` puts one up — never blocking the
     /// window; closed, `isPresented` is set to false and `onDismiss` told.
+    /// (1.3.170) `light`: a note to be read and left, closed by a press anywhere outside it too.
     func floatingPopup<V: View>(_ key: String, title: String, isPresented: Binding<Bool>, layout: PopupLayout = .fitted,
-                                engine: Engine? = nil, onDismiss: (() -> Void)? = nil, @ViewBuilder content: @escaping () -> V) -> some View {
-        modifier(FloatingPopupShown(key: key, title: title, shown: isPresented, layout: layout, engine: engine, onDismiss: onDismiss, popup: content))
+                                engine: Engine? = nil, light: Bool = false, onDismiss: (() -> Void)? = nil,
+                                @ViewBuilder content: @escaping () -> V) -> some View {
+        modifier(FloatingPopupShown(key: key, title: title, shown: isPresented, layout: layout, engine: engine, light: light, onDismiss: onDismiss,
+                                    popup: content))
     }
 }
 
@@ -224,6 +229,7 @@ private struct FloatingPopupShown<V: View>: ViewModifier {
     @Binding var shown: Bool
     let layout: PopupLayout
     let engine: Engine?
+    let light: Bool
     let onDismiss: (() -> Void)?
     let popup: () -> V
     @Environment(\.engineLink) private var link
@@ -242,7 +248,7 @@ private struct FloatingPopupShown<V: View>: ViewModifier {
     private func show() {
         let binding = $shown
         let dismissed = onDismiss
-        (engine ?? link.acting).popups.present(key, title: title, layout: layout, onClose: {
+        (engine ?? link.acting).popups.present(key, title: title, layout: layout, light: light, onClose: {
             binding.wrappedValue = false
             dismissed?()
         }) {
@@ -270,6 +276,7 @@ final class FloatingPopups {
     init(engine: Engine) {
         self.engine = engine
         FloatingPopups.watchKeys()
+        PopoverQuickClose.install()
     }
 
     func isOpen(_ key: String) -> Bool { panels[key] != nil }
@@ -291,10 +298,44 @@ final class FloatingPopups {
     /// brought to the front. `onClose` is told when it closes, however it is closed. `ground`: drawn on the page's
     /// ground in a rounded card (false: what it shows draws its own, as a counter's glass list does). `sizeKey`: what a
     /// large popup's size is kept under (a tool's own, `tool.dna`; nil, `key` up to a colon — "feedback:…" is "feedback").
+    /// (1.3.170) `light`: closed by a press anywhere outside it too (a note, a list to be read and left) — and the press
+    /// that closed it, on what opens it, opening it no more (as a popover's button).
     func present<V: View>(_ key: String, title: String, layout: PopupLayout = .fitted, ground: Bool = true, anchor: UnitPoint = .top,
-                          sizeKey: String? = nil, onClose: (() -> Void)? = nil, @ViewBuilder content: () -> V) {
+                          sizeKey: String? = nil, light: Bool = false, onClose: (() -> Void)? = nil, @ViewBuilder content: () -> V) {
+        if light, panels[key] == nil, let at = closedOutside[key], Date().timeIntervalSince(at) < 0.45 {
+            closedOutside[key] = nil
+            onClose?() // (what asked for it set back, as when it closed)
+            return
+        }
         let kept = sizeKey ?? String(key.split(separator: ":", maxSplits: 1).first ?? Substring(key))
         put(key, title: title, layout: layout, ground: ground, anchor: anchor, sizeKey: kept, onClose: onClose, view: AnyView(content()), tries: 6)
+        if light, let panel = panels[key] {
+            panel.light = true
+            watchOutside()
+        }
+    }
+
+    /// (1.3.170) The light popups closed by a press outside them, and when: what opens one, pressed to close it, does not
+    /// open it again.
+    private var closedOutside: [String: Date] = [:]
+    private var outside: Any?
+
+    /// While a light popup is up: a press anywhere but in it (or in a popover of its own) closes it, and still does what
+    /// it does.
+    private func watchOutside() {
+        guard outside == nil else { return }
+        outside = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] e in
+            guard let self else { return e }
+            for (key, panel) in self.panels where panel.light && e.window !== panel && e.window?.parent !== panel {
+                self.closedOutside[key] = Date()
+                self.close(key)
+            }
+            if !self.panels.values.contains(where: { $0.light }), let m = self.outside {
+                NSEvent.removeMonitor(m)
+                self.outside = nil
+            }
+            return e
+        }
     }
 
     /// A popup closed — its ×, Escape, ⌘W, what it shows saying it is done, or its window closing — and whoever put it
@@ -502,11 +543,14 @@ final class FloatingPopups {
         return r
     }
 
-    /// The popup motion: in on a short ease-out, out a little quicker (the scale is left out under Reduce Motion, where
-    /// the popup is drawn).
+    /// The popup motion: in on a short ease-out, out (1.3.170) quicker — 0.12 seconds (the scale is left out under Reduce
+    /// Motion, where the popup is drawn).
     static func motion(in coming: Bool) -> Animation {
-        coming ? .easeOut(duration: 0.22) : .easeIn(duration: 0.16)
+        coming ? .easeOut(duration: 0.22) : .easeIn(duration: 0.12)
     }
+
+    /// How long a popup takes to go, before its window is put away.
+    static let goneAfter = 0.13
 
     private static var keyWatch: Any?
 
@@ -568,6 +612,8 @@ final class PopupPanel: NSPanel {
     private var closing = false
     /// Held open by what it shows (`popupCloseHeld`): Escape, ⌘W and its × do nothing meanwhile.
     fileprivate var held = false
+    /// (1.3.170) A light popup: a press anywhere outside it closes it too.
+    fileprivate var light = false
     /// (1.3.79) What it shows measures itself (`PopupHandle.fit`): the measure from outside is not taken.
     fileprivate var selfSized = false
     private var drag: (mouse: NSPoint, origin: NSPoint)?
@@ -771,7 +817,7 @@ final class PopupPanel: NSPanel {
         }
         hasShadow = false
         withAnimation(FloatingPopups.motion(in: false)) { model.out = false }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { gone() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + FloatingPopups.goneAfter) { gone() }
     }
 
     // MARK: Moving
@@ -1099,5 +1145,80 @@ private struct PopupRoot: View {
         DispatchQueue.main.async {
             if panel?.selfSized == false { panel?.fit(s) }
         }
+    }
+}
+
+// MARK: - Popovers, closed quicker (1.3.170)
+
+/// (1.3.170) Every popover — the plan rail, Calendars, a pin's quick tool, a picker — closes on a press anywhere outside
+/// it, as AppKit's own popovers do, and now quicker: once it is shown its own slower fade is turned off, and as it goes a
+/// still of it fades in its place in 0.12 seconds (it is simply gone where no still can be had).
+@MainActor
+enum PopoverQuickClose {
+    private static var watches: [NSObjectProtocol] = []
+    /// The stills fading out, kept until they are gone.
+    private static var stills: [NSWindow] = []
+
+    static func install() {
+        guard watches.isEmpty else { return }
+        let center = NotificationCenter.default
+        watches = [
+            center.addObserver(forName: NSPopover.didShowNotification, object: nil, queue: .main) { n in
+                MainActor.assumeIsolated {
+                    if let p = n.object as? NSPopover { p.animates = false }
+                }
+            },
+            center.addObserver(forName: NSPopover.willCloseNotification, object: nil, queue: .main) { n in
+                MainActor.assumeIsolated {
+                    if let p = n.object as? NSPopover { fade(p) }
+                }
+            },
+            center.addObserver(forName: NSPopover.didCloseNotification, object: nil, queue: .main) { n in
+                MainActor.assumeIsolated {
+                    if let p = n.object as? NSPopover { p.animates = true } // (shown again, it comes in as ever)
+                }
+            },
+        ]
+    }
+
+    /// A still of the popover's window, over where it was, fading out.
+    private static func fade(_ p: NSPopover) {
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion, let w = p.contentViewController?.view.window,
+              w.isVisible, w.alphaValue > 0.01, let image = still(of: w) else { return }
+        let ghost = NSWindow(contentRect: w.frame, styleMask: .borderless, backing: .buffered, defer: false)
+        ghost.isOpaque = false
+        ghost.backgroundColor = .clear
+        ghost.hasShadow = true
+        ghost.ignoresMouseEvents = true
+        ghost.isReleasedWhenClosed = false
+        ghost.level = w.level
+        ghost.collectionBehavior = [.fullScreenAuxiliary, .transient, .ignoresCycle]
+        let view = NSImageView(frame: NSRect(origin: .zero, size: w.frame.size))
+        view.image = NSImage(cgImage: image, size: w.frame.size)
+        view.imageScaling = .scaleAxesIndependently
+        ghost.contentView = view
+        ghost.orderFront(nil)
+        stills.append(ghost)
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.12
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            ghost.animator().alphaValue = 0
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) {
+            ghost.orderOut(nil)
+            stills.removeAll { $0 === ghost }
+        }
+    }
+
+    /// The window as the window server has it drawn (CGWindowListCreateImage, looked up at run time as the screenshot
+    /// suite's camera does: gone from the SDK's headers since macOS 15).
+    private static func still(of w: NSWindow) -> CGImage? {
+        typealias Capture = @convention(c) (CGRect, UInt32, UInt32, UInt32) -> Unmanaged<CGImage>?
+        guard let handle = dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", RTLD_NOW),
+              let symbol = dlsym(handle, "CGWindowListCreateImage") else { return nil }
+        let capture = unsafeBitCast(symbol, to: Capture.self)
+        let including: UInt32 = 1 << 3 // kCGWindowListOptionIncludingWindow
+        let options: UInt32 = (1 << 0) | (1 << 3) // kCGWindowImageBoundsIgnoreFraming | kCGWindowImageBestResolution
+        return capture(.null, including, UInt32(w.windowNumber), options)?.takeRetainedValue()
     }
 }
