@@ -68,23 +68,24 @@ public static class UpdateWatch
     // ---- opening again after an update ----
 
     /// <summary>
-    /// Opened again by an update: as the window was left — in front as usual; minimized, without taking the front from
-    /// what the student is in (it was behind other windows, or minimized); or in the notification area, out of sight
-    /// (its window closed there), shown a moment minimized so it starts as ever, then put away.
+    /// Opened again by an update: (0.3.79) in front, over whatever else is open, however the window was left — before,
+    /// one left behind other windows or in the notification area opened again minimized or out of sight there, and an
+    /// update, which goes in by itself when the window is not in use, looked like Simpl had closed (its What's New over a
+    /// window nobody saw). Raised over the others even when Windows keeps the focus where it is.
     /// </summary>
     private static void Reopen(MainWindow main)
     {
-        var how = Updates.Resumed?.Window;
-        if (how is not ("behind" or "hidden")) return;
-        main.ShowActivated = false;
-        main.WindowState = WindowState.Minimized;
-        main.Loaded += (_, _) =>
+        if (Updates.Resumed is not { } r) return;
+        void Front(object? sender, EventArgs e)
         {
-            main.ShowActivated = true;
-            if (how != "hidden") return;
-            main.Hide();
-            Log.Write("update: opened again in the notification area, as it was left");
-        };
+            main.ContentRendered -= Front;
+            if (main.WindowState == WindowState.Minimized) main.WindowState = WindowState.Normal;
+            main.Topmost = true; // (over the other windows, whether or not Windows lets it take the focus)
+            main.Activate();
+            main.Topmost = false;
+            Log.Write($"update: opened again in front (the window was {r.Window})");
+        }
+        main.ContentRendered += Front;
     }
 
     /// <summary>Where the window is: its place and what is opened on it, and how it stands.</summary>

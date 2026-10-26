@@ -867,7 +867,7 @@ public sealed partial class CalendarScreen : Screen
             Read();
             engine.DataChanged();
             await Task.Delay(1500);
-            PlanSheet.Show(engine, ev, Window.GetWindow(page), PlanChanged, edit);
+            PlanSheet.Show(engine, ev, Window.GetWindow(page), PlanChanged, edit, BlockOf(ev)); // (0.3.79: by its block)
             Log.Write($"calendar: plan popup opened{(edit ? " at its Edit" : "")} for {row.Id}");
             await Task.Delay(1500);
         }
@@ -923,5 +923,21 @@ public sealed partial class CalendarScreen : Screen
             Log.Write($"calendar: the week's menu open, {WeekDays} days shown");
         }
         finally { Shot.Ended(); }
+    }
+
+    /// <summary>(0.3.79) An item's block on the page as drawn (its button, known by the preview's key), for a popup opened
+    /// beside it; null when it is not in view.</summary>
+    private FrameworkElement? BlockOf(CalEvent ev)
+    {
+        var key = CalendarPeek.KeyOf(ev);
+        FrameworkElement? found = null;
+        void Look(DependencyObject d)
+        {
+            if (found != null) return;
+            if (d is System.Windows.Controls.Primitives.ButtonBase { IsVisible: true } b && Equals(b.Tag, key)) { found = b; return; }
+            for (var i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(d); i++) Look(System.Windows.Media.VisualTreeHelper.GetChild(d, i));
+        }
+        Look(page);
+        return found;
     }
 }

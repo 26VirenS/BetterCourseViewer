@@ -318,7 +318,7 @@ public sealed partial class CalendarScreen
         if (CalendarKit.IsPlan(ev) && CalendarKit.Text(ev.PlanId) != null)
         {
             peek.Dismiss();
-            PlanSheet.Show(engine, ev, Window.GetWindow(page), PlanChanged);
+            PlanSheet.Show(engine, ev, Window.GetWindow(page), PlanChanged, beside: b); // (0.3.79: by its block)
         }
         else peek.Press(ev, b);
     }
@@ -364,7 +364,7 @@ public sealed partial class CalendarScreen
             if (planned != null)
             {
                 if (m.Items.Count > 0) m.Items.Add(new Separator());
-                m.Items.Add(CalendarKit.Item("Edit Plan…", SymbolRegular.Edit24, () => PlanSheet.Show(engine, ev, Window.GetWindow(page), PlanChanged, editing: true)));
+                m.Items.Add(CalendarKit.Item("Edit Plan…", SymbolRegular.Edit24, () => PlanSheet.Show(engine, ev, Window.GetWindow(page), PlanChanged, editing: true, beside: b)));
                 m.Items.Add(CalendarKit.Item("Move Plan…", SymbolRegular.Clock24, () => PlanRail.Open(b, planned, ev.Title, engine, Read)));
                 m.Items.Add(CalendarKit.Item("Delete Plan", SymbolRegular.CalendarCancel24, () => _ = DeletePlan(planned)));
             }

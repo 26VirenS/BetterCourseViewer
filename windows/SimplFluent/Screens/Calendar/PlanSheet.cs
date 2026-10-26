@@ -24,7 +24,7 @@ internal static class PlanSheet
 {
     private static readonly CultureInfo En = CultureInfo.InvariantCulture;
 
-    public static async void Show(Engine.Engine engine, CalEvent ev, Window? over, Action changed, bool editing = false)
+    public static async void Show(Engine.Engine engine, CalEvent ev, Window? over, Action changed, bool editing = false, FrameworkElement? beside = null)
     {
         if (CalendarKit.Text(ev.PlanId) is not { } pid) return;
         PlanDetail d;
@@ -34,7 +34,7 @@ internal static class PlanSheet
         var holder = new ContentControl { Focusable = false };
         var problem = K.Wrapped("", Ty.Caption, B.Caution);
         problem.Visibility = Visibility.Collapsed;
-        var s = new Sheet { Title = "Plan", Body = K.V(12, holder, problem), Width = 420, Floats = true, Light = true, Name = "Plan" };
+        var s = new Sheet { Title = "Plan", Body = K.V(12, holder, problem), Width = 420, Floats = true, Light = true, Name = "Plan", Anchor = beside };
         var url = CalendarKit.Text(d.Url);
         var open = s.Add("Open", SheetButtonKind.Secondary, () => { if (url != null) engine.OpenWeb(url, d.Title); });
         // (what these do is set below, once everything it uses is made)

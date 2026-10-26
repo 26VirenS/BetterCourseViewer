@@ -245,7 +245,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         engine.QuizRequested += q => Simpl.Screens.QuizPopup.Show(engine, q, this);
         engine.AltaRequested += a => Simpl.Screens.AltaPopup.Show(engine, a, this);
         engine.SettingsRequested += OpenSettings;
-        engine.WhatsNewRequested += d => { WhatsNew.MarkSeen(); WhatsNewSheet.Show(d, this); };
+        engine.WhatsNewRequested += d => WhenInSight(() => { WhatsNew.MarkSeen(); WhatsNewSheet.Show(d, this); });
         engine.SetupRequested += () => SetupSheet.Show(engine, this);
         engine.NewMessageRequested += () => Simpl.Screens.ComposeSheet.Show(engine, this);
         Simpl.Screens.CourseCompose.Hook = (to, context) => Simpl.Screens.ComposeSheet.Show(engine, this, new[] { to }, context);
@@ -517,6 +517,23 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         sheets.Show(s);
         // (the screenshot suite's sign-in, answered as it would be: kept)
         if (Launch.Get("sign-in") != null && Launch.Get("stay") == "yes") Dispatcher.BeginInvoke(() => { e.Login.Stay(true); s.Close(); });
+    }
+
+    /// <summary>(0.3.79) Done now if the window is in view, else as soon as it is (shown from the notification area,
+    /// restored from the taskbar): What's New, never shown over a window nobody sees and so never counted seen unseen.</summary>
+    private void WhenInSight(Action a)
+    {
+        if (IsVisible && WindowState != WindowState.Minimized) { a(); return; }
+        // (activated, or restored: whichever Windows says last, the window is in view by then)
+        void Seen(object? sender, EventArgs e)
+        {
+            if (!IsVisible || WindowState == WindowState.Minimized) return;
+            Activated -= Seen;
+            StateChanged -= Seen;
+            a();
+        }
+        Activated += Seen;
+        StateChanged += Seen;
     }
 
     // ---- Settings, the account's own windows ----

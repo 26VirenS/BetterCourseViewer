@@ -43,6 +43,8 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
     private readonly Grid root = new();
     /// <summary>Where it was moved to, from where it opens (the middle of the window).</summary>
     private Vector offset;
+    /// <summary>(0.3.79) Opened beside what it is about (Sheet.Anchor): its offset kept from the room's corner.</summary>
+    private bool anchored;
     /// <summary>A large one's step down and along from the large ones already open over its window (none: the first).</summary>
     private Vector cascade;
     /// <summary>A large one's size as the student gave it by its edges — now, or an earlier time (kept by its sheet's
@@ -297,10 +299,41 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
         if (room.IsEmpty || whole.IsEmpty) return;
         card.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         SizeTo(card.DesiredSize);
-        var at = Centre(room, whole, card.DesiredSize) + offset;
+        // (0.3.79) beside what it is about, where it has one: kept from the window's corner after that, so it moves with
+        // the window as any popup does and stays where it opened as it grows (a plan's popup turned to its Edit)
+        if (Beside(sheet.Anchor, room, whole, card.DesiredSize) is { } by)
+        {
+            anchored = true;
+            offset = by - room.TopLeft;
+        }
+        var at = Basis(room, whole, card.DesiredSize) + offset;
         Left = at.X;
         Top = at.Y;
         Said("opens at");
+    }
+
+    /// <summary>(0.3.79) Where a popup opens beside the element it is about (Sheet.Anchor), in screen units: on its right
+    /// where there is room for it, else on its left, else over it where there is most room; its top level with the
+    /// element's, kept inside the window's room. Null when it has none, or it is not in view.</summary>
+    private static Point? Beside(FrameworkElement? anchor, Rect room, Rect whole, Size size)
+    {
+        if (anchor is not { IsVisible: true } || PresentationSource.FromVisual(anchor) is not { CompositionTarget: { } target }) return null;
+        Rect r;
+        try
+        {
+            var a = target.TransformFromDevice.Transform(anchor.PointToScreen(new Point(0, 0)));
+            var b = target.TransformFromDevice.Transform(anchor.PointToScreen(new Point(anchor.ActualWidth, anchor.ActualHeight)));
+            r = new Rect(a, b);
+        }
+        catch (InvalidOperationException) { return null; }
+        const double gap = 8;
+        var m = Gap(room);
+        double x;
+        if (r.Right + gap + size.Width <= whole.Right - m) x = r.Right + gap;
+        else if (r.Left - gap - size.Width >= whole.Left + m) x = r.Left - gap - size.Width;
+        else x = Math.Clamp(r.Right - size.Width, whole.Left + m, Math.Max(whole.Left + m, whole.Right - m - size.Width));
+        var y = Math.Clamp(r.Top - 12, room.Top + m, Math.Max(room.Top + m, room.Bottom - m - size.Height));
+        return new Point(x, y);
     }
 
     /// <summary>The window as large as its card (not while the student sizes it by its edges: the card follows it then).</summary>
@@ -360,7 +393,7 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
         Remember(sheet.SizeKey, size);
         var room = Room();
         var whole = Whole();
-        if (!room.IsEmpty && !whole.IsEmpty) offset = new Point(Left, Top) - Centre(room, whole, new Size(ActualWidth, ActualHeight));
+        if (!room.IsEmpty && !whole.IsEmpty) offset = new Point(Left, Top) - Basis(room, whole, new Size(ActualWidth, ActualHeight));
         Fit();
         Place();
         Said("sized by its edges to");
@@ -377,15 +410,20 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
         placing = true;
         try
         {
-            var at = Centre(room, whole, new Size(ActualWidth, ActualHeight)) + offset;
+            var at = Basis(room, whole, new Size(ActualWidth, ActualHeight)) + offset;
             const double keep = 120;
             var x = Math.Clamp(at.X, whole.Left - ActualWidth + keep, Math.Max(whole.Left - ActualWidth + keep, whole.Right - keep));
             var y = Math.Clamp(at.Y, whole.Top, Math.Max(whole.Top, whole.Bottom - 48));
+            // (one opened beside what it is about, grown taller: lifted so its foot — Done, Delete — stays in the window)
+            if (anchored) y = Math.Max(room.Top + Gap(room), Math.Min(y, room.Bottom - Gap(room) - ActualHeight));
             if (Math.Abs(Left - x) > 0.5) Left = x;
             if (Math.Abs(Top - y) > 0.5) Top = y;
         }
         finally { placing = false; }
     }
+
+    /// <summary>What its offset is kept from: the room's corner for one opened beside what it is about, else the centre.</summary>
+    private Point Basis(Rect room, Rect whole, Size size) => anchored ? room.TopLeft : Centre(room, whole, size);
 
     /// <summary>Where it opens: centred in the window, kept inside it.</summary>
     private Point Centre(Rect room, Rect whole, Size size)
@@ -445,7 +483,7 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
                 NoBoxes();
             }
         }
-        if (!room.IsEmpty && !whole.IsEmpty) offset = new Point(Left, Top) - Centre(room, whole, new Size(ActualWidth, ActualHeight));
+        if (!room.IsEmpty && !whole.IsEmpty) offset = new Point(Left, Top) - Basis(room, whole, new Size(ActualWidth, ActualHeight));
         Place();
     }
 

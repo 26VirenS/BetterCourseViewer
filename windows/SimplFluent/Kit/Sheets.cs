@@ -90,6 +90,10 @@ public class Sheet
     /// first setup, the sign-in's questions and the questions that must be answered first ("Discard changes?").
     /// </summary>
     public bool Floats { get; set; }
+    /// <summary>(0.3.79) Floating, opened beside this — a calendar item's popup by its block, as the Mac's popover is —
+    /// on its right where there is room, else its left, its top level with it, kept inside the window; moved with the
+    /// window after that as any popup is. None (or not in view): centred, as before.</summary>
+    public FrameworkElement? Anchor { get; set; }
     /// <summary>(0.3.64, the owner's #241) Floating, a light one — something to read, or a switch or a button to press, no
     /// form to fill (What's New, the Calendar's Calendars and Find Appointment, the pane's History and Help): a click
     /// anywhere in the window it floats over closes it, and the click still does what it does there.</summary>

@@ -36,8 +36,7 @@ public static class Placement
             w.Left = Math.Clamp(r.X, area.Left, Math.Max(area.Left, area.Right - wdt));
             w.Top = Math.Clamp(r.Y, area.Top, Math.Max(area.Top, area.Bottom - hgt));
             w.WindowStartupLocation = WindowStartupLocation.Manual;
-            // (not the main window opened out of sight by an update: maximizing it would bring it to the front)
-            if (Prefs.Bool($"window:{key}:max") && !(key == "main" && Updates.ReopensOutOfSight)) w.Loaded += (_, _) => w.WindowState = WindowState.Maximized;
+            if (Prefs.Bool($"window:{key}:max")) w.Loaded += (_, _) => w.WindowState = WindowState.Maximized;
             return;
         }
         w.Width = Math.Min(width, room.Width);

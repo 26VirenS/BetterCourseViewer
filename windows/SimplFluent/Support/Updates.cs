@@ -1181,10 +1181,6 @@ public static partial class Updates
     /// <summary>Opened again by an update, within half an hour of it: where the window was (read once, as Simpl starts).</summary>
     public static Resume? Resumed { get; private set; }
 
-    /// <summary>The window opens out of sight (minimized, or in the notification area): it takes nothing from what is in
-    /// front, and is not maximized as it opens (Placement).</summary>
-    public static bool ReopensOutOfSight => Resumed?.Window is "behind" or "hidden";
-
     private static void Remember()
     {
         var where = Where?.Invoke() ?? new Resume();
