@@ -388,6 +388,10 @@ jobs:
           # (0.3.62) the week over its hours in dark, and a plan put on it and moved an hour on by planMove (the log says so)
           Shot 'calendar-week-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'calendar', '--cal-view', 'week'))
           Shot 'calendar-week-plan' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'calendar', '--cal-view', 'week', '--open', 'cal-plan'))
+          # (0.3.66) a plan's popup on the week, and its Edit in light and dark (a piece of work planned for each; the log says so)
+          Shot 'calendar-plan-popup' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'calendar', '--cal-view', 'week', '--open', 'cal-plan-popup'))
+          Shot 'calendar-plan-edit' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'calendar', '--cal-view', 'week', '--open', 'cal-plan-edit'))
+          Shot 'calendar-plan-edit-dark' '1366x778' 50 ($mock + @('--appearance', 'dark', '--place', 'calendar', '--cal-view', 'week', '--open', 'cal-plan-edit'))
           # (0.3.63) the week with To Do beside it and a row of To Do held over Wednesday at 1 PM, where it would be planned
           Shot 'calendar-week-todo-drop' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'calendar', '--cal-view', 'week', '--open', 'cal-todo-drop'))
           Shot 'calendar-list' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'calendar', '--cal-view', 'list'))
@@ -1454,6 +1458,13 @@ jobs:
             $l = PhoneLog 'calendar-week-plan'
             Write-Host "calendar-week-plan: $((@($l -split "`n" | Where-Object { $_ -match 'calendar: ' }) -join ' | '))"
             if ($l -notmatch 'calendar: plan put .+, moved to ') { Write-Host "::error::calendar-week-plan: no plan was put and moved before the picture (shots/profile-calendar-week-plan.log)"; exit 1 }
+          }
+          # (0.3.66) a plan's popup, and its Edit, opened before each picture (Screens/Calendar/CalendarScreen.cs ShotPlanPopup)
+          foreach ($p in @('calendar-plan-popup', 'calendar-plan-edit', 'calendar-plan-edit-dark')) {
+            if ($script:mine -notcontains $p) { continue }
+            $l = PhoneLog $p
+            Write-Host "${p}: $((@($l -split "`n" | Where-Object { $_ -match 'calendar: ' }) -join ' | '))"
+            if ($l -notmatch 'calendar: plan popup opened') { Write-Host "::error::${p}: the plan's popup was not opened before the picture (shots/profile-$p.log)"; exit 1 }
           }
           # (0.3.64) To Do & Calendar: To Do's menu and Week's menu open, the week pinched to the whole day, and the week
           # scrolled with something waiting at its edges, before each picture (Screens/Calendar/CalendarTodo.cs TodoShots,
