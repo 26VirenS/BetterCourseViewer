@@ -3360,8 +3360,10 @@ try {
   check(!discBare.head && !discBare.backRow, `a discussion has no section header over it and no row for the way back: ${JSON.stringify(discBare)}`);
   await page.fill('.bcv-reply textarea', 'My question is about removable discontinuities.');
   await page.click('.bcv-reply .bcv-btn--primary');
-  await page.waitForFunction(() => document.querySelectorAll('.bcv-entry').length === 3, null, { timeout: 10000 });
-  check(true, 'reply posted to the discussion entries API');
+  // (the thread drawn again with the reply in it: the mock keeps what is posted. Waiting for the three there were before
+  // passed only when it read the page before the redraw — under load it read the redraw, four, and waited out its time)
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-entry').length === 4 && [...document.querySelectorAll('.bcv-entry')].some((e) => /removable discontinuities/.test(e.textContent)), null, { timeout: 10000 });
+  check(!(await page.$eval('.bcv-reply textarea', (t) => t.value)), 'reply posted to the discussion entries API, and the thread drawn again with it (the box emptied)');
   // a reply aimed at one post can be aimed at the thread again: Reply on an entry names it, Cancel reply-to takes it back
   await page.click('.bcv-entry .bcv-entry__action');
   const replyAimed = (await texts('.bcv-reply__title'))[0];
