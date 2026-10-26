@@ -32,7 +32,8 @@ struct PlanPopover: View {
         }
         .font(.sBody)
         .padding(18)
-        .frame(width: 340)
+        // (wider while editing: the two times and the ten colours each take a row's whole width beside the names)
+        .frame(width: editing && detail != nil ? 384 : 340)
         .animation(reduceMotion ? nil : Motion.snappy, value: editing)
         .task { await load() }
     }
@@ -54,9 +55,10 @@ struct PlanPopover: View {
                 if d.members.isEmpty {
                     GridRow {
                         key("For")
-                        HStack(spacing: 6) {
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
                             Circle().fill(Color(hex: d.color ?? "#0a84ff")).frame(width: 9, height: 9)
-                            Text(forWords(d)).lineLimit(2)
+                                .alignmentGuide(.firstTextBaseline) { $0[.bottom] + 1 }
+                            Text(forWords(d)).fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     if let due = d.dueWords, !due.isEmpty { fact("Due", due) }
@@ -123,6 +125,7 @@ struct PlanPopover: View {
         Text(k)
             .font(.sFootnote.weight(.semibold))
             .foregroundStyle(.secondary)
+            .fixedSize() // (the names whole, whatever the row beside them asks for)
             .gridColumnAlignment(.trailing)
     }
 
