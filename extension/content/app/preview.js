@@ -186,6 +186,17 @@
     panel.style.height = `${Math.round(Math.min(CARD_H, vh - 2 * M))}px`;
     const a = anchor?.isConnected ? anchor.getBoundingClientRect() : null;
     const hgt = panel.getBoundingClientRect().height;
+    // (2.99.113) an item on the calendar (a block of the week, a chip of the month, a row of To Do beside it): beside it, as
+    // a calendar app has it — to its right where there is room, else its left — level with it, kept inside the window
+    if (a && a.width <= 420 && anchor.closest?.('.bcv-cal, .bcv-cal__todo')) {
+      const right = vw - a.right - 10 - M >= w || vw - a.right >= a.left;
+      const sx = Math.max(M, Math.min(right ? a.right + 10 : a.left - 10 - w, vw - M - w));
+      const sy = Math.max(M, Math.min(a.top + a.height / 2 - 60, vh - M - hgt));
+      panel.style.left = `${Math.round(sx)}px`;
+      panel.style.top = `${Math.round(sy)}px`;
+      panel.style.transformOrigin = `${right ? 0 : w}px ${Math.round(Math.max(0, Math.min(hgt, a.top + a.height / 2 - sy)))}px`;
+      return;
+    }
     const x = Math.max(M, Math.min(a ? a.left + Math.min(a.width, 640) / 2 - w / 2 : (vw - w) / 2, vw - M - w));
     let y = a ? a.bottom + 8 : (vh - hgt) / 2;
     if (a && y + hgt > vh - M && a.top - 8 - hgt >= M) y = a.top - 8 - hgt;

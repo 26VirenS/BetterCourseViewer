@@ -28,6 +28,11 @@
     lock: 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.113', date: '2026-10-26', notes: [
+      { kind: 'new', title: 'Plans Are Events', body: 'Edit a plan: its name, time, repeat, alert and notes.', icon: P.cal },
+      { kind: 'improved', title: 'Beside the Item', body: 'Popups on the calendar open next to what you pressed.', icon: P.layers },
+      { kind: 'new', title: 'Pull to Lengthen', body: 'Pull a plan’s bottom edge to make it longer.', icon: P.arrows },
+    ] },
     { version: '2.99.112', date: '2026-10-25', notes: [
       { kind: 'new', title: 'To Do & Calendar', body: 'To Do and the calendar are now one tab.', icon: P.cal },
       { kind: 'new', title: 'Pinch the Week', body: 'Pinch the hours to see more or less of the day.', icon: P.arrows },

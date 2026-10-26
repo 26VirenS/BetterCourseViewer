@@ -40,6 +40,8 @@
 
   // ---- the plans ------------------------------------------------------------------------------------
   // prefs 'plans' (this Canvas's own): itemId -> { at, mins, title, url, course, color, due, ev } — ev: the Canvas event it was sent as
+  // (2.99.113) and, a plan being an event of its own (Calendar → a plan → Edit): name, allDay, repeat, alert, notes and
+  // tint (a colour of its own), each there only when set, kept when the plan is moved or given another time
   let plans = {};
   let loaded = null;
   const listeners = new Set();
@@ -66,12 +68,14 @@
 
   const lengthFor = (it) => (/quiz|discussion/.test(it.type || '') ? 30 : 60);
   const isDoneWork = (it) => !!(it.complete || it.submitted || it.graded || it.dismissed || it.excused);
+  const KEEP = ['name', 'repeat', 'alert', 'notes', 'tint']; // (what Edit set, kept through a new time)
+  const kept = (p) => Object.fromEntries(KEEP.filter((k) => p?.[k] != null && p[k] !== '').map((k) => [k, p[k]]));
   async function put(it, at, mins) {
     const prev = plans[it.id] || null;
-    const plan = { at: new Date(at).toISOString(), mins, title: it.title, url: it.url || '', course: it.custom ? (it.course?.name || 'My task') : (it.courseName || ''), color: it.course?.color || null, due: it.date ? new Date(it.date).toISOString() : null, ev: prev?.ev || null };
+    const plan = { at: new Date(at).toISOString(), mins, title: it.title, url: it.url || '', course: it.custom ? (it.course?.name || 'My task') : (it.courseName || ''), color: it.course?.color || null, due: it.date ? new Date(it.date).toISOString() : null, ev: prev?.ev || null, ...kept(prev) };
     const patch = { [it.id]: plan };
     const cut = Date.now() - 30 * DAY; // (plans a month past are let go)
-    for (const [k, p] of Object.entries(plans)) if (k !== it.id && Date.parse(p.at) < cut) patch[k] = null;
+    for (const [k, p] of Object.entries(plans)) if (k !== it.id && !p.repeat && Date.parse(p.at) < cut) patch[k] = null; // (a repeating one goes on)
     plans = Object.fromEntries(Object.entries({ ...plans, ...patch }).filter(([, v]) => v));
     changed();
     await store.mergePref('plans', patch);
@@ -86,6 +90,41 @@
     changed();
     await store.mergePref('plans', { [id]: next });
     return next;
+  }
+  /** (2.99.113) A plan's own settings changed (Calendar → a plan → Edit): { name, at, mins, allDay, repeat, alert, notes,
+   *  tint } — one left empty (or null) is taken off. */
+  async function edit(id, fields) {
+    const p = plans[id];
+    if (!p) return null;
+    const next = { ...p };
+    for (const [k, v] of Object.entries(fields)) {
+      if (v == null || v === '' || v === false) delete next[k];
+      else next[k] = k === 'at' ? new Date(v).toISOString() : v;
+    }
+    next.mins = Math.max(15, Math.min(24 * 60, Number(next.mins) || 60));
+    plans = { ...plans, [id]: next };
+    changed();
+    await store.mergePref('plans', { [id]: next });
+    return next;
+  }
+  const REPEATS = [['', 'Never'], ['day', 'Every day'], ['week', 'Every week'], ['2week', 'Every 2 weeks'], ['month', 'Every month']];
+  const ALERTS = [[null, 'None'], [0, 'At the time'], [5, '5 minutes before'], [10, '10 minutes before'], [15, '15 minutes before'], [30, '30 minutes before'], [60, '1 hour before'], [1440, '1 day before']];
+  /** When a plan falls in [from, to): its own time, and, repeating, each time after it (a hundred at most). */
+  function occurrences(p, from, to) {
+    const a = Date.parse(p.at);
+    if (!a) return [];
+    if (!p.repeat) return a >= from && a < to ? [a] : [];
+    const out = [];
+    const d = new Date(a);
+    for (let i = 0; i < 400 && d.getTime() < to && out.length < 100; i++) {
+      if (d.getTime() >= from) out.push(d.getTime());
+      if (p.repeat === 'day') d.setDate(d.getDate() + 1);
+      else if (p.repeat === 'week') d.setDate(d.getDate() + 7);
+      else if (p.repeat === '2week') d.setDate(d.getDate() + 14);
+      else if (p.repeat === 'month') d.setMonth(d.getMonth() + 1);
+      else break;
+    }
+    return out;
   }
   async function clear(id) {
     const prev = plans[id];
@@ -495,5 +534,5 @@
     return rowEl;
   }
 
-  BCV.plan = { ready, get, all, onChange, put, move, clear, attach, pill, open: openBar, close: closeBar, freeSlots, slotsFor, slotOn, linked, linkedEvents, sending, setSending, canSend, retireSending, whenWords, dayWord, lenWord, lengthFor };
+  BCV.plan = { ready, get, all, onChange, put, move, edit, occurrences, REPEATS, ALERTS, clear, attach, pill, open: openBar, close: closeBar, freeSlots, slotsFor, slotOn, linked, linkedEvents, sending, setSending, canSend, retireSending, whenWords, dayWord, lenWord, lengthFor };
 })();

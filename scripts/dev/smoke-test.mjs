@@ -1843,6 +1843,7 @@ try {
   await page.waitForSelector('.bcv-week__body', { timeout: 5000 });
   const planBlock = await page.$('.bcv-wev.bcv-ev--plan');
   if (planBlock) {
+    await planBlock.scrollIntoViewIfNeeded(); // (2.99.112: the day's hours scroll inside the card)
     const before = (await prefPlans())[target.id];
     const at0 = new Date(before.at);
     const dir = at0.getHours() >= 12 ? -1 : 1;
@@ -1862,6 +1863,19 @@ try {
     check(!!after && after.mins === before.mins && !!midTime && !sheetOpened && /\/calendar/.test(page.url()),
       `a plan's block dragged an hour on the week: it moves a quarter of an hour at a time (half way: ${midTime}), kept an hour ${dir > 0 ? 'later' : 'earlier'} as it is let go, its length kept, nothing opened: ${JSON.stringify({ before: before.at, after: after?.at })}`);
     await shot(page, '07c-calendar-week-plan');
+    // (2.99.113) its foot pulled down an hour: the plan is an hour longer, a quarter of an hour at a time, its start kept
+    const pb = await page.$('.bcv-wev.bcv-ev--plan');
+    await pb.scrollIntoViewIfNeeded();
+    const gb = await pb.boundingBox();
+    const mins0 = (await prefPlans())[target.id].mins;
+    await page.mouse.move(gb.x + gb.width / 2, gb.y + gb.height - 3);
+    await page.mouse.down();
+    await page.mouse.move(gb.x + gb.width / 2, gb.y + gb.height + 21, { steps: 4 });
+    const midLen = await page.$eval('.bcv-wev.bcv-ev--plan.is-stretching .bcv-wev__time', (e) => e.textContent).catch(() => null);
+    await page.mouse.move(gb.x + gb.width / 2, gb.y + gb.height + 45, { steps: 4 });
+    await page.mouse.up();
+    const longer = await untilV(async () => { const p = (await prefPlans())[target.id]; return p && p.mins === mins0 + 60 ? p : null; });
+    check(!!longer && Date.parse(longer.at) === want && / – /.test(midLen || '') && !(await page.$('.bcv-evsheet')), `its foot pulled down an hour, the plan is an hour longer — its times said as it is pulled (${midLen}) — its start kept, nothing opened: ${JSON.stringify({ mins0, mins: longer?.mins })}`);
   }
   // (2.99.110) To Do beside the week: what is still to do, grouped by when it is due; a piece of work dragged out of it
   // onto a day's hours is planned there, a quarter of an hour at a time (a block showing where as it is held); let go
@@ -1931,12 +1945,37 @@ try {
   }
   await page.click('.bcv-seg__btn[data-value="month"]');
   await page.waitForSelector('.bcv-cal__grid', { timeout: 5000 });
+  // (2.99.113) a press on the plan: its popover beside it, as a calendar app has it — the page not dimmed, the tools left in
+  // the bar — Edit first, then Open
   await page.click('.bcv-ev--plan');
   await page.waitForSelector('.bcv-evsheet', { timeout: 5000 });
-  const planSheet = await page.evaluate(() => { const sh = document.querySelector('.bcv-evsheet'); return { kicker: sh.querySelector('.bcv-evsheet__kicker').textContent, rows: [...sh.querySelectorAll('.bcv-evsheet__k')].map((k) => k.textContent), btns: [...sh.querySelectorAll('.bcv-evsheet__foot button')].map((b) => b.textContent) }; });
-  check(planSheet.kicker === 'Plan' && planSheet.rows.slice(0, 2).join('|') === 'When|For' && planSheet.btns.join('|') === 'Open|Move|Clear plan', `a press on the plan: its sheet, with Open, Move and Clear plan: ${JSON.stringify(planSheet)}`);
-  await page.click('.bcv-evsheet__clear');
-  check(await eventually(async () => !(await page.$('.bcv-ev--plan')) && !(await prefPlans())[target.id] && (await ownEvents()).length === 0, 10000), 'Clear plan: off the month, out of the preferences, and off the Canvas calendar');
+  const planSheet = await page.evaluate(() => { const sh = document.querySelector('.bcv-evsheet'); const c = document.querySelector('.bcv-ev--plan').getBoundingClientRect(); const r = sh.getBoundingClientRect(); return { kicker: sh.querySelector('.bcv-evsheet__kicker').textContent, rows: [...sh.querySelectorAll('.bcv-evsheet__k')].map((k) => k.textContent), btns: [...sh.querySelectorAll('.bcv-evsheet__foot button')].map((b) => b.textContent), beside: r.left >= c.right - 1 || r.right <= c.left + 1, level: r.top <= c.bottom && r.bottom >= c.top, dim: getComputedStyle(sh.parentElement).backgroundColor }; });
+  check(planSheet.kicker === 'Plan' && planSheet.rows.slice(0, 2).join('|') === 'When|For' && planSheet.btns.join('|') === 'Edit|Open' && planSheet.beside && planSheet.level && planSheet.dim === 'rgba(0, 0, 0, 0)', `a press on the plan: its popover beside it, the page not dimmed, with Edit and Open: ${JSON.stringify(planSheet)}`);
+  await shot(page, '06h-calendar-plan-popover');
+  // Edit: its own name, a weekly repeat, an alert and notes — on the grid, and in Simpl's calendar as a calendar app reads them
+  await page.click('.bcv-evsheet__edit');
+  await page.waitForSelector('.bcv-evedit__name', { timeout: 3000 });
+  const editRows = await texts('.bcv-evedit__k');
+  await page.fill('.bcv-evedit__name', 'Read and outline');
+  await page.click('.bcv-evedit__pick >> nth=0');
+  await page.locator('.bcv-menu__item', { hasText: 'Every week' }).click();
+  await page.click('.bcv-evedit__pick >> nth=1');
+  await page.locator('.bcv-menu__item', { hasText: '15 minutes before' }).click();
+  await page.fill('.bcv-evedit__notes', 'Pages 1 to 20');
+  await shot(page, '06i-calendar-plan-edit');
+  await page.click('.bcv-evedit__done');
+  const edited = await untilV(async () => { const p = (await prefPlans())[target.id]; return p?.name === 'Read and outline' && p.repeat === 'week' && p.alert === 15 && p.notes === 'Pages 1 to 20' ? p : null; });
+  const fed = await untilV(async () => { const t = await feedText(); return t && t.includes('SUMMARY:Read and outline') ? t : null; }, 15000);
+  const chipsNow = await page.$$eval('.bcv-ev--plan', (els) => els.map((e) => e.textContent.trim()));
+  check(editRows.join('|') === 'Day|All day|Repeat|Alert|Colour' && !!edited && chipsNow.length >= 1 && chipsNow.every((t) => t === 'Read and outline') && !!fed && /RRULE:FREQ=WEEKLY/.test(fed) && /TRIGGER:-PT15M/.test(fed) && fed.includes('DESCRIPTION:Pages 1 to 20'),
+    `Edit names the plan, repeats it weekly with an alert a quarter of an hour before and notes — on the month by its name, and in Simpl's calendar with its repeat and alert: ${JSON.stringify({ editRows, chipsNow, rrule: /RRULE:FREQ=WEEKLY/.test(fed || ''), alarm: /TRIGGER:-PT15M/.test(fed || '') })}`);
+  // and Delete plan, in Edit, takes it away
+  await page.click('.bcv-ev--plan');
+  await page.waitForSelector('.bcv-evsheet__edit', { timeout: 5000 });
+  await page.click('.bcv-evsheet__edit');
+  await page.waitForSelector('.bcv-evedit__del', { timeout: 3000 });
+  await page.click('.bcv-evedit__del');
+  check(await eventually(async () => !(await page.$('.bcv-ev--plan')) && !(await prefPlans())[target.id] && (await ownEvents()).length === 0, 10000), 'Delete plan: off the month, out of the preferences, and off the Canvas calendar');
   // put back as it was: Simpl's calendar stopped (its link no longer opens), the calendar unlinked
   await openSync();
   const stopId = (await feedState())?.id;

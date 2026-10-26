@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.112"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.113"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -5502,6 +5502,48 @@ html[data-bcv-theme="light"] .bcv-spot { --bcv-spot-shade: .24; }
 .bcv-evsheet__prose { font-size: 13.5px; }
 .bcv-evsheet__foot { padding: 14px 22px 18px; border-top: 1px solid var(--bcv-sep); display: flex; align-items: center; gap: 10px; }
 .bcv-evsheet__times { margin-left: auto; }
+/* (2.99.113) An event's popover, beside it as a calendar app has it: the page left as it is under it — no dim, no blur, the
+   pinned tools left in the bar (.bcv-sheet-ov--float) — growing out of the side it hangs from (ui.anchor sets the
+   origin), a press anywhere else closing it (calendar.js openEvent) */
+.bcv-sheet-ov--pop { display: block; padding: 0; background: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; animation: none; }
+.bcv-sheet-ov--pop > .bcv-evpop { position: fixed; width: 340px; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px); overflow: auto; overscroll-behavior: contain; box-shadow: var(--bcv-shadow-glass), 0 18px 48px rgba(0,0,0,.16); animation: bcv-pop var(--bcv-t-snappy) var(--bcv-spring-snappy) backwards; }
+.bcv-evpop .bcv-sheet__head { padding: 16px 18px 8px; }
+.bcv-evpop .bcv-evsheet__title { font-size: 16.5px; }
+.bcv-evpop .bcv-evsheet__list { padding: 4px 18px 14px; gap: 9px; }
+.bcv-evpop .bcv-evsheet__row { grid-template-columns: 62px minmax(0, 1fr); font-size: 13px; }
+.bcv-evpop .bcv-evsheet__k { font-size: 12px; }
+.bcv-evpop .bcv-evsheet__foot { padding: 12px 18px 14px; gap: 8px; }
+.bcv-evpop .bcv-evsheet__foot > .bcv-btn { flex: 1; justify-content: center; }
+.bcv-evpop__notes { white-space: pre-wrap; color: var(--bcv-ink2); }
+/* (2.99.113) a plan's settings, in its popover: its name, the day, all day or its times, a repeat, an alert, a colour, notes */
+.bcv-evedit { display: flex; flex-direction: column; gap: 10px; padding: 4px 18px 14px; }
+.bcv-evedit__name { width: 100%; box-sizing: border-box; height: 36px; padding: 0 12px; border-radius: 10px; border: 0 !important; outline: none; background: var(--bcv-fill) !important; font: 600 14.5px/1 var(--bcv-font); color: var(--bcv-ink) !important; }
+.bcv-evedit__name:focus, .bcv-evedit__notes:focus { box-shadow: 0 0 0 2px var(--bcv-blue-soft, rgba(10,132,255,.35)); }
+.bcv-evedit__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 30px; font: 400 13px/1.3 var(--bcv-font); }
+.bcv-evedit__k { font: 600 12.5px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-evedit__v { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.bcv-evedit__times { display: flex; align-items: center; gap: 6px; }
+.bcv-evedit__times[hidden] { display: none; }
+.bcv-evedit__time { flex: 1 1 0; min-width: 0; height: 32px !important; font-size: 13px !important; padding-right: 26px !important; }
+.bcv-evedit__to { flex: none; font: 500 12px/1 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-evedit__pick { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 0; border-radius: 9px; background: var(--bcv-fill); color: var(--bcv-ink); font: 500 13px/1 var(--bcv-font); cursor: pointer; }
+.bcv-evedit__pick:hover { background: var(--bcv-hover); }
+.bcv-evedit__day { height: 30px; }
+.bcv-evedit__tints { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.bcv-evedit__tint { width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; background: var(--bcv-tint); cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); transition: transform .12s var(--bcv-ease-out), box-shadow .12s ease; }
+.bcv-evedit__tint:first-child { background: conic-gradient(from 210deg, var(--bcv-tint) 0 50%, color-mix(in srgb, var(--bcv-tint) 45%, white) 50% 100%); }
+.bcv-evedit__tint.is-on { box-shadow: 0 0 0 2px var(--bcv-card, #fff), 0 0 0 4px var(--bcv-tint); }
+@media (hover: hover) and (pointer: fine) { .bcv-evedit__tint:hover { transform: scale(1.12); } }
+.bcv-evedit__notes { width: 100%; box-sizing: border-box; min-height: 64px; resize: vertical; padding: 8px 12px; border-radius: 10px; border: 0 !important; outline: none; background: var(--bcv-fill) !important; font: 400 13px/1.4 var(--bcv-font); color: var(--bcv-ink) !important; }
+.bcv-evpop .bcv-evedit__foot > .bcv-btn { flex: none; }
+.bcv-evpop .bcv-evedit__del { margin-right: auto; }
+/* (2.99.113) a plan's foot, to pull it longer or shorter: a grip shown on hover */
+.bcv-wev__grip { position: absolute; left: 0; right: 0; bottom: 0; height: 7px; cursor: ns-resize; touch-action: none; }
+.bcv-wev__grip::after { content: ''; position: absolute; left: 50%; bottom: 2px; width: 18px; height: 3px; margin-left: -9px; border-radius: 2px; background: var(--bcv-ev-bar); opacity: 0; transition: opacity .12s ease; }
+@media (hover: hover) and (pointer: fine) { .bcv-wev.bcv-ev--plan:hover .bcv-wev__grip::after { opacity: .55; } }
+.bcv-wev.is-stretching { z-index: 4; transition: none; box-shadow: inset 3px 0 0 var(--bcv-ev-bar), 0 8px 22px rgba(0,0,0,.16); }
+.bcv-wev.is-stretching .bcv-wev__grip::after { opacity: .8; }
+@media (prefers-reduced-motion: reduce) { .bcv-sheet-ov--pop > .bcv-evpop { animation: bcv-fade-in .15s ease backwards; } }
 /* 2.84.0: Upload CSV on the GPA settings sheet, beside the two fields */
 .bcv-gpa-set__csv { flex: 1 1 100%; display: flex; align-items: flex-start; gap: 12px; }
 .bcv-gpa-set__csv .bcv-gpa-set__from { flex: 1; min-width: 0; margin: 0; padding-top: 4px; }

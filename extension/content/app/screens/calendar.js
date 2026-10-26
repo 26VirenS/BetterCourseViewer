@@ -319,12 +319,15 @@
           } else out.push({ ...base, id: `ext:${l.id}:${x.id}`, date: new Date(x.start), end: new Date(x.end), done: new Date(x.end) < now });
         }
       }
+      // (2.99.113) a plan as Edit left it: its own name and colour, a whole day, each time a repeating one comes round
       for (const [pid, p] of Object.entries(BCV.plan?.all() || {})) {
-        const at = new Date(p.at);
-        if (Number.isNaN(at.getTime()) || at < s || at >= e) continue;
-        const end = new Date(at.getTime() + p.mins * 60000);
-        const pal = U.palette(p.color || '#0a84ff', dark);
-        out.push({ id: `plan:${pid}`, planId: pid, title: p.title, date: at, end, allDay: false, isAssignment: false, icon: IC.clock, kind: 'plan', contextName: p.course || '', contextColor: p.color || '#0a84ff', color: pal.text, tint: pal.tint, url: p.url || '#', done: end < now, due: p.due ? new Date(p.due) : null, mins: p.mins, points: null });
+        const first = Date.parse(p.at);
+        const pal = U.palette(p.tint || p.color || '#0a84ff', dark);
+        for (const t of BCV.plan.occurrences(p, s.getTime(), e.getTime())) {
+          const at = new Date(t);
+          const end = new Date(t + p.mins * 60000);
+          out.push({ id: `plan:${pid}${t === first ? '' : `:${t}`}`, planId: pid, occurs: t, title: p.name || p.title, date: p.allDay ? U.startOfDay(at) : at, end: p.allDay ? null : end, allDay: !!p.allDay, isAssignment: false, icon: p.repeat ? IC.repeat : IC.clock, kind: 'plan', contextName: p.course || '', contextColor: p.tint || p.color || '#0a84ff', color: pal.text, tint: pal.tint, url: p.url || '#', done: (p.allDay ? U.addDays(U.startOfDay(at), 1) : end) < now, due: p.due ? new Date(p.due) : null, mins: p.mins, points: null });
+        }
       }
       return out;
     }
@@ -473,11 +476,13 @@
         tiny ? null : h('div', { class: 'bcv-wev__time', style: { color: ev.color }, text: ev.isAssignment ? `Due ${timeWord}` : timeWord }),
         h('div', { class: `bcv-wev__title ${ev.done ? 'bcv-strike' : ''}`, style: { color: ev.color }, text: tiny ? `${timeWord} ${ev.title}` : ev.title }),
         roomy && facts(ev).length ? h('div', { class: 'bcv-wev__facts', style: { color: ev.color }, text: facts(ev).join(' · ') }) : null,
+        // (2.99.113) its foot pulled down or up, a plan is longer or shorter, a quarter of an hour at a time
+        ev.kind === 'plan' ? h('span', { class: 'bcv-wev__grip', 'aria-hidden': 'true', title: 'Pull to make it longer or shorter' }) : null,
       ]);
       if (ev.kind === 'plan') {
         el.setAttribute('draggable', 'false'); // (a link would otherwise be dragged off as a link)
         el.addEventListener('dragstart', (e) => e.preventDefault());
-        el.addEventListener('pointerdown', (e) => dragPlan(e, el, ev, a, b - a));
+        el.addEventListener('pointerdown', (e) => (e.target.closest('.bcv-wev__grip') ? stretchPlan(e, el, ev, a, b - a) : dragPlan(e, el, ev, a, b - a)));
       }
       return el;
     }
@@ -629,7 +634,8 @@
         }
         el.classList.add('is-dropped'); // (it stays where it was let go: the grid is drawn again around it)
         const when = Number(cols[at.i].dataset.day) + at.m * 60000;
-        BCV.plan?.move(ev.planId, when).then(() => U.haptic?.('success')).catch((err) => { U.toast(`Could not move the plan: ${err.message}`, { error: true }); merge(); draw(); });
+        const first = Date.parse(BCV.plan?.get(ev.planId)?.at) || ev.date.getTime(); // (a repeating one: the whole series moves by as much)
+        BCV.plan?.move(ev.planId, first + (when - ev.date.getTime())).then(() => U.haptic?.('success')).catch((err) => { U.toast(`Could not move the plan: ${err.message}`, { error: true }); merge(); draw(); });
       };
       const up = (u) => { if (u.pointerId === pid) end(true); };
       const cancelUp = (u) => { if (u.pointerId === pid) end(false); };
@@ -637,6 +643,56 @@
       window.addEventListener('pointermove', move, { capture: true, passive: false });
       window.addEventListener('pointerup', up, true);
       window.addEventListener('pointercancel', cancelUp, true);
+      window.addEventListener('keydown', key, true);
+    }
+
+    /**
+     * (2.99.113) A plan's foot pulled: the block follows a quarter of an hour at a time (its times saying so), at least a
+     * quarter of an hour long and no later than midnight; let go, the plan is that long. Escape puts it back.
+     */
+    function stretchPlan(e, el, ev, a0, len) {
+      if (e.button !== 0 || !e.isPrimary || !ev.planId) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const y0 = e.clientY;
+      const pid = e.pointerId;
+      const timeEl = el.querySelector('.bcv-wev__time');
+      const timeWas = timeEl?.textContent || '';
+      const hWas = el.style.height;
+      let mins = len;
+      let engaged = false;
+      try { el.setPointerCapture(pid); } catch { /* the window still hears it */ }
+      const say = () => { if (timeEl) timeEl.textContent = `${(U.fmtTimeLower(ev.date) || '').replace(/m$/, '')} – ${(U.fmtTimeLower(new Date(ev.date.getTime() + mins * 60000)) || '').replace(/m$/, '')}`; };
+      const move = (m) => {
+        if (m.pointerId !== pid) return;
+        const dy = m.clientY - y0;
+        if (!engaged && Math.abs(dy) < 3) return;
+        engaged = true;
+        m.preventDefault();
+        const next = Math.max(SNAP, Math.min(DAY_B - a0, Math.round((len + (dy / hourPx) * 60) / SNAP) * SNAP));
+        if (next === mins) return;
+        mins = next;
+        el.classList.add('is-stretching');
+        el.style.height = `max(20px, calc(var(--bcv-hour) * ${mins / 60} - 2px))`;
+        say();
+        U.haptic?.('select');
+      };
+      const end = (keep) => {
+        window.removeEventListener('pointermove', move, true);
+        window.removeEventListener('pointerup', up, true);
+        window.removeEventListener('pointercancel', cancel, true);
+        window.removeEventListener('keydown', key, true);
+        el.addEventListener('click', (c) => { c.preventDefault(); c.stopPropagation(); }, { capture: true, once: true }); // (the press on the grip opens nothing)
+        el.classList.remove('is-stretching');
+        if (!keep || mins === len) { el.style.height = hWas; if (timeEl) timeEl.textContent = timeWas; return; }
+        BCV.plan?.edit(ev.planId, { mins }).then(() => U.haptic?.('success')).catch((err) => { U.toast(`Could not change the plan: ${err.message}`, { error: true }); merge(); draw(); });
+      };
+      const up = (u) => { if (u.pointerId === pid) end(engaged); };
+      const cancel = (u) => { if (u.pointerId === pid) end(false); };
+      const key = (k) => { if (k.key === 'Escape') { k.preventDefault(); k.stopPropagation(); end(false); } };
+      window.addEventListener('pointermove', move, { capture: true, passive: false });
+      window.addEventListener('pointerup', up, true);
+      window.addEventListener('pointercancel', cancel, true);
       window.addEventListener('keydown', key, true);
     }
 
@@ -717,21 +773,44 @@
       load();
     }
 
-    // ---- an event's own sheet ------------------------------------------------------------------
-    // Canvas answers a press on an event with a popover — the title, the time, the calendar, the
-    // place, the details, Un-reserve for an appointment. Its address is the calendar page itself,
-    // which the interface would only draw again, so the same things are shown here, in a sheet.
-    function openEvent(ev, from = null) {
+    // ---- an event's own popover -----------------------------------------------------------------
+    // Canvas answers a press on an event with a popover — the title, the time, the calendar, the place, the details,
+    // Un-reserve for an appointment. Its address is the calendar page itself, which the interface would only draw again,
+    // so the same things are shown here: (2.99.113) beside the event, as a calendar app has it — the page left as it is
+    // under it (nothing dimmed, the pinned tools left in the bar), a press anywhere else closing it. A plan's is an event
+    // of the student's own: Edit first — its name, day, start and end or all day, repeat, alert, notes, colour — then Open,
+    // the work it is for.
+    const TINTS = ['#ff3b30', '#ff9500', '#ffcc00', '#34c759', '#00c7be', '#0a84ff', '#5856d6', '#af52de', '#8e8e93'];
+    function openEvent(ev, from = null, { editing = false } = {}) {
       document.querySelector('.bcv-sheet-ov')?.remove();
-      const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': ev.title });
-      const close = () => BCV.ui.dismiss(ov);
-      ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
-      ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+      const ov = U.el('bcv-sheet-ov bcv-sheet-ov--float bcv-sheet-ov--pop', null, { role: 'dialog', 'aria-label': ev.title });
+      const outside = (e) => {
+        if (!ov.isConnected) { document.removeEventListener('pointerdown', outside, true); return; }
+        if (ov.contains(e.target) || e.target.closest?.('.bcv-menu, .bcv-datepop, .bcv-toast')) return;
+        close();
+      };
+      const close = () => { document.removeEventListener('pointerdown', outside, true); BCV.ui.dismiss(ov); };
+      ov.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape' || document.querySelector('.bcv-menu, .bcv-datepop')) return;
+        e.preventDefault();
+        close();
+        if (from?.isConnected) from.focus?.();
+      });
       const appt = ev.kind === 'appointment';
       const plan = ev.kind === 'plan';
-      const when = ev.allDay ? `${U.fmtDow(ev.date)} · all day` : `${U.fmtDow(ev.date)} · ${U.fmtTimeLower(ev.date)}${ev.end && ev.end > ev.date ? ` – ${U.fmtTimeLower(ev.end)}` : ''}`;
+      const sheet = U.el('bcv-sheet bcv-evsheet bcv-evpop');
+      /** Beside the event — to its right, else its left; under a row as wide as the agenda's — kept in the window. */
+      const place = () => {
+        if (!sheet.isConnected) return;
+        if (from?.isConnected) { U.anchor(sheet, from, { side: from.getBoundingClientRect().width > 420 ? 'below' : 'right', gap: 10, margin: 16 }); return; }
+        Object.assign(sheet.style, { position: 'fixed', left: `${Math.round((innerWidth - sheet.offsetWidth) / 2)}px`, top: `${Math.round(Math.max(16, (innerHeight - sheet.offsetHeight) / 2))}px` });
+      };
+      const show = (parts) => { sheet.replaceChildren(...parts.filter(Boolean)); place(); };
       const row = (k, v) => (v == null || v === '' || (Array.isArray(v) && !v.length) ? null : U.el('bcv-evsheet__row', [U.text('bcv-evsheet__k', k, 'span'), h('span', { class: 'bcv-evsheet__v' }, v)]));
-      const prose = ev.description ? BCV.screens.course?.prose?.(ev.description, { cls: 'bcv-evsheet__prose' }) || h('p', { text: htmlToText(ev.description, 2000) }) : null;
+      const head = (kicker, title) => U.el('bcv-sheet__head', [
+        h('div', { style: { flex: '1', minWidth: '0' } }, [U.text('bcv-evsheet__kicker', kicker), U.text('bcv-sheet__title bcv-evsheet__title bcv-pretty', title)]),
+        h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
+      ]);
       let busy = false;
       const unreserve = async (btn) => {
         if (busy || !ev.reservationId) return;
@@ -752,36 +831,130 @@
         load();
         loadAppointments({ force: true });
       };
-      // a plan: the work it is for, moved to another free time (the rail, from its block on the grid) or cleared
-      const planItem = plan ? { id: ev.planId, title: ev.title, url: ev.url === '#' ? '' : ev.url, date: ev.due, courseName: ev.contextName, course: { color: ev.contextColor, name: ev.contextName }, type: '' } : null;
-      const foot = appt
-        ? [U.btn('Un-reserve', { kind: 'danger', cls: 'bcv-evsheet__unreserve', onClick: (e) => unreserve(e.currentTarget) }), U.btn('Other times', { cls: 'bcv-evsheet__times', onClick: (e) => { close(); openAppointments(e.currentTarget); } })]
-        : plan
-          ? [
-            planItem.url ? U.btn('Open', { cls: 'bcv-evsheet__open', onClick: () => { close(); app.go(planItem.url); } }) : null,
-            U.btn('Move', { cls: 'bcv-evsheet__move', onClick: () => { close(); const at = mainCol.querySelector(`[data-ev="${CSS.escape(ev.id)}"]`) || syncBtn; BCV.plan?.open(at, planItem, { mode: 'pick' }); } }),
-            U.btn('Clear plan', { kind: 'danger', cls: 'bcv-evsheet__clear', onClick: () => { close(); BCV.plan?.clear(ev.planId); } }),
-          ].filter(Boolean)
-          : [];
-      ov.append(U.el('bcv-sheet bcv-evsheet', [
-        U.el('bcv-sheet__head', [
-          h('div', { style: { flex: '1', minWidth: '0' } }, [U.text('bcv-evsheet__kicker', appt ? 'Appointment' : plan ? 'Plan' : ev.kind === 'external' ? 'Your calendar' : 'Event'), U.text('bcv-sheet__title bcv-evsheet__title bcv-pretty', ev.title)]),
-          h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
-        ]),
-        U.el('bcv-sheet__list bcv-evsheet__list', [
-          row('When', when),
-          row(plan ? 'For' : 'Calendar', [U.dot(ev.contextColor, 'bcv-dot--9'), h('span', { text: ev.contextName || '—' })]),
-          plan && ev.due ? row('Due', `${U.fmtDow(ev.due)} · ${U.fmtTimeLower(ev.due)}`) : null,
-          ev.kind === 'external' && ev.free ? row('Shows as', 'Free') : null,
-          row('Where', [ev.location ? linkify(ev.location) : null, ev.location && ev.address ? ' ' : null, ev.address ? h('span', { class: 'bcv-evsheet__addr', text: ev.address }) : null].flat().filter(Boolean)),
-          prose ? row('Details', prose) : null,
-        ].filter(Boolean)),
-        foot.length ? U.el('bcv-evsheet__foot', foot) : null,
-      ].filter(Boolean)));
+      const whenOf = (date, end, allDay) => (allDay ? `${U.fmtDow(date)} · all day` : `${U.fmtDow(date)} · ${U.fmtTimeLower(date)}${end && end > date ? ` – ${U.fmtTimeLower(end)}` : ''}`);
+      const repeatWord = (k) => BCV.plan?.REPEATS.find(([x]) => x === (k || ''))?.[1] || 'Never';
+      const alertWord = (m) => BCV.plan?.ALERTS.find(([x]) => x === (Number.isFinite(m) ? m : null))?.[1] || 'None';
+
+      function view() {
+        if (!plan) {
+          const prose = ev.description ? BCV.screens.course?.prose?.(ev.description, { cls: 'bcv-evsheet__prose' }) || h('p', { text: htmlToText(ev.description, 2000) }) : null;
+          show([
+            head(appt ? 'Appointment' : ev.kind === 'external' ? 'Your calendar' : 'Event', ev.title),
+            U.el('bcv-sheet__list bcv-evsheet__list', [
+              row('When', whenOf(ev.date, ev.end, ev.allDay)),
+              row('Calendar', [U.dot(ev.contextColor, 'bcv-dot--9'), h('span', { text: ev.contextName || '—' })]),
+              ev.kind === 'external' && ev.free ? row('Shows as', 'Free') : null,
+              row('Where', [ev.location ? linkify(ev.location) : null, ev.location && ev.address ? ' ' : null, ev.address ? h('span', { class: 'bcv-evsheet__addr', text: ev.address }) : null].flat().filter(Boolean)),
+              prose ? row('Details', prose) : null,
+            ].filter(Boolean)),
+            appt ? U.el('bcv-evsheet__foot', [U.btn('Un-reserve', { kind: 'danger', cls: 'bcv-evsheet__unreserve', onClick: (e) => unreserve(e.currentTarget) }), U.btn('Other times', { cls: 'bcv-evsheet__times', onClick: (e) => { close(); openAppointments(e.currentTarget); } })]) : null,
+          ]);
+          return;
+        }
+        const p = BCV.plan?.get(ev.planId);
+        if (!p) { close(); return; }
+        const url = p.url && p.url !== '#' ? p.url : '';
+        show([
+          head(p.repeat ? `Plan · ${repeatWord(p.repeat).toLowerCase()}` : 'Plan', p.name || p.title),
+          U.el('bcv-sheet__list bcv-evsheet__list', [
+            row('When', whenOf(ev.date, ev.end, ev.allDay)),
+            row('For', [U.dot(p.color || ev.contextColor, 'bcv-dot--9'), h('span', { text: p.name ? `${p.title}${p.course ? ` · ${p.course}` : ''}` : p.course || '—' })]),
+            p.due ? row('Due', `${U.fmtDow(new Date(p.due))} · ${U.fmtTimeLower(new Date(p.due))}`) : null,
+            Number.isFinite(p.alert) ? row('Alert', alertWord(p.alert)) : null,
+            p.notes ? row('Notes', h('span', { class: 'bcv-evpop__notes', text: p.notes })) : null,
+          ].filter(Boolean)),
+          U.el('bcv-evsheet__foot', [
+            U.btn('Edit', { kind: 'primary', cls: 'bcv-evsheet__edit', onClick: () => editView() }),
+            url ? U.btn('Open', { cls: 'bcv-evsheet__open', onClick: () => { close(); app.go(url); } }) : null,
+          ].filter(Boolean)),
+        ]);
+      }
+
+      /** A plan's settings, in the popover: Done keeps them (a repeating one's day moved moves the series by as much). */
+      function editView() {
+        const p = BCV.plan?.get(ev.planId);
+        if (!p) { close(); return; }
+        const occ = ev.occurs ?? Date.parse(p.at);
+        const d0 = new Date(occ);
+        const st = { name: p.name || '', day: U.startOfDay(d0), start: Math.min(1425, Math.round((d0.getHours() * 60 + d0.getMinutes()) / 15) * 15), mins: p.mins || 60, allDay: !!p.allDay, repeat: p.repeat || '', alert: Number.isFinite(p.alert) ? p.alert : null, notes: p.notes || '', tint: p.tint || null };
+        const timeWord = (m) => U.fmtTime(new Date(2000, 0, 1, 0, m));
+        const nameIn = h('input', { class: 'bcv-evedit__name', type: 'text', placeholder: `Work on ${p.title}`, 'aria-label': 'Title', value: st.name, maxlength: '120', oninput: () => { st.name = nameIn.value; }, onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); save(); } } });
+        const dayField = U.dateField(st.day, (d) => { st.day = U.startOfDay(d); }, { cls: 'bcv-evedit__day', label: 'Day' });
+        const startSel = h('select', { class: 'bcv-select bcv-evedit__time', 'aria-label': 'Starts', onchange: () => { st.start = Number(startSel.value); st.mins = Math.min(st.mins, 1440 - st.start); fillEnd(); } },
+          Array.from({ length: 96 }, (_, i) => h('option', { value: String(i * 15), text: timeWord(i * 15) })));
+        startSel.value = String(st.start);
+        const endSel = h('select', { class: 'bcv-select bcv-evedit__time', 'aria-label': 'Ends', onchange: () => { st.mins = Number(endSel.value) - st.start; } });
+        const fillEnd = () => {
+          const opts = [];
+          for (let m = st.start + 15; m <= 1440; m += 15) opts.push(h('option', { value: String(m), text: `${m === 1440 ? 'Midnight' : timeWord(m)} (${BCV.plan.lenWord(m - st.start)})` }));
+          endSel.replaceChildren(...opts);
+          endSel.value = String(st.start + Math.max(15, st.mins));
+          if (!endSel.value) { st.mins = Math.min(60, 1440 - st.start); endSel.value = String(st.start + st.mins); }
+        };
+        fillEnd();
+        const times = U.el('bcv-evedit__times', [startSel, h('span', { class: 'bcv-evedit__to', text: 'to' }), endSel]);
+        times.hidden = st.allDay;
+        const allSw = U.switchEl(st.allDay, (on) => { st.allDay = on; times.hidden = on; place(); }, 'All day');
+        const pick = (label, list, get, set) => {
+          const btn = h('button', { type: 'button', class: 'bcv-evedit__pick', 'aria-haspopup': 'menu' });
+          const paint = () => { btn.replaceChildren(h('span', { text: list.find(([k]) => k === get())?.[1] || list[0][1] }), U.svg(IC.chevron, { size: 9, stroke: 'currentColor', width: 2.6, style: { transform: 'rotate(90deg)' } })); btn.setAttribute('aria-label', `${label}: ${btn.textContent}`); };
+          btn.onclick = (e) => { e.stopPropagation(); U.menu(btn, list.map(([k, l]) => ({ label: l, active: k === get(), onSelect: () => { set(k); paint(); } }))); };
+          paint();
+          return btn;
+        };
+        const repeatBtn = pick('Repeat', BCV.plan.REPEATS, () => st.repeat, (k) => { st.repeat = k; });
+        const alertBtn = pick('Alert', BCV.plan.ALERTS, () => st.alert, (k) => { st.alert = k; });
+        const notes = h('textarea', { class: 'bcv-evedit__notes', rows: '3', placeholder: 'Notes', 'aria-label': 'Notes', maxlength: '2000', oninput: () => { st.notes = notes.value; } });
+        notes.value = st.notes;
+        const swatch = (c) => h('button', {
+          type: 'button', class: `bcv-evedit__tint ${(st.tint || null) === c ? 'is-on' : ''}`, style: { '--bcv-tint': c || p.color || '#0a84ff' },
+          'aria-label': c ? `Colour ${c}` : 'The course’s colour', 'aria-pressed': String((st.tint || null) === c), title: c ? '' : 'The course’s colour',
+          onclick: (e) => { st.tint = c; for (const b of e.currentTarget.parentElement.children) { const on = b === e.currentTarget; b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', String(on)); } },
+        });
+        const field = (k, v) => U.el('bcv-evedit__row', [U.text('bcv-evedit__k', k, 'span'), U.el('bcv-evedit__v', v)]);
+        async function save() {
+          let at = st.allDay ? st.day.getTime() : st.day.getTime() + st.start * 60000;
+          if (p.repeat && occ !== Date.parse(p.at)) at = Date.parse(p.at) + (at - (st.allDay ? U.startOfDay(d0).getTime() : occ)); // (one of a series: the series moves by as much)
+          try {
+            await BCV.plan.edit(ev.planId, { name: st.name.trim(), at, mins: st.allDay ? p.mins : st.mins, allDay: st.allDay, repeat: st.repeat, alert: st.alert, notes: st.notes.trim(), tint: st.tint });
+          } catch (err) {
+            U.toast(`Could not save the plan: ${err.message}`, { error: true });
+            return;
+          }
+          close();
+          U.haptic?.('success');
+        }
+        show([
+          head('Edit plan', p.name || p.title),
+          U.el('bcv-evedit', [
+            nameIn,
+            field('Day', dayField),
+            field('All day', allSw),
+            times,
+            field('Repeat', repeatBtn),
+            field('Alert', alertBtn),
+            field('Colour', U.el('bcv-evedit__tints', [null, ...TINTS].map(swatch))),
+            notes,
+          ]),
+          U.el('bcv-evsheet__foot bcv-evedit__foot', [
+            U.btn('Delete plan', { kind: 'danger', cls: 'bcv-evedit__del', onClick: () => { close(); BCV.plan?.clear(ev.planId); U.toast('Plan deleted'); } }),
+            h('span', { class: 'bcv-todo__spacer' }),
+            U.btn('Cancel', { cls: 'bcv-evedit__cancel', onClick: () => view() }),
+            U.btn('Done', { kind: 'primary', cls: 'bcv-evedit__done', onClick: save }),
+          ]),
+        ]);
+        nameIn.focus();
+      }
+
+      ov.append(sheet);
       document.body.append(ov);
-      U.morphFrom(ov.firstElementChild, from);
+      if (editing && plan) editView(); else view();
+      // (on the next frame: the press that opened it does not close it)
+      requestAnimationFrame(() => { if (ov.isConnected) document.addEventListener('pointerdown', outside, true); });
+      const onResize = () => { if (!ov.isConnected) { removeEventListener('resize', onResize); return; } place(); };
+      addEventListener('resize', onResize);
       ov.tabIndex = -1;
-      ov.focus();
+      if (!(editing && plan)) ov.focus();
     }
 
     // The user's own calendars (the favourite courses) are on by default; the personal calendar,
