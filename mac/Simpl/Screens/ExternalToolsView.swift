@@ -389,6 +389,13 @@ private struct ToolCard: View {
     /// (courses-27) The most the list's popover may be tall: (1.3.82) reckoned as the list opens (`reckonRoom`), and
     /// kept while it is open.
     @State private var room: CGFloat = 460
+    /// (1.3.178) Whether its list's popover is up — asked for is not up: a list asked for as its card was still coming
+    /// into its window, or while another copy of the app had the front (the suite's), never came, and nothing asked
+    /// again once the cards were held under it (1.3.178's dark-36b picture). `reasking` while it is asked for afresh;
+    /// `holding` while the screenshot suite's picture waits for it.
+    @State private var up = false
+    @State private var reasking = false
+    @State private var holding = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var tint: Color { Color(hex: tool.courses.first?.color ?? "#8e8e93") }
@@ -437,7 +444,11 @@ private struct ToolCard: View {
             if on && !shown { reckonRoom() }
             if shown != on { shown = on }
         }
-        .onChange(of: shown) { _, on in if listed != on { listed = on } }
+        .onChange(of: shown) { _, on in
+            guard !reasking else { return }
+            if on { checkUp(since: Date()) }
+            if listed != on { listed = on }
+        }
         .onAppear {
             // (a card made again while its list is open — moved to another column by a new answer: its list opened again
             // a turn of the run loop later, once the card is in its window, for the room round it to be reckoned there)
@@ -448,6 +459,7 @@ private struct ToolCard: View {
                 shown = true
             }
         }
+        .onDisappear { letPictureGo() }
     }
 
     /// The card's own button, the whole card under what it says: it tells the card when it is held, for the card to give.
@@ -474,9 +486,52 @@ private struct ToolCard: View {
         .popover(isPresented: $shown, attachmentAnchor: .point(.bottom), arrowEdge: .bottom) {
             ToolPlacesList(tool: tool, tint: tint, room: room, choose: choose, close: { shown = false })
                 // (the screenshot suite's console: when a list shows and goes)
-                .onAppear { if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] tool list shown: %@", tool.name) } }
-                .onDisappear { if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] tool list closed: %@", tool.name) } }
+                .onAppear {
+                    up = true
+                    letPictureGo()
+                    if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] tool list shown: %@", tool.name) }
+                }
+                .onDisappear {
+                    up = false
+                    if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] tool list closed: %@", tool.name) }
+                }
         }
+    }
+
+    /// (1.3.178) Its list asked for and not up a second later: asked for afresh, from its card in its window, once the
+    /// app is in front (a popover shows only for the app in front) — three times at most, and not past 30 seconds.
+    private func checkUp(since: Date, tries: Int = 0) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            guard shown, listed, !up, tries < 3, Date().timeIntervalSince(since) < 30 else {
+                letPictureGo()
+                return
+            }
+            guard NSApp.isActive, spot.view?.window?.isVisible == true else {
+                checkUp(since: since, tries: tries)
+                return
+            }
+            NSLog("[Simpl] tool list: %@'s list asked for but not up; asked again", tool.name)
+            if UserDefaults.standard.string(forKey: "SimplShotFile") != nil, !holding {
+                holding = true
+                Shot.began()
+            }
+            reckonRoom()
+            // (closed and asked for again a few frames apart, so SwiftUI sees both; the page's `listed` left as it is)
+            reasking = true
+            shown = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                shown = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { reasking = false }
+                checkUp(since: since, tries: tries + 1)
+            }
+        }
+    }
+
+    /// (1.3.178) The suite's picture, held while its list was asked for again, let go: the list up, or no longer asked for.
+    private func letPictureGo() {
+        guard holding else { return }
+        holding = false
+        Shot.ended()
     }
 
     /// (courses-27) The room between the card's foot and the window's, less a margin: the list under the card is no

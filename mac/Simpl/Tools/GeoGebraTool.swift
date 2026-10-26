@@ -24,6 +24,11 @@ struct GeoGebraWeb: NSViewRepresentable {
         w.setValue(false, forKey: "drawsBackground")
         w.navigationDelegate = context.coordinator
         context.coordinator.look = lookKey
+        // (1.3.178) a picture waits for GeoGebra to say it is ready (or could not be loaded) — it comes from geogebra.org
+        if UserDefaults.standard.string(forKey: "SimplShotFile") != nil {
+            context.coordinator.awaited = true
+            Shot.began()
+        }
         load(w)
         return w
     }
@@ -37,6 +42,7 @@ struct GeoGebraWeb: NSViewRepresentable {
 
     static func dismantleNSView(_ w: WKWebView, coordinator: Coordinator) {
         w.configuration.userContentController.removeScriptMessageHandler(forName: "simplSolver")
+        coordinator.arrived()
     }
 
     private var dark: Bool { scheme == .dark }
@@ -64,13 +70,22 @@ struct GeoGebraWeb: NSViewRepresentable {
     final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
         var parent: GeoGebraWeb
         var look = ""
+        /// (1.3.178) A picture is waiting for GeoGebra.
+        var awaited = false
         init(_ p: GeoGebraWeb) { parent = p }
+
+        /// GeoGebra here (or gone, or never coming): the picture's wait for it over.
+        func arrived() {
+            guard awaited else { return }
+            awaited = false
+            Shot.ended()
+        }
 
         func userContentController(_ u: WKUserContentController, didReceive m: WKScriptMessage) {
             guard let body = m.body as? [String: Any], let kind = body["kind"] as? String else { return }
             switch kind {
-            case "ready": NSLog("[Simpl] calculator: GeoGebra is ready")
-            case "offline": NSLog("[Simpl] calculator: GeoGebra could not be loaded")
+            case "ready": NSLog("[Simpl] calculator: GeoGebra is ready"); arrived()
+            case "offline": NSLog("[Simpl] calculator: GeoGebra could not be loaded"); arrived()
             default: break
             }
         }

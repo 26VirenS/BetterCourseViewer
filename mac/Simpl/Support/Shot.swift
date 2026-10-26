@@ -52,7 +52,6 @@ enum Shot {
         }
         if settle {
             poll(file, after: after)
-            DispatchQueue.main.asyncAfter(deadline: .now() + after) { take(file) }
         } else {
             waitForScreens(file, after: after)
         }
@@ -76,17 +75,27 @@ enum Shot {
         }
     }
 
+    /// When the app's own screens were up, if they are.
+    nonisolated(unsafe) private static var readyAt: Date?
+
     /// Every quarter second: the picture taken once the app has been up a little (its arrivals played), and nothing has
-    /// been asked of the page for 1.4 seconds.
+    /// been asked of the page for 1.4 seconds — or at the longest wait whatever is under way. (1.3.178) That wait counted
+    /// as `waitForScreens` counts it: screens up by their usual 6 s, it is `after` from launch; later, as much longer,
+    /// and never past it and 40 s more. A runner slow enough that the Dashboard came 17 s in pictured the calculator's
+    /// pin at its 14 s, the window still blank.
     private static func poll(_ file: String, after: Double) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
             guard !taken else { return }
             let up = Date().timeIntervalSince(started), quiet = Date().timeIntervalSince(lastActivity)
             // (and the app's own screens are up — before then nothing is asked, which is not the same as done)
             let ready = MainActor.assumeIsolated { AppModel.shared.engine.map { $0.phase == .native && $0.countsLive } ?? true }
+            if ready, readyAt == nil { readyAt = Date() }
+            let late = readyAt.map { max(0, $0.timeIntervalSince(started) - 6) } ?? 0
             if up >= min(4, after) && ready && busy == 0 && quiet >= 1.4 {
                 take(file)
-            } else if up < after {
+            } else if (ready && up >= after + min(late, 40)) || up >= after + 40 {
+                take(file)
+            } else {
                 poll(file, after: after)
             }
         }
@@ -170,9 +179,10 @@ enum Shot {
     /// full set; with only one more try, Hardy–Weinberg's was pictured closed).
     private static func settle(_ file: String, again: Bool = true, since: Date = Date()) {
         // (1.3.165: the plan rail on To Do, -SimplPlanFirst, is a popover too; 1.3.170: and To Do's ⋯ menu, -SimplTodoMenu,
-        //  a menu, closes the same way)
+        //  a menu, closes the same way; 1.3.178: and a tool's list on External Tools, -SimplExternalToolList)
         let d = UserDefaults.standard
         let popover = d.string(forKey: "SimplPinOpen") != nil || d.bool(forKey: "SimplPlanFirst") || d.bool(forKey: "SimplTodoMenu")
+            || d.string(forKey: "SimplExternalToolList") != nil
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
             let waited = Date().timeIntervalSince(since)
             if NSApp.isActive || (popover ? waited > 8 : (!again || waited > 2)) {
