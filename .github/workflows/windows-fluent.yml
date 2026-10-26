@@ -294,6 +294,12 @@ jobs:
           for i in $(seq 1 60); do curl -s -o /dev/null http://localhost:8800/ && curl -s -o /dev/null http://localhost:8802/login/canvas && break; sleep 0.5; done
           curl -s -o /dev/null -w "mock %{http_code}\n" http://localhost:8800/
           curl -s -o /dev/null -w "mock sign-in %{http_code}\n" http://localhost:8802/login/canvas
+          # (0.3.67) Simpl Community's gallery in the mock school (scripts/dev/mock-community.mjs, the site's own handler):
+          # three themes shared and approved — two of drawings, one of photos (one moved and zoomed, one with its Ink off)
+          curl -s -o /dev/null -F 'theme={"name":"Night Peaks","maker":"Sam","accent":"#5e5ce6","look":"dark","places":{"side":{"scene":"Peaks"},"today":{"scene":"Peaks"},"overdue":{"scene":"Peaks"}}}' http://localhost:8800/api/community/submit
+          curl -s -o /dev/null -F 'theme={"name":"Beach Day","maker":"Ana","accent":"#ff9f0a","look":"light","places":{"side":{"scene":"Sand"},"today":{"scene":"Ocean"},"overdue":{"scene":"Sand"}}}' http://localhost:8800/api/community/submit
+          curl -s -o /dev/null -F 'theme={"name":"Harbour","maker":"Lee","accent":"#40c8e0","places":{"side":{"photo":true,"x":30,"y":80,"z":1.2},"today":{"photo":true,"ink":false},"overdue":{"scene":"Ocean"}}}' -F 'photo-side=@scripts/dev/fixtures/photo.jpg' -F 'photo-today=@scripts/dev/fixtures/photo.jpg' http://localhost:8800/api/community/submit
+          curl -s http://localhost:8800/__mock/community/approve-all; echo
       - name: Pictures
         shell: pwsh
         env:
@@ -560,6 +566,11 @@ jobs:
           # buttons, the bar at the foot — the themes in light, the courses' colours in dark
           Shot 'appearance-mode' '1366x778' 45 ($mock + @('--appearance', 'light', '--theme', 'Ocean', '--appearance-mode', 'yes'))
           Shot 'appearance-courses-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--appearance-mode', 'yes', '--appearance-tab', 'courses'))
+          # (0.3.67) Appearance's Community: the mock's gallery, in light and dark; and its photo theme worn, on the Dashboard
+          $community = @('--community-base', 'http://localhost:8800')
+          Shot 'appearance-community' '1366x778' 45 ($mock + $community + @('--appearance', 'light', '--appearance-mode', 'yes', '--appearance-tab', 'community'))
+          Shot 'appearance-community-dark' '1366x778' 45 ($mock + $community + @('--appearance', 'dark', '--appearance-mode', 'yes', '--appearance-tab', 'community'))
+          Shot 'community-worn' '1366x778' 45 ($mock + $community + @('--appearance', 'light', '--community-wear', 'Harbour'))
           # (0.3.59) the fixture photo in every place: inked, and with its Ink off — shown as it is, the words on it dark
           # with a white border — in light and dark
           $themePhoto = (Resolve-Path scripts/dev/fixtures/photo.jpg).Path
@@ -1465,6 +1476,15 @@ jobs:
             $l = PhoneLog $p
             Write-Host "${p}: $((@($l -split "`n" | Where-Object { $_ -match 'calendar: ' }) -join ' | '))"
             if ($l -notmatch 'calendar: plan popup opened') { Write-Host "::error::${p}: the plan's popup was not opened before the picture (shots/profile-$p.log)"; exit 1 }
+          }
+          # (0.3.67) Simpl Community's gallery read before each of its pictures, and its photo theme worn before that one's
+          # (Support/Community.cs)
+          foreach ($p in @('appearance-community', 'appearance-community-dark', 'community-worn')) {
+            if ($script:mine -notcontains $p) { continue }
+            $l = PhoneLog $p
+            Write-Host "${p}: $((@($l -split "`n" | Where-Object { $_ -match 'community' }) -join ' | '))"
+            if ($l -notmatch 'community: [1-9]\d* themes read') { Write-Host "::error::${p}: Simpl Community's gallery was not read before the picture (shots/profile-$p.log)"; exit 1 }
+            if ($p -eq 'community-worn' -and $l -notmatch 'community: wore ') { Write-Host "::error::${p}: the Harbour theme was not worn before the picture (shots/profile-$p.log)"; exit 1 }
           }
           # (0.3.64) To Do & Calendar: To Do's menu and Week's menu open, the week pinched to the whole day, and the week
           # scrolled with something waiting at its edges, before each picture (Screens/Calendar/CalendarTodo.cs TodoShots,
