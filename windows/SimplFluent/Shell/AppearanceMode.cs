@@ -272,12 +272,13 @@ public sealed class AppearanceOverlay : Grid
         return b;
     }
 
-    /// <summary>(0.3.68, as the web's 2.99.117) A lit place's catch: a press anywhere on it uploads a photo there — a photo
-    /// dropped on it too — which then opens in its place; the pointer over it says so, under the photo button in its
-    /// middle (which keeps the drawings, Ink, Move and zoom… and Remove).</summary>
+    /// <summary>(0.3.68, as the web's 2.99.117) A lit place's catch: a press anywhere on it — (0.3.72, as the web's
+    /// 2.99.119) its photo controls shown where the pointer is, Upload photo… first, the same as its photo button's — or a
+    /// photo dropped on it, put there at once and opened in its place; the pointer over it says so, under the photo
+    /// button in its middle.</summary>
     private Border Catch(string slot)
     {
-        var words = K.Text("Click to upload a photo", Ty.Caption);
+        var words = K.Text("Click for photo options", Ty.Caption);
         words.Foreground = Brushes.White;
         words.FontWeight = FontWeights.SemiBold;
         var cap = new Border
@@ -305,7 +306,7 @@ public sealed class AppearanceOverlay : Grid
         {
             e.Handled = true;
             Lit(false);
-            Choose(slot);
+            PhotoMenu(slot, c, atPointer: true);
         };
         c.DragEnter += (_, e) => { var file = e.Data.GetDataPresent(DataFormats.FileDrop); e.Effects = file ? DragDropEffects.Copy : DragDropEffects.None; if (file) Lit(true, drop: true); e.Handled = true; };
         c.DragOver += (_, e) => { e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None; e.Handled = true; };
@@ -316,13 +317,15 @@ public sealed class AppearanceOverlay : Grid
             Lit(false);
             if (e.Data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } files) Take(slot, files[0]);
         };
-        System.Windows.Automation.AutomationProperties.SetName(c, slot == "side" ? "Upload a navigation pane photo" : "Upload a card photo");
+        System.Windows.Automation.AutomationProperties.SetName(c, slot == "side" ? "Navigation pane photo options" : "Card photo options");
         return c;
     }
 
-    private void PhotoMenu(string slot, FrameworkElement at)
+    /// <summary>A place's photo controls: under its photo button, or (0.3.72: a press anywhere on the place,
+    /// <paramref name="atPointer"/>) where the pointer is.</summary>
+    private void PhotoMenu(string slot, FrameworkElement at, bool atPointer = false)
     {
-        var menu = new ContextMenu { PlacementTarget = at, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom, MinWidth = 220 };
+        var menu = new ContextMenu { PlacementTarget = at, Placement = atPointer ? System.Windows.Controls.Primitives.PlacementMode.MousePoint : System.Windows.Controls.Primitives.PlacementMode.Bottom, MinWidth = 220 };
         MenuItem Item(string text, SymbolRegular icon, Action act)
         {
             var mi = new MenuItem { Header = text, Icon = new SymbolIcon { Symbol = icon } };
@@ -340,7 +343,8 @@ public sealed class AppearanceOverlay : Grid
         }
         menu.Items.Add(drawing);
         // (0.3.70, as the web's 2.99.118) a colour of the place's own, in place of the theme's there
-        menu.Items.Add(Item("Colour…", SymbolRegular.Color24, () => PlaceColour(slot, at)));
+        // (its popup under the photo button, wherever the controls were shown)
+        menu.Items.Add(Item("Colour…", SymbolRegular.Color24, () => PlaceColour(slot, badgeOf.TryGetValue(slot, out var badge) ? badge : at)));
         if (Scenes.Of(slot) != null)
         {
             menu.Items.Add(new Separator());
