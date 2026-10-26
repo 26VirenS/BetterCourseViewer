@@ -426,6 +426,11 @@ public sealed class CalEvent
     public string? Layer { get; set; }
     public string? PlanId { get; set; }
     public string? End { get; set; }
+    // (0.3.66, the Mac's 1.3.172) a plan's time this block is (a repeating plan's each), whether it repeats, and how many
+    // tasks its group holds (1 for a plan alone)
+    public string? Occurs { get; set; }
+    public bool? Repeats { get; set; }
+    public int? Tasks { get; set; }
 }
 
 // (2.99.95) Find Appointment: Canvas's Scheduler as native-app.js `appointments` reads it — the classes with something to

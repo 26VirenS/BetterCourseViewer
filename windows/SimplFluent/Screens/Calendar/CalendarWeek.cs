@@ -69,8 +69,10 @@ public sealed partial class CalendarScreen
         public int B { get; } = b;
         public int Lane { get; set; }
         public int Lanes { get; set; } = 1;
+        /// <summary>(0.3.66) Where it ends while its foot is being pulled (a plan's).</summary>
+        public int? Pulled { get; set; }
         /// <summary>Its block's height with hours <paramref name="px"/> tall.</summary>
-        public double Height(double px) => Math.Max(20, (B - A) / 60.0 * px - 2);
+        public double Height(double px) => Math.Max(20, ((Pulled ?? B) - A) / 60.0 * px - 2);
     }
 
     /// <summary>(0.3.64) The week's hours as drawn: what a pinch changes in place — the hours' height, their lines and
@@ -155,6 +157,8 @@ public sealed partial class CalendarScreen
     /// left them, else in a window <see cref="HoursTall"/> tall.</summary>
     private FrameworkElement WeekGrid(List<DateTime> days, Dictionary<string, List<CalEvent>> byDay, bool fit)
     {
+        rings.Clear();
+        ringOn = null;
         var n = days.Count;
         var evs = days.Select(d => EventsOn(byDay, d)).ToList();
         var todayAt = days.FindIndex(d => d == DateTime.Today);
@@ -237,7 +241,7 @@ public sealed partial class CalendarScreen
             foreach (var s in slots) panel.Children.Add(WeekBlock(s, days[i], i, cell, columns));
             cell.Children.Add(panel);
             cell.Children.Add(Hairline(false));
-            TodoDrops(cell, days[i]); // (0.3.63: a row of To Do dragged onto it is planned there)
+            TodoDrops(cell, days[i], slots); // (0.3.63: a row of To Do dragged onto it is planned there; 0.3.66: onto a plan, joins it)
             columns.Add(cell);
             body.Children.Add(cell.Col(i + 1));
             w.Panels.Add(panel);
@@ -573,17 +577,35 @@ public sealed partial class CalendarScreen
                 Stroke = K.Brush(K.WithAlpha(color, 0.8)), IsHitTestVisible = false,
             });
         g.Children.Add(words);
+        // (0.3.66, the Mac's 1.3.172) a plan's foot, pulled to make it longer or shorter, and the ring it wears while another
+        // plan or a row of To Do is held over it (let go there, they are one block)
+        Border? grip = null;
+        if (plan)
+        {
+            var ring = new Rectangle { RadiusX = 6, RadiusY = 6, StrokeThickness = 2, Stroke = K.Brush(Appearance.Accent), IsHitTestVisible = false, Visibility = Visibility.Collapsed };
+            g.Children.Add(ring);
+            rings[s] = ring;
+            var bar = new Border { Width = 22, Height = 3, CornerRadius = new CornerRadius(1.5), Background = K.Brush(K.WithAlpha(color, 0.9)), Opacity = 0, IsHitTestVisible = false, VerticalAlignment = VerticalAlignment.Center };
+            grip = new Border { Height = 9, VerticalAlignment = VerticalAlignment.Bottom, Background = Brushes.Transparent, Cursor = Cursors.SizeNS, Child = bar, Tag = GripTag };
+            grip.MouseEnter += (_, _) => bar.Opacity = 1;
+            grip.MouseLeave += (_, _) => bar.Opacity = 0;
+            g.Children.Add(grip);
+        }
 
         var b = K.Subtle(g, null, new Thickness(0), 6);
         b.HorizontalContentAlignment = HorizontalAlignment.Stretch;
         b.VerticalContentAlignment = VerticalAlignment.Stretch;
         b.MinHeight = 0;
         b.MinWidth = 0;
-        b.Click += (_, _) => peek.Press(ev, b);
-        b.ToolTip = string.Join(" · ", new[] { plan ? "Planned" : null, ev.Title, ev.Sub, plan ? "drag to move it" : null }.Where(x => !string.IsNullOrEmpty(x)));
+        b.Click += (_, _) => Press(ev, b);
+        b.ToolTip = string.Join(" · ", new[] { plan ? "Planned" : null, ev.Title, ev.Sub, plan ? "drag to move it, or its foot to make it longer" : null }.Where(x => !string.IsNullOrEmpty(x)));
         WeekDayPanel.SetSlot(b, s);
         Item(b, ev, menu: true);
-        if (plan && CalendarKit.Text(ev.PlanId) is { } pid) Draggable(b, s, pid, day, dayIndex, column, columns, time, clock);
+        if (plan && CalendarKit.Text(ev.PlanId) is { } pid)
+        {
+            Draggable(b, s, pid, day, dayIndex, column, columns, time, clock);
+            if (grip != null) Stretchable(b, grip, s, pid, day, time, clock);
+        }
         return b;
     }
 
@@ -602,8 +624,9 @@ public sealed partial class CalendarScreen
         var engaged = false;
         var days = 0;
         var minutes = 0;
+        var grab = 0; // (0.3.66: how far into the block it was taken, in minutes — where the pointer is, for the plan it is over)
         var name = AutomationProperties.GetName(b);
-        AutomationProperties.SetHelpText(b, "Shows a preview; drag it to move the plan");
+        AutomationProperties.SetHelpText(b, "Shows the plan; drag it to move it, or onto another plan to group them");
 
         void Lift(bool on)
         {
@@ -621,9 +644,15 @@ public sealed partial class CalendarScreen
             Motion.To(shift, TranslateTransform.YProperty, 0, Motion.Fast);
             time.Text = clock;
             AutomationProperties.SetName(b, name);
+            Ring(null);
         }
 
-        b.PreviewMouseLeftButtonDown += (_, e) => from = e.GetPosition(columns[0].Parent as IInputElement ?? b);
+        b.PreviewMouseLeftButtonDown += (_, e) =>
+        {
+            if (FromGrip(e.OriginalSource, b)) return; // (its foot: pulled, not moved — Stretchable)
+            from = e.GetPosition(columns[0].Parent as IInputElement ?? b);
+            grab = Math.Max(0, (int)(e.GetPosition(b).Y / hourPx * 60));
+        };
         b.PreviewMouseMove += (_, e) =>
         {
             if (from is not { } f || e.LeftButton != MouseButtonState.Pressed) return;
@@ -652,8 +681,10 @@ public sealed partial class CalendarScreen
             shift.X = x;
             shift.Y = minutes / 60.0 * hourPx;
             var when = day.AddDays(d).AddMinutes(at);
-            time.Text = d == 0 ? ClockWords(when) : $"{when.ToString("ddd", CultureInfo.InvariantCulture)} {ClockWords(when)}";
-            AutomationProperties.SetName(b, $"Move to {when.ToString("dddd", CultureInfo.InvariantCulture)} {ClockWords(when)}");
+            var onto = PlanAt(dayIndex + d, at + grab, pid);
+            Ring(onto);
+            time.Text = onto != null ? $"Group with {onto.Ev.Title}" : d == 0 ? ClockWords(when) : $"{when.ToString("ddd", CultureInfo.InvariantCulture)} {ClockWords(when)}";
+            AutomationProperties.SetName(b, onto != null ? $"Group with {onto.Ev.Title}" : $"Move to {when.ToString("dddd", CultureInfo.InvariantCulture)} {ClockWords(when)}");
         };
         b.PreviewMouseLeftButtonUp += (_, e) =>
         {
@@ -663,6 +694,14 @@ public sealed partial class CalendarScreen
             engaged = false;
             from = null;
             b.ReleaseMouseCapture();
+            // (0.3.66) let go over another plan: one block with it, its group's
+            if (PlanAt(dayIndex + days, s.A + minutes + grab, pid) is { } target && CalendarKit.Text(target.Ev.PlanId) is { } onto)
+            {
+                Ring(null);
+                Lift(false);
+                _ = Join(onto, target.Ev.Title);
+                return;
+            }
             if (days == 0 && minutes == 0) { Back(); return; }
             Lift(false);
             Panel.SetZIndex(column, 5); // (it stays where it was let go, over the days beside, until the week is drawn again)
@@ -681,10 +720,102 @@ public sealed partial class CalendarScreen
         async Task Drop(DateTime moved)
         {
             var iso = DateTime.SpecifyKind(moved, DateTimeKind.Local).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
-            if (!await engine.Act("planMove", new { id = pid, at = iso })) Back();
+            // (0.3.66) one of a repeating plan's times: the series moves by as much (the page's planMove, given the time it was)
+            if (!await engine.Act("planMove", new { id = pid, at = iso, occurs = CalendarKit.Text(s.Ev.Occurs) })) Back();
             Read();
             engine.DataChanged();
         }
+
+        async Task Join(string onto, string title)
+        {
+            if (!await engine.Act("planJoin", new { id = pid, onto, whole = true })) { Back(); return; }
+            Said($"Grouped with {title}");
+            Read();
+            engine.DataChanged();
+        }
+    }
+
+    /// <summary>(0.3.66) What marks a plan's foot (its grip), so a press on it is a pull, never a move.</summary>
+    private const string GripTag = "plan-foot";
+
+    /// <summary>Whether a press began on a plan's foot (inside <paramref name="block"/>).</summary>
+    private static bool FromGrip(object source, DependencyObject block)
+    {
+        for (var o = source as DependencyObject; o != null && o != block; o = o is Visual || o is System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(o) : LogicalTreeHelper.GetParent(o))
+            if (o is FrameworkElement { Tag: GripTag }) return true;
+        return false;
+    }
+
+    /// <summary>(0.3.66) Each plan's ring on the week drawn now, lit while another plan or a row of To Do is held over it.</summary>
+    private readonly Dictionary<WeekSlot, Rectangle> rings = new();
+    private WeekSlot? ringOn;
+
+    private void Ring(WeekSlot? target)
+    {
+        if (target == ringOn) return;
+        if (ringOn != null && rings.TryGetValue(ringOn, out var was)) was.Visibility = Visibility.Collapsed;
+        ringOn = target;
+        if (target != null && rings.TryGetValue(target, out var now)) now.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>(0.3.66) The plan of a day of the week drawn now whose block holds a minute of it (other than the plan
+    /// <paramref name="not"/>): what a dragged block, or a row of To Do, let go there joins.</summary>
+    private WeekSlot? PlanAt(int dayIndex, int minute, string? not)
+    {
+        if (hours is not { } w || dayIndex < 0 || dayIndex >= w.Slots.Count) return null;
+        return w.Slots[dayIndex].FirstOrDefault(x => CalendarKit.IsPlan(x.Ev) && CalendarKit.Text(x.Ev.PlanId) is { } p && p != not && minute >= x.A && minute < (x.Pulled ?? x.B));
+    }
+
+    /// <summary>
+    /// (0.3.66, the Mac's 1.3.172 and the web's 2.99.113) A plan's foot pulled: its block follows a quarter of an hour at a
+    /// time, its times on it, a quarter of an hour long at least and over by midnight; let go, the plan is that long (the
+    /// page's planEdit), its group's every task with it. Let go where it began, nothing changes.
+    /// </summary>
+    private void Stretchable(Button b, Border grip, WeekSlot s, string pid, DateTime day, Run time, string clock)
+    {
+        var len = s.B - s.A;
+        double? from = null;
+        var mins = len;
+        void Relayout() => (VisualTreeHelper.GetParent(b) as UIElement)?.InvalidateMeasure();
+        void Back()
+        {
+            from = null;
+            s.Pulled = null;
+            mins = len;
+            time.Text = clock;
+            Relayout();
+        }
+        grip.MouseLeftButtonDown += (_, e) =>
+        {
+            e.Handled = true; // (the block's own press, a click, never hears it)
+            peek.Dismiss();
+            from = e.GetPosition(b).Y;
+            grip.CaptureMouse();
+        };
+        grip.MouseMove += (_, e) =>
+        {
+            if (from is not { } f || e.LeftButton != MouseButtonState.Pressed) return;
+            e.Handled = true;
+            var dy = e.GetPosition(b).Y - f;
+            var next = Math.Clamp((int)Math.Round((len + dy / hourPx * 60) / Snap) * Snap, Snap, DayEnd - s.A);
+            if (next == mins) return;
+            mins = next;
+            s.Pulled = s.A + mins;
+            time.Text = $"{clock} – {ClockWords(day.AddMinutes(s.A + mins))}";
+            Relayout();
+        };
+        grip.MouseLeftButtonUp += async (_, e) =>
+        {
+            if (from == null) return;
+            e.Handled = true;
+            from = null;
+            grip.ReleaseMouseCapture();
+            if (mins == len) { Back(); return; }
+            if (!await engine.Act("planEdit", new { id = pid, mins })) { Back(); return; }
+            Read();
+            engine.DataChanged();
+        };
+        grip.LostMouseCapture += (_, _) => { if (from != null) Back(); };
     }
 
     /// <summary>A day of the week's grid: each block at its time and as tall as it lasts at the hours' height now (a pinch

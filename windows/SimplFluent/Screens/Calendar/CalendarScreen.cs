@@ -214,7 +214,8 @@ public sealed partial class CalendarScreen : Screen
             var nav = K.H(4, prevButton, today, nextButton);
             nav.VerticalAlignment = VerticalAlignment.Center;
             pager = nav;
-            // (0.3.65) each symbol-only button's tooltip is its name, shown soon (NameTip) — what it does is its help text
+            // (0.3.65) each symbol-only button says its name — (0.3.66) widening to show it beside its symbol while the
+            // pointer rests on it (HoverWords) — and what it does is its help text
             var calendars = calendarsButton = K.IconButton(SymbolRegular.CalendarCheckmark24, ChooseCalendars, "Calendars", 16, 32);
             System.Windows.Automation.AutomationProperties.SetHelpText(calendars, "Choose the calendars shown");
             // (0.3.53) Canvas's Scheduler: office hours and sign-ups with a time to reserve — (0.3.65) a person and a speech
@@ -228,7 +229,7 @@ public sealed partial class CalendarScreen : Screen
             todoButton = K.IconButton(SymbolRegular.PanelLeft24, ToggleTodo, "Hide To Do", 16, 32);
             Button? more = null;
             more = K.IconButton(SymbolRegular.MoreHorizontal24, () => MoreMenu(more!), "More", 16, 32);
-            foreach (var b in new Button[] { prevButton!, nextButton!, todoButton!, finder, sync, calendars, more }) NameTip(b);
+            foreach (var b in new Button[] { prevButton!, nextButton!, todoButton!, finder, sync, calendars, more }) HoverWords(b);
             foreach (var e in new FrameworkElement[] { spinner, today, todoButton, finder, sync, calendars, more }) e.VerticalAlignment = VerticalAlignment.Center;
             commands = K.H(8, spinner, selector, nav, todoButton, finder, sync, calendars, more);
             PaintCommands();
@@ -243,19 +244,19 @@ public sealed partial class CalendarScreen : Screen
     {
         if (commands == null) return;
         var week = mode == "week";
-        void Words(Button? b, string name, string tip)
+        void Words(Button? b, string name, string keys)
         {
             if (b == null) return;
-            b.ToolTip = tip;
-            System.Windows.Automation.AutomationProperties.SetName(b, name);
+            System.Windows.Automation.AutomationProperties.SetName(b, name); // (the name it widens to show: HoverWords)
+            System.Windows.Automation.AutomationProperties.SetAcceleratorKey(b, keys);
         }
-        Words(prevButton, week ? "Previous week" : "Previous month", week ? "Previous week (←)" : "Previous month (←)");
-        Words(nextButton, week ? "Next week" : "Next month", week ? "Next week (→)" : "Next month (→)");
+        Words(prevButton, week ? "Previous week" : "Previous month", "Left");
+        Words(nextButton, week ? "Next week" : "Next month", "Right");
         if (pager != null) pager.Visibility = mode == "list" ? Visibility.Collapsed : Visibility.Visible;
         if (todoButton != null)
         {
             todoButton.Visibility = mode == "list" ? Visibility.Collapsed : Visibility.Visible; // (0.3.65: the list's column is its month)
-            Words(todoButton, TodoOn ? "Hide To Do" : "Show To Do", TodoOn ? "Hide To Do" : "Show To Do");
+            Words(todoButton, TodoOn ? "Hide To Do" : "Show To Do", "");
             // (on: filled, as a toggle's on state is — the web's is-on)
             if (TodoOn) todoButton.SetResourceReference(Control.BackgroundProperty, B.Subtle);
             else todoButton.ClearValue(Control.BackgroundProperty);
@@ -270,13 +271,50 @@ public sealed partial class CalendarScreen : Screen
             week ? $"{WeekDays} days: press again for {(WeekDays == 5 ? "seven" : "five")}" : null);
     }
 
-    /// <summary>(0.3.65) A symbol-only button's name, as its tooltip, under it and soon: a quarter of a second's rest on it
-    /// rather than Windows' own wait, and gone as soon as the pointer leaves.</summary>
-    private static void NameTip(Button b)
+    /// <summary>
+    /// (0.3.66, the Mac's 1.3.172) A symbol-only button says its name while the pointer rests on it: after a quarter of a
+    /// second the button itself widens to show its name (its automation name) beside its symbol, and narrows again as the
+    /// pointer leaves or presses. Nothing floats over what is near it, as a tooltip did (0.3.65).
+    /// </summary>
+    private static void HoverWords(Button b)
     {
-        ToolTipService.SetInitialShowDelay(b, 250);
-        ToolTipService.SetBetweenShowDelay(b, 0);
-        ToolTipService.SetPlacement(b, PlacementMode.Bottom);
+        if (b.Content is not UIElement symbol) return;
+        var box = double.IsNaN(b.Width) ? 32 : b.Width;
+        b.ToolTip = null;
+        b.Content = null;
+        var word = K.Text("", Ty.Body);
+        word.VerticalAlignment = VerticalAlignment.Center;
+        word.Margin = new Thickness(0, 0, 11, 1);
+        word.Opacity = 0;
+        var mark = new Grid { Width = box - 2, Children = { symbol } };
+        if (symbol is FrameworkElement f) f.HorizontalAlignment = HorizontalAlignment.Center;
+        b.Content = new StackPanel { Orientation = Orientation.Horizontal, Children = { mark, word } };
+        b.HorizontalContentAlignment = HorizontalAlignment.Left;
+        b.ClipToBounds = true;
+        var wait = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+        var open = false;
+        void Show()
+        {
+            wait.Stop();
+            word.Text = System.Windows.Automation.AutomationProperties.GetName(b);
+            word.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            open = true;
+            Motion.To(b, FrameworkElement.WidthProperty, box + word.DesiredSize.Width, Motion.Normal, Motion.Out);
+            Motion.To(word, UIElement.OpacityProperty, 1, Motion.Normal);
+        }
+        void Hide()
+        {
+            wait.Stop();
+            if (!open) return;
+            open = false;
+            Motion.To(b, FrameworkElement.WidthProperty, box, Motion.Normal, Motion.Out);
+            Motion.To(word, UIElement.OpacityProperty, 0, Motion.Fast);
+        }
+        wait.Tick += (_, _) => { if (b.IsMouseOver && b.IsEnabled) Show(); else wait.Stop(); };
+        b.MouseEnter += (_, _) => wait.Start();
+        b.MouseLeave += (_, _) => Hide();
+        b.PreviewMouseLeftButtonDown += (_, _) => Hide();
+        b.IsVisibleChanged += (_, _) => { if (!b.IsVisible) Hide(); };
     }
 
     /// <summary>(0.3.64) The commands kept to the few on a narrow page.</summary>
@@ -807,6 +845,36 @@ public sealed partial class CalendarScreen : Screen
         finally { Shot.Ended(); }
     }
 
+    /// <summary>
+    /// (0.3.66) The screenshot suite's plan popup (--open cal-plan-popup; --open cal-plan-edit, at its Edit): the first piece
+    /// of work still to do planned at its first free time, the week read again and scrolled to it, then its block's popup
+    /// opened; the log says so.
+    /// </summary>
+    private async Task ShotPlanPopup(bool edit)
+    {
+        Shot.Began();
+        try
+        {
+            var todo = await engine.Call<TodoData>("todo");
+            if (todo.Sections.SelectMany(s => s.Rows).FirstOrDefault(r => !r.Done && r.Custom != true) is not { } row) { Log.Write("calendar: no work to plan"); return; }
+            var slots = await engine.Call<PlanSlots>("planSlots", new { id = row.Id, mins = 60 });
+            if (slots.Slots is not { Count: > 0 } list || CalendarKit.Date(list[0].At) is not { } at) { Log.Write("calendar: no free time to plan"); return; }
+            await engine.Call<OK>("planPut", new { id = row.Id, at = list[0].At, mins = 60 });
+            string Iso(DateTime d) => DateTime.SpecifyKind(d, DateTimeKind.Local).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
+            var day = await engine.Call<CalendarData>("calendar", new { from = Iso(at.Date), to = Iso(at.Date.AddDays(1)) });
+            if (day.Events.FirstOrDefault(e => CalendarKit.IsPlan(e) && e.PlanId == row.Id) is not { } ev) { Log.Write("calendar: the plan is not on the calendar"); return; }
+            weekScroll = GridInset + Math.Max(0, at.Hour - 2) * hourPx;
+            Read();
+            engine.DataChanged();
+            await Task.Delay(1500);
+            PlanSheet.Show(engine, ev, Window.GetWindow(page), PlanChanged, edit);
+            Log.Write($"calendar: plan popup opened{(edit ? " at its Edit" : "")} for {row.Id}");
+            await Task.Delay(1500);
+        }
+        catch (Exception e) { Log.Write("calendar: plan popup " + e.Message); }
+        finally { Shot.Ended(); }
+    }
+
     /// <summary>The screenshot suite's preview (--open preview): the first item on screen opens its preview, once.</summary>
     private void PreviewShot()
     {
@@ -821,6 +889,9 @@ public sealed partial class CalendarScreen : Screen
             page.Dispatcher.BeginInvoke(OpenSync, DispatcherPriority.Background);
         // (0.3.62) and a plan on the week, moved an hour on as a drag moves one (--open cal-plan)
         if (cal.Data != null && !cal.Loading && Launch.Take("cal-plan") != null) _ = ShotPlanMoved();
+        // (0.3.66) and a plan's popup (--open cal-plan-popup), or its Edit (--open cal-plan-edit)
+        if (cal.Data != null && !cal.Loading && Launch.Take("cal-plan-popup") != null) _ = ShotPlanPopup(edit: false);
+        if (cal.Data != null && !cal.Loading && Launch.Take("cal-plan-edit") != null) _ = ShotPlanPopup(edit: true);
         // (0.3.64) and the menu of the week's five days or seven (--open cal-week-menu), under Week; and the week pinched to
         // the whole day (--open cal-pinch)
         if (cal.Data != null && !cal.Loading && mode == "week" && Launch.Take("cal-week-menu") != null) _ = ShotWeekMenu();

@@ -26,6 +26,11 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.66", "2026-10-26",
+            ("new", "Edit Your Plans", "Click a plan to rename it, repeat it, colour it and more."),
+            ("new", "Stretch a Plan", "Drag a plan's foot to make it longer or shorter."),
+            ("new", "Group Your Tasks", "Drop a task or a plan onto a plan to work on them together."),
+            ("improved", "Buttons Grow a Name", "A calendar button widens to show its name as you point.")),
         R("0.3.65", "2026-10-26",
             ("new", "Pick Agenda's Days", "In Agenda, pick its days on the month on the left."),
             ("improved", "Buttons Say Their Name", "Rest the pointer on a calendar button to see its name."),

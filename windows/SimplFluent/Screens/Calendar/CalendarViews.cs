@@ -228,7 +228,7 @@ public sealed partial class CalendarScreen
         if (CalendarKit.IsStruck(ev) && !missing) title.Struck();
         var g = K.Columns("auto, *", mark.Col(0), title.Col(1));
         var b = K.Subtle(g, null, new Thickness(3, 1, 4, 1), 5);
-        b.Click += (_, _) => peek.Press(ev, b);
+        b.Click += (_, _) => Press(ev, b);
         b.ToolTip = ev.Title;
         Item(b, ev, menu: false);
         return b;
@@ -299,7 +299,7 @@ public sealed partial class CalendarScreen
             g.Children.Add(time.Margin(8, 0, 0, 0).Align(HorizontalAlignment.Right, VerticalAlignment.Center).Col(3));
         }
         var b = K.Subtle(g, null, new Thickness(8, 9, 8, 9));
-        b.Click += (_, _) => peek.Press(ev, b);
+        b.Click += (_, _) => Press(ev, b);
         Item(b, ev, menu: true);
         return b;
     }
@@ -312,6 +312,30 @@ public sealed partial class CalendarScreen
     /// An item's button made one: known by its preview (the press that opened it, pressed again, folds it back), named for
     /// a screen reader, its own menu where it has an address (open it, open it in Canvas, copy its link).
     /// </summary>
+    /// <summary>(0.3.66) An item pressed: a plan's own popup (its settings, Edit: PlanSheet), anything else's preview.</summary>
+    private void Press(CalEvent ev, Button b)
+    {
+        if (CalendarKit.IsPlan(ev) && CalendarKit.Text(ev.PlanId) != null)
+        {
+            peek.Dismiss();
+            PlanSheet.Show(engine, ev, Window.GetWindow(page), PlanChanged);
+        }
+        else peek.Press(ev, b);
+    }
+
+    /// <summary>(0.3.66) A plan changed from its popup or its block: the calendar, and To Do beside it, read again.</summary>
+    private void PlanChanged()
+    {
+        Read();
+        engine.DataChanged();
+    }
+
+    /// <summary>(0.3.66) Delete Plan: the plan let go, its group with it.</summary>
+    private async Task DeletePlan(string id)
+    {
+        if (await engine.Act("planClear", new { id, group = true })) PlanChanged();
+    }
+
     private void Item(Button b, CalEvent ev, bool menu)
     {
         b.Tag = CalendarPeek.KeyOf(ev);
@@ -336,12 +360,13 @@ public sealed partial class CalendarScreen
                 m.Items.Add(CalendarKit.Item("Give Back This Time", SymbolRegular.CalendarCancel24, () => _ = GiveBack(held)));
                 m.Items.Add(CalendarKit.Item("Find Another Time…", SymbolRegular.CalendarClock24, FindAppointment));
             }
-            // (0.3.60) a plan: moved (the rail under it) or cleared
+            // (0.3.60) a plan: moved (the rail under it) or cleared — (0.3.66) edited, or deleted with its group
             if (planned != null)
             {
                 if (m.Items.Count > 0) m.Items.Add(new Separator());
+                m.Items.Add(CalendarKit.Item("Edit Plan…", SymbolRegular.Edit24, () => PlanSheet.Show(engine, ev, Window.GetWindow(page), PlanChanged, editing: true)));
                 m.Items.Add(CalendarKit.Item("Move Plan…", SymbolRegular.Clock24, () => PlanRail.Open(b, planned, ev.Title, engine, Read)));
-                m.Items.Add(CalendarKit.Item("Clear Plan", SymbolRegular.CalendarCancel24, () => PlanRail.Clear(planned, engine, Read)));
+                m.Items.Add(CalendarKit.Item("Delete Plan", SymbolRegular.CalendarCancel24, () => _ = DeletePlan(planned)));
             }
             b.ContextMenu = m;
         }

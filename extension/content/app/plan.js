@@ -40,6 +40,11 @@
 
   // ---- the plans ------------------------------------------------------------------------------------
   // prefs 'plans' (this Canvas's own): itemId -> { at, mins, title, url, course, color, due, ev } — ev: the Canvas event it was sent as
+  // (2.99.113) and, a plan being an event of its own (Calendar → a plan → Edit): name, allDay, repeat, alert, notes and
+  // tint (a colour of its own), each there only when set, kept when the plan is moved or given another time
+  // (2.99.114) and group: the plans dropped one on another are one block — each keeps a record of its own, with the
+  // group's time, length and settings and the group's id (the plan first dropped on); moved, stretched or edited, every
+  // one of them changes together
   let plans = {};
   let loaded = null;
   const listeners = new Set();
@@ -66,35 +71,108 @@
 
   const lengthFor = (it) => (/quiz|discussion/.test(it.type || '') ? 30 : 60);
   const isDoneWork = (it) => !!(it.complete || it.submitted || it.graded || it.dismissed || it.excused);
+  const KEEP = ['name', 'repeat', 'alert', 'notes', 'tint']; // (what Edit set, kept through a new time)
+  const kept = (p) => Object.fromEntries(KEEP.filter((k) => p?.[k] != null && p[k] !== '').map((k) => [k, p[k]]));
   async function put(it, at, mins) {
     const prev = plans[it.id] || null;
-    const plan = { at: new Date(at).toISOString(), mins, title: it.title, url: it.url || '', course: it.custom ? (it.course?.name || 'My task') : (it.courseName || ''), color: it.course?.color || null, due: it.date ? new Date(it.date).toISOString() : null, ev: prev?.ev || null };
+    const plan = { at: new Date(at).toISOString(), mins, title: it.title, url: it.url || '', course: it.custom ? (it.course?.name || 'My task') : (it.courseName || ''), color: it.course?.color || null, due: it.date ? new Date(it.date).toISOString() : null, ev: prev?.ev || null, ...kept(prev) };
     const patch = { [it.id]: plan };
     const cut = Date.now() - 30 * DAY; // (plans a month past are let go)
-    for (const [k, p] of Object.entries(plans)) if (k !== it.id && Date.parse(p.at) < cut) patch[k] = null;
+    for (const [k, p] of Object.entries(plans)) if (k !== it.id && !p.repeat && Date.parse(p.at) < cut) patch[k] = null; // (a repeating one goes on)
     plans = Object.fromEntries(Object.entries({ ...plans, ...patch }).filter(([, v]) => v));
     changed();
     await store.mergePref('plans', patch);
     return plan;
   }
-  /** (2.99.109) A plan moved to another time, as it is (its block dragged on the Calendar's week). */
-  async function move(id, at) {
-    const p = plans[id];
-    if (!p) return null;
-    const next = { ...p, at: new Date(at).toISOString() };
-    plans = { ...plans, [id]: next };
+  /** (2.99.114) The plans of a plan's group (or the plan alone): their ids, the group's first one first. */
+  const groupOf = (id) => {
+    const g = plans[id]?.group;
+    if (!g) return plans[id] ? [id] : [];
+    return Object.keys(plans).filter((k) => plans[k].group === g).sort((a, b) => (a === g ? -1 : b === g ? 1 : 0));
+  };
+  /** Each plan of a plan's group changed by fn, saved together. */
+  async function each(id, fn) {
+    const ids = groupOf(id);
+    if (!ids.length) return null;
+    const patch = Object.fromEntries(ids.map((k) => [k, fn({ ...plans[k] })]));
+    plans = { ...plans, ...patch };
     changed();
-    await store.mergePref('plans', { [id]: next });
-    return next;
+    await store.mergePref('plans', patch);
+    return patch[id];
   }
-  async function clear(id) {
+  /** (2.99.109) A plan moved to another time, as it is (its block dragged on the Calendar's week) — its group with it. */
+  async function move(id, at) {
+    return each(id, (p) => ({ ...p, at: new Date(at).toISOString() }));
+  }
+  /**
+   * (2.99.114) A piece of work (a To Do row) or another plan (its id) dropped on a plan: one block now, the group's — at
+   * its time, for as long, with its settings; the plan dropped on leads it. A plan dropped on its own group stays put.
+   */
+  async function join(src, ontoId) {
+    const lead = plans[ontoId];
+    const id = typeof src === 'string' ? src : src?.id;
+    if (!lead || !id || id === ontoId || (lead.group && plans[id]?.group === lead.group)) return null;
+    const gid = lead.group || ontoId;
+    const prev = plans[id] || null;
+    const own = typeof src === 'string'
+      ? { title: prev?.title || '', url: prev?.url || '', course: prev?.course || '', color: prev?.color || null, due: prev?.due || null }
+      : { title: src.title, url: src.url || '', course: src.custom ? (src.course?.name || 'My task') : (src.courseName || ''), color: src.course?.color || null, due: src.date ? new Date(src.date).toISOString() : null };
+    const shared = Object.fromEntries(['at', 'mins', 'allDay', ...KEEP].filter((k) => lead[k] != null && lead[k] !== '').map((k) => [k, lead[k]]));
+    const patch = { [id]: { ...own, ev: prev?.ev || null, ...shared, group: gid } };
+    if (!lead.group) patch[ontoId] = { ...lead, group: gid };
+    const left = prev?.group && prev.group !== gid ? Object.keys(plans).filter((k) => k !== id && plans[k].group === prev.group) : [];
+    if (left.length === 1) { const { group: _g, ...alone } = plans[left[0]]; patch[left[0]] = alone; } // (the group it came from, down to one: a plan alone)
+    plans = { ...plans, ...patch };
+    changed();
+    await store.mergePref('plans', patch);
+    return patch[id];
+  }
+  /** (2.99.113) A plan's own settings changed (Calendar → a plan → Edit): { name, at, mins, allDay, repeat, alert, notes,
+   *  tint } — one left empty (or null) is taken off. */
+  async function edit(id, fields) {
+    return each(id, (p) => {
+      const next = { ...p };
+      for (const [k, v] of Object.entries(fields)) {
+        if (v == null || v === '' || v === false) delete next[k];
+        else next[k] = k === 'at' ? new Date(v).toISOString() : v;
+      }
+      next.mins = Math.max(15, Math.min(24 * 60, Number(next.mins) || 60));
+      return next;
+    });
+  }
+  const REPEATS = [['', 'Never'], ['day', 'Every day'], ['week', 'Every week'], ['2week', 'Every 2 weeks'], ['month', 'Every month']];
+  const ALERTS = [[null, 'None'], [0, 'At the time'], [5, '5 minutes before'], [10, '10 minutes before'], [15, '15 minutes before'], [30, '30 minutes before'], [60, '1 hour before'], [1440, '1 day before']];
+  /** When a plan falls in [from, to): its own time, and, repeating, each time after it (a hundred at most). */
+  function occurrences(p, from, to) {
+    const a = Date.parse(p.at);
+    if (!a) return [];
+    if (!p.repeat) return a >= from && a < to ? [a] : [];
+    const out = [];
+    const d = new Date(a);
+    for (let i = 0; i < 400 && d.getTime() < to && out.length < 100; i++) {
+      if (d.getTime() >= from) out.push(d.getTime());
+      if (p.repeat === 'day') d.setDate(d.getDate() + 1);
+      else if (p.repeat === 'week') d.setDate(d.getDate() + 7);
+      else if (p.repeat === '2week') d.setDate(d.getDate() + 14);
+      else if (p.repeat === 'month') d.setMonth(d.getMonth() + 1);
+      else break;
+    }
+    return out;
+  }
+  /** A plan let go (a group's others stay together: down to one, it is a plan alone again). { group: true }: its whole group. */
+  async function clear(id, { group = false } = {}) {
     const prev = plans[id];
     if (!prev) return;
-    const { [id]: _gone, ...rest } = plans;
-    plans = rest;
+    const ids = group ? groupOf(id) : [id];
+    const evs = ids.map((k) => plans[k]?.ev).filter(Boolean); // (copies once put on Canvas's calendar, 2.99.107)
+    const patch = Object.fromEntries(ids.map((k) => [k, null]));
+    const left = prev.group && !group ? Object.keys(plans).filter((k) => k !== id && plans[k].group === prev.group) : [];
+    if (left.length === 1) { const { group: _g, ...alone } = plans[left[0]]; patch[left[0]] = alone; }
+    else if (left.length && prev.group === id) { const lead = left[0]; for (const k of left) patch[k] = { ...plans[k], group: lead }; } // (its lead let go: the next leads)
+    plans = Object.fromEntries(Object.entries({ ...plans, ...patch }).filter(([, v]) => v));
     changed();
-    await store.mergePref('plans', { [id]: null });
-    if (prev.ev) C.del(`/api/v1/calendar_events/${prev.ev}`).catch(() => {});
+    await store.mergePref('plans', patch);
+    for (const ev of evs) C.del(`/api/v1/calendar_events/${ev}`).catch(() => {});
   }
 
   // ---- (2.99.110) Send plans, retired --------------------------------------------------------------------------
@@ -275,10 +353,12 @@
     function paint() {
       for (const b of lenBtns) { const on = Number(b.dataset.mins) === mins; b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); }
       if (!slots) { track.replaceChildren(U.el('bcv-planbar__wait', 'Finding free time…')); status.textContent = ''; return; }
+      // (2.99.109) the day said once, over the first of its times, and a little more room before each new day: the times
+      // read as a day's handful, not "Today" four times over
       const chips = slots.map((s, i) => {
         const prevDay = i && U.sameDay(new Date(slots[i - 1].at), new Date(s.at));
         return h('button', { type: 'button', class: `bcv-planbar__slot ${i === sel ? 'is-on' : ''} ${prevDay ? '' : 'is-day'} ${planned === s.at ? 'is-current' : ''}`, dataset: { at: String(s.at) }, tabIndex: mode === 'pick' ? (i === sel ? 0 : -1) : -1, 'aria-label': `${whenWords(s.at)}, ${lenWord(mins)}`, onclick: () => commit(i) }, [
-          h('span', { class: 'bcv-planbar__day', text: dayWord(s.at) }),
+          h('span', { class: 'bcv-planbar__day', text: prevDay ? '' : dayWord(s.at), 'aria-hidden': prevDay ? 'true' : null }),
           h('span', { class: 'bcv-planbar__time', text: U.fmtTime(s.at) }),
         ]);
       });
@@ -296,7 +376,11 @@
       if (!slots?.length) return;
       const f = Math.max(-1, Math.min(slots.length - 1, (pulled - LEAD) / STEP));
       const next = f < -0.5 ? -1 : Math.round(f);
-      track.style.transform = `translateX(${(1 - next) * CHIP}px)`;
+      // (by where the chip is: a new day has a little more room before it)
+      const chipEls = track.querySelectorAll('.bcv-planbar__slot');
+      const x = next < 0 ? -CHIP : chipEls[next]?.offsetLeft ?? next * CHIP;
+      track.style.transform = `translateX(${CHIP - x}px)`;
+      if (rowEl.classList.contains('is-pulling')) rowEl.classList.toggle('is-armed', next >= 0);
       if (next !== sel) {
         sel = next;
         for (const [i, c] of [...track.querySelectorAll('.bcv-planbar__slot')].entries()) c.classList.toggle('is-on', i === sel);
@@ -417,6 +501,7 @@
     const pid = e.pointerId;
     let engaged = false;
     let rail = null;
+    let reveal = null;
     const move = (ev) => {
       if (ev.pointerId !== pid) return;
       const dx = ev.clientX - x0;
@@ -429,10 +514,17 @@
         try { window.getSelection()?.removeAllRanges(); } catch { /* none */ }
         rowEl.classList.add('is-pulling');
         rowEl.style.transition = 'none';
+        // (2.99.109) what the pull will do, uncovered behind the row as it moves: a clock that grows with the pull and
+        // fills once a time is chosen (as a list's swipe shows its action under the row)
+        reveal = U.el('bcv-pullreveal', U.svg(IC.clock, { size: 16, stroke: 'currentColor', width: 2.3 }), { 'aria-hidden': 'true' });
+        rowEl.prepend(reveal);
         rail = openBar(rowEl, it, { mode: 'pull' });
       }
       ev.preventDefault();
-      rowEl.style.transform = `translateX(${rubber(dx - ENGAGE).toFixed(1)}px)`;
+      const shift = rubber(dx - ENGAGE);
+      rowEl.style.transform = `translateX(${shift.toFixed(1)}px)`;
+      rowEl.style.setProperty('--bcv-pull', `${shift.toFixed(1)}px`);
+      rowEl.style.setProperty('--bcv-pull-k', Math.min(1, shift / 40).toFixed(3));
       rail.pull(dx - ENGAGE);
     };
     const up = (ev) => { if (ev.pointerId === pid) finish(ev.type === 'pointerup'); };
@@ -448,9 +540,12 @@
       if (!engaged) return;
       swallowUntil = performance.now() + 1000;
       const pick = letGo ? rail.chosen() : null;
-      rowEl.classList.remove('is-pulling');
+      rowEl.classList.remove('is-pulling', 'is-armed');
       rowEl.style.transition = ''; // (springs home: the stylesheet's transition on .bcv-pullable)
       rowEl.style.transform = '';
+      rowEl.style.removeProperty('--bcv-pull');
+      rowEl.style.removeProperty('--bcv-pull-k');
+      reveal?.remove();
       if (pick) rail.commit(pick.i); else rail.close();
     }
     window.addEventListener('pointermove', move, { capture: true, passive: false });
@@ -478,5 +573,5 @@
     return rowEl;
   }
 
-  BCV.plan = { ready, get, all, onChange, put, move, clear, attach, pill, open: openBar, close: closeBar, freeSlots, slotsFor, slotOn, linked, linkedEvents, sending, setSending, canSend, retireSending, whenWords, dayWord, lenWord, lengthFor };
+  BCV.plan = { ready, get, all, onChange, put, move, edit, join, groupOf, occurrences, REPEATS, ALERTS, clear, attach, pill, open: openBar, close: closeBar, freeSlots, slotsFor, slotOn, linked, linkedEvents, sending, setSending, canSend, retireSending, whenWords, dayWord, lenWord, lengthFor };
 })();

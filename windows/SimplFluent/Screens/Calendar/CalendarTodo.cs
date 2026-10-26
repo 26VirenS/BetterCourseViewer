@@ -496,7 +496,7 @@ public sealed partial class CalendarScreen
 
     /// <summary>A day of the week taking a row of To Do dragged over it: where it would go follows the pointer a quarter of
     /// an hour at a time (the hour's block centred under it); let go, the work is planned there.</summary>
-    private void TodoDrops(Grid cell, DateTime day)
+    private void TodoDrops(Grid cell, DateTime day, List<WeekSlot>? slots = null)
     {
         cell.Background ??= Brushes.Transparent;
         cell.AllowDrop = true;
@@ -506,12 +506,18 @@ public sealed partial class CalendarScreen
             var m = (int)Math.Round((y / hourPx * 60 - 30) / Snap) * Snap;
             return Math.Clamp(m, 0, DayEnd - 60);
         }
+        // (0.3.66) the plan under the pointer, if any: a row let go there joins its group
+        WeekSlot? Onto(DragEventArgs e)
+        {
+            var m = (int)((e.GetPosition(cell).Y - GridInset) / hourPx * 60);
+            return slots?.FirstOrDefault(x => CalendarKit.IsPlan(x.Ev) && CalendarKit.Text(x.Ev.PlanId) != null && x.Ev.AllDay != true && m >= x.A && m < (x.Pulled ?? x.B));
+        }
         void Over(object _, DragEventArgs e)
         {
             e.Handled = true;
             if (!e.Data.GetDataPresent(TodoFormat)) { e.Effects = DragDropEffects.None; return; }
             e.Effects = DragDropEffects.Copy;
-            ShowDrop(cell, day, MinutesAt(e), placing: false);
+            ShowDrop(cell, day, MinutesAt(e), placing: false, onto: Onto(e));
         }
         cell.DragEnter += Over;
         cell.DragOver += Over;
@@ -526,6 +532,12 @@ public sealed partial class CalendarScreen
         {
             if (e.Data.GetData(TodoFormat) is not string id) return;
             e.Handled = true;
+            if (Onto(e) is { } onto && CalendarKit.Text(onto.Ev.PlanId) is { } target)
+            {
+                ShowDrop(cell, day, onto.A, placing: true, onto: onto);
+                _ = JoinFromTodo(id, target, onto.Ev.Title);
+                return;
+            }
             var m = MinutesAt(e);
             ShowDrop(cell, day, m, placing: true);
             _ = PlanFromTodo(id, day.AddMinutes(m));
@@ -534,7 +546,7 @@ public sealed partial class CalendarScreen
 
     /// <summary>An hour's block in a day at <paramref name="minutes"/>, its times on it: dashed while it is only where a row
     /// would go, solid once let go.</summary>
-    private void ShowDrop(Grid cell, DateTime day, int minutes, bool placing)
+    private void ShowDrop(Grid cell, DateTime day, int minutes, bool placing, WeekSlot? onto = null)
     {
         if (dropMark == null)
         {
@@ -550,13 +562,18 @@ public sealed partial class CalendarScreen
         if (dropMark.Parent is Panel old && old != cell) old.Children.Remove(dropMark);
         if (dropMark.Parent == null) cell.Children.Add(dropMark);
         dropMark.Tag = placing ? "placing" : null;
-        dropMark.Height = Math.Max(20, hourPx - 2);
-        dropMark.Margin = new Thickness(3, GridInset + WeekY(minutes), 3, 0);
-        if (dropMark.Children[1] is Rectangle edge) edge.StrokeDashArray = placing ? null : new DoubleCollection { 4, 3 };
+        // (0.3.66) held over a plan: that plan's block, ringed, "Group with …" on it
+        dropMark.Height = onto?.Height(hourPx) ?? Math.Max(20, hourPx - 2);
+        dropMark.Margin = new Thickness(3, GridInset + WeekY(onto?.A ?? minutes), 3, 0);
+        if (dropMark.Children[1] is Rectangle edge)
+        {
+            edge.StrokeDashArray = placing || onto != null ? null : new DoubleCollection { 4, 3 };
+            edge.StrokeThickness = onto != null ? 2 : 1.5;
+        }
         if (dropMark.Children[2] is TextBlock words)
         {
             var at = day.AddMinutes(minutes);
-            words.Text = $"{ClockWords(at)} – {ClockWords(at.AddHours(1))}\n{(placing ? "Planning it…" : "Plan it here")}";
+            words.Text = onto != null ? $"Group with\n{onto.Ev.Title}" : $"{ClockWords(at)} – {ClockWords(at.AddHours(1))}\n{(placing ? "Planning it…" : "Plan it here")}";
         }
     }
 
@@ -581,6 +598,24 @@ public sealed partial class CalendarScreen
         else
         {
             Log.Write($"calendar: could not plan {id} from To Do");
+            HideDrop();
+        }
+    }
+
+    /// <summary>(0.3.66) A row let go on a plan of the week: one block with it, the plan's group's (the page's planJoin), and
+    /// what came of it said under To Do.</summary>
+    private async Task JoinFromTodo(string id, string onto, string title)
+    {
+        if (await engine.Act("planJoin", new { id, onto }))
+        {
+            Log.Write($"calendar: {id} grouped with {onto}");
+            Said($"Grouped with {title}");
+            Read();
+            engine.DataChanged();
+        }
+        else
+        {
+            Log.Write($"calendar: could not group {id} with {onto}");
             HideDrop();
         }
     }
