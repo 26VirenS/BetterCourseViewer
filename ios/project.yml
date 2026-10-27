@@ -12,8 +12,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MARKETING_VERSION: "1.7.5" # the iPhone app's own version, from 1.0 up (the interface it carries is numbered by extension/manifest.json)
-    CURRENT_PROJECT_VERSION: "29"
+    MARKETING_VERSION: "1.7.6" # the iPhone app's own version, from 1.0 up (the interface it carries is numbered by extension/manifest.json)
+    CURRENT_PROJECT_VERSION: "30"
     CODE_SIGN_STYLE: Automatic
 targets:
   SimplCourses:
@@ -45,6 +45,9 @@ targets:
         CFBundleDisplayName: Simpl Courses
         CFBundleName: Simpl Courses
         CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleURLTypes: # (1.7.6) simplcourses://open?url=… and simplcourses:///courses/1 open the app there (Engine.openFromOutside)
+          - CFBundleURLName: com.simplcourses.app
+            CFBundleURLSchemes: [simplcourses]
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSRequiresIPhoneOS: true
         NSAppTransportSecurity:

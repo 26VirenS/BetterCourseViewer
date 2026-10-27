@@ -285,6 +285,36 @@ final class Activity: ObservableObject {
         try? await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "simpl.activity.\(e.key)", content: c, trigger: nil))
     }
 
+    // MARK: - Still signed in? (iPhone 1.7.6)
+
+    /// What the school says of the sign-in kept on this device.
+    enum SignIn { case signedIn, signedOut, unknown }
+
+    /// Asked of the school itself — Canvas's own account (api/v1/users/self), Brightspace's whoami — with `cookies` (the
+    /// web view's own, as it holds them now): refused, or sent to the sign-in page, it has ended; no answer (offline, the
+    /// school down) or one not to read, unknown.
+    static func signIn(at base: URL, cookies: [HTTPCookie], lms: String?) async -> SignIn {
+        let host = base.host?.lowercased() ?? ""
+        let fields = HTTPCookie.requestHeaderFields(with: cookies.filter { cookie($0, fits: host) })
+        let ctx = context()
+        let d2l = (lms ?? ctx.lms) == "d2l"
+        let url = d2l ? base.appendingPathComponent("d2l/api/lp/\(ctx.lp ?? "1.50")/users/whoami") : base.appendingPathComponent("api/v1/users/self")
+        return await signInAnswer(url, cookies: fields, d2l: d2l)
+    }
+
+    private nonisolated static func signInAnswer(_ url: URL, cookies: [String: String], d2l: Bool) async -> SignIn {
+        var req = URLRequest(url: url, timeoutInterval: 12)
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.httpShouldHandleCookies = false
+        for (k, v) in cookies { req.setValue(v, forHTTPHeaderField: k) }
+        guard let answer = try? await URLSession.shared.data(for: req), let http = answer.1 as? HTTPURLResponse else { return .unknown }
+        // (Canvas says an ended sign-in with 401 alone — a 403 is a page the student may not see; Brightspace with either)
+        if http.statusCode == 401 || (d2l && http.statusCode == 403) { return .signedOut }
+        if (http.url?.path.lowercased() ?? "").contains("login") { return .signedOut } // (sent on to the sign-in page)
+        guard http.statusCode == 200, let me = json(answer.0) as? [String: Any] else { return .unknown }
+        return me[d2l ? "Identifier" : "id"] != nil ? .signedIn : .unknown
+    }
+
     /// Canvas refused the kept sign-in (it ended): said once, until a check gets through again.
     private func sayStale() async {
         guard !UserDefaults.standard.bool(forKey: Activity.staleKey) else { return }

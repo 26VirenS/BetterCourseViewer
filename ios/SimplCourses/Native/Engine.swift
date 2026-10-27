@@ -106,6 +106,14 @@ final class Engine: ObservableObject, ShellListener {
     private var asked: Ask?
     private var insets: (top: CGFloat, bottom: CGFloat) = (0, 0)
     private var shownNative = false
+    /// (1.7.6) Where the student was going as the app opened — a notification pressed, a link — kept until the school is
+    /// known to have them signed in and the app's screens are up, then opened (checkSignIn).
+    private var pendingOpen: String?
+    /// A sign-in check under way; when the last one found the student signed in; and the page sent back to the school's
+    /// sign-in by one, so the screens read afresh once it is done.
+    private var checking = false
+    private var lastSignedIn: Date?
+    private var signingBackIn = false
 
     init(host: String) {
         self.host = host
@@ -180,6 +188,14 @@ final class Engine: ObservableObject, ShellListener {
                     shownNative = true
                     Task { await self.firstNative() }
                 }
+                // (1.7.6) up on a page the school drew for the student: signed in. After a sign-in the check sent the
+                // page back to, every screen reads again (what it asked meanwhile came back empty)
+                lastSignedIn = Date()
+                if signingBackIn {
+                    signingBackIn = false
+                    changed()
+                }
+                openPending()
             } else {
                 ready = false
                 if let id = active { detach(id) }
@@ -241,6 +257,83 @@ final class Engine: ObservableObject, ShellListener {
         // after an update: what changed (seen once its sheet is really up — a sign-in still under way only delays it)
         if let wn = try? await call("whatsNew", ["due": true, "peek": true], as: WhatsNewData.self), !wn.releases.isEmpty {
             queuePopup(.whatsNew(wn))
+        }
+    }
+
+    // MARK: - Still signed in? (1.7.6)
+
+    /// Back in the app, however it came back (its icon, the app switcher, a notification, a link): the sign-in asked
+    /// after (checkSignIn).
+    func returned() {
+        checkSignIn()
+    }
+
+    /// A notification pressed or a link opened: opened once the school is known to have the student signed in and the
+    /// app's screens are up — never onto a screen left loading on a page that can no longer read anything.
+    func openChecked(_ url: String) {
+        pendingOpen = url
+        checkSignIn()
+    }
+
+    /// Whether the school still has the student signed in, asked of it directly with the web view's own sign-in
+    /// (Activity.signIn) while the app's screens are up — at every return to the app, a notification pressed, a link
+    /// opened, and when the page cannot answer a screen. Ended (the session ran out while the app was away), the page
+    /// goes back to the school's sign-in, which the saved sign-in fills in ("Logging you in"), and the screens come back
+    /// once it is done; then what was asked for opens. With the screens not up, the page on its way or the sign-in
+    /// showing is the check itself, and what was asked for waits for the screens. Asked again within half a minute of a
+    /// good answer, it is taken as still good.
+    func checkSignIn() {
+        guard phase == .native, !checking else { return }
+        if let last = lastSignedIn, Date().timeIntervalSince(last) < 30 {
+            openPending()
+            return
+        }
+        checking = true
+        Task {
+            let answer = await signInAnswer()
+            checking = false
+            switch answer {
+            case .signedOut where phase == .native:
+                print("[Simpl Courses] sign-in: ended — back to the school's sign-in")
+                signBackIn()
+            case .signedIn:
+                lastSignedIn = Date()
+                openPending()
+            default:
+                openPending() // (no answer — offline, the school down: the screens as they are)
+            }
+        }
+    }
+
+    private func signInAnswer() async -> Activity.SignIn {
+        if web.isTestSchool { return TestSchool.signedIn ? .signedIn : .signedOut } // (the test school's sign-in is the app's own)
+        let cookies = await web.webView.configuration.websiteDataStore.httpCookieStore.allCookies()
+        return await Activity.signIn(at: web.baseURL, cookies: cookies, lms: lms)
+    }
+
+    /// What was asked for while the sign-in was checked, opened once the screens are up and nothing is being checked.
+    private func openPending() {
+        guard phase == .native, !checking, let url = pendingOpen else { return }
+        pendingOpen = nil
+        go(url, title: "")
+    }
+
+    /// The page back to the school's sign-in: what is over the screens put away, the splash while the page goes, the
+    /// sign-in (or "Logging you in") once it is there; shown as it is if nothing has said otherwise in ten seconds.
+    private func signBackIn() {
+        signingBackIn = true
+        lastSignedIn = nil
+        searchOpen = false
+        tool = nil
+        quiz = nil
+        if let id = active { detach(id) }
+        ready = false
+        web.shellOn = false
+        setPhase(.starting)
+        web.load()
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 10_000_000_000)
+            if self?.phase == .starting { self?.setPhase(.web) }
         }
     }
 
@@ -319,13 +412,17 @@ final class Engine: ObservableObject, ShellListener {
         var lastError: Error = EngineError.notReady(lmsName)
         for attempt in 0..<3 {
             await whenReady()
-            guard ready else { throw EngineError.notReady(lmsName) }
+            guard ready else {
+                checkSignIn() // (1.7.6: a page that never came ready — the sign-in may have ended under it)
+                throw EngineError.notReady(lmsName)
+            }
             do {
                 let raw = try await web.webView.callAsyncJavaScript("return JSON.stringify(await BCVNative.call(name, args))", arguments: ["name": name, "args": args], in: nil, contentWorld: .defaultClient)
                 guard let text = raw as? String, let data = text.data(using: .utf8) else { throw EngineError.unreadable }
                 if let box = try? JSONDecoder().decode(ErrorBox.self, from: data), let message = box.error { throw EngineError.page(message) }
                 return try JSONDecoder().decode(T.self, from: data)
             } catch let e as EngineError {
+                if case .page = e { checkSignIn() } // (1.7.6: the page could not read it — the sign-in may have ended)
                 throw e
             } catch let e as DecodingError {
                 print("[Simpl Courses] \(name) answer not understood:", e)

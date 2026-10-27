@@ -61,7 +61,12 @@ struct RootView: View {
                 engine.setup = true
             }
         }
-        .onAppear { engine.start() }
+        .onAppear {
+            engine.start()
+            openReminder() // (a reminder pressed before the app's screens were made)
+        }
+        // (1.7.6) a link that opened the app: opened as a notification's is, the sign-in asked after first
+        .onOpenURL { engine.openFromOutside($0) }
         .onReceive(NotificationCenter.default.publisher(for: .simplSignedOut)) { _ in
             engine.web.login.forget()
             engine.web.load() // back to the login page
@@ -69,22 +74,26 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: .simplInterfaceToggled)) { _ in
             engine.reload() // Canvas's own bundles are allowed or blocked per page; a fresh load applies it
         }
-        // a reminder pressed: its work opens once the app's screens are up (a cold launch waits for them)
+        // a reminder or an alert pressed: its work opens once the school is known to have the student signed in and the
+        // app's screens are up (a cold launch waits for them) — Engine.openChecked
         .onChange(of: reminders.opening) { openReminder() }
         .onChange(of: engine.phase) { openReminder() }
-        // back in the foreground: the reminders set again from what Canvas says now
+        // back in the foreground: (1.7.6) the sign-in asked after, however the app came back; the reminders set again
+        // from what Canvas says now
         .onChange(of: scenePhase) {
             if scenePhase == .background { Activity.shared.schedule() } // (the next look for new activity, while away)
-            guard scenePhase == .active, engine.phase == .native else { return }
+            guard scenePhase == .active else { return }
+            engine.returned()
+            guard engine.phase == .native else { return }
             Task { await Reminders.shared.reschedule(engine) }
             Task { await Activity.shared.sync(engine) }
         }
     }
 
     private func openReminder() {
-        guard engine.phase == .native, let url = reminders.opening else { return }
+        guard let url = reminders.opening else { return }
         reminders.opening = nil
-        engine.go(url, title: "")
+        engine.openChecked(url)
     }
 }
 

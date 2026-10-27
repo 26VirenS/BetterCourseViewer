@@ -218,6 +218,32 @@ extension Engine {
         }
     }
 
+    /// (1.7.6) A link that opened the app — simplcourses://open?url=<an address of the school's>, simplcourses:///courses/1
+    /// (or simplcourses://courses/1), or the school's own https address — opened as a notification's is, once the school
+    /// is known to have the student signed in. Only the school's own addresses: another site's link opens nothing.
+    func openFromOutside(_ link: URL) {
+        let scheme = link.scheme?.lowercased() ?? ""
+        var target: String?
+        if scheme == "http" || scheme == "https" {
+            target = link.absoluteString
+        } else if scheme == "simplcourses" {
+            let asked = URLComponents(url: link, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "url" })?.value
+            if let asked, !asked.isEmpty {
+                target = asked
+            } else {
+                let host = link.host ?? ""
+                let path = (host == "open" ? "" : host) + link.path
+                let trimmed = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                if !trimmed.isEmpty { target = "/" + trimmed }
+            }
+        }
+        guard let target, let url = absolute(target), isCanvas(url) else {
+            returned() // (the app opened all the same: the sign-in asked after)
+            return
+        }
+        openChecked(target)
+    }
+
     /// A row's address, wherever it leads: a native screen, the web interface's screen (with the row's
     /// title while it loads), a file in the phone's viewer, another site in Safari.
     func go(_ raw: String?, title: String) {
