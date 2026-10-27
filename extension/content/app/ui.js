@@ -414,6 +414,14 @@
     }
     return webMenu(at, items);
   }
+  /** (2.99.122) A menu opened from inside a sheet — a plan's editor floating over the calendar — goes over that sheet:
+   *  a menu sits under sheets (--bcv-z-menu), so there its items were hidden by the sheet and could not be pressed. */
+  function overSheet(m, at) {
+    const ov = at?.closest?.('.bcv-sheet-ov');
+    if (!ov) return;
+    const z = parseInt(getComputedStyle(ov).zIndex, 10);
+    if (Number.isFinite(z)) m.style.zIndex = String(z + 1);
+  }
   function webMenu(at, items) {
     closeMenus();
     const m = el('bcv-menu', items.map((it) => h('button', {
@@ -430,6 +438,7 @@
         it.sub ? h('span', { class: 'bcv-menu__sub', text: it.sub }) : null,
       ]),
     ])));
+    overSheet(m, at);
     overlayRoot().append(m);
     anchor(m, at, { side: 'below' }); // (under its button, or above it when the room is above; on screen either way)
     setTimeout(() => document.addEventListener('click', closeMenus, { once: true }), 0);
@@ -657,6 +666,7 @@
     const left = Math.max(8, Math.min(r.left, window.innerWidth - 230));
     // (it grows out of the dot that opened it, not from its own middle: bcv-pop scales from the origin)
     Object.assign(m.style, { position: 'fixed', top: `${r.bottom + 6}px`, left: `${left}px`, transformOrigin: `${Math.round(r.left + r.width / 2 - left)}px top` });
+    overSheet(m, anchor);
     overlayRoot().append(m);
     setTimeout(() => document.addEventListener('click', closeMenus, { once: true }), 0);
     return m;

@@ -1978,6 +1978,9 @@ try {
   const editRows = await texts('.bcv-evedit__k');
   await page.fill('.bcv-evedit__name', 'Read and outline');
   await page.click('.bcv-evedit__pick >> nth=0');
+  // (2.99.122) its menu opens over the editor, every item on top and pressable — not under the sheet it was opened from
+  const repeatOnTop = await page.evaluate(() => [...document.querySelectorAll('.bcv-menu__item')].every((it) => { const r = it.getBoundingClientRect(); const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!top && it.contains(top); }));
+  check(repeatOnTop, "the plan editor's Repeat menu opens over the editor, each of its items on top and pressable");
   await page.locator('.bcv-menu__item', { hasText: 'Every week' }).click();
   await page.click('.bcv-evedit__pick >> nth=1');
   await page.locator('.bcv-menu__item', { hasText: '15 minutes before' }).click();

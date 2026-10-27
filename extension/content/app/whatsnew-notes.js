@@ -30,6 +30,7 @@
   self.BCV_WHATS_NEW = [
     { version: '2.99.122', date: '2026-10-27', notes: [
       { kind: 'fixed', title: 'Course Colours Show', body: 'Course names keep their colours over a sidebar photo.', icon: P.check },
+      { kind: 'fixed', title: 'Plan Menus on Top', body: "The Repeat and Alert menus open over a plan's editor.", icon: P.check },
     ] },
     { version: '2.99.121', date: '2026-10-27', notes: [
       { kind: 'fixed', title: 'Word Counter Fixed', body: "The Word Counter's text box is ready to type in at once.", icon: P.check },
