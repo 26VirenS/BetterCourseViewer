@@ -6872,6 +6872,10 @@ try {
   const sideScroll = await page.evaluate(() => { const side = document.querySelector('.bcv-side'); const pic = side.querySelector('.bcv-side__pic'); const layer = pic.querySelector('.bcv-side__pic-sharp'); const before = Math.round(layer.getBoundingClientRect().top); side.scrollTop = 10000; const after = layer.getBoundingClientRect(); return { scrollable: side.scrollHeight > side.clientHeight, scrolled: side.scrollTop, before, top: Math.round(after.top), sideTop: Math.round(side.getBoundingClientRect().top), h: Math.round(after.height), clientH: side.clientHeight, sticky: getComputedStyle(pic).position, brandTop: Math.round(side.querySelector('.bcv-brand').getBoundingClientRect().top) }; });
   check(sideScroll.sticky === 'sticky' && sideScroll.before === sideScroll.sideTop && sideScroll.top === sideScroll.sideTop && sideScroll.h === sideScroll.clientH && (!sideScroll.scrollable || sideScroll.brandTop < sideScroll.sideTop), `the sidebar's photo holds still as the sidebar scrolls (sticky, the height of the sidebar, the rows going by under it): ${JSON.stringify(sideScroll)}`);
   await shot(page, '32h2-themed-side-scrolled');
+  // (2.99.122) over the photo, each course's name keeps a colour of its own (the photo's ink mixed in), never the ink alone
+  const courseInks = await page.$$eval('#bcv-app .bcv-side--pic .bcv-nav > .bcv-fav', (els) => els.map((e) => getComputedStyle(e).color));
+  const sideInk = await page.$eval('#bcv-app .bcv-side--pic .bcv-nav__item', (e) => getComputedStyle(e).color);
+  check(courseInks.length >= 2 && new Set(courseInks).size >= 2 && !courseInks.includes(sideInk), `over the sidebar's photo each course's name keeps its own colour, not the photo's ink: ${JSON.stringify({ courseInks, sideInk })}`);
   await page.evaluate(() => { document.querySelector('.bcv-side').scrollTop = 0; });
   // Ready-made: a card places a colour and one scene drawn to each place at once — its tall drawing on the sidebar, a wide one on
   // every counter (no two the same), its long one on every header — in the panel's Themes section, left of the preview

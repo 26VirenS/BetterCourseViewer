@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.121"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.122"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -5884,6 +5884,9 @@ html.bcv-onebar .bcv-fav__dot { width: 13px; height: 13px; border-radius: 3.5px;
 html.bcv-onebar #bcv-app .bcv-nav > .bcv-fav { padding-left: 45px; color: color-mix(in oklab, var(--bcv-c, var(--bcv-ink)) 80%, #000); }
 html.bcv-onebar[data-bcv-theme="dark"] #bcv-app .bcv-nav > .bcv-fav { color: color-mix(in oklab, var(--bcv-c, var(--bcv-ink)) 72%, #fff); }
 html.bcv-onebar .bcv-nav > .bcv-fav > .bcv-fav__dot { display: none; }
+/* (2.99.122) over a photo the sidebar's words take the photo's ink — but a course's name keeps its colour, the photo's ink
+   mixed into it so it still reads on any photo: the colours that tell the courses apart are never washed out by a theme */
+html.bcv-onebar #bcv-app .bcv-side--pic .bcv-nav > .bcv-fav { color: color-mix(in oklab, var(--bcv-c, var(--bcv-photo-ink)) 64%, var(--bcv-photo-ink)) !important; }
 html.bcv-onebar .bcv-nav > .bcv-ctabs:not(.bcv-ctabs--groups) { margin-left: 35px; }
 .bcv-fav__chev { margin-left: auto; flex: none; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 5px; color: var(--bcv-ink3); cursor: pointer; transition: rotate .2s var(--bcv-ease-out), background .15s ease; }
 .bcv-fav__chev.is-open { rotate: 90deg; }

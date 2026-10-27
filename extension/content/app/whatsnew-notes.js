@@ -28,6 +28,9 @@
     lock: 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.122', date: '2026-10-27', notes: [
+      { kind: 'fixed', title: 'Course Colours Show', body: 'Course names keep their colours over a sidebar photo.', icon: P.check },
+    ] },
     { version: '2.99.121', date: '2026-10-27', notes: [
       { kind: 'fixed', title: 'Word Counter Fixed', body: "The Word Counter's text box is ready to type in at once.", icon: P.check },
     ] },
