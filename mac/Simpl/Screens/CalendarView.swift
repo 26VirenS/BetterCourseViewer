@@ -62,6 +62,8 @@ struct CalendarView: View {
     /// (1.3.167) A plan's block being dragged on the week: by how many days and minutes (a quarter of an hour at a time);
     /// `dropped`, let go and on its way to the page — it stays where it was let go until the week is read again.
     @State private var planDrag: PlanDrag?
+    /// (1.3.185) Where the pointer has that block, to the point: watched by the block alone (PlanFollow).
+    @State private var planFollow = PlanFollow()
     /// (1.3.172, the web's 2.99.113 and 2.99.114) A plan's block whose foot is being pulled: how long it would be;
     /// `dropped`, let go and on its way to the page. The plan whose popover is up (its settings, Edit). The plan a dragged
     /// block or a row of To Do is held over: let go there, it joins that plan's group. The foot the pointer is over.
@@ -1280,7 +1282,7 @@ struct CalendarView: View {
                                     .layoutValue(key: WeekAt.self, value: weekY(item.at))
                                     .layoutValue(key: WeekLength.self, value: drawnHeight(item.ev))
                                     .layoutValue(key: WeekLane.self, value: drawnHeight(item.ev, resting: true))
-                                    .zIndex(planStretch?.id == item.ev.id ? 1 : 0) // (a block being pulled over the next)
+                                    .zIndex(planStretch?.id == item.ev.id || planDrag?.id == item.ev.id ? 1 : 0) // (a block pulled or dragged over the rest)
                             }
                         }
                         .padding(.horizontal, 3)
@@ -1307,6 +1309,7 @@ struct CalendarView: View {
                     }
                 }
                 .fixedSize(horizontal: false, vertical: true) // (every day as tall as the hours, or the fullest day)
+                .coordinateSpace(name: Self.gridSpace) // (1.3.185: a dragged plan measured here, where nothing moves)
                 .background(alignment: .top) {
                     // (a hairline at each hour, past the hours' names)
                     VStack(spacing: 0) {
@@ -1443,6 +1446,8 @@ struct CalendarView: View {
     /// (1.3.176) A dragged block settling into its place: quick, no bounce.
     private static let settle = Animation.spring(response: 0.28, dampingFraction: 1)
     private static let blockLeast: CGFloat = 18
+    /// (1.3.185) The week's grid of hours, a dragged plan's block measured on it.
+    private static let gridSpace = "weekGrid"
 
     /// How long an item lasts, in minutes, when it says (a plan, a linked calendar's event): its block that tall.
     private func length(_ ev: CalEvent) -> Int? {
@@ -1458,82 +1463,107 @@ struct CalendarView: View {
     /// (1.3.172, the web's 2.99.113 and 2.99.114) Its foot pulled makes it longer or shorter; held over another plan, that
     /// plan is ringed and the tag says "Group with …" — let go there, it joins that plan's group (its own group with it).
     /// Anything else on the grid is as it was.
+    /// (1.3.185) Very smooth: the drag is measured on the week's grid, which stays still (measured on the block, which
+    /// follows the pointer, each move undid the one before and the block flickered between its place and the finger);
+    /// the block follows the pointer through PlanFollow, so only it is drawn again as it moves, the week and To Do only as
+    /// the quarter hour or the day it would go to changes; it rides over the day's other items; and the trackpad ticks
+    /// only as it crosses into another day, not every quarter hour.
     @ViewBuilder
     private func planDraggable(_ item: WeekItem, day: Int, week: [[WeekItem]]) -> some View {
         if item.ev.layer == "plan", let pid = item.ev.planId {
             let d = planDrag?.id == item.ev.id ? planDrag : nil
             let len = length(item.ev) ?? 60
             let onto = d.flatMap { d in d.dropped ? nil : planAt(dayOf(week, day + d.days), minute: item.at + d.minutes + d.grab, not: pid) }
-            ZStack(alignment: .bottom) {
-                weekBlock(item.ev, fill: true)
-                    .highPriorityGesture(
-                        DragGesture(minimumDistance: 4)
-                            .onChanged { g in
-                                // (1.3.176) the block to the point under the pointer, kept to the week and the day's hours;
-                                // the quarter hour and the day it would go to, from that
-                                let lo = -item.at, hi = max(lo, 24 * 60 - len - item.at)
-                                let dy = min(CGFloat(hi) / 60 * hour, max(CGFloat(lo) / 60 * hour, g.translation.height))
-                                let dx = weekColumn > 0 ? min(CGFloat(weekDays - 1 - day) * weekColumn, max(-CGFloat(day) * weekColumn, g.translation.width)) : 0
-                                let mins = min(hi, max(lo, Int((dy / hour * 60 / 15).rounded()) * 15))
-                                let days = weekColumn > 0 ? Int((dx / weekColumn).rounded()) : 0
-                                let grab = max(0, Int(g.startLocation.y / hour * 60))
-                                let next = PlanDrag(id: item.ev.id, days: days, minutes: mins, dx: dx, dy: dy, grab: grab)
-                                let stepped = planDrag?.id != item.ev.id || planDrag?.days != days || planDrag?.minutes != mins
-                                var t = Transaction()
-                                t.disablesAnimations = true
-                                withTransaction(t) { planDrag = next }
-                                guard stepped else { return }
-                                joinOnto = planAt(dayOf(week, day + days), minute: item.at + mins + grab, not: pid)?.ev.id
-                                NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
-                            }
-                            .onEnded { _ in
-                                guard let d = planDrag, d.id == item.ev.id else { return }
-                                joinOnto = nil
-                                if let target = planAt(dayOf(week, day + d.days), minute: item.at + d.minutes + d.grab, not: pid), let onto = target.ev.planId {
-                                    planDrag?.dropped = true
+            let held = d != nil && d?.dropped == false
+            let settled = d.flatMap { d in d.dropped ? CGSize(width: CGFloat(d.days) * weekColumn, height: CGFloat(d.minutes) / 60 * hour) : nil }
+            PlanFollowing(follow: planFollow, id: item.ev.id, settled: settled) {
+                ZStack(alignment: .bottom) {
+                    weekBlock(item.ev, fill: true)
+                        .highPriorityGesture(
+                            DragGesture(minimumDistance: 4, coordinateSpace: .named(Self.gridSpace))
+                                .onChanged { g in
+                                    // (1.3.176) the block to the point under the pointer, kept to the week and the day's
+                                    // hours; the quarter hour and the day it would go to, from that
+                                    let lo = -item.at, hi = max(lo, 24 * 60 - len - item.at)
+                                    let dy = min(CGFloat(hi) / 60 * hour, max(CGFloat(lo) / 60 * hour, g.translation.height))
+                                    let dx = weekColumn > 0 ? min(CGFloat(weekDays - 1 - day) * weekColumn, max(-CGFloat(day) * weekColumn, g.translation.width)) : 0
+                                    let mins = min(hi, max(lo, Int((dy / hour * 60 / 15).rounded()) * 15))
+                                    let days = weekColumn > 0 ? Int((dx / weekColumn).rounded()) : 0
+                                    var t = Transaction()
+                                    t.disablesAnimations = true
+                                    withTransaction(t) { planFollow.move(item.ev.id, to: CGSize(width: dx, height: dy)) }
+                                    let was = planDrag?.id == item.ev.id ? planDrag : nil
+                                    guard was == nil || was?.days != days || was?.minutes != mins else { return }
+                                    // (how far into the block it was taken: where it starts on the grid, less the block's top)
+                                    let grab = was?.grab ?? max(0, Int((g.startLocation.y - weekY(item.at)) / hour * 60))
+                                    withTransaction(t) { planDrag = PlanDrag(id: item.ev.id, days: days, minutes: mins, grab: grab) }
+                                    let over = planAt(dayOf(week, day + days), minute: item.at + mins + grab, not: pid)?.ev.id
+                                    if joinOnto != over { joinOnto = over }
+                                    if let was, was.days != days { NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now) }
+                                }
+                                .onEnded { _ in
+                                    guard let d = planDrag, d.id == item.ev.id else {
+                                        planFollow.clear()
+                                        return
+                                    }
+                                    joinOnto = nil
+                                    if let target = planAt(dayOf(week, day + d.days), minute: item.at + d.minutes + d.grab, not: pid), let onto = target.ev.planId {
+                                        withAnimation(reduceMotion ? nil : Self.settle) {
+                                            planDrag?.dropped = true
+                                            planFollow.clear()
+                                        }
+                                        Task {
+                                            let r = try? await engine.call("planJoin", ["id": pid, "onto": onto, "whole": true], as: ActReply.self)
+                                            if r?.ok == true { say("Grouped with \(target.ev.title)") } else { withAnimation(Motion.snappy) { planDrag = nil } }
+                                            engine.changed()
+                                        }
+                                        return
+                                    }
+                                    guard d.days != 0 || d.minutes != 0, let start = PreviewFormat.date(item.ev.date),
+                                          let moved = cal.date(byAdding: .minute, value: d.days * 24 * 60 + d.minutes, to: start) else {
+                                        withAnimation(reduceMotion ? nil : Self.settle) { // (back where it was)
+                                            planDrag = nil
+                                            planFollow.clear()
+                                        }
+                                        return
+                                    }
+                                    withAnimation(reduceMotion ? nil : Self.settle) { // (into its quarter hour)
+                                        planDrag?.dropped = true
+                                        planFollow.clear()
+                                    }
+                                    var args: [String: Any] = ["id": pid, "at": ISO8601DateFormatter().string(from: moved)]
+                                    if let occurs = item.ev.occurs { args["occurs"] = occurs }
                                     Task {
-                                        let r = try? await engine.call("planJoin", ["id": pid, "onto": onto, "whole": true], as: ActReply.self)
-                                        if r?.ok == true { say("Grouped with \(target.ev.title)") } else { withAnimation(Motion.snappy) { planDrag = nil } }
+                                        let r = try? await engine.call("planMove", args, as: ActReply.self)
+                                        if r?.ok != true { withAnimation(Motion.snappy) { planDrag = nil } }
                                         engine.changed()
                                     }
-                                    return
                                 }
-                                guard d.days != 0 || d.minutes != 0, let start = PreviewFormat.date(item.ev.date),
-                                      let moved = cal.date(byAdding: .minute, value: d.days * 24 * 60 + d.minutes, to: start) else {
-                                    withAnimation(reduceMotion ? nil : Self.settle) { planDrag = nil } // (back where it was)
-                                    return
-                                }
-                                withAnimation(reduceMotion ? nil : Self.settle) { planDrag?.dropped = true } // (into its quarter hour)
-                                var args: [String: Any] = ["id": pid, "at": ISO8601DateFormatter().string(from: moved)]
-                                if let occurs = item.ev.occurs { args["occurs"] = occurs }
-                                Task {
-                                    let r = try? await engine.call("planMove", args, as: ActReply.self)
-                                    if r?.ok != true { withAnimation(Motion.snappy) { planDrag = nil } }
-                                    engine.changed()
-                                }
-                            }
-                    )
-                stretchGrip(item, pid: pid, len: len)
-            }
-            .overlay {
-                if joinOnto == item.ev.id { // (another plan held over this one: let go, they are one block)
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(Theme.accent, lineWidth: 2)
-                        .allowsHitTesting(false)
+                        )
+                    stretchGrip(item, pid: pid, len: len)
                 }
-            }
-            .overlay(alignment: .bottom) {
-                if let s = planStretch, s.id == item.ev.id, !s.dropped {
-                    Text("\(clock(item.at)) – \(clock(item.at + s.mins))")
-                        .font(.system(size: 10.5, weight: .semibold).monospacedDigit())
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 2)
-                        .background(Capsule().fill(Theme.accent))
-                        .fixedSize()
-                        .offset(y: 12)
-                        .allowsHitTesting(false)
+                .overlay {
+                    if joinOnto == item.ev.id { // (another plan held over this one: let go, they are one block)
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(Theme.accent, lineWidth: 2)
+                            .allowsHitTesting(false)
+                    }
                 }
+                .overlay(alignment: .bottom) {
+                    if let s = planStretch, s.id == item.ev.id, !s.dropped {
+                        Text("\(clock(item.at)) – \(clock(item.at + s.mins))")
+                            .font(.system(size: 10.5, weight: .semibold).monospacedDigit())
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(Theme.accent))
+                            .fixedSize()
+                            .offset(y: 12)
+                            .allowsHitTesting(false)
+                    }
+                }
+                .scaleEffect(held && !reduceMotion ? 1.02 : 1)
+                .shadow(color: .black.opacity(held ? 0.22 : 0), radius: 10, y: 5)
             }
             .background {
                 // (1.3.176) where it would go: its quarter hour and its day, outlined, while it is held elsewhere
@@ -1541,22 +1571,16 @@ struct CalendarView: View {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(Theme.accent.opacity(0.1))
                         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.accent.opacity(0.7), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])))
-                        .offset(x: CGFloat(d.days) * weekColumn - d.dx, y: CGFloat(d.minutes) / 60 * hour - d.dy)
+                        .offset(x: CGFloat(d.days) * weekColumn, y: CGFloat(d.minutes) / 60 * hour)
                         .allowsHitTesting(false)
-                        .animation(reduceMotion ? nil : .easeOut(duration: 0.1), value: d.minutes)
-                        .animation(reduceMotion ? nil : .easeOut(duration: 0.1), value: d.days)
                 }
             }
-            .scaleEffect(d != nil && d?.dropped == false && !reduceMotion ? 1.02 : 1)
-            .offset(x: d.map { $0.dropped ? CGFloat($0.days) * weekColumn : $0.dx } ?? 0, y: d.map { $0.dropped ? CGFloat($0.minutes) / 60 * hour : $0.dy } ?? 0)
-            .shadow(color: .black.opacity(d != nil && d?.dropped == false ? 0.22 : 0), radius: 10, y: 5)
             .overlay(alignment: .top) {
                 if let d, !d.dropped {
                     Group {
                         if let onto { joinTag(onto.ev.title) } else { dragTime(item.at + d.minutes, day: day + d.days) }
                     }
                     .offset(x: CGFloat(d.days) * weekColumn, y: CGFloat(d.minutes) / 60 * hour - 12)
-                    .animation(reduceMotion ? nil : .easeOut(duration: 0.1), value: d.minutes)
                 }
             }
             .accessibilityHint("Drag to move the plan, or onto another plan to group them; drag its foot to make it longer or shorter")
@@ -1989,7 +2013,10 @@ struct CalendarView: View {
             let d = try await engine.read("calendar", Self.args((s, e)), as: CalendarData.self)
             guard asked == ask else { return } // (a later move asked for another span)
             marks.shown("calendar", Self.args((s, e)), by: engine) // (1.3.80: the answer a live check asks after)
-            if data == nil || !animated {
+            // (1.3.185) a plan just let go, pulled or planned from To Do: put where the page has it at once — eased, its
+            // block went back to where it was taken from before gliding to where it had been let go
+            let settling = planDrag?.dropped == true || planStretch?.dropped == true || todoDrop?.placed == true
+            if data == nil || !animated || settling {
                 var t = Transaction()
                 t.disablesAnimations = true
                 withTransaction(t) {
@@ -2616,8 +2643,9 @@ private struct TodoDropDelegate: DropDelegate {
         MainActor.assumeIsolated { scroller.nudge(at: info.location.y) }
         let next = TodoDrop(day: day, minutes: minutes(info))
         guard next != drop else { return }
+        let newDay = drop?.day != day // (1.3.185: the trackpad ticks as another day is reached, not every quarter hour)
         drop = next
-        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+        if newDay { NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now) }
     }
 }
 
@@ -2658,14 +2686,11 @@ private struct PlanDayReply: Decodable {
 }
 
 /// (1.3.167) A plan's block dragged on the week: by how many days and minutes; dropped, on its way to the page.
-/// (1.3.176) And where the pointer has it, to the point (`dx`, `dy`): the block follows that, the quarter hour it would go
-/// to shown under it.
+/// (1.3.185) Where the pointer has it to the point is PlanFollow's, so this changes only a quarter hour or a day at a time.
 struct PlanDrag: Equatable {
     var id: String
     var days: Int
     var minutes: Int
-    var dx: CGFloat = 0
-    var dy: CGFloat = 0
     /// (1.3.172) How far into the block it was taken, in minutes: where the pointer is, for the plan it is held over.
     var grab = 0
     var dropped = false
@@ -2676,6 +2701,37 @@ struct PlanStretch: Equatable {
     var id: String
     var mins: Int
     var dropped = false
+}
+
+/// (1.3.185) Where the pointer has a dragged plan's block, to the point. Kept apart from the week's own state and watched
+/// (Observation) by each plan's block for its own id alone: following the pointer draws that one block again, not the
+/// whole week and To Do beside it.
+@Observable
+final class PlanFollow {
+    private(set) var id: String?
+    private(set) var offset: CGSize = .zero
+
+    func move(_ id: String, to offset: CGSize) {
+        if self.id != id { self.id = id } // (the other blocks watch the id: told only as a drag starts or ends)
+        self.offset = offset
+    }
+
+    func clear() {
+        if id != nil { id = nil }
+        if offset != .zero { offset = .zero }
+    }
+}
+
+/// (1.3.185) A plan's block where the pointer has it while held (PlanFollow), and where it settles once let go.
+private struct PlanFollowing<Content: View>: View {
+    let follow: PlanFollow
+    let id: String
+    let settled: CGSize?
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        content.offset(settled ?? (follow.id == id ? follow.offset : .zero))
+    }
 }
 
 /// The calendars shown, each with its colour: your own courses on, the rest off until turned on — ten at most, as Canvas
