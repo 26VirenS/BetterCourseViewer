@@ -72,7 +72,9 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
 - **The Simpl layout in the Mac's own controls.** A quiet page with cards lifted off it (`Theme`), small-capital card
   headings, the course colours, grade rings that fill once — drawn with native buttons, toggles, pickers, menus, steppers,
   date pickers, popovers, sheets and context menus. The sidebar is the Mac's (vibrancy, selection, badges); each course in
-  it opens to its sections. (1.3.102) A row pressed again while its place shows a screen pushed on it — an assignment
+  it opens to its sections. (1.3.188) Its order is the web's: the Dashboard, All Courses with the courses under it (each
+  named in its colour, lifted in dark and deepened in light — `CourseName` — so a photo or a theme never washes it out),
+  Groups, then To Do & Calendar, Grades, Notifications, the Inbox, Tools and External Tools. (1.3.102) A row pressed again while its place shows a screen pushed on it — an assignment
   opened on the Dashboard, a conversation on the Inbox — goes back to that place's root, as Back goes and one step in
   the history (`Engine.rowPressed`, from a click on the row seen beside the list's own: `PressedAgain` in
   Shell/MainShell.swift; the list saying its selection again as its rows change, or the arrow keys, never do it; a

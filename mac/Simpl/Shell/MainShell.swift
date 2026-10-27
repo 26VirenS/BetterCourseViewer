@@ -405,11 +405,48 @@ struct Sidebar: View {
 
     private var list: some View {
         List(selection: selection) {
+            // (1.3.188) the web's order: the Dashboard, then All Courses with the courses under it — each named in its
+            // colour, its chevron at the right, its sections opening under it — and the groups, then the places of every
+            // day: To Do and the calendar, Grades, Notifications, the Inbox, the Tools
             Section {
                 Label("Dashboard", systemImage: "square.grid.2x2")
                     .tourSpot(.dashboardRow)
                     .tag(Place.dashboard)
                     .windowMenu(Place.dashboard)
+                Label("All Courses", systemImage: "books.vertical")
+                    .tag(Place.courses)
+                    .windowMenu(Place.courses)
+                ForEach(engine.courses) { course in
+                    courseRow(course)
+                    if isOpen("courses/\(course.id)") {
+                        ForEach(sections("courses/\(course.id)")) { s in
+                            Label(s.label, systemImage: Glyph.section(s.kind))
+                                .padding(.leading, Self.nest)
+                                .tag(Place.section("courses/\(course.id)", s.kind))
+                                .windowMenu(Place.section("courses/\(course.id)", s.kind))
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+                    }
+                }
+                if !engine.onBrightspace, !engine.groups.isEmpty {
+                    // (1.2) the groups under one row of their own, as a course's sections are under it: a press opens all
+                    // of them, the chevron lists them here — never each one pinned to the sidebar
+                    groupsRow
+                    if open.contains("groups") {
+                        ForEach(engine.groups) { g in
+                            HStack(spacing: 9) {
+                                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                    .fill(Color(hex: g.color))
+                                    .frame(width: 13, height: 13)
+                                Text(g.name).lineLimit(1)
+                            }
+                            .padding(.leading, Self.nest)
+                            .tag(Place.home("groups/\(g.id)"))
+                            .windowMenu(Place.home("groups/\(g.id)"))
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+                    }
+                }
                 // (1.3.170) To Do and the Calendar, one place — To Do beside the calendar — with To Do's count
                 Label("To Do & Calendar", systemImage: "calendar")
                     .badge(engine.countsLive ? (engine.snapshot?.todoOpen ?? 0) : 0)
@@ -437,41 +474,6 @@ struct Sidebar: View {
                     Label("External Tools", systemImage: "puzzlepiece.extension")
                         .tag(Place.externalTools)
                         .windowMenu(Place.externalTools)
-                }
-            }
-            Section("Courses") {
-                ForEach(engine.courses) { course in
-                    courseRow(course)
-                    if isOpen("courses/\(course.id)") {
-                        ForEach(sections("courses/\(course.id)")) { s in
-                            Label(s.label, systemImage: Glyph.section(s.kind))
-                                .padding(.leading, 20)
-                                .tag(Place.section("courses/\(course.id)", s.kind))
-                                .windowMenu(Place.section("courses/\(course.id)", s.kind))
-                                .transition(.opacity.combined(with: .move(edge: .top)))
-                        }
-                    }
-                }
-                Label("All Courses", systemImage: "books.vertical").tag(Place.courses)
-                    .windowMenu(Place.courses)
-                if !engine.onBrightspace, !engine.groups.isEmpty {
-                    // (1.2) the groups in this section under one row of their own, as a course's sections are under it:
-                    // a press opens all of them, the chevron lists them here — never each one pinned to the sidebar
-                    groupsRow
-                    if open.contains("groups") {
-                        ForEach(engine.groups) { g in
-                            HStack(spacing: 9) {
-                                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                    .fill(Color(hex: g.color))
-                                    .frame(width: 13, height: 13)
-                                Text(g.name).lineLimit(1)
-                            }
-                            .padding(.leading, 20)
-                            .tag(Place.home("groups/\(g.id)"))
-                            .windowMenu(Place.home("groups/\(g.id)"))
-                            .transition(.opacity.combined(with: .move(edge: .top)))
-                        }
-                    }
                 }
             }
             // what the school added to Canvas's own navigation — its tools, History, Help — under the app's own, as the
@@ -519,11 +521,10 @@ struct Sidebar: View {
         let expanded = isOpen(ctx)
         return HStack(spacing: 8) {
             HStack(spacing: 8) {
-                RoundedRectangle(cornerRadius: 3.5, style: .continuous)
-                    .fill(Color(hex: c.color))
-                    .frame(width: 13, height: 13)
-                Text(c.code)
+                // (1.3.188) named in its colour where All Courses' own name starts, as the web's sidebar names it
+                CourseName(text: c.code, hex: c.color)
                     .lineLimit(1)
+                    .padding(.leading, Self.nest)
                 Spacer(minLength: 4)
                 if engine.coursesLive, let n = c.unread, n > 0 {
                     // (home-14) a count, as the Notifications row's, that says what it counts when the pointer rests on it
@@ -565,12 +566,34 @@ struct Sidebar: View {
         }
     }
 
-    private func isOpen(_ ctx: String) -> Bool {
+    /// (1.3.188) How far a row under All Courses (a course), or under a course or Groups (a section, a group), sits in: to
+    /// where a row's name starts past its glyph.
+    static let nest: CGFloat = 32
+
+        private func isOpen(_ ctx: String) -> Bool {
         open.contains(ctx) || engine.nav.current.place.ctx == ctx
     }
 
     private func sections(_ ctx: String) -> [SectionLink] {
         (engine.sections[ctx] ?? Sidebar.defaultSections).filter { $0.kind != "home" }
+    }
+}
+
+/// (1.3.188) A course's name in its own colour, as the web's sidebar names it — lifted toward white in the dark look and
+/// deepened in the light (the web's 72% and 80%), so it reads on the sidebar; over a photo and under a theme too, the
+/// colours that tell the courses apart are never washed out.
+struct CourseName: View {
+    let text: String
+    let hex: String?
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        Text(text).foregroundStyle(Self.ink(hex, dark: scheme == .dark))
+    }
+
+    static func ink(_ hex: String?, dark: Bool) -> Color {
+        let base = NSColor(Color(hex: hex)).usingColorSpace(.sRGB) ?? .systemGray
+        return Color(nsColor: base.blended(withFraction: dark ? 0.28 : 0.2, of: dark ? .white : .black) ?? base)
     }
 }
 
