@@ -15,7 +15,6 @@
   const { h, overlayRoot } = BCV.utils;
   const U = BCV.ui;
   const IC = BCV.IC;
-  const html = document.documentElement;
   const api = BCV.api;
   const SVG = 'http://www.w3.org/2000/svg';
 
@@ -810,7 +809,6 @@
   // tool from anywhere. The pointer over a pin shows an X that takes it away again.
   const PINS_KEY = 'tools:pins';
   let pins = [];
-  let pinsRead = false;
   /** A pinned tool's body is fetched ahead: its capsule under the pointer draws from it. */
   const preloadPinned = () => {
     for (const k of pins) { const mod = BCV.lazy?.toolModule?.(k); if (mod && !BCV.lazy.has(mod)) BCV.lazy.load(mod).catch(() => {}); }
@@ -842,7 +840,6 @@
       try { if (!BCV.widgets && BCV.lazy?.load) await BCV.lazy.load('widgets'); await BCV.widgets?.all?.(); } catch { /* the widgets sit this page out */ }
     }
     pins = Array.isArray(raw) ? raw.filter((k) => toolOf(k)) : [];
-    pinsRead = true;
     preloadPinned();
     return pins;
   }

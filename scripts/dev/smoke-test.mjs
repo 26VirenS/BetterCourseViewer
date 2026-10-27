@@ -7849,6 +7849,9 @@ try {
   await closeTool();
   // (2.99.79) the word counter, the Mac's: words, characters, sentences and paragraphs, the words used most, and a target
   await openTool('words');
+  // (2.99.121) its text box takes the focus as it opens (asked of the popup's sheet: words.js asked its handle, and threw)
+  const wordsFocused = await page.waitForFunction(() => document.activeElement?.classList.contains('bcv-words__text'), null, { timeout: 2000 }).then(() => true).catch(() => false);
+  check(wordsFocused, "the word counter's text box takes the focus as it opens");
   await page.fill('.bcv-words__text', "The cell is the unit of life. Cells divide; cells grow.\n\nDon't stop now, well-read student!");
   await page.fill('.bcv-words__targetin', '20');
   const wordsSeen = await page.evaluate(() => ({ stats: Object.fromEntries([...document.querySelectorAll('.bcv-words__stat')].map((e) => [e.dataset.stat, e.querySelector('.bcv-words__statv').textContent])), top: [...document.querySelectorAll('.bcv-words__word')].map((e) => e.textContent).slice(0, 2), target: document.querySelector('.bcv-words__targettext').textContent }));

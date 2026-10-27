@@ -1065,7 +1065,6 @@
     return U.el('bcv-col', parts.length ? parts : [U.emptyCard(q ? 'No assignments match.' : 'No assignments yet.')], { style: { gap: '22px' } });
   };
   T.assignments = async (ctx, shell) => {
-    const c = shell.course;
     const b = body('bcv-body--22');
     let mode = 'date';
     let query = '';
@@ -1081,7 +1080,6 @@
       wrap.replaceChildren(el);
     }
     await draw();
-    const list = await store.assignments(c.id).catch(() => []);
     return b;
   };
 

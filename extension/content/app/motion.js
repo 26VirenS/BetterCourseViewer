@@ -148,7 +148,6 @@
   }
 
   // ---- script-driven motion --------------------------------------------------------------------
-  const num = (v) => (typeof v === 'number' ? `${v}px` : String(v));
   const lerpLen = (a, b, p) => {
     // pixels or a percentage; two units never mix within one axis
     const pa = String(a), pb = String(b);

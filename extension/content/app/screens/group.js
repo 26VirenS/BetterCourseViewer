@@ -3,7 +3,7 @@
  * Home shows the group's activity stream and an About card. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
-  const { h, htmlToText } = BCV.utils;
+  const { h } = BCV.utils;
   const U = BCV.ui;
   const IC = BCV.IC;
   const store = BCV.store;

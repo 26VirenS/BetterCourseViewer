@@ -11,7 +11,6 @@
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
   const U = BCV.ui;
-  const IC = BCV.IC;
   const store = BCV.store;
   const CS = () => BCV.screens.course;
 

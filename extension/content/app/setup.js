@@ -498,7 +498,6 @@
   async function finish() {
     if (!st || st.closing) return;
     st.closing = true;
-    const { app } = st;
     try {
       await store.setPref('setupDone', true);
       const [targetsPref] = await Promise.all([store.pref('gradeTargets')]);

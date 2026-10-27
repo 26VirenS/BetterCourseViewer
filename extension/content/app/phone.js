@@ -1514,8 +1514,6 @@
       }
       parts.push(calendarsRow());
       body.replaceChildren(...parts.filter(Boolean).map((p, i) => enter(p, i)));
-      const [s, e] = range();
-      const vis = events.filter((ev) => ev.date >= s && ev.date < e);
     }
     await load();
     return screen;
@@ -1559,7 +1557,6 @@
     b.append(U.loading('rows', 4));
     const [asg, anns] = await Promise.all([store.assignments(c.id).catch(() => null), store.announcements(c.id, { kind: shell.kind }).catch(() => null)]);
     if (!ctx.alive()) return b;
-    const now = new Date();
     const list = (asg || []).filter((a) => a.published !== false);
     // every piece of work still open — past due included, with its Missing flag, rather than dropped after a day
     const open = list.filter((a) => !submittedA(a) && !a.submission?.excused && !(a.submission_types || []).some((t) => ['none', 'on_paper', 'not_graded'].includes(t)))

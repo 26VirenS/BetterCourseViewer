@@ -9,7 +9,6 @@
   const { h, htmlToText } = BCV.utils;
   const U = BCV.ui;
   const IC = BCV.IC;
-  const store = BCV.store;
   const QP = () => BCV.quizPage; // Canvas's own quiz page as a question source (one-question-at-a-time quizzes)
   const LETTERS = 'ABCDEFGHIJKLMNOP';
   const FLAG = 'M6 4v16M6 4h11l-2 4 2 4H6';

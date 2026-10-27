@@ -801,29 +801,6 @@
       ])), { role: 'group', 'aria-label': 'Groups' }) : null,
     ].filter(Boolean);
   }
-  function sideCourses(r) {
-    const defs = navDef();
-    const all = defs.find((d) => d[0] === 'courses');
-    const groups = defs.find((d) => d[0] === 'groups');
-    const gOpen = !!state.sideGroupsOpen;
-    const gChev = groups ? h('span', { class: `bcv-fav__chev ${gOpen ? 'is-open' : ''}`, role: 'button', title: gOpen ? 'Hide groups' : 'Show groups', 'aria-label': gOpen ? 'Hide groups' : 'Show groups', onclick: (e) => {
-      e.stopPropagation();
-      state.sideGroupsOpen = !gOpen;
-      if (state.sideGroupsOpen && !state.sideGroups) store.groups().then((g) => { state.sideGroups = g || []; renderSide(); }).catch(() => { state.sideGroups = []; renderSide(); });
-      renderSide();
-    } }, U.svg('M9 6l6 6-6 6', { size: 12, stroke: 'currentColor', width: 2.4 })) : null;
-    return U.el('bcv-side__group bcv-side__group--courses', [
-      U.text('bcv-side__label', 'Courses'),
-      ...state.favs.flatMap((c) => [favRow(c), courseNavRows(c) || sideSections(c)]),
-      state.favs.length ? null : U.text('bcv-hint', 'Star a course under Courses to pin it here.'),
-      all ? navButton([all[0], 'All Courses', ...all.slice(2)], 0, [all], r) : null,
-      groups ? navButton(groups, 0, [groups], r, gChev) : null,
-      gOpen && state.sideGroups ? U.el('bcv-ctabs bcv-ctabs--groups', state.sideGroups.map((g) => h('button', { type: 'button', class: `bcv-ctab ${r.screen === 'group' && String(r.courseId) === String(g.id) ? 'is-active' : ''}`, title: g.name, onclick: () => go(`/groups/${g.id}`, { motion: 'fade' }) }, [
-        h('span', { class: 'bcv-ctab__sq', style: { background: g.color || '#30b0c7' } }),
-        h('span', { class: 'bcv-ellip', text: g.name }),
-      ])), { role: 'group', 'aria-label': 'Groups' }) : null,
-    ].filter(Boolean));
-  }
   function renderSide() {
     if (phone()) {
       if (root) BCV.phone.paintChrome(BCV.app, { focus: inQuiz() && !state.quizOpen });
@@ -994,33 +971,6 @@
   async function toggleTheme() {
     const next = state.dark ? 'off' : 'on';
     await S.update({ appearance: { darkMode: next } });
-  }
-  /** The look, one press away: light or dark saved for every page (the page loads afresh in it), and
-   *  Personalize for the rest — the colour, the photos, the ready-made themes. */
-  async function setLook(mode) {
-    const cur = (await S.get()).appearance?.darkMode || 'system';
-    if (cur === mode) return;
-    await S.update({ appearance: { darkMode: mode } });
-  }
-  /** The menu over the Appearance button: Light, Dark (the one in effect marked) and Personalize. */
-  function appearanceMenu(anchor) {
-    if (document.querySelector('.bcv-menu--theme:not(.is-closing)')) { U.closeMenus(); return; }
-    U.closeMenus();
-    const item = (icon, label, sub, active, onSelect) => h('button', { type: 'button', class: `bcv-menu__item ${active ? 'is-active' : ''}`, role: 'menuitemradio', 'aria-checked': active ? 'true' : 'false', onclick: () => { U.closeMenus(); onSelect(); } }, [
-      h('span', { class: 'bcv-menu__ic' }, U.svg(icon, { size: 14, width: 1.9 })),
-      h('span', { style: { flex: '1', minWidth: '0' } }, [h('span', { class: 'bcv-ellip', style: { display: 'block' }, text: label }), sub ? h('span', { class: 'bcv-menu__sub', text: sub }) : null]),
-    ]);
-    const dark = !!state.dark;
-    const m = U.el('bcv-menu bcv-menu--theme', [
-      item(IC.sun, 'Light', null, !dark, () => setLook('off')),
-      item(IC.moon, 'Dark', null, dark, () => setLook('on')),
-      U.el('bcv-menu__sep'),
-      item(IC.image, 'Personalize', 'Colour, photos, themes', false, () => BCV.appearance.open(BCV.app)), // (2.99.60: over the Dashboard, as the Mac's)
-    ], { role: 'menu', 'aria-label': 'Appearance' });
-    const r = anchor.getBoundingClientRect();
-    Object.assign(m.style, { position: 'fixed', left: `${Math.max(8, r.left)}px`, bottom: `${Math.max(8, window.innerHeight - r.top + 6)}px`, top: 'auto', transformOrigin: 'left bottom' }); // (it grows up out of the row it hangs from)
-    document.body.append(m);
-    setTimeout(() => document.addEventListener('click', U.closeMenus, { once: true }), 0);
   }
 
   /** Simpl Courses settings, opened by the background (a content script cannot open it itself). */

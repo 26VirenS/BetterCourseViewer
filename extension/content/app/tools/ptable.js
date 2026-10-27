@@ -8,7 +8,6 @@
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
   const U = BCV.ui;
-  const IC = BCV.IC;
   const T = BCV.tools;
 
   const ELEMENTS = (self.BCV_PTABLE || []).map((r) => ({ number: r[0], symbol: r[1], name: r[2], mass: r[3], category: r[4], group: r[5], period: r[6], block: r[7], phase: r[8], config: r[9], en: r[10], melt: r[11], boil: r[12], density: r[13], found: r[14], x: r[15], y: r[16], summary: r[17] }));

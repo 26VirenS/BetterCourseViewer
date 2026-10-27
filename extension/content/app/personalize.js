@@ -741,7 +741,6 @@
     if (st.picker.owner === 'course') { const c = selCourse(); const any = ui.root.querySelector('#pzAny'); if (any && c) { any.style.background = `radial-gradient(circle, ${courseColour(c)} 0 38%, transparent 40%), conic-gradient(#f44,#fb3,#4d4,#3cf,#66f,#e4e,#f44)`; any.classList.add('is-on'); ui.root.querySelectorAll('.pz__palsw:not(.pz__palsw--any)').forEach((b) => b.classList.toggle('is-on', b.dataset.color === courseColour(c))); const reset = ui.root.querySelector('#pzReset'); if (reset) { reset.disabled = !st.courseColors[c.id]; reset.textContent = st.courseColors[c.id] ? (BCV.lms.d2l ? 'Use the saved colour' : 'Use the Canvas colour') : (BCV.lms.d2l ? 'Saved colour' : 'Canvas colour'); } } }
   }
   function pickerEl() {
-    const t = T();
     const el = h('div', { class: `pz__pk ${st.picker.owner === 'course' ? 'pz__pk--course' : ''}`, dataset: { pk: '1' }, role: 'dialog', 'aria-label': 'Colour picker' });
     el.addEventListener('click', (e) => e.stopPropagation());
     el.addEventListener('pointerdown', (e) => {

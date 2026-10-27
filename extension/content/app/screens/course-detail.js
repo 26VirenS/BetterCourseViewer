@@ -492,7 +492,6 @@
     const postedOf = (x) => gradedOf(x) && x.posted_at !== null;
     const heldOf = (x) => gradedOf(x) && x.posted_at === null;
     const status = statusOf(s), posted = postedOf(s), held = heldOf(s);
-    const feedback = (s.submission_comments || []).length || Object.keys(s.rubric_assessment || {}).length;
     // the phone draws the item page its own way (the iPhone mockup)
     if (BCV.phone?.active()) return BCV.phone.assignment(ctx, shell, { a, s, types, available, isTool, toolNewTab, toolLaunch, nativeSubmit, canvasOnly, attemptsLeft, status, posted, held, slot, fill });
     // (2.99.13) The assignment page, to the mockup: the way back and the assignments either side on one row; the title and
@@ -546,7 +545,6 @@
     // (2.99.53) the word alone, as the Mac's chip says it (the when is in Your Work and the facts)
     const statusEl = (x) => { const st = standingOf(x); return h('div', { class: `bcv-asg__status is-${st.tone}`, title: st.text }, [U.text('bcv-asg__statustext', st.text.split(' · ')[0], 'span')]); };
 
-    const GRADING = { points: 'Graded', pass_fail: 'Complete or incomplete', letter_grade: 'Letter grade', gpa_scale: 'GPA scale', percent: 'Percentage', not_graded: 'Not graded' };
     // (2.99.50) each fact led by its own tile, as the Mac's details are (Due, Points, Handed in as)
     const FACT_ICON = { Due: IC.cal, Points: IC.star, Available: 'M12 4a8 8 0 100 16 8 8 0 000-16zM12 8v4l3 2', 'Handed In As': 'M12 15V4M8 8l4-4 4 4M5 14v4a2 2 0 002 2h10a2 2 0 002-2v-4', Attempts: 'M4 12a8 8 0 108-8 8 8 0 00-5.7 2.3L4 8.6M4 4v4.6h4.6', 'Submit as': 'M12 15V4M8 8l4-4 4 4M5 14v4a2 2 0 002 2h10a2 2 0 002-2v-4', Rubric: IC.check };
     const fact = (k, v, sub, extra = {}) => h(extra.onclick ? 'button' : 'div', { class: `bcv-asg__fact ${extra.cls || ''}`, type: extra.onclick ? 'button' : null, onclick: extra.onclick || null, title: extra.title || null }, [
@@ -554,7 +552,6 @@
       U.el('bcv-asg__facttext', [U.text('bcv-asg__factk', k, 'span'), U.text('bcv-asg__factv bcv-ellip', v, 'span'), sub ? U.text('bcv-asg__factsub bcv-ellip', sub, 'span') : null]),
       extra.side || null,
     ]);
-    const dueSub = lockAt && due && lockAt > due ? `Late until ${U.fmtShort(lockAt)}` : lockAt && due && +lockAt === +due ? 'Closes when due' : unlockAt && unlockAt > Date.now() ? `Opens ${U.fmtShort(unlockAt)}` : lockAt && !due ? `Closes ${U.fmtShort(lockAt)}` : due ? 'No late cutoff' : 'Hand in any time';
     const rubricFact = () => {
       if (!a.rubric?.length) return null;
       const ringSlot = h('span', { class: 'bcv-asg__factring', 'aria-hidden': 'true' });
@@ -577,7 +574,6 @@
     // ---- the one big pill ----------------------------------------------------------------------------------------
     const ICONS = { up: 'M12 19V5M6 11l6-6 6 6', lock: 'M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 017 0v3', tick: 'M20 6L9 17l-5-5', x: 'M6 6l12 12M18 6L6 18', play: 'M8 5v14l11-7z', out: 'M9 6h9v9M18 6L7 17' };
     let current = s; // (the submission as the page knows it: a tool's grade landing, a hand-in sent, redraws from it)
-    let opened = null; // (the box open off the pill, if any)
     const openHand = (pill, api = null) => {
       if (!handScreen) return;
       const content = (bx) => {
@@ -587,7 +583,7 @@
         return { cls: 'bcv-hand', kids: [handScreen], measure: () => handScreen.scrollHeight + 2, after: () => setTimeout(() => (handScreen.querySelector('.bcv-sb__tab.is-active, .bcv-sb__tab, .bcv-sb__drop, .bcv-sb__ta') || handScreen).focus?.({ preventScroll: true }), 60) };
       };
       if (api) { api.swap(content, { W: 400 }); return; }
-      opened = growBox(ctx, pill, { label: `${a.name}: hand in`, W: 380, H: 600, anchor: 'center', within: pill.closest('.bcv-asg__card'), onClosed: afterClose, vars: courseVars(c) }, content);
+      growBox(ctx, pill, { label: `${a.name}: hand in`, W: 380, H: 600, anchor: 'center', within: pill.closest('.bcv-asg__card'), onClosed: afterClose, vars: courseVars(c) }, content);
     };
     let sentOff = false;
     const afterClose = () => { if (sentOff && ctx.alive()) app.go(`${c.url}/assignments/${a.id}`, { confirmed: true }); }; // (handed in: the page redraws, Submitted)
@@ -831,9 +827,6 @@
       (document.getElementById('bcv-app') || document.body).append(ov);
       sheet.querySelector('.bcv-fbs__close').focus({ preventScroll: true });
     }
-    const feedbackBtn = (x) => (x.submitted_at || (x.submission_comments || []).length || postedOf(x)
-      ? h('button', { type: 'button', class: 'bcv-asg__seefb', onclick: (e) => openFeedback(current, e.currentTarget) }, [U.svg(IC.disc, { size: 15, stroke: 'currentColor', width: 2 }), h('span', { text: 'See Feedback' })])
-      : null);
 
     // the right-hand side: the big action, the grade, the details
     const LETTERS = [[97, 'A+'], [93, 'A'], [90, 'A-'], [87, 'B+'], [83, 'B'], [80, 'B-'], [77, 'C+'], [73, 'C'], [70, 'C-'], [67, 'D+'], [60, 'D'], [0, 'F']];

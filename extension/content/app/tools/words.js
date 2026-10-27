@@ -128,7 +128,7 @@
     paint();
     // (the text box takes the focus once the tool is in — unless a press or a key has already put it somewhere: the target
     //  box clicked straight away kept its typing, which the late focus used to carry into the text)
-    setTimeout(() => { const a = document.activeElement; if (!a || a === document.body || !p.contains(a)) area.focus(); }, 60);
+    setTimeout(() => { const a = document.activeElement; if (!a || a === document.body || !p.sheet.contains(a)) area.focus(); }, 60); // (the popup's handle: its sheet is the element)
     return p;
   }
 

@@ -35,7 +35,6 @@
   const OLD_KEYS = ['welcome:look2', 'welcome:look3', 'welcome:look4']; // the marks of the shows before it, cleared when this one is seen
   const LOOK2_SINCE = '2.58.0'; // a What's New mark from before the slider means the switch's steps are owed
   const KEY5 = 'welcome:report1'; // the purple button's step seen
-  const REPORT_SINCE = '2.98.20'; // a What's New mark from before the purple button means its step is owed
   const GRADES_KEY = 'welcome:grades'; // the Grades page's steps seen (screens/gpa.js runs them on its first opening)
   const NS = 'http://www.w3.org/2000/svg';
   const PAD = 10; // the lit place's margin round the thing
