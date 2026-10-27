@@ -41,6 +41,10 @@ struct CalendarView: View {
     @State private var finding = UserDefaults.standard.bool(forKey: "SimplFindAppointment")
     /// (1.3.165) Sync's popup (SyncPopup.swift); the screenshot suite's -SimplSync YES opens it.
     @State private var syncing = UserDefaults.standard.bool(forKey: "SimplSync")
+    /// (1.3.186) The calendars of Sync's accounts and those linked by their address that are shown, counted on Calendars'
+    /// button with Canvas's; the screenshot suite's -SimplCalendars YES draws Calendars' popover in the window.
+    @State private var linkedShown = 0
+    private static let shotCalendars = UserDefaults.standard.bool(forKey: "SimplCalendars")
     /// (1.3.78) Where what is shown first came from, for the console's open line (OpenClock).
     @State private var source = "fetched"
     /// (1.3.80) What the live checks know of the span shown (its fingerprint: LiveRefresh).
@@ -182,6 +186,17 @@ struct CalendarView: View {
         .onDisappear { weekScroll.detach() }
         // (1.3.184) a calendar account's calendars read again, shown or hidden: laid over the calendar as they are now
         .onReceive(NotificationCenter.default.publisher(for: .simplCalendarAccountsSynced)) { _ in Task { await load(animated: true) } }
+        .overlay(alignment: .topTrailing) {
+            if Self.shotCalendars, let d = data {
+                CalendarsPopover(choices: d.calendars, openSync: {}) {}
+                    .environmentObject(engine)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.primary.opacity(0.1)))
+                    .shadow(color: .black.opacity(0.18), radius: 18, y: 6)
+                    .padding(.top, 64)
+                    .padding(.trailing, 150)
+            }
+        }
         .overlay(alignment: .topTrailing) {
             if Self.shotInline, let id = planOpen, let ev = data?.events.first(where: { $0.id == id }) {
                 PlanPopover(event: ev, startEditing: Self.shotPlanEdit) { planOpen = nil }
@@ -434,7 +449,7 @@ struct CalendarView: View {
 
     /// To Do beside the calendar or not; Find Appointment, Sync and Calendars (how many are shown); and the view.
     private func tools(_ d: CalendarData, words: Bool) -> some View {
-        let shown = d.calendars.filter(\.on).count
+        let shown = d.calendars.filter(\.on).count + linkedShown
         return HStack(spacing: 8) {
             if mode != "list" { // (1.3.171: the agenda's column is its month, not To Do)
                 Button {
@@ -469,7 +484,7 @@ struct CalendarView: View {
             }
             .glassButton()
             .hoverName("Sync", when: !words)
-            .accessibilityHint("Simpl in Apple, Google or Outlook, and your own calendars here")
+            .accessibilityHint("Connect Apple, Google or Outlook calendars, and send Simpl to them")
             Button {
                 choosing.toggle()
             } label: {
@@ -489,7 +504,7 @@ struct CalendarView: View {
             .hoverName("Calendars", when: !words && !choosing)
             .accessibilityHint("Choose the calendars shown (\(shown) shown)")
             .popover(isPresented: $choosing) {
-                CalendarsPopover(choices: data?.calendars ?? []) { Task { await load(animated: true) } }
+                CalendarsPopover(choices: data?.calendars ?? [], openSync: openSync) { Task { await load(animated: true) } }
                     .environmentObject(engine)
             }
             CalendarModeSwitch(mode: mode, weekDays: weekDays, pick: setMode, weekMenu: weekMenu)
@@ -1384,6 +1399,24 @@ struct CalendarView: View {
         withTransaction(t) { hourHeight = next }
     }
 
+    /// (1.3.186) Calendars' popover closed, then Sync opened (its accounts and links are added and taken away there).
+    private func openSync() {
+        choosing = false
+        Task {
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            syncing = true
+        }
+    }
+
+    /// (1.3.186) The calendars shown that are not Canvas's: each account's turned on, and those linked by their address
+    /// turned on (the page's cal:links).
+    private static func linkedShownNow() -> Int {
+        let fromAccounts = CalendarAccounts.shared.accounts.filter { !$0.signedOut }.reduce(0) { $0 + $1.calendars.filter(\.on).count }
+        let links = Bridge.shared.stored(["cal:links"])["cal:links"] as? [[String: Any]] ?? []
+        let byAddress = links.filter { ($0["source"] as? String) != "account" && ($0["on"] as? Bool) != false }.count // (on unless turned off, as calSync says)
+        return fromAccounts + byAddress
+    }
+
     /// The hour's height kept for next time (a pinch let go; the wheel at rest a moment).
     private func keepHour() {
         UserDefaults.standard.set(Double(hourHeight), forKey: Self.hourKey)
@@ -2036,6 +2069,7 @@ struct CalendarView: View {
                 if todoDrop?.placed == true { todoDrop = nil }
             }
             error = nil
+            linkedShown = Self.linkedShownNow()
             if !shotPlanned, UserDefaults.standard.bool(forKey: "SimplPlanPopover") {
                 shotPlanned = true
                 Task { await shotPlan() }
@@ -2736,38 +2770,69 @@ private struct PlanFollowing<Content: View>: View {
 
 /// The calendars shown, each with its colour: your own courses on, the rest off until turned on — ten at most, as Canvas
 /// allows (the others wait, greyed, until one is turned off).
+/// (1.3.186) Every calendar Simpl can show, chosen here alone: Canvas's; each calendar account's (Sync's accounts,
+/// CalendarAccounts); and those linked by their address. Sync only connects them — signs in and out, links and
+/// unlinks, sends Simpl out — and a button here opens it.
 private struct CalendarsPopover: View {
     let choices: [CalendarChoice]
+    /// Sync opened (this popover closed first).
+    let openSync: () -> Void
     let changed: () -> Void
     @EnvironmentObject private var engine: Engine
+    @ObservedObject private var accounts = CalendarAccounts.shared
     @State private var on: Set<String> = []
+    /// The calendars linked by their address (native-app.js calSync), read as the popover opens.
+    @State private var links: [SyncLink] = []
 
     private var own: [CalendarChoice] { choices.filter { $0.own == true } }
     private var other: [CalendarChoice] { choices.filter { $0.own != true } }
     private var full: Bool { on.count >= 10 }
+    private var shown: Int {
+        on.count + accounts.accounts.filter { !$0.signedOut }.reduce(0) { $0 + $1.calendars.filter(\.on).count } + links.filter(\.on).count
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Calendars").font(.sHeadline)
                 Spacer(minLength: 8)
-                Text("\(on.count) of \(choices.count) on")
+                Text("\(shown) shown")
                     .font(.sFootnote.monospacedDigit())
                     .foregroundStyle(.secondary)
-                    .contentTransition(.numericText(value: Double(on.count)))
+                    .contentTransition(.numericText(value: Double(shown)))
             }
-            if choices.isEmpty {
+            if choices.isEmpty && accounts.accounts.isEmpty && links.isEmpty {
                 Text("No calendars to show.").foregroundStyle(.secondary)
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 9) {
-                        ForEach(own) { row($0) }
-                        if !other.isEmpty {
-                            Text("Other Calendars")
-                                .font(.sFootnote.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                                .padding(.top, own.isEmpty ? 0 : 8)
-                            ForEach(other) { row($0) }
+                        if !choices.isEmpty {
+                            heading(engine.onBrightspace ? "Brightspace" : "Canvas", detail: nil, first: true)
+                            ForEach(own) { canvasRow($0) }
+                            if !other.isEmpty {
+                                Text("Other Calendars")
+                                    .font(.sFootnote.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                    .padding(.top, own.isEmpty ? 0 : 4)
+                                ForEach(other) { canvasRow($0) }
+                            }
+                            Text(full ? "Ten at most: turn one off to show another." : (engine.onBrightspace ? "At most 10 of these show at once." : "Canvas shows at most 10 of these at once."))
+                                .font(.sFootnote)
+                                .foregroundStyle(full ? Color.orange : Color.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        ForEach(accounts.accounts) { a in
+                            heading(a.provider.name, detail: a.name, first: choices.isEmpty && a.id == accounts.accounts.first?.id)
+                            if a.calendars.isEmpty {
+                                Text(a.signedOut ? "Sign in again in Sync to choose its calendars." : "Reading its calendars…")
+                                    .font(.sFootnote)
+                                    .foregroundStyle(.secondary)
+                            }
+                            ForEach(a.calendars) { c in accountRow(c, of: a) }
+                        }
+                        if !links.isEmpty {
+                            heading("Linked by Address", detail: nil, first: choices.isEmpty && accounts.accounts.isEmpty)
+                            ForEach(links) { linkRow($0) }
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -2777,35 +2842,108 @@ private struct CalendarsPopover: View {
                 .frame(minHeight: min(84, listHeight), idealHeight: listHeight, maxHeight: listHeight)
             }
             Divider()
-            Text(full ? "Ten calendars at most: turn one off to show another." : (engine.onBrightspace ? "At most 10 calendars show at once." : "Canvas shows at most 10 calendars at once."))
-                .font(.sFootnote)
-                .foregroundStyle(full ? Color.orange : Color.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            Button(action: openSync) {
+                Label("Add or Remove Calendars in Sync…", systemImage: "arrow.triangle.2.circlepath")
+                    .font(.sCallout)
+            }
+            .buttonStyle(.borderless)
         }
         .font(.sBody)
         .padding(18)
         .frame(width: 340)
         .animation(Motion.snappy, value: full)
+        .animation(Motion.snappy, value: links)
         .onAppear { on = Set(choices.filter { $0.on }.map { $0.code }) }
+        .task { await readLinks() }
     }
 
     private var listHeight: CGFloat {
-        let rows = CGFloat(choices.count) * 28 + (other.isEmpty ? 0 : 34)
-        return min(max(rows, 28), 420)
+        var h: CGFloat = 0
+        if !choices.isEmpty { h += 34 + CGFloat(choices.count) * 28 + (other.isEmpty ? 0 : 30) + 30 }
+        for a in accounts.accounts { h += 40 + CGFloat(max(1, a.calendars.count)) * 28 }
+        if !links.isEmpty { h += 34 + CGFloat(links.count) * 28 }
+        return min(max(h, 28), 460)
     }
 
-    private func row(_ c: CalendarChoice) -> some View {
+    /// A section's name — the place its calendars come from — and who, for an account.
+    private func heading(_ title: String, detail: String?, first: Bool) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(title.uppercased())
+                .font(.sCaption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            if let detail, !detail.isEmpty {
+                Text(detail)
+                    .font(.sCaption)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+        }
+        .padding(.top, first ? 0 : 10)
+    }
+
+    private func dot(_ color: String?) -> some View {
+        Circle()
+            .fill(Color(hex: color))
+            .frame(width: 11, height: 11)
+    }
+
+    private func canvasRow(_ c: CalendarChoice) -> some View {
         Toggle(isOn: Binding(get: { on.contains(c.code) }, set: { set(c, $0) })) {
             HStack(spacing: 8) {
-                Circle()
-                    .fill(Color(hex: c.color))
-                    .frame(width: 11, height: 11)
+                dot(c.color)
                 Text(c.name).font(.sBody).lineLimit(1)
             }
         }
         .toggleStyle(.checkbox)
         .disabled(!on.contains(c.code) && full)
         .help(c.name)
+    }
+
+    private func accountRow(_ c: AccountCalendar, of a: CalendarAccount) -> some View {
+        Toggle(isOn: Binding(get: { c.on }, set: { value in
+            accounts.show(c.id, of: a.id, value)
+            changed()
+        })) {
+            HStack(spacing: 8) {
+                dot(c.color)
+                Text(c.name).font(.sBody).lineLimit(1)
+                if let g = c.group, !g.isEmpty {
+                    Text(g).font(.sCaption).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
+        }
+        .toggleStyle(.checkbox)
+        .disabled(a.signedOut)
+        .help(c.name)
+    }
+
+    private func linkRow(_ l: SyncLink) -> some View {
+        Toggle(isOn: Binding(get: { l.on }, set: { value in
+            if let i = links.firstIndex(where: { $0.id == l.id }) { links[i].on = value }
+            Task {
+                _ = try? await engine.call("calShow", ["id": l.id, "on": value], as: ActReply.self)
+                changed()
+            }
+        })) {
+            HStack(spacing: 8) {
+                dot(l.color)
+                Text(l.name).font(.sBody).lineLimit(1)
+                if !l.error.isEmpty {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.red)
+                        .help(l.error)
+                }
+            }
+        }
+        .toggleStyle(.checkbox)
+        .help(l.name)
+    }
+
+    private func readLinks() async {
+        guard let got = try? await engine.call("calSync", as: SyncData.self) else { return }
+        links = got.links
     }
 
     private func set(_ c: CalendarChoice, _ value: Bool) {

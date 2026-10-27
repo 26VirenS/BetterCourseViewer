@@ -555,6 +555,10 @@ ui_review() {
   # written (-SimplCalAccountsDemo); with none, the sign-in buttons alone (the two above)
   MODE=light shoot light-05v-calendar-sync-accounts 16 -SimplPlace calendar -SimplSync YES -SimplCalAccountsDemo YES
   MODE=dark shoot dark-05v-calendar-sync-accounts 16 -SimplPlace calendar -SimplSync YES -SimplCalAccountsDemo YES
+  # (1.3.186) Calendars' popover drawn in the window (-SimplCalendars): every calendar shown or not — Canvas's, each
+  # account's (as if signed in to) and those linked by their address; Sync above only connects them
+  MODE=light shoot light-05c-calendar-calendars 16 -SimplPlace calendar -SimplCalendars YES -SimplCalAccountsDemo YES
+  MODE=dark shoot dark-05c-calendar-calendars 16 -SimplPlace calendar -SimplCalendars YES -SimplCalAccountsDemo YES
   MODE=light shoot light-03p-todo-plan-rail 16 -SimplPlace todo -SimplPlanFirst YES
   MODE=dark shoot dark-03p-todo-plan-rail 16 -SimplPlace todo -SimplPlanFirst YES
   MODE=light shoot light-11w-course-grades-whatif 16 -SimplPlace section:courses/101:grades -SimplWhatIf YES

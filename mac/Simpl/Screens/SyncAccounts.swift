@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// (1.3.184) Sync's calendar accounts (CalendarAccounts.swift), at the head of its popup: each account signed in to — who,
-/// how the last sync went, Sync Now, its calendars each shown on Simpl's calendar or not, and whether Simpl's own
-/// calendar is written there — then a button for each kind of account: Apple Calendar (this Mac's), Google, Microsoft.
+/// how the last sync went, Sync Now, and whether Simpl's own calendar is written there — then a button for each kind of
+/// account: Apple Calendar (this Mac's), Google, Microsoft. (1.3.186) Which of its calendars show is chosen with
+/// Calendars, beside Sync (CalendarView's CalendarsPopover); here, only how many.
 struct SyncAccounts: View {
     /// Something shown changed: the Calendar under the popup reads it again.
     let changed: () -> Void
@@ -139,13 +140,17 @@ struct SyncAccounts: View {
                 .help("More")
             }
             .padding(14)
-            status(a, syncing: syncing)
-                .padding(.horizontal, 14)
-                .padding(.bottom, 10)
-            if !a.calendars.isEmpty {
-                Divider().padding(.leading, 14)
-                ForEach(a.calendars) { c in calendarRow(c, of: a) }
+            VStack(alignment: .leading, spacing: 4) {
+                status(a, syncing: syncing)
+                if !a.calendars.isEmpty {
+                    let on = a.calendars.filter(\.on).count
+                    Text("\(on) of \(a.calendars.count) calendars shown · choose them with Calendars")
+                        .font(.sCaption)
+                        .foregroundStyle(.secondary)
+                }
             }
+            .padding(.horizontal, 14)
+            .padding(.bottom, 10)
             Divider().padding(.leading, 14)
             Toggle(isOn: Binding(get: { a.push }, set: { on in store.setPush(on, for: a.id) })) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -189,26 +194,5 @@ struct SyncAccounts: View {
         }
         .font(.sCaption.weight(.medium))
         .foregroundStyle(color)
-    }
-
-    private func calendarRow(_ c: AccountCalendar, of a: CalendarAccount) -> some View {
-        HStack(spacing: 12) {
-            Circle().fill(Color(hex: c.color)).frame(width: 12, height: 12)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(c.name).font(.sCallout).lineLimit(1)
-                if let g = c.group, !g.isEmpty { Text(g).font(.sCaption).foregroundStyle(.secondary).lineLimit(1) }
-            }
-            Spacer(minLength: 8)
-            Toggle("Show \(c.name) on Simpl's calendar", isOn: Binding(get: { c.on }, set: { on in
-                store.show(c.id, of: a.id, on)
-                changed()
-            }))
-            .toggleStyle(.switch)
-            .controlSize(.small)
-            .labelsHidden()
-            .disabled(a.signedOut)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 7)
     }
 }

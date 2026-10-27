@@ -6,8 +6,9 @@ import AppKit
 /// calendar named Simpl, sealed and kept on simplcourses.com (the app sends it: Web/Bridge.swift feedSend) — handed to a
 /// calendar app: Apple's Calendar subscribes to it straight away (webcal), Google's and Outlook's add-by-address pages
 /// open in the browser, or the private link is copied; and the student's own calendars linked by their private address
-/// (the app reads the file, the page parses it: background.js and lib/ics.js), each shown or hidden on the Calendar.
-/// Canvas's own feed and Send plans are gone: the plans are in Simpl's calendar of themselves.
+/// (the app reads the file, the page parses it: background.js and lib/ics.js). Canvas's own feed and Send plans are gone:
+/// the plans are in Simpl's calendar of themselves. (1.3.186) Sync only connects: which calendars show is chosen with
+/// Calendars, beside it (CalendarView's CalendarsPopover).
 struct SyncPopup: View {
     let changed: () -> Void
     @EnvironmentObject private var engine: Engine
@@ -59,7 +60,7 @@ struct SyncPopup: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Sync")
                     .font(.sTitle3.weight(.semibold))
-                Text("Simpl in your calendar app, and your calendars here")
+                Text("Connect your calendar apps to Simpl")
                     .font(.sCallout)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -97,7 +98,7 @@ struct SyncPopup: View {
                 .font(.sCallout)
                 // (1.3.167) what the copy did, said under it (a link's outcome is said under its field)
                 if let said { saidLine(said) }
-                Text("Drag work from To Do beside the week onto a time to plan it, or pull it to the right on To Do or the Dashboard.")
+                Text("Choose which calendars show with Calendars, beside Sync.")
                     .font(.sCaption)
                     .foregroundStyle(.secondary)
             }
@@ -250,15 +251,6 @@ struct SyncPopup: View {
                             .lineLimit(2)
                     }
                     Spacer(minLength: 8)
-                    Toggle("Show \(l.name) on the calendar", isOn: Binding(get: { l.on }, set: { on in
-                        if let i = data?.links.firstIndex(where: { $0.id == l.id }) { data?.links[i].on = on }
-                        Task {
-                            _ = try? await engine.call("calShow", ["id": l.id, "on": on], as: ActReply.self)
-                            changed()
-                        }
-                    }))
-                    .toggleStyle(.switch)
-                    .labelsHidden()
                     Button {
                         unlinking = l
                     } label: {
