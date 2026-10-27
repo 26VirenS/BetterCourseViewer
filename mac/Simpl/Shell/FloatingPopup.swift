@@ -326,6 +326,9 @@ final class FloatingPopups {
         guard outside == nil else { return }
         outside = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] e in
             guard let self else { return e }
+            // (1.3.187: a press on a piece of work's card — over the window or in its own popup — is the card's: the popup
+            //  its row is in stays, or the card went with it before its button was let go)
+            if WorkPreview.shared.isOnCard(e) { return e }
             for (key, panel) in self.panels where panel.light && e.window !== panel && e.window?.parent !== panel {
                 self.closedOutside[key] = Date()
                 self.close(key)

@@ -275,27 +275,45 @@ final class WorkPreview: ObservableObject {
     /// (1.3.170) While a card is up over the window: a press anywhere but on the card (or in its popup) and its own row
     /// folds it back, and still does what it does — on another row, that row's card comes up. Its own row pressed again
     /// closes it as before (`press`).
+    /// (1.3.187) A left press folds it back once it is let go and has done what it does, never as it goes down: a press
+    /// on one of the card's buttons taken for one round it closed the card under the pointer, and the button, gone before
+    /// it was let go, never acted. A press that began on the card never closes it.
     private func watchOutside() {
         guard outside == nil else { return }
-        outside = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] e in
-            guard let self, self.item != nil, self.shown, !self.isOnCard(e) else { return e }
-            self.close()
+        outside = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp, .rightMouseDown, .otherMouseDown]) { [weak self] e in
+            guard let self, self.item != nil, self.shown else { return e }
+            switch e.type {
+            case .leftMouseDown:
+                self.pressedRound = !self.isOnCard(e)
+            case .leftMouseUp:
+                guard self.pressedRound else { return e }
+                self.pressedRound = false
+                let t = self.token
+                DispatchQueue.main.async { if self.token == t { self.close() } } // (after the press has done what it does)
+            default:
+                if !self.isOnCard(e) { self.close() } // (a menu's press: nothing on the card waits on it)
+            }
             return e
         }
     }
+
+    /// (1.3.187) The left press now down began round the card, not on it.
+    private var pressedRound = false
 
     private func unwatchOutside() {
         if let m = outside { NSEvent.removeMonitor(m) }
         outside = nil
     }
 
-    /// A press on the card (over the window, or in its own popup) or on the row it grew from.
-    private func isOnCard(_ e: NSEvent) -> Bool {
-        guard let w = e.window else { return false }
+    /// A press on the card (over the window, or in its own popup) or on the row it grew from. (1.3.187) Where the card
+    /// is, as laid out and as AppKit has it drawn now (TourFrames: the card says where it is), a little round it as well.
+    func isOnCard(_ e: NSEvent) -> Bool {
+        guard item != nil, let w = e.window else { return false }
         if let panel = w as? PopupPanel, panel.popupKey == "preview" { return true }
         let h = w.contentView?.frame.height ?? w.frame.height
         let p = CGPoint(x: e.locationInWindow.x, y: h - e.locationInWindow.y)
-        if w === cardWindow, let f = cardFrame, f.contains(p) { return true }
+        if w === cardWindow, let f = cardFrame, f.insetBy(dx: -4, dy: -4).contains(p) { return true }
+        if let f = TourFrames.shared.rect(.preview, in: w), f.insetBy(dx: -4, dy: -4).contains(p) { return true }
         if let row = anchor?.view, row.window === w, TourFrames.flip(row.convert(row.bounds, to: nil), w).contains(p) { return true }
         return false
     }

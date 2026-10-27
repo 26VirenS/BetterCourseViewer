@@ -428,7 +428,9 @@ struct DashboardView: View {
                 let panel = anchor.view == nil ? TourFrames.shared.rect(.counterPanel, in: window)
                     : (anchor.view?.window === window ? anchor.rect() : nil)
                 let card = WorkPreview.shared.item == nil ? nil : TourFrames.shared.rect(.preview, in: window)
-                if !hit(panel) && !hit(card) { setOpen(nil) }
+                // (1.3.187: a press on a row's card — over the window or in a popup of its own — is the card's, wherever
+                //  its place is read from)
+                if !hit(panel) && !hit(card) && !WorkPreview.shared.isOnCard(e) { setOpen(nil) }
                 return e
             }
         } else if !on, let w = clickWatch {
