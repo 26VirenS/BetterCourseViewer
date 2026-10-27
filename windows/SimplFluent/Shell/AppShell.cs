@@ -267,6 +267,16 @@ public sealed partial class AppShell : Grid, IDisposable
         }
     }
 
+    /// <summary>(0.3.82) A course's name in its own colour, as the web's sidebar names it — lifted toward white in the dark
+    /// look and deepened in the light (the web's 72% and 80%; dark words, the light look's, where the pane's photo has its
+    /// Ink off), so it reads on the pane: a photo or a theme never washes the course colours out.</summary>
+    private static Color CourseInk(Color c)
+    {
+        var lift = Appearance.Dark && !Appearance.Plain("side");
+        byte Mix(byte v) => (byte)Math.Round(lift ? v + (255 - v) * 0.28 : v * 0.8);
+        return Color.FromRgb(Mix(c.R), Mix(c.G), Mix(c.B));
+    }
+
     /// <summary>The app's own places in the pane (not a course, a group or a school's link, which keep their colours).</summary>
     private static readonly HashSet<string> OwnPlaces = new() { "dashboard", "calendar", "grades", "notifications", "inbox", "tools", "externaltools", "courses", "groups" };
 
@@ -327,65 +337,53 @@ public sealed partial class AppShell : Grid, IDisposable
         var notes = snap?.NotifUnread ?? 0;
         var mail = snap?.InboxUnread ?? 0;
         var todo = engine.TodoOpen ?? 0;
+        // (0.3.82) the web's order: the Dashboard, then All courses with the courses under it — each named in its colour, its
+        // chevron at the right, its sections folding out under it — and Groups, then the places of every day
         var list = new List<NavEntry>
         {
             new() { Key = "dashboard", Title = "Dashboard", Icon = SymbolRegular.Home24, Tint = Blue, Go = () => GoPlace(Place.Dashboard), Prepare = Ready(Place.Dashboard), Spot = TourSpot.DashboardRow },
-            // (0.3.64) To Do and the Calendar are one place, To Do & Calendar (the web's 2.99.112): the calendar with To Do
-            // beside it, in the Calendar's place, To Do's count on it
-            new() { Key = "calendar", Title = CalendarScreen.PlaceName, Icon = SymbolRegular.CalendarLtr24, Tint = Red, Badge = todo, BadgeLabel = todo == 1 ? "1 thing to do" : $"{todo} things to do", Go = () => GoPlace(Place.Calendar), Prepare = Ready(Place.Calendar) },
-            new() { Key = "grades", Title = "Grades", Icon = SymbolRegular.DataBarVertical24, Tint = Purple, Go = () => GoPlace(Place.Grades), Prepare = Ready(Place.Grades), Spot = TourSpot.GradesRow },
-            new() { Key = "notifications", Title = "Notifications", Icon = SymbolRegular.Alert24, Tint = Orange, Badge = notes, BadgeLabel = notes == 1 ? "1 new notification" : $"{notes} new notifications", Go = () => GoPlace(Place.Notifications), Prepare = Ready(Place.Notifications) },
-            new() { Key = "inbox", Title = "Inbox", Icon = SymbolRegular.Mail24, Tint = Teal, Badge = mail, BadgeLabel = mail == 1 ? "1 unread message" : $"{mail} unread messages", Go = () => GoPlace(Place.Inbox), Prepare = Ready(Place.Inbox) },
-            new() { Key = "tools", Title = "Tools", Icon = SymbolRegular.Toolbox24, Tint = Gray, Go = () => GoPlace(Place.Tools), Prepare = Ready(Place.Tools), Spot = TourSpot.ToolsRow },
+            new() { Key = "courses", Title = "All courses", Icon = SymbolRegular.Library24, Tint = Gold, Go = () => GoPlace(Place.Courses), Prepare = Ready(Place.Courses) },
         };
         // (the course open: its row folds out, as the Mac's sidebar unfolds the one open — the chevron folds out any other)
         var openCtx = engine.Nav.Current.Place.Ctx;
         if (folded is { } f && f.At != openCtx) folded = null;
         // (the sections of a course folded out, asked for once the rows are shown: read once, and at once when kept)
         var toRead = new List<string>();
-        // (the Mac's: right under Tools, every tool the school provides in the courses — Canvas's, so not on Brightspace)
-        if (!engine.OnBrightspace)
-            list.Add(new NavEntry { Key = "externaltools", Title = "External tools", Icon = SymbolRegular.PuzzlePiece24, Tint = Orchid, Go = () => GoPlace(Place.ExternalTools), Prepare = Ready(Place.ExternalTools) });
         var courses = engine.Courses;
-        if (courses.Count > 0)
+        foreach (var c in courses)
         {
-            list.Add(new NavEntry { Header = true, Title = "Courses" });
-            foreach (var c in courses)
+            var ctx = $"courses/{c.Id}";
+            var label = string.IsNullOrEmpty(c.Code) ? c.Name : c.Code;
+            var isOpen = expanded.Contains(ctx) || (openCtx == ctx && folded?.Key != ctx);
+            if (isOpen) toRead.Add(ctx);
+            // (its unread announcements, drawn as the Notifications badge is, saying what it counts)
+            var unread = engine.CoursesLive ? c.Unread ?? 0 : 0;
+            var entry = new NavEntry
             {
-                var ctx = $"courses/{c.Id}";
-                var label = string.IsNullOrEmpty(c.Code) ? c.Name : c.Code;
-                var isOpen = expanded.Contains(ctx) || (openCtx == ctx && folded?.Key != ctx);
-                if (isOpen) toRead.Add(ctx);
-                // (its unread announcements, drawn as the Notifications badge is, saying what it counts)
-                var unread = engine.CoursesLive ? c.Unread ?? 0 : 0;
-                var entry = new NavEntry
+                Key = ctx, Title = label, Ink = CourseInk(K.Hex(c.Color, Blue)),
+                Badge = unread,
+                BadgeLabel = !string.IsNullOrEmpty(c.UnreadLabel) ? c.UnreadLabel : unread == 1 ? "1 unread announcement" : $"{unread} unread announcements",
+                Go = () => GoPlace(Place.Home(ctx)),
+                Prepare = Ready(Place.Home(ctx)),
+                Expanded = isOpen,
+                // (the chevron folds the course open away too, until another place is opened)
+                Toggle = open =>
                 {
-                    Key = ctx, Title = label, Square = K.Hex(c.Color, Blue), Letter = Initial(label),
-                    Badge = unread,
-                    BadgeLabel = !string.IsNullOrEmpty(c.UnreadLabel) ? c.UnreadLabel : unread == 1 ? "1 unread announcement" : $"{unread} unread announcements",
-                    Go = () => GoPlace(Place.Home(ctx)),
-                    Prepare = Ready(Place.Home(ctx)),
-                    Expanded = isOpen,
-                    // (the chevron folds the course open away too, until another place is opened)
-                    Toggle = open =>
-                    {
-                        if (open) { expanded.Add(ctx); if (folded?.Key == ctx) folded = null; _ = engine.LoadSections(ctx); }
-                        else { expanded.Remove(ctx); if (openCtx == ctx) folded = (ctx, openCtx); }
-                        BuildPane();
-                    },
-                    Spot = c == courses[0] ? TourSpot.FirstCourse : null,
-                    Hover = () => Tour.Did(TourEvent.CourseHover),
-                };
-                if (engine.Sections.TryGetValue(ctx, out var secs))
-                    entry.Children = secs.Where(s => s.Kind != "home").Select(s => new NavEntry
-                    {
-                        Key = $"{ctx}:{s.Kind}", Title = s.Label, Icon = Glyph.Section(s.Kind), Tint = K.Hex(c.Color, Blue),
-                        Go = () => GoPlace(Place.Section(ctx, s.Kind)),
-                        Prepare = Ready(Place.Section(ctx, s.Kind)),
-                    }).ToList();
-                list.Add(entry);
-            }
-            list.Add(new NavEntry { Key = "courses", Title = "All courses", Icon = SymbolRegular.Library24, Tint = Gold, Go = () => GoPlace(Place.Courses), Prepare = Ready(Place.Courses) });
+                    if (open) { expanded.Add(ctx); if (folded?.Key == ctx) folded = null; _ = engine.LoadSections(ctx); }
+                    else { expanded.Remove(ctx); if (openCtx == ctx) folded = (ctx, openCtx); }
+                    BuildPane();
+                },
+                Spot = c == courses[0] ? TourSpot.FirstCourse : null,
+                Hover = () => Tour.Did(TourEvent.CourseHover),
+            };
+            if (engine.Sections.TryGetValue(ctx, out var secs))
+                entry.Children = secs.Where(s => s.Kind != "home").Select(s => new NavEntry
+                {
+                    Key = $"{ctx}:{s.Kind}", Title = s.Label, Icon = Glyph.Section(s.Kind), Tint = K.Hex(c.Color, Blue),
+                    Go = () => GoPlace(Place.Section(ctx, s.Kind)),
+                    Prepare = Ready(Place.Section(ctx, s.Kind)),
+                }).ToList();
+            list.Add(entry);
         }
         var groups = engine.Groups;
         if (groups.Count > 0 && !engine.OnBrightspace)
@@ -411,6 +409,16 @@ public sealed partial class AppShell : Grid, IDisposable
                 }).ToList(),
             });
         }
+        // (0.3.64) To Do and the Calendar are one place, To Do & Calendar (the web's 2.99.112): the calendar with To Do
+        // beside it, in the Calendar's place, To Do's count on it
+        list.Add(new NavEntry { Key = "calendar", Title = CalendarScreen.PlaceName, Icon = SymbolRegular.CalendarLtr24, Tint = Red, Badge = todo, BadgeLabel = todo == 1 ? "1 thing to do" : $"{todo} things to do", Go = () => GoPlace(Place.Calendar), Prepare = Ready(Place.Calendar) });
+        list.Add(new NavEntry { Key = "grades", Title = "Grades", Icon = SymbolRegular.DataBarVertical24, Tint = Purple, Go = () => GoPlace(Place.Grades), Prepare = Ready(Place.Grades), Spot = TourSpot.GradesRow });
+        list.Add(new NavEntry { Key = "notifications", Title = "Notifications", Icon = SymbolRegular.Alert24, Tint = Orange, Badge = notes, BadgeLabel = notes == 1 ? "1 new notification" : $"{notes} new notifications", Go = () => GoPlace(Place.Notifications), Prepare = Ready(Place.Notifications) });
+        list.Add(new NavEntry { Key = "inbox", Title = "Inbox", Icon = SymbolRegular.Mail24, Tint = Teal, Badge = mail, BadgeLabel = mail == 1 ? "1 unread message" : $"{mail} unread messages", Go = () => GoPlace(Place.Inbox), Prepare = Ready(Place.Inbox) });
+        list.Add(new NavEntry { Key = "tools", Title = "Tools", Icon = SymbolRegular.Toolbox24, Tint = Gray, Go = () => GoPlace(Place.Tools), Prepare = Ready(Place.Tools), Spot = TourSpot.ToolsRow });
+        // (the Mac's: right under Tools, every tool the school provides in the courses — Canvas's, so not on Brightspace)
+        if (!engine.OnBrightspace)
+            list.Add(new NavEntry { Key = "externaltools", Title = "External tools", Icon = SymbolRegular.PuzzlePiece24, Tint = Orchid, Go = () => GoPlace(Place.ExternalTools), Prepare = Ready(Place.ExternalTools) });
         // (what the school added to Canvas's own navigation — History, its tools, Help —, under Simpl's own places as the
         //  extension's sidebar has it; nothing when it adds nothing)
         list.AddRange(MoreFromCanvas.Entries(more, it => { if (narrow) ClosePane(); MoreFromCanvas.Open(engine, it, window); }));

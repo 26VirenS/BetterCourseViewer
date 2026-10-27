@@ -20,6 +20,9 @@ public sealed class NavEntry
     /// square holds <see cref="Picture"/>, else the symbol (a tool of the school's own on the colour of Canvas's nav).</summary>
     public Color? Square;
     public string? Letter;
+    /// <summary>(0.3.82) A course named in its own colour, as the web's sidebar names it: no glyph, its name where the rows'
+    /// names start.</summary>
+    public Color? Ink;
     /// <summary>The school's own picture for it, on its <see cref="Square"/> (a tool's icon in Canvas's nav).</summary>
     public ImageSource? Picture;
     /// <summary>It opens in a Simpl window of its own (a tool, another site): the window's mark at the row's end, as a
@@ -121,7 +124,7 @@ public sealed class NavList : Grid
             s.Append(depth).Append(e.Separator ? 'S' : e.Header ? 'H' : 'R').Append('\u001f')
                 .Append(e.Key).Append('\u001f').Append(e.Title).Append('\u001f')
                 .Append((int)e.Icon).Append('\u001f').Append(e.Tint.ToString()).Append('\u001f')
-                .Append(e.Square?.ToString()).Append('\u001f').Append(e.Letter).Append('\u001f')
+                .Append(e.Square?.ToString()).Append('\u001f').Append(e.Letter).Append('\u001f').Append(e.Ink?.ToString()).Append('\u001f')
                 .Append(e.Picture?.GetHashCode()).Append(e.OwnWindow ? 'W' : '_').Append('\u001f')
                 .Append(e.Badge).Append('\u001f').Append(e.BadgeLabel).Append('\u001f').Append(e.Tip).Append('\u001f').Append(e.Folds).Append('\u001f').Append(e.Expanded ? '+' : '-').Append(e.Toggle != null ? 'T' : '_')
                 .Append(e.Hover != null ? 'h' : '_').Append('\u001f').Append(e.Spot?.ToString()).Append('\u001e');
@@ -171,8 +174,10 @@ public sealed class NavList : Grid
             inside.VerticalAlignment = VerticalAlignment.Center;
             glyph = new Border { Width = 18, Height = 18, CornerRadius = new CornerRadius(4), Background = K.Brush(sq), Child = inside, VerticalAlignment = VerticalAlignment.Center };
         }
+        else if (e.Ink != null) glyph = new Border { Width = 16 }; // (a course: its colour in its name, no glyph)
         else glyph = K.Icon(e.Icon, 16, e.Tint, filled: true);
         var title = K.Text(e.Title, Ty.Body);
+        if (e.Ink is { } ink) title.Foreground = K.Brush(ink);
         var grid = K.Columns("auto, *, auto, auto", glyph.Col(0), title.Margin(14, 0, 8, 0).Col(1));
         if (e.Badge > 0)
         {

@@ -26,6 +26,8 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.82", "2026-10-27",
+            ("improved", "Sidebar Like the Web", "Courses sit under All courses, each in its own colour.")),
         R("0.3.81", "2026-10-27",
             ("new", "Sign In to Calendars", "Sign in to iCloud Calendar in Sync to see it in Simpl."),
             ("improved", "Calendars Chooser", "Calendars now picks what shows; Sync connects apps.")),
