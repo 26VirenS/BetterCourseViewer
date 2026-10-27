@@ -22,11 +22,15 @@ namespace Simpl.Screens;
 /// the private link is copied; and the student's own calendars linked by their private address (the app reads the file,
 /// the page parses it: background.js and lib/ics.js), each shown or hidden on the Calendar or unlinked. Canvas's own feed
 /// and Send plans are gone: the plans are in Simpl's calendar of themselves. What changes here is read again behind it
-/// (<c>changed</c>). <c>make</c>: the screenshot suite's (--open sync-simpl), Simpl's calendar made as it opens.
+/// (<c>changed</c>). <c>make</c>: the screenshot suite's (--open sync-simpl), Simpl's calendar made as it opens; <c>icloud</c>
+/// (--open sync-icloud), the iCloud sign-in asked for.
+/// (0.3.81) As the Mac's since 1.3.186: Sync manages what is connected and nothing more — the calendar accounts signed in to
+/// first (SyncAccounts), then Simpl's calendar by its link, then calendars linked by address — and which calendars show is
+/// chosen with Calendars, beside it (CalendarsSheet), so a linked calendar's row here no longer has its switch.
 /// </summary>
 internal static class SyncSheet
 {
-    public static void Show(Engine.Engine engine, Action changed, Window? over, bool make = false)
+    public static void Show(Engine.Engine engine, Action changed, Window? over, bool make = false, bool icloud = false)
     {
         SyncData? data = null;
         var turning = false;
@@ -41,6 +45,10 @@ internal static class SyncSheet
         var showWhere = false;
         var draft = "";
         var host = new Border();
+        // (0.3.81) the accounts drawn again with the sheet, as one is signed in to, syncs or signs out
+        SyncAccounts accounts = null!;
+        accounts = new SyncAccounts(() => Paint());
+        if (icloud) accounts.AskICloud();
 
         FrameworkElement Said(string text, bool bad)
         {
@@ -222,19 +230,9 @@ internal static class SyncSheet
                     K.H(8, gone, keep));
                 return new Border { Child = K.Columns("auto, *", swatch.Align(HorizontalAlignment.Left, VerticalAlignment.Top).Margin(0, 4, 12, 0).Col(0), ask.Col(1)), Padding = new Thickness(14, 10, 14, 10) };
             }
-            var show = new ToggleSwitch { IsChecked = l.On, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
-            System.Windows.Automation.AutomationProperties.SetName(show, $"Show {l.Name} on the calendar");
-            show.ToolTip = $"Show {l.Name} on the calendar";
-            show.Click += async (_, _) =>
-            {
-                var on = show.IsChecked == true;
-                l.On = on;
-                await engine.Act("calShow", new { id = l.Id, on });
-                changed();
-            };
             var x = K.IconButton(SymbolRegular.Dismiss24, () => { unlinking = l.Id; Paint(); }, $"Unlink {l.Name}", 14, 28);
             x.Margin = new Thickness(6, 0, 0, 0);
-            var row = K.Columns("auto, *, auto, auto", swatch.Col(0), words.Col(1), show.Col(2), x.Col(3));
+            var row = K.Columns("auto, *, auto", swatch.Col(0), words.Col(1), x.Col(2));
             return new Border { Child = row, Padding = new Thickness(14, 10, 10, 10) };
         }
 
@@ -256,7 +254,7 @@ internal static class SyncSheet
             var field = K.V(8, K.Columns("*, auto", box.Col(0), go.Col(1)));
             if (linking || linkSaid != null) field.Children.Add(LinkStatus());
             v.Children.Add(new Border { Child = field, Padding = new Thickness(14) });
-            if (list.Count == 0) v.Children.Insert(0, K.Wrapped("Link Google, iCloud or Outlook to see your own events beside your classes, and plan around them.", Ty.Body, B.Text2).Margin(14, 12, 14, 0));
+            if (list.Count == 0) v.Children.Insert(0, K.Wrapped("No account to sign in to? A calendar's private address works too: Simpl reads it every half hour.", Ty.Body, B.Text2).Margin(14, 12, 14, 0));
             return K.Card(v, new Thickness(0), 8);
         }
 
@@ -305,11 +303,12 @@ internal static class SyncSheet
                 return;
             }
             var list = K.V(18,
-                Section("Simpl, in your calendar app", SimplCard(data.Simpl)),
-                Section("Your calendars, in Simpl", LinksCard(data.Links)));
+                Section("Your calendar accounts", accounts.Build()),
+                Section("Or add Simpl by its link", SimplCard(data.Simpl)),
+                Section("Or link a calendar by its address", LinksCard(data.Links)));
             if (said != null) list.Children.Add(Said(said, saidBad));
             list.Children.Add(Where());
-            list.Children.Add(K.Wrapped("Drag work from To Do beside the calendar onto a day or a time to plan it, or pull it to the right on the Dashboard.", Ty.Caption, B.Text2));
+            list.Children.Add(K.Wrapped("Choose which calendars show with Calendars, beside Sync.", Ty.Caption, B.Text2));
             host.Child = list;
         }
 
@@ -356,7 +355,7 @@ internal static class SyncSheet
             await Load();
         }
 
-        var lede = K.Text("Simpl in your calendar app, and your calendars here", Ty.Body, B.Text2).Align(HorizontalAlignment.Left, VerticalAlignment.Bottom);
+        var lede = K.Text("Connect your calendar apps to Simpl", Ty.Body, B.Text2).Align(HorizontalAlignment.Left, VerticalAlignment.Bottom);
         var body = new ScrollViewer
         {
             Content = host, MaxHeight = 600, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
@@ -365,8 +364,20 @@ internal static class SyncSheet
         Paint();
         var sheet = new Sheet { Title = "Sync", Body = K.V(12, lede, body), Width = 580, Floats = true };
         sheet.Add("Done", SheetButtonKind.Primary);
+        // (0.3.81) an account's sync or sign-in drawn as it goes; the Calendar read again behind as it lands
+        void Moved() => host.Dispatcher.InvokeAsync(() => { if (data != null) Paint(); });
+        void Landed() => host.Dispatcher.InvokeAsync(changed);
+        CalendarAccounts.Changed += Moved;
+        CalendarAccounts.Synced += Landed;
+        sheet.Closed += () =>
+        {
+            CalendarAccounts.Changed -= Moved;
+            CalendarAccounts.Synced -= Landed;
+            CalendarAccounts.StopSigningIn();
+        };
         Dialogs.Show(sheet, over);
         _ = Load();
+        _ = CalendarAccounts.SyncStale();
     }
 }
 

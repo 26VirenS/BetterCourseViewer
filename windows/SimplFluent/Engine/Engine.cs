@@ -510,6 +510,8 @@ public sealed partial class Engine : Observable, IShellListener
         else if (Launch.Take("compose") != null) NewMessageRequested?.Invoke();
         await RefreshSnapshot();
         await LoadSidebar();
+        // (0.3.81) the calendar accounts signed in to, read soon and every fifteen minutes after
+        Simpl.Support.CalendarAccounts.Started(this);
         // (0.3.25) an account that uses Knewton Alta: its popup's web view made ahead, once the window has been quiet a while
         if (HasAlta) Simpl.Screens.AltaSpare.Prepare(this, 3);
         // (a first setup quit halfway, or whose save failed, is asked again — the page may have kept some of it — unless

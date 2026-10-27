@@ -615,6 +615,9 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
   const CAL_MAX = 8 * 1024 * 1024;
   const calKey = (id) => `cal:feed:${id}`;
   const calLinks = async () => { const v = (await api.storage.local.get(CAL_LINKS).catch(() => ({})))[CAL_LINKS]; return Array.isArray(v) ? v : []; };
+  // (Mac 1.3.184) a calendar account's calendar (source "account": signed in to in the app's Sync) is the app's to read
+  // and keep (CalendarAccounts.swift); here only those linked by their address are read
+  const byAddress = (links) => links.filter((l) => l.source !== 'account' && l.url);
   const calHostName = (href) => { const h = new URL(href).hostname; return /google\.com$/.test(h) ? 'Google Calendar' : /icloud\.com$/.test(h) ? 'iCloud Calendar' : /(outlook|office365|office|live)\.com$/.test(h) ? 'Outlook' : h.replace(/^www\./, ''); };
   /** The file at a calendar's address: { status, text }. In the apps the app reads it (their page, a Canvas page, cannot
    *  read another site: bridge.js fetchText); here, the background itself. */
@@ -649,7 +652,7 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
     return feed;
   }
   async function calArm() {
-    const links = await calLinks();
+    const links = byAddress(await calLinks());
     if (!api.alarms) return;
     try {
       if (!links.length) { await api.alarms.clear(CAL_ALARM); return; }
@@ -660,7 +663,7 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
   async function calSync({ force = false } = {}) {
     if (calSyncing) return calSyncing;
     calSyncing = (async () => {
-      const links = await calLinks();
+      const links = byAddress(await calLinks());
       const feeds = await api.storage.local.get(links.map((l) => calKey(l.id))).catch(() => ({}));
       let read = 0;
       for (const link of links) {

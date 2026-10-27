@@ -111,6 +111,9 @@ public sealed partial class CalendarScreen : Screen
         // (the page taking the keyboard is no reason to scroll to its top)
         page.RequestBringIntoView += (_, e) => { if (e.OriginalSource == page) e.Handled = true; };
         page.Loaded += (_, _) => HookWindow();
+        // (0.3.81) an account's calendars synced (Support/CalendarAccounts.cs): read again now, or when next shown
+        page.Loaded += (_, _) => { CalendarAccounts.Synced -= AccountsSynced; CalendarAccounts.Synced += AccountsSynced; };
+        page.Unloaded += (_, _) => CalendarAccounts.Synced -= AccountsSynced;
         // (0.3.64: the page's height says whether it holds still — built again when that changes)
         View.SizeChanged += (_, e) =>
         {
@@ -352,7 +355,13 @@ public sealed partial class CalendarScreen : Screen
 
     /// <summary>The calendars shown (the Mac's popover), as a dialog over the window; each change read again at once.</summary>
     private void ChooseCalendars() =>
-        CalendarsSheet.Show(engine, (cal.Data ?? last)?.Calendars ?? new List<CalendarChoice>(), Read, Window.GetWindow(page));
+        CalendarsSheet.Show(engine, (cal.Data ?? last)?.Calendars ?? new List<CalendarChoice>(), Read, OpenSync, Window.GetWindow(page));
+
+    private void AccountsSynced() => page.Dispatcher.InvokeAsync(() =>
+    {
+        if (hidden) cal.Again();
+        else Read();
+    });
 
     /// <summary>(0.3.53) Find Appointment (the Mac's popup): a time reserved or given back there read again behind it.</summary>
     private void FindAppointment() => AppointmentsSheet.Show(engine, Read, Window.GetWindow(page));
@@ -884,6 +893,11 @@ public sealed partial class CalendarScreen : Screen
         // (0.3.63) and its Sync with Simpl's calendar made as it opens (--open sync-simpl), against the mock's /api/feed
         if (cal.Data != null && !cal.Loading && Launch.Take("sync-simpl") != null)
             page.Dispatcher.BeginInvoke(() => SyncSheet.Show(engine, Read, Window.GetWindow(page), make: true), DispatcherPriority.Background);
+        // (0.3.81) and its Sync with iCloud's sign-in asked for (--open sync-icloud), and Calendars (--open calendars)
+        if (cal.Data != null && !cal.Loading && Launch.Take("sync-icloud") != null)
+            page.Dispatcher.BeginInvoke(() => SyncSheet.Show(engine, Read, Window.GetWindow(page), icloud: true), DispatcherPriority.Background);
+        if (cal.Data != null && !cal.Loading && Launch.Take("calendars") != null)
+            page.Dispatcher.BeginInvoke(ChooseCalendars, DispatcherPriority.Background);
         // (0.3.60) and its Sync (--open sync)
         if (cal.Data != null && !cal.Loading && Launch.Take("sync") != null)
             page.Dispatcher.BeginInvoke(OpenSync, DispatcherPriority.Background);

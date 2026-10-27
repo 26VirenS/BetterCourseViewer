@@ -50,6 +50,25 @@ public sealed class Bridge
 
     public JsonNode? Value(string key) => store.Value(key);
 
+    /// <summary>(0.3.81) Keys written and taken away by the app itself — Sync's calendar accounts' calendars and their
+    /// events (Support/CalendarAccounts.cs) — told to every page as storage.onChanged, as a page's own writes are.</summary>
+    public void Keep(JsonObject items, IEnumerable<string>? removing = null)
+    {
+        var changes = items.Count > 0 ? store.Set(items) : new JsonObject();
+        var gone = removing?.ToList() ?? new List<string>();
+        if (gone.Count > 0)
+        {
+            var removed = store.Remove(gone);
+            foreach (var key in removed.Select(kv => kv.Key).ToList())
+            {
+                var change = removed[key];
+                removed.Remove(key);
+                changes[key] = change;
+            }
+        }
+        Broadcast(changes);
+    }
+
     /// <summary>The extension's saved settings (the appearance, among others), for the app's own chrome.</summary>
     public JsonObject Settings => store.Value("settings") as JsonObject ?? new JsonObject();
 
