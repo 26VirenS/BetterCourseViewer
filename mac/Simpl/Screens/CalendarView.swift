@@ -178,6 +178,8 @@ struct CalendarView: View {
         }
         .onAppear(perform: seed)
         .onDisappear { weekScroll.detach() }
+        // (1.3.184) a calendar account's calendars read again, shown or hidden: laid over the calendar as they are now
+        .onReceive(NotificationCenter.default.publisher(for: .simplCalendarAccountsSynced)) { _ in Task { await load(animated: true) } }
         .overlay(alignment: .topTrailing) {
             if Self.shotInline, let id = planOpen, let ev = data?.events.first(where: { $0.id == id }) {
                 PlanPopover(event: ev, startEditing: Self.shotPlanEdit) { planOpen = nil }

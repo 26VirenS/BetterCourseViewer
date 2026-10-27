@@ -38,6 +38,19 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         store.erase()
     }
 
+    /// (Mac 1.3.184) What the page keeps, read by the app itself (Sync's calendar accounts).
+    func stored(_ keys: [String]) -> [String: Any] {
+        store.get(keys)
+    }
+
+    /// (Mac 1.3.184) Keys written and taken away by the app itself — Sync's calendar accounts' calendars and their events —
+    /// told to every page as storage.onChanged, as a page's own writes are.
+    func keep(_ items: [String: Any], removing: [String] = []) {
+        var changes = items.isEmpty ? [:] : store.set(items)
+        if !removing.isEmpty { changes.merge(store.remove(removing)) { mine, _ in mine } }
+        broadcast(changes)
+    }
+
     /// What the app's settings always are, whatever writes them (a settings import from a computer, an old
     /// command): light or dark is the phone's own setting (1.4: "system"), and Simpl's look is always on
     /// (1.4.5) — off, the app's own screens and the menu that leads back to Settings would be gone.

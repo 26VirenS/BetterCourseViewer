@@ -21,7 +21,7 @@ PROJ = os.path.join(MAC, 'Simpl.xcodeproj')
 
 NAME = 'Simpl'
 BUNDLE_ID = 'com.simplcourses.mac'
-MARKETING_VERSION = '1.3.183' # Simpl for Mac's own version line (scripts/release-mac-native.sh releases it as mac-v<this>)
+MARKETING_VERSION = '1.3.184' # Simpl for Mac's own version line (scripts/release-mac-native.sh releases it as mac-v<this>)
 BUILD = '101' # raised with every release
 DEPLOYMENT = '14.0'
 
@@ -331,6 +331,7 @@ RELEASE_PROJECT = dict(COMMON_PROJECT, **{
 TARGET = {
     'ASSETCATALOG_COMPILER_APPICON_NAME': 'AppIcon',
     'ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME': 'AccentColor',
+    'CODE_SIGN_ENTITLEMENTS': 'Support/Simpl.entitlements', # (1.3.184: this Mac's calendars, for Sync's Apple Calendar account)
     'CODE_SIGN_IDENTITY': '"-"',
     'CODE_SIGN_STYLE': 'Automatic',
     'COMBINE_HIDPI_IMAGES': 'YES',

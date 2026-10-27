@@ -480,6 +480,7 @@ final class Engine: ObservableObject, ShellListener {
         if hasAlta { AltaSpare.shared.prepare(self, quiet: 3) }
         Task { await Reminders.shared.reschedule(self) } // (each launch: the reminders set again from what Canvas says now)
         Task { await Activity.shared.sync(self) }
+        CalendarAccounts.shared.started(self) // (1.3.184: Sync's calendar accounts read soon, then every fifteen minutes)
         // (the screenshot suite: -SimplActivityProbe YES — one read of the school as the new-activity check makes it, on the console)
         if UserDefaults.standard.bool(forKey: "SimplActivityProbe") { Task { await Activity.shared.probe(self) } }
         // the first run: the app's own setup (the courses shown, the goals), before anything else — unless (onboarding-4)

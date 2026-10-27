@@ -44,6 +44,10 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Simpl shows your calendars beside your work, counts them when it finds you free time, and can add your work and plans to a calendar named Simpl.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Simpl shows your calendars beside your work, counts them when it finds you free time, and can add your work and plans to a calendar named Simpl.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Send from Phone lets your phone, on the same Wi-Fi, send photos and files to the hand-in you have open.</string>
 	<key>NSHumanReadableCopyright</key>

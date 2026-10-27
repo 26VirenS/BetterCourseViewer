@@ -3118,12 +3118,18 @@
   const feedOn = async () => feedOut(await BCV.feed.turnOn());
   const feedOff = async () => feedOut(await BCV.feed.turnOff());
   const feedSend = async () => feedOut(await BCV.feed.publish({ force: true }));
+  // (Mac 1.3.184) Simpl's own calendar's events, for the app to write into a calendar account's Simpl calendar
+  // (CalendarAccounts.swift): the same events the private link's calendar holds
+  const feedEvents = async () => ({ events: await BCV.feed.events() });
   async function calSync() {
     const [linked, simpl] = await Promise.all([BCV.plan.linked(), feedState()]);
-    if (linked.links.length) askCal({ op: 'sync' }); // (what was read more than half an hour ago, read again: the answer follows in storage)
+    // (Mac 1.3.184: a calendar account's calendars are the app's own to list, in Sync's accounts — only those linked by
+    //  their address here)
+    const byAddress = linked.links.filter((l) => l.source !== 'account');
+    if (byAddress.length) askCal({ op: 'sync' }); // (what was read more than half an hour ago, read again: the answer follows in storage)
     return {
       simpl,
-      links: linked.links.map((l) => { const f = linked.feeds[l.id]; return { id: l.id, name: l.name, color: l.color || GRAY, on: l.on !== false, read: f?.at ? new Date(f.at).toISOString() : null, count: (f?.events || []).length, error: f && !f.ok ? f.error || 'Could not be read.' : '' }; }),
+      links: byAddress.map((l) => { const f = linked.feeds[l.id]; return { id: l.id, name: l.name, color: l.color || GRAY, on: l.on !== false, read: f?.at ? new Date(f.at).toISOString() : null, count: (f?.events || []).length, error: f && !f.ok ? f.error || 'Could not be read.' : '' }; }),
     };
   }
   async function calLink({ url } = {}) {
@@ -3278,7 +3284,7 @@
     return { events: out, sent: new Set(Object.values(BCV.plan.all()).map((p) => p.ev).filter(Boolean)) };
   }
 
-  const CALLS = { calSync, feedState, feedOn, feedOff, feedSend, calLink, calShow, calUnlink, calRefresh, planSlots, planPut, planMove, planClear, planDay, planDetail, planEdit, planJoin, setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, setColor, todo, todoDismiss, todoRestore, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, appointments, reserveAppointment, cancelReservation, notifications, notifMark, search, searchLocal, searchWarm, searchRecent, appearance, whatsNew, whatsNewSeen, refresh,
+  const CALLS = { calSync, feedState, feedOn, feedOff, feedSend, feedEvents, calLink, calShow, calUnlink, calRefresh, planSlots, planPut, planMove, planClear, planDay, planDetail, planEdit, planJoin, setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, setColor, todo, todoDismiss, todoRestore, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, appointments, reserveAppointment, cancelReservation, notifications, notifMark, search, searchLocal, searchWarm, searchRecent, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, fileInfo, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage, messageUpload,
     toolLaunch, externalTools, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizAssignment, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback, neighbours };
   // (Mac 1.2) Grade needed: a course's score now (by the student's own weights where set, as the Grades screen) and each

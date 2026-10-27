@@ -551,6 +551,10 @@ ui_review() {
   MODE=light shoot light-05s-calendar-sync 16 -SimplPlace calendar -SimplSync YES
   MODE=dark shoot dark-05s-calendar-sync 16 -SimplPlace calendar -SimplSync YES
   MODE=light shoot light-05u-calendar-sync-simpl 30 -SimplPlace calendar -SimplSync YES -SimplMakeFeed YES
+  # (1.3.184) Sync's calendar accounts as if signed in to — this Mac's calendars and a Google account — nothing read or
+  # written (-SimplCalAccountsDemo); with none, the sign-in buttons alone (the two above)
+  MODE=light shoot light-05v-calendar-sync-accounts 16 -SimplPlace calendar -SimplSync YES -SimplCalAccountsDemo YES
+  MODE=dark shoot dark-05v-calendar-sync-accounts 16 -SimplPlace calendar -SimplSync YES -SimplCalAccountsDemo YES
   MODE=light shoot light-03p-todo-plan-rail 16 -SimplPlace todo -SimplPlanFirst YES
   MODE=dark shoot dark-03p-todo-plan-rail 16 -SimplPlace todo -SimplPlanFirst YES
   MODE=light shoot light-11w-course-grades-whatif 16 -SimplPlace section:courses/101:grades -SimplWhatIf YES

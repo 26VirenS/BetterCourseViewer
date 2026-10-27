@@ -37,7 +37,10 @@ struct SyncPopup: View {
         }
         .frame(width: 560)
         .frame(minHeight: 360, idealHeight: 600, maxHeight: 720)
-        .task { await load() }
+        .task {
+            await load()
+            await CalendarAccounts.shared.syncStale() // (1.3.184: an account not read for a while, read as Sync opens)
+        }
         .confirmationDialog("Unlink \(unlinking?.name ?? "this calendar")?", isPresented: Binding(get: { unlinking != nil }, set: { if !$0 { unlinking = nil } }), presenting: unlinking) { l in
             Button("Unlink", role: .destructive) { Task { await unlink(l) } }
         } message: { _ in
@@ -74,8 +77,11 @@ struct SyncPopup: View {
     private var content: some View {
         if let d = data {
             VStack(alignment: .leading, spacing: 18) {
-                section("Simpl, in your calendar app") { simplCard(d.simpl) }
-                section("Your calendars, in Simpl") { linksCard(d.links) }
+                // (1.3.184) the calendar accounts signed in to — the real sync — first; the private link and the calendars
+                // linked by their address after, for a calendar app Simpl does not sign in to
+                section("Your calendar accounts") { SyncAccounts(changed: changed) }
+                section("Or add Simpl by its link") { simplCard(d.simpl) }
+                section("Or link a calendar by its address") { linksCard(d.links) }
                 DisclosureGroup("Where is my calendar's link?", isExpanded: $showWhere) {
                     VStack(alignment: .leading, spacing: 6) {
                         whereLine("Google", "Settings → your calendar → Integrate calendar → Secret address in iCal format.")
