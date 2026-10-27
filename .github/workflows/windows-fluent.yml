@@ -440,6 +440,11 @@ jobs:
           Shot 'calendar-sync-dark' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'calendar', '--open', 'sync'))
           # (0.3.63) and Sync with Simpl's own calendar made as it opens, sent through the app to the mock's /api/feed
           Shot 'calendar-sync-simpl' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'calendar', '--open', 'sync-simpl'))
+          # (0.3.81) Sync with two calendar accounts signed in to, iCloud's sign-in asked for (dark), and Calendars with Canvas's,
+          # the accounts' and the linked calendars, each by where it comes from
+          Shot 'calendar-sync-accounts' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'calendar', '--open', 'sync', '--cal-accounts-demo', 'yes'))
+          Shot 'calendar-sync-icloud-dark' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'calendar', '--open', 'sync-icloud'))
+          Shot 'calendar-calendars' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'calendar', '--open', 'calendars', '--cal-accounts-demo', 'yes'))
           Shot 'todo-plan' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'todo', '--open', 'plan'))
           Shot 'todo-plan-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'todo', '--open', 'plan'))
           Shot 'notifications' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'notifications'))
