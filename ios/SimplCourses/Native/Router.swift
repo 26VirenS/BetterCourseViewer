@@ -218,9 +218,11 @@ extension Engine {
         }
     }
 
+    #if os(iOS)
     /// (1.7.6) A link that opened the app — simplcourses://open?url=<an address of the school's>, simplcourses:///courses/1
     /// (or simplcourses://courses/1), or the school's own https address — opened as a notification's is, once the school
-    /// is known to have the student signed in. Only the school's own addresses: another site's link opens nothing.
+    /// is known to have the student signed in. Only the school's own addresses: another site's link opens nothing. (The
+    /// iPhone's: the Mac app shares this file, not its engine's sign-in check.)
     func openFromOutside(_ link: URL) {
         let scheme = link.scheme?.lowercased() ?? ""
         var target: String?
@@ -243,6 +245,7 @@ extension Engine {
         }
         openChecked(target)
     }
+    #endif
 
     /// A row's address, wherever it leads: a native screen, the web interface's screen (with the row's
     /// title while it loads), a file in the phone's viewer, another site in Safari.
