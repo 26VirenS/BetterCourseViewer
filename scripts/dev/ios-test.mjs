@@ -73,6 +73,16 @@ try {
     }
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   };
+  // the sheet at rest — no transition or spring still moving it, its top where it stays — before its grabber is measured:
+  // a press lands where the grabber is, not where it was a moment ago (on a slow machine the settle can outlast a fixed wait)
+  const sheetAtRest = () => page.waitForFunction(() => {
+    const s = document.querySelector('.bcv-ph-sheet');
+    if (!s) return true;
+    const top = s.getBoundingClientRect().top;
+    const still = !s.getAnimations().length && Math.abs(top - (self.__bcvSheetTop ?? NaN)) < 0.5;
+    self.__bcvSheetTop = top;
+    return still;
+  }, null, { timeout: 5000, polling: 120 });
   const texts = (sel) => page.$$eval(sel, (els) => els.map((e) => (e.innerText || e.textContent).replace(/\s+/g, ' ').trim()));
 
   console.log('the app\'s screen');
@@ -162,11 +172,13 @@ try {
   const s1 = await page.evaluate(() => { const s = document.querySelector('.bcv-ph-sheet'); const r = s.getBoundingClientRect(); return { large: s.classList.contains('is-large'), top: Math.round(r.top), h: Math.round(r.height) }; });
   check(s1.large && s1.top < s0.top - 40 && s1.h > s0.h, `a sheet holding more than it shows grows to nearly the full screen when pulled up from its list: ${JSON.stringify({ s0, s1 })}`);
   await page.screenshot({ path: join(out, 'ios-01-sheet-large.png') });
+  await sheetAtRest();
   const handle = await page.evaluate(() => { const r = document.querySelector('.bcv-ph-sheet__handle').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; });
   await touchDrag(handle.x, handle.y, 110, { steps: 6, ms: 40 });
   await page.waitForTimeout(600);
   const s2 = await page.evaluate(() => { const s = document.querySelector('.bcv-ph-sheet'); return s ? { large: s.classList.contains('is-large'), there: true } : { there: false }; });
   check(s2.there && !s2.large, `pulled down a little from nearly the full screen, it comes back to its own height and stays up: ${JSON.stringify(s2)}`);
+  await sheetAtRest();
   const h2 = await page.evaluate(() => { const r = document.querySelector('.bcv-ph-sheet__handle').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; });
   await touchDrag(h2.x, h2.y, 300, { steps: 6, ms: 30 });
   check(await eventually(async () => !(await page.$('.bcv-sheet-ov')), 3000), 'pulled down far by its grabber, it goes, its own close run');
@@ -174,6 +186,7 @@ try {
   await page.evaluate(() => { self.__saved = null; self.BCV.ui.promptSheet({ title: 'Rename', value: 'x', onSave: (v) => { self.__saved = v; } }); });
   await page.waitForSelector('.bcv-sheet-ov .bcv-sheet--prompt', { timeout: 5000 });
   await page.waitForTimeout(400);
+  await sheetAtRest();
   const grip = await page.evaluate(() => { const g = document.querySelector('.bcv-sheet--prompt > .bcv-ph-sheet__handle--added'); const r = g?.getBoundingClientRect(); return g ? { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) } : null; });
   check(!!grip, 'a sheet drawn without a grabber gets one on the phone');
   if (grip) {
