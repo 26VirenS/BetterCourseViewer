@@ -522,12 +522,17 @@ public sealed partial class Engine : Observable, IShellListener
         if (Launch.Take("whatsnew") != null) WhatsNewRequested?.Invoke(WhatsNew.All);
         else if (Launch.Take("mergedintro") != null) MergedIntroRequested?.Invoke();
         else if (Launch.Take("settings") != null) SettingsRequested?.Invoke();
-        // (0.3.80: the first update to it brings up To Do and the calendar as one, and Quick Plan, in its place)
-        else if (WhatsNew.Due() is { } wn)
-        {
-            if (MergedIntro.Due) MergedIntroRequested?.Invoke();
-            else WhatsNewRequested?.Invoke(wn);
-        }
+        else AfterUpdate();
+    }
+
+    /// <summary>After an update: what changed since the version last seen — (0.3.80) the first update to it brings up To
+    /// Do and the calendar as one, and Quick Plan, in its place. (0.3.83) The developer tools' update played through
+    /// without a restart brings them up the same way.</summary>
+    public void AfterUpdate()
+    {
+        if (WhatsNew.Due() is not { } wn) return;
+        if (MergedIntro.Due) MergedIntroRequested?.Invoke();
+        else WhatsNewRequested?.Invoke(wn);
     }
 
     /// <summary>The first setup not finished yet — quit halfway, or its save failed: asked again at the next start.</summary>

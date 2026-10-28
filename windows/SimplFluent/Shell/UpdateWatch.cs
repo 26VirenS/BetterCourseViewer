@@ -184,23 +184,26 @@ public static class UpdateWatch
     private static void Say()
     {
         if (pill == null || words == null || mark == null) return;
-        var v = Updates.Found?.Version ?? "";
+        // (0.3.83: an update played through from the developer tools says what a real one would, to this version)
+        var rehearsal = Updates.Rehearsing;
+        var v = rehearsal != null ? WhatsNew.Number : Updates.Found?.Version ?? "";
         string? text = null;
         var stays = false;
-        var critical = Updates.Critical;
+        var critical = rehearsal != null ? Updates.RehearsingCritical : Updates.Critical;
         FrameworkElement icon = critical ? K.Icon(SymbolRegular.Warning24, 16, Color.FromRgb(0xe3, 0x6c, 0x0a), filled: true) : K.Icon(SymbolRegular.ArrowSync24, 16, B.AccentText);
-        if (Updates.State == Updates.Mode.Installing)
+        if (Updates.State == Updates.Mode.Installing || rehearsal == Updates.Rehearsal.Installing)
         {
             text = critical ? $"Installing critical update {v} — Simpl opens again in a moment." : $"Updating Simpl to {v} — it opens again in a moment.";
             icon = K.Spinner(16);
             stays = true;
         }
-        else if (Updates.State == Updates.Mode.Ready && Updates.Waiting is { When: { } when })
+        // (one played through, downloading: nothing over the window, as for a real one)
+        else if (rehearsal == null && Updates.State == Updates.Mode.Ready && Updates.Waiting is { When: { } when })
         {
             text = critical ? $"Critical update {v} installs {when}." : $"Simpl updates to {v} {when}.";
             stays = critical;
         }
-        else if (critical && Updates.State == Updates.Mode.Failed && Updates.Found != null)
+        else if (rehearsal == null && critical && Updates.State == Updates.Mode.Failed && Updates.Found != null)
             text = $"Critical update {v} couldn’t be installed yet; Simpl tries again shortly.";
 
         if (text == null) { Hide(); return; }

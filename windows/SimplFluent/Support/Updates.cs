@@ -1181,10 +1181,10 @@ public static partial class Updates
     /// <summary>Opened again by an update, within half an hour of it: where the window was (read once, as Simpl starts).</summary>
     public static Resume? Resumed { get; private set; }
 
-    private static void Remember()
+    private static void Remember(string? to = null)
     {
         var where = Where?.Invoke() ?? new Resume();
-        where.To = Found?.Version;
+        where.To = to ?? Found?.Version;
         where.At = DateTime.UtcNow;
         Prefs.Set(ResumeKey, JsonSerializer.Serialize(where));
         Log.Write($"update: where it was: {where.Place ?? "(no place)"}{(where.Path is { Count: > 0 } p ? $" with {p.Count} opened on it" : "")}, the window {where.Window}");

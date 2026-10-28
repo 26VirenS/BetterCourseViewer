@@ -26,6 +26,8 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.83", "2026-10-28",
+            ("new", "Simulate an Update", "Developer tools can replay an update from any older version.")),
         R("0.3.82", "2026-10-27",
             ("improved", "Sidebar Like the Web", "Courses sit under All courses, each in its own colour.")),
         R("0.3.81", "2026-10-27",
@@ -317,13 +319,23 @@ public static class WhatsNew
     public static WhatsNewData? Due()
     {
         if (Launch.Get("shot") != null) return null;
-        var seen = Prefs.String(SeenKey);
-        var newer = Releases.Where(r => seen != null ? IsNewer(r.Version, seen) : r.Version == Number)
-                            .Where(r => !IsNewer(r.Version, Number)).ToList();
+        var newer = Since(Prefs.String(SeenKey), Number);
         return newer.Count == 0 ? null : new WhatsNewData { Version = Current, Releases = newer };
     }
 
+    /// <summary>The versions an update from <paramref name="seen"/> to <paramref name="number"/> brings, newest first
+    /// (none seen before: that version's own alone).</summary>
+    public static List<Release> Since(string? seen, string number) =>
+        Releases.Where(r => seen != null ? IsNewer(r.Version, seen) : r.Version == number)
+                .Where(r => !IsNewer(r.Version, number)).ToList();
+
+    /// <summary>(0.3.83) The versions before this one, newest first: what the developer tools can play an update from.</summary>
+    public static List<string> Older() => Releases.Where(r => IsNewer(Number, r.Version)).Select(r => r.Version).ToList();
+
     public static void MarkSeen() => Prefs.Set(SeenKey, Number);
+
+    /// <summary>(0.3.83) As if <paramref name="from"/> was the version here before this one (an update played through).</summary>
+    public static void Pretend(string from) => Prefs.Set(SeenKey, from);
 
     /// <summary>(0.3.80) A What's New seen before, by some version of this app: it was here before this one.</summary>
     public static bool SeenAny => Prefs.String(SeenKey) != null;
@@ -353,9 +365,18 @@ public static class MergedIntro
 {
     private const string SeenKey = "mergedIntro:seen";
 
+    /// <summary>The version it came with: an update from one before it brings it up.</summary>
+    public const string Since = "0.3.80";
+
     /// <summary>After an update (a What's New seen before: an older version was here), not seen yet.</summary>
     public static bool Due => WhatsNew.SeenAny && !Prefs.Bool(SeenKey);
 
     /// <summary>Seen: its popup was up, or a What's New was (a first install's).</summary>
     public static void MarkSeen() => Prefs.Set(SeenKey, true);
+
+    /// <summary>(0.3.83) An update from <paramref name="from"/> brings it up: that version came before it.</summary>
+    public static bool ComesAfter(string from) => WhatsNew.IsNewer(Since, from);
+
+    /// <summary>(0.3.83) As after an update from <paramref name="from"/>: not seen yet when that came before it, else seen.</summary>
+    public static void Pretend(string from) => Prefs.Set(SeenKey, ComesAfter(from) ? null : (object)true);
 }

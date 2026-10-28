@@ -795,6 +795,44 @@ public sealed class DeveloperWindow : FluentWindow
         var paused = new ToggleSwitch { IsChecked = Updates.Paused };
         paused.Checked += (_, _) => Updates.Paused = true;
         paused.Unchecked += (_, _) => Updates.Paused = false;
+
+        // (0.3.83) an update played through, as from any earlier version (Support/UpdateRehearsal.cs)
+        var older = WhatsNew.Older();
+        var from = new ComboBox { MinWidth = 150, ItemsSource = older, SelectedIndex = older.Count > 0 ? 0 : -1 };
+        var critical = new ToggleSwitch();
+        var restart = new ToggleSwitch { IsChecked = true };
+        var brings = K.Wrapped("", Ty.Caption, B.Text2);
+        var step = Value("");
+        Wpf.Ui.Controls.Button? go = null;
+        void Brings()
+        {
+            if (from.SelectedItem is not string f) { brings.Text = "This copy has no earlier version to play an update from."; return; }
+            var since = WhatsNew.Since(f, WhatsNew.Number);
+            var versions = since.Count == 1 ? since[0].Version : $"{since.Count} versions, {since[^1].Version} to {since[0].Version}";
+            brings.Text = since.Count == 0 ? "Then: nothing new to show."
+                : MergedIntro.ComesAfter(f) ? $"Then: To Do & Calendar’s intro, in place of What’s New ({versions})."
+                : $"Then: What’s New with {versions}.";
+        }
+        void Moved()
+        {
+            step.Text = Updates.Rehearsing switch
+            {
+                Updates.Rehearsal.Downloading => $"Downloading · {Updates.RehearsalProgress * 100:0}%",
+                Updates.Rehearsal.Installing => "Installing",
+                _ => "",
+            };
+            if (go != null) go.IsEnabled = Updates.Rehearsing == null && from.SelectedItem is string;
+        }
+        from.SelectionChanged += (_, _) => { Brings(); Moved(); };
+        go = K.Button("Simulate update", () =>
+        {
+            if (from.SelectedItem is not string f) return;
+            Owner?.Activate(); // (the main window in front: its notice and its popups are what is played)
+            _ = Updates.Rehearse(f, critical.IsChecked == true, restart.IsChecked == true, engine.AfterUpdate, Moved);
+        }, accent: true, icon: SymbolRegular.Play24);
+        Brings();
+        Moved();
+
         var v = K.V(0,
             K.SectionHeader("This copy", 0),
             K.Group(
@@ -805,9 +843,16 @@ public sealed class DeveloperWindow : FluentWindow
             K.Group(
                 K.Row(SymbolRegular.Beaker24, "Get beta updates", "The betas are offered too, not only the usual releases.", beta),
                 K.Row(SymbolRegular.Pause24, "Pause updates", "Looked for all the same, but nothing installs by itself (a Critical Update still does).", paused),
-                K.Row(SymbolRegular.ArrowDownload24, "Look now", Updates.Off ? "A development run never updates." : null, K.Button("Check for updates", () => _ = Updates.Check()))));
+                K.Row(SymbolRegular.ArrowDownload24, "Look now", Updates.Off ? "A development run never updates." : null, K.Button("Check for updates", () => _ = Updates.Check()))),
+            K.SectionHeader("Simulate an update"),
+            K.Group(
+                K.Row(SymbolRegular.History24, "From version", "Simpl acts as if it was just updated from this version to this one. Nothing is downloaded or installed.", from),
+                K.Row(SymbolRegular.Warning24, "As a Critical Update", "The notice at the top of the window says so.", critical),
+                K.Row(SymbolRegular.ArrowClockwise24, "Restart Simpl", "Quit and open again, as an update does. Off: the popups come up at once.", restart),
+                K.Row(SymbolRegular.Play24, "Play it through", "The download, the notice as it goes in, then the popups that version would see.", K.H(12, step, go))),
+            brings.Margin(2, 8, 0, 0));
         Draw();
-        onTick = Draw;
+        onTick = () => { Draw(); Moved(); };
         return Scrolled(v);
     }
 

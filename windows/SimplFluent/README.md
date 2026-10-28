@@ -210,6 +210,13 @@ and its window in the notification area, the installer just made as the next ver
 order, the installer run and Simpl opened again, then that profile opened again: at the Grades, out of sight, its
 engine running.
 
+**Simulating one from the developer tools** (0.3.83, any copy with them on): Developer ▸ Updates ▸ Simulate an
+update plays an update through from any earlier version on What's New's list to this one, with nothing downloaded or
+installed (Support/UpdateRehearsal.cs): a download's progress on that page, the notice at the top of the window as it
+goes in (a Critical Update's words with *As a Critical Update*), then Simpl quits and opens again as an update opens it
+— in front, where it was — with what that version would see: What's New with every version since it, or To Do &
+Calendar's intro in its place from before 0.3.80. With *Restart Simpl* off, those popups come up at once instead.
+
 **Publishing a beta, and promoting it.** A version for testers only goes out as a beta, from the commit's green run:
 `gh workflow run windows-fluent.yml --ref claude/windows-liquid-glass -f preview=true -f reuse=true -f beta=true`
 (`-f from_run=<id>` for another green run — its id, the long number in its link, not the v-number; `-f critical=true`
