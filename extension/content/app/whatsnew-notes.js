@@ -28,6 +28,9 @@
     lock: 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.125', date: '2026-10-28', notes: [
+      { kind: 'new', title: 'Silent Mode', body: 'A black, quiet Dashboard: only what comes next.', icon: P.eye },
+    ] },
     { version: '2.99.124', date: '2026-10-28', notes: [
       { kind: 'new', title: 'Calendar Accounts', body: 'Sign in to iCloud Calendar right from Sync.', icon: P.cal },
     ] },

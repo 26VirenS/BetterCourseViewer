@@ -1438,6 +1438,7 @@
     state.quizOpen = false;
     state.submitOpen = false;
     html.classList.remove('bcv-quiz', 'bcv-quiz-fb'); // the quiz screen puts them back while an attempt or its feedback is on screen
+    if (r.screen !== 'dashboard') html.classList.remove('bcv-dash-silent'); // (2.99.125: the Dashboard's Silent mode, which it keeps across its own redraws)
     punchOut(); // a native screen punches back in while it builds
     BCV.preview?.close(); // a preview beside the list belongs to the list it was opened from
     // a sheet (a counter's list, the calendars, a rubric, GPA settings) belongs to the screen it

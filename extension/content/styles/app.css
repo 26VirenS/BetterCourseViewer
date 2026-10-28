@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.124"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.125"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -1252,7 +1252,39 @@ html[data-bcv-theme="dark"] .bcv-mring__track { stroke: rgba(255,255,255,.1); }
 .bcv-dash__hello { overflow-wrap: anywhere; }
 .bcv-dash__date { margin-top: 5px; font: 400 14px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-dash__bar { margin-top: 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.bcv-dash__new { height: 30px; border-radius: 15px; padding: 0 13px; font-size: 12.5px; }
+.bcv-dash__new, .bcv-dash__silent { height: 30px; border-radius: 15px; padding: 0 13px; font-size: 12.5px; }
+/* ---- (2.99.125) Silent mode: the Dashboard as nothing but what comes next — black, large type, no head, no counters, no
+ * cards (dashboard.js silentBlock). The bar has gone up out of view (html.bcv-dash-silent, with the quiz's); the sidebar stays. */
+html.bcv-on.bcv-dash-silent:not(.bcv-phone):not(.bcv-punch) .bcv-main { background: #000; padding-bottom: 0; }
+.bcv-screen--silent > .bcv-head { display: none; }
+.bcv-screen--silent > .bcv-body { max-width: none; padding: 0; }
+.bcv-silent { position: relative; box-sizing: border-box; min-height: 100vh; display: flex; align-items: center; padding: 96px clamp(32px, 7vw, 128px); background: #000; color: #fff; color-scheme: dark; font-family: var(--bcv-font); -webkit-font-smoothing: antialiased; }
+.bcv-silent__in { width: 100%; max-width: 1100px; }
+.bcv-silent__label { margin-bottom: 18px; font: 600 13px/1 var(--bcv-font); letter-spacing: .09em; text-transform: uppercase; color: rgba(255,255,255,.42); }
+.bcv-silent__title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; font: 700 clamp(44px, 6vw, 96px)/1.03 var(--bcv-font); letter-spacing: -.035em; color: #fff; text-decoration: none; overflow-wrap: anywhere; text-wrap: balance; }
+#bcv-main .bcv-silent .bcv-silent__title { color: #fff; } /* (a link: over Canvas's own link colour, as the page has it) */
+#bcv-main .bcv-silent .bcv-silent__title--quiet { font-size: clamp(30px, 3.6vw, 52px); color: rgba(255,255,255,.7); }
+.bcv-silent__when { margin-top: 22px; font: 500 clamp(18px, 1.8vw, 26px)/1.35 var(--bcv-font); letter-spacing: -.01em; color: rgba(255,255,255,.48); font-variant-numeric: tabular-nums; }
+.bcv-silent__soon { color: #fff; }
+.bcv-silent__then { margin-top: clamp(56px, 10vh, 112px); display: flex; flex-direction: column; }
+.bcv-silent__then > .bcv-silent__label { margin-bottom: 8px; }
+.bcv-silent__row { display: flex; align-items: baseline; gap: 28px; padding: 9px 0; color: inherit; text-decoration: none; }
+.bcv-silent__rowt { flex: 1; min-width: 0; font: 600 clamp(22px, 2.3vw, 34px)/1.25 var(--bcv-font); letter-spacing: -.02em; color: rgba(255,255,255,.84); }
+.bcv-silent__roww { flex: none; font: 500 clamp(15px, 1.35vw, 20px)/1.2 var(--bcv-font); color: rgba(255,255,255,.42); font-variant-numeric: tabular-nums; }
+a.bcv-silent__title, a.bcv-silent__row .bcv-silent__rowt { transition: opacity .15s ease; }
+@media (hover: hover) and (pointer: fine) { a.bcv-silent__title:hover, a.bcv-silent__row:hover .bcv-silent__rowt { opacity: .7; } }
+.bcv-silent :is(a, button):focus-visible { outline: 2px solid rgba(255,255,255,.7); outline-offset: 4px; border-radius: 6px; }
+.bcv-silent__exit { position: absolute; top: 16px; right: 20px; display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 13px; border: 0; border-radius: 15px; background: transparent; color: rgba(255,255,255,.45); font: 500 13px/1 var(--bcv-font); cursor: pointer; transition: color .15s ease, background-color .15s ease; }
+#bcv-main .bcv-silent .bcv-silent__exit { color: rgba(255,255,255,.45); } /* (a button: over the page's own button colour) */
+@media (hover: hover) and (pointer: fine) { #bcv-main .bcv-silent .bcv-silent__exit:hover { color: rgba(255,255,255,.92); background: rgba(255,255,255,.1); } }
+.bcv-silent__exit:active { scale: .97; }
+/* coming in: each piece rises a little into place, one after another (a fade alone, with reduced motion) */
+.bcv-silent.is-entering .bcv-silent__piece { animation: bcv-silent-in .3s var(--bcv-ease-out) both; animation-delay: calc(var(--bcv-i, 0) * 55ms); }
+.bcv-silent.is-entering .bcv-silent__exit { animation: bcv-silent-fade .3s ease-out .12s both; }
+@keyframes bcv-silent-in { from { opacity: 0; transform: translateY(10px); } }
+@keyframes bcv-silent-fade { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .bcv-silent.is-entering .bcv-silent__piece { animation-name: bcv-silent-fade; } }
+html.bcv-on.bcv-dash-silent:not(.bcv-phone):not(.bcv-punch).bcv-side-off #bcv-sidetoggle { background: rgba(255,255,255,.1); color: rgba(255,255,255,.6); } /* (the sidebar folded away: its button over the black) */
 .bcv-dash__coming { justify-content: flex-start; align-items: baseline; gap: 12px; padding: 0 4px; margin-bottom: -12px; }
 .bcv-dash__coming > .bcv-dash__count { margin-left: auto; font: 400 13px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-dash__coming > .bcv-dash__done { align-self: center; }
@@ -4196,6 +4228,11 @@ html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab).bcv-quiz { --bcv-b
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab).bcv-quiz #bcv-bar { height: 44px; translate: 0 -100%; opacity: 0; pointer-events: none; }
 html.bcv-on:not(.bcv-phone):not(.bcv-tooltab).bcv-quiz #bcv-tray, html.bcv-on:not(.bcv-phone):not(.bcv-tooltab).bcv-quiz #bcv-look, html.bcv-on:not(.bcv-phone):not(.bcv-tooltab).bcv-quiz #bcv-report { translate: 0 -64px; opacity: 0; pointer-events: none; }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-main { transition: padding-top .45s var(--bcv-ease); }
+/* (2.99.125) The Dashboard's Silent mode sends the bar up and out of view the same way, with the pins, the switch, the
+ * search box and the report button; the sidebar stays (dashboard.js silentBlock, below) */
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab).bcv-dash-silent { --bcv-bar-h: 0px; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab).bcv-dash-silent #bcv-bar { height: 44px; translate: 0 -100%; opacity: 0; pointer-events: none; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab).bcv-dash-silent :is(#bcv-tophist, #bcv-topsearch, #bcv-tray, #bcv-look, #bcv-report) { translate: 0 -64px; opacity: 0; pointer-events: none; }
 @media (max-width: 1100px) { html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) { --bcv-side-w: 200px; } }
 #bcv-bar { display: none; }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-bar { display: block; position: fixed; top: 0; left: var(--bcv-side-w); right: 0; height: var(--bcv-bar-h); z-index: var(--bcv-z-bar); box-sizing: border-box; background: var(--bcv-chrome-ground, var(--bcv-chrome)); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-bottom: 1px solid var(--bcv-edge); transition: left .45s var(--bcv-ease), translate .45s var(--bcv-ease), opacity .3s ease; }

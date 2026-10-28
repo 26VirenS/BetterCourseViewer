@@ -994,6 +994,7 @@
     const r = app?.state?.route;
     if (!app || !r || !document.getElementById('bcv-app') || BCV.phone?.active?.()) return false;
     if (r.screen === 'native' || r.params?.get?.('bcv') === 'native' || app.state.quizOpen || document.documentElement.classList.contains('bcv-quiz')) return false;
+    if (document.documentElement.classList.contains('bcv-dash-silent')) return false; // (2.99.125: the Dashboard's Silent mode has no box, and keeps quiet)
     return !document.querySelector('.bcv-sheet-ov, .bcv-viewer-ov, #bcv-setup, .bcv-menu');
   };
   function summon() {

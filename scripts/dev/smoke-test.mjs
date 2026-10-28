@@ -1044,6 +1044,60 @@ try {
   check(await eventually(async () => (await texts('.bcv-dash__done'))[0] === `Show completed · ${doneBefore}`), 'the choice is kept across a reload');
   await page.click('.bcv-dash__done');
   check(await eventually(async () => (await dashDoneRows()) === doneBefore), 'Show completed brings them back');
+  // ---- (2.99.125) Silent mode: black, large type, only what comes next; the bar goes up out of view, the sidebar stays ----
+  const notDone = await page.$$eval('.bcv-day .bcv-row:not(.bcv-row--done) .bcv-row__title', (els) => els.map((e) => e.textContent));
+  await page.click('.bcv-dash__silent');
+  await page.waitForSelector('.bcv-silent .bcv-silent__label', { timeout: 8000 });
+  await page.waitForTimeout(600); // (the bar's way out: .45 s)
+  const silentSeen = () => page.evaluate(() => {
+    const vis = (sel) => { const e = document.querySelector(sel); if (!e) return false; const s = getComputedStyle(e); const r = e.getBoundingClientRect(); return s.display !== 'none' && s.visibility !== 'hidden' && Number(s.opacity) > 0.05 && r.bottom > 0 && r.width > 0; };
+    const one = (sel) => document.querySelector(sel)?.textContent ?? null;
+    return {
+      on: document.documentElement.classList.contains('bcv-dash-silent'),
+      bg: getComputedStyle(document.getElementById('bcv-main')).backgroundColor,
+      bar: vis('#bcv-bar'), hist: vis('#bcv-tophist'), head: vis('.bcv-screen > .bcv-head'), side: vis('.bcv-side'),
+      cards: !!document.querySelector('#bcv-main :is(.bcv-stat, .bcv-card, .bcv-dash-rail, .bcv-day)'),
+      labels: [...document.querySelectorAll('.bcv-silent__label')].map((e) => e.textContent),
+      title: one('.bcv-silent__title'), when: one('.bcv-silent__when'),
+      rows: [...document.querySelectorAll('.bcv-silent__row .bcv-silent__rowt')].map((e) => e.textContent),
+      size: parseFloat(getComputedStyle(document.querySelector('.bcv-silent__title')).fontSize),
+      ink: getComputedStyle(document.querySelector('.bcv-silent__title')).color,
+      exitInk: getComputedStyle(document.querySelector('.bcv-silent__exit')).color,
+      focus: !!document.activeElement?.classList.contains('bcv-silent__exit'),
+    };
+  });
+  const sil = await silentSeen();
+  check(sil.on && sil.bg === 'rgb(0, 0, 0)' && !sil.bar && !sil.hist && !sil.head && sil.side && !sil.cards,
+    `Silent: the page black, the bar up out of view, no head, no counters, no cards; the sidebar stays: ${JSON.stringify({ ...sil, rows: sil.rows.length })}`);
+  // what it shows is what the list had still to do, in its order: the next one large, up to four after it
+  const inOrder = (seq, all) => { let i = 0; for (const t of seq) { i = all.indexOf(t, i); if (i < 0) return false; i++; } return true; };
+  check(sil.labels.join() === 'Next,Then' && sil.size >= 44 && sil.ink === 'rgb(255, 255, 255)' && inOrder([sil.title, ...sil.rows], notDone) && sil.rows.length >= 1 && sil.rows.length <= 4
+    && /^(Due|Starts|In) |^(Today|Tomorrow|[A-Z][a-z]+) at \d/.test(sil.when || '') && sil.focus,
+    `only what comes next: "${sil.title}" large and white (${sil.size}px, ${sil.ink}), "${sil.when}", then ${JSON.stringify(sil.rows)}; the keyboard on Exit`);
+  await page.mouse.move(1000, 840); // (off the words: a hover dims them)
+  check((await silentSeen()).exitInk === 'rgba(255, 255, 255, 0.45)', `Exit Silent Mode is quiet until the pointer is on it: ${(await silentSeen()).exitInk}`);
+  await shot(page, '01g-dashboard-silent');
+  await page.keyboard.press('/');
+  await page.waitForTimeout(300);
+  check(await page.evaluate(() => document.activeElement?.tagName !== 'INPUT' && !document.querySelector('.bcv-spot')), '"/" keeps quiet in Silent mode (no search box to put the cursor in)');
+  await page.reload();
+  await page.waitForSelector('.bcv-silent .bcv-silent__label', { timeout: 15000 });
+  check(!(await page.$('.bcv-stat')) && (await silentSeen()).on, 'Silent is kept across a reload');
+  await nav('courses');
+  await page.waitForSelector('.bcv-screen:not(.bcv-screen--silent) .bcv-head', { timeout: 10000 });
+  await page.waitForTimeout(600);
+  const away = await page.evaluate(() => ({ on: document.documentElement.classList.contains('bcv-dash-silent'), bar: getComputedStyle(document.getElementById('bcv-bar')).opacity, bg: getComputedStyle(document.getElementById('bcv-main')).backgroundColor }));
+  check(!away.on && away.bar === '1' && away.bg !== 'rgb(0, 0, 0)', `another screen: the bar back, the page as it was: ${JSON.stringify(away)}`);
+  await nav('dashboard');
+  await page.waitForSelector('.bcv-silent .bcv-silent__label', { timeout: 10000 });
+  check((await silentSeen()).on, 'and the Dashboard is still silent on the way back');
+  await page.click('.bcv-silent__exit');
+  await page.waitForSelector('.bcv-stat', { timeout: 8000 });
+  check(await page.evaluate(() => !document.documentElement.classList.contains('bcv-dash-silent') && !document.querySelector('.bcv-silent') && !!document.querySelector('.bcv-screen > .bcv-head') && !!document.activeElement?.classList.contains('bcv-dash__silent')),
+    'Exit Silent Mode: the whole Dashboard back, the keyboard on Silent');
+  await page.reload();
+  await page.waitForSelector('.bcv-stat', { timeout: 15000 });
+  check(!(await page.$('.bcv-silent')), 'and it stays out after a reload');
   // the views the dashboard offers are the ones the setup (or Settings) asked for; one alone needs no switcher
   await setSettings({ appearance: { dashboard: { activity: false } } });
   await page.reload();

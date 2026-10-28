@@ -13,6 +13,9 @@
   let arrived = false;
   const arrivedBefore = () => { if (arrived) return true; try { return sessionStorage.getItem(ARRIVED) === '1'; } catch { return false; } };
   const markArrived = () => { arrived = true; try { sessionStorage.setItem(ARRIVED, '1'); } catch { /* (private window: this page's memory is enough) */ } };
+  // (2.99.125) Silent mode as last read: a redraw starts in it, rather than flashing the bar and the cards back first
+  let silentWas = false;
+  const SILENT_MORE = 4; // (what comes after the next: so many lines under it)
 
   /** The counters' own lists — shared by the Dashboard and the phone's Today (2.98.36), so the two
    *  never count differently: what is due today, tomorrow and in the next 7 days (and what of each is already
@@ -223,14 +226,23 @@
     store.me().then((me) => { const first = String(me?.shortName || me?.name || '').trim().split(/\s+/)[0]; if (first && first !== 'Account') hello.textContent = `Good ${part}, ${first}`; }).catch(() => {});
     BCV.plan?.ready(); // (2.99.107) the plans, for the pills on the rows (they paint when it lands)
     const newTask = U.btn('New Task', { kind: 'xs', icon: IC.plus, cls: 'bcv-dash__new', title: 'Add a task of your own to To Do', onClick: () => { BCV.todoAddNext = true; app.go('/#todo'); } });
+    // (2.99.125) Silent mode (silentBlock, below): the desktop's alone — the phone has Today, and the apps draw their own
+    const desk = !BCV.phone?.active?.() && !self.BCVBridge?.native;
+    let silent = desk && silentWas;
+    const silentBtn = desk ? U.btn('Silent', { kind: 'xs', icon: IC.moon, cls: 'bcv-dash__silent', title: 'Silent mode: only what comes next, in large type on black', onClick: () => setSilent(true) }) : null;
+    const paintSilent = () => {
+      document.documentElement.classList.toggle('bcv-dash-silent', silent); // (the bar goes up out of view: app.css)
+      screen.classList.toggle('bcv-screen--silent', silent);
+    };
+    paintSilent();
     screen.append(
       U.el('bcv-head bcv-head--hello', U.el('bcv-head__in', [
         U.el('bcv-head__row', [U.el('bcv-dash__title', [hello, U.text('bcv-dash__date', `${U.DAYS_LONG[today.getDay()]}, ${U.MONTHS_LONG[today.getMonth()]} ${today.getDate()}`, 'div')]), BCV.search?.field?.(app) || null]),
-        U.el('bcv-dash__bar', [segWrap, newTask]),
+        U.el('bcv-dash__bar', [segWrap, silentBtn, newTask].filter(Boolean)),
       ])),
       body,
     );
-    body.append(U.loading('rows', 6)); // list-row skeletons hold the place until the planner lands
+    if (!silent) body.append(U.loading('rows', 6)); // list-row skeletons hold the place until the planner lands (silent: black, and nothing)
 
     let view = 'list';
     // the views the setup (or Settings) asked for; with one, there is nothing to switch between
@@ -264,7 +276,7 @@
     const weightMap = (o) => (o && typeof o === 'object' && Object.keys(o).length ? new Map(Object.entries(o).map(([g, w]) => [String(g), Number(w) || 0])) : null);
     const groupWeights = (groups) => (Array.isArray(groups) ? new Map(groups.map((g) => [String(g.id), Number(g.group_weight) || 0])) : null);
     const freshWeightsP = Promise.all([favsP, ownWeightsP]).then(([fs, own]) => Promise.all((fs || []).map(async (c) => [c.id, weightMap(own[c.id]) || (c.weighted ? groupWeights(await store.assignmentGroups(c.id).catch(() => null)) : null)]))).then((e) => new Map(e)).catch(() => new Map());
-    const [planner, favs, courses, seen, savedView, settings, hidePref, overrides, kept] = await Promise.all([
+    const [planner, favs, courses, seen, savedView, settings, hidePref, overrides, kept, silentPref] = await Promise.all([
       store.planner().catch(() => null),
       favsP,
       store.courses().catch(() => []),
@@ -274,6 +286,7 @@
       store.pref('dashHideDone', false).catch(() => false),
       store.plannerOverrides().catch(() => []), // what the X on the Overdue list wrote, on any device (see below)
       store.keptAssignments().catch(() => null),
+      store.pref('dashSilent', false).catch(() => false), // (2.99.125: kept per site, like Hide completed)
     ]);
     if (!ctx.alive()) return screen;
     // the counters' lists, the same ones the phone's Today counts (workLists above): from the kept copy when it holds
@@ -288,6 +301,9 @@
     // the view saved on the Canvas profile, unless it is one that was switched off here
     view = views.some(([k]) => k === savedView) ? savedView : views[0][0];
     hideDone = !!hidePref;
+    silent = desk && !!silentPref;
+    silentWas = silent;
+    paintSilent();
     // Unread: the announcement's own read state when we know it, else the stream's flag; either
     // way an item opened from here loses its dot. The activity rows on screen are kept here so
     // that a feed landing after they were drawn settles their dots in place.
@@ -1074,9 +1090,89 @@
       return '/';
     }
 
+    // ---- (2.99.125) Silent mode -------------------------------------------------------------------
+    // The Dashboard with nothing on it but what comes next: black, the next piece of work (or event, or task of the
+    // student's own) in large type with when it is and its course, and the few after it under it. No head, no counters,
+    // no cards; the bar across the top goes up out of view (app.css html.bcv-dash-silent) and the sidebar stays. Kept per site,
+    // like Hide completed; Exit Silent Mode, at the top right, puts everything back.
+    function setSilent(on) {
+      silent = on;
+      silentWas = on;
+      Promise.resolve(store.setPref('dashSilent', on)).catch(() => {});
+      paintSilent();
+      renderBody();
+      scrollTo(0, 0);
+      // (the button pressed is gone with what it was in: the keyboard lands on the one that goes back)
+      screen.querySelector(on ? '.bcv-silent__exit' : '.bcv-dash__silent')?.focus({ preventScroll: true });
+    }
+    /** What is still ahead, soonest first: not done, not handed in, not dismissed, in the courses on the Dashboard. */
+    const silentAhead = (at) => (planner || []).filter((it) => it.date && it.date >= at && !it.complete && !it.submitted && !it.graded && !it.excused && !it.dismissed && it.type !== 'announcement' && inSel(it)).sort(byDate);
+    /** "Today", "Tomorrow", "Friday" (within the week), else "November 3" (or the short forms: "Fri", "Nov 3"). */
+    const silentDay = (d, at, short = false) => {
+      const n = U.dayDiff(d, at);
+      if (n === 0) return 'Today';
+      if (n === 1) return 'Tomorrow';
+      if (n < 7) return (short ? U.DAYS : U.DAYS_LONG)[d.getDay()];
+      return short ? U.fmtShort(d) : `${U.MONTHS_LONG[d.getMonth()]} ${d.getDate()}`;
+    };
+    /** The next one's line: how soon, in words that count down within the day ("Due in 4 h 40 min"; an event "Starts…",
+     *  a task of the student's own just "In…"), then the day and time when that is not already said, and its course. */
+    function silentWords(it, at) {
+      const left = it.date - at;
+      const mins = Math.floor((left % 3600000) / 60000);
+      const soon = left < 60 * 60000 ? `in ${U.plural(Math.max(1, Math.round(left / 60000)), 'minute')}`
+        : left < 24 * 3600000 ? `in ${Math.floor(left / 3600000)} h${mins ? ` ${mins} min` : ''}`
+          : '';
+      const day = `${silentDay(it.date, at)} at ${U.fmtTime(it.date)}`;
+      const verb = it.isDue ? 'Due' : it.type === 'calendar_event' ? 'Starts' : '';
+      const lead = verb ? `${verb} ${soon || day.replace(/^(Today|Tomorrow)/, (w) => w.toLowerCase())}` : soon ? `I${soon.slice(1)}` : day;
+      const course = it.custom ? (it.course ? `${it.course.shortName || it.courseName} · Your task` : 'Your task') : it.course?.shortName || it.courseName || '';
+      return { lead, rest: [soon ? day : null, course].filter(Boolean) };
+    }
+    function silentBlock(enter) {
+      const at = new Date();
+      const [next, ...rest] = silentAhead(at);
+      let n = 0;
+      const piece = (el) => { el.classList.add('bcv-silent__piece'); el.style.setProperty('--bcv-i', n++); return el; };
+      const link = (cls, it, kids) => h(it.url ? 'a' : 'div', { class: cls, ...(it.url ? { href: it.url } : {}) }, kids);
+      const kids = [];
+      if (!planner) kids.push(piece(U.text('bcv-silent__title bcv-silent__title--quiet', 'Your planner could not be loaded.')));
+      else if (!next) kids.push(piece(U.text('bcv-silent__label', 'Next')), piece(U.text('bcv-silent__title', 'Nothing coming up.')), piece(U.text('bcv-silent__when', 'Nothing is due in the next three weeks.')));
+      else {
+        const w = silentWords(next, at);
+        kids.push(
+          piece(U.text('bcv-silent__label', 'Next')),
+          piece(link('bcv-silent__title', next, [next.title])),
+          piece(h('div', { class: 'bcv-silent__when' }, [h('span', { class: 'bcv-silent__soon', text: w.lead }), ...w.rest.map((t) => h('span', { text: ` · ${t}` }))])),
+        );
+        const more = rest.slice(0, SILENT_MORE);
+        if (more.length) {
+          kids.push(piece(h('div', { class: 'bcv-silent__then' }, [
+            U.text('bcv-silent__label', 'Then'),
+            ...more.map((it) => link('bcv-silent__row', it, [U.text('bcv-silent__rowt bcv-ellip', it.title, 'span'), U.text('bcv-silent__roww', `${silentDay(it.date, at, true)}, ${U.fmtTime(it.date)}`, 'span')])),
+          ])));
+        }
+      }
+      const exit = h('button', { type: 'button', class: 'bcv-silent__exit', title: 'Back to the whole Dashboard', onclick: () => setSilent(false) }, [U.svg(IC.moon, { size: 13, stroke: 'currentColor', width: 2 }), h('span', { text: 'Exit Silent Mode' })]);
+      return U.el(`bcv-silent${enter && !U.isStill() ? ' is-entering' : ''}`, [exit, U.el('bcv-silent__in', kids)], { role: 'region', 'aria-label': 'Silent mode: what comes next' });
+    }
+    // the words count down: drawn again each half minute while it is up, when they say something else (the next one past,
+    // "in 5 min" now "in 4 min"), the keyboard kept on Exit if it was there
+    const silentTick = setInterval(() => {
+      if (!ctx.alive()) { clearInterval(silentTick); return; }
+      if (!silent || document.hidden) return;
+      const cur = body.querySelector('.bcv-silent');
+      const fresh = silentBlock(false);
+      if (cur && cur.textContent === fresh.textContent) return;
+      const onExit = !!cur?.contains(document.activeElement) && document.activeElement.classList.contains('bcv-silent__exit');
+      body.replaceChildren(fresh);
+      if (onExit) fresh.querySelector('.bcv-silent__exit')?.focus({ preventScroll: true });
+    }, 30000);
+
     let bodyGen = 0; // (the activity view lands after a wait: a view switched to meanwhile is not painted over)
     async function renderBody() {
       const gen = ++bodyGen;
+      if (silent) { body.replaceChildren(silentBlock(true)); return; }
       const stats = statsBlock();
       const work = workloadBlock();
       const sky = skylineBlock();
