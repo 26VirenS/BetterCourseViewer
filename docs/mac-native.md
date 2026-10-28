@@ -621,7 +621,11 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   Developer menu (the Developer window, Save Alta / Macmillan Page Code — no longer in the popups — Refresh, Reload,
   Check for Updates Now, Copy Diagnostics, Leave Developer Mode) and the Developer window (no Window-menu item of its
   own): Overview (versions, where the app runs, live diagnostics), Updates (state, feed, beta / pause — (1.3.86) no
-  automatic switch any more — the version put back from, a feed address of its own, Check and Install Now), Engine
+  automatic switch any more — the version put back from, a feed address of its own, Check and Install Now; (1.3.189)
+  Simulate an update: from any earlier version on What's New's list to this one, nothing downloaded or installed —
+  `UpdateRehearsal` plays the download on that page, a Critical Update's notice over the window when asked, then Simpl
+  quits and opens again (`AppPlacement.relaunch`) with what that version would see, What's New with every version since
+  it or To Do & Calendar's intro in its place from before 1.3.182; Restart off brings those popups up at once), Engine
   (its state, Refresh, Reload, Forget Kept Answers, and a console: any `BCVNative.call` with JSON arguments, its
   answer pretty-printed), Alta & Macmillan (state, Save Page Code, Error Logs — Alta's Error Logs button shows only in
   developer mode now — and the graphs' light colours), Interface (What's New, the tour, the setup, their resets, the

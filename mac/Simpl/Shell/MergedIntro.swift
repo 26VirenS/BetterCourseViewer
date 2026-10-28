@@ -8,11 +8,22 @@ import SwiftUI
 enum MergedIntro {
     private static let seenKey = "SimplMergedIntroSeen"
 
+    /// The version it came with: an update from one before it brings it up.
+    static let since = "1.3.182"
+
     /// Not seen yet (an update brings it up once, in place of What's New).
     static var due: Bool { !UserDefaults.standard.bool(forKey: seenKey) }
 
     /// Seen: its popup was up, or a first run made it moot.
     static func markSeen() { UserDefaults.standard.set(true, forKey: seenKey) }
+
+    /// (1.3.189) An update from `from` brings it up: that version came before it.
+    static func comesAfter(_ from: String) -> Bool { Updater.isNewer(since, than: from) }
+
+    /// (1.3.189) As after an update from `from`: not seen yet when that came before it, else seen.
+    static func pretend(from: String) {
+        if comesAfter(from) { UserDefaults.standard.removeObject(forKey: seenKey) } else { markSeen() }
+    }
 }
 
 struct MergedIntroItem: Identifiable {

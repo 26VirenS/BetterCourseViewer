@@ -478,7 +478,8 @@ final class Updater: ObservableObject {
     }
 
     private func begin(asked: Bool) {
-        guard !Self.isDevelopmentRun, case .available(let release) = state else { return }
+        // (1.3.189: not while Developer ▸ Updates plays one through — it would quit and open the app itself)
+        guard !Self.isDevelopmentRun, UpdateRehearsal.shared.step == nil, case .available(let release) = state else { return }
         self.asked = asked
         if let kept = ready {
             ready = nil

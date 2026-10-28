@@ -499,12 +499,16 @@ final class Engine: ObservableObject, ShellListener {
             queuePopup(.mergedIntro)
             return
         }
-        // after an update: what changed in this app since the version last seen (1.3.3: the Mac's own notes, not the
-        // web extension's; seen once its sheet is really up)
-        // (1.3.182: the first update to it brings up To Do and the calendar as one, and Quick Plan, in its place)
-        if let wn = MacWhatsNew.due() {
-            queuePopup(MergedIntro.due ? .mergedIntro : .whatsNew(wn))
-        }
+        popupsAfterUpdate()
+    }
+
+    /// After an update: what changed in this app since the version last seen (1.3.3: the Mac's own notes, not the web
+    /// extension's; seen once its sheet is really up) — (1.3.182) the first update to it brings up To Do and the calendar
+    /// as one, and Quick Plan, in its place. (1.3.189) Developer ▸ Updates' update played through without a restart
+    /// brings them up the same way.
+    func popupsAfterUpdate() {
+        guard let wn = MacWhatsNew.due() else { return }
+        queuePopup(MergedIntro.due ? .mergedIntro : .whatsNew(wn))
     }
 
     /// (1.3.69) A place's name, as `place(named:)` reads it (a window more opens on it).

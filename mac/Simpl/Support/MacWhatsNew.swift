@@ -9,6 +9,9 @@ import Foundation
 /// seen); a first run sees none (its setup comes instead). Help ▸ What's New shows them all.
 enum MacWhatsNew {
     static let releases: [Release] = [
+        Release(version: "1.3.189", date: "2026-10-28", notes: [
+            ReleaseNote(kind: "new", title: "Simulate an Update", body: "Developer tools can replay an update from any older version."),
+        ]),
         Release(version: "1.3.188", date: "2026-10-27", notes: [
             ReleaseNote(kind: "improved", title: "Sidebar Like the Web", body: "Courses sit under All Courses, each in its own colour."),
         ]),
@@ -784,15 +787,27 @@ enum MacWhatsNew {
     /// After an update, the versions since the one last seen (nil: nothing to show). Never seen before: this
     /// version's own notes alone — an update from a version that showed the web's notes.
     static func due() -> WhatsNewData? {
-        let seen = UserDefaults.standard.string(forKey: seenKey)
-        let newer = releases.filter { r in
-            seen.map { Updater.isNewer(r.version, than: $0) } ?? (r.version == current)
-        }.filter { !Updater.isNewer($0.version, than: current) }
+        let newer = since(UserDefaults.standard.string(forKey: seenKey))
         return newer.isEmpty ? nil : WhatsNewData(version: current, releases: newer)
     }
+
+    /// The versions an update from `seen` to `version` brings, newest first (none seen before: that version's own alone).
+    static func since(_ seen: String?, to version: String = current) -> [Release] {
+        releases.filter { r in
+            seen.map { Updater.isNewer(r.version, than: $0) } ?? (r.version == version)
+        }.filter { !Updater.isNewer($0.version, than: version) }
+    }
+
+    /// (1.3.189) The versions before this one, newest first: what Developer ▸ Updates can play an update from.
+    static var older: [String] { releases.map(\.version).filter { Updater.isNewer(current, than: $0) } }
 
     /// This version's notes seen (the sheet was up, or the first run's setup made them moot).
     static func markSeen() {
         UserDefaults.standard.set(current, forKey: seenKey)
+    }
+
+    /// (1.3.189) As if `from` was the version here before this one (an update played through).
+    static func pretend(from: String) {
+        UserDefaults.standard.set(from, forKey: seenKey)
     }
 }

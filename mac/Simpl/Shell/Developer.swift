@@ -179,7 +179,7 @@ struct DeveloperView: View {
                 case .crashes: DevCrashesPage()
                 case .system: DevSystemPage()
                 case .stats: DevStatsPage()
-                case .updates: DevUpdates()
+                case .updates: DevUpdates(engine: model.engine)
                 case .engine: DevEngine(engine: model.engine)
                 case .popups: DevPopups()
                 case .interface: DevInterface(engine: model.engine)
@@ -225,8 +225,14 @@ private struct DevOverview: View {
 }
 
 private struct DevUpdates: View {
+    let engine: Engine?
     @ObservedObject private var u = Updater.shared
+    @ObservedObject private var rehearsal = UpdateRehearsal.shared
     @AppStorage("SimplUpdateFeedOverride") private var feed = ""
+    // (1.3.189) an update played through, as from any earlier version (UpdateRehearsal)
+    @State private var from = MacWhatsNew.older.first ?? ""
+    @State private var critical = false
+    @State private var restart = true
 
     var body: some View {
         Form {
@@ -263,8 +269,93 @@ private struct DevUpdates: View {
                     Button("Forget Last Check") { UserDefaults.standard.removeObject(forKey: "lastUpdateCheck") }
                 }
             }
+            Section {
+                Picker("From version", selection: $from) {
+                    ForEach(MacWhatsNew.older, id: \.self) { Text($0).tag($0) }
+                }
+                Toggle("As a Critical Update", isOn: $critical)
+                Toggle("Restart Simpl, as an update does", isOn: $restart)
+                HStack {
+                    Text(stepText).foregroundStyle(.secondary).monospacedDigit()
+                    Spacer()
+                    Button("Simulate Update") { play() }
+                        .disabled(rehearsal.step != nil || from.isEmpty)
+                }
+            } header: {
+                Text("Simulate an update")
+            } footer: {
+                Text(brings)
+            }
         }
         .formStyle(.grouped)
+    }
+
+    private var stepText: String {
+        switch rehearsal.step {
+        case .downloading(let f)?: return "Downloading \(Int(f * 100))%"
+        case .installing?: return restart ? "Installing — Simpl opens again in a moment" : "Installing"
+        case nil: return ""
+        }
+    }
+
+    /// What the update played through brings, in a line.
+    private var brings: String {
+        let what = "Simpl acts as if it was just updated from that version to this one; nothing is downloaded or installed. Over the window, as for a real update, only a Critical Update shows a notice. With Restart off, the popups come up at once."
+        guard !from.isEmpty else { return "This copy has no earlier version to play an update from." }
+        let since = MacWhatsNew.since(from)
+        guard let newest = since.first, let oldest = since.last else { return what + " Then: nothing new to show." }
+        let versions = since.count == 1 ? newest.version : "\(since.count) versions, \(oldest.version) to \(newest.version)"
+        return what + (MergedIntro.comesAfter(from) ? " Then: To Do & Calendar's intro, in place of What's New (\(versions))." : " Then: What's New with \(versions).")
+    }
+
+    private func play() {
+        engine?.hostView.window?.makeKeyAndOrderFront(nil) // (the main window in front: its notice and its popups are what is played)
+        rehearsal.play(from: from, critical: critical, restart: restart, engine: engine)
+    }
+}
+
+/// (1.3.189) An update played through from Developer ▸ Updates, as from any earlier version to this one, with what a
+/// student sees: the download (its progress on that page — over the window, nothing for an update that comes by itself,
+/// and a Critical Update's notice with its progress when it is one), Simpl quitting and opening again as an update opens
+/// it, and what that version brings: What's New with every version since it, or (from before 1.3.182) To Do & Calendar's
+/// intro in its place. Nothing is downloaded or installed, and no real update goes in meanwhile. With Restart off, the
+/// popups come up at once.
+@MainActor
+final class UpdateRehearsal: ObservableObject {
+    static let shared = UpdateRehearsal()
+
+    enum Step: Equatable {
+        case downloading(Double)
+        case installing
+    }
+
+    /// The step under way (nil: none).
+    @Published private(set) var step: Step?
+    /// It is played as a Critical Update.
+    @Published private(set) var critical = false
+
+    func play(from: String, critical: Bool, restart: Bool, engine: Engine?) {
+        guard step == nil else { return }
+        self.critical = critical
+        NSLog("[Simpl] update rehearsal: from \(from) to \(MacWhatsNew.current)\(critical ? ", a Critical Update" : "")\(restart ? "" : ", in place")")
+        Task { @MainActor in
+            for i in 0...40 {
+                step = .downloading(Double(i) / 40)
+                try? await Task.sleep(nanoseconds: 60_000_000)
+            }
+            step = .installing
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            MacWhatsNew.pretend(from: from)
+            MergedIntro.pretend(from: from)
+            if restart {
+                NSLog("[Simpl] update rehearsal: quitting, to open again")
+                AppPlacement.relaunch(AppPlacement.runningURL)
+                return
+            }
+            step = nil
+            self.critical = false
+            engine?.popupsAfterUpdate()
+        }
     }
 }
 
@@ -530,18 +621,35 @@ private struct DevDefaults: View {
 /// While a Critical Update installs: a notice over the window — Simpl restarts on it in a moment.
 struct CriticalUpdateNotice: View {
     @ObservedObject private var u = Updater.shared
+    @ObservedObject private var rehearsal = UpdateRehearsal.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// The version the notice is up for: a Critical Update's under way, or (1.3.189) this one, played through as one from
+    /// Developer ▸ Updates.
+    private var shown: String? {
+        u.criticalNotice ?? (rehearsal.critical && rehearsal.step != nil ? MacWhatsNew.current : nil)
+    }
+
+    /// How far its download has come, while it downloads.
+    private var fraction: Double? {
+        if u.criticalNotice != nil {
+            if case .downloading(let f) = u.state { return f }
+            return nil
+        }
+        if case .downloading(let f)? = rehearsal.step { return f }
+        return nil
+    }
 
     var body: some View {
         ZStack {
-            if let v = u.criticalNotice {
+            if let v = shown {
                 HStack(spacing: 10) {
                     Image(systemName: "exclamationmark.shield.fill").foregroundStyle(.orange)
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Installing a Critical Update").font(.sCallout.weight(.semibold))
                         Text(status(v)).font(.sFootnote).foregroundStyle(.secondary)
                     }
-                    if case .downloading(let f) = u.state {
+                    if let f = fraction {
                         ProgressView(value: f).frame(width: 90)
                     }
                 }
@@ -554,11 +662,11 @@ struct CriticalUpdateNotice: View {
         }
         // (1.3.76: outside the if, as the quiz's banner has it — Updater sets the notice plainly, so the transition
         // never ran and the capsule cut in. It comes down from the top and goes back up; under Reduce Motion it fades)
-        .animation(reduceMotion ? Animation.easeInOut(duration: 0.2) : Motion.gentle, value: u.criticalNotice)
+        .animation(reduceMotion ? Animation.easeInOut(duration: 0.2) : Motion.gentle, value: shown)
     }
 
     private func status(_ v: String) -> String {
-        if case .failed = u.state { return "Simpl \(v) could not be installed yet; it will try again shortly." }
+        if u.criticalNotice != nil, case .failed = u.state { return "Simpl \(v) could not be installed yet; it will try again shortly." }
         return "Simpl \(v) — Simpl restarts on it in a moment."
     }
 }
