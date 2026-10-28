@@ -207,12 +207,11 @@
         <!-- Simulate: an update from any version, played again; the runs that open over a Canvas page -->
         <div class="devpane" data-pane="sim" role="tabpanel">
           <div class="card card--pad">
-            <div class="row"><span class="row__body"><span class="row__t">Simulate an update</span><span class="row__s">Updates from an older version to this one again: What&rsquo;s New from that version, the tour steps it owes, and every open Canvas tab loaded again, as someone updating sees it.</span></span></div>
-            <div class="addrow">
-              <input type="text" id="devFrom" class="input input--mono" list="devFromList" placeholder="2.97.0" autocomplete="off" spellcheck="false" aria-label="The version to update from">
-              <datalist id="devFromList"></datalist>
-              <button type="button" class="btn btn--primary" id="devSimRun">Simulate</button>
-            </div>
+            <div class="row"><span class="row__body"><span class="row__t">Simulate an update</span><span class="row__s">Updates from an older version to this one again, as someone updating sees it: What&rsquo;s New from that version (or the To Do &amp; Calendar intro in its place), the tour steps it owes, and every open Canvas tab loaded again. Nothing is downloaded or installed.</span></span></div>
+            <!-- (2.99.123) as the apps' Developer ▸ Updates: the versions in a list, what that one would see, and loading the tabs again or not -->
+            <div class="row row--top"><span class="row__body"><span class="row__t">From version</span></span><select class="input input--mono" id="devFrom" aria-label="The version to update from"></select></div>
+            <div class="row row--top"><span class="row__body"><span class="row__t">Load Canvas tabs again</span><span class="row__s">As an update does. Off: the next Canvas page you open or reload shows it.</span></span><button class="switch is-on" id="devSimReload" type="button" role="switch" aria-checked="true" aria-label="Load Canvas tabs again"><span class="switch__knob"></span></button></div>
+            <div class="row row--top"><span class="row__body"><span class="row__s" id="devSimBrings"></span></span><button type="button" class="btn btn--primary" id="devSimRun">Simulate</button></div>
             <p class="note note--msg" id="devSimMsg" hidden></p>
           </div>
           <div class="card card--pad">

@@ -28,6 +28,9 @@
     lock: 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.123', date: '2026-10-28', notes: [
+      { kind: 'improved', title: 'Simulate an Update', body: 'Developer tools replay an update from any older version.', icon: P.arrows },
+    ] },
     { version: '2.99.122', date: '2026-10-27', notes: [
       { kind: 'fixed', title: 'Course Colours Show', body: 'Course names keep their colours over a sidebar photo.', icon: P.check },
       { kind: 'fixed', title: 'Plan Menus on Top', body: "The Repeat and Alert menus open over a plan's editor.", icon: P.check },

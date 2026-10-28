@@ -9432,8 +9432,8 @@ try {
   await options.evaluate(() => { try { localStorage.removeItem('bcv:devPane'); } catch { /* */ } });
   await options.reload();
   await options.waitForSelector('#dev.is-active', { timeout: 5000 });
-  const devOpen = await options.evaluate(() => ({ tabs: [...document.querySelectorAll('#devTabs .devtab')].map((b) => `${b.textContent}${b.classList.contains('is-on') ? '*' : ''}`).join(','), shown: [...document.querySelectorAll('#dev .devpane')].filter((p) => !p.hidden).map((p) => p.dataset.pane).join(','), from: document.getElementById('devFrom').value, froms: document.querySelectorAll('#devFromList option').length, nav: !!document.querySelector('.navlink[data-section="dev"].is-active') }));
-  check(devOpen.tabs === 'Simulate*,Quiz,Rubric,State,Storage,Tool tabs' && devOpen.shown === 'sim' && /^\d+\.\d+(\.\d+)?$/.test(devOpen.from) && devOpen.froms > 20 && devOpen.nav, `the Developer section opens on its tabs, Simulate first, offering every version What's New has notes for: ${JSON.stringify(devOpen)}`);
+  const devOpen = await options.evaluate(() => ({ tabs: [...document.querySelectorAll('#devTabs .devtab')].map((b) => `${b.textContent}${b.classList.contains('is-on') ? '*' : ''}`).join(','), shown: [...document.querySelectorAll('#dev .devpane')].filter((p) => !p.hidden).map((p) => p.dataset.pane).join(','), from: document.getElementById('devFrom').value, froms: document.querySelectorAll('#devFrom option').length, newest: document.querySelector('#devFrom option')?.value || '', mine: chrome.runtime.getManifest().version, nav: !!document.querySelector('.navlink[data-section="dev"].is-active') }));
+  check(devOpen.tabs === 'Simulate*,Quiz,Rubric,State,Storage,Tool tabs' && devOpen.shown === 'sim' && /^\d+\.\d+(\.\d+)?$/.test(devOpen.from) && devOpen.froms > 20 && devOpen.newest === devOpen.from && devOpen.newest !== devOpen.mine && devOpen.nav, `the Developer section opens on its tabs, Simulate first, offering every version before this one that What's New has notes for, newest first: ${JSON.stringify(devOpen)}`);
   // Quiz: a switch writes the flag a quiz reads as an attempt opens
   await options.click('#devTabs [data-pane="quiz"]');
   await options.click('#devQuizImport');
@@ -9614,19 +9614,32 @@ try {
   await page.waitForSelector('.bcv-stat', { timeout: 15000 });
   await options.bringToFront();
   await options.click('#devTabs [data-pane="sim"]');
-  await options.fill('#devFrom', '2.98.19');
+  await options.selectOption('#devFrom', '2.98.19');
+  // (2.99.123) what that version would see, said under the list: from before 2.99.120, the To Do & Calendar intro
+  const brings = await options.$eval('#devSimBrings', (e) => e.textContent);
+  check(/^Then: the To Do & Calendar intro, in place of What’s New \(\d+ versions, 2\.98\.\d+ to \d+\.\d+\.\d+\)\.$/.test(brings), `under the list, what an update from 2.98.19 would show: ${brings}`);
+  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'intro:merged': true }));
   const reloaded = page.waitForEvent('load', { timeout: 15000 }).then(() => true).catch(() => false);
   await options.click('#devSimRun');
   check(await eventually(async () => /^Updated from 2\.98\.19 to \d+\.\d+(\.\d+)?: \d+ Canvas tabs? loaded again/.test(await options.$eval('#devSimMsg', (e) => e.textContent)), 8000), `Simulate says what it did: ${await options.$eval('#devSimMsg', (e) => e.textContent)}`);
-  const simFlags = await sw.evaluate(async () => { const f = await self.BCV.api.storage.local.get(['whatsnew:from', 'welcome:report1', 'welcome:look5']); return { from: f['whatsnew:from'], report: 'welcome:report1' in f, look: 'welcome:look5' in f }; });
-  check((await reloaded) && simFlags.from === '2.98.19' && !simFlags.report && !simFlags.look, `and the update is played again: the Canvas tab loads again with the flags an update from 2.98.19 leaves: ${JSON.stringify(simFlags)}`);
+  const simFlags = await sw.evaluate(async () => { const f = await self.BCV.api.storage.local.get(['whatsnew:from', 'welcome:report1', 'welcome:look5', 'intro:merged']); return { from: f['whatsnew:from'], report: 'welcome:report1' in f, look: 'welcome:look5' in f, merged: 'intro:merged' in f }; });
+  check((await reloaded) && simFlags.from === '2.98.19' && !simFlags.report && !simFlags.look && !simFlags.merged, `and the update is played again: the Canvas tab loads again with the flags an update from 2.98.19 leaves (the To Do & Calendar intro owed again): ${JSON.stringify(simFlags)}`);
   await page.bringToFront();
   check(await eventually(async () => !!(await page.$('#bcv-tour, #bcv-whatsnew')), 15000), 'what someone updating from 2.98.19 sees comes up on it: the tour step it owes, or What\'s New');
   await page.screenshot({ path: join(out, '29c-dev-simulated-update.png') });
-  await options.click('#devFrom').catch(() => {});
-  await options.fill('#devFrom', '9.9.9');
+  // (2.99.123) with Load Canvas tabs again off: the flags left, no tab loaded again — the next page opened shows it
+  await options.bringToFront();
+  await options.selectOption('#devFrom', '2.99.121');
+  check(/^Then: What’s New with 2\.99\.122|^Then: What’s New with \d+ versions, 2\.99\.122 to /.test(await options.$eval('#devSimBrings', (e) => e.textContent)), `from a version after 2.99.120, What's New alone: ${await options.$eval('#devSimBrings', (e) => e.textContent)}`);
+  await options.click('#devSimReload');
+  const quietLoad = page.waitForEvent('load', { timeout: 4000 }).then(() => true).catch(() => false);
   await options.click('#devSimRun');
-  check(await eventually(async () => /^Pick a version before this one/.test(await options.$eval('#devSimMsg', (e) => e.textContent))), 'a version that is not older is refused, and says why');
+  check(await eventually(async () => /^Updated from 2\.99\.121 to \d+\.\d+(\.\d+)?: the next Canvas page opened or reloaded shows it\.$/.test(await options.$eval('#devSimMsg', (e) => e.textContent)), 8000), `with the tabs left alone, Simulate says the next page shows it: ${await options.$eval('#devSimMsg', (e) => e.textContent)}`);
+  check(!(await quietLoad) && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('whatsnew:from'))['whatsnew:from'])) === '2.99.121', 'and no Canvas tab loads again, the flags left for the next page');
+  await options.click('#devSimReload');
+  // a version that is not older, asked of the background, is refused and says why (the list offers none)
+  const notOlder = await options.evaluate(() => chrome.runtime.sendMessage({ type: 'devSimUpdate', from: '9.9.9' }));
+  check(notOlder?.ok === false && /^Pick a version before this one/.test(notOlder.message || ''), `a version that is not older is refused, and says why: ${JSON.stringify(notOlder)}`);
   // (put back: nothing owed, the flag off, the page as it was)
   await sw.evaluate(async () => { const v = self.BCV.api.runtime.getManifest().version; await self.BCV.api.storage.local.set({ 'whatsnew:seen': v, 'welcome:report1': true, 'welcome:look5': true }); await self.BCV.api.storage.local.remove('whatsnew:from'); await self.BCV.settings.update({ developer: { quizImport: false } }); });
   await page.goto(`${BASE}/`);

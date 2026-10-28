@@ -262,12 +262,12 @@ try {
   const answer = (kind, reply) => page.waitForFunction((k) => window.__store.commands.some((c) => c.type === 'dev' && c.message.type === k), kind, { timeout: 5000 })
     .then(() => page.evaluate(([k, r]) => { const st = window.__store; const c = st.commands.find((x) => x.type === 'dev' && x.message.type === k); st.commands = st.commands.filter((x) => x !== c); (st.devReplies ||= []).push({ id: c.id, reply: r }); return c.message; }, [kind, reply]));
   await page.click('#devTabs [data-pane="sim"]');
-  await page.fill('#devFrom', '2.98.28');
+  await page.selectOption('#devFrom', '2.98.28');
   await page.click('#devSimRun');
   await page.waitForFunction(() => document.getElementById('devSimMsg').textContent === 'Asking Safari…', null, { timeout: 3000 });
   const simAsked = await answer('devSimUpdate', { ok: true, from: '2.98.28', to: '9.9.9', reloaded: 2, updatedPage: false });
   await page.waitForFunction(() => /^Updated from/.test(document.getElementById('devSimMsg').textContent), null, { timeout: 5000 });
-  check(simAsked.from === '2.98.28' && (await text('#devSimMsg')) === 'Updated from 2.98.28 to 9.9.9: 2 Canvas tabs loaded again.', `Simulate is no longer "Not here": the ask waits for Safari ("Asking Safari…") and its answer is said (${await text('#devSimMsg')})`);
+  check(simAsked.from === '2.98.28' && simAsked.reload === true && (await text('#devSimMsg')) === 'Updated from 2.98.28 to 9.9.9: 2 Canvas tabs loaded again.', `Simulate is no longer "Not here": the ask waits for Safari ("Asking Safari…") and its answer is said (${await text('#devSimMsg')})`);
   await page.click('#devTabs [data-pane="quiz"]');
   await page.click('#devQuizImport');
   await page.waitForFunction(() => window.__store.settings?.developer?.quizImport === true, null, { timeout: 3000 });

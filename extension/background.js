@@ -432,7 +432,7 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
       case 'devGet': return devGet();
       case 'devSet': return devSet(msg.settings);
       case 'devLog': return devLog(msg.clear);
-      case 'devSimUpdate': return devSimUpdate(msg.from);
+      case 'devSimUpdate': return devSimUpdate(msg.from, { reload: msg.reload !== false });
       case 'devStorage': { // every key kept, its size, and its value where it is small (op 'remove': one key taken away first)
         if (msg.op === 'remove' && msg.key) await api.storage.local.remove(String(msg.key));
         const all = await api.storage.local.get(null);
@@ -1333,19 +1333,25 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
    *  steps it owes, the updated page not yet shown), then every Canvas tab loaded again and the
    *  updated page opened where this build has one — so the tour steps and the notes can be seen as
    *  someone updating from that version sees them. */
-  async function devSimUpdate(from) {
+  async function devSimUpdate(from, { reload = true } = {}) {
     const v = String(from || '').trim();
     const now = api.runtime.getManifest().version;
     if (!/^\d+\.\d+(\.\d+)?$/.test(v)) return { ok: false, message: 'A version looks like 2.98.12.' };
     if (!olderThan(v, now)) return { ok: false, message: `Pick a version before this one (${now}).` };
     try {
-      await api.storage.local.remove(['welcome:look5', 'welcome:report1', 'updated:shown']);
+      // (2.99.123) the To Do & Calendar intro's flag too: whatsnew.js owes it only to an update from before it came, so
+      // from a later version it stays away all the same
+      await api.storage.local.remove(['welcome:look5', 'welcome:report1', 'updated:shown', 'intro:merged']);
       await api.storage.local.set({ 'whatsnew:seen': v, 'whatsnew:from': v, [VERSION_KEY]: now });
     } catch (e) { return { ok: false, message: `The flags could not be written: ${e?.message || e}` }; }
-    reloadedFor = null; // (an update's reload is once per version a run; this one is asked for)
-    const r = await afterUpdate(v);
+    // (2.99.123) the tabs loaded again as an update loads them, or (off) left for the next Canvas page opened
+    let reloaded = 0;
+    if (reload) {
+      reloadedFor = null; // (an update's reload is once per version a run; this one is asked for)
+      reloaded = (await afterUpdate(v)).reloaded;
+    }
     const updatedPage = await openUpdated(v);
-    return { ok: true, from: v, to: now, reloaded: r.reloaded, updatedPage };
+    return { ok: true, from: v, to: now, reloaded, updatedPage };
   }
 
   // ---- lifecycle ----------------------------------------------------------

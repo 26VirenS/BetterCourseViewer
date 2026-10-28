@@ -910,20 +910,50 @@
   $('devTabs').addEventListener('click', (e) => { const b = e.target.closest('.devtab'); if (b) devPane(b.dataset.pane); });
 
   // Simulate: an update from any version to this one, played again by the background (the flags an
-  // update leaves, every Canvas tab loaded again); the versions offered are the ones What's New has notes for
+  // update leaves, every Canvas tab loaded again); the versions offered are the ones What's New has notes for.
+  // (2.99.123, as the apps' Developer ▸ Updates) a list of them, newest first, with what that one would see under it,
+  // and the tabs loaded again or left for the next Canvas page opened.
+  const MERGED_IN = '2.99.120'; // (content/app/whatsnew.js: an update from before it shows the To Do & Calendar intro)
+  const verCmp = (a, b) => {
+    const x = String(a).split('.').map(Number);
+    const y = String(b).split('.').map(Number);
+    for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; }
+    return 0;
+  };
+  const devNotes = () => (Array.isArray(self.BCV_WHATS_NEW) ? self.BCV_WHATS_NEW : []);
+  const devMine = () => api.runtime.getManifest?.()?.version || '';
   function devSimInit() {
-    const mine = api.runtime.getManifest?.()?.version || '';
-    const older = (Array.isArray(self.BCV_WHATS_NEW) ? self.BCV_WHATS_NEW : []).map((n) => n.version).filter((v) => v && v !== mine);
-    $('devFromList').replaceChildren(...older.map((v) => h('option', { value: v })));
-    if (!$('devFrom').value) $('devFrom').value = older[0] || '';
+    const mine = devMine();
+    const older = devNotes().map((n) => n.version).filter((v) => v && verCmp(v, mine) < 0);
+    const had = $('devFrom').value;
+    $('devFrom').replaceChildren(...older.map((v) => h('option', { value: v, text: v })));
+    $('devFrom').value = older.includes(had) ? had : older[0] || '';
+    $('devSimRun').disabled = !older.length;
+    devSimBrings();
   }
+  /** What an update from the version picked would show: the To Do & Calendar intro (from before it), else What's New
+   *  with every version since it — as content/app/whatsnew.js decides on the first Canvas page after. */
+  function devSimBrings() {
+    const from = $('devFrom').value;
+    const mine = devMine();
+    if (!from) { $('devSimBrings').textContent = 'This version has no earlier one to update from.'; return; }
+    const since = devNotes().filter((n) => verCmp(n.version, from) > 0 && verCmp(n.version, mine) <= 0);
+    const versions = since.length === 1 ? since[0].version : `${since.length} versions, ${since[since.length - 1]?.version} to ${since[0]?.version}`;
+    $('devSimBrings').textContent = !since.length ? 'Then: nothing new to show.'
+      : verCmp(from, MERGED_IN) < 0 && verCmp(mine, MERGED_IN) >= 0 ? `Then: the To Do & Calendar intro, in place of What’s New (${versions}).`
+        : `Then: What’s New with ${versions}.`;
+  }
+  $('devFrom').addEventListener('change', devSimBrings);
+  onSwitch($('devSimReload'), () => {});
   $('devSimRun').addEventListener('click', async () => {
     devSay('devSimMsg', 'Simulating…');
     $('devSimRun').disabled = true;
-    const r = await devAsk({ type: 'devSimUpdate', from: $('devFrom').value }, { note: 'devSimMsg' });
+    const reload = $('devSimReload').classList.contains('is-on');
+    const r = await devAsk({ type: 'devSimUpdate', from: $('devFrom').value, reload }, { note: 'devSimMsg' });
     $('devSimRun').disabled = false;
     if (!r?.ok) { devSay('devSimMsg', r?.message || 'The background is not answering.'); return; }
-    const tabs = r.reloaded ? `${r.reloaded} Canvas ${r.reloaded === 1 ? 'tab' : 'tabs'} loaded again` : 'no Canvas tab is open: the next one opened shows it';
+    const tabs = !reload ? 'the next Canvas page opened or reloaded shows it'
+      : r.reloaded ? `${r.reloaded} Canvas ${r.reloaded === 1 ? 'tab' : 'tabs'} loaded again` : 'no Canvas tab is open: the next one opened shows it';
     devSay('devSimMsg', `Updated from ${r.from} to ${r.to}: ${tabs}${r.updatedPage ? ', and the updated page opened' : ''}.`);
   });
   $('devRuns').addEventListener('click', (e) => { const b = e.target.closest('[data-run]'); if (b) openOnCanvas(b.dataset.run); });
