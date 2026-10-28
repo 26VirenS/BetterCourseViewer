@@ -1105,8 +1105,39 @@
       // (the button pressed is gone with what it was in: the keyboard lands on the one that goes back)
       screen.querySelector(on ? '.bcv-silent__exit' : '.bcv-dash__silent')?.focus({ preventScroll: true });
     }
-    /** What is still ahead, soonest first: not done, not handed in, not dismissed, in the courses on the Dashboard. */
-    const silentAhead = (at) => (planner || []).filter((it) => it.date && it.date >= at && !it.complete && !it.submitted && !it.graded && !it.excused && !it.dismissed && it.type !== 'announcement' && inSel(it)).sort(byDate);
+    // (2.99.126) struck out here: still shown, struck through, while Silent stays up (to put back with a press); gone
+    // the next time it is drawn afresh
+    const struckHere = new Set();
+    /** What is still ahead, soonest first: not done (or struck out here), not handed in, not dismissed, in the courses on
+     *  the Dashboard. */
+    const silentAhead = (at) => (planner || []).filter((it) => it.date && it.date >= at && (!it.complete || struckHere.has(it.id)) && !it.submitted && !it.graded && !it.excused && !it.dismissed && it.type !== 'announcement' && inSel(it)).sort(byDate);
+    /** (2.99.126) An item's words as a press that strikes it out — marked done on Canvas's planner, as the circle on a
+     *  list's row does — a line drawn through them and the whole of it dimmed; pressed again, put back. */
+    function strikeWords(cls, it) {
+      const btn = h('button', { type: 'button', class: 'bcv-silent__strike', dataset: { focusKey: `s:${it.id}` } }, [h('span', { class: cls }, [h('span', { class: 'bcv-silent__words', text: it.title })])]);
+      const paint = (on) => {
+        btn.closest('.bcv-silent__item')?.classList.toggle('is-struck', on);
+        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        btn.title = on ? 'Done: press to put it back' : 'Press to strike it out';
+        btn.setAttribute('aria-label', `${on ? 'Done' : 'Mark done'}: ${it.title}`);
+      };
+      btn.addEventListener('click', async () => {
+        const on = btn.getAttribute('aria-pressed') !== 'true';
+        struckHere.add(it.id);
+        paint(on);
+        try {
+          await store.setComplete(it, on);
+          app.refreshCounts();
+        } catch (err) {
+          paint(!!it.complete);
+          U.toast(`Could not update it: ${err.message}`, { error: true });
+        }
+      });
+      paint(!!it.complete); // (its item, not built yet, is given its class by the one building it)
+      return btn;
+    }
+    /** "Open", beside the words: the item itself (shown while the pointer is on the item, or the keyboard is). */
+    const openLink = (it) => (it.url ? h('a', { class: 'bcv-silent__open', href: it.url, title: `Open ${it.title}`, 'aria-label': `Open ${it.title}`, dataset: { focusKey: `o:${it.id}` }, text: 'Open' }) : null);
     /** "Today", "Tomorrow", "Friday" (within the week), else "November 3" (or the short forms: "Fri", "Nov 3"). */
     const silentDay = (d, at, short = false) => {
       const n = U.dayDiff(d, at);
@@ -1134,7 +1165,6 @@
       const [next, ...rest] = silentAhead(at);
       let n = 0;
       const piece = (el) => { el.classList.add('bcv-silent__piece'); el.style.setProperty('--bcv-i', n++); return el; };
-      const link = (cls, it, kids) => h(it.url ? 'a' : 'div', { class: cls, ...(it.url ? { href: it.url } : {}) }, kids);
       const kids = [];
       if (!planner) kids.push(piece(U.text('bcv-silent__title bcv-silent__title--quiet', 'Your planner could not be loaded.')));
       else if (!next) kids.push(piece(U.text('bcv-silent__label', 'Next')), piece(U.text('bcv-silent__title', 'Nothing coming up.')), piece(U.text('bcv-silent__when', 'Nothing is due in the next three weeks.')));
@@ -1142,31 +1172,37 @@
         const w = silentWords(next, at);
         kids.push(
           piece(U.text('bcv-silent__label', 'Next')),
-          piece(link('bcv-silent__title', next, [next.title])),
-          piece(h('div', { class: 'bcv-silent__when' }, [h('span', { class: 'bcv-silent__soon', text: w.lead }), ...w.rest.map((t) => h('span', { text: ` · ${t}` }))])),
+          h('div', { class: `bcv-silent__item bcv-silent__next${next.complete ? ' is-struck' : ''}` }, [
+            piece(strikeWords('bcv-silent__title', next)),
+            piece(h('div', { class: 'bcv-silent__when' }, [h('span', { class: 'bcv-silent__soon', text: w.lead }), ...w.rest.map((t) => h('span', { text: ` · ${t}` })), openLink(next)].filter(Boolean))),
+          ]),
         );
         const more = rest.slice(0, SILENT_MORE);
         if (more.length) {
           kids.push(piece(h('div', { class: 'bcv-silent__then' }, [
             U.text('bcv-silent__label', 'Then'),
-            ...more.map((it) => link('bcv-silent__row', it, [U.text('bcv-silent__rowt bcv-ellip', it.title, 'span'), U.text('bcv-silent__roww', `${silentDay(it.date, at, true)}, ${U.fmtTime(it.date)}`, 'span')])),
+            ...more.map((it) => h('div', { class: `bcv-silent__item bcv-silent__row${it.complete ? ' is-struck' : ''}` }, [
+              strikeWords('bcv-silent__rowt', it),
+              U.text('bcv-silent__roww', `${silentDay(it.date, at, true)}, ${U.fmtTime(it.date)}`, 'span'),
+              openLink(it),
+            ].filter(Boolean))),
           ])));
         }
       }
-      const exit = h('button', { type: 'button', class: 'bcv-silent__exit', title: 'Back to the whole Dashboard', onclick: () => setSilent(false) }, [U.svg(IC.moon, { size: 13, stroke: 'currentColor', width: 2 }), h('span', { text: 'Exit Silent Mode' })]);
+      const exit = h('button', { type: 'button', class: 'bcv-silent__exit', title: 'Back to the whole Dashboard', dataset: { focusKey: 'exit' }, onclick: () => setSilent(false) }, [U.svg(IC.moon, { size: 13, stroke: 'currentColor', width: 2 }), h('span', { text: 'Exit Silent Mode' })]);
       return U.el(`bcv-silent${enter && !U.isStill() ? ' is-entering' : ''}`, [exit, U.el('bcv-silent__in', kids)], { role: 'region', 'aria-label': 'Silent mode: what comes next' });
     }
     // the words count down: drawn again each half minute while it is up, when they say something else (the next one past,
-    // "in 5 min" now "in 4 min"), the keyboard kept on Exit if it was there
+    // "in 5 min" now "in 4 min"), the keyboard kept where it was
     const silentTick = setInterval(() => {
       if (!ctx.alive()) { clearInterval(silentTick); return; }
       if (!silent || document.hidden) return;
       const cur = body.querySelector('.bcv-silent');
       const fresh = silentBlock(false);
       if (cur && cur.textContent === fresh.textContent) return;
-      const onExit = !!cur?.contains(document.activeElement) && document.activeElement.classList.contains('bcv-silent__exit');
+      const key = cur?.contains(document.activeElement) ? document.activeElement.dataset?.focusKey : null;
       body.replaceChildren(fresh);
-      if (onExit) fresh.querySelector('.bcv-silent__exit')?.focus({ preventScroll: true });
+      if (key) fresh.querySelector(`[data-focus-key="${CSS.escape(key)}"]`)?.focus({ preventScroll: true });
     }, 30000);
 
     let bodyGen = 0; // (the activity view lands after a wait: a view switched to meanwhile is not painted over)

@@ -1080,9 +1080,52 @@ try {
   await page.keyboard.press('/');
   await page.waitForTimeout(300);
   check(await page.evaluate(() => document.activeElement?.tagName !== 'INPUT' && !document.querySelector('.bcv-spot')), '"/" keeps quiet in Silent mode (no search box to put the cursor in)');
+  // (2.99.126) the sidebar in Silent: words alone, in black, white and grey
+  const sideSeen = await page.evaluate(() => {
+    const side = document.querySelector('.bcv-side');
+    const shown = (e) => { const r = e.getBoundingClientRect(); const st = getComputedStyle(e); return r.width > 0 && r.height > 0 && st.display !== 'none' && st.visibility !== 'hidden' && Number(st.opacity) > 0.05; };
+    const grey = (c) => { const v = (c.match(/[\d.]+/g) || []).map(Number); return v.length < 3 || (v[0] === v[1] && v[1] === v[2]); };
+    const all = [...side.querySelectorAll('*')].filter(shown);
+    const inks = all.filter((e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())).map((e) => getComputedStyle(e).color);
+    const grounds = [side, ...all].map((e) => getComputedStyle(e).backgroundColor).filter((c) => c !== 'rgba(0, 0, 0, 0)');
+    const active = side.querySelector('.bcv-nav__item.is-active');
+    return {
+      bg: getComputedStyle(side).backgroundColor,
+      marks: all.filter((e) => e.matches('svg:not(.bcv-brand__word), img, .bcv-fav__dot, .bcv-ctab__sq, .bcv-account__avatar, .bcv-brand__tile')).length,
+      colourful: [...new Set([...inks, ...grounds])].filter((c) => !grey(c)),
+      active: active ? getComputedStyle(active).color : null,
+      words: ['Dashboard', 'Courses', 'Grades'].every((w) => side.textContent.includes(w)),
+      toggle: Number(getComputedStyle(document.getElementById('bcv-sidetoggle')).opacity),
+      foot: getComputedStyle(side.querySelector('.bcv-side__bottom'), '::before').backgroundColor,
+    };
+  });
+  check(sideSeen.bg === 'rgb(0, 0, 0)' && sideSeen.marks === 0 && !sideSeen.colourful.length && sideSeen.active === 'rgb(255, 255, 255)' && sideSeen.words && sideSeen.toggle === 0 && sideSeen.foot === 'rgb(0, 0, 0)',
+    `the sidebar in Silent: black, words alone in white and grey — no glyphs, dots, photo or colours; the row on show white: ${JSON.stringify(sideSeen)}`);
+  // (2.99.126) striking out: a press on the words marks it done on Canvas (as a row's circle does) and draws a line through
+  // them; again, back. "Open" beside them goes to it.
+  const struckOf = (sel) => page.evaluate((q) => { const el = document.querySelector(q); const w = el?.querySelector('.bcv-silent__words'); return el ? { on: el.classList.contains('is-struck'), pressed: el.querySelector('.bcv-silent__strike').getAttribute('aria-pressed'), line: getComputedStyle(w).backgroundSize, ink: getComputedStyle(el.querySelector('.bcv-silent__title, .bcv-silent__rowt')).color, open: el.querySelector('.bcv-silent__open')?.getAttribute('href') || null } : null; }, sel);
+  const nextTitle = sil.title;
+  const before = await struckOf('.bcv-silent__next');
+  await page.click('.bcv-silent__next .bcv-silent__strike');
+  await page.waitForTimeout(450); // (the line drawn: .26 s)
+  const struck = await struckOf('.bcv-silent__next');
+  check(!before.on && before.pressed === 'false' && /^0px/.test(before.line) && !!before.open && struck.on && struck.pressed === 'true' && /^100%/.test(struck.line) && struck.ink !== 'rgb(255, 255, 255)',
+    `a press on the next one strikes it out: a line drawn through its words, dimmed; Open beside it: ${JSON.stringify({ before, struck })}`);
+  await page.mouse.move(1000, 840);
+  await shot(page, '01h-dashboard-silent-struck');
+  const rowSel = '.bcv-silent__row:nth-of-type(3)'; // (the second under Then: the label is the first of its kind)
+  await page.click(`${rowSel} .bcv-silent__strike`);
+  await page.waitForTimeout(500);
+  const rowOn = await struckOf(rowSel);
+  await page.click(`${rowSel} .bcv-silent__strike`);
+  await page.waitForTimeout(500);
+  const rowOff = await struckOf(rowSel);
+  check(rowOn?.on && rowOn.pressed === 'true' && !rowOff.on && rowOff.pressed === 'false' && /^0px/.test(rowOff.line), `one after it struck out and put back with two presses: ${JSON.stringify({ rowOn, rowOff })}`);
   await page.reload();
   await page.waitForSelector('.bcv-silent .bcv-silent__label', { timeout: 15000 });
-  check(!(await page.$('.bcv-stat')) && (await silentSeen()).on, 'Silent is kept across a reload');
+  const afterStrike = await silentSeen();
+  check(!(await page.$('.bcv-stat')) && afterStrike.on && afterStrike.title === sil.rows[0] && afterStrike.rows.includes(sil.rows[1]),
+    `Silent is kept across a reload; what was struck out is done on Canvas, so the next is the one after it ("${afterStrike.title}"), and the one put back is still there`);
   await nav('courses');
   await page.waitForSelector('.bcv-screen:not(.bcv-screen--silent) .bcv-head', { timeout: 10000 });
   await page.waitForTimeout(600);
@@ -1093,8 +1136,16 @@ try {
   check((await silentSeen()).on, 'and the Dashboard is still silent on the way back');
   await page.click('.bcv-silent__exit');
   await page.waitForSelector('.bcv-stat', { timeout: 8000 });
-  check(await page.evaluate(() => !document.documentElement.classList.contains('bcv-dash-silent') && !document.querySelector('.bcv-silent') && !!document.querySelector('.bcv-screen > .bcv-head') && !!document.activeElement?.classList.contains('bcv-dash__silent')),
-    'Exit Silent Mode: the whole Dashboard back, the keyboard on Silent');
+  check(await page.evaluate(() => !document.documentElement.classList.contains('bcv-dash-silent') && !document.querySelector('.bcv-silent') && !!document.querySelector('.bcv-screen > .bcv-head') && !!document.activeElement?.classList.contains('bcv-dash__silent')
+    && getComputedStyle(document.querySelector('.bcv-side')).backgroundColor !== 'rgb(0, 0, 0)' && !!document.querySelector('.bcv-side .bcv-nav__ic svg')?.getClientRects().length),
+    'Exit Silent Mode: the whole Dashboard back, the keyboard on Silent, the sidebar as it was');
+  // the one struck out in Silent is done on the list too; its circle puts it back (as it was, for what follows)
+  const struckRow = await page.evaluateHandle((t) => [...document.querySelectorAll('.bcv-day .bcv-row')].find((r) => r.querySelector('.bcv-row__title')?.textContent === t && r.classList.contains('bcv-row--done')) || null, nextTitle);
+  check(!!(await struckRow.asElement()), `"${nextTitle}", struck out in Silent, is ticked on the list`);
+  if (await struckRow.asElement()) {
+    await (await struckRow.asElement().$('.bcv-circle')).click();
+    check(await eventually(() => page.evaluate((t) => [...document.querySelectorAll('.bcv-day .bcv-row')].some((r) => r.querySelector('.bcv-row__title')?.textContent === t && !r.classList.contains('bcv-row--done')), nextTitle)), 'and its circle puts it back');
+  }
   await page.reload();
   await page.waitForSelector('.bcv-stat', { timeout: 15000 });
   check(!(await page.$('.bcv-silent')), 'and it stays out after a reload');
