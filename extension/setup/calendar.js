@@ -4,6 +4,33 @@
 (function () {
   const api = typeof browser !== 'undefined' && browser.runtime ? browser : chrome;
   const $ = (id) => document.getElementById(id);
+  // (2.99.124) #account:<kind>:<the sites, as JSON>: a calendar account about to be signed in to in Sync (lib/calaccounts.js),
+  // whose sites the browser asks about from this press; the sign-in itself is pressed again in Sync, where the
+  // password was typed (never carried here)
+  const acct = /^#account:(icloud|google|microsoft):(.+)$/.exec(location.hash);
+  if (acct) {
+    const NAMES = { icloud: 'iCloud Calendar', google: 'Google Calendar', microsoft: 'Outlook' };
+    let origins = [];
+    try { origins = JSON.parse(decodeURIComponent(acct[2])).filter((o) => typeof o === 'string'); } catch { origins = []; }
+    document.title = 'Sign in to a calendar';
+    $('title').textContent = `Let Simpl reach ${NAMES[acct[1]]}`;
+    $('where').textContent = `Your browser asks before Simpl reaches a new site. Allow it, then go back to Simpl's Calendar and press Sign In again.`;
+    $('allow').textContent = 'Allow';
+    let done = false;
+    $('allow').addEventListener('click', async () => {
+      if (done) { window.close(); return; }
+      let ok = false;
+      try { ok = await api.permissions.request({ origins }); } catch (e) { $('msg').textContent = `The browser did not ask (${e?.message || e}).`; return; } // (straight from the press)
+      if (!ok) { $('msg').textContent = 'Not allowed, so Simpl cannot sign in to it.'; return; }
+      done = true;
+      document.documentElement.dataset.state = 'ok';
+      $('title').textContent = 'Allowed';
+      $('where').textContent = `Go back to Simpl's Calendar → Sync and press Sign In again.`;
+      $('msg').textContent = '';
+      $('allow').textContent = 'Close this tab';
+    });
+    return;
+  }
   let href = '';
   try { href = decodeURIComponent(location.hash.slice(1)); } catch { href = ''; }
   let host = '';

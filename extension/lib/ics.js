@@ -362,12 +362,16 @@
    * time); a whole day by day ("2026-10-25") and how many days; rrule a repeat ("FREQ=WEEKLY"); alarm the minutes before
    * it starts that the calendar app should say so.
    */
-  function write({ name = 'Simpl', description = '', color = '', refreshMinutes = 60, events = [], now = Date.now() } = {}) {
-    const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Simpl Courses//Simpl calendar//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
-      `X-WR-CALNAME:${esc(name)}`, `NAME:${esc(name)}`];
-    if (description) L.push(`X-WR-CALDESC:${esc(description)}`);
-    if (color) L.push(`X-APPLE-CALENDAR-COLOR:${color}`, `COLOR:${color}`);
-    L.push(`REFRESH-INTERVAL;VALUE=DURATION:PT${refreshMinutes}M`, `X-PUBLISHED-TTL:PT${refreshMinutes}M`);
+  function write({ name = 'Simpl', description = '', color = '', refreshMinutes = 60, events = [], now = Date.now(), object = false } = {}) {
+    // (2.99.124) `object`: one event as a CalDAV server keeps it (lib/calaccounts.js) — a calendar object resource, with
+    // none of a published calendar's own lines (RFC 4791 forbids METHOD in one)
+    const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Simpl Courses//Simpl calendar//EN', 'CALSCALE:GREGORIAN'];
+    if (!object) {
+      L.push('METHOD:PUBLISH', `X-WR-CALNAME:${esc(name)}`, `NAME:${esc(name)}`);
+      if (description) L.push(`X-WR-CALDESC:${esc(description)}`);
+      if (color) L.push(`X-APPLE-CALENDAR-COLOR:${color}`, `COLOR:${color}`);
+      L.push(`REFRESH-INTERVAL;VALUE=DURATION:PT${refreshMinutes}M`, `X-PUBLISHED-TTL:PT${refreshMinutes}M`);
+    }
     const stamp = utc(now);
     for (const ev of events) {
       L.push('BEGIN:VEVENT', `UID:${esc(ev.uid)}`, `DTSTAMP:${stamp}`);

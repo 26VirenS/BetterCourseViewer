@@ -128,6 +128,21 @@
   async function turnOff() { return told(await ask('off')); }
   const onChange = (fn) => { listeners.add(fn); return () => listeners.delete(fn); };
 
+  // (2.99.124) The calendar accounts signed in to in Sync (lib/calaccounts.js), read and written by the background: what
+  // Simpl's own calendar holds handed over when one of them writes it there (only this page can read Canvas). `id`: that
+  // account alone; `stale`: only those not read in that long. Never in the apps: they sign in to calendars themselves.
+  const ACCOUNTS_EVERY = 15 * MIN;
+  async function syncAccounts({ id = null, stale = 0 } = {}) {
+    if (self.BCVBridge?.native) return null;
+    let accts = [];
+    try { accts = (await api.storage.local.get('cal:accounts'))['cal:accounts'] || []; } catch { return null; }
+    const due = accts.filter((a) => !a.signedOut && (!id || a.id === id) && (!stale || !a.synced || Date.now() - a.synced >= stale));
+    if (!due.length) return null;
+    let list = null;
+    if (due.some((a) => a.push !== false)) { try { list = await events(); } catch { list = null; } } // (Canvas did not answer: read, not written)
+    return Promise.resolve(api.runtime.sendMessage({ type: 'calAcct', op: 'sync', id, stale, events: list })).catch(() => null);
+  }
+
   // ---- kept up to date while a page is open ---------------------------------------------------------------------
   let planTimer = null;
   function start() {
@@ -136,8 +151,11 @@
     setTimeout(() => { BCV.plan?.retireSending?.().catch(() => {}); publish().catch(() => {}); }, FIRST);
     setInterval(() => { if (document.visibilityState === 'visible') publish().catch(() => {}); }, EVERY);
     BCV.plan?.onChange?.(() => { dirty = true; clearTimeout(planTimer); planTimer = setTimeout(() => publish().catch(() => {}), AFTER_PLAN); });
+    // (2.99.124) the accounts: soon after a page opens, then every fifteen minutes (another tab open does it once between them)
+    setTimeout(() => syncAccounts({ stale: ACCOUNTS_EVERY - MIN }).catch(() => {}), FIRST + 4000);
+    setInterval(() => { if (document.visibilityState === 'visible') syncAccounts({ stale: ACCOUNTS_EVERY - MIN }).catch(() => {}); }, ACCOUNTS_EVERY);
   }
 
-  BCV.feed = { state, publish, turnOn, turnOff, onChange, links, events, start };
+  BCV.feed = { state, publish, turnOn, turnOff, onChange, links, events, start, syncAccounts };
   if (document.readyState === 'complete') start(); else addEventListener('load', start, { once: true });
 })();

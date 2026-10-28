@@ -224,6 +224,42 @@ function personalIcs() {
     'END:VCALENDAR', '',
   ].join('\r\n');
 }
+// (2.99.124) Calendar → Sync → Sign In with iCloud: an iCloud account over CalDAV (/__mock/caldav/, its Apple ID
+// sam@icloud.com and the app-specific password mock-app-pass): its principal, its calendar home, two calendars (Home with a
+// dentist's appointment, Work with a lab meeting) and a reminders list, the events asked for a span, and the calendar Simpl
+// makes there (MKCALENDAR) with an event of Simpl's in a file each (PUT, DELETE). /__mock/caldav/__state: what it holds.
+const caldav = { calendars: new Map(), objects: new Map() };
+{
+  const C = '/__mock/caldav/1/calendars/';
+  caldav.calendars.set(`${C}home/`, { name: 'Home', color: '#AF52DEFF' });
+  caldav.calendars.set(`${C}work/`, { name: 'Work', color: '#34C759FF' });
+  caldav.calendars.set(`${C}todo/`, { name: 'Reminders', color: '#FF9500FF', comps: ['VTODO'] });
+  const ev = (uid, title, start, end) => ['BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT', `UID:${uid}`, `DTSTART:${icsTime(start)}`, `DTEND:${icsTime(end)}`, `SUMMARY:${title}`, 'END:VEVENT', 'END:VCALENDAR', ''].join('\r\n');
+  caldav.objects.set(`${C}home/dentist.ics`, ev('dentist@icloud', 'Dentist appointment', at(2, 11, 0), at(2, 12, 0)));
+  caldav.objects.set(`${C}work/lab.ics`, ev('lab@icloud', 'Lab meeting', at(2, 14, 0), at(2, 15, 0)));
+}
+function caldavMock(req, res, url) {
+  let raw = '';
+  req.on('data', (c) => (raw += c));
+  req.on('end', () => {
+    const p = url.pathname;
+    const send = (code, text = '', type = 'application/xml; charset=utf-8') => { res.writeHead(code, { 'content-type': type }); res.end(text); };
+    if (p === '/__mock/caldav/__state') return send(200, JSON.stringify({ calendars: [...caldav.calendars].map(([href, c]) => ({ href, ...c })), objects: [...caldav.objects].map(([href, t]) => ({ href, title: /SUMMARY:(.*)/.exec(t)?.[1]?.trim() || '' })) }), 'application/json');
+    if (req.headers.authorization !== `Basic ${Buffer.from('sam@icloud.com:mock-app-pass').toString('base64')}`) return send(401, 'Unauthorized', 'text/plain');
+    const ms = (rows) => `<?xml version="1.0" encoding="UTF-8"?><d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav" xmlns:a="http://apple.com/ns/ical/">${rows.join('')}</d:multistatus>`;
+    const cal = (href, c) => `<d:response><d:href>${href}</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><c:calendar/></d:resourcetype><d:displayname>${c.name}</d:displayname><a:calendar-color>${c.color}</a:calendar-color><c:supported-calendar-component-set>${(c.comps || ['VEVENT']).map((x) => `<c:comp name="${x}"/>`).join('')}</c:supported-calendar-component-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>`;
+    const xmlText = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    if (req.method === 'PROPFIND' && p === '/__mock/caldav/') return send(207, ms(['<d:response><d:href>/__mock/caldav/</d:href><d:propstat><d:prop><d:current-user-principal><d:href>/__mock/caldav/1/principal/</d:href></d:current-user-principal></d:prop></d:propstat></d:response>']));
+    if (req.method === 'PROPFIND' && p === '/__mock/caldav/1/principal/') return send(207, ms(['<d:response><d:href>/__mock/caldav/1/principal/</d:href><d:propstat><d:prop><c:calendar-home-set><d:href>/__mock/caldav/1/calendars/</d:href></c:calendar-home-set></d:prop></d:propstat></d:response>']));
+    if (req.method === 'PROPFIND' && p === '/__mock/caldav/1/calendars/') return send(207, ms([`<d:response><d:href>${p}</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop></d:propstat></d:response>`, ...[...caldav.calendars].map(([href, c]) => cal(href, c))]));
+    if (req.method === 'PROPFIND' && caldav.calendars.has(p)) return send(207, ms([cal(p, caldav.calendars.get(p))]));
+    if (req.method === 'MKCALENDAR') { if (caldav.calendars.has(p)) return send(405); caldav.calendars.set(p, { name: /displayname>([^<]*)</.exec(raw)?.[1] || '', color: '#0A84FFFF' }); return send(201); }
+    if (req.method === 'REPORT' && caldav.calendars.has(p)) return send(207, ms([...caldav.objects].filter(([href]) => href.startsWith(p)).map(([href, t]) => `<d:response><d:href>${href}</d:href><d:propstat><d:prop><c:calendar-data>${xmlText(t)}</c:calendar-data></d:prop></d:propstat></d:response>`)));
+    if (req.method === 'PUT') { if (!caldav.calendars.has(p.replace(/[^/]+$/, ''))) return send(409); const had = caldav.objects.has(p); caldav.objects.set(p, raw); return send(had ? 204 : 201); }
+    if (req.method === 'DELETE') return send(caldav.objects.delete(p) ? 204 : 404);
+    return send(404);
+  });
+}
 // the session's CSRF token, as Canvas keeps it: in the _csrf_token cookie, URL-encoded (base64 has + / =)
 const CSRF = 'mock+csrf/token=';
 
@@ -1678,6 +1714,7 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${port}`);
   if (communityMock && /^\/(api|__mock)\/community\//.test(url.pathname)) return void communityMock(req, res, url).catch((e) => { res.writeHead(500); res.end(String(e?.message || e)); }); // (bytes, not text: before the reading below)
   if (feedMock && /^\/(api\/feed|__mock\/feed)(\/|$)/.test(url.pathname)) return void feedMock(req, res, url).catch((e) => { res.writeHead(500); res.end(String(e?.message || e)); }); // (2.99.110: Simpl's calendar feed, its bytes sealed)
+  if (url.pathname.startsWith('/__mock/caldav/')) return void caldavMock(req, res, url); // (2.99.124: an iCloud account's calendars)
   if (mockConfig.siteNames) renaming(res);
   const path = url.pathname.replace(/\/+$/, '') || '/';
   let raw = '';

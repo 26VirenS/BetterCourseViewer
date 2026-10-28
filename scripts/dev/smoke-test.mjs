@@ -1674,8 +1674,11 @@ try {
   const closeSync = async () => { await page.keyboard.press('Escape'); await page.waitForFunction(() => !document.querySelector('.bcv-sync'), null, { timeout: 3000 }); };
   await openSync();
   const sheetLabels = await page.$$eval('.bcv-sync .bcv-label', (els) => els.map((e) => e.textContent));
-  check(sheetLabels.join('|') === 'Simpl, in your calendar app|Your calendars, in Simpl' && !!(await page.$('.bcv-sync__make')) && !(await page.$('.bcv-sync__send')),
-    `(2.99.110) the sheet: Simpl's own calendar (made with a press) and your calendars in; no Canvas feed, no Send plans: ${JSON.stringify(sheetLabels)}`);
+  check(sheetLabels.join('|') === 'Calendar accounts|Simpl, in your calendar app|Your calendars, in Simpl' && !!(await page.$('.bcv-sync__make')) && !(await page.$('.bcv-sync__send')),
+    `(2.99.110, 2.99.124) the sheet: calendar accounts to sign in to, Simpl's own calendar (made with a press) and your calendars in; no Canvas feed, no Send plans: ${JSON.stringify(sheetLabels)}`);
+  const kinds = await page.$$eval('.bcv-acct__kind', (els) => els.map((e) => ({ t: e.querySelector('.bcv-acct__kindtitle').textContent, sub: e.querySelector('.bcv-sync__sub').textContent, off: e.disabled })));
+  check(kinds.map((k) => `${k.t}:${k.off ? 'off' : 'on'}`).join('|') === 'Sign In with iCloud:on|Sign In with Google:off|Sign In with Microsoft:off' && kinds[0].sub === 'Your Apple ID and an app password' && kinds[1].sub === 'Coming in a later beta',
+    `(2.99.124) a button for each kind of account: iCloud now, Google and Microsoft in a later beta: ${JSON.stringify(kinds)}`);
   await page.click('.bcv-sync__make');
   await page.waitForSelector('.bcv-sync .bcv-sync__app', { timeout: 8000 });
   const made = await untilV(() => page.evaluate(() => { const st = document.querySelector('.bcv-sync__feed .bcv-sync__status.is-ok'); return st ? st.textContent.trim() : null; }), 12000);
@@ -1724,11 +1727,11 @@ try {
   check(linked === 'Sam\'s calendar is linked: 5 events read.', `a private address pasted: read, named from the calendar, its events counted (the cancelled lunch left out): "${linked}"`);
   const inline = await page.evaluate(() => { const st = document.querySelector('.bcv-sync__links .bcv-sync__status'); return { inCard: !!st?.closest('.bcv-sync__links'), ok: !!st?.classList.contains('is-ok'), tick: !!st?.querySelector('svg') }; });
   check(inline.inCard && inline.ok && inline.tick, `(2.99.109) what came of the link is said under its field, in its card, with a tick: ${JSON.stringify(inline)}`);
-  const linkRow = await untilV(() => page.evaluate(() => { const r = document.querySelector('.bcv-sync__link'); return r ? { name: r.querySelector('.bcv-calrow__name').textContent, sub: r.querySelector('.bcv-sync__sub').textContent, on: !!r.querySelector('.bcv-switch.is-on') } : null; }));
+  const linkRow = await untilV(() => page.evaluate(() => { const r = document.querySelector('.bcv-sync__link'); return r ? { name: r.querySelector('.bcv-calrow__name').textContent, sub: r.querySelector('.bcv-sync__sub').textContent, switch: !!r.querySelector('.bcv-switch') } : null; }));
   const count = (await texts('.bcv-cal__synccount'))[0];
   const stored = await sw.evaluate(async () => { const l = (await self.BCV.api.storage.local.get('cal:links'))['cal:links'] || []; const a = await chrome.alarms.get('simpl:cal-sync'); return { n: l.length, url: l[0]?.url, alarm: a?.periodInMinutes || null }; });
-  check(linkRow?.name === 'Sam\'s calendar' && linkRow.sub === 'Read just now · 5 events' && linkRow.on && count === '1' && stored.n === 1 && stored.url === `${BASE}/__mock/ics/personal.ics` && stored.alarm === 30,
-    `it is listed with when it was read, shown, the button counting it; kept in this browser, read again every half hour: ${JSON.stringify({ linkRow, count, stored })}`);
+  check(linkRow?.name === 'Sam\'s calendar' && linkRow.sub === 'Read just now · 5 events' && !linkRow.switch && count === '1' && stored.n === 1 && stored.url === `${BASE}/__mock/ics/personal.ics` && stored.alarm === 30,
+    `it is listed with when it was read (shown or not with Calendars, 2.99.124), the button counting it; kept in this browser, read again every half hour: ${JSON.stringify({ linkRow, count, stored })}`);
   await shot(page, '06e-calendar-sync');
   await closeSync();
   const extChips = await untilV(() => page.$$eval('.bcv-ev--ext', (els) => els.map((e) => e.textContent.trim())).then((t) => (t.length >= 4 ? t : null)));
@@ -1740,12 +1743,80 @@ try {
   check(extSheet.kicker === 'Your calendar' && extSheet.rows.Calendar === 'Sam\'s calendar' && extSheet.rows.Where === 'Kolligian Library' && /4:00pm – 8:00pm$/.test(extSheet.rows.When), `a press on one opens its sheet: ${JSON.stringify(extSheet)}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-evsheet'), null, { timeout: 3000 });
-  await openSync();
-  await page.click('.bcv-sync__link .bcv-switch');
+  // (2.99.124) shown or hidden with Calendars, as an account's calendars are
+  const openCals = async () => { await page.click('.bcv-cal__calbtn'); await page.waitForSelector('.bcv-sheet-ov[aria-label="Calendars"] .bcv-cal__sheet', { timeout: 8000 }); await page.waitForTimeout(300); };
+  const closeCals = async () => { await page.keyboard.press('Escape'); await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov[aria-label="Calendars"]'), null, { timeout: 3000 }); };
+  await openCals();
+  const byAddr = await page.evaluate(() => ({ labels: [...document.querySelectorAll('.bcv-cal__sheet .bcv-label')].map((e) => e.textContent), rows: [...document.querySelectorAll('.bcv-cal__links .bcv-row')].map((r) => `${r.querySelector('.bcv-calrow__name').textContent}:${!!r.querySelector('.bcv-switch.is-on')}`), tosync: document.querySelector('.bcv-cal__tosync')?.textContent }));
+  check(byAddr.labels.includes('Linked by address') && byAddr.rows.join() === 'Sam\'s calendar:true' && byAddr.tosync === 'Add or remove calendars in Sync…', `Calendars lists it under Linked by address, shown, with the way to Sync: ${JSON.stringify(byAddr)}`);
+  await page.click('.bcv-cal__links .bcv-switch');
   check(await eventually(() => page.$$eval('.bcv-ev--ext', (els) => els.length === 0)), 'its switch off: its events leave the month');
-  await page.click('.bcv-sync__link .bcv-switch');
-  check(await eventually(() => page.$$eval('.bcv-ev--ext', (els) => els.length >= 4)), 'and on again: back');
+  await closeCals();
+  await openSync();
+  check(/^Read just now · 5 events · hidden$/.test((await texts('.bcv-sync__link .bcv-sync__sub'))[0] || ''), 'Sync says it is hidden');
   await closeSync();
+  await openCals();
+  await page.click('.bcv-cal__links .bcv-switch');
+  check(await eventually(() => page.$$eval('.bcv-ev--ext', (els) => els.length >= 4)), 'and on again: back');
+  await closeCals();
+
+  // ---- (2.99.124) a calendar account: iCloud, signed in to with its Apple ID and an app-specific password (the mock's
+  // CalDAV server, scripts/dev/mock-canvas.mjs), its calendars on the month and chosen with Calendars, Simpl's own
+  // calendar written into it, and signed out of ----
+  await sw.evaluate((base) => self.BCV.api.storage.local.set({ 'dev:icloudBase': base }), `${BASE}/__mock/caldav/`);
+  const davState = async () => (await fetch(`${BASE}/__mock/caldav/__state`)).json();
+  await openSync();
+  await page.click('.bcv-acct__kind.is-icloud');
+  await page.waitForSelector('.bcv-acct__form .bcv-acct__appleid', { timeout: 4000 });
+  await page.waitForTimeout(100);
+  const form = await page.evaluate(() => ({ focused: !!document.activeElement?.classList.contains('bcv-acct__appleid'), pw: document.querySelector('.bcv-acct__password')?.type, make: document.querySelector('.bcv-acct__make')?.href, kinds: !!document.querySelector('.bcv-acct__kinds') }));
+  check(form.focused && form.pw === 'password' && /^https:\/\/account\.apple\.com\//.test(form.make || '') && !form.kinds, `Sign In with iCloud: the Apple ID asked for (focused), an app-specific password hidden as typed, where to make one: ${JSON.stringify(form)}`);
+  await page.fill('.bcv-acct__appleid', 'sam@icloud.com');
+  await page.press('.bcv-acct__appleid', 'Enter');
+  check(await page.evaluate(() => !!document.activeElement?.classList.contains('bcv-acct__password')), 'Enter on the Apple ID moves on to the password');
+  await page.keyboard.type('not-it');
+  await page.keyboard.press('Enter');
+  const wrongPw = await untilV(() => page.evaluate(() => document.querySelector('.bcv-acct__form .bcv-sync__status.is-error')?.textContent.trim() || null), 10000);
+  check(/^iCloud did not take that Apple ID and password\. Use an app-specific password/.test(wrongPw || '') && !(await page.$('.bcv-acct:not(.bcv-acct__form)')), `a wrong password said in the form, nothing signed in to: "${wrongPw}"`);
+  await page.fill('.bcv-acct__password', 'mock-app-pass');
+  await page.click('.bcv-acct__signin');
+  const acctCard = await untilV(() => page.evaluate(() => {
+    const c = document.querySelector('.bcv-acct:not(.bcv-acct__form)');
+    const st = c?.querySelector('.bcv-sync__status.is-ok')?.textContent.trim() || '';
+    return /events? out$/.test(st) && !/· 0 events out$/.test(st) ? { name: c.querySelector('.bcv-calrow__name').textContent, who: c.querySelector('.bcv-acct__who').textContent, st, shown: c.querySelector('.bcv-acct__shown')?.textContent, push: !!c.querySelector('.bcv-acct__push .bcv-switch.is-on'), kinds: !!document.querySelector('.bcv-acct__kinds .bcv-acct__kind.is-icloud .bcv-acct__kindtitle')?.textContent.startsWith('Add Another') } : null;
+  }), 20000);
+  const dav = await davState();
+  const simplCal = dav.calendars.find((c) => c.name === 'Simpl');
+  const written = dav.objects.filter((o) => simplCal && o.href.startsWith(simplCal.href));
+  check(acctCard?.name === 'iCloud Calendar' && acctCard.who === 'sam@icloud.com' && acctCard.shown === '1 of 2 calendars shown · choose them with Calendars' && acctCard.push && acctCard.kinds,
+    `signed in: the account's card, its main calendar of two shown (not the reminders list), another iCloud account offered: ${JSON.stringify(acctCard)}`);
+  check(!!simplCal && written.length > 0 && acctCard?.st === `Synced just now · 1 event in · ${written.length} events out` && written.some((o) => /Due|·/.test(o.title)),
+    `Simpl's calendar made in the account and the work written into it, counted in and out: ${JSON.stringify({ st: acctCard?.st, written: written.length, first: written[0]?.title })}`);
+  const secretsKept = await sw.evaluate(async () => JSON.stringify(await self.BCV.api.storage.local.get(null)));
+  check(!secretsKept.includes('mock-app-pass') && secretsKept.includes('cal:accounts:sealed'), 'its password sealed, nowhere in storage as typed');
+  await shot(page, '06f-calendar-accounts');
+  await closeSync();
+  check(await eventually(() => page.$$eval('.bcv-ev--ext', (els) => els.some((e) => e.textContent.trim() === 'Dentist appointment'))), 'its Home calendar on the month: the dentist');
+  await openCals();
+  const acctCals = await page.evaluate(() => { const l = document.querySelector('.bcv-cal__acctlabel'); return { label: l?.querySelector('.bcv-label')?.textContent, who: l?.querySelector('.bcv-cal__acctwho')?.textContent, rows: [...document.querySelectorAll('.bcv-cal__acct .bcv-row')].map((r) => `${r.querySelector('.bcv-calrow__name').textContent}:${!!r.querySelector('.bcv-switch.is-on')}`) }; });
+  check(acctCals.label === 'iCloud Calendar' && acctCals.who === 'sam@icloud.com' && acctCals.rows.join() === 'Home:true,Work:false', `Calendars lists the account's calendars under its name, a switch each: ${JSON.stringify(acctCals)}`);
+  await page.click('.bcv-cal__acct .bcv-row:has-text("Work") .bcv-switch');
+  check(await eventually(() => page.$$eval('.bcv-ev--ext', (els) => els.some((e) => e.textContent.trim() === 'Lab meeting')), 10000), 'Work turned on: read at once, its lab meeting on the month');
+  await closeCals();
+  check((await texts('.bcv-cal__synccount'))[0] === '2', 'the Sync button counts the account beside the linked calendar');
+  await openSync();
+  await page.click('.bcv-acct:not(.bcv-acct__form) .bcv-acct__head .bcv-iconbtn[title="More"]');
+  await page.click('.bcv-menu .bcv-menu__item:has-text("Sign Out")');
+  const leaveWords = await untilV(() => page.evaluate(() => document.querySelector('.bcv-acct__leavewords')?.textContent || null), 3000);
+  check(/^Sign out of sam@icloud\.com\? Its calendars leave Simpl's calendar\. The Simpl calendar in iCloud Calendar stays there/.test(leaveWords || ''), `Sign Out… asks first, saying what stays: "${leaveWords}"`);
+  await page.click('.bcv-acct__signout');
+  check(await eventually(async () => !(await page.$('.bcv-acct:not(.bcv-acct__form)')) && !!(await page.$('.bcv-acct__kind.is-icloud'))), 'signed out: its card gone, Sign In with iCloud back');
+  await closeSync();
+  check(await eventually(() => page.$$eval('.bcv-ev--ext', (els) => !els.some((e) => ['Dentist appointment', 'Lab meeting'].includes(e.textContent.trim())) && els.length >= 4)) && (await texts('.bcv-cal__synccount'))[0] === '1',
+    'its events leave the month; the calendar linked by address stays');
+  const davAfter = await davState();
+  check(davAfter.objects.filter((o) => o.href.startsWith(simplCal?.href || '-')).length === written.length && (await sw.evaluate(async () => !(await self.BCV.api.storage.local.get('cal:accounts:sealed'))['cal:accounts:sealed'])),
+    'the Simpl calendar stays in the account; its sealed password is forgotten here');
 
   // ---- pull to plan, on the Dashboard's rows (2.99.112: To Do beside the calendar drags onto it instead) ----
   await nav('dashboard');

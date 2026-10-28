@@ -346,9 +346,28 @@
     }
     async function readLinks() {
       linkState = (await BCV.plan?.linked()) || { links: [], feeds: {} };
-      syncCount.textContent = String(linkState.links.length);
-      syncCount.hidden = !linkState.links.length;
-      syncBtn.classList.toggle('has-error', linkState.links.some((l) => linkState.feeds[l.id] && !linkState.feeds[l.id].ok));
+      countSync();
+    }
+    // (2.99.124) the calendar accounts signed in to in Sync (lib/calaccounts.js keeps them in the background): their
+    // calendars are among the linked ones (source "account"); here, who is signed in, how each did, the kinds offered.
+    // Never in the apps: they sign in to calendars themselves
+    let acctState = { kinds: [], accounts: [], busy: [] };
+    const appHere = !!self.BCVBridge?.native;
+    const callAcct = (m) => Promise.resolve(BCV.api.runtime.sendMessage({ type: 'calAcct', ...m })).catch((e) => ({ ok: false, message: e?.message || String(e) }));
+    const byAddress = () => linkState.links.filter((l) => l.source !== 'account');
+    async function readAccounts() {
+      if (appHere) return;
+      const r = await callAcct({ op: 'state' });
+      if (r?.ok) acctState = { kinds: r.kinds || [], accounts: r.accounts || [], busy: r.busy || [] };
+      countSync();
+    }
+    /** Sync's count: the calendars linked by address and the accounts signed in to; red when one of them is not read. */
+    function countSync() {
+      const links = byAddress();
+      const n = links.length + acctState.accounts.length;
+      syncCount.textContent = String(n);
+      syncCount.hidden = !n;
+      syncBtn.classList.toggle('has-error', links.some((l) => linkState.feeds[l.id] && !linkState.feeds[l.id].ok) || acctState.accounts.some((a) => a.problem || a.signedOut));
     }
 
     // (2.99.109) a title as wide in every view, so the bar beside it never wraps as the view changes: the week named by
@@ -1059,11 +1078,32 @@
         refused.has(c.code) ? h('span', { class: 'bcv-badge bcv-badge--xs', title: `${BCV.lms.name} refused this calendar (a restricted or concluded course)`, text: 'Not shared' }) : null,
         U.switchEl(selected.includes(c.code), (on) => toggleContext(c.code, on), `Show ${c.name}`),
       ], { mod: `bcv-row--p12-16 ${refused.has(c.code) ? 'bcv-calrow--refused' : ''}` });
+      // (2.99.124, the apps' Calendars) then each calendar account's calendars, then those linked by their address: every
+      // calendar shown is chosen here; Sync is where they are added or taken away
+      const swatchRow = (color, name, on, toggle, warn = null) => U.row([
+        U.dot(color || '#8e8e93', 'bcv-sync__swatch'),
+        U.text('bcv-calrow__name bcv-pretty', name, 'span'),
+        warn ? h('span', { class: 'bcv-badge bcv-badge--xs bcv-cal__unread', title: warn, text: 'Not read' }) : null,
+        U.switchEl(on, toggle, `Show ${name}`),
+      ], { mod: 'bcv-row--p12-16' });
+      const accts = [];
+      for (const a of acctState.accounts) {
+        const kind = acctState.kinds.find((k) => k.kind === a.kind);
+        accts.push(U.el('bcv-cal__acctlabel', [U.label(kind?.name || 'Calendar'), U.text('bcv-cal__acctwho', a.name, 'span')]));
+        accts.push(a.calendars?.length
+          ? U.card(a.calendars.map((c) => swatchRow(c.color, c.name, !!c.on, (on) => { c.on = on; callAcct({ op: 'show', id: a.id, calendar: c.id, on }); })), 'bcv-card--list bcv-cal__acct')
+          : U.hint(a.signedOut ? 'Sign in again in Sync to choose its calendars.' : 'Reading its calendars…'));
+      }
+      const links = byAddress();
       return [
         own.length ? U.card(own.map(row), 'bcv-card--list bcv-cal__own') : U.emptyCard('No courses'),
         other.length ? U.label('Other calendars') : null,
         other.length ? U.card(other.map(row), 'bcv-card--list bcv-cal__other') : null,
         U.hint(`Struck-through items are submitted or past. Toggling a calendar hides its events; ${BCV.lms.d2l ? 'at most 10 show at once' : 'Canvas shows at most 10 at once'}.`),
+        ...accts,
+        links.length ? U.label('Linked by address') : null,
+        links.length ? U.card(links.map((l) => { const f = linkState.feeds[l.id]; return swatchRow(l.color, l.name, l.on !== false, (on) => { callCal({ op: 'set', id: l.id, on }); }, f && !f.ok ? f.error : null); }), 'bcv-card--list bcv-cal__links') : null,
+        appHere ? null : h('button', { type: 'button', class: 'bcv-cal__tosync', onclick: () => { const b = syncBtn; BCV.ui.dismiss(calSheet?.ov); calSheet = null; requestAnimationFrame(() => openSync(b)); } }, [U.svg(IC.link, { size: 13, stroke: 'currentColor', width: 2.1 }), h('span', { text: 'Add or remove calendars in Sync…' })]),
       ].filter(Boolean);
     }
     const calSub = () => `${selected.length} of ${contexts.length} on · up to 10 at once`;
@@ -1359,8 +1399,167 @@
     const syncUi = { busy: false, msg: null, ask: null, draft: '', simpl: undefined, turning: false };
     const callCal = (m) => Promise.resolve(BCV.api.runtime.sendMessage({ type: 'cal', ...m })).catch((e) => ({ ok: false, message: e?.message || String(e) }));
     const agoWords = (ms) => { const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 48 * 60 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
+
+    // ---- (2.99.124) the calendar accounts, at the head of Sync (the apps' SyncAccounts) ------------------------------
+    // Each account signed in to — who, how the last sync went, Sync Now, how many of its calendars show (chosen with
+    // Calendars), and whether Simpl's own calendar is written there — then a button for each kind: iCloud (its Apple ID and
+    // an app-specific password, asked for here), Google and Microsoft (the browser's own sign-in window). The password
+    // lives in this sheet only while it is typed; the background seals it (lib/calaccounts.js).
+    const acctUi = { form: false, appleId: '', password: '', signing: false, problem: null, note: null, leaving: null, ask: null };
+    const CLOUD = 'M7.5 18.5h9.5a4 4 0 0 0 .6-7.96A6 6 0 0 0 6 9.9a4.3 4.3 0 0 0 1.5 8.6z';
+    const KIND_ICON = { icloud: CLOUD, google: IC.globe, microsoft: IC.mail };
+    const kindOf = (kind) => acctState.kinds.find((k) => k.kind === kind) || { kind, name: 'Calendar', short: 'Calendar', tint: '#8e8e93', available: false };
+    const acctLine = (kind, text, role = null) => U.el(`bcv-sync__status ${kind ? `is-${kind}` : ''}`, [
+      kind === 'busy' ? h('span', { class: 'bcv-sync__spin', 'aria-hidden': 'true' }) : U.svg(kind === 'error' ? IC.warn : 'M5 12.5l4.5 4.5L19 7.5', { size: 13, stroke: 'currentColor', width: 2.4 }),
+      h('span', { text }),
+    ], role ? { role } : null);
+    function accountsBody() {
+      const out = acctState.accounts.map(accountCard);
+      out.push(acctUi.form ? icloudForm() : acctButtons());
+      if (acctUi.ask) {
+        out.push(U.el('bcv-sync__ask bcv-acct__ask', [
+          h('span', { text: `Your browser asks before Simpl reaches ${kindOf(acctUi.ask.kind).name}.` }),
+          U.btn('Allow…', { kind: 'xs', cls: 'bcv-acct__allow', onClick: async () => { await callAcct({ op: 'allow', kind: acctUi.ask.kind }); acctUi.ask = null; acctUi.note = 'Allow it in the tab that opened, then press Sign In again.'; paintSync(); } }),
+        ]));
+      }
+      if (acctUi.note && !acctUi.ask) out.push(U.el('bcv-acct__note', [acctLine('', acctUi.note, 'status')]));
+      if (acctUi.problem && !acctUi.form) out.push(U.el('bcv-acct__note', [acctLine('error', acctUi.problem, 'alert')]));
+      return out;
+    }
+    function accountCard(a) {
+      const k = kindOf(a.kind);
+      const syncing = acctState.busy.includes(a.id);
+      const more = U.iconbtn(IC.dots, { title: 'More', iconSize: 15, width: 3.4, stroke: 'var(--bcv-ink2)', onClick: (e) => U.menu(e.currentTarget, [{ label: 'Sign Out…', onSelect: () => { acctUi.leaving = a.id; paintSync(); } }]) });
+      const act = a.signedOut ? U.btn('Sign In Again', { kind: 'xs', cls: 'bcv-acct__again', onClick: () => signInAgain(a) })
+        : syncing ? h('span', { class: 'bcv-sync__spin bcv-acct__spin', 'aria-label': 'Syncing' })
+          : U.iconbtn(IC.repeat, { title: 'Sync Now', onClick: () => syncNow(a) });
+      const head = U.el('bcv-acct__head', [
+        U.tile(KIND_ICON[a.kind] || IC.cal, { color: '#fff', tint: k.tint, size: 32, iconSize: 16, width: 2 }),
+        h('div', { class: 'bcv-row__body' }, [U.text('bcv-calrow__name', k.name, 'div'), U.text('bcv-sync__sub bcv-acct__who', a.name, 'div')]),
+        act,
+        more,
+      ]);
+      const status = syncing ? acctLine('busy', a.synced ? 'Syncing…' : 'Reading your calendars…', 'status')
+        : a.problem ? acctLine('error', a.problem, 'alert')
+          : a.synced ? acctLine('ok', `Synced ${agoWords(a.synced)} · ${U.plural(a.pulled || 0, 'event')} in${a.push !== false ? ` · ${U.plural(a.pushed || 0, 'event')} out` : ''}`, 'status') : null;
+      const cals = a.calendars || [];
+      const shown = cals.length ? U.text('bcv-sync__sub bcv-acct__shown', `${cals.filter((c) => c.on).length} of ${cals.length} ${cals.length === 1 ? 'calendar' : 'calendars'} shown · choose them with Calendars`, 'div') : null;
+      let foot;
+      if (acctUi.leaving === a.id) {
+        foot = U.el('bcv-acct__leave', [
+          U.text('bcv-acct__leavewords', a.push !== false
+            ? `Sign out of ${a.name}? Its calendars leave Simpl's calendar. The Simpl calendar in ${k.name} stays there; delete it there if you don't want it.`
+            : `Sign out of ${a.name}? Its calendars leave Simpl's calendar.`, 'div'),
+          U.el('bcv-acct__leavebtns', [
+            U.btn('Sign Out', { kind: 'danger', cls: 'bcv-acct__signout', onClick: () => signOut(a) }),
+            U.btn('Cancel', { kind: 'sm', onClick: () => { acctUi.leaving = null; paintSync(); } }),
+          ]),
+        ]);
+      } else {
+        foot = U.el('bcv-acct__push', [
+          h('div', { class: 'bcv-row__body' }, [
+            U.text('bcv-calrow__name', 'Add My Work and Plans', 'div'),
+            U.text('bcv-sync__sub', `Due dates, your own tasks and your plans, in a calendar named Simpl in ${k.name}.`, 'div'),
+          ]),
+          U.switchEl(a.push !== false, (on) => setPush(a, on), 'Add My Work and Plans'),
+        ]);
+      }
+      return U.card([head, status, shown, foot].filter(Boolean), `bcv-card--pad-14 bcv-acct${a.problem || a.signedOut ? ' is-error' : ''}`);
+    }
+    /** A button for each kind of account: another of the same kind once one is signed in to. */
+    function acctButtons() {
+      return U.el('bcv-acct__kinds', acctState.kinds.map((k) => {
+        const adding = acctState.busy.includes(`new:${k.kind}`);
+        const another = acctState.accounts.some((a) => a.kind === k.kind);
+        const title = another ? `Add Another ${k.short} Account` : k.action;
+        return h('button', {
+          type: 'button', class: `bcv-acct__kind is-${k.kind}`, disabled: !k.available || adding || null, 'aria-label': title,
+          title: k.available ? title : `${k.name} sign-in comes in a later beta.`,
+          onclick: () => { acctUi.problem = null; acctUi.note = null; if (k.kind === 'icloud') { acctUi.form = true; paintSync(); requestAnimationFrame(() => syncSheet?.list.querySelector('.bcv-acct__appleid')?.focus()); } else connect(k.kind); },
+        }, [
+          adding ? h('span', { class: 'bcv-sync__spin', 'aria-hidden': 'true' }) : U.svg(KIND_ICON[k.kind] || IC.cal, { size: 16, stroke: k.available ? k.tint : 'var(--bcv-ink3)', width: 2 }),
+          h('span', { class: 'bcv-acct__kindwords' }, [h('span', { class: 'bcv-acct__kindtitle', text: title }), h('span', { class: 'bcv-sync__sub', text: k.available ? k.sub : 'Coming in a later beta' })]),
+        ]);
+      }));
+    }
+    /** iCloud's own: the Apple ID and an app-specific password, made at account.apple.com for Simpl alone (never the
+     *  Apple ID's own password, which Apple does not let a calendar use). */
+    function icloudForm() {
+      const busy = acctUi.signing || acctState.busy.includes('new:icloud');
+      const id = h('input', { type: 'email', class: 'bcv-input bcv-acct__field bcv-acct__appleid', placeholder: 'Apple ID (your iCloud email)', 'aria-label': 'Apple ID', autocomplete: 'username', spellcheck: 'false', value: acctUi.appleId, disabled: busy || null });
+      const pw = h('input', { type: 'password', class: 'bcv-input bcv-acct__field bcv-acct__password', placeholder: 'App-specific password', 'aria-label': 'App-specific password', autocomplete: 'off', spellcheck: 'false', value: acctUi.password, disabled: busy || null });
+      id.addEventListener('input', () => { acctUi.appleId = id.value; });
+      pw.addEventListener('input', () => { acctUi.password = pw.value; });
+      id.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); pw.focus(); } });
+      pw.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); signInICloud(); } });
+      return U.card([
+        U.el('bcv-acct__head', [
+          U.tile(CLOUD, { color: '#fff', tint: kindOf('icloud').tint, size: 32, iconSize: 16, width: 2 }),
+          h('div', { class: 'bcv-row__body' }, [
+            U.text('bcv-calrow__name', 'Sign in to iCloud Calendar', 'div'),
+            U.text('bcv-sync__sub', 'Use your Apple ID and an app-specific password, not your Apple ID’s own password. Make one at account.apple.com, under Sign-In and Security, App-Specific Passwords.', 'div'),
+          ]),
+        ]),
+        id,
+        pw,
+        h('a', { class: 'bcv-acct__make', href: 'https://account.apple.com/account/manage', target: '_blank', rel: 'noopener' }, [U.svg(IC.lock, { size: 13, stroke: 'currentColor', width: 2 }), h('span', { text: 'Make an App-Specific Password' })]),
+        U.el('bcv-acct__formbtns', [
+          U.btn(busy ? 'Signing In…' : 'Sign In', { kind: 'primary', cls: 'bcv-acct__signin', disabled: busy, onClick: signInICloud }),
+          U.btn('Cancel', { kind: 'sm', disabled: busy, onClick: () => { Object.assign(acctUi, { form: false, password: '', problem: null }); paintSync(); } }),
+        ]),
+        acctUi.problem ? acctLine('error', acctUi.problem, 'alert') : null,
+      ].filter(Boolean), 'bcv-card--pad-14 bcv-acct bcv-acct__form');
+    }
+    async function signInICloud() {
+      if (acctUi.signing) return;
+      Object.assign(acctUi, { signing: true, problem: null, note: null, ask: null });
+      paintSync();
+      const r = await callAcct({ op: 'icloud', appleId: acctUi.appleId, password: acctUi.password });
+      acctUi.signing = false;
+      if (r?.ok) {
+        Object.assign(acctUi, { form: false, password: '' });
+        BCV.feed?.syncAccounts?.({ id: r.id }).catch(() => {}); // (Simpl's calendar written there now: its events from this page)
+      } else if (r?.ask) acctUi.ask = { kind: 'icloud' };
+      else if (!r?.busy) acctUi.problem = r?.message || 'iCloud could not be reached. Check the connection and try again.';
+      await readAccounts();
+      paintSync();
+    }
+    async function connect(kind) {
+      Object.assign(acctUi, { problem: null, note: null, ask: null });
+      paintSync();
+      const r = await callAcct({ op: 'oauth', kind });
+      if (r?.ok) BCV.feed?.syncAccounts?.({ id: r.id }).catch(() => {});
+      else if (r?.ask) acctUi.ask = { kind };
+      else if (!r?.cancelled && !r?.busy) acctUi.problem = r?.message || 'The sign-in could not be finished. Try again.';
+      await readAccounts();
+      paintSync();
+    }
+    function signInAgain(a) {
+      if (a.kind === 'icloud') { Object.assign(acctUi, { form: true, appleId: a.name, password: '', problem: null }); paintSync(); requestAnimationFrame(() => syncSheet?.list.querySelector('.bcv-acct__password')?.focus()); return; }
+      connect(a.kind);
+    }
+    function syncNow(a) {
+      acctState.busy = [...acctState.busy, a.id]; // (the spinner at once; the background's own word follows)
+      paintSync();
+      BCV.feed?.syncAccounts?.({ id: a.id }).then(() => readAccounts()).then(() => paintSync()).catch(() => {});
+    }
+    async function setPush(a, on) {
+      a.push = on;
+      await callAcct({ op: 'push', id: a.id, on });
+      if (on) BCV.feed?.syncAccounts?.({ id: a.id }).catch(() => {});
+    }
+    async function signOut(a) {
+      acctUi.leaving = null;
+      await callAcct({ op: 'signOut', id: a.id });
+      await Promise.all([readAccounts(), readLinks()]);
+      merge();
+      draw();
+      paintSync();
+    }
     function syncBody() {
       const out = [];
+      // (2.99.124) the calendar accounts, signed in to here
+      if (!appHere) out.push(U.label('Calendar accounts'), ...accountsBody());
       // (2.99.110) Simpl in the student's calendar app
       out.push(U.label('Simpl, in your calendar app'));
       const st = syncUi.simpl;
@@ -1401,13 +1600,13 @@
       }
       // the student's own calendars, here
       out.push(U.label('Your calendars, in Simpl'));
-      const rows = linkState.links.map((l) => {
+      // (2.99.124) shown or not with Calendars, as an account's calendars are: here, how it was read, and Unlink
+      const rows = byAddress().map((l) => {
         const f = linkState.feeds[l.id];
-        const sub = !f ? 'Not read yet' : f.ok ? `Read ${agoWords(f.at)} · ${U.plural((f.events || []).length, 'event')}` : f.error;
+        const sub = !f ? 'Not read yet' : f.ok ? `Read ${agoWords(f.at)} · ${U.plural((f.events || []).length, 'event')}${l.on === false ? ' · hidden' : ''}` : f.error;
         return U.row([
           U.dot(l.color || '#8e8e93', 'bcv-sync__swatch'), // (2.99.109: round, as a calendar app marks its calendars)
           h('div', { class: 'bcv-row__body' }, [U.text('bcv-calrow__name bcv-pretty', l.name, 'div'), U.text(`bcv-sync__sub ${f && !f.ok ? 'is-error' : ''}`, sub, 'div')]),
-          U.switchEl(l.on !== false, async (on) => { await callCal({ op: 'set', id: l.id, on }); }, `Show ${l.name} on the calendar`),
           U.iconbtn(IC.close, { size: 26, title: `Unlink ${l.name}`, onClick: async () => { if (!window.confirm(`Unlink ${l.name}? Its events leave Simpl's Calendar; the calendar itself is not touched.`)) return; await callCal({ op: 'remove', id: l.id }); } }),
         ], { mod: 'bcv-row--p12-16 bcv-sync__link', cls: f && !f.ok ? 'is-error' : '' });
       });
@@ -1443,9 +1642,14 @@
     }
     function paintSync() {
       if (!syncSheet) return;
-      const had = syncSheet.ov.contains(document.activeElement) ? document.activeElement.className : null;
+      // (2.99.124: any field typed in — the link, the Apple ID, its password — found again by its name, the caret where it was)
+      const a = document.activeElement;
+      const field = syncSheet.ov.contains(a) && a?.tagName === 'INPUT' ? a.getAttribute('aria-label') : null;
+      let caret = null;
+      try { caret = field ? a.selectionStart : null; } catch { caret = null; }
       syncSheet.list.replaceChildren(...syncBody());
-      if (had && /bcv-sync__input/.test(had)) syncSheet.list.querySelector('.bcv-sync__input')?.focus();
+      const back = field ? [...syncSheet.list.querySelectorAll('input')].find((x) => x.getAttribute('aria-label') === field) : null;
+      if (back) { back.focus(); try { if (caret != null) back.setSelectionRange(caret, caret); } catch { /* an email field keeps no caret */ } }
       else if (!syncSheet.ov.contains(document.activeElement)) syncSheet.ov.focus();
     }
     // (2.99.110) Simpl's calendar made (and sent at once), or stopped (its link stops working; a new one next time)
@@ -1485,7 +1689,7 @@
     async function openSync(from = null) {
       document.querySelector('.bcv-sheet-ov')?.remove();
       const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': 'Sync' });
-      const close = () => { BCV.ui.dismiss(ov); syncSheet = null; syncUi.msg = null; syncUi.ask = null; };
+      const close = () => { BCV.ui.dismiss(ov); syncSheet = null; syncUi.msg = null; syncUi.ask = null; Object.assign(acctUi, { form: false, password: '', problem: null, leaving: null, ask: null }); };
       ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
       ov.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !e.target.closest?.('.bcv-menu')) close(); });
       const list = U.el('bcv-sheet__list', []);
@@ -1503,6 +1707,7 @@
       U.morphFrom(sheet, from);
       ov.tabIndex = -1;
       ov.focus();
+      readAccounts().then(() => { paintSync(); BCV.feed?.syncAccounts?.({ stale: 5 * 60000 }).catch(() => {}); }); // (2.99.124: read again when Sync opens, if not lately)
       syncUi.simpl = (await BCV.feed?.state().catch(() => null)) || { on: false };
       paintSync();
       const offFeed = BCV.feed?.onChange((st) => { if (!syncSheet) { offFeed?.(); return; } syncUi.simpl = st; paintSync(); });
@@ -1511,7 +1716,10 @@
     // plans changed (here, or a pull on another screen or tab): the grid and the sheet follow
     const onStorage = (changes, area) => {
       if (!ctx.alive()) { try { BCV.api.storage.onChanged.removeListener(onStorage); } catch { /* gone */ } return; }
-      if (area !== 'local' || !Object.keys(changes).some((k) => k === 'cal:links' || k.startsWith('cal:feed:'))) return;
+      if (area !== 'local') return;
+      const keys = Object.keys(changes);
+      if (keys.some((k) => k === 'cal:accounts' || k === 'cal:accounts:busy')) readAccounts().then(() => { paintSync(); if (calSheet) { calSheet.list.replaceChildren(...calendarsBody()); } });
+      if (!keys.some((k) => k === 'cal:links' || k.startsWith('cal:feed:'))) return;
       readLinks().then(() => { merge(); draw(); paintSync(); });
     };
     try { BCV.api.storage.onChanged.addListener(onStorage); } catch { /* no change events: a reload shows them */ }
@@ -1829,7 +2037,7 @@
     load().catch(() => {});
     loadAppointments(); // in its own time: the button's count fills in when Canvas answers
     // (2.99.107) the linked calendars as last read, then read again if that was more than half an hour ago, and the plans
-    Promise.all([readLinks(), BCV.plan?.ready()]).then(() => { if (!ctx.alive()) return; merge(); draw(); if (linkState.links.length) callCal({ op: 'sync' }); }).catch(() => {});
+    Promise.all([readLinks(), readAccounts(), BCV.plan?.ready()]).then(() => { if (!ctx.alive()) return; merge(); draw(); if (byAddress().length) callCal({ op: 'sync' }); }).catch(() => {});
     return screen;
   }
 

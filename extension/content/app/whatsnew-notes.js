@@ -28,6 +28,9 @@
     lock: 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.124', date: '2026-10-28', notes: [
+      { kind: 'new', title: 'Calendar Accounts', body: 'Sign in to iCloud Calendar right from Sync.', icon: P.cal },
+    ] },
     { version: '2.99.123', date: '2026-10-28', notes: [
       { kind: 'improved', title: 'Simulate an Update', body: 'Developer tools replay an update from any older version.', icon: P.arrows },
     ] },

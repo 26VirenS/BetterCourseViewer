@@ -13,6 +13,9 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
 if (typeof importScripts === 'function' && !self.BCV?.ics) {
   importScripts('lib/ics.js'); // (2.99.107) the calendars a student links, read here
 }
+if (typeof importScripts === 'function' && !self.BCV?.calAccounts) {
+  importScripts('lib/calaccounts.js'); // (2.99.124) the calendar accounts signed in to in Calendar → Sync
+}
 if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
   importScripts('content/app/lazy-modules.js'); // the on-demand modules' files: what a page may ask to have loaded
 }
@@ -541,6 +544,9 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
       case 'communityKit': // (2.99.106) Simpl Community's page: the theme code, to wear a theme added there (content/sniff.js)
         reply(communityKit(sender));
         return true;
+      case 'calAcct': // (2.99.124) the calendar accounts signed in to in Calendar → Sync: signed in and out, read and written (lib/calaccounts.js)
+        reply(BCV.calAccounts.rpc(msg));
+        return true;
       case 'cal': // (2.99.107) the calendars linked in Calendar → Sync: add, allow, remove, show or hide, read again (content/app/screens/calendar.js)
         reply(cal(msg));
         return true;
@@ -772,6 +778,7 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
   }
   if (api.alarms?.onAlarm) api.alarms.onAlarm.addListener((a) => { if (a?.name === CAL_ALARM) calSync().catch(() => {}); });
   calArm();
+  BCV.calAccounts?.start(); // (2.99.124: nothing is being read as the background starts)
   // (2.99.110) Simpl's own calendar feed: the student's work, their own tasks and their plans, as one calendar named
   // Simpl in Apple Calendar, Google Calendar or Outlook — in place of Canvas's own feed. The page puts its events
   // together (content/app/feed.js) and hands them here; here they are written as an .ics (lib/ics.js write), sealed
