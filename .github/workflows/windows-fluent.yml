@@ -471,6 +471,10 @@ jobs:
           Shot 'section-modules' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'section:courses/102:modules'))
           Shot 'section-people' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'section:courses/101:people'))
           Shot 'section-files' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'section:courses/101:files', '--open', 'file:f1'))
+          # (0.3.85) a file opened shows in the preview window before anything is downloaded: a PDF in Edge's viewer, and a
+          # Word document, which it cannot draw, as its card (Shell/FileViewWindow.cs)
+          Shot 'file-preview' '1366x778' 50 ($mock + @('--appearance', 'light', '--file-view', 'sample'))
+          Shot 'file-preview-card' '1366x778' 45 ($mock + @('--appearance', 'dark', '--file-view', 'card'))
           Shot 'page' '1024x681' 45 ($mock + @('--appearance', 'light', '--push', '/courses/101/pages/chapter-4-notes'))
           # Search, External Tools, Tools (pins in the title bar, a pin's flyout, a tool open), a discussion
           Shot 'search' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'search:discussion'))
@@ -1484,6 +1488,15 @@ jobs:
             $l = PhoneLog $sh
             Write-Host "${sh}: $((@($l -split "`n" | Where-Object { $_ -match 'shrink: ' }) -join ' | '))"
             if ($l -notmatch 'shrink: done at \w+, .+ \(\d+% saved\) across 3 files') { Write-Host "::error::${sh}: the sample files were not compressed before the picture (shots/profile-$sh.log)"; exit 1 }
+          }
+          # (0.3.85) the file preview: shown in its window, and nothing put in Downloads (Shell/FileViewWindow.cs: "files:
+          # preview .pdf file, not downloaded")
+          foreach ($fp in @(@('file-preview', '.pdf'), @('file-preview-card', '.docx'))) {
+            if ($script:mine -notcontains $fp[0]) { continue }
+            $l = PhoneLog $fp[0]
+            Write-Host "$($fp[0]): $((@($l -split "`n" | Where-Object { $_ -match 'files: ' }) -join ' | '))"
+            if ($l -notmatch "files: preview $([regex]::Escape($fp[1])) file, not downloaded") { Write-Host "::error::$($fp[0]): the file was not shown in the preview window (shots/profile-$($fp[0]).log)"; exit 1 }
+            if ($l -match 'files: preview downloaded') { Write-Host "::error::$($fp[0]): the preview downloaded the file by itself"; exit 1 }
           }
           # (tools) Study planner: the mock's work due was read and planned into blocks before each picture
           # (Tools/Planner/StudyPlanner.cs: "plan: shows N blocks for M items over D days (view)")
