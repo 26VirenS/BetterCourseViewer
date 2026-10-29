@@ -209,10 +209,9 @@ public sealed partial class AppShell : Grid, IDisposable
                 Dispatcher.BeginInvoke(() => PlaceWindow.Open(engine, page), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
         }
         // (0.3.86) Silent mode, the whole app's: chosen or put back anywhere (the Dashboard, the account's menu), the pane
-        //  and every window follow it (Kit/SilentGrey.cs)
-        SilentGrey.Engine = engine.Web;
-        SilentGrey.Follow(SilentMode.Shown);
-        SilentMode.Changed += () => Dispatcher.BeginInvoke(() => { Header(); SilentGrey.Follow(SilentMode.Shown); });
+        //  follows it, and (0.3.87) the courses' colours go quiet with it (QuietColors)
+        _ = QuietColors(SilentMode.Shown);
+        SilentMode.Changed += () => Dispatcher.BeginInvoke(() => { Header(); _ = QuietColors(SilentMode.Shown); });
         // (0.3.85, the screenshot suite: --file-view sample shows a PDF of notes in the file preview window, --file-view
         //  card a Word document, which it cannot draw, as its card)
         if (Launch.Take("", "file-view") is { Length: > 0 } viewed)
@@ -324,7 +323,7 @@ public sealed partial class AppShell : Grid, IDisposable
     /// course colours, photo or picture of anyone, its search box away (Ctrl+F still searches) — and, over the Dashboard's
     /// Silent mode (<paramref name="dash"/>), the title bar black, its buttons in grey (MainWindow.SilentLook); its own look
     /// again after. (0.3.86) Silent mode is the whole app's: the pane stays quiet on every screen while it is on, and the
-    /// rest of every window is in black and white (Kit/SilentGrey.cs).
+    /// courses' colours go quiet (QuietColors).
     /// </summary>
     private void SilentLook(bool on, bool dash)
     {
@@ -348,6 +347,23 @@ public sealed partial class AppShell : Grid, IDisposable
         BuildPane(redraw: true);
         if (!on) { sceneMasked = null; MaskScene(); }
         Log.Write($"silent mode: {(on ? "up" : "down")}");
+    }
+
+    /// <summary>The courses' colours were last made quiet (so turning Silent off reads every screen again in its own).</summary>
+    private bool quietWas;
+
+    /// <summary>
+    /// (0.3.87) Silent mode's quiet colours, as the web's (2.99.128) and the Mac's (1.3.192): the engine draws the courses'
+    /// own colours as a hint of each while it is on — what a colour means (late, done, a grade, a button) keeps its own,
+    /// and so does what a page holds — and every screen reads again in them, or in their own colours once it is off.
+    /// (0.3.86 drew every window in black and white.)
+    /// </summary>
+    private async Task QuietColors(bool on)
+    {
+        if (!await engine.Act("quietColors", new { on })) return;
+        if (on || quietWas) engine.DataChanged();
+        quietWas = on;
+        Log.Write($"silent mode: the courses' colours quiet: {(on ? "yes" : "no")}");
     }
 
     /// <summary>The pane's ground: black in Silent mode; the flyout's while it is open over the page on a narrow window;

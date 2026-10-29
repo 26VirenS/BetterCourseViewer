@@ -244,7 +244,8 @@
     // Courses (an age of a minute) read every one of them again — up to 50 requests — each minute
     const [list, done, cols, dark] = await Promise.all([rawCourses({ force, refresh, maxAge }), past ? doneCourses({ force, refresh, maxAge: maxAge > 0 ? Math.max(maxAge, 10 * MIN) : 0 }) : null, colors({ force, refresh }), Promise.resolve(BCV.early?.isDark?.() ?? false)]);
     const memo = coursesMemo[past];
-    if (memo && memo.list === list && memo.done === done && memo.cols === cols && memo.dark === dark) return memo.out;
+    const quiet = !!BCV.quietColors; // (2.99.128: Silent mode — the courses' colours go quiet, U.quiet)
+    if (memo && memo.list === list && memo.done === done && memo.cols === cols && memo.dark === dark && memo.quiet === quiet) return memo.out;
     const seen = new Set();
     const out = [];
     let fallbackIdx = 0;
@@ -255,6 +256,7 @@
       const enr = (c.enrollments || [])[0] || {};
       let color = cols[`course_${id}`];
       if (!color) color = U.FALLBACK_COLORS[fallbackIdx++ % U.FALLBACK_COLORS.length];
+      if (quiet) color = U.quiet(color);
       out.push({
         id,
         raw: c,
@@ -284,7 +286,7 @@
         url: `/courses/${id}`,
       });
     }
-    coursesMemo[past] = { list, done, cols, dark, out };
+    coursesMemo[past] = { list, done, cols, dark, quiet, out };
     return out;
   }
   function roleLabel(type) {
@@ -977,7 +979,7 @@
     if (found) return found;
     const c = await C.cached(`course:${id}`, 10 * MIN, () => C.get(`/api/v1/courses/${id}`, { params: { include: ['term', 'teachers', 'total_scores', 'sections', 'course_image'] } }), { force, refresh, maxAge });
     const cols = await colors();
-    const color = cols[`course_${id}`] || U.FALLBACK_COLORS[0];
+    const color = BCV.quietColors ? U.quiet(cols[`course_${id}`] || U.FALLBACK_COLORS[0]) : cols[`course_${id}`] || U.FALLBACK_COLORS[0];
     const enr = (c.enrollments || [])[0] || {};
     return {
       id: String(c.id), raw: c, name: c.name, originalName: c.original_name || c.name, nickname: c.original_name ? c.name : null, code: c.course_code, term: c.term?.name || '', favorite: !!c.is_favorite,

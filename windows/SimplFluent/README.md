@@ -491,6 +491,10 @@ public sealed class GradesScreen : Screen
   it so, for the `dashboard-overdue-none` pictures: the mock always has something late); with something late, the
   alert instead — a stronger red wash ringed in red (in dark a deeper red, so the card is redder without lifting it
   towards the red number, which reads on it at about 4:1) — and its number in red.
+- **Quiet colour in Silent mode (0.3.87; the web's 2.99.128, the Mac's 1.3.192).** Silent mode's screens are no longer
+  black and white (0.3.86's shader is gone): the engine draws the courses' own colours as a quiet hint of each
+  (`quietColors`) and every screen reads again in them, while what a colour means — late, missing, done, a grade, a
+  button, a link — and what a page holds keep their own.
 - **Silent mode across the app (0.3.86; the web's 2.99.127, the Mac's 1.3.192).** Once on, Silent mode stays on from
   screen to screen until it is left: the pane stays quiet (black, words alone) on every screen, and every window of
   Simpl's — the main one, a place's own, a popup, a tool's, the file preview — is laid out as it was but in black and

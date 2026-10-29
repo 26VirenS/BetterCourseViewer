@@ -3296,7 +3296,14 @@
     return { events: out, sent: new Set(Object.values(BCV.plan.all()).map((p) => p.ev).filter(Boolean)) };
   }
 
-  const CALLS = { calSync, feedState, feedOn, feedOff, feedSend, feedEvents, calLink, calShow, calUnlink, calRefresh, planSlots, planPut, planMove, planClear, planDay, planDetail, planEdit, planJoin, todoDismiss, todoRestore, todoCount, setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashSilent, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, setColor, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, appointments, reserveAppointment, cancelReservation, notifications, notifMark, search, searchLocal, searchWarm, searchRecent, appearance, whatsNew, whatsNewSeen, refresh,
+  /** (2.99.128) Silent mode in the apps: the courses' own colours go quiet (a hint of each) while it is on, as on the web
+   *  (store.courses, U.quiet); what a colour means — late, done, a grade, a button — keeps its own. */
+  async function quietColors({ on = false } = {}) {
+    BCV.quietColors = !!on;
+    return { on: BCV.quietColors };
+  }
+
+  const CALLS = { quietColors, calSync, feedState, feedOn, feedOff, feedSend, feedEvents, calLink, calShow, calUnlink, calRefresh, planSlots, planPut, planMove, planClear, planDay, planDetail, planEdit, planJoin, todoDismiss, todoRestore, todoCount, setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashSilent, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, setColor, todo, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, appointments, reserveAppointment, cancelReservation, notifications, notifMark, search, searchLocal, searchWarm, searchRecent, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, fileInfo, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage, messageUpload,
     toolLaunch, externalTools, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizAssignment, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback, neighbours };
   // (Mac 1.2) Grade needed: a course's score now (by the student's own weights where set, as the Grades screen) and each
