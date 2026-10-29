@@ -24,6 +24,8 @@ struct MainShell: View {
     /// (1.3.113) Appearance on: the toolbar's buttons rest, as for the tour.
     @ObservedObject private var appearanceMode = AppearanceMode.shared
     /// (1.3.190) Silent mode, up while the Dashboard is the screen showing: the sidebar goes black, in words alone.
+    /// (1.3.192) Silent mode is the whole app's: on, the sidebar stays quiet on every screen, and every window of Simpl's
+    /// is in black and white (SilentGrey); the Dashboard alone has its large Next and Then, and the dark window.
     @ObservedObject private var silent = SilentMode.shared
 
     var body: some View {
@@ -31,7 +33,7 @@ struct MainShell: View {
         let silentUp = silent.shown && engine.nav.current.place == .dashboard && engine.nav.current.path.isEmpty
         NavigationSplitView(columnVisibility: $columns) {
             Sidebar()
-                .environment(\.silentUp, silentUp)
+                .environment(\.silentUp, silent.shown) // (1.3.192: quiet on every screen while Silent mode is on)
                 .id(appearance.revision) // (1.3.1: a colour worn, the sidebar drawn again in it — never the whole split view)
                 .tourSpot(.sidebar)
                 .navigationSplitViewColumnWidth(min: 210, ideal: 270, max: 360)
@@ -55,6 +57,9 @@ struct MainShell: View {
         .background { SilentWindowLook(on: silentUp) }
         .onAppear { if silent.held != touring { silent.held = touring } }
         .onChange(of: touring) { _, now in withAnimation(Motion.gentle) { silent.held = now } }
+        // (1.3.192) every window of Simpl's in black and white while Silent mode is on
+        .onAppear { SilentGrey.follow(silent.shown) }
+        .onChange(of: silent.shown) { _, on in SilentGrey.follow(on) }
         .overlay { TourOverlay(columns: $columns) } // (1.2) the Mac tour (Shell/Tour.swift)
         .overlay { AppearanceOverlay(columns: $columns) } // (1.3.113) Appearance, from the ⋯ menu (Shell/AppearanceMode.swift)
         .overlay { WorkPreviewOverlay() } // (1.2.3) a piece of work's quick look, grown out of its row (Shell/WorkPreviewOverlay.swift)
@@ -710,6 +715,10 @@ struct AccountBar: View {
                 SettingsLink { Text("Settings…") }
                 // (1.3.113) the theme, the photos and the courses' colours, over the window itself
                 Button("Appearance…") { AppearanceMode.shared.begin(engine) }
+                // (1.3.192) Silent mode from any screen, and the way out of it off the Dashboard (the web's 2.99.127)
+                Button(SilentMode.shared.on ? "Exit Silent Mode" : "Silent Mode") {
+                    withAnimation(Motion.gentle) { SilentMode.shared.on.toggle() }
+                }
                 Button("What’s New") { engine.whatsNew = WhatsNewSheetItem(data: MacWhatsNew.all) }
                 Button("\(engine.lmsName) Profile") { engine.openWebScreen("/profile", title: "Profile") }
                 Divider()
