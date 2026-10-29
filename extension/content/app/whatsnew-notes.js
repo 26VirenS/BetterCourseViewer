@@ -28,6 +28,9 @@
     lock: 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.129', date: '2026-10-29', notes: [
+      { kind: 'improved', title: "This Week's Betas", body: 'Everything from the betas since 2.99.104, for everyone.', icon: P.sparkle },
+    ] },
     { version: '2.99.128', date: '2026-10-29', notes: [
       { kind: 'improved', title: 'Quiet Colour', body: 'Silent mode keeps colour where it means something.', icon: P.eye },
     ] },
