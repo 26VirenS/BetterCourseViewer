@@ -614,7 +614,9 @@ public sealed partial class CalendarScreen
     /// A plan's block dragged to another time: (0.3.69, the Mac's 1.3.176) it follows the pointer to the point, lifted over
     /// the days beside, the quarter hour and the day it would go to outlined under it and the time on it saying which;
     /// let go, it settles there, the plan is moved there and the week read again. Escape, or a drag back to where it was, puts it back. A click without a drag is the
-    /// block's own: its preview opens.
+    /// block's own: its preview opens. (0.3.90, the web's 2.99.114 and the Mac's 1.3.195) Held over To Do, it fades and To Do
+    /// is ringed with an Unplan tag; let go there, the plan (its group with it, as Delete Plan) is let go, its work back on To
+    /// Do unplanned.
     /// </summary>
     private void Draggable(Button b, WeekSlot s, string pid, DateTime day, int dayIndex, Grid column, List<Grid> columns, Run time, string clock)
     {
@@ -626,6 +628,7 @@ public sealed partial class CalendarScreen
         var days = 0;
         var minutes = 0;
         var grab = 0; // (0.3.66: how far into the block it was taken, in minutes — where the pointer is, for the plan it is over)
+        var toTodo = false; // (0.3.90: held over To Do — let go, it is unplanned)
         var name = AutomationProperties.GetName(b);
         AutomationProperties.SetHelpText(b, "Shows the plan; drag it to move it, or onto another plan to group them");
 
@@ -677,6 +680,10 @@ public sealed partial class CalendarScreen
             time.Text = clock;
             AutomationProperties.SetName(b, name);
             Ring(null);
+            toTodo = false;
+            UnplanMark(false);
+            b.BeginAnimation(UIElement.OpacityProperty, null);
+            b.Opacity = 1;
         }
 
         b.PreviewMouseLeftButtonDown += (_, e) =>
@@ -707,6 +714,22 @@ public sealed partial class CalendarScreen
             shift.BeginAnimation(TranslateTransform.YProperty, null);
             shift.X = Math.Clamp(dx, xLo, xHi);
             shift.Y = Math.Clamp(dy, -s.A / 60.0 * hourPx, (latest - s.A) / 60.0 * hourPx);
+            // (0.3.90) over To Do: faded, To Do ringed, nothing outlined on the week
+            var leaving = OverTodo(e);
+            if (leaving != toTodo)
+            {
+                toTodo = leaving;
+                UnplanMark(leaving);
+                b.Opacity = leaving ? 0.45 : 1;
+                if (leaving)
+                {
+                    Ring(null);
+                    NoGhost();
+                    time.Text = "Unplan";
+                    AutomationProperties.SetName(b, $"Unplan {s.Ev.Title}");
+                }
+            }
+            if (leaving) return;
             // (and the quarter hour and the day it would go to, from that)
             var at = Math.Clamp((int)Math.Round((s.A + shift.Y / hourPx * 60) / Snap) * Snap, 0, latest);
             var w = column.ActualWidth;
@@ -729,8 +752,17 @@ public sealed partial class CalendarScreen
             engaged = false;
             from = null;
             b.ReleaseMouseCapture();
-            // (0.3.66) let go over another plan: one block with it, its group's
             NoGhost();
+            if (toTodo) // (0.3.90) let go over To Do: no longer planned
+            {
+                toTodo = false;
+                UnplanMark(false);
+                Ring(null);
+                Lift(false);
+                _ = Unplan();
+                return;
+            }
+            // (0.3.66) let go over another plan: one block with it, its group's
             if (PlanAt(dayIndex + days, s.A + minutes + grab, pid) is { } target && CalendarKit.Text(target.Ev.PlanId) is { } onto)
             {
                 Ring(null);
@@ -766,12 +798,74 @@ public sealed partial class CalendarScreen
             engine.DataChanged();
         }
 
+        async Task Unplan()
+        {
+            Motion.To(b, UIElement.OpacityProperty, 0, Motion.Fast);
+            if (!await engine.Act("planClear", new { id = pid, group = true }))
+            {
+                Said($"Could not unplan {s.Ev.Title}", problem: true);
+                Back();
+                return;
+            }
+            Said($"Unplanned {s.Ev.Title}");
+            Read();
+            engine.DataChanged();
+        }
+
         async Task Join(string onto, string title)
         {
             if (!await engine.Act("planJoin", new { id = pid, onto, whole = true })) { Back(); return; }
             Said($"Grouped with {title}");
             Read();
             engine.DataChanged();
+        }
+    }
+
+    /// <summary>(0.3.90) The pointer over To Do beside (or over) the week.</summary>
+    private bool OverTodo(MouseEventArgs e)
+    {
+        if (!TodoOn || mode == "list" || !todoCard.IsVisible || todoCard.ActualWidth <= 0) return false;
+        var p = e.GetPosition(todoCard);
+        return p.X >= 0 && p.Y >= 0 && p.X <= todoCard.ActualWidth && p.Y <= todoCard.ActualHeight;
+    }
+
+    private UnplanRing? unplanRing;
+
+    /// <summary>(0.3.90) To Do ringed (or not) for a plan held over it.</summary>
+    private void UnplanMark(bool on)
+    {
+        if (on == (unplanRing != null) || AdornerLayer.GetAdornerLayer(todoCard) is not { } layer) return;
+        if (on)
+        {
+            unplanRing = new UnplanRing(todoCard);
+            layer.Add(unplanRing);
+        }
+        else
+        {
+            layer.Remove(unplanRing);
+            unplanRing = null;
+        }
+    }
+
+    /// <summary>(0.3.90, the web's 2.99.114) To Do with a plan's block held over it: tinted and ringed in the accent, and a
+    /// tag in the middle saying letting go there unplans it.</summary>
+    private sealed class UnplanRing : Adorner
+    {
+        public UnplanRing(UIElement on) : base(on) { IsHitTestVisible = false; }
+
+        protected override void OnRender(DrawingContext dc)
+        {
+            var accent = Appearance.Accent;
+            var size = AdornedElement.RenderSize;
+            var r = new Rect(1, 1, Math.Max(0, size.Width - 2), Math.Max(0, size.Height - 2));
+            dc.DrawRoundedRectangle(K.Brush(K.WithAlpha(accent, 0.08)), new Pen(K.Brush(accent), 2), r, 12, 12);
+            var words = new FormattedText("Unplan", CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+                new Typeface(K.TextFace, FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal), 12, Brushes.White,
+                VisualTreeHelper.GetDpi(this).PixelsPerDip);
+            var tag = new Rect(0, 0, words.Width + 20, words.Height + 8);
+            tag.Offset((size.Width - tag.Width) / 2, (size.Height - tag.Height) / 2);
+            dc.DrawRoundedRectangle(K.Brush(accent), null, tag, tag.Height / 2, tag.Height / 2);
+            dc.DrawText(words, new Point(tag.X + 10, tag.Y + 4));
         }
     }
 

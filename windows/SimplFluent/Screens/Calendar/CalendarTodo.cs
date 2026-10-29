@@ -696,6 +696,8 @@ public sealed partial class CalendarScreen
     /// where it would go.</summary>
     private void ShotTodoDrop(List<Grid> columns, List<DateTime> days)
     {
+        // (0.3.90: --open cal-unplan, To Do ringed as a plan held over it rings it)
+        if (Launch.Take("cal-unplan") != null) page.Dispatcher.BeginInvoke(() => UnplanMark(true), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
         var at = days.FindIndex(d => d.DayOfWeek == DayOfWeek.Wednesday);
         if (at < 0 || Launch.Take("cal-todo-drop") == null) return;
         page.Dispatcher.BeginInvoke(() => ShowDrop(columns[at], days[at], 13 * 60, placing: false), System.Windows.Threading.DispatcherPriority.Background);
