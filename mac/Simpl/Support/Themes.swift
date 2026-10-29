@@ -770,15 +770,19 @@ struct PlainPhotoWords: ViewModifier {
 /// its Ink off in the dark look they were light on it; with the column in the light look they are the light look's, dark.
 struct ColumnAppearance: NSViewRepresentable {
     let light: Bool
+    /// (1.3.190) Silent mode: the column drawn in the dark look (its list's selection, its words) over its black.
+    var dark = false
 
     func makeNSView(context: Context) -> Probe { Probe() }
     func updateNSView(_ view: Probe, context: Context) {
         view.light = light
+        view.dark = dark
         view.apply()
     }
 
     final class Probe: NSView {
         var light = false
+        var dark = false
         private var owned = false
 
         override func viewDidMoveToWindow() {
@@ -787,7 +791,7 @@ struct ColumnAppearance: NSViewRepresentable {
             // (SwiftUI puts the column under its split view after this one is in the window: asked again once it has)
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.window != nil else { return }
-                if !self.apply() && self.light { NSLog("ColumnAppearance: no split view above the sidebar") }
+                if !self.apply() && (self.light || self.dark) { NSLog("ColumnAppearance: no split view above the sidebar") }
             }
         }
         override func layout() {
@@ -802,7 +806,10 @@ struct ColumnAppearance: NSViewRepresentable {
             var view: NSView = self
             while let up = view.superview, !(up is NSSplitView) { view = up }
             guard view.superview is NSSplitView else { return false }
-            if light {
+            if dark {
+                if view.appearance?.name != .darkAqua { view.appearance = NSAppearance(named: .darkAqua) }
+                owned = true
+            } else if light {
                 if view.appearance?.name != .aqua { view.appearance = NSAppearance(named: .aqua) }
                 owned = true
             } else if owned {

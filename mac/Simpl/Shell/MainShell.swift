@@ -341,6 +341,7 @@ struct Sidebar: View {
     /// (1.3.190) Silent mode is up: words alone, in black, white and grey — no glyphs, no course colours, no photo, no
     /// picture of anyone — the rows where they were and pressed as before (the web's, 2.99.126).
     @Environment(\.silentUp) private var silent
+    @Environment(\.colorScheme) private var scheme
 
     /// A course's sections before its home has said which it has.
     static let defaultSections: [SectionLink] = [
@@ -402,7 +403,10 @@ struct Sidebar: View {
             AccountBar()
         }
         .plainPhotoWords(appearance.isPlain(.side) && !silent) // (1.3.164: its photo's Ink off — dark words, a white border round them)
-        .background { ColumnAppearance(light: appearance.isPlain(.side) && !silent) } // (and the list's own words, drawn natively, in the light look)
+        // (and the list's own words, drawn natively, in the light look; 1.3.190: in the dark look while Silent mode is up —
+        //  the window's own dark look never reached the sidebar's column)
+        .background { ColumnAppearance(light: appearance.isPlain(.side) && !silent, dark: silent) }
+        .environment(\.colorScheme, silent ? .dark : scheme)
         .background {
             // (1.3.1) the sidebar's photo, frosted, behind its rows; (1.3.190) black while Silent mode is up
             if silent { Color.black.ignoresSafeArea() } else { SidebarGround() }
