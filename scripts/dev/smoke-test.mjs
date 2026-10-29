@@ -2106,14 +2106,21 @@ try {
     const days = [...document.querySelectorAll('.bcv-week__day')];
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const col = days.find((d) => Number(d.dataset.day) > today.getTime()) || days.find((d) => Number(d.dataset.day) === today.getTime()) || days[days.length - 1];
-    document.querySelector('.bcv-week__scroll').scrollTop = 9 * 48; // (2.99.112: the whole day scrolls inside the card; 11 am in view)
+    // (the hour to drop it at: 11 am, unless a plan already on that day covers it — late in the day, the plan made
+    //  above lands tomorrow morning and, moved and pulled longer, runs past 11 — then the first hour clear of plans,
+    //  so it is planned there rather than grouped with that plan)
+    const top0 = col.getBoundingClientRect().top;
+    const taken = [...col.querySelectorAll('.bcv-wev.bcv-ev--plan')].map((e) => { const r = e.getBoundingClientRect(); const a = (r.top - top0) / 48 * 60; return [a, a + r.height / 48 * 60]; });
+    const hour = [11, 13, 14, 15, 16, 17, 9, 10, 12].find((h) => taken.every(([a, z]) => z <= h * 60 - 15 || a >= h * 60 + 75)) ?? 11;
+    document.querySelector('.bcv-week__scroll').scrollTop = (hour - 2) * 48; // (2.99.112: the whole day scrolls inside the card; the hour in view)
     const c = col.getBoundingClientRect();
-    return { id: r.dataset.item, title: r.querySelector('.bcv-tdrag__title').textContent, x: b.left + b.width / 2, y: b.top + b.height / 2, day: Number(col.dataset.day), cx: c.left + c.width / 2, ctop: c.top };
+    return { id: r.dataset.item, title: r.querySelector('.bcv-tdrag__title').textContent, x: b.left + b.width / 2, y: b.top + b.height / 2, day: Number(col.dataset.day), cx: c.left + c.width / 2, ctop: c.top, hour };
   });
   check(!!pick, `a piece of work in the week's To Do to drag: ${JSON.stringify(pick && { id: pick.id, title: pick.title })}`);
   if (pick) {
-    // (11 am: eleven hours under the day's top, scrolled out of view above, the block's top a little over the pointer)
-    const ty = pick.ctop + 10 + 11 * 48 + 2;
+    // (the hour: that many hours under the day's top, scrolled out of view above, the block's top a little over the pointer)
+    const ty = pick.ctop + 10 + pick.hour * 48 + 2;
+    const clock = (m) => `${Math.floor(m / 60) % 12 || 12}:${String(m % 60).padStart(2, '0')}${m < 720 ? 'a' : 'p'}`;
     const rowAt = await page.evaluate((id) => { const r = document.querySelector(`.bcv-cal__todo .bcv-tdrag[data-item="${CSS.escape(id)}"]`); const b = r.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; }, pick.id);
     await page.mouse.move(rowAt.x, rowAt.y);
     await page.mouse.down();
@@ -2134,11 +2141,12 @@ try {
     const dropAt = await page.evaluate(() => { const d = document.querySelector('.bcv-wev--drop'); return d ? { t: d.querySelector('.bcv-wev__time').textContent, top: Math.round(parseFloat(d.style.top)), over: !!document.querySelector('.bcv-tdrag.is-ghost.is-over') } : null; });
     await shot(page, '07d-calendar-week-todo-drag');
     await page.mouse.up();
-    const want = pick.day + 11 * 3600e3;
+    const want = pick.day + pick.hour * 3600e3;
     const dragged = await untilV(async () => { const p = (await prefPlans())[pick.id]; return p && Date.parse(p.at) === want ? p : null; });
     const blockNow = await untilV(() => page.$$eval('.bcv-wev.bcv-ev--plan', (els, t) => els.some((e) => e.textContent.includes(t)), pick.title));
     const rowSays = await untilV(() => page.$eval(`.bcv-cal__todo .bcv-tdrag[data-item="${pick.id}"] .bcv-tdrag__plan`, (e) => e.textContent).catch(() => null));
-    check(!!dropAt && /^11:00a – (11:30a|12:00p)$/.test(dropAt.t) && dropAt.top === 11 * 48 && dropAt.over && !!dragged && [30, 60].includes(dragged.mins) && dragged.title === pick.title && blockNow && /^Planned /.test(rowSays || ''),
+    const h0 = pick.hour * 60;
+    check(!!dropAt && [`${clock(h0)} – ${clock(h0 + 30)}`, `${clock(h0)} – ${clock(h0 + 60)}`].includes(dropAt.t) && dropAt.top === pick.hour * 48 && dropAt.over && !!dragged && [30, 60].includes(dragged.mins) && dragged.title === pick.title && blockNow && /^Planned /.test(rowSays || ''),
       `held over the hours a block says where it would go (${dropAt?.t}); let go, it is planned there, its block on the week, the row saying when: ${JSON.stringify({ at: dragged?.at, mins: dragged?.mins, rowSays })}`);
     await shot(page, '07e-calendar-week-todo-planned');
     // the To Do button folds the column away, and back
