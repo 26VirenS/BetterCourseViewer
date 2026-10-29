@@ -34,6 +34,8 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
     /// <summary>(0.3.74) The colour worn, cast faintly over the whole window under everything — the title bar, the pane,
     /// the page; the cards, see-through, take it with the ground (the Mac's Theme.page, the web's cast grounds).</summary>
     private readonly Border cast = new() { IsHitTestVisible = false, Focusable = false };
+    /// <summary>(0.3.84) Silent mode's black behind the title bar (AppShell.SilentLook).</summary>
+    private readonly Border silentBand = new() { IsHitTestVisible = false, Focusable = false, Background = Brushes.Black, Visibility = Visibility.Collapsed };
     private readonly TitleBar titleBar;
     private readonly System.Windows.Controls.Button back;
     private readonly System.Windows.Controls.Button refresh;
@@ -47,6 +49,14 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
 
     /// <summary>The account menu's Take the tour.</summary>
     public void StartTour() => tour?.Start();
+
+    /// <summary>(0.3.84) Silent mode up on the Dashboard: the title bar black, its buttons and Windows' own in grey (the
+    /// theme's words under them made Silent mode's, AppShell.Quiet); its own look again after.</summary>
+    public void SilentLook(bool on)
+    {
+        silentBand.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var e in new FrameworkElement[] { titleBar, back, refresh, menuButton, searchButton }) AppShell.Quiet(e, on);
+    }
 
     /// <summary>(0.3.31) The account menu's Appearance… (Shell/AppearanceMode.cs).</summary>
     public void StartAppearance() => appearanceMode?.Begin();
@@ -115,6 +125,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         Content = root;
         Grid.SetRowSpan(cast, 2);
         root.Children.Add(cast);
+        root.Children.Add(silentBand); // (row 0, under the title bar's buttons)
 
         // the title bar: Back and Refresh at its left (outside the drag area) — with the pane's button and Search while
         // the window is too narrow for the pane — then the app's icon and name, a Start over while the school's sign-in

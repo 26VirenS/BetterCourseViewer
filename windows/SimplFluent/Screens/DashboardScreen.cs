@@ -51,6 +51,8 @@ public sealed partial class DashboardScreen : Screen
         skyFresh = Watch(new Loader<DashSkylineData>());
         list = Watch(new Loader<DashListData>());
         activity = Watch(new Loader<DashActivityData>());
+        silentRead = Watch(new Loader<DashSilentData>()); // (0.3.84: Silent mode, DashboardSilent.cs)
+        SilentMode.Changed += OnSilent;
         sheet.Changed += PanelData;
         view = Launch.Get("dash-view") switch { "cards" => 0, "activity" => 2, "list" => 1, _ => (int)Prefs.Double("dashView", 1) };
         openKey = Launch.Get("sheet") is { Length: > 0 } k ? k : null;
@@ -61,11 +63,11 @@ public sealed partial class DashboardScreen : Screen
     private string[] ViewsHere => engine.OnBrightspace ? Views[..2] : Views;
     private int View => Math.Min(view, ViewsHere.Length - 1);
 
-    public override string Title => today.Data is { } d ? Greeting(d) : "Dashboard";
+    public override string Title => !Silent && today.Data is { } d ? Greeting(d) : "Dashboard";
 
     /// <summary>The date, and — while the counts are still the ones kept from last time — that they are being brought up
     /// to date (the Mac's "Updating…"): the numbers stay, dimmed, and the live ones take their places as they come.</summary>
-    public override string? Subtitle => today.Data?.DateLine is { } line ? (Updating ? $"{line} · Updating…" : Stale ? $"{line} · Couldn’t update" : line) : null;
+    public override string? Subtitle => Silent ? null : today.Data?.DateLine is { } line ? (Updating ? $"{line} · Updating…" : Stale ? $"{line} · Couldn’t update" : line) : null;
 
     /// <summary>The counts shown are the ones kept from last time: Today's answer not in yet, or the counts made on their
     /// own (Overdue, Graded) only as kept.</summary>
@@ -84,6 +86,7 @@ public sealed partial class DashboardScreen : Screen
     {
         get
         {
+            if (Silent) return null; // (0.3.84: Silent mode has no header)
             if (commands != null) return commands;
             selector = new SelectorBar(ViewsHere, View);
             selector.Changed += v =>
@@ -98,12 +101,16 @@ public sealed partial class DashboardScreen : Screen
             // (0.3.64: To Do is To Do & Calendar's — the task is added there, To Do showing, as the web's Dashboard has it)
             var add = K.Button("New task", () => { engine.Go(Place.Todo); engine.AskNewTask(); }, icon: SymbolRegular.Add24);
             add.ToolTip = "New task in To Do & Calendar (Ctrl+N)";
-            return commands = K.H(12, selector, add);
+            // (0.3.84) Silent mode: only what comes next, in large type on black
+            var silent = K.Button("Silent", () => SilentMode.Set(true), icon: SymbolRegular.WeatherMoon24);
+            silent.ToolTip = "Silent mode: only what comes next, in large type on black";
+            return commands = K.H(12, selector, silent, add);
         }
     }
 
     public override void Refresh()
     {
+        if (Silent) { RefreshSilent(); return; } // (0.3.84: only what Silent mode shows)
         today.Ensure(engine, "today");
         countsQuick.Ensure(engine, "todayCounts", new { kept = true });
         countsFresh.Ensure(engine, "todayCounts", new { kept = false });
@@ -133,7 +140,8 @@ public sealed partial class DashboardScreen : Screen
 
     protected override bool LayoutChanges(double before, double now) =>
         CounterLayout(before) != CounterLayout(now) || (before >= 900) != (now >= 900) || (before >= 760) != (now >= 760) || CardCols(before) != CardCols(now)
-        || Math.Abs(RailWidth(before) - RailWidth(now)) >= 24;
+        || Math.Abs(RailWidth(before) - RailWidth(now)) >= 24
+        || (Silent && Math.Abs(before - now) >= 40); // (0.3.84: Silent mode's type follows the page's width)
 
     /// <summary>The widest the view beside the rail grows: a row's title and its due time stay within a glance of each
     /// other on a 1080p screen (the rest of the page goes to the rail, then to room at the right).</summary>
@@ -147,6 +155,7 @@ public sealed partial class DashboardScreen : Screen
     {
         var d = today.Data;
         if (Title != lastTitle || Subtitle != lastSubtitle) { lastTitle = Title; lastSubtitle = Subtitle; HeaderChange(); }
+        if (Silent) return SilentPage(); // (0.3.84)
         if (d == null) return K.LoadState(today.Error, () => today.Reload(engine, "today"));
         var page = new Stack { Orientation = Orientation.Vertical, Spacing = 28 };
         builtWidth = Width;

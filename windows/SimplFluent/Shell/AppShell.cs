@@ -124,10 +124,7 @@ public sealed partial class AppShell : Grid, IDisposable
         // (the Mac's sidebar: the search at the top, the places and courses; at the foot Settings — Windows 11's place
         // for it — and who is signed in, whose menu holds Settings too, as the Mac's account bar does)
         searchBox.Margin = SearchAtHead;
-        footNav.Show(new[]
-        {
-            new NavEntry { Key = "settings", Title = "Settings", Icon = SymbolRegular.Settings24, Tint = Gray, Tip = "Settings (Ctrl+,)", Go = () => { if (narrow) ClosePane(); window.OpenSettings(); } },
-        }, null);
+        footNav.Show(FootEntries(), null);
         foot = new Border { BorderThickness = new Thickness(0, 1, 0, 0), Child = K.V(2, footNav, account), Padding = new Thickness(0, 6, 0, 6) };
         foot.SetResourceReference(Border.BorderBrushProperty, B.Divider);
         pane.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -293,6 +290,76 @@ public sealed partial class AppShell : Grid, IDisposable
         for (var i = 0; i < places.Count; i++) places[i].Tint = shades[i];
     }
 
+    /// <summary>The pane's foot: Settings (Windows 11's NavigationView keeps it there).</summary>
+    private NavEntry[] FootEntries() => new[]
+    {
+        new NavEntry { Key = "settings", Title = "Settings", Icon = SymbolRegular.Settings24, Tint = Gray, Tip = "Settings (Ctrl+,)", Go = () => { if (narrow) ClosePane(); window.OpenSettings(); } },
+    };
+
+    // ---- (0.3.84) Silent mode's look ----
+
+    /// <summary>The pane and the title bar in Silent mode's look, as the last Header drew them.</summary>
+    private bool silentLook;
+
+    /// <summary>
+    /// (0.3.84) Silent mode up on the Dashboard: the pane as the web's goes — black, words alone in white and grey, no
+    /// glyphs, chevrons, course colours, photo or picture of anyone, its search box away (Ctrl+F still searches) — and the
+    /// title bar black over it, its buttons in grey (MainWindow.SilentLook); its own look again after.
+    /// </summary>
+    private void SilentLook(bool on)
+    {
+        if (on == silentLook) return;
+        silentLook = on;
+        paneScene.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
+        paneTint.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
+        searchBox.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
+        Scenes.PlainWords(pane, Appearance.Plain("side") && !on);
+        Quiet(paneHolder, on);
+        PaneGround();
+        nav.Plain = on;
+        footNav.Plain = on;
+        footNav.Set(FootEntries(), null);
+        accountDrawn = null;
+        BuildPane(redraw: true);
+        if (!on) { sceneMasked = null; MaskScene(); }
+        window.SilentLook(on);
+        Log.Write($"silent mode: {(on ? "up" : "down")}");
+    }
+
+    /// <summary>The pane's ground: black in Silent mode; the flyout's while it is open over the page on a narrow window;
+    /// else none (the window's own shows through).</summary>
+    private void PaneGround()
+    {
+        if (silentLook) paneHolder.Background = Brushes.Black;
+        else if (narrow && paneOpen) paneHolder.Bg(B.Flyout);
+        else paneHolder.Background = null;
+    }
+
+    /// <summary>(0.3.84) The theme's words, lines and soft fills under <paramref name="e"/> in Silent mode's white and greys
+    /// (the web's: words at 58%, quiet words at 34%, lines at 12%, a row under the pointer at 7%) — or its own again.</summary>
+    internal static void Quiet(FrameworkElement e, bool on)
+    {
+        string[] keys = { B.Text, B.Text2, B.Text3, B.Divider, B.Subtle, B.Subtle3, B.Control, B.Control2, B.ControlStroke, B.CardStroke };
+        foreach (var k in keys) e.Resources.Remove(k);
+        if (!on) return;
+        static SolidColorBrush W(double a)
+        {
+            var b = new SolidColorBrush(Color.FromArgb((byte)Math.Round(a * 255), 255, 255, 255));
+            b.Freeze();
+            return b;
+        }
+        e.Resources[B.Text] = W(0.58);
+        e.Resources[B.Text2] = W(0.34);
+        e.Resources[B.Text3] = W(0.34);
+        e.Resources[B.Divider] = W(0.12);
+        e.Resources[B.Subtle] = W(0.07);
+        e.Resources[B.Subtle3] = W(0.05);
+        e.Resources[B.Control] = W(0.06);
+        e.Resources[B.Control2] = W(0.09);
+        e.Resources[B.ControlStroke] = W(0.12);
+        e.Resources[B.CardStroke] = W(0.12);
+    }
+
     /// <summary>Light, dark or the accent changed: what is drawn with colours of its own is drawn again.</summary>
     private void TintPane() =>
         paneTint.Background = Appearance.Tint("side") is { } t && !Appearance.Plain("side") ? K.Brush(K.WithAlpha(t, Appearance.Dark ? 0.2 : 0.14)) : null;
@@ -300,7 +367,7 @@ public sealed partial class AppShell : Grid, IDisposable
     public void Retheme()
     {
         paneScene.Content = Scenes.Backdrop("side");
-        Scenes.PlainWords(pane, Appearance.Plain("side"));
+        Scenes.PlainWords(pane, Appearance.Plain("side") && !silentLook);
         TintPane();
         sceneMasked = null;
         MaskScene();
@@ -565,8 +632,10 @@ public sealed partial class AppShell : Grid, IDisposable
         var me = engine.Snapshot?.Me;
         var name = me?.Name ?? "Signed in";
         var school = engine.Snapshot?.Site is { Length: > 0 } site ? site : engine.Host;
-        var avatar = K.Avatar(name, me?.Initials, me?.Avatar, 36);
+        // (0.3.84: Silent mode — no picture of anyone, the name in white, ⋯ in words)
+        FrameworkElement avatar = silentLook ? new Border { Width = 0 } : K.Avatar(name, me?.Initials, me?.Avatar, 36);
         var nameText = K.Text(name, Ty.BodyStrong);
+        if (silentLook) nameText.Foreground = Brushes.White;
         nameText.TextTrimming = TextTrimming.CharacterEllipsis;
         var words = K.V(0, nameText);
         var lines = new List<string>();
@@ -580,9 +649,9 @@ public sealed partial class AppShell : Grid, IDisposable
         }
         words.VerticalAlignment = VerticalAlignment.Center;
         // (the ⋯ that says the tile opens a menu: what the tour's last step lights, alone — where Report a bug is)
-        var more = new Border { Width = 28, Height = 28, Child = K.Icon(SymbolRegular.MoreHorizontal20, 16, B.Text2), VerticalAlignment = VerticalAlignment.Center };
+        var more = new Border { Width = 28, Height = 28, Child = silentLook ? K.Text("⋯", Ty.BodyStrong, B.Text) : K.Icon(SymbolRegular.MoreHorizontal20, 16, B.Text2), VerticalAlignment = VerticalAlignment.Center };
         more.Mark(TourSpot.AccountMenu);
-        var grid = K.Columns("auto, *, auto", avatar.Col(0), words.Margin(12, 0, 4, 0).Col(1), more.Col(2));
+        var grid = K.Columns("auto, *, auto", avatar.Col(0), words.Margin(silentLook ? 4 : 12, 0, 4, 0).Col(1), more.Col(2));
         Button? tile = null;
         tile = K.Subtle(grid, () => AccountMenu(tile!), new Thickness(10, 8, 10, 8), 6);
         tile.Margin = new Thickness(4, 0, 4, 0);
@@ -701,6 +770,11 @@ public sealed partial class AppShell : Grid, IDisposable
     private void Header()
     {
         if (current == null) return;
+        // (0.3.84) a page with no header of its own (the Dashboard's Silent mode): the header goes and the page is drawn
+        //  edge to edge — and, while it is the Dashboard's, the pane and the title bar take Silent mode's look
+        header.Visibility = current.Bare ? Visibility.Collapsed : Visibility.Visible;
+        Remount();
+        SilentLook(current is DashboardScreen { Silent: true } && engine.Nav.Current.Path.Count == 0);
         var loc = engine.Nav.Current;
         var crumbs = new List<(string Title, Action? Go)>();
         if (loc.Path.Count > 0)
@@ -859,6 +933,7 @@ public sealed partial class AppShell : Grid, IDisposable
             paneHolder.Width = double.NaN;
             paneHolder.Visibility = Visibility.Visible;
             paneHolder.Background = null;
+            PaneGround(); // (0.3.84: black in Silent mode)
             paneHolder.Effect = null;
             paneHolder.BorderThickness = new Thickness(0);
             Grid.SetColumn(page, 1);
@@ -880,6 +955,7 @@ public sealed partial class AppShell : Grid, IDisposable
         paneOpen = true;
         paneHolder.Visibility = Visibility.Visible;
         paneHolder.Bg(B.Flyout).Stroke(B.FlyoutStroke);
+        PaneGround(); // (0.3.84: black in Silent mode)
         paneHolder.BorderThickness = new Thickness(0, 1, 1, 0);
         paneHolder.CornerRadius = new CornerRadius(0, 8, 0, 0);
         paneHolder.Effect = K.Shadow(32, 0, 0.28);

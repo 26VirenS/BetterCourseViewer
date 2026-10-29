@@ -491,6 +491,18 @@ public sealed class GradesScreen : Screen
   it so, for the `dashboard-overdue-none` pictures: the mock always has something late); with something late, the
   alert instead — a stronger red wash ringed in red (in dark a deeper red, so the card is redder without lifting it
   towards the red number, which reads on it at about 4:1) — and its number in red.
+- **Silent mode (0.3.84; the web's of 2.99.125–126, the Mac's 1.3.190).** Silent, beside the view and New task, puts
+  the whole Dashboard away for what comes next alone (`Screens/DashboardSilent.cs`): black, "Next" and the next piece
+  of work in large type, how soon in words that count down within the day ("Due in 4 h 40 min", `SilentWords`, tested
+  in `SilentWordsTests`), its day, time and course, then "Then" and the four after it — from the engine's `dashSilent`.
+  A press on an item's words strikes it out (`complete`): a line drawn through them left to right (the strikethrough's
+  pen a gradient whose stops move) and the item dimmed, still listed while Silent stays up (kept here, whatever the next
+  read says); Open beside them, while the pointer or the keyboard is on the item, opens it. The page has no header
+  (`Screen.Bare`) and lays itself out edge to edge; the pane goes black, in words alone (`NavList.Plain`, the theme's
+  words made white and grey under it, `AppShell.Quiet`), its search box away, and the title bar black over it
+  (`MainWindow.SilentLook`). Kept on this PC (`SilentMode`, `dashSilent`); Exit Silent Mode at the top right brings the
+  Dashboard back. The tour and Appearance put it by while they are on. Checked live on its own: only `dashSilent`; its
+  words drawn again each half minute when they say something else. (The screenshot suite: `--dash-silent`.)
 - Colours are theme resources (`B.Text`, `B.Text2`, `B.Card`, `B.Accent` …), set with `.Fg()`, `.Bg()`, `.Stroke()`, so
   light, dark and the accent follow Settings. A course's own colour comes from the page (`K.Hex(row.Color)`). In the
   light theme `B.Text2` and `B.Text3` are solid greys (#5F5F5F, #707070; `Appearance.ReadableText`): Fluent's

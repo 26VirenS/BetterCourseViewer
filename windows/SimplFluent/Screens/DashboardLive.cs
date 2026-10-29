@@ -136,11 +136,18 @@ public sealed partial class DashboardScreen
     /// the last visit, which are not the school's.</summary>
     private void ChecksForView()
     {
+        // (0.3.84: Silent mode checks only what it shows)
+        var all = !Silent;
+        today.Checks = all;
+        countsFresh.Checks = all;
+        courses.Checks = all;
+        skyFresh.Checks = all;
         countsQuick.Checks = false;
         skyKept.Checks = false;
-        progress.Checks = View == 0;
-        list.Checks = View == 1;
-        activity.Checks = View == 2;
+        progress.Checks = all && View == 0;
+        list.Checks = all && View == 1;
+        activity.Checks = all && View == 2;
+        silentRead.Checks = !all;
     }
 
     /// <summary>
@@ -150,6 +157,12 @@ public sealed partial class DashboardScreen
     /// </summary>
     public override string LiveApplied(IReadOnlyList<ILiveRead> changed)
     {
+        // (0.3.84) Silent mode: built again for what it shows, nothing else
+        if (Silent)
+        {
+            if (changed.Contains(silentRead)) Render();
+            return string.Join(",", changed.Select(c => c.Call));
+        }
         var d = today.Data;
         if (d == null || root == null || shownParts.Count == 0)
         {

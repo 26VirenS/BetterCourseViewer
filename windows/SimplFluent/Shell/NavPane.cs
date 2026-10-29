@@ -68,7 +68,36 @@ public sealed class NavList : Grid
     private readonly TranslateTransform pillMove = new();
     private readonly ScaleTransform pillStretch = new(1, 1);
     private readonly Dictionary<string, Button> rows = new();
+    /// <summary>(0.3.84) Each row's name, for Silent mode to light the one chosen.</summary>
+    private readonly Dictionary<string, TextBlock> names = new();
     private string? selected;
+    private bool plain;
+
+    /// <summary>
+    /// (0.3.84) Silent mode's rows, as the web's sidebar draws them then: words alone — no symbols, squares, chevrons or
+    /// counts' pills, no course colours — in grey, the one chosen white on a faint wash (no accent pill), each name where
+    /// it was. Set, the rows are built again at the next Set or Show.
+    /// </summary>
+    public bool Plain
+    {
+        get => plain;
+        set
+        {
+            if (plain == value) return;
+            plain = value;
+            drawn = null;
+            if (plain) pill.Visibility = Visibility.Hidden;
+        }
+    }
+
+    private static readonly SolidColorBrush PlainName = Frozen(0.58), PlainChosen = Frozen(1), PlainQuiet = Frozen(0.34), PlainWash = Frozen(0.13);
+
+    private static SolidColorBrush Frozen(double a)
+    {
+        var b = new SolidColorBrush(Color.FromArgb((byte)Math.Round(a * 255), 255, 255, 255));
+        b.Freeze();
+        return b;
+    }
     private double? pillAt;
     /// <summary>What the rows built last draw (<see cref="Signature"/>).</summary>
     private string? drawn;
@@ -110,6 +139,7 @@ public sealed class NavList : Grid
         drawn = sign;
         items.Children.Clear();
         rows.Clear();
+        names.Clear();
         foreach (var e in entries) Add(e, 0);
         Select(chosen);
     }
@@ -146,6 +176,7 @@ public sealed class NavList : Grid
         {
             // (a heading for Narrator too: Courses, Groups, More from Canvas)
             var head = K.Text(e.Title, Ty.BodyStrong);
+            if (plain) head.Foreground = PlainQuiet;
             System.Windows.Automation.AutomationProperties.SetHeadingLevel(head, System.Windows.Automation.AutomationHeadingLevel.Level2);
             items.Children.Add(head.Margin(16, 14, 16, 4));
             return;
@@ -163,7 +194,8 @@ public sealed class NavList : Grid
     private Button Row(NavEntry e, int depth)
     {
         FrameworkElement glyph;
-        if (e.Square is { } sq)
+        if (plain) glyph = new Border { Width = 16 }; // (0.3.84: Silent mode — words alone, each where it was)
+        else if (e.Square is { } sq)
         {
             // (its letter white only where white reads on the course's colour, else near-black: the course cards' rule)
             FrameworkElement inside = e.Letter != null
@@ -177,9 +209,17 @@ public sealed class NavList : Grid
         else if (e.Ink != null) glyph = new Border { Width = 16 }; // (a course: its colour in its name, no glyph)
         else glyph = K.Icon(e.Icon, 16, e.Tint, filled: true);
         var title = K.Text(e.Title, Ty.Body);
-        if (e.Ink is { } ink) title.Foreground = K.Brush(ink);
+        if (plain) title.Foreground = PlainName;
+        else if (e.Ink is { } ink) title.Foreground = K.Brush(ink);
+        names[e.Key] = title;
         var grid = K.Columns("auto, *, auto, auto", glyph.Col(0), title.Margin(14, 0, 8, 0).Col(1));
-        if (e.Badge > 0)
+        if (e.Badge > 0 && plain)
+        {
+            // (0.3.84: the count in grey words, no pill)
+            var count = new TextBlock { Text = e.Badge > 99 ? "99+" : e.Badge.ToString(), FontSize = 12, Foreground = PlainQuiet, VerticalAlignment = VerticalAlignment.Center, ToolTip = e.BadgeLabel };
+            grid.Children.Add(count.Col(2));
+        }
+        else if (e.Badge > 0)
         {
             var badge = new Border
             {
@@ -191,8 +231,8 @@ public sealed class NavList : Grid
             badge.ToolTip = e.BadgeLabel;
             grid.Children.Add(badge.Col(2));
         }
-        if (e.OwnWindow) grid.Children.Add(Screens.CourseKit.OwnWindowMark(12, B.Text3).Col(2));
-        if (e.Toggle != null)
+        if (e.OwnWindow && !plain) grid.Children.Add(Screens.CourseKit.OwnWindowMark(12, B.Text3).Col(2));
+        if (e.Toggle != null && !plain)
         {
             var chev = K.Icon(e.Expanded ? SymbolRegular.ChevronUp20 : SymbolRegular.ChevronDown20, 12, B.Text2);
             var t = K.Subtle(chev, () => e.Toggle(!e.Expanded), new Thickness(6), 4);
@@ -252,11 +292,18 @@ public sealed class NavList : Grid
     public void Select(string? key)
     {
         if (selected != null && rows.TryGetValue(selected, out var old)) old.Background = Brushes.Transparent;
+        if (plain && selected != null && names.TryGetValue(selected, out var oldName)) oldName.Foreground = PlainName;
         if (key != null && !rows.ContainsKey(key) && key.IndexOf(':') is > 0 and var colon && rows.ContainsKey(key[..colon])) key = key[..colon];
         selected = key;
         if (key != null && rows.TryGetValue(key, out var row))
         {
-            row.SetResourceReference(Control.BackgroundProperty, B.Subtle);
+            if (plain)
+            {
+                // (0.3.84: Silent mode — the one chosen white on a faint wash)
+                row.Background = PlainWash;
+                if (names.TryGetValue(key, out var name)) name.Foreground = PlainChosen;
+            }
+            else row.SetResourceReference(Control.BackgroundProperty, B.Subtle);
             if (key != shownKey)
             {
                 // (0.3.26) a course chosen — its home, or a section of another course than before — has its row scrolled
@@ -296,7 +343,7 @@ public sealed class NavList : Grid
 
     private void PlacePill(bool animate)
     {
-        if (selected == null || !rows.TryGetValue(selected, out var row) || !row.IsVisible)
+        if (plain || selected == null || !rows.TryGetValue(selected, out var row) || !row.IsVisible)
         {
             pill.Visibility = Visibility.Hidden;
             pillAt = null;

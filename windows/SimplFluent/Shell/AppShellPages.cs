@@ -182,6 +182,15 @@ public sealed partial class AppShell
         return leaf;
     }
 
+    /// <summary>(0.3.84) The page showing mounted again where it now scrolls otherwise (the Dashboard's Silent mode, in and
+    /// out).</summary>
+    private void Remount()
+    {
+        if (current == null || !leaves.TryGetValue(current, out var leaf)) return;
+        var scrolled = leaf.Scroller != null && ReferenceEquals(leaf.Scroller.Content, current.View);
+        if (scrolled != current.Scrolls) Mount(current);
+    }
+
     private static void Detach(FrameworkElement e)
     {
         switch (e.Parent)
@@ -199,7 +208,7 @@ public sealed partial class AppShell
     {
         if (current is { Scrolls: true, MaxContentWidth: { } mw }) current.View.Width = Math.Min(mw, ContentWidth);
         current?.SetWidth(ContentWidth, WindowActualWidth);
-        if (current != null && leaves.TryGetValue(current, out var leaf) && leaf.Scroller != null)
+        if (current is { Scrolls: true } && leaves.TryGetValue(current, out var leaf) && leaf.Scroller != null)
         {
             leaf.Scroller.Padding = SidePadding;
             current.View.Margin = new Thickness(0, 0, 0, Foot);

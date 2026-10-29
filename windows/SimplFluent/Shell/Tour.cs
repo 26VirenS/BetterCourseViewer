@@ -222,6 +222,7 @@ public sealed class TourOverlay : Grid
         WorkPreview.Dismiss();
         // (the popups floating over the window — windows of their own, above its veil — stepped aside until it is over)
         foreach (var p in FloatPopup.Over(window)) p.Hide();
+        SilentMode.Hold(true); // (0.3.84: the tour shows the whole Dashboard; Silent mode back after)
         // (from the start, on the Dashboard; one begun part-way, as the screenshot suite does, stays where it is opened)
         if (at == 0 && (engine.Nav.Current.Place != Place.Dashboard || engine.Nav.Current.Path.Count > 0)) engine.Go(Place.Dashboard);
         steps = Steps();
@@ -260,6 +261,7 @@ public sealed class TourOverlay : Grid
     {
         index = null;
         timer.Stop();
+        SilentMode.Hold(false);
         Prefs.Set("tour:done", true);
         Motion.FadeOut(this, () => Visibility = Visibility.Collapsed, Motion.Normal);
         FloatPopup.ShowAgain(window);

@@ -165,6 +165,7 @@ public sealed class AppearanceOverlay : Grid
     public void Begin()
     {
         if (On) return;
+        SilentMode.Hold(true); // (0.3.84: Appearance shows the whole Dashboard; Silent mode back after)
         if (engine.Nav.Current.Place != Place.Dashboard || engine.Nav.Current.Path.Count > 0) engine.Go(Place.Dashboard);
         foreach (var p in FloatPopup.Over(window)) p.Hide(); // (the popups floating over the window step aside)
         On = true;
@@ -195,6 +196,7 @@ public sealed class AppearanceOverlay : Grid
         if (!On) return;
         EndEdit(quiet: true);
         On = false;
+        SilentMode.Hold(false);
         timer.Stop();
         Visibility = Visibility.Collapsed;
         badges.Children.Clear();

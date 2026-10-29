@@ -56,6 +56,9 @@ public abstract class Screen
     /// <summary>The page scrolls as one (most do); a screen with its own scrolling parts says false.</summary>
     public virtual bool Scrolls => true;
 
+    /// <summary>(0.3.84) The page has no header of its own and is drawn edge to edge (the Dashboard's Silent mode).</summary>
+    public virtual bool Bare => false;
+
     /// <summary>The widest the content is laid out (a reading width), or null for the whole page.</summary>
     public virtual double? MaxContentWidth => null;
 
