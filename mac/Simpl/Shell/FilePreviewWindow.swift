@@ -170,7 +170,7 @@ private struct PreviewActions: View {
                 Button { download() } label: {
                     Label("Download", systemImage: "arrow.down.circle")
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(PreviewDownloadStyle())
                 .keyboardShortcut("s", modifiers: .command)
                 .help("Save it to your Downloads folder (⌘S)")
             }
@@ -178,6 +178,20 @@ private struct PreviewActions: View {
         .labelStyle(.titleAndIcon)
         .fixedSize()
         .padding(.horizontal, 2)
+    }
+}
+
+/// Download, the window's one blue button. Its fill is its own: in the toolbar's glass, `.borderedProminent` is drawn
+/// without one, its white words on white.
+private struct PreviewDownloadStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(Color.accentColor.opacity(configuration.isPressed ? 0.75 : 1)))
+            .contentShape(Capsule())
     }
 }
 
