@@ -98,7 +98,7 @@ its phases — must finish), checking the same. The installer's and each Simpl's
 Simpl keeps itself up to date as the Mac app does (`mac/Simpl/Support/Updater.swift`), in `Support/Updates.cs` and the
 window's side of it, `Shell/UpdateWatch.cs`:
 
-- **When it looks**: at launch when the last look is over an hour old, then every hour (looked at every five minutes,
+- **When it looks**: at launch when the last look is over an hour old, then every hour (looked at every half minute,
   whenever Simpl comes to the front and a quarter of a minute after the PC wakes, so a PC asleep does not count its
   hours) — one request for GitHub's releases of
   this repository (the first 100 it lists, compressed: the Mac's share the list; 0.3.0 and earlier read 40), the
@@ -106,21 +106,25 @@ window's side of it, `Shell/UpdateWatch.cs`:
   by run number (`Support/UpdatesChoice.cs`: the newest newer than this copy that it may take — a beta only with Get
   beta updates on, Betas below). **Check for updates automatically** (on) turns it off. A development run (the mock,
   a demo, a picture) never looks.
-- **The five-minute look** (0.3.22, `Updates.LookForCritical`): between the hourly looks, every five minutes while Simpl
-  runs (one timer for both; at launch when the hourly look is not due, as Simpl comes to the front, and on waking when
-  the last look is five minutes old) Simpl reads the site's small Critical Update feed,
+- **The half-minute look** (0.3.22, `Updates.LookForNew`; every half minute and for any newer version since 0.3.89 —
+  every minute, and for a Critical Update alone, before): between the hourly looks, every half minute while Simpl runs
+  (every five minutes on a metered connection; one timer for both; at launch when the hourly look is not due, as Simpl
+  comes to the front, and on waking when the last look is half a minute old) Simpl reads the site's small update feed,
   `https://simplcourses.com/app/windows-latest.json` (`scripts/publish-site.sh` on the development branch writes it at
   every run of the Site workflow — a release published, edited or deleted, and every hour: the newest run, a beta's too,
   and the newest Critical Update's of the usual releases, `critical`, and of all, `criticalBeta`). It is a file on the
   site, not GitHub's API, because every API request counts against the 60 an hour GitHub allows a network that is not
   signed in — a 304 to an ETag too (only a signed-in request is spared) — and a school's network is shared by many
-  copies: twelve looks an hour each would use it up and hold every copy's updates back. GitHub is still asked once an
-  hour (with the last list's ETag, `If-None-Match`, which saves the download but not the count). The look is silent:
-  nothing is shown, logged or changed unless the feed names a Critical Update newer than this copy that it may take (a
-  beta's only with Get beta updates on; `update: a Critical Update (v132) found in the five-minute look`); then the
-  versions are read from GitHub as Check for updates reads them and it goes in as below (one run handed on once, unless
-  GitHub could not be reached). A newer version that is not one waits for the hourly look, and so does everything while
-  the feed cannot be read (none yet, no network). It is skipped while a look, a download or an install is under way,
+  copies: a look every half minute each would use it up and hold every copy's updates back. The feed is asked with its
+  last ETag (`If-None-Match`), so a feed unchanged comes back empty as 304. GitHub is asked once an hour (with the last
+  list's ETag, which saves the download but not the count), and when the feed names a new version. The look is silent:
+  nothing is shown, logged or changed unless the feed names a version newer than this copy that it may take (`newest`,
+  and with Get beta updates on `newestBeta`; or a Critical Update; `update: v132 found in the half-minute look`, `update:
+  a Critical Update (v132) found in the half-minute look`) — not the version already found, nor one at or below the
+  version an earlier one was put back from (Earlier versions, below) unless it is a Critical Update; then the versions
+  are read from GitHub as Check for updates reads them and it goes in as below (one run handed on once, unless GitHub
+  could not be reached), so a new version is in within the minute of the site naming it. Everything waits for the
+  hourly look while the feed cannot be read (none yet, no network). It is skipped while a look, a download or an install is under way,
   once a Critical Update is found, and with Check for updates automatically off. GitHub refusing (403, 429) holds the
   automatic looks back as long as it says (`Retry-After`, or the limit's reset), else 10, 20, 40 then 60 minutes
   (`update: GitHub answered 403; the automatic looks wait 10 minutes`); Check for updates pressed still asks.
@@ -155,7 +159,7 @@ window's side of it, `Shell/UpdateWatch.cs`:
   no question is asked, and the notice takes no clicks.
 - **A Critical Update**: a release whose notes carry `<!-- simpl-critical -->` (the workflow's Run workflow ▸ critical
   adds it, with a line saying so, as `scripts/release-mac-native.sh` does for the Mac). Every installed copy older than
-  it finds it within five minutes (the five-minute look, above), downloads the newest and puts it in whatever the pause, an earlier version put back or a metered connection say,
+  it finds it within the minute (the half-minute look, above), downloads the newest and puts it in whatever the pause, an earlier version put back or a metered connection say,
   and a failed download is tried again every ten minutes. Unlike the Mac's, it still waits for what is open — a quiz,
   a hand-in, a dialog — though only five seconds for the student's own typing; its notice stays while it waits
   ("Critical Update v132 installs when you close the quiz."). Turning Check for updates automatically off stops every

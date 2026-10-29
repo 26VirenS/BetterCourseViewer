@@ -208,5 +208,12 @@ public class UpdatesTests
         // (only a usual Critical Update: a beta copy takes it too)
         using var usual = JsonDocument.Parse("""{ "critical": 128, "criticalBeta": 128 }""");
         Assert.Equal(128, Updates.CriticalRun(usual.RootElement, betas: true));
+        // (0.3.89: the newest of any kind the half-minute look hands on — a usual copy the newest usual release, a beta
+        //  copy the newest of all; none named, or no feed, none)
+        Assert.Equal(129, Updates.NewestRun(both.RootElement, betas: false));
+        Assert.Equal(130, Updates.NewestRun(both.RootElement, betas: true));
+        Assert.Equal(129, Updates.NewestRun(bare.RootElement, betas: true));
+        Assert.Equal(0, Updates.NewestRun(usual.RootElement, betas: true));
+        Assert.Equal(0, Updates.NewestRun(odd.RootElement, betas: false));
     }
 }

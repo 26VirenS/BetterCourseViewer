@@ -19,8 +19,8 @@ namespace Simpl.Support;
 /// hour old, and every hour after (Check for updates automatically, on unless turned off), it reads the versions
 /// published — GitHub's releases of this repository, the Windows ones (Support/UpdatesChoice.cs: a beta only with Get
 /// beta updates on) — and a newer one is offered in Settings ▸ Updates, with the versions published before and whether
-/// betas are wanted. In between, every five minutes, it looks quietly for a Critical Update alone
-/// (<see cref="LookForCritical"/>). A copy Simpl-Setup.exe installed always installs its updates itself (0.3.7: Install updates
+/// betas are wanted. In between, every half minute (0.3.89), it looks quietly at the site's small feed for a newer
+/// version (<see cref="LookForNew"/>), and reads the versions at once when it names one. A copy Simpl-Setup.exe installed always installs its updates itself (0.3.7: Install updates
 /// automatically is no longer a setting): it downloads the new version's installer by itself (picked up where it
 /// stopped, tried again a while later when it fails; checked against the size and SHA-256 published, and — when this
 /// copy is signed — signed by the same publisher) and puts it in at once, unless
@@ -117,7 +117,7 @@ public static partial class Updates
     public static bool HeldForMetered { get; private set; }
     private static string? downloaded;
 
-    /// <summary>Check for updates automatically: at launch and every hour, and for a Critical Update every five minutes
+    /// <summary>Check for updates automatically: at launch and every hour, and for a newer version every half minute
     /// (Settings ▸ Updates; on unless turned off).</summary>
     public static bool Automatic { get => Prefs.Bool("updates:auto", true); set { Prefs.Set("updates:auto", value); Changed?.Invoke(); if (value) CheckIfDue(); } }
     /// <summary>
@@ -230,10 +230,11 @@ public static partial class Updates
     // ---- the schedule ----
 
     private const double Hour = 60;
-    /// <summary>How often Simpl looks for a Critical Update between the hourly looks (0.3.22), in minutes.</summary>
-    private const double CriticalEvery = 1;
-    /// <summary>(0.3.27) The critical look on a metered connection: every five minutes, as before.</summary>
-    private const double CriticalEveryMetered = 5;
+    /// <summary>How often Simpl looks at the site's feed between the hourly looks, in minutes (0.3.89: every half minute,
+    /// for any newer version; a minute before, for a Critical Update alone).</summary>
+    private const double LookEvery = 0.5;
+    /// <summary>(0.3.27) The look on a metered connection: every five minutes.</summary>
+    private const double LookEveryMetered = 5;
     private static bool started;
     private static DispatcherTimer? ticker, waiter;
     /// <summary>When a download that failed by itself is tried again, and how many have failed in a row.</summary>
@@ -243,9 +244,9 @@ public static partial class Updates
 
     /// <summary>
     /// From the window's first showing: the versions read now when the last look is over an hour old (or never made, or
-    /// the clock went back), and looked at again every five minutes (and whenever Simpl comes to the front, or the PC
-    /// wakes) for the hour being up — a PC asleep does not count its hours — and for a Critical Update in between
-    /// (<see cref="LookForCritical"/>). An update waiting to go in is looked at every couple of seconds for what holds it
+    /// the clock went back), and looked at again every half minute (and whenever Simpl comes to the front, or the PC
+    /// wakes) for the hour being up — a PC asleep does not count its hours — and for a newer version in between
+    /// (<see cref="LookForNew"/>). An update waiting to go in is looked at every couple of seconds for what holds it
     /// back (much of it is only seen by looking), and as Simpl leaves the front.
     /// </summary>
     public static void Start()
@@ -256,16 +257,16 @@ public static partial class Updates
         // not an update played through, whose pictures are taken sooner)
         if (!Testing) lastInput = Environment.TickCount64;
         InputManager.Current.PreProcessInput += OnInput;
-        // (the one timer for the looks: every minute, as the critical look's)
-        ticker = new DispatcherTimer { Interval = TimeSpan.FromMinutes(CriticalEvery) };
+        // (the one timer for the looks: every half minute, as the feed's look)
+        ticker = new DispatcherTimer { Interval = TimeSpan.FromMinutes(LookEvery) };
         ticker.Tick += (_, _) => Tick();
         ticker.Start();
         waiter = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
         waiter.Tick += (_, _) => Proceed();
-        app.Activated += (_, _) => { CheckIfDue(); LookForCritical(); };
+        app.Activated += (_, _) => { CheckIfDue(); LookForNew(); };
         app.Deactivated += (_, _) => Proceed();
         // (the PC woken from sleep or hibernation: looked at once the network is back, a quarter of a minute on, when the
-        //  last look is five minutes old — the ticker's own tick may be up to five minutes off)
+        //  last look is half a minute old — the ticker's own tick may be up to half a minute off)
         try { Microsoft.Win32.SystemEvents.PowerModeChanged += OnPower; }
         catch (Exception e) { Log.Write("update: waking from sleep is not watched: " + e.Message); }
         Settle();
@@ -277,8 +278,8 @@ public static partial class Updates
             return;
         }
         CheckIfDue();
-        // (the hourly look not due: a look for a Critical Update at once, then every five minutes)
-        LookForCritical();
+        // (the hourly look not due: a look at the feed at once, then every half minute)
+        LookForNew();
     }
 
     /// <summary>
@@ -307,7 +308,7 @@ public static partial class Updates
             _ = Download(asked: false);
         }
         CheckIfDue();
-        LookForCritical();
+        LookForNew();
         Proceed();
     }
 
@@ -315,7 +316,7 @@ public static partial class Updates
     private static void OnPower(object sender, Microsoft.Win32.PowerModeChangedEventArgs e)
     {
         if (e.Mode != Microsoft.Win32.PowerModes.Resume) return;
-        _ = Task.Delay(TimeSpan.FromSeconds(15)).ContinueWith(_ => Application.Current?.Dispatcher.BeginInvoke(() => { CheckIfDue(); LookForCritical(); }));
+        _ = Task.Delay(TimeSpan.FromSeconds(15)).ContinueWith(_ => Application.Current?.Dispatcher.BeginInvoke(() => { CheckIfDue(); LookForNew(); }));
     }
 
     /// <summary>The versions read when the last look is an hour old (or was never made, or the clock went back) — not
@@ -336,40 +337,41 @@ public static partial class Updates
     /// <summary>
     /// The site's Critical Update feed (scripts/publish-site.sh, rewritten at every release published or edited and every
     /// hour): the newest Windows run, a beta's too, and the newest Critical Update's of each (<see cref="CriticalRun"/>).
-    /// A file on simplcourses.com, as the Mac's feeds are, so the five-minute look never counts against the sixty
+    /// A file on simplcourses.com, as the Mac's feeds are, so the half-minute look never counts against the sixty
     /// requests an hour GitHub's API allows a network without signing in — a school's, shared by many copies — which
     /// an ETag does not spare: GitHub counts a 304 too unless the request is signed in.
     /// </summary>
     private const string CriticalFeed = "https://simplcourses.com/app/windows-latest.json";
 
-    /// <summary>When the five-minute look, or GitHub's list, was last asked, answered or not (this run's; null before the
+    /// <summary>When the half-minute look, or GitHub's list, was last asked, answered or not (this run's; null before the
     /// first).</summary>
     private static DateTime? lastLook;
     private static bool looking;
     /// <summary>(0.3.27) The feed as last read, and the site's tag for it (If-None-Match).</summary>
     private static string? feedTag, feedBody;
-    /// <summary>The Critical Update the look last handed to Check for updates: not handed again at every look should
-    /// GitHub's list not say so (the feed a step ahead of it, or behind), till GitHub could not be asked.</summary>
+    /// <summary>The version the look last handed to Check for updates: not handed again at every look should GitHub's
+    /// list not say so (the feed a step ahead of it, or behind), till GitHub could not be asked.</summary>
     private static int lookedFor;
 
     /// <summary>
-    /// The five-minute look (0.3.22): between the hourly looks, the site's small feed read for a Critical Update alone
-    /// (<see cref="CriticalFeed"/>), so one reaches every copy within minutes rather than within the hour, while GitHub
-    /// is still asked only once an hour. Silent: nothing is shown, logged or changed unless the feed names a Critical
-    /// Update newer than this copy that it may take (a beta's only with Get beta updates on); then the versions are read
-    /// as Check for updates reads them, and the Critical Update goes in as ever. A version that is not one waits for the
-    /// hourly look, and so does everything while the feed cannot be read (none yet, no network). Not while a look, a
-    /// download or an install is under way, nor once a Critical Update is found (it is on its way in), nor with Check
-    /// for updates automatically off (the student asked Simpl not to look), nor while GitHub has asked Simpl to wait
-    /// (the list it would need could not be read); and not within five minutes of the last look (half a minute's slack,
-    /// so the ticker's own tick is never just short).
+    /// The half-minute look (0.3.22, every half minute since 0.3.89): between the hourly looks, the site's small feed
+    /// read (<see cref="CriticalFeed"/>), so a new version reaches every copy within the minute rather than within the
+    /// hour, while GitHub is asked only when the feed names one. Silent: nothing is shown, logged or changed unless the
+    /// feed names a version newer than this copy that it may take (a beta's only with Get beta updates on; 0.3.88 and
+    /// earlier, a Critical Update alone), not the one already found, nor one at or below the version an earlier one was
+    /// put back from; then the versions are read as Check for updates reads them, and it goes in as ever. Everything
+    /// waits for the hourly look while the feed cannot be read (none yet, no network). Not while a look, a download or
+    /// an install is under way, nor once a Critical Update is found (it is on its way in), nor with Check for updates
+    /// automatically off (the student asked Simpl not to look), nor while GitHub has asked Simpl to wait (the list it
+    /// would need could not be read); and not within a look's while of the last look (a quarter of it in slack, so the
+    /// ticker's own tick is never just short).
     /// </summary>
-    public static void LookForCritical()
+    public static void LookForNew()
     {
         if (!started || Testing || !Automatic || Waited || looking || checking || restarting) return;
         if (State is Mode.Downloading or Mode.Installing || (Critical && Found != null)) return;
-        var every = Metered ? CriticalEveryMetered : CriticalEvery;
-        if (lastLook is { } last && (DateTime.UtcNow - last).TotalMinutes is var since && since >= 0 && since < every - 0.25) return;
+        var every = Metered ? LookEveryMetered : LookEvery;
+        if (lastLook is { } last && (DateTime.UtcNow - last).TotalMinutes is var since && since >= 0 && since < every - Math.Min(0.25, every / 4)) return;
         _ = Look();
     }
 
@@ -383,7 +385,7 @@ public static partial class Updates
             req.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
             // (0.3.27: asked only if it changed — the site answers 304, nothing sent, all the minutes it has not)
             if (feedTag != null) req.Headers.TryAddWithoutValidation("If-None-Match", feedTag);
-            // (when it was asked, answered or not: no network is not asked again for five minutes)
+            // (when it was asked, answered or not: no network is not asked again for half a minute)
             lastLook = DateTime.UtcNow;
             using var cut = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             using var res = await Http.SendAsync(req, cut.Token);
@@ -398,10 +400,14 @@ public static partial class Updates
                 feedTag = res.Headers.ETag?.ToString();
             }
             using var doc = JsonDocument.Parse(body);
-            var run = CriticalRun(doc.RootElement, Beta);
-            if (run <= CurrentRun || run == lookedFor || restarting || checking) return;
+            var critical = CriticalRun(doc.RootElement, Beta);
+            // (0.3.89: any version newer than this copy, not a Critical Update alone — but not the one already found,
+            //  nor, a Critical Update aside, one an earlier version put back stays below)
+            var run = Math.Max(critical, NewestRun(doc.RootElement, Beta));
+            if (run <= CurrentRun || run == lookedFor || Found?.Run >= run || restarting || checking) return;
+            if (run != critical && StayingFrom is { } back && run <= back) return;
             lookedFor = run;
-            Log.Write($"update: a Critical Update (v{run:000}) found in the five-minute look");
+            Log.Write(run == critical ? $"update: a Critical Update (v{run:000}) found in the half-minute look" : $"update: v{run:000} found in the half-minute look");
             looking = false;
             // (the versions read as Check for updates reads them, and on from there)
             var asked = answeredAt;
@@ -509,7 +515,7 @@ public static partial class Updates
     /// The Windows versions as GitHub lists them now, and nothing else changed: asked with the ETag of the list read
     /// last (If-None-Match), so a list unchanged since comes back empty as 304 — the one read then. A 304 still counts
     /// against the sixty requests an hour GitHub allows a network without signing in (only a signed-in one is spared),
-    /// which is why the five-minute look reads the site's feed instead (<see cref="CriticalFeed"/>). GitHub refusing (<see cref="Refused"/>) is thrown as any other answer is.
+    /// which is why the half-minute look reads the site's feed instead (<see cref="CriticalFeed"/>). GitHub refusing (<see cref="Refused"/>) is thrown as any other answer is.
     /// </summary>
     private static async Task<List<Release>> Read()
     {
@@ -517,7 +523,7 @@ public static partial class Updates
         req.Headers.TryAddWithoutValidation("User-Agent", "Simpl-for-Windows");
         req.Headers.TryAddWithoutValidation("Accept", "application/vnd.github+json");
         if (lastRead is { } had) req.Headers.TryAddWithoutValidation("If-None-Match", had.Tag);
-        // (when it was asked, answered or not: no network is not asked again for five minutes)
+        // (when it was asked, answered or not: no network is not asked again for half a minute)
         lastLook = DateTime.UtcNow;
         using var res = await Http.SendAsync(req);
         if (res.StatusCode == HttpStatusCode.NotModified && lastRead is { } same) { Answered(); return same.List; }

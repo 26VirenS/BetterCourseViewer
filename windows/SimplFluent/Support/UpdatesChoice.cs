@@ -91,16 +91,23 @@ public static partial class Updates
 
     /// <summary>
     /// The Critical Update the site's feed (/app/windows-latest.json, written by scripts/publish-site.sh; read by the
-    /// five-minute look) names for a copy: the newest of the usual releases' (<c>critical</c>), and with Get beta updates
+    /// half-minute look) names for a copy: the newest of the usual releases' (<c>critical</c>), and with Get beta updates
     /// on (<paramref name="betas"/>) the newest of all, a beta's too (<c>criticalBeta</c>) — as <see cref="Choose"/>
     /// finds one among the releases a copy may take. 0 when it names none, or the feed is not as it should be.
     /// </summary>
-    internal static int CriticalRun(JsonElement feed, bool betas)
-    {
-        if (feed.ValueKind != JsonValueKind.Object) return 0;
-        int Run(string name) => feed.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var run) ? run : 0;
-        return betas ? Math.Max(Run("critical"), Run("criticalBeta")) : Run("critical");
-    }
+    internal static int CriticalRun(JsonElement feed, bool betas) =>
+        betas ? Math.Max(FeedRun(feed, "critical"), FeedRun(feed, "criticalBeta")) : FeedRun(feed, "critical");
+
+    /// <summary>
+    /// (0.3.89) The newest version the site's feed names for a copy, a Critical Update or not: the newest usual release's
+    /// (<c>newest</c>), and with Get beta updates on (<paramref name="betas"/>) the newest of all, a beta's too
+    /// (<c>newestBeta</c>). 0 when it names none, or the feed is not as it should be.
+    /// </summary>
+    internal static int NewestRun(JsonElement feed, bool betas) =>
+        betas ? Math.Max(FeedRun(feed, "newest"), FeedRun(feed, "newestBeta")) : FeedRun(feed, "newest");
+
+    private static int FeedRun(JsonElement feed, string name) =>
+        feed.ValueKind == JsonValueKind.Object && feed.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var run) ? run : 0;
 
     /// <summary>
     /// The version found waits for Update now (0.3.7, Updates.KeptBack): an earlier version put back from run
