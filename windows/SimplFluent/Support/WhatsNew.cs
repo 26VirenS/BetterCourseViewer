@@ -26,6 +26,8 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.86", "2026-10-29",
+            ("improved", "Silent Everywhere", "Silent mode stays on across the app, in black and white.")),
         R("0.3.85", "2026-10-29",
             ("new", "Preview Files First", "Files open in a preview; download only what you keep.")),
         R("0.3.84", "2026-10-29",

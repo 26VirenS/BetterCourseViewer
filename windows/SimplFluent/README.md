@@ -491,6 +491,12 @@ public sealed class GradesScreen : Screen
   it so, for the `dashboard-overdue-none` pictures: the mock always has something late); with something late, the
   alert instead — a stronger red wash ringed in red (in dark a deeper red, so the card is redder without lifting it
   towards the red number, which reads on it at about 4:1) — and its number in red.
+- **Silent mode across the app (0.3.86; the web's 2.99.127, the Mac's 1.3.192).** Once on, Silent mode stays on from
+  screen to screen until it is left: the pane stays quiet (black, words alone) on every screen, and every window of
+  Simpl's — the main one, a place's own, a popup, a tool's, the file preview — is laid out as it was but in black and
+  white (Kit/SilentGrey.cs: a small pixel shader over each window's content, and a filter on the page in each web view,
+  which draws out of WPF's reach). The Dashboard keeps its large Next and Then and the black title bar. Silent Mode in
+  the account's menu turns it on from anywhere, and Exit Silent Mode there turns it off.
 - **Files previewed first (0.3.85; the Mac's 1.3.191).** A file opened — a click on it anywhere, its menu's Preview, a
   download a page starts itself — is fetched with the session into a folder of Simpl's own (`FilePreview.Previews`,
   `…\Simpl\Previews`, each file in a folder of its own, cleared of what is a day old), not Downloads, and shown in

@@ -208,6 +208,11 @@ public sealed partial class AppShell : Grid, IDisposable
             else if (apart.StartsWith('/') && engine.NativeRoute(apart, "") is { } page)
                 Dispatcher.BeginInvoke(() => PlaceWindow.Open(engine, page), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
         }
+        // (0.3.86) Silent mode, the whole app's: chosen or put back anywhere (the Dashboard, the account's menu), the pane
+        //  and every window follow it (Kit/SilentGrey.cs)
+        SilentGrey.Engine = engine.Web;
+        SilentGrey.Follow(SilentMode.Shown);
+        SilentMode.Changed += () => Dispatcher.BeginInvoke(() => { Header(); SilentGrey.Follow(SilentMode.Shown); });
         // (0.3.85, the screenshot suite: --file-view sample shows a PDF of notes in the file preview window, --file-view
         //  card a Word document, which it cannot draw, as its card)
         if (Launch.Take("", "file-view") is { Length: > 0 } viewed)
@@ -309,16 +314,25 @@ public sealed partial class AppShell : Grid, IDisposable
 
     // ---- (0.3.84) Silent mode's look ----
 
-    /// <summary>The pane and the title bar in Silent mode's look, as the last Header drew them.</summary>
+    /// <summary>The pane in Silent mode's look, as the last Header drew it.</summary>
     private bool silentLook;
+    /// <summary>The title bar black over the Dashboard's Silent mode, as the last Header drew it.</summary>
+    private bool silentDash;
 
     /// <summary>
-    /// (0.3.84) Silent mode up on the Dashboard: the pane as the web's goes — black, words alone in white and grey, no
-    /// glyphs, chevrons, course colours, photo or picture of anyone, its search box away (Ctrl+F still searches) — and the
-    /// title bar black over it, its buttons in grey (MainWindow.SilentLook); its own look again after.
+    /// (0.3.84) Silent mode up: the pane as the web's goes — black, words alone in white and grey, no glyphs, chevrons,
+    /// course colours, photo or picture of anyone, its search box away (Ctrl+F still searches) — and, over the Dashboard's
+    /// Silent mode (<paramref name="dash"/>), the title bar black, its buttons in grey (MainWindow.SilentLook); its own look
+    /// again after. (0.3.86) Silent mode is the whole app's: the pane stays quiet on every screen while it is on, and the
+    /// rest of every window is in black and white (Kit/SilentGrey.cs).
     /// </summary>
-    private void SilentLook(bool on)
+    private void SilentLook(bool on, bool dash)
     {
+        if (dash != silentDash)
+        {
+            silentDash = dash;
+            window.SilentLook(dash);
+        }
         if (on == silentLook) return;
         silentLook = on;
         paneScene.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
@@ -333,7 +347,6 @@ public sealed partial class AppShell : Grid, IDisposable
         accountDrawn = null;
         BuildPane(redraw: true);
         if (!on) { sceneMasked = null; MaskScene(); }
-        window.SilentLook(on);
         Log.Write($"silent mode: {(on ? "up" : "down")}");
     }
 
@@ -697,6 +710,8 @@ public sealed partial class AppShell : Grid, IDisposable
         menu.Items.Add(Item("Settings…", SymbolRegular.Settings24, window.OpenSettings));
         // (0.3.31) the theme, the photos and the courses' colours, over the window itself
         menu.Items.Add(Item("Appearance…", SymbolRegular.PaintBrush24, () => { if (narrow) ClosePane(); window.StartAppearance(); }));
+        // (0.3.86) Silent mode from any screen, and the way out of it off the Dashboard (the web's 2.99.127)
+        menu.Items.Add(Item(SilentMode.On ? "Exit Silent Mode" : "Silent Mode", SymbolRegular.WeatherMoon24, () => SilentMode.Set(!SilentMode.On)));
         menu.Items.Add(Item("What’s new", SymbolRegular.Sparkle24, () => engine.ShowWhatsNew(WhatsNew.All)));
         menu.Items.Add(Item("Take the tour", SymbolRegular.Map24, window.StartTour));
         menu.Items.Add(Item($"{engine.LmsName} profile", SymbolRegular.Person24, () => engine.OpenWebScreen("/profile", "Profile")));
@@ -785,7 +800,7 @@ public sealed partial class AppShell : Grid, IDisposable
         //  edge to edge — and, while it is the Dashboard's, the pane and the title bar take Silent mode's look
         header.Visibility = current.Bare ? Visibility.Collapsed : Visibility.Visible;
         Remount();
-        SilentLook(current is DashboardScreen { Silent: true } && engine.Nav.Current.Path.Count == 0);
+        SilentLook(SilentMode.Shown, current is DashboardScreen { Silent: true } && engine.Nav.Current.Path.Count == 0);
         var loc = engine.Nav.Current;
         var crumbs = new List<(string Title, Action? Go)>();
         if (loc.Path.Count > 0)
