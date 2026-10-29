@@ -35,7 +35,7 @@ mac/
     App/SimplApp.swift          the scenes: the main window, a window per tool, Settings; the app delegate
     Engine/Engine.swift         the web view as the engine: calls, where the window is, opening any Canvas address
     Engine/Navigator.swift      places in the sidebar and a browser's Back/Forward history across them
-    Engine/FilePreview.swift    a Canvas file fetched with the session, shown in Quick Look
+    Engine/FilePreview.swift    a Canvas file fetched with the session, shown in the preview window (Shell/FilePreviewWindow.swift)
     Engine/AnswerCache.swift    each read's last answer, sealed on disk, for a fast start
     Engine/ReadAhead.swift      this session's answers in memory (AnswerMemo) and reading ahead of the student
     Shell/RootView.swift        the engine underneath, the window over it, sign-in, sheets, Quick Look
@@ -707,18 +707,20 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   course home shows the course's name under its title only when nothing on the page says it already. Modules: a course's
   only module opens by itself, and a locked one says when it opens under its name, closed. A module's file opens as the
   Files screen opens one (`openModuleFile`): by its id, through the engine's `fileInfo` — the file's own download
-  address, with its one-time key — into Quick Look under the module's name for it; the module's own address (which needs
+  address, with its one-time key — into the preview window under the module's name for it; the module's own address (which needs
   the session and Canvas's redirect to its file host) only when Canvas will not say. (1.3.103) So does a Canvas file's
   link anywhere else — in an assignment's instructions, an announcement, a discussion, a page (`openLinkedFile`,
   through `openWeb`) — the Files page's own address for one too (…/files?preview=12, …/files/folder/Week 3?preview=12),
-  the link a teacher copies from there — the address made from the link keeping its own key (`verifier`). Quick Look's
-  panel finds its controller along the chain of responders of the key window, or the main window once the panel has the
-  keys, and looks again whenever either changes: a hook to `FilePreview`'s controller sits in the chain of each window
-  it may look in, the file is kept and handed back whenever it looks again, a web view that answers the panel itself (the
-  instructions', after a link in them was clicked) lets go of the keys, and a moment after the panel comes up it is
-  checked — the file in it, or the panel put away and the file opened in its app; never "No items selected". The
-  screenshot suite clicks the instructions' file link (`-SimplWalk filelink`, light-14e) and fails on a panel left empty
-  (`quicklook_check`, "[files] Quick Look: 1 item, …" on the console). A tool in a module, a tool's
+  the link a teacher copies from there — the address made from the link keeping its own key (`verifier`). (1.3.191) A
+  file opened is previewed before anything is downloaded: fetched into a folder of Simpl's own (Caches/…/Previews, each
+  file in a folder of its own, cleared of what is a day old), not Downloads, and shown in Simpl's preview window
+  (`FilePreviewWindow`, one window kept where it was put: the file's name its title, its icon the file to drag out) —
+  a PDF in PDFKit's view, anything else in Quick Look's (`QuickLookView`) — with Share, Open in its app and Download
+  (⌘S) in its toolbar. Only Download (Show in Finder after it) and Open in its app put a copy in Downloads; a file's menu
+  still has Download straight away. Escape or ⌘W closes it. (Quick Look's panel, with its hooks into the windows' chains
+  of responders of 1.3.103, is gone.) The screenshot suite clicks the instructions' file link (`-SimplWalk filelink`,
+  light-14e) and fails when the file is not shown (`quicklook_check`, "[files] Preview: 1 item, …" on the console).
+  A tool in a module, a tool's
   course chip and the home's More rows end in the window's symbol (a Simpl window); ↗ is only for the browser. People:
   a section of one (the teacher) runs across the card with a named Message button. Files: one vocabulary for a file's
   kind (`typeText`: PDF, Image, Spreadsheet, Text…). A discussion's post is drawn as plain text at once and the web

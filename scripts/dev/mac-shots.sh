@@ -934,10 +934,11 @@ newwin_check() {
   if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::tool window: /'; return 1; fi
 }
 
-# (1.3.103) quicklook_check: what light-14e-instructions-file-open's walk and its Quick Look said (Support/OpenClock.swift,
+# (1.3.103) quicklook_check: what light-14e-instructions-file-open's walk and its preview said (Support/OpenClock.swift,
 # Engine/FilePreview.swift), as quicklook-check.txt — the file link in the assignment's instructions found and clicked,
-# and the panel up with the file in it ("[files] Quick Look: 1 item, …"), not empty; and no picture's app saying its
-# panel was taken by no window ("Quick Look: 0 items"). The module's file (light-14d) is said, not failed: opened at
+# and the file shown ("[files] Preview: 1 item, …" from Simpl's preview window since 1.3.191, "[files] Quick Look: 1
+# item, …" from Quick Look's panel before), not empty; and no picture's app saying its panel was taken by no window
+# ("Quick Look: 0 items"). The module's file (light-14d) is said, not failed: opened at
 # launch, its app may still be behind another copy when its picture is taken. A FAIL fails the check (SHOTS=check: the
 # workflow's "What the apps said").
 quicklook_check() {
@@ -948,10 +949,10 @@ quicklook_check() {
   else
     echo "FAIL the instructions' file link was not clicked: $(grep -o 'walk: file link .*' "$f" 2>/dev/null | head -1)" >> "$out"
   fi
-  if grep -q '\[files\] Quick Look: 1 item' "$f" 2>/dev/null; then
-    echo "ok   its file in Quick Look: $(grep -o 'Quick Look: 1 item.*' "$f" | head -1)" >> "$out"
+  if grep -qE '\[files\] (Quick Look|Preview): 1 item' "$f" 2>/dev/null; then
+    echo "ok   its file shown: $(grep -oE '(Quick Look|Preview): 1 item.*' "$f" | head -1)" >> "$out"
   else
-    echo "FAIL its file was not seen in Quick Look: $(grep -o '\[files\] Quick Look: .*' "$f" 2>/dev/null | head -1)" >> "$out"
+    echo "FAIL its file was not seen shown: $(grep -oE '\[files\] (Quick Look|Preview): .*' "$f" 2>/dev/null | head -1)" >> "$out"
   fi
   empty="$(grep -l 'Quick Look: 0 items' "$OUT_ABS"/console-*.txt 2>/dev/null | sed 's|.*/console-||; s|\.txt$||' | tr '\n' ' ')"
   if [ -z "$empty" ]; then
@@ -959,10 +960,10 @@ quicklook_check() {
   else
     echo "FAIL Quick Look taken by no window (0 items) in: $empty" >> "$out"
   fi
-  if grep -q '\[files\] Quick Look: 1 item' "$m" 2>/dev/null; then
-    echo "ok   the module's file in Quick Look: $(grep -o 'Quick Look: 1 item.*' "$m" | head -1)" >> "$out"
+  if grep -qE '\[files\] (Quick Look|Preview): 1 item' "$m" 2>/dev/null; then
+    echo "ok   the module's file shown: $(grep -oE '(Quick Look|Preview): 1 item.*' "$m" | head -1)" >> "$out"
   else
-    echo "note the module's file was not seen in Quick Look before its picture (its app behind another copy?)" >> "$out"
+    echo "note the module's file was not seen shown before its picture (its app behind another copy?)" >> "$out"
   fi
   cat "$out"
   if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::quick look: /'; return 1; fi
@@ -1247,11 +1248,13 @@ the_set() {
   SIZE=940x820 shoot light-42-narrow-inbox 12 -SimplPlace inbox
   SIZE=1720x1040 shoot light-43-wide-dashboard 14
   SIZE=1720x1040 shoot light-44-wide-inbox 14 -SimplPlace inbox -SimplOpen conversation:first
-  # (modules-file) a module's worksheet opened from its row: the file by its id, in Quick Look over the Modules screen
+  # (modules-file) a module's worksheet opened from its row: the file by its id, in the preview window (1.3.191) over the
+  # Modules screen
   shoot light-14d-module-file-open 24 -SimplPlace section:courses/101:modules -SimplOpen modulefile:i16
   # (1.3.103) the file link in an assignment's instructions (Canvas's …/courses/101/files/f1?wrap=1) clicked as a student
-  # clicks it, its web view given the keys: the file in Quick Look over the assignment, the panel with it pictured, and
-  # what the panel held said on the console (quicklook_check) — in 1.3.102 it came up saying "No items selected"
+  # clicks it, its web view given the keys: the file in the preview window (1.3.191; Quick Look before) over the
+  # assignment, pictured, and what it showed said on the console (quicklook_check) — in 1.3.102 Quick Look came up
+  # saying "No items selected"
   shoot light-14e-instructions-file-open 40 -SimplPlace course:104 -SimplPush /courses/104/assignments/4002 -SimplWalk filelink -SimplWalkWait 2
   # Brightspace: a made-up student's (scripts/dev/mock-brightspace.mjs), in light — no Inbox or Groups in the sidebar
   export BASE=http://localhost:8860

@@ -4,23 +4,23 @@ import Quartz
 import WebKit
 
 /// A file from the school in the Mac's own viewer. A click on a file fetches it with the web view's own session (its
-/// cookies, its redirects to the school's file host) into Downloads and, the moment it is in, opens it in Quick Look over
-/// the window — no second click, no other app: the space bar or Escape puts it away, and the panel's own toolbar opens
-/// it in its app or shares it. While it comes, a small glass toast at the window's foot says how far it has got
-/// (FileToastContent). The same fetch serves a file's other ways out (1.2): Open in its app (Preview, Pages…), Download
-/// (the copy in Downloads shown in Finder) and the previews drawn in a page (FilesBrowser). (1.3.73) Every file the
-/// school hands over lands in Downloads — opened, previewed or downloaded — under a name not yet taken, and stays there:
-/// the student has it after, as on the web. A file fetched once opens at once the next time, while it is still there.
-/// Not tied to the main actor: the web view's delegates (shared with the iPhone app) hand downloads to it from wherever
-/// they run, and everything it shows is set on the main thread.
+/// cookies, its redirects to the school's file host) and, the moment it is in, shows it in Simpl's preview window
+/// (1.3.191, Shell/FilePreviewWindow.swift) — no second click, no other app — with Download, Open in its app and Share
+/// over it. While it comes, a small glass toast at the window's foot says how far it has got (FileToastContent). The same
+/// fetch serves a file's other ways out (1.2): Open in its app (Preview, Pages…), Download (the copy in Downloads shown in
+/// Finder) and the previews drawn in a page (FilesBrowser). (1.3.191) A file previewed — in the window or in a page — is
+/// fetched into a folder of Simpl's own (`scratch`, cleared of what is a day old), not Downloads: only Download, and Open
+/// in its app, put a copy in Downloads, under a name not yet taken (1.3.73 put every file there). A file fetched once
+/// opens at once the next time, while it is still there. Not tied to the main actor: the web view's delegates (shared
+/// with the iPhone app) hand downloads to it from wherever they run, and everything it shows is set on the main thread.
 final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
     static let shared = FilePreview()
 
     /// What a file is fetched for.
     enum Purpose {
-        /// Quick Look over the window (a click on a file).
+        /// The preview window (a click on a file).
         case look
-        /// The Mac's own app for it.
+        /// The Mac's own app for it (a copy in Downloads).
         case app
         /// A copy kept in Downloads.
         case keep
@@ -28,8 +28,7 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
         case quiet
     }
 
-    /// (1.2) Quick Look's panel is driven from here now; this stays only for the window's old `.quickLookPreview`
-    /// binding, and is never set, so that binding never opens a second panel.
+    /// (1.2) Never set: the window's old `.quickLookPreview` binding stays, and never opens a panel.
     @Published var url: URL?
     /// A file on its way: its name, for the toast.
     @Published private(set) var opening: String?
@@ -74,11 +73,8 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
     /// Files fetched lately, by their address: opened again at once.
     private var cache: [URL: (file: URL, at: Date)] = [:]
     private static let keepFor: TimeInterval = 24 * 60 * 60
-    /// Quick Look's controller, hooked into the windows' chains of responders while a file is open in it (made on the
-    /// main thread, the first time a file is shown).
-    private var controller: PreviewController?
-    /// (1.3.103) How many files Quick Look has been seen to show — or not, and the file opened in its app instead — a
-    /// moment after each came up (the screenshot suite's walk waits on it: Support/OpenClock.swift).
+    /// (1.3.103) How many files have been shown in the preview window (1.3.191; Quick Look's panel before) — the
+    /// screenshot suite's walk waits on it: Support/OpenClock.swift.
     nonisolated(unsafe) static var looked = 0
     /// The window the file was opened from (the main window, or a tool's).
     private weak var host: NSWindow?
@@ -86,12 +82,12 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
 
     // MARK: - Asking for a file
 
-    /// Open the file at `url` (a school download address), fetched by the web view, in Quick Look.
+    /// Open the file at `url` (a school download address), fetched by the web view, in the preview window.
     func open(_ url: URL, name: String, in webView: WKWebView) {
         open(url, name: name, in: webView, for: .look)
     }
 
-    /// (1.3.13) In Quick Look, or — when the school will not give it — wherever `instead` goes.
+    /// (1.3.13) In the preview window, or — when the school will not give it — wherever `instead` goes.
     func open(_ url: URL, name: String, in webView: WKWebView, instead: (() -> Void)?) {
         open(url, name: name, in: webView, for: .look, instead: instead)
     }
@@ -105,7 +101,8 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
             if let hit = self.cached(url) {
                 if purpose != .quiet { self.follow(nil) }
                 var file = hit
-                if purpose == .keep, !FilePreview.inDownloads(hit) { // (kept: a copy of the one already here, in Downloads)
+                // (kept, or for its app: a copy of the one already here, in Downloads)
+                if purpose == .keep || purpose == .app, !FilePreview.inDownloads(hit) {
                     guard let copy = FilePreview.copyToDownloads(hit) else {
                         self.failed = "\(name) could not be saved to Downloads."
                         done?(.failure(CocoaError(.fileWriteUnknown)))
@@ -126,7 +123,7 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
         }
     }
 
-    /// A download the web view began itself (a link to a file it cannot show as a page): into Quick Look.
+    /// A download the web view began itself (a link to a file it cannot show as a page): into the preview window.
     func take(_ download: WKDownload, name: String?) {
         onMain {
             if let w = NSApp.keyWindow, !(w is QLPreviewPanel) { self.host = w }
@@ -146,15 +143,30 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
         }
     }
 
-    /// Put away: the file on its way stops and Quick Look closes.
+    /// Put away: the file on its way stops and the preview window closes.
     func close() {
         cancel()
-        onMain {
-            if QLPreviewPanel.sharedPreviewPanelExists() {
-                let panel: QLPreviewPanel? = QLPreviewPanel.shared()
-                if panel?.isVisible == true { panel?.orderOut(nil) }
-            }
+        onMain { MainActor.assumeIsolated { FilePreviewWindow.shared.close() } }
+    }
+
+    /// (1.3.191) The preview window's Download: a copy of the file on show in Downloads, under a name not yet taken —
+    /// the Dock's Downloads stack bounces and the toast says so. Nil (and the toast saying why) when it cannot be.
+    func download(_ file: URL, name: String) -> URL? {
+        guard let copy = FilePreview.inDownloads(file) ? file : FilePreview.copyToDownloads(file) else {
+            failed = "\(name) could not be saved to Downloads."
+            return nil
         }
+        keep(copy)
+        return copy
+    }
+
+    /// (1.3.191) The preview window's Open in its app: a copy in Downloads to open (no toast).
+    func copyForApp(_ file: URL, name: String) -> URL? {
+        guard let copy = FilePreview.inDownloads(file) ? file : FilePreview.copyToDownloads(file) else {
+            failed = "\(name) could not be saved to Downloads."
+            return nil
+        }
+        return copy
     }
 
     /// The toast's "Show in Finder" for a copy just kept.
@@ -166,7 +178,7 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
 
     // MARK: - The fetch
 
-    /// The toast follows this fetch (none: the toast goes). A Quick Look still on its way is dropped for the new one.
+    /// The toast follows this fetch (none: the toast goes). A preview still on its way is dropped for the new one.
     private func follow(_ job: Job?) {
         if let old = front, old !== job, old.purpose == .look, !old.over {
             old.cancelled = true
@@ -208,7 +220,7 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
     private func deliver(_ purpose: Purpose, file: URL, name: String, shown: Bool) {
         switch purpose {
         case .look:
-            if shown { show(file) }
+            if shown { show(file, name: name) }
         case .app:
             NSWorkspace.shared.open(file)
         case .keep:
@@ -218,13 +230,10 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
         }
     }
 
-    /// Quick Look over the window, on the file (another already open in it gives way to this one). (1.3.103) Never a panel
-    /// saying "No items selected": see PreviewController.
-    private func show(_ file: URL) {
+    /// (1.3.191) The preview window, on the file (another already open in it gives way to this one).
+    private func show(_ file: URL, name: String) {
         MainActor.assumeIsolated { // (only ever called on the main thread: onMain)
-            let controller = self.controller ?? PreviewController()
-            self.controller = controller
-            controller.show(file, from: self.host)
+            FilePreviewWindow.shared.show(file, name: name, from: self.host)
         }
     }
 
@@ -242,7 +251,8 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
 
     private func cached(_ url: URL) -> URL? {
         let now = Date()
-        // (a stale entry is forgotten; the file itself stays — it is the student's, in Downloads)
+        // (a stale entry is forgotten; a file in Downloads stays — it is the student's — and one in `scratch` goes with the
+        //  folder's next clearing)
         for (key, hit) in cache where now.timeIntervalSince(hit.at) > FilePreview.keepFor { cache[key] = nil }
         guard let hit = cache[url], FileManager.default.fileExists(atPath: hit.file.path) else { return nil }
         return hit.file
@@ -263,7 +273,29 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
             ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads", isDirectory: true)
     }
 
-    /// Whether a file is in Downloads already (every file fetched is, since 1.3.73; one fetched by an older copy may not be).
+    /// (1.3.191) Simpl's own folder for files fetched to be previewed (Caches/…/Previews): each in a folder of its own, so
+    /// it keeps its own name; what is a day old cleared away the first time it is asked for in a run.
+    private static func scratch() -> URL {
+        let fm = FileManager.default
+        let root = (fm.urls(for: .cachesDirectory, in: .userDomainMask).first ?? fm.temporaryDirectory)
+            .appendingPathComponent(Bundle.main.bundleIdentifier ?? "Simpl", isDirectory: true)
+            .appendingPathComponent("Previews", isDirectory: true)
+        if !scratchCleared {
+            scratchCleared = true
+            let old = Date().addingTimeInterval(-keepFor)
+            for dir in (try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: [.contentModificationDateKey])) ?? [] {
+                let at = (try? dir.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+                if at < old { try? fm.removeItem(at: dir) }
+            }
+        }
+        let dir = root.appendingPathComponent(UUID().uuidString.prefix(8).lowercased(), isDirectory: true)
+        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    nonisolated(unsafe) private static var scratchCleared = false
+
+    /// Whether a file is in Downloads already (a copy kept, or opened in its app; every file fetched was, 1.3.73–1.3.190).
     private static func inDownloads(_ file: URL) -> Bool {
         file.deletingLastPathComponent().standardizedFileURL.path == downloads.standardizedFileURL.path
     }
@@ -307,9 +339,10 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
             completionHandler(nil)
             return
         }
-        // (1.3.73) every file the school hands over lands in Downloads — one opened in Quick Look, one for its app, one
-        // kept, one drawn in a page — under a name not yet taken (never over another), and stays there
-        let dir = FilePreview.downloads
+        // (1.3.191) one to keep or for its app lands in Downloads, under a name not yet taken (never over another), and
+        // stays there; one to preview — in the window, or drawn in a page — in Simpl's own folder, until Download
+        let toDownloads = job.purpose == .keep || job.purpose == .app
+        let dir = toDownloads ? FilePreview.downloads : FilePreview.scratch()
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let fileName = FilePreview.clean(suggestedFilename.isEmpty ? job.name : suggestedFilename)
         let dest = FilePreview.unused(dir.appendingPathComponent(fileName))
@@ -334,7 +367,7 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
             if let src = job.source { self.cache[src] = (dest, Date()) } // (opened again: the same file, at once)
             job.done?(.success(dest))
             job.done = nil
-            // (a Quick Look a later click took the place of is not shown; a file asked for its app or kept always is)
+            // (a preview a later click took the place of is not shown; a file asked for its app or kept always is)
             self.deliver(job.purpose, file: dest, name: job.name, shown: wasFront && !job.cancelled)
         }
     }
@@ -362,260 +395,5 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
             }
             job.done = nil
         }
-    }
-}
-
-/// Quick Look's controller. The panel looks for one along the chain of responders — from what has the keys in the window
-/// that has them, or in the main window once the panel has them itself — and looks again whenever the key or the main
-/// window changes, letting go of the one it had when it finds none. (1.3.103) Until now this sat in the chain of the main
-/// window alone (the window the engine's page lives in), threw its file away the first time the panel let go of it, and
-/// would not take the panel again without one: a click on a file while a popup, a tool's panel or a second window had
-/// the keys, or the panel looking again as one came or went, or Simpl put behind another app and brought back, left the
-/// panel up and empty, saying "No items selected". Now a hook to it sits in the chain of every window the panel may
-/// look in; the file is kept while the panel is up, and handed back whenever the panel looks again; a web view that
-/// answers the panel itself (the one a link in the instructions was clicked in) lets go of the keys first; and a moment
-/// after the panel comes up it is checked — the file in it, or the panel put away and the file opened in its app.
-private final class PreviewController: NSResponder, QLPreviewPanelDataSource {
-    /// (Set and read on the main thread only: the panel asks for it there.)
-    nonisolated(unsafe) var items: [URL] = []
-    /// A file is on show, or on its way into the panel: the panel is taken whenever it looks.
-    private(set) var showing = false
-    /// Counts the files shown: a late word about one shown before is not taken for this one's.
-    private var shown = 0
-    /// How many more times the panel may be handed the file before it is given up on for this one.
-    private var tries = 0
-    /// This file's check said on the console.
-    private var said = false
-    private var hooks: [PanelHook] = []
-    private var watching: [NSObjectProtocol] = []
-    private weak var panel: QLPreviewPanel?
-    /// The window the file was opened from.
-    private weak var host: NSWindow?
-
-    /// The file in Quick Look: the panel up (or, up already, on this file instead), and checked a moment later.
-    func show(_ file: URL, from host: NSWindow?) {
-        let shared: QLPreviewPanel? = QLPreviewPanel.shared()
-        guard let panel = shared else {
-            NSWorkspace.shared.open(file) // (no panel to be had: the file's own app)
-            return
-        }
-        items = [file]
-        showing = true
-        shown += 1
-        tries = 3
-        said = false
-        self.panel = panel
-        self.host = host
-        watch()
-        claim(letGo: true)
-        if panel.isVisible {
-            panel.updateController()
-            panel.reloadData()
-            panel.currentPreviewItemIndex = 0
-        } else {
-            panel.makeKeyAndOrderFront(nil)
-        }
-        check(after: 0.3)
-    }
-
-    /// Whether the panel is showing this file: its controller one of the hooks, this its data source, a file in it.
-    private func holds(_ panel: QLPreviewPanel) -> Bool {
-        panel.currentController is PanelHook && (panel.dataSource as AnyObject?) === self && !items.isEmpty
-    }
-
-    /// A hook in the chain of each window the panel may look in — the key window, the main window, the one the file was
-    /// opened from — and, as a file is opened (`letGo`), anything in one of them that would answer the panel before the
-    /// hook let go of the keys. (Not as the student moves on with the panel up: a field clicked into keeps its keys.)
-    private func claim(letGo: Bool) {
-        hooks.removeAll { $0.window == nil }
-        var windows: [NSWindow] = []
-        for case let w? in [NSApp.keyWindow, NSApp.mainWindow, host] where !(w is QLPreviewPanel) && !windows.contains(where: { $0 === w }) {
-            windows.append(w)
-        }
-        for w in windows {
-            if !hooks.contains(where: { $0.window === w && $0.isHooked }) {
-                hooks.removeAll { h in
-                    guard h.window === w else { return false }
-                    h.unhook()
-                    return true
-                }
-                let h = PanelHook()
-                h.controller = self
-                h.hook(w)
-                hooks.append(h)
-            }
-            if letGo { self.letGo(w) }
-        }
-    }
-
-    /// The window's first responder let go of the keys when it, or anything between it and the window, answers the
-    /// panel itself: a web view does (for Look Up on its pictures) — the instructions' own, after a link in them was
-    /// clicked — and the panel's search is not to stop there.
-    private func letGo(_ w: NSWindow) {
-        let asks = NSSelectorFromString("acceptsPreviewPanelControl:")
-        var r = w.firstResponder
-        var steps = 0
-        while let x = r, x !== w, steps < 64 {
-            if x.responds(to: asks) {
-                w.makeFirstResponder(nil)
-                return
-            }
-            r = x.nextResponder
-            steps += 1
-        }
-    }
-
-    /// While a file is on show, the windows that take the keys or become main are watched: the panel looks again then.
-    private func watch() {
-        guard watching.isEmpty else { return }
-        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didBecomeMainNotification, NSApplication.didBecomeActiveNotification] {
-            watching.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.moved() }
-            })
-        }
-    }
-
-    /// Another window has the keys, or is main, or Simpl is in front again: hooked into it, and the panel — if it is up
-    /// without this file — made to look again, then checked.
-    private func moved() {
-        guard showing, let panel else { return }
-        claim(letGo: false)
-        if panel.isVisible, !holds(panel) {
-            panel.updateController()
-            check(after: 0.2)
-        } else if !said {
-            check(after: 0.2) // (the panel up at last, Simpl having come forward: said)
-        }
-    }
-
-    /// A moment on: the file in the panel (said on the console, in the screenshot suite and developer mode); else handed
-    /// back to it, three times at most; else the panel put away and the file opened in its app — never left empty.
-    private func check(after delay: Double) {
-        let which = shown
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-            guard let self, self.showing, which == self.shown, let panel = self.panel, let file = self.items.first else { return }
-            // (Simpl behind another app — the panel hidden with it — or the panel closed already: looked at again as
-            // Simpl comes forward, `moved`)
-            guard NSApp.isActive, panel.isVisible else { return }
-            if self.holds(panel) {
-                if !self.said {
-                    self.said = true
-                    FilePreview.looked += 1
-                    if OpenClock.verbose { NSLog("[files] Quick Look: %ld item, %@ (its controller Simpl's)", self.items.count, file.lastPathComponent) }
-                }
-                return
-            }
-            if self.tries > 0 {
-                self.tries -= 1
-                self.claim(letGo: true)
-                panel.updateController()
-                panel.reloadData()
-                self.check(after: 0.3)
-                return
-            }
-            NSLog("[files] Quick Look: 0 items, the panel taken by no window; the file opened in its app instead")
-            FilePreview.looked += 1
-            self.done()
-            panel.orderOut(nil)
-            NSWorkspace.shared.open(file)
-        }
-    }
-
-    /// The panel closed: the file let go of, the hooks out of the windows, nothing watched.
-    private func done() {
-        showing = false
-        items = []
-        for h in hooks { h.unhook() }
-        hooks = []
-        for o in watching { NotificationCenter.default.removeObserver(o) }
-        watching = []
-    }
-
-    // (the panel calls these on the main thread, through a hook)
-
-    var accepts: Bool { showing && !items.isEmpty }
-
-    func begin(_ panel: QLPreviewPanel) {
-        panel.dataSource = self
-        panel.currentPreviewItemIndex = 0
-    }
-
-    /// The panel let go: closed (the file goes), handed from one window's hook to another's (nothing to do), hidden with
-    /// Simpl behind another app (kept for when it comes back), or looking again and finding no one (handed it back).
-    func end(_ panel: QLPreviewPanel) {
-        let which = shown
-        DispatchQueue.main.async { [weak self] in
-            guard let self, self.showing, which == self.shown, let panel = self.panel, !self.holds(panel) else { return }
-            if !panel.isVisible {
-                if NSApp.isActive { self.done() }
-                return
-            }
-            self.moved()
-        }
-    }
-
-    nonisolated func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int {
-        items.count
-    }
-
-    nonisolated func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> QLPreviewItem! {
-        guard items.indices.contains(index) else { return nil }
-        return items[index] as NSURL
-    }
-}
-
-/// (1.3.103) Quick Look's controller as one window's chain of responders has it: just after the window, passing what the
-/// panel asks on to the one controller.
-private final class PanelHook: NSResponder {
-    weak var controller: PreviewController?
-    private(set) weak var window: NSWindow?
-
-    /// Still in its window's chain (something else may have been put in after the window since, or in its place).
-    var isHooked: Bool {
-        guard let window else { return false }
-        var r = window.nextResponder
-        var steps = 0
-        while let x = r, steps < 64 {
-            if x === self { return true }
-            r = x.nextResponder
-            steps += 1
-        }
-        return false
-    }
-
-    func hook(_ w: NSWindow) {
-        nextResponder = w.nextResponder
-        w.nextResponder = self
-        window = w
-    }
-
-    /// Out of its window's chain, wherever it now is in it.
-    func unhook() {
-        if let w = window {
-            var r: NSResponder = w
-            var steps = 0
-            while let next = r.nextResponder, steps < 64 {
-                if next === self {
-                    r.nextResponder = nextResponder
-                    break
-                }
-                r = next
-                steps += 1
-            }
-        }
-        nextResponder = nil
-        window = nil
-    }
-
-    nonisolated override func acceptsPreviewPanelControl(_ panel: QLPreviewPanel!) -> Bool {
-        MainActor.assumeIsolated { controller?.accepts ?? false }
-    }
-
-    nonisolated override func beginPreviewPanelControl(_ panel: QLPreviewPanel!) {
-        MainActor.assumeIsolated { controller?.begin(panel) }
-    }
-
-    nonisolated override func endPreviewPanelControl(_ panel: QLPreviewPanel!) {
-        MainActor.assumeIsolated { controller?.end(panel) }
     }
 }
