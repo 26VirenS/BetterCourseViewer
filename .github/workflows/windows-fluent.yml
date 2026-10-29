@@ -364,6 +364,8 @@ jobs:
           Shot 'dashboard-light-wide' '1366x778' 45 ($mock + @('--appearance', 'light'))
           Shot 'dashboard-dark-wide' '1366x778' 45 ($mock + @('--appearance', 'dark'))
           Shot 'dashboard-cards-wide' '1366x778' 45 ($mock + @('--appearance', 'dark', '--dash-view', 'cards'))
+          # (0.3.84) Silent mode: in the light look too, the page, the pane and the title bar black, the pane in words alone
+          Shot 'dashboard-silent' '1366x778' 45 ($mock + @('--appearance', 'light', '--dash-silent'))
           Shot 'dashboard-activity' '1024x681' 45 ($mock + @('--appearance', 'light', '--dash-view', 'activity'))
           Shot 'dashboard-counter' '1024x681' 45 ($mock + @('--appearance', 'light', '--sheet', 'next'))
           Shot 'dashboard-counter-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--sheet', 'unread'))
