@@ -54,12 +54,15 @@ struct MainShell: View {
         .background { MenuBarTabProbe(sidebarShown: columns != .detailOnly, engine: engine) }
         // (1.3.190) Silent mode up: the window dark — its toolbar over the black — and its own look again after; (the tour
         //  and Appearance show the whole Dashboard: Silent mode is put by while they are on, its choice kept)
-        .background { SilentWindowLook(on: silentUp) }
+        // (1.3.192) and every window of Simpl's in black and white while Silent mode is on (on the unseen view: the
+        //  window's own chain is as long as the type checker takes)
+        .background {
+            SilentWindowLook(on: silentUp)
+                .onAppear { SilentGrey.follow(silent.shown) }
+                .onChange(of: silent.shown) { _, on in SilentGrey.follow(on) }
+        }
         .onAppear { if silent.held != touring { silent.held = touring } }
         .onChange(of: touring) { _, now in withAnimation(Motion.gentle) { silent.held = now } }
-        // (1.3.192) every window of Simpl's in black and white while Silent mode is on
-        .onAppear { SilentGrey.follow(silent.shown) }
-        .onChange(of: silent.shown) { _, on in SilentGrey.follow(on) }
         .overlay { TourOverlay(columns: $columns) } // (1.2) the Mac tour (Shell/Tour.swift)
         .overlay { AppearanceOverlay(columns: $columns) } // (1.3.113) Appearance, from the ⋯ menu (Shell/AppearanceMode.swift)
         .overlay { WorkPreviewOverlay() } // (1.2.3) a piece of work's quick look, grown out of its row (Shell/WorkPreviewOverlay.swift)
