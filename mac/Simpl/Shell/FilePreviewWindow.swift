@@ -177,7 +177,10 @@ private struct PreviewActions: View {
         }
         .labelStyle(.titleAndIcon)
         .fixedSize()
-        .padding(.horizontal, 2)
+        // (1.3.193) Download kept clear of the bar's rounded end, as far in from it as from its top and foot (it sat
+        //  flush against it before)
+        .padding(.leading, 4)
+        .padding(.trailing, 6)
     }
 }
 
