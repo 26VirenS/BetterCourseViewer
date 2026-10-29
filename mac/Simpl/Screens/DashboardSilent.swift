@@ -1,5 +1,4 @@
 import AppKit
-import CoreImage
 import SwiftUI
 
 /// (1.3.190) Silent mode, as the web Dashboard has it (2.99.125–126): the Dashboard with nothing on it but what comes
@@ -21,48 +20,6 @@ final class SilentMode: ObservableObject {
 
     /// The Dashboard shows Silent mode.
     var shown: Bool { on && !held }
-}
-
-/// (1.3.192) Silent mode across the app, as the web's (2.99.127): while it is on, every window of Simpl's — the main
-/// ones, a place in a window of its own, a tool's, a popup, the file preview — is laid out as it was, in black and white:
-/// a Core Image filter over each window's content, so what a web view or Quick Look draws in it goes grey too. A window
-/// that comes up later is greyed as it shows. (The sidebar is quiet besides: `silentUp`.)
-@MainActor
-enum SilentGrey {
-    private static var watching: [NSObjectProtocol] = []
-    private static var on = false
-    /// The colours taken out (a filter of each window's own).
-    private static func grey() -> CIFilter? {
-        let f = CIFilter(name: "CIColorControls")
-        f?.setValue(0, forKey: kCIInputSaturationKey)
-        return f
-    }
-
-    /// Every window as Silent mode is now, and each one that shows after.
-    static func follow(_ now: Bool) {
-        on = now
-        for w in NSApp.windows { paint(w) }
-        guard watching.isEmpty else { return }
-        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didBecomeMainNotification, NSWindow.didChangeOcclusionStateNotification] {
-            watching.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { note in
-                MainActor.assumeIsolated { if let w = note.object as? NSWindow { paint(w) } }
-            })
-        }
-    }
-
-    private static func paint(_ w: NSWindow) {
-        guard !(w is NSSavePanel), let view = w.contentView else { return }
-        let greyed = !view.contentFilters.isEmpty
-        if on == greyed { return }
-        if on, let filter = grey() {
-            view.wantsLayer = true
-            view.layerUsesCoreImageFilters = true
-            view.contentFilters = [filter]
-        } else {
-            view.contentFilters = []
-        }
-        if OpenClock.verbose { NSLog("[silent] %@ in black and white: %@", w.title.isEmpty ? "a window" : w.title, on ? "yes" : "no") }
-    }
 }
 
 private struct SilentUpKey: EnvironmentKey {

@@ -10,7 +10,7 @@ import Foundation
 enum MacWhatsNew {
     static let releases: [Release] = [
         Release(version: "1.3.192", date: "2026-10-29", notes: [
-            ReleaseNote(kind: "improved", title: "Silent Everywhere", body: "Silent mode stays on across the app, in black and white."),
+            ReleaseNote(kind: "improved", title: "Silent Everywhere", body: "Silent mode stays on across the app, with quiet colour."),
         ]),
         Release(version: "1.3.191", date: "2026-10-29", notes: [
             ReleaseNote(kind: "new", title: "Preview Files First", body: "Files open in a preview; download only what you keep."),

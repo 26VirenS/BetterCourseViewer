@@ -139,10 +139,10 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   Silent Mode at the top right brings the Dashboard back. The tour and Appearance put it by while they are on. Checked
   live on its own (`dashboard silent`); the words are drawn again each half minute. (1.3.192, the web's 2.99.127)
   Silent mode is the whole app's: once on it stays on from screen to screen until it is left — the sidebar quiet on every
-  screen, and every window of Simpl's (the main ones, a place's own, a tool's, a popup, the file preview) laid out as
-  it was but in black and white (`SilentGrey`: a Core Image filter over each window's content, so a web view or Quick
-  Look goes grey too; a window greyed as it shows). Silent Mode in the account's ⋯ menu turns it on from anywhere, and
-  Exit Silent Mode there turns it off.
+  screen, and every screen laid out as it was with less colour, as the web's 2.99.128: the engine draws the courses'
+  own colours as a quiet hint of each (`quietColors`, U.quiet in store.courses) and every screen reads again in them,
+  while what a colour means — late, missing, done, a grade, a button, a link — and what a page holds keep their own.
+  Silent Mode in the account's ⋯ menu turns it on from anywhere, and Exit Silent Mode there turns it off.
 - **The Dashboard and the window, after the UI review (the home findings; the same on Windows).** The view (Cards,
   List, Activity) and a labelled New Task sit in the page by the greeting, so a tool pinned to the toolbar never pushes
   them into its » menu; on a one-column page the view chosen comes straight under the counters. Each row of tiles shows

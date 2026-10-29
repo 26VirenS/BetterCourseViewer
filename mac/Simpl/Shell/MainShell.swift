@@ -24,9 +24,12 @@ struct MainShell: View {
     /// (1.3.113) Appearance on: the toolbar's buttons rest, as for the tour.
     @ObservedObject private var appearanceMode = AppearanceMode.shared
     /// (1.3.190) Silent mode, up while the Dashboard is the screen showing: the sidebar goes black, in words alone.
-    /// (1.3.192) Silent mode is the whole app's: on, the sidebar stays quiet on every screen, and every window of Simpl's
-    /// is in black and white (SilentGrey); the Dashboard alone has its large Next and Then, and the dark window.
+    /// (1.3.192) Silent mode is the whole app's: on, the sidebar stays quiet on every screen, and every screen has less
+    /// colour — the courses' own colours a quiet hint of each (`quietColors`), what a colour means kept; the Dashboard
+    /// alone has its large Next and Then, and the dark window.
     @ObservedObject private var silent = SilentMode.shared
+    /// The courses' colours were last made quiet (so turning Silent off reads every screen again in its own colours).
+    @State private var quietWas = false
 
     var body: some View {
         let touring = tour.step != nil || appearanceMode.on
@@ -54,12 +57,11 @@ struct MainShell: View {
         .background { MenuBarTabProbe(sidebarShown: columns != .detailOnly, engine: engine) }
         // (1.3.190) Silent mode up: the window dark — its toolbar over the black — and its own look again after; (the tour
         //  and Appearance show the whole Dashboard: Silent mode is put by while they are on, its choice kept)
-        // (1.3.192) and every window of Simpl's in black and white while Silent mode is on (on the unseen view: the
-        //  window's own chain is as long as the type checker takes)
+        // (1.3.192) and the courses' colours quiet while Silent mode is on (on the unseen view: the window's own chain is
+        //  as long as the type checker takes)
         .background {
             SilentWindowLook(on: silentUp)
-                .onAppear { SilentGrey.follow(silent.shown) }
-                .onChange(of: silent.shown) { _, on in SilentGrey.follow(on) }
+                .task(id: silent.shown) { await quietColors(silent.shown) }
         }
         .onAppear { if silent.held != touring { silent.held = touring } }
         .onChange(of: touring) { _, now in withAnimation(Motion.gentle) { silent.held = now } }
@@ -164,6 +166,15 @@ extension MainShell {
 
     /// (1.3.80) The screenshot suite's -SimplSidebar hidden: the picture is of the window with its sidebar folded away.
     private static let launchFolded = UserDefaults.standard.string(forKey: "SimplSidebar") == "hidden"
+
+    /// (1.3.192) Silent mode's quiet colours, as the web's (2.99.128): the engine draws the courses' own colours as a
+    /// hint of each while it is on — what a colour means (late, done, a grade, a button) keeps its own — and every screen
+    /// reads again in them, or in their own colours once it is off.
+    @MainActor fileprivate func quietColors(_ on: Bool) async {
+        guard await engine.act("quietColors", ["on": on]) else { return }
+        if on || quietWas { engine.changed() }
+        quietWas = on
+    }
 
     fileprivate func fit(_ width: CGFloat) {
         let wide = width >= Self.narrow
