@@ -564,6 +564,8 @@ jobs:
           Shot 'assignment-narrow' '780x683' 45 ($mock + @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1001'))
           # (a big window: the page fills its width — the 1920x1080 a laptop or desktop opens at)
           Shot 'assignment-1080p' '1920x1050' 45 ($mock + @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1001'))
+          # (0.3.86) Silent mode across the app: an assignment laid out as ever, in black and white, the pane quiet
+          Shot 'assignment-silent' '1366x778' 45 ($mock + @('--appearance', 'light', '--dash-silent', '--place', 'course:101', '--push', '/courses/101/assignments/1001'))
           Shot 'assignment-late' '1366x778' 45 ($mock + @('--appearance', 'dark', '--place', 'course:101', '--push', '/courses/101/assignments/1008'))
           Shot 'assignment-feedback' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1008', '--open', 'feedback'))
           Shot 'assignment-held' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1006'))
