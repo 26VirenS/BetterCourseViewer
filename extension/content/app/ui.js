@@ -839,6 +839,14 @@
     const textS = dark ? clamp(s, 0.5, 1) : clamp(s, 0.45, 1);
     return { text: hslToHex([hh, textS, textL]), tint: rgba(hex, dark ? 0.2 : 0.14), raw: hex };
   }
+  /** (2.99.128) A course's colour in Silent mode: its hue kept as a hint, most of its colour taken out — the courses'
+   *  colours go quiet while what a colour means (late, done, a grade, a button) keeps its own. */
+  function quiet(hex) {
+    const rgb = hexToRgb(hex);
+    if (!rgb) return hex;
+    const [hh, s, l] = rgbToHsl(rgb);
+    return hslToHex([hh, s * 0.28, clamp(l, 0.4, 0.62)]);
+  }
   const FALLBACK_COLORS = ['#34c759', '#30b0c7', '#ff2d55', '#ff9500', '#c8901c', '#5856d6', '#0a84ff', '#6b5f7a', '#af52de', '#ff6b22'];
 
   /** Staggered entry (mockup 8/9): the element rises in after index × step ms, capped at
@@ -1748,7 +1756,7 @@
     empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, picker, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField, promptSheet, askSheet,
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,
     fmtTime, fmtTimeLower, fmtShort, fmtLong, fmtDateComma, fmtAt, fmtAtUpper, fmtBy, dayTitle, fmtDow, fmtRecent, whenShort, plural,
-    hexToRgb, rgba, palette, FALLBACK_COLORS, initials, enter, still, isStill, roll, morphFrom, reducedMotion, flipList, drawCheck, collapsible, dpr, onDprChange, dismiss, recall,
+    hexToRgb, rgba, palette, quiet, FALLBACK_COLORS, initials, enter, still, isStill, roll, morphFrom, reducedMotion, flipList, drawCheck, collapsible, dpr, onDprChange, dismiss, recall,
     afterMotion, onGone, watchLayout, anchor, keepOnScreen, boundsOf, hoverOpens, hoverCool, hoverHold, cardBox,
   };
 })();

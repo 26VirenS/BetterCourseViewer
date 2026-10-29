@@ -977,18 +977,24 @@
 
   // ---- (2.99.127) Silent mode, the whole app's ----------------------------------------------------------
   // Silent, once on (the Dashboard's Silent, or Silent Mode in the account's menu), stays on from screen to screen until it
-  // is left: the sidebar quiet — black, words only — and every other screen as it is, in black and white (app.css
-  // html.bcv-silent-on); the Dashboard its large Next and Then (screens/dashboard.js). Kept per Canvas (the pref keeps its
+  // is left: the sidebar quiet — black, words only — and every other screen as it is, with less colour (2.99.128): the
+  // courses' own colours go quiet, a hint of each (store.courses, U.quiet), and a photo at a page's head goes grey (app.css
+  // html.bcv-silent-on), while what a colour means — late, missing, done, a grade, a button, a link — and what a page
+  // holds keep theirs; the Dashboard its large Next and Then (screens/dashboard.js). Kept per Canvas (the pref keeps its
   // 2.99.125 name). The desktop's alone: the phone has Today, and the apps draw their own.
   const silentHere = () => !phone() && !self.BCVBridge?.native;
-  const paintSilent = () => html.classList.toggle('bcv-silent-on', !!state.silent && silentHere());
+  const paintSilent = () => {
+    const on = !!state.silent && silentHere();
+    html.classList.toggle('bcv-silent-on', on);
+    BCV.quietColors = on;
+  };
   function setSilent(on, { redraw = true } = {}) {
     on = !!on && silentHere();
     if (on === !!state.silent) return;
     state.silent = on;
     paintSilent();
     Promise.resolve(BCV.store.setPref('dashSilent', on)).catch(() => {});
-    if (redraw && state.route?.screen === 'dashboard') render({ quiet: true });
+    if (redraw) render({ quiet: true }); // (every screen: its courses' colours drawn again, quiet or as they were)
   }
 
   /** Simpl Courses settings, opened by the background (a content script cannot open it itself). */

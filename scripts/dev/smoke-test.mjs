@@ -1131,10 +1131,13 @@ try {
   await page.waitForTimeout(600);
   const away = await page.evaluate(() => ({ on: document.documentElement.classList.contains('bcv-dash-silent'), bar: getComputedStyle(document.getElementById('bcv-bar')).opacity, bg: getComputedStyle(document.getElementById('bcv-main')).backgroundColor,
     silent: document.documentElement.classList.contains('bcv-silent-on'), filter: getComputedStyle(document.documentElement).filter, side: getComputedStyle(document.querySelector('.bcv-side')).backgroundColor,
+    // (2.99.128) a course card's colour: a quiet hint of itself (saturation, 0–1)
+    hero: (() => { const e = document.querySelector('.bcv-ccard__hero'); const v = e ? (getComputedStyle(e).backgroundColor.match(/[\d.]+/g) || []).slice(0, 3).map((n) => Number(n) / 255) : null; if (!v) return null; const mx = Math.max(...v), mn = Math.min(...v), l = (mx + mn) / 2; return mx === mn ? 0 : Math.round(((mx - mn) / (1 - Math.abs(2 * l - 1))) * 100) / 100; })(),
     glyphs: [...document.querySelectorAll('.bcv-side .bcv-nav__ic')].filter((e) => e.getClientRects().length).length }));
-  // (2.99.127) Silent is the whole app's: another screen keeps its bar and its page, in black and white, and the sidebar quiet
-  check(!away.on && away.bar === '1' && away.bg !== 'rgb(0, 0, 0)' && away.silent && away.filter === 'grayscale(1)' && away.side === 'rgb(0, 0, 0)' && away.glyphs === 0,
-    `another screen in Silent: the bar back, the page as it was but in black and white, the sidebar still quiet: ${JSON.stringify(away)}`);
+  // (2.99.127) Silent is the whole app's: another screen keeps its bar and its page, and the sidebar quiet; (2.99.128) with
+  // less colour, not none — the courses' colours a quiet hint (a card's at most a third of its colour), no filter on the page
+  check(!away.on && away.bar === '1' && away.bg !== 'rgb(0, 0, 0)' && away.silent && away.filter === 'none' && away.side === 'rgb(0, 0, 0)' && away.glyphs === 0 && away.hero !== null && away.hero > 0 && away.hero < 0.34,
+    `another screen in Silent: the bar back, the page as it was with its courses' colours quiet, the sidebar still quiet: ${JSON.stringify(away)}`);
   await shot(page, '01i-courses-silent');
   await page.click('#bcv-account');
   await page.waitForSelector('.bcv-menu--account .bcv-menu__item--silent', { timeout: 4000 });
