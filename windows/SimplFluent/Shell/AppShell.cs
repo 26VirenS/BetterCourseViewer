@@ -56,6 +56,7 @@ public sealed partial class AppShell : Grid, IDisposable
     private readonly ContentControl commandsHost = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
     private readonly Border toast = new();
     private readonly TextBlock toastText;
+    private readonly FrameworkElement toastSpinner;
     private readonly TranslateTransform toastShift = new();
     private bool toastShown;
     private int toastTurn;
@@ -159,7 +160,8 @@ public sealed partial class AppShell : Grid, IDisposable
 
         // a file on its way (FilePreview's word), at the foot of the page, as Windows 11's snackbar
         toastText = K.Text("", Ty.Body);
-        toast.Child = K.H(12, K.Spinner(16), toastText);
+        toastSpinner = K.Spinner(16);
+        toast.Child = K.H(12, toastSpinner, toastText);
         toast.Padding = new Thickness(16, 12, 20, 12);
         toast.CornerRadius = new CornerRadius(8);
         toast.HorizontalAlignment = HorizontalAlignment.Center;
@@ -206,6 +208,10 @@ public sealed partial class AppShell : Grid, IDisposable
             else if (apart.StartsWith('/') && engine.NativeRoute(apart, "") is { } page)
                 Dispatcher.BeginInvoke(() => PlaceWindow.Open(engine, page), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
         }
+        // (0.3.85, the screenshot suite: --file-view sample shows a PDF of notes in the file preview window, --file-view
+        //  card a Word document, which it cannot draw, as its card)
+        if (Launch.Take("", "file-view") is { Length: > 0 } viewed)
+            Dispatcher.BeginInvoke(() => FilePreview.Sample(viewed == "card"), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
     }
 
     /// <summary>A screen is being read ahead now (a pointer resting on another waits its turn).</summary>
@@ -232,7 +238,12 @@ public sealed partial class AppShell : Grid, IDisposable
     private void OnFile(object? sender, PropertyChangedEventArgs e)
     {
         var s = FilePreview.Shared.Status;
-        if (s != null) toastText.Text = s; // (its words kept while it goes)
+        if (s != null)
+        {
+            toastText.Text = s; // (its words kept while it goes)
+            // (0.3.85: a spinner while a file comes, none for what it says after — saved to Downloads, or why it could not be)
+            toastSpinner.Visibility = s.EndsWith('…') ? Visibility.Visible : Visibility.Collapsed;
+        }
         var on = s != null;
         if (on == toastShown) return;
         toastShown = on;

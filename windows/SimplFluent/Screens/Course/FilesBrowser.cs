@@ -208,11 +208,12 @@ internal sealed class CourseFilesPart : CoursePart
         return (g, nameText);
     }
 
-    /// <summary>The menu of a file's ways out (the Mac's FileMenuItems): its app, another app, a copy in Downloads; the
-    /// school's own page for it, its link.</summary>
+    /// <summary>The menu of a file's ways out (the Mac's FileMenuItems): its preview, its app, another app, a copy in
+    /// Downloads; the school's own page for it, its link.</summary>
     private void FileMenu(ItemCollection items, string url, string fileName, string page)
     {
-        items.Add(CourseKit.MenuEntry(CourseFiles.OpenTitle(fileName), SymbolRegular.Open24, () => OpenFile(url, fileName)));
+        items.Add(CourseKit.MenuEntry("Preview", SymbolRegular.Eye24, () => OpenFile(url, fileName)));
+        items.Add(CourseKit.MenuEntry(CourseFiles.OpenTitle(fileName), SymbolRegular.Open24, () => OpenInApp(url, fileName)));
         items.Add(CourseKit.MenuEntry("Open with…", SymbolRegular.AppGeneric24, () => OpenWith(url, fileName)));
         items.Add(CourseKit.MenuEntry("Download", SymbolRegular.ArrowDownload24, () => Download(url, fileName)));
         items.Add(new Separator());
@@ -391,10 +392,23 @@ internal sealed class CourseFilesPart : CoursePart
         ShowPane();
     }
 
-    /// <summary>A file opened in the app Windows has for it, fetched first (the Mac's Quick Look, the Windows way).</summary>
+    /// <summary>(0.3.85) A file opened in Simpl's preview window, fetched first — nothing downloaded until its Download.</summary>
     private void OpenFile(string url, string fileName)
     {
         if (engine.Absolute(url) is { } a) FilePreview.Open(a, fileName, engine.Web);
+    }
+
+    /// <summary>A copy kept in Downloads, opened in the app Windows has for it.</summary>
+    private async void OpenInApp(string url, string fileName)
+    {
+        Note(K.Columns("auto, *", K.Spinner(16).Margin(0, 0, 10, 0).Col(0), K.Text($"Fetching {fileName}…", Ty.Body, B.Text2).Col(1)), false);
+        try
+        {
+            var path = await CourseFiles.Keep(engine, url, fileName);
+            ClearNote();
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception e) { Failed(fileName, e.Message); }
     }
 
     private async void OpenWith(string url, string fileName)

@@ -491,6 +491,14 @@ public sealed class GradesScreen : Screen
   it so, for the `dashboard-overdue-none` pictures: the mock always has something late); with something late, the
   alert instead — a stronger red wash ringed in red (in dark a deeper red, so the card is redder without lifting it
   towards the red number, which reads on it at about 4:1) — and its number in red.
+- **Files previewed first (0.3.85; the Mac's 1.3.191).** A file opened — a click on it anywhere, its menu's Preview, a
+  download a page starts itself — is fetched with the session into a folder of Simpl's own (`FilePreview.Previews`,
+  `…\Simpl\Previews`, each file in a folder of its own, cleared of what is a day old), not Downloads, and shown in
+  Simpl's preview window (`Shell/FileViewWindow.cs`, one window kept where it was put): a PDF in Edge's own viewer, a
+  picture, a film or a sound, plain text in a web view; a kind no web view draws (a Word document, a deck, a zip) as
+  its name, kind and size. Its title bar has Open in its app and Download (Ctrl+S); only those put a copy in Downloads
+  (`FilePreview.KeepCopy`; the window's foot says "Saved … to Downloads"), Download then offering Show in folder. A
+  file's menu has Preview, Open in its app and Download straight away. Escape closes the window.
 - **Silent mode (0.3.84; the web's of 2.99.125–126, the Mac's 1.3.190).** Silent, beside the view and New task, puts
   the whole Dashboard away for what comes next alone (`Screens/DashboardSilent.cs`): black, "Next" and the next piece
   of work in large type, how soon in words that count down within the day ("Due in 4 h 40 min", `SilentWords`, tested

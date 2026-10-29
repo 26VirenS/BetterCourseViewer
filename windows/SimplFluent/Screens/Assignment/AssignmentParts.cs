@@ -197,10 +197,22 @@ internal static class AssignKit
     /// <summary>"Open in Microsoft Edge", or "Open in default app" when Windows names none.</summary>
     public static string OpenTitle(string name) => AppFor(name) is { } app ? $"Open in {app}" : "Open in default app";
 
-    /// <summary>A file of the school's opened (fetched with the session, kept in Downloads, opened in its app).</summary>
+    /// <summary>(0.3.85) A file of the school's opened in Simpl's preview window (fetched with the session into a folder of
+    /// Simpl's own): nothing downloaded until its Download.</summary>
     public static void OpenFile(Engine.Engine engine, string url, string name)
     {
         if (engine.Absolute(url) is { } u) Simpl.Engine.FilePreview.Open(u, name, engine.Web);
+    }
+
+    /// <summary>A copy of a file of the school's kept in Downloads, opened in its app.</summary>
+    public static async void OpenInApp(Engine.Engine engine, string url, string name)
+    {
+        try
+        {
+            var path = await Fetch(engine, url, name, Simpl.Engine.FilePreview.Downloads);
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception e) { Shell.Dialogs.Fail($"{name} could not be opened", e.Message); }
     }
 
     /// <summary>A copy of a file of the school's kept in Downloads, shown in File Explorer.</summary>
@@ -214,11 +226,12 @@ internal static class AssignKit
         catch (Exception e) { Shell.Dialogs.Fail($"{name} could not be downloaded", e.Message); }
     }
 
-    /// <summary>The menu of a file's ways out: its app, a copy in Downloads, its link (the Mac's FileMenuItems).</summary>
+    /// <summary>The menu of a file's ways out: its preview, its app, a copy in Downloads, its link (the Mac's FileMenuItems).</summary>
     public static ContextMenu FileMenu(Engine.Engine engine, string url, string name)
     {
         var m = new ContextMenu();
-        m.Items.Add(Item(OpenTitle(name), SymbolRegular.Open24, () => OpenFile(engine, url, name)));
+        m.Items.Add(Item("Preview", SymbolRegular.Eye24, () => OpenFile(engine, url, name)));
+        m.Items.Add(Item(OpenTitle(name), SymbolRegular.Open24, () => OpenInApp(engine, url, name)));
         m.Items.Add(Item("Download", SymbolRegular.ArrowDownload24, () => Download(engine, url, name)));
         m.Items.Add(new Separator());
         m.Items.Add(Item("Copy link", SymbolRegular.Link24, () => { if (engine.Absolute(url) is { } u) Copy(u.ToString()); }));

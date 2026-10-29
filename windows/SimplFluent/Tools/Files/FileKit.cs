@@ -135,8 +135,8 @@ internal static class FileKit
         catch (InvalidOperationException e) { Log.Write("pdf fonts: " + e.Message); }
     }
 
-    /// <summary>A PDF of two pages of a student's notes (for the screenshot suite).</summary>
-    private static string? Sample()
+    /// <summary>A PDF of two pages of a student's notes (for the screenshot suite; the file preview's too).</summary>
+    internal static string? Sample()
     {
         try
         {
