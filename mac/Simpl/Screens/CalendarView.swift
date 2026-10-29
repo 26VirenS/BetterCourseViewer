@@ -74,6 +74,13 @@ struct CalendarView: View {
     @State private var planStretch: PlanStretch?
     @State private var planOpen: String?
     @State private var joinOnto: String?
+    /// (1.3.195) The plan whose block is held out over To Do beside the week (let go, it is unplanned), and the plans let
+    /// go there, faded out while the page takes them off.
+    /// (the screenshot suite's -SimplUnplanOver YES: To Do ringed as one would be, no block held)
+    @State private var unplanOver: String? = UserDefaults.standard.bool(forKey: "SimplUnplanOver") ? "" : nil
+    @State private var unplanned: Set<String> = []
+    /// (1.3.195) To Do sits beside the calendar (the page holding still), not over it: a plan can be dragged onto it.
+    @State private var todoBeside = false
     @State private var gripHover: String?
     /// (1.3.181) The up-and-down pointer pushed for a plan's foot (popped once, when the pointer has left it and no pull is on).
     @State private var stretchCursor = false
@@ -273,6 +280,7 @@ struct CalendarView: View {
                     TodoPanel(said: todoSaid)
                         .frame(width: TodoPanel.width)
                         .frame(maxHeight: .infinity)
+                        .overlay { unplanHere }
                         .transition(.move(edge: .leading).combined(with: .opacity))
                 }
                 GeometryReader { c in
@@ -290,6 +298,8 @@ struct CalendarView: View {
         .frame(maxWidth: Self.widest + pad * 2, maxHeight: .infinity, alignment: .top)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(PageGround())
+        .onAppear { todoBeside = true }
+        .onDisappear { todoBeside = false }
     }
 
     /// A window too narrow or too short to hold still: the page scrolls, To Do over the calendar.
@@ -848,6 +858,29 @@ struct CalendarView: View {
         .accessibilityAddTraits(isSel ? .isSelected : [])
     }
 
+    /// (1.3.195, the web's 2.99.114) To Do with a plan's block held over it: ringed, and a tag saying letting go there
+    /// unplans it.
+    @ViewBuilder
+    private var unplanHere: some View {
+        if unplanOver != nil {
+            ZStack {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Theme.accent.opacity(0.08))
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(Theme.accent, lineWidth: 2)
+                Label("Unplan", systemImage: "calendar.badge.minus")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Theme.accent))
+                    .fixedSize()
+            }
+            .allowsHitTesting(false)
+            .transition(.opacity)
+        }
+    }
+
     /// (1.3.170) Over a day a row of To Do is held over: where letting go plans it.
     private var planHereTag: some View {
         Text("Plan here")
@@ -1183,6 +1216,32 @@ struct CalendarView: View {
         _ = try? await engine.call("planDay", ["id": first.id, "day": ISO8601DateFormatter().string(from: tomorrow > last ? today : tomorrow)], as: PlanDayReply.self)
         await load(animated: false)
         if let ev = data?.events.first(where: { $0.layer == "plan" && $0.planId == first.id }) { planOpen = ev.id }
+    }
+
+    /// (1.3.195) A plan's block: faded while held over To Do, gone once let go there.
+    private func unplanFade(_ id: String) -> Double {
+        if unplanned.contains(id) { return 0 }
+        return unplanOver == id ? 0.45 : 1
+    }
+
+    /// (1.3.195) A plan's block let go over To Do: the plan (its group's too, as Delete Plan) taken off the calendar, so
+    /// its work is back on To Do unplanned. The block fades where it is; should the page not take it, it comes back.
+    private func unplan(_ ev: CalEvent, pid: String) {
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) {
+            unplanOver = nil
+            joinOnto = nil
+            planDrag = nil
+            planFollow.clear()
+            unplanned.insert(ev.id)
+        }
+        NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
+        Task {
+            let r = try? await engine.call("planClear", ["id": pid, "group": true], as: ActReply.self)
+            if r?.ok == true { say("Unplanned \(ev.title)") } else { say("Could not unplan \(ev.title)") }
+            engine.changed()
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            unplanned.remove(ev.id)
+        }
     }
 
     /// What came of a row let go, under To Do for four seconds.
@@ -1525,16 +1584,28 @@ struct CalendarView: View {
                                     var t = Transaction()
                                     t.disablesAnimations = true
                                     withTransaction(t) { planFollow.move(item.ev.id, to: CGSize(width: dx, height: dy)) }
+                                    // (1.3.195) held out past the week's left edge, over To Do beside it: let go there,
+                                    // it is unplanned
+                                    let leaving = todoBeside && todoOn && mode != "list" && g.location.x < -Self.todoGap / 2
+                                    if leaving != (unplanOver == item.ev.id) {
+                                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.12)) { unplanOver = leaving ? item.ev.id : nil }
+                                        if leaving { joinOnto = nil }
+                                        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                                    }
                                     let was = planDrag?.id == item.ev.id ? planDrag : nil
                                     guard was == nil || was?.days != days || was?.minutes != mins else { return }
                                     // (how far into the block it was taken: where it starts on the grid, less the block's top)
                                     let grab = was?.grab ?? max(0, Int((g.startLocation.y - weekY(item.at)) / hour * 60))
                                     withTransaction(t) { planDrag = PlanDrag(id: item.ev.id, days: days, minutes: mins, grab: grab) }
-                                    let over = planAt(dayOf(week, day + days), minute: item.at + mins + grab, not: pid)?.ev.id
+                                    let over = leaving ? nil : planAt(dayOf(week, day + days), minute: item.at + mins + grab, not: pid)?.ev.id
                                     if joinOnto != over { joinOnto = over }
                                     if let was, was.days != days { NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now) }
                                 }
                                 .onEnded { _ in
+                                    if unplanOver == item.ev.id { // (1.3.195) let go over To Do: no longer planned
+                                        unplan(item.ev, pid: pid)
+                                        return
+                                    }
                                     guard let d = planDrag, d.id == item.ev.id else {
                                         planFollow.clear()
                                         return
@@ -1597,6 +1668,7 @@ struct CalendarView: View {
                 }
                 .scaleEffect(held && !reduceMotion ? 1.02 : 1)
                 .shadow(color: .black.opacity(held ? 0.22 : 0), radius: 10, y: 5)
+                .opacity(unplanFade(item.ev.id))
             }
             .background {
                 // (1.3.176) where it would go: its quarter hour and its day, outlined, while it is held elsewhere

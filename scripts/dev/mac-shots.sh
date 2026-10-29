@@ -527,6 +527,7 @@ ui_review() {
   MODE=light shoot light-05w-calendar-week 22 -SimplPlace calendar -SimplCalView week -SimplSidebar hidden
   MODE=dark shoot dark-05w-calendar-week 22 -SimplPlace calendar -SimplCalView week -SimplSidebar hidden
   MODE=light shoot light-05t-calendar-week-todo-drop 22 -SimplPlace calendar -SimplCalView week -SimplSidebar hidden -SimplTodoDrop 3,780
+  MODE=light shoot light-05t-calendar-week-unplan 22 -SimplPlace calendar -SimplCalView week -SimplSidebar hidden -SimplUnplanOver YES # (1.3.195: a plan held over To Do)
   MODE=light shoot light-05l-calendar-list 22 -SimplPlace calendar -SimplCalView list # (1.3.170: its first read is slow on a loaded runner)
   # (1.3.172) a plan's popover on the week (a piece of work planned for it, in a home of its own) and its Edit
   OWN_HOME=1 MODE=light shoot light-05p-calendar-plan 26 -SimplPlace calendar -SimplCalView week -SimplSidebar hidden -SimplPlanPopover YES
