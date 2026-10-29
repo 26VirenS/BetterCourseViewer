@@ -437,7 +437,7 @@ try {
   await page.click('#bcv-account');
   await page.waitForSelector('.bcv-menu--account', { timeout: 5000 });
   const acctItems = await texts('.bcv-menu--account .bcv-menu__item');
-  check(acctItems.join(' | ') === 'Settings… | Appearance… | What’s New | Canvas Profile | Report a Bug… | Sign Out…', `the account's ⋯ menu is the Mac's, item for item: ${acctItems.join(' | ')}`);
+  check(acctItems.join(' | ') === 'Settings… | Appearance… | Silent Mode | What’s New | Canvas Profile | Report a Bug… | Sign Out…', `the account's ⋯ menu is the Mac's, item for item: ${acctItems.join(' | ')}`);
   await shot(page, '01e-report-button');
   await page.keyboard.press('Escape');
   await page.mouse.click(700, 500);
@@ -1129,14 +1129,23 @@ try {
   await nav('courses');
   await page.waitForSelector('.bcv-screen:not(.bcv-screen--silent) .bcv-head', { timeout: 10000 });
   await page.waitForTimeout(600);
-  const away = await page.evaluate(() => ({ on: document.documentElement.classList.contains('bcv-dash-silent'), bar: getComputedStyle(document.getElementById('bcv-bar')).opacity, bg: getComputedStyle(document.getElementById('bcv-main')).backgroundColor }));
-  check(!away.on && away.bar === '1' && away.bg !== 'rgb(0, 0, 0)', `another screen: the bar back, the page as it was: ${JSON.stringify(away)}`);
+  const away = await page.evaluate(() => ({ on: document.documentElement.classList.contains('bcv-dash-silent'), bar: getComputedStyle(document.getElementById('bcv-bar')).opacity, bg: getComputedStyle(document.getElementById('bcv-main')).backgroundColor,
+    silent: document.documentElement.classList.contains('bcv-silent-on'), filter: getComputedStyle(document.documentElement).filter, side: getComputedStyle(document.querySelector('.bcv-side')).backgroundColor,
+    glyphs: [...document.querySelectorAll('.bcv-side .bcv-nav__ic')].filter((e) => e.getClientRects().length).length }));
+  // (2.99.127) Silent is the whole app's: another screen keeps its bar and its page, in black and white, and the sidebar quiet
+  check(!away.on && away.bar === '1' && away.bg !== 'rgb(0, 0, 0)' && away.silent && away.filter === 'grayscale(1)' && away.side === 'rgb(0, 0, 0)' && away.glyphs === 0,
+    `another screen in Silent: the bar back, the page as it was but in black and white, the sidebar still quiet: ${JSON.stringify(away)}`);
+  await shot(page, '01i-courses-silent');
+  await page.click('#bcv-account');
+  await page.waitForSelector('.bcv-menu--account .bcv-menu__item--silent', { timeout: 4000 });
+  check((await page.$eval('.bcv-menu--account .bcv-menu__item--silent', (e) => e.textContent.trim())) === 'Exit Silent Mode', '(2.99.127) the account\'s menu offers Exit Silent Mode on any screen');
+  await page.keyboard.press('Escape');
   await nav('dashboard');
   await page.waitForSelector('.bcv-silent .bcv-silent__label', { timeout: 10000 });
   check((await silentSeen()).on, 'and the Dashboard is still silent on the way back');
   await page.click('.bcv-silent__exit');
   await page.waitForSelector('.bcv-stat', { timeout: 8000 });
-  check(await page.evaluate(() => !document.documentElement.classList.contains('bcv-dash-silent') && !document.querySelector('.bcv-silent') && !!document.querySelector('.bcv-screen > .bcv-head') && !!document.activeElement?.classList.contains('bcv-dash__silent')
+  check(await page.evaluate(() => !document.documentElement.classList.contains('bcv-dash-silent') && !document.documentElement.classList.contains('bcv-silent-on') && getComputedStyle(document.documentElement).filter === 'none' && !document.querySelector('.bcv-silent') && !!document.querySelector('.bcv-screen > .bcv-head') && !!document.activeElement?.classList.contains('bcv-dash__silent')
     && getComputedStyle(document.querySelector('.bcv-side')).backgroundColor !== 'rgb(0, 0, 0)' && !!document.querySelector('.bcv-side .bcv-nav__ic svg')?.getClientRects().length),
     'Exit Silent Mode: the whole Dashboard back, the keyboard on Silent, the sidebar as it was');
   // the one struck out in Silent is done on the list too; its circle puts it back (as it was, for what follows)
@@ -7358,7 +7367,7 @@ try {
   await page.click('#bcv-account');
   await page.waitForSelector('.bcv-menu--account', { timeout: 5000 });
   const acctItems = await texts('.bcv-menu--account .bcv-menu__item');
-  check(acctItems.map((t) => t.split('\n')[0].trim()).join(' | ') === 'Settings… | Appearance… | What’s New | Canvas Profile | Report a Bug… | Sign Out…' /* (2.99.53: the Mac's account menu) */ && (await page.$eval('.bcv-menu--account', (m) => m.getBoundingClientRect().bottom <= window.innerHeight)), `the profile row opens a panel above itself: ${acctItems.join(' | ')}`);
+  check(acctItems.map((t) => t.split('\n')[0].trim()).join(' | ') === 'Settings… | Appearance… | Silent Mode | What’s New | Canvas Profile | Report a Bug… | Sign Out…' /* (2.99.53: the Mac's account menu; 2.99.127: Silent Mode) */ && (await page.$eval('.bcv-menu--account', (m) => m.getBoundingClientRect().bottom <= window.innerHeight)), `the profile row opens a panel above itself: ${acctItems.join(' | ')}`);
   check((await texts('.bcv-menu--account .bcv-menu__name'))[0] === 'Sam Student (they/them)' && (await texts('.bcv-menu--account .bcv-menu__sub'))[0] === 'sstudent@ucmerced.edu' && (await texts('.bcv-acctbar .bcv-account__sub'))[0] === 'sstudent@ucmerced.edu', `the bar says the address they sign in with, as the Mac's, and its panel carries the pronouns and the e-mail Canvas holds (the profile's): ${(await texts('.bcv-menu--account .bcv-menu__name'))[0]} · ${(await texts('.bcv-acctbar .bcv-account__sub'))[0]}`);
   const photo = await page.$eval('.bcv-menu--account .bcv-menu__photo', (b) => { const r = b.getBoundingClientRect(); const head = b.closest('.bcv-menu__head').getBoundingClientRect(); return { w: b.offsetWidth, h: b.offsetHeight, round: getComputedStyle(b).borderRadius === '50%', centred: Math.abs((r.left + r.width / 2) - (head.left + head.width / 2)) < 2, what: b.querySelector('img') ? 'img' : b.textContent }; });
   check(photo.w === 72 && photo.h === 72 && photo.round && photo.centred && (photo.what === 'img' || photo.what === 'SS'), `the panel opens on the profile's photo, large and round at its head (the initials when Canvas has none; its own size, the panel's grow aside): ${JSON.stringify(photo)}`);

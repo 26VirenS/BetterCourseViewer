@@ -955,6 +955,8 @@
       ]),
       item(IC.settings, 'Settings…', null, openSettings),
       item(IC.image, 'Appearance…', null, () => BCV.appearance.open(BCV.app), 'bcv-menu__item--appearance'), // (2.99.60: Appearance itself, as the Mac's ⋯ menu opens it)
+      // (2.99.127) Silent from any screen, and the way out of it off the Dashboard
+      silentHere() ? item(IC.moon, state.silent ? 'Exit Silent Mode' : 'Silent Mode', null, () => setSilent(!state.silent), 'bcv-menu__item--silent') : null,
       item(IC.sparkle || IC.star, 'What’s New', null, () => BCV.whatsnew?.open(BCV.app, { manual: true })),
       item(IC.people, `${BCV.lms.name} Profile`, null, () => go('/profile')),
       U.el('bcv-menu__sep'),
@@ -971,6 +973,22 @@
   async function toggleTheme() {
     const next = state.dark ? 'off' : 'on';
     await S.update({ appearance: { darkMode: next } });
+  }
+
+  // ---- (2.99.127) Silent mode, the whole app's ----------------------------------------------------------
+  // Silent, once on (the Dashboard's Silent, or Silent Mode in the account's menu), stays on from screen to screen until it
+  // is left: the sidebar quiet — black, words only — and every other screen as it is, in black and white (app.css
+  // html.bcv-silent-on); the Dashboard its large Next and Then (screens/dashboard.js). Kept per Canvas (the pref keeps its
+  // 2.99.125 name). The desktop's alone: the phone has Today, and the apps draw their own.
+  const silentHere = () => !phone() && !self.BCVBridge?.native;
+  const paintSilent = () => html.classList.toggle('bcv-silent-on', !!state.silent && silentHere());
+  function setSilent(on, { redraw = true } = {}) {
+    on = !!on && silentHere();
+    if (on === !!state.silent) return;
+    state.silent = on;
+    paintSilent();
+    Promise.resolve(BCV.store.setPref('dashSilent', on)).catch(() => {});
+    if (redraw && state.route?.screen === 'dashboard') render({ quiet: true });
   }
 
   /** Simpl Courses settings, opened by the background (a content script cannot open it itself). */
@@ -1438,7 +1456,7 @@
     state.quizOpen = false;
     state.submitOpen = false;
     html.classList.remove('bcv-quiz', 'bcv-quiz-fb'); // the quiz screen puts them back while an attempt or its feedback is on screen
-    if (r.screen !== 'dashboard') html.classList.remove('bcv-dash-silent'); // (2.99.125: the Dashboard's Silent mode, which it keeps across its own redraws)
+    if (r.screen !== 'dashboard') html.classList.remove('bcv-dash-silent'); // (2.99.125: the Dashboard's Silent look, which it keeps across its own redraws; Silent itself, html.bcv-silent-on, stays: setSilent)
     punchOut(); // a native screen punches back in while it builds
     BCV.preview?.close(); // a preview beside the list belongs to the list it was opened from
     // a sheet (a counter's list, the calendars, a rubric, GPA settings) belongs to the screen it
@@ -2238,6 +2256,8 @@
       quietCanvasFlash(); // (Canvas's banners: passed on or dropped from here on, see above)
       if (!started) {
         started = true;
+        // (2.99.127) Silent as it was left, before the first screen is drawn (no colour flashing up first)
+        if (silentHere()) { state.silent = !!(await BCV.store.pref('dashSilent', false).catch(() => false)); paintSilent(); }
         loadShellData();
         try { await render(); } finally { flashReady = true; quietCanvasFlash(); } // (what waited for the first screen)
       }
@@ -2501,6 +2521,7 @@
     isDark: () => state.dark,
     holds: () => !!(state.submitOpen || state.quizOpen), // something on the page would be lost by a reload (a hand-in being written, a quiz attempt): the layout tier waits (early.js)
     openSettings,
+    setSilent, // (2.99.127: the Dashboard's Silent and Exit; the account's menu)
     recover, // (the suite checks that a quiz is never reloaded out from under)
     checkVersions, versionsDisagree, // (the suite makes the stamps disagree and reads what the page says)
     syncQuizFlag, // (the quiz screen says when an attempt opens and closes)

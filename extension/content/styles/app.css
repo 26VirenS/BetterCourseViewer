@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.126"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.127"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -1300,16 +1300,20 @@ html.bcv-on.bcv-dash-silent:not(.bcv-phone):not(.bcv-punch) .bcv-main { backgrou
 /* (2.99.126) and the sidebar goes with it: words alone, in black, white and grey — no glyphs, no course colours, no photo,
  * no picture of anyone, no tints; the rows where they were and pressed as before, the one on show white on a grey wash. Its
  * button at the corner goes too (back, in grey, if the sidebar was folded away: the way to bring it back). */
-html.bcv-on.bcv-dash-silent:not(.bcv-phone):not(.bcv-punch) .bcv-side { background: #000 !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; border-right-color: rgba(255,255,255,.12) !important; color: rgba(255,255,255,.58); color-scheme: dark; }
-html.bcv-on.bcv-dash-silent:not(.bcv-phone):not(.bcv-punch) .bcv-side * { color: inherit !important; background-color: transparent !important; background-image: none !important; box-shadow: none !important; text-shadow: none !important; border-color: rgba(255,255,255,.12) !important; outline-color: rgba(255,255,255,.7) !important; }
-html.bcv-on.bcv-dash-silent:not(.bcv-phone):not(.bcv-punch) .bcv-side :is(svg:not(.bcv-brand__word), img, .bcv-nav__ic, .bcv-fav__dot, .bcv-fav__chev, .bcv-ctab__sq, .bcv-account__avatar, .bcv-brand__tile, .bcv-side__pic, .bcv-account__more) { display: none !important; }
-html.bcv-on.bcv-dash-silent:not(.bcv-phone):not(.bcv-punch) .bcv-side .bcv-brand__word :is(text, .bcv-brand__dot) { fill: #fff !important; }
-html.bcv-on.bcv-dash-silent:not(.bcv-phone):not(.bcv-punch) .bcv-side :is(.bcv-nav__item, .bcv-fav, .bcv-ctab).is-active { color: #fff !important; background-color: rgba(255,255,255,.13) !important; }
-@media (hover: hover) { html.bcv-on.bcv-dash-silent:not(.bcv-phone):not(.bcv-punch) .bcv-side :is(.bcv-nav__item, .bcv-fav, .bcv-ctab):hover { color: rgba(255,255,255,.92) !important; background-color: rgba(255,255,255,.07) !important; } }
-html.bcv-on.bcv-dash-silent:not(.bcv-phone):not(.bcv-punch) .bcv-side :is(.bcv-side__label, .bcv-nav__count, .bcv-account__sub, .bcv-hint) { color: rgba(255,255,255,.34) !important; }
-html.bcv-on.bcv-dash-silent:not(.bcv-phone):not(.bcv-punch) .bcv-side .bcv-account__name { color: #fff !important; }
-html.bcv-on.bcv-dash-silent:not(.bcv-phone):not(.bcv-punch) .bcv-side .bcv-side__bottom::before { background: #000 !important; } /* (the account's strip at the foot: its ground, black like the rest) */
-html.bcv-on.bcv-dash-silent:not(.bcv-phone):not(.bcv-punch) .bcv-side .bcv-account::after { content: '\22EF'; font: 600 18px/1 var(--bcv-font); } /* (⋯ in words: the account's menu, still there) */
+html.bcv-on.bcv-silent-on:not(.bcv-phone):not(.bcv-punch) .bcv-side { background: #000 !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; border-right-color: rgba(255,255,255,.12) !important; color: rgba(255,255,255,.58); color-scheme: dark; }
+html.bcv-on.bcv-silent-on:not(.bcv-phone):not(.bcv-punch) .bcv-side * { color: inherit !important; background-color: transparent !important; background-image: none !important; box-shadow: none !important; text-shadow: none !important; border-color: rgba(255,255,255,.12) !important; outline-color: rgba(255,255,255,.7) !important; }
+html.bcv-on.bcv-silent-on:not(.bcv-phone):not(.bcv-punch) .bcv-side :is(svg:not(.bcv-brand__word), img, .bcv-nav__ic, .bcv-fav__dot, .bcv-fav__chev, .bcv-ctab__sq, .bcv-account__avatar, .bcv-brand__tile, .bcv-side__pic, .bcv-account__more) { display: none !important; }
+html.bcv-on.bcv-silent-on:not(.bcv-phone):not(.bcv-punch) .bcv-side .bcv-brand__word :is(text, .bcv-brand__dot) { fill: #fff !important; }
+html.bcv-on.bcv-silent-on:not(.bcv-phone):not(.bcv-punch) .bcv-side :is(.bcv-nav__item, .bcv-fav, .bcv-ctab).is-active { color: #fff !important; background-color: rgba(255,255,255,.13) !important; }
+@media (hover: hover) { html.bcv-on.bcv-silent-on:not(.bcv-phone):not(.bcv-punch) .bcv-side :is(.bcv-nav__item, .bcv-fav, .bcv-ctab):hover { color: rgba(255,255,255,.92) !important; background-color: rgba(255,255,255,.07) !important; } }
+html.bcv-on.bcv-silent-on:not(.bcv-phone):not(.bcv-punch) .bcv-side :is(.bcv-side__label, .bcv-nav__count, .bcv-account__sub, .bcv-hint) { color: rgba(255,255,255,.34) !important; }
+html.bcv-on.bcv-silent-on:not(.bcv-phone):not(.bcv-punch) .bcv-side .bcv-account__name { color: #fff !important; }
+html.bcv-on.bcv-silent-on:not(.bcv-phone):not(.bcv-punch) .bcv-side .bcv-side__bottom::before { background: #000 !important; } /* (the account's strip at the foot: its ground, black like the rest) */
+html.bcv-on.bcv-silent-on:not(.bcv-phone):not(.bcv-punch) .bcv-side .bcv-account::after { content: '\22EF'; font: 600 18px/1 var(--bcv-font); } /* (⋯ in words: the account's menu, still there) */
+/* (2.99.127) Silent is the whole app's: the sidebar stays quiet (above) on every screen, and every other screen is as it
+ * is, in black and white — the whole page, sheets, menus, popups and the frames of a school's tools in them too. On the
+ * root, so nothing fixed in the page is held by it (a filter elsewhere would hold what is fixed inside it). */
+html.bcv-on.bcv-silent-on:not(.bcv-phone):not(.bcv-punch) { filter: grayscale(1); }
 html.bcv-on.bcv-dash-silent:not(.bcv-phone):not(.bcv-punch):not(.bcv-side-off) #bcv-sidetoggle { opacity: 0; pointer-events: none; }
 html.bcv-on.bcv-dash-silent:not(.bcv-phone):not(.bcv-punch).bcv-side-off #bcv-sidetoggle { background: rgba(255,255,255,.1); color: rgba(255,255,255,.6); } /* (the sidebar folded away: its button over the black) */
 .bcv-dash__coming { justify-content: flex-start; align-items: baseline; gap: 12px; padding: 0 4px; margin-bottom: -12px; }

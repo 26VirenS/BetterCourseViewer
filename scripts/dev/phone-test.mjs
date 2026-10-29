@@ -159,7 +159,7 @@ try {
   check(l.phone && l.root && l.tabbar === 'fixed' && l.glass && l.topbarHidden === true && !l.side, `phone layout: html.bcv-phone, root screen, a fixed glass tab bar, no top bar, no sidebar (${JSON.stringify(l)})`);
   check((await texts('.bcv-tabbar__item')).join(',') === 'Today,Courses,To Do,Grades,Calendar', `five tabs: ${(await texts('.bcv-tabbar__item')).join(', ')}`);
   check((await page.$eval('.bcv-tabbar__item.is-active', (e) => e.dataset.tab)) === 'dashboard', 'Today is the active tab');
-  check(await page.evaluate(() => !document.querySelector('.bcv-dash__silent, .bcv-silent') && !document.documentElement.classList.contains('bcv-dash-silent')), '(2.99.126) no Silent mode on the phone: it is the desktop web\'s alone');
+  check(await page.evaluate(() => !document.querySelector('.bcv-dash__silent, .bcv-silent') && !document.documentElement.classList.contains('bcv-dash-silent') && !document.documentElement.classList.contains('bcv-silent-on')), '(2.99.126) no Silent mode on the phone: it is the desktop web\'s alone');
   check((await texts('.bcv-ph-h1'))[0] === 'Today' && /^(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday), \w+ \d+$/.test((await texts('.bcv-ph-title__sub'))[0]), `large title with the date line: ${(await texts('.bcv-ph-title__sub'))[0]}`);
   // (2.98.36) the Dashboard's six counters, counted the Dashboard's way: Overdue and Graded land once each course's assignments are read
   await eventually(async () => !(await texts('.bcv-ph-stat')).some((t) => /…/.test(t)), 8000);

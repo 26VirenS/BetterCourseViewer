@@ -13,8 +13,6 @@
   let arrived = false;
   const arrivedBefore = () => { if (arrived) return true; try { return sessionStorage.getItem(ARRIVED) === '1'; } catch { return false; } };
   const markArrived = () => { arrived = true; try { sessionStorage.setItem(ARRIVED, '1'); } catch { /* (private window: this page's memory is enough) */ } };
-  // (2.99.125) Silent mode as last read: a redraw starts in it, rather than flashing the bar and the cards back first
-  let silentWas = false;
   const SILENT_MORE = 4; // (what comes after the next: so many lines under it)
 
   /** The counters' own lists — shared by the Dashboard and the phone's Today (2.98.36), so the two
@@ -226,9 +224,11 @@
     store.me().then((me) => { const first = String(me?.shortName || me?.name || '').trim().split(/\s+/)[0]; if (first && first !== 'Account') hello.textContent = `Good ${part}, ${first}`; }).catch(() => {});
     BCV.plan?.ready(); // (2.99.107) the plans, for the pills on the rows (they paint when it lands)
     const newTask = U.btn('New Task', { kind: 'xs', icon: IC.plus, cls: 'bcv-dash__new', title: 'Add a task of your own to To Do', onClick: () => { BCV.todoAddNext = true; app.go('/#todo'); } });
-    // (2.99.125) Silent mode (silentBlock, below): the desktop's alone — the phone has Today, and the apps draw their own
+    // (2.99.125) Silent mode (silentBlock, below): the desktop's alone — the phone has Today, and the apps draw their own.
+    // (2.99.127) Silent is the whole app's now (app.js setSilent: the other screens in black and white); here it is read
+    // from there, so a redraw starts in it rather than flashing the bar and the cards back first
     const desk = !BCV.phone?.active?.() && !self.BCVBridge?.native;
-    let silent = desk && silentWas;
+    let silent = desk && !!app.state.silent;
     const silentBtn = desk ? U.btn('Silent', { kind: 'xs', icon: IC.moon, cls: 'bcv-dash__silent', title: 'Silent mode: only what comes next, in large type on black', onClick: () => setSilent(true) }) : null;
     const paintSilent = () => {
       document.documentElement.classList.toggle('bcv-dash-silent', silent); // (the bar goes up out of view: app.css)
@@ -276,7 +276,7 @@
     const weightMap = (o) => (o && typeof o === 'object' && Object.keys(o).length ? new Map(Object.entries(o).map(([g, w]) => [String(g), Number(w) || 0])) : null);
     const groupWeights = (groups) => (Array.isArray(groups) ? new Map(groups.map((g) => [String(g.id), Number(g.group_weight) || 0])) : null);
     const freshWeightsP = Promise.all([favsP, ownWeightsP]).then(([fs, own]) => Promise.all((fs || []).map(async (c) => [c.id, weightMap(own[c.id]) || (c.weighted ? groupWeights(await store.assignmentGroups(c.id).catch(() => null)) : null)]))).then((e) => new Map(e)).catch(() => new Map());
-    const [planner, favs, courses, seen, savedView, settings, hidePref, overrides, kept, silentPref] = await Promise.all([
+    const [planner, favs, courses, seen, savedView, settings, hidePref, overrides, kept] = await Promise.all([
       store.planner().catch(() => null),
       favsP,
       store.courses().catch(() => []),
@@ -286,7 +286,6 @@
       store.pref('dashHideDone', false).catch(() => false),
       store.plannerOverrides().catch(() => []), // what the X on the Overdue list wrote, on any device (see below)
       store.keptAssignments().catch(() => null),
-      store.pref('dashSilent', false).catch(() => false), // (2.99.125: kept per site, like Hide completed)
     ]);
     if (!ctx.alive()) return screen;
     // the counters' lists, the same ones the phone's Today counts (workLists above): from the kept copy when it holds
@@ -301,8 +300,7 @@
     // the view saved on the Canvas profile, unless it is one that was switched off here
     view = views.some(([k]) => k === savedView) ? savedView : views[0][0];
     hideDone = !!hidePref;
-    silent = desk && !!silentPref;
-    silentWas = silent;
+    silent = desk && !!app.state.silent;
     paintSilent();
     // Unread: the announcement's own read state when we know it, else the stream's flag; either
     // way an item opened from here loses its dot. The activity rows on screen are kept here so
@@ -1094,11 +1092,11 @@
     // The Dashboard with nothing on it but what comes next: black, the next piece of work (or event, or task of the
     // student's own) in large type with when it is and its course, and the few after it under it. No head, no counters,
     // no cards; the bar across the top goes up out of view (app.css html.bcv-dash-silent) and the sidebar stays. Kept per site,
-    // like Hide completed; Exit Silent Mode, at the top right, puts everything back.
+    // like Hide completed; Exit Silent Mode, at the top right, puts everything back. (2.99.127) Silent is the whole app's
+    // (app.js setSilent): the other screens stay in it, in black and white, until it is left, here or in the account's menu.
     function setSilent(on) {
       silent = on;
-      silentWas = on;
-      Promise.resolve(store.setPref('dashSilent', on)).catch(() => {});
+      app.setSilent(on, { redraw: false });
       paintSilent();
       renderBody();
       scrollTo(0, 0);
