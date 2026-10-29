@@ -38,9 +38,10 @@ private struct UpdateFailure: LocalizedError {
 /// checksum, unpacks it with ditto, checks the app inside is Simpl, signed, and signed by the same team as this copy,
 /// puts it in this copy's place (this copy goes to the Bin; into the Applications folder when this copy cannot be
 /// replaced where it is) and opens it as this one quits. A development run never checks or installs anything.
-/// (1.3.102) Between those checks it looks for a Critical Update alone every minute (1.3.109; five before) (`scanForCritical`), and as
-/// the Mac wakes or Simpl comes to the front when the last look is older than that: the feed read without the cache,
-/// and nothing shown unless it names one — then the usual check runs and the Critical Update goes in as ever.
+/// (1.3.102) Between those checks it looks at the feed every half minute (1.3.194; every minute, and for a Critical
+/// Update alone, before) (`scanFeed`), and as the Mac wakes or Simpl comes to the front when the last look is older than
+/// that: the feed read without the cache, and nothing shown unless it names a newer version — then the usual check runs
+/// and the update goes in as ever.
 @MainActor
 final class Updater: ObservableObject {
 
@@ -79,12 +80,13 @@ final class Updater: ObservableObject {
     /// Simpl for Mac's releases, for Earlier Versions (each `mac-v<version>`, its zip `Simpl-Mac-<version>.zip`).
     private static let releasesAPI = "https://api.github.com/repos/26VirenS/BetterCourseViewer/releases"
     let interval: TimeInterval = 3600 // (1.2.19: every hour; a check is one small request)
-    /// (1.3.102) How often a Critical Update is looked for while Simpl runs: a Critical Update reaches a Mac in use
-    /// within a minute of being published (1.3.109; five before), not at the next hourly check — the feed asked only
-    /// whether it changed (If-None-Match), so all the minutes it has not, nothing comes back but a 304.
-    let criticalInterval: TimeInterval = 60
-    /// (1.3.109) On an expensive network (a phone's hotspot) or in Low Power Mode: every five minutes, as before.
-    let criticalIntervalSparing: TimeInterval = 300
+    /// (1.3.102) How often the feed is looked at while Simpl runs: a new version reaches a Mac in use within the minute
+    /// of being published (1.3.194: every half minute, any newer version; 1.3.109: every minute, a Critical Update
+    /// alone), not at the next hourly check — the feed asked only whether it changed (If-None-Match), so all the
+    /// looks it has not, nothing comes back but a 304.
+    let lookInterval: TimeInterval = 30
+    /// (1.3.109) On an expensive network (a phone's hotspot) or in Low Power Mode: every five minutes.
+    let lookIntervalSparing: TimeInterval = 300
     private static let path: NWPathMonitor = {
         let m = NWPathMonitor()
         m.start(queue: DispatchQueue(label: "simpl.updater.path"))
@@ -92,7 +94,7 @@ final class Updater: ObservableObject {
     }()
     private var lookEvery: TimeInterval {
         let p = Self.path.currentPath
-        return p.isExpensive || p.isConstrained || ProcessInfo.processInfo.isLowPowerModeEnabled ? criticalIntervalSparing : criticalInterval
+        return p.isExpensive || p.isConstrained || ProcessInfo.processInfo.isLowPowerModeEnabled ? lookIntervalSparing : lookInterval
     }
     /// (1.3.109) The feed as the last look read it, and the site's tag for it.
     private var criticalTag: (url: URL, tag: String, data: Data)?
@@ -157,19 +159,19 @@ final class Updater: ObservableObject {
     // MARK: - The schedule
 
     /// From the app's launch: the feed read now when the last look is older than an hour, and looked at again every
-    /// five minutes (1.3.102; ten before) and whenever Simpl comes to the front for the hour being up — a Mac asleep
-    /// does not count its hours — with a look for a Critical Update alone each time the hour is not up
-    /// (`scanForCritical`), and as the Mac wakes. One timer does all of it. An update waiting to install itself goes in
+    /// half minute (1.3.194; five minutes from 1.3.102, ten before) and whenever Simpl comes to the front for the hour
+    /// being up — a Mac asleep does not count its hours — with a look at the feed for a newer version each time the
+    /// hour is not up (`scanFeed`), and as the Mac wakes. One timer does all of it. An update waiting to install itself goes in
     /// as soon as nothing holds it back (`quiet`).
     func start() {
         guard !started, !Self.isDevelopmentRun else { return }
         started = true
         _ = AppPlacement.originalURL // (where this copy is, worked out before an update moves anything)
         checkIfDue()
-        let t = Timer(timeInterval: criticalInterval, repeats: true) { @Sendable _ in
+        let t = Timer(timeInterval: lookInterval, repeats: true) { @Sendable _ in
             Task { @MainActor in Updater.shared.tick() }
         }
-        t.tolerance = 10
+        t.tolerance = 3
         _ = Self.path // (the network watched from the start: its first answer takes a moment)
         RunLoop.main.add(t, forMode: .common)
         timer = t
@@ -180,7 +182,7 @@ final class Updater: ObservableObject {
         observers.append(center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { @Sendable _ in
             Task { @MainActor in Updater.shared.installIfQuiet() }
         })
-        // (1.3.102) a Mac woken: a few seconds for its network to come back, then a look if the last is a minute old
+        // (1.3.102) a Mac woken: a few seconds for its network to come back, then a look if the last is half a minute old
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { @Sendable _ in
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 8_000_000_000)
@@ -190,16 +192,16 @@ final class Updater: ObservableObject {
     }
 
     private func tick() {
-        // (1.3.72) a Critical Update that failed (no network, a download cut off) is tried again at each tick (1.3.109:
-        // every minute)
+        // (1.3.72) a Critical Update that failed (no network, a download cut off) is tried again at each tick (1.3.194:
+        // every half minute)
         if criticalNotice != nil, case .failed = state { check() }
         lookIfDue()
         installIfQuiet()
     }
 
-    /// (1.3.102) The hourly check when it is due, else the look for a Critical Update alone: never both at once.
+    /// (1.3.102) The hourly check when it is due, else the look at the feed: never both at once.
     private func lookIfDue() {
-        if !checkIfDue() { scanForCritical() }
+        if !checkIfDue() { scanFeed() }
     }
 
     /// The feed read when the last look is an hour old (or was never made, or the clock went back); whether it was.
@@ -234,44 +236,77 @@ final class Updater: ObservableObject {
         return true
     }
 
-    /// (1.3.102) When the feed was last asked, by a check or a look for a Critical Update alone (`scanForCritical`),
+    /// (1.3.102) When the feed was last asked, by a check or a look (`scanFeed`),
     /// answered or not: from when the asking began, so a slow answer does not push the next look a tick on, and no
     /// answer at all (no network, the feed failing) is not asked again each time Simpl comes to the front. Nil before
     /// this run's first; `lastCheck` (kept across launches) stands in for it till then.
     private var lastAsked: Date?
     private var scanning = false
+    /// (1.3.194) The version a look last handed to the check: not handed again at every look this run (a download of
+    /// it that failed waits for the hourly check, rather than starting again every half minute).
+    private var lookedFor: String?
 
-    /// (1.3.102) A look for a Critical Update alone, when the feed was last read — by a check or a look — a minute
-    /// ago or more: the feed this Mac reads (its beta feed for betas, which names `criticalVersion` too) read without the
-    /// cache, with a short timeout, and nothing shown unless it names a Critical Update newer than this copy that this
-    /// Mac can run; then the usual check (`check`), which puts it in at once with its notice over the window. None
-    /// while a check, a download or an install is under way, or once a Critical Update has been found (its notice is up;
-    /// one that failed is tried again by `tick`) — so a look never stacks on another, nor a notice on a notice.
-    func scanForCritical() {
+    /// (1.3.102) A look at the feed, when it was last read — by a check or a look — half a minute ago or more (1.3.194;
+    /// a minute before): the feed this Mac reads (its beta feed for betas, which names `criticalVersion` too) read
+    /// without the cache, with a short timeout, and nothing shown unless it names a version newer than this copy that
+    /// this Mac can run; then the usual check (`check`), which puts it in as ever — a Critical Update at once with its
+    /// notice over the window. (1.3.194) Any newer version, not a Critical Update alone (1.3.193 and earlier): once a
+    /// version, not while paused (Developer window), nor for the version already found, nor for one a version put
+    /// back holds back. None while a check, a download or an install is under way, or once a Critical Update has been
+    /// found (its notice is up; one that failed is tried again by `tick`) — so a look never stacks on another, nor a
+    /// notice on a notice.
+    func scanFeed() {
         guard started, !scanning, criticalNotice == nil else { return }
         switch state {
         case .checking, .downloading, .installing: return
         case .available(let r) where r.critical: return
         default: break
         }
-        // (a quarter minute's slack: the timer's ticks, a minute apart give or take its ten seconds' tolerance, can come
-        // 50 s apart, and never one is skipped for that)
+        // (a quarter of a look's slack: the timer's ticks, half a minute apart give or take its three seconds'
+        // tolerance, can come 27 s apart, and never one is skipped for that)
         if let last = lastAsked ?? lastCheck {
             let since = Date().timeIntervalSince(last)
-            if since >= 0 && since < lookEvery - 15 { return }
+            if since >= 0 && since < lookEvery - min(15, lookEvery / 4) { return }
         }
         scanning = true
         lastAsked = Date()
         Task {
-            let critical = await self.readForCritical()
+            let named = await self.readFeed()
             self.scanning = false
-            guard let critical else { return } // (no answer: looked for again at the next tick, a minute on)
-            if critical { NSLog("[Simpl] update: the feed names a Critical Update; checking"); self.check() }
+            switch named {
+            case nil, .nothing?:
+                return // (nothing new, or no answer: looked at again at the next tick, half a minute on)
+            case .critical?:
+                NSLog("[Simpl] update: the feed names a Critical Update; checking")
+                self.check()
+            case .newer(let version)?:
+                guard !self.paused, version != self.lookedFor, !self.hasFound(version), !self.isHeldBack(version) else { return }
+                self.lookedFor = version
+                NSLog("[Simpl] update: the feed names %@; checking", version)
+                self.check()
+            }
         }
     }
 
-    /// (1.3.102) Whether the feed names a Critical Update for this copy; nil when it could not be read.
-    private func readForCritical() async -> Bool? {
+    /// (1.3.194) What the feed names for this copy.
+    private enum Named { case nothing, newer(String), critical }
+
+    /// (1.3.194) The version found and offered (or downloaded, waiting for a quiet moment) is `version`.
+    private func hasFound(_ version: String) -> Bool {
+        if ready?.release.version == version { return true }
+        if case .available(let release) = state { return release.version == version }
+        return false
+    }
+
+    /// (1.3.194) `version` is held back by a version put back: no newer than the one it replaced.
+    private func isHeldBack(_ version: String) -> Bool {
+        guard let from = rolledBackFrom else { return false }
+        return !Self.isNewer(version, than: from)
+    }
+
+    /// (1.3.102) What the feed names for this copy — a Critical Update, a newer version (1.3.194), or nothing new that
+    /// this Mac runs; nil when it could not be read.
+    private func readFeed() async -> Named? {
         do {
             var url = feedURL
             var (data, response) = try await Self.ask(url, timeout: 10, tag: criticalTag?.url == url ? criticalTag?.tag : nil)
@@ -286,8 +321,10 @@ final class Updater: ObservableObject {
             guard status == 200 || status == 304,
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
             // (as the check will find it: a version with its zip, that this Mac's macOS runs)
-            guard (json["url"] as? String).flatMap({ URL(string: $0) }) != nil else { return false }
-            return Self.namesCritical(json, over: currentVersion) && Self.osNeeded(json) == nil
+            guard (json["url"] as? String).flatMap({ URL(string: $0) }) != nil, Self.osNeeded(json) == nil,
+                  let version = (json["version"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) else { return .nothing }
+            if Self.namesCritical(json, over: currentVersion) { return .critical }
+            return Self.isNewer(version, than: currentVersion) ? .newer(version) : .nothing
         } catch {
             return nil
         }
