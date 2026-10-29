@@ -2,7 +2,7 @@
 // The website's pictures of the interface (site/public/img/): the extension in Chromium at 2×, on the mock Canvas and
 // the mock Brightspace, signed in as their made-up students at a made-up school ("Lakeside University", a plain crest
 // for its logo, its courses, work and classmates made up too: scripts/dev/site-names.mjs), in light and in dark. Each
-// picture is written as a 2× WebP and a 1× WebP for the page's srcset; the four moments (search, quiz, phone, grades)
+// picture is written as a 2× WebP and a 1× WebP for the page's srcset; the five moments (search, quiz, phone, grades, silent)
 // are filmed as well, each a looping animated WebP (<name>-motion.webp); each browser tool is pictured once, at 1×
 // (web-tool-<key>), for the tool chips' previews.
 //   node scripts/dev/site-shots.mjs [out-dir]        (default: site/public/img)
@@ -97,7 +97,7 @@ try {
   const pause = (ms) => page.waitForTimeout(ms);
   const look = async (dark) => { await settings({ appearance: { darkMode: dark ? 'on' : 'off' } }); await page.waitForTimeout(250); };
   // (SITE_SHOTS: a comma list of the pictures to make — dashboard, grades, course, calendar, quiz, brightspace, search,
-  //  phone, tools, tool-previews, canvas — else every one)
+  //  phone, silent, tools, tool-previews, canvas — else every one)
   const only = new Set(String(process.env.SITE_SHOTS || '').split(',').map((x) => x.trim()).filter(Boolean));
   const want = (name) => !only.size || only.has(name);
 
@@ -198,6 +198,24 @@ try {
         await page.waitForSelector('.bcv-sb__done', { timeout: 15000 }).catch(() => {});
         await pause(1200);
       }, 1600);
+    }
+    if (want('silent')) {
+      // Silent mode: from the Dashboard to only what comes next, in large type on black; filmed as Silent is pressed and
+      // the next piece of work is struck out (put back, and Silent left, after: the passes after it see the Dashboard)
+      await page.goto(`${BASE}/`);
+      await page.waitForSelector('.bcv-dash__silent', { timeout: 20000 });
+      await film(`web-silent${sfx}`, async () => {
+        await page.click('.bcv-dash__silent');
+        await page.waitForSelector('.bcv-silent .bcv-silent__label', { timeout: 15000 });
+        await pause(2400);
+        await page.click('.bcv-silent__next .bcv-silent__strike');
+        await pause(1800);
+      }, 1600);
+      await page.click('.bcv-silent__next .bcv-silent__strike'); // (put back)
+      await page.waitForTimeout(900);
+      await shot(`web-silent${sfx}`);
+      await page.click('.bcv-silent__exit');
+      await page.waitForSelector('.bcv-stat', { timeout: 15000 }).catch(() => {});
     }
     if (want('tools')) {
       // the tools: their page, then the periodic table opened over it
