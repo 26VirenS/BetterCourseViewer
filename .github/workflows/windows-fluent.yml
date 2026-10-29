@@ -420,6 +420,7 @@ jobs:
           Shot 'calendar-plan-edit-forest' '1366x778' 50 ($mock + @('--appearance', 'dark', '--theme', 'Forest', '--place', 'calendar', '--cal-view', 'week', '--open', 'cal-plan-edit'))
           # (0.3.63) the week with To Do beside it and a row of To Do held over Wednesday at 1 PM, where it would be planned
           Shot 'calendar-week-todo-drop' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'calendar', '--cal-view', 'week', '--open', 'cal-todo-drop'))
+          Shot 'calendar-week-unplan' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'calendar', '--cal-view', 'week', '--open', 'cal-unplan'))
           Shot 'calendar-list' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'calendar', '--cal-view', 'list'))
           # (0.3.64) To Do & Calendar: To Do opened (--place todo) is the calendar with To Do in its panel beside it — the month
           # in light, the week in dark, the list — each scrolling inside itself, the page held still; To Do's ⋯ menu; the week
