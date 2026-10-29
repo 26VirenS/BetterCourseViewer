@@ -175,23 +175,33 @@ internal static class AssignKit
         return K.IconTile(sym, K.Tone(tone), size);
     }
 
-    /// <summary>The app Windows opens a kind of file in, by name ("Microsoft Edge"), or null.</summary>
+    /// <summary>The app Windows opens a kind of file in, by name ("Microsoft Edge"), or null — null too when it has none
+    /// and would only ask (0.3.85: its "Pick an app", OpenWith.exe, was named as if it were the app).</summary>
     public static string? AppFor(string name)
     {
         var ext = Path.GetExtension(name);
         if (ext.Length == 0) return null;
         try
         {
-            uint size = 0;
-            const uint friendlyAppName = 4, noTruncate = 0x20;
-            AssocQueryString(noTruncate, friendlyAppName, ext, null, null, ref size);
-            if (size == 0) return null;
-            var sb = new StringBuilder((int)size);
-            if (AssocQueryString(noTruncate, friendlyAppName, ext, null, sb, ref size) != 0) return null;
-            var s = sb.ToString().Trim();
-            return s.Length == 0 ? null : s;
+            const uint executable = 2, friendlyAppName = 4;
+            var exe = Assoc(executable, ext);
+            if (exe == null || Path.GetFileName(exe).Equals("OpenWith.exe", StringComparison.OrdinalIgnoreCase)) return null;
+            return Assoc(friendlyAppName, ext);
         }
         catch { return null; }
+    }
+
+    /// <summary>What Windows says of a kind of file (its app's name, its program), or null; never the unknown kind's.</summary>
+    private static string? Assoc(uint what, string ext)
+    {
+        const uint noTruncate = 0x20, ignoreUnknown = 0x400;
+        uint size = 0;
+        AssocQueryString(noTruncate | ignoreUnknown, what, ext, null, null, ref size);
+        if (size == 0) return null;
+        var sb = new StringBuilder((int)size);
+        if (AssocQueryString(noTruncate | ignoreUnknown, what, ext, null, sb, ref size) != 0) return null;
+        var s = sb.ToString().Trim();
+        return s.Length == 0 ? null : s;
     }
 
     /// <summary>"Open in Microsoft Edge", or "Open in default app" when Windows names none.</summary>
