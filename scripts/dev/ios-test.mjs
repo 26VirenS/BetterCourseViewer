@@ -673,6 +673,17 @@ try {
   const dl34 = await nc('dashList');
   const WEEKDAY = /^(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)$/;
   check(dl34.days.length > 0 && dl34.days.every((d) => (['Today', 'Tomorrow', 'Yesterday'].includes(d.title) ? /^\w{3}, \w{3} \d{1,2}(, \d{4})?$/ : WEEKDAY.test(d.title) ? /^\w{3} \d{1,2}(, \d{4})?$/ : WEEKDAY).test(d.date)), `Coming up's days: "Today" over "Tue, Oct 13", "Thursday" over "Oct 15", never "Tuesday, October 13": ${JSON.stringify(dl34.days.map((d) => [d.title, d.date]))}`);
+  // (Mac 1.3.190, Windows 0.3.84) Silent mode's read: what is still ahead, soonest first — nothing done, handed in or
+  // past — each with when it is; one struck out is gone from the next read, unless it is held (still struck out on show)
+  const si34 = await nc('dashSilent');
+  const siNow = Date.now();
+  check(!si34.error && si34.rows.length > 1 && si34.rows.every((r, i, a) => r.id && r.title && r.at >= siNow - 60000 && !r.done && ['Due', 'Starts', ''].includes(r.verb) && (i === 0 || a[i - 1].at <= r.at)), `Silent mode reads what is still ahead, soonest first, none of it done: ${JSON.stringify(si34.rows?.slice(0, 3))}`);
+  const siFirst = si34.rows[0];
+  await nc('complete', { id: siFirst.id, done: true });
+  const siGone = await nc('dashSilent');
+  const siHeld = await nc('dashSilent', { held: [siFirst.id] });
+  await nc('complete', { id: siFirst.id, done: false });
+  check(!siGone.rows.some((r) => r.id === siFirst.id) && siHeld.rows.some((r) => r.id === siFirst.id && r.done), 'one struck out in Silent mode leaves the next read, and stays (struck through) while it is held');
   // Canvas's own words about a lock carry its times as every time is written ("12am" is "12:00 AM")
   await sp.route('**/api/v1/courses/101/pages/locked-notes*', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ title: 'Locked notes', url: 'locked-notes', body: '<p>Notes</p>', locked_for_user: true, lock_explanation: 'This page is locked until Oct 20 at 12am. The unit closes Oct 19 at 11:59pm.' }) }));
   const lockedPg34 = await nc('page', { ctx: 'courses/101', slug: 'locked-notes' });

@@ -6,16 +6,20 @@ import AppKit
 /// it is signed in to stays its accessibility label.
 struct SchoolHeader: View {
     @EnvironmentObject private var engine: Engine
+    /// (1.3.190) Silent mode is up: the word alone, in white (its dot too).
+    @Environment(\.silentUp) private var silent
 
     var body: some View {
         let school = engine.snapshot?.site.flatMap { $0.isEmpty ? nil : $0 }
         HStack(spacing: 10) {
-            Image("SimplTile")
-                .resizable()
-                .interpolation(.high)
-                .frame(width: 32, height: 32)
-                .overlay(RoundedRectangle(cornerRadius: 7.3, style: .continuous).strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5)) // (black on black: its edge)
-            SimplWordmark(size: 27)
+            if !silent {
+                Image("SimplTile")
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 32, height: 32)
+                    .overlay(RoundedRectangle(cornerRadius: 7.3, style: .continuous).strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5)) // (black on black: its edge)
+            }
+            SimplWordmark(size: 27, dot: silent ? Color.white : nil)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 18)
@@ -30,6 +34,8 @@ struct SchoolHeader: View {
 /// its capitals (at 28–31 % and 66–69 % of their height down), and a blue dot sitting on the baseline after it.
 struct SimplWordmark: View {
     var size: CGFloat
+    /// (1.3.190) The dot's colour where it is not the blue (Silent mode's white).
+    var dot: Color? = nil
 
     var body: some View {
         let font = NSFont.systemFont(ofSize: size, weight: .semibold)
@@ -56,7 +62,7 @@ struct SimplWordmark: View {
                     }
                 )
             Circle()
-                .fill(Color(red: 10 / 255, green: 132 / 255, blue: 1))
+                .fill(dot ?? Color(red: 10 / 255, green: 132 / 255, blue: 1))
                 .frame(width: 18 * unit, height: 18 * unit)
                 .alignmentGuide(.lastTextBaseline) { d in d[.bottom] - 1 * unit }
         }

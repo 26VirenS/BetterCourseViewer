@@ -58,6 +58,8 @@ struct DashboardView: View {
     @State private var holdToken = UUID()
     @Namespace private var morph
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// (1.3.190) Silent mode: only what comes next, in large type on black (DashboardSilent.swift).
+    @ObservedObject private var silent = SilentMode.shared
 
     // (written out: the state above is private)
     init(active: Bool, version: Int, brightspace: Bool) {
@@ -81,7 +83,10 @@ struct DashboardView: View {
     var body: some View {
         let _ = LiveTrace.drew("dashboard") // (1.3.80: a live check's line says how many times it drew the page)
         Group {
-            if let d = model.data {
+            if silent.shown {
+                DashSilentView(active: active) // (1.3.190: in place of the whole Dashboard, which reads on under it)
+                    .transition(.opacity)
+            } else if let d = model.data {
                 page(d)
             } else {
                 LoadState(error: model.error) { Task { await load() } }
@@ -96,7 +101,8 @@ struct DashboardView: View {
         }
         .openTimed("Dashboard", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.source)
         // (1.3.80) checked live while it is the screen showing: only what changed is put in place
-        .liveChecks("dashboard", shown: active, since: { marks.at }) { _, age in try await liveCheck(age) }
+        // (1.3.190: not while Silent mode is up — it checks what it shows itself)
+        .liveChecks("dashboard", shown: active && !silent.shown, since: { marks.at }) { _, age in try await liveCheck(age) }
         .task(id: version) {
             if active { await load() } else { behind = true }
         }
@@ -169,7 +175,7 @@ struct DashboardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// The view chosen (kept on this Mac) and New Task (⌘N): its words beside its symbol.
+    /// The view chosen (kept on this Mac), Silent mode (1.3.190) and New Task (⌘N): its words beside its symbol.
     private var viewControls: some View {
         HStack(spacing: 10) {
             Picker("View", selection: $chosen.animation(Motion.gentle)) {
@@ -181,6 +187,14 @@ struct DashboardView: View {
             .labelsHidden()
             .fixedSize()
             .help("Cards, a list by day, or recent activity")
+            Button {
+                if open != nil { setOpen(nil) }
+                withAnimation(Motion.gentle) { silent.on = true }
+            } label: {
+                Label("Silent", systemImage: "moon")
+            }
+            .glassButton()
+            .help("Silent mode: only what comes next, in large type on black")
             Button { engine.newTask() } label: {
                 Label("New Task", systemImage: "plus")
             }

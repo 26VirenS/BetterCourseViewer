@@ -492,6 +492,8 @@ ui_review() {
   MODE=light shoot light-01g-dashboard-cards 14 -SimplDashView cards
   MODE=light SIZE=1440x900 shoot light-01h-dashboard-cards-wide 14 -SimplDashView cards
   MODE=light shoot light-01u-counter-unread 30 -SimplSheet unread # (1.3.80: up to 30 seconds for its list, as the others)
+  # (1.3.190) Silent mode: in the light look too the window goes dark, the sidebar in words alone
+  MODE=light shoot light-01s-dashboard-silent 16 -SimplDashSilent YES
   MODE=light shoot light-30b-palette-sum 14 -SimplOpen "palette:12*4"
   MODE=light shoot light-30d-palette-instant 20 -SimplOpen "palette:quiz" # (1.3.136: the school's results under the field before Return)
   # (1.3.152) the floating search: the four kinds before anything is typed; /open's tool asking which assignment

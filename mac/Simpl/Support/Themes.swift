@@ -832,13 +832,18 @@ private struct SidebarThemeLabelBody: View {
     let configuration: LabelStyleConfiguration
     @Environment(\.sidebarPlace) private var showing
     @Environment(\.sidebarRowPlace) private var row
+    /// (1.3.190) Silent mode is up: the words alone — white on the row showing, grey on the rest.
+    @Environment(\.silentUp) private var silent
 
     @ObservedObject private var store = AppearanceStore.shared
 
     var body: some View {
         // (1.3.177: the sidebar's own colour, where it has one)
         let own = store.tints[.side] != nil ? AppearanceStore.tintsNow[.side] : nil
-        if Theme.themed || own != nil, let row, row == showing {
+        if silent {
+            configuration.title
+                .foregroundStyle(row != nil && row == showing ? Color.primary : Color.secondary)
+        } else if Theme.themed || own != nil, let row, row == showing {
             Label {
                 configuration.title
             } icon: {

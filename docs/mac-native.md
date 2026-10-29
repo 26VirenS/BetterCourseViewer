@@ -126,6 +126,18 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   given, so it always shows its whole header and list. Under Reduce Motion nothing grows, its height either: the panel
   fades in over its tile as the tile fades out under it. (The compact strip of 1.3.78 and the popup over the window of
   1.3.79, which faded in, are gone.)
+- **Silent mode (1.3.190; the web's of 2.99.125–126, the same on Windows).** Silent, by the view and New Task, puts
+  the whole Dashboard away for what comes next alone (`DashSilentView`, Screens/DashboardSilent.swift): black, "Next"
+  and the next piece of work (or event, or task of one's own) in large type, how soon in words that count down within
+  the day ("Due in 4 h 40 min"), its day, time and course, then "Then" and the four after it — from the engine's
+  `dashSilent` (what is still ahead, soonest first: not done, handed in or dismissed, in the courses on the Dashboard).
+  A press on an item's words strikes it out (`complete`): a line drawn through them left to right (a `TextRenderer` on
+  macOS 15, the type's own line before) and the item dimmed, still listed while Silent stays up (`held`), to put back
+  with a press; Open beside them, while the pointer is on the item, opens it. The sidebar goes with it (`\.silentUp`):
+  black, words alone — no glyphs, chevrons, course colours, photo or avatar, the logo's tile gone and its dot white —
+  and the window drawn dark (`SilentWindowLook`), its toolbar over the black. Kept on this Mac (`SimplDashSilent`); Exit
+  Silent Mode at the top right brings the Dashboard back. The tour and Appearance put it by while they are on. Checked
+  live on its own (`dashboard silent`); the words are drawn again each half minute.
 - **The Dashboard and the window, after the UI review (the home findings; the same on Windows).** The view (Cards,
   List, Activity) and a labelled New Task sit in the page by the greeting, so a tool pinned to the toolbar never pushes
   them into its » menu; on a one-column page the view chosen comes straight under the counters. Each row of tiles shows

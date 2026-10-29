@@ -29,6 +29,7 @@ final class AnswerMemo {
         "resolveUrl", "pageFor", "search", "toolLaunch", "quizIntro", "quizRules", "quizAttempt", "quizFeedback",
         "composeContexts", "recipients", "gradeNeeded", "settingsInfo", "settingsExport", "historyExport", "convertInfo",
         "convertFile", "reminders", "watchInfo", "setupInfo", "whatsNew", "appearance", "moreHistory", "moreHelp", "appointments",
+        "dashSilent", // (1.3.190: Silent mode, read afresh each time — the planner it reads from is held by the engine)
     ]
     /// A read's arguments that set a preference as it reads (To Do's grouping and Show Completed, the Dashboard's Hide
     /// Completed, the calendar's view) or ask the page to read afresh (a course's grades): its answer is the plain read's

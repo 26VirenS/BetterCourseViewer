@@ -184,6 +184,7 @@ struct MoreSection: View {
 private struct MoreSidebarRow: View {
     let item: MoreItem
     @EnvironmentObject private var engine: Engine
+    @Environment(\.silentUp) private var silent
 
     var body: some View {
         HStack(spacing: 8) {
@@ -193,7 +194,7 @@ private struct MoreSidebarRow: View {
                 MoreGlyph(item: item)
             }
             Spacer(minLength: 4)
-            if item.external == true {
+            if item.external == true, !silent { // (1.3.190: no glyphs while Silent mode is up)
                 Image(systemName: "arrow.up.right.square")
                     .font(.system(size: 11.5, weight: .medium))
                     .foregroundStyle(.tertiary)

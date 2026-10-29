@@ -23,11 +23,15 @@ struct MainShell: View {
     @ObservedObject private var tour = MacTour.shared
     /// (1.3.113) Appearance on: the toolbar's buttons rest, as for the tour.
     @ObservedObject private var appearanceMode = AppearanceMode.shared
+    /// (1.3.190) Silent mode, up while the Dashboard is the screen showing: the sidebar goes black, in words alone.
+    @ObservedObject private var silent = SilentMode.shared
 
     var body: some View {
         let touring = tour.step != nil || appearanceMode.on
+        let silentUp = silent.shown && engine.nav.current.place == .dashboard && engine.nav.current.path.isEmpty
         NavigationSplitView(columnVisibility: $columns) {
             Sidebar()
+                .environment(\.silentUp, silentUp)
                 .id(appearance.revision) // (1.3.1: a colour worn, the sidebar drawn again in it — never the whole split view)
                 .tourSpot(.sidebar)
                 .navigationSplitViewColumnWidth(min: 210, ideal: 270, max: 360)
@@ -46,6 +50,11 @@ struct MainShell: View {
         // (1.3.153, 1.3.155) New Window, while a large popup is up: a little black tab hanging from the menu bar in full
         //  screen, a black button beside the window's buttons otherwise (Shell/MenuBarTab.swift)
         .background { MenuBarTabProbe(sidebarShown: columns != .detailOnly, engine: engine) }
+        // (1.3.190) Silent mode up: the window dark — its toolbar over the black — and its own look again after; (the tour
+        //  and Appearance show the whole Dashboard: Silent mode is put by while they are on, its choice kept)
+        .background { SilentWindowLook(on: silentUp) }
+        .onAppear { if silent.held != touring { silent.held = touring } }
+        .onChange(of: touring) { _, now in withAnimation(Motion.gentle) { silent.held = now } }
         .overlay { TourOverlay(columns: $columns) } // (1.2) the Mac tour (Shell/Tour.swift)
         .overlay { AppearanceOverlay(columns: $columns) } // (1.3.113) Appearance, from the ⋯ menu (Shell/AppearanceMode.swift)
         .overlay { WorkPreviewOverlay() } // (1.2.3) a piece of work's quick look, grown out of its row (Shell/WorkPreviewOverlay.swift)
@@ -329,6 +338,9 @@ struct Sidebar: View {
     @ObservedObject private var appearanceMode = AppearanceMode.shared
     /// (1.3.164) Whether its photo has its Ink switch off: the words over it then dark, with a white border.
     @ObservedObject private var appearance = AppearanceStore.shared
+    /// (1.3.190) Silent mode is up: words alone, in black, white and grey — no glyphs, no course colours, no photo, no
+    /// picture of anyone — the rows where they were and pressed as before (the web's, 2.99.126).
+    @Environment(\.silentUp) private var silent
 
     /// A course's sections before its home has said which it has.
     static let defaultSections: [SectionLink] = [
@@ -389,9 +401,12 @@ struct Sidebar: View {
             }
             AccountBar()
         }
-        .plainPhotoWords(appearance.isPlain(.side)) // (1.3.164: its photo's Ink off — dark words, a white border round them)
-        .background { ColumnAppearance(light: appearance.isPlain(.side)) } // (and the list's own words, drawn natively, in the light look)
-        .background { SidebarGround() } // (1.3.1) the sidebar's photo, frosted, behind its rows
+        .plainPhotoWords(appearance.isPlain(.side) && !silent) // (1.3.164: its photo's Ink off — dark words, a white border round them)
+        .background { ColumnAppearance(light: appearance.isPlain(.side) && !silent) } // (and the list's own words, drawn natively, in the light look)
+        .background {
+            // (1.3.1) the sidebar's photo, frosted, behind its rows; (1.3.190) black while Silent mode is up
+            if silent { Color.black.ignoresSafeArea() } else { SidebarGround() }
+        }
         // (1.3.113) Appearance on: its photo button, in its middle (1.3.166: none while a photo is being placed)
         .overlay {
             if appearanceMode.on && appearanceMode.editing == nil {
@@ -435,10 +450,12 @@ struct Sidebar: View {
                     if open.contains("groups") {
                         ForEach(engine.groups) { g in
                             HStack(spacing: 9) {
-                                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                    .fill(Color(hex: g.color))
-                                    .frame(width: 13, height: 13)
-                                Text(g.name).lineLimit(1)
+                                if !silent {
+                                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                        .fill(Color(hex: g.color))
+                                        .frame(width: 13, height: 13)
+                                }
+                                Text(g.name).lineLimit(1).foregroundStyle(silent ? Color.secondary : Color.primary)
                             }
                             .padding(.leading, Self.nest)
                             .tag(Place.home("groups/\(g.id)"))
@@ -496,20 +513,22 @@ struct Sidebar: View {
             Label("Groups", systemImage: "person.2")
                 .pressedAgain(Place.groups) // (1.3.102: all but the chevron)
             Spacer(minLength: 4)
-            Button {
-                withAnimation(Motion.gentle) {
-                    if open.contains("groups") { open.remove("groups") } else { open.insert("groups") }
+            if !silent { // (1.3.190: no glyphs while Silent mode is up)
+                Button {
+                    withAnimation(Motion.gentle) {
+                        if open.contains("groups") { open.remove("groups") } else { open.insert("groups") }
+                    }
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(open.contains("groups") ? 90 : 0))
+                        .frame(width: 18, height: 18)
+                        .contentShape(Rectangle())
                 }
-            } label: {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11.5, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .rotationEffect(.degrees(open.contains("groups") ? 90 : 0))
-                    .frame(width: 18, height: 18)
-                    .contentShape(Rectangle())
+                .buttonStyle(.plain)
+                .help(open.contains("groups") ? "Hide groups" : "Show groups")
             }
-            .buttonStyle(.plain)
-            .help(open.contains("groups") ? "Hide groups" : "Show groups")
         }
         .tag(Place.groups)
         .modifier(WindowMenu(place: Place.groups))
@@ -537,21 +556,23 @@ struct Sidebar: View {
                 }
             }
             .pressedAgain(Place.home(ctx)) // (1.3.102: all but the chevron, which only folds the sections)
-            Button {
-                withAnimation(Motion.gentle) {
-                    if open.contains(ctx) { open.remove(ctx) } else { open.insert(ctx) }
+            if !silent { // (1.3.190: no glyphs while Silent mode is up)
+                Button {
+                    withAnimation(Motion.gentle) {
+                        if open.contains(ctx) { open.remove(ctx) } else { open.insert(ctx) }
+                    }
+                    Task { await engine.loadSections(ctx) }
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(expanded ? 90 : 0))
+                        .frame(width: 16, height: 16)
+                        .contentShape(Rectangle())
                 }
-                Task { await engine.loadSections(ctx) }
-            } label: {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11.5, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .rotationEffect(.degrees(expanded ? 90 : 0))
-                    .frame(width: 16, height: 16)
-                    .contentShape(Rectangle())
+                .buttonStyle(.plain)
+                .help(expanded ? "Hide sections" : "Show sections")
             }
-            .buttonStyle(.plain)
-            .help(expanded ? "Hide sections" : "Show sections")
         }
         .tourSpot(c.id == engine.courses.first?.id ? .firstCourse : nil)
         .onHover { on in if on { MacTour.shared.did(.courseHover) } } // (the tour's "Hover over a course")
@@ -586,9 +607,11 @@ struct CourseName: View {
     let text: String
     let hex: String?
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.silentUp) private var silent
 
     var body: some View {
-        Text(text).foregroundStyle(Self.ink(hex, dark: scheme == .dark))
+        // (1.3.190: in grey while Silent mode is up, no course colours)
+        Text(text).foregroundStyle(silent ? Color.secondary : Self.ink(hex, dark: scheme == .dark))
     }
 
     static func ink(_ hex: String?, dark: Bool) -> Color {
@@ -650,11 +673,13 @@ struct AccountBar: View {
     @EnvironmentObject private var engine: Engine
     @EnvironmentObject private var session: AppSession
     @State private var confirmSignOut = false
+    /// (1.3.190) Silent mode is up: no picture of anyone, and ⋯ in words.
+    @Environment(\.silentUp) private var silent
 
     var body: some View {
         let me = engine.snapshot?.me
         HStack(spacing: 10) {
-            Avatar(person: me, size: 30)
+            if !silent { Avatar(person: me, size: 30) }
             VStack(alignment: .leading, spacing: 1) {
                 Text(me?.name ?? "Account")
                     .font(.sCallout.weight(.semibold))
@@ -688,7 +713,11 @@ struct AccountBar: View {
                 Divider()
                 Button("Sign Out…") { confirmSignOut = true }
             } label: {
-                Image(systemName: "ellipsis.circle")
+                if silent {
+                    Text("⋯").font(.system(size: 18, weight: .semibold)).foregroundStyle(.secondary)
+                } else {
+                    Image(systemName: "ellipsis.circle")
+                }
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)

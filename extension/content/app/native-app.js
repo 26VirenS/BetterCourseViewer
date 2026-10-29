@@ -673,6 +673,22 @@
     }
     return { hideDone: hide, done: upcoming.filter(doneOf).length, total: upcoming.length, days, empty: upcoming.length ? 'Everything coming up is done.' : 'Nothing coming up in the next three weeks.' };
   }
+  /** (Mac 1.3.190, Windows 0.3.84) Silent mode, as the web Dashboard's (screens/dashboard.js silentAhead): what is still
+   *  ahead, soonest first — not done, not handed in, not dismissed, in the courses on the Dashboard — with when it is
+   *  (`at`, ms) for the app to count down to. `held`: struck out in Silent while it is up, still listed, struck through. */
+  async function dashSilent({ held = [], age = NO_AGE } = {}) {
+    const [planner, sel] = await Promise.all([store.planner(age).catch(() => null), selection(age)]);
+    if (!planner) return { error: 'Your planner could not be loaded.', rows: [] };
+    const now = new Date();
+    const struck = new Set((held || []).map(String));
+    const ahead = planner.filter((it) => it.date && it.date >= now && (!it.complete || struck.has(String(it.id))) && !it.submitted && !it.graded && !it.excused && !it.dismissed && it.type !== 'announcement' && inSelection(sel, it)).sort(byDate).slice(0, 12);
+    keep(ahead); // (struck out from here: `complete` finds it)
+    const courseOf = (it) => (it.custom ? (it.course ? `${it.course.shortName || it.courseName} · Your task` : 'Your task') : it.course?.shortName || it.courseName || '');
+    return {
+      rows: ahead.map((it) => ({ id: String(it.id), title: it.title || 'Untitled', at: it.date.getTime(), verb: it.isDue ? 'Due' : it.type === 'calendar_event' ? 'Starts' : '', course: courseOf(it), url: it.url || null, done: !!it.complete })),
+      empty: 'Nothing is due in the next three weeks.',
+    };
+  }
   /** Recent activity: Canvas's activity stream, each with what it is, where, its first words and whether it is new. */
   const ACT_KIND = { Announcement: 'Announcement', DiscussionTopic: 'Discussion', Conversation: 'Message', Message: 'Notification', Submission: 'Grade posted', Conference: 'Conference', WebConference: 'Conference', Collaboration: 'Collaboration', AssessmentRequest: 'Peer review' };
   const actSubmissionKind = (a) => {
@@ -3284,7 +3300,7 @@
     return { events: out, sent: new Set(Object.values(BCV.plan.all()).map((p) => p.ev).filter(Boolean)) };
   }
 
-  const CALLS = { calSync, feedState, feedOn, feedOff, feedSend, feedEvents, calLink, calShow, calUnlink, calRefresh, planSlots, planPut, planMove, planClear, planDay, planDetail, planEdit, planJoin, setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, setColor, todo, todoDismiss, todoRestore, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, appointments, reserveAppointment, cancelReservation, notifications, notifMark, search, searchLocal, searchWarm, searchRecent, appearance, whatsNew, whatsNewSeen, refresh,
+  const CALLS = { calSync, feedState, feedOn, feedOff, feedSend, feedEvents, calLink, calShow, calUnlink, calRefresh, planSlots, planPut, planMove, planClear, planDay, planDetail, planEdit, planJoin, setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashSilent, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, setColor, todo, todoDismiss, todoRestore, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, appointments, reserveAppointment, cancelReservation, notifications, notifMark, search, searchLocal, searchWarm, searchRecent, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, fileInfo, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage, messageUpload,
     toolLaunch, externalTools, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizAssignment, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback, neighbours };
   // (Mac 1.2) Grade needed: a course's score now (by the student's own weights where set, as the Grades screen) and each
