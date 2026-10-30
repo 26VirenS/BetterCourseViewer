@@ -1341,6 +1341,8 @@ on('GET', /^\/api\/v1\/courses\/(\w+)\/external_tools\/sessionless_launch$/, (ur
   if (['4003', '4010', '4011', '4012', '1090'].includes(q.get('assignment_id'))) return { id: '9', name: 'Knewton Alta', url: altaLaunch(m[1], '/mock-alta/learn/course/c1/assignment/a1') };
   // (Mac 1.3.66) a Macmillan Learning assignment, for its popup
   if (q.get('assignment_id') === '4005') return { id: '9', name: 'Macmillan Learning', url: `http://localhost:${port}/mock-macmillan/assignment/a1` };
+  // (Mac 1.3.197, Windows 0.3.92) the same, opened on its first question already solved, for Simpl's look of it
+  if (q.get('assignment_id') === '4006') return { id: '9', name: 'Macmillan Learning', url: `http://localhost:${port}/mock-macmillan/assignment/a1?state=answered` };
   // (Mac 1.3.59) an Alta assignment that opens on its cover, for the popup's start screen
   if (q.get('assignment_id') === '4004') return { id: '9', name: 'Knewton Alta', url: altaLaunch(m[1], '/mock-alta/learn/course/c1/assignment/a4/cover') };
   // (Windows 0.3.24) a tool Canvas will not launch this way (as Smartwork, an LTI 1.3 tool, at the owner's school): the
@@ -1674,7 +1676,10 @@ if (sample === 'right' || sample === 'wrong') window.mockVerdict(sample === 'rig
     // (Mac 1.3.115) the hub's launch, posted into its frame (a GET here), lands on the player; a widget frame of the
     // player's own sits under /sac/ too, with nothing of the assessment on it
     if (path === '/mock-macmillan/launch') {
-      res.writeHead(302, { location: `/mock-macmillan/sac/12778033${url.searchParams.get('folded') === '1' ? '?folded=1' : ''}` });
+      const on = new URLSearchParams();
+      if (url.searchParams.get('folded') === '1') on.set('folded', '1');
+      if (/^[a-z]+$/.test(url.searchParams.get('state') || '')) on.set('state', url.searchParams.get('state'));
+      res.writeHead(302, { location: `/mock-macmillan/sac/12778033${on.size ? `?${on}` : ''}` });
       return res.end();
     }
     if (path === '/mock-macmillan/sac/static/widget.html') {

@@ -56,6 +56,10 @@ public sealed class WebWindow : FluentWindow
     private PageRecorder? recorder;
     /// <summary>(a picture run's --record: the recording begun by itself once the page has loaded)</summary>
     private bool recordAsked = Simpl.Support.Launch.Flag("record");
+    /// <summary>(0.3.92) On Macmillan Learning's pages, Simpl Look: Simpl's look over the page (<see cref="MacmillanLook"/>),
+    /// or the page as Macmillan draws it.</summary>
+    private readonly Button lookButton;
+    private MacmillanLook? look;
     /// <summary>The line under the title bar while a page loads.</summary>
     private readonly ProgressBar loading = new() { IsIndeterminate = true, Height = 2, MinHeight = 2, VerticalAlignment = VerticalAlignment.Bottom, Visibility = Visibility.Collapsed, IsHitTestVisible = false };
     /// <summary>Over the page's place until it shows: "Opening …", or why it could not open.</summary>
@@ -109,11 +113,14 @@ public sealed class WebWindow : FluentWindow
         rec.VerticalAlignment = VerticalAlignment.Center;
         recSaid.VerticalAlignment = VerticalAlignment.Center;
         recSaid.Margin = new Thickness(0, 0, 4, 0);
+        lookButton = K.IconButton(SymbolRegular.Sparkle24, ToggleLook, "Simpl Look", 16, 40);
+        lookButton.Height = 36;
+        lookButton.VerticalAlignment = VerticalAlignment.Center;
         var lead = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(4, 6, 0, 6), VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Left, Children = { back, forward, refresh } };
         bar = new TitleBar
         {
             Title = Title, Height = BarHeight, Margin = new Thickness(8 + 3 * 40 + 4, 0, 0, 0),
-            TrailingContent = new StackPanel { Orientation = Orientation.Horizontal, Children = { recSaid, rec, more } },
+            TrailingContent = new StackPanel { Orientation = Orientation.Horizontal, Children = { recSaid, rec, lookButton, more } },
             Icon = new ImageIcon { Source = new BitmapImage(new Uri("pack://application:,,,/Assets/Simpl-256.png")), Width = 16, Height = 16 },
         };
         loading.SetResourceReference(Control.ForegroundProperty, B.Accent);
@@ -226,6 +233,7 @@ public sealed class WebWindow : FluentWindow
                 await LightPages.Apply(web.CoreWebView2, "web window");
                 recorder = new PageRecorder(web.CoreWebView2);
                 recorder.Changed += PaintRecord;
+                look = await MacmillanLook.Attach(web.CoreWebView2);
                 ready = true;
                 PaintRecord();
             }
@@ -373,6 +381,26 @@ public sealed class WebWindow : FluentWindow
         forward.IsEnabled = core?.CanGoForward == true;
         refresh.IsEnabled = !opening;
         more.IsEnabled = Current() != null;
+        PaintLook();
+    }
+
+    private async void ToggleLook()
+    {
+        if (look == null) return;
+        await look.Set(!look.On);
+        PaintLook();
+    }
+
+    /// <summary>Simpl Look, on a page of Macmillan's: lit while the look is on.</summary>
+    private void PaintLook()
+    {
+        var on = look?.On ?? true;
+        lookButton.Visibility = look != null && MacmillanLook.Applies(Current()) ? Visibility.Visible : Visibility.Collapsed;
+        lookButton.Content = K.Icon(SymbolRegular.Sparkle24, 16, on ? B.Accent : B.Text, filled: on);
+        lookButton.ToolTip = on
+            ? "Simpl's look is on: the questions in a rail, the tools in a bar, Submit and the verdict under the question. Click to show the page as Macmillan draws it."
+            : "Show Macmillan's page in Simpl's look: the questions in a rail, the tools in a bar, Submit and the verdict under the question";
+        System.Windows.Automation.AutomationProperties.SetName(lookButton, on ? "Simpl Look, on" : "Simpl Look, off");
     }
 
     /// <summary>The address showing now (or the one to open).</summary>
