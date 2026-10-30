@@ -506,6 +506,12 @@ public sealed partial class Engine : Observable, IShellListener
             // (0.3.58: in the tool window, as Macmillan draws it — the screenshot suite's macmillan shot)
             if (parts.Length == 2) OpenTool(ToolLaunch.Assignment(parts[0], parts[1], "Macmillan Learning"));
         }
+        else if (Launch.Take("aleks:") is { } ak)
+        {
+            var parts = ak.Split(':');
+            // (0.3.93: an ALEKS assignment in the tool window — the screenshot suite's aleks-look shots)
+            if (parts.Length == 2) OpenTool(ToolLaunch.Assignment(parts[0], parts[1], "ALEKS"));
+        }
         else if (Launch.Take("newtask") != null) NewTaskRequested?.Invoke();
         else if (Launch.Take("compose") != null) NewMessageRequested?.Invoke();
         await RefreshSnapshot();

@@ -6,6 +6,7 @@
 //   (the second port is where a module's external link points: a site of somebody else's, which the
 //   smoke suite serves beside the mock)
 import { MACMILLAN_HUB_HTML, MACMILLAN_SAC_HTML } from './mock-macmillan.mjs';
+import { ALEKS_LEARN_HTML } from './mock-aleks.mjs';
 import http from 'node:http';
 import { feedMock } from './mock-feed.mjs'; // (2.99.110: Simpl's own calendar feed, as simplcourses.com has it)
 import { communityMock } from './mock-community.mjs'; // (2.99.106: Simpl Community, as simplcourses.com has it)
@@ -1343,6 +1344,8 @@ on('GET', /^\/api\/v1\/courses\/(\w+)\/external_tools\/sessionless_launch$/, (ur
   if (q.get('assignment_id') === '4005') return { id: '9', name: 'Macmillan Learning', url: `http://localhost:${port}/mock-macmillan/assignment/a1` };
   // (Mac 1.3.197, Windows 0.3.92) the same, opened on its first question already solved, for Simpl's look of it
   if (q.get('assignment_id') === '4006') return { id: '9', name: 'Macmillan Learning', url: `http://localhost:${port}/mock-macmillan/assignment/a1?state=answered` };
+  // (Mac 1.3.198, Windows 0.3.93) an ALEKS assignment: its learning page, a wrong answer checked (?state=wrong)
+  if (q.get('assignment_id') === '4007') return { id: '9', name: 'ALEKS', url: `http://localhost:${port}/mock-aleks/learn?state=wrong` };
   // (Mac 1.3.59) an Alta assignment that opens on its cover, for the popup's start screen
   if (q.get('assignment_id') === '4004') return { id: '9', name: 'Knewton Alta', url: altaLaunch(m[1], '/mock-alta/learn/course/c1/assignment/a4/cover') };
   // (Windows 0.3.24) a tool Canvas will not launch this way (as Smartwork, an LTI 1.3 tool, at the owner's school): the
@@ -1685,6 +1688,11 @@ if (sample === 'right' || sample === 'wrong') window.mockVerdict(sample === 'rig
     if (path === '/mock-macmillan/sac/static/widget.html') {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       return res.end('<!DOCTYPE html><html><head><title>widget</title></head><body><div class="widget"></div></body></html>');
+    }
+    // (Mac 1.3.198, Windows 0.3.93) a stand-in for an ALEKS learning page (scripts/dev/mock-aleks.mjs)
+    if (path === '/mock-aleks/learn') {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      return res.end(ALEKS_LEARN_HTML);
     }
     if (path === '/mock-macmillan/sac/12778033') {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
