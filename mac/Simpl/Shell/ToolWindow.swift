@@ -2,7 +2,8 @@ import AppKit
 import SwiftUI
 import WebKit
 
-private struct LaunchAnswer: Decodable {
+/// Canvas's one-time launch of a tool (the tool window's, and the Macmillan and ALEKS popup's: Screens/LookQuiz.swift).
+struct LaunchAnswer: Decodable {
     var url: String
     var name: String?
     var sessionless: Bool?
@@ -325,6 +326,14 @@ struct PageLook {
 
     static func applying(to url: URL?) -> PageLook? { all.first { $0.applies(to: url) } }
 
+    /// (1.3.199) A look by its name (the popup's launch says which): Macmillan's for a name it does not know.
+    static func named(_ name: String) -> PageLook { all.first { $0.name == name } ?? macmillan }
+
+    /// (1.3.199) For the popup's bar: the tool's name in full, and a mark and a colour of its own.
+    var fullName: String { name == "aleks" ? "ALEKS" : "Macmillan Learning" }
+    var symbol: String { name == "aleks" ? "chart.pie.fill" : "graduationcap.fill" }
+    var color: Color { name == "aleks" ? Color.teal : Color.indigo }
+
     /// The looks' scripts, from the extension the app carries (each read once).
     private static var sources: [String: String] = [:]
 
@@ -339,13 +348,16 @@ struct PageLook {
         return js
     }
 
-    /// In every frame at its start (the look there before the tool's page first shows), told whether it is on.
-    func script() -> WKUserScript? {
+    /// In every frame at its start (the look there before the tool's page first shows), told whether it is on —
+    /// (1.3.199) and, in the Macmillan and ALEKS popup, that the popup's rail is beside the page (`rail`). Both on its
+    /// first line, the line `set` knows the look's own script by.
+    func script(rail: Bool = false) -> WKUserScript? {
         guard let source else { return nil }
-        return WKUserScript(source: "window.\(flag) = \(isOn ? "true" : "false");\n" + source, injectionTime: .atDocumentStart, forMainFrameOnly: false)
+        let head = "window.\(flag) = \(isOn ? "true" : "false");" + (rail ? " window.__simplLookRail = true;" : "")
+        return WKUserScript(source: head + "\n" + source, injectionTime: .atDocumentStart, forMainFrameOnly: false)
     }
 
-    static func scripts() -> [WKUserScript] { all.compactMap { $0.script() } }
+    static func scripts(rail: Bool = false) -> [WKUserScript] { all.compactMap { $0.script(rail: rail) } }
 
     /// Turned on or off: the page showing follows at once (the page passes it on to its frames), and the pages loaded
     /// from now on start as it is — the script put in again with the new setting, the window's other scripts kept.
@@ -354,24 +366,32 @@ struct PageLook {
         guard let view else { return }
         view.evaluateJavaScript("window.\(setter) && window.\(setter)(\(on ? "true" : "false"))", completionHandler: nil)
         let scripts = view.configuration.userContentController
-        let kept = scripts.userScripts.filter { !$0.source.contains("window.\(flag) = ") }
+        let mine = { (s: WKUserScript) in s.source.hasPrefix("window.\(flag) = ") }
+        let rail = scripts.userScripts.contains { mine($0) && $0.source.prefix(while: { $0 != "\n" }).contains("__simplLookRail") }
+        let kept = scripts.userScripts.filter { !mine($0) }
         scripts.removeAllUserScripts()
         for s in kept { scripts.addUserScript(s) }
-        if let s = script() { scripts.addUserScript(s) }
+        if let s = script(rail: rail) { scripts.addUserScript(s) }
     }
 
     /// What a look found on its page, said once a page (for the log, and the screenshot suite's look_check): Macmillan's
-    /// its questions and the one marked, ALEKS's what it found of the page (its "look" names it).
+    /// its questions and the one marked, ALEKS's what it found of the page (its "look" names it). (1.3.199: what the
+    /// page tells the popup's rail as it changes is the rail's — LookRail — and not logged.)
+    nonisolated static func log(_ o: [String: Any]) {
+        guard o["rail"] == nil else { return }
+        let said = o["said"] as? String ?? "?", host = o["host"] as? String ?? "?"
+        if let look = o["look"] as? String {
+            NSLog("[Simpl] %@ look: %@ in %@, %@", look, said, host, o["detail"] as? String ?? "")
+            return
+        }
+        let here = o["here"] as? String ?? ""
+        NSLog("[Simpl] macmillan look: %@ in %@, %@ questions, %@ marked", said, host, "\(o["rows"] ?? "?")", here.isEmpty ? "none" : here)
+    }
+
     final class Listener: NSObject, WKScriptMessageHandler {
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             guard let o = message.body as? [String: Any] else { return }
-            let said = o["said"] as? String ?? "?", host = o["host"] as? String ?? "?"
-            if let look = o["look"] as? String {
-                NSLog("[Simpl] %@ look: %@ in %@, %@", look, said, host, o["detail"] as? String ?? "")
-                return
-            }
-            let here = o["here"] as? String ?? ""
-            NSLog("[Simpl] macmillan look: %@ in %@, %@ questions, %@ marked", said, host, "\(o["rows"] ?? "?")", here.isEmpty ? "none" : here)
+            PageLook.log(o)
         }
     }
 }

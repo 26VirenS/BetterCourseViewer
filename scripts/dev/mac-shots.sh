@@ -987,7 +987,8 @@ record_check() {
 # (1.3.197) look_check: Simpl's look over Macmillan's page, as look-check.txt — drawn in the mock's player with its
 # questions found and the open one marked (light-21n-macmillan-look), and not drawn with Simpl Look off (light-21o);
 # (1.3.198) and over ALEKS's, drawn with its Check and its 5 tools found (light-21p-aleks-look), not drawn when off
-# (light-21q). A FAIL fails it.
+# (light-21q). A FAIL fails it. (1.3.199) Both in their popup now, as Alta's: its rail heard from the page — Macmillan's
+# 4 questions with Q1 open, ALEKS's topic progress 0 of 5 — with Simpl Look on and off alike.
 look_check() {
   local out="$OUT_ABS/look-check.txt" f="$OUT_ABS/console-light-21n-macmillan-look.txt" g="$OUT_ABS/console-light-21o-macmillan-look-off.txt"
   : > "$out"
@@ -1000,6 +1001,15 @@ look_check() {
   else echo "FAIL not drawn over ALEKS's page as it should be ($(grep -o 'aleks look: .*' "$h" 2>/dev/null | head -3 | tr '\n' ';'))" >> "$out"; fi
   if [ -f "$k" ] && ! grep -q 'aleks look: drawn' "$k"; then echo "ok   ALEKS's page not drawn with Simpl Look off" >> "$out"
   else echo "FAIL ALEKS's page drawn with Simpl Look off, or no console ($(grep -o 'aleks look: .*' "$k" 2>/dev/null | head -2 | tr '\n' ';'))" >> "$out"; fi
+  local c
+  for c in "$f" "$g"; do
+    if grep -q 'macmillan popup: rail heard, 4 questions, 1 done, question 1 open' "$c" 2>/dev/null; then echo "ok   the popup's rail heard Macmillan's questions ($(basename "$c" .txt))" >> "$out"
+    else echo "FAIL the popup's rail heard nothing of Macmillan's questions ($(basename "$c" .txt): $(grep -o 'macmillan popup: .*' "$c" 2>/dev/null | head -3 | tr '\n' ';'))" >> "$out"; fi
+  done
+  for c in "$h" "$k"; do
+    if grep -q 'aleks popup: rail heard, topic progress 0 of 5' "$c" 2>/dev/null; then echo "ok   the popup's rail heard ALEKS's topic progress ($(basename "$c" .txt))" >> "$out"
+    else echo "FAIL the popup's rail heard nothing of ALEKS's topic ($(basename "$c" .txt): $(grep -o 'aleks popup: .*' "$c" 2>/dev/null | head -3 | tr '\n' ';'))" >> "$out"; fi
+  done
   cat "$out"
   if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::macmillan look: /'; return 1; fi
 }
@@ -1082,7 +1092,7 @@ push_set() {
   shoot light-01s-dashboard-no-sidebar 12 -SimplSidebar hidden
   # (1.3.80) Next 7 days' tile half-way through growing into its panel over the page (held there: -SimplMorphHold)
   shoot light-01m-counter-morph-next 30 -SimplSheet next -SimplMorphHold 0.5 # (its wait the longest: under load the panel came 15 seconds in)
-  shoot light-21d-macmillan 26 -SimplOpen macmillan:104:4005 # (1.3.66: a Macmillan Learning assignment — 1.3.163: in the tool window, as Macmillan draws it)
+  shoot light-21d-macmillan 26 -SimplOpen macmillan:104:4005 # (1.3.66: a Macmillan Learning assignment — 1.3.199: in its popup, on Macmillan's cover)
   # (1.3.197) Simpl's look over Macmillan's page (extension/tools/macmillan/look.js), on its first question solved: the
   # rail with Q1 marked, the bar of tools, the question's number large, the verdict and Next Question at the sheet's foot
   # — then the same with the toolbar's Simpl Look off, as Macmillan draws it (look_check)
@@ -1093,6 +1103,9 @@ push_set() {
   # Recheck under the answer — then with Simpl Look off, as ALEKS draws it (look_check)
   shoot light-21p-aleks-look 26 -SimplOpen aleks:104:4007
   shoot light-21q-aleks-look-off 26 -SimplOpen aleks:104:4007 -SimplAleksLook NO
+  # (1.3.199) both popups in Dark Mode: the rail on dark glass, the tool's page light beside it
+  MODE=dark shoot dark-21n-macmillan-popup 26 -SimplOpen macmillan:104:4006
+  MODE=dark shoot dark-21p-aleks-popup 26 -SimplOpen aleks:104:4007
   shoot light-21e-second-window 18 -SimplOpen window:section:courses/101:grades # (1.3.69: a window more, on a course's grades: its breakdown bar)
   shoot light-36-external-tools 16 -SimplPlace externaltools # (1.3.67: every external tool in the courses)
   shoot light-36b-external-tools-list 16 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77: every place Knewton Alta is used, to choose from)

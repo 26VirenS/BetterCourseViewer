@@ -101,6 +101,11 @@ struct EngineSheets: ViewModifier {
                 AltaQuizScreen(launch: a, engine: engine)
                     .modifier(UpdateHold()) // (nor while an Alta assignment is open)
             }
+            // (1.3.199) Macmillan Learning and ALEKS, as Alta: a popup with the assignment's rail beside the tool's page
+            .floatingPopup("look", title: "Assignment", item: $engine.lookTool, layout: .large, engine: engine) { l in
+                LookQuizScreen(launch: l)
+                    .modifier(UpdateHold()) // (nor while one is open)
+            }
             .sheet(isPresented: $engine.setup) {
                 SetupScreen()
                     .environmentObject(engine)

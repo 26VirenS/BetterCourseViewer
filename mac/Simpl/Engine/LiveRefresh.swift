@@ -409,7 +409,7 @@ final class LiveHolds {
         if engine.phase != .native || !engine.pageReady { out.append("page") }
         if (engine.primary ?? engine).waiting > 0 { out.append("loading") } // (a screen's own read under way goes first)
         if engine.quiz != nil { out.append("quiz") }
-        if engine.alta != nil { out.append("assignment popup") }
+        if engine.alta != nil || engine.lookTool != nil { out.append("assignment popup") }
         if typing { out.append("typing") }
         out += on.filter { !$0.value.isEmpty }.keys.sorted()
         if dialog(engine, window) { out.append("dialog") }

@@ -780,10 +780,22 @@ private struct AltaLookSwitch: View {
 /// (1.3.83) Beside Light / Dark (1.3.131: in the popup's bar): Show Browser — Knewton Alta's own page on the right, as Alta
 /// draws it, in place of the app's view of it. (1.3.170) A toggle that still says Browser: a glass pill holding the
 /// globe, the word and a small switch — its knob sliding over, its track filled in the accent while it is on — as the
-/// Light / Dark switch beside it has them.
-private struct AltaBrowserToggle: View {
+/// Light / Dark switch beside it has them. (1.3.199) The Macmillan and ALEKS popup's Simpl Look too, with its sparkles.
+struct AltaBrowserToggle: View {
     @Binding var on: Bool
     let label: String
+    var icon = "globe"
+    var helpOn = "Back to Simpl's view of the assignment"
+    var helpOff = "Show Knewton Alta's own page, as Alta draws it"
+
+    init(on: Binding<Bool>, label: String, icon: String = "globe",
+         helpOn: String = "Back to Simpl's view of the assignment", helpOff: String = "Show Knewton Alta's own page, as Alta draws it") {
+        _on = on
+        self.label = label
+        self.icon = icon
+        self.helpOn = helpOn
+        self.helpOff = helpOff
+    }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let track = CGSize(width: 30, height: 18), inset: CGFloat = 2
@@ -794,7 +806,7 @@ private struct AltaBrowserToggle: View {
             withAnimation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.3, dampingFraction: 0.85)) { on.toggle() }
         } label: {
             HStack(spacing: 7) {
-                Image(systemName: "globe")
+                Image(systemName: icon)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(on ? Theme.accent : Color.secondary)
                 Text(label)
@@ -820,7 +832,7 @@ private struct AltaBrowserToggle: View {
         }
         .buttonStyle(.plain)
         .fixedSize()
-        .help(on ? "Back to Simpl's view of the assignment" : "Show Knewton Alta's own page, as Alta draws it")
+        .help(on ? helpOn : helpOff)
         .accessibilityLabel(label)
         .accessibilityValue(on ? "On" : "Off")
         .accessibilityAddTraits(.isToggle)

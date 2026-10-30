@@ -98,6 +98,8 @@ final class Engine: ObservableObject, ShellListener {
     @Published var alta: AltaLaunch? {
         didSet { if alta?.id != oldValue?.id { altaAsked() } }
     }
+    /// (1.3.199) A Macmillan Learning or ALEKS assignment in a popup of its own, as an Alta one is (Screens/LookQuiz.swift).
+    @Published var lookTool: LookLaunch?
     /// (1.3.101) The Alta popup's session, made the moment `alta` is set, until the popup takes it (`altaSession(for:)`).
     private var pendingAlta: AltaSession?
 
@@ -451,13 +453,14 @@ final class Engine: ObservableObject, ShellListener {
                 }
             }
         } else if let a = LaunchOpen.take("macmillan:") {
-            // (1.3.66: -SimplOpen macmillan:104:4005 — 1.3.163: in the tool window, as Macmillan draws it)
+            // (1.3.66: -SimplOpen macmillan:104:4005 — 1.3.163: in the tool window, as Macmillan draws it — 1.3.199: in its
+            // popup, as an Alta assignment)
             let parts = a.split(separator: ":").map(String.init)
-            if parts.count == 2 { openTool(.assignment(course: parts[0], id: parts[1], title: "Macmillan Learning")) }
+            if parts.count == 2 { lookTool = LookLaunch(look: PageLook.macmillan.name, course: parts[0], assignment: parts[1], title: "W8 Homework: Forces in Motion") }
         } else if let a = LaunchOpen.take("aleks:") {
-            // (1.3.198: -SimplOpen aleks:104:4007 — an ALEKS assignment in the tool window, the mock's stand-in for one)
+            // (1.3.198: -SimplOpen aleks:104:4007 — an ALEKS assignment, the mock's stand-in for one — 1.3.199: in its popup)
             let parts = a.split(separator: ":").map(String.init)
-            if parts.count == 2 { openTool(.assignment(course: parts[0], id: parts[1], title: "ALEKS")) }
+            if parts.count == 2 { lookTool = LookLaunch(look: PageLook.aleks.name, course: parts[0], assignment: parts[1], title: "Exponential and Logarithmic Functions") }
         } else if let w = LaunchOpen.take("window:") {
             // (1.3.69: -SimplOpen window:grades, a window more on that place)
             NotificationCenter.default.post(name: .simplOpenWindow, object: w)
