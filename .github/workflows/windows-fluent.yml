@@ -597,6 +597,9 @@ jobs:
           # (0.3.93) Simpl's look over ALEKS's page, the mock's learning page with a wrong answer checked; then with it off
           Shot 'aleks-look' '1366x778' 50 ($mock + @('--appearance', 'light', '--open', 'aleks:104:4007'))
           Shot 'aleks-look-off' '1366x778' 50 ($mock + @('--appearance', 'light', '--open', 'aleks:104:4007', '--aleks-look', 'off'))
+          # (0.3.94) both in their popup, as Alta's, with the app dark: the rail beside the tool's page, the page light
+          Shot 'macmillan-popup-dark' '1366x778' 50 ($mock + @('--appearance', 'dark', '--open', 'macmillan:104:4006'))
+          Shot 'aleks-popup-dark' '1366x778' 50 ($mock + @('--appearance', 'dark', '--open', 'aleks:104:4007'))
           # Settings, as Windows 11's own Settings app, on each of its categories
           foreach ($tab in @('general', 'notifications', 'grades', 'data', 'updates', 'about')) {
             Shot "settings-$tab" '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', $tab))
@@ -1357,6 +1360,20 @@ jobs:
             $l = Get-Content 'shots/profile-aleks-look-off.log' -Raw -ErrorAction SilentlyContinue
             if ("$l".Contains('aleks look: drawn')) { Write-Host "::error::aleks-look-off: drawn with Simpl Look off"; exit 1 }
             Write-Host "aleks-look-off: not drawn, as ALEKS draws it"
+          }
+          # (0.3.94) both in their popup now: its rail heard from the page — Macmillan's 4 questions with Q1 open, ALEKS's
+          # topic progress 0 of 5 — with Simpl Look on and off alike
+          foreach ($lookShot in @('macmillan-look', 'macmillan-look-off', 'macmillan-popup-dark')) {
+            if (-not ($script:mine -contains $lookShot)) { continue }
+            $l = Get-Content "shots/profile-$lookShot.log" -Raw -ErrorAction SilentlyContinue
+            if ("$l" -notmatch 'macmillan popup: rail heard, 4 questions, 1 done, question 1 open') { Write-Host "::error::${lookShot}: the popup's rail heard nothing of Macmillan's questions (shots/profile-$lookShot.log)"; exit 1 }
+            Write-Host "${lookShot}: the popup's rail heard Macmillan's 4 questions, Q1 open"
+          }
+          foreach ($lookShot in @('aleks-look', 'aleks-look-off', 'aleks-popup-dark')) {
+            if (-not ($script:mine -contains $lookShot)) { continue }
+            $l = Get-Content "shots/profile-$lookShot.log" -Raw -ErrorAction SilentlyContinue
+            if ("$l" -notmatch 'aleks popup: rail heard, topic progress 0 of 5') { Write-Host "::error::${lookShot}: the popup's rail heard nothing of ALEKS's topic (shots/profile-$lookShot.log)"; exit 1 }
+            Write-Host "${lookShot}: the popup's rail heard ALEKS's topic progress, 0 of 5"
           }
           # Knewton Alta's page in light in a dark app whose web profile prefers dark (Shell/WebWindow.cs, LightPages: the
           # popup writes "alta: the page prefers …" in a picture run as each page comes in)
