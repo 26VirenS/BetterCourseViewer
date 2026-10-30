@@ -152,7 +152,7 @@
     BAR_R + '.simpl-hide,html.simpl-ak.simpl-front [role="navigation"][aria-label="Actions"],html.simpl-ak.simpl-front .aleks-legal-footer{opacity:0!important;pointer-events:none!important}',
     'html.simpl-ak.simpl-front [role="navigation"][aria-label="Actions"]::before{display:none}',
     R + '[id^="itemContainer_"]{margin-bottom:24px!important}',
-    'html.simpl-ak.simpl-front .mainview_item_page{padding-bottom:116px!important}',
+    'html.simpl-ak.simpl-front-glass .mainview_item_page{padding-bottom:116px!important}', // (the popup's bar floats over the foot)
     // ('glass': no ground and no sheet of the page's own — the popup's Liquid Glass is under the clear page)
     'html.simpl-ak.simpl-front-glass,html.simpl-ak.simpl-front-glass body,html.simpl-ak.simpl-front-glass #welcomePage,html.simpl-ak.simpl-front-glass #welcomePage>div,html.simpl-ak.simpl-front-glass .tooltiptarget_mainview,html.simpl-ak.simpl-front-glass .tooltiptarget_banner,html.simpl-ak.simpl-front-glass #current-main-view,html.simpl-ak.simpl-front-glass .mainview_item_page{background:transparent!important}',
     'html.simpl-ak.simpl-front-glass [id^="itemContainer_"]{background:transparent!important;box-shadow:none!important}',

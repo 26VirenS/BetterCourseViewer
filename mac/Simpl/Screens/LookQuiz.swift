@@ -367,7 +367,8 @@ private struct LookButtonBar: View {
     @ObservedObject var rail: LookRail
 
     var body: some View {
-        QuizFloatingBar {
+        // (docked: no haze of its own behind it — over the glass pane a haze reads as a smear)
+        QuizFloatingBar(docked: true) {
             ForEach(rail.tools) { b in
                 Button { rail.press(b) } label: {
                     if b.symbol.isEmpty { Text(b.label) } else { Label(b.label, systemImage: b.symbol) }
@@ -586,11 +587,12 @@ final class LookRail: ObservableObject {
     private var zoomSaid = -1.0
 
     /// The tool's page zoomed out (never in) as far as it takes to fit its width into the popup's — less a scroll bar's
-    /// width, so the page never scrolls sideways for want of it — not past 70%.
+    /// width, so the page never scrolls sideways for want of it — not past 66% (1.3.200: 70% left a small popup's page a
+    /// few points too wide, scrolling sideways under the glass).
     private func zoom() {
         guard let v = webView, wide > 0, width > 16 else { return }
         let room = Double(width) - 16
-        let z = max(0.7, min(1, room / wide))
+        let z = max(0.66, min(1, room / wide))
         if abs(Double(v.pageZoom) - z) > 0.004 { v.pageZoom = CGFloat(z) }
         guard abs(zoomSaid - z) > 0.004 else { return }
         zoomSaid = z
@@ -684,10 +686,13 @@ private struct LookRailView: View {
         .accessibilityElement(children: .combine)
 
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Questions").font(.sHeadline)
-                Spacer(minLength: 6)
-                LookLegend()
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Questions").font(.sHeadline)
+                    Spacer(minLength: 6)
+                    LookLegend().fixedSize()
+                }
+                Text("Questions").font(.sHeadline).frame(maxWidth: .infinity, alignment: .leading)
             }
             if rail.questions.isEmpty {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 5), spacing: 6) {

@@ -237,7 +237,9 @@
     'html.simpl-mm.simpl-front #attempts-holder.dropdown #attempts-button{top:4px!important}',
     'html.simpl-mm.simpl-front #sac{padding:6px 22px 0!important}',
     'html.simpl-mm.simpl-front .raptor-container{height:calc(100vh - 6px)!important}',
-    'html.simpl-mm.simpl-front #raptor-content-container .content-area{padding-bottom:124px!important}',
+    'html.simpl-mm.simpl-front #raptor-content-container .content-area{padding-bottom:32px!important}',
+    // ('glass': the popup's bar floats over the foot of the page — room under the question for it)
+    'html.simpl-mm.simpl-front-glass #raptor-content-container .content-area{padding-bottom:124px!important}',
     // ('glass': no ground and no sheet of the page's own — the popup's Liquid Glass is under the clear page; its
     // answer fields and banks frosted over it)
     'html.simpl-mm.simpl-front-glass,html.simpl-mm.simpl-front-glass body,html.simpl-mm.simpl-front-glass #root,html.simpl-mm.simpl-front-glass #__next,html.simpl-mm.simpl-front-glass #main-content,html.simpl-mm.simpl-front-glass #sac,html.simpl-mm.simpl-front-glass #main{background:transparent!important}',
