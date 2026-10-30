@@ -6132,10 +6132,13 @@ try {
   const landed = await texts('.bcv-stat__value');
   // (a card whose own request is still out shows "…" rather than a number, and is not a counter yet)
   check(midRoll.every((t) => /^\d+$/.test(t) || t === '…') && midRoll.some((t) => /^\d+$/.test(t)) && landed[0] === dueNow && (await page.evaluate(() => !document.querySelector('.bcv-stat__value[data-rolling]'))), `counters run through plausible digits and land on the real count: ${midRoll.join(',')} → ${landed.join(',')} (Due today is ${dueNow})`);
-  // a view switch after entry redraws the counters without rolling them again
-  await page.click('.bcv-seg__btn:nth-child(2)');
+  // a view switch after entry redraws the counters without rolling them again (2.99.132: to Recent activity, then back to the List)
+  await page.click('.bcv-seg__btn[data-value="activity"]');
+  await page.waitForSelector('.bcv-act__title', { timeout: 10000 });
+  const rolledOnSwitch = !!(await page.$('[data-rolling]'));
+  await page.click('.bcv-seg__btn[data-value="list"]');
   await page.waitForSelector('.bcv-day', { timeout: 10000 });
-  check(!(await page.$('[data-rolling]')) && (await texts('.bcv-stat__value'))[0] === dueNow && !(await page.$('.bcv-work__fill--grow')) && !(await page.$('.bcv-sky__tower--rise')) && !!(await page.$('.bcv-sky__win')), 'a number already on screen never rolls again, and the towers stand without rising again, windows lit at once (entry only)');
+  check(!rolledOnSwitch && !(await page.$('[data-rolling]')) && (await texts('.bcv-stat__value'))[0] === dueNow && !(await page.$('.bcv-work__fill--grow')) && !(await page.$('.bcv-sky__tower--rise')) && !!(await page.$('.bcv-sky__win')), 'a number already on screen never rolls again, and the towers stand without rising again, windows lit at once (entry only)');
   // cards lift under the pointer once they have landed (the entrance fill is backwards, so the hover transform takes)
   await page.waitForTimeout(700);
   await page.hover('.bcv-stat');
