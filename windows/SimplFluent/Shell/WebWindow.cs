@@ -11,6 +11,7 @@ using Simpl.Support;
 using Wpf.Ui.Controls;
 using Button = System.Windows.Controls.Button;
 using MenuItem = System.Windows.Controls.MenuItem;
+using TextBlock = System.Windows.Controls.TextBlock;
 
 namespace Simpl.Shell;
 
