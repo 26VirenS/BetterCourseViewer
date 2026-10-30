@@ -937,6 +937,53 @@ newwin_check() {
   if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::tool window: /'; return 1; fi
 }
 
+# (1.3.196) record_files: the recording light-21m-tool-record's tool window made (Shell/PageRecorder.swift), read here on
+# the Mac that took it, into record-files.txt for record_check: each file in it, each .gz unzipped whole (gunzip -t),
+# each picture a JPEG, each data file JSON, and the folder's size. Nothing when this part did not take that picture.
+record_files() {
+  local d f out="$OUT_ABS/record-files.txt"
+  d="$(ls -d "$HOMES/own-light-21m-tool-record/Downloads/Simpl Recordings/"*/ 2>/dev/null | head -1)"
+  [ -n "$d" ] || return 0
+  : > "$out"
+  (cd "$d" && find . -type f | sed 's|^\./||' | sort | sed 's/^/file /') >> "$out"
+  for f in "$d"*.gz "$d"assets/*.gz; do
+    [ -f "$f" ] || continue
+    if gunzip -t "$f" 2>/dev/null; then echo "ok   unzips whole: ${f#"$d"}"; else echo "FAIL does not unzip: ${f#"$d"}"; fi
+  done >> "$out"
+  for f in "$d"*.jpg; do
+    [ -f "$f" ] || continue
+    if file -b "$f" | grep -q JPEG; then echo "ok   a JPEG: ${f#"$d"}"; else echo "FAIL not a JPEG: ${f#"$d"}"; fi
+  done >> "$out"
+  for f in "$d"*.json; do
+    [ -f "$f" ] || continue
+    if python3 -c 'import json, sys; json.load(open(sys.argv[1]))' "$f" 2>/dev/null; then echo "ok   JSON: ${f#"$d"}"; else echo "FAIL not JSON: ${f#"$d"}"; fi
+  done >> "$out"
+  echo "size $(du -sk "$d" | cut -f1) KB" >> "$out"
+}
+
+# (1.3.196) record_check: light-21m-tool-record's recording, as record-check.txt — begun in developer mode, its first
+# step saved (the page's code, a picture, its data), and what record_files read of its folder whole. A FAIL fails it.
+record_check() {
+  local out="$OUT_ABS/record-check.txt" f="$OUT_ABS/console-light-21m-tool-record.txt" files="$OUT_ABS/record-files.txt"
+  : > "$out"
+  if grep -q 'recorder: on, into' "$f" 2>/dev/null; then echo "ok   the tool window's recording began (developer mode)" >> "$out"
+  else echo "FAIL the tool window's recording did not begin ($(grep -o 'recorder: .*' "$f" 2>/dev/null | head -3 | tr '\n' ';'))" >> "$out"; fi
+  if grep -q 'recorder: step 1 (0001 page.html.gz.*0001 screenshot.jpg.*0001 data.json' "$f" 2>/dev/null; then echo "ok   its first step: the page's code, a picture and its data" >> "$out"
+  else echo "FAIL its first step was not saved whole ($(grep -o 'recorder: step .*' "$f" 2>/dev/null | head -2 | tr '\n' ';'))" >> "$out"; fi
+  if grep -q 'recorder: .* could not be written' "$f" 2>/dev/null; then echo "FAIL a file could not be written: $(grep -o 'recorder: .* could not be written.*' "$f" | head -2 | tr '\n' ';')" >> "$out"; fi
+  if [ -f "$files" ]; then
+    local want
+    for want in "0001 page.html.gz" "0001 screenshot.jpg" "0001 data.json" "README.txt" "timeline.txt"; do
+      if grep -qx "file $want" "$files"; then echo "ok   in its folder: $want" >> "$out"; else echo "FAIL not in its folder: $want" >> "$out"; fi
+    done
+    grep -E '^(FAIL|size)' "$files" >> "$out"
+  else
+    echo "FAIL its folder in Downloads was not found (no record-files.txt)" >> "$out"
+  fi
+  cat "$out"
+  if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::recorder: /'; return 1; fi
+}
+
 # (1.3.103) quicklook_check: what light-14e-instructions-file-open's walk and its preview said (Support/OpenClock.swift,
 # Engine/FilePreview.swift), as quicklook-check.txt — the file link in the assignment's instructions found and clicked,
 # and the file shown ("[files] Preview: 1 item, …" from Simpl's preview window since 1.3.191, "[files] Quick Look: 1
@@ -1035,6 +1082,9 @@ push_set() {
   # (1.3.104) a tool Canvas opens in a new window, its one-time launch refused by the mock (as Smartwork's is at the
   # owner's school): Canvas's page for it, its launch sent on in the tool window (newwin_check)
   shoot light-21k-tool-new-window 24 -SimplOpen tool:101:20
+  # (1.3.196) developer mode's Record in a tool window, begun by itself once the tool's page loads: the toolbar's red Stop
+  # and "Recording · N saved" under the title; its folder in Downloads read on this Mac by record_files (record_check)
+  OWN_HOME=1 shoot light-21m-tool-record 30 -SimplOpen tool:101:20 -SimplDeveloperMode YES -SimplRecordShot YES
   shoot light-05p-calendar-preview 16 -SimplPlace calendar -SimplOpen preview
   shoot light-10b-grades-assignment 12 -SimplPlace grades -SimplPush /courses/101/assignments/1001
   shoot light-10c-feedback 18 -SimplPlace course:101 -SimplPush /courses/101/assignments/1008 -SimplOpen feedback
@@ -1146,6 +1196,7 @@ if [ "${SHOTS:-full}" = check ]; then
   again_check || exit 1 # (1.3.102)
   quicklook_check || exit 1 # (1.3.103)
   newwin_check || exit 1 # (1.3.104)
+  record_check || exit 1 # (1.3.196)
   exit 0
 fi
 
@@ -1272,6 +1323,7 @@ the_set() {
   shoot d2l-08-todo 12 -SimplPlace todo
   unset BASE
   wait # (the rest alone: a running focus timer is kept)
+  record_files # (1.3.196: light-21m-tool-record's folder, read while its home is here)
   walks
   # (1.2) last, since a running focus timer is kept: the timer, and the pinned tools in the toolbar with it live
   PART=$TIMER_PART shoot light-36-tool-timer 12 -SimplPlace tools -SimplTool pomo -SimplFocusDemo YES -SimplPinnedTools "calc,need"
@@ -1316,6 +1368,7 @@ if [ "$SHARDS" = 1 ]; then
   again_check || true # (1.3.102)
   quicklook_check || true # (1.3.103)
   newwin_check || true # (1.3.104)
+  record_check || true # (1.3.196)
 fi
 keep_crashes
 exit 0

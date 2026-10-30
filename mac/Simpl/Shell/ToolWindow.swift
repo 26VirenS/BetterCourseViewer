@@ -18,6 +18,11 @@ struct ToolWindow: View {
     @StateObject private var browser = ToolBrowser()
     @ObservedObject private var tools = ToolsCenter.shared
     @ObservedObject private var focus = FocusTimer.shared
+    /// (1.3.196) Developer mode's Record button: the page's code, data and a picture saved each time it changes.
+    @ObservedObject private var dev = DevMode.shared
+    @StateObject private var recorder = PageRecorder()
+    /// (the screenshot suite's -SimplRecordShot YES: the recording begun by itself once the tool's page has loaded)
+    @State private var recordShot = UserDefaults.standard.bool(forKey: "SimplRecordShot")
     /// (1.3.79) How many pins the toolbar has room for (Tools/PinnedTools.swift).
     @StateObject private var fit = ToolbarFit(searching: false)
     /// (1.2.16) A light tool page drawn dark while the Mac is in dark mode (the moon in the toolbar turns it on and off).
@@ -74,7 +79,7 @@ struct ToolWindow: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .modifier(UpdateHold()) // (1.2.19: no update relaunches Simpl while a tool is open)
         .navigationTitle(title)
-        .navigationSubtitle(browser.current?.host ?? "")
+        .navigationSubtitle(recorder.on ? "Recording · \(recorder.steps) saved" : browser.current?.host ?? "")
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 ControlGroup {
@@ -103,6 +108,19 @@ struct ToolWindow: View {
                     }
                     .menuIndicator(.hidden)
                     .help("More")
+                }
+            }
+            // (1.3.196) developer mode: Record — each change of the page saved into a folder in Downloads until Stop
+            if dev.unlocked && url != nil {
+                ToolbarItem(placement: .primaryAction) {
+                    Button { recorder.toggle(browser.webView, name: title) } label: {
+                        Label(recorder.on ? "Stop Recording" : "Record", systemImage: recorder.on ? "stop.circle.fill" : "record.circle")
+                            .foregroundStyle(recorder.on ? Color.red : Color.primary)
+                    }
+                    .help(recorder.on
+                        ? "Stop recording: \(recorder.steps) saved, \(ByteCountFormatter.string(fromByteCount: Int64(recorder.bytes), countStyle: .file)) (developer mode)"
+                        : "Record this page: its code, data and a screenshot each time it changes, into a folder in Downloads (developer mode)")
+                    .toolbarFit(fit, .own)
                 }
             }
             // (1.2.16) the tools pinned in the main window, here too — (tools-6) the rest in the Tools pull-down, (1.3.79)
@@ -135,6 +153,13 @@ struct ToolWindow: View {
         }
         .task(id: model.engine == nil) { await start() }
         .onChange(of: darkPage) { _, on in ToolDarkPage.set(on, in: browser.webView) }
+        .onChange(of: dev.unlocked) { _, on in if !on { recorder.stop() } } // (developer mode left: the recording ends)
+        .onChange(of: browser.loading) { _, loading in
+            guard recordShot, !loading, dev.unlocked, browser.webView != nil else { return }
+            recordShot = false
+            recorder.start(browser.webView!, name: title)
+        }
+        .onDisappear { recorder.stop(reveal: false) } // (the window closed: the recording ends where it is)
     }
 
     private func start() async {
