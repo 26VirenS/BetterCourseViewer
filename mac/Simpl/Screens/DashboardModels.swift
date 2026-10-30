@@ -6,13 +6,12 @@ import Foundation
 /// The Dashboard's views, the web Dashboard's three: the courses as cards, the work coming up as a list by day, and
 /// Canvas's recent activity. The one chosen is kept on this Mac.
 enum DashView: String, CaseIterable, Identifiable {
-    case cards, list, activity
+    case list, activity
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .cards: return "Cards"
         case .list: return "List"
         case .activity: return "Activity"
         }
@@ -20,7 +19,6 @@ enum DashView: String, CaseIterable, Identifiable {
 
     var help: String {
         switch self {
-        case .cards: return "Your courses as cards"
         case .list: return "Everything coming up, day by day"
         case .activity: return "Recent activity in your courses"
         }

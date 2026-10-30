@@ -70,15 +70,13 @@ struct ExternalToolsView: View {
     @EnvironmentObject private var engine: Engine
     @StateObject private var model = Loader<ExternalToolsData>()
     @State private var query = ""
-    /// (1.3.77) The tool whose list of places is open, if one is.
+    /// (1.3.77) The tool whose list of places is open, if one is. (1.3.204: in a popup over the page, not a popover)
     @State private var listed: String?
-    /// (1.3.77) The screenshot suite's list, kept open for its picture: the suite runs several copies of the app at once,
-    /// and another coming to the front closes a popover (its app no longer active), so it is opened again.
-    @State private var keptOpen: String?
     /// (1.3.178) The answer the cards were drawn from as a tool's list opened, held while it is open; a newer one (the
     /// school's after the kept one, a live check) put in once it closes. A card drawn again under its open list — moved
     /// to another column by the newer answer — had its popover presented afresh in the middle of laying the window out,
-    /// and AppKit stopped the app (more passes laying it out than it has views; 1.3.175's dark-36b picture).
+    /// and AppKit stopped the app (more passes laying it out than it has views; 1.3.175's dark-36b picture). (1.3.204:
+    /// kept for the popup, so the list does not change under the pointer.)
     @State private var held: ExternalToolsData?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -115,9 +113,7 @@ struct ExternalToolsView: View {
                             // by side, each card put in the column with least in it (a popover would not show from a card
                             // placed by a Layout of the app's own)
                             ExternalToolColumns(tools: shown) { t in
-                                ToolCard(tool: t, listed: listedBinding(t),
-                                         openTab: { c in open(t, in: c) },
-                                         choose: { c, item in choose(t, c, item) })
+                                ToolCard(tool: t, listed: listedBinding(t), openTab: { c in open(t, in: c) })
                             }
                             .animation(reduceMotion ? nil : Motion.gentle, value: shown.map(\.id))
                         }
@@ -127,6 +123,7 @@ struct ExternalToolsView: View {
                 LoadState(error: model.error) { Task { await load() } }
             }
         }
+        .overlay { placesPopup }
         .navigationTitle("External Tools")
         .openTimed("External Tools", ready: model.data != nil, live: model.data != nil && !model.kept, source: model.source)
         .task(id: engine.dataVersion) {
@@ -134,23 +131,57 @@ struct ExternalToolsView: View {
             await openAskedList()
         }
         .liveChecks(model) // (1.3.80: checked every minute while it is on show; only what changed moves)
-        .onChange(of: query) { _, _ in
-            keptOpen = nil
-            listed = nil
-        }
+        .onChange(of: query) { _, _ in listed = nil }
         .onChange(of: listed) { was, now in
             // (1.3.178: the answer held while a list is open, the newest drawn as it closes)
             if was == nil, now != nil { held = model.data }
             if now == nil { held = nil }
-            guard now == nil, let id = keptOpen else { return }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { if keptOpen == id { listed = id } }
         }
+    }
+
+    /// (1.3.204) The open tool's list in a popup of its own over the page — a little wider than a card, centred, the
+    /// page dimmed a touch under it — rather than a popover hanging from its card, cramped by the room under it. It
+    /// grows in from just under its size and fades (220 ms, a strong ease-out; a fade alone under Reduce Motion), and
+    /// goes the same way, quicker; a click outside it, Escape or its × closes it.
+    private var placesPopup: some View {
+        GeometryReader { g in
+            ZStack {
+                if let id = listed, let t = shownData?.rows.first(where: { $0.id == id }) {
+                    Color.black.opacity(0.2)
+                        .contentShape(Rectangle())
+                        .onTapGesture { listed = nil }
+                        .accessibilityHidden(true)
+                        .transition(.opacity)
+                    let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    ToolPlacesList(tool: t, tint: Color(hex: t.courses.first?.color ?? "#8e8e93"),
+                                   room: max(240, min(560, g.size.height - 64)),
+                                   choose: { c, item in choose(t, c, item) }, close: { listed = nil })
+                        .clipShape(shape)
+                        .overlay(shape.strokeBorder(Theme.edge, lineWidth: 1).allowsHitTesting(false))
+                        .shadow(color: .black.opacity(0.24), radius: 30, y: 14)
+                        .id(t.id)
+                        .transition(popupArrival)
+                        // (the screenshot suite's console: when a list shows and goes)
+                        .onAppear { if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] tool list shown: %@", t.name) } }
+                        .onDisappear { if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] tool list closed: %@", t.name) } }
+                }
+            }
+            .frame(width: g.size.width, height: g.size.height)
+        }
+        .allowsHitTesting(listed != nil)
+        .animation(reduceMotion ? .easeOut(duration: 0.15) : .timingCurve(0.23, 1, 0.32, 1, duration: 0.22), value: listed)
+    }
+
+    private var popupArrival: AnyTransition {
+        if reduceMotion { return .opacity }
+        return .asymmetric(insertion: .scale(scale: 0.96).combined(with: .opacity),
+                           removal: .scale(scale: 0.98).combined(with: .opacity))
     }
 
     private func load() async { await model.load(engine, "externalTools") }
 
     /// (1.3.77) The screenshot suite's `-SimplExternalToolList knewton`: the list of the first tool whose name has that
-    /// word in it, opened a moment after the page is up (its card laid out in the window, for the list to come from).
+    /// word in it, opened a moment after the page is up.
     private func openAskedList() async {
         // (the flag is only taken once its tool is there: a first run of this task before the answer came, or one the
         // engine's first data change cut short, must not use it up)
@@ -161,26 +192,17 @@ struct ExternalToolsView: View {
         }
         guard LaunchOpen.take("", key: "SimplExternalToolList") != nil else { return }
         NSLog("[Simpl] tool list: opening %@", t.name)
-        // (a popover shows for the app in front: the suite runs several copies at once, so this one is brought forward,
-        // its window made key, before the list is asked for — as a student's own click always is)
-        if UserDefaults.standard.string(forKey: "SimplShotFile") != nil {
-            NSApp.activate()
-            NSApp.windows.first(where: { $0.isVisible && $0.canBecomeKey })?.makeKeyAndOrderFront(nil)
-        }
-        // (for a picture, at once: a popover shows only while its app is in front, and the suite starts other copies
-        // that take the front a few seconds after this one starts)
+        // (for a picture, at once; otherwise once the page has been seen a moment)
         if UserDefaults.standard.string(forKey: "SimplShotFile") == nil { try? await Task.sleep(nanoseconds: 600_000_000) }
-        if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { keptOpen = t.id }
         listed = t.id
         // (a task of its own: the page's is cancelled as the engine's data changes, which would cut its wait short)
         Task { await readAgainAsked(t) }
     }
 
     /// (1.3.82) The screenshot suite's `-SimplExternalToolReread YES`: a moment after the list is open, the tools read
-    /// again and put in place under it, the card under the list drawn again — as the tools' answer coming in a second
-    /// time did in 1.3.81, when the list's popover was sized and sized again until AppKit stopped the app (1.3.178: held
-    /// until the list closes, the cards under it left as they were). The console
-    /// says whether the list is still open after it; the picture waits for it.
+    /// again and put in place under it — as the tools' answer coming in a second time did in 1.3.81, when the list's
+    /// popover was sized and sized again until AppKit stopped the app (1.3.178: held until the list closes, the cards
+    /// under it left as they were). The console says whether the list is still open after it; the picture waits for it.
     private func readAgainAsked(_ t: ExternalToolsData.Tool) async {
         guard UserDefaults.standard.bool(forKey: "SimplExternalToolReread") else { return }
         Shot.began()
@@ -210,9 +232,8 @@ struct ExternalToolsView: View {
     }
 
     /// (1.3.77) A place chosen in a tool's list: the list closes first, and that place opens as it goes (a popup or a
-    /// window arriving over a popover still closing is a stutter).
+    /// window arriving over a list still closing is a stutter).
     private func choose(_ t: ExternalToolsData.Tool, _ c: ExternalToolsData.Course, _ item: ExternalToolsData.Item) {
-        keptOpen = nil
         listed = nil
         // (1.3.101) a Knewton Alta assignment's launch asked of Canvas at once, while the list closes: only its popup waits
         let alta = altaLaunch(t, in: c, item: item)
@@ -387,35 +408,14 @@ private extension ExternalToolsData.Tool {
 /// A tool found only in courses' navigation has a chip a course, opening its tab there; the card itself is not a button.
 /// (1.3.77) A tool used in assignments or module items is a button as a whole: it gives a little under a press (scale
 /// 0.98, 100 ms), washes under the pointer and while its list is open, says the next still to do and, at its foot, how
-/// many there are; the press opens the list beside it. Its chips for a course's own tab (when it is one too) stay buttons
-/// of their own, laid over the card's — never a button inside a button.
+/// many there are; the press opens the list (1.3.204: in a popup over the page). Its chips for a course's own tab (when it
+/// is one too) stay buttons of their own, laid over the card's — never a button inside a button.
 private struct ToolCard: View {
     let tool: ExternalToolsData.Tool
     @Binding var listed: Bool
     let openTab: (ExternalToolsData.Course) -> Void
-    let choose: (ExternalToolsData.Course, ExternalToolsData.Item) -> Void
     @State private var hover = false
     @State private var pressed = false
-    /// When its list last closed: a press that closed it (a transient popover closes as the mouse goes down outside it)
-    /// must not open it again as the mouse comes up.
-    @State private var closedAt = Date.distantPast
-    /// Whether this card's list is showing — the card's own, as a pinned tool keeps its popover's, kept in step with the
-    /// page's `listed` (which card's list is open) both ways.
-    @State private var shown = false
-    /// (1.3.82) The card as AppKit has it — its window, and where its foot is on the screen — for the room its list has.
-    @State private var spot = PreviewAnchor()
-    /// (courses-27) The most the list's popover may be tall: (1.3.82) reckoned as the list opens (`reckonRoom`), and
-    /// kept while it is open.
-    @State private var room: CGFloat = 460
-    /// (1.3.178) Whether its list's popover is up — asked for is not up: a list asked for as its card was still coming
-    /// into its window, or while another copy of the app had the front (the suite's), never came, and nothing asked
-    /// again once the cards were held under it (1.3.178's dark-36b picture). `reasking` while it is asked for afresh;
-    /// `holding` while the screenshot suite's picture waits for it. (Counted: a popover's list can come twice, the one
-    /// before going after the next has come.)
-    @State private var ups = 0
-    private var up: Bool { ups > 0 }
-    @State private var reasking = false
-    @State private var holding = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var tint: Color { Color(hex: tool.courses.first?.color ?? "#8e8e93") }
@@ -452,39 +452,11 @@ private struct ToolCard: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background { revealButton }
-        // (courses-27: where its foot is, read as its list opens — not on every frame of a scroll)
-        .background { PreviewProbe(anchor: spot) }
         .modifier(ListCardSurface(lit: hover || listed))
         .scaleEffect(pressed && !reduceMotion ? 0.98 : 1)
         .animation(.easeOut(duration: 0.1), value: pressed)
         .animation(Motion.hover, value: hover || listed)
         .onHover { hover = $0 }
-        .onChange(of: listed) { _, on in
-            if !on { closedAt = Date() }
-            if on, UserDefaults.standard.string(forKey: "SimplShotFile") != nil {
-                NSLog("[Simpl] tool list: %@'s list asked for (card in a window: %@)", tool.name, spot.view?.window == nil ? "no" : "yes")
-            }
-            if on && !shown { reckonRoom() }
-            if shown != on { shown = on }
-        }
-        .onChange(of: shown) { _, on in
-            guard !reasking else { return }
-            if on, !up { holdPicture() }
-            if on { checkUp(since: Date()) }
-            if listed != on { listed = on }
-        }
-        .onAppear {
-            // (a card made again while its list is open — moved to another column by a new answer: its list opened again
-            // a turn of the run loop later, once the card is in its window, for the room round it to be reckoned there)
-            guard listed, !shown else { return }
-            if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] tool list: %@'s card made with its list asked for", tool.name) }
-            DispatchQueue.main.async {
-                guard listed, !shown else { return }
-                reckonRoom()
-                shown = true
-            }
-        }
-        .onDisappear { letPictureGo() }
     }
 
     /// The card's own button, the whole card under what it says: it tells the card when it is held, for the card to give.
@@ -494,9 +466,7 @@ private struct ToolCard: View {
         var next = ""
         if let n = tool.nextShown { next = "Next: \(n.title), \(n.line)" }
         return Button {
-            guard Date().timeIntervalSince(closedAt) > 0.3 else { return }
-            reckonRoom()
-            shown = true
+            listed = true
         } label: {
             shape.fill(Color.clear).contentShape(shape)
         }
@@ -505,95 +475,6 @@ private struct ToolCard: View {
         .accessibilityLabel(label)
         .accessibilityValue(next)
         .accessibilityHint(tool.chooseHelp)
-        // (the list hangs from this button — the whole card, under its words — not from the card's glass surface over
-        // it, from which a popover did not show. courses-27: from the card's foot, under it, its arrow at "5 assignments"
-        // — beside the card it covered the page's heading and the card itself; with no room below, it goes above)
-        .popover(isPresented: $shown, attachmentAnchor: .point(.bottom), arrowEdge: .bottom) {
-            ToolPlacesList(tool: tool, tint: tint, room: room, choose: choose, close: { shown = false })
-                // (the screenshot suite's console: when a list shows and goes)
-                .onAppear {
-                    ups += 1
-                    letPictureGo()
-                    if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] tool list shown: %@", tool.name) }
-                }
-                .onDisappear {
-                    ups = max(0, ups - 1)
-                    if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] tool list closed: %@", tool.name) }
-                }
-        }
-    }
-
-    /// (1.3.178) Its list asked for and not up a second later: asked for afresh, from its card in its window, once the
-    /// app is in front (a popover shows only for the app in front) — three times at most, and not past 30 seconds.
-    private func checkUp(since: Date, tries: Int = 0, told: Bool = false) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            guard shown, listed, !up, tries < 3, Date().timeIntervalSince(since) < 30 else {
-                letPictureGo()
-                return
-            }
-            guard NSApp.isActive, spot.view?.window?.isVisible == true else {
-                // (1.3.179: the suite's console says what it waits for, once — the dark-36b list asked for and never up)
-                if !told, UserDefaults.standard.string(forKey: "SimplShotFile") != nil {
-                    NSLog("[Simpl] tool list: %@'s list waits (app in front: %@, card in a window: %@)", tool.name,
-                          NSApp.isActive ? "yes" : "no", spot.view?.window == nil ? "no" : "yes")
-                }
-                checkUp(since: since, tries: tries, told: true)
-                return
-            }
-            NSLog("[Simpl] tool list: %@'s list asked for but not up; asked again", tool.name)
-            reckonRoom()
-            // (closed and asked for again a few frames apart, so SwiftUI sees both; the page's `listed` left as it is)
-            reasking = true
-            shown = false
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                shown = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { reasking = false }
-                checkUp(since: since, tries: tries + 1, told: told)
-            }
-        }
-    }
-
-    /// (1.3.178) The suite's picture held from when its list is asked for until it is up: a list asked for while the app
-    /// was behind was pictured as the app came in front, before it was asked for again (the light-36b picture).
-    private func holdPicture() {
-        guard !holding, UserDefaults.standard.string(forKey: "SimplShotFile") != nil else { return }
-        holding = true
-        Shot.began()
-    }
-
-    /// (1.3.178) The suite's picture let go: the list up, or no longer asked for.
-    private func letPictureGo() {
-        guard holding else { return }
-        holding = false
-        Shot.ended()
-    }
-
-    /// (courses-27) The room between the card's foot and the window's, less a margin: the list under the card is no
-    /// taller than that. With too little room the list goes above the card, as tall as it likes (460 points at most).
-    /// (1.3.82) Reckoned as the list opens, from the card's own window and its screen, and kept while the list is open —
-    /// and never more than the screen has room for on the side the list goes. 1.3.81 reckoned it each time the card
-    /// was drawn, from the key window, which once the list had the keys was the list's own: a card drawn again under its
-    /// open list (the tools' answer coming in a second time) asked 460 points of a screen with some 330 over and under
-    /// the card, AppKit kept the popover on the screen, SwiftUI made its window as tall as the list again, and the two
-    /// went on until AppKit stopped the app (more passes laying a window out than it has views).
-    private func reckonRoom(again: Bool = true) {
-        // (1.3.97) a list opened by the page as its answer comes in (the launch's -SimplExternalToolList, a card made
-        // afresh) can find its card not yet in a window: the room is reckoned once more a turn of the run loop later,
-        // when it is — before, it stayed its 460 of the start, and the suite's console had no room line to read
-        guard let v = spot.view, let window = v.window else {
-            if again { DispatchQueue.main.async { reckonRoom(again: false) } }
-            return
-        }
-        let card = window.convertToScreen(v.convert(v.bounds, to: nil))
-        let screen = (window.screen ?? NSScreen.main)?.visibleFrame ?? window.frame
-        // (the popover's arrow and its gap from the card take some 40 points of the screen's room on its side)
-        let under = min(card.minY - window.frame.minY - 24, card.minY - screen.minY - 40)
-        let over = screen.maxY - card.minY - 40
-        let fits = under >= 240 ? min(460, under) : min(460, max(under, over))
-        room = max(160, fits.rounded(.down))
-        if UserDefaults.standard.string(forKey: "SimplShotFile") != nil {
-            NSLog("[Simpl] tool list room: %.0f (%.0f under the card, %.0f over its foot)", room, under, over)
-        }
     }
 
     private var header: some View {
@@ -633,19 +514,17 @@ private struct ToolCard: View {
         .background(Theme.well, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
-    /// (1.3.77) The card's foot: how many places it has, and a chevron — there is more inside. (courses-29) It points
-    /// down, to the list that opens under it here (a right chevron promised a page of its own), and up while it is open.
+    /// (1.3.77) The card's foot: how many places it has, and a chevron — there is more inside. (1.3.204: to the right,
+    /// the list opening in a popup of its own, no longer under the card)
     private var footer: some View {
         VStack(spacing: 10) {
             Divider()
             HStack(spacing: 6) {
                 Text(tool.placesPhrase).font(.sCallout).foregroundStyle(.secondary)
                 Spacer(minLength: 6)
-                Image(systemName: "chevron.down")
+                Image(systemName: "chevron.right")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.tertiary)
-                    .rotationEffect(.degrees(listed ? 180 : 0))
-                    .animation(reduceMotion ? nil : .timingCurve(0.23, 1, 0.32, 1, duration: 0.2), value: listed)
             }
         }
     }
@@ -737,20 +616,20 @@ private struct NextTag: View {
 
 // MARK: - The list of places
 
-/// (1.3.77) Every place a tool is used, to choose the one to open, in a popover from its card. (1.3.202) A viewer of its
+/// (1.3.77) Every place a tool is used, to choose the one to open — (1.3.204) in a popup over the page, centred, 480 points
+/// wide (a popover from its card before, cramped by the room under it). (1.3.202) A viewer of its
 /// own rather than a plain list: a head washed in the tool's colour — its tile, its name, its site and how many there
 /// are, and how many are still to do; To Do and All when it has both (To Do to start with); a filter when there are more
 /// than eight; then the next still to do on a card of its own with Open, and the rest under each course's name and how
 /// many it has there, each with a mark of where it stands (to do, done, missing, a module item), its title and its line,
 /// its status and, under the highlight, a chevron; at the foot, the keys it takes. The pointer and the arrow keys move one
-/// highlight (it starts on the next still to do), Return or a click opens it, Escape closes the list (a filter with words
-/// in it is emptied first). It is as tall as what it first shows, up to 460 points, and scrolls past that — a narrower
-/// choice, or a filter, leaves it its size.
+/// highlight (it starts on the next still to do), Return or a click opens it, Escape or its × closes the list (a filter
+/// with words in it is emptied first). It is as tall as what it first shows, up to 560 points (less on a short window),
+/// and scrolls past that — a narrower choice, or a filter, leaves it its size.
 private struct ToolPlacesList: View {
     let tool: ExternalToolsData.Tool
     let tint: Color
-    /// (courses-27) The most the whole popover may be tall: the room under its card — (1.3.82) or over it, on the screen;
-    /// reckoned once as the list opened.
+    /// The most the whole popup may be tall: 560 points, or the window's height less a margin.
     let room: CGFloat
     let choose: (ExternalToolsData.Course, ExternalToolsData.Item) -> Void
     let close: () -> Void
@@ -777,7 +656,7 @@ private struct ToolPlacesList: View {
     private enum Focus: Hashable { case filter, list }
     private enum Scope: Hashable { case toDo, all }
 
-    init(tool: ExternalToolsData.Tool, tint: Color, room: CGFloat = 460, choose: @escaping (ExternalToolsData.Course, ExternalToolsData.Item) -> Void, close: @escaping () -> Void) {
+    init(tool: ExternalToolsData.Tool, tint: Color, room: CGFloat = 560, choose: @escaping (ExternalToolsData.Course, ExternalToolsData.Item) -> Void, close: @escaping () -> Void) {
         self.tool = tool
         self.tint = tint
         self.room = room
@@ -809,11 +688,11 @@ private struct ToolPlacesList: View {
         let places = "\(tool.placesPhrase) in \(courseCount == 1 ? "1 course" : "\(courseCount) courses")"
         return tool.showsHost ? "\(tool.host) · \(places)" : places
     }
-    /// The list's own height at most: the whole popover no taller than 460 points, (courses-27) nor than the room under
-    /// its card (its head, its choices, its filter and its foot take the rest).
+    /// The list's own height at most: the whole popup no taller than its room (its head, its choices, its filter and its
+    /// foot take the rest).
     private var listMax: CGFloat {
         let head: CGFloat = 64 + (scoped ? 38 : 0) + (hasFilter ? 40 : 0) + 30
-        return max(120, min(460, room) - head)
+        return max(120, room - head)
     }
 
     /// The list's height: as tall as it is, up to its most.
@@ -848,10 +727,11 @@ private struct ToolPlacesList: View {
             Divider()
             foot
         }
-        .frame(width: 400)
-        // (courses-27: solid under the list — the card behind showed through the popover's foot as a cut-off line)
+        .frame(width: 480)
+        // (solid: the popup over the dimmed page)
         .background(Color(nsColor: .windowBackgroundColor))
         .background { keyHolder }
+        .background { escapeKey }
         .defaultFocus($focus, firstFocus)
         .task {
             // (the keys to the filter, or to the list: at once, and again once the popover's window is key if not taken)
@@ -882,12 +762,37 @@ private struct ToolPlacesList: View {
                     Text("\(toDo)").font(.system(size: 20, weight: .bold, design: .rounded)).monospacedDigit()
                     Text("to do").font(.sCaption2.weight(.medium)).foregroundStyle(.secondary)
                 }
+                .accessibilityElement(children: .combine)
             }
+            closeButton
         }
         .padding(.horizontal, 16)
         .frame(height: 64)
         .background(LinearGradient(colors: [tint.opacity(0.18), tint.opacity(0.02)], startPoint: .top, endPoint: .bottom))
-        .accessibilityElement(children: .combine)
+    }
+
+    /// (1.3.204) The popup's ×, as a floating panel's.
+    private var closeButton: some View {
+        Button(action: close) {
+            Image(systemName: "xmark")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.secondary)
+                .frame(width: 22, height: 22)
+                .background(Circle().fill(Color.primary.opacity(0.08)))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .help("Close (Esc)")
+        .accessibilityLabel("Close")
+    }
+
+    /// (1.3.204) Escape, wherever the keys are in the window: the filter emptied first, then the list closed.
+    private var escapeKey: some View {
+        Button("") { if query.isEmpty { close() } else { query = "" } }
+            .keyboardShortcut(.cancelAction)
+            .opacity(0)
+            .frame(width: 0, height: 0)
+            .accessibilityHidden(true)
     }
 
     private var scopePicker: some View {
@@ -951,18 +856,15 @@ private struct ToolPlacesList: View {
                 }
             }
             .scrollBounceBehavior(.basedOnSize)
-            // (1.3.82: as tall as the list, up to its most — and shorter where AppKit has less room for the popover on
-            // the screen: SwiftUI sizes a popover's window to what it shows each time it lays it out, and a list of one
-            // height only, in a popover the screen kept shorter, had it sized back up, pass after pass)
+            // (1.3.82: as tall as the list, up to its most)
             .frame(minHeight: min(120, listFrame), idealHeight: listFrame, maxHeight: listFrame)
             .onPreferenceChange(PlacesListHeightKey.self) { h in
-                // (measured as it first shows, unfiltered: a filter, or the other choice, leaves the popover its size)
+                // (measured as it first shows, unfiltered: a filter, or the other choice, leaves the popup its size)
                 let whole = h.rounded(.up)
                 if query.isEmpty, scope == firstScope, abs(whole - measured) > 0.5 { measured = whole }
             }
             .task(id: measured) {
-                // (1.3.82: the measure taken up on a later turn of the run loop — the popover sized again while it was
-                // being laid out was laid out again, and measured again — and only when it is another by half a point)
+                // (1.3.82: the measure taken up on a later turn of the run loop, and only when it is another by half a point)
                 if measured > 0, abs(measured - listHeight) > 0.5 { listHeight = measured }
             }
             .onChange(of: keyMoves) { _, _ in

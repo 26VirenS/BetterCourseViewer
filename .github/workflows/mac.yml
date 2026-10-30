@@ -426,7 +426,7 @@ jobs:
       # (1.3.80) Live checks: mac-shots.sh's live pictures (light-48*), each alone against a mock of its own, had the
       # screen on show checked every 4 seconds and the mock school changed behind the engine's back; live_check read
       # their consoles (shots/live-check.txt): a check with nothing new drew nothing ("· 0 redraws"), the change was found
-      # and only its parts put in place (the counters and the List's row, one course's card, To Do's new row), the next
+      # and only its parts put in place (the counters and the List's row, Grades' course total, To Do's new row), the next
       # check found nothing new, a course's page was checked at its own pace, and no check went unanswered
       - name: Live checks find what changed
         if: ${{ !cancelled() && hashFiles('shots/FAILED') == '' && env.SHOTS != 'none' }}

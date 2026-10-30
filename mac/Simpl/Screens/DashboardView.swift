@@ -2,9 +2,9 @@ import AppKit
 import SwiftUI
 
 /// The Dashboard: the day at a glance, as Simpl's web Dashboard has it (1.2). Six counters, each growing in place into a
-/// panel of what it counted; then one of three views, chosen in the toolbar and kept on this Mac — Cards (the courses as
-/// cards: score, what is due, unread announcements, how much is handed in, quick links), List (every course on one
-/// line, then everything coming up day by day, ticked off where it is done) and Activity (Canvas's recent activity).
+/// panel of what it counted; then one of two views, chosen in the toolbar and kept on this Mac — List (everything coming
+/// up day by day, ticked off where it is done) and Activity (Canvas's recent activity). (1.3.204: no Cards view, as the
+/// web has it; a Mac that kept Cards opens on List.)
 /// Beside the view on a wide window, and under it on a narrow one: the day's work, the grades skyline and the week's
 /// load per course. (1.3.78) Kept once opened (DetailStack): `active` while it is the screen showing; put away, it keeps
 /// everything it shows, and reads again — quietly, each card changing in place — when something was done meanwhile.
@@ -25,7 +25,8 @@ struct DashboardView: View {
     @StateObject private var model = Loader<Today>()
     /// (1.3.78) Something was done while it was put away (`dataVersion` moved on): it reads again when it is shown.
     @State private var behind = false
-    /// The view chosen (Cards, List, Activity), kept on this Mac. (The screenshot suite: -SimplDashView list.)
+    /// The view chosen (List, Activity), kept on this Mac — a kept "cards" reads as List. (The screenshot suite:
+    /// -SimplDashView list.)
     @AppStorage("SimplDashView") private var chosen: DashView = .list // (1.2.1: List unless another is picked)
     @State private var counts: TodayCounts?
     /// (home-25) Overdue's and Graded's numbers are Canvas's word now, not the ones counted from what was kept.
@@ -43,9 +44,6 @@ struct DashboardView: View {
     @State private var panelHeight: CGFloat = 0
     @State private var sheetAsked = false
     @State private var width: CGFloat = 0
-    @State private var courses: DashCoursesData?
-    @State private var progress: [String: CourseProgress] = [:]
-    @State private var progressRead = false
     @State private var sky: DashSkylineData?
     @State private var list: DashListData?
     @State private var listError: String?
@@ -128,10 +126,8 @@ struct DashboardView: View {
         var asks: [ReadAhead.Ask?] = [
             .read("today", Today.self), .read("todayCounts", ["kept": false], TodayCounts.self),
             .read("dashSkyline", ["kept": false], DashSkylineData.self),
-            .read("dashCourses", DashCoursesData.self), .read("coursesProgress", [String: CourseProgress].self),
         ]
         switch DashView.offered(brightspace: engine.onBrightspace).contains(chosen) ? chosen : .list {
-        case .cards: break
         case .list: asks.append(.read("dashList", DashListData.self))
         case .activity: asks.append(.read("dashActivity", DashActivityData.self))
         }
@@ -155,7 +151,7 @@ struct DashboardView: View {
         }
     }
 
-    /// (home-4) The greeting and the day, with the page's own controls beside them — its view (Cards, List, Activity) and
+    /// (home-4) The greeting and the day, with the page's own controls beside them — its view (List, Activity) and
     /// New Task — in the page, not the toolbar, so a tool pinned to the toolbar never pushes them into its » menu (as
     /// Windows has them); under the greeting where the page is too narrow for both on one line. (home-25) While the page
     /// shows what was kept from last time, the day's line says it is updating.
@@ -178,15 +174,18 @@ struct DashboardView: View {
     /// The view chosen (kept on this Mac), Silent mode (1.3.190) and New Task (⌘N): its words beside its symbol.
     private var viewControls: some View {
         HStack(spacing: 10) {
-            Picker("View", selection: $chosen.animation(Motion.gentle)) {
-                ForEach(views) { v in
-                    Text(v.title).tag(v).help(v.help)
+            // (on Brightspace only List: no choice to make, so no picker)
+            if views.count > 1 {
+                Picker("View", selection: $chosen.animation(Motion.gentle)) {
+                    ForEach(views) { v in
+                        Text(v.title).tag(v).help(v.help)
+                    }
                 }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+                .help("A list by day, or recent activity")
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
-            .help("Cards, a list by day, or recent activity")
             Button {
                 if open != nil { setOpen(nil) }
                 withAnimation(Motion.gentle) { silent.on = true }
@@ -479,9 +478,8 @@ struct DashboardView: View {
     @ViewBuilder
     private func main(_ d: Today) -> some View {
         switch view {
-        case .cards: courseCards
         case .list:
-            upcoming // (1.3.1: no Courses card here — the sidebar and the Cards view have the courses)
+            upcoming // (1.3.1: no Courses card here — the sidebar has the courses)
         case .activity: activityList
         }
     }
@@ -525,33 +523,6 @@ struct DashboardView: View {
             .padding(8)
             .card(radius: 18)
         }
-    }
-
-    private var courseCards: some View {
-        PageSection(title: "Courses", trailing: courses.map { "\($0.rows.count) \($0.rows.count == 1 ? "course" : "courses")" }, accessory: {
-            Button("All Courses") { engine.go(.courses) }
-                .buttonStyle(.link)
-                .font(.sCallout)
-        }) {
-            if let c = courses {
-                if c.rows.isEmpty {
-                    EmptyNote(text: c.empty ?? "No courses chosen yet.", symbol: "books.vertical")
-                } else {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 18, alignment: .top)], alignment: .leading, spacing: 18) {
-                        ForEach(c.rows) { row in
-                            DashCourseCard(course: row, progress: progressOf(row.id))
-                        }
-                    }
-                }
-            } else {
-                loadingNote("Reading your courses…")
-            }
-        }
-    }
-
-    /// A course's share handed in: nil until read; a course left out of the answer has nothing to hand in.
-    private func progressOf(_ id: String) -> CourseProgress? {
-        progress[id] ?? (progressRead ? CourseProgress(done: 0, total: 0) : nil)
     }
 
     private var upcoming: some View {
@@ -640,7 +611,6 @@ struct DashboardView: View {
         // (1.2.3: every part opens on what it showed last time, and each asks Canvas at once, not after the day's)
         showKept()
         Task { await loadCounts() }
-        Task { await loadCourses() }
         Task { await loadSkyline() }
         Task { await loadView() }
         await model.load(engine, "today", animated: animated)
@@ -654,26 +624,13 @@ struct DashboardView: View {
         }
     }
 
-    /// The cards, the List, the activity and the skyline as they were last time (AnswerCache), until the live answers
-    /// are in. Their counts wait for the live answer, as every count does: a card's due today and unread, a new dot.
+    /// The List, the activity and the skyline as they were last time (AnswerCache), until the live answers are in. Their
+    /// counts wait for the live answer, as every count does: a new dot.
     /// (1.3.78) This session's answers first, whole (read ahead, or from a visit before): nothing held back.
     private func showKept() {
         var t = Transaction()
         t.disablesAnimations = true
         withTransaction(t) {
-            if courses == nil, let c = engine.recent("dashCourses", as: DashCoursesData.self)?.value {
-                courses = c
-                if let p = engine.recent("coursesProgress", as: [String: CourseProgress].self)?.value {
-                    progress = p
-                    progressRead = true
-                }
-            } else if courses == nil, var c = engine.kept("dashCourses", as: DashCoursesData.self) {
-                for i in c.rows.indices {
-                    c.rows[i].unread = nil
-                    c.rows[i].dueToday = nil
-                }
-                courses = c
-            }
             if counts == nil, let c = engine.recent("todayCounts", ["kept": false], as: TodayCounts.self) {
                 counts = c.value
                 countsLive = c.fresh
@@ -706,22 +663,6 @@ struct DashboardView: View {
         }
     }
 
-    private func loadCourses() async {
-        if let c = try? await engine.read("dashCourses", as: DashCoursesData.self) {
-            withAnimation(courses == nil ? nil : Motion.gentle) { courses = c }
-            marks.shown("dashCourses", by: engine)
-        } else if courses == nil {
-            courses = DashCoursesData(rows: [], empty: "Your courses could not be loaded.")
-        }
-        if let p = try? await engine.read("coursesProgress", as: [String: CourseProgress].self) {
-            withAnimation(Motion.gentle) {
-                progress = p
-                progressRead = true
-            }
-            marks.shown("coursesProgress", by: engine)
-        }
-    }
-
     /// The skyline from the copy kept from the last visit first (at once), then from what Canvas says now.
     private func loadSkyline() async {
         if sky == nil, let kept = try? await engine.read("dashSkyline", ["kept": true], as: DashSkylineData.self), sky == nil {
@@ -735,7 +676,6 @@ struct DashboardView: View {
 
     private func loadView() async {
         switch view {
-        case .cards: break
         case .list: await loadList()
         case .activity: await loadActivity()
         }
@@ -770,10 +710,10 @@ struct DashboardView: View {
     // MARK: - Live checks (1.3.80)
 
     /// The live check (LiveRefresh): each part's read asked again with the check's age — the day and its counters,
-    /// Overdue's and Graded's numbers, the courses' cards and how much of each is handed in (in Cards), Coming up (List)
-    /// or the activity (Activity), the skyline — each answer compared with the one shown, and only the parts that changed
-    /// put in place, together: a counter's number rolls to its new count, a card or a row changes, arrives or goes, and
-    /// every other part keeps its value, so it is not drawn again (the rows and cards by their ids). A check that finds
+    /// Overdue's and Graded's numbers, Coming up (List) or the activity (Activity), the skyline — each answer compared
+    /// with the one shown, and only the parts that changed put in place, together: a counter's number rolls to its new
+    /// count, a row changes, arrives or goes, and every other part keeps its value, so it is not drawn again (the rows
+    /// by their ids). A check that finds
     /// nothing new changes nothing: the page is not drawn at all. (Only what the view shows is read: no reads for a view
     /// not chosen.)
     private func liveCheck(_ age: Double) async throws -> LiveFound {
@@ -791,21 +731,6 @@ struct DashboardView: View {
                 c.put {
                     counts = c.value
                     countsLive = c.value.overdue != nil
-                }
-            }
-        }
-        if view == .cards {
-            if let c = try await e.liveCheck("dashCourses", as: DashCoursesData.self, shown: courses, marks: marks, maxAge: age) {
-                note("cards")
-                changes.append { c.put { courses = c.value } }
-            }
-            if let c = try await e.liveCheck("coursesProgress", as: [String: CourseProgress].self, shown: progressRead ? progress : nil, marks: marks, maxAge: age) {
-                note("handed-in")
-                changes.append {
-                    c.put {
-                        progress = c.value
-                        progressRead = true
-                    }
                 }
             }
         }
@@ -921,7 +846,7 @@ struct DashboardView: View {
 }
 
 /// (1.3.78) The Dashboard's title in the window's stack, where every screen's is; the Dashboard itself is kept over the
-/// stack (DetailStack), so going back to it never draws it again. (home-4) Its view (Cards, List, Activity) and New Task
+/// stack (DetailStack), so going back to it never draws it again. (home-4) Its view (List, Activity) and New Task
 /// are in its page, by the greeting: the toolbar keeps Back, Refresh, the pinned tools and Search, the same on every
 /// screen, and a pinned tool never pushes the page's own controls into the toolbar's » menu.
 struct DashboardChrome: View {
@@ -934,7 +859,7 @@ struct DashboardChrome: View {
 extension DashView {
     /// The views offered: Brightspace has no activity stream, so no Activity there.
     static func offered(brightspace: Bool) -> [DashView] {
-        brightspace ? [.cards, .list] : allCases
+        brightspace ? [.list] : allCases
     }
 }
 

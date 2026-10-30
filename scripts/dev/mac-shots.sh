@@ -489,8 +489,7 @@ bio_pins() {
 # People and the Future courses; the first-run setup, the sign-in still going, a school's preview that failed, and the
 # Settings tabs
 ui_review() {
-  MODE=light shoot light-01g-dashboard-cards 14 -SimplDashView cards
-  MODE=light SIZE=1440x900 shoot light-01h-dashboard-cards-wide 14 -SimplDashView cards
+  MODE=light SIZE=1440x900 shoot light-01h-dashboard-list-wide 14 -SimplDashView list
   MODE=light shoot light-01u-counter-unread 30 -SimplSheet unread # (1.3.80: up to 30 seconds for its list, as the others)
   # (1.3.190) Silent mode: in the light look too the window goes dark, the sidebar in words alone
   MODE=light shoot light-01s-dashboard-silent 16 -SimplDashSilent YES
@@ -848,7 +847,7 @@ richtext_check() {
 # "live: dashboard unchanged · 12 reads · 0 redraws", "live: dashboard updated counters,day,list · 9 reads · 1 redraw" —
 # and live_check reads them. (1.3.80: in a part of their own, LIVE_PART; the mock is up once it answers, not after a
 # fixed two seconds.)
-LIVE_NAMES="light-48a-live-dashboard light-48b-live-cards light-48c-live-todo light-48d-live-course"
+LIVE_NAMES="light-48a-live-dashboard light-48b-live-grades light-48c-live-todo light-48d-live-course"
 live_shots() {
   local mock="" live=(-SimplLiveEvery 4 -SimplLiveShotAfter 5) i
   if [ -z "$PLANNING" ] && [ "$LIVE_PART" = "$SHARD" ]; then
@@ -860,7 +859,7 @@ live_shots() {
   # (each picture waited for by its own worker's pid: a bare `wait` would wait for the mock above too, which never ends)
   PART=$LIVE_PART MODE=light BASE=http://localhost:8810 shoot light-48a-live-dashboard 50 "${live[@]}" -SimplLiveChange done:6
   wait_shot
-  PART=$LIVE_PART MODE=light BASE=http://localhost:8810 shoot light-48b-live-cards 50 "${live[@]}" -SimplDashView cards -SimplLiveChange grade:6
+  PART=$LIVE_PART MODE=light BASE=http://localhost:8810 shoot light-48b-live-grades 50 "${live[@]}" -SimplPlace grades -SimplLiveChange grade:6
   wait_shot
   PART=$LIVE_PART MODE=light BASE=http://localhost:8810 shoot light-48c-live-todo 50 "${live[@]}" -SimplPlace todo -SimplLiveChange task:6
   wait_shot
@@ -873,11 +872,11 @@ live_shots() {
 
 # (1.3.80) live_check: what the live pictures' consoles say, as live-check.txt (the workflow fails on a FAIL line). A
 # check that found nothing new drew nothing; the mock school's change was found by a check that put in place only what
-# it changed — the counters and the List's row, one course's card, To Do's new row — and the next check found nothing
+# it changed — the counters and the List's row, Grades' course total, To Do's new row — and the next check found nothing
 # new again; a course's page was checked at its own pace; no check went without an answer.
 live_check() {
   local out="$OUT_ABS/live-check.txt"
-  local d="$OUT_ABS/console-light-48a-live-dashboard.txt" k="$OUT_ABS/console-light-48b-live-cards.txt"
+  local d="$OUT_ABS/console-light-48a-live-dashboard.txt" k="$OUT_ABS/console-light-48b-live-grades.txt"
   local t="$OUT_ABS/console-light-48c-live-todo.txt" a="$OUT_ABS/console-light-48d-live-course.txt"
   : > "$out"
   say() { if [ "$1" = 0 ]; then echo "ok   $2" >> "$out"; else echo "FAIL $2" >> "$out"; fi; }
@@ -892,8 +891,8 @@ live_check() {
   say $? "and the List's row (Coming up)"
   after "$d" 'live: dashboard updated' 'live: dashboard unchanged'
   say $? "the check after it found nothing new again"
-  grep -q 'live: dev change grade made' "$k" 2>/dev/null && grep -Eq 'live: dashboard updated ([a-z-]+,)*cards[, ]' "$k" 2>/dev/null
-  say $? "a course's total moved: the Cards view's card changed ($(grep -Eo 'live: dashboard updated [a-z,-]+' "$k" 2>/dev/null | head -1))"
+  grep -q 'live: dev change grade made' "$k" 2>/dev/null && grep -Eq 'live: [a-z-]+ updated ([a-z-]+,)*grades([, ]|$)' "$k" 2>/dev/null
+  say $? "a course's total moved: Grades changed ($(grep -Eo 'live: [a-z-]+ updated [a-z,-]+' "$k" 2>/dev/null | head -1))"
   grep -q 'live: dev change task made' "$t" 2>/dev/null && grep -q 'live: todo updated todo' "$t" 2>/dev/null
   say $? "a task added: To Do's list changed"
   after "$t" 'live: todo updated' 'live: todo unchanged'
@@ -1068,7 +1067,7 @@ quicklook_check() {
 }
 
 # (1.3.82) tool_list_check: what the External Tools lists' consoles say, as tool-list-check.txt (a FAIL line is said as
-# a warning of the run): each list reckoned its room once as it opened ("[Simpl] tool list room: 303 (…)"), the list
+# a warning of the run): each list showed (1.3.204: in its popup over the page, "[Simpl] tool list shown: …"), the list
 # read again under it was still open after the read, and no copy of the app crashed (a crash report is kept beside the
 # pictures by keep_crashes: 1.3.81's was a popover sized again and again until AppKit stopped the app). (1.3.80: the
 # crash reports looked for on this Mac and among the parts' files put together, where SHOTS=check finds them.)
@@ -1078,8 +1077,8 @@ tool_list_check() {
   say() { if [ "$1" = 0 ]; then echo "ok   $2" >> "$out"; else echo "FAIL $2" >> "$out"; fi; }
   for f in "$OUT_ABS"/console-*-36[bcd]-external-tools-*.txt; do
     [ -f "$f" ] || continue
-    grep -q '\[Simpl\] tool list room: ' "$f"
-    say $? "$(basename "$f" .txt | sed 's/^console-//'): $(grep -o 'tool list room: .*' "$f" | head -1)"
+    grep -q '\[Simpl\] tool list shown: ' "$f"
+    say $? "$(basename "$f" .txt | sed 's/^console-//'): $(grep -o 'tool list shown: .*' "$f" | head -1)"
   done
   grep -q "read again; Knewton Alta's list still open" "$r" 2>/dev/null
   say $? "the list was still open after the tools were read again under it: $(grep -o 'read again; .*' "$r" 2>/dev/null | head -1)"
