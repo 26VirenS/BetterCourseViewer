@@ -309,7 +309,7 @@ try {
   const leftBy = (name) => !!SECTIONS && !SECTIONS.includes(name) && !!firstHere && halfOf(name) === halfOf(firstHere) && SMOKE_PARTS[halfOf(name)].indexOf(name) < SMOKE_PARTS[halfOf(name)].indexOf(firstHere);
   const setPrefs = (patch) => sw.evaluate(async ([k, p]) => { const cur = (await self.BCV.api.storage.local.get(k))[k] || {}; await self.BCV.api.storage.local.set({ [k]: { ...cur, ...p } }); }, [`prefs:localhost:${PORT}`, patch]);
   const asMe = { 'content-type': 'application/json', 'x-csrf-token': 'mock+csrf/token=' };
-  if (leftBy('dashboard')) { // a course's colour picked on its card; a discussion opened from the stream, read since
+  if (leftBy('dashboard')) { // a course's colour picked on its page; a discussion opened from the stream, read since
     await fetch(`${BASE}/api/v1/users/self/colors/course_101`, { method: 'PUT', headers: asMe, body: JSON.stringify({ hexcode: '#1770AB' }) });
     await fetch(`${BASE}/api/v1/courses/101/discussion_topics/7003/read_all`, { method: 'PUT', headers: asMe });
   }
@@ -582,7 +582,7 @@ try {
   // (2.99.41) the Mac's head: a greeting with the first name over today's date, the views and New Task under it; and "Coming up"
   await page.waitForFunction(() => /, Sam$/.test(document.querySelector('.bcv-dash__hello')?.textContent || ''), null, { timeout: 5000 }).catch(() => {});
   const hello = await page.evaluate(() => ({ h1: document.querySelector('.bcv-dash__hello')?.textContent, date: document.querySelector('.bcv-dash__date')?.textContent, bar: [...document.querySelectorAll('.bcv-dash__bar .bcv-seg__btn, .bcv-dash__bar .bcv-dash__new')].map((e) => e.textContent.trim()).join('|'), coming: document.querySelector('.bcv-dash__coming')?.textContent }));
-  check(/^Good (morning|afternoon|evening), Sam$/.test(hello.h1 || '') && /^[A-Z][a-z]+day, [A-Z][a-z]+ \d{1,2}$/.test(hello.date || '') && /Cards\|List\|Recent activity\|New Task/.test(hello.bar) && /^Coming up\d+ to do/.test(hello.coming || ''), `the Mac's Dashboard head — a greeting, the date, the views and New Task — and "Coming up" over the list: ${JSON.stringify(hello)}`);
+  check(/^Good (morning|afternoon|evening), Sam$/.test(hello.h1 || '') && /^[A-Z][a-z]+day, [A-Z][a-z]+ \d{1,2}$/.test(hello.date || '') && /^List\|Recent activity\|New Task$/.test(hello.bar) && /^Coming up\d+ to do/.test(hello.coming || ''), `the Mac's Dashboard head — a greeting, the date, the views and New Task — and "Coming up" over the list: ${JSON.stringify(hello)}`);
   await waitText('.bcv-stats > :nth-child(3) .bcv-stat__value', /^3$/);
   // Overdue: past due with nothing handed in (Canvas's missing flag); work handed in late, scored or still waiting on a grade, is not overdue; the number matches its sheet
   check(/^Overdue\s*1\s*1 not submitted$/i.test(stats[3]), `Overdue counts work past its due date with nothing handed in (late work, scored or awaiting a grade, is not overdue): ${stats[3]}`);
@@ -970,39 +970,34 @@ try {
   check(true, 'ticking again marks it not done');
   await page.click('.bcv-day .bcv-row .bcv-circle');
   await page.waitForSelector('.bcv-day .bcv-row.bcv-row--done', { timeout: 5000 });
-  // (2.98.71) the view switch's light is one shape behind the options that slides to the one chosen — across the redraw the choice makes
-  const segAt = () => page.evaluate(() => { const w = document.querySelector('.bcv-head .bcv-seg'); const t = w?.querySelector(':scope > .bcv-seg__thumb'); const on = w?.querySelector('.bcv-seg__btn.is-active'); const x = t ? new DOMMatrix(getComputedStyle(t).transform).m41 : null; return { thumb: !!t, last: w?.lastElementChild === t, x: x === null ? null : Math.round(x), w: t ? Math.round(t.getBoundingClientRect().width) : 0, on: on?.dataset.value, onX: on ? on.offsetLeft : null, onW: on ? on.offsetWidth : null, bg: on ? getComputedStyle(on).backgroundColor : '' }; });
-  const segList = await segAt();
-  await motionAt(page, 1); // (the glide is watched as it happens: real speed)
-  // the highlight's place read every frame from the press on (the slide starts once Cards has redrawn the Dashboard, later under load):
-  // somewhere along the way it is part way, between List and Cards
-  const glide = page.evaluate(() => new Promise((res) => { const xs = []; const t0 = performance.now(); const look = () => { const t = document.querySelector('.bcv-head .bcv-seg > .bcv-seg__thumb'); if (t) xs.push(Math.round(new DOMMatrix(getComputedStyle(t).transform).m41)); if (performance.now() - t0 < 900) requestAnimationFrame(look); else res(xs); }; look(); }));
-  await page.click('.bcv-seg__btn[data-value="cards"]');
-  const xs = await glide;
-  const segCards = await segAt();
-  const segMid = { x: xs.find((x) => x < segList.x - 2 && x > segCards.x + 2) ?? null, frames: xs.length, seen: [...new Set(xs)].slice(0, 12) };
-  await motionAt(page, MOTION_RATE);
-  check(segList.thumb && segList.last && segList.on === 'list' && Math.abs(segList.x - segList.onX) <= 1 && Math.abs(segList.w - segList.onW) <= 1 && segList.bg === 'rgba(0, 0, 0, 0)' && segMid.x !== null && segCards.on === 'cards' && Math.abs(segCards.x - segCards.onX) <= 1 && Math.abs(segCards.w - segCards.onW) <= 1, `the view switch's highlight slides from List to Cards — under List, part way, then under Cards — though Cards redraws the Dashboard: ${JSON.stringify({ segList, segMid, segCards })}`);
-  // cards view
-  await page.waitForSelector('.bcv-ccard', { timeout: 5000 });
-  await page.waitForFunction(() => document.querySelectorAll('.bcv-ccard .bcv-bar').length >= 5, null, { timeout: 10000 });
-  const cards = await texts('.bcv-ccard');
-  check(cards.length === 5 && /F26-MATH 021 20/.test(cards[0]) && /of \d+ items submitted/.test(cards[0]) && /due today/.test(cards[0]), `course cards: ${cards[0]}`);
-  check((await page.$$('.bcv-ccard__quick')).length === 20, 'quick links on every card');
-  // they arrive together rather than one after another (the entrance itself is only on a first draw)
-  const cardDelays = await page.$$eval('.bcv-ccard', (els) => els.map((e) => getComputedStyle(e).animationDelay));
-  check(cardDelays.length === 5 && cardDelays.every((d) => d === '0s'), `no course card waits its turn: ${cardDelays.join(',')}`);
-  await shot(page, '02-dashboard-cards');
-  // course colour from the card menu
-  await page.click('.bcv-ccard .bcv-ccard__more');
-  await page.click('.bcv-menu__item:has-text("Change colour")');
+  // (2.99.132) a course's colour, picked on the course's own page now that the Dashboard has no course cards (the sections
+  // after this one expect it): Canvas's 15 colours and a custom one; the page and the sidebar take it at once, and Canvas keeps it
+  await page.goto(`${BASE}/courses/101`);
+  await page.waitForSelector('.bcv-head .bcv-colorbtn', { timeout: 10000 });
+  await page.click('.bcv-head .bcv-colorbtn');
   await page.waitForSelector('.bcv-swatch', { timeout: 3000 });
   check((await page.$$('.bcv-swatch')).length === 16 && (await page.$('.bcv-swatch__input')), 'colour palette: Canvas\'s 15 colours plus a custom one');
   await shot(page, '02b-course-colour');
   await page.click('.bcv-swatch[data-color="#1770AB"]');
-  await page.waitForFunction(() => getComputedStyle(document.querySelector('.bcv-ccard__hero')).backgroundColor === 'rgb(23, 112, 171)' && getComputedStyle(document.querySelector('.bcv-fav__dot')).backgroundColor === 'rgb(23, 112, 171)', null, { timeout: 5000 });
-  check(await eventually(() => sw.evaluate(async (base) => (await (await fetch(`${base}/api/v1/users/self/colors`)).text()).includes('"course_101":"#1770AB"'), BASE)), 'picking a colour recolours the card and the sidebar at once and saves it to Canvas');
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('.bcv-head .bcv-colorbtn')).backgroundColor === 'rgb(23, 112, 171)' && getComputedStyle(document.querySelector('.bcv-fav__dot')).backgroundColor === 'rgb(23, 112, 171)', null, { timeout: 5000 });
+  check(await eventually(() => sw.evaluate(async (base) => (await (await fetch(`${base}/api/v1/users/self/colors`)).text()).includes('"course_101":"#1770AB"'), BASE)), 'picking a colour recolours the course and the sidebar at once and saves it to Canvas');
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-head .bcv-seg__btn', { timeout: 15000 });
+  await page.waitForSelector('.bcv-day .bcv-row', { timeout: 10000 });
+  // (2.98.71) the view switch's light is one shape behind the options that slides to the one chosen — across the redraw the choice makes
+  const segAt = () => page.evaluate(() => { const w = document.querySelector('.bcv-head .bcv-seg'); const t = w?.querySelector(':scope > .bcv-seg__thumb'); const on = w?.querySelector('.bcv-seg__btn.is-active'); const x = t ? new DOMMatrix(getComputedStyle(t).transform).m41 : null; return { thumb: !!t, last: w?.lastElementChild === t, x: x === null ? null : Math.round(x), w: t ? Math.round(t.getBoundingClientRect().width) : 0, on: on?.dataset.value, onX: on ? on.offsetLeft : null, onW: on ? on.offsetWidth : null, bg: on ? getComputedStyle(on).backgroundColor : '' }; });
+  check((await page.$$eval('.bcv-head .bcv-seg__btn', (bs) => bs.map((b) => b.dataset.value))).join(',') === 'list,activity' && !(await page.$('.bcv-ccard')), 'the Dashboard offers the List and Recent activity — no course cards');
+  const segList = await segAt();
+  await motionAt(page, 1); // (the glide is watched as it happens: real speed)
+  // the highlight's place read every frame from the press on (the slide starts once Recent activity has redrawn the Dashboard, later
+  // under load): somewhere along the way it is part way, between List and Recent activity. (2.99.132: the two views; Cards is gone)
+  const glide = page.evaluate(() => new Promise((res) => { const xs = []; const t0 = performance.now(); const look = () => { const t = document.querySelector('.bcv-head .bcv-seg > .bcv-seg__thumb'); if (t) xs.push(Math.round(new DOMMatrix(getComputedStyle(t).transform).m41)); if (performance.now() - t0 < 900) requestAnimationFrame(look); else res(xs); }; look(); }));
   await page.click('.bcv-seg__btn[data-value="activity"]');
+  const xs = await glide;
+  const segAct = await segAt();
+  const segMid = { x: xs.find((x) => x > segList.x + 2 && x < segAct.x - 2) ?? null, frames: xs.length, seen: [...new Set(xs)].slice(0, 12) };
+  await motionAt(page, MOTION_RATE);
+  check(segList.thumb && segList.last && segList.on === 'list' && Math.abs(segList.x - segList.onX) <= 1 && Math.abs(segList.w - segList.onW) <= 1 && segList.bg === 'rgba(0, 0, 0, 0)' && segMid.x !== null && segAct.on === 'activity' && Math.abs(segAct.x - segAct.onX) <= 1 && Math.abs(segAct.w - segAct.onW) <= 1, `the view switch's highlight slides from List to Recent activity — under List, part way, then under Recent activity — though the view redraws the Dashboard: ${JSON.stringify({ segList, segMid, segAct })}`);
   await page.waitForSelector('.bcv-act__title', { timeout: 5000 });
   const acts = await texts('.bcv-act__kind');
   check(acts.length === 8 && /Announcement · F26-MATH 021 20/.test(acts[0]) && /Discussion · 23 replies/.test(acts[1]), `recent activity: ${acts.slice(0, 2).join(' | ')}`);
@@ -1031,10 +1026,10 @@ try {
   const dashAllRows = () => page.$$eval('.bcv-day .bcv-row', (els) => els.length);
   const [doneBefore, allBefore] = [await dashDoneRows(), await dashAllRows()];
   check(doneBefore > 0 && (await texts('.bcv-dash__done'))[0] === 'Hide completed' && (await page.$eval('.bcv-dash__done', (e) => e.getBoundingClientRect().height <= 32)), `the list shows its done rows, ticked, with a small Hide completed above them (${doneBefore} of ${allBefore} done)`);
-  // the list keeps to the courses on the dashboard (the favourites), like the cards above it: the
+  // the list keeps to the courses on the dashboard (the favourites), like the counters above it: the
   // placement exam's event (a course kept off the dashboard) is not in it
   const listOver = await texts('.bcv-day .bcv-row__over');
-  check(listOver.length === allBefore && !listOver.some((t) => /Placement Exam|Chemistry placement/.test(t)) && listOver.filter((t) => /^F26-/.test(t)).every((t) => /^F26-(MATH 021|PHYS 008|SPRK 010|WRI 010|CHEM 002)/.test(t)), `the list covers the same courses as the cards: ${[...new Set(listOver.map((t) => t.split(' · ')[0]))].join(', ')}`);
+  check(listOver.length === allBefore && !listOver.some((t) => /Placement Exam|Chemistry placement/.test(t)) && listOver.filter((t) => /^F26-/.test(t)).every((t) => /^F26-(MATH 021|PHYS 008|SPRK 010|WRI 010|CHEM 002)/.test(t)), `the list covers the dashboard's courses: ${[...new Set(listOver.map((t) => t.split(' · ')[0]))].join(', ')}`);
   await shot(page, '01d-dashboard-hide-done');
   await page.click('.bcv-dash__done');
   check(await eventually(async () => (await dashDoneRows()) === 0 && (await dashAllRows()) === allBefore - doneBefore), 'Hide completed takes exactly the done rows out');
@@ -1164,13 +1159,9 @@ try {
   // the views the dashboard offers are the ones the setup (or Settings) asked for; one alone needs no switcher
   await setSettings({ appearance: { dashboard: { activity: false } } });
   await page.reload();
-  await page.waitForSelector('.bcv-head .bcv-seg__btn', { timeout: 15000 });
-  check((await page.$$eval('.bcv-head .bcv-seg__btn', (bs) => bs.map((b) => b.dataset.value))).join(',') === 'cards,list', `a view switched off in the settings is not offered: ${(await page.$$eval('.bcv-head .bcv-seg__btn', (bs) => bs.map((b) => b.dataset.value))).join(',')}`);
-  await setSettings({ appearance: { dashboard: { cards: false, activity: false } } });
-  await page.reload();
   await page.waitForSelector('.bcv-day', { timeout: 15000 });
-  check(!(await page.$('.bcv-head .bcv-seg__btn')) && !!(await page.$('.bcv-day')), 'with one view left there is no switcher, and the dashboard is that view');
-  await setSettings({ appearance: { dashboard: { cards: true, list: true, activity: true } } });
+  check(!(await page.$('.bcv-head .bcv-seg__btn')) && !!(await page.$('.bcv-day')), 'a view switched off in the settings is not offered: with one view left there is no switcher, and the dashboard is that view');
+  await setSettings({ appearance: { dashboard: { list: true, activity: true } } });
   await page.reload();
   await page.waitForSelector('.bcv-head .bcv-seg__btn', { timeout: 15000 });
   } // dashboard
@@ -6630,29 +6621,31 @@ try {
   const LOOK_OF = { off: 'light', on: 'dark', system: 'system' };
   const lookBefore = LOOK_OF[(await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.darkMode))] || 'system';
   await sNext('.tile[data-view]');
-  // step 3: what the Dashboard shows first — three preview tiles drawn in the chosen courses' colours, List chosen to start with
-  const VIEW_OF = { cards: 'cards', planner: 'list', activity: 'activity' };
+  // step 3: what the Dashboard shows first — two preview tiles drawn in the chosen courses' colours, List chosen to start with
+  // (2.99.132: the List or Recent activity; Canvas's Card View opens the List)
+  const VIEW_OF = { cards: 'list', planner: 'list', activity: 'activity' };
+  const VIEW_WORD = { list: 'List', activity: 'Recent activity' };
   const viewBefore = VIEW_OF[(await apiGet('/dashboard/view')).dashboard_view] || 'list';
   const dashTiles = () => page.$$eval(su('.tile[data-view]'), (els) => els.map((t) => `${t.dataset.view}${t.classList.contains('is-on') ? ' *' : ''} [${t.querySelector('.tile__label').textContent}]`));
   const tileWords = await page.$$eval(su('.tile[data-view]'), (els) => els.map((t) => `${t.querySelector('.tile__t').textContent} — ${t.querySelector('.tile__s').textContent}`));
-  check((await sStep()) === '3 of 3' && (await page.$eval(su('#next'), (e) => e.textContent.trim())) === 'Finish' && tileWords.join(' | ') === 'Cards — Courses as tiles, with what is due next. | List — Everything due, day by day, with a tick. | Activity — Announcements, replies and grades as they arrive.' && (await dashTiles()).join(' | ') === ['cards', 'list', 'activity'].map((v) => `${v}${v === 'list' ? ' * [Selected]' : ' [Choose]'}`).join(' | '), `step 3 asks what the Dashboard shows first, List selected to start with whatever Canvas has (${viewBefore}): ${(await dashTiles()).join(' | ')}`);
-  check((await page.$$(su('.tile[data-view="cards"] .mini__card'))).length === 4 && (await page.$eval(su('.tile[data-view="cards"] .mini__card'), (e) => e.style.background)) === firstColour && (await page.$$(su('.tile[data-view="list"] .mini__row'))).length === 4 && (await page.$$(su('.tile[data-view="activity"] .mini__row'))).length === 3, `the tiles are miniatures of the real layouts in the chosen courses' own colours (${firstColour})`);
-  const other = viewBefore === 'cards' ? 'activity' : 'cards';
+  check((await sStep()) === '3 of 3' && (await page.$eval(su('#next'), (e) => e.textContent.trim())) === 'Finish' && tileWords.join(' | ') === 'List — Everything due, day by day, with a tick. | Recent activity — Announcements, replies and grades as they arrive.' && (await dashTiles()).join(' | ') === ['list', 'activity'].map((v) => `${v}${v === 'list' ? ' * [Selected]' : ' [Choose]'}`).join(' | ') && !(await page.$(su('.tile[data-view="cards"]'))), `step 3 asks what the Dashboard shows first, List selected to start with whatever Canvas has (${viewBefore}): ${(await dashTiles()).join(' | ')}`);
+  check((await page.$eval(su('.tile[data-view="list"] .mini__dot'), (e) => e.style.background || e.style.borderColor)) === firstColour && (await page.$$(su('.tile[data-view="list"] .mini__row'))).length === 4 && (await page.$$(su('.tile[data-view="activity"] .mini__row'))).length === 3, `the tiles are miniatures of the real layouts in the chosen courses' own colours (${firstColour})`);
+  const other = viewBefore === 'activity' ? 'list' : 'activity';
   await page.click(su(`.tile[data-view="${other}"]`));
-  check((await dashTiles()).join(' | ') === ['cards', 'list', 'activity'].map((v) => `${v}${v === other ? ' * [Selected]' : ' [Choose]'}`).join(' | ') && (await railAnswer('dashboard')) === { cards: 'Cards', list: 'List', activity: 'Activity' }[other] && VIEW_OF[(await apiGet('/dashboard/view')).dashboard_view] === viewBefore, 'one tile at a time, the rail says which, and nothing is written until the end');
+  check((await dashTiles()).join(' | ') === ['list', 'activity'].map((v) => `${v}${v === other ? ' * [Selected]' : ' [Choose]'}`).join(' | ') && (await railAnswer('dashboard')) === VIEW_WORD[other] && VIEW_OF[(await apiGet('/dashboard/view')).dashboard_view] === viewBefore, 'one tile at a time, the rail says which, and nothing is written until the end');
   await shot(page, '32e-setup-dashboard');
   await page.click(su(`.tile[data-view="${viewBefore}"]`)); // back to what Canvas had: the pages after this read it
   await sNext('.summary__row');
   // Ready: a read-back of every answer, then Open Canvas writes them all at once
   const summary = await page.$$eval(su('.summary__row'), (els) => els.map((r) => `${r.querySelector('.summary__k').textContent}: ${r.querySelector('.summary__v').textContent}`));
-  check((await sStep()) === 'Ready' && (await texts(su('.fr__h1')))[0] === 'You’re set' && summary.join(' | ') === `Courses shown: 5 of ${total} | Grade history: On · goal 3.90 | Dashboard: ${{ cards: 'Cards', list: 'List', activity: 'Activity' }[viewBefore]}` && (await texts(su('.fr__blurb')))[0] === 'Next, the look: light or dark, a colour of your own, photos, and your sidebar.' && (await page.$eval(su('#next'), (e) => e.textContent.trim())) === 'Continue to appearance' && (await page.$(su('#back'))) !== null && (await page.$$(su('.rail__item.is-done'))).length === 3, `Finish shows the read-back with every rail step ticked, and Continue to appearance: ${summary.join(' | ')}`);
+  check((await sStep()) === 'Ready' && (await texts(su('.fr__h1')))[0] === 'You’re set' && summary.join(' | ') === `Courses shown: 5 of ${total} | Grade history: On · goal 3.90 | Dashboard: ${VIEW_WORD[viewBefore]}` && (await texts(su('.fr__blurb')))[0] === 'Next, the look: light or dark, a colour of your own, photos, and your sidebar.' && (await page.$eval(su('#next'), (e) => e.textContent.trim())) === 'Continue to appearance' && (await page.$(su('#back'))) !== null && (await page.$$(su('.rail__item.is-done'))).length === 3, `Finish shows the read-back with every rail step ticked, and Continue to appearance: ${summary.join(' | ')}`);
   await shot(page, '32g-setup-ready');
   await page.click(su('#back'));
   await page.waitForSelector(su('.tile[data-view]'), { timeout: 10000 });
   check((await sStep()) === '3 of 3' && (await railNow()).filter((r) => r.includes('(locked)')).length === 0, 'Back from the read-back returns to the last step, nothing locked behind');
   await page.click(su('.rail__item[data-step="courses"]'));
   await page.waitForSelector(su('.row[data-course]'), { timeout: 10000 });
-  check((await sStep()) === '1 of 3' && (await page.$$(su('.row.is-on'))).length === 5 && (await page.$eval(su(`.row[data-course="${nickId}"] .row__nick`), (e) => e.value)) === 'Setup nick' && (await railNow()).join(' | ') === `Your courses: 5 courses | Grades: Tracking · goal 3.90 · 1 pass/fail ✓ | Dashboard: ${{ cards: 'Cards', list: 'List', activity: 'Activity' }[viewBefore]} ✓`, `the rail goes back to any step done, with its answers kept: ${(await railNow()).join(' | ')}`);
+  check((await sStep()) === '1 of 3' && (await page.$$(su('.row.is-on'))).length === 5 && (await page.$eval(su(`.row[data-course="${nickId}"] .row__nick`), (e) => e.value)) === 'Setup nick' && (await railNow()).join(' | ') === `Your courses: 5 courses | Grades: Tracking · goal 3.90 · 1 pass/fail ✓ | Dashboard: ${VIEW_WORD[viewBefore]} ✓`, `the rail goes back to any step done, with its answers kept: ${(await railNow()).join(' | ')}`);
   for (const s of ['#track', '.tile[data-view]', '.summary__row']) await sNext(s);
   check((await sStep()) === 'Ready' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === undefined, 'forward again to the read-back: still nothing marked done');
   // (2.99.74) Continue to appearance writes the steps and loads the page afresh: Appearance over the real Dashboard, dimmed
@@ -6664,7 +6657,12 @@ try {
   const apSetup = await page.evaluate(() => ({ tabs: [...document.querySelectorAll('.bcv-ap-tabs .bcv-ap-seg__b')].map((b) => b.textContent).join(','), looks: document.querySelectorAll('.bcv-ap-looks .bcv-ap-seg__b').length, next: document.querySelector('#bcv-ap-next')?.textContent, done: !!document.querySelector('#bcv-ap-done'), veil: !!document.querySelector('.bcv-ap-veil'), badges: document.querySelectorAll('.bcv-ap-badge').length, setupCard: !!document.querySelector('#bcv-setup'), tour: !!document.querySelector('#bcv-tour .bcv-tour__card'), cls: document.documentElement.classList.contains('bcv-appear-setup') }));
   const owed = async () => (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('appearance:setup'))['appearance:setup'])) === true;
   check(page.url() === `${BASE}/` && apSetup.tabs === 'Theme,Courses' && apSetup.looks === 3 && apSetup.next === 'Next' && !apSetup.done && apSetup.veil && apSetup.badges >= 2 && !apSetup.setupCard && !apSetup.tour && apSetup.cls && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true && await owed(), `the page comes back with Appearance over the Dashboard in the setup's own way: Theme and Courses, the look, Next in Done's place, the photo buttons on, no tour yet — owed until its Done: ${JSON.stringify(apSetup)}`);
+  // (2.99.132) a big arrow in the middle of the page, bouncing toward the bar as it comes up, gone after a few seconds
+  const pointAt = () => page.evaluate(() => { const p = document.querySelector('.bcv-ap-point'); const bar = document.querySelector('.bcv-ap-bar'); if (!p || !bar) return null; const r = p.getBoundingClientRect(); return { dx: Math.round(r.left + r.width / 2 - innerWidth / 2), dy: Math.round(r.top + r.height / 2 - innerHeight / 2), w: Math.round(r.width), above: r.bottom < bar.getBoundingClientRect().top, quiet: p.getAttribute('aria-hidden') === 'true' && getComputedStyle(p).pointerEvents === 'none', bounce: getComputedStyle(p.firstElementChild).animationName }; });
+  const point = await pointAt();
+  check(!!point && Math.abs(point.dx) <= 2 && Math.abs(point.dy) <= 2 && point.w >= 96 && point.above && point.quiet && /bcv-ap-point-bounce/.test(point.bounce), `a big arrow in the middle of the page points down at the bar, bouncing, and takes no presses: ${JSON.stringify(point)}`);
   await shot(page, '32e-setup-appearance');
+  check(await eventually(async () => !(await pointAt()), 6000), 'the arrow goes on its own after a few seconds');
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
   check(!!(await page.$('.bcv-ap-bar')), 'Escape does not put the setup’s Appearance away: its Done does');
@@ -9445,17 +9443,14 @@ try {
   await options.waitForTimeout(250);
   check(await options.$eval('#noBlur', (e) => !e.hidden && /graphics acceleration/.test(e.textContent) && /chrome:\/\/settings\/system/.test(e.textContent)), 'Appearance says Chrome is drawing without its blur, and where to turn graphics acceleration back on');
   check(!(await options.$('#sideCourses')), 'no choice of courses on hover: they are always listed on the sidebar (2.99.89)');
-  // Appearance: the Dashboard's views, the same three the setup asks about
-  check((await options.$$eval('#dashCards, #dashList, #dashActivity', (bs) => bs.map((b) => b.classList.contains('is-on')))).join(',') === 'true,true,true', 'the three dashboard switches start on');
+  // Appearance: the Dashboard's views, the same two the setup asks about (2.99.132: no course cards)
+  check((await options.$$eval('#dashList, #dashActivity', (bs) => bs.map((b) => b.classList.contains('is-on')))).join(',') === 'true,true' && !(await options.$('#dashCards')), 'the two dashboard switches start on, and there is none for course cards');
   await options.click('#dashActivity');
   await options.waitForTimeout(250);
   check((await sw.evaluate(() => self.BCV.settings.get())).appearance.dashboard.activity === false && !(await options.$eval('#dashActivity', (b) => b.classList.contains('is-on'))), 'switching one off saves');
-  await options.click('#dashCards');
-  await options.waitForTimeout(250);
   await options.click('#dashList');
   await options.waitForTimeout(250);
   check((await sw.evaluate(() => self.BCV.settings.get())).appearance.dashboard.list !== false && (await options.$eval('#dashList', (b) => b.classList.contains('is-on'))), 'the last one on cannot be switched off');
-  await options.click('#dashCards');
   await options.click('#dashActivity');
   await options.waitForTimeout(250);
   check((await sw.evaluate(() => self.BCV.settings.get())).appearance.dashboard.activity === true, 'and back on saves too');

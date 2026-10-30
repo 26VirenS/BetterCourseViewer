@@ -402,7 +402,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .tiles--2 { gap: 16px; max-width: 640px; }
 .tile { flex: 1; min-width: 0; padding: 0; border: 0; background: transparent; cursor: pointer; text-align: left; display: flex; flex-direction: column; gap: 11px; color: inherit; font: inherit; }
 .tile__frame { display: block; height: 136px; padding: 12px; border: 1px solid var(--hair); border-radius: 13px; background: var(--tile); transition: border-color .2s ease, box-shadow .2s ease; }
-.tile[data-view="cards"] .tile__frame, .tiles--2 .tile__frame { padding: 10px; }
+.tiles--2 .tile__frame { padding: 10px; }
 .tiles--2 .tile__frame { height: 164px; }
 .tile.is-on .tile__frame { border-color: var(--blue); box-shadow: inset 0 0 0 1px var(--blue); }
 .tile__foot { display: flex; align-items: flex-start; gap: 8px; }
@@ -418,8 +418,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .tile__badge svg { display: block; opacity: 0; transition: opacity .16s ease; }
 .tile.is-on .tile__badge svg { opacity: 1; }
 .mini { display: flex; height: 100%; }
-.mini--grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 7px; }
-.mini__card { display: block; border-radius: 6px; }
 .mini--col { flex-direction: column; gap: 9px; justify-content: center; }
 .mini--feed { gap: 11px; }
 .mini__row { display: flex; align-items: center; gap: 7px; }

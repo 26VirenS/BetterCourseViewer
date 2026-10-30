@@ -245,8 +245,9 @@
     if (!silent) body.append(U.loading('rows', 6)); // list-row skeletons hold the place until the planner lands (silent: black, and nothing)
 
     let view = 'list';
-    // the views the setup (or Settings) asked for; with one, there is nothing to switch between
-    const ALL_VIEWS = [['cards', 'Cards'], ['list', 'List'], ['activity', 'Recent activity']];
+    // the views the setup (or Settings) asked for; with one, there is nothing to switch between. (2.99.132: the List or
+    // Recent activity — the courses as cards are gone; a Cards kept from before opens the List)
+    const ALL_VIEWS = [['list', 'List'], ['activity', 'Recent activity']];
     let views = ALL_VIEWS;
     let hideDone = false; // the list without what is already done; kept per site, like To Do's
     const draw = () => {
@@ -848,99 +849,6 @@
       return card;
     }
 
-    // ---- cards view ------------------------------------------------------------------
-    function cardsBlock() {
-      if (!favs.length) return U.emptyCard('No courses on your dashboard yet. Star some under Courses.');
-      const grid = U.el('bcv-cards');
-      const first = !entered;
-      favs.forEach((c, i) => {
-        const todayN = dueToday.filter((it) => it.courseId === c.id).length;
-        const next = dueItems.filter((it) => it.courseId === c.id && !it.submitted && it.date >= todayStart).sort((a, b) => a.date - b.date)[0];
-        const badgeEl = todayN ? U.badge(`${todayN} due today`, 'red', 'bcv-badge--sm') : (next ? U.badge(`${next.title} ${U.whenShort(next.date)}`, '', 'bcv-badge--sm') : U.badge('Nothing due', '', 'bcv-badge--sm'));
-        badgeEl.classList.add('bcv-ml-auto', 'bcv-ellip');
-        badgeEl.style.maxWidth = '55%';
-        const quick = quickLinks(c);
-        const progress = U.el('bcv-ccard__progress');
-        const card = h('div', { class: 'bcv-ccard', role: 'link', tabindex: '0', onclick: () => app.go(c.url), onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) app.go(c.url); } }, [
-          h('div', { class: 'bcv-ccard__hero', style: c.image ? { background: `${c.color} url(${JSON.stringify(c.image)}) center/cover` } : { background: c.color } },
-            h('button', { type: 'button', class: 'bcv-ccard__more', title: 'Course options', onclick: (e) => { e.stopPropagation(); courseMenu(e.currentTarget, c); } }, U.svg(IC.dots, { size: 13, stroke: '#fff', width: 2 }))),
-          U.el('bcv-ccard__body', [
-            // the code, the term and who teaches it (Canvas's card subtitle is only "Enrolled as: Student"); the current score beside the quick links
-            h('div', {}, [h('div', { class: 'bcv-ccard__code bcv-ellip', text: c.shortName || c.name, style: { color: c.palette.text } }), U.text('bcv-ccard__section bcv-ellip', [c.code && c.code !== c.name ? c.code : null, c.cardTerm || c.term, c.teachers?.[0]].filter(Boolean).join(' · ') || c.sections[0] || '')]),
-            progress,
-            U.el('bcv-ccard__foot', [...quick, c.score !== null && c.score !== undefined ? U.badge(`${store.fmtPts(c.score)}%${c.grade ? ` · ${c.grade}` : ''}`, 'green', 'bcv-badge--sm bcv-ccard__grade') : null, badgeEl]),
-          ]),
-        ]);
-        grid.append(first ? U.enter(card) : card); // the cards float in beneath the workload, once, all on the same beat
-        store.progress(c.id).then(({ done, total }) => {
-          if (!total) return;
-          progress.append(
-            U.el('bcv-bar', h('div', { class: `bcv-bar__fill ${first && Date.now() - t0 < 2500 ? 'bcv-work__fill--grow' : ''}`, style: { width: `${Math.round((done / total) * 100)}%`, background: c.color } })),
-            U.text('bcv-bar__note', `${done} of ${total} items submitted`),
-          );
-        });
-      });
-      return grid;
-    }
-    function quickLinks(c) {
-      const defs = [['announcements', IC.bell, '/announcements', 'Announcements'], ['assignments', IC.doc, '/assignments', 'Assignments'], ['discussions', IC.disc, '/discussion_topics', 'Discussions'], ['files', IC.folder, '/files', 'Files']];
-      const links = (c.links || []).filter((l) => !l.hidden);
-      const pick = links.length ? links.slice(0, 4).map((l) => ({ icon: iconForLink(l), href: l.path, title: l.label })) : defs.map(([, icon, seg, title]) => ({ icon, href: `${c.url}${seg}`, title }));
-      return pick.map((l) => h('button', { type: 'button', class: 'bcv-ccard__quick', title: l.title, onclick: (e) => { e.stopPropagation(); app.go(l.href); } }, U.svg(l.icon, { size: 14, stroke: 'var(--bcv-ink3)', width: 1.8 })));
-    }
-    function iconForLink(l) {
-      const s = `${l.css_class || ''} ${l.icon || ''} ${l.label || ''}`.toLowerCase();
-      if (s.includes('announce')) return IC.bell;
-      if (s.includes('assign')) return IC.doc;
-      if (s.includes('discuss')) return IC.disc;
-      if (s.includes('file') || s.includes('folder')) return IC.folder;
-      if (s.includes('grade')) return IC.chart;
-      if (s.includes('module')) return IC.modules;
-      if (s.includes('quiz')) return IC.bolt;
-      if (s.includes('people') || s.includes('user')) return IC.people;
-      return IC.page;
-    }
-    function courseMenu(anchor, c) {
-      U.menu(anchor, [
-        // deferred so the click that picked this item does not close the palette it opens
-        { label: 'Change colour', onSelect: () => setTimeout(() => U.colorMenu(anchor, c.color, (hex) => recolor(c, hex)), 0) },
-        { label: c.favorite ? 'Remove from dashboard' : 'Add to dashboard', onSelect: () => toggleDashboard(c) },
-        { label: 'Announcements', onSelect: () => app.go(`${c.url}/announcements`) },
-        { label: 'Grades', onSelect: () => app.go(`${c.url}/grades`) },
-        { label: 'Files', onSelect: () => app.go(`${c.url}/files`) },
-      ]);
-    }
-    function applyColor(c, hex) {
-      c.color = hex;
-      c.palette = U.palette(hex, dark);
-      const cm = courseMap.get(c.id);
-      if (cm && cm !== c) { cm.color = hex; cm.palette = c.palette; }
-    }
-    /** Optimistic: recolour now, tell Canvas, roll back if it refuses. */
-    function recolor(c, hex) {
-      const prev = c.color;
-      applyColor(c, hex);
-      renderBody();
-      store.setColor(c.id, hex).then(() => app.loadShellData({ force: true })).catch((e) => {
-        applyColor(c, prev);
-        renderBody();
-        U.toast(`Could not change the colour: ${e.message}`, { error: true });
-      });
-    }
-    /** Optimistic: the card moves now, Canvas is told in the background. */
-    function toggleDashboard(c) {
-      const on = !c.favorite;
-      const i = favs.indexOf(c);
-      if (!on && i >= 0) favs.splice(i, 1);
-      else if (on && i < 0) favs.push(c);
-      c.favorite = on;
-      renderBody();
-      store.setFavorite(c.id, on).then(() => app.loadShellData({ force: true })).catch((e) => {
-        U.toast(`Could not update favourites: ${e.message}`, { error: true });
-        render(ctx).then((el) => { if (ctx.alive()) app.main().replaceChildren(el); });
-      });
-    }
-
     // ---- list view -----------------------------------------------------------------------
     function listBlock() {
       if (!planner) return U.emptyCard('Your planner could not be loaded.');
@@ -1211,8 +1119,7 @@
       const work = workloadBlock();
       const sky = skylineBlock();
       let viewEl;
-      if (view === 'cards') viewEl = cardsBlock();
-      else if (view === 'activity') viewEl = await activityBlock();
+      if (view === 'activity') viewEl = await activityBlock();
       else viewEl = listBlock();
       if (!ctx.alive() || gen !== bodyGen) return;
       // (2.98.90) the grades skyline at the workload's left, the two side by side (stacked when narrow)

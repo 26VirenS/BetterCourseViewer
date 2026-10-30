@@ -43,7 +43,7 @@
   const PAL = ['#c2410c', '#ff3b30', '#e91e63', '#8e44ad', '#6f42c1', '#3f51b5', '#1976d2', '#03a9f4', '#00acc1', '#009688', '#22a822', '#9aa31a', '#e08a00', '#ff6a13', '#f06292', '#111111'];
   const LOOKS = [['off', 'Light', 'M12 4V2M12 22v-2M4 12H2M22 12h-2M5.6 5.6L4.2 4.2M19.8 19.8l-1.4-1.4M5.6 18.4l-1.4 1.4M19.8 4.2l-1.4 1.4M12 7a5 5 0 100 10 5 5 0 000-10z'], ['on', 'Dark', 'M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z'], ['system', 'System', 'M12 3a9 9 0 100 18V3z M12 3a9 9 0 110 18']];
 
-  let st = null; // { app, images, theme, look, tab, courses, sidebar, setup, onDone, veil, bar, badges, file, target, timer, onKey }
+  let st = null; // { app, images, theme, look, tab, courses, sidebar, setup, onDone, veil, bar, badges, file, target, timer, onKey, point }
   const reduced = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const unpack = (kept) => {
     const raw = (v) => T().rawOf(kept, v);
@@ -108,6 +108,7 @@
     document.addEventListener('keydown', st.onKey, true);
     paintBar();
     follow();
+    if (setup) pointAtBar();
     if (st.tab === 'community') loadCommunity();
     st.coursesRead = store.favorites().then((favs) => { if (!st) return; st.courses = (favs || []).map((c) => ({ id: String(c.id), name: c.nickname || c.shortName || c.code || c.name, color: (c.color || '#8e8e93').toLowerCase() })); paintBar(); }).catch(() => {});
   }
@@ -121,7 +122,22 @@
     document.documentElement.classList.remove('bcv-appear', 'bcv-appear-setup');
     U.closeMenus();
     const gone = (el) => { if (!el) return; if (reduced()) { el.remove(); return; } el.classList.add('is-closing'); setTimeout(() => el.remove(), 260); };
-    gone(s.veil); gone(s.bar); s.badges.forEach((b) => { gone(b.el); gone(b.hit); }); s.file.remove();
+    gone(s.veil); gone(s.bar); s.badges.forEach((b) => { gone(b.el); gone(b.hit); }); s.file.remove(); s.point?.remove();
+  }
+  /** (2.99.132) The setup's way in: a big arrow in the middle of the page, bouncing toward the bar at its foot as the bar
+   *  comes up, gone after a few seconds — or at the first press, wherever it is. */
+  function pointAtBar() {
+    const el = h('div', { class: 'bcv-ap-point', 'aria-hidden': 'true' }, h('span', { class: 'bcv-ap-point__disc' }, U.svg('M12 4v15M5.5 12.5L12 19l6.5-6.5', { size: 54, stroke: '#fff', width: 2.6 })));
+    document.body.append(el);
+    st.point = el;
+    const go = () => {
+      document.removeEventListener('pointerdown', go, true);
+      if (!el.isConnected || el.classList.contains('is-closing')) return;
+      el.classList.add('is-closing');
+      setTimeout(() => el.remove(), 400);
+    };
+    setTimeout(go, reduced() ? 2600 : 3200);
+    document.addEventListener('pointerdown', go, true);
   }
 
   // ---- the veil and the photo buttons: following the sidebar and the counters --------------------------

@@ -354,14 +354,15 @@
   }
 
   // ---- dashboard view (stored on the Canvas user) -------------------------------------
-  const VIEW_MAP = { cards: 'cards', planner: 'list', activity: 'activity' };
-  const VIEW_BACK = { cards: 'cards', list: 'planner', activity: 'activity' };
+  // (2.99.132) the List or Recent activity: Canvas's Card View, or a Cards kept from before, opens the List
+  const VIEW_MAP = { cards: 'list', planner: 'list', activity: 'activity' };
+  const VIEW_BACK = { list: 'planner', activity: 'activity' };
   async function dashboardView() {
     const e = env();
     const fromEnv = e.PREFERENCES?.dashboard_view;
     if (fromEnv && VIEW_MAP[fromEnv]) return VIEW_MAP[fromEnv];
     const local = await pref('dashboardView');
-    if (local) return local;
+    if (local) return local === 'activity' ? 'activity' : 'list';
     try {
       const r = await C.get('/dashboard/view');
       if (r?.dashboard_view && VIEW_MAP[r.dashboard_view]) return VIEW_MAP[r.dashboard_view];

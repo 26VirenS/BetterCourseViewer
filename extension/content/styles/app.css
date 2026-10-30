@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.131"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.132"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -6254,6 +6254,16 @@ html.bcv-on:not(.bcv-phone):not(.bcv-punch) .bcv-qz.is-pop .bcv-qz__head { top: 
 .bcv-ap-custom__head { display: flex; align-items: center; gap: 8px; font: 600 13px/1 var(--bcv-font); }
 .bcv-ap-custom__sw { width: 22px; height: 22px; border-radius: 50%; }
 .bcv-ap-custom__row { display: grid; grid-template-columns: 64px 1fr; align-items: center; gap: 8px; font: 500 12px/1 var(--bcv-font); color: var(--bcv-ink2); }
+/* (2.99.132) after the setup: a big arrow in the middle of the page, bouncing toward the bar at the foot, then gone
+   (content/app/appearance.js pointAtBar) */
+.bcv-ap-point { position: fixed; left: 50%; top: 50%; z-index: calc(var(--bcv-z-tray) - 1); width: 112px; height: 112px; margin: -56px 0 0 -56px; pointer-events: none; animation: bcv-ap-point-in .4s cubic-bezier(.23,1,.32,1) .35s both; }
+.bcv-ap-point__disc { display: grid; place-items: center; width: 100%; height: 100%; border: 2px solid rgba(255,255,255,.85); border-radius: 50%; box-sizing: border-box; background: var(--bcv-accent, #0a84ff); box-shadow: 0 18px 50px rgba(0,0,0,.34); animation: bcv-ap-point-bounce .8s cubic-bezier(.45,0,.55,1) .75s 3; }
+.bcv-ap-point__disc svg { display: block; translate: 0 3px; }
+.bcv-ap-point.is-closing { animation: bcv-ap-point-out .4s cubic-bezier(.23,1,.32,1) both; }
+@keyframes bcv-ap-point-in { from { opacity: 0; transform: scale(.9); } }
+@keyframes bcv-ap-point-bounce { 50% { transform: translateY(30px); } }
+@keyframes bcv-ap-point-out { from { opacity: 1; } to { opacity: 0; transform: translateY(24px); } }
+@media (prefers-reduced-motion: reduce) { .bcv-ap-point { animation: bcv-ap-in .2s ease .35s both; } .bcv-ap-point__disc { animation: none; } .bcv-ap-point.is-closing { animation: bcv-ap-out .3s ease both; } }
 @keyframes bcv-ap-in { from { opacity: 0; } }
 @keyframes bcv-ap-out { to { opacity: 0; } }
 @keyframes bcv-ap-pop { from { opacity: 0; transform: scale(.6); } }

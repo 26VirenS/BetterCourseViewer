@@ -7,7 +7,7 @@
  *     unchecked ones stay hidden everywhere: they become the Canvas favourites, the one list every
  *     screen follows) ·
  *   2 grades (a history kept on this device, a goal, a target letter per course) ·
- *   3 what the Dashboard shows first, chosen by looking at miniatures of the real layouts ·
+ *   3 what the Dashboard shows first — the List or Recent activity — chosen by looking at miniatures of the real layouts ·
  * then a read-back of what was chosen, and Continue to appearance writes it all at once and loads
  * the page afresh: (2.99.74) Appearance (content/app/appearance.js) over the real Dashboard, dimmed
  * but for what it changes, its bar at the foot — the look, a theme, the courses' colours — then Next:
@@ -28,7 +28,8 @@
   const CHECK = 'M20 6L9 17l-5-5';
   const GRADES = ['C', 'B', 'B+', 'A-', 'A', 'A+']; // the target letters, lowest on the left (saved as the letter the Grades page reads)
   const PASS_FAIL = 'P/F'; // saved in place of a letter: the course is pass/fail, and stays out of the GPA
-  const VIEWS = [['cards', 'Cards', 'Courses as tiles, with what is due next.'], ['list', 'List', 'Everything due, day by day, with a tick.'], ['activity', 'Activity', 'Announcements, replies and grades as they arrive.']];
+  // (2.99.132) the Dashboard's two views: the courses as cards are gone
+  const VIEWS = [['list', 'List', 'Everything due, day by day, with a tick.'], ['activity', 'Recent activity', 'Announcements, replies and grades as they arrive.']];
   // the steps, in order, each with its name on the rail; the lists are settled when the card opens (see open())
   const ALL = [
     { key: 'courses', name: 'Your courses', build: courses },
@@ -43,7 +44,7 @@
   const COPY = {
     courses: ['Which classes are you in?', 'Only select the courses that count towards your GPA.'],
     grades: ['Grades', `${BCV.lms.name} keeps no history. Simpl Courses can, on this device.`],
-    dashboard: ['What you see first', 'Pick the shape of your dashboard.'],
+    dashboard: ['What you see first', 'The list of what is due, or what is new in your courses.'],
     done: ['You’re set', 'Next, the look: light or dark, a colour of your own, photos, and your sidebar.'],
     donePhone: ['You’re set', 'Next, the look: light or dark, a colour of your own, and photos.'],
   };
@@ -433,7 +434,6 @@
     const { body } = ui;
     const [a, b, c, d] = swatches();
     const minis = {
-      cards: () => [h('span', { class: 'mini mini--grid' }, [a, b, c, d].map((col) => h('span', { class: 'mini__card', style: { background: col } })))],
       list: () => [h('span', { class: 'mini mini--col' }, [[a, true], [b, false], [c, true], [d, true]].map(([col, hollow]) => h('span', { class: 'mini__row' }, [dot(col, 10, hollow), bar(col)])))],
       activity: () => [h('span', { class: 'mini mini--col mini--feed' }, [[a, '60%'], [c, '45%'], [d, '70%']].map(([col, w]) => h('span', { class: 'mini__row' }, [dot(col, 14), h('span', { class: 'mini__stack' }, [bar(col, { hgt: 4 }), h('span', { class: 'mini__bar mini__bar--faint', style: { width: w } })])])))],
     };
@@ -442,7 +442,7 @@
       tiles = VIEWS.map(([key, title, why]) => tile({ dataset: { view: key }, on: st.dashView === key, title, why, mini: minis[key](), pick: () => { st.dashView = key; draw(); paintChrome(); } }));
       grid.replaceChildren(...tiles);
     };
-    const grid = h('div', { class: 'tiles tiles--3' });
+    const grid = h('div', { class: 'tiles tiles--2' });
     draw();
     body.append(...heading('dashboard'), grid);
     footer({ onNext: () => go(st.step + 1) });

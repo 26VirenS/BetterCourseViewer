@@ -581,10 +581,11 @@
   });
   onSeg($('sidebarLayout'), (v) => save({ appearance: { sidebar: v } })); // (2.99.39)
   // the Dashboard's views: a switch may not take the last one off — a dashboard with nothing on it is not one
-  const DASH = [['dashCards', 'cards'], ['dashList', 'list'], ['dashActivity', 'activity']];
+  // (2.99.132: the List and Recent activity — the courses as cards are gone)
+  const DASH = [['dashList', 'list'], ['dashActivity', 'activity']];
   for (const [id, key] of DASH) {
     onSwitch($(id), (on) => {
-      const d = { cards: true, list: true, activity: true, ...(settings.appearance.dashboard || {}) };
+      const d = { list: true, activity: true, ...(settings.appearance.dashboard || {}) };
       if (!on && !DASH.some(([, k]) => k !== key && d[k] !== false)) { setSwitch($(id), true); return; }
       save({ appearance: { dashboard: { [key]: on } } });
     });
