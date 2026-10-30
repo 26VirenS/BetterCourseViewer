@@ -154,7 +154,7 @@ struct ExternalToolsView: View {
                         .transition(.opacity)
                     let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
                     ToolPlacesList(tool: t, tint: Color(hex: t.courses.first?.color ?? "#8e8e93"),
-                                   room: max(240, min(560, g.size.height - 64)),
+                                   room: max(300, min(720, g.size.height - 56)),
                                    choose: { c, item in choose(t, c, item) }, close: { listed = nil })
                         .clipShape(shape)
                         .overlay(shape.strokeBorder(Theme.edge, lineWidth: 1).allowsHitTesting(false))
@@ -626,20 +626,20 @@ private struct NextTag: View {
 
 // MARK: - The list of places
 
-/// (1.3.77) Every place a tool is used, to choose the one to open — (1.3.204) in a popup over the page, centred, 480 points
-/// wide (a popover from its card before, cramped by the room under it). (1.3.202) A viewer of its
-/// own rather than a plain list: a head washed in the tool's colour — its tile, its name, its site and how many there
-/// are, and how many are still to do; To Do and All when it has both (To Do to start with); a filter when there are more
-/// than eight; then the next still to do on a card of its own with Open, and the rest under each course's name and how
-/// many it has there, each with a mark of where it stands (to do, done, missing, a module item), its title and its line,
-/// its status and, under the highlight, a chevron; at the foot, the keys it takes. The pointer and the arrow keys move one
-/// highlight (it starts on the next still to do), Return or a click opens it, Escape or its × closes the list (a filter
-/// with words in it is emptied first). It is as tall as what it first shows, up to 560 points (less on a short window),
-/// and scrolls past that — a narrower choice, or a filter, leaves it its size.
+/// (1.3.77) Every place a tool is used, to choose the one to open — (1.3.204) in a popup over the page, centred, 600 points
+/// wide (a popover from its card before, cramped by the room under it). One list of them all, in their order — under each
+/// course's name when there is more than one — as before 1.3.202's To Do and All and its Up Next card (1.3.205: one list
+/// again, the next still to do in it with its Next tag, the highlight starting on it and the list scrolled to it). Its head
+/// is washed in the tool's colour — its tile, its name, its site and how many there are, and how many are still to do; a
+/// filter when there are more than eight; each place with a mark of where it stands (to do, done, missing, a module item),
+/// its title and its line, its status and, under the highlight, a chevron; at the foot, the keys it takes. The pointer
+/// and the arrow keys move the highlight, Return or a click opens it, Escape or its × closes the list (a filter with words
+/// in it is emptied first). It is as tall as the list, up to 720 points (less on a short window), and scrolls past that —
+/// a filter leaves it its size.
 private struct ToolPlacesList: View {
     let tool: ExternalToolsData.Tool
     let tint: Color
-    /// The most the whole popup may be tall: 560 points, or the window's height less a margin.
+    /// The most the whole popup may be tall: 720 points, or the window's height less a margin.
     let room: CGFloat
     let choose: (ExternalToolsData.Course, ExternalToolsData.Item) -> Void
     let close: () -> Void
@@ -648,12 +648,8 @@ private struct ToolPlacesList: View {
     private let nextID: String?
     /// How many are still to do.
     private let toDo: Int
-    /// (1.3.202) Whether it has both still to do and the rest: To Do and All to choose between, To Do first.
-    private let scoped: Bool
-    private let firstScope: Scope
-    @State private var scope: Scope
     @State private var query = ""
-    @State private var lit = 0
+    @State private var lit: Int
     /// Raised by an arrow key: the highlighted place scrolled into view (a place under the pointer already is).
     @State private var keyMoves = 0
     @State private var listHeight: CGFloat
@@ -661,12 +657,10 @@ private struct ToolPlacesList: View {
     /// later, never while the popover is being laid out.
     @State private var measured: CGFloat = 0
     @FocusState private var focus: Focus?
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private enum Focus: Hashable { case filter, list }
-    private enum Scope: Hashable { case toDo, all }
 
-    init(tool: ExternalToolsData.Tool, tint: Color, room: CGFloat = 560, choose: @escaping (ExternalToolsData.Course, ExternalToolsData.Item) -> Void, close: @escaping () -> Void) {
+    init(tool: ExternalToolsData.Tool, tint: Color, room: CGFloat = 720, choose: @escaping (ExternalToolsData.Course, ExternalToolsData.Item) -> Void, close: @escaping () -> Void) {
         self.tool = tool
         self.tint = tint
         self.room = room
@@ -676,17 +670,11 @@ private struct ToolPlacesList: View {
         let next = tool.nextPlaceID
         self.all = all
         self.nextID = next
-        let open = all.filter { $0.item.upcoming == true }.count
-        self.toDo = open
-        self.scoped = open > 0 && open < all.count
-        let first: Scope = open > 0 && open < all.count ? .toDo : .all
-        self.firstScope = first
-        _scope = State(initialValue: first)
-        // (a first guess at its height, until it is measured: a place a row, a course a heading, the next its card)
-        let rows = Self.ordered(all, scope: first, query: "", nextID: next)
-        let courses = Set(rows.map(\.course.id)).count
-        let featured: CGFloat = rows.first?.id == next && next != nil ? 96 : 0
-        _listHeight = State(initialValue: CGFloat(rows.count) * 50 + CGFloat(courses) * 30 + featured + 12)
+        self.toDo = all.filter { $0.item.upcoming == true }.count
+        _lit = State(initialValue: all.firstIndex { $0.id == next } ?? 0)
+        // (a first guess at its height, until it is measured: a place a row, a course a heading)
+        let courses = Set(all.map(\.course.id)).count
+        _listHeight = State(initialValue: CGFloat(all.count) * 50 + (courses > 1 ? CGFloat(courses) * 30 : 0) + 16)
     }
 
     private var courseCount: Int { Set(all.map(\.course.id)).count }
@@ -698,46 +686,35 @@ private struct ToolPlacesList: View {
         let places = "\(tool.placesPhrase) in \(courseCount == 1 ? "1 course" : "\(courseCount) courses")"
         return tool.showsHost ? "\(tool.host) · \(places)" : places
     }
-    /// The list's own height at most: the whole popup no taller than its room (its head, its choices, its filter and its
-    /// foot take the rest).
+    /// The list's own height at most: the whole popup no taller than its room (its head, its filter and its foot take
+    /// the rest).
     private var listMax: CGFloat {
-        let head: CGFloat = 64 + (scoped ? 38 : 0) + (hasFilter ? 40 : 0) + 30
-        return max(120, room - head)
+        let head: CGFloat = 64 + (hasFilter ? 50 : 0) + 30
+        return max(160, room - head)
     }
 
     /// The list's height: as tall as it is, up to its most.
     private var listFrame: CGFloat { min(max(listHeight, 40), listMax) }
 
-    /// What the list shows, in its order: the next still to do first (on its card) while nothing is typed.
-    private var shown: [ToolPlace] { Self.ordered(all, scope: scope, query: trimmed, nextID: trimmed.isEmpty ? nextID : nil) }
-    /// Whether the first shown is the next still to do, on its card.
-    private func featured(_ rows: [ToolPlace]) -> Bool { trimmed.isEmpty && nextID != nil && rows.first?.id == nextID }
-
-    private static func ordered(_ all: [ToolPlace], scope: Scope, query: String, nextID: String?) -> [ToolPlace] {
-        let q = query.lowercased()
-        var rows = scope == .toDo ? all.filter { $0.item.upcoming == true } : all
-        if !q.isEmpty {
-            rows = rows.filter { p in
-                p.item.title.lowercased().contains(q) || (p.item.sub ?? "").lowercased().contains(q) || p.course.name.lowercased().contains(q)
-            }
+    /// What the list shows, in its order: all of it, or what the filter's words find.
+    private var shown: [ToolPlace] {
+        let q = trimmed.lowercased()
+        guard !q.isEmpty else { return all }
+        return all.filter { p in
+            p.item.title.lowercased().contains(q) || (p.item.sub ?? "").lowercased().contains(q) || p.course.name.lowercased().contains(q)
         }
-        if let id = nextID, let i = rows.firstIndex(where: { $0.id == id }), i > 0 {
-            rows.insert(rows.remove(at: i), at: 0)
-        }
-        return rows
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
-            if scoped { scopePicker }
             if hasFilter { filterField }
             Divider()
             list(shown)
             Divider()
             foot
         }
-        .frame(width: 480)
+        .frame(width: 600)
         // (solid: the popup over the dimmed page)
         .background(Color(nsColor: .windowBackgroundColor))
         .background { keyHolder }
@@ -805,18 +782,6 @@ private struct ToolPlacesList: View {
             .accessibilityHidden(true)
     }
 
-    private var scopePicker: some View {
-        Picker("Show", selection: $scope) {
-            Text("To Do · \(toDo)").tag(Scope.toDo)
-            Text("All · \(all.count)").tag(Scope.all)
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .padding(.horizontal, 12)
-        .frame(height: 38)
-        .onChange(of: scope) { _, _ in lit = 0 }
-    }
-
     private var filterField: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
@@ -827,81 +792,63 @@ private struct ToolPlacesList: View {
                 .onKeyPress(.downArrow) { move(1); return .handled }
                 .onKeyPress(.upArrow) { move(-1); return .handled }
                 .onExitCommand { if query.isEmpty { close() } else { query = "" } }
-                .onChange(of: query) { _, _ in lit = 0 }
+                .onChange(of: query) { _, now in lit = now.isEmpty ? (all.firstIndex { $0.id == nextID } ?? 0) : 0 }
         }
         .padding(.horizontal, 10)
         .frame(height: 30)
         .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .padding(.horizontal, 12)
+        .padding(.top, 10)
         .padding(.bottom, 10)
     }
 
     private func list(_ shown: [ToolPlace]) -> some View {
-        let lead = featured(shown)
-        return ScrollViewReader { proxy in
+        ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
                     if shown.isEmpty {
-                        Text(trimmed.isEmpty ? "Nothing still to do." : "Nothing matches “\(trimmed)”.")
+                        Text("Nothing matches “\(trimmed)”.")
                             .font(.sCallout)
                             .foregroundStyle(.secondary)
                             .padding(10)
                     }
                     ForEach(Array(shown.enumerated()), id: \.element.id) { k, p in
-                        if lead && k == 0 {
-                            upNext(p, at: k).id(p.id)
-                        } else {
-                            VStack(alignment: .leading, spacing: 0) {
-                                heading(above: k, in: shown, lead: lead)
-                                row(p, at: k)
+                        VStack(alignment: .leading, spacing: 0) {
+                            if grouped && (k == 0 || shown[k - 1].course.id != p.course.id) {
+                                courseHeading(p.course, count: shown.filter { $0.course.id == p.course.id }.count, first: k == 0)
                             }
-                            .id(p.id)
+                            row(p, at: k)
                         }
+                        .id(p.id)
                     }
                 }
                 .padding(8)
-                .animation(reduceMotion ? nil : Motion.gentle, value: scope)
                 .background {
                     GeometryReader { g in Color.clear.preference(key: PlacesListHeightKey.self, value: g.size.height) }
                 }
             }
             .scrollBounceBehavior(.basedOnSize)
             // (1.3.82: as tall as the list, up to its most)
-            .frame(minHeight: min(120, listFrame), idealHeight: listFrame, maxHeight: listFrame)
+            .frame(minHeight: min(160, listFrame), idealHeight: listFrame, maxHeight: listFrame)
             .onPreferenceChange(PlacesListHeightKey.self) { h in
-                // (measured as it first shows, unfiltered: a filter, or the other choice, leaves the popup its size)
+                // (measured whole, unfiltered: a filter narrowing the list leaves the popup its size)
                 let whole = h.rounded(.up)
-                if query.isEmpty, scope == firstScope, abs(whole - measured) > 0.5 { measured = whole }
+                if query.isEmpty, abs(whole - measured) > 0.5 { measured = whole }
             }
             .task(id: measured) {
                 // (1.3.82: the measure taken up on a later turn of the run loop, and only when it is another by half a point)
                 if measured > 0, abs(measured - listHeight) > 0.5 { listHeight = measured }
+            }
+            .task {
+                // (1.3.205: the next still to do in view as the list opens, with what comes before it above)
+                try? await Task.sleep(nanoseconds: 60_000_000)
+                if let id = nextID { proxy.scrollTo(id, anchor: UnitPoint(x: 0.5, y: 0.3)) }
             }
             .onChange(of: keyMoves) { _, _ in
                 if shown.indices.contains(lit) { proxy.scrollTo(shown[lit].id) }
             }
         }
         .animation(Motion.snappy, value: lit)
-    }
-
-    /// The heading over the place at `k`, if one goes there: each course's name and how many it has shown, when there is
-    /// more than one course; with one, a word for what follows the next one's card.
-    @ViewBuilder
-    private func heading(above k: Int, in shown: [ToolPlace], lead: Bool) -> some View {
-        let first = k == (lead ? 1 : 0)
-        let p = shown[k]
-        if grouped, first || shown[k - 1].course.id != p.course.id {
-            courseHeading(p.course, count: shown.filter { $0.course.id == p.course.id }.count, first: first && !lead)
-        } else if !grouped, lead, first {
-            HStack {
-                Text(scope == .toDo ? "Later" : tool.placesNoun.capitalized)
-                    .font(.sCaption.weight(.semibold)).foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 10)
-            .padding(.top, 10)
-            .padding(.bottom, 4)
-            .accessibilityAddTraits(.isHeader)
-        }
     }
 
     /// The list's keys, held by an unseen view of their own under it (as the quiz's are): held by the list itself, a
@@ -960,46 +907,6 @@ private struct ToolPlacesList: View {
         case "warn": return ("clock", "warn")
         default: return p.item.upcoming == true ? ("calendar", nil) : ("doc.text", nil)
         }
-    }
-
-    /// (1.3.202) The next still to do, on a card of its own: Up Next, its mark, its title, its line (and its course when
-    /// there are several), and Open.
-    private func upNext(_ p: ToolPlace, at k: Int) -> some View {
-        let on = k == lit
-        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
-        let line = [p.item.sub ?? "", grouped ? p.course.name : ""].filter { !$0.isEmpty }.joined(separator: " · ")
-        return Button { choose(p.course, p.item) } label: {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("UP NEXT").font(.sCaption2.weight(.bold)).tracking(0.6).foregroundStyle(Theme.accent)
-                HStack(alignment: .center, spacing: 12) {
-                    mark(p, size: 36)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(title(p)).font(.sBody.weight(.semibold)).lineLimit(2)
-                        if !line.isEmpty { Text(line).font(.sCaption).foregroundStyle(.secondary).lineLimit(1) }
-                    }
-                    Spacer(minLength: 8)
-                    HStack(spacing: 4) {
-                        Text("Open")
-                        Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold))
-                    }
-                    .font(.sCallout.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .frame(height: 28)
-                    .background(Theme.accent, in: Capsule())
-                }
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(shape.fill(Theme.accent.opacity(on ? 0.15 : 0.08)))
-            .overlay(shape.strokeBorder(Theme.accent.opacity(on ? 0.45 : 0.2), lineWidth: 1))
-            .contentShape(shape)
-        }
-        .buttonStyle(PlaceRowStyle())
-        .onHover { inside in if inside { lit = k } }
-        .padding(.bottom, 4)
-        .accessibilityLabel("Up next: \(title(p))")
-        .accessibilityValue(line)
     }
 
     private func row(_ p: ToolPlace, at k: Int) -> some View {
