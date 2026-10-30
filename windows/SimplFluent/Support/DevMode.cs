@@ -14,7 +14,8 @@ public static class DevMode
     private const string Key = "developer";
     private static readonly List<long> taps = new();
 
-    public static bool On => Prefs.Bool(Key);
+    /// <summary>On: let in by the student — or (0.3.91) a picture run's --developer (the tool window's Record pictured).</summary>
+    public static bool On => Prefs.Bool(Key) || Launch.IsDevelopment && Launch.Flag("developer");
 
     /// <summary>Turned on or off (the popups' buttons, About's row).</summary>
     public static event Action? Changed;

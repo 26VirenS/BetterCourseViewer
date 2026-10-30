@@ -48,6 +48,13 @@ public sealed class WebWindow : FluentWindow
     private readonly ToolLaunch? launch;
     private readonly string name;
     private readonly Button back, forward, refresh, more;
+    /// <summary>(0.3.91) Developer mode's Record: the page's code, data and a picture saved each time it changes
+    /// (<see cref="PageRecorder"/>), and while it records, how many steps it has saved, beside it.</summary>
+    private readonly Button rec;
+    private readonly TextBlock recSaid = K.Text("", Ty.Caption, B.Critical);
+    private PageRecorder? recorder;
+    /// <summary>(a picture run's --record: the recording begun by itself once the page has loaded)</summary>
+    private bool recordAsked = Simpl.Support.Launch.Flag("record");
     /// <summary>The line under the title bar while a page loads.</summary>
     private readonly ProgressBar loading = new() { IsIndeterminate = true, Height = 2, MinHeight = 2, VerticalAlignment = VerticalAlignment.Bottom, Visibility = Visibility.Collapsed, IsHitTestVisible = false };
     /// <summary>Over the page's place until it shows: "Opening …", or why it could not open.</summary>
@@ -96,10 +103,16 @@ public sealed class WebWindow : FluentWindow
         more = K.IconButton(SymbolRegular.MoreHorizontal24, () => More(), "More", 16, 40);
         more.Height = 36;
         more.VerticalAlignment = VerticalAlignment.Center;
+        rec = K.IconButton(SymbolRegular.Record24, ToggleRecord, "Record this page", 16, 40);
+        rec.Height = 36;
+        rec.VerticalAlignment = VerticalAlignment.Center;
+        recSaid.VerticalAlignment = VerticalAlignment.Center;
+        recSaid.Margin = new Thickness(0, 0, 4, 0);
         var lead = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(4, 6, 0, 6), VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Left, Children = { back, forward, refresh } };
         bar = new TitleBar
         {
-            Title = Title, Height = BarHeight, Margin = new Thickness(8 + 3 * 40 + 4, 0, 0, 0), TrailingContent = more,
+            Title = Title, Height = BarHeight, Margin = new Thickness(8 + 3 * 40 + 4, 0, 0, 0),
+            TrailingContent = new StackPanel { Orientation = Orientation.Horizontal, Children = { recSaid, rec, more } },
             Icon = new ImageIcon { Source = new BitmapImage(new Uri("pack://application:,,,/Assets/Simpl-256.png")), Width = 16, Height = 16 },
         };
         loading.SetResourceReference(Control.ForegroundProperty, B.Accent);
@@ -129,6 +142,41 @@ public sealed class WebWindow : FluentWindow
             if (e.ChangedButton == MouseButton.XButton2) { forward.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent)); e.Handled = true; }
         };
         Loaded += (_, _) => Open();
+        PaintRecord();
+        DevMode.Changed += DevChanged;
+        Closed += (_, _) =>
+        {
+            DevMode.Changed -= DevChanged;
+            recorder?.Stop(reveal: false); // (the window closed: the recording ends where it is)
+        };
+    }
+
+    /// <summary>Developer mode turned on or off: Record shown or hidden (and a recording ended with it).</summary>
+    private void DevChanged()
+    {
+        if (!DevMode.On) recorder?.Stop(reveal: false);
+        PaintRecord();
+    }
+
+    private void ToggleRecord()
+    {
+        if (recorder == null) { System.Media.SystemSounds.Beep.Play(); return; }
+        recorder.Toggle(Title);
+    }
+
+    /// <summary>Record (developer mode, once there is a page) — red Stop and "Recording · N saved" while it records.</summary>
+    private void PaintRecord()
+    {
+        var on = recorder?.On == true;
+        rec.Visibility = DevMode.On && (on || ready) ? Visibility.Visible : Visibility.Collapsed;
+        rec.Content = on ? K.Icon(SymbolRegular.RecordStop24, 16, B.Critical, filled: true) : K.Icon(SymbolRegular.Record24, 16);
+        var tip = on
+            ? $"Stop recording: {recorder!.Steps} saved, {PageRecorder.Size(recorder.Bytes)} (developer mode)"
+            : "Record this page: its code, data and a screenshot each time it changes, into a folder in Downloads (developer mode)";
+        rec.ToolTip = tip;
+        System.Windows.Automation.AutomationProperties.SetName(rec, on ? "Stop recording" : "Record");
+        recSaid.Text = on ? $"Recording · {recorder!.Steps} saved" : "";
+        recSaid.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private static Button BarButton(SymbolRegular icon, string tip, Action click)
@@ -167,6 +215,7 @@ public sealed class WebWindow : FluentWindow
                     Paint();
                     LightPages.Tell(web.CoreWebView2, "web window");
                     if (e.IsSuccess) LoadToolOnPage();
+                    if (recordAsked && e.IsSuccess && DevMode.On && recorder is { On: false } r) { recordAsked = false; _ = r.Start(Title); }
                 };
                 web.CoreWebView2.HistoryChanged += (_, _) => Paint();
                 // (a window the page opens — "Open in a new window", a sign-in's popup — is another of these, in light: left
@@ -174,7 +223,10 @@ public sealed class WebWindow : FluentWindow
                 web.CoreWebView2.NewWindowRequested += (_, e) => Popup(e);
                 // (the tool's page in light, whatever the app's appearance or Windows': its title bar stays as the app is)
                 await LightPages.Apply(web.CoreWebView2, "web window");
+                recorder = new PageRecorder(web.CoreWebView2);
+                recorder.Changed += PaintRecord;
                 ready = true;
+                PaintRecord();
             }
             if (asked is { } a)
             {
