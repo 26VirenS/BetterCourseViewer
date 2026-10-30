@@ -54,8 +54,9 @@ struct LookQuizScreen: View {
         VStack(spacing: 0) {
             topBar
             HStack(spacing: 0) {
+                // (narrower in a small popup, so the tool's page keeps the room it is laid out for)
                 LookRailView(rail: rail, look: look)
-                    .frame(width: ideal.width >= 960 ? 284 : 240)
+                    .frame(width: ideal.width >= 1040 ? 284 : 224)
                 Divider()
                 page
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -98,23 +99,25 @@ struct LookQuizScreen: View {
                               helpOff: "Show \(look.fullName)'s page in Simpl's look")
             PopupPins()
             GlassGroup(spacing: 8) {
-                Button { browser.reload() } label: { Label("Reload", systemImage: "arrow.clockwise") }
-                    .labelStyle(.iconOnly)
-                    .glassButton()
-                    .help("Reload")
-                    .disabled(url == nil)
-                Button {
-                    // (the classic window, with Back, Forward, Share and Open in Browser — the work goes on there)
-                    engine.openTool(.assignment(course: launch.course, id: launch.assignment, title: launch.title))
-                    dismiss()
-                } label: { Label("Open in Window", systemImage: "macwindow") }
-                    .labelStyle(.iconOnly)
-                    .glassButton()
-                    .help("Open in a window of its own, with Back, Forward and Open in Browser")
-                Button("Close") { dismiss() }
-                    .glassButton()
-                    .keyboardShortcut(.cancelAction)
-                    .help("Close — your work is kept by \(look.fullName)")
+                HStack(spacing: 8) { // (in a row: the glass container stacks what it holds)
+                    Button { browser.reload() } label: { Label("Reload", systemImage: "arrow.clockwise") }
+                        .labelStyle(.iconOnly)
+                        .glassButton()
+                        .help("Reload")
+                        .disabled(url == nil)
+                    Button {
+                        // (the classic window, with Back, Forward, Share and Open in Browser — the work goes on there)
+                        engine.openTool(.assignment(course: launch.course, id: launch.assignment, title: launch.title))
+                        dismiss()
+                    } label: { Label("Open in Window", systemImage: "macwindow") }
+                        .labelStyle(.iconOnly)
+                        .glassButton()
+                        .help("Open in a window of its own, with Back, Forward and Open in Browser")
+                    Button("Close") { dismiss() }
+                        .glassButton()
+                        .keyboardShortcut(.cancelAction)
+                        .help("Close — your work is kept by \(look.fullName)")
+                }
             }
         }
         .controlSize(.large)
