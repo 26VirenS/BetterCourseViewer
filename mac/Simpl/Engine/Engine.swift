@@ -454,6 +454,10 @@ final class Engine: ObservableObject, ShellListener {
             // (1.3.66: -SimplOpen macmillan:104:4005 — 1.3.163: in the tool window, as Macmillan draws it)
             let parts = a.split(separator: ":").map(String.init)
             if parts.count == 2 { openTool(.assignment(course: parts[0], id: parts[1], title: "Macmillan Learning")) }
+        } else if let a = LaunchOpen.take("aleks:") {
+            // (1.3.198: -SimplOpen aleks:104:4007 — an ALEKS assignment in the tool window, the mock's stand-in for one)
+            let parts = a.split(separator: ":").map(String.init)
+            if parts.count == 2 { openTool(.assignment(course: parts[0], id: parts[1], title: "ALEKS")) }
         } else if let w = LaunchOpen.take("window:") {
             // (1.3.69: -SimplOpen window:grades, a window more on that place)
             NotificationCenter.default.post(name: .simplOpenWindow, object: w)

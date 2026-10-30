@@ -161,7 +161,7 @@ shoot() {
   # (What's New comes up once the page is loaded and the app is quiet — 20 s on, with four copies of the app at work: a
   # settled picture caught it on its way in, faint, so its picture waits its whole time)
   # ((1.3.83) Desmos in a pin's panel, and a pin's Open Full Screen pressed a few seconds in: their whole time too)
-  case " $* " in *PickerConfirm*|*" tool:"*|*" more:tool "*|*" alta:"*|*" macmillan:"*|*" file:"*|*" modulefile:"*|*SimplHandInPreview*|*"SimplOpen whatsnew"*|*"SimplOpen mergedintro"*|*SimplPinGraph*|*SimplPinFull*) settle=NO ;; esac
+  case " $* " in *PickerConfirm*|*" tool:"*|*" more:tool "*|*" alta:"*|*" macmillan:"*|*" aleks:"*|*" file:"*|*" modulefile:"*|*SimplHandInPreview*|*"SimplOpen whatsnew"*|*"SimplOpen mergedintro"*|*SimplPinGraph*|*SimplPinFull*) settle=NO ;; esac
   (
     rm -f "$OUT_ABS/$name.rect" "$OUT_ABS/$name.png" "$OUT_ABS/$name-app.png"
     local start=$SECONDS took=0 sampled="" home="$HOMES/home$slot"
@@ -985,8 +985,9 @@ record_check() {
 }
 
 # (1.3.197) look_check: Simpl's look over Macmillan's page, as look-check.txt — drawn in the mock's player with its
-# questions found and the open one marked (light-21n-macmillan-look), and not drawn with Simpl Look off (light-21o). A FAIL
-# fails it.
+# questions found and the open one marked (light-21n-macmillan-look), and not drawn with Simpl Look off (light-21o);
+# (1.3.198) and over ALEKS's, drawn with its Check and its 5 tools found (light-21p-aleks-look), not drawn when off
+# (light-21q). A FAIL fails it.
 look_check() {
   local out="$OUT_ABS/look-check.txt" f="$OUT_ABS/console-light-21n-macmillan-look.txt" g="$OUT_ABS/console-light-21o-macmillan-look-off.txt"
   : > "$out"
@@ -994,6 +995,11 @@ look_check() {
   else echo "FAIL not drawn as it should be ($(grep -o 'macmillan look: .*' "$f" 2>/dev/null | head -3 | tr '\n' ';'))" >> "$out"; fi
   if [ -f "$g" ] && ! grep -q 'macmillan look: drawn' "$g"; then echo "ok   not drawn with Simpl Look off" >> "$out"
   else echo "FAIL drawn with Simpl Look off, or no console ($(grep -o 'macmillan look: .*' "$g" 2>/dev/null | head -2 | tr '\n' ';'))" >> "$out"; fi
+  local h="$OUT_ABS/console-light-21p-aleks-look.txt" k="$OUT_ABS/console-light-21q-aleks-look-off.txt"
+  if grep -q 'aleks look: drawn in localhost:[0-9]*, Check found, 5 tools' "$h" 2>/dev/null; then echo "ok   drawn over ALEKS's page, its Check and 5 tools found" >> "$out"
+  else echo "FAIL not drawn over ALEKS's page as it should be ($(grep -o 'aleks look: .*' "$h" 2>/dev/null | head -3 | tr '\n' ';'))" >> "$out"; fi
+  if [ -f "$k" ] && ! grep -q 'aleks look: drawn' "$k"; then echo "ok   ALEKS's page not drawn with Simpl Look off" >> "$out"
+  else echo "FAIL ALEKS's page drawn with Simpl Look off, or no console ($(grep -o 'aleks look: .*' "$k" 2>/dev/null | head -2 | tr '\n' ';'))" >> "$out"; fi
   cat "$out"
   if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::macmillan look: /'; return 1; fi
 }
@@ -1082,6 +1088,11 @@ push_set() {
   # — then the same with the toolbar's Simpl Look off, as Macmillan draws it (look_check)
   shoot light-21n-macmillan-look 26 -SimplOpen macmillan:104:4006
   shoot light-21o-macmillan-look-off 26 -SimplOpen macmillan:104:4006 -SimplMacmillanLook NO
+  # (1.3.198) Simpl's look over ALEKS's page (extension/tools/aleks/look.js), the mock's learning page with a wrong answer
+  # checked: the light bar with the topic and its progress, the sheet, the tools' column beside it, Explanation and
+  # Recheck under the answer — then with Simpl Look off, as ALEKS draws it (look_check)
+  shoot light-21p-aleks-look 26 -SimplOpen aleks:104:4007
+  shoot light-21q-aleks-look-off 26 -SimplOpen aleks:104:4007 -SimplAleksLook NO
   shoot light-21e-second-window 18 -SimplOpen window:section:courses/101:grades # (1.3.69: a window more, on a course's grades: its breakdown bar)
   shoot light-36-external-tools 16 -SimplPlace externaltools # (1.3.67: every external tool in the courses)
   shoot light-36b-external-tools-list 16 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77: every place Knewton Alta is used, to choose from)

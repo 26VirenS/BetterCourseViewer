@@ -28,8 +28,10 @@ struct ToolWindow: View {
     /// (1.2.16) A light tool page drawn dark while the Mac is in dark mode (the moon in the toolbar turns it on and off).
     /// (1.3.79) Off until the moon turns it on: a tool's page is made for light, and in dark it was hard to read.
     @AppStorage(ToolDarkPage.key) private var darkPage = false
-    /// (1.3.197) Simpl's look over Macmillan Learning's page (MacmillanLook): on until the toolbar's Simpl Look turns it off.
-    @AppStorage(MacmillanLook.key) private var macmillanLook = true
+    /// (1.3.197) Simpl's look over Macmillan Learning's page, (1.3.198) and ALEKS's (PageLook): each on until the toolbar's
+    /// Simpl Look turns it off there.
+    @AppStorage(PageLook.macmillan.key) private var macmillanLook = true
+    @AppStorage(PageLook.aleks.key) private var aleksLook = true
     /// The window's own appearance: the moon shows only in Dark Mode, where it does something.
     @Environment(\.colorScheme) private var scheme
     @State private var url: URL?
@@ -51,8 +53,8 @@ struct ToolWindow: View {
     var body: some View {
         ZStack(alignment: .top) {
             if let url {
-                ToolWebView(url: url, browser: browser, scripts: MacmillanLook.script().map { [$0] } ?? [],
-                            messages: ["simplLook": MacmillanLook.Listener()], externalTool: true, sendToolForm: sendForm)
+                ToolWebView(url: url, browser: browser, scripts: PageLook.scripts(),
+                            messages: ["simplLook": PageLook.Listener()], externalTool: true, sendToolForm: sendForm)
                     .transition(.opacity)
             } else if let error {
                 ContentUnavailableView {
@@ -143,14 +145,15 @@ struct ToolWindow: View {
                     }
                 }
             }
-            // (1.3.197) on Macmillan Learning's pages: Simpl's look over the page, or the page as Macmillan draws it
-            if MacmillanLook.applies(to: browser.current ?? url) {
+            // (1.3.197) on Macmillan Learning's pages, (1.3.198) and ALEKS's: Simpl's look over the page, or the page as the
+            // tool draws it
+            if let look = PageLook.applying(to: browser.current ?? url) {
                 ToolbarItem(placement: .primaryAction) {
-                    Toggle(isOn: $macmillanLook) { Label("Simpl Look", systemImage: "sparkles") }
+                    Toggle(isOn: lookOn(look)) { Label("Simpl Look", systemImage: "sparkles") }
                         .toggleStyle(.button)
-                        .help(macmillanLook
-                            ? "Simpl's look is on: the questions in a rail, the tools in a bar, Submit and the verdict under the question. Click to show the page as Macmillan draws it."
-                            : "Show Macmillan's page in Simpl's look: the questions in a rail, the tools in a bar, Submit and the verdict under the question")
+                        .help(lookOn(look).wrappedValue
+                            ? "Simpl's look is on: \(look.title)'s page laid out as an Alta question is. Click to show it as \(look.title) draws it."
+                            : "Show \(look.title)'s page in Simpl's look, laid out as an Alta question is")
                         .toolbarFit(fit, .own)
                 }
             }
@@ -167,7 +170,8 @@ struct ToolWindow: View {
         }
         .task(id: model.engine == nil) { await start() }
         .onChange(of: darkPage) { _, on in ToolDarkPage.set(on, in: browser.webView) }
-        .onChange(of: macmillanLook) { _, on in MacmillanLook.set(on, in: browser.webView) }
+        .onChange(of: macmillanLook) { _, on in PageLook.macmillan.set(on, in: browser.webView) }
+        .onChange(of: aleksLook) { _, on in PageLook.aleks.set(on, in: browser.webView) }
         .onChange(of: dev.unlocked) { _, on in if !on { recorder.stop() } } // (developer mode left: the recording ends)
         .onChange(of: browser.loading) { _, loading in
             guard recordShot, !loading, dev.unlocked, browser.webView != nil else { return }
@@ -176,6 +180,9 @@ struct ToolWindow: View {
         }
         .onDisappear { recorder.stop(reveal: false) } // (the window closed: the recording ends where it is)
     }
+
+    /// (1.3.198) The setting of the look on this page's tool.
+    private func lookOn(_ look: PageLook) -> Binding<Bool> { look.name == PageLook.aleks.name ? $aleksLook : $macmillanLook }
 
     private func start() async {
         guard url == nil, let launch else { return }
@@ -275,63 +282,96 @@ enum ToolDarkPage {
     }
 }
 
-/// (1.3.197) Simpl's look for Macmillan Learning (extension/tools/macmillan/look.js, the Windows app's too): Macmillan's
-/// own page restyled as an Alta question is in the apps — a glass rail of questions with the one open marked, a glass bar
-/// of its tools, the question's number large over its sheet, and the main button (Submit Answer, Next Question) with the
-/// verdict beside it at the sheet's foot. Styles only: nothing of the page is taken out, and every question is answered as
-/// on Macmillan's own page (the old skin, a second page drawn from Macmillan's, was taken out in 1.3.163). Drawn in every
-/// frame of Macmillan's (its player is one) and nowhere else; on until the toolbar's Simpl Look turns it off (kept).
+/// (1.3.197) Simpl's look over a tool's own page, restyled as an Alta question is in the apps — styles only, from the
+/// extension the app carries (the Windows app's too): nothing of the page is taken out, and every question is answered as
+/// on the tool's own page (the old Macmillan skin, a second page drawn from Macmillan's, was taken out in 1.3.163).
+/// Macmillan Learning (extension/tools/macmillan/look.js): a glass rail of questions with the one open marked, a glass
+/// bar of its tools, the question's number large over its sheet, and the main button (Submit Answer, Next Question) with
+/// the verdict beside it at the sheet's foot. (1.3.198) ALEKS (extension/tools/aleks/look.js): a light glass bar with the
+/// topic and its progress, the question on a sheet, its tools in a glass column beside it, and the actions (Explanation,
+/// Check, …) on a glass strip under the answer. Each script is put in every frame and draws only on its tool's pages; each
+/// look is on until the toolbar's Simpl Look turns it off there (kept, one setting per tool).
 @MainActor
-enum MacmillanLook {
-    static let key = "SimplMacmillanLook"
+struct PageLook {
+    /// For the log (and the screenshot suite's checks): "macmillan", "aleks".
+    let name: String
+    /// As the toolbar's help names the tool.
+    let title: String
+    let key: String
+    let file: String
+    /// The script's own globals: the setting put before it, and its switch.
+    let flag: String
+    let setter: String
+    let domain: String
+    /// (the mock school's stand-in for the tool, on localhost)
+    let mock: String
+
+    static let macmillan = PageLook(name: "macmillan", title: "Macmillan", key: "SimplMacmillanLook", file: "tools/macmillan/look.js",
+                                    flag: "__simplMMOn", setter: "__simplMMSet", domain: "macmillanlearning.com", mock: "/mock-macmillan/")
+    static let aleks = PageLook(name: "aleks", title: "ALEKS", key: "SimplAleksLook", file: "tools/aleks/look.js",
+                                flag: "__simplAKOn", setter: "__simplAKSet", domain: "aleks.com", mock: "/mock-aleks/")
+    static let all = [macmillan, aleks]
 
     /// (read with bool(forKey:), as @AppStorage reads it: a launch's -SimplMacmillanLook NO comes as the string "NO", which
     /// `as? Bool` does not take)
-    static var isOn: Bool { UserDefaults.standard.object(forKey: key) == nil || UserDefaults.standard.bool(forKey: key) }
+    var isOn: Bool { UserDefaults.standard.object(forKey: key) == nil || UserDefaults.standard.bool(forKey: key) }
 
-    /// A page of Macmillan's (its Integration Hub, its assessment player), or the mock's stand-in for one.
-    static func applies(to url: URL?) -> Bool {
+    /// A page of the tool's (any of its hosts), or the mock's stand-in for one.
+    func applies(to url: URL?) -> Bool {
         guard let url, let host = url.host?.lowercased() else { return false }
-        if host == "macmillanlearning.com" || host.hasSuffix(".macmillanlearning.com") { return true }
-        return (host == "localhost" || host == "127.0.0.1") && url.path.hasPrefix("/mock-macmillan/")
+        if host == domain || host.hasSuffix("." + domain) { return true }
+        return (host == "localhost" || host == "127.0.0.1") && url.path.hasPrefix(mock)
     }
 
-    /// The look's script, from the extension the app carries (read once).
-    private static let source: String? = {
+    static func applying(to url: URL?) -> PageLook? { all.first { $0.applies(to: url) } }
+
+    /// The looks' scripts, from the extension the app carries (each read once).
+    private static var sources: [String: String] = [:]
+
+    private var source: String? {
+        if let s = Self.sources[file] { return s }
         guard let dir = Bundle.main.url(forResource: "extension", withExtension: nil),
-              let js = try? String(contentsOf: dir.appendingPathComponent("tools/macmillan/look.js"), encoding: .utf8) else {
-            NSLog("[Simpl] macmillan look: the app has no copy of the look's script")
+              let js = try? String(contentsOf: dir.appendingPathComponent(file), encoding: .utf8) else {
+            NSLog("[Simpl] %@ look: the app has no copy of the look's script", name)
             return nil
         }
+        Self.sources[file] = js
         return js
-    }()
-
-    /// In every frame at its start (the look there before Macmillan's page first shows), told whether it is on.
-    static func script() -> WKUserScript? {
-        guard let source else { return nil }
-        return WKUserScript(source: "window.__simplMMOn = \(isOn ? "true" : "false");\n" + source, injectionTime: .atDocumentStart, forMainFrameOnly: false)
     }
+
+    /// In every frame at its start (the look there before the tool's page first shows), told whether it is on.
+    func script() -> WKUserScript? {
+        guard let source else { return nil }
+        return WKUserScript(source: "window.\(flag) = \(isOn ? "true" : "false");\n" + source, injectionTime: .atDocumentStart, forMainFrameOnly: false)
+    }
+
+    static func scripts() -> [WKUserScript] { all.compactMap { $0.script() } }
 
     /// Turned on or off: the page showing follows at once (the page passes it on to its frames), and the pages loaded
     /// from now on start as it is — the script put in again with the new setting, the window's other scripts kept.
-    static func set(_ on: Bool, in view: WKWebView?) {
-        NSLog("[Simpl] macmillan look: %@", on ? "on" : "off")
+    func set(_ on: Bool, in view: WKWebView?) {
+        NSLog("[Simpl] %@ look: %@", name, on ? "on" : "off")
         guard let view else { return }
-        view.evaluateJavaScript("window.__simplMMSet && window.__simplMMSet(\(on ? "true" : "false"))", completionHandler: nil)
+        view.evaluateJavaScript("window.\(setter) && window.\(setter)(\(on ? "true" : "false"))", completionHandler: nil)
         let scripts = view.configuration.userContentController
-        let kept = scripts.userScripts.filter { !$0.source.contains("window.__simplMMOn = ") }
+        let kept = scripts.userScripts.filter { !$0.source.contains("window.\(flag) = ") }
         scripts.removeAllUserScripts()
         for s in kept { scripts.addUserScript(s) }
         if let s = script() { scripts.addUserScript(s) }
     }
 
-    /// What the script found on the player, said once a page (for the log, and the screenshot suite's look_check).
+    /// What a look found on its page, said once a page (for the log, and the screenshot suite's look_check): Macmillan's
+    /// its questions and the one marked, ALEKS's what it found of the page (its "look" names it).
     final class Listener: NSObject, WKScriptMessageHandler {
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             guard let o = message.body as? [String: Any] else { return }
+            let said = o["said"] as? String ?? "?", host = o["host"] as? String ?? "?"
+            if let look = o["look"] as? String {
+                NSLog("[Simpl] %@ look: %@ in %@, %@", look, said, host, o["detail"] as? String ?? "")
+                return
+            }
             let here = o["here"] as? String ?? ""
-            NSLog("[Simpl] macmillan look: %@ in %@, %@ questions, %@ marked", o["said"] as? String ?? "?", o["host"] as? String ?? "?",
-                  "\(o["rows"] ?? "?")", here.isEmpty ? "none" : here)
+            NSLog("[Simpl] macmillan look: %@ in %@, %@ questions, %@ marked", said, host, "\(o["rows"] ?? "?")", here.isEmpty ? "none" : here)
         }
     }
 }

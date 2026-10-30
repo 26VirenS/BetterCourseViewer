@@ -51,6 +51,12 @@ if (src.includes(MM_IMPORT)) {
   const mm = readFileSync(join(root, 'scripts', 'dev', 'mock-macmillan.mjs'), 'utf8').replace(/\r\n/g, '\n').replace(/^export const /gm, 'const ');
   src = src.replace(MM_IMPORT, () => `// (mock-macmillan.mjs, put in here)\n${mm}`);
 }
+// (Mac 1.3.198) ALEKS's stand-in page, scripts/dev/mock-aleks.mjs: a string of HTML, put in where the mock imports it
+const AK_IMPORT = "import { ALEKS_LEARN_HTML } from './mock-aleks.mjs';";
+if (src.includes(AK_IMPORT)) {
+  const ak = readFileSync(join(root, 'scripts', 'dev', 'mock-aleks.mjs'), 'utf8').replace(/\r\n/g, '\n').replace(/^export const /gm, 'const ');
+  src = src.replace(AK_IMPORT, () => `// (mock-aleks.mjs, put in here)\n${ak}`);
+}
 // (the website's made-up names, scripts/dev/site-names.mjs, are for the website's pictures: the test school never turns
 // them on, so it gets a stand-in that leaves every answer as it is)
 const SN_IMPORT = "import { renameNames } from './site-names.mjs';";
