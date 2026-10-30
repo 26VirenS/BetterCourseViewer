@@ -55,6 +55,7 @@ internal sealed class LookPopupView
     private readonly ScrollViewer rail = new() { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false };
     private readonly WebView2 web = new() { Visibility = Visibility.Hidden };
     private readonly ContentControl state = new() { Focusable = false };
+    private readonly Grid holder = new();
     private readonly TextBlock title = K.Text("", Ty.Subtitle);
     private readonly TextBlock subtitle = K.Text("", Ty.Body, B.Text2);
     private readonly Wpf.Ui.Controls.Button lookButton;
@@ -99,7 +100,9 @@ internal sealed class LookPopupView
         body.ColumnDefinitions.Add(railColumn);
         body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         body.Children.Add(rail.Col(0));
-        var holder = new Grid { Margin = new Thickness(0, 0, FloatPopup.EdgeRoom, 8), Children = { web, state } };
+        holder.Margin = new Thickness(0, 0, FloatPopup.EdgeRoom, 8);
+        holder.Children.Add(web);
+        holder.Children.Add(state);
         holder.SizeChanged += (_, _) => Zoom();
         body.Children.Add(AltaLook.Frame(holder).Col(1));
         root.Children.Add(body.Row(1));
@@ -292,14 +295,20 @@ internal sealed class LookPopupView
         DrawRail();
     }
 
-    /// <summary>The tool's page zoomed out (never in) as far as it takes to fit its width into the popup's, not past 70%.</summary>
+    private double zoomSaid = -1;
+
+    /// <summary>The tool's page zoomed out (never in) as far as it takes to fit its width into the popup's — less the
+    /// page's own scroll bar, so it never scrolls sideways for want of that — not past 70%.</summary>
     private void Zoom()
     {
-        if (closed || wide <= 0 || web.CoreWebView2 == null || web.ActualWidth <= 0) return;
-        var z = Math.Clamp(web.ActualWidth / wide, 0.7, 1);
-        if (Math.Abs(web.ZoomFactor - z) < 0.004) return;
-        web.ZoomFactor = z;
-        Log.Write($"look popup: page zoomed to {Math.Round(z * 100)}%");
+        if (closed || wide <= 0 || web.CoreWebView2 == null) return;
+        var room = holder.ActualWidth - 18;
+        if (room <= 0) return;
+        var z = Math.Clamp(room / wide, 0.7, 1);
+        if (Math.Abs(web.ZoomFactor - z) >= 0.004) web.ZoomFactor = z;
+        if (Math.Abs(zoomSaid - z) < 0.004) return;
+        zoomSaid = z;
+        Log.Write($"look popup: page at {Math.Round(z * 100)}% (its {wide:0} wide in {room:0})");
     }
 
     private async void Go(int n)
