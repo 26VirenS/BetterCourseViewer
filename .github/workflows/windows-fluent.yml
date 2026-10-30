@@ -1399,6 +1399,14 @@ jobs:
             if ("$l" -notmatch 'aleks popup: front end, buttons Explanation, Recheck') { Write-Host "::error::aleks-look: the popup's front end drew no ALEKS buttons (shots/profile-aleks-look.log)"; exit 1 }
             Write-Host "aleks-look: the popup's front end drew ALEKS's buttons"
           }
+          # (0.3.102) the question on the popup's card as the app is: drawn for dark glass in Dark Mode, for light in light
+          foreach ($pair in @(@('macmillan-look', 'macmillan', 'light'), @('aleks-look', 'aleks', 'light'), @('macmillan-popup-dark', 'macmillan', 'dark'), @('aleks-popup-dark', 'aleks', 'dark'))) {
+            $lookShot, $who, $tone = $pair
+            if (-not ($script:mine -contains $lookShot)) { continue }
+            $l = Get-Content "shots/profile-$lookShot.log" -Raw -ErrorAction SilentlyContinue
+            if ("$l" -notmatch "$who popup: the question drawn for $tone glass") { Write-Host "::error::${lookShot}: $who's question not drawn for $tone glass (shots/profile-$lookShot.log)"; exit 1 }
+            Write-Host "${lookShot}: $who's question drawn for $tone glass"
+          }
           # (0.3.99) a module's Macmillan item opens in the popup too, on its cover
           if ($script:mine -contains 'macmillan-from-module') {
             $l = Get-Content 'shots/profile-macmillan-from-module.log' -Raw -ErrorAction SilentlyContinue

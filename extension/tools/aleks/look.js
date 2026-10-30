@@ -21,6 +21,10 @@
 // bar — ALEKS's own out of sight but there, pressed by the popup's (`__simplAKDo({ press: id })`) — and the page keeps
 // the question, its answer, ALEKS's verdict over it, its tools and its menu.
 //
+// (Mac 1.3.206, Windows 0.3.102) In Dark Mode, as Macmillan's: `window.__simplLookDark = true;` put before it, turned
+// with `__simplAKDark(dark)` — the question on dark glass, the page turned round once at the top of the look's pages,
+// its photographs and video turned back, and what the look draws for light set to show as dark glass's own once turned.
+//
 // The app puts `window.__simplAKOn = true|false;` before this file (the toolbar's Simpl Look, as last left) and turns
 // it at once with `__simplAKSet(on)` in the top page, which passes it on to the page's frames; a frame loaded later
 // asks its parent. It tells the app once what it found, for the log: a frame through the top page, the top page with
@@ -36,8 +40,14 @@
   var on = window.__simplAKOn !== false;
   var front = window.__simplLookFront === 'glass' || window.__simplLookFront === 'card' ? window.__simplLookFront : '';
   var rail = window.__simplLookRail === true || !!front; // (in the apps' popup, its rail beside the page)
+  var framed = window.parent !== window;
+  var dark = !!front && window.__simplLookDark === true;
+  // (a frame inside a page of the look's own, which turns it dark with itself: taken so until its parent is heard from —
+  // else, a moment on, it turns itself)
+  var under = framed, heardParent = false;
 
   var A = 'html.simpl-ak ';
+  var D = 'html.simpl-ak.simpl-front-dark';
   var BAR = A + '[role="navigation"][aria-label="Actions"]';
   var TOOLS = A + '[role="complementary"][aria-label="Tools"]';
   var R = 'html.simpl-ak.simpl-rail ';
@@ -158,6 +168,22 @@
     'html.simpl-ak.simpl-front-glass [id^="itemContainer_"]{background:transparent!important;box-shadow:none!important}',
     'html.simpl-ak.simpl-front-glass .aleks-editor-content .ansed_root{background:rgba(255,255,255,.66)!important}',
     'html.simpl-ak.simpl-front-glass #result_feedback_alert{background:rgba(255,255,255,.6)!important}',
+
+    // ---- (1.3.206) Dark Mode, as Macmillan's: the question on dark glass — the page turned round once, its photographs
+    // and video turned back; fills and rims in black (light once turned), shadows in white (dark once turned)
+    D + ':not(.simpl-under){filter:invert(.92) hue-rotate(180deg)!important}',
+    D + ' video,' + D + ' img[src*=".jpg" i],' + D + ' img[src*=".jpeg" i],' + D + ' img[src^="data:image/jpeg"]{filter:invert(1) hue-rotate(180deg)!important}',
+    D + '{--ak-glass-edge:inset 0 1px 0 rgba(0,0,0,.16),inset 0 0 0 1px rgba(0,0,0,.07);--ak-float:0 0 0 .5px rgba(255,255,255,.3),0 22px 50px -18px rgba(255,255,255,.6)}',
+    D + ' .aleks-editor-content .ansed_root{background:rgba(0,0,0,.05)!important}',
+    D + ' #result_feedback_alert{background:rgba(0,0,0,.05)!important;box-shadow:var(--ak-glass-edge),0 10px 28px -8px rgba(255,255,255,.5)!important}',
+    D + ' header.aleks-header .hamburger-menu-button,' + D + ' #userProfile{background:rgba(0,0,0,.07)!important;box-shadow:var(--ak-glass-edge)!important}',
+    D + ' [role="complementary"][aria-label="Tools"]>table{background:rgba(0,0,0,.05)!important;box-shadow:var(--ak-glass-edge),var(--ak-float)!important}',
+    D + ' .aleks-editor-menu [id^="menubar_"]>div[style]{background:#dcdce0!important;box-shadow:0 8px 24px rgba(255,255,255,.4)!important}',
+    D + ' [class^="dialog--"],' + D + ' [class*=" dialog--"]{box-shadow:0 18px 50px rgba(255,255,255,.55)!important}',
+    // ('card', Windows': the page's own ground and sheet, set so that once turned the ground is dark, lit faintly, and
+    // the sheet a shade lighter, as a card is in Dark Mode)
+    'html.simpl-ak.simpl-rail.simpl-front-dark:not(.simpl-front-glass){--ak-ground:radial-gradient(900px 620px at 6% -12%,rgba(0,122,255,.16),transparent 62%),radial-gradient(760px 560px at 104% 14%,rgba(175,82,222,.12),transparent 62%),radial-gradient(980px 640px at 46% 118%,rgba(48,176,199,.12),transparent 60%),#e9eaee;',
+    '--ak-sheet-glass:linear-gradient(168deg,rgba(0,0,0,.085),rgba(0,0,0,.05) 55%,rgba(0,0,0,.07))}',
   ].join('\n');
 
   var style = document.createElement('style');
@@ -215,6 +241,7 @@
       if (b.getAttribute('data-simpl-id') !== id) b.setAttribute('data-simpl-id', id);
       f.actions.push({ id: id, label: text(b), primary: b.classList.contains('primary'), enabled: !b.disabled && b.getAttribute('aria-disabled') !== 'true' });
     }
+    f.dark = on && dark; // (1.3.206: drawn for dark glass)
     return f;
   };
   // What the popup asks of the page: one of ALEKS's own actions pressed for the popup's.
@@ -258,24 +285,36 @@
     root.classList.toggle('simpl-rail', on && rail);
     root.classList.toggle('simpl-front', on && !!front);
     root.classList.toggle('simpl-front-glass', on && front === 'glass');
+    root.classList.toggle('simpl-front-dark', on && !!front && dark);
+    root.classList.toggle('simpl-under', under);
   };
   var draw = function () {
     if (!root) return;
     classes();
     if (on || rail) { watch(); queue(); } // (the rail is told of the topic with the look off too)
   };
-  var relay = function () {
-    for (var i = 0; i < window.frames.length; i++) { try { window.frames[i].postMessage({ simplAKLook: on }, '*'); } catch (e) { /* (gone) */ } }
+  var relay = function (d) {
+    for (var i = 0; i < window.frames.length; i++) { try { window.frames[i].postMessage(d, '*'); } catch (e) { /* (gone) */ } }
   };
-  window.__simplAKSet = function (v) { on = !!v; draw(); relay(); };
+  window.__simplAKSet = function (v) { on = !!v; draw(); relay({ simplAKLook: on }); };
+  // (1.3.206) The app's appearance: the question on dark glass or light
+  window.__simplAKDark = function (v) { dark = !!front && !!v; if (root) classes(); relay({ simplAKDark: dark }); };
   addEventListener('message', function (e) {
     var d = e.data;
     if (!d || typeof d !== 'object') return;
-    if (d.simplAKAsk === 1 && e.source) { try { e.source.postMessage({ simplAKLook: on }, '*'); } catch (x) { /* (gone) */ } return; }
+    if (d.simplAKAsk === 1 && e.source) { try { e.source.postMessage({ simplAKLook: on, simplAKDark: dark }, '*'); } catch (x) { /* (gone) */ } return; }
     if (d.simplAKTell && typeof d.simplAKTell === 'object' && window.parent === window) { tell(d.simplAKTell); return; }
-    if (typeof d.simplAKLook === 'boolean' && e.source === window.parent && window.parent !== window) window.__simplAKSet(d.simplAKLook);
+    var parent = e.source === window.parent && window.parent !== window;
+    // (a parent of the look's own: it turns this frame dark with itself)
+    if (parent && (typeof d.simplAKLook === 'boolean' || typeof d.simplAKDark === 'boolean')) { heardParent = true; if (!under) { under = true; if (root) classes(); } }
+    if (typeof d.simplAKDark === 'boolean' && parent) window.__simplAKDark(d.simplAKDark);
+    if (typeof d.simplAKLook === 'boolean' && parent) window.__simplAKSet(d.simplAKLook);
   });
-  if (window.parent !== window) { try { window.parent.postMessage({ simplAKAsk: 1 }, '*'); } catch (e) { /* (no parent to ask) */ } }
+  // (a parent not of the look's, never heard from, leaves the frame to turn itself dark)
+  if (framed) {
+    try { window.parent.postMessage({ simplAKAsk: 1 }, '*'); } catch (e) { /* (no parent to ask) */ }
+    setTimeout(function () { if (!heardParent && under) { under = false; if (root) classes(); } }, 600);
+  }
 
   // (in from the start, so ALEKS's page is never drawn first in its own look; moved to the head's end once there is one)
   var begin = function () {

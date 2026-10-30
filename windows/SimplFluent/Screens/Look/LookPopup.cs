@@ -124,6 +124,7 @@ internal sealed class LookPopupView
     private List<PageButton> tools = new(), actions = new();
     private string verdictText = "", verdictKind = "", layout = "", frontSig = "";
     private bool frontLogged;
+    private bool? darkSaid;
     /// <summary>The share done and the steps' fills as last drawn: the ring and the bars grow from there.</summary>
     private double drawnShare = -1;
     private List<double> drawnFills = new();
@@ -221,7 +222,9 @@ internal sealed class LookPopupView
             // (a window the page opens — a sign-in, a resource — shown in place, as a tab would be)
             core.NewWindowRequested += (_, e) => { e.Handled = true; core.Navigate(e.Uri); };
             await LightPages.Apply(core, $"{kind.Name} popup");
-            look = await PageLook.Attach(core, rail: true, front: "card");
+            // (0.3.102: in Dark Mode the question on a dark card, the page turned light on dark by the look)
+            look = await PageLook.Attach(core, rail: true, front: "card", dark: Support.Appearance.Dark);
+            Support.Appearance.Changed += OnAppearance;
             look.Rail += o => root.Dispatcher.BeginInvoke(() => Take(o));
             PaintLook();
             // (0.3.99: a module's tool item launched as that)
@@ -296,9 +299,13 @@ internal sealed class LookPopupView
     {
         if (closed) return;
         closed = true;
+        Support.Appearance.Changed -= OnAppearance;
         web.Visibility = Visibility.Collapsed;
         try { web.Dispose(); } catch { /* (gone) */ }
     }
+
+    /// <summary>(0.3.102) The app turned light or dark: the question's card follows.</summary>
+    private void OnAppearance() => root.Dispatcher.BeginInvoke(async () => { if (!closed && look != null) await look.SetDark(Support.Appearance.Dark); });
 
     // ---- Simpl Look ----
 
@@ -403,6 +410,14 @@ internal sealed class LookPopupView
         {
             frontLogged = true;
             Log.Write($"{which} popup: front end, buttons {string.Join(", ", tools.Concat(actions).Select(b => b.Label))}");
+        }
+        // (0.3.102) the question drawn for the popup's dark card or its light one, as the page tells it (the log, and the
+        // picture run's checks)
+        if (o.TryGetProperty("front", out var fd) && fd.ValueKind == JsonValueKind.Object && fd.TryGetProperty("dark", out var d)
+            && d.ValueKind is JsonValueKind.True or JsonValueKind.False && d.GetBoolean() != darkSaid)
+        {
+            darkSaid = d.GetBoolean();
+            Log.Write($"{which} popup: the question drawn for {(darkSaid == true ? "dark" : "light")} glass");
         }
         heard = true;
         if (!logged)

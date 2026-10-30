@@ -18,21 +18,23 @@ namespace Simpl.Shell;
 /// each look is on until the title bar's Simpl Look turns it off there (kept, one setting per tool). A picture run's
 /// --macmillan-look off / --aleks-look off starts with it off. (0.3.94) In the Macmillan and ALEKS popup
 /// (Screens/Look/LookPopup.cs), attached with <c>rail</c>: each script is told its page has the popup's rail beside it,
-/// and what the page tells that rail as it changes is handed on (<see cref="Rail"/>).
+/// and what the page tells that rail as it changes is handed on (<see cref="Rail"/>). (0.3.102, the Mac's 1.3.206) And in
+/// Dark Mode, told so (<c>dark</c>): the question on dark glass, the page turned light on dark by the look; turned again
+/// as the app's appearance changes (<see cref="SetDark"/>).
 /// </summary>
 internal sealed class PageLook
 {
     /// <summary>A tool's look. (0.3.97) <c>Domains</c>: the sites its pages and its launch are on — Macmillan Learning's on
     /// *.macmillanlearning.com (its Integration Hub, Achieve, LaunchPad) and Canvas's launch of it on lmslink.bfwpub.com;
     /// ALEKS's on *.aleks.com (the launch on secure.aleks.com/lti/canvas, the pages on www-awu.aleks.com and the like).</summary>
-    public sealed record Kind(string Name, string Title, string Key, string Dir, string Flag, string Setter, string[] Domains, string Mock, string Arg)
+    public sealed record Kind(string Name, string Title, string Key, string Dir, string Flag, string Setter, string DarkSetter, string[] Domains, string Mock, string Arg)
     {
         /// <summary>A host of one of its sites ("www-awu.aleks.com", "lmslink.bfwpub.com").</summary>
         public bool Owns(string host) => Domains.Any(d => host.Equals(d, StringComparison.OrdinalIgnoreCase) || host.EndsWith("." + d, StringComparison.OrdinalIgnoreCase));
     }
 
-    public static readonly Kind Macmillan = new("macmillan", "Macmillan", "macmillanLook", "macmillan", "__simplMMOn", "__simplMMSet", new[] { "macmillanlearning.com", "bfwpub.com" }, "/mock-macmillan/", "macmillan-look");
-    public static readonly Kind Aleks = new("aleks", "ALEKS", "aleksLook", "aleks", "__simplAKOn", "__simplAKSet", new[] { "aleks.com" }, "/mock-aleks/", "aleks-look");
+    public static readonly Kind Macmillan = new("macmillan", "Macmillan", "macmillanLook", "macmillan", "__simplMMOn", "__simplMMSet", "__simplMMDark", new[] { "macmillanlearning.com", "bfwpub.com" }, "/mock-macmillan/", "macmillan-look");
+    public static readonly Kind Aleks = new("aleks", "ALEKS", "aleksLook", "aleks", "__simplAKOn", "__simplAKSet", "__simplAKDark", new[] { "aleks.com" }, "/mock-aleks/", "aleks-look");
     private static readonly Kind[] All = { Macmillan, Aleks };
 
     /// <summary>(0.3.94) A look by its name (the popup's launch says which): Macmillan's for a name it does not know.</summary>
@@ -46,17 +48,20 @@ internal sealed class PageLook
     /// <summary>(0.3.95) The popup's own front end over the page ("card": the tool's bar out of sight in the page, its
     /// buttons the popup's), or "" for none.</summary>
     private readonly string front;
+    /// <summary>(0.3.102) The question on dark glass (the app in Dark Mode), with a front end only.</summary>
+    private bool dark;
     private readonly Dictionary<string, string> scriptIds = new();
     private readonly Dictionary<string, bool> on = new();
 
     /// <summary>(0.3.94) What the page tells the popup's rail, each time it changes (its <c>rail</c> names the look).</summary>
     public event Action<JsonElement>? Rail;
 
-    private PageLook(CoreWebView2 core, bool rail, string front)
+    private PageLook(CoreWebView2 core, bool rail, string front, bool dark)
     {
         this.core = core;
         this.rail = rail;
         this.front = front;
+        this.dark = dark;
     }
 
     public bool On(Kind k) => on.TryGetValue(k.Name, out var v) ? v : Start(k);
@@ -81,9 +86,9 @@ internal sealed class PageLook
 
     /// <summary>Every look put into the web view's pages and frames from their start (before the tool's page first shows),
     /// and what they find heard, for the log.</summary>
-    public static async Task<PageLook> Attach(CoreWebView2 core, bool rail = false, string front = "")
+    public static async Task<PageLook> Attach(CoreWebView2 core, bool rail = false, string front = "", bool dark = false)
     {
-        var look = new PageLook(core, rail, front);
+        var look = new PageLook(core, rail, front, dark);
         core.WebMessageReceived += (_, e) => look.Heard(e);
         foreach (var k in All)
         {
@@ -98,7 +103,7 @@ internal sealed class PageLook
         if (!Sources.TryGetValue(k.Dir, out var source)) Sources[k.Dir] = source = Read(k);
         if (source == null) return;
         var head = $"window.{k.Flag} = {(On(k) ? "true" : "false")};" + (rail || front.Length > 0 ? " window.__simplLookRail = true;" : "")
-            + (front.Length > 0 ? $" window.__simplLookFront = '{front}';" : "");
+            + (front.Length > 0 ? $" window.__simplLookFront = '{front}';" : "") + (front.Length > 0 && dark ? " window.__simplLookDark = true;" : "");
         try { scriptIds[k.Name] = await core.AddScriptToExecuteOnDocumentCreatedAsync($"{head}\n{source}"); }
         catch (Exception e) { Log.Write($"{k.Name} look: the script could not be added: " + e.Message); }
     }
@@ -117,6 +122,26 @@ internal sealed class PageLook
         Prefs.Set(k.Key, value);
         Log.Write($"{k.Name} look: {(value ? "on" : "off")}");
         try { await core.ExecuteScriptAsync($"window.{k.Setter} && window.{k.Setter}({(value ? "true" : "false")})"); } catch { /* the web view gone */ }
+        await Reput(k);
+    }
+
+    /// <summary>(0.3.102) The popup turned light or dark with the app: the question showing follows at once (the page passes
+    /// it on to its frames), and the pages loaded from now on start so.</summary>
+    public async Task SetDark(bool value)
+    {
+        if (front.Length == 0 || value == dark) return;
+        dark = value;
+        Log.Write($"look: the question on {(value ? "dark" : "light")} glass");
+        foreach (var k in All)
+        {
+            try { await core.ExecuteScriptAsync($"window.{k.DarkSetter} && window.{k.DarkSetter}({(value ? "true" : "false")})"); } catch { /* the web view gone */ }
+            await Reput(k);
+        }
+    }
+
+    /// <summary>The look's script put in again as it now is.</summary>
+    private async Task Reput(Kind k)
+    {
         if (scriptIds.Remove(k.Name, out var id)) { try { core.RemoveScriptToExecuteOnDocumentCreated(id); } catch { /* the web view gone */ } }
         await Put(k);
     }

@@ -22,9 +22,9 @@
     <Product>Simpl</Product>
     <Company>Simpl Courses</Company>
     <Description>Simpl for Windows</Description>
-    <Version>0.3.101</Version>
-    <FileVersion>0.3.101.1</FileVersion>
-    <InformationalVersion>0.3.101</InformationalVersion>
+    <Version>0.3.102</Version>
+    <FileVersion>0.3.102.1</FileVersion>
+    <InformationalVersion>0.3.102</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <NoWarn>$(NoWarn);CA1416;WPF0001</NoWarn>

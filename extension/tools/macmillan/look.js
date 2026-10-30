@@ -24,6 +24,12 @@
 // out of sight but there, and the popup's buttons press them (`__simplMMDo({ press: id })`): nothing is answered
 // differently. The page tells the popup what they say and whether they can be pressed (`front` in what it tells the rail).
 //
+// (Mac 1.3.206, Windows 0.3.102) In Dark Mode the app puts `window.__simplLookDark = true;` before it too, and turns it
+// with `__simplMMDark(dark)` as the app's appearance changes: the question then lies on dark glass — the page turned round
+// once, light on dark, at the top of the look's own pages (a frame inside one is turned with it), its photographs and
+// video turned back; what the look draws for light (answer fields, menus, their rims and shadows) set so that, once
+// turned, it shows as dark glass's own. Nothing of the page is changed but its colours.
+//
 // The app puts `window.__simplMMOn = true|false;` before this file (the toolbar's Simpl Look, as last left) and turns
 // it at once with `__simplMMSet(on)` in the top page, which passes it on to the page's frames; a frame loaded later
 // asks its parent. It tells the app once what it found, for the log: a frame through the top page (a frame of another
@@ -41,7 +47,12 @@
   var front = window.__simplLookFront === 'glass' || window.__simplLookFront === 'card' ? window.__simplLookFront : '';
   var rail = window.__simplLookRail === true || !!front; // (in the apps' popup, its rail beside the page)
   var framed = window.parent !== window;
+  var dark = !!front && window.__simplLookDark === true;
+  // (a frame inside a page of the look's own, which turns it dark with itself: taken so until its parent is heard from —
+  // else, a moment on, it turns itself)
+  var under = framed, heardParent = false;
 
+  var D = 'html.simpl-mm.simpl-front-dark';
   var CSS = [
     'html.simpl-mm{--mm-ui:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable Text","Segoe UI",system-ui,"Helvetica Neue",Arial,sans-serif;',
     '--mm-ink:#1d1d1f;--mm-ink2:#6e6e73;--mm-line:rgba(15,23,42,.08);--mm-fill:rgba(120,120,128,.12);--mm-fill2:rgba(120,120,128,.2);',
@@ -247,6 +258,23 @@
     'html.simpl-mm.simpl-front-glass .numeric-entry-border{background:rgba(255,255,255,.66)!important;border-color:rgba(60,60,67,.22)!important}',
     'html.simpl-mm.simpl-front-glass .labeling-answer-bank{background:rgba(255,255,255,.42)!important;border:1px solid rgba(255,255,255,.7)!important}',
     'html.simpl-mm.simpl-front-glass #attempts-holder.dropdown #attempts-button{background:rgba(255,255,255,.58)!important}',
+
+    // ---- (1.3.206) Dark Mode: the question on dark glass — the page turned round once (not again in a frame of it), its
+    // photographs and video turned back (a picture of a diagram or of maths, often clear behind dark lines, turned with
+    // the page, light on dark). Drawn here for the turn: fills and rims in black show light once turned, shadows in white
+    // dark — so the answer fields frosted light over the dark, and the menus lifted off it.
+    D + ':not(.simpl-under){filter:invert(.92) hue-rotate(180deg)!important}',
+    D + ' video,' + D + ' img[src*=".jpg" i],' + D + ' img[src*=".jpeg" i],' + D + ' img[src^="data:image/jpeg"]{filter:invert(1) hue-rotate(180deg)!important}',
+    D + '{--mm-glass-edge:inset 0 1px 0 rgba(0,0,0,.16),inset 0 0 0 1px rgba(0,0,0,.07);--mm-float:0 0 0 .5px rgba(255,255,255,.3),0 22px 50px -18px rgba(255,255,255,.6)}',
+    D + ' .numeric-entry-border{background:rgba(0,0,0,.05)!important}',
+    D + ' .labeling-answer-bank{background:rgba(0,0,0,.04)!important;border-color:rgba(0,0,0,.1)!important}',
+    D + ' #attempts-holder.dropdown #attempts-button{background:rgba(0,0,0,.07)!important;box-shadow:var(--mm-glass-edge)!important}',
+    D + ' #attempts-holder.dropdown #attempts,' + D + ' .numeric-entry-toolmenu{box-shadow:0 12px 32px rgba(255,255,255,.55)!important}',
+    D + ' .math-palette{box-shadow:0 16px 40px rgba(255,255,255,.6)!important}',
+    // ('card', Windows': the page's own ground and sheet, set so that once turned the ground is dark, lit faintly, and
+    // the sheet a shade lighter, as a card is in Dark Mode)
+    'html.simpl-mm.simpl-rail.simpl-front-dark:not(.simpl-front-glass){--mm-ground:radial-gradient(900px 620px at 6% -12%,rgba(0,122,255,.16),transparent 62%),radial-gradient(760px 560px at 104% 14%,rgba(175,82,222,.12),transparent 62%),radial-gradient(980px 640px at 46% 118%,rgba(48,176,199,.12),transparent 60%),#e9eaee;',
+    '--mm-sheet-glass:linear-gradient(168deg,rgba(0,0,0,.085),rgba(0,0,0,.05) 55%,rgba(0,0,0,.07))}',
   ].join('\n');
 
   var style = document.createElement('style');
@@ -390,6 +418,7 @@
     if (shown(layout)) f.layout = { id: named(layout, 'layout'), label: text(layout).replace(/\s*Beta$/i, '') };
     var said = document.getElementById('results'), words = text(said);
     if (words) f.verdict = { text: words, kind: said.classList.contains('correct') ? 'right' : said.classList.contains('incorrect') ? 'wrong' : 'said' };
+    f.dark = on && dark; // (1.3.206: drawn for dark glass)
     return f;
   };
 
@@ -469,6 +498,8 @@
     root.classList.toggle('simpl-rail', on && rail);
     root.classList.toggle('simpl-front', on && !!front);
     root.classList.toggle('simpl-front-glass', on && front === 'glass');
+    root.classList.toggle('simpl-front-dark', on && !!front && dark);
+    root.classList.toggle('simpl-under', under);
     root.classList.toggle('simpl-framed', framed);
   };
   var draw = function () {
@@ -481,16 +512,26 @@
   };
   window.__simplMMSet = function (v) { on = !!v; draw(); relay({ simplMMLook: on }); };
   window.__simplMMDo = function (c) { act(c); relay({ simplMMDo: c }); };
+  // (1.3.206) The app's appearance: the question on dark glass or light
+  window.__simplMMDark = function (v) { dark = !!front && !!v; if (root) classes(); relay({ simplMMDark: dark }); };
   addEventListener('message', function (e) {
     var d = e.data;
     if (!d || typeof d !== 'object') return;
-    if (d.simplMMAsk === 1 && e.source) { try { e.source.postMessage({ simplMMLook: on }, '*'); } catch (x) { /* (gone) */ } return; }
+    if (d.simplMMAsk === 1 && e.source) { try { e.source.postMessage({ simplMMLook: on, simplMMDark: dark }, '*'); } catch (x) { /* (gone) */ } return; }
     if (d.simplMMTell && typeof d.simplMMTell === 'object' && window.parent === window) { tell(d.simplMMTell); return; }
-    if (typeof d.simplMMLook === 'boolean' && e.source === window.parent && window.parent !== window) window.__simplMMSet(d.simplMMLook);
-    if (d.simplMMDo && typeof d.simplMMDo === 'object' && e.source === window.parent && window.parent !== window) window.__simplMMDo(d.simplMMDo);
+    var parent = e.source === window.parent && window.parent !== window;
+    // (a parent of the look's own: it turns this frame dark with itself)
+    if (parent && (typeof d.simplMMLook === 'boolean' || typeof d.simplMMDark === 'boolean')) { heardParent = true; if (!under) { under = true; if (root) classes(); } }
+    if (typeof d.simplMMDark === 'boolean' && parent) window.__simplMMDark(d.simplMMDark);
+    if (typeof d.simplMMLook === 'boolean' && parent) window.__simplMMSet(d.simplMMLook);
+    if (d.simplMMDo && typeof d.simplMMDo === 'object' && parent) window.__simplMMDo(d.simplMMDo);
   });
-  // (a frame loaded after the look was turned: as its parent has it now)
-  if (window.parent !== window) { try { window.parent.postMessage({ simplMMAsk: 1 }, '*'); } catch (e) { /* (no parent to ask) */ } }
+  // (a frame loaded after the look was turned: as its parent has it now — a parent not of the look's, never heard from,
+  // leaves the frame to turn itself dark)
+  if (framed) {
+    try { window.parent.postMessage({ simplMMAsk: 1 }, '*'); } catch (e) { /* (no parent to ask) */ }
+    setTimeout(function () { if (!heardParent && under) { under = false; if (root) classes(); } }, 600);
+  }
 
   // (in from the start, so Macmillan's page is never drawn first in its own look; moved to the head's end once there is one)
   var begin = function () {
