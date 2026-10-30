@@ -71,6 +71,9 @@ public sealed class WebWindow : FluentWindow
     /// has loaded, the tool's launch on it is sent here, in this window, rather than left behind Canvas's "Load … in a new
     /// window" button. Null once done (or for anything else).</summary>
     private Uri? loadOnPage;
+    /// <summary>(0.3.98) When Canvas's "Load … in a new window" was pressed for the student: the window it opens is shown
+    /// in this one instead.</summary>
+    private DateTime pressedAt = DateTime.MinValue;
     private int loadTries;
     /// <summary>A window a page asked for, still to be given this one's web view (<see cref="Opened"/>).</summary>
     private (CoreWebView2NewWindowRequestedEventArgs Asked, CoreWebView2Deferral Deferral)? asked;
@@ -228,7 +231,18 @@ public sealed class WebWindow : FluentWindow
                 web.CoreWebView2.HistoryChanged += (_, _) => Paint();
                 // (a window the page opens — "Open in a new window", a sign-in's popup — is another of these, in light: left
                 //  to the web view, it was a bare window of the browser's, dark when Windows is)
-                web.CoreWebView2.NewWindowRequested += (_, e) => Popup(e);
+                web.CoreWebView2.NewWindowRequested += (_, e) =>
+                {
+                    // (0.3.98: the tool's own window, opened by Canvas's Load button pressed for the student: here instead)
+                    if (DateTime.UtcNow - pressedAt < TimeSpan.FromSeconds(6) && Uri.TryCreate(e.Uri, UriKind.Absolute, out var to) && to.Scheme.StartsWith("http", StringComparison.Ordinal))
+                    {
+                        pressedAt = DateTime.MinValue;
+                        e.Handled = true;
+                        web.CoreWebView2.Navigate(to.ToString());
+                        return;
+                    }
+                    Popup(e);
+                };
                 // (the tool's page in light, whatever the app's appearance or Windows': its title bar stays as the app is)
                 await LightPages.Apply(web.CoreWebView2, "web window");
                 recorder = new PageRecorder(web.CoreWebView2);
@@ -331,17 +345,40 @@ public sealed class WebWindow : FluentWindow
     /// waits there behind a "Load … in a new window" button, its form aimed at a new window. That form is sent here
     /// instead, in this window — a page of its own already, framed by nothing — so the tool opens at once, as its one-time
     /// launch would have opened it. Sent with the form's own fields, as the button sends them; only on the page this
-    /// window opened for the tool (not one the student moves to after), and once.
+    /// window opened for the tool (not one the student moves to after), and once. (0.3.98) Found too where real Canvas
+    /// puts it: in a frame of Canvas's own on the page, or aimed at a window of its own name (Canvas's window launch,
+    /// <c>data-tool-launch-type="window"</c>) — sent to the top of this window; and with no form, Canvas's "Load … in a new
+    /// window" button pressed, the window it opens shown here. Any page of the school's (not only the very address
+    /// asked for: Canvas may move on to another first), for the first few pages.
     /// </summary>
-    private const string SendToolForm = """
+    internal const string SendToolForm = """
         (function () {
-          var f = document.getElementById('tool_form');
-          if (!f || !f.action) return 'none';
+          var find = function (doc, depth) {
+            var f = doc.getElementById('tool_form') || doc.querySelector('form[data-tool-launch-type]');
+            if (f && f.action) return f;
+            if (depth > 2) return null;
+            var frames = doc.querySelectorAll('iframe');
+            for (var i = 0; i < frames.length; i++) {
+              try { var d = frames[i].contentDocument, g = d && find(d, depth + 1); if (g) return g; } catch (e) { /* another site's frame */ }
+            }
+            return null;
+          };
+          var f = find(document, 0);
+          if (!f) {
+            var bs = document.querySelectorAll('button, a.btn, [role="button"]');
+            for (var j = 0; j < bs.length; j++) {
+              var w = (bs[j].textContent || '').replace(/\s+/g, ' ').trim();
+              if (/^load\b.*\bin a new (window|tab)$/i.test(w) && !bs[j].getAttribute('data-simpl-sent')) { bs[j].setAttribute('data-simpl-sent', '1'); bs[j].click(); return 'pressed'; }
+            }
+            return 'none';
+          }
           if (f.getAttribute('data-simpl-sent')) return 'sent';
           var target = (f.getAttribute('target') || '').toLowerCase();
-          if (target && target !== '_blank') return 'framed';
+          var kind = (f.getAttribute('data-tool-launch-type') || '').toLowerCase();
+          var windowed = kind === 'window' || kind === 'new_window' || !!f.querySelector('.load_tab') || /in a new (window|tab)/i.test(f.textContent || '');
+          if (target && target !== '_blank' && target !== '_top' && target !== '_self' && !windowed) return 'framed';
           f.setAttribute('data-simpl-sent', '1');
-          f.setAttribute('target', '_self');
+          f.setAttribute('target', '_top');
           HTMLFormElement.prototype.submit.call(f);
           return 'sent';
         })()
@@ -350,7 +387,7 @@ public sealed class WebWindow : FluentWindow
     private async void LoadToolOnPage()
     {
         if (loadOnPage is not { } page || web.CoreWebView2 is not { } core) return;
-        if (!Uri.TryCreate(core.Source, UriKind.Absolute, out var here) || here.Host != page.Host || here.AbsolutePath.TrimEnd('/') != page.AbsolutePath.TrimEnd('/'))
+        if (!Uri.TryCreate(core.Source, UriKind.Absolute, out var here) || !here.Host.Equals(page.Host, StringComparison.OrdinalIgnoreCase))
         {
             // (the page went elsewhere first — the school's sign-in: tried again when it comes back, a few times at most)
             if (++loadTries > 4) loadOnPage = null;
@@ -359,10 +396,11 @@ public sealed class WebWindow : FluentWindow
         try
         {
             var said = (await core.ExecuteScriptAsync(SendToolForm)).Trim('"');
-            // (no form on the page yet: Canvas may still be drawing it; a second look a moment on, then left as it is)
-            if (said == "none" && ++loadTries <= 4) { await Task.Delay(700); if (loadOnPage != null) LoadToolOnPage(); return; }
+            // (no form on the page yet: Canvas may still be drawing it; another look a moment on, a few times, then left)
+            if (said == "none" && ++loadTries <= 8) { await Task.Delay(700); if (loadOnPage != null) LoadToolOnPage(); return; }
             loadOnPage = null;
-            Log.Write($"web window: the school's page for the tool, its launch {said switch { "sent" => "sent on in this window", "framed" => "framed in the page as it is", _ => "not found" }}");
+            if (said == "pressed") pressedAt = DateTime.UtcNow;
+            Log.Write($"web window: the school's page for the tool, its launch {said switch { "sent" => "sent on in this window", "pressed" => "pressed (Canvas's Load button), opened in this window", "framed" => "framed in the page as it is", _ => "not found" }}");
         }
         catch (Exception x) { loadOnPage = null; Log.Write("web window: sending the tool's launch: " + x.Message); }
     }

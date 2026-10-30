@@ -365,7 +365,20 @@ internal sealed class QuizTile : Button
 
     public void Paint(QuizQuestion q, bool current, bool done, bool sealedOff, bool loading, bool free, Color tint)
     {
-        var flagged = q.Flagged;
+        Paint(current, done, q.Flagged, sealedOff, loading, free, tint);
+        var tip = $"Question {number}";
+        if (sealedOff) tip += " — sealed";
+        else if (q.Kind == "info") tip += " — information only";
+        else tip += q.IsAnswered ? " — answered" : " — not answered";
+        if (q.Flagged) tip += ", flagged";
+        ToolTip = tip;
+        System.Windows.Automation.AutomationProperties.SetName(this, $"Question {number}{(done ? ", answered" : "")}{(q.Flagged ? ", flagged" : "")}{(current ? ", showing" : "")}");
+    }
+
+    /// <summary>(0.3.98) The tile's face as it stands, for another's questions (Macmillan's, in its popup's rail): the
+    /// one showing filled, one done washed with its tick, one <paramref name="flagged"/> edged in orange.</summary>
+    public void Paint(bool current, bool done, bool flagged, bool sealedOff, bool loading, bool free, Color tint)
+    {
         if (current)
         {
             face.Background = K.Brush(tint);
@@ -393,13 +406,6 @@ internal sealed class QuizTile : Button
         text.Visibility = loading ? Visibility.Hidden : Visibility.Visible;
         face.Opacity = sealedOff ? 0.35 : 1;
         IsEnabled = !sealedOff && free;
-        var tip = $"Question {number}";
-        if (sealedOff) tip += " — sealed";
-        else if (q.Kind == "info") tip += " — information only";
-        else tip += q.IsAnswered ? " — answered" : " — not answered";
-        if (flagged) tip += ", flagged";
-        ToolTip = tip;
-        System.Windows.Automation.AutomationProperties.SetName(this, $"Question {number}{(done ? ", answered" : "")}{(flagged ? ", flagged" : "")}{(current ? ", showing" : "")}");
     }
 }
 

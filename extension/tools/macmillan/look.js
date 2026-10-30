@@ -270,8 +270,78 @@
   // state — success, default, … — the line under it and its points), the one open, how many are done, the score.
   var railSaid = '', opened = false, lastHere = 0;
   var text = function (e) { return e ? (e.textContent || '').replace(/\s+/g, ' ').trim() : ''; };
+  // (1.3.202) The assignment's cover — its name, how many questions, when it is due, Macmillan's grading settings and its
+  // Open Assignment — for the popup's own start screen, as Alta's (each setting's words in runs, bold where Macmillan's
+  // are). Read by what it says, not by Macmillan's class names: the button that opens the work, the heading over it.
+  var runsOf = function (e) {
+    var runs = [], walk = function (n, bold) {
+      if (n.nodeType === 3) {
+        var t = n.nodeValue.replace(/\s+/g, ' ');
+        if (!t) return;
+        var last = runs[runs.length - 1];
+        if (last && last.b === bold) last.t += t; else runs.push({ t: t, b: bold });
+        return;
+      }
+      if (n.nodeType !== 1 || /^(svg|style|script|button)$/i.test(n.tagName)) return;
+      var b = bold || /^(b|strong)$/i.test(n.tagName) || (parseInt(getComputedStyle(n).fontWeight, 10) || 400) >= 600;
+      for (var c = n.firstChild; c; c = c.nextSibling) walk(c, b);
+    };
+    walk(e, false);
+    if (runs.length) { runs[0].t = runs[0].t.replace(/^\s+/, ''); runs[runs.length - 1].t = runs[runs.length - 1].t.replace(/\s+$/, ''); }
+    return runs.filter(function (r) { return r.t; });
+  };
+  var policyKind = function (w) {
+    w = w.toLowerCase();
+    return /attempt/.test(w) && !/incorrect/.test(w) ? 'attempts' : /partial credit|incorrect|penalt/.test(w) && !/late/.test(w) ? 'penalty' : /late/.test(w) ? 'late'
+      : /solution|explanation/.test(w) ? 'solutions' : /resource/.test(w) ? 'resources' : /tutor|\bai\b/.test(w) ? 'tutor' : 'info';
+  };
+  var coverOf = function () {
+    if (document.getElementById('question-nav') || document.getElementById('check-bar')) return null;
+    var open = null, list = document.querySelectorAll('button, a[role="button"], a.btn');
+    for (var i = 0; i < list.length && !open; i++) {
+      if (shown(list[i]) && /^(open|start|begin|continue|resume|review)( (the )?(assignment|assessment|homework))?$/i.test(text(list[i]))) open = list[i];
+    }
+    if (!open) return null;
+    var title = '', heads = document.querySelectorAll('h1, h2, h3');
+    for (var h = 0; h < heads.length && !title; h++) {
+      var ht = text(heads[h]);
+      if (ht && shown(heads[h]) && !/^(assessment|grading settings)$/i.test(ht) && !heads[h].closest('.hub_molecule_app_header')) title = ht;
+    }
+    var count = 0, due = '', bits = document.querySelectorAll('p, span, div, li');
+    for (var k = 0; k < bits.length; k++) {
+      if (bits[k].children.length > 2) continue;
+      var bt = text(bits[k]);
+      if (!count && /^(\d+)\s+questions?$/i.test(bt)) count = +/^(\d+)/.exec(bt)[1];
+      if (/^due:?\s+\S/i.test(bt) && bt.length < 60 && bt.length > due.length) due = bt.replace(/^due:?\s+/i, '');
+    }
+    var policies = [], gs = null;
+    var hs = document.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span');
+    for (var m = 0; m < hs.length && !gs; m++) if (/^grading settings$/i.test(text(hs[m]))) gs = hs[m];
+    if (gs) {
+      var box = gs.parentElement, rows = [];
+      for (var up = 0; up < 4 && box; up++) {
+        rows = box.querySelectorAll('li');
+        if (rows.length) break;
+        box = box.parentElement;
+      }
+      if (!rows.length && gs.parentElement && gs.parentElement.nextElementSibling) rows = gs.parentElement.nextElementSibling.children;
+      for (var r = 0; r < rows.length && policies.length < 12; r++) {
+        var runs = runsOf(rows[r]), all = runs.map(function (x) { return x.t; }).join('');
+        if (all && all.length < 200) policies.push({ kind: policyKind(all), runs: runs });
+      }
+    }
+    return { title: title, count: count, due: due, start: { id: named(open, 'open'), label: text(open) }, policies: policies };
+  };
+
   var report = function () {
     var rows = document.querySelectorAll('#question-nav > li[data-test-id^="item-"]');
+    var cover = !rows.length && rail && coverOf();
+    if (cover) {
+      var oc = { rail: 'macmillan', rows: [], here: 0, done: 0, total: cover.count, score: '', title: '', policy: false, wide: 1024, cover: cover };
+      var saidC = JSON.stringify(oc);
+      if (saidC !== railSaid) { railSaid = saidC; tell(oc); }
+      return 0;
+    }
     if (!rows.length) {
       // (the side list folded: opened once, as its questions are only there while it is open)
       var nav = document.getElementById('side-nav'), open = nav && nav.querySelector('[data-test-id="nav-toggle-item"] > button');

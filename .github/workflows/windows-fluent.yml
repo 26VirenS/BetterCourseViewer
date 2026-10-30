@@ -1395,6 +1395,12 @@ jobs:
             if ("$l" -notmatch 'aleks popup: front end, buttons Explanation, Recheck') { Write-Host "::error::aleks-look: the popup's front end drew no ALEKS buttons (shots/profile-aleks-look.log)"; exit 1 }
             Write-Host "aleks-look: the popup's front end drew ALEKS's buttons"
           }
+          # (0.3.98) Macmillan's cover heard and drawn as the popup's own start page, Alta's way: its questions and its grading settings
+          if ($script:mine -contains 'macmillan') {
+            $l = Get-Content 'shots/profile-macmillan.log' -Raw -ErrorAction SilentlyContinue
+            if ("$l" -notmatch 'macmillan popup: cover heard, 4 questions, 5 grading settings') { Write-Host "::error::macmillan: the popup's start page heard nothing of Macmillan's cover (shots/profile-macmillan.log)"; exit 1 }
+            Write-Host "macmillan: the popup's start page heard Macmillan's cover (4 questions, 5 grading settings)"
+          }
           # Knewton Alta's page in light in a dark app whose web profile prefers dark (Shell/WebWindow.cs, LightPages: the
           # popup writes "alta: the page prefers …" in a picture run as each page comes in)
           if ($script:mine -contains 'alta-question-light') {

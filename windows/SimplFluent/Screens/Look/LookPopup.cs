@@ -50,6 +50,12 @@ internal sealed class LookPopupView
         public bool Tried => !Solved && Kind != "default" && Kind.Length > 0;
     }
 
+    /// <summary>(0.3.98) Macmillan's cover: the assignment's name, how many questions, when Macmillan says it is due, its Open
+    /// Assignment (pressed by the start screen's Start) and its grading settings, each in runs of words, bold where
+    /// Macmillan's are, with what it is about.</summary>
+    private sealed record Cover(string Title, int Count, string Due, PageButton? Start, List<Setting> Settings);
+    private sealed record Setting(string Kind, List<(string Text, bool Bold)> Runs);
+
     /// <summary>(0.3.95) One of the tool's own buttons, as the popup's front end draws it: pressed, it presses the tool's.</summary>
     private sealed record PageButton(string Id, string Label, string Kind, bool Primary, bool Enabled)
     {
@@ -83,6 +89,17 @@ internal sealed class LookPopupView
     private readonly WebView2 web = new() { Visibility = Visibility.Hidden };
     private readonly ContentControl state = new() { Focusable = false };
     private readonly Grid holder = new();
+    /// <summary>(0.3.98) Macmillan's cover as the popup's own start screen, over the page (the web view hidden under it:
+    /// nothing is drawn over a web view).</summary>
+    private readonly ContentControl coverSlot = new() { Visibility = Visibility.Collapsed, Focusable = false };
+    private Cover? cover;
+    private string coverSig = "";
+    private bool webShown, going;
+    /// <summary>(0.3.98) The question asked for from a tile, until the page opens it (its tile a spinner, as a quiz's).</summary>
+    private int? moving;
+    /// <summary>(0.3.98) The rail's tiles, kept from one drawing to the next and painted afresh (a quiz's own, QuizTile).</summary>
+    private readonly List<QuizTile> tiles = new();
+    private UniformGrid? tileGrid;
     /// <summary>(0.3.95) Over the page, the question's heading; under it, the tool's buttons — the popup's own.</summary>
     private readonly Border questionBar = new() { Visibility = Visibility.Collapsed, Padding = new Thickness(20, 12, 16, 10) };
     private readonly Border footer = new() { Visibility = Visibility.Collapsed, Padding = new Thickness(16, 12, 16, 12), BorderThickness = new Thickness(0, 1, 0, 0) };
@@ -136,6 +153,7 @@ internal sealed class LookPopupView
         body.Children.Add(rail.Col(0));
         holder.Children.Add(web);
         holder.Children.Add(state);
+        holder.Children.Add(coverSlot);
         holder.SizeChanged += (_, _) => Zoom();
         footer.SetResourceReference(Border.BorderBrushProperty, B.Divider);
         var page = K.Rows("auto, *, auto", questionBar.Row(0), holder.Row(1), footer.Row(2));
@@ -198,6 +216,7 @@ internal sealed class LookPopupView
             {
                 LightPages.Tell(core, $"{kind.Name} popup");
                 if (e.IsSuccess && !loadedOnce) { loadedOnce = true; Ready(); }
+                if (e.IsSuccess) SendLaunch();
             };
             // (a window the page opens — a sign-in, a resource — shown in place, as a tab would be)
             core.NewWindowRequested += (_, e) => { e.Handled = true; core.Navigate(e.Uri); };
@@ -208,15 +227,14 @@ internal sealed class LookPopupView
             var a = await engine.Call<LaunchAnswer>("toolLaunch", new Dictionary<string, object> { ["course"] = launch.Course, ["assignment"] = launch.Assignment });
             if (closed) return;
             if (!Uri.TryCreate(a.Url, UriKind.Absolute, out var u)) throw new InvalidOperationException("Simpl could not find where this assignment opens.");
-            if (!a.Sessionless)
-            {
-                // (the school's own page for the tool, its launch form to be sent: the tool window does that)
-                Log.Write($"{kind.Name} popup: no one-time launch, opened in the tool window");
-                OpenInWindow();
-                return;
-            }
-            Log.Write($"{kind.Name} popup: opened");
+            // (0.3.98: the school's own page for the tool, the one-time launch refused — its launch form sent on from it here,
+            //  in the popup, as the Mac's popup does; 0.3.94 to 0.3.97 sent it to the tool window, which left it behind
+            //  Canvas's "Load … in a new window" button)
+            if (!a.Sessionless) { launchPage = u; launchTries = 0; }
+            Log.Write($"{kind.Name} popup: opened{(a.Sessionless ? "" : " (the school's page for it, its launch sent on here)")}");
             web.Visibility = Visibility.Visible;
+            webShown = true;
+            UpdateCover();
             core.Navigate(u.ToString());
         }
         catch (Exception e)
@@ -231,9 +249,32 @@ internal sealed class LookPopupView
     /// <summary>The page there (loaded once, or heard from): the opening card fades away over it.</summary>
     private void Ready()
     {
-        if (closed || state.Content == null || web.Visibility != Visibility.Visible) return;
+        if (closed || state.Content == null || !webShown) return;
         if (state.Content is FrameworkElement f) Motion.FadeOut(f, () => state.Content = null, Motion.Normal);
         else state.Content = null;
+    }
+
+    private Uri? launchPage;
+    private int launchTries;
+
+    /// <summary>(0.3.98) On the school's page for the tool: Canvas's launch form sent on in this web view (the tool window's
+    /// script, Shell/WebWindow.SendToolForm), a few looks while Canvas draws it; any page of the school's, the first few.</summary>
+    private async void SendLaunch()
+    {
+        if (closed || launchPage is not { } page || web.CoreWebView2 is not { } core) return;
+        if (!Uri.TryCreate(core.Source, UriKind.Absolute, out var here) || !here.Host.Equals(page.Host, StringComparison.OrdinalIgnoreCase))
+        {
+            if (++launchTries > 4) launchPage = null;
+            return;
+        }
+        try
+        {
+            var said = (await core.ExecuteScriptAsync(WebWindow.SendToolForm)).Trim('"');
+            if (said == "none" && ++launchTries <= 8) { await Task.Delay(700); if (launchPage != null) SendLaunch(); return; }
+            launchPage = null;
+            Log.Write($"{kind.Name} popup: the school's page for the tool, its launch {said switch { "sent" => "sent on in the popup", "pressed" => "pressed (Canvas's Load button), opened in the popup", "framed" => "framed in the page as it is", _ => "not found" }}");
+        }
+        catch (Exception x) { launchPage = null; Log.Write($"{kind.Name} popup: sending the tool's launch: " + x.Message); }
     }
 
     private void OpenInWindow()
@@ -275,6 +316,7 @@ internal sealed class LookPopupView
             : $"Show {FullName}'s page in Simpl's look";
         System.Windows.Automation.AutomationProperties.SetName(lookButton, on ? "Simpl Look, on" : "Simpl Look, off");
         UpdateFront();
+        UpdateCover();
     }
 
     // ---- what the page says ----
@@ -299,6 +341,11 @@ internal sealed class LookPopupView
                 }
             questions = list;
             here = Math.Max(0, I(o, "here"));
+            if (moving is { } m && m == here) moving = null;
+            var was = cover;
+            cover = o.TryGetProperty("cover", out var cv) && cv.ValueKind == JsonValueKind.Object ? CoverOf(cv) : null;
+            if (cover != null && was == null && !coverLogged) { coverLogged = true; Log.Write($"macmillan popup: cover heard, {cover.Count} questions, {cover.Settings.Count} grading settings"); }
+            if (cover == null && was != null) { going = false; Log.Write("macmillan popup: on from the cover"); }
             done = I(o, "done");
             total = Math.Max(0, I(o, "total"));
             score = S(o, "score");
@@ -370,7 +417,116 @@ internal sealed class LookPopupView
         Ready();
         DrawRail();
         UpdateFront();
+        UpdateCover();
     }
+
+    private bool coverLogged;
+
+    private static Cover CoverOf(JsonElement c)
+    {
+        static string S(JsonElement o, string k) => o.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : "";
+        var settings = new List<Setting>();
+        if (c.TryGetProperty("policies", out var ps) && ps.ValueKind == JsonValueKind.Array)
+            foreach (var p in ps.EnumerateArray())
+            {
+                var runs = new List<(string, bool)>();
+                if (p.TryGetProperty("runs", out var rs) && rs.ValueKind == JsonValueKind.Array)
+                    foreach (var r in rs.EnumerateArray()) runs.Add((S(r, "t"), r.TryGetProperty("b", out var b) && b.ValueKind == JsonValueKind.True));
+                settings.Add(new Setting(S(p, "kind") is { Length: > 0 } k ? k : "info", runs));
+            }
+        PageButton? start = null;
+        if (c.TryGetProperty("start", out var st) && st.ValueKind == JsonValueKind.Object && S(st, "id") is { Length: > 0 } id)
+            start = new PageButton(id, S(st, "label"), "", true, true);
+        var count = c.TryGetProperty("count", out var n) && n.ValueKind == JsonValueKind.Number && n.TryGetInt32(out var i) ? i : 0;
+        return new Cover(S(c, "title"), count, S(c, "due"), start, settings);
+    }
+
+    /// <summary>(0.3.98) Macmillan's cover, while it shows and Simpl Look is on, as the popup's own start screen: the web view
+    /// hidden under it until Start (Macmillan's Open Assignment pressed) has the page move on.</summary>
+    private void UpdateCover()
+    {
+        if (closed) return;
+        var on = (look?.On(kind) ?? true) && cover != null && webShown;
+        var sig = on ? JsonSerializer.Serialize(new object?[] { cover!.Count, cover.Due, cover.Start?.Label, cover.Settings.Select(x => x.Kind + string.Concat(x.Runs.Select(r => r.Text))), going, due }) : "";
+        if (sig == coverSig) return;
+        var was = coverSig.Length > 0;
+        coverSig = sig;
+        web.Visibility = on || !webShown ? Visibility.Hidden : Visibility.Visible;
+        if (!on) { coverSlot.Visibility = Visibility.Collapsed; coverSlot.Content = null; return; }
+        coverSlot.Content = StartScreen(cover!);
+        coverSlot.Visibility = Visibility.Visible;
+        if (!was) Motion.FadeIn(coverSlot, Motion.Normal);
+    }
+
+    /// <summary>The start screen, as Alta's (AltaParts.StartScreen): how many questions and (when the header does not say
+    /// it) when it is due, a large Start; under it Macmillan's grading settings, each with a symbol for what it is about
+    /// and Macmillan's own words, bold where Macmillan's are.</summary>
+    private FrameworkElement StartScreen(Cover c)
+    {
+        var details = new WrapPanel { Orientation = Orientation.Horizontal };
+        void Detail(string label, string value)
+        {
+            var col = K.V(3, K.Text(label, Ty.Caption, B.Text2).Strong(), K.Wrapped(value, Ty.BodyStrong));
+            col.Margin = new Thickness(0, 0, 28, 6);
+            details.Children.Add(col);
+        }
+        Detail("Status", "Not started");
+        if (c.Count > 0) Detail("Questions", c.Count.ToString(CultureInfo.CurrentCulture));
+        if (string.IsNullOrEmpty(due) && c.Due.Length > 0) Detail("Due", c.Due);
+        var label = c.Start?.Label is { Length: > 0 } l && !Regex.IsMatch(l, @"^open( (the )?(assignment|assessment|homework))?$", RegexOptions.IgnoreCase) ? AltaParts.Capital(l) : "Start";
+        var words = new TextBlock { Text = label, FontSize = 16, FontWeight = FontWeights.SemiBold, FontFamily = K.TextFace, VerticalAlignment = VerticalAlignment.Center };
+        UIElement mark = going ? K.Spinner(16) : new SymbolIcon { Symbol = SymbolRegular.Play24, Filled = true, FontSize = 16, VerticalAlignment = VerticalAlignment.Center };
+        var go = new Wpf.Ui.Controls.Button
+        {
+            Content = K.H(8, mark, words), Appearance = ControlAppearance.Primary, MinWidth = 150, MinHeight = 40, Padding = new Thickness(20, 6, 20, 7),
+            IsEnabled = !going && c.Start != null, ToolTip = $"{label} the assignment (Enter) — Macmillan's own {c.Start?.Label ?? "Open Assignment"}",
+            HorizontalAlignment = HorizontalAlignment.Left,
+        };
+        go.Click += (_, _) =>
+        {
+            if (going || c.Start is not { } b) return;
+            going = true;
+            UpdateCover();
+            Press(b.Id, b.Label);
+            // (back to the button if Macmillan's page did not move on)
+            var back = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
+            back.Tick += (_, _) => { back.Stop(); if (going) { going = false; UpdateCover(); } };
+            back.Start();
+        };
+        var head = K.Card(K.V(16, details, go.Margin(0, 4, 0, 0)), new Thickness(24));
+        var v = K.V(18, head);
+        if (c.Settings.Count > 0)
+        {
+            var list = K.V(14, K.Text("Grading settings", Ty.Subtitle));
+            foreach (var g in c.Settings)
+            {
+                var (symbol, tone) = SettingLook(g.Kind);
+                var dot = new Border { Width = 30, Height = 30, CornerRadius = new CornerRadius(15), Background = K.Brush(K.WithAlpha(tone, 0.15)), Child = K.Icon(symbol, 15, tone).Align(HorizontalAlignment.Center, VerticalAlignment.Center), VerticalAlignment = VerticalAlignment.Center };
+                var line = new TextBlock { TextWrapping = TextWrapping.Wrap, FontFamily = K.TextFace, FontSize = 14, VerticalAlignment = VerticalAlignment.Center };
+                line.SetResourceReference(TextBlock.ForegroundProperty, B.Text);
+                foreach (var (t, bold) in g.Runs) line.Inlines.Add(new System.Windows.Documents.Run(t) { FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal });
+                list.Children.Add(K.Columns("auto, *", dot.Col(0), line.Margin(12, 0, 0, 0).Col(1)));
+            }
+            v.Children.Add(K.Card(list, new Thickness(22)));
+        }
+        v.MaxWidth = 780;
+        v.Margin = new Thickness(32, 28, 32, 28);
+        var host = new Grid { Children = { v } };
+        host.Bg(B.Layer);
+        return new ScrollViewer { Content = host, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false };
+    }
+
+    /// <summary>A setting's symbol and colour by what it is about: a penalty in orange, the rest in teal.</summary>
+    private static (SymbolRegular, Color) SettingLook(string kind) => kind switch
+    {
+        "attempts" => (SymbolRegular.ArrowSync24, Color.FromRgb(0x0e, 0x8a, 0x9a)),
+        "penalty" => (SymbolRegular.Dismiss24, K.Tone("orange")),
+        "late" => (SymbolRegular.CalendarClock24, Color.FromRgb(0x0e, 0x8a, 0x9a)),
+        "solutions" => (SymbolRegular.Lightbulb24, Color.FromRgb(0x0e, 0x8a, 0x9a)),
+        "resources" => (SymbolRegular.Book24, Color.FromRgb(0x0e, 0x8a, 0x9a)),
+        "tutor" => (SymbolRegular.ChatMultiple24, Color.FromRgb(0x0e, 0x8a, 0x9a)),
+        _ => (SymbolRegular.Info24, K.Tone(null)),
+    };
 
     private double zoomSaid = -1;
 
@@ -390,7 +546,13 @@ internal sealed class LookPopupView
 
     private async void Go(int n)
     {
-        if (web.CoreWebView2 is not { } c || n < 1) return;
+        if (web.CoreWebView2 is not { } c || n < 1 || n == here || moving != null) return;
+        // (0.3.98: the tile a spinner until the page has the question open, as a quiz's; let go if it never does)
+        moving = n;
+        PaintTiles();
+        var back = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
+        back.Tick += (_, _) => { back.Stop(); if (moving == n) { moving = null; PaintTiles(); } };
+        back.Start();
         try { await c.ExecuteScriptAsync($"window.__simplMMDo && window.__simplMMDo({{ go: {n} }})"); } catch { /* (gone) */ }
     }
 
@@ -576,8 +738,8 @@ internal sealed class LookPopupView
 
     private void DrawRail()
     {
-        var sig = JsonSerializer.Serialize(new object[] { heard, questions.Select(q => $"{q.N}{q.Kind}{q.Sub}{q.Points}"), here, done, total, score, policy, slice, topic, status, onQuestion, fills });
-        if (sig == railSig) return;
+        var sig = JsonSerializer.Serialize(new object[] { heard, questions.Select(q => $"{q.N}{q.Kind}{q.Sub}{q.Points}"), here, done, total, score, policy, slice, topic, status, onQuestion, fills, cover?.Count ?? -1 });
+        if (sig == railSig) { PaintTiles(); return; }
         railSig = sig;
         var v = K.V(16);
         if (kind.Name == PageLook.Aleks.Name) Aleks(v); else Macmillan(v);
@@ -602,16 +764,30 @@ internal sealed class LookPopupView
 
         // the questions as tiles
         var head = K.Columns("*, auto", K.Text("Questions", Ty.BodyStrong).Col(0), Legend().Col(1));
-        FrameworkElement tiles;
-        if (questions.Count == 0) tiles = new Grid { MinHeight = 34, Children = { K.Spinner(16) } };
+        FrameworkElement shown;
+        var count = questions.Count > 0 ? questions.Count : cover?.Count ?? 0;
+        if (count == 0) shown = new Grid { MinHeight = 34, Children = { K.Spinner(16) } };
         else
         {
-            var grid = new UniformGrid { Columns = 5, Margin = new Thickness(-3) };
-            foreach (var q in questions) grid.Children.Add(Tile(q, q.N == here, q.N == here && drawnHere != 0 && drawnHere != here).Margin(3));
-            tiles = grid;
+            // (0.3.98) a quiz's own tiles (QuizTile), kept and painted afresh: the one open filled, a solved one washed with
+            // its tick, one tried and not solved edged in orange, the one asked for a spinner; on the cover, its questions
+            if (tileGrid == null || tiles.Count != count)
+            {
+                tiles.Clear();
+                tileGrid = new UniformGrid { Columns = 5, Margin = new Thickness(-3) };
+                for (var k = 1; k <= Math.Min(count, 200); k++)
+                {
+                    var t = new QuizTile(k, null, i => Go(questions.ElementAtOrDefault(i)?.N ?? 0)) { Margin = new Thickness(3) };
+                    tiles.Add(t);
+                    tileGrid.Children.Add(t);
+                }
+            }
+            if (tileGrid.Parent is Panel old) old.Children.Remove(tileGrid);
+            PaintTiles();
+            shown = tileGrid;
         }
         drawnHere = here;
-        v.Children.Add(K.Card(K.V(12, head, tiles), new Thickness(14), 12));
+        v.Children.Add(K.Card(K.V(12, head, shown), new Thickness(14), 12));
 
         // the question open, and the ones either side of it
         if (questions.FindIndex(q => q.N == here) is var at && at >= 0)
@@ -655,8 +831,10 @@ internal sealed class LookPopupView
 
     private static FrameworkElement Legend()
     {
-        FrameworkElement Mark(Color c, string w) => K.H(4, new Ellipse { Width = 6, Height = 6, Fill = K.Brush(c), VerticalAlignment = VerticalAlignment.Center }, K.Text(w, Ty.Caption, B.Text2));
-        var h = K.H(10, Mark(Colors.SeaGreen, "Solved"), Mark(Colors.DarkOrange, "Tried"));
+        // (0.3.98: as the quiz's tiles mark them — solved washed in the accent, tried edged in orange)
+        var solved = K.H(4, new Ellipse { Width = 7, Height = 7, Fill = K.Brush(K.WithAlpha(Support.Appearance.Accent, 0.4)), VerticalAlignment = VerticalAlignment.Center }, K.Text("Solved", Ty.Caption, B.Text2));
+        var tried = K.H(4, new Ellipse { Width = 7, Height = 7, Stroke = K.Brush(Colors.DarkOrange), StrokeThickness = 1.5, VerticalAlignment = VerticalAlignment.Center }, K.Text("Tried", Ty.Caption, B.Text2));
+        var h = K.H(10, solved, tried);
         h.VerticalAlignment = VerticalAlignment.Center;
         return h;
     }
@@ -688,33 +866,27 @@ internal sealed class LookPopupView
         return g;
     }
 
-    /// <summary>One question's tile: its number, the one open filled in the accent (springing in as it becomes the one
-    /// open), a solved one washed green with a tick, one tried and not solved washed orange. A button: the question opens.</summary>
-    private FrameworkElement Tile(Question q, bool current, bool arrived)
+    /// <summary>(0.3.98) The rail's tiles painted as they stand, as a quiz's are: the one open filled in the accent, a solved
+    /// one washed in it with its tick, one tried and not solved edged in orange, the one asked for a spinner while the page
+    /// opens it (the others held till then); on the cover, its questions, none open, none to press.</summary>
+    private void PaintTiles()
     {
-        var face = new Border { CornerRadius = new CornerRadius(6), Height = 34, Cursor = Cursors.Hand, Focusable = true, FocusVisualStyle = null };
-        if (current) face.Bg(B.Accent);
-        else if (q.Solved) face.Background = K.Brush(K.WithAlpha(Colors.SeaGreen, 0.18));
-        else if (q.Tried) face.Background = K.Brush(K.WithAlpha(Colors.DarkOrange, 0.2));
-        else face.Bg(B.Subtle);
-        UIElement mark = q.Solved && !current
-            ? K.Icon(SymbolRegular.Checkmark24, 14, Colors.SeaGreen)
-            : K.Text(q.N.ToString(CultureInfo.InvariantCulture), Ty.Body, current ? B.OnAccent : q.Tried ? B.Caution : B.Text2).Strong().Center();
-        if (mark is FrameworkElement m) m.VerticalAlignment = VerticalAlignment.Center;
-        face.Child = mark;
-        var scale = new ScaleTransform(1, 1);
-        face.RenderTransformOrigin = new Point(0.5, 0.5);
-        face.RenderTransform = scale;
-        void To(double s, double ms) { Motion.FromTo(scale, ScaleTransform.ScaleXProperty, scale.ScaleX, s, ms, Motion.Decelerate); Motion.FromTo(scale, ScaleTransform.ScaleYProperty, scale.ScaleY, s, ms, Motion.Decelerate); }
-        face.MouseEnter += (_, _) => { if (!current) To(1.05, Motion.Fast); };
-        face.MouseLeave += (_, _) => To(1, Motion.Fast);
-        face.MouseLeftButtonDown += (_, e) => { To(0.93, Motion.Fast); e.Handled = true; };
-        face.MouseLeftButtonUp += (_, e) => { To(1, Motion.Normal); e.Handled = true; Go(q.N); };
-        face.KeyDown += (_, e) => { if (e.Key is Key.Enter or Key.Space) { e.Handled = true; Go(q.N); } };
-        if (arrived && Motion.On) { scale.ScaleX = scale.ScaleY = 0.85; To(1, Motion.Slow); }
-        face.ToolTip = q.Sub.Length > 0 ? $"{q.Label} — {q.Sub}" : q.Label;
-        System.Windows.Automation.AutomationProperties.SetName(face, $"Question {q.N}, {(q.Solved ? "solved" : q.Tried ? "tried" : "not answered")}{(current ? ", open" : "")}");
-        return face;
+        var tint = Support.Appearance.Accent;
+        for (var k = 0; k < tiles.Count; k++)
+        {
+            var t = tiles[k];
+            if (k >= questions.Count)
+            {
+                t.Paint(false, false, false, false, false, false, tint);
+                t.ToolTip = null;
+                continue;
+            }
+            var q = questions[k];
+            var current = q.N == here;
+            t.Paint(current, q.Solved, q.Tried, false, moving == q.N, moving == null, tint);
+            t.ToolTip = q.Sub.Length > 0 ? $"{q.Label} — {q.Sub}" : q.Label;
+            System.Windows.Automation.AutomationProperties.SetName(t, $"Question {q.N}, {(q.Solved ? "solved" : q.Tried ? "tried" : "not answered")}{(current ? ", open" : "")}");
+        }
     }
 
     private void Aleks(Panel v)

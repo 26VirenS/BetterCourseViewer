@@ -26,6 +26,11 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.98", "2026-10-30",
+            ("new", "A Start Page, as Alta", "Macmillan homework opens on a start page with Start."),
+            ("improved", "Smoother Questions", "Moving between Macmillan questions animates like a quiz."),
+            ("improved", "A Better Tool List", "A tool's list shows what's next, to do, and done."),
+            ("fixed", "No More Load Button", "Tools that ask to load in a new window just open.")),
         R("0.3.97", "2026-10-30",
             ("fixed", "Homework in Its Popup", "Macmillan and ALEKS homework now opens in its own popup.")),
         R("0.3.96", "2026-10-30",
