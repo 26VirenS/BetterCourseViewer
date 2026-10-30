@@ -1375,6 +1375,17 @@ jobs:
             if ("$l" -notmatch 'aleks popup: rail heard, topic progress 0 of 5') { Write-Host "::error::${lookShot}: the popup's rail heard nothing of ALEKS's topic (shots/profile-$lookShot.log)"; exit 1 }
             Write-Host "${lookShot}: the popup's rail heard ALEKS's topic progress, 0 of 5"
           }
+          # (0.3.95) the popup's own front end: the tool's buttons heard and drawn as the popup's own
+          if ($script:mine -contains 'macmillan-look') {
+            $l = Get-Content 'shots/profile-macmillan-look.log' -Raw -ErrorAction SilentlyContinue
+            if ("$l" -notmatch 'macmillan popup: front end, buttons Resources, Solution, Next Question') { Write-Host "::error::macmillan-look: the popup's front end drew no Macmillan buttons (shots/profile-macmillan-look.log)"; exit 1 }
+            Write-Host "macmillan-look: the popup's front end drew Macmillan's buttons"
+          }
+          if ($script:mine -contains 'aleks-look') {
+            $l = Get-Content 'shots/profile-aleks-look.log' -Raw -ErrorAction SilentlyContinue
+            if ("$l" -notmatch 'aleks popup: front end, buttons Explanation, Recheck') { Write-Host "::error::aleks-look: the popup's front end drew no ALEKS buttons (shots/profile-aleks-look.log)"; exit 1 }
+            Write-Host "aleks-look: the popup's front end drew ALEKS's buttons"
+          }
           # Knewton Alta's page in light in a dark app whose web profile prefers dark (Shell/WebWindow.cs, LightPages: the
           # popup writes "alta: the page prefers …" in a picture run as each page comes in)
           if ($script:mine -contains 'alta-question-light') {
