@@ -594,6 +594,9 @@ jobs:
           # Q1 marked, the bar of tools, the verdict and Next Question at the sheet's foot; then with Simpl Look off
           Shot 'macmillan-look' '1366x778' 50 ($mock + @('--appearance', 'light', '--open', 'macmillan:104:4006'))
           Shot 'macmillan-look-off' '1366x778' 50 ($mock + @('--appearance', 'light', '--open', 'macmillan:104:4006', '--macmillan-look', 'off'))
+          # (0.3.93) Simpl's look over ALEKS's page, the mock's learning page with a wrong answer checked; then with it off
+          Shot 'aleks-look' '1366x778' 50 ($mock + @('--appearance', 'light', '--open', 'aleks:104:4007'))
+          Shot 'aleks-look-off' '1366x778' 50 ($mock + @('--appearance', 'light', '--open', 'aleks:104:4007', '--aleks-look', 'off'))
           # Settings, as Windows 11's own Settings app, on each of its categories
           foreach ($tab in @('general', 'notifications', 'grades', 'data', 'updates', 'about')) {
             Shot "settings-$tab" '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', $tab))
@@ -1343,6 +1346,17 @@ jobs:
             $l = Get-Content 'shots/profile-macmillan-look-off.log' -Raw -ErrorAction SilentlyContinue
             if ("$l".Contains('macmillan look: drawn')) { Write-Host "::error::macmillan-look-off: drawn with Simpl Look off"; exit 1 }
             Write-Host "macmillan-look-off: not drawn, as Macmillan draws it"
+          }
+          # (0.3.93) Simpl's look over ALEKS's page (Shell/PageLook.cs): drawn with its Check and 5 tools found; not drawn off
+          if ($script:mine -contains 'aleks-look') {
+            $l = Get-Content 'shots/profile-aleks-look.log' -Raw -ErrorAction SilentlyContinue
+            if ("$l" -notmatch 'aleks look: drawn in localhost:\d+, Check found, 5 tools') { Write-Host "::error::aleks-look: not drawn as it should be (shots/profile-aleks-look.log)"; exit 1 }
+            Write-Host "aleks-look: drawn over ALEKS's page, its Check and 5 tools found"
+          }
+          if ($script:mine -contains 'aleks-look-off') {
+            $l = Get-Content 'shots/profile-aleks-look-off.log' -Raw -ErrorAction SilentlyContinue
+            if ("$l".Contains('aleks look: drawn')) { Write-Host "::error::aleks-look-off: drawn with Simpl Look off"; exit 1 }
+            Write-Host "aleks-look-off: not drawn, as ALEKS draws it"
           }
           # Knewton Alta's page in light in a dark app whose web profile prefers dark (Shell/WebWindow.cs, LightPages: the
           # popup writes "alta: the page prefers …" in a picture run as each page comes in)
