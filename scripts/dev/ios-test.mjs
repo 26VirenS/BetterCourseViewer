@@ -178,6 +178,19 @@ try {
   await page.waitForTimeout(600);
   const s2 = await page.evaluate(() => { const s = document.querySelector('.bcv-ph-sheet'); return s ? { large: s.classList.contains('is-large'), there: true } : { there: false }; });
   check(s2.there && !s2.large, `pulled down a little from nearly the full screen, it comes back to its own height and stays up: ${JSON.stringify(s2)}`);
+  // (2.99.131) the same pull with its moves handed over all at once, a few milliseconds apart, as a busy page does (a slow
+  // runner's did, and the sheet went): still a pull, not a throw
+  await sheetAtRest();
+  const s1b = await page.evaluate(() => { const l = document.querySelector('.bcv-ph-sheet__list').getBoundingClientRect(); return { x: Math.round(l.left + l.width / 2), y: Math.round(l.top + 100) }; });
+  await touchDrag(s1b.x, s1b.y, -160);
+  await page.waitForTimeout(600);
+  await sheetAtRest();
+  const grewB = await page.evaluate(() => !!document.querySelector('.bcv-ph-sheet.is-large'));
+  const hb = await page.evaluate(() => { const r = document.querySelector('.bcv-ph-sheet__handle').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; });
+  await touchDrag(hb.x, hb.y, 110, { steps: 6, ms: 2 });
+  await page.waitForTimeout(600);
+  const s2b = await page.evaluate(() => { const s = document.querySelector('.bcv-ph-sheet'); return s ? { large: s.classList.contains('is-large'), there: true } : { there: false }; });
+  check(grewB && s2b.there && !s2b.large, `pulled down a little with its moves bunched together (a busy page), it still comes back to its own height: ${JSON.stringify({ grewB, s2b })}`);
   await sheetAtRest();
   const h2 = await page.evaluate(() => { const r = document.querySelector('.bcv-ph-sheet__handle').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; });
   await touchDrag(h2.x, h2.y, 300, { steps: 6, ms: 30 });

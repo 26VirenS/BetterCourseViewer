@@ -360,8 +360,8 @@
     };
     const begin = () => { for (const a of sheet.getAnimations()) a.cancel(); sheet.style.willChange = 'transform'; };
     const follow = (y, t) => {
-      const dt = t - g.lastT;
-      if (dt > 0) g.vy = 0.7 * g.vy + 0.3 * ((y - g.lastY) / dt) * 1000; // px/s, smoothed
+      g.hist.push({ y, t });
+      while (g.hist.length > 2 && t - g.hist[0].t > 150) g.hist.shift(); // (the last 150 ms of the finger's way)
       g.lastY = y; g.lastT = t;
       let dy = y - g.y0;
       if (dy < 0) {
@@ -399,10 +399,21 @@
         }, 90);
       }, ms);
     };
+    /** (2.99.131) How fast the finger was going as it let go, px/s: over its last 50 ms or more, the moves counted a frame
+     *  apart at least — a busy page hands over moves it held back all at once, a few milliseconds apart, and read one by
+     *  one a slow pull came out a throw (a sheet pulled down a little from nearly the full screen went, on a slow runner). */
+    const speed = (h) => {
+      if (h.length < 2) return 0;
+      const last = h[h.length - 1];
+      let i = h.length - 2;
+      while (i > 0 && last.t - h[i].t < 50) i--;
+      const span = Math.max(last.t - h[i].t, 16 * (h.length - 1 - i));
+      return span > 0 ? ((last.y - h[i].y) / span) * 1000 : 0;
+    };
     const release = () => {
       if (!g) return;
       const { dy = 0, grew } = g;
-      const vy = performance.now() - g.lastT > 80 ? 0 : g.vy || 0; // (a finger that stopped before letting go threw nothing)
+      const vy = performance.now() - g.lastT > 80 ? 0 : speed(g.hist); // (a finger that stopped before letting go threw nothing)
       g = null;
       const H = sheet.offsetHeight || 1;
       const large = sheet.classList.contains('is-large');
@@ -417,7 +428,7 @@
       if (dy > Math.min(110, H * 0.3) || vy > 700) { U.haptic?.('soft'); putAway(dy, vy); } else settle(dy);
     };
     const startAt = (x, y, target) => {
-      g = { x0: x, y0: y, lastY: y, lastT: performance.now(), vy: 0, dy: 0, mode: null, target, scroller: scrollerOf(target), grew: false };
+      g = { x0: x, y0: y, lastY: y, lastT: performance.now(), hist: [{ y, t: performance.now() }], dy: 0, mode: null, target, scroller: scrollerOf(target), grew: false };
     };
     const decide = (x, y) => {
       const dx = x - g.x0, dy = y - g.y0;
@@ -446,7 +457,7 @@
       if (e.pointerType === 'touch' || (e.button ?? 0) !== 0) return;
       if (!handle.contains(e.target) && !e.target.closest?.('.bcv-ph-sheet__head')) return;
       startAt(e.clientX, e.clientY, e.target);
-      g.mode = 'drag'; g.pointer = e.pointerId; g.lastT = e.timeStamp;
+      g.mode = 'drag'; g.pointer = e.pointerId; g.lastT = e.timeStamp; g.hist = [{ y: e.clientY, t: e.timeStamp }];
       begin();
       try { sheet.setPointerCapture(e.pointerId); } catch { /* fine */ }
     });
