@@ -984,6 +984,20 @@ record_check() {
   if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::recorder: /'; return 1; fi
 }
 
+# (1.3.197) look_check: Simpl's look over Macmillan's page, as look-check.txt — drawn in the mock's player with its
+# questions found and the open one marked (light-21n-macmillan-look), and not drawn with Simpl Look off (light-21o). A FAIL
+# fails it.
+look_check() {
+  local out="$OUT_ABS/look-check.txt" f="$OUT_ABS/console-light-21n-macmillan-look.txt" g="$OUT_ABS/console-light-21o-macmillan-look-off.txt"
+  : > "$out"
+  if grep -q 'macmillan look: drawn in localhost:[0-9]*, 4 questions, item-1-success-row marked' "$f" 2>/dev/null; then echo "ok   drawn over the player, its 4 questions found and Q1 marked" >> "$out"
+  else echo "FAIL not drawn as it should be ($(grep -o 'macmillan look: .*' "$f" 2>/dev/null | head -3 | tr '\n' ';'))" >> "$out"; fi
+  if [ -f "$g" ] && ! grep -q 'macmillan look: drawn' "$g"; then echo "ok   not drawn with Simpl Look off" >> "$out"
+  else echo "FAIL drawn with Simpl Look off, or no console ($(grep -o 'macmillan look: .*' "$g" 2>/dev/null | head -2 | tr '\n' ';'))" >> "$out"; fi
+  cat "$out"
+  if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::macmillan look: /'; return 1; fi
+}
+
 # (1.3.103) quicklook_check: what light-14e-instructions-file-open's walk and its preview said (Support/OpenClock.swift,
 # Engine/FilePreview.swift), as quicklook-check.txt — the file link in the assignment's instructions found and clicked,
 # and the file shown ("[files] Preview: 1 item, …" from Simpl's preview window since 1.3.191, "[files] Quick Look: 1
@@ -1063,6 +1077,11 @@ push_set() {
   # (1.3.80) Next 7 days' tile half-way through growing into its panel over the page (held there: -SimplMorphHold)
   shoot light-01m-counter-morph-next 30 -SimplSheet next -SimplMorphHold 0.5 # (its wait the longest: under load the panel came 15 seconds in)
   shoot light-21d-macmillan 26 -SimplOpen macmillan:104:4005 # (1.3.66: a Macmillan Learning assignment — 1.3.163: in the tool window, as Macmillan draws it)
+  # (1.3.197) Simpl's look over Macmillan's page (extension/tools/macmillan/look.js), on its first question solved: the
+  # rail with Q1 marked, the bar of tools, the question's number large, the verdict and Next Question at the sheet's foot
+  # — then the same with the toolbar's Simpl Look off, as Macmillan draws it (look_check)
+  shoot light-21n-macmillan-look 26 -SimplOpen macmillan:104:4006
+  shoot light-21o-macmillan-look-off 26 -SimplOpen macmillan:104:4006 -SimplMacmillanLook NO
   shoot light-21e-second-window 18 -SimplOpen window:section:courses/101:grades # (1.3.69: a window more, on a course's grades: its breakdown bar)
   shoot light-36-external-tools 16 -SimplPlace externaltools # (1.3.67: every external tool in the courses)
   shoot light-36b-external-tools-list 16 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77: every place Knewton Alta is used, to choose from)
@@ -1197,6 +1216,7 @@ if [ "${SHOTS:-full}" = check ]; then
   quicklook_check || exit 1 # (1.3.103)
   newwin_check || exit 1 # (1.3.104)
   record_check || exit 1 # (1.3.196)
+  look_check || exit 1 # (1.3.197)
   exit 0
 fi
 
@@ -1369,6 +1389,7 @@ if [ "$SHARDS" = 1 ]; then
   quicklook_check || true # (1.3.103)
   newwin_check || true # (1.3.104)
   record_check || true # (1.3.196)
+  look_check || true # (1.3.197)
 fi
 keep_crashes
 exit 0

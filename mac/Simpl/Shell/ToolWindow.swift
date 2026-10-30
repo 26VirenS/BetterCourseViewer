@@ -28,6 +28,8 @@ struct ToolWindow: View {
     /// (1.2.16) A light tool page drawn dark while the Mac is in dark mode (the moon in the toolbar turns it on and off).
     /// (1.3.79) Off until the moon turns it on: a tool's page is made for light, and in dark it was hard to read.
     @AppStorage(ToolDarkPage.key) private var darkPage = false
+    /// (1.3.197) Simpl's look over Macmillan Learning's page (MacmillanLook): on until the toolbar's Simpl Look turns it off.
+    @AppStorage(MacmillanLook.key) private var macmillanLook = true
     /// The window's own appearance: the moon shows only in Dark Mode, where it does something.
     @Environment(\.colorScheme) private var scheme
     @State private var url: URL?
@@ -49,7 +51,8 @@ struct ToolWindow: View {
     var body: some View {
         ZStack(alignment: .top) {
             if let url {
-                ToolWebView(url: url, browser: browser, externalTool: true, sendToolForm: sendForm)
+                ToolWebView(url: url, browser: browser, scripts: MacmillanLook.script().map { [$0] } ?? [],
+                            messages: ["simplLook": MacmillanLook.Listener()], externalTool: true, sendToolForm: sendForm)
                     .transition(.opacity)
             } else if let error {
                 ContentUnavailableView {
@@ -140,6 +143,17 @@ struct ToolWindow: View {
                     }
                 }
             }
+            // (1.3.197) on Macmillan Learning's pages: Simpl's look over the page, or the page as Macmillan draws it
+            if MacmillanLook.applies(to: browser.current ?? url) {
+                ToolbarItem(placement: .primaryAction) {
+                    Toggle(isOn: $macmillanLook) { Label("Simpl Look", systemImage: "sparkles") }
+                        .toggleStyle(.button)
+                        .help(macmillanLook
+                            ? "Simpl's look is on: the questions in a rail, the tools in a bar, Submit and the verdict under the question. Click to show the page as Macmillan draws it."
+                            : "Show Macmillan's page in Simpl's look: the questions in a rail, the tools in a bar, Submit and the verdict under the question")
+                        .toolbarFit(fit, .own)
+                }
+            }
             // (courses-33: only in Dark Mode, the one time it does anything — in Light Mode a lit moon over a white page
             // read as "dark mode is on", the loudest control in the bar)
             if scheme == .dark {
@@ -153,6 +167,7 @@ struct ToolWindow: View {
         }
         .task(id: model.engine == nil) { await start() }
         .onChange(of: darkPage) { _, on in ToolDarkPage.set(on, in: browser.webView) }
+        .onChange(of: macmillanLook) { _, on in MacmillanLook.set(on, in: browser.webView) }
         .onChange(of: dev.unlocked) { _, on in if !on { recorder.stop() } } // (developer mode left: the recording ends)
         .onChange(of: browser.loading) { _, loading in
             guard recordShot, !loading, dev.unlocked, browser.webView != nil else { return }
@@ -257,6 +272,65 @@ enum ToolDarkPage {
     static func set(_ on: Bool, in view: WKWebView?) {
         if let view { look(view, dark: on) }
         view?.evaluateJavaScript("window.__simplDark = \(on ? "true" : "false"); var s = document.getElementById('simpl-dark-page'); if (s && !window.__simplDark) s.remove(); window.__simplDarkApply && window.__simplDarkApply();", completionHandler: nil)
+    }
+}
+
+/// (1.3.197) Simpl's look for Macmillan Learning (extension/tools/macmillan/look.js, the Windows app's too): Macmillan's
+/// own page restyled as an Alta question is in the apps — a glass rail of questions with the one open marked, a glass bar
+/// of its tools, the question's number large over its sheet, and the main button (Submit Answer, Next Question) with the
+/// verdict beside it at the sheet's foot. Styles only: nothing of the page is taken out, and every question is answered as
+/// on Macmillan's own page (the old skin, a second page drawn from Macmillan's, was taken out in 1.3.163). Drawn in every
+/// frame of Macmillan's (its player is one) and nowhere else; on until the toolbar's Simpl Look turns it off (kept).
+@MainActor
+enum MacmillanLook {
+    static let key = "SimplMacmillanLook"
+
+    static var isOn: Bool { UserDefaults.standard.object(forKey: key) as? Bool ?? true }
+
+    /// A page of Macmillan's (its Integration Hub, its assessment player), or the mock's stand-in for one.
+    static func applies(to url: URL?) -> Bool {
+        guard let url, let host = url.host?.lowercased() else { return false }
+        if host == "macmillanlearning.com" || host.hasSuffix(".macmillanlearning.com") { return true }
+        return (host == "localhost" || host == "127.0.0.1") && url.path.hasPrefix("/mock-macmillan/")
+    }
+
+    /// The look's script, from the extension the app carries (read once).
+    private static let source: String? = {
+        guard let dir = Bundle.main.url(forResource: "extension", withExtension: nil),
+              let js = try? String(contentsOf: dir.appendingPathComponent("tools/macmillan/look.js"), encoding: .utf8) else {
+            NSLog("[Simpl] macmillan look: the app has no copy of the look's script")
+            return nil
+        }
+        return js
+    }()
+
+    /// In every frame at its start (the look there before Macmillan's page first shows), told whether it is on.
+    static func script() -> WKUserScript? {
+        guard let source else { return nil }
+        return WKUserScript(source: "window.__simplMMOn = \(isOn ? "true" : "false");\n" + source, injectionTime: .atDocumentStart, forMainFrameOnly: false)
+    }
+
+    /// Turned on or off: the page showing follows at once (the page passes it on to its frames), and the pages loaded
+    /// from now on start as it is — the script put in again with the new setting, the window's other scripts kept.
+    static func set(_ on: Bool, in view: WKWebView?) {
+        NSLog("[Simpl] macmillan look: %@", on ? "on" : "off")
+        guard let view else { return }
+        view.evaluateJavaScript("window.__simplMMSet && window.__simplMMSet(\(on ? "true" : "false"))", completionHandler: nil)
+        let scripts = view.configuration.userContentController
+        let kept = scripts.userScripts.filter { !$0.source.contains("window.__simplMMOn = ") }
+        scripts.removeAllUserScripts()
+        for s in kept { scripts.addUserScript(s) }
+        if let s = script() { scripts.addUserScript(s) }
+    }
+
+    /// What the script found on the player, said once a page (for the log, and the screenshot suite's look_check).
+    final class Listener: NSObject, WKScriptMessageHandler {
+        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            guard let o = message.body as? [String: Any] else { return }
+            let here = o["here"] as? String ?? ""
+            NSLog("[Simpl] macmillan look: %@ in %@, %@ questions, %@ marked", o["said"] as? String ?? "?", o["host"] as? String ?? "?",
+                  "\(o["rows"] ?? "?")", here.isEmpty ? "none" : here)
+        }
     }
 }
 
