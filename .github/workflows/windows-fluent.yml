@@ -600,6 +600,9 @@ jobs:
           # (0.3.94) both in their popup, as Alta's, with the app dark: the rail beside the tool's page, the page light
           Shot 'macmillan-popup-dark' '1366x778' 50 ($mock + @('--appearance', 'dark', '--open', 'macmillan:104:4006'))
           Shot 'aleks-popup-dark' '1366x778' 50 ($mock + @('--appearance', 'dark', '--open', 'aleks:104:4007'))
+          # (0.3.97) a Macmillan assignment opened by the route its own page's button takes — CHEM's week-7 homework,
+          # launched on lmslink.bfwpub.com as a school's is — in its popup, not the tool window
+          Shot 'macmillan-from-assignment' '1366x778' 45 ($mock + @('--appearance', 'light', '--open', 'worktool:106:6004'))
           # Settings, as Windows 11's own Settings app, on each of its categories
           foreach ($tab in @('general', 'notifications', 'grades', 'data', 'updates', 'about')) {
             Shot "settings-$tab" '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', $tab))
@@ -1374,6 +1377,12 @@ jobs:
             $l = Get-Content "shots/profile-$lookShot.log" -Raw -ErrorAction SilentlyContinue
             if ("$l" -notmatch 'aleks popup: rail heard, topic progress 0 of 5') { Write-Host "::error::${lookShot}: the popup's rail heard nothing of ALEKS's topic (shots/profile-$lookShot.log)"; exit 1 }
             Write-Host "${lookShot}: the popup's rail heard ALEKS's topic progress, 0 of 5"
+          }
+          # (0.3.97) an assignment launched on lmslink.bfwpub.com, as a school's Macmillan homework is, opens in the popup
+          if ($script:mine -contains 'macmillan-from-assignment') {
+            $l = Get-Content 'shots/profile-macmillan-from-assignment.log' -Raw -ErrorAction SilentlyContinue
+            if ("$l" -notmatch 'macmillan popup: opened from the assignment \(its tool on lmslink\.bfwpub\.com\)') { Write-Host "::error::macmillan-from-assignment: a Macmillan assignment launched on lmslink.bfwpub.com did not open in the popup (shots/profile-macmillan-from-assignment.log)"; exit 1 }
+            Write-Host "macmillan-from-assignment: a Macmillan assignment launched on lmslink.bfwpub.com opened in the popup"
           }
           # (0.3.95) the popup's own front end: the tool's buttons heard and drawn as the popup's own
           if ($script:mine -contains 'macmillan-look') {

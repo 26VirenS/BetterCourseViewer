@@ -514,6 +514,17 @@ public sealed partial class Engine : Observable, IShellListener
             // (0.3.93: an ALEKS assignment, the screenshot suite's aleks-look shots — 0.3.94: in its popup)
             if (parts.Length == 2) OpenLook(new LookLaunch("aleks", parts[0], parts[1], "Exponential and Logarithmic Functions"));
         }
+        else if (Launch.Take("worktool:") is { } wt)
+        {
+            // (0.3.97: --open worktool:106:6004 — an assignment's tool opened as its page's button opens it, by the same
+            // route: the mock's Macmillan homework, launched on lmslink.bfwpub.com as a school's is, in its popup)
+            var parts = wt.Split(':');
+            if (parts.Length == 2)
+            {
+                try { OpenAssignmentTool(await Call<AssignmentData>("assignment", new Dictionary<string, object> { ["course"] = parts[0], ["id"] = parts[1] }), parts[0], parts[1]); }
+                catch (Exception e) { Log.Write("worktool: the assignment could not be read: " + e.Message); }
+            }
+        }
         else if (Launch.Take("newtask") != null) NewTaskRequested?.Invoke();
         else if (Launch.Take("compose") != null) NewMessageRequested?.Invoke();
         await RefreshSnapshot();
@@ -1131,6 +1142,21 @@ public sealed partial class Engine : Observable, IShellListener
     public void OpenAlta(AltaLaunch a) => AltaRequested?.Invoke(a);
 
     public void OpenLook(LookLaunch l) => LookRequested?.Invoke(l);
+
+    /// <summary>An assignment's tool opened as its kind is: Knewton Alta's in its popup, as a quiz, with its due line;
+    /// (0.3.94) Macmillan Learning's and ALEKS's in theirs — (0.3.97) known by the engine's own word and the host the tool
+    /// launches on (lmslink.bfwpub.com, secure.aleks.com), not by the assignment's address in Canvas, which has no host;
+    /// the rest in the tool window.</summary>
+    public void OpenAssignmentTool(AssignmentData d, string course, string id)
+    {
+        if (d.Alta == true) OpenAlta(new AltaLaunch(course, id, d.Title) { Due = d.DueLine ?? "" });
+        else if (Simpl.Shell.PageLook.ForAssignment(d.Macmillan, d.Aleks, d.ToolHost) is { } look)
+        {
+            Log.Write($"{look.Name} popup: opened from the assignment (its tool on {d.ToolHost ?? "?"})");
+            OpenLook(new LookLaunch(look.Name, course, id, d.Title) { Due = d.DueLine ?? "" });
+        }
+        else OpenTool(ToolLaunch.Assignment(course, id, d.Title));
+    }
 
     public void AskSetup() => SetupRequested?.Invoke();
 

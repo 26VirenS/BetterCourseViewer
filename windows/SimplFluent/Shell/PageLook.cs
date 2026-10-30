@@ -22,10 +22,17 @@ namespace Simpl.Shell;
 /// </summary>
 internal sealed class PageLook
 {
-    public sealed record Kind(string Name, string Title, string Key, string Dir, string Flag, string Setter, string Domain, string Mock, string Arg);
+    /// <summary>A tool's look. (0.3.97) <c>Domains</c>: the sites its pages and its launch are on — Macmillan Learning's on
+    /// *.macmillanlearning.com (its Integration Hub, Achieve, LaunchPad) and Canvas's launch of it on lmslink.bfwpub.com;
+    /// ALEKS's on *.aleks.com (the launch on secure.aleks.com/lti/canvas, the pages on www-awu.aleks.com and the like).</summary>
+    public sealed record Kind(string Name, string Title, string Key, string Dir, string Flag, string Setter, string[] Domains, string Mock, string Arg)
+    {
+        /// <summary>A host of one of its sites ("www-awu.aleks.com", "lmslink.bfwpub.com").</summary>
+        public bool Owns(string host) => Domains.Any(d => host.Equals(d, StringComparison.OrdinalIgnoreCase) || host.EndsWith("." + d, StringComparison.OrdinalIgnoreCase));
+    }
 
-    public static readonly Kind Macmillan = new("macmillan", "Macmillan", "macmillanLook", "macmillan", "__simplMMOn", "__simplMMSet", "macmillanlearning.com", "/mock-macmillan/", "macmillan-look");
-    public static readonly Kind Aleks = new("aleks", "ALEKS", "aleksLook", "aleks", "__simplAKOn", "__simplAKSet", "aleks.com", "/mock-aleks/", "aleks-look");
+    public static readonly Kind Macmillan = new("macmillan", "Macmillan", "macmillanLook", "macmillan", "__simplMMOn", "__simplMMSet", new[] { "macmillanlearning.com", "bfwpub.com" }, "/mock-macmillan/", "macmillan-look");
+    public static readonly Kind Aleks = new("aleks", "ALEKS", "aleksLook", "aleks", "__simplAKOn", "__simplAKSet", new[] { "aleks.com" }, "/mock-aleks/", "aleks-look");
     private static readonly Kind[] All = { Macmillan, Aleks };
 
     /// <summary>(0.3.94) A look by its name (the popup's launch says which): Macmillan's for a name it does not know.</summary>
@@ -58,9 +65,19 @@ internal sealed class PageLook
 
     /// <summary>The look for a page of a tool's (any of its hosts), or the mock's stand-in for one; null for any other.</summary>
     public static Kind? For(Uri? u) => u == null ? null : All.FirstOrDefault(k =>
-        u.Host.Equals(k.Domain, StringComparison.OrdinalIgnoreCase)
-        || u.Host.EndsWith("." + k.Domain, StringComparison.OrdinalIgnoreCase)
+        k.Owns(u.Host)
         || (u.Host is "localhost" or "127.0.0.1" && u.AbsolutePath.StartsWith(k.Mock, StringComparison.Ordinal)));
+
+    /// <summary>(0.3.97) The look of an assignment's tool, as the engine knows it — Macmillan Learning's (its launch on
+    /// lmslink.bfwpub.com or a Macmillan site, Sapling, LaunchPad, or a title that names it) or ALEKS's (its launch on
+    /// aleks.com, or a title that names it) — else by the host its tool launches on. (0.3.94 to 0.3.96 asked the
+    /// assignment's own address in Canvas, which has no host, so such an assignment went to the tool window instead.)</summary>
+    public static Kind? ForAssignment(bool? macmillan, bool? aleks, string? host)
+    {
+        if (macmillan == true) return Macmillan;
+        if (aleks == true) return Aleks;
+        return string.IsNullOrEmpty(host) ? null : All.FirstOrDefault(k => k.Owns(host));
+    }
 
     /// <summary>Every look put into the web view's pages and frames from their start (before the tool's page first shows),
     /// and what they find heard, for the log.</summary>

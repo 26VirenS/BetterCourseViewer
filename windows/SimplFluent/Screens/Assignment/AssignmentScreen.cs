@@ -592,14 +592,7 @@ public sealed partial class AssignmentScreen : Screen
         else if (d.QuizId is { } quiz) engine.OpenQuiz(new QuizLaunch(course, quiz, d.Title));
         else if (d.QuizUrl is { } qu) engine.GoTo(qu, d.Title);
         else if (d.DiscussionUrl is { } du) engine.GoTo(du, d.Title);
-        else if (d.ToolUrl != null)
-        {
-            if (d.Alta == true) engine.OpenAlta(new AltaLaunch(course, id, d.Title) { Due = d.DueLine ?? "" }); // (Knewton Alta, as a quiz; its due line as this page has it)
-            // (0.3.94: Macmillan Learning and ALEKS in a popup of their own, as Alta — the rail beside the tool's page)
-            else if (Uri.TryCreate(d.ToolUrl, UriKind.Absolute, out var tool) && Simpl.Shell.PageLook.For(tool) is { } look)
-                engine.OpenLook(new LookLaunch(look.Name, course, id, d.Title) { Due = d.DueLine ?? "" });
-            else engine.OpenTool(ToolLaunch.Assignment(course, id, d.Title)); // (0.3.58: Macmillan Learning too, as Macmillan draws it)
-        }
+        else if (d.ToolUrl != null) engine.OpenAssignmentTool(d, course, id);
     }
 
     /// <summary>Arrived from a piece of work's own action: its Hand In done at once, or its feedback shown (a quiz's in the

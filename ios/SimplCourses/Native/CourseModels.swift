@@ -288,6 +288,8 @@ struct AssignmentData: Codable {
     var alta: Bool?
     /// (Mac 1.3.66) A Macmillan Learning assignment (Achieve, Sapling, LaunchPad).
     var macmillan: Bool?
+    /// (Mac 1.3.201) An ALEKS assignment.
+    var aleks: Bool?
     var ltiQuiz: Bool?
     var discussionUrl: String?
     var canvasUrl: String?

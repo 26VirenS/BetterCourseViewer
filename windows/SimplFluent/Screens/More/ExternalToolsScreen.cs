@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using Simpl.Engine;
 using Simpl.Kit;
+using Simpl.Shell;
 using Simpl.Support;
 using Wpf.Ui.Controls;
 using Button = System.Windows.Controls.Button;
@@ -352,14 +353,18 @@ public sealed partial class ExternalToolsScreen : Screen
 
     // ---- opening ----
 
-    /// <summary>The window a tool's assignments open in: Knewton Alta's own, else null — the tool window (0.3.58: Macmillan's
-    /// too, as Macmillan draws them).</summary>
+    /// <summary>The window a tool's assignments open in: Knewton Alta's own; (0.3.97) Macmillan Learning's and ALEKS's
+    /// own popup ("look"), the tool known by the engine's provider or the host it launches on (lmslink.bfwpub.com,
+    /// secure.aleks.com); else null — the tool window.</summary>
     private static string? WindowOf(Tool t)
     {
         var label = (t.Name + " " + t.Host).ToLowerInvariant();
         if (label.Contains("knewton")) return "alta";
+        if (LookOf(t) != null) return "look";
         return null;
     }
+
+    private static PageLook.Kind? LookOf(Tool t) => PageLook.ForAssignment(t.Id == "macmillan" ? true : null, t.Id == "aleks" ? true : null, t.Host);
 
     /// <summary>Opened in that course (a chip), or on one place it is used (<paramref name="it"/>, a row of its list) — as
     /// the search's /open opens it too (0.3.56).</summary>
@@ -372,6 +377,7 @@ public sealed partial class ExternalToolsScreen : Screen
             switch (WindowOf(t))
             {
                 case "alta": engine.OpenAlta(new AltaLaunch(course, a, t.Name)); return;
+                case "look": Log.Write($"{LookOf(t)!.Name} popup: opened from External Tools (its tool on {t.Host})"); engine.OpenLook(new LookLaunch(LookOf(t)!.Name, course, a, t.Name)); return;
             }
         }
         engine.OpenTool(new ToolLaunch(t.Name, c.Open));
@@ -386,6 +392,7 @@ public sealed partial class ExternalToolsScreen : Screen
         switch (WindowOf(t))
         {
             case "alta": engine.OpenAlta(new AltaLaunch(course, it.Id, it.Title) { Due = DueOf(it) }); return;
+            case "look": Log.Write($"{LookOf(t)!.Name} popup: opened from External Tools (its tool on {t.Host})"); engine.OpenLook(new LookLaunch(LookOf(t)!.Name, course, it.Id, it.Title) { Due = DueOf(it) }); return;
         }
         engine.OpenTool(ToolLaunch.Assignment(course, it.Id, it.Title));
     }

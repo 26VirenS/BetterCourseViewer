@@ -912,6 +912,7 @@ public sealed class AssignmentData
     public string? ToolHost { get; set; }
     public bool? Alta { get; set; }
     public bool? Macmillan { get; set; }
+    public bool? Aleks { get; set; }
     public bool? LtiQuiz { get; set; }
     public string? DiscussionUrl { get; set; }
     public string? CanvasUrl { get; set; }
