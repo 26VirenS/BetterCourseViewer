@@ -1021,6 +1021,13 @@ look_check() {
   else echo "FAIL the popup's front end drew no Macmillan buttons ($(grep -o 'macmillan popup: front.*' "$f" 2>/dev/null | head -2 | tr '\n' ';'))" >> "$out"; fi
   if grep -q 'aleks popup: front end, buttons Explanation, Recheck' "$h" 2>/dev/null; then echo "ok   the popup's front end drew ALEKS's buttons" >> "$out"
   else echo "FAIL the popup's front end drew no ALEKS buttons ($(grep -o 'aleks popup: front.*' "$h" 2>/dev/null | head -2 | tr '\n' ';'))" >> "$out"; fi
+  # (1.3.206) the question on the popup's glass as the app is: drawn for dark glass in Dark Mode, for light in light
+  local t n m
+  for t in macmillan:light-21n-macmillan-look:light aleks:light-21p-aleks-look:light macmillan:dark-21n-macmillan-popup:dark aleks:dark-21p-aleks-popup:dark; do
+    IFS=: read -r n c m <<< "$t"
+    if grep -q "$n popup: the question drawn for $m glass" "$OUT_ABS/console-$c.txt" 2>/dev/null; then echo "ok   $n's question drawn for $m glass ($c)" >> "$out"
+    else echo "FAIL $n's question not drawn for $m glass ($c: $(grep -o "$n popup: the question.*" "$OUT_ABS/console-$c.txt" 2>/dev/null | head -2 | tr '\n' ';'))" >> "$out"; fi
+  done
   # (1.3.203) a module's Macmillan item opens in the popup too, on its cover
   local s="$OUT_ABS/console-light-21s-macmillan-from-module.txt"
   if grep -q 'macmillan popup: opened from a module (its tool on lmslink.bfwpub.com)' "$s" 2>/dev/null && grep -q 'macmillan popup: cover heard' "$s" 2>/dev/null; then echo "ok   a module's Macmillan item opened in the popup, on its cover" >> "$out"

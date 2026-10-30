@@ -303,6 +303,8 @@ struct PageLook {
     /// The script's own globals: the setting put before it, and its switch.
     let flag: String
     let setter: String
+    /// (1.3.206) Its switch for the app's appearance in the popup: the question on dark glass or light.
+    let darkSetter: String
     /// (1.3.201) The sites its pages and its launch are on: Macmillan Learning's on *.macmillanlearning.com (its Integration
     /// Hub, Achieve, LaunchPad) and Canvas's launch of it on lmslink.bfwpub.com; ALEKS's on *.aleks.com (the launch on
     /// secure.aleks.com/lti/canvas, the pages on www-awu.aleks.com and the like, its files on static.aleks.com).
@@ -311,9 +313,9 @@ struct PageLook {
     let mock: String
 
     static let macmillan = PageLook(name: "macmillan", title: "Macmillan", key: "SimplMacmillanLook", file: "tools/macmillan/look.js",
-                                    flag: "__simplMMOn", setter: "__simplMMSet", domains: ["macmillanlearning.com", "bfwpub.com"], mock: "/mock-macmillan/")
+                                    flag: "__simplMMOn", setter: "__simplMMSet", darkSetter: "__simplMMDark", domains: ["macmillanlearning.com", "bfwpub.com"], mock: "/mock-macmillan/")
     static let aleks = PageLook(name: "aleks", title: "ALEKS", key: "SimplAleksLook", file: "tools/aleks/look.js",
-                                flag: "__simplAKOn", setter: "__simplAKSet", domains: ["aleks.com"], mock: "/mock-aleks/")
+                                flag: "__simplAKOn", setter: "__simplAKSet", darkSetter: "__simplAKDark", domains: ["aleks.com"], mock: "/mock-aleks/")
     static let all = [macmillan, aleks]
 
     /// (read with bool(forKey:), as @AppStorage reads it: a launch's -SimplMacmillanLook NO comes as the string "NO", which
@@ -371,15 +373,18 @@ struct PageLook {
     /// In every frame at its start (the look there before the tool's page first shows), told whether it is on —
     /// (1.3.199) and, in the Macmillan and ALEKS popup, that the popup's rail is beside the page (`rail`); (1.3.200) and
     /// that the popup's own front end is over it (`front`: the page clear over the popup's Liquid Glass, its buttons the
-    /// popup's). All on its first line, the line `set` knows the look's own script by.
-    func script(rail: Bool = false, front: Bool = false) -> WKUserScript? {
+    /// popup's); (1.3.206) and, in Dark Mode, that the question is on dark glass (`dark`: the page drawn light on dark).
+    /// All on its first line, the line `set` knows the look's own script by.
+    func script(rail: Bool = false, front: Bool = false, dark: Bool = false) -> WKUserScript? {
         guard let source else { return nil }
         let head = "window.\(flag) = \(isOn ? "true" : "false");" + (rail || front ? " window.__simplLookRail = true;" : "")
-            + (front ? " window.__simplLookFront = 'glass';" : "")
+            + (front ? " window.__simplLookFront = 'glass';" : "") + (front && dark ? " window.__simplLookDark = true;" : "")
         return WKUserScript(source: head + "\n" + source, injectionTime: .atDocumentStart, forMainFrameOnly: false)
     }
 
-    static func scripts(rail: Bool = false, front: Bool = false) -> [WKUserScript] { all.compactMap { $0.script(rail: rail, front: front) } }
+    static func scripts(rail: Bool = false, front: Bool = false, dark: Bool = false) -> [WKUserScript] {
+        all.compactMap { $0.script(rail: rail, front: front, dark: dark) }
+    }
 
     /// Turned on or off: the page showing follows at once (the page passes it on to its frames), and the pages loaded
     /// from now on start as it is — the script put in again with the new setting, the window's other scripts kept.
@@ -387,13 +392,31 @@ struct PageLook {
         NSLog("[Simpl] %@ look: %@", name, on ? "on" : "off")
         guard let view else { return }
         view.evaluateJavaScript("window.\(setter) && window.\(setter)(\(on ? "true" : "false"))", completionHandler: nil)
+        reput(in: view)
+    }
+
+    /// (1.3.206) The popup turned light or dark with the app: the question showing follows at once (the page passes it on
+    /// to its frames), and the pages loaded from now on start so.
+    static func setDark(_ dark: Bool, in view: WKWebView?) {
+        NSLog("[Simpl] look: the question on %@ glass", dark ? "dark" : "light")
+        guard let view else { return }
+        let put = view.configuration.userContentController.userScripts
+        for look in all where put.contains(where: { $0.source.hasPrefix("window.\(look.flag) = ") }) {
+            view.evaluateJavaScript("window.\(look.darkSetter) && window.\(look.darkSetter)(\(dark ? "true" : "false"))", completionHandler: nil)
+            look.reput(in: view, dark: dark)
+        }
+    }
+
+    /// The look's own script put in again as it now is (`dark` as given, else as it was), the window's other scripts kept.
+    private func reput(in view: WKWebView, dark: Bool? = nil) {
         let scripts = view.configuration.userContentController
         let mine = { (s: WKUserScript) in s.source.hasPrefix("window.\(flag) = ") }
         let head = scripts.userScripts.first(where: mine).map { String($0.source.prefix(while: { $0 != "\n" })) } ?? ""
         let kept = scripts.userScripts.filter { !mine($0) }
         scripts.removeAllUserScripts()
         for s in kept { scripts.addUserScript(s) }
-        if let s = script(rail: head.contains("__simplLookRail"), front: head.contains("__simplLookFront")) { scripts.addUserScript(s) }
+        if let s = script(rail: head.contains("__simplLookRail"), front: head.contains("__simplLookFront"),
+                          dark: dark ?? head.contains("__simplLookDark")) { scripts.addUserScript(s) }
     }
 
     /// What a look found on its page, said once a page (for the log, and the screenshot suite's look_check): Macmillan's
@@ -465,7 +488,7 @@ struct ToolWebView: NSViewRepresentable {
     /// for a tool Canvas opens that way — is sent on in this window, so the tool opens without the extra click.
     var sendToolForm: URL? = nil
     /// (1.3.200) No ground of its own: what is behind the web view (the Macmillan and ALEKS popup's Liquid Glass) shows
-    /// wherever the page draws nothing.
+    /// wherever the page draws nothing. (1.3.206) Its page never drawn dark by Dark Page: the look does that itself.
     var clear = false
 
     /// The form sent, in the page: "sent", "framed" (the tool framed in the page, left as it is) or "none" (no form yet).
@@ -518,11 +541,12 @@ struct ToolWebView: NSViewRepresentable {
         config.websiteDataStore = .default()
         config.mediaTypesRequiringUserActionForPlayback = []
         config.applicationNameForUserAgent = "Version/18.4 Safari/605.1.15"
-        config.userContentController.addUserScript(ToolDarkPage.script(fallback: !externalTool))
+        // (1.3.206: not under a clear page — the Macmillan and ALEKS popup's, whose look draws it dark in Dark Mode itself)
+        if !clear { config.userContentController.addUserScript(ToolDarkPage.script(fallback: !externalTool)) }
         for script in scripts { config.userContentController.addUserScript(script) }
         for (name, handler) in messages { config.userContentController.add(handler, name: name) }
         let v = WKWebView(frame: .zero, configuration: config)
-        if externalTool { ToolDarkPage.look(v, dark: ToolDarkPage.isOn(fallback: false)) }
+        if externalTool { ToolDarkPage.look(v, dark: !clear && ToolDarkPage.isOn(fallback: false)) }
         if clear {
             v.setValue(false, forKey: "drawsBackground")
             v.underPageBackgroundColor = .clear

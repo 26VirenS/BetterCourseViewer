@@ -75,6 +75,8 @@ struct LookQuizScreen: View {
     @State private var loadedOnce = false
     @AppStorage(PageLook.macmillan.key) private var macmillanLook = true
     @AppStorage(PageLook.aleks.key) private var aleksLook = true
+    /// (1.3.206) The app's appearance: the question's glass, and the page over it, follow it.
+    @Environment(\.colorScheme) private var scheme
 
     init(launch: LookLaunch) {
         self.launch = launch
@@ -113,6 +115,7 @@ struct LookQuizScreen: View {
         }
         .onChange(of: macmillanLook) { _, on in if look.name == PageLook.macmillan.name { look.set(on, in: browser.webView) } }
         .onChange(of: aleksLook) { _, on in if look.name == PageLook.aleks.name { look.set(on, in: browser.webView) } }
+        .onChange(of: scheme) { _, s in PageLook.setDark(s == .dark, in: browser.webView) }
         .onDisappear { browser.webView?.stopLoading() }
     }
 
@@ -185,11 +188,12 @@ struct LookQuizScreen: View {
                     .transition(.opacity.combined(with: .offset(y: -6)))
             }
             ZStack {
-                // (the pane of Liquid Glass the question is laid on — light, as the tool's page is drawn for light)
+                // (the pane of Liquid Glass the question is laid on — (1.3.206) as the app is, light or dark: in Dark Mode
+                // the look draws the page light on dark over it, PageLook's `dark`; 1.3.200 to 1.3.205 kept it light, a
+                // white card in a dark popup)
                 if front {
                     Rectangle().fill(Color.clear)
-                        .glassCard(radius: 26, tint: Color.white.opacity(0.5))
-                        .environment(\.colorScheme, .light)
+                        .glassCard(radius: 26, tint: scheme == .dark ? nil : Color.white.opacity(0.5))
                         .transition(.opacity)
                 } else {
                     Color.white
@@ -197,7 +201,7 @@ struct LookQuizScreen: View {
                 GeometryReader { g in
                     ZStack {
                         if let url {
-                            ToolWebView(url: url, browser: browser, scripts: PageLook.scripts(front: true),
+                            ToolWebView(url: url, browser: browser, scripts: PageLook.scripts(front: true, dark: scheme == .dark),
                                         messages: ["simplLook": rail.relay], externalTool: true, sendToolForm: sendForm, clear: true)
                         } else if let error {
                             ContentUnavailableView {
@@ -682,6 +686,7 @@ final class LookRail: ObservableObject {
     private var logged = false
     private var frontLogged = false
     private var coverLogged = false
+    private var darkSaid: Bool?
 
     /// On a question (Macmillan's) or a topic (ALEKS's): the popup's own heading over it.
     var onItem: Bool { lookName == PageLook.aleks.name ? !topic.isEmpty : total > 0 && here > 0 }
@@ -746,6 +751,12 @@ final class LookRail: ObservableObject {
         if !frontLogged, hasButtons {
             frontLogged = true
             NSLog("[Simpl] %@ popup: front end, buttons %@", kind, (tools + actions).map(\.label).joined(separator: ", "))
+        }
+        // (1.3.206) the question drawn for the popup's dark glass or its light, as the page tells it (the log, and the
+        // screenshot suite's look_check)
+        if let d = f?["dark"] as? Bool, d != darkSaid {
+            darkSaid = d
+            NSLog("[Simpl] %@ popup: the question drawn for %@ glass", kind, d ? "dark" : "light")
         }
         if kind == PageLook.macmillan.name {
             questions = (o["rows"] as? [[String: Any]] ?? []).compactMap { (r: [String: Any]) -> Question? in
