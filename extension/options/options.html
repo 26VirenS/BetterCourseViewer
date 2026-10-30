@@ -214,6 +214,14 @@
             <div class="row row--top"><span class="row__body"><span class="row__s" id="devSimBrings"></span></span><button type="button" class="btn btn--primary" id="devSimRun">Simulate</button></div>
             <p class="note note--msg" id="devSimMsg" hidden></p>
           </div>
+          <!-- (2.99.130) the intro tour, simulated: from any step, practising (what it changes put back), its strip of steps on the page -->
+          <div class="card card--pad">
+            <div class="row"><span class="row__body"><span class="row__t">Simulate the tour</span><span class="row__s">The intro tour over a Canvas page, as a new student sees it. A strip at the foot of the page steps back and on (or [ and ]); Esc ends it. Nothing is marked seen.</span></span></div>
+            <div class="row row--top"><span class="row__body"><span class="row__t">Start at</span></span><select class="input" id="devTourFrom" aria-label="The step to start at"></select></div>
+            <div class="row row--top"><span class="row__body"><span class="row__t">Practice</span><span class="row__s">What the tour changes — a pin, a plan, Silent mode — is put back when it ends.</span></span><button class="switch is-on" id="devTourPractice" type="button" role="switch" aria-checked="true" aria-label="Practice"><span class="switch__knob"></span></button></div>
+            <div class="row row--top"><span class="row__body"><span class="row__t">Step controls</span><span class="row__s">The strip at the foot of the page.</span></span><button class="switch is-on" id="devTourBar" type="button" role="switch" aria-checked="true" aria-label="Step controls"><span class="switch__knob"></span></button></div>
+            <div class="row row--top"><span class="row__body"><span class="row__s" id="devTourSub"></span></span><button type="button" class="btn btn--primary" id="devTourRun">Simulate</button></div>
+          </div>
           <div class="card card--pad">
             <div class="row"><span class="row__body"><span class="row__t">Run on a Canvas page</span><span class="row__s">Each opens a Canvas tab with it running over the page. Nothing is reset.</span></span></div>
             <div class="chips" id="devRuns">

@@ -391,10 +391,62 @@
     const facts = (ev) => [ev.points !== null && ev.points !== undefined ? `${store.fmtPts(ev.points)} pts` : '', ev.location || ''].filter(Boolean);
     const kindCls = (ev) => (ev.kind === 'plan' ? 'bcv-ev--plan' : ev.kind === 'external' ? 'bcv-ev--ext' : '');
     function chip(ev, small = true) {
-      return h('a', { class: `bcv-ev ${ev.done ? 'is-done' : ''} ${ev.missing ? 'is-missing' : ''} ${kindCls(ev)}`, href: ev.url, dataset: { ev: ev.id, ...(ev.planId ? { plan: ev.planId } : {}) }, style: { background: ev.tint, color: ev.color, '--bcv-ev-bar': ev.color }, title: [ev.kind === 'plan' ? 'Planned' : '', ev.title, ev.contextName, ...facts(ev), ev.missing ? 'Missing' : ''].filter(Boolean).join(' · '), onclick: onEvent(ev) }, [
+      const el = h('a', { class: `bcv-ev ${ev.done ? 'is-done' : ''} ${ev.missing ? 'is-missing' : ''} ${kindCls(ev)}`, href: ev.url, dataset: { ev: ev.id, ...(ev.planId ? { plan: ev.planId } : {}) }, style: { background: ev.tint, color: ev.color, '--bcv-ev-bar': ev.color }, title: [ev.kind === 'plan' ? 'Planned' : '', ev.title, ev.contextName, ...facts(ev), ev.missing ? 'Missing' : ''].filter(Boolean).join(' · '), onclick: onEvent(ev) }, [
         U.svg(ev.icon, { size: 10, stroke: ev.color, width: 2.1, style: { flex: 'none' } }),
         h('span', { class: `bcv-ev__label ${ev.done ? 'bcv-strike' : ''}`, style: { color: ev.color }, text: ev.title }),
       ]);
+      if (ev.planId) { // (2.99.130) a plan's chip, dragged back onto To Do: no longer planned
+        el.addEventListener('dragstart', (e) => e.preventDefault()); // (a link would otherwise be dragged off as a link)
+        el.addEventListener('pointerdown', (e) => dragChip(e, el, ev));
+      }
+      return el;
+    }
+
+    /** (2.99.130, as the week's blocks since 2.99.114) A plan's chip on the month or the week's all-day row, dragged
+     *  out: a ghost of it follows the pointer from where it was taken; over To Do beside the calendar To Do is ringed,
+     *  and let go there the plan (its group with it) is taken off. Let go anywhere else, it goes back. A press without
+     *  a drag is the chip's own: its sheet opens. */
+    function dragChip(e, el, ev) {
+      if (e.button !== 0 || !e.isPrimary || !ev.planId) return;
+      const x0 = e.clientX, y0 = e.clientY, pid = e.pointerId;
+      let ghost = null;
+      let onTodo = false;
+      const move = (m) => {
+        if (m.pointerId !== pid) return;
+        if (!ghost) {
+          if (Math.hypot(m.clientX - x0, m.clientY - y0) < 5) return;
+          const r = el.getBoundingClientRect();
+          ghost = el.cloneNode(true);
+          ghost.classList.add('is-ghost');
+          Object.assign(ghost.style, { width: `${r.width}px`, left: `${r.left}px`, top: `${r.top}px` });
+          document.body.append(ghost);
+          el.classList.add('is-lifted');
+          U.haptic?.('select');
+        }
+        m.preventDefault();
+        ghost.style.transform = `translate(${m.clientX - x0}px, ${m.clientY - y0}px) scale(1.04)`;
+        const over = overTodo(m.clientX, m.clientY);
+        if (over !== onTodo) { onTodo = over; todoCol.classList.toggle('is-unplan-drop', over); ghost.classList.toggle('is-over', over); if (over) U.haptic?.('select'); }
+      };
+      const up = (u) => {
+        if (u.pointerId !== pid) return;
+        removeEventListener('pointermove', move, true);
+        removeEventListener('pointerup', up, true);
+        removeEventListener('pointercancel', up, true);
+        todoCol.classList.remove('is-unplan-drop');
+        if (!ghost) return;
+        el.addEventListener('click', (c) => { c.preventDefault(); c.stopPropagation(); }, { capture: true, once: true }); // (the click a drag ends with opens nothing)
+        ghost.remove();
+        if (onTodo && u.type === 'pointerup') {
+          el.classList.add('is-dropped');
+          BCV.plan.clear(ev.planId, { group: true }).then(() => { U.haptic?.('success'); U.toast(ev.members ? 'Unplanned the group.' : 'Unplanned.'); }).catch((err) => { el.classList.remove('is-lifted', 'is-dropped'); U.toast(`Could not unplan it: ${err.message}`, { error: true }); });
+          return;
+        }
+        el.classList.remove('is-lifted');
+      };
+      addEventListener('pointermove', move, { capture: true, passive: false });
+      addEventListener('pointerup', up, true);
+      addEventListener('pointercancel', up, true);
     }
 
     function monthGrid() {

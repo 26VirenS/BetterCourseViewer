@@ -1569,6 +1569,7 @@
     // guided tour runs over the reloaded page: see boot())
     if ((r.params.get('bcv') === 'setup' || r.params.get('bcv') === 'personalize') && BCV.setup && !BCV.setup.active()) BCV.setup.open(BCV.app);
     else if (r.params.get('bcv') === 'welcome' && BCV.welcome && !BCV.welcome.active()) welcomeHere();
+    else if (r.params.get('bcv') === 'tour' && BCV.welcome && !BCV.welcome.active()) tourHere(r.params);
     else if (r.params.get('bcv') === 'whatsnew' && BCV.whatsnew) whatsnewHere();
     else if (r.params.get('bcv') === 'simquiz') simQuizHere();
     else if (r.params.get('bcv') === 'rubric') rubricHere();
@@ -1660,6 +1661,20 @@
     BCV.welcome.cover();
     await render();
     BCV.welcome.open(BCV.app).catch(() => {});
+  }
+
+  /** ?bcv=tour (Settings → Developer → Simulate → The tour): the parameters dropped, the page drawn, and the setup's
+   *  tour run over it as the simulator's — from a step (&from=), practising (&practice=0: what it changes is kept), with
+   *  its strip of steps (&bar=0: without). Nothing is marked seen. */
+  async function tourHere(params) {
+    const opts = { from: params.get('from') || '', practice: params.get('practice') !== '0', bar: params.get('bar') !== '0' };
+    const url = BCV.lms.routeUrl();
+    for (const k of ['bcv', 'from', 'practice', 'bar']) url.searchParams.delete(k);
+    history.replaceState(navState(false), '', BCV.lms.pageFor(url));
+    state.route = parseRoute();
+    BCV.welcome.cover();
+    await render();
+    BCV.welcome.simulate(BCV.app, opts).catch(() => {});
   }
 
   function titleFor(r) {
@@ -2419,10 +2434,9 @@
     mountLookToggle();
     mountReportButton(); // (the purple button, left of the switch: Report a bug)
     if (state.lookOn) { BCV.tools?.mountTray?.(); BCV.tools?.focusLoad?.().catch(() => {}); } // the tray beside the switch (live activities, pinned tools); the focus timer's clock, so a session going is known
-    // (an update's own run: the switch's steps, the purple button and the Tools row — everyone sees those once;
-    // an update from before the purple button: its step alone, once; after
-    // Personalize from the theme invitation: the Appearance button alone, where the themes live now)
-    const tour = () => BCV.welcome.open(BCV.app, welcome === 'look' ? ['look', 'report', 'tools'] : welcome === 'report' ? ['report'] : welcome === 'appearance' ? ['appearance'] : welcome === 'search' ? ['search'] : null).catch(() => {});
+    // (an update's own run: the switch's step and Tools with a pin — everyone from before the slider sees those once;
+    // after Personalize from the theme invitation: the account's ⋯ alone, where the themes live now)
+    const tour = () => BCV.welcome.open(BCV.app, welcome === 'look' ? ['look', 'tools'] : welcome === 'appearance' ? ['appearance'] : welcome === 'search' ? ['search'] : null).catch(() => {});
     if (firstLook) await BCV.appearance.open(BCV.app, { setup: true, onDone: () => { if (welcome) tour(); } });
     else if (welcome) tour();
     // The first Canvas page after an update shows what changed: once per version, never over the

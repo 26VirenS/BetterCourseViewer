@@ -28,6 +28,10 @@
     lock: 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.130', date: '2026-10-30', notes: [
+      { kind: 'new', title: 'A Better Tour', body: 'A short, hands-on tour of what Simpl can do.', icon: P.sparkle },
+      { kind: 'improved', title: 'Unplan in the Month', body: 'Drag a plan in the month back onto To Do to unplan it.', icon: P.cal },
+    ] },
     { version: '2.99.129', date: '2026-10-29', notes: [
       { kind: 'improved', title: "This Week's Betas", body: 'Everything from the betas since 2.99.104, for everyone.', icon: P.sparkle },
     ] },

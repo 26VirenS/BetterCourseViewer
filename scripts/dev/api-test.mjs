@@ -318,7 +318,7 @@ console.log('the veil behind a box');
   const clear = {
     scrim: (css.match(/--bcv-scrim: ([^;]+);/g) || []).every((d) => /transparent/.test(d)) && /--bcv-blur-scrim: none;/.test(css),
     boxBlur: !/\.bcv-card-blur\b/.test(css) && /\.bcv-card-dim \{ display: none; \}/.test(css),
-    tour: /\.bcv-tour__veil, \.bcv-tour__blur \{ display: none; \}/.test(css),
+    tour: !/\.bcv-tour__(veil|blur)\b/.test(css) && !/backdrop-filter|background/.test(ruleOf(css, '#bcv-tour')) && !/backdrop-filter/.test(ruleOf(css, '.bcv-tour__block')), // (2.99.130: no dim or blur layer at all — the ring alone, the page held under clear blocks)
     fbs: /background: transparent;/.test(ruleOf(css, '.bcv-fbs-ov')) && !/backdrop-filter/.test(ruleOf(css, '.bcv-fbs-ov')),
     quiz: /background: transparent;/.test(ruleOf(css, '.bcv-qz-veil')),
     appearance: /background: transparent;/.test(ruleOf(css, '.bcv-ap-veil')) && !/\.bcv-ap-veil \{ background: rgba/.test(css),

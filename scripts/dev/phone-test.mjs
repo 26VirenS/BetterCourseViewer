@@ -856,27 +856,33 @@ try {
   await page.waitForSelector('#bcv-setup #pzOpen', { timeout: 10000 });
   check((await page.$eval('#bcv-setup .pz__doneh1', (e) => e.textContent)) === 'Saved' && (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.theme?.name)) === 'Regular', 'Saved, with Regular kept');
   await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click('#bcv-setup #pzOpen')]); // Open Canvas: the page reloads
-  // …and comes back black, with the welcome on it. A phone's header has no look switch to point at,
-  // and Away Refresh is off unless turned on (2.98.13), so the welcome here is the Dashboard pointer alone
-  await tourStep('peek', 20000);
+  // …and comes back with the tour on it (2.99.130). A phone gets what it has — no switch, no sidebar: the hello, Today's
+  // search box, the counters and their sheet, and the end
+  await tourStep('hello', 20000);
+  const ph0 = await tourAt();
+  check((await page.$('#bcv-setup')) === null && page.url() === `${BASE}/` && /^(reload|navigate)$/.test(await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) && ph0.steps === 'hello,search,week,peek-close,end' && ph0.bg === 'rgba(0, 0, 0, 0)' && ph0.title === 'Welcome to Simpl' && ph0.next === 'Start' && ph0.fits && !ph0.ring,
+    `the reload comes back with the tour over Today — what a phone has, the hello card on the screen: ${JSON.stringify(ph0)}`);
+  await page.click('#bcv-tour .bcv-tour__next');
+  // (2.98.37) Today has the search box
+  await tourStep('search');
+  const searchStage = await tourAt();
+  check(searchStage.title === 'Search everything' && searchStage.doing === 'Type anything' && searchStage.fits && !!searchStage.ring, `Start, then Today's search box, lit: ${JSON.stringify(searchStage)}`);
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: join(out, 'phone-12c-welcome-search.png') });
+  await page.click('#bcv-omni');
+  await page.keyboard.type('lab', { delay: 30 });
+  await tourStep('week');
   const ph1 = await tourAt();
-  check((await page.$('#bcv-setup')) === null && page.url() === `${BASE}/` && /^(reload|navigate)$/.test(await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) && ph1.steps === 'peek,peek-close,search,end' && ph1.bg === 'rgba(0, 0, 0, 0)' && ph1.title === 'The cards open' && ph1.doing === 'Tap Next 7 days' && ph1.fits && !!ph1.ring, `the reload comes back with the tour over Today — what a phone has: its This week counter lit, a tap asked for, the card on the screen: ${JSON.stringify(ph1)}`);
+  check(ph1.title === 'Every card opens' && ph1.doing === 'Tap Next 7 days' && ph1.fits && !!ph1.ring && (await page.$eval('#bcv-omni', (e) => e.value)) === '', `typing done, the box emptied; then This week's counter, a tap asked for: ${JSON.stringify(ph1)}`);
   await page.waitForTimeout(300);
   await page.screenshot({ path: join(out, 'phone-12b-welcome-peek.png') });
   await page.click('.bcv-ph-stats .bcv-ph-stat:nth-child(2)');
   await tourStep('peek-close');
   const ph2 = await tourAt();
-  check(!!(await page.$('.bcv-sheet-ov .bcv-ph-sheet')) && ph2.title === 'Close it' && ph2.fits, `the tap opens its sheet; then closing it is asked for: ${JSON.stringify(ph2)}`);
+  check(!!(await page.$('.bcv-sheet-ov .bcv-ph-sheet')) && ph2.title === 'Close it' && ph2.doing === 'Swipe it down' && ph2.fits, `the tap opens its sheet; then closing it is asked for: ${JSON.stringify(ph2)}`);
   await page.mouse.click(20, 40); // (above the sheet: the scrim)
-  // (2.98.37) Today has the search box, so the tour points it out last, as the Dashboard's does
-  await tourStep('search');
-  const searchStage = await tourAt();
-  check(!(await page.$('.bcv-sheet-ov')) && searchStage.title === 'Search everything' && searchStage.doing === 'Type anything' && searchStage.fits && !!searchStage.ring, `the sheet closed with a tap above it; then Today's search box, lit: ${JSON.stringify(searchStage)}`);
-  await page.waitForTimeout(300);
-  await page.screenshot({ path: join(out, 'phone-12c-welcome-search.png') });
-  await page.click('#bcv-omni');
-  await page.keyboard.type('lab', { delay: 30 });
   await tourStep('end');
+  check(!(await page.$('.bcv-sheet-ov')), 'the sheet closed with a tap above it; then the end');
   await page.click('#bcv-tour .bcv-tour__next');
   await tourGone();
   await page.fill('#bcv-omni', '').catch(() => {});

@@ -958,6 +958,25 @@
   });
   $('devRuns').addEventListener('click', (e) => { const b = e.target.closest('[data-run]'); if (b) openOnCanvas(b.dataset.run); });
 
+  // (2.99.130) Simulate the tour: the setup's tour over a Canvas page (?bcv=tour, content/app/welcome.js simulate), from
+  // the step picked, practising or not, with its strip of steps or not. The steps as the tour has them (its SETUP run,
+  // on a desktop: a phone's has fewer).
+  const TOUR_STEPS = [
+    ['hello', 'Welcome'], ['search', 'Search everything'], ['week', 'Every card opens'], ['peek', 'Peek'],
+    ['silent', 'Silent mode'], ['silent-exit', 'Back any time'], ['look', 'Simpl on or off'],
+    ['calendar', 'Plan your week'], ['plan', 'Drag to plan'], ['unplan', 'Changed your mind?'],
+    ['grades', 'Grades'], ['grade-ring', 'What makes a grade'], ['tools', 'Tools'], ['pin', 'Pin one'], ['end', 'You’re all set'],
+  ];
+  $('devTourFrom').replaceChildren(...TOUR_STEPS.map(([id, name], i) => h('option', { value: id, text: `${i + 1}. ${name}` })));
+  const devTourSub = () => { $('devTourSub').textContent = `${TOUR_STEPS.length} steps. Opens in a new Canvas tab.`; };
+  devTourSub();
+  onSwitch($('devTourPractice'), () => {});
+  onSwitch($('devTourBar'), () => {});
+  $('devTourRun').addEventListener('click', () => {
+    const on = (id) => ($(id).classList.contains('is-on') ? '1' : '0');
+    openOnCanvas(`tour&from=${encodeURIComponent($('devTourFrom').value)}&practice=${on('devTourPractice')}&bar=${on('devTourBar')}`);
+  });
+
   // Quiz: the Import answers button on a quiz being taken (content/app/screens/quiz.js reads it as an attempt opens).
   // A setting (developer.quizImport), so the Mac app's window turns it on the way it turns on any other.
   function devQuizPaint() {
