@@ -142,14 +142,18 @@ window's side of it, `Shell/UpdateWatch.cs`:
   or popup floating over it (Hand In, a message, a task, a tool opened whole… — all but What's New, History and Help,
   which are only there to be read), a dialog in Settings, a window of a page of the school's or a tool's (`WebWindow`), Alta's graph; Windows' own Open and Save
   dialogs; the tour; the sign-in while it is on screen; Simpl opening; and, for a moment, a menu or a flyout, the quick
-  look, a file on its way. Besides, with Simpl in front it waits for half a minute without a key or a click (the
+  look, a file on its way; and (0.3.100) the window closed to the notification area — no update, a Critical one neither,
+  goes in from there; it waits until the window is opened again, and that opening counts as a click, so the half minute
+  below starts from it. Besides, with Simpl in front it waits for half a minute without a key or a click (the
   student may be reading); behind other windows, five seconds. Going in, the notice at the top of the window says so
   for a moment (a key or a click then, or something opened, and it waits again), where the window is is noted —
   its place and what is opened on it, and whether it was in front, behind (or minimized) or in the notification area —
   what Simpl keeps is written out, and the installer runs with `/LAUNCH` as Simpl quits. The new version opens where
-  the student was: in front as it was; minimized, taking nothing from the app in front, when it was behind; in the
-  notification area, out of sight, its engine running as ever, when it was there (`updates:resume`, used once, within
-  half an hour).
+  the student was, and as the window was left — never pushed over other windows (0.3.79 to 0.3.99 raised it in front
+  however it was left, so an update that went in from the notification area opened Simpl by itself over what the
+  student was doing): in front as it was; minimized, taking nothing from the app in front, when it was behind; in the
+  notification area, out of sight, when the installer's own reopening after a failed install comes back there
+  (`updates:resume`, used once, within half an hour).
 - **What the student sees**: Settings ▸ Updates says where it stands — found ("Version v133 (beta) is available" for a
   beta), downloading, "Version v132 is ready —
   Simpl updates when you close the quiz, and opens again where you were", installing — with Restart to update to put it
@@ -194,9 +198,10 @@ window's side of it, `Shell/UpdateWatch.cs`:
   v132` in `simpl.log`; `--update-test-staying` plays an update through as a copy put back from the version it finds
   (`settings-updates-staying`).
 
-`simpl.log`'s `update:` lines say each step: found, downloaded and checked (or why not), `held (quiz)`, `no longer held
-(by quiz)`, `where it was: grades, the window hidden`, `installing …, and quitting`; and, opened again, `back after
-updating to v132`, `opened again at grades`.
+`simpl.log`'s `update:` lines say each step: found, downloaded and checked (or why not), `held (Simpl closed to the
+notification area)`, `held (quiz)`, `no longer held (by quiz)`, `where it was: grades, the window front`, `installing …,
+and quitting`; and, opened again, `back after updating to v132`, `opened again in front, as it was left`, `opened again
+at grades`.
 
 **Trying it** (a development run only): `--update-test <file>` plays an update through against a local file — the
 next run number is found at once, its installer that file (its SHA-256 the file's; `--update-test-sha <hex>` to try a
@@ -205,14 +210,15 @@ installer, so give it a Simpl-Setup.exe. `--update-test-installed` acts as a cop
 `--update-test-critical` as a Critical Update, `--update-test-hold quiz` holds as an open quiz would (for Settings'
 pictures), `--update-test-staying` as a copy staying on an earlier version put back from the one it finds,
 `--update-test-earlier yes` lists this version and the one before it under Earlier versions (their dates,
-sizes and Install…), `--update-test-close <s>` closes what is open over the window after that long, and `--update-test-tray`
-closes the window to the notification area a moment after it opens. With `--shot` nothing is ever run: the notice of
+sizes and Install…), `--update-test-close <s>` closes what is open over the window after that long, `--update-test-tray`
+closes the window to the notification area a moment after it opens, and `--update-test-reopen <s>` opens it again from
+there after that long. With `--shot` nothing is ever run: the notice of
 an update going in stays for the picture. CI pictures Settings ▸ Updates (`settings-updates-waiting`, `-dark`, `-zip`,
 `-staying`) and the notice (`update-waiting-quiz`, `update-critical-quiz`, `update-restarting`) this way, with the build's own
 Simpl.exe as the file, and plays one through for real in the installer job (2b): the installed Simpl with a quiz open
-and its window in the notification area, the installer just made as the next version — every step logged in its
-order, the installer run and Simpl opened again, then that profile opened again: at the Grades, out of sight, its
-engine running.
+and its window in the notification area, the installer just made as the next version — held all the while the window
+is there, then opened again and held by the quiz until it closes: every step logged in its order, the installer run
+and Simpl opened again, then that profile opened again: at the Grades, as its window was left, its engine running.
 
 **Simulating one from the developer tools** (0.3.83, any copy with them on): Developer ▸ Updates ▸ Simulate an
 update plays an update through from any earlier version on What's New's list to this one, with nothing downloaded or

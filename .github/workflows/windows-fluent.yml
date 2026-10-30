@@ -2184,10 +2184,11 @@ jobs:
 
           # 2b. an update that comes by itself, as an installed Simpl meets one (--update-test, Support/Updates.cs: the
           #     installer just made, played as the next version): found and downloaded at once, and checked; held while
-          #     Simpl opens and while a quiz is open -- its window closed to the notification area meanwhile, as its close
-          #     button does; the quiz closed, it notes where it was, quits, and the installer puts the version in place and
-          #     opens Simpl again. Opened again on that profile, Simpl comes back where it was, the Grades -- (0.3.79) in
-          #     front, its window shown, though it was left in the notification area: an update is seen to have gone in
+          #     Simpl opens, and -- (0.3.100) its window closed to the notification area, as its close button does --
+          #     held all the while it is there, never put in from there; the window opened again from its icon, held
+          #     while the quiz is open; the quiz closed, it notes where it was, quits, and the installer puts the version
+          #     in place and opens Simpl again. Opened again on that profile, Simpl comes back where it was, the Grades,
+          #     as its window was left (in front, or minimized when it was behind) -- never pushed over other windows
           $prof3 = Join-Path $env:RUNNER_TEMP 'profile-update'
           $simplLogs['profile-update'] = $prof3
           $ulog = Join-Path $prof3 'simpl.log'
@@ -2195,19 +2196,23 @@ jobs:
           function Says($file, $from, $pattern) { (Test-Path $file) -and (@(Get-Content $file | Select-Object -Skip $from | Select-String -Pattern $pattern).Count -gt 0) }
           $nextSetup = Join-Path $env:RUNNER_TEMP 'Simpl-Setup-next.exe'
           Copy-Item dist\Simpl-Setup.exe $nextSetup
-          $updating = Start-Process -FilePath $exe -ArgumentList @('--profile', $prof3, '--base-url', 'http://localhost:8800', '--demo', '--appearance', 'light', '--place', 'grades', '--open', 'quiz:101:9011', '--update-test', $nextSetup, '--update-test-tray', '--update-test-close', '40') -PassThru
+          $updating = Start-Process -FilePath $exe -ArgumentList @('--profile', $prof3, '--base-url', 'http://localhost:8800', '--demo', '--appearance', 'light', '--place', 'grades', '--open', 'quiz:101:9011', '--update-test', $nextSetup, '--update-test-tray', '--update-test-reopen', '30', '--update-test-close', '40') -PassThru
           $null = $updating.Handle
           if (-not $updating.WaitForExit(150000)) { Stop-Process -Id $updating.Id -Force -ErrorAction SilentlyContinue; Fail "Simpl, with an update waiting, had not put it in after two and a half minutes" }
           if (Test-Path $ulog) { Write-Host "--- the updating Simpl's log, its updates"; Select-String -Path $ulog -Pattern 'update' | ForEach-Object { $_.Line } }
-          # (each step, in its order: found; downloaded and checked; held by the quiz; the quiz closed and the hold let go;
-          #  where it was kept; the installer run)
+          # (each step, in its order: found; downloaded and checked; held while closed to the notification area; the window
+          #  opened again; held by the quiz; the quiz closed and the hold let go; where it was kept; the installer run)
           $at = 0
-          foreach ($s in @('update: v\d+ found', "update: v\d+'s installer downloaded and checked", 'update: held \(quiz\)', 'update test: closing what is open over the window',
-                           'update: no longer held \(by quiz\)', 'update: where it was: grades, the window hidden', 'update: installing .* and quitting')) {
-            $hit = if (Test-Path $ulog) { Select-String -Path $ulog -Pattern $s | Select-Object -First 1 } else { $null }
-            if (-not $hit) { Fail "the update played through never logged '$s'" }
-            if ($hit.LineNumber -lt $at) { Fail "the update played through logged '$s' out of its order" }
-            $at = $hit.LineNumber
+          $ulines = if (Test-Path $ulog) { @(Get-Content $ulog) } else { @() }
+          foreach ($s in @('update: v\d+ found', "update: v\d+'s installer downloaded and checked",
+                           'update: held \(Simpl closed to the notification area\)', 'update test: the window opened again from the notification area',
+                           'update: held \(quiz\)', 'update test: closing what is open over the window',
+                           'update: no longer held \(by quiz\)', 'update: where it was: grades, the window (front|behind)', 'update: installing .* and quitting')) {
+            # (looked for after the step before it: a hold can be said more than once, as what holds it changes)
+            $hit = 0
+            for ($i = $at; $i -lt $ulines.Count; $i++) { if ($ulines[$i] -match $s) { $hit = $i + 1; break } }
+            if (-not $hit) { Fail "the update played through never logged '$s' after the step before it" }
+            $at = $hit
           }
           # the installer it ran: the version put in place, and Simpl opened again by /LAUNCH (with no arguments: the
           # default profile)
@@ -2231,11 +2236,11 @@ jobs:
           Stop-Process -Id $back.Id -Force -ErrorAction SilentlyContinue
           Start-Sleep -Seconds 2
           if (Test-Path $ulog) { Write-Host "--- opened again"; Get-Content $ulog | Select-Object -Skip $from | Select-String -Pattern 'update|perf: start|phase' | ForEach-Object { $_.Line } }
-          foreach ($s in @('update: back after updating to v\d+', 'update: opened again in front', 'update: opened again at grades', 'perf: start .*engine ready \d')) {
+          foreach ($s in @('update: back after updating to v\d+', 'update: opened again (in front|minimized), as it was left', 'update: opened again at grades', 'perf: start .*engine ready \d')) {
             if (-not (Says $ulog $from $s)) { Fail "Simpl, opened again after the update, never logged '$s'" }
           }
           if ($shown -eq '0' -or $shown -like 'none*') { Fail "Simpl, opened again after the update, showed no window ($shown): it opens in front" }
-          Write-Host "opened again after the update: at the Grades, in front (it was left in the notification area), its engine running"
+          Write-Host "opened again after the update: at the Grades, as its window was left, its engine running"
 
           # 3. an update over a Simpl left open, exactly as Restart to Update runs it: Setup asks Simpl to quit (the quit
           #    event), Simpl takes it and goes, Setup sees it gone, puts the new version in place, and /LAUNCH opens it again

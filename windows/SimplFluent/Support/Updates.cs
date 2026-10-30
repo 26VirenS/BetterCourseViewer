@@ -263,7 +263,14 @@ public static partial class Updates
         ticker.Start();
         waiter = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
         waiter.Tick += (_, _) => Proceed();
-        app.Activated += (_, _) => { CheckIfDue(); LookForNew(); };
+        // (0.3.100: Simpl brought to the front — opened again from the notification area, where no update goes in —
+        //  counts as Simpl in use: an update waiting is given its half minute, not put in as the window opens)
+        app.Activated += (_, _) =>
+        {
+            if (!Testing) lastInput = Environment.TickCount64;
+            CheckIfDue();
+            LookForNew();
+        };
         app.Deactivated += (_, _) => Proceed();
         // (the PC woken from sleep or hibernation: looked at once the network is back, a quarter of a minute on, when the
         //  last look is half a minute old — the ticker's own tick may be up to half a minute off)

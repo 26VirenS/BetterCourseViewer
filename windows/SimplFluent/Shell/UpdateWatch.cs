@@ -68,22 +68,35 @@ public static class UpdateWatch
     // ---- opening again after an update ----
 
     /// <summary>
-    /// Opened again by an update: (0.3.79) in front, over whatever else is open, however the window was left — before,
-    /// one left behind other windows or in the notification area opened again minimized or out of sight there, and an
-    /// update, which goes in by itself when the window is not in use, looked like Simpl had closed (its What's New over a
-    /// window nobody saw). Raised over the others even when Windows keeps the focus where it is.
+    /// Opened again by an update: (0.3.100) as the window was left, never pushed in front of what the student is in.
+    /// In front, it comes back in front. Behind other windows or minimized, it comes back minimized, without taking the
+    /// front. In the notification area — which no update goes in from now, but the installer's own reopening after a
+    /// failed install can still come here — shown a moment minimized so it starts as ever, then put away. (0.3.79 to
+    /// 0.3.99 raised it over everything however it was left, and an update that went in from the notification area
+    /// opened Simpl by itself on top of whatever the student was doing.) What's New waits until the window is in view.
     /// </summary>
     private static void Reopen(MainWindow main)
     {
         if (Updates.Resumed is not { } r) return;
+        if (r.Window is "behind" or "hidden")
+        {
+            main.ShowActivated = false;
+            main.WindowState = WindowState.Minimized;
+            void Quiet(object sender, RoutedEventArgs e)
+            {
+                main.Loaded -= Quiet;
+                main.ShowActivated = true;
+                if (r.Window == "hidden") main.Hide();
+                Log.Write(r.Window == "hidden" ? "update: opened again in the notification area, as it was left" : "update: opened again minimized, as it was left behind");
+            }
+            main.Loaded += Quiet;
+            return;
+        }
         void Front(object? sender, EventArgs e)
         {
             main.ContentRendered -= Front;
-            if (main.WindowState == WindowState.Minimized) main.WindowState = WindowState.Normal;
-            main.Topmost = true; // (over the other windows, whether or not Windows lets it take the focus)
             main.Activate();
-            main.Topmost = false;
-            Log.Write($"update: opened again in front (the window was {r.Window})");
+            Log.Write("update: opened again in front, as it was left");
         }
         main.ContentRendered += Front;
     }
@@ -111,6 +124,9 @@ public static class UpdateWatch
         // (Simpl opening, a moment; the sign-in while it is on screen — finding the school, the card, "Logging you in",
         // the school's own page — not one left waiting in the notification area)
         if (e is { Phase: Phase.Starting }) return new Updates.Holding("Simpl opening", null);
+        // (0.3.100) Simpl closed to the notification area: no update goes in — a Critical one neither — until its window
+        // is opened again. One that went in from there opened Simpl again by itself, over what the student was doing.
+        if (!main.IsVisible) return new Updates.Holding("Simpl closed to the notification area", null);
         if (main.IsVisible && main.WindowState != WindowState.Minimized && (e == null || e.Login.Covers || e.Phase == Phase.Web))
             return new Updates.Holding("the sign-in", "when you’ve signed in");
         if (touring) return new Updates.Holding("the tour", "when the tour is over");
@@ -243,7 +259,8 @@ public static class UpdateWatch
     /// <summary>
     /// For CI's run of an update played through: --update-test-close &lt;seconds&gt; closes what is open over the window
     /// (the quiz) after that long, as the student would; --update-test-tray closes the window to the notification area a
-    /// moment after it opens, as its close button does.
+    /// moment after it opens, as its close button does; (0.3.100) --update-test-reopen &lt;seconds&gt; opens it again from
+    /// there after that long, as its icon does.
     /// </summary>
     private static void Test(MainWindow main)
     {
@@ -253,6 +270,12 @@ public static class UpdateWatch
             {
                 Log.Write("update test: the window closed to the notification area");
                 main.Close();
+            });
+        if (Launch.Number("update-test-reopen", 0) is > 0 and var back)
+            _ = Later(TimeSpan.FromSeconds(back), () =>
+            {
+                Log.Write("update test: the window opened again from the notification area");
+                main.Bring();
             });
         if (Launch.Number("update-test-close", 0) is > 0 and var after)
             _ = Later(TimeSpan.FromSeconds(after), () =>
