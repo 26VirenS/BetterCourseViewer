@@ -1020,6 +1020,10 @@ look_check() {
   else echo "FAIL the popup's front end drew no Macmillan buttons ($(grep -o 'macmillan popup: front.*' "$f" 2>/dev/null | head -2 | tr '\n' ';'))" >> "$out"; fi
   if grep -q 'aleks popup: front end, buttons Explanation, Recheck' "$h" 2>/dev/null; then echo "ok   the popup's front end drew ALEKS's buttons" >> "$out"
   else echo "FAIL the popup's front end drew no ALEKS buttons ($(grep -o 'aleks popup: front.*' "$h" 2>/dev/null | head -2 | tr '\n' ';'))" >> "$out"; fi
+  # (1.3.202) Macmillan's cover heard and drawn as the popup's own start page, Alta's way: its questions and its grading settings
+  local d="$OUT_ABS/console-light-21d-macmillan.txt"
+  if grep -q 'macmillan popup: cover heard, 4 questions, 5 grading settings' "$d" 2>/dev/null; then echo "ok   the popup's start page heard Macmillan's cover (4 questions, 5 grading settings)" >> "$out"
+  else echo "FAIL the popup's start page heard nothing of Macmillan's cover ($(grep -o 'macmillan popup: .*' "$d" 2>/dev/null | head -3 | tr '\n' ';'))" >> "$out"; fi
   cat "$out"
   if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::macmillan look: /'; return 1; fi
 }

@@ -210,6 +210,13 @@ struct LookQuizScreen: View {
                     .transition(.opacity.combined(with: .offset(y: 8)))
             }
         }
+        // (1.3.202) Macmillan's cover as the popup's own start screen, as Alta's: its page waits under it
+        .overlay {
+            if front && ready, let c = rail.cover {
+                LookStartScreen(cover: c, dueShown: dueLine != nil) { if let b = c.start { rail.press(b) } }
+                    .transition(.opacity)
+            }
+        }
         .overlay {
             if !ready {
                 LookOpening(look: look)
@@ -219,6 +226,7 @@ struct LookQuizScreen: View {
         .animation(Motion.gentle, value: ready)
         .animation(Motion.gentle, value: front)
         .animation(Motion.gentle, value: rail.onItem)
+        .animation(Motion.gentle, value: rail.cover)
     }
 
     private func start() async {
@@ -435,6 +443,126 @@ private struct LookVerdictPill: View {
     }
 }
 
+/// (1.3.202) Macmillan's cover as the popup's own start screen, as Alta's (AltaQuiz.swift, AltaStartScreen): on Liquid
+/// Glass, how many questions and (when the popup's header does not say it already) when Macmillan says it is due, and a
+/// large Start that presses Macmillan's own Open Assignment; under it, Macmillan's grading settings, each with a symbol
+/// for what it is about and Macmillan's own words, bold where Macmillan's are.
+private struct LookStartScreen: View {
+    let cover: LookRail.Cover
+    /// The popup's header says when it is due.
+    let dueShown: Bool
+    let start: () -> Void
+    @State private var going = false
+    @State private var shown = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Macmillan's words for its button, as a start screen says it: "Open Assignment" is Start; any other as it is.
+    private var startLabel: String {
+        let t = (cover.start?.label ?? "").trimmingCharacters(in: .whitespaces)
+        if t.isEmpty || t.range(of: #"^open( (the )?(assignment|assessment|homework))?$"#, options: [.regularExpression, .caseInsensitive]) != nil { return "Start" }
+        return t.lowercased().capitalized
+    }
+
+    var body: some View {
+        ZStack {
+            PageGround()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    header
+                        .opacity(shown ? 1 : 0)
+                        .offset(y: shown || reduceMotion ? 0 : 8)
+                    if !cover.settings.isEmpty {
+                        settings
+                            .opacity(shown ? 1 : 0)
+                            .offset(y: shown || reduceMotion ? 0 : 12)
+                    }
+                }
+                .padding(.horizontal, 32)
+                .padding(.vertical, 28)
+                .frame(maxWidth: 780)
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .onAppear { withAnimation(reduceMotion ? .easeOut(duration: 0.2) : Motion.gentle) { shown = true } }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 28) {
+                detail("Status", "Not started")
+                if cover.count > 0 { detail("Questions", "\(cover.count)") }
+                if !dueShown && !cover.due.isEmpty { detail("Due", CanvasDue.words(cover.due)) }
+            }
+            Button {
+                going = true
+                start()
+                // (back to the button if Macmillan's page did not move on)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 8) { going = false }
+            } label: {
+                HStack(spacing: 8) {
+                    if going { ProgressView().controlSize(.small) } else { Image(systemName: "play.fill") }
+                    Text(startLabel)
+                }
+                .font(.system(size: 17, weight: .semibold))
+                .frame(minWidth: 150, minHeight: 30)
+            }
+            .glassButton(prominent: true)
+            .controlSize(.extraLarge)
+            .keyboardShortcut(.defaultAction)
+            .disabled(going || cover.start == nil)
+            .help("\(startLabel) the assignment (Return) — Macmillan's own \(cover.start?.label ?? "Open Assignment")")
+            .padding(.top, 4)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard(radius: 26)
+    }
+
+    private func detail(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label.uppercased()).font(.system(size: 10.5, weight: .semibold)).tracking(0.5).foregroundStyle(.secondary)
+            Text(value).font(.sBody.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var settings: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Grading Settings").font(.system(size: 18, weight: .semibold))
+            ForEach(cover.settings) { g in
+                HStack(alignment: .center, spacing: 12) {
+                    let mark = Self.look(g.kind)
+                    Image(systemName: mark.0)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(mark.1)
+                        .frame(width: 30, height: 30)
+                        .background(Circle().fill(mark.1.opacity(0.15)))
+                    g.runs.reduce(Text("")) { t, r in t + Text(r.text).fontWeight(r.bold ? .semibold : .regular) }
+                        .font(.sCallout)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .padding(22)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard(radius: 26)
+    }
+
+    /// A setting's symbol and colour by what it is about: a penalty in orange, the rest in teal, as Macmillan marks them.
+    static func look(_ kind: String) -> (String, Color) {
+        switch kind {
+        case "attempts": return ("arrow.triangle.2.circlepath", .teal)
+        case "penalty": return ("xmark", .orange)
+        case "late": return ("calendar.badge.clock", .teal)
+        case "solutions": return ("lightbulb", .teal)
+        case "resources": return ("book.closed", .teal)
+        case "tutor": return ("text.bubble", .teal)
+        default: return ("info.circle", .secondary)
+        }
+    }
+}
+
 // MARK: - What the page tells the rail
 
 /// (1.3.199) What the tool's page tells the popup (extension/tools/*/look.js, `rail:`), as it changes; and what the rail
@@ -473,6 +601,10 @@ final class LookRail: ObservableObject {
     @Published private(set) var actions: [PageButton] = []
     @Published private(set) var verdict: Verdict?
     @Published private(set) var layout = ""
+    /// (1.3.202) Macmillan's cover, while the assignment shows it: the popup's own start screen over it.
+    @Published private(set) var cover: Cover?
+    /// (1.3.202) The question asked for from a tile, until the page opens it (its tile a spinner, as a quiz's).
+    @Published private(set) var moving: Int?
     /// The look the page is in, as it last said ("macmillan", "aleks").
     private(set) var lookName = ""
 
@@ -500,6 +632,19 @@ final class LookRail: ObservableObject {
         }
     }
 
+    /// (1.3.202) Macmillan's cover: the assignment's name, how many questions, when Macmillan says it is due, its Open
+    /// Assignment (pressed by the start screen's Start) and its grading settings, each in runs of words, bold where
+    /// Macmillan's are, with what it is about ("attempts", "penalty", "late", "solutions", "resources", "tutor", "info").
+    struct Cover: Equatable {
+        struct Run: Equatable { let text: String; let bold: Bool }
+        struct Setting: Equatable, Identifiable { let id: Int; let kind: String; let runs: [Run] }
+        let title: String
+        let count: Int
+        let due: String
+        let start: PageButton?
+        let settings: [Setting]
+    }
+
     /// (1.3.200) The tool's word on the last answer: its own words, and whether it was right ("right", "wrong", "said").
     struct Verdict: Equatable {
         let text: String
@@ -514,6 +659,7 @@ final class LookRail: ObservableObject {
     private var width: CGFloat = 0
     private var logged = false
     private var frontLogged = false
+    private var coverLogged = false
 
     /// On a question (Macmillan's) or a topic (ALEKS's): the popup's own heading over it.
     var onItem: Bool { lookName == PageLook.aleks.name ? !topic.isEmpty : total > 0 && here > 0 }
@@ -544,6 +690,22 @@ final class LookRail: ObservableObject {
         let f = o["front"] as? [String: Any]
         var lesser: [PageButton] = [], main: [PageButton] = [], said: Verdict? = nil
         if kind == PageLook.macmillan.name {
+            let c: Cover? = (o["cover"] as? [String: Any]).map { c in
+                let settings = (c["policies"] as? [[String: Any]] ?? []).enumerated().map { i, p in
+                    Cover.Setting(id: i, kind: p["kind"] as? String ?? "info",
+                                  runs: (p["runs"] as? [[String: Any]] ?? []).map { Cover.Run(text: $0["t"] as? String ?? "", bold: $0["b"] as? Bool ?? false) })
+                }
+                return Cover(title: c["title"] as? String ?? "", count: (c["count"] as? NSNumber)?.intValue ?? 0, due: c["due"] as? String ?? "",
+                             start: (c["start"] as? [String: Any]).flatMap { button($0, primary: true) }, settings: settings)
+            }
+            if c != cover {
+                if cover != nil && c == nil { NSLog("[Simpl] macmillan popup: on from the cover") }
+                cover = c
+                if let c, !coverLogged {
+                    coverLogged = true
+                    NSLog("[Simpl] macmillan popup: cover heard, %ld questions, %ld grading settings", c.count, c.settings.count)
+                }
+            }
             lesser = (f?["tools"] as? [[String: Any]] ?? []).compactMap { button($0, primary: false) }
             main = (f?["main"] as? [String: Any]).flatMap { button($0, primary: true) }.map { [$0] } ?? []
             if let v = f?["verdict"] as? [String: Any], let t = v["text"] as? String, !t.isEmpty {
@@ -570,6 +732,7 @@ final class LookRail: ObservableObject {
                                 sub: r["sub"] as? String ?? "", points: r["points"] as? String ?? "")
             }
             here = max(0, int("here"))
+            if let m = moving, m == here || here == 0 && cover != nil { moving = nil }
             done = int("done")
             total = max(0, int("total"))
             score = str("score")
@@ -617,10 +780,13 @@ final class LookRail: ObservableObject {
         NSLog("[Simpl] look popup: page at %ld%% (its %ld wide in %ld)", Int((z * 100).rounded()), Int(wide), Int(room))
     }
 
-    /// A question of Macmillan's opened: its own row in the page clicked.
+    /// A question of Macmillan's opened: its own row in the page clicked — (1.3.202) its tile a spinner until the page has
+    /// it open, as a quiz's tile is (QuizNumberTile), and let go if the page never does.
     func go(_ n: Int) {
-        guard n >= 1, questions.isEmpty || questions.contains(where: { $0.n == n }) else { return }
+        guard n >= 1, n != here, questions.contains(where: { $0.n == n }) else { return }
+        moving = n
         webView?.evaluateJavaScript("window.__simplMMDo && window.__simplMMDo({ go: \(n) })", completionHandler: nil)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6) { [weak self] in if self?.moving == n { self?.moving = nil } }
     }
 
     /// Macmillan's grading settings shown (its own button clicked).
@@ -655,7 +821,6 @@ final class LookRelay: NSObject, WKScriptMessageHandler {
 private struct LookRailView: View {
     @ObservedObject var rail: LookRail
     let look: PageLook
-    @Namespace private var marks
 
     var body: some View {
         ScrollView {
@@ -712,19 +877,36 @@ private struct LookRailView: View {
                 }
                 Text("Questions").font(.sHeadline).frame(maxWidth: .infinity, alignment: .leading)
             }
-            if rail.questions.isEmpty {
+            if rail.questions.isEmpty, let c = rail.cover, c.count > 0 {
+                // (1.3.202) on the cover: its questions, none open yet
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 5), spacing: 6) {
+                    ForEach(1...min(c.count, 200), id: \.self) { n in
+                        QuizNumberTile(number: n, current: false, done: false, flagged: false, tint: Theme.accent)
+                    }
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(c.count) questions")
+            } else if rail.questions.isEmpty {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 5), spacing: 6) {
                     ForEach(0..<10, id: \.self) { _ in
-                        RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Color.primary.opacity(0.07)).frame(height: 34)
+                        RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.primary.opacity(0.07)).frame(height: 32)
                     }
                 }
             } else {
+                // (1.3.202) a quiz's own tiles (QuizTaking.swift): the one open filled, a solved one washed in the colour, one
+                // tried and not solved edged in orange; the one asked for a spinner until the page has it open
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 5), spacing: 6) {
                     ForEach(rail.questions) { q in
-                        LookTile(q: q, current: q.n == rail.here, marks: marks) { rail.go(q.n) }
+                        let current = q.n == rail.here
+                        Button { rail.go(q.n) } label: {
+                            QuizNumberTile(number: q.n, current: current, done: q.solved, flagged: q.tried, loading: rail.moving == q.n, tint: Theme.accent)
+                        }
+                        .buttonStyle(QuizTileStyle())
+                        .disabled(rail.moving != nil)
+                        .help("\(q.label)\(q.sub.isEmpty ? "" : " — \(q.sub)")")
+                        .accessibilityLabel("Question \(q.n), \(q.solved ? "solved" : q.tried ? "tried" : "not answered")\(current ? ", open" : "")")
                     }
                 }
-                .animation(Motion.snappy, value: rail.here)
             }
         }
         .padding(14)
@@ -885,8 +1067,11 @@ private struct LookRing: View {
 private struct LookLegend: View {
     var body: some View {
         HStack(spacing: 8) {
-            mark(Color.green, "Solved")
-            mark(Color.orange, "Tried")
+            mark(Theme.accent.opacity(0.35), "Solved")
+            HStack(spacing: 3) {
+                Circle().strokeBorder(Color.orange, lineWidth: 1.5).frame(width: 7, height: 7)
+                Text("Tried")
+            }
         }
         .font(.sCaption2)
         .foregroundStyle(.secondary)
@@ -897,58 +1082,6 @@ private struct LookLegend: View {
             Circle().fill(c).frame(width: 6, height: 6)
             Text(word)
         }
-    }
-}
-
-/// One question's tile: its number, the one open filled in the accent (its ring gliding from tile to tile), a solved
-/// one washed green with a tick, one tried and not solved washed orange. A button: the question opens in the page.
-private struct LookTile: View {
-    let q: LookRail.Question
-    let current: Bool
-    let marks: Namespace.ID
-    let open: () -> Void
-    @State private var hover = false
-
-    var body: some View {
-        Button(action: open) {
-            let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
-            ZStack {
-                shape.fill(fill)
-                if current {
-                    shape.fill(Theme.accent).matchedGeometryEffect(id: "here", in: marks)
-                }
-                if q.solved && !current {
-                    Image(systemName: "checkmark").font(.system(size: 12, weight: .bold)).foregroundStyle(Color.green)
-                } else {
-                    Text("\(q.n)")
-                        .font(.sCallout.weight(.semibold).monospacedDigit())
-                        .foregroundStyle(current ? Color.white : q.tried ? Color.orange : Color.secondary)
-                }
-            }
-            .frame(height: 34)
-            .frame(maxWidth: .infinity)
-            .scaleEffect(hover && !current ? 1.05 : 1)
-            .contentShape(shape)
-        }
-        .buttonStyle(LookPress())
-        .onHover { h in withAnimation(Motion.hover) { hover = h } }
-        .help("\(q.label)\(q.sub.isEmpty ? "" : " — \(q.sub)")")
-        .accessibilityLabel("Question \(q.n), \(q.solved ? "solved" : q.tried ? "tried" : "not answered")\(current ? ", open" : "")")
-    }
-
-    private var fill: Color {
-        if q.solved { return Color.green.opacity(0.17) }
-        if q.tried { return Color.orange.opacity(0.18) }
-        return Color.primary.opacity(hover ? 0.11 : 0.07)
-    }
-}
-
-/// A tile pressed: it gives a little under the pointer, at once, and springs back.
-private struct LookPress: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.93 : 1)
-            .animation(.spring(response: 0.22, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
 

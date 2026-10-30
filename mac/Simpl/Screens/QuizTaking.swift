@@ -423,7 +423,7 @@ private struct QuizChip: View {
 /// A tile's face: the number in a small rounded square — the one showing filled with the colour, an answered one washed
 /// in it, one not yet answered a quiet grey; a flagged one edged in orange, one on its way a spinner. Flat: no glass.
 /// (1.3.78) In dark mode the wash is deeper — a dark green beside a dark grey could hardly be told apart.
-private struct QuizNumberTile: View {
+struct QuizNumberTile: View {
     let number: Int
     let current: Bool
     let done: Bool

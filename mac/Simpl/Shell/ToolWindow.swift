@@ -469,20 +469,42 @@ struct ToolWebView: NSViewRepresentable {
     var clear = false
 
     /// The form sent, in the page: "sent", "framed" (the tool framed in the page, left as it is) or "none" (no form yet).
-    /// The same script as the Windows app's (windows/SimplFluent/Shell/WebWindow.cs, SendToolForm).
-    static let sendToolFormScript = """
+    /// The same script as the Windows app's (windows/SimplFluent/Shell/WebWindow.cs, SendToolForm). (1.3.202) Found too
+    /// where real Canvas puts it — in a frame of Canvas's own, or aimed at a window of its own name (Canvas's window
+    /// launch) — and sent to the top of the window; with no form, Canvas's "Load … in a new window" pressed ("pressed"),
+    /// the window it opens shown in place (createWebViewWith).
+    static let sendToolFormScript = #"""
         (function () {
-          var f = document.getElementById('tool_form');
-          if (!f || !f.action) return 'none';
+          var find = function (doc, depth) {
+            var f = doc.getElementById('tool_form') || doc.querySelector('form[data-tool-launch-type]');
+            if (f && f.action) return f;
+            if (depth > 2) return null;
+            var frames = doc.querySelectorAll('iframe');
+            for (var i = 0; i < frames.length; i++) {
+              try { var d = frames[i].contentDocument, g = d && find(d, depth + 1); if (g) return g; } catch (e) { /* another site's frame */ }
+            }
+            return null;
+          };
+          var f = find(document, 0);
+          if (!f) {
+            var bs = document.querySelectorAll('button, a.btn, [role="button"]');
+            for (var j = 0; j < bs.length; j++) {
+              var w = (bs[j].textContent || '').replace(/\s+/g, ' ').trim();
+              if (/^load\b.*\bin a new (window|tab)$/i.test(w) && !bs[j].getAttribute('data-simpl-sent')) { bs[j].setAttribute('data-simpl-sent', '1'); bs[j].click(); return 'pressed'; }
+            }
+            return 'none';
+          }
           if (f.getAttribute('data-simpl-sent')) return 'sent';
           var target = (f.getAttribute('target') || '').toLowerCase();
-          if (target && target !== '_blank') return 'framed';
+          var kind = (f.getAttribute('data-tool-launch-type') || '').toLowerCase();
+          var windowed = kind === 'window' || kind === 'new_window' || !!f.querySelector('.load_tab') || /in a new (window|tab)/i.test(f.textContent || '');
+          if (target && target !== '_blank' && target !== '_top' && target !== '_self' && !windowed) return 'framed';
           f.setAttribute('data-simpl-sent', '1');
-          f.setAttribute('target', '_self');
+          f.setAttribute('target', '_top');
           HTMLFormElement.prototype.submit.call(f);
           return 'sent';
         })()
-        """
+        """#
 
     func makeCoordinator() -> Coordinator {
         let c = Coordinator()
@@ -531,8 +553,8 @@ struct ToolWebView: NSViewRepresentable {
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             guard let page = sendToolForm, let here = webView.url else { return }
-            let trim = CharacterSet(charactersIn: "/")
-            guard here.host == page.host, here.path.trimmingCharacters(in: trim) == page.path.trimmingCharacters(in: trim) else {
+            // (1.3.202: any page of the school's, not only the very address asked for — Canvas may move on to another first)
+            guard here.host?.lowercased() == page.host?.lowercased() else {
                 // (the page went elsewhere first — the school's sign-in: tried again when it comes back, a few times at most)
                 formTries += 1
                 if formTries > 4 { sendToolForm = nil }
@@ -546,7 +568,7 @@ struct ToolWebView: NSViewRepresentable {
                 guard let self else { return }
                 let said = result as? String ?? "none"
                 // (no form on the page yet: Canvas may still be drawing it; looked for again a moment on, a few times)
-                if said == "none", self.formTries < 4, let webView {
+                if said == "none", self.formTries < 8, let webView {
                     self.formTries += 1
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self, weak webView] in
                         guard let self, let webView, self.sendToolForm != nil else { return }
@@ -555,7 +577,7 @@ struct ToolWebView: NSViewRepresentable {
                     return
                 }
                 self.sendToolForm = nil
-                NSLog("[Simpl] tool window: the school's page for the tool, its launch %@", said == "sent" ? "sent on in this window" : said == "framed" ? "framed in the page as it is" : "not found")
+                NSLog("[Simpl] tool window: the school's page for the tool, its launch %@", said == "sent" ? "sent on in this window" : said == "pressed" ? "pressed (Canvas's Load button), opened in this window" : said == "framed" ? "framed in the page as it is" : "not found")
             }
         }
 
