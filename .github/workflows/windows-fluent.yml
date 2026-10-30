@@ -815,6 +815,9 @@ jobs:
           # a tool Canvas will not launch on its own (the mock refuses its one-time launch, as Canvas does Smartwork's at the
           # owner's school): Canvas's page for it, whose launch waits behind "Load … in a new window", sends it on in the window
           Shot 'tool-window-newwindow' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'course:101', '--open', 'tool:101:20'))
+          # (0.3.91) developer mode's Record in a tool window, begun by itself once the page loads: the title bar's red Stop
+          # and "Recording · N saved"; its folder in Downloads read below
+          Shot 'tool-window-record' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'course:101', '--open', 'tool:101:20', '--developer', '--record'))
           # a counter's panel caught as it grows out of its tile (--open sheetmorph: drawn as it is a quarter of the way
           # through its time — the surface most of the way from the tile to its place, its words only starting to come
           # in), light in a 1024 window and dark in a 1366 one; and the narrow window's counters in dark
@@ -1292,6 +1295,37 @@ jobs:
             if (-not "$l".Contains('web window: opens /courses/101/external_tools/20')) { Write-Host "::error::tool-window-newwindow: the window did not open Canvas's page for the tool ($nwLog)"; exit 1 }
             if (-not "$l".Contains("its launch sent on in this window")) { Write-Host "::error::tool-window-newwindow: the tool's launch was not sent on from Canvas's page ($nwLog)"; exit 1 }
             Write-Host "tool-window-newwindow: the launch was sent on from Canvas's page, in the window"
+          }
+          # (0.3.91) the tool window's recording (Shell/PageRecorder.cs): begun in developer mode, its first step saved whole
+          # (the page's code, a picture, its data), and its folder in this runner's Downloads read — each .gz unzips, each
+          # picture is a JPEG, each data file is JSON
+          if ($script:mine -contains 'tool-window-record') {
+            $recLog = 'shots/profile-tool-window-record.log'
+            $l = Get-Content $recLog -Raw -ErrorAction SilentlyContinue
+            if (-not "$l".Contains('recorder: on, into')) { Write-Host "::error::tool-window-record: the recording did not begin ($recLog)"; exit 1 }
+            if ("$l" -notmatch 'recorder: step 1 \(0001 page\.html\.gz.*0001 screenshot\.jpg.*0001 data\.json') { Write-Host "::error::tool-window-record: its first step was not saved whole ($recLog)"; exit 1 }
+            $recRoot = Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads\Simpl Recordings'
+            $dir = Get-ChildItem $recRoot -Directory -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+            if (-not $dir) { Write-Host "::error::tool-window-record: its folder was not found in $recRoot"; exit 1 }
+            foreach ($want in @('0001 page.html.gz', '0001 screenshot.jpg', '0001 data.json', 'README.txt', 'timeline.txt')) {
+              if (-not (Test-Path -LiteralPath (Join-Path $dir.FullName $want))) { Write-Host "::error::tool-window-record: not in its folder: $want"; exit 1 }
+            }
+            foreach ($f in Get-ChildItem -LiteralPath $dir.FullName -Recurse -Filter *.gz) {
+              try {
+                $s = [IO.File]::OpenRead($f.FullName); $g = New-Object IO.Compression.GZipStream($s, [IO.Compression.CompressionMode]::Decompress)
+                $m = New-Object IO.MemoryStream; $g.CopyTo($m); $g.Dispose(); $s.Dispose()
+              } catch { Write-Host "::error::tool-window-record: does not unzip: $($f.Name)"; exit 1 }
+            }
+            foreach ($f in Get-ChildItem -LiteralPath $dir.FullName -Filter *.jpg) {
+              $b = [IO.File]::ReadAllBytes($f.FullName)
+              if ($b.Length -lt 3 -or $b[0] -ne 0xFF -or $b[1] -ne 0xD8) { Write-Host "::error::tool-window-record: not a JPEG: $($f.Name)"; exit 1 }
+            }
+            foreach ($f in Get-ChildItem -LiteralPath $dir.FullName -Filter *.json) {
+              try { $null = Get-Content -LiteralPath $f.FullName -Raw | ConvertFrom-Json } catch { Write-Host "::error::tool-window-record: not JSON: $($f.Name)"; exit 1 }
+            }
+            $files = @(Get-ChildItem -LiteralPath $dir.FullName -Recurse -File)
+            $kb = [math]::Round((($files | Measure-Object Length -Sum).Sum) / 1KB)
+            Write-Host "tool-window-record: recorded into '$($dir.Name)', $kb KB in $($files.Count) files; every .gz unzips, the pictures are JPEGs, the data JSON"
           }
           # Knewton Alta's page in light in a dark app whose web profile prefers dark (Shell/WebWindow.cs, LightPages: the
           # popup writes "alta: the page prefers …" in a picture run as each page comes in)
