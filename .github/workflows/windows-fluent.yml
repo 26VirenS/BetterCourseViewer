@@ -590,6 +590,10 @@ jobs:
           Shot 'alta-overview' '1366x778' 50 ($mock + @('--appearance', 'light', '--open', 'alta:104:4003'))
           Shot 'alta-start' '1366x778' 50 ($mock + @('--appearance', 'dark', '--open', 'alta:104:4004'))
           Shot 'macmillan' '1366x778' 50 ($mock + @('--appearance', 'light', '--open', 'macmillan:104:4005'))
+          # (0.3.92) Simpl's look over Macmillan's page (Shell/MacmillanLook.cs), on its first question solved: the rail with
+          # Q1 marked, the bar of tools, the verdict and Next Question at the sheet's foot; then with Simpl Look off
+          Shot 'macmillan-look' '1366x778' 50 ($mock + @('--appearance', 'light', '--open', 'macmillan:104:4006'))
+          Shot 'macmillan-look-off' '1366x778' 50 ($mock + @('--appearance', 'light', '--open', 'macmillan:104:4006', '--macmillan-look', 'off'))
           # Settings, as Windows 11's own Settings app, on each of its categories
           foreach ($tab in @('general', 'notifications', 'grades', 'data', 'updates', 'about')) {
             Shot "settings-$tab" '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', $tab))
@@ -1326,6 +1330,19 @@ jobs:
             $files = @(Get-ChildItem -LiteralPath $dir.FullName -Recurse -File)
             $kb = [math]::Round((($files | Measure-Object Length -Sum).Sum) / 1KB)
             Write-Host "tool-window-record: recorded into '$($dir.Name)', $kb KB in $($files.Count) files; every .gz unzips, the pictures are JPEGs, the data JSON"
+          }
+          # (0.3.92) Simpl's look over Macmillan's page (Shell/MacmillanLook.cs): drawn in the mock's player, its questions
+          # found and Q1 marked (said by the look through the top page); not drawn with Simpl Look off
+          if ($script:mine -contains 'macmillan-look') {
+            $lkLog = 'shots/profile-macmillan-look.log'
+            $l = Get-Content $lkLog -Raw -ErrorAction SilentlyContinue
+            if ("$l" -notmatch 'macmillan look: drawn in localhost:\d+, 4 questions, item-1-success-row marked') { Write-Host "::error::macmillan-look: not drawn as it should be ($lkLog)"; exit 1 }
+            Write-Host "macmillan-look: drawn over the player, its 4 questions found and Q1 marked"
+          }
+          if ($script:mine -contains 'macmillan-look-off') {
+            $l = Get-Content 'shots/profile-macmillan-look-off.log' -Raw -ErrorAction SilentlyContinue
+            if ("$l".Contains('macmillan look: drawn')) { Write-Host "::error::macmillan-look-off: drawn with Simpl Look off"; exit 1 }
+            Write-Host "macmillan-look-off: not drawn, as Macmillan draws it"
           }
           # Knewton Alta's page in light in a dark app whose web profile prefers dark (Shell/WebWindow.cs, LightPages: the
           # popup writes "alta: the page prefers …" in a picture run as each page comes in)
