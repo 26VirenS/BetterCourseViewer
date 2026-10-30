@@ -20,6 +20,14 @@ public sealed record QuizLaunch(string Course, string Quiz, string Title)
     public bool Review { get; init; }
 }
 
+/// <summary>(0.3.94) A Macmillan Learning or ALEKS assignment in its popup (the Mac's LookLaunch): its look's name
+/// ("macmillan", "aleks"), and its due line as the screen it was opened from had it (null: asked of Canvas).</summary>
+public sealed record LookLaunch(string Look, string Course, string Assignment, string Title)
+{
+    public Guid Id { get; } = Guid.NewGuid();
+    public string? Due { get; init; }
+}
+
 /// <summary>A Knewton Alta assignment in its popup (the Mac's AltaLaunch).</summary>
 public sealed record AltaLaunch(string Course, string Assignment, string Title, string? Page = null)
 {

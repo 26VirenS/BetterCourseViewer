@@ -16,7 +16,9 @@ namespace Simpl.Shell;
 /// question on a sheet, its tools in a glass column beside it, and the actions (Explanation, Check, …) on a glass strip
 /// under the answer. Each script is put into every page and frame from their start and draws only on its tool's pages;
 /// each look is on until the title bar's Simpl Look turns it off there (kept, one setting per tool). A picture run's
-/// --macmillan-look off / --aleks-look off starts with it off.
+/// --macmillan-look off / --aleks-look off starts with it off. (0.3.94) In the Macmillan and ALEKS popup
+/// (Screens/Look/LookPopup.cs), attached with <c>rail</c>: each script is told its page has the popup's rail beside it,
+/// and what the page tells that rail as it changes is handed on (<see cref="Rail"/>).
 /// </summary>
 internal sealed class PageLook
 {
@@ -26,14 +28,25 @@ internal sealed class PageLook
     public static readonly Kind Aleks = new("aleks", "ALEKS", "aleksLook", "aleks", "__simplAKOn", "__simplAKSet", "aleks.com", "/mock-aleks/", "aleks-look");
     private static readonly Kind[] All = { Macmillan, Aleks };
 
+    /// <summary>(0.3.94) A look by its name (the popup's launch says which): Macmillan's for a name it does not know.</summary>
+    public static Kind Named(string name) => All.FirstOrDefault(k => k.Name == name) ?? Macmillan;
+
     /// <summary>The looks' scripts, from the extension the app carries (each read once).</summary>
     private static readonly Dictionary<string, string?> Sources = new();
 
     private readonly CoreWebView2 core;
+    private readonly bool rail;
     private readonly Dictionary<string, string> scriptIds = new();
     private readonly Dictionary<string, bool> on = new();
 
-    private PageLook(CoreWebView2 core) => this.core = core;
+    /// <summary>(0.3.94) What the page tells the popup's rail, each time it changes (its <c>rail</c> names the look).</summary>
+    public event Action<JsonElement>? Rail;
+
+    private PageLook(CoreWebView2 core, bool rail)
+    {
+        this.core = core;
+        this.rail = rail;
+    }
 
     public bool On(Kind k) => on.TryGetValue(k.Name, out var v) ? v : Start(k);
 
@@ -47,10 +60,10 @@ internal sealed class PageLook
 
     /// <summary>Every look put into the web view's pages and frames from their start (before the tool's page first shows),
     /// and what they find heard, for the log.</summary>
-    public static async Task<PageLook> Attach(CoreWebView2 core)
+    public static async Task<PageLook> Attach(CoreWebView2 core, bool rail = false)
     {
-        var look = new PageLook(core);
-        core.WebMessageReceived += (_, e) => Heard(e);
+        var look = new PageLook(core, rail);
+        core.WebMessageReceived += (_, e) => look.Heard(e);
         foreach (var k in All)
         {
             look.on[k.Name] = Start(k);
@@ -63,7 +76,8 @@ internal sealed class PageLook
     {
         if (!Sources.TryGetValue(k.Dir, out var source)) Sources[k.Dir] = source = Read(k);
         if (source == null) return;
-        try { scriptIds[k.Name] = await core.AddScriptToExecuteOnDocumentCreatedAsync($"window.{k.Flag} = {(On(k) ? "true" : "false")};\n{source}"); }
+        var head = $"window.{k.Flag} = {(On(k) ? "true" : "false")};" + (rail ? " window.__simplLookRail = true;" : "");
+        try { scriptIds[k.Name] = await core.AddScriptToExecuteOnDocumentCreatedAsync($"{head}\n{source}"); }
         catch (Exception e) { Log.Write($"{k.Name} look: the script could not be added: " + e.Message); }
     }
 
@@ -86,13 +100,19 @@ internal sealed class PageLook
     }
 
     /// <summary>What a look found on its page (said by the top page for its frames), once a page: Macmillan's its
-    /// questions and the one marked, ALEKS's what it found of the page (its "look" names it).</summary>
-    private static void Heard(CoreWebView2WebMessageReceivedEventArgs e)
+    /// questions and the one marked, ALEKS's what it found of the page (its "look" names it). (0.3.94) What it tells the
+    /// popup's rail (its "rail" names it) is handed on, not logged.</summary>
+    private void Heard(CoreWebView2WebMessageReceivedEventArgs e)
     {
         try
         {
             using var said = JsonDocument.Parse(e.WebMessageAsJson);
             if (said.RootElement.ValueKind != JsonValueKind.Object || !said.RootElement.TryGetProperty("simplLook", out var o)) return;
+            if (o.ValueKind == JsonValueKind.Object && o.TryGetProperty("rail", out _))
+            {
+                Rail?.Invoke(o.Clone());
+                return;
+            }
             string S(string k) => o.TryGetProperty(k, out var v) ? v.ToString() : "?";
             if (o.TryGetProperty("look", out var name))
             {

@@ -91,6 +91,8 @@ public sealed partial class Engine : Observable, IShellListener
     // the window's popups: whoever shows the window shows them (MainWindow)
     public event Action<QuizLaunch>? QuizRequested;
     public event Action<AltaLaunch>? AltaRequested;
+    /// <summary>(0.3.94) A Macmillan Learning or ALEKS assignment, in its popup (Screens/Look/LookPopup.cs).</summary>
+    public event Action<LookLaunch>? LookRequested;
     public event Action<ToolLaunch>? ToolRequested;
     public event Action? SetupRequested;
     public event Action<WhatsNewData>? WhatsNewRequested;
@@ -503,14 +505,14 @@ public sealed partial class Engine : Observable, IShellListener
         else if (Launch.Take("macmillan:") is { } mm)
         {
             var parts = mm.Split(':');
-            // (0.3.58: in the tool window, as Macmillan draws it — the screenshot suite's macmillan shot)
-            if (parts.Length == 2) OpenTool(ToolLaunch.Assignment(parts[0], parts[1], "Macmillan Learning"));
+            // (0.3.58: in the tool window, as Macmillan draws it — 0.3.94: in its popup, as an Alta assignment)
+            if (parts.Length == 2) OpenLook(new LookLaunch("macmillan", parts[0], parts[1], "W8 Homework: Forces in Motion"));
         }
         else if (Launch.Take("aleks:") is { } ak)
         {
             var parts = ak.Split(':');
-            // (0.3.93: an ALEKS assignment in the tool window — the screenshot suite's aleks-look shots)
-            if (parts.Length == 2) OpenTool(ToolLaunch.Assignment(parts[0], parts[1], "ALEKS"));
+            // (0.3.93: an ALEKS assignment, the screenshot suite's aleks-look shots — 0.3.94: in its popup)
+            if (parts.Length == 2) OpenLook(new LookLaunch("aleks", parts[0], parts[1], "Exponential and Logarithmic Functions"));
         }
         else if (Launch.Take("newtask") != null) NewTaskRequested?.Invoke();
         else if (Launch.Take("compose") != null) NewMessageRequested?.Invoke();
@@ -1127,6 +1129,8 @@ public sealed partial class Engine : Observable, IShellListener
     public void OpenQuiz(QuizLaunch q) => QuizRequested?.Invoke(q);
 
     public void OpenAlta(AltaLaunch a) => AltaRequested?.Invoke(a);
+
+    public void OpenLook(LookLaunch l) => LookRequested?.Invoke(l);
 
     public void AskSetup() => SetupRequested?.Invoke();
 

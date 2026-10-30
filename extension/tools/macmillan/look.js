@@ -9,6 +9,13 @@
 // sets them. The first answer of the old skin (removed in Mac 1.3.163) was a second page drawn from this one; this is
 // the same page, restyled, so a change of Macmillan's at worst leaves a part looking as Macmillan draws it.
 //
+// (Mac 1.3.199, Windows 0.3.94) In the apps' Macmillan popup — opened as a Knewton Alta assignment is, over the main
+// window — the app puts `window.__simplLookRail = true;` before it too: the questions, the score and how many are done
+// are then the popup's own rail (told to the app as they change, `rail: 'macmillan'`), so Macmillan's side list is not
+// drawn again beside them (a click on the rail's question clicks Macmillan's own row: `__simplMMDo({ go: n })`); the
+// question lies on a sheet of liquid glass over a lit ground, its number large over it, and Resources, AI Tutor,
+// Solution, the verdict and the main button float in a glass dock along the foot; a new question eases in.
+//
 // The app puts `window.__simplMMOn = true|false;` before this file (the toolbar's Simpl Look, as last left) and turns
 // it at once with `__simplMMSet(on)` in the top page, which passes it on to the page's frames; a frame loaded later
 // asks its parent. It tells the app once what it found, for the log: a frame through the top page (a frame of another
@@ -23,6 +30,8 @@
   if (!mine) return;
   var root = null; // (the page's <html>: not there yet when Windows runs this, before the page is read)
   var on = window.__simplMMOn !== false;
+  var rail = window.__simplLookRail === true; // (in the apps' popup, its rail beside the page)
+  var framed = window.parent !== window;
 
   var CSS = [
     'html.simpl-mm{--mm-ui:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable Text","Segoe UI",system-ui,"Helvetica Neue",Arial,sans-serif;',
@@ -145,6 +154,67 @@
     '@media (prefers-reduced-motion:no-preference){html.simpl-mm #results{transition:opacity .2s cubic-bezier(.23,1,.32,1),transform .2s cubic-bezier(.23,1,.32,1),bottom .25s cubic-bezier(.23,1,.32,1)}@starting-style{html.simpl-mm #results{opacity:0;transform:translateY(6px) scale(.97)}}}',
     '@media (prefers-reduced-motion:reduce){html.simpl-mm button[data-test-id="btn-sac-main"]:active,html.simpl-mm #question-name button:active{transform:none}}',
     '@media (prefers-reduced-transparency:reduce){html.simpl-mm{--mm-glass:#fff}html.simpl-mm #results{-webkit-backdrop-filter:none;backdrop-filter:none;background:#fff!important}}',
+    // ---- (1.3.199) in the popup: the rail is the app's, the question on liquid glass, the actions in a dock
+    'html.simpl-mm.simpl-rail{--mm-ground:radial-gradient(900px 620px at 6% -12%,rgba(0,122,255,.22),transparent 62%),radial-gradient(760px 560px at 104% 14%,rgba(175,82,222,.17),transparent 62%),radial-gradient(980px 640px at 46% 118%,rgba(48,176,199,.18),transparent 60%),#edf0f7;',
+    '--mm-sheet-glass:linear-gradient(168deg,rgba(255,255,255,.9),rgba(255,255,255,.72) 55%,rgba(255,255,255,.8));',
+    '--mm-glass-edge:inset 0 1px 0 rgba(255,255,255,.98),inset 0 0 0 1px rgba(255,255,255,.6),inset 0 -1px 0 rgba(255,255,255,.35);',
+    '--mm-float:0 0 0 .5px rgba(15,23,42,.08),0 2px 6px rgba(30,41,82,.05),0 26px 60px -18px rgba(30,41,82,.26);--mm-ease:cubic-bezier(.23,1,.32,1)}',
+    // (a frame's page clear, so the hub's ground runs on under it with no seam)
+    'html.simpl-mm.simpl-rail.simpl-framed,html.simpl-mm.simpl-rail.simpl-framed body,html.simpl-mm.simpl-rail #root{background:transparent!important}',
+    // the hub's bar: its title and due date are the popup's, its buttons glass on the ground
+    'html.simpl-mm.simpl-rail .hub_molecule_app_header{background:transparent!important;border:0!important;-webkit-backdrop-filter:none;backdrop-filter:none;padding:0 14px!important}',
+    'html.simpl-mm.simpl-rail .hub_molecule_app_header>button{background:rgba(255,255,255,.72)!important;box-shadow:var(--mm-glass-edge),0 2px 8px rgba(30,41,82,.1)!important;transition:transform .12s var(--mm-ease),background-color .15s ease}',
+    'html.simpl-mm.simpl-rail .hub_molecule_app_header>button:active{transform:scale(.94)}',
+    // (the hub's help — its Resource Center, which floats in the window's corner — up by the bar, clear of the dock)
+    'html.simpl-mm.simpl-rail [aria-label="Open Resource Center"]{top:8px!important;right:14px!important;bottom:auto!important;left:auto!important;width:36px!important;height:36px!important}',
+    'html.simpl-mm.simpl-rail .hub_molecule_app_header .app_header_title_txt,html.simpl-mm.simpl-rail [data-test-id="assign-due-div"],html.simpl-mm.simpl-rail #check-bar [data-test-id="final-score-fraction"]{position:absolute!important;width:1px!important;height:1px!important;margin:-1px!important;padding:0!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;white-space:nowrap!important;border:0!important}',
+    // the player: no side list (the rail has it), room under the question for the dock
+    'html.simpl-mm.simpl-rail #sac{box-sizing:border-box;height:100vh;padding:6px 24px 0!important;overflow:hidden}',
+    'html.simpl-mm.simpl-rail #sac>#side-nav{display:none!important}',
+    'html.simpl-mm.simpl-rail #main{--mm-side:0px}',
+    // the dock: Resources, AI Tutor, Solution at its left; the verdict and the main button at its right (glass drawn
+    // under it, not on it — a blur on the bar would hold the verdict, fixed, inside it)
+    'html.simpl-mm.simpl-rail #check-bar{position:fixed!important;z-index:50;left:24px!important;right:24px!important;top:auto!important;bottom:calc(18px + var(--simpl-lift,0px))!important;width:auto!important;height:64px!important;min-height:0!important;margin:0!important;padding:0 11px 0 12px!important;display:flex!important;align-items:center;gap:8px;border:0!important;border-radius:22px!important;background:transparent!important;box-shadow:var(--mm-float)!important;isolation:isolate;transition:bottom .25s var(--mm-ease)}',
+    'html.simpl-mm.simpl-rail #check-bar::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:rgba(255,255,255,.62);-webkit-backdrop-filter:blur(24px) saturate(1.9);backdrop-filter:blur(24px) saturate(1.9);box-shadow:var(--mm-glass-edge);pointer-events:none}',
+    'html.simpl-mm.simpl-rail #check-bar>.header-actions-container{display:flex!important;align-items:center;gap:8px;min-width:0;flex:1 1 auto}',
+    'html.simpl-mm.simpl-rail #check-bar>.check-bar-actions{display:flex!important;align-items:center;margin-left:auto!important;flex:none}',
+    'html.simpl-mm.simpl-rail #tools{width:auto!important;flex:none!important;margin:0 4px 0 0!important}',
+    'html.simpl-mm.simpl-rail #tools li>button[data-test-id]{display:inline-flex!important;flex-direction:row!important;align-items:center!important;gap:7px;height:40px!important;padding:0 16px!important;background:rgba(120,120,128,.1)!important;transition:transform .12s var(--mm-ease),background-color .15s ease}',
+    'html.simpl-mm.simpl-rail #tools li>button[data-test-id]:active{transform:scale(.96)}',
+    'html.simpl-mm.simpl-rail #tools li>button[class*="pendo"]{background:transparent!important;box-shadow:none!important;padding:0!important;width:24px!important}',
+    'html.simpl-mm.simpl-rail #tools li>button .MuiButton-startIcon{margin:0!important}',
+    'html.simpl-mm.simpl-rail #tools li>button svg{width:18px!important;height:18px!important}',
+    'html.simpl-mm.simpl-rail #check-bar [data-test-id="switch-to-new-layout"]{border:0!important;background:transparent!important;box-shadow:none!important}',
+    'html.simpl-mm.simpl-rail button[data-test-id="btn-sac-main"]{position:static!important;height:44px!important;min-width:var(--mm-btn-w)!important;width:auto!important}',
+    // (the verdict over the dock's right end, by the main button, the question scrolling under both)
+    'html.simpl-mm.simpl-rail #results{right:30px!important;bottom:calc(18px + 64px + 10px + var(--simpl-lift,0px))!important;height:40px!important;max-width:min(60vw,520px)}',
+    // (a narrow popup: Switch to New Layout said shorter, the tools closer, so the dock holds them all)
+    '@media (max-width:900px){html.simpl-mm.simpl-rail #check-bar [data-test-id="switch-to-new-layout"]{font-size:0!important;padding:7px 6px!important}html.simpl-mm.simpl-rail #check-bar [data-test-id="switch-to-new-layout"]::before{content:"New Layout";font:500 12px/1 var(--mm-ui);margin-right:5px}html.simpl-mm.simpl-rail #check-bar [data-test-id="switch-to-new-layout"]>*{font-size:10px!important}html.simpl-mm.simpl-rail #tools li>button[data-test-id]{padding:0 12px!important}}',
+    // the question: its number large, the arrows and attempts as glass beside it
+    'html.simpl-mm.simpl-rail #attempts-holder{height:60px!important;min-height:60px!important}',
+    'html.simpl-mm.simpl-rail #question-name{height:60px!important}',
+    'html.simpl-mm.simpl-rail #question-name #nav-question-num{font:700 26px/1.15 var(--mm-ui)!important;letter-spacing:-.022em}',
+    'html.simpl-mm.simpl-rail #question-name button{width:34px!important;height:34px!important;background:rgba(255,255,255,.72)!important;border:0!important;box-shadow:var(--mm-glass-edge),0 2px 8px rgba(30,41,82,.12)!important}',
+    'html.simpl-mm.simpl-rail #attempts-holder.dropdown #attempts-button{top:12px!important;height:36px;border:0!important;background:rgba(255,255,255,.72)!important;box-shadow:var(--mm-glass-edge),0 2px 8px rgba(30,41,82,.12)!important}',
+    // the sheet: liquid glass — light through it from the ground, a bright rim, a deep soft shadow
+    'html.simpl-mm.simpl-rail #raptor-content-container .authoring-area>.parent-module-container,html.simpl-mm.simpl-rail #raptor-content-container .shared-module-container{background:var(--mm-sheet-glass)!important;border:0!important;border-radius:28px!important;box-shadow:var(--mm-glass-edge),var(--mm-float)!important}',
+    // (the question scrolls from under its number down under the dock: as tall as the frame, room at its foot to scroll
+    // its last line clear of the dock; Macmillan lays it out 960 wide — the popup zooms its page out to fit, as the
+    // browser's own zoom would, told the width by the rail's `wide` — and centred when there is room to spare)
+    'html.simpl-mm.simpl-rail .raptor-container{height:calc(100vh - 6px)!important;padding-bottom:0!important}',
+    'html.simpl-mm.simpl-rail #raptor-content-container{width:auto!important;max-width:100%}',
+    'html.simpl-mm.simpl-rail #raptor-content-container .content-area{margin:0!important;left:var(--simpl-left,0px)!important;padding-bottom:112px!important}',
+    'html.simpl-mm.simpl-rail #raptor-content-container .authoring-area>.parent-module-container,html.simpl-mm.simpl-rail #sac .authoring-area .shared-module-container{min-height:calc(100vh - 190px)!important}',
+    'html.simpl-mm.simpl-rail #sac .authoring-area .shared-module-container.vertical{height:calc(100vh - 190px)!important}',
+    'html.simpl-mm.simpl-rail .labeling-answer-bank{border-radius:16px!important;overflow:hidden;background:rgba(255,255,255,.6)!important}',
+    'html.simpl-mm.simpl-rail .numeric-entry-border{background:rgba(255,255,255,.92)!important}',
+    'html.simpl-mm.simpl-rail .math-palette.as-popup{border-radius:18px!important;overflow:hidden}',
+    // (a new question eases in where the last one was: up a little and clear, as a page turned)
+    '@keyframes simpl-mm-turn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}',
+    '@keyframes simpl-mm-fade{from{opacity:0}to{opacity:1}}',
+    '@media (prefers-reduced-motion:no-preference){html.simpl-mm.simpl-rail #raptor-content-container.simpl-turn{animation:simpl-mm-turn .34s var(--mm-ease)}html.simpl-mm.simpl-rail #check-bar{animation:simpl-mm-fade .3s var(--mm-ease)}}',
+    '@media (prefers-reduced-motion:reduce){html.simpl-mm.simpl-rail #raptor-content-container.simpl-turn{animation:simpl-mm-fade .2s ease}}',
+    '@media (prefers-reduced-transparency:reduce){html.simpl-mm.simpl-rail{--mm-sheet-glass:#fff}html.simpl-mm.simpl-rail #check-bar::before{-webkit-backdrop-filter:none;backdrop-filter:none;background:#fff}}',
   ].join('\n');
 
   var style = document.createElement('style');
@@ -163,8 +233,57 @@
   // What the styles cannot see for themselves: the question open (the rail's row marked), how much is done, whether a
   // verdict is showing, and Macmillan's maths keyboard over the window's foot (the button and the verdict lifted over it).
   var told = false, queued = false;
+
+  // (1.3.199) For the popup's rail, said again whenever it changes: each question (its number, Macmillan's word for its
+  // state — success, default, … — the line under it and its points), the one open, how many are done, the score.
+  var railSaid = '', opened = false, lastHere = 0;
+  var text = function (e) { return e ? (e.textContent || '').replace(/\s+/g, ' ').trim() : ''; };
+  var report = function () {
+    var rows = document.querySelectorAll('#question-nav > li[data-test-id^="item-"]');
+    if (!rows.length) {
+      // (the side list folded: opened once, as its questions are only there while it is open)
+      var nav = document.getElementById('side-nav'), open = nav && nav.querySelector('[data-test-id="nav-toggle-item"] > button');
+      if (rail && !opened && nav && nav.classList.contains('closed') && open) { opened = true; open.click(); }
+      return 0;
+    }
+    var list = [];
+    for (var i = 0; i < rows.length; i++) {
+      var m = /^item-(\d+)-([a-z-]*?)-?row$/i.exec(rows[i].getAttribute('data-test-id') || '');
+      if (!m) continue;
+      var num = rows[i].querySelector('[data-test-id$="-number"]');
+      list.push({ n: +m[1], kind: m[2] || 'default', label: text(num) || ('Q' + m[1]), sub: text(num && num.nextElementSibling), points: text(rows[i].querySelector('[data-test-id$="-points"]')) });
+    }
+    var h = document.getElementById('nav-question-num') || document.querySelector('[data-test-id="nav-question-header"]');
+    var at = /(\d+)\s+of\s+(\d+)/i.exec(text(h));
+    var t = text(document.querySelector('[data-test-id="side-nav-button-title"]'));
+    var done = /(\d+)\s+of\s+(\d+)/i.exec(t);
+    var area = document.querySelector('#raptor-content-container .content-area');
+    var o = { rail: 'macmillan', rows: list, here: at ? +at[1] : 0, done: done ? +done[1] : -1, total: done ? +done[2] : list.length,
+      score: text(document.querySelector('[data-test-id="final-score-fraction"]')), title: t,
+      policy: !!document.querySelector('[data-test-id="show-policy-details-button"]'),
+      // (the width the question wants, in the page's own pixels: its sheet and the margins round it)
+      wide: Math.ceil((area ? parseFloat(getComputedStyle(area).width) || 960 : 960) + 48) };
+    var said = JSON.stringify(o);
+    if (rail && said !== railSaid) { railSaid = said; tell(o); }
+    return o.here;
+  };
+  // What the popup's rail asks of the page: a question opened (Macmillan's own row clicked), the grading settings shown.
+  var act = function (c) {
+    if (!c || typeof c !== 'object') return;
+    var b = c.go ? document.querySelector('#question-nav > li[data-test-id^="item-' + (+c.go) + '-"]')
+      : c.policy ? document.querySelector('[data-test-id="show-policy-details-button"]') : null;
+    if (b) b.click();
+  };
+
   var mark = function () {
     queued = false;
+    var now = report();
+    // (a new question: eased in, as a page turned — not the first one drawn)
+    if (on && rail && now && lastHere && now !== lastHere) {
+      var turn = document.getElementById('raptor-content-container');
+      if (turn) { turn.classList.remove('simpl-turn'); void turn.offsetWidth; turn.classList.add('simpl-turn'); }
+    }
+    if (now) lastHere = now;
     if (!on) return;
     root.classList.add('simpl-mm');
     var h = document.getElementById('nav-question-num') || document.querySelector('[data-test-id="nav-question-header"]');
@@ -193,6 +312,14 @@
       if (k.width > 0 && k.height > 0 && k.right > from - 8) lift = Math.max(0, Math.round(innerHeight - k.top - 12));
     }
     root.style.setProperty('--simpl-lift', lift + 'px');
+    if (rail) {
+      // (1.3.199) the question centred in the room the frame has (the popup zooms the page out when it has less)
+      var area = document.querySelector('#raptor-content-container .content-area'), box = document.getElementById('raptor-content-container');
+      if (area && box) {
+        var room = Math.min(box.clientWidth, root.clientWidth - 48) - 2;
+        root.style.setProperty('--simpl-left', Math.max(0, Math.floor((room - (parseFloat(getComputedStyle(area).width) || 0)) / 2)) + 'px');
+      }
+    }
     if (!told && rows.length) {
       told = true;
       tell({ said: 'drawn', host: location.host, rows: rows.length, here: here ? here.getAttribute('data-test-id') : '' });
@@ -209,21 +336,28 @@
     queue();
   };
 
+  var classes = function () {
+    root.classList.toggle('simpl-mm', on);
+    root.classList.toggle('simpl-rail', on && rail);
+    root.classList.toggle('simpl-framed', framed);
+  };
   var draw = function () {
     if (!root) return;
-    root.classList.toggle('simpl-mm', on);
-    if (on) { watch(); queue(); }
+    classes();
+    if (on || rail) { watch(); queue(); } // (the rail is told of the questions with the look off too)
   };
-  var relay = function () {
-    for (var i = 0; i < window.frames.length; i++) { try { window.frames[i].postMessage({ simplMMLook: on }, '*'); } catch (e) { /* (gone) */ } }
+  var relay = function (d) {
+    for (var i = 0; i < window.frames.length; i++) { try { window.frames[i].postMessage(d, '*'); } catch (e) { /* (gone) */ } }
   };
-  window.__simplMMSet = function (v) { on = !!v; draw(); relay(); };
+  window.__simplMMSet = function (v) { on = !!v; draw(); relay({ simplMMLook: on }); };
+  window.__simplMMDo = function (c) { act(c); relay({ simplMMDo: c }); };
   addEventListener('message', function (e) {
     var d = e.data;
     if (!d || typeof d !== 'object') return;
     if (d.simplMMAsk === 1 && e.source) { try { e.source.postMessage({ simplMMLook: on }, '*'); } catch (x) { /* (gone) */ } return; }
     if (d.simplMMTell && typeof d.simplMMTell === 'object' && window.parent === window) { tell(d.simplMMTell); return; }
     if (typeof d.simplMMLook === 'boolean' && e.source === window.parent && window.parent !== window) window.__simplMMSet(d.simplMMLook);
+    if (d.simplMMDo && typeof d.simplMMDo === 'object' && e.source === window.parent && window.parent !== window) window.__simplMMDo(d.simplMMDo);
   });
   // (a frame loaded after the look was turned: as its parent has it now)
   if (window.parent !== window) { try { window.parent.postMessage({ simplMMAsk: 1 }, '*'); } catch (e) { /* (no parent to ask) */ } }
@@ -232,7 +366,7 @@
   var begin = function () {
     root = document.documentElement;
     root.appendChild(style);
-    root.classList.toggle('simpl-mm', on);
+    classes();
     if (document.body) draw(); else document.addEventListener('DOMContentLoaded', draw, { once: true });
   };
   if (document.documentElement) begin();

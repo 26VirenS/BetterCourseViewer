@@ -255,6 +255,7 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
         engine.ToolRequested += t => { if (engine is { } e) new WebWindow(e, t, this).Show(); };
         engine.QuizRequested += q => Simpl.Screens.QuizPopup.Show(engine, q, this);
         engine.AltaRequested += a => Simpl.Screens.AltaPopup.Show(engine, a, this);
+        engine.LookRequested += l => Simpl.Screens.LookPopup.Show(engine, l, this);
         engine.SettingsRequested += OpenSettings;
         engine.WhatsNewRequested += d => WhenInSight(() => { WhatsNew.MarkSeen(); MergedIntro.MarkSeen(); WhatsNewSheet.Show(d, this); });
         // (0.3.80: seen once it is up, the update's What's New with it — the account menu's What's new has those notes)
