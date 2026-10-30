@@ -232,7 +232,7 @@ struct LookQuizScreen: View {
         // (1.3.202) Macmillan's cover as the popup's own start screen, as Alta's: its page waits under it
         .overlay {
             if front && ready, let c = rail.cover {
-                LookStartScreen(cover: c, dueShown: dueLine != nil) { if let b = c.start { rail.press(b) } }
+                LookStartScreen(cover: c, dueShown: !(dueLine ?? "").isEmpty) { if let b = c.start { rail.press(b) } }
                     .transition(.opacity)
             }
         }
