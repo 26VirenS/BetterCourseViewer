@@ -355,7 +355,8 @@ jobs:
           Shot 'sign-in-light-wide' '1366x778' 40 ($login + @('--appearance', 'light'))
           # (the page, then a failed sign-in on it: the plain sign-in pictures' 22 s and more — at 16 s a runner that stalled
           #  7 s at start took this before the page had drawn)
-          Shot 'sign-in-wrong' '1024x681' 24 ($login + @('--appearance', 'light', '--sign-in', 'student:wrong'))
+          # (0.3.102: up to 40 seconds as the card's other pictures, not 24 — on a slow runner its web view started later)
+          Shot 'sign-in-wrong' '1024x681' 40 ($login + @('--appearance', 'light', '--sign-in', 'student:wrong'))
           Shot 'sign-in-working' '1024x681' 14 ($login + @('--appearance', 'light', '--sign-in', 'slow:demo'))
           Shot 'sign-in-stay' '1024x681' 40 ($login + @('--appearance', 'dark', '--sign-in', 'student:demo'))
           Shot 'sign-in-handoff' '1024x681' 18 ($login + @('--appearance', 'light', '--sign-in', 'code:demo'))
@@ -783,7 +784,7 @@ jobs:
           # dark; a pin's quick version pulled out into its own window over a quiz, light and dark; a graded quiz's quick
           # look from the calendar; Updates' earlier versions as an installed copy lists them; an assignment in a window of
           # its own
-          Shot 'sign-in-wrong-dark' '1024x681' 24 ($login + @('--appearance', 'dark', '--sign-in', 'student:wrong'))
+          Shot 'sign-in-wrong-dark' '1024x681' 40 ($login + @('--appearance', 'dark', '--sign-in', 'student:wrong'))
           Shot 'pin-popout' '1366x778' 45 ($mock + @('--appearance', 'light', '--pin', 'calc,ptable', '--open', 'quiz:101:9011:take:2', '--pin-popout', 'calc'))
           Shot 'pin-popout-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--pin', 'calc,ptable', '--open', 'quiz:101:9011:take:2', '--pin-popout', 'calc'))
           Shot 'calendar-preview-graded' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'calendar', '--open', 'preview', '--preview-of', 'Lec01-PreQuiz'))
