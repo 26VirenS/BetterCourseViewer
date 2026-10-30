@@ -26,6 +26,8 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.101", "2026-10-30",
+            ("improved", "One Big List", "A tool's popup is bigger and lists all its work in order.")),
         R("0.3.100", "2026-10-30",
             ("improved", "List or Activity", "The Dashboard shows a list by day or recent activity."),
             ("improved", "Tool Lists in a Popup", "Choosing a tool opens its list in a popup over the page."),

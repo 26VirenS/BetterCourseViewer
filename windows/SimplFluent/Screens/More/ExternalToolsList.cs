@@ -17,19 +17,19 @@ namespace Simpl.Screens;
 
 /// <summary>
 /// A tool's list, its card pressed: every place the tool is used, to choose the one to open — (0.3.100) in a popup of
-/// its own over the window, as the app's dialogs are: centred, 480 wide, the window dimmed behind it, arriving from a
-/// touch larger as it fades in (a flyout hung under its card before, cramped by the room under it).
-/// (0.3.98) A viewer of its own rather than a plain list: at its head, on a wash of the tool's colour, its tile, its name,
-/// its site, how many places in how many courses, and how many are still to do; To do and All when it has both (To do to
-/// start with); a filter once there are more than eight; then the next still to do on a card of its own with Open, and
-/// the rest — by course, under the course's name and how many it has there, when it is in more than one — each with a
-/// mark of where it stands (to do, done, missing, late, a module item), its title, its line and its status, a chevron
-/// under the pointer; at its foot, the keys it takes. ↑ and ↓ move between them, Enter opens one, Escape, its × or a
-/// press anywhere outside it closes it, and opening one closes it first.
+/// its own over the window, as the app's dialogs are: centred, 600 wide, up to 720 tall, the window dimmed behind it,
+/// arriving from a touch larger as it fades in (a flyout hung under its card before, cramped by the room under it).
+/// (0.3.101) One list of them all, in their order — by course, under the course's name and how many it has there, when
+/// it is in more than one — as before 0.3.98's To do and All and its Up next card: the next still to do in it with its
+/// Next tag, the keyboard on it and the list scrolled to it. At its head, on a wash of the tool's colour, its tile, its
+/// name, its site, how many places in how many courses, and how many are still to do; a filter once there are more than
+/// eight; each place with a mark of where it stands (to do, done, missing, late, a module item), its title, its line and
+/// its status, a chevron under the pointer; at its foot, the keys it takes. ↑ and ↓ move between them, Enter opens one,
+/// Escape, its × or a press anywhere outside it closes it, and opening one closes it first.
 /// </summary>
 public sealed partial class ExternalToolsScreen
 {
-    private const double ListWidth = 480, ListHeight = 560;
+    private const double ListWidth = 600, ListHeight = 720;
 
     private Sheet? list;
     private string? listId;
@@ -40,9 +40,8 @@ public sealed partial class ExternalToolsScreen
     private Stack? rowsHost;
     /// <summary>The rows shown, in order, each with what it opens: ↑ and ↓ move between them, Enter opens one.</summary>
     private readonly List<(Button Row, Action Open)> listRows = new();
-    /// <summary>(0.3.98) To do (0) or All (1), when the tool has both (<see cref="listScoped"/>).</summary>
-    private int listScope;
-    private bool listScoped;
+    /// <summary>(0.3.101) The next still to do's row in <see cref="listRows"/>, if it is shown.</summary>
+    private int listNext = -1;
 
     /// <summary>A card pressed: its list.</summary>
     private void ToggleList(string id, FrameworkElement card)
@@ -60,9 +59,9 @@ public sealed partial class ExternalToolsScreen
     }
 
     /// <summary>
-    /// The list of a tool's places, in its popup over the window: 480 wide, as tall as its rows up to 560 (then they
+    /// The list of a tool's places, in its popup over the window: 600 wide, as tall as its rows up to 720 (then they
     /// scroll), and no taller than the window has room for. The filter takes the keyboard when there is one, else the
-    /// first row.
+    /// next still to do's row; the list is scrolled to that row either way.
     /// </summary>
     private void OpenList(Tool t, FrameworkElement card)
     {
@@ -103,23 +102,13 @@ public sealed partial class ExternalToolsScreen
             Child = K.Columns("auto, *, auto, auto", tile.Margin(0, 0, 12, 0).Col(0), words.Col(1), still?.Col(2), close.Col(3)),
         };
 
-        // (0.3.98) To do and All, when it has both: To do to start with
-        listScope = 0;
-        listScoped = toDo > 0 && toDo < count;
-        SelectorBar? scope = null;
-        if (listScoped)
-        {
-            scope = new SelectorBar(new[] { $"To do · {toDo}", $"All · {count}" }, 0) { Margin = new Thickness(10, 2, 10, 6) };
-            scope.Changed += i => { listScope = i; FillList(t); };
-        }
-
         if (count > 8)
         {
             listFilter = new TextBox
             {
                 PlaceholderText = Noun(t) switch { "assignment" => "Filter assignments", "module item" => "Filter module items", _ => "Filter" },
                 Icon = new SymbolIcon { Symbol = SymbolRegular.Filter24 }, IconPlacement = ElementPlacement.Left,
-                MinHeight = 32, Margin = new Thickness(12, scope == null ? 8 : 0, 12, 8),
+                MinHeight = 32, Margin = new Thickness(12, 8, 12, 8),
             };
             listFilter.TextChanged += (_, _) => FillList(t);
         }
@@ -129,7 +118,7 @@ public sealed partial class ExternalToolsScreen
             Content = rows, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
             Focusable = false, Margin = new Thickness(6, 4, 4, 6), Padding = new Thickness(0, 0, 2, 0),
         };
-        var content = K.Rows("auto, auto, auto, *, auto", head.Row(0), scope?.Row(1), listFilter?.Row(2), scroller.Row(3), Foot().Row(4));
+        var content = K.Rows("auto, auto, *, auto", head.Row(0), listFilter?.Row(1), scroller.Row(2), Foot().Row(3));
 
         var surface = new Grid { MaxHeight = ListHeight, Children = { content } };
         surface.SetResourceReference(TextElement.ForegroundProperty, B.Text);
@@ -150,44 +139,45 @@ public sealed partial class ExternalToolsScreen
         surface.Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
         {
             if (listSurface != surface) return;
+            var at = listNext >= 0 ? listNext : 0;
+            if (listRows.Count > at) listRows[at].Row.BringIntoView();
             if (listFilter != null) { listFilter.Focus(); listFilter.CaretIndex = listFilter.Text.Length; }
-            else if (listRows.Count > 0) listRows[0].Row.Focus();
+            else if (listRows.Count > at) listRows[at].Row.Focus();
         });
         if (Shot.Asked) Log.Write($"tool list shown: {t.Name}");
     }
 
     /// <summary>
-    /// The list's rows for the choice and the filter's words (all of them with none): the next still to do first, on its
-    /// card, while nothing is typed; then by course when the tool is in more than one — the course's dot, name and count
-    /// over its own — each place a row.
+    /// The list's rows for the filter's words (all of them with none), in their order: by course when the tool is in more
+    /// than one — the course's dot, name and count over its own — each place a row, the next still to do with its Next tag.
     /// </summary>
     private void FillList(Tool t)
     {
         if (rowsHost is not { } rows) return;
         rows.Children.Clear();
         listRows.Clear();
+        listNext = -1;
         var q = (listFilter?.Text ?? "").Trim();
         var places = t.Courses.Where(c => c.Items.Count > 0).ToList();
         var grouped = places.Count > 1;
         // (the soonest still to do — as the card says it — else the first still to do as listed)
         var next = t.Next is { } n ? places.FirstOrDefault(c => c.Name == n.Course)?.Items.FirstOrDefault(i => i.Upcoming && i.Title == n.Title) : null;
         next ??= places.SelectMany(c => c.Items).FirstOrDefault(i => i.Upcoming);
-        var toDoOnly = listScoped && listScope == 0;
         bool Has(string? s) => s?.Contains(q, StringComparison.CurrentCultureIgnoreCase) == true;
-        List<Item> Shown(Course c) => c.Items.Where(i => (!toDoOnly || i.Upcoming) && (q.Length == 0 || Has(i.Title) || Has(i.Sub) || Has(i.Status?.Word) || Has(c.Name))).ToList();
-        var lead = q.Length == 0 && next != null && places.Any(c => Shown(c).Contains(next));
-        if (lead && places.FirstOrDefault(c => c.Items.Contains(next!)) is { } nc) rows.Children.Add(UpNext(t, nc, next!, grouped));
         var any = false;
         foreach (var c in places)
         {
-            var items = Shown(c).Where(i => !(lead && ReferenceEquals(i, next))).ToList();
+            var items = c.Items.Where(i => q.Length == 0 || Has(i.Title) || Has(i.Sub) || Has(i.Status?.Word) || Has(c.Name)).ToList();
             if (items.Count == 0) continue;
-            if (grouped) rows.Children.Add(GroupHead(c, items.Count, first: !any && !lead));
-            else if (lead && !any) rows.Children.Add(Label(toDoOnly ? "Later" : Noun(t) switch { "assignment" => "Assignments", "module item" => "Module items", _ => "All" }));
-            foreach (var it in items) rows.Children.Add(ListRow(t, c, it, ReferenceEquals(it, next)));
+            if (grouped) rows.Children.Add(GroupHead(c, items.Count, first: !any));
+            foreach (var it in items)
+            {
+                if (ReferenceEquals(it, next)) listNext = listRows.Count;
+                rows.Children.Add(ListRow(t, c, it, ReferenceEquals(it, next)));
+            }
             any = true;
         }
-        if (!any && !lead) rows.Children.Add(K.Wrapped(q.Length == 0 ? "Nothing still to do." : $"Nothing matches “{q}”.", Ty.Body, B.Text2).Margin(10, 6, 10, 12));
+        if (!any) rows.Children.Add(K.Wrapped($"Nothing matches “{q}”.", Ty.Body, B.Text2).Margin(10, 6, 10, 12));
     }
 
     /// <summary>A course's name over its places in the list: its dot, its name and how many it has there, small and quiet.</summary>
@@ -201,14 +191,6 @@ public sealed partial class ExternalToolsScreen
         h.Margin = new Thickness(10, first ? 2 : 12, 10, 4);
         AutomationProperties.SetName(h, $"{c.Name}, {count}");
         return h;
-    }
-
-    /// <summary>A quiet word over the places after the next one's card, when they are all in one course.</summary>
-    private static FrameworkElement Label(string word)
-    {
-        var t = K.Text(word, Ty.Caption, B.Text2);
-        t.FontWeight = FontWeights.Medium;
-        return t.Margin(10, 10, 10, 4);
     }
 
     /// <summary>(0.3.98) Where a place stands, at a glance: a tick for work done, a mark for work missing, a clock for work
@@ -227,49 +209,6 @@ public sealed partial class ExternalToolsScreen
         return tile;
     }
 
-    /// <summary>(0.3.98) The next still to do, on a card of its own: Up next, its mark, its title, its line (and its course
-    /// when there are several), and Open.</summary>
-    private Button UpNext(Tool t, Course c, Item it, bool grouped)
-    {
-        var accent = Appearance.Accent;
-        var kicker = K.Text("UP NEXT", Ty.Caption);
-        kicker.FontWeight = FontWeights.Bold;
-        kicker.Foreground = K.Brush(K.Darkened(accent));
-        var title = K.Wrapped(it.Short is { Length: > 0 } s0 ? s0 : Short(t, it.Title), Ty.BodyStrong, B.Text, 2);
-        var line = string.Join(" · ", new[] { it.Sub, grouped ? c.Name : null }.Where(x => !string.IsNullOrEmpty(x)));
-        var words = K.V(2, title, line.Length > 0 ? K.Text(line, Ty.Caption, B.Text2) : null);
-        words.VerticalAlignment = VerticalAlignment.Center;
-        var openWord = K.Text("Open", Ty.Body);
-        openWord.FontWeight = FontWeights.SemiBold;
-        openWord.Foreground = Brushes.White;
-        var open = new Border
-        {
-            Background = K.Brush(accent), CornerRadius = new CornerRadius(14), Padding = new Thickness(12, 4, 10, 5), VerticalAlignment = VerticalAlignment.Center,
-            Child = K.H(4, openWord, K.Icon(SymbolRegular.ChevronRight16, 12, Colors.White)),
-        };
-        var g = K.Columns("auto, *, auto", Mark(c, it, 36).Margin(0, 0, 12, 0).Col(0), words.Col(1), open.Margin(10, 0, 0, 0).Col(2));
-        var face = new Border
-        {
-            Padding = new Thickness(12, 10, 12, 12), CornerRadius = new CornerRadius(8),
-            Background = K.Brush(K.WithAlpha(accent, Appearance.Dark ? 0.16 : 0.08)), BorderBrush = K.Brush(K.WithAlpha(accent, 0.3)), BorderThickness = new Thickness(1),
-            Child = K.V(8, kicker, g),
-        };
-        void Go()
-        {
-            CloseList();
-            Open(engine, t, c, it);
-        }
-        var b = K.Subtle(face, Go, new Thickness(0), 8);
-        b.Margin = new Thickness(0, 0, 0, 4);
-        AutomationProperties.SetName(b, string.Join(", ", new[] { "Up next", it.Title, it.Sub, grouped ? c.Name : null }.Where(x => !string.IsNullOrEmpty(x))));
-        listRows.Add((b, Go));
-        return b;
-    }
-
-    /// <summary>A place in the list: its mark, its title (two lines at most), the line under it (when it is due and its
-    /// points, or its module), Next before that line for the next one to do (when it is not on its card, a filter typed),
-    /// and where the work stands at its end, as every list of work shows it, a chevron after it under the pointer. A press
-    /// opens it.</summary>
     private Button ListRow(Tool t, Course c, Item it, bool next)
     {
         var title = K.Wrapped(it.Short is { Length: > 0 } s0 ? s0 : Short(t, it.Title), Ty.Body, B.Text, 2);
