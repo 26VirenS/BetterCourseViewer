@@ -587,11 +587,11 @@ final class LookRail: ObservableObject {
     private var zoomSaid = -1.0
 
     /// The tool's page zoomed out (never in) as far as it takes to fit its width into the popup's — less a scroll bar's
-    /// width, so the page never scrolls sideways for want of it — not past 66% (1.3.200: 70% left a small popup's page a
-    /// few points too wide, scrolling sideways under the glass).
+    /// width and a little over, so the page never scrolls sideways for want of it — not past 66% (1.3.200: 70% left a
+    /// small popup's page a few points too wide, scrolling sideways under the glass).
     private func zoom() {
-        guard let v = webView, wide > 0, width > 16 else { return }
-        let room = Double(width) - 16
+        guard let v = webView, wide > 0, width > 28 else { return }
+        let room = Double(width) - 28
         let z = max(0.66, min(1, room / wide))
         if abs(Double(v.pageZoom) - z) > 0.004 { v.pageZoom = CGFloat(z) }
         guard abs(zoomSaid - z) > 0.004 else { return }
