@@ -26,6 +26,10 @@ namespace Simpl.Screens;
 /// word on the last answer — and in the rest, the tool's own page in Simpl's look (PageLook's rail mode), where every
 /// question is answered as on the tool's own page. A tile clicked opens that question (Macmillan's own row clicked in the
 /// page). The page is zoomed out, as the browser's own zoom would, while the popup is narrower than the tool lays it out.
+/// (0.3.95, the Mac's 1.3.200) And the popup's own front end around the page: over it, the question's heading the popup's
+/// (which question, Previous and Next; ALEKS's topic and its steps); under it, the tool's buttons and its verdict as the
+/// popup's own, each pressing the tool's (its own bar out of sight in the page). Nothing can be drawn over a web view, so
+/// they sit above and below it (the Mac lays the page clear over Liquid Glass and floats them over it).
 /// </summary>
 public static class LookPopup
 {
@@ -46,6 +50,29 @@ internal sealed class LookPopupView
         public bool Tried => !Solved && Kind != "default" && Kind.Length > 0;
     }
 
+    /// <summary>(0.3.95) One of the tool's own buttons, as the popup's front end draws it: pressed, it presses the tool's.</summary>
+    private sealed record PageButton(string Id, string Label, string Kind, bool Primary, bool Enabled)
+    {
+        /// <summary>Its symbol, from what it is (null for its words alone).</summary>
+        public SymbolRegular? Symbol
+        {
+            get
+            {
+                var k = (Kind + " " + Label).ToLowerInvariant();
+                if (k.Contains("resource")) return SymbolRegular.Library24;
+                if (k.Contains("-mat-") || k.Contains("tutor")) return SymbolRegular.Sparkle24;
+                if (k.Contains("solution") || k.Contains("hint")) return SymbolRegular.Lightbulb24;
+                if (k.Contains("explain") || k.Contains("explanation")) return SymbolRegular.BookOpen24;
+                if (k.Contains("calculator")) return SymbolRegular.Calculator24;
+                if (k.Contains("video")) return SymbolRegular.Video24;
+                if (k.Contains("ebook") || k.Contains("textbook")) return SymbolRegular.Book24;
+                if (k.Contains("periodic")) return SymbolRegular.Beaker24;
+                if (k.Contains("help")) return SymbolRegular.QuestionCircle24;
+                return null;
+            }
+        }
+    }
+
     private readonly Engine.Engine engine;
     private readonly LookLaunch launch;
     private readonly Window over;
@@ -56,6 +83,9 @@ internal sealed class LookPopupView
     private readonly WebView2 web = new() { Visibility = Visibility.Hidden };
     private readonly ContentControl state = new() { Focusable = false };
     private readonly Grid holder = new();
+    /// <summary>(0.3.95) Over the page, the question's heading; under it, the tool's buttons — the popup's own.</summary>
+    private readonly Border questionBar = new() { Visibility = Visibility.Collapsed, Padding = new Thickness(20, 12, 16, 10) };
+    private readonly Border footer = new() { Visibility = Visibility.Collapsed, Padding = new Thickness(16, 12, 16, 12), BorderThickness = new Thickness(0, 1, 0, 0) };
     private readonly TextBlock title = K.Text("", Ty.Subtitle);
     private readonly TextBlock subtitle = K.Text("", Ty.Body, B.Text2);
     private readonly Wpf.Ui.Controls.Button lookButton;
@@ -73,6 +103,10 @@ internal sealed class LookPopupView
     private string score = "", slice = "", topic = "", status = "";
     private bool policy, onQuestion;
     private List<double> fills = new();
+    // (0.3.95) the popup's front end: the tool's lesser buttons and its main ones, its verdict, Macmillan's layout switch
+    private List<PageButton> tools = new(), actions = new();
+    private string verdictText = "", verdictKind = "", layout = "", frontSig = "";
+    private bool frontLogged;
     /// <summary>The share done and the steps' fills as last drawn: the ring and the bars grow from there.</summary>
     private double drawnShare = -1;
     private List<double> drawnFills = new();
@@ -100,11 +134,13 @@ internal sealed class LookPopupView
         body.ColumnDefinitions.Add(railColumn);
         body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         body.Children.Add(rail.Col(0));
-        holder.Margin = new Thickness(0, 0, FloatPopup.EdgeRoom, 8);
         holder.Children.Add(web);
         holder.Children.Add(state);
         holder.SizeChanged += (_, _) => Zoom();
-        body.Children.Add(AltaLook.Frame(holder).Col(1));
+        footer.SetResourceReference(Border.BorderBrushProperty, B.Divider);
+        var page = K.Rows("auto, *, auto", questionBar.Row(0), holder.Row(1), footer.Row(2));
+        page.Margin = new Thickness(0, 0, FloatPopup.EdgeRoom, 8);
+        body.Children.Add(AltaLook.Frame(page).Col(1));
         root.Children.Add(body.Row(1));
         PaintLook();
         PaintSubtitle();
@@ -120,6 +156,7 @@ internal sealed class LookPopupView
         sheet = AltaLook.Popup(root, header, Close, FullName, "look");
         root.SizeChanged += (_, e) => railColumn.Width = new GridLength(e.NewSize.Width >= 960 ? 284 : 240);
         sheet.Closed += Cleanup;
+        root.PreviewKeyDown += OnKey;
         sheet.Closed += Updates.Hold(FullName, $"when you close {FullName}").Dispose;
         RoutedEventHandler? loaded = null;
         loaded = (_, _) =>
@@ -165,7 +202,7 @@ internal sealed class LookPopupView
             // (a window the page opens — a sign-in, a resource — shown in place, as a tab would be)
             core.NewWindowRequested += (_, e) => { e.Handled = true; core.Navigate(e.Uri); };
             await LightPages.Apply(core, $"{kind.Name} popup");
-            look = await PageLook.Attach(core, rail: true);
+            look = await PageLook.Attach(core, rail: true, front: "card");
             look.Rail += o => root.Dispatcher.BeginInvoke(() => Take(o));
             PaintLook();
             var a = await engine.Call<LaunchAnswer>("toolLaunch", new Dictionary<string, object> { ["course"] = launch.Course, ["assignment"] = launch.Assignment });
@@ -234,9 +271,10 @@ internal sealed class LookPopupView
         lookButton.Appearance = on ? ControlAppearance.Primary : ControlAppearance.Secondary;
         lookButton.IsEnabled = look != null;
         lookButton.ToolTip = on
-            ? $"Simpl's look is on: {FullName}'s page on glass, its actions in a dock. Click to show it as {FullName} draws it."
+            ? $"Simpl's look is on: {FullName}'s question on glass, its buttons the popup's own. Click to show it as {FullName} draws it."
             : $"Show {FullName}'s page in Simpl's look";
         System.Windows.Automation.AutomationProperties.SetName(lookButton, on ? "Simpl Look, on" : "Simpl Look, off");
+        UpdateFront();
     }
 
     // ---- what the page says ----
@@ -278,6 +316,44 @@ internal sealed class LookPopupView
                 ? fs.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.Number).Select(x => Math.Clamp(x.GetDouble(), 0, 1)).ToList()
                 : new List<double>();
         }
+        // (0.3.95) the popup's front end: the tool's buttons, its verdict, Macmillan's layout switch
+        var lesser = new List<PageButton>();
+        var main = new List<PageButton>();
+        string said = "", saidKind = "";
+        static PageButton? ToButton(JsonElement b, bool? primary = null)
+        {
+            var id = S(b, "id");
+            var label = S(b, "label");
+            if (id.Length == 0 || label.Length == 0) return null;
+            return new PageButton(id, label, S(b, "kind"), primary ?? F(b, "primary"), !(b.TryGetProperty("enabled", out var e) && e.ValueKind == JsonValueKind.False));
+        }
+        if (o.TryGetProperty("front", out var f) && f.ValueKind == JsonValueKind.Object)
+        {
+            if (which == PageLook.Macmillan.Name)
+            {
+                if (f.TryGetProperty("tools", out var ts) && ts.ValueKind == JsonValueKind.Array)
+                    lesser.AddRange(ts.EnumerateArray().Select(t => ToButton(t, false)).OfType<PageButton>());
+                if (f.TryGetProperty("main", out var m) && m.ValueKind == JsonValueKind.Object && ToButton(m, true) is { } mb) main.Add(mb);
+                if (f.TryGetProperty("verdict", out var v) && v.ValueKind == JsonValueKind.Object) { said = S(v, "text"); saidKind = S(v, "kind"); }
+                layout = f.TryGetProperty("layout", out var l) && l.ValueKind == JsonValueKind.Object ? S(l, "label") : "";
+            }
+            else if (f.TryGetProperty("actions", out var acts) && acts.ValueKind == JsonValueKind.Array)
+            {
+                var all = acts.EnumerateArray().Select(a => ToButton(a)).OfType<PageButton>().ToList();
+                lesser.AddRange(all.Where(a => !a.Primary));
+                main.AddRange(all.Where(a => a.Primary));
+            }
+        }
+        tools = lesser;
+        actions = main;
+        verdictText = said;
+        verdictKind = saidKind;
+        lookName = which;
+        if (!frontLogged && tools.Count + actions.Count > 0)
+        {
+            frontLogged = true;
+            Log.Write($"{which} popup: front end, buttons {string.Join(", ", tools.Concat(actions).Select(b => b.Label))}");
+        }
         heard = true;
         if (!logged)
         {
@@ -293,6 +369,7 @@ internal sealed class LookPopupView
         }
         Ready();
         DrawRail();
+        UpdateFront();
     }
 
     private double zoomSaid = -1;
@@ -321,6 +398,178 @@ internal sealed class LookPopupView
     {
         if (web.CoreWebView2 is not { } c) return;
         try { await c.ExecuteScriptAsync("window.__simplMMDo && window.__simplMMDo({ policy: 1 })"); } catch { /* (gone) */ }
+    }
+
+    private string lookName = "", drawnVerdict = "";
+
+    /// <summary>(0.3.95) One of the tool's own buttons pressed, for the popup's: the page clicks it (look.js names each).</summary>
+    private async void Press(string id, string label)
+    {
+        if (web.CoreWebView2 is not { } c) return;
+        var safe = new string(id.Where(ch => char.IsLetterOrDigit(ch) || ch == '-').ToArray());
+        var fn = lookName == PageLook.Aleks.Name ? "__simplAKDo" : "__simplMMDo";
+        Log.Write($"{(lookName.Length > 0 ? lookName : kind.Name)} popup: pressed {label}");
+        try { await c.ExecuteScriptAsync($"window.{fn} && window.{fn}({{ press: '{safe}' }})"); } catch { /* (gone) */ }
+    }
+
+    // ---- (0.3.95) the front end: the question's heading over the page, the tool's buttons under it ----
+
+    private bool OnItem => heard && (kind.Name == PageLook.Aleks.Name ? topic.Length > 0 : total > 0 && here > 0);
+
+    private void UpdateFront()
+    {
+        if (closed) return;
+        var on = look?.On(kind) ?? true;
+        var head = on && OnItem;
+        var foot = on && tools.Count + actions.Count > 0;
+        var sig = JsonSerializer.Serialize(new object[] { head, foot, here, total, questions.Select(q => $"{q.N}{q.Kind}{q.Sub}{q.Points}"), slice, topic, done, fills, policy,
+            tools.Select(b => $"{b.Id}|{b.Label}|{b.Enabled}"), actions.Select(b => $"{b.Id}|{b.Label}|{b.Enabled}"), verdictText, verdictKind, layout });
+        if (sig == frontSig) return;
+        var verdictWas = drawnVerdict == verdictText;
+        drawnVerdict = verdictText;
+        frontSig = sig;
+
+        var headWas = questionBar.Visibility == Visibility.Visible;
+        questionBar.Visibility = head ? Visibility.Visible : Visibility.Collapsed;
+        questionBar.Child = head ? (kind.Name == PageLook.Aleks.Name ? AleksHeading() : MacmillanHeading()) : null;
+        if (head && !headWas) Motion.FadeIn(questionBar, Motion.Normal);
+
+        var footWas = footer.Visibility == Visibility.Visible;
+        footer.Visibility = foot ? Visibility.Visible : Visibility.Collapsed;
+        if (!foot) { footer.Child = null; return; }
+        var left = K.H(8);
+        foreach (var b in tools)
+        {
+            var (id, label) = (b.Id, b.Label);
+            var btn = K.Button(label, () => Press(id, label), icon: b.Symbol);
+            btn.IsEnabled = b.Enabled;
+            btn.ToolTip = $"{label} ({kind.Title}'s own)";
+            left.Children.Add(btn);
+        }
+        var right = K.H(8);
+        if (verdictText.Length > 0)
+        {
+            var pill = VerdictPill(verdictText, verdictKind);
+            if (footWas && !verdictWas) Motion.Pop(pill);
+            right.Children.Add(pill);
+        }
+        foreach (var b in actions)
+        {
+            var (id, label) = (b.Id, b.Label);
+            var btn = K.Button(label, () => Press(id, label), accent: b.Primary);
+            btn.MinWidth = 96;
+            btn.IsEnabled = b.Enabled;
+            btn.ToolTip = b.Enabled ? $"{label} ({kind.Title}'s own button{(b.Primary ? ", Ctrl+Enter" : "")})" : "Not ready yet: answer the question first";
+            ToolTipService.SetShowOnDisabled(btn, true);
+            right.Children.Add(btn);
+        }
+        footer.Child = K.Columns("auto, *, auto", left.Col(0), right.Align(HorizontalAlignment.Right).Col(2));
+        if (!footWas) Motion.FadeIn(footer, Motion.Normal);
+    }
+
+    /// <summary>Ctrl+Enter: the tool's main button, as the popup's own.</summary>
+    private void OnKey(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter || (Keyboard.Modifiers & ModifierKeys.Control) == 0) return;
+        if (!(look?.On(kind) ?? true) || actions.FirstOrDefault(a => a.Primary && a.Enabled) is not { } b) return;
+        e.Handled = true;
+        Press(b.Id, b.Label);
+    }
+
+    /// <summary>Macmillan's: which question of how many, what Macmillan says of it, Previous and Next, and its layout
+    /// switch and grading settings under "…".</summary>
+    private FrameworkElement MacmillanHeading()
+    {
+        var at = questions.FindIndex(q => q.N == here);
+        var before = at > 0 ? questions[at - 1].N : (int?)null;
+        var after = at >= 0 && at + 1 < questions.Count ? questions[at + 1].N : (int?)null;
+        var of = K.Text($"of {total}", Ty.Body, B.Text2);
+        of.VerticalAlignment = VerticalAlignment.Bottom;
+        of.Margin = new Thickness(0, 0, 0, 2);
+        var words = K.V(2, K.H(6, K.Text($"Question {here}", Ty.Subtitle), of));
+        if (at >= 0)
+        {
+            var q = questions[at];
+            var said = q.Sub.Length > 0 ? q.Sub : q.Solved ? "Solved" : q.Tried ? "Tried, not solved yet" : "Not answered yet";
+            var (icon, brush) = q.Solved ? (SymbolRegular.CheckmarkCircle24, B.Success) : q.Tried ? (SymbolRegular.ErrorCircle24, B.Caution) : (SymbolRegular.Circle24, B.Text2);
+            words.Children.Add(K.H(6, K.Icon(icon, 14, brush, filled: q.Solved || q.Tried), K.Text(string.Join(" · ", new[] { said, q.Points }.Where(x => x.Length > 0)), Ty.Caption, brush)));
+        }
+        words.VerticalAlignment = VerticalAlignment.Center;
+        var prev = K.IconButton(SymbolRegular.ChevronLeft24, () => { if (before is { } n) Go(n); }, "Previous question");
+        prev.IsEnabled = before != null;
+        var next = K.IconButton(SymbolRegular.ChevronRight24, () => { if (after is { } n) Go(n); }, "Next question");
+        next.IsEnabled = after != null;
+        var buttons = K.H(6, prev, next);
+        if (layout.Length > 0 || policy)
+        {
+            System.Windows.Controls.Button? more = null;
+            more = K.IconButton(SymbolRegular.MoreHorizontal24, () =>
+            {
+                var m = new ContextMenu { PlacementTarget = more, Placement = PlacementMode.Bottom, MinWidth = 200 };
+                if (layout.Length > 0)
+                {
+                    var l = layout;
+                    var item = new System.Windows.Controls.MenuItem { Header = l };
+                    item.Click += (_, _) => Press("layout", l);
+                    m.Items.Add(item);
+                }
+                if (policy)
+                {
+                    var item = new System.Windows.Controls.MenuItem { Header = "Grading policy" };
+                    item.Click += (_, _) => ShowPolicy();
+                    m.Items.Add(item);
+                }
+                m.IsOpen = true;
+            }, "Macmillan's layout and grading settings");
+            buttons.Children.Add(more);
+        }
+        buttons.VerticalAlignment = VerticalAlignment.Center;
+        return K.Columns("*, auto", words.Col(0), buttons.Col(1));
+    }
+
+    /// <summary>ALEKS's: the topic, its part of the course, and the topic's steps as ALEKS fills them.</summary>
+    private FrameworkElement AleksHeading()
+    {
+        var words = K.V(2, slice.Length > 0 ? K.Text(slice.ToUpperInvariant(), Ty.Caption, B.Text2).Strong() : null, K.Wrapped(topic, Ty.Subtitle));
+        words.VerticalAlignment = VerticalAlignment.Center;
+        if (total <= 0) return words;
+        var steps = fills.Count == total ? fills : Enumerable.Range(0, total).Select(i => i < done ? 1.0 : 0.0).ToList();
+        var bars = new UniformGrid { Rows = 1, Columns = Math.Max(steps.Count, 1), Width = 150, Margin = new Thickness(-2, 0, -2, 0) };
+        foreach (var x in steps) bars.Children.Add(Step(x, x).Margin(2, 0, 2, 0));
+        var count = K.Text($"{Math.Max(done, 0)} of {total}", Ty.Body).Strong();
+        count.HorizontalAlignment = HorizontalAlignment.Right;
+        var progress = K.V(6, count, bars);
+        progress.VerticalAlignment = VerticalAlignment.Center;
+        progress.Margin = new Thickness(16, 0, 0, 0);
+        System.Windows.Automation.AutomationProperties.SetName(progress, $"Topic progress, {Math.Max(done, 0)} of {total}");
+        return K.Columns("*, auto", words.Col(0), progress.Col(1));
+    }
+
+    /// <summary>The tool's verdict on the last answer, in its own words, as a pill (as Alta's): green with a tick when
+    /// right, red with a cross when wrong, plain otherwise.</summary>
+    private static Border VerdictPill(string text, string kind)
+    {
+        var right = kind == "right";
+        var wrong = kind == "wrong";
+        var t = K.Text(text, Ty.Body);
+        t.FontWeight = FontWeights.SemiBold;
+        t.VerticalAlignment = VerticalAlignment.Center;
+        var pill = new Border { Padding = new Thickness(12, 5, 14, 6), CornerRadius = new CornerRadius(16), VerticalAlignment = VerticalAlignment.Center };
+        if (right || wrong)
+        {
+            var tint = K.Tone(right ? "good" : "bad");
+            var fore = K.Darkened(tint);
+            t.Foreground = K.Brush(fore);
+            pill.Child = K.H(6, K.Icon(right ? SymbolRegular.CheckmarkCircle24 : SymbolRegular.DismissCircle24, 16, fore, filled: true), t);
+            pill.Background = K.Brush(Color.FromArgb(Support.Appearance.Dark ? (byte)56 : (byte)36, tint.R, tint.G, tint.B));
+        }
+        else
+        {
+            pill.Child = K.H(6, K.Icon(SymbolRegular.Info24, 16, B.Text2), t);
+            pill.Bg(B.Subtle);
+        }
+        System.Windows.Automation.AutomationProperties.SetName(pill, text);
+        return pill;
     }
 
     // ---- the rail ----

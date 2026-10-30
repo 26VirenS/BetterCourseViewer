@@ -36,16 +36,20 @@ internal sealed class PageLook
 
     private readonly CoreWebView2 core;
     private readonly bool rail;
+    /// <summary>(0.3.95) The popup's own front end over the page ("card": the tool's bar out of sight in the page, its
+    /// buttons the popup's), or "" for none.</summary>
+    private readonly string front;
     private readonly Dictionary<string, string> scriptIds = new();
     private readonly Dictionary<string, bool> on = new();
 
     /// <summary>(0.3.94) What the page tells the popup's rail, each time it changes (its <c>rail</c> names the look).</summary>
     public event Action<JsonElement>? Rail;
 
-    private PageLook(CoreWebView2 core, bool rail)
+    private PageLook(CoreWebView2 core, bool rail, string front)
     {
         this.core = core;
         this.rail = rail;
+        this.front = front;
     }
 
     public bool On(Kind k) => on.TryGetValue(k.Name, out var v) ? v : Start(k);
@@ -60,9 +64,9 @@ internal sealed class PageLook
 
     /// <summary>Every look put into the web view's pages and frames from their start (before the tool's page first shows),
     /// and what they find heard, for the log.</summary>
-    public static async Task<PageLook> Attach(CoreWebView2 core, bool rail = false)
+    public static async Task<PageLook> Attach(CoreWebView2 core, bool rail = false, string front = "")
     {
-        var look = new PageLook(core, rail);
+        var look = new PageLook(core, rail, front);
         core.WebMessageReceived += (_, e) => look.Heard(e);
         foreach (var k in All)
         {
@@ -76,7 +80,8 @@ internal sealed class PageLook
     {
         if (!Sources.TryGetValue(k.Dir, out var source)) Sources[k.Dir] = source = Read(k);
         if (source == null) return;
-        var head = $"window.{k.Flag} = {(On(k) ? "true" : "false")};" + (rail ? " window.__simplLookRail = true;" : "");
+        var head = $"window.{k.Flag} = {(On(k) ? "true" : "false")};" + (rail || front.Length > 0 ? " window.__simplLookRail = true;" : "")
+            + (front.Length > 0 ? $" window.__simplLookFront = '{front}';" : "");
         try { scriptIds[k.Name] = await core.AddScriptToExecuteOnDocumentCreatedAsync($"{head}\n{source}"); }
         catch (Exception e) { Log.Write($"{k.Name} look: the script could not be added: " + e.Message); }
     }
