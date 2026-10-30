@@ -282,14 +282,18 @@ final class LookRail: ObservableObject {
         zoom()
     }
 
-    /// The tool's page zoomed out (never in) as far as it takes to fit its width into the popup's, not past 70%.
+    private var zoomSaid = -1.0
+
+    /// The tool's page zoomed out (never in) as far as it takes to fit its width into the popup's — less a scroll bar's
+    /// width, so the page never scrolls sideways for want of it — not past 70%.
     private func zoom() {
-        guard let v = webView, wide > 0, width > 0 else { return }
-        let z = max(0.7, min(1, Double(width) / wide))
-        if abs(Double(v.pageZoom) - z) > 0.004 {
-            v.pageZoom = CGFloat(z)
-            NSLog("[Simpl] look popup: page zoomed to %ld%%", Int((z * 100).rounded()))
-        }
+        guard let v = webView, wide > 0, width > 16 else { return }
+        let room = Double(width) - 16
+        let z = max(0.7, min(1, room / wide))
+        if abs(Double(v.pageZoom) - z) > 0.004 { v.pageZoom = CGFloat(z) }
+        guard abs(zoomSaid - z) > 0.004 else { return }
+        zoomSaid = z
+        NSLog("[Simpl] look popup: page at %ld%% (its %ld wide in %ld)", Int((z * 100).rounded()), Int(wide), Int(room))
     }
 
     /// A question of Macmillan's opened: its own row in the page clicked.
