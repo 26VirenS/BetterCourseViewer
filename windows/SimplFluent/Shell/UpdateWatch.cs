@@ -33,6 +33,7 @@ public static class UpdateWatch
     {
         Reopen(main);
         Updates.Watch = () => Holding(main, engine(), touring());
+        Updates.Away = () => !main.IsVisible;
         Updates.WindowShown = () => main.IsVisible && main.WindowState != WindowState.Minimized;
         Updates.Where = () => Where(main, engine());
 
@@ -124,9 +125,6 @@ public static class UpdateWatch
         // (Simpl opening, a moment; the sign-in while it is on screen — finding the school, the card, "Logging you in",
         // the school's own page — not one left waiting in the notification area)
         if (e is { Phase: Phase.Starting }) return new Updates.Holding("Simpl opening", null);
-        // (0.3.100) Simpl closed to the notification area: no update goes in — a Critical one neither — until its window
-        // is opened again. One that went in from there opened Simpl again by itself, over what the student was doing.
-        if (!main.IsVisible) return new Updates.Holding("Simpl closed to the notification area", null);
         if (main.IsVisible && main.WindowState != WindowState.Minimized && (e == null || e.Login.Covers || e.Phase == Phase.Web))
             return new Updates.Holding("the sign-in", "when you’ve signed in");
         if (touring) return new Updates.Holding("the tour", "when the tour is over");

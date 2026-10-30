@@ -959,6 +959,8 @@ public static partial class Updates
     /// </summary>
     public static Holding? HeldBy()
     {
+        // (0.3.100: before anything else — what holds it in the window holds nothing while the window is not there)
+        if (Away?.Invoke() == true) return AwayHold;
         if (holds.Count > 0) return holds[0];
         if (Watch?.Invoke() is { } w) return w;
         if (ComponentDispatcher.IsThreadModal) return new Holding("a Windows dialog", "when you close the dialog");
@@ -981,6 +983,12 @@ public static partial class Updates
     private static double QuietNeeded => !Critical && Application.Current?.Windows.OfType<Window>().Any(w => w.IsActive) == true ? 30 : 5;
 
     // ---- going in ----
+
+    /// <summary>(0.3.100) Simpl closed to the notification area (UpdateWatch's): no update goes in, a Critical one
+    /// neither, until its window is opened again — one that went in from there opened Simpl again by itself, over what
+    /// the student was doing.</summary>
+    public static Func<bool>? Away { get; set; }
+    private static readonly Holding AwayHold = new("Simpl closed to the notification area", null);
 
     /// <summary>The main window shows (the notice is seen on it; the moment before an update goes in is given only then).</summary>
     public static Func<bool>? WindowShown { get; set; }
