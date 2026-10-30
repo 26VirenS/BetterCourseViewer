@@ -461,6 +461,19 @@ final class Engine: ObservableObject, ShellListener {
             // (1.3.198: -SimplOpen aleks:104:4007 — an ALEKS assignment, the mock's stand-in for one — 1.3.199: in its popup)
             let parts = a.split(separator: ":").map(String.init)
             if parts.count == 2 { lookTool = LookLaunch(look: PageLook.aleks.name, course: parts[0], assignment: parts[1], title: "Exponential and Logarithmic Functions") }
+        } else if let a = LaunchOpen.take("worktool:") {
+            // (1.3.201: -SimplOpen worktool:106:6004 — an assignment's tool opened as its page's button opens it, by the
+            // same route: the mock's Macmillan homework, launched on lmslink.bfwpub.com as a school's is, in its popup)
+            let parts = a.split(separator: ":").map(String.init)
+            if parts.count == 2 {
+                Task {
+                    guard let d = try? await self.call("assignment", ["course": parts[0], "id": parts[1]], as: AssignmentData.self) else {
+                        NSLog("[Simpl] worktool: the assignment could not be read")
+                        return
+                    }
+                    self.openAssignmentTool(d, course: parts[0], id: parts[1])
+                }
+            }
         } else if let w = LaunchOpen.take("window:") {
             // (1.3.69: -SimplOpen window:grades, a window more on that place)
             NotificationCenter.default.post(name: .simplOpenWindow, object: w)

@@ -258,14 +258,31 @@ enum ToolOpening {
         return AltaLaunch(course: p.course, assignment: a, title: p.title, dueLine: due)
     }
 
-    /// Opened in that course: Knewton Alta's assignments in their own popup, the rest (1.3.163: Macmillan's too, as
-    /// Macmillan draws them) in the tool window.
+    /// (1.3.201) The Macmillan Learning or ALEKS assignment this opens in its popup, if it is one: the tool known by the
+    /// engine's provider ("macmillan", "aleks"), else by the host it launches on (lmslink.bfwpub.com, secure.aleks.com).
+    static func lookLaunch(_ t: ExternalToolsData.Tool, in c: ExternalToolsData.Course, item: ExternalToolsData.Item?) -> LookLaunch? {
+        let p = place(t, in: c, item: item)
+        guard let a = p.args["assignment"],
+              let look = PageLook.forAssignment(macmillan: t.id == "macmillan" ? true : nil, aleks: t.id == "aleks" ? true : nil, host: t.host)
+        else { return nil }
+        let first = item?.sub?.components(separatedBy: " · ").first
+        let due = first.map { $0.hasPrefix("Due ") ? $0 : "" }
+        return LookLaunch(look: look.name, course: p.course, assignment: a, title: p.title, dueLine: due)
+    }
+
+    /// Opened in that course: Knewton Alta's assignments in their own popup, (1.3.201) Macmillan Learning's and ALEKS's
+    /// in theirs, the rest in the tool window.
     /// Without `item`, as the course's chip opens it (its tab, else its first assignment or module item there); (1.3.77)
     /// with one, that assignment or module item itself, under its own title.
     /// (1.3.101) `alta`: the Alta launch already asked for as the place was chosen.
     static func open(_ t: ExternalToolsData.Tool, in c: ExternalToolsData.Course, item: ExternalToolsData.Item? = nil, alta: AltaLaunch? = nil, engine: Engine) {
         if let a = alta ?? altaLaunch(t, in: c, item: item) {
             engine.alta = a
+            return
+        }
+        if let l = lookLaunch(t, in: c, item: item) {
+            NSLog("[Simpl] %@ popup: opened from External Tools (its tool on %@)", l.look, t.host)
+            engine.lookTool = l
             return
         }
         let (_, args, title) = place(t, in: c, item: item)

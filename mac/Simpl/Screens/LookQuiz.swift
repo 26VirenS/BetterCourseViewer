@@ -2,6 +2,24 @@ import AppKit
 import SwiftUI
 import WebKit
 
+extension Engine {
+    /// An assignment's tool opened as its kind is: (1.3.17) Knewton Alta's in its quiz-style popup, with its due line for
+    /// the header (1.3.101); (1.3.199) Macmillan Learning's and ALEKS's in theirs — (1.3.201) known by the engine's own
+    /// word and the host the tool launches on (lmslink.bfwpub.com, secure.aleks.com), not by the assignment's address in
+    /// Canvas, which has no host (1.3.199 and 1.3.200 sent every such assignment to the tool window); the rest in the
+    /// tool window.
+    func openAssignmentTool(_ d: AssignmentData, course: String, id: String) {
+        if d.alta == true {
+            alta = AltaLaunch(course: course, assignment: id, title: d.title, dueLine: d.dueLine)
+        } else if let look = PageLook.forAssignment(macmillan: d.macmillan, aleks: d.aleks, host: d.toolHost) {
+            NSLog("[Simpl] %@ popup: opened from the assignment (its tool on %@)", look.name, d.toolHost ?? "?")
+            lookTool = LookLaunch(look: look.name, course: course, assignment: id, title: d.title, dueLine: d.dueLine)
+        } else {
+            openTool(.assignment(course: course, id: id, title: d.title))
+        }
+    }
+}
+
 /// (1.3.199) A Macmillan Learning or ALEKS assignment, as the popup over the window is asked for it.
 struct LookLaunch: Identifiable, Hashable {
     let id = UUID()

@@ -303,14 +303,17 @@ struct PageLook {
     /// The script's own globals: the setting put before it, and its switch.
     let flag: String
     let setter: String
-    let domain: String
+    /// (1.3.201) The sites its pages and its launch are on: Macmillan Learning's on *.macmillanlearning.com (its Integration
+    /// Hub, Achieve, LaunchPad) and Canvas's launch of it on lmslink.bfwpub.com; ALEKS's on *.aleks.com (the launch on
+    /// secure.aleks.com/lti/canvas, the pages on www-awu.aleks.com and the like, its files on static.aleks.com).
+    let domains: [String]
     /// (the mock school's stand-in for the tool, on localhost)
     let mock: String
 
     static let macmillan = PageLook(name: "macmillan", title: "Macmillan", key: "SimplMacmillanLook", file: "tools/macmillan/look.js",
-                                    flag: "__simplMMOn", setter: "__simplMMSet", domain: "macmillanlearning.com", mock: "/mock-macmillan/")
+                                    flag: "__simplMMOn", setter: "__simplMMSet", domains: ["macmillanlearning.com", "bfwpub.com"], mock: "/mock-macmillan/")
     static let aleks = PageLook(name: "aleks", title: "ALEKS", key: "SimplAleksLook", file: "tools/aleks/look.js",
-                                flag: "__simplAKOn", setter: "__simplAKSet", domain: "aleks.com", mock: "/mock-aleks/")
+                                flag: "__simplAKOn", setter: "__simplAKSet", domains: ["aleks.com"], mock: "/mock-aleks/")
     static let all = [macmillan, aleks]
 
     /// (read with bool(forKey:), as @AppStorage reads it: a launch's -SimplMacmillanLook NO comes as the string "NO", which
@@ -320,11 +323,28 @@ struct PageLook {
     /// A page of the tool's (any of its hosts), or the mock's stand-in for one.
     func applies(to url: URL?) -> Bool {
         guard let url, let host = url.host?.lowercased() else { return false }
-        if host == domain || host.hasSuffix("." + domain) { return true }
+        if owns(host: host) { return true }
         return (host == "localhost" || host == "127.0.0.1") && url.path.hasPrefix(mock)
     }
 
+    /// A host of one of its sites ("www-awu.aleks.com", "lmslink.bfwpub.com").
+    func owns(host: String) -> Bool {
+        let h = host.lowercased()
+        return domains.contains { h == $0 || h.hasSuffix("." + $0) }
+    }
+
     static func applying(to url: URL?) -> PageLook? { all.first { $0.applies(to: url) } }
+
+    /// (1.3.201) The look of an assignment's tool, as the engine knows it — Macmillan Learning's (its launch on
+    /// lmslink.bfwpub.com or a Macmillan site, Sapling, LaunchPad, or a title that names it) or ALEKS's (its launch on
+    /// aleks.com, or a title that names it) — else by the host its tool launches on. (1.3.199 and 1.3.200 asked the
+    /// assignment's own address in Canvas, which has no host, so such an assignment went to the tool window instead.)
+    static func forAssignment(macmillan: Bool?, aleks: Bool?, host: String?) -> PageLook? {
+        if macmillan == true { return .macmillan }
+        if aleks == true { return .aleks }
+        guard let host, !host.isEmpty else { return nil }
+        return all.first { $0.owns(host: host) }
+    }
 
     /// (1.3.199) A look by its name (the popup's launch says which): Macmillan's for a name it does not know.
     static func named(_ name: String) -> PageLook { all.first { $0.name == name } ?? macmillan }

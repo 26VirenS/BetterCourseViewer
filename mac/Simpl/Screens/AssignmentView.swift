@@ -838,16 +838,7 @@ struct AssignmentView: View {
         } else if let u = d.discussionUrl {
             engine.go(u, title: d.title)
         } else if d.toolUrl != nil {
-            if d.alta == true {
-                // (1.3.17: Knewton Alta, as a quiz — 1.3.101: with its due line, for the popup's header)
-                engine.alta = AltaLaunch(course: course, assignment: id, title: d.title, dueLine: d.dueLine)
-            } else if let look = PageLook.applying(to: d.toolUrl.flatMap { URL(string: $0) }) {
-                // (1.3.199: Macmillan Learning and ALEKS in a popup of their own, as Alta — the rail beside the tool's page)
-                engine.lookTool = LookLaunch(look: look.name, course: course, assignment: id, title: d.title, dueLine: d.dueLine)
-            } else {
-                // (1.3.163: Macmillan Learning too — its page as Macmillan draws it, in the tool window)
-                engine.openTool(.assignment(course: course, id: id, title: d.title))
-            }
+            engine.openAssignmentTool(d, course: course, id: id)
         }
     }
 

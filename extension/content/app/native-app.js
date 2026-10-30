@@ -1903,6 +1903,9 @@
       alta: (types.includes('external_tool') || ltiQuiz) && (/knewton/i.test(a.external_tool_tag_attributes?.url || '') || /^\s*knewton alta\b/i.test(a.name || '')),
       // (Mac 1.3.66) and whether it is Macmillan Learning's (Achieve, Sapling, LaunchPad): its own popup too
       macmillan: (types.includes('external_tool') || ltiQuiz) && (/macmillanlearning|macmillan|sapling|launchpad\.|bfwpub/i.test(a.external_tool_tag_attributes?.url || '') || /^\s*(macmillan|sapling|achieve(?!\s*3000))\b/i.test(a.name || '')),
+      // (Mac 1.3.201, Windows 0.3.97) and whether it is ALEKS's (Canvas launches it at secure.aleks.com/lti/canvas; its pages
+      // are on www-awu.aleks.com and the like), or an assignment titled for it: its own popup as Macmillan's is
+      aleks: (types.includes('external_tool') || ltiQuiz) && (/aleks/i.test(a.external_tool_tag_attributes?.url || '') || /^\s*aleks\b/i.test(a.name || '')),
       discussionUrl: a.discussion_topic?.id ? `/courses/${cid}/discussion_topics/${a.discussion_topic.id}` : null,
       canvasUrl: `/courses/${cid}/assignments/${aid}?bcv=native`,
       comments: (sub.submission_comments || []).map((cm) => ({ id: String(cm.id), author: cm.author_name || cm.author?.display_name || 'Someone', avatar: cm.author?.avatar_image_url || null, when: whenText(cm.created_at), text: String(cm.comment || '').trim() || (cm.media_comment ? 'Media comment' : ''), /* (trimmed: Canvas keeps the blank lines round a comment) */ attempt: cm.attempt || null, attachments: (cm.attachments || []).map((x) => ({ name: x.display_name || x.filename || 'Attachment', url: absUrl(x.url) })).filter((x) => x.url) })),
