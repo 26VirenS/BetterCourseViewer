@@ -285,7 +285,9 @@ enum ToolDarkPage {
 enum MacmillanLook {
     static let key = "SimplMacmillanLook"
 
-    static var isOn: Bool { UserDefaults.standard.object(forKey: key) as? Bool ?? true }
+    /// (read with bool(forKey:), as @AppStorage reads it: a launch's -SimplMacmillanLook NO comes as the string "NO", which
+    /// `as? Bool` does not take)
+    static var isOn: Bool { UserDefaults.standard.object(forKey: key) == nil || UserDefaults.standard.bool(forKey: key) }
 
     /// A page of Macmillan's (its Integration Hub, its assessment player), or the mock's stand-in for one.
     static func applies(to url: URL?) -> Bool {
