@@ -542,8 +542,25 @@ final class Engine: ObservableObject, ShellListener {
     /// brings them up the same way.
     func popupsAfterUpdate() {
         guard let wn = MacWhatsNew.due() else { return }
+        // (1.3.204) not over the app in front: an update that went in while Simpl was behind another app opens it again
+        // hidden, and what changed waits until the student comes back to Simpl
+        guard NSApp.isActive || Updater.isDevelopmentRun else {
+            guard whatsNewWaits == nil else { return }
+            whatsNewWaits = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { @Sendable _ in
+                Task { @MainActor in
+                    guard let engine = AppModel.shared.engine, let w = engine.whatsNewWaits else { return }
+                    NotificationCenter.default.removeObserver(w)
+                    engine.whatsNewWaits = nil
+                    engine.popupsAfterUpdate()
+                }
+            }
+            return
+        }
         queuePopup(MergedIntro.due ? .mergedIntro : .whatsNew(wn))
     }
+
+    /// (1.3.204) Waiting for Simpl to come to the front, for what changed in an update.
+    private var whatsNewWaits: NSObjectProtocol?
 
     /// (1.3.69) A place's name, as `place(named:)` reads it (a window more opens on it).
     static func name(of place: Place) -> String {

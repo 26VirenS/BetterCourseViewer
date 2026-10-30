@@ -490,10 +490,24 @@ final class Updater: ObservableObject {
 
     /// An update that came by itself goes in when nothing holds it back: no quiz or tool open (`quiet`), updates not
     /// paused, and (1.3.86) newer than any version put back replaced. A Critical Update goes in whatever holds it.
+    /// (1.3.204) Neither goes in while Simpl has no window open (`windowOpen`): a Critical Update downloads, and waits.
     func installIfQuiet() {
-        if started, case .available(let r) = state, r.critical { begin(asked: true); return }
-        guard started, !paused, case .available(let r) = state, !waitsForUpdateNow(r), quiet else { return }
+        if started, case .available(let r) = state, r.critical {
+            if ready != nil, !windowOpen { return }
+            begin(asked: true)
+            return
+        }
+        guard started, !paused, case .available(let r) = state, !waitsForUpdateNow(r), quiet, windowOpen else { return }
         begin(asked: false)
+    }
+
+    /// (1.3.204) A window of Simpl's open — on screen, or minimized to the Dock. With none (its window closed, Simpl left
+    /// running for its reminders), no update goes in, a Critical one neither: one that did opened Simpl again by itself,
+    /// its window over whatever the student was doing. It goes in once a window is open again.
+    private var windowOpen: Bool {
+        NSApp.windows.contains { w in
+            (w.isVisible || w.isMiniaturized) && w.styleMask.contains(.titled) && !(w is NSPanel) && w.canBecomeMain
+        }
     }
 
     /// (1.2.19) What is open that an update waits for: a quiz, an external tool's window (`UpdateHold`).
@@ -582,8 +596,10 @@ final class Updater: ObservableObject {
             state = .failed(error.localizedDescription)
             return
         }
-        if !asked && !quiet {
-            ready = (release: release, unpacked: unpacked) // (a quiz or a tool opened meanwhile: in at the next quiet moment, no second download)
+        if (!asked && !quiet) || !windowOpen {
+            // (a quiz or a tool opened meanwhile, or — 1.3.204 — the window closed: in at the next quiet moment with a
+            //  window open, no second download)
+            ready = (release: release, unpacked: unpacked)
             state = .available(release)
             return
         }
@@ -596,7 +612,9 @@ final class Updater: ObservableObject {
             let target = try await Task.detached(priority: .userInitiated) {
                 try UpdateInstall.put(unpacked)
             }.value
-            AppPlacement.relaunch(target, quietly: !asked) // (1.3.161: one that came by itself, never pulled to the front)
+            // (1.3.161: one that came by itself, never pulled to the front — 1.3.204: nor one asked for or a Critical Update,
+            //  when Simpl is behind another app by the time it goes in)
+            AppPlacement.relaunch(target, quietly: true)
         } catch {
             UpdateInstall.discard(unpacked)
             state = .failed(error.localizedDescription)
@@ -833,15 +851,16 @@ enum AppPlacement {
     }
 
     /// The copy at `url` opens once this one has quit (ten seconds at most waited for; -n: started afresh rather than
-    /// this one found), and this one quits. (1.3.161) `quietly` (an update that came by itself): while Simpl is behind
-    /// another app it opens again behind it (-g, never made the front app nor its window's space shown) — hidden if it
-    /// was hidden (-j) — so an update in the background is never pulled over what the student is doing; in front, it
-    /// comes back in front, as before.
+    /// this one found), and this one quits. (1.3.161) `quietly` (an update): while Simpl is behind another app it opens
+    /// again out of the way (-g, never made the front app nor its window's space shown) — (1.3.204) and hidden (-j),
+    /// its window shown when the student comes back to Simpl: opened behind, its window still came up over the app in
+    /// front — so an update in the background is never pulled over what the student is doing; in front, it comes back
+    /// in front, as before.
     @MainActor
     static func relaunch(_ url: URL, quietly: Bool = false) {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/sh")
-        let flags = quietly && !NSApp.isActive ? (NSApp.isHidden ? "-n -g -j" : "-n -g") : "-n"
+        let flags = quietly && !NSApp.isActive ? "-n -g -j" : "-n"
         let script = "i=0; while kill -0 \"$1\" 2>/dev/null && [ $i -lt 50 ]; do sleep 0.2; i=$((i+1)); done; /usr/bin/open \(flags) \"$0\""
         p.arguments = ["-c", script, url.path, String(ProcessInfo.processInfo.processIdentifier)]
         try? p.run()

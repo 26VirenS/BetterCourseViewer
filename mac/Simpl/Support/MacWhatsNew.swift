@@ -12,6 +12,7 @@ enum MacWhatsNew {
         Release(version: "1.3.204", date: "2026-10-30", notes: [
             ReleaseNote(kind: "improved", title: "List or Activity", body: "The Dashboard shows a list by day or recent activity."),
             ReleaseNote(kind: "improved", title: "Tool Lists in a Popup", body: "Choosing a tool opens its list in a popup over the page."),
+            ReleaseNote(kind: "fixed", title: "No Surprise Reopening", body: "Updates wait while Simpl is closed and never jump in front."),
         ]),
         Release(version: "1.3.203", date: "2026-10-30", notes: [
             ReleaseNote(kind: "new", title: "Modules, in the Popup", body: "Macmillan and ALEKS module items open in their popup."),

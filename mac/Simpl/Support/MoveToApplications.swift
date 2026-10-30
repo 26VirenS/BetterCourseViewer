@@ -9,11 +9,29 @@ import CoreServices
 enum MoveToApplications {
     private static let declinedKey = "SimplMoveToApplicationsDeclined"
 
+    /// (1.3.204) Waiting for Simpl to be the app in front, to ask.
+    @MainActor private static var waiting: NSObjectProtocol?
+
     @MainActor
     static func offerIfNeeded() {
         guard !Updater.isDevelopmentRun, !UserDefaults.standard.bool(forKey: declinedKey) else { return }
+        guard !inApplications(AppPlacement.originalURL.standardizedFileURL) else { return }
+        // (1.3.204) asked once Simpl is the app in front — at once when the student opened it; when an update opened it
+        // again behind another app, only when the student comes to it: asked at launch, it pulled Simpl over what they
+        // were doing
+        guard NSApp.isActive else {
+            guard waiting == nil else { return }
+            waiting = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { @Sendable _ in
+                Task { @MainActor in
+                    guard let w = waiting else { return }
+                    NotificationCenter.default.removeObserver(w)
+                    waiting = nil
+                    offerIfNeeded()
+                }
+            }
+            return
+        }
         let here = AppPlacement.originalURL.standardizedFileURL
-        guard !inApplications(here) else { return }
 
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()

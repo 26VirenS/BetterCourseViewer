@@ -653,6 +653,11 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   quiz open: nothing holds it back — with a notice over the window while it installs, tried again every ten minutes if
   it fails (1.3.102: every five). Only copies from 1.3.72 on know to do this. (1.3.102) A running copy looks at the feed
   every half minute between its checks (1.3.194; every minute from 1.3.109; every five minutes on an expensive network or in Low Power Mode, the feed asked only whether it changed) (Updates, below), so a Critical Update reaches a Mac in use within the minute.
+  (1.3.204) No update goes in — a Critical one neither — while Simpl has no window open (its window closed, the app
+  left running for its reminders): it waits, downloaded, until a window is open again (`Updater.windowOpen`). One that
+  goes in while Simpl is behind another app opens it again hidden (`open -n -g -j`), its window, What's New and the
+  offer to move to Applications all waiting until the student comes back to Simpl — before, a closed Simpl reopened
+  itself after an update, its window over whatever the student was doing.
   (1.3.74) The 3D builder's shapes are laid out by VSEPR, not found by forces (`Tools/MoleculeShape.swift`, `VSEPR`):
   round each atom its bonds, lone pairs and an odd electron take the directions their number gives (a line, a
   triangle, a tetrahedron, a trigonal bipyramid with lone pairs round its middle, an octahedron with lone pairs
