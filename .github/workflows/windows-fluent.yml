@@ -348,9 +348,11 @@ jobs:
           # signing in (the mock with --login): the card (given 22 s: at 14 the sign-in page had once not painted yet on a
           # busy runner, and the picture came out blank), a wrong password, "Logging you in", "Stay logged in?", a page
           # finished by hand (a one-time code)
-          Shot 'sign-in-dark' '1024x681' 22 ($login + @('--appearance', 'dark'))
-          Shot 'sign-in-light' '1024x681' 22 ($login + @('--appearance', 'light'))
-          Shot 'sign-in-light-wide' '1366x778' 22 ($login + @('--appearance', 'light'))
+          # (0.3.101: the sign-in card as it first shows, up to 40 seconds for it, not 22 — on a slow runner the web view
+          #  itself took longer than 22 to start, and the picture came out blank; the card does not change once it shows)
+          Shot 'sign-in-dark' '1024x681' 40 ($login + @('--appearance', 'dark'))
+          Shot 'sign-in-light' '1024x681' 40 ($login + @('--appearance', 'light'))
+          Shot 'sign-in-light-wide' '1366x778' 40 ($login + @('--appearance', 'light'))
           # (the page, then a failed sign-in on it: the plain sign-in pictures' 22 s and more — at 16 s a runner that stalled
           #  7 s at start took this before the page had drawn)
           Shot 'sign-in-wrong' '1024x681' 24 ($login + @('--appearance', 'light', '--sign-in', 'student:wrong'))
