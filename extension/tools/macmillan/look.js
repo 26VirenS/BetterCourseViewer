@@ -294,7 +294,9 @@
       score: text(document.querySelector('[data-test-id="final-score-fraction"]')), title: t,
       policy: !!document.querySelector('[data-test-id="show-policy-details-button"]'),
       // (the width the question wants, in the page's own pixels: its sheet and the margins round it)
-      wide: Math.ceil((area ? parseFloat(getComputedStyle(area).width) || 960 : 960) + 48) };
+      // (1.3.200: Macmillan's own page holds its body 1024 wide at the least — the width the popup must fit, not the sheet's)
+      wide: Math.ceil(Math.max((area ? parseFloat(getComputedStyle(area).width) || 960 : 960) + 48,
+        (document.body && parseFloat(getComputedStyle(document.body).minWidth)) || 0)) };
     if (front) o.front = buttons();
     var said = JSON.stringify(o);
     if (rail && said !== railSaid) { railSaid = said; tell(o); }
