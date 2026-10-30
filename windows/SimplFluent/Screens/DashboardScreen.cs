@@ -15,24 +15,22 @@ namespace Simpl.Screens;
 /// <summary>
 /// The Dashboard (the Mac's DashboardView), in Windows 11's cards: the greeting as the page's title and the date under
 /// it; six counters, each growing in place into a panel of what it counted (the panel rises out of its card and folds
-/// back into it); then one of three views, chosen with the SelectorBar beside the title and kept — Cards (the courses as
-/// cards), List (everything coming up, day by day, ticked off where it is done) and Activity (the school's recent
-/// activity). Beside the view on a wide page, under it on a narrow one: the day's work, the grades skyline and the
+/// back into it); then one of two views, chosen with the SelectorBar beside the title and kept — List (everything coming
+/// up, day by day, ticked off where it is done) and Activity (the school's recent activity). (0.3.100: no Cards view, as
+/// the web has it; a saved Cards opens on List.) Beside the view on a wide page, under it on a narrow one: the day's work, the grades skyline and the
 /// week's load per course.
 /// </summary>
 public sealed partial class DashboardScreen : Screen
 {
     private readonly Loader<Today> today;
     private readonly Loader<TodayCounts> countsQuick, countsFresh;
-    private readonly Loader<DashCoursesData> courses;
-    private readonly Loader<Dictionary<string, CourseProgress>> progress;
     private readonly Loader<DashSkylineData> skyKept, skyFresh;
     private readonly Loader<DashListData> list;
     private readonly Loader<DashActivityData> activity;
     private readonly Loader<ItemsSheetData> sheet = new();
     private readonly Dictionary<string, bool> ticked = new();
     private readonly HashSet<string> seen = new();
-    private static readonly string[] Views = { "Cards", "List", "Activity" };
+    private static readonly string[] Views = { "List", "Activity" };
     private int view;
     private bool? hideDone;
     private int overdueAdjust;
@@ -45,8 +43,6 @@ public sealed partial class DashboardScreen : Screen
         today = Watch(new Loader<Today>());
         countsQuick = Watch(new Loader<TodayCounts>());
         countsFresh = Watch(new Loader<TodayCounts>());
-        courses = Watch(new Loader<DashCoursesData>());
-        progress = Watch(new Loader<Dictionary<string, CourseProgress>>());
         skyKept = Watch(new Loader<DashSkylineData>());
         skyFresh = Watch(new Loader<DashSkylineData>());
         list = Watch(new Loader<DashListData>());
@@ -54,14 +50,15 @@ public sealed partial class DashboardScreen : Screen
         silentRead = Watch(new Loader<DashSilentData>()); // (0.3.84: Silent mode, DashboardSilent.cs)
         SilentMode.Changed += OnSilent;
         sheet.Changed += PanelData;
-        view = Launch.Get("dash-view") switch { "cards" => 0, "activity" => 2, "list" => 1, _ => (int)Prefs.Double("dashView", 1) };
+        // (the view's number: 1 List, 2 Activity — 0 was Cards, saved before 0.3.100, and opens on List)
+        view = Launch.Get("dash-view") switch { "activity" => 2, "list" or "cards" => 1, _ => (int)Prefs.Double("dashView", 1) };
         openKey = Launch.Get("sheet") is { Length: > 0 } k ? k : null;
         sheetAsked = openKey != null;
         ChecksForView();
     }
 
-    private string[] ViewsHere => engine.OnBrightspace ? Views[..2] : Views;
-    private int View => Math.Min(view, ViewsHere.Length - 1);
+    private string[] ViewsHere => engine.OnBrightspace ? Views[..1] : Views;
+    private int View => Math.Clamp(view, 1, ViewsHere.Length);
 
     public override string Title => !Silent && today.Data is { } d ? Greeting(d) : "Dashboard";
 
@@ -81,20 +78,19 @@ public sealed partial class DashboardScreen : Screen
     /// could not bring them up to date — never that it still is.</summary>
     private bool Stale => today.Data != null && !Updating && ((today.Kept && !today.Loading) || (countsFresh.Data == null && countsFresh.Error != null));
 
-    /// <summary>Cards · List · Activity (Windows 11's SelectorBar) and New task, beside the title.</summary>
+    /// <summary>List · Activity (Windows 11's SelectorBar) and New task, beside the title.</summary>
     public override FrameworkElement? Commands
     {
         get
         {
             if (Silent) return null; // (0.3.84: Silent mode has no header)
             if (commands != null) return commands;
-            selector = new SelectorBar(ViewsHere, View);
+            selector = new SelectorBar(ViewsHere, View - 1);
             selector.Changed += v =>
             {
-                if (v == 0 && view != 0) courseCardsShown = false;
-                view = v;
+                view = v + 1;
                 ChecksForView();
-                Prefs.Set("dashView", v);
+                Prefs.Set("dashView", view);
                 Refresh();
                 Render();
             };
@@ -104,7 +100,8 @@ public sealed partial class DashboardScreen : Screen
             // (0.3.84) Silent mode: only what comes next, in large type on black
             var silent = K.Button("Silent", () => SilentMode.Set(true), icon: SymbolRegular.WeatherMoon24);
             silent.ToolTip = "Silent mode: only what comes next, in large type on black";
-            return commands = K.H(12, selector, silent, add);
+            // (on Brightspace only List: no choice to make, so no SelectorBar)
+            return commands = ViewsHere.Length > 1 ? K.H(12, selector, silent, add) : K.H(12, silent, add);
         }
     }
 
@@ -114,8 +111,6 @@ public sealed partial class DashboardScreen : Screen
         today.Ensure(engine, "today");
         countsQuick.Ensure(engine, "todayCounts", new { kept = true });
         countsFresh.Ensure(engine, "todayCounts", new { kept = false });
-        courses.Ensure(engine, "dashCourses");
-        progress.Ensure(engine, "coursesProgress");
         skyKept.Ensure(engine, "dashSkyline", new { kept = true });
         skyFresh.Ensure(engine, "dashSkyline", new { kept = false });
         if (View == 1) list.Ensure(engine, "dashList", hideDone is { } hd ? new { hideDone = hd } : null);
@@ -139,7 +134,7 @@ public sealed partial class DashboardScreen : Screen
     private string? lastTitle, lastSubtitle;
 
     protected override bool LayoutChanges(double before, double now) =>
-        CounterLayout(before) != CounterLayout(now) || (before >= 900) != (now >= 900) || (before >= 760) != (now >= 760) || CardCols(before) != CardCols(now)
+        CounterLayout(before) != CounterLayout(now) || (before >= 900) != (now >= 900) || (before >= 760) != (now >= 760)
         || Math.Abs(RailWidth(before) - RailWidth(now)) >= 24
         || (Silent && Math.Abs(before - now) >= 40); // (0.3.84: Silent mode's type follows the page's width)
 
@@ -172,7 +167,7 @@ public sealed partial class DashboardScreen : Screen
         }
         else
         {
-            // (one column: the view chosen right under the counters — Activity or Cards shows at once — then the day's work)
+            // (one column: the view chosen right under the counters — Activity shows at once — then the day's work)
             page.Children.Add(main);
             if (specs.TryGetValue("today", out var todaySpec)) page.Children.Add(Part("today", todaySpec));
             page.Children.Add(Part("rail", specs["rail"]));
@@ -224,9 +219,9 @@ public sealed partial class DashboardScreen : Screen
         var two = width >= 900;
         var railW = RailWidth(width);
         var mainW = two ? Math.Min(MainMost, width - railW - 28) : width;
-        // (the view: what it shows, at its width; the cards are the courses' and their progress, the list the planner's,
+        // (the view: what it shows, at its width; the list the planner's,
         //  the activity the school's — not today's, so a new count leaves them as they are)
-        specs["main"] = new(new object?[] { View, Math.Round(mainW), courses.Data, progress.Data, courses.Error, list.Data, list.Error, activity.Data, activity.Error, ticks, seenTurn, courseCardsShown, look }, () => Main(d, mainW));
+        specs["main"] = new(new object?[] { View, Math.Round(mainW), list.Data, list.Error, activity.Data, activity.Error, ticks, seenTurn, look }, () => Main(d, mainW));
         if (two) specs["rail"] = new(new object?[] { d, skyFresh.Data, skyKept.Data, View, railW, false, ticks, look }, () => Rail(d, railW, false));
         else
         {

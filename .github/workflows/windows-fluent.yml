@@ -363,7 +363,7 @@ jobs:
           Shot 'dashboard-light' '1024x681' 45 ($mock + @('--appearance', 'light'))
           Shot 'dashboard-light-wide' '1366x778' 45 ($mock + @('--appearance', 'light'))
           Shot 'dashboard-dark-wide' '1366x778' 45 ($mock + @('--appearance', 'dark'))
-          Shot 'dashboard-cards-wide' '1366x778' 45 ($mock + @('--appearance', 'dark', '--dash-view', 'cards'))
+          Shot 'dashboard-list-wide' '1366x778' 45 ($mock + @('--appearance', 'dark', '--dash-view', 'list'))
           # (0.3.84) Silent mode: in the light look too, the page, the pane and the title bar black, the pane in words alone
           Shot 'dashboard-silent' '1366x778' 45 ($mock + @('--appearance', 'light', '--dash-silent'))
           Shot 'dashboard-activity' '1024x681' 45 ($mock + @('--appearance', 'light', '--dash-view', 'activity'))
@@ -898,7 +898,7 @@ jobs:
           }
           LiveShot 'live-dashboard-done' 0 8810 '1366x778' @('--appearance', 'light', '--dash-view', 'list', '--live-every', '5', '--live-change', 'done:25')
           LiveShot 'live-dashboard-task' 1 8812 '1366x778' @('--appearance', 'dark', '--dash-view', 'list', '--live-every', '5', '--live-change', 'task:25')
-          LiveShot 'live-dashboard-grade' 0 8814 '1366x778' @('--appearance', 'light', '--dash-view', 'cards', '--live-every', '5', '--live-change', 'grade:25')
+          LiveShot 'live-grades' 0 8814 '1366x778' @('--appearance', 'light', '--place', 'grades', '--live-every', '5', '--live-change', 'grade:25')
           LiveShot 'live-course' 1 8816 '1024x681' @('--appearance', 'light', '--place', 'course:101', '--live-every', '3')
           # (the Chemistry section, at the end so the pictures before keep their parts) the Tools page scrolled to it, light
           # and dark; Lewis Structures, the Molecule Builder and Atoms & Orbitals opened plainly over the Tools page (the
@@ -1534,9 +1534,10 @@ jobs:
           }
           # the live check (Shell/LiveCheck.cs): before the mock changed, a check found nothing new; after, one found the
           # change and showed only that part — a counter's number and a row of Coming up drawn again (done), a row added
-          # (task), one course's card (grade) — and nothing built the page again from then on; then a check found nothing
-          # new again. Each check's line, with the reads it cost, is printed
-          foreach ($live in @(@('live-dashboard-done', @('counter:', 'list(~1)')), @('live-dashboard-task', @('list(+1')), @('live-dashboard-grade', @('card:')))) {
+          # (task) — and nothing built the page again from then on; then a check found nothing new again. Each check's line,
+          # with the reads it cost, is printed. (0.3.100: a course's total moved is Grades' to show, the Dashboard having no
+          # Cards: live-grades, below)
+          foreach ($live in @(@('live-dashboard-done', @('counter:', 'list(~1)')), @('live-dashboard-task', @('list(+1')))) {
             $name = $live[0]
             if ($script:mine -notcontains $name) { continue }
             $phase = 'before'; $quietBefore = 0; $quietAfter = 0; $built = 0; $builtBefore = 0; $updates = @()
@@ -1562,6 +1563,14 @@ jobs:
             if ($quietAfter -lt 1) { $bad += 'no check found nothing new after the update' }
             if ($bad.Count -gt 0) { $bad | ForEach-Object { Write-Host "::error::${name}: $_ (shots/profile-$name.log)" }; exit 1 }
             Write-Host "${name}: $quietBefore checks found nothing new, then $($updates -join ' | '), then $quietAfter found nothing new; the page not built again"
+          }
+          # a course's total moved behind the engine's back: a check on Grades found it
+          if ($script:mine -contains 'live-grades') {
+            $said = @(Get-Content 'shots/profile-live-grades.log' -ErrorAction SilentlyContinue | Where-Object { $_ -match 'live: ' })
+            $said | ForEach-Object { Write-Host "live-grades: $($_ -replace '^\S+ ', '')" }
+            $changed = [array]::FindIndex([string[]]$said, [Predicate[string]]{ param($l) $l -match 'live: the mock school changed: grade \(ok' })
+            $found = $changed -ge 0 -and @($said[$changed..($said.Count - 1)] | Where-Object { $_ -match 'live: grades updated' }).Count -gt 0
+            if (-not $found) { Write-Host "::error::live-grades: no check on Grades found the course's moved total (shots/profile-live-grades.log)"; exit 1 }
           }
           # a course's page checked every ten intervals, not every one: with --live-every 3, once or twice in the minute
           if ($script:mine -contains 'live-course') {

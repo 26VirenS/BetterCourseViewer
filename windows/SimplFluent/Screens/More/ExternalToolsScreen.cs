@@ -99,10 +99,8 @@ public sealed partial class ExternalToolsScreen : Screen
     private string query = "";
     private bool hadRows;
     private string? lastSub;
-    /// <summary>The cards as drawn, by tool: where a tool's list hangs from.</summary>
+    /// <summary>The cards as drawn, by tool: where the keyboard goes back to as a tool's list closes.</summary>
     private readonly Dictionary<string, FrameworkElement> cards = new();
-    /// <summary>The chevron at the foot of each card that opens a list, turned over while its list is open.</summary>
-    private readonly Dictionary<string, RotateTransform> chevrons = new();
 
     public ExternalToolsScreen(Engine.Engine engine) : base(engine) => model = Watch(new Loader<Data>());
 
@@ -152,7 +150,6 @@ public sealed partial class ExternalToolsScreen : Screen
         var has = model.Data is { Rows.Count: > 0 };
         if (has != hadRows || Subtitle != lastSub) { hadRows = has; lastSub = Subtitle; HeaderChange(); }
         cards.Clear();
-        chevrons.Clear();
         if (model.Data is not { } d) { CloseList(); return K.LoadState(model.Error, () => model.Reload(engine, "externalTools")); }
         if (d.Rows.Count == 0)
         {
@@ -264,11 +261,8 @@ public sealed partial class ExternalToolsScreen : Screen
     /// <summary>A card's foot, under a hairline: how many places the tool is used, and the chevron of its list.</summary>
     private FrameworkElement Foot(Tool t)
     {
-        var chevron = K.Icon(SymbolRegular.ChevronDown20, 12, B.Text2);
-        var turn = new RotateTransform(0);
-        chevron.RenderTransformOrigin = new Point(0.5, 0.5);
-        chevron.RenderTransform = turn;
-        chevrons[t.Id] = turn;
+        // (0.3.100: to the right — the list opens in a popup of its own, no longer under the card)
+        var chevron = K.Icon(SymbolRegular.ChevronRight20, 12, B.Text2);
         var row = K.Columns("*, auto", K.Text(Places(t), Ty.Caption, B.Text2).Col(0), chevron.Col(1));
         return K.V(10, K.Divider(), row);
     }
@@ -437,7 +431,7 @@ public sealed partial class ExternalToolsScreen : Screen
     /// A card that is a button whole (the kit's CardButton style: Windows 11's card, lighter under the pointer, a shade down
     /// while pressed) and gives a little under the press — to 0.98 while it is held, by the pointer or the Space bar, and
     /// back as it is let go (Motion.Fast in, Motion.Normal out, decelerating; still, with Windows' animation effects off).
-    /// It is the card's face that gives, not the button: the list hung from the button is placed by where the card rests.
+    /// It is the card's face that gives, not the button.
     /// A button inside it (a course's chip) takes its own press: the card is neither pressed nor opened by it.
     /// </summary>
     private sealed class PressCard : Button

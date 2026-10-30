@@ -32,7 +32,6 @@ public sealed partial class DashboardScreen
         public FrameworkElement? Sky, Load;
         public string? SkySaid, LoadSaid;
         public UpcomingRefs? Upcoming;
-        public CardsRefs? Cards;
         public ActivityRefs? Activity;
     }
 
@@ -85,7 +84,6 @@ public sealed partial class DashboardScreen
         public List<DayRefs> Blocks { get; set; } = Blocks;
     }
 
-    private sealed record CardsRefs(double CardWidth, List<(string Id, string Look, FrameworkElement Card)> Cards);
 
     private sealed record ActivityRefs(Stack View, FrameworkElement Heading, string? HeadSaid, RowList Rows)
     {
@@ -118,8 +116,6 @@ public sealed partial class DashboardScreen
     private string TodayLook(WorkRow r, bool narrow) => $"{Json.Write(r)}|{Done(r.Id, r.Done)}|{narrow}";
     private string DashLook(DashRow r, string day, bool wide) => $"{Json.Write(r)}|{Done(r.Id, r.Done)}|{day}|{wide}";
     private string ActivityLook(DashActivityRow r) => $"{Json.Write(r)}|{r.Unread == true && !seen.Contains(r.Id)}";
-    private string CardLook(DashCourse c, double cardW) =>
-        $"{Json.Write(c)}|{(progress.Data == null ? "?" : progress.Data.TryGetValue(c.Id, out var p) ? Json.Write(p) : "-")}|{Math.Round(cardW)}";
     private static string TodaySaid(Today d) => $"{d.List.Heading}|{d.List.Note}|{d.List.Empty}";
     private static string UpcomingSaid(DashListData l) => $"{l.Total}|{l.Done}|{l.HideDone}";
     private string SkySaid() => Json.Write(skyFresh.Data ?? skyKept.Data);
@@ -131,20 +127,17 @@ public sealed partial class DashboardScreen
     /// <summary>A counter's panel open: the check waits until it folds back (its rows are what the student is reading).</summary>
     public override string? LiveHold => openKey != null ? "a counter's panel" : base.LiveHold;
 
-    /// <summary>What a check reads besides Today, the counts, the courses' cards and the grades: the view on show's — the
-    /// List's planner, or the Activity, or the cards' handed-in counts — never another view's; nor the copies kept from
-    /// the last visit, which are not the school's.</summary>
+    /// <summary>What a check reads besides Today, the counts and the grades: the view on show's — the List's planner, or
+    /// the Activity — never another view's; nor the copies kept from the last visit, which are not the school's.</summary>
     private void ChecksForView()
     {
         // (0.3.84: Silent mode checks only what it shows)
         var all = !Silent;
         today.Checks = all;
         countsFresh.Checks = all;
-        courses.Checks = all;
         skyFresh.Checks = all;
         countsQuick.Checks = false;
         skyKept.Checks = false;
-        progress.Checks = all && View == 0;
         list.Checks = all && View == 1;
         activity.Checks = all && View == 2;
         silentRead.Checks = !all;
@@ -197,7 +190,7 @@ public sealed partial class DashboardScreen
             railBuilt = WeekLoadAgain(d, specs["rail"], said);
         }
         if (Has(skyFresh) && !railBuilt) SkylineAgain(specs["rail"], said);
-        if ((View == 0 && (Has(courses) || Has(progress))) || (View == 1 && Has(list)) || (View == 2 && Has(activity))) MainAgain(specs["main"], said);
+        if ((View == 1 && Has(list)) || (View == 2 && Has(activity))) MainAgain(specs["main"], said);
         // (every part on the page shows what its answers say now: kept as it is, its new answers its inputs, so the next
         //  build — a resize, a tick — takes it as it is)
         foreach (var k in shownParts)
@@ -420,37 +413,15 @@ public sealed partial class DashboardScreen
         said.Add("grades");
     }
 
-    // ---- the view: the cards, Coming up, the activity ----
+    // ---- the view: Coming up, the activity ----
 
     private void MainAgain(PartSpec main, List<string> said)
     {
         if (!refs.TryGetValue("main", out var r)) { Again("main", main, said); return; }
         switch (View)
         {
-            case 0: CardsAgain(r, main, said); break;
             case 1: UpcomingAgain(r, main, said); break;
             default: ActivityAgain(r, main, said); break;
-        }
-    }
-
-    /// <summary>The cards whose course changed drawn again, each where it was; the same courses in the same order, or the
-    /// view is built again.</summary>
-    private void CardsAgain(PartRefs r, PartSpec main, List<string> said)
-    {
-        var c = courses.Data;
-        if (c == null || r.Cards is not { } cr || c.Rows.Count != cr.Cards.Count || !c.Rows.Select(x => x.Id).SequenceEqual(cr.Cards.Select(x => x.Id)))
-        {
-            Again("main", main, said);
-            return;
-        }
-        for (var k = 0; k < c.Rows.Count; k++)
-        {
-            var look = CardLook(c.Rows[k], cr.CardWidth);
-            if (look == cr.Cards[k].Look) continue;
-            var fresh = CourseCard(c.Rows[k], cr.CardWidth);
-            Swap(cr.Cards[k].Card, fresh);
-            cr.Cards[k] = (c.Rows[k].Id, look, fresh);
-            said.Add($"card:{c.Rows[k].Id}");
         }
     }
 

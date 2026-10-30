@@ -96,7 +96,8 @@ public class Sheet
     public FrameworkElement? Anchor { get; set; }
     /// <summary>(0.3.64, the owner's #241) Floating, a light one — something to read, or a switch or a button to press, no
     /// form to fill (What's New, the Calendar's Calendars and Find Appointment, the pane's History and Help): a click
-    /// anywhere in the window it floats over closes it, and the click still does what it does there.</summary>
+    /// anywhere in the window it floats over closes it, and the click still does what it does there. (0.3.100) Over the
+    /// window, not floating (a tool's list on External Tools): a click on the dimmed window round it closes it.</summary>
     public bool Light { get; set; }
     /// <summary>Floating, as large as the window under its title bar less a margin — over the navigation pane too —
     /// resized with the window, and sized by its edges and corners (a tool, Knewton Alta, feedback, a
@@ -188,7 +189,11 @@ public sealed class SheetHost : Grid
     {
         Visibility = Visibility.Collapsed;
         smoke.Background = K.Brush(Color.FromArgb(Support.Appearance.Dark ? (byte)140 : (byte)102, 0, 0, 0));
-        smoke.MouseLeftButtonDown += (_, e) => { e.Handled = true; };
+        smoke.MouseLeftButtonDown += (_, e) =>
+        {
+            e.Handled = true;
+            if (current is { Light: true, Modal: false } light) Close(light);
+        };
         Children.Add(smoke);
         Panel.SetZIndex(this, 1000);
         PreviewKeyDown += OnKey;

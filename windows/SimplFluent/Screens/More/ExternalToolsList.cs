@@ -7,35 +7,31 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Simpl.Kit;
+using Simpl.Shell;
 using Simpl.Support;
 using Wpf.Ui.Controls;
 using Button = System.Windows.Controls.Button;
-using Popup = System.Windows.Controls.Primitives.Popup;
 using TextBox = Wpf.Ui.Controls.TextBox;
 
 namespace Simpl.Screens;
 
 /// <summary>
-/// A tool's list, its card pressed: every place the tool is used, to choose the one to open — a flyout hung under its
-/// card, as a pinned tool's hangs under its pin (Windows 11's flyout surface: its fill, its hairline, rounded 8, on a
-/// soft shadow drawn by a copy of it behind, so its words keep their crisp ClearType), rising into place as it fades in.
+/// A tool's list, its card pressed: every place the tool is used, to choose the one to open — (0.3.100) in a popup of
+/// its own over the window, as the app's dialogs are: centred, 480 wide, the window dimmed behind it, arriving from a
+/// touch larger as it fades in (a flyout hung under its card before, cramped by the room under it).
 /// (0.3.98) A viewer of its own rather than a plain list: at its head, on a wash of the tool's colour, its tile, its name,
 /// its site, how many places in how many courses, and how many are still to do; To do and All when it has both (To do to
 /// start with); a filter once there are more than eight; then the next still to do on a card of its own with Open, and
 /// the rest — by course, under the course's name and how many it has there, when it is in more than one — each with a
 /// mark of where it stands (to do, done, missing, late, a module item), its title, its line and its status, a chevron
-/// under the pointer; at its foot, the keys it takes. ↑ and ↓ move between them, Enter opens one, Escape or a press
-/// anywhere else folds it away, and opening one folds it away first. It goes too when the page under it scrolls, and when
-/// Simpl is left for another app (a popup would otherwise float over it); it follows its card as the window moves or
-/// changes size.
+/// under the pointer; at its foot, the keys it takes. ↑ and ↓ move between them, Enter opens one, Escape, its × or a
+/// press anywhere outside it closes it, and opening one closes it first.
 /// </summary>
 public sealed partial class ExternalToolsScreen
 {
-    private const double ListWidth = 420, ListHeight = 500;
-    /// <summary>Room round the list for its shadow, inside the popup's own window (the gap under the card is the top).</summary>
-    private const double Side = 12, Above = 4, Below = 20;
+    private const double ListWidth = 480, ListHeight = 560;
 
-    private Popup? list;
+    private Sheet? list;
     private string? listId;
     private FrameworkElement? listCard;
     private Grid? listSurface;
@@ -44,29 +40,18 @@ public sealed partial class ExternalToolsScreen
     private Stack? rowsHost;
     /// <summary>The rows shown, in order, each with what it opens: ↑ and ↓ move between them, Enter opens one.</summary>
     private readonly List<(Button Row, Action Open)> listRows = new();
-    private Window? listWindow;
-    private ScrollViewer? listPage;
     /// <summary>(0.3.98) To do (0) or All (1), when the tool has both (<see cref="listScoped"/>).</summary>
     private int listScope;
     private bool listScoped;
 
-    /// <summary>A card pressed: its list, or — its list open already — folded away.</summary>
+    /// <summary>A card pressed: its list.</summary>
     private void ToggleList(string id, FrameworkElement card)
     {
-        if (listId == id) { CloseList(); return; }
+        if (listId == id) return;
         if (ToolOf(id) is { } t) OpenList(t, card);
     }
 
-    /// <summary>A press anywhere in the window outside the list folds it away (the press still does what it does); a
-    /// press on its own card folds it by the card's click.</summary>
-    public override void Pressed(MouseButtonEventArgs e)
-    {
-        if (list == null) return;
-        if (listSurface?.IsMouseOver == true || listCard?.IsMouseOver == true) return;
-        CloseList();
-    }
-
-    /// <summary>Escape: the list folded away, the keyboard back on its card.</summary>
+    /// <summary>Escape: the list closed, the keyboard back on its card.</summary>
     public override bool Escape()
     {
         if (list == null) return false;
@@ -75,11 +60,11 @@ public sealed partial class ExternalToolsScreen
     }
 
     /// <summary>
-    /// The list of a tool's places, hung from its card: centred under it, 400 wide, as tall as its rows up to 460 (then
-    /// they scroll) — above the card where there is no room below (WPF's own fallback). The filter takes the keyboard when
-    /// there is one, else the first row. <paramref name="keep"/>: the filter's words, when it is hung again.
+    /// The list of a tool's places, in its popup over the window: 480 wide, as tall as its rows up to 560 (then they
+    /// scroll), and no taller than the window has room for. The filter takes the keyboard when there is one, else the
+    /// first row.
     /// </summary>
-    private void OpenList(Tool t, FrameworkElement card, string keep = "", bool animate = true)
+    private void OpenList(Tool t, FrameworkElement card)
     {
         CloseList();
         var places = t.Courses.Where(c => c.Items.Count > 0).ToList();
@@ -107,11 +92,15 @@ public sealed partial class ExternalToolsScreen
             still = K.V(0, n, w).Margin(12, 0, 0, 0);
             still.VerticalAlignment = VerticalAlignment.Center;
         }
+        // (0.3.100: its × at the right, as a popup's)
+        var close = K.IconButton(SymbolRegular.Dismiss24, () => CloseList(returnFocus: true), "Close (Esc)", 14, 30);
+        close.VerticalAlignment = VerticalAlignment.Center;
+        close.Margin = new Thickness(10, 0, -6, 0);
         var head = new Border
         {
-            Padding = new Thickness(16, 12, 16, 12), CornerRadius = new CornerRadius(8, 8, 0, 0),
+            Padding = new Thickness(16, 12, 16, 12),
             Background = new LinearGradientBrush(K.WithAlpha(tint, Appearance.Dark ? 0.26 : 0.18), K.WithAlpha(tint, 0.02), 90),
-            Child = K.Columns("auto, *, auto", tile.Margin(0, 0, 12, 0).Col(0), words.Col(1), still?.Col(2)),
+            Child = K.Columns("auto, *, auto, auto", tile.Margin(0, 0, 12, 0).Col(0), words.Col(1), still?.Col(2), close.Col(3)),
         };
 
         // (0.3.98) To do and All, when it has both: To do to start with
@@ -130,7 +119,7 @@ public sealed partial class ExternalToolsScreen
             {
                 PlaceholderText = Noun(t) switch { "assignment" => "Filter assignments", "module item" => "Filter module items", _ => "Filter" },
                 Icon = new SymbolIcon { Symbol = SymbolRegular.Filter24 }, IconPlacement = ElementPlacement.Left,
-                MinHeight = 32, Margin = new Thickness(12, scope == null ? 8 : 0, 12, 8), Text = keep,
+                MinHeight = 32, Margin = new Thickness(12, scope == null ? 8 : 0, 12, 8),
             };
             listFilter.TextChanged += (_, _) => FillList(t);
         }
@@ -142,74 +131,29 @@ public sealed partial class ExternalToolsScreen
         };
         var content = K.Rows("auto, auto, auto, *, auto", head.Row(0), scope?.Row(1), listFilter?.Row(2), scroller.Row(3), Foot().Row(4));
 
-        var shade = new Border { CornerRadius = new CornerRadius(8), Effect = K.Shadow(24, 6, 0.22) }.Bg(B.Flyout);
-        var face = new Border { CornerRadius = new CornerRadius(8), Child = content, SnapsToDevicePixels = true }.Bg(B.Flyout).Stroke(B.FlyoutStroke);
-        var surface = new Grid { Width = ListWidth, MaxHeight = ListHeight, Margin = new Thickness(Side, Above, Side, Below), Children = { shade, face } };
+        var surface = new Grid { MaxHeight = ListHeight, Children = { content } };
         surface.SetResourceReference(TextElement.ForegroundProperty, B.Text);
-        KeyboardNavigation.SetTabNavigation(surface, KeyboardNavigationMode.Cycle);
         AutomationProperties.SetName(surface, $"{t.Name}: {Places(t)}");
         surface.PreviewKeyDown += OnListKey;
-        // (a popup's events go on through its card: a press on the list's own ground stops here — it does not press the
-        // card under it, which would fold the list — and the wheel over the list is the list's, never the page's)
-        surface.MouseLeftButtonDown += (_, e) => e.Handled = true;
-        surface.MouseWheel += (_, e) => e.Handled = true;
-        // (the keyboard taken elsewhere in Simpl — the search box, Ctrl+F — folds it; not the card's own press, whose
-        // click does, nor Simpl merely left for another app)
-        surface.IsKeyboardFocusWithinChanged += (_, e) =>
-        {
-            if ((bool)e.NewValue || Shot.Asked) return;
-            surface.Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
-            {
-                if (listSurface == surface && !surface.IsKeyboardFocusWithin && Keyboard.FocusedElement is DependencyObject now && !ReferenceEquals(now, listCard))
-                    CloseList();
-            });
-        };
-
-        list = new Popup
-        {
-            Child = surface, AllowsTransparency = true, StaysOpen = true, Focusable = false, PopupAnimation = PopupAnimation.None,
-            PlacementTarget = card, Placement = PlacementMode.Bottom, HorizontalOffset = (card.ActualWidth - (ListWidth + 2 * Side)) / 2,
-        };
+        // (a light one: a press on the dimmed window round it closes it; Escape is the dialog's own)
+        var sheet = new Sheet { Body = surface, Bare = true, Width = ListWidth, Light = true, Name = t.Name };
+        sheet.Closed += () => { if (list == sheet) Forget(); };
+        list = sheet;
         listId = t.Id;
         listCard = card;
         listSurface = surface;
         rowsHost = rows;
         FillList(t);
-
-        listWindow = Window.GetWindow(card);
-        if (listWindow != null)
-        {
-            listWindow.LocationChanged += OnListWindowMoved;
-            listWindow.SizeChanged += OnListWindowMoved;
-        }
-        if (Application.Current != null) Application.Current.Deactivated += OnAppLeft;
-        listPage = Ancestor<ScrollViewer>(card);
-        if (listPage != null) listPage.ScrollChanged += OnPageScrolled;
-
-        list.IsOpen = true;
+        Dialogs.Show(sheet, Window.GetWindow(card));
         // (its card's "Choose which …" is said: it would only cover the list)
         ToolTipService.SetIsEnabled(card, false);
-        if (chevrons.TryGetValue(t.Id, out var turn))
-        {
-            if (animate) Motion.To(turn, RotateTransform.AngleProperty, 180, Motion.Normal, Motion.Decelerate);
-            else { turn.BeginAnimation(RotateTransform.AngleProperty, null); turn.Angle = 180; }
-        }
-        if (animate && Motion.On)
-        {
-            // (Windows 11's flyout arriving: up the last few pixels into place as it fades in, decelerating)
-            var rise = new TranslateTransform(0, 8);
-            surface.RenderTransform = rise;
-            surface.Opacity = 0;
-            Motion.To(rise, TranslateTransform.YProperty, 0, Motion.Normal, Motion.Decelerate);
-            Motion.To(surface, UIElement.OpacityProperty, 1, Motion.Normal, Motion.Decelerate);
-        }
         surface.Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
         {
             if (listSurface != surface) return;
             if (listFilter != null) { listFilter.Focus(); listFilter.CaretIndex = listFilter.Text.Length; }
             else if (listRows.Count > 0) listRows[0].Row.Focus();
         });
-        Shot.Moved();
+        if (Shot.Asked) Log.Write($"tool list shown: {t.Name}");
     }
 
     /// <summary>
@@ -429,78 +373,39 @@ public sealed partial class ExternalToolsScreen
         row.BringIntoView();
     }
 
-    /// <summary>The list folded away (at once: what it was for has been chosen, or left), its card's chevron turned back;
-    /// <paramref name="returnFocus"/>: the keyboard back on the card.</summary>
+    /// <summary>The list closed (what it was for has been chosen, or left); <paramref name="returnFocus"/>: the keyboard
+    /// back on its card.</summary>
     private void CloseList(bool returnFocus = false)
     {
+        if (list is not { } sheet) return;
+        var card = listCard;
+        Forget();
+        sheet.Close();
+        if (returnFocus) card?.Focus();
+    }
+
+    /// <summary>What the open list kept, let go: it has closed, or is closing.</summary>
+    private void Forget()
+    {
         if (list == null) return;
-        var (popup, card, id) = (list, listCard, listId);
         list = null;
+        listCard?.ClearValue(ToolTipService.IsEnabledProperty);
         listId = null;
         listCard = null;
         listSurface = null;
         listFilter = null;
         rowsHost = null;
         listRows.Clear();
-        if (listWindow != null)
-        {
-            listWindow.LocationChanged -= OnListWindowMoved;
-            listWindow.SizeChanged -= OnListWindowMoved;
-            listWindow = null;
-        }
-        if (Application.Current != null) Application.Current.Deactivated -= OnAppLeft;
-        if (listPage != null) { listPage.ScrollChanged -= OnPageScrolled; listPage = null; }
-        popup.IsOpen = false;
-        card?.ClearValue(ToolTipService.IsEnabledProperty);
-        if (id != null && chevrons.TryGetValue(id, out var turn)) Motion.To(turn, RotateTransform.AngleProperty, 0, Motion.Normal, Motion.Decelerate);
-        if (returnFocus) card?.Focus();
     }
 
     /// <summary>
-    /// The page built again with a list open (a new answer, the columns changed, the look): the list hung again from its
-    /// tool's new card once that is in place — its filter's words kept, without the entrance — or gone with its tool.
+    /// The page built again with a list open (a new answer, the columns changed, the look): the list stays open over it —
+    /// its card now the new one — or closes, its tool gone.
     /// </summary>
     private void Rehang(List<Tool> shown)
     {
         if (listId is not { } id) return;
-        var keep = listFilter?.Text ?? "";
-        CloseList();
-        if (shown.FirstOrDefault(t => t.Id == id) is not { } tool || !Chooser(tool) || !cards.TryGetValue(id, out var card)) return;
-        void Hang(object sender, RoutedEventArgs e)
-        {
-            card.Loaded -= Hang;
-            if (list == null && cards.TryGetValue(id, out var now) && ReferenceEquals(now, card)) OpenList(tool, card, keep, animate: false);
-        }
-        card.Loaded += Hang;
-    }
-
-    /// <summary>The window moved or changed size: the list follows its card (WPF places a popup only as it opens).</summary>
-    private void OnListWindowMoved(object? sender, EventArgs e)
-    {
-        if (list is not { } p || listCard is not { } card) return;
-        p.HorizontalOffset = (card.ActualWidth - (ListWidth + 2 * Side)) / 2 + 0.01;
-        p.HorizontalOffset -= 0.01;
-    }
-
-    /// <summary>The page scrolled under the list: it folds away, as a light-dismissed flyout does. (The list's own
-    /// scrolling comes this way too — a popup's events go on through its card — and is the list's business.)</summary>
-    private void OnPageScrolled(object sender, ScrollChangedEventArgs e)
-    {
-        if (!ReferenceEquals(e.OriginalSource, listPage)) return;
-        if (e.VerticalChange != 0 || e.HorizontalChange != 0) CloseList();
-    }
-
-    /// <summary>Simpl left for another app: the list folds away rather than float over it (not while the screenshot
-    /// suite pictures it — other copies of Simpl starting may take the foreground).</summary>
-    private void OnAppLeft(object? sender, EventArgs e)
-    {
-        if (!Shot.Asked) CloseList();
-    }
-
-    private static T? Ancestor<T>(DependencyObject d) where T : DependencyObject
-    {
-        for (var p = VisualTreeHelper.GetParent(d); p != null; p = VisualTreeHelper.GetParent(p))
-            if (p is T t) return t;
-        return null;
+        if (shown.FirstOrDefault(t => t.Id == id) is not { } tool || !Chooser(tool)) { CloseList(); return; }
+        if (cards.TryGetValue(id, out var card)) listCard = card;
     }
 }
