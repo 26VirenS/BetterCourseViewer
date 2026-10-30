@@ -16,6 +16,14 @@
 // question lies on a sheet of liquid glass over a lit ground, its number large over it, and Resources, AI Tutor,
 // Solution, the verdict and the main button float in a glass dock along the foot; a new question eases in.
 //
+// (Mac 1.3.200, Windows 0.3.95) The popup's own front end over the page: with `window.__simplLookFront` set ('glass': the
+// Mac's popup, real Liquid Glass drawn by the app behind a clear page; 'card': Windows', the sheet drawn here) the page
+// keeps only the question — its parts, its answer fields, the attempts menu — and the popup draws the rest itself: the
+// question's number and the way to the others over it, Resources / AI Tutor / Solution and Submit Answer / Next Question
+// in a bar of its own at its foot, and Macmillan's verdict as its own. Macmillan's own bar and buttons stay in the page,
+// out of sight but there, and the popup's buttons press them (`__simplMMDo({ press: id })`): nothing is answered
+// differently. The page tells the popup what they say and whether they can be pressed (`front` in what it tells the rail).
+//
 // The app puts `window.__simplMMOn = true|false;` before this file (the toolbar's Simpl Look, as last left) and turns
 // it at once with `__simplMMSet(on)` in the top page, which passes it on to the page's frames; a frame loaded later
 // asks its parent. It tells the app once what it found, for the log: a frame through the top page (a frame of another
@@ -30,7 +38,8 @@
   if (!mine) return;
   var root = null; // (the page's <html>: not there yet when Windows runs this, before the page is read)
   var on = window.__simplMMOn !== false;
-  var rail = window.__simplLookRail === true; // (in the apps' popup, its rail beside the page)
+  var front = window.__simplLookFront === 'glass' || window.__simplLookFront === 'card' ? window.__simplLookFront : '';
+  var rail = window.__simplLookRail === true || !!front; // (in the apps' popup, its rail beside the page)
   var framed = window.parent !== window;
 
   var CSS = [
@@ -215,6 +224,27 @@
     '@media (prefers-reduced-motion:no-preference){html.simpl-mm.simpl-rail #raptor-content-container.simpl-turn{animation:simpl-mm-turn .34s var(--mm-ease)}html.simpl-mm.simpl-rail #check-bar{animation:simpl-mm-fade .3s var(--mm-ease)}}',
     '@media (prefers-reduced-motion:reduce){html.simpl-mm.simpl-rail #raptor-content-container.simpl-turn{animation:simpl-mm-fade .2s ease}}',
     '@media (prefers-reduced-transparency:reduce){html.simpl-mm.simpl-rail{--mm-sheet-glass:#fff}html.simpl-mm.simpl-rail #check-bar::before{-webkit-backdrop-filter:none;backdrop-filter:none;background:#fff}}',
+
+    // ---- (1.3.200) the popup's front end: only the question is the page's; the popup draws the rest
+    // (Macmillan's chrome out of sight but there — its buttons pressed by the popup's own)
+    'html.simpl-mm.simpl-front .hub_molecule_app_header{position:absolute!important;width:1px!important;height:1px!important;margin:-1px!important;padding:0!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;border:0!important}',
+    'html.simpl-mm.simpl-front #main-content{top:0!important}',
+    'html.simpl-mm.simpl-front [aria-label="Open Resource Center"]{display:none!important}',
+    'html.simpl-mm.simpl-front #check-bar,html.simpl-mm.simpl-front #results{opacity:0!important;pointer-events:none!important}',
+    'html.simpl-mm.simpl-front #check-bar::before{display:none}',
+    'html.simpl-mm.simpl-front #question-name{visibility:hidden!important}',
+    'html.simpl-mm.simpl-front #attempts-holder{height:44px!important;min-height:44px!important}',
+    'html.simpl-mm.simpl-front #attempts-holder.dropdown #attempts-button{top:4px!important}',
+    'html.simpl-mm.simpl-front #sac{padding:6px 22px 0!important}',
+    'html.simpl-mm.simpl-front .raptor-container{height:calc(100vh - 6px)!important}',
+    'html.simpl-mm.simpl-front #raptor-content-container .content-area{padding-bottom:124px!important}',
+    // ('glass': no ground and no sheet of the page's own — the popup's Liquid Glass is under the clear page; its
+    // answer fields and banks frosted over it)
+    'html.simpl-mm.simpl-front-glass,html.simpl-mm.simpl-front-glass body,html.simpl-mm.simpl-front-glass #root,html.simpl-mm.simpl-front-glass #__next,html.simpl-mm.simpl-front-glass #main-content,html.simpl-mm.simpl-front-glass #sac,html.simpl-mm.simpl-front-glass #main{background:transparent!important}',
+    'html.simpl-mm.simpl-front-glass #raptor-content-container .authoring-area>.parent-module-container,html.simpl-mm.simpl-front-glass #raptor-content-container .shared-module-container{background:transparent!important;box-shadow:none!important;border:0!important}',
+    'html.simpl-mm.simpl-front-glass .numeric-entry-border{background:rgba(255,255,255,.66)!important;border-color:rgba(60,60,67,.22)!important}',
+    'html.simpl-mm.simpl-front-glass .labeling-answer-bank{background:rgba(255,255,255,.42)!important;border:1px solid rgba(255,255,255,.7)!important}',
+    'html.simpl-mm.simpl-front-glass #attempts-holder.dropdown #attempts-button{background:rgba(255,255,255,.58)!important}',
   ].join('\n');
 
   var style = document.createElement('style');
@@ -263,15 +293,39 @@
       policy: !!document.querySelector('[data-test-id="show-policy-details-button"]'),
       // (the width the question wants, in the page's own pixels: its sheet and the margins round it)
       wide: Math.ceil((area ? parseFloat(getComputedStyle(area).width) || 960 : 960) + 48) };
+    if (front) o.front = buttons();
     var said = JSON.stringify(o);
     if (rail && said !== railSaid) { railSaid = said; tell(o); }
     return o.here;
   };
-  // What the popup's rail asks of the page: a question opened (Macmillan's own row clicked), the grading settings shown.
+  // (1.3.200) For the popup's front end: Macmillan's buttons as they stand — each named for the popup to press it, its
+  // words, whether it can be pressed — and its verdict on the answer, if it has given one.
+  var shown = function (e) { return !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden'; };
+  var named = function (e, id) { if (e.getAttribute('data-simpl-id') !== id) e.setAttribute('data-simpl-id', id); return id; };
+  var able = function (e) { return !e.disabled && !e.classList.contains('Mui-disabled') && e.getAttribute('aria-disabled') !== 'true'; };
+  var buttons = function () {
+    var f = { tools: [], main: null, verdict: null, layout: null };
+    var main = document.querySelector('button[data-test-id="btn-sac-main"]');
+    if (shown(main)) f.main = { id: named(main, 'main'), label: text(main), enabled: able(main) };
+    var tools = document.querySelectorAll('#tools li > button[data-test-id]');
+    for (var i = 0; i < tools.length; i++) {
+      if (!shown(tools[i])) continue;
+      f.tools.push({ id: named(tools[i], 'tool-' + i), label: text(tools[i]) || tools[i].getAttribute('aria-label') || '', kind: tools[i].getAttribute('data-test-id') || '', enabled: able(tools[i]) });
+    }
+    var layout = document.querySelector('[data-test-id="switch-to-new-layout"]');
+    if (shown(layout)) f.layout = { id: named(layout, 'layout'), label: text(layout).replace(/\s*Beta$/i, '') };
+    var said = document.getElementById('results'), words = text(said);
+    if (words) f.verdict = { text: words, kind: said.classList.contains('correct') ? 'right' : said.classList.contains('incorrect') ? 'wrong' : 'said' };
+    return f;
+  };
+
+  // What the popup asks of the page: a question opened (Macmillan's own row clicked), the grading settings shown, or
+  // (1.3.200) one of Macmillan's own buttons pressed for the popup's.
   var act = function (c) {
     if (!c || typeof c !== 'object') return;
     var b = c.go ? document.querySelector('#question-nav > li[data-test-id^="item-' + (+c.go) + '-"]')
-      : c.policy ? document.querySelector('[data-test-id="show-policy-details-button"]') : null;
+      : c.policy ? document.querySelector('[data-test-id="show-policy-details-button"]')
+      : c.press ? document.querySelector('[data-simpl-id="' + String(c.press).replace(/[^a-z0-9-]/gi, '') + '"]') : null;
     if (b) b.click();
   };
 
@@ -339,6 +393,8 @@
   var classes = function () {
     root.classList.toggle('simpl-mm', on);
     root.classList.toggle('simpl-rail', on && rail);
+    root.classList.toggle('simpl-front', on && !!front);
+    root.classList.toggle('simpl-front-glass', on && front === 'glass');
     root.classList.toggle('simpl-framed', framed);
   };
   var draw = function () {

@@ -988,7 +988,8 @@ record_check() {
 # questions found and the open one marked (light-21n-macmillan-look), and not drawn with Simpl Look off (light-21o);
 # (1.3.198) and over ALEKS's, drawn with its Check and its 5 tools found (light-21p-aleks-look), not drawn when off
 # (light-21q). A FAIL fails it. (1.3.199) Both in their popup now, as Alta's: its rail heard from the page — Macmillan's
-# 4 questions with Q1 open, ALEKS's topic progress 0 of 5 — with Simpl Look on and off alike.
+# 4 questions with Q1 open, ALEKS's topic progress 0 of 5 — with Simpl Look on and off alike. (1.3.200) And the
+# popup's own front end: Macmillan's Resources, Solution and Next Question, ALEKS's Explanation and Recheck.
 look_check() {
   local out="$OUT_ABS/look-check.txt" f="$OUT_ABS/console-light-21n-macmillan-look.txt" g="$OUT_ABS/console-light-21o-macmillan-look-off.txt"
   : > "$out"
@@ -1010,6 +1011,11 @@ look_check() {
     if grep -q 'aleks popup: rail heard, topic progress 0 of 5' "$c" 2>/dev/null; then echo "ok   the popup's rail heard ALEKS's topic progress ($(basename "$c" .txt))" >> "$out"
     else echo "FAIL the popup's rail heard nothing of ALEKS's topic ($(basename "$c" .txt): $(grep -o 'aleks popup: .*' "$c" 2>/dev/null | head -3 | tr '\n' ';'))" >> "$out"; fi
   done
+  # (1.3.200) the popup's own front end: the tool's buttons heard and drawn as the popup's own
+  if grep -q 'macmillan popup: front end, buttons Resources, Solution, Next Question' "$f" 2>/dev/null; then echo "ok   the popup's front end drew Macmillan's buttons" >> "$out"
+  else echo "FAIL the popup's front end drew no Macmillan buttons ($(grep -o 'macmillan popup: front.*' "$f" 2>/dev/null | head -2 | tr '\n' ';'))" >> "$out"; fi
+  if grep -q 'aleks popup: front end, buttons Explanation, Recheck' "$h" 2>/dev/null; then echo "ok   the popup's front end drew ALEKS's buttons" >> "$out"
+  else echo "FAIL the popup's front end drew no ALEKS buttons ($(grep -o 'aleks popup: front.*' "$h" 2>/dev/null | head -2 | tr '\n' ';'))" >> "$out"; fi
   cat "$out"
   if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::macmillan look: /'; return 1; fi
 }

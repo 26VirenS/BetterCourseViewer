@@ -21,6 +21,10 @@ struct LookLaunch: Identifiable, Hashable {
 /// the last answer — and in the rest, the tool's own page in Simpl's look (PageLook's rail mode), where every question is
 /// answered as on the tool's own page. A tile clicked opens that question (Macmillan's own row clicked in the page). The
 /// page is zoomed out, as the browser's own zoom would, while the popup is narrower than the tool lays its page out.
+/// (1.3.200) And the popup's own front end over the page, as Alta's popup is over Alta's: the question's heading the
+/// popup's (which question, Previous and Next; ALEKS's topic and its steps), the question on a pane of Liquid Glass — the
+/// tool's page clear over it, its words and answer fields the tool's own, punched through — and the tool's buttons and
+/// verdict the popup's own along the foot, each pressing the tool's (its own bar out of sight in the page).
 struct LookQuizScreen: View {
     let launch: LookLaunch
     @EnvironmentObject private var engine: Engine
@@ -95,7 +99,7 @@ struct LookQuizScreen: View {
             }
             Spacer(minLength: 8)
             AltaBrowserToggle(on: lookOn, label: "Simpl Look", icon: "sparkles",
-                              helpOn: "Simpl's look is on: \(look.fullName)'s page on glass, its actions in a dock. Click to show it as \(look.fullName) draws it.",
+                              helpOn: "Simpl's look is on: \(look.fullName)'s question on Liquid Glass, its buttons the popup's own. Click to show it as \(look.fullName) draws it.",
                               helpOff: "Show \(look.fullName)'s page in Simpl's look")
             PopupPins()
             GlassGroup(spacing: 8) {
@@ -134,31 +138,69 @@ struct LookQuizScreen: View {
 
     // MARK: The page
 
+    /// Simpl Look on: the popup's own front end over the tool's page. Off: the page as the tool draws it, on white.
+    private var front: Bool { lookOn.wrappedValue }
+
     private var page: some View {
-        GeometryReader { g in
-            ZStack {
-                if let url {
-                    ToolWebView(url: url, browser: browser, scripts: PageLook.scripts(rail: true),
-                                messages: ["simplLook": rail.relay], externalTool: true, sendToolForm: sendForm)
-                } else if let error {
-                    ContentUnavailableView {
-                        Label("\(look.fullName) could not open", systemImage: look.symbol)
-                    } description: {
-                        Text(error)
-                    } actions: {
-                        Button("Try Again") { Task { await start() } }
-                            .keyboardShortcut(.defaultAction)
-                    }
-                }
-                if !ready {
-                    LookOpening(look: look)
-                        .transition(.opacity.combined(with: .scale(scale: 0.97)))
-                }
+        VStack(spacing: 0) {
+            if front && rail.heard && rail.onItem {
+                LookQuestionHeader(rail: rail, look: look)
+                    .transition(.opacity.combined(with: .offset(y: -6)))
             }
-            .onAppear { rail.fit(width: g.size.width) }
-            .onChange(of: g.size.width) { _, w in rail.fit(width: w) }
+            ZStack {
+                // (the pane of Liquid Glass the question is laid on — light, as the tool's page is drawn for light)
+                if front {
+                    Rectangle().fill(Color.clear)
+                        .glassCard(radius: 26, tint: Color.white.opacity(0.5))
+                        .environment(\.colorScheme, .light)
+                        .transition(.opacity)
+                } else {
+                    Color.white
+                }
+                GeometryReader { g in
+                    ZStack {
+                        if let url {
+                            ToolWebView(url: url, browser: browser, scripts: PageLook.scripts(front: true),
+                                        messages: ["simplLook": rail.relay], externalTool: true, sendToolForm: sendForm, clear: true)
+                        } else if let error {
+                            ContentUnavailableView {
+                                Label("\(look.fullName) could not open", systemImage: look.symbol)
+                            } description: {
+                                Text(error)
+                            } actions: {
+                                Button("Try Again") { Task { await start() } }
+                                    .keyboardShortcut(.defaultAction)
+                            }
+                        }
+                    }
+                    .onAppear { rail.fit(width: g.size.width) }
+                    .onChange(of: g.size.width) { _, w in rail.fit(width: w) }
+                }
+                .padding(front ? 6 : 0)
+            }
+            .padding(.horizontal, front ? 14 : 0)
+            .padding(.top, front && !(rail.heard && rail.onItem) ? 14 : 0)
+            .padding(.bottom, front ? 14 : 0)
+        }
+        // (the tool's buttons, whatever they say, as the popup's own — its main one prominent, one it has greyed out
+        // greyed out — each pressing the tool's; its verdict on the last answer a pill at their left)
+        .overlay(alignment: .bottom) {
+            if front && ready && rail.hasButtons {
+                LookButtonBar(rail: rail)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 14)
+                    .transition(.opacity.combined(with: .offset(y: 8)))
+            }
+        }
+        .overlay {
+            if !ready {
+                LookOpening(look: look)
+                    .transition(.opacity.combined(with: .scale(scale: 0.97)))
+            }
         }
         .animation(Motion.gentle, value: ready)
+        .animation(Motion.gentle, value: front)
+        .animation(Motion.gentle, value: rail.onItem)
     }
 
     private func start() async {
@@ -198,6 +240,182 @@ private struct LookOpening: View {
     }
 }
 
+// MARK: - The front end
+
+/// (1.3.200) Over the question, the popup's own heading for it. Macmillan's: which question of how many, what Macmillan
+/// says of it (its attempts, its points), Previous and Next, and its layout switch and grading settings under "…".
+/// ALEKS's: the topic, its part of the course, and the topic's steps as ALEKS fills them.
+private struct LookQuestionHeader: View {
+    @ObservedObject var rail: LookRail
+    let look: PageLook
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 14) {
+            if look.name == PageLook.aleks.name { aleks } else { macmillan }
+        }
+        .controlSize(.regular)
+        .padding(.horizontal, 28)
+        .padding(.top, 14)
+        .padding(.bottom, 10)
+    }
+
+    private var question: LookRail.Question? { rail.questions.first(where: { $0.n == rail.here }) }
+
+    @ViewBuilder
+    private var macmillan: some View {
+        let at = rail.questions.firstIndex(where: { $0.n == rail.here })
+        let before = at.flatMap { $0 > 0 ? rail.questions[$0 - 1].n : nil }
+        let after = at.flatMap { $0 + 1 < rail.questions.count ? rail.questions[$0 + 1].n : nil }
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("Question \(rail.here)")
+                    .font(.sTitle3.weight(.semibold).monospacedDigit())
+                    .contentTransition(.numericText(value: Double(rail.here)))
+                Text("of \(rail.total)")
+                    .font(.sCallout.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+            if let q = question {
+                Label(line(q), systemImage: q.solved ? "checkmark.circle.fill" : q.tried ? "exclamationmark.circle.fill" : "circle.dashed")
+                    .font(.sFootnote)
+                    .foregroundStyle(q.solved ? Color.green : q.tried ? Color.orange : Color.secondary)
+                    .lineLimit(1)
+                    .contentTransition(.opacity)
+            }
+        }
+        .animation(Motion.snappy, value: rail.here)
+        .accessibilityElement(children: .combine)
+        Spacer(minLength: 8)
+        GlassGroup(spacing: 6) {
+            HStack(spacing: 6) {
+                Button { if let before { rail.go(before) } } label: { Label("Previous Question", systemImage: "chevron.left") }
+                    .labelStyle(.iconOnly)
+                    .glassButton()
+                    .disabled(before == nil)
+                    .keyboardShortcut("[", modifiers: .command)
+                    .help("Previous question")
+                Button { if let after { rail.go(after) } } label: { Label("Next Question", systemImage: "chevron.right") }
+                    .labelStyle(.iconOnly)
+                    .glassButton()
+                    .disabled(after == nil)
+                    .keyboardShortcut("]", modifiers: .command)
+                    .help("Next question")
+            }
+        }
+        if !rail.layout.isEmpty || rail.policy {
+            Menu {
+                if !rail.layout.isEmpty {
+                    Button(rail.layout) { rail.press(id: "layout", label: rail.layout) }
+                }
+                if rail.policy {
+                    Button("Grading Policy") { rail.showPolicy() }
+                }
+            } label: {
+                Label("More", systemImage: "ellipsis")
+            }
+            .labelStyle(.iconOnly)
+            .menuStyle(.button)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .glassButton()
+            .help("Macmillan's layout and grading settings")
+        }
+    }
+
+    /// "Solved in 1 attempt · +100", from Macmillan's own list.
+    private func line(_ q: LookRail.Question) -> String {
+        let said = q.sub.isEmpty ? (q.solved ? "Solved" : q.tried ? "Tried, not solved yet" : "Not answered yet") : q.sub
+        return [said, q.points].filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+
+    @ViewBuilder
+    private var aleks: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            if !rail.slice.isEmpty {
+                Text(rail.slice.uppercased())
+                    .font(.sCaption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .tracking(0.4)
+                    .lineLimit(1)
+            }
+            Text(rail.topic)
+                .font(.sTitle3.weight(.semibold))
+                .lineLimit(2)
+                .contentTransition(.opacity)
+        }
+        .animation(Motion.gentle, value: rail.topic)
+        .accessibilityElement(children: .combine)
+        Spacer(minLength: 8)
+        if rail.total > 0 {
+            VStack(alignment: .trailing, spacing: 6) {
+                Text("\(max(rail.done, 0)) of \(rail.total)")
+                    .font(.sCallout.weight(.semibold).monospacedDigit())
+                    .contentTransition(.numericText(value: Double(max(rail.done, 0))))
+                LookSteps(fills: rail.steps)
+                    .frame(width: 140, height: 8)
+            }
+            .animation(Motion.snappy, value: rail.done)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Topic progress, \(max(rail.done, 0)) of \(rail.total)")
+        }
+    }
+}
+
+/// (1.3.200) Along the foot of the question, in Liquid Glass, the tool's own buttons as the popup's: its lesser ones at
+/// the left with their symbols, its main one at the right in the accent (⌘↩), the tool's verdict a pill beside it.
+private struct LookButtonBar: View {
+    @ObservedObject var rail: LookRail
+
+    var body: some View {
+        QuizFloatingBar {
+            ForEach(rail.tools) { b in
+                Button { rail.press(b) } label: {
+                    if b.symbol.isEmpty { Text(b.label) } else { Label(b.label, systemImage: b.symbol) }
+                }
+                .glassButton()
+                .disabled(!b.enabled)
+                .help("\(b.label) (\(rail.lookName == PageLook.aleks.name ? "ALEKS" : "Macmillan")'s own)")
+                .transition(.opacity.combined(with: .scale(scale: 0.94)))
+            }
+            Spacer(minLength: 12)
+            if let v = rail.verdict {
+                LookVerdictPill(verdict: v)
+            }
+            ForEach(rail.actions) { b in
+                Button { rail.press(b) } label: { Text(b.label).frame(minWidth: 84) }
+                    .glassButton(prominent: b.primary)
+                    .disabled(!b.enabled)
+                    .keyboardShortcut(b.primary ? KeyboardShortcut(.return, modifiers: .command) : nil)
+                    .help(b.enabled ? "\(b.label) (⌘↩)" : "Not ready yet: answer the question first")
+                    .transition(.opacity.combined(with: .scale(scale: 0.94)))
+            }
+        }
+        .animation(Motion.snappy, value: rail.tools)
+        .animation(Motion.snappy, value: rail.actions)
+        .animation(Motion.snappy, value: rail.verdict)
+    }
+}
+
+/// (1.3.200) The tool's verdict on the last answer, in its own words, as a pill (as Alta's, AltaVerdictPill): green with
+/// a tick when right, red with a cross when wrong, plain otherwise.
+private struct LookVerdictPill: View {
+    let verdict: LookRail.Verdict
+
+    var body: some View {
+        let tone: Color = verdict.right ? .green : verdict.wrong ? .red : .secondary
+        Label(verdict.text, systemImage: verdict.right ? "checkmark.circle.fill" : verdict.wrong ? "xmark.circle.fill" : "info.circle.fill")
+            .font(.sCallout.weight(.semibold))
+            .foregroundStyle(tone)
+            .lineLimit(1)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
+            .glassCapsule(tint: verdict.right || verdict.wrong ? tone.opacity(0.28) : nil)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(verdict.text)
+            .transition(.opacity.combined(with: .scale(scale: 0.9)))
+    }
+}
+
 // MARK: - What the page tells the rail
 
 /// (1.3.199) What the tool's page tells the popup (extension/tools/*/look.js, `rail:`), as it changes; and what the rail
@@ -230,12 +448,64 @@ final class LookRail: ObservableObject {
     @Published private(set) var fills: [Double] = []
     @Published private(set) var status = ""
     @Published private(set) var onQuestion = false
+    // (1.3.200) the popup's front end: the tool's buttons — its lesser ones (Resources, AI Tutor; ALEKS's Explanation)
+    // and its main ones (Submit Answer, Next Question; ALEKS's Check) — its verdict, and Macmillan's layout switch
+    @Published private(set) var tools: [PageButton] = []
+    @Published private(set) var actions: [PageButton] = []
+    @Published private(set) var verdict: Verdict?
+    @Published private(set) var layout = ""
+    /// The look the page is in, as it last said ("macmillan", "aleks").
+    private(set) var lookName = ""
+
+    /// (1.3.200) One of the tool's own buttons, as the popup's front end draws it: pressed, it presses the tool's.
+    struct PageButton: Identifiable, Equatable {
+        let id: String
+        let label: String
+        let kind: String
+        let primary: Bool
+        let enabled: Bool
+
+        /// Its symbol, from what it is ("" for its words alone).
+        var symbol: String {
+            let k = (kind + " " + label).lowercased()
+            if k.contains("resource") { return "books.vertical" }
+            if k.contains("-mat-") || k.contains("tutor") { return "sparkles" }
+            if k.contains("solution") || k.contains("hint") { return "lightbulb" }
+            if k.contains("explanation") || k.contains("explain") { return "text.book.closed" }
+            if k.contains("calculator") { return "plus.forwardslash.minus" }
+            if k.contains("video") { return "play.rectangle" }
+            if k.contains("ebook") || k.contains("textbook") { return "book" }
+            if k.contains("periodic") { return "atom" }
+            if k.contains("help") { return "questionmark.circle" }
+            return ""
+        }
+    }
+
+    /// (1.3.200) The tool's word on the last answer: its own words, and whether it was right ("right", "wrong", "said").
+    struct Verdict: Equatable {
+        let text: String
+        let kind: String
+        var right: Bool { kind == "right" }
+        var wrong: Bool { kind == "wrong" }
+    }
 
     let relay = LookRelay()
     weak var webView: WKWebView? { didSet { zoom() } }
     private var wide: Double = 0
     private var width: CGFloat = 0
     private var logged = false
+    private var frontLogged = false
+
+    /// On a question (Macmillan's) or a topic (ALEKS's): the popup's own heading over it.
+    var onItem: Bool { lookName == PageLook.aleks.name ? !topic.isEmpty : total > 0 && here > 0 }
+    var hasButtons: Bool { !tools.isEmpty || !actions.isEmpty }
+
+    /// How full each step of ALEKS's topic is: as ALEKS draws them, else as many full as are done.
+    var steps: [Double] {
+        if fills.count == total, total > 0 { return fills }
+        let n = heard ? max(total, 0) : 5
+        return (0..<n).map { $0 < done ? 1 : 0 }
+    }
 
     init() { relay.rail = self }
 
@@ -246,6 +516,34 @@ final class LookRail: ObservableObject {
         }
         func int(_ k: String) -> Int { (o[k] as? NSNumber)?.intValue ?? -1 }
         func str(_ k: String) -> String { o[k] as? String ?? "" }
+        func button(_ b: [String: Any], primary: Bool? = nil) -> PageButton? {
+            guard let id = b["id"] as? String, let label = b["label"] as? String, !label.isEmpty else { return nil }
+            return PageButton(id: id, label: label, kind: b["kind"] as? String ?? "", primary: primary ?? (b["primary"] as? Bool ?? false),
+                              enabled: b["enabled"] as? Bool ?? true)
+        }
+        lookName = kind
+        let f = o["front"] as? [String: Any]
+        var lesser: [PageButton] = [], main: [PageButton] = [], said: Verdict? = nil
+        if kind == PageLook.macmillan.name {
+            lesser = (f?["tools"] as? [[String: Any]] ?? []).compactMap { button($0, primary: false) }
+            main = (f?["main"] as? [String: Any]).flatMap { button($0, primary: true) }.map { [$0] } ?? []
+            if let v = f?["verdict"] as? [String: Any], let t = v["text"] as? String, !t.isEmpty {
+                said = Verdict(text: t, kind: v["kind"] as? String ?? "said")
+            }
+            let l = (f?["layout"] as? [String: Any])?["label"] as? String ?? ""
+            if l != layout { layout = l }
+        } else {
+            let all = (f?["actions"] as? [[String: Any]] ?? []).compactMap { button($0) }
+            lesser = all.filter { !$0.primary }
+            main = all.filter(\.primary)
+        }
+        if lesser != tools { tools = lesser }
+        if main != actions { actions = main }
+        if said != verdict { verdict = said }
+        if !frontLogged, hasButtons {
+            frontLogged = true
+            NSLog("[Simpl] %@ popup: front end, buttons %@", kind, (tools + actions).map(\.label).joined(separator: ", "))
+        }
         if kind == PageLook.macmillan.name {
             questions = (o["rows"] as? [[String: Any]] ?? []).compactMap { (r: [String: Any]) -> Question? in
                 guard let n = (r["n"] as? NSNumber)?.intValue else { return nil }
@@ -308,6 +606,16 @@ final class LookRail: ObservableObject {
     /// Macmillan's grading settings shown (its own button clicked).
     func showPolicy() {
         webView?.evaluateJavaScript("window.__simplMMDo && window.__simplMMDo({ policy: 1 })", completionHandler: nil)
+    }
+
+    /// (1.3.200) One of the tool's own buttons pressed, for the popup's: the page clicks it (look.js names each).
+    func press(_ b: PageButton) { press(id: b.id, label: b.label) }
+
+    func press(id: String, label: String) {
+        let safe = id.filter { $0.isLetter || $0.isNumber || $0 == "-" }
+        let fn = lookName == PageLook.aleks.name ? "__simplAKDo" : "__simplMMDo"
+        NSLog("[Simpl] %@ popup: pressed %@", lookName, label)
+        webView?.evaluateJavaScript("window.\(fn) && window.\(fn)({ press: '\(safe)' })", completionHandler: nil)
     }
 }
 
@@ -525,12 +833,7 @@ private struct LookRailView: View {
         }
     }
 
-    /// How full each step of the topic is: as ALEKS draws them, else as many full as are done.
-    private var steps: [Double] {
-        if rail.fills.count == rail.total, rail.total > 0 { return rail.fills }
-        let n = rail.heard ? max(rail.total, 0) : 5
-        return (0..<n).map { $0 < rail.done ? 1 : 0 }
-    }
+    private var steps: [Double] { rail.steps }
 }
 
 /// How much is done, as a ring: the accent round a faint track, the share in its middle.

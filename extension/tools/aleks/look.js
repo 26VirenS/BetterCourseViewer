@@ -15,6 +15,12 @@
 // on a sheet of liquid glass over a lit ground, the tools in a glass column, the actions in a glass dock along the foot;
 // a new question eases in and ALEKS's verdict rises into place.
 //
+// (Mac 1.3.200, Windows 0.3.95) The popup's own front end over the page, as Macmillan's (extension/tools/macmillan/look.js):
+// with `window.__simplLookFront` set ('glass' on the Mac, Liquid Glass drawn by the app behind a clear page; 'card' on
+// Windows, the sheet drawn here) ALEKS's actions (Explanation, Check, Next, …) and its legal line are the popup's own
+// bar — ALEKS's own out of sight but there, pressed by the popup's (`__simplAKDo({ press: id })`) — and the page keeps
+// the question, its answer, ALEKS's verdict over it, its tools and its menu.
+//
 // The app puts `window.__simplAKOn = true|false;` before this file (the toolbar's Simpl Look, as last left) and turns
 // it at once with `__simplAKSet(on)` in the top page, which passes it on to the page's frames; a frame loaded later
 // asks its parent. It tells the app once what it found, for the log: a frame through the top page, the top page with
@@ -28,7 +34,8 @@
   if (!mine) return;
   var root = null; // (the page's <html>: not there yet when Windows runs this, before the page is read)
   var on = window.__simplAKOn !== false;
-  var rail = window.__simplLookRail === true; // (in the apps' popup, its rail beside the page)
+  var front = window.__simplLookFront === 'glass' || window.__simplLookFront === 'card' ? window.__simplLookFront : '';
+  var rail = window.__simplLookRail === true || !!front; // (in the apps' popup, its rail beside the page)
 
   var A = 'html.simpl-ak ';
   var BAR = A + '[role="navigation"][aria-label="Actions"]';
@@ -140,6 +147,17 @@
     '@media (prefers-reduced-motion:no-preference){' + R + '[id^="itemContainer_"].simpl-turn{animation:simpl-ak-turn .34s var(--ak-ease)}' + R + '#result_feedback_alert{animation:simpl-ak-rise .3s var(--ak-ease)}' + BAR_R + '{animation:simpl-ak-fade .3s var(--ak-ease)}}',
     '@media (prefers-reduced-motion:reduce){' + R + '[id^="itemContainer_"].simpl-turn{animation:simpl-ak-fade .2s ease}}',
     '@media (prefers-reduced-transparency:reduce){html.simpl-ak.simpl-rail{--ak-sheet-glass:#fff}' + BAR_R + '::before,' + TOOLS_R + '>table{-webkit-backdrop-filter:none;backdrop-filter:none;background:#fff}}',
+
+    // ---- (1.3.200) the popup's front end: ALEKS's actions and legal line are the popup's own — out of sight but there
+    BAR_R + '.simpl-hide,html.simpl-ak.simpl-front [role="navigation"][aria-label="Actions"],html.simpl-ak.simpl-front .aleks-legal-footer{opacity:0!important;pointer-events:none!important}',
+    'html.simpl-ak.simpl-front [role="navigation"][aria-label="Actions"]::before{display:none}',
+    R + '[id^="itemContainer_"]{margin-bottom:24px!important}',
+    'html.simpl-ak.simpl-front .mainview_item_page{padding-bottom:116px!important}',
+    // ('glass': no ground and no sheet of the page's own — the popup's Liquid Glass is under the clear page)
+    'html.simpl-ak.simpl-front-glass,html.simpl-ak.simpl-front-glass body,html.simpl-ak.simpl-front-glass #welcomePage,html.simpl-ak.simpl-front-glass #welcomePage>div,html.simpl-ak.simpl-front-glass .tooltiptarget_mainview,html.simpl-ak.simpl-front-glass .tooltiptarget_banner,html.simpl-ak.simpl-front-glass #current-main-view,html.simpl-ak.simpl-front-glass .mainview_item_page{background:transparent!important}',
+    'html.simpl-ak.simpl-front-glass [id^="itemContainer_"]{background:transparent!important;box-shadow:none!important}',
+    'html.simpl-ak.simpl-front-glass .aleks-editor-content .ansed_root{background:rgba(255,255,255,.66)!important}',
+    'html.simpl-ak.simpl-front-glass #result_feedback_alert{background:rgba(255,255,255,.6)!important}',
   ].join('\n');
 
   var style = document.createElement('style');
@@ -178,9 +196,34 @@
       done: m ? +m[1] : -1, total: m ? +m[2] : 0, fills: fills, status: text(st && st.querySelector('.status')),
       question: !!(document.querySelector('[role="navigation"][aria-label="Actions"]') && document.querySelector('.ansed_root')),
       wide: 1024 }; // (ALEKS lays its page out 1024 wide at the least)
+    if (front) o.front = buttons();
     var said = JSON.stringify(o);
     if (rail && said !== railSaid) { railSaid = said; tell(o); }
   };
+
+  // (1.3.200) For the popup's front end: ALEKS's actions as they stand — the ones shown, each named for the popup to press
+  // it, its words, whether it is ALEKS's main one and whether it can be pressed.
+  var shown = function (e) { return !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden' && getComputedStyle(e).display !== 'none'; };
+  var buttons = function () {
+    var f = { actions: [] };
+    var bar = document.querySelector('[role="navigation"][aria-label="Actions"]');
+    var list = bar ? bar.querySelectorAll('button') : [];
+    for (var i = 0; i < list.length; i++) {
+      var b = list[i];
+      if (!shown(b)) continue;
+      var id = 'act-' + (b.id || i).replace(/^smt_bottomnav_button_input_/, '').replace(/[^a-z0-9-]/gi, '');
+      if (b.getAttribute('data-simpl-id') !== id) b.setAttribute('data-simpl-id', id);
+      f.actions.push({ id: id, label: text(b), primary: b.classList.contains('primary'), enabled: !b.disabled && b.getAttribute('aria-disabled') !== 'true' });
+    }
+    return f;
+  };
+  // What the popup asks of the page: one of ALEKS's own actions pressed for the popup's.
+  var act = function (c) {
+    if (!c || typeof c !== 'object' || !c.press) return;
+    var b = document.querySelector('[data-simpl-id="' + String(c.press).replace(/[^a-z0-9-]/gi, '') + '"]');
+    if (b) b.click();
+  };
+  window.__simplAKDo = function (c) { act(c); };
 
   // What the look found, said once a page: the question's page (its actions bar and Check), or another of ALEKS's.
   var told = false, queued = false;
@@ -213,6 +256,8 @@
   var classes = function () {
     root.classList.toggle('simpl-ak', on);
     root.classList.toggle('simpl-rail', on && rail);
+    root.classList.toggle('simpl-front', on && !!front);
+    root.classList.toggle('simpl-front-glass', on && front === 'glass');
   };
   var draw = function () {
     if (!root) return;

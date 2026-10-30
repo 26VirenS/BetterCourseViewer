@@ -349,15 +349,17 @@ struct PageLook {
     }
 
     /// In every frame at its start (the look there before the tool's page first shows), told whether it is on —
-    /// (1.3.199) and, in the Macmillan and ALEKS popup, that the popup's rail is beside the page (`rail`). Both on its
-    /// first line, the line `set` knows the look's own script by.
-    func script(rail: Bool = false) -> WKUserScript? {
+    /// (1.3.199) and, in the Macmillan and ALEKS popup, that the popup's rail is beside the page (`rail`); (1.3.200) and
+    /// that the popup's own front end is over it (`front`: the page clear over the popup's Liquid Glass, its buttons the
+    /// popup's). All on its first line, the line `set` knows the look's own script by.
+    func script(rail: Bool = false, front: Bool = false) -> WKUserScript? {
         guard let source else { return nil }
-        let head = "window.\(flag) = \(isOn ? "true" : "false");" + (rail ? " window.__simplLookRail = true;" : "")
+        let head = "window.\(flag) = \(isOn ? "true" : "false");" + (rail || front ? " window.__simplLookRail = true;" : "")
+            + (front ? " window.__simplLookFront = 'glass';" : "")
         return WKUserScript(source: head + "\n" + source, injectionTime: .atDocumentStart, forMainFrameOnly: false)
     }
 
-    static func scripts(rail: Bool = false) -> [WKUserScript] { all.compactMap { $0.script(rail: rail) } }
+    static func scripts(rail: Bool = false, front: Bool = false) -> [WKUserScript] { all.compactMap { $0.script(rail: rail, front: front) } }
 
     /// Turned on or off: the page showing follows at once (the page passes it on to its frames), and the pages loaded
     /// from now on start as it is — the script put in again with the new setting, the window's other scripts kept.
@@ -367,11 +369,11 @@ struct PageLook {
         view.evaluateJavaScript("window.\(setter) && window.\(setter)(\(on ? "true" : "false"))", completionHandler: nil)
         let scripts = view.configuration.userContentController
         let mine = { (s: WKUserScript) in s.source.hasPrefix("window.\(flag) = ") }
-        let rail = scripts.userScripts.contains { mine($0) && $0.source.prefix(while: { $0 != "\n" }).contains("__simplLookRail") }
+        let head = scripts.userScripts.first(where: mine).map { String($0.source.prefix(while: { $0 != "\n" })) } ?? ""
         let kept = scripts.userScripts.filter { !mine($0) }
         scripts.removeAllUserScripts()
         for s in kept { scripts.addUserScript(s) }
-        if let s = script(rail: rail) { scripts.addUserScript(s) }
+        if let s = script(rail: head.contains("__simplLookRail"), front: head.contains("__simplLookFront")) { scripts.addUserScript(s) }
     }
 
     /// What a look found on its page, said once a page (for the log, and the screenshot suite's look_check): Macmillan's
@@ -442,6 +444,9 @@ struct ToolWebView: NSViewRepresentable {
     /// Smartwork): once it has loaded, Canvas's launch form on it — aimed at a new window, behind "Load … in a new window"
     /// for a tool Canvas opens that way — is sent on in this window, so the tool opens without the extra click.
     var sendToolForm: URL? = nil
+    /// (1.3.200) No ground of its own: what is behind the web view (the Macmillan and ALEKS popup's Liquid Glass) shows
+    /// wherever the page draws nothing.
+    var clear = false
 
     /// The form sent, in the page: "sent", "framed" (the tool framed in the page, left as it is) or "none" (no form yet).
     /// The same script as the Windows app's (windows/SimplFluent/Shell/WebWindow.cs, SendToolForm).
@@ -476,6 +481,10 @@ struct ToolWebView: NSViewRepresentable {
         for (name, handler) in messages { config.userContentController.add(handler, name: name) }
         let v = WKWebView(frame: .zero, configuration: config)
         if externalTool { ToolDarkPage.look(v, dark: ToolDarkPage.isOn(fallback: false)) }
+        if clear {
+            v.setValue(false, forKey: "drawsBackground")
+            v.underPageBackgroundColor = .clear
+        }
         v.allowsBackForwardNavigationGestures = true
         v.allowsMagnification = true
         v.navigationDelegate = context.coordinator
