@@ -1773,6 +1773,9 @@
       default: return null;
     }
   }
+  /** (Mac 1.3.203, Windows 0.3.99) The host a module's tool item launches on (its external_url's), for the apps to open
+   *  Macmillan Learning's and ALEKS's in their popup. */
+  const toolHostOf = (u) => { try { return u ? new URL(u, location.origin).hostname.replace(/^www\./, '') : null; } catch { return null; } };
   async function modules({ ctx, age = NO_AGE } = {}) {
     const c = ctxOf(ctx, age);
     const [info, mods] = await Promise.all([contextInfo(c), store.modules(c.id, age)]);
@@ -1789,6 +1792,7 @@
           const cd = it.content_details || {};
           return {
             id: String(it.id), title: it.title || 'Item', type: it.type, indent: Math.min(Number(it.indent) || 0, 3), url: itemUrl(it, c.base),
+            toolHost: it.type === 'ExternalTool' ? toolHostOf(it.external_url) : null,
             file: it.type === 'File', external: it.type === 'ExternalUrl', header: it.type === 'SubHeader',
             requirement: reqWord(cr), done: !!cr?.completed, markable: cr?.type === 'must_mark_done' && !BCV.lms?.d2l, // (Brightspace takes that mark on its own page only)
             locked: !!cd.locked_for_user, lockText: cd.locked_for_user ? canvasTimes(textOf(cd.lock_explanation || '', 160)) : '',

@@ -18,6 +18,19 @@ extension Engine {
             openTool(.assignment(course: course, id: id, title: d.title))
         }
     }
+
+    /// (1.3.203) A module's tool item opened (the course's Modules, the screenshot suite's moduletool:): Macmillan Learning's
+    /// or ALEKS's in its popup, as their assignments open — known by the host it launches on — any other in the tool window.
+    func openModuleTool(course: String, item: String, title: String, sub: String?, host: String?) {
+        guard let look = PageLook.forAssignment(macmillan: nil, aleks: nil, host: host) else {
+            openTool(.moduleItem(course: course, id: item, title: title))
+            return
+        }
+        NSLog("[Simpl] %@ popup: opened from a module (its tool on %@)", look.name, host ?? "?")
+        // (its line says when it is due, as "20 pts · Due Oct 12 at 11:59 PM": that part for the header, "" for none)
+        let due = (sub ?? "").components(separatedBy: " · ").first { $0.hasPrefix("Due ") } ?? ""
+        lookTool = LookLaunch(look: look.name, course: course, assignment: "", title: title, dueLine: due, moduleItem: item)
+    }
 }
 
 /// (1.3.199) A Macmillan Learning or ALEKS assignment, as the popup over the window is asked for it.
@@ -29,6 +42,8 @@ struct LookLaunch: Identifiable, Hashable {
     let assignment: String
     let title: String
     var dueLine: String? = nil
+    /// (1.3.203) A module's tool item instead of an assignment: launched as that (Canvas's module_item launch).
+    var moduleItem: String? = nil
 }
 
 /// (1.3.199) A Macmillan Learning or ALEKS assignment in a popup over the window, as a Knewton Alta one is (AltaQuiz.swift)
@@ -89,7 +104,7 @@ struct LookQuizScreen: View {
         .tint(Theme.accent)
         .task { await start() }
         .task {
-            guard dueLine == nil else { return }
+            guard dueLine == nil, launch.moduleItem == nil else { return }
             dueLine = await CanvasDue.line(engine, course: launch.course, assignment: launch.assignment)
         }
         .onChange(of: browser.loading) { _, loading in
@@ -129,7 +144,11 @@ struct LookQuizScreen: View {
                         .disabled(url == nil)
                     Button {
                         // (the classic window, with Back, Forward, Share and Open in Browser — the work goes on there)
-                        engine.openTool(.assignment(course: launch.course, id: launch.assignment, title: launch.title))
+                        if let m = launch.moduleItem {
+                            engine.openTool(.moduleItem(course: launch.course, id: m, title: launch.title))
+                        } else {
+                            engine.openTool(.assignment(course: launch.course, id: launch.assignment, title: launch.title))
+                        }
                         dismiss()
                     } label: { Label("Open in Window", systemImage: "macwindow") }
                         .labelStyle(.iconOnly)
@@ -233,7 +252,10 @@ struct LookQuizScreen: View {
         guard url == nil else { return }
         error = nil
         do {
-            let a = try await engine.call("toolLaunch", ["course": launch.course, "assignment": launch.assignment], as: LaunchAnswer.self)
+            // (1.3.203: a module's tool item launched as that)
+            var asked: [String: Any] = ["course": launch.course]
+            if let m = launch.moduleItem { asked["moduleItem"] = m } else { asked["assignment"] = launch.assignment }
+            let a = try await engine.call("toolLaunch", asked, as: LaunchAnswer.self)
             guard let u = URL(string: a.url) else { throw EngineError.unreadable }
             if a.sessionless == false { sendForm = u }
             url = u

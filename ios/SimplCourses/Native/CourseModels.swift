@@ -160,6 +160,8 @@ struct ModuleItem: Codable, Identifiable, Hashable {
     var locked: Bool?
     var lockText: String?
     var sub: String?
+    /// (Mac 1.3.203) A tool item's host, the one it launches on: Macmillan Learning's and ALEKS's open in their popup.
+    var toolHost: String?
 }
 
 struct ModuleData: Codable, Identifiable, Hashable {

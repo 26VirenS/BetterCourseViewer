@@ -474,6 +474,20 @@ final class Engine: ObservableObject, ShellListener {
                     self.openAssignmentTool(d, course: parts[0], id: parts[1])
                 }
             }
+        } else if let a = LaunchOpen.take("moduletool:") {
+            // (1.3.203: -SimplOpen moduletool:106:i61 — a module's tool item opened as the course's Modules opens it: the
+            // mock's Macmillan pre-lecture, launched on lmslink.bfwpub.com, in its popup)
+            let parts = a.split(separator: ":").map(String.init)
+            if parts.count == 2 {
+                Task {
+                    guard let d = try? await self.call("modules", ["ctx": "courses/\(parts[0])"], as: ModulesData.self),
+                          let it = d.modules.flatMap(\.items).first(where: { $0.id == parts[1] }) else {
+                        NSLog("[Simpl] moduletool: the module item could not be read")
+                        return
+                    }
+                    self.openModuleTool(course: parts[0], item: it.id, title: it.title, sub: it.sub, host: it.toolHost)
+                }
+            }
         } else if let w = LaunchOpen.take("window:") {
             // (1.3.69: -SimplOpen window:grades, a window more on that place)
             NotificationCenter.default.post(name: .simplOpenWindow, object: w)

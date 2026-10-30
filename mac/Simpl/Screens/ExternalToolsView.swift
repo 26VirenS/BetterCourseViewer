@@ -260,14 +260,15 @@ enum ToolOpening {
 
     /// (1.3.201) The Macmillan Learning or ALEKS assignment this opens in its popup, if it is one: the tool known by the
     /// engine's provider ("macmillan", "aleks"), else by the host it launches on (lmslink.bfwpub.com, secure.aleks.com).
+    /// (1.3.203) Or its module item, launched as that.
     static func lookLaunch(_ t: ExternalToolsData.Tool, in c: ExternalToolsData.Course, item: ExternalToolsData.Item?) -> LookLaunch? {
         let p = place(t, in: c, item: item)
-        guard let a = p.args["assignment"],
+        guard p.args["assignment"] != nil || p.args["moduleItem"] != nil,
               let look = PageLook.forAssignment(macmillan: t.id == "macmillan" ? true : nil, aleks: t.id == "aleks" ? true : nil, host: t.host)
         else { return nil }
-        let first = item?.sub?.components(separatedBy: " · ").first
-        let due = first.map { $0.hasPrefix("Due ") ? $0 : "" }
-        return LookLaunch(look: look.name, course: p.course, assignment: a, title: p.title, dueLine: due)
+        let due = item?.sub?.components(separatedBy: " · ").first { $0.hasPrefix("Due ") } ?? ""
+        return LookLaunch(look: look.name, course: p.course, assignment: p.args["assignment"] ?? "", title: p.title, dueLine: due,
+                          moduleItem: p.args["moduleItem"])
     }
 
     /// Opened in that course: Knewton Alta's assignments in their own popup, (1.3.201) Macmillan Learning's and ALEKS's

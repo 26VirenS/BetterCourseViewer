@@ -436,7 +436,8 @@ private struct ModulesList: View {
         if it.locked == true, it.type == "File" || it.type == "ExternalTool", let url = it.url, !url.isEmpty {
             engine.openWebScreen(ModulesList.page(url), title: it.title)
         } else if it.type == "ExternalTool", ctx.hasPrefix("courses/") {
-            engine.openTool(.moduleItem(course: ContextHome.id(of: ctx), id: it.id, title: it.title))
+            // (1.3.203: Macmillan Learning's and ALEKS's in their popup)
+            engine.openModuleTool(course: ContextHome.id(of: ctx), item: it.id, title: it.title, sub: it.sub, host: it.toolHost)
         } else if it.type == "File", let url = it.url, !url.isEmpty {
             // (modules-file) a file as the Files screen opens one: by its id, in Quick Look, under the module's name for it
             engine.openModuleFile(url, title: it.title)

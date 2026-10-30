@@ -1020,6 +1020,10 @@ look_check() {
   else echo "FAIL the popup's front end drew no Macmillan buttons ($(grep -o 'macmillan popup: front.*' "$f" 2>/dev/null | head -2 | tr '\n' ';'))" >> "$out"; fi
   if grep -q 'aleks popup: front end, buttons Explanation, Recheck' "$h" 2>/dev/null; then echo "ok   the popup's front end drew ALEKS's buttons" >> "$out"
   else echo "FAIL the popup's front end drew no ALEKS buttons ($(grep -o 'aleks popup: front.*' "$h" 2>/dev/null | head -2 | tr '\n' ';'))" >> "$out"; fi
+  # (1.3.203) a module's Macmillan item opens in the popup too, on its cover
+  local s="$OUT_ABS/console-light-21s-macmillan-from-module.txt"
+  if grep -q 'macmillan popup: opened from a module (its tool on lmslink.bfwpub.com)' "$s" 2>/dev/null && grep -q 'macmillan popup: cover heard' "$s" 2>/dev/null; then echo "ok   a module's Macmillan item opened in the popup, on its cover" >> "$out"
+  else echo "FAIL a module's Macmillan item did not open in the popup ($(grep -o 'macmillan popup: .*\|moduletool: .*\|tool window: .*' "$s" 2>/dev/null | head -3 | tr '\n' ';'))" >> "$out"; fi
   # (1.3.202) Macmillan's cover heard and drawn as the popup's own start page, Alta's way: its questions and its grading settings
   local d="$OUT_ABS/console-light-21d-macmillan.txt"
   if grep -q 'macmillan popup: cover heard, 4 questions, 5 grading settings' "$d" 2>/dev/null; then echo "ok   the popup's start page heard Macmillan's cover (4 questions, 5 grading settings)" >> "$out"
@@ -1123,6 +1127,8 @@ push_set() {
   # (1.3.201) a Macmillan assignment opened by the route its own page's button takes — CHEM's week-7 homework, launched on
   # lmslink.bfwpub.com as a school's is — in its popup, not the tool window (look_check)
   shoot light-21r-macmillan-from-assignment 22 -SimplOpen worktool:106:6004
+  # (1.3.203) a module's Macmillan item, opened as the course's Modules opens it: in the popup, launched as a module item
+  shoot light-21s-macmillan-from-module 22 -SimplOpen moduletool:106:i61
   shoot light-21e-second-window 18 -SimplOpen window:section:courses/101:grades # (1.3.69: a window more, on a course's grades: its breakdown bar)
   shoot light-36-external-tools 16 -SimplPlace externaltools # (1.3.67: every external tool in the courses)
   shoot light-36b-external-tools-list 16 -SimplPlace externaltools -SimplExternalToolList knewton # (1.3.77: every place Knewton Alta is used, to choose from)
