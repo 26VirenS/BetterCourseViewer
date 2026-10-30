@@ -26,6 +26,8 @@ public sealed record LookLaunch(string Look, string Course, string Assignment, s
 {
     public Guid Id { get; } = Guid.NewGuid();
     public string? Due { get; init; }
+    /// <summary>(0.3.99) A module's tool item instead of an assignment: launched as that (Canvas's module_item launch).</summary>
+    public string? ModuleItem { get; init; }
 }
 
 /// <summary>A Knewton Alta assignment in its popup (the Mac's AltaLaunch).</summary>

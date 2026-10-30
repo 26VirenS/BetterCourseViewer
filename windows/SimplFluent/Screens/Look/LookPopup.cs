@@ -186,7 +186,7 @@ internal sealed class LookPopupView
         state.Content = AltaLook.Opening($"Opening {FullName}…");
         Dialogs.Show(sheet, over);
         Start();
-        if (due == null) ReadDue();
+        if (due == null && launch.ModuleItem == null) ReadDue();
     }
 
     private async void ReadDue()
@@ -224,7 +224,10 @@ internal sealed class LookPopupView
             look = await PageLook.Attach(core, rail: true, front: "card");
             look.Rail += o => root.Dispatcher.BeginInvoke(() => Take(o));
             PaintLook();
-            var a = await engine.Call<LaunchAnswer>("toolLaunch", new Dictionary<string, object> { ["course"] = launch.Course, ["assignment"] = launch.Assignment });
+            // (0.3.99: a module's tool item launched as that)
+            var asked = new Dictionary<string, object> { ["course"] = launch.Course };
+            if (launch.ModuleItem is { } m) asked["moduleItem"] = m; else asked["assignment"] = launch.Assignment;
+            var a = await engine.Call<LaunchAnswer>("toolLaunch", asked);
             if (closed) return;
             if (!Uri.TryCreate(a.Url, UriKind.Absolute, out var u)) throw new InvalidOperationException("Simpl could not find where this assignment opens.");
             // (0.3.98: the school's own page for the tool, the one-time launch refused — its launch form sent on from it here,
@@ -279,7 +282,7 @@ internal sealed class LookPopupView
 
     private void OpenInWindow()
     {
-        engine.OpenTool(ToolLaunch.Assignment(launch.Course, launch.Assignment, launch.Title));
+        engine.OpenTool(launch.ModuleItem is { } m ? ToolLaunch.ModuleItem(launch.Course, m, launch.Title) : ToolLaunch.Assignment(launch.Course, launch.Assignment, launch.Title));
         Close();
     }
 

@@ -388,7 +388,8 @@ public sealed partial class ExternalToolsScreen : Screen
     private static void OpenItem(Engine.Engine engine, Tool t, Course c, Item it)
     {
         var course = c.Open.GetValueOrDefault("course") is { Length: > 0 } id ? id : c.Id;
-        if (it.Kind == "moduleItem") { engine.OpenTool(ToolLaunch.ModuleItem(course, it.Id, it.Title)); return; }
+        // (0.3.99: a module item of Macmillan Learning's or ALEKS's in its popup, as their assignments)
+        if (it.Kind == "moduleItem") { engine.OpenModuleTool(course, it.Id, it.Title, it.Sub, WindowOf(t) == "look" ? t.Host : null); return; }
         switch (WindowOf(t))
         {
             case "alta": engine.OpenAlta(new AltaLaunch(course, it.Id, it.Title) { Due = DueOf(it) }); return;

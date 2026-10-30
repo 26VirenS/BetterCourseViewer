@@ -525,6 +525,22 @@ public sealed partial class Engine : Observable, IShellListener
                 catch (Exception e) { Log.Write("worktool: the assignment could not be read: " + e.Message); }
             }
         }
+        else if (Launch.Take("moduletool:") is { } mt)
+        {
+            // (0.3.99: --open moduletool:106:i61 — a module's tool item opened as the course's Modules opens it: the mock's
+            // Macmillan pre-lecture, launched on lmslink.bfwpub.com, in its popup)
+            var parts = mt.Split(':');
+            if (parts.Length == 2)
+            {
+                try
+                {
+                    var d = await Call<ModulesData>("modules", new Dictionary<string, object> { ["ctx"] = $"courses/{parts[0]}" });
+                    if (d.Modules.SelectMany(m => m.Items).FirstOrDefault(i => i.Id == parts[1]) is { } it) OpenModuleTool(parts[0], it.Id, it.Title, it.Sub, it.ToolHost);
+                    else Log.Write("moduletool: no such module item");
+                }
+                catch (Exception e) { Log.Write("moduletool: the modules could not be read: " + e.Message); }
+            }
+        }
         else if (Launch.Take("newtask") != null) NewTaskRequested?.Invoke();
         else if (Launch.Take("compose") != null) NewMessageRequested?.Invoke();
         await RefreshSnapshot();
@@ -1156,6 +1172,18 @@ public sealed partial class Engine : Observable, IShellListener
             OpenLook(new LookLaunch(look.Name, course, id, d.Title) { Due = d.DueLine ?? "" });
         }
         else OpenTool(ToolLaunch.Assignment(course, id, d.Title));
+    }
+
+    /// <summary>(0.3.99) A module's tool item opened (the course's Modules, External Tools, the suite's moduletool:):
+    /// Macmillan Learning's or ALEKS's in its popup, as their assignments open — known by the host it launches on — any
+    /// other in the tool window.</summary>
+    public void OpenModuleTool(string course, string item, string title, string? sub, string? host)
+    {
+        if (Simpl.Shell.PageLook.ForAssignment(null, null, host) is not { } look) { OpenTool(ToolLaunch.ModuleItem(course, item, title)); return; }
+        Log.Write($"{look.Name} popup: opened from a module (its tool on {host ?? "?"})");
+        // (its line says when it is due, as "20 pts · Due Oct 12 at 11:59 PM": that part for the header, "" for none)
+        var due = (sub ?? "").Split(" · ").FirstOrDefault(p => p.StartsWith("Due ", StringComparison.Ordinal)) ?? "";
+        OpenLook(new LookLaunch(look.Name, course, "", title) { Due = due, ModuleItem = item });
     }
 
     public void AskSetup() => SetupRequested?.Invoke();

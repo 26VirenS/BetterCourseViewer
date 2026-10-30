@@ -1344,6 +1344,8 @@ on('GET', /^\/api\/v1\/courses\/(\w+)\/external_tools\/sessionless_launch$/, (ur
   if (q.get('assignment_id') === '4005') return { id: '9', name: 'Macmillan Learning', url: `http://localhost:${port}/mock-macmillan/assignment/a1` };
   // (Mac 1.3.197, Windows 0.3.92) the same, opened on its first question already solved, for Simpl's look of it
   if (q.get('assignment_id') === '4006') return { id: '9', name: 'Macmillan Learning', url: `http://localhost:${port}/mock-macmillan/assignment/a1?state=answered` };
+  // (Mac 1.3.203, Windows 0.3.99) CHEM's Macmillan pre-lecture placed in a module, for its popup from the course's Modules
+  if (q.get('module_item_id') === 'i61') return { id: '31', name: 'Macmillan Learning', url: `http://localhost:${port}/mock-macmillan/assignment/a1` };
   // (Mac 1.3.198, Windows 0.3.93) an ALEKS assignment: its learning page, a wrong answer checked (?state=wrong)
   if (q.get('assignment_id') === '4007') return { id: '9', name: 'ALEKS', url: `http://localhost:${port}/mock-aleks/learn?state=wrong` };
   // (Mac 1.3.59) an Alta assignment that opens on its cover, for the popup's start screen

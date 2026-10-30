@@ -767,6 +767,7 @@ public sealed class ModuleItem
     public bool? Locked { get; set; }
     public string? LockText { get; set; }
     public string? Sub { get; set; }
+    public string? ToolHost { get; set; }
 }
 
 public sealed class ModuleData

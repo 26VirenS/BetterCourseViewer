@@ -603,6 +603,8 @@ jobs:
           # (0.3.97) a Macmillan assignment opened by the route its own page's button takes — CHEM's week-7 homework,
           # launched on lmslink.bfwpub.com as a school's is — in its popup, not the tool window
           Shot 'macmillan-from-assignment' '1366x778' 45 ($mock + @('--appearance', 'light', '--open', 'worktool:106:6004'))
+          # (0.3.99) a module's Macmillan item, opened as the course's Modules opens it: in the popup, launched as a module item
+          Shot 'macmillan-from-module' '1366x778' 45 ($mock + @('--appearance', 'light', '--open', 'moduletool:106:i61'))
           # Settings, as Windows 11's own Settings app, on each of its categories
           foreach ($tab in @('general', 'notifications', 'grades', 'data', 'updates', 'about')) {
             Shot "settings-$tab" '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', $tab))
@@ -1394,6 +1396,12 @@ jobs:
             $l = Get-Content 'shots/profile-aleks-look.log' -Raw -ErrorAction SilentlyContinue
             if ("$l" -notmatch 'aleks popup: front end, buttons Explanation, Recheck') { Write-Host "::error::aleks-look: the popup's front end drew no ALEKS buttons (shots/profile-aleks-look.log)"; exit 1 }
             Write-Host "aleks-look: the popup's front end drew ALEKS's buttons"
+          }
+          # (0.3.99) a module's Macmillan item opens in the popup too, on its cover
+          if ($script:mine -contains 'macmillan-from-module') {
+            $l = Get-Content 'shots/profile-macmillan-from-module.log' -Raw -ErrorAction SilentlyContinue
+            if ("$l" -notmatch 'macmillan popup: opened from a module \(its tool on lmslink\.bfwpub\.com\)' -or "$l" -notmatch 'macmillan popup: cover heard') { Write-Host "::error::macmillan-from-module: a module's Macmillan item did not open in the popup on its cover (shots/profile-macmillan-from-module.log)"; exit 1 }
+            Write-Host "macmillan-from-module: a module's Macmillan item opened in the popup, on its cover"
           }
           # (0.3.98) Macmillan's cover heard and drawn as the popup's own start page, Alta's way: its questions and its grading settings
           if ($script:mine -contains 'macmillan') {
