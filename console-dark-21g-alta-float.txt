@@ -1,0 +1,29 @@
+2026-10-30 23:24:38.848 Simpl[5215:19216] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-30 23:24:40.362 Simpl[5215:19216] [Simpl] window: the app's screens (no page)
+2026-10-30 23:24:41.382 Simpl[5215:19216] [Simpl] appear Dashboard: 1371 ms
+2026-10-30 23:24:42.096 Simpl[5215:19216] [Simpl] appear Dashboard: 2085 ms
+2026-10-30 23:24:47.403 Simpl[5215:19216] [Simpl] open Dashboard: 7390 ms (kept)
+2026-10-30 23:24:51.220 Simpl[5215:19216] [Simpl] calculator: its page loaded
+2026-10-30 23:24:53.639 Simpl[5215:19216] [Simpl] popup alta: 984 × 591, 20 in from the window (sidebar out)
+2026-10-30 23:24:54.578 Simpl[5215:19216] [Simpl] calculator: GeoGebra is ready
+2026-10-30 23:25:01.292 Simpl[5215:19216] [Simpl] popup alta: 984 × 589, 20 in from the window (sidebar out)
+2026-10-30 23:25:02.051 Simpl[5215:19216] [Simpl] call quietColors: 20655 ms
+2026-10-30 23:25:02.052 Simpl[5215:19216] [Simpl] call todayCounts: 14725 ms
+2026-10-30 23:25:02.053 Simpl[5215:19216] [Simpl] call todayCounts: 14726 ms
+2026-10-30 23:25:02.054 Simpl[5215:19216] [Simpl] call dashSkyline: 17126 ms
+2026-10-30 23:25:02.072 Simpl[5215:19216] [Simpl] call today: 16870 ms
+2026-10-30 23:25:02.072 Simpl[5215:19216] [Simpl] call todayCounts: 14745 ms
+2026-10-30 23:25:02.072 Simpl[5215:19216] [Simpl] call todayCounts: 14745 ms
+2026-10-30 23:25:02.076 Simpl[5215:19216] [Simpl] call dashSkyline: 17148 ms
+2026-10-30 23:25:02.105 Simpl[5215:19216] [Simpl] call dashList: 17179 ms
+2026-10-30 23:25:02.108 Simpl[5215:19216] [Simpl] call today: 16919 ms
+2026-10-30 23:25:02.110 Simpl[5215:19216] [Simpl] call dashList: 17182 ms
+2026-10-30 23:25:03.203 Simpl[5215:19216] [Simpl] call toolLaunch: 2143 ms
+2026-10-30 23:25:03.231 Simpl[5215:19216] [Simpl] call snapshot: 10772 ms
+2026-10-30 23:25:03.580 Simpl[5215:19216] [Simpl] open Dashboard: 23558 ms (live)
+2026-10-30 23:25:07.242 Simpl[5215:19216] [Simpl] alta: view made 138 ms · asked 9155 ms · launch 11300 ms · page 14997 ms · overview 15161 ms · shown 15163 ms (overview, quiet 128 ms, 159 ms after DOMContentLoaded)
+2026-10-30 23:25:07.590 Simpl[5215:19216] [Simpl] call courses: 4014 ms
+2026-10-30 23:25:07.834 Simpl[5215:19216] [Simpl] call groups: 242 ms
+2026-10-30 23:25:07.995 Simpl[5215:19216] [Simpl] call assignment: 527 ms
+2026-10-30 23:25:08.803 Simpl[5215:19216] [Simpl] popup alta: 984 × 591, 20 in from the window (sidebar out)
+2026-10-30 23:25:09.138 Simpl[5215:19216] [Simpl] call moreFromCanvas: 1303 ms

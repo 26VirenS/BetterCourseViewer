@@ -1,0 +1,15 @@
+2026-10-30 23:24:51.951 Simpl[5273:20084] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-30 23:24:53.888 Simpl[5273:20084] [Simpl] window: the app's screens (no page)
+2026-10-30 23:24:54.657 Simpl[5273:20084] [Simpl] appear Section Assignments: 1499 ms
+2026-10-30 23:24:55.064 Simpl[5273:20084] [Simpl] appear Section Assignments: 1906 ms
+2026-10-30 23:24:55.850 Simpl[5273:20084] NSQuitAlwaysKeepsWindows=NO
+2026-10-30 23:24:58.518 Simpl[5273:20084] [Simpl] call quietColors: 3859 ms
+2026-10-30 23:24:58.521 Simpl[5273:20084] [Simpl] call assignments: 2238 ms
+2026-10-30 23:24:58.523 Simpl[5273:20084] [Simpl] call assignments: 2244 ms
+2026-10-30 23:25:00.573 Simpl[5273:20084] [Simpl] open Section Assignments: 7413 ms (fetched)
+2026-10-30 23:25:00.612 Simpl[5273:20084] [Simpl] call snapshot: 2550 ms
+2026-10-30 23:25:00.990 Simpl[5273:20084] [Simpl] call home: 4781 ms
+2026-10-30 23:25:01.241 Simpl[5273:20084] [Simpl] call courses: 432 ms
+2026-10-30 23:25:01.824 Simpl[5273:20084] [Simpl] call groups: 582 ms
+2026-10-30 23:25:03.674 Simpl[5273:20084] [Simpl] call moreFromCanvas: 1848 ms
+2026-10-30 23:25:08.609 Simpl[5273:20084] [Simpl] shot: the window came back empty; asked again (1)

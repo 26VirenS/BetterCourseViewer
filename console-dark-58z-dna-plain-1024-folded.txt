@@ -1,0 +1,11 @@
+2026-10-30 23:30:16.463 Simpl[17830:52579] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-30 23:30:17.880 Simpl[17830:52579] [Simpl] window: the app's screens (no page)
+2026-10-30 23:30:20.476 Simpl[17830:52579] [Simpl] popup tool: 984 × 609, 20 in from the window (sidebar away)
+2026-10-30 23:30:26.673 Simpl[17830:52579] [Simpl] popup tool: 984 × 591, 20 in from the window (sidebar away)
+2026-10-30 23:30:28.655 Simpl[17830:52579] [Simpl] call quietColors: 9467 ms
+2026-10-30 23:30:28.729 Simpl[17830:52579] [Simpl] call snapshot: 257 ms
+2026-10-30 23:30:28.984 Simpl[17830:52579] [Simpl] bio scene: helix|ATGCGTACGTTAGCCATGCA|cartoon|true|false|false|true|0.000|true made in 8170 ms, 108 objects
+2026-10-30 23:30:29.574 Simpl[17830:52579] [Simpl] bio frame helix|ATGCGTACGTTAGCCATGCA|cartoon|true|false|false|true|0.0: view 570 × 367, model 14% across, 84% up
+2026-10-30 23:30:30.738 Simpl[17830:52579] [Simpl] call courses: 1949 ms
+2026-10-30 23:30:33.672 Simpl[17830:52579] [Simpl] call groups: 2924 ms
+2026-10-30 23:30:34.351 Simpl[17830:52579] [Simpl] call moreFromCanvas: 679 ms

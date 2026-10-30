@@ -1,0 +1,19 @@
+2026-10-30 23:31:16.354 Simpl[20851:59382] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-30 23:31:17.657 Simpl[20851:59382] [Simpl] window: the app's screens (no page)
+2026-10-30 23:31:18.386 Simpl[20851:59382] [Simpl] appear Calendar: 849 ms
+2026-10-30 23:31:19.089 Simpl[20851:59382] [Simpl] appear Calendar: 1552 ms
+2026-10-30 23:31:24.904 Simpl[20851:59382] [Simpl] popup sync: 560 × 600
+2026-10-30 23:31:25.816 Simpl[20851:59382] [Simpl] call quietColors: 7427 ms
+2026-10-30 23:31:25.818 Simpl[20851:59382] [Simpl] call calView: 7315 ms
+2026-10-30 23:31:25.820 Simpl[20851:59382] [Simpl] call calView: 6711 ms
+2026-10-30 23:31:25.843 Simpl[20851:59382] [Simpl] call snapshot: 261 ms
+2026-10-30 23:31:26.506 Simpl[20851:59382] [Simpl] call calSync: 8003 ms
+2026-10-30 23:31:26.638 Simpl[20851:59382] [Simpl] call courses: 488 ms
+2026-10-30 23:31:26.759 Simpl[20851:59382] [Simpl] call calendar: 939 ms
+2026-10-30 23:31:26.766 Simpl[20851:59382] [Simpl] call calendar: 945 ms
+2026-10-30 23:31:29.597 Simpl[20851:59382] [Simpl] open Calendar: 12055 ms (fetched)
+2026-10-30 23:31:29.600 Simpl[20851:59382] [Simpl] call groups: 2959 ms
+2026-10-30 23:31:31.395 Simpl[20851:59382] [Simpl] call todo: 1796 ms
+2026-10-30 23:31:32.336 Simpl[20851:59382] [Simpl] call feedOn: 5827 ms
+2026-10-30 23:31:32.337 Simpl[20851:59382] [Simpl] sync: simpl calendar made, 34 events sent
+2026-10-30 23:31:32.340 Simpl[20851:59382] [Simpl] call moreFromCanvas: 2738 ms

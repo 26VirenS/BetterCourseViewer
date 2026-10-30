@@ -1,0 +1,22 @@
+2026-10-30 23:35:43.730 Simpl[31502:87384] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-30 23:35:45.588 Simpl[31502:87384] [Simpl] window: the app's screens (no page)
+2026-10-30 23:35:47.194 Simpl[31502:87384] [Simpl] appear External Tools: 1903 ms
+2026-10-30 23:35:47.936 Simpl[31502:87384] [Simpl] appear External Tools: 2644 ms
+2026-10-30 23:35:53.375 Simpl[31502:87384] [Simpl] call quietColors: 6179 ms
+2026-10-30 23:35:53.528 Simpl[31502:87384] [Simpl] call snapshot: 260 ms
+2026-10-30 23:35:54.599 Simpl[31502:87384] [Simpl] call externalTools: 7404 ms
+2026-10-30 23:35:54.599 Simpl[31502:87384] [Simpl] tool list: opening Macmillan Learning
+2026-10-30 23:35:54.599 Simpl[31502:87384] [Simpl] call externalTools: 6663 ms
+2026-10-30 23:35:54.599 Simpl[31502:87384] [Simpl] tool list: opening Macmillan Learning
+2026-10-30 23:35:54.917 Simpl[31502:87384] [Simpl] tool list shown: Macmillan Learning
+2026-10-30 23:35:54.918 Simpl[31502:87384] [Simpl] tool list shown: Macmillan Learning
+2026-10-30 23:35:54.948 Simpl[31502:87384] [Simpl] tool list closed: Macmillan Learning
+2026-10-30 23:35:55.057 Simpl[31502:87384] [Simpl] call courses: 1324 ms
+2026-10-30 23:35:55.058 Simpl[31502:87384] [Simpl] open External Tools: 9767 ms (fetched)
+2026-10-30 23:35:55.175 Simpl[31502:87384] [Simpl] call groups: 117 ms
+2026-10-30 23:35:56.082 Simpl[31502:87384] [Simpl] call moreFromCanvas: 907 ms
+2026-10-30 23:35:59.395 Simpl[31502:87384] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-10-30 23:36:00.152 Simpl[31502:87384] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-10-30 23:36:00.943 Simpl[31502:87384] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-10-30 23:36:01.761 Simpl[31502:87384] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-10-30 23:36:03.146 Simpl[31502:87384] [Simpl] shot: another copy of the app is in front; brought forward again

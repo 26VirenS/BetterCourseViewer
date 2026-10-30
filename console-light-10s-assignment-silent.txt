@@ -1,0 +1,23 @@
+2026-10-30 23:30:46.620 Simpl[18932:55526] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-30 23:30:50.216 Simpl[18932:55526] [Simpl] window: the app's screens (no page)
+2026-10-30 23:30:50.968 Simpl[18932:55526] [Simpl] appear Course home: 1062 ms
+2026-10-30 23:30:51.692 Simpl[18932:55526] [Simpl] appear Course home: 1786 ms
+2026-10-30 23:30:55.047 Simpl[18932:55526] [Simpl] appear Assignment: 177 ms
+2026-10-30 23:30:55.827 Simpl[18932:55526] [Simpl] call quietColors: 4858 ms
+2026-10-30 23:30:55.942 Simpl[18932:55526] [Simpl] call home: 1700 ms
+2026-10-30 23:30:55.942 Simpl[18932:55526] [Simpl] call neighbours: 577 ms
+2026-10-30 23:30:55.942 Simpl[18932:55526] [Simpl] call home: 1700 ms
+2026-10-30 23:30:55.946 Simpl[18932:55526] [Simpl] call snapshot: 1076 ms
+2026-10-30 23:30:56.233 Simpl[18932:55526] [Simpl] call home: 2077 ms
+2026-10-30 23:30:56.658 Simpl[18932:55526] [Simpl] open Course home: 1787 ms (fetched)
+2026-10-30 23:30:56.658 Simpl[18932:55526] [Simpl] call assignment: 424 ms
+2026-10-30 23:30:56.669 Simpl[18932:55526] SimplAssignment 4001: files 1, comments 3, steps See Feedback+Hand In Again, review 0, handIn 0, error -
+2026-10-30 23:30:59.249 Simpl[18932:55526] [Simpl] call assignment: 3572 ms
+2026-10-30 23:30:59.249 Simpl[18932:55526] SimplAssignment 4001: files 1, comments 3, steps See Feedback+Hand In Again, review 0, handIn 0, error -
+2026-10-30 23:30:59.263 Simpl[18932:55526] [Simpl] open Assignment: 4390 ms (fetched)
+2026-10-30 23:30:59.372 Simpl[18932:55526] [Simpl] call snapshot: 3429 ms
+2026-10-30 23:30:59.373 Simpl[18932:55526] [Simpl] call courses: 3139 ms
+2026-10-30 23:31:00.068 Simpl[18932:55526] [Simpl] call home: 3832 ms
+2026-10-30 23:31:00.070 Simpl[18932:55526] [Simpl] call neighbours: 1996 ms
+2026-10-30 23:31:00.323 Simpl[18932:55526] [Simpl] call groups: 749 ms
+2026-10-30 23:31:02.356 Simpl[18932:55526] [Simpl] call moreFromCanvas: 2031 ms

@@ -1,0 +1,13 @@
+2026-10-30 23:37:30.299 Simpl[35612:97814] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-30 23:37:32.405 Simpl[35612:97814] [Simpl] window: the app's screens (no page)
+2026-10-30 23:37:33.582 Simpl[35612:97814] [Simpl] popup tool: 984 × 609, 20 in from the window (sidebar out)
+2026-10-30 23:37:35.504 Simpl[35612:97814] [Simpl] atom frame 26-cloud-3d-true: view 570 × 404, model 57% across, 80% up
+2026-10-30 23:37:38.701 Simpl[35612:97814] [Simpl] popup tool: 984 × 591, 20 in from the window (sidebar out)
+2026-10-30 23:37:38.859 Simpl[35612:97814] [Simpl] atom frame 26-cloud-3d-true: view 570 × 386, model 54% across, 80% up
+2026-10-30 23:37:39.769 Simpl[35612:97814] [Simpl] call quietColors: 6856 ms
+2026-10-30 23:37:39.961 Simpl[35612:97814] [Simpl] call snapshot: 229 ms
+2026-10-30 23:37:40.285 Simpl[35612:97814] [Simpl] call courses: 229 ms
+2026-10-30 23:37:40.536 Simpl[35612:97814] [Simpl] call groups: 250 ms
+2026-10-30 23:37:41.257 Simpl[35612:97814] [Simpl] call moreFromCanvas: 719 ms
+2026-10-30 23:37:45.148 Simpl[35612:97814] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-10-30 23:37:48.171 Simpl[35612:97814] [Simpl] popup tool: 984 × 589, 20 in from the window (sidebar out)

@@ -1,0 +1,27 @@
+2026-10-30 23:34:44.647 Simpl[29024:81216] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-30 23:34:45.870 Simpl[29024:81216] [Simpl] window: the app's screens (no page)
+2026-10-30 23:34:46.176 Simpl[29024:81216] [Simpl] appear Dashboard: 673 ms
+2026-10-30 23:34:46.415 Simpl[29024:81216] [Simpl] appear Dashboard: 911 ms
+2026-10-30 23:34:53.814 Simpl[29024:81216] [Simpl] open Dashboard: 8307 ms (kept)
+2026-10-30 23:34:55.225 Simpl[29024:81216] [Simpl] call quietColors: 9044 ms
+2026-10-30 23:34:55.295 Simpl[29024:81216] [Simpl] call today: 2431 ms
+2026-10-30 23:34:55.297 Simpl[29024:81216] [Simpl] call dashSkyline: 2846 ms
+2026-10-30 23:34:55.300 Simpl[29024:81216] [Simpl] call today: 2438 ms
+2026-10-30 23:34:55.301 Simpl[29024:81216] [Simpl] call dashSkyline: 2852 ms
+2026-10-30 23:34:55.303 Simpl[29024:81216] [Simpl] call todayCounts: 1494 ms
+2026-10-30 23:34:55.303 Simpl[29024:81216] [Simpl] call todayCounts: 1494 ms
+2026-10-30 23:34:55.303 Simpl[29024:81216] [Simpl] call todayCounts: 1494 ms
+2026-10-30 23:34:55.304 Simpl[29024:81216] [Simpl] call todayCounts: 1495 ms
+2026-10-30 23:34:55.316 Simpl[29024:81216] [Simpl] call dashList: 2861 ms
+2026-10-30 23:34:55.319 Simpl[29024:81216] [Simpl] call assignment: 1236 ms
+2026-10-30 23:34:55.319 Simpl[29024:81216] [Simpl] macmillan popup: opened from the assignment (its tool on lmslink.bfwpub.com)
+2026-10-30 23:34:55.321 Simpl[29024:81216] [Simpl] call dashList: 2872 ms
+2026-10-30 23:34:55.998 Simpl[29024:81216] [Simpl] popup look: 984 × 589, 20 in from the window (sidebar out)
+2026-10-30 23:34:56.227 Simpl[29024:81216] [Simpl] call snapshot: 2146 ms
+2026-10-30 23:34:56.358 Simpl[29024:81216] [Simpl] open Dashboard: 10850 ms (live)
+2026-10-30 23:34:57.535 Simpl[29024:81216] [Simpl] call toolLaunch: 1395 ms
+2026-10-30 23:34:57.535 Simpl[29024:81216] [Simpl] macmillan popup: opened
+2026-10-30 23:34:57.775 Simpl[29024:81216] [Simpl] call courses: 1421 ms
+2026-10-30 23:34:59.004 Simpl[29024:81216] [Simpl] call groups: 1228 ms
+2026-10-30 23:35:00.252 Simpl[29024:81216] [Simpl] popup look: 984 × 591, 20 in from the window (sidebar out)
+2026-10-30 23:35:00.444 Simpl[29024:81216] [Simpl] call moreFromCanvas: 1434 ms

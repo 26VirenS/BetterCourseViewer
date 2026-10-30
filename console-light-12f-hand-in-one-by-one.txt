@@ -1,0 +1,39 @@
+2026-10-30 23:33:59.082 Simpl[27526:77268] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-30 23:34:00.166 Simpl[27526:77268] [Simpl] window: the app's screens (no page)
+2026-10-30 23:34:01.166 Simpl[27526:77268] [Simpl] appear Course home: 1253 ms
+2026-10-30 23:34:01.713 Simpl[27526:77268] [Simpl] appear Course home: 1800 ms
+2026-10-30 23:34:09.068 Simpl[27526:77268] [Simpl] appear Assignment: 120 ms
+2026-10-30 23:34:10.049 Simpl[27526:77268] [Simpl] call quietColors: 8884 ms
+2026-10-30 23:34:10.049 Simpl[27526:77268] [Simpl] call neighbours: 887 ms
+2026-10-30 23:34:10.052 Simpl[27526:77268] [Simpl] call snapshot: 1104 ms
+2026-10-30 23:34:10.272 Simpl[27526:77268] [Simpl] call home: 9105 ms
+2026-10-30 23:34:10.273 Simpl[27526:77268] [Simpl] call home: 1857 ms
+2026-10-30 23:34:10.273 Simpl[27526:77268] [Simpl] call home: 1924 ms
+2026-10-30 23:34:11.046 Simpl[27526:77268] [Simpl] open Course home: 2098 ms (fetched)
+2026-10-30 23:34:11.048 Simpl[27526:77268] [Simpl] call assignment: 1113 ms
+2026-10-30 23:34:11.049 Simpl[27526:77268] SimplAssignment 1012: files 0, comments 0, steps Hand In, review 0, handIn 1, error -
+2026-10-30 23:34:12.604 Simpl[27526:77268] [Simpl] call courses: 2519 ms
+2026-10-30 23:34:12.632 Simpl[27526:77268] [Simpl] open Assignment: 3681 ms (fetched)
+2026-10-30 23:34:12.633 Simpl[27526:77268] [Simpl] popup handin:101/1012: 580 × 560
+2026-10-30 23:34:13.372 Simpl[27526:77268] [Simpl] call neighbours: 1212 ms
+2026-10-30 23:34:13.407 Simpl[27526:77268] [Simpl] call groups: 803 ms
+2026-10-30 23:34:13.556 Simpl[27526:77268] SimplHandIn adding file 1 of 4: long-reading.pdf
+2026-10-30 23:34:13.558 Simpl[27526:77268] SimplHandIn added long-reading.pdf (1 files)
+2026-10-30 23:34:13.604 Simpl[27526:77268] SimplHandIn added file 1 of 4: 1 in
+2026-10-30 23:34:13.634 Simpl[27526:77268] SimplPreview: long-reading.pdf in PDFKit (6 pages)
+IOServiceMatchingfailed for: AppleM2ScalerParavirtDriver
+2026-10-30 23:34:14.997 Simpl[27526:77268] [Simpl] popup handin:101/1012: 977 × 560
+2026-10-30 23:34:18.337 Simpl[27526:77268] SimplHandIn adding file 2 of 4: calendar.png
+2026-10-30 23:34:18.340 Simpl[27526:77268] SimplHandIn added calendar.png (2 files)
+2026-10-30 23:34:18.518 Simpl[27526:77268] SimplHandIn added file 2 of 4: 2 in
+2026-10-30 23:34:18.578 Simpl[27526:77268] SimplHandIn adding file 3 of 4: reading.pdf
+2026-10-30 23:34:18.583 Simpl[27526:77268] SimplHandIn added reading.pdf (3 files)
+2026-10-30 23:34:18.591 Simpl[27526:77268] SimplPreview: calendar.png in Quick Look
+2026-10-30 23:34:18.928 Simpl[27526:77268] SimplHandIn added file 3 of 4: 3 in
+2026-10-30 23:34:18.935 Simpl[27526:77268] SimplPreview: reading.pdf in PDFKit (2 pages)
+2026-10-30 23:34:19.669 Simpl[27526:77268] SimplHandIn adding file 4 of 4: grades.png
+2026-10-30 23:34:19.672 Simpl[27526:77268] SimplHandIn added grades.png (4 files)
+2026-10-30 23:34:19.804 Simpl[27526:77268] SimplHandIn added file 4 of 4: 4 in
+2026-10-30 23:34:19.820 Simpl[27526:77268] SimplPreview: grades.png in Quick Look
+2026-10-30 23:34:20.490 Simpl[27526:77268] [Simpl] call moreFromCanvas: 7080 ms
+2026-10-30 23:34:24.997 Simpl[27526:77283] Drawing a PDFPage when its PDFDocument is nil is unsupported.

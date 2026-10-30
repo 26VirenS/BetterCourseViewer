@@ -1,0 +1,28 @@
+2026-10-30 23:55:49.291 Simpl[33792:93048] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-30 23:55:52.241 Simpl[33792:93048] [Simpl] window: the app's screens (/d2l/home)
+2026-10-30 23:55:53.052 Simpl[33792:93048] [Simpl] appear Dashboard: 1966 ms
+2026-10-30 23:55:53.177 Simpl[33792:93048] [Simpl] appear Course home: 110 ms
+2026-10-30 23:55:53.379 Simpl[33792:93048] [Simpl] appear Dashboard: 312 ms
+2026-10-30 23:55:53.381 Simpl[33792:93048] [Simpl] appear Course home: 313 ms
+2026-10-30 23:55:56.862 Simpl[33792:93048] [Simpl] appear Assignment: 3793 ms
+2026-10-30 23:55:58.544 Simpl[33792:93048] [Simpl] call quietColors: 5497 ms
+2026-10-30 23:55:58.549 Simpl[33792:93048] [Simpl] call today: 5492 ms
+2026-10-30 23:55:58.550 Simpl[33792:93048] [Simpl] call dashSkyline: 5371 ms
+2026-10-30 23:55:58.551 Simpl[33792:93048] [Simpl] call dashList: 5372 ms
+2026-10-30 23:55:58.551 Simpl[33792:93048] [Simpl] call snapshot: 5373 ms
+2026-10-30 23:55:58.888 Simpl[33792:93048] [Simpl] call home: 2464 ms
+2026-10-30 23:55:58.888 Simpl[33792:93048] [Simpl] call neighbours: 1197 ms
+2026-10-30 23:55:58.890 Simpl[33792:93048] [Simpl] call home: 2468 ms
+2026-10-30 23:55:58.891 Simpl[33792:93048] [Simpl] call home: 2469 ms
+2026-10-30 23:55:59.942 Simpl[33792:93048] [Simpl] open Course home: 6870 ms (fetched)
+2026-10-30 23:55:59.951 Simpl[33792:93048] [Simpl] call todayCounts: 1477 ms
+2026-10-30 23:55:59.951 Simpl[33792:93048] [Simpl] call todayCounts: 1478 ms
+2026-10-30 23:55:59.953 Simpl[33792:93048] [Simpl] call assignment: 1452 ms
+2026-10-30 23:55:59.954 Simpl[33792:93048] SimplAssignment 702: files 0, comments 0, steps Hand In, review 0, handIn 0, error -
+2026-10-30 23:56:01.337 Simpl[33792:93048] [Simpl] call dashSkyline: 2786 ms
+2026-10-30 23:56:01.337 Simpl[33792:93048] [Simpl] call courses: 2674 ms
+2026-10-30 23:56:01.377 Simpl[33792:93048] [Simpl] open Assignment: 8310 ms (fetched)
+2026-10-30 23:56:01.717 Simpl[33792:93048] [Simpl] call neighbours: 1038 ms
+2026-10-30 23:56:01.739 Simpl[33792:93048] [Simpl] call groups: 401 ms
+2026-10-30 23:56:01.916 Simpl[33792:93048] [Simpl] call moreFromCanvas: 175 ms
+2026-10-30 23:56:04.766 Simpl[33792:93048] [Simpl] shot: another copy of the app is in front; brought forward again

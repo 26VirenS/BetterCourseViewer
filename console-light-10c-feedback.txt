@@ -1,0 +1,23 @@
+2026-10-30 23:35:13.003 Simpl[30151:84156] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-30 23:35:15.768 Simpl[30151:84156] [Simpl] window: the app's screens (no page)
+2026-10-30 23:35:16.671 Simpl[30151:84156] [Simpl] appear Course home: 1261 ms
+2026-10-30 23:35:17.560 Simpl[30151:84156] [Simpl] appear Course home: 2149 ms
+2026-10-30 23:35:23.274 Simpl[30151:84156] [Simpl] open Course home: 7860 ms (kept)
+2026-10-30 23:35:24.582 Simpl[30151:84156] [Simpl] appear Assignment: 552 ms
+2026-10-30 23:35:26.917 Simpl[30151:84156] [Simpl] call quietColors: 10249 ms
+2026-10-30 23:35:26.921 Simpl[30151:84156] [Simpl] call neighbours: 1963 ms
+2026-10-30 23:35:26.922 Simpl[30151:84156] [Simpl] call home: 6285 ms
+2026-10-30 23:35:26.930 Simpl[30151:84156] [Simpl] call home: 6292 ms
+2026-10-30 23:35:26.941 Simpl[30151:84156] [Simpl] call snapshot: 2909 ms
+2026-10-30 23:35:27.036 Simpl[30151:84156] [Simpl] call home: 6473 ms
+2026-10-30 23:35:27.036 Simpl[30151:84156] [Simpl] call assignment: 214 ms
+2026-10-30 23:35:27.068 Simpl[30151:84156] SimplAssignment 1008: files 1, comments 0, steps See Feedback+Hand In Again, review 1, handIn 0, error -
+2026-10-30 23:35:29.127 Simpl[30151:84156] [Simpl] popup feedback:101/1008: 984 × 589, 20 in from the window (sidebar out)
+2026-10-30 23:35:41.464 Simpl[30151:84156] [Simpl] open Course home: 17425 ms (live)
+2026-10-30 23:35:41.546 Simpl[30151:84156] [Simpl] open Assignment: 17507 ms (fetched)
+2026-10-30 23:35:41.893 Simpl[30151:84156] [richtext] not measured after 12 s, shown as plain text: <p>Complete <strong>Shifting and stretching grap
+2026-10-30 23:35:41.893 Simpl[30151:84156] [Simpl] feedback: DocViewer drew no page in 12 s (try 1)
+2026-10-30 23:35:43.926 Simpl[30151:84156] [Simpl] call neighbours: 12217 ms
+2026-10-30 23:35:43.927 Simpl[30151:84156] [Simpl] call courses: 16883 ms
+2026-10-30 23:35:44.776 Simpl[30151:84156] [Simpl] call groups: 831 ms
+2026-10-30 23:35:46.460 Simpl[30151:84156] [Simpl] call moreFromCanvas: 1683 ms

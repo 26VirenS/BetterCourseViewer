@@ -1,0 +1,28 @@
+2026-10-30 23:30:26.834 Simpl[18789:54072] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-30 23:30:28.730 Simpl[18789:54072] [Simpl] window: the app's screens (no page)
+2026-10-30 23:30:29.149 Simpl[18789:54072] [Simpl] appear Dashboard: 631 ms
+2026-10-30 23:30:29.714 Simpl[18789:54072] [Simpl] appear Dashboard: 1197 ms
+2026-10-30 23:30:45.219 Simpl[18789:54072] [Simpl] open Dashboard: 16694 ms (kept)
+2026-10-30 23:30:57.454 Simpl[18789:54072] [Simpl] calculator: its page loaded
+2026-10-30 23:30:59.651 Simpl[18789:54072] [Simpl] calculator: GeoGebra is ready
+2026-10-30 23:31:00.373 Simpl[18789:54072] [Simpl] call dashList: 26523 ms
+2026-10-30 23:31:00.374 Simpl[18789:54072] [Simpl] call dashList: 26401 ms
+2026-10-30 23:31:00.375 Simpl[18789:54072] [Simpl] call today: 26525 ms
+2026-10-30 23:31:00.376 Simpl[18789:54072] [Simpl] call today: 26401 ms
+2026-10-30 23:31:00.377 Simpl[18789:54072] [Simpl] call todayCounts: 12137 ms
+2026-10-30 23:31:00.377 Simpl[18789:54072] [Simpl] call todayCounts: 12137 ms
+2026-10-30 23:31:00.377 Simpl[18789:54072] [Simpl] call todayCounts: 12137 ms
+2026-10-30 23:31:00.381 Simpl[18789:54072] [Simpl] call dashSkyline: 26530 ms
+2026-10-30 23:31:00.382 Simpl[18789:54072] [Simpl] call todayCounts: 12142 ms
+2026-10-30 23:31:00.599 Simpl[18789:54072] [Simpl] call dashSkyline: 26625 ms
+2026-10-30 23:31:00.604 Simpl[18789:54072] [Simpl] call snapshot: 2917 ms
+2026-10-30 23:31:00.767 Simpl[18789:54072] [Simpl] open Dashboard: 32234 ms (live)
+2026-10-30 23:31:06.148 Simpl[18789:54072] [Simpl] call courses: 5383 ms
+2026-10-30 23:31:06.654 Simpl[18789:54072] [Simpl] call groups: 505 ms
+2026-10-30 23:31:07.105 Simpl[18789:54072] [Simpl] calculator: its page loaded
+2026-10-30 23:31:08.028 Simpl[18789:54072] [Simpl] call moreFromCanvas: 1371 ms
+2026-10-30 23:31:08.037 Simpl[18789:54072] [Simpl] calculator: GeoGebra is ready
+2026-10-30 23:31:17.252 Simpl[18789:54072] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-10-30 23:31:19.043 Simpl[18789:54072] [Simpl] calculator: its page loaded
+2026-10-30 23:31:21.525 Simpl[18789:54072] [Simpl] calculator: its page loaded
+2026-10-30 23:31:25.943 Simpl[18789:54072] [Simpl] calculator: GeoGebra is ready

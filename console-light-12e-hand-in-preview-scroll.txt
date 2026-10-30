@@ -1,0 +1,26 @@
+2026-10-30 23:35:49.495 Simpl[31808:88514] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-30 23:35:55.256 Simpl[31808:88514] [Simpl] window: the app's screens (no page)
+2026-10-30 23:35:56.683 Simpl[31808:88514] [Simpl] appear Course home: 1970 ms
+2026-10-30 23:35:57.425 Simpl[31808:88514] [Simpl] appear Course home: 2712 ms
+2026-10-30 23:36:01.331 Simpl[31808:88514] [Simpl] open Course home: 6616 ms (kept)
+2026-10-30 23:36:02.066 Simpl[31808:88514] [Simpl] appear Assignment: 395 ms
+2026-10-30 23:36:03.226 Simpl[31808:88514] [Simpl] call quietColors: 6542 ms
+2026-10-30 23:36:03.227 Simpl[31808:88514] [Simpl] call neighbours: 892 ms
+2026-10-30 23:36:03.227 Simpl[31808:88514] [Simpl] call home: 3100 ms
+2026-10-30 23:36:03.243 Simpl[31808:88514] [Simpl] call home: 3137 ms
+2026-10-30 23:36:03.329 Simpl[31808:88514] [Simpl] call home: 3300 ms
+2026-10-30 23:36:03.329 Simpl[31808:88514] [Simpl] call snapshot: 1658 ms
+2026-10-30 23:36:03.409 Simpl[31808:88514] [Simpl] open Course home: 1738 ms (live)
+2026-10-30 23:36:04.245 Simpl[31808:88514] [Simpl] call assignment: 1197 ms
+2026-10-30 23:36:04.267 Simpl[31808:88514] SimplAssignment 1012: files 0, comments 0, steps Hand In, review 0, handIn 1, error -
+2026-10-30 23:36:07.281 Simpl[31808:88514] [Simpl] open Assignment: 5607 ms (fetched)
+2026-10-30 23:36:07.289 Simpl[31808:88514] [Simpl] popup handin:101/1012: 580 × 560
+2026-10-30 23:36:07.355 Simpl[31808:88514] [Simpl] call courses: 3945 ms
+2026-10-30 23:36:07.356 Simpl[31808:88514] SimplHandIn added long-reading.pdf (1 files)
+2026-10-30 23:36:07.971 Simpl[31808:88514] SimplPreview: long-reading.pdf in PDFKit (6 pages)
+IOServiceMatchingfailed for: AppleM2ScalerParavirtDriver
+2026-10-30 23:36:10.344 Simpl[31808:88514] [Simpl] popup handin:101/1012: 977 × 560
+2026-10-30 23:36:12.060 Simpl[31808:88514] [Simpl] call neighbours: 5804 ms
+2026-10-30 23:36:12.196 Simpl[31808:88514] [Simpl] call groups: 4838 ms
+2026-10-30 23:36:14.111 Simpl[31808:88514] [Simpl] call moreFromCanvas: 1909 ms
+2026-10-30 23:36:14.353 Simpl[31808:88514] SimplScrollProbe: PDF, pages 6, scrolled yes (4000 → 3624)

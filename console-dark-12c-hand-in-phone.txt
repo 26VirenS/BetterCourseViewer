@@ -1,0 +1,22 @@
+2026-10-30 23:45:15.912 Simpl[7311:25482] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-30 23:45:18.279 Simpl[7311:25482] [Simpl] window: the app's screens (no page)
+2026-10-30 23:45:20.341 Simpl[7311:25482] [Simpl] appear Course home: 2668 ms
+2026-10-30 23:45:21.312 Simpl[7311:25482] [Simpl] appear Course home: 3639 ms
+2026-10-30 23:45:24.567 Simpl[7311:25482] [Simpl] open Course home: 6894 ms (kept)
+2026-10-30 23:45:25.102 Simpl[7311:25482] [Simpl] appear Assignment: 197 ms
+2026-10-30 23:45:28.738 Simpl[7311:25482] [Simpl] open Assignment: 3832 ms (kept)
+2026-10-30 23:45:28.754 Simpl[7311:25482] [Simpl] call quietColors: 8414 ms
+2026-10-30 23:45:28.788 Simpl[7311:25482] [Simpl] call neighbours: 1714 ms
+2026-10-30 23:45:28.793 Simpl[7311:25482] [Simpl] call neighbours: 3414 ms
+2026-10-30 23:45:29.004 Simpl[7311:25482] [Simpl] call home: 5604 ms
+2026-10-30 23:45:29.005 Simpl[7311:25482] [Simpl] call home: 5607 ms
+2026-10-30 23:45:29.011 Simpl[7311:25482] [Simpl] call home: 5729 ms
+2026-10-30 23:45:29.019 Simpl[7311:25482] [Simpl] call snapshot: 4113 ms
+2026-10-30 23:45:31.369 Simpl[7311:25482] [Simpl] open Course home: 6453 ms (live)
+2026-10-30 23:45:31.370 Simpl[7311:25482] [Simpl] call assignment: 4927 ms
+2026-10-30 23:45:31.370 Simpl[7311:25482] SimplAssignment 1012: files 0, comments 0, steps Hand In, review 0, handIn 1, error -
+2026-10-30 23:45:34.824 Simpl[7311:25482] [Simpl] open Assignment: 9918 ms (live)
+2026-10-30 23:45:34.824 Simpl[7311:25482] [Simpl] popup handin:101/1012: 580 × 560
+2026-10-30 23:45:34.967 Simpl[7311:25482] [Simpl] call courses: 4802 ms
+2026-10-30 23:45:37.321 Simpl[7311:25482] [Simpl] call groups: 2352 ms
+2026-10-30 23:45:38.131 Simpl[7311:25482] [Simpl] call moreFromCanvas: 809 ms

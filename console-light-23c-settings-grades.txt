@@ -1,0 +1,24 @@
+2026-10-30 23:31:29.539 Simpl[21250:60497] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-30 23:31:35.265 Simpl[21250:60497] [Simpl] window: the app's screens (no page)
+2026-10-30 23:31:36.466 Simpl[21250:60497] [Simpl] appear Dashboard: 3152 ms
+2026-10-30 23:31:36.725 Simpl[21250:60497] [Simpl] appear Dashboard: 3410 ms
+2026-10-30 23:31:42.958 Simpl[21250:60497] [Simpl] open Dashboard: 9640 ms (kept)
+2026-10-30 23:31:48.070 Simpl[21250:60497] [Simpl] call settingsInfo: 3250 ms
+2026-10-30 23:31:49.359 Simpl[21250:60497] [Simpl] call settingsInfo: 4849 ms
+2026-10-30 23:31:50.097 Simpl[21250:60497] [Simpl] call quietColors: 13624 ms
+2026-10-30 23:31:50.165 Simpl[21250:60497] [Simpl] call snapshot: 6737 ms
+2026-10-30 23:31:51.684 Simpl[21250:60497] [Simpl] call todayCounts: 8813 ms
+2026-10-30 23:31:51.685 Simpl[21250:60497] [Simpl] call today: 12522 ms
+2026-10-30 23:31:51.692 Simpl[21250:60497] [Simpl] call today: 12528 ms
+2026-10-30 23:31:52.046 Simpl[21250:60497] [Simpl] call dashSkyline: 13167 ms
+2026-10-30 23:31:52.046 Simpl[21250:60497] [Simpl] call todayCounts: 9175 ms
+2026-10-30 23:31:52.046 Simpl[21250:60497] [Simpl] call todayCounts: 9176 ms
+2026-10-30 23:31:52.047 Simpl[21250:60497] [Simpl] call dashList: 13168 ms
+2026-10-30 23:31:52.047 Simpl[21250:60497] [Simpl] call dashList: 13169 ms
+2026-10-30 23:31:52.047 Simpl[21250:60497] [Simpl] call todayCounts: 9177 ms
+2026-10-30 23:31:52.048 Simpl[21250:60497] [Simpl] call dashSkyline: 13170 ms
+2026-10-30 23:31:54.315 Simpl[21250:60497] [Simpl] open Dashboard: 20986 ms (live)
+2026-10-30 23:31:55.121 Simpl[21250:60497] [Simpl] call courses: 3436 ms
+2026-10-30 23:31:57.325 Simpl[21250:60497] [Simpl] call groups: 2191 ms
+2026-10-30 23:31:59.249 Simpl[21250:60497] [Simpl] call moreFromCanvas: 1923 ms
+2026-10-30 23:32:03.922 Simpl[21250:60497] [Simpl] shot: the window came back empty; asked again (1)

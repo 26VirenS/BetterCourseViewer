@@ -1,0 +1,25 @@
+2026-10-30 23:26:34.253 Simpl[9051:30052] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-30 23:26:35.719 Simpl[9051:30052] [Simpl] window: the app's screens (no page)
+2026-10-30 23:26:36.193 Simpl[9051:30052] [Simpl] appear Dashboard: 864 ms
+2026-10-30 23:26:36.368 Simpl[9051:30052] [Simpl] appear Dashboard: 1039 ms
+2026-10-30 23:26:40.204 Simpl[9051:30052] [Simpl] open Dashboard: 4873 ms (kept)
+2026-10-30 23:26:41.685 Simpl[9051:30052] [Simpl] call quietColors: 5490 ms
+2026-10-30 23:26:41.687 Simpl[9051:30052] [Simpl] call dashList: 3236 ms
+2026-10-30 23:26:41.689 Simpl[9051:30052] [Simpl] call dashList: 3217 ms
+2026-10-30 23:26:41.689 Simpl[9051:30052] [Simpl] call todayCounts: 1496 ms
+2026-10-30 23:26:41.690 Simpl[9051:30052] [Simpl] call todayCounts: 1497 ms
+2026-10-30 23:26:41.690 Simpl[9051:30052] [Simpl] call todayCounts: 1497 ms
+2026-10-30 23:26:41.690 Simpl[9051:30052] [Simpl] call today: 2977 ms
+2026-10-30 23:26:41.691 Simpl[9051:30052] [Simpl] call todayCounts: 1498 ms
+2026-10-30 23:26:41.691 Simpl[9051:30052] [Simpl] call today: 2978 ms
+2026-10-30 23:26:41.691 Simpl[9051:30052] [Simpl] call dashSkyline: 3219 ms
+2026-10-30 23:26:41.691 Simpl[9051:30052] [Simpl] call dashSkyline: 3241 ms
+2026-10-30 23:26:41.777 Simpl[9051:30052] [Simpl] call snapshot: 1269 ms
+2026-10-30 23:26:42.040 Simpl[9051:30052] [Simpl] counter: today fades in (Reduce Motion)
+2026-10-30 23:26:42.043 Simpl[9051:30052] [Simpl] open Dashboard: 6711 ms (live)
+2026-10-30 23:26:42.545 Simpl[9051:30052] [Simpl] counter: today fades in (Reduce Motion)
+2026-10-30 23:26:43.020 Simpl[9051:30052] [Simpl] call courses: 981 ms
+2026-10-30 23:26:43.892 Simpl[9051:30052] [Simpl] call groups: 871 ms
+2026-10-30 23:26:44.444 Simpl[9051:30052] [Simpl] call todaySheet: 1703 ms
+2026-10-30 23:26:45.566 Simpl[9051:30052] [Simpl] call moreFromCanvas: 1671 ms
+2026-10-30 23:26:46.464 Simpl[9051:30052] [Simpl] call assignment: 158 ms

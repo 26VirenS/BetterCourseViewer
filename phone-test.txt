@@ -1,0 +1,2 @@
+light-12d-hand-in-phone-connected: page 200, wrong key 404, uploads 200 200
+dark-12e-hand-in-phone-photos: page 200, wrong key 404, uploads 200 200 415

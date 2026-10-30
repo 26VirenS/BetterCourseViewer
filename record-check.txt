@@ -1,0 +1,8 @@
+ok   the tool window's recording began (developer mode)
+ok   its first step: the page's code, a picture and its data
+ok   in its folder: 0001 page.html.gz
+ok   in its folder: 0001 screenshot.jpg
+ok   in its folder: 0001 data.json
+ok   in its folder: README.txt
+ok   in its folder: timeline.txt
+size 64 KB

@@ -1,0 +1,12 @@
+2026-10-30 23:30:37.092 Simpl[19240:55191] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-30 23:30:39.246 Simpl[19240:55191] [Simpl] window: the app's screens (no page)
+2026-10-30 23:30:40.779 Simpl[19240:55191] [Simpl] popup tool: 984 × 609, 20 in from the window (sidebar out)
+IOServiceMatchingfailed for: AppleM2ScalerParavirtDriver
+2026-10-30 23:30:49.274 Simpl[19240:55191] [Simpl] popup tool: 984 × 591, 20 in from the window (sidebar out)
+2026-10-30 23:30:52.290 Simpl[19240:55191] [Simpl] popup tool: 984 × 589, 20 in from the window (sidebar out)
+2026-10-30 23:30:53.128 Simpl[19240:55191] [Simpl] call quietColors: 12551 ms
+2026-10-30 23:30:53.228 Simpl[19240:55191] [Simpl] call snapshot: 228 ms
+2026-10-30 23:30:54.161 Simpl[19240:55191] [Simpl] call courses: 752 ms
+2026-10-30 23:30:54.663 Simpl[19240:55191] [Simpl] call groups: 500 ms
+2026-10-30 23:30:56.030 Simpl[19240:55191] [Simpl] popup tool: 984 × 591, 20 in from the window (sidebar out)
+2026-10-30 23:30:57.226 Simpl[19240:55191] [Simpl] call moreFromCanvas: 2562 ms

@@ -1,0 +1,24 @@
+2026-10-30 23:54:17.870 Simpl[29685:83123] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-30 23:54:18.700 Simpl[29685:83123] [Simpl] window: the app's screens (no page)
+2026-10-30 23:54:19.129 Simpl[29685:83123] [Simpl] appear Course home: 566 ms
+2026-10-30 23:54:19.566 Simpl[29685:83123] [Simpl] appear Course home: 1003 ms
+2026-10-30 23:54:21.857 Simpl[29685:83123] [Simpl] open Course home: 3294 ms (kept)
+2026-10-30 23:54:22.802 Simpl[29685:83123] [Simpl] appear Assignment: 508 ms
+2026-10-30 23:54:24.091 Simpl[29685:83123] [Simpl] call quietColors: 4962 ms
+2026-10-30 23:54:24.094 Simpl[29685:83123] [Simpl] call neighbours: 1195 ms
+2026-10-30 23:54:24.196 Simpl[29685:83123] [Simpl] call snapshot: 1900 ms
+2026-10-30 23:54:24.666 Simpl[29685:83123] [Simpl] call assignment: 674 ms
+2026-10-30 23:54:24.667 Simpl[29685:83123] SimplAssignment 1012: files 0, comments 0, steps Hand In, review 0, handIn 1, error -
+2026-10-30 23:54:24.667 Simpl[29685:83123] [Simpl] call home: 3806 ms
+2026-10-30 23:54:24.668 Simpl[29685:83123] [Simpl] call home: 3875 ms
+2026-10-30 23:54:25.759 Simpl[29685:83123] [Simpl] call home: 4869 ms
+2026-10-30 23:54:26.866 Simpl[29685:83123] [Simpl] open Assignment: 4572 ms (fetched)
+2026-10-30 23:54:26.866 Simpl[29685:83123] [Simpl] popup handin:101/1012: 580 × 560
+2026-10-30 23:54:26.871 Simpl[29685:83123] [Simpl] open Course home: 4577 ms (live)
+2026-10-30 23:54:26.912 Simpl[29685:83123] [Simpl] call courses: 2632 ms
+2026-10-30 23:54:27.371 Simpl[29685:83123] [Simpl] call neighbours: 1171 ms
+2026-10-30 23:54:27.911 Simpl[29685:83123] SimplHandIn added calendar.png (1 files)
+2026-10-30 23:54:28.043 Simpl[29685:83123] SimplPreview: calendar.png in Quick Look
+2026-10-30 23:54:29.707 Simpl[29685:83123] [Simpl] popup handin:101/1012: 977 × 560
+2026-10-30 23:54:30.395 Simpl[29685:83123] [Simpl] call groups: 3480 ms
+2026-10-30 23:54:31.382 Simpl[29685:83123] [Simpl] call moreFromCanvas: 986 ms

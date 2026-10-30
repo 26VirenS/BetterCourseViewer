@@ -1,0 +1,14 @@
+2026-10-30 23:27:31.289 Simpl[11224:35618] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-30 23:27:32.698 Simpl[11224:35618] [Simpl] window: the app's screens (no page)
+2026-10-30 23:27:33.111 Simpl[11224:35618] [Simpl] popup tool: 984 × 607, 20 in from the window (sidebar out)
+2026-10-30 23:27:33.176 Simpl[11224:35618] [Simpl] bio launch: dna helix:style=atoms:pair=5: style atoms, grooves off, measure off, unzip 0.00, nucleotide DA (model3D), rna cloverleaf, step 1
+2026-10-30 23:27:40.712 Simpl[11224:35618] [Simpl] popup tool: 984 × 591, 20 in from the window (sidebar out)
+2026-10-30 23:27:43.113 Simpl[11224:35618] [Simpl] call quietColors: 10144 ms
+2026-10-30 23:27:43.352 Simpl[11224:35618] [Simpl] call snapshot: 415 ms
+2026-10-30 23:27:43.865 Simpl[11224:35618] [Simpl] call courses: 387 ms
+2026-10-30 23:27:44.108 Simpl[11224:35618] [Simpl] call groups: 243 ms
+2026-10-30 23:27:44.673 Simpl[11224:35618] [Simpl] call moreFromCanvas: 563 ms
+2026-10-30 23:27:47.300 Simpl[11224:35618] [Simpl] bio scene: helix|ATGCGTACGTTAGCCATGCA|atoms|true|false|false|true|0.000|false made in 13599 ms, 1946 objects
+2026-10-30 23:27:47.621 Simpl[11224:35618] [Simpl] bio frame helix|ATGCGTACGTTAGCCATGCA|atoms|true|false|false|true|0.000: view 570 × 367, model 16% across, 84% up
+2026-10-30 23:27:49.257 Simpl[11224:35618] [Simpl] popup tool: 984 × 589, 20 in from the window (sidebar out)
+2026-10-30 23:27:49.525 Simpl[11224:35618] [Simpl] bio frame helix|ATGCGTACGTTAGCCATGCA|atoms|true|false|false|true|0.000: view 570 × 365, model 16% across, 84% up

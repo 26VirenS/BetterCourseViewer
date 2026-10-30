@@ -1,0 +1,29 @@
+2026-10-30 23:34:59.905 Simpl[29756:83121] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-30 23:35:03.263 Simpl[29756:83121] [Simpl] window: the app's screens (no page)
+2026-10-30 23:35:03.943 Simpl[29756:83121] [Simpl] appear Course home: 1233 ms
+2026-10-30 23:35:04.901 Simpl[29756:83121] [Simpl] appear Course home: 2191 ms
+2026-10-30 23:35:08.459 Simpl[29756:83121] [Simpl] open Course home: 5749 ms (kept)
+2026-10-30 23:35:09.521 Simpl[29756:83121] [Simpl] appear Assignment: 498 ms
+2026-10-30 23:35:11.311 Simpl[29756:83121] [Simpl] call quietColors: 7368 ms
+2026-10-30 23:35:11.401 Simpl[29756:83121] [Simpl] call neighbours: 1419 ms
+2026-10-30 23:35:11.495 Simpl[29756:83121] [Simpl] call snapshot: 2473 ms
+2026-10-30 23:35:12.071 Simpl[29756:83121] [Simpl] call assignment: 880 ms
+2026-10-30 23:35:12.075 Simpl[29756:83121] SimplAssignment 1013: files 0, comments 0, steps Hand In, review 0, handIn 1, error -
+2026-10-30 23:35:15.211 Simpl[29756:83121] [Simpl] call home: 8416 ms
+2026-10-30 23:35:15.212 Simpl[29756:83121] [Simpl] call home: 8419 ms
+2026-10-30 23:35:15.214 Simpl[29756:83121] [Simpl] call home: 8524 ms
+2026-10-30 23:35:15.220 Simpl[29756:83121] [Simpl] open Assignment: 6197 ms (fetched)
+2026-10-30 23:35:15.232 Simpl[29756:83121] [Simpl] popup handin:101/1013: 580 × 560
+2026-10-30 23:35:16.055 Simpl[29756:83121] [Simpl] open Course home: 7033 ms (live)
+2026-10-30 23:35:16.472 Simpl[29756:83121] SimplPhone ready http://192.168.64.16:57694/6BnW1jCioHoAUvqlHk_DHg/ (Ethernet)
+2026-10-30 23:35:16.472 Simpl[29756:83121] [Simpl] call convertInfo: 2479 ms
+2026-10-30 23:35:16.845 Simpl[29756:83121] [Simpl] call courses: 5251 ms
+2026-10-30 23:35:16.894 Simpl[29756:83121] SimplPhone opened
+2026-10-30 23:35:19.328 Simpl[29756:83121] [Simpl] call neighbours: 5031 ms
+2026-10-30 23:35:19.769 Simpl[29756:83121] SimplPhone received IMG_0001.jpg 103579 bytes
+2026-10-30 23:35:20.071 Simpl[29756:83121] SimplPhone received IMG_0002.jpg 103579 bytes
+2026-10-30 23:35:20.456 Simpl[29756:83121] [Simpl] call groups: 3609 ms
+IOServiceMatchingfailed for: AppleM2ScalerParavirtDriver
+2026-10-30 23:35:20.942 Simpl[29756:83121] SimplHandIn added Group project.pdf (1 files)
+2026-10-30 23:35:21.442 Simpl[29756:83121] SimplHandIn added Group project.pdf (1 files)
+2026-10-30 23:35:21.485 Simpl[29756:83121] [Simpl] call moreFromCanvas: 1029 ms

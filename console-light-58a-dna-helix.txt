@@ -1,0 +1,12 @@
+2026-10-30 23:27:26.117 Simpl[11037:35175] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-10-30 23:27:29.127 Simpl[11037:35175] [Simpl] window: the app's screens (no page)
+2026-10-30 23:27:30.899 Simpl[11037:35175] [Simpl] popup tool: 984 × 607, 20 in from the window (sidebar out)
+2026-10-30 23:27:31.028 Simpl[11037:35175] [Simpl] bio launch: dna helix:measure:pair=3: style cartoon, grooves off, measure on, unzip 0.00, nucleotide DA (model3D), rna cloverleaf, step 1
+2026-10-30 23:27:34.173 Simpl[11037:35175] [Simpl] popup tool: 984 × 588, 20 in from the window (sidebar out)
+2026-10-30 23:27:35.214 Simpl[11037:35175] [Simpl] bio scene: helix|ATGCGTACGTTAGCCATGCA|cartoon|true|false|true|true|0.000|false made in 3159 ms, 109 objects
+2026-10-30 23:27:35.530 Simpl[11037:35175] [Simpl] bio frame helix|ATGCGTACGTTAGCCATGCA|cartoon|true|false|true|true|0.00: view 570 × 364, model 46% across, 79% up
+2026-10-30 23:27:39.743 Simpl[11037:35175] [Simpl] call quietColors: 9190 ms
+2026-10-30 23:27:39.760 Simpl[11037:35175] [Simpl] call snapshot: 74 ms
+2026-10-30 23:27:40.976 Simpl[11037:35175] [Simpl] call courses: 1023 ms
+2026-10-30 23:27:41.088 Simpl[11037:35175] [Simpl] call groups: 110 ms
+2026-10-30 23:27:43.203 Simpl[11037:35175] [Simpl] call moreFromCanvas: 2114 ms

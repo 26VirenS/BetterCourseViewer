@@ -1,0 +1,13 @@
+file 0001 data.json
+file 0001 page.html.gz
+file 0001 screenshot.jpg
+file 0002 data.json
+file 0002 page.html.gz
+file README.txt
+file timeline.txt
+ok   unzips whole: 0001 page.html.gz
+ok   unzips whole: 0002 page.html.gz
+ok   a JPEG: 0001 screenshot.jpg
+ok   JSON: 0001 data.json
+ok   JSON: 0002 data.json
+size 64 KB
