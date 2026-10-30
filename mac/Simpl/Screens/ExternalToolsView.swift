@@ -162,7 +162,10 @@ struct ExternalToolsView: View {
                         .id(t.id)
                         .transition(popupArrival)
                         // (the screenshot suite's console: when a list shows and goes)
-                        .onAppear { if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] tool list shown: %@", t.name) } }
+                        .onAppear {
+                            if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] tool list shown: %@", t.name) }
+                            if UserDefaults.standard.string(forKey: "SimplExternalToolList") != nil { Self.askedListShown = true }
+                        }
                         .onDisappear { if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("[Simpl] tool list closed: %@", t.name) } }
                 }
             }
@@ -183,21 +186,28 @@ struct ExternalToolsView: View {
     /// (1.3.77) The screenshot suite's `-SimplExternalToolList knewton`: the list of the first tool whose name has that
     /// word in it, opened a moment after the page is up.
     private func openAskedList() async {
-        // (the flag is only taken once its tool is there: a first run of this task before the answer came, or one the
-        // engine's first data change cut short, must not use it up)
-        guard let word = UserDefaults.standard.string(forKey: "SimplExternalToolList")?.lowercased(), !word.isEmpty else { return }
+        // (the flag is only used up once its list has shown — 1.3.204: the page made afresh as its answers came in, a
+        // list asked for in the copy made first never showed; each copy asks until one has)
+        guard !Self.askedListShown, let word = UserDefaults.standard.string(forKey: "SimplExternalToolList")?.lowercased(), !word.isEmpty else { return }
         guard let t = model.data?.rows.first(where: { $0.name.lowercased().contains(word) && $0.listable }) else {
             NSLog("[Simpl] tool list: %@ not there yet (%d tools)", word, model.data?.rows.count ?? -1)
             return
         }
-        guard LaunchOpen.take("", key: "SimplExternalToolList") != nil else { return }
+        guard listed != t.id else { return }
         NSLog("[Simpl] tool list: opening %@", t.name)
         // (for a picture, at once; otherwise once the page has been seen a moment)
         if UserDefaults.standard.string(forKey: "SimplShotFile") == nil { try? await Task.sleep(nanoseconds: 600_000_000) }
         listed = t.id
         // (a task of its own: the page's is cancelled as the engine's data changes, which would cut its wait short)
-        Task { await readAgainAsked(t) }
+        if !Self.rereadAsked {
+            Self.rereadAsked = true
+            Task { await readAgainAsked(t) }
+        }
     }
+
+    /// (1.3.204) The suite's list has shown, and its reading again has been asked for: once a run.
+    @MainActor private static var askedListShown = false
+    @MainActor private static var rereadAsked = false
 
     /// (1.3.82) The screenshot suite's `-SimplExternalToolReread YES`: a moment after the list is open, the tools read
     /// again and put in place under it — as the tools' answer coming in a second time did in 1.3.81, when the list's

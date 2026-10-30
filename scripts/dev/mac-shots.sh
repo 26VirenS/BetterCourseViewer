@@ -861,7 +861,9 @@ live_shots() {
   wait_shot
   PART=$LIVE_PART MODE=light BASE=http://localhost:8810 shoot light-48b-live-grades 50 "${live[@]}" -SimplPlace grades -SimplLiveChange grade:6
   wait_shot
-  PART=$LIVE_PART MODE=light BASE=http://localhost:8810 shoot light-48c-live-todo 50 "${live[@]}" -SimplPlace todo -SimplLiveChange task:6
+  # (1.3.204: seven checks, not five — To Do & Calendar's checks take turns, To Do's and the calendar's, and with five
+  #  the picture could come before To Do was checked again after its new row)
+  PART=$LIVE_PART MODE=light BASE=http://localhost:8810 shoot light-48c-live-todo 50 -SimplLiveEvery 4 -SimplLiveShotAfter 7 -SimplPlace todo -SimplLiveChange task:6
   wait_shot
   # (a course's page at its own pace: every 4 seconds here too, -SimplLiveCourseEvery, ten minutes in the app)
   PART=$LIVE_PART MODE=light BASE=http://localhost:8810 shoot light-48d-live-course 40 -SimplLiveEvery 4 -SimplLiveCourseEvery 4 -SimplLiveShotAfter 3 \
