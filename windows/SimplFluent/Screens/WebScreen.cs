@@ -48,6 +48,18 @@ public sealed class WebScreen : Screen
         }
     }
 
+    /// <summary>(0.3.103) A page of the school's open in the window is a quiz being taken (Support/UpdatesForce.cs): an
+    /// update never goes in over it.</summary>
+    public static bool ShowsQuiz()
+    {
+        foreach (var w in All.ToList())
+        {
+            if (!w.TryGetTarget(out var s)) { All.Remove(w); continue; }
+            if (s.updateHold != null && Updates.IsQuizPage(s.web?.Source ?? s.url)) return true;
+        }
+        return false;
+    }
+
     /// <summary>A sheet or the pane over the window: the pages (each a window of its own) step aside meanwhile.</summary>
     public static void SheetOver(bool over)
     {

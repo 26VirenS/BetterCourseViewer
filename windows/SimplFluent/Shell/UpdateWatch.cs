@@ -36,6 +36,10 @@ public static class UpdateWatch
         Updates.Away = () => !main.IsVisible;
         Updates.WindowShown = () => main.IsVisible && main.WindowState != WindowState.Minimized;
         Updates.Where = () => Where(main, engine());
+        // (0.3.103: a quiz on a page of the school's — a window of its own, or the window's own page — as Simpl's own quiz)
+        Updates.QuizPage = () => Simpl.Screens.WebScreen.ShowsQuiz()
+            || Application.Current.Windows.OfType<WebWindow>().Any(w => w.IsVisible && Updates.IsQuizPage(w.Showing));
+        Updates.PromptChanged += () => main.Dispatcher.BeginInvoke(() => Prompt(main));
 
         words = K.Text("", Ty.Body);
         words.TextTrimming = TextTrimming.CharacterEllipsis;
@@ -250,6 +254,74 @@ public static class UpdateWatch
     {
         await Task.Delay(wait);
         then();
+    }
+
+    // ---- the prompt before an update kept waiting goes in ----
+
+    private static Sheet? prompt;
+    private static string? promptVersion;
+    private static TextBlock? promptLeft;
+    private static System.Windows.Threading.DispatcherTimer? promptTick;
+
+    /// <summary>
+    /// (0.3.103, the Mac's ForcedUpdatePrompt) An update that has waited a day for what is open says, in a popup over the
+    /// window, that it goes in in half an hour, and counts it down: Later puts it away (it comes back with five minutes
+    /// left), Update Now puts it in now. It holds nothing up itself, and goes once the update does, or a quiz opens.
+    /// </summary>
+    private static void Prompt(MainWindow main)
+    {
+        if (Updates.Prompt is not { } p)
+        {
+            promptTick?.Stop();
+            var open = prompt;
+            prompt = null;
+            open?.Close();
+            return;
+        }
+        if (prompt != null && promptVersion == p.Version) { Count(p); return; }
+        // (a newer version found while it was up: shown again for that one)
+        if (prompt is { } before) { prompt = null; before.Close(); }
+        promptLeft = K.Text("", Ty.BodyStrong, B.Text);
+        promptLeft.Foreground = new SolidColorBrush(Color.FromRgb(0xe3, 0x6c, 0x0a));
+        var head = K.Columns("auto, *",
+            K.Icon(SymbolRegular.ArrowCircleDown24, 28, B.AccentText, filled: true).Col(0),
+            K.V(2, K.Text($"Simpl {p.Version} is ready", Ty.BodyStrong), K.Text("An update has waited a day for open windows to close.", Ty.Caption, B.Text2)).Margin(12, 0, 0, 0).Col(1));
+        var body = K.V(14, head,
+            K.Wrapped("Save your work: when the time is up, Simpl restarts on the new version, whatever is open. A quiz is never interrupted.", Ty.Body, B.Text),
+            promptLeft);
+        var s = new Sheet { Title = "Simpl Needs to Update", Body = body, Width = 420, Floats = true, HoldsUpdates = false, Name = "Update Simpl" };
+        s.Add("Update Now", SheetButtonKind.Primary, Updates.InstallFromPrompt);
+        s.Add("Later", SheetButtonKind.Close, Updates.DismissPrompt);
+        s.Closed += () =>
+        {
+            if (prompt != s) return;
+            prompt = null;
+            promptTick?.Stop();
+            // (closed another way — Alt+F4, the window's own going: as Later)
+            Updates.DismissPrompt();
+        };
+        prompt = s;
+        promptVersion = p.Version;
+        Count(p);
+        promptTick ??= new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        promptTick.Tick -= OnPromptTick;
+        promptTick.Tick += OnPromptTick;
+        promptTick.Start();
+        main.Sheets.Show(s);
+        Log.Write($"update: the prompt shows over the window ({p.Version})");
+    }
+
+    private static void OnPromptTick(object? sender, EventArgs e)
+    {
+        if (Updates.Prompt is { } p) Count(p);
+    }
+
+    private static void Count(Updates.ForcePrompt p)
+    {
+        if (promptLeft == null) return;
+        var left = p.At - DateTime.UtcNow;
+        if (left < TimeSpan.Zero) left = TimeSpan.Zero;
+        promptLeft.Text = $"Updates in {(int)left.TotalMinutes}:{left.Seconds:00}";
     }
 
     // ---- an update played through (--update-test) ----

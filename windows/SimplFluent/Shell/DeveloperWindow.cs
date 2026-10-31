@@ -254,7 +254,7 @@ public sealed class DeveloperWindow : FluentWindow
             "Calls (n · p50 · p95 · max ms): " + string.Join("; ", Perf.CallLines(30)),
             "Switches: " + string.Join("; ", Perf.SwitchLines()),
             "Builds: " + string.Join("; ", Perf.BuildLines()),
-            $"Updates: {Updates.State}{(Updates.Message is { } msg ? " · " + msg : "")} · beta {(Updates.Beta ? "on" : "off")} · paused {(Updates.Paused ? "yes" : "no")}",
+            $"Updates: {Updates.State}{(Updates.Message is { } msg ? " · " + msg : "")} · {Updates.WaitingText} · paused {(Updates.Paused ? "yes" : "no")}",
         };
         return string.Join("\n", lines);
     }
@@ -789,9 +789,6 @@ public sealed class DeveloperWindow : FluentWindow
             state.Text = Updates.State + (Updates.Found is { } f && Updates.State is Updates.Mode.Available or Updates.Mode.Downloading or Updates.Mode.Ready ? $" · {f.Version}" : "") + (Updates.Message is { Length: > 0 } m ? " · " + m : "");
             last.Text = Updates.LastCheck is { } t ? t.ToLocalTime().ToString("g", CultureInfo.CurrentCulture) : "never";
         }
-        var beta = new ToggleSwitch { IsChecked = Updates.Beta };
-        beta.Checked += (_, _) => Updates.Beta = true;
-        beta.Unchecked += (_, _) => Updates.Beta = false;
         var paused = new ToggleSwitch { IsChecked = Updates.Paused };
         paused.Checked += (_, _) => Updates.Paused = true;
         paused.Unchecked += (_, _) => Updates.Paused = false;
@@ -841,7 +838,7 @@ public sealed class DeveloperWindow : FluentWindow
                 K.Row(SymbolRegular.Timer24, "Last looked", null, last)),
             K.SectionHeader("Channel"),
             K.Group(
-                K.Row(SymbolRegular.Beaker24, "Get beta updates", "The betas are offered too, not only the usual releases.", beta),
+                K.Row(SymbolRegular.Beaker24, "Betas", "Every copy takes the newest version, a beta or not (0.3.103).", Value(Updates.WaitingText)),
                 K.Row(SymbolRegular.Pause24, "Pause updates", "Looked for all the same, but nothing installs by itself (a Critical Update still does).", paused),
                 K.Row(SymbolRegular.ArrowDownload24, "Look now", Updates.Off ? "A development run never updates." : null, K.Button("Check for updates", () => _ = Updates.Check()))),
             K.SectionHeader("Simulate an update"),

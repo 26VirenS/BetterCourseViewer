@@ -152,14 +152,12 @@ public static partial class Updates
     /// <summary>The version found is one Simpl stays back from (<see cref="StayingFrom"/>): not put in by itself, unless
     /// it is a Critical Update.</summary>
     public static bool KeptBack => StaysBack(Found, Critical, StayingFrom);
-    /// <summary>Get beta updates (Settings ▸ Updates; off unless turned on): the betas are offered too, not only the usual
-    /// releases (<see cref="Choose"/>). Turned off, the versions are read again — a beta found and not yet in is let go —
-    /// and a copy on a beta stays on it until a usual release newer than it comes.</summary>
-    public static bool Beta
-    {
-        get => Prefs.Bool("updates:beta", false);
-        set { Prefs.Set("updates:beta", value); Changed?.Invoke(); if (!Off) _ = Check(); }
-    }
+    /// <summary>
+    /// Where 0.3.102 and earlier kept Get beta updates (off unless turned on). (0.3.103) Every copy takes the newest
+    /// version, a beta or not — a copy with it off was stuck on the last usual release while the betas went on — so it is
+    /// let go of at the first start (<see cref="Settle"/>) and nothing reads it any more.
+    /// </summary>
+    private const string OldBetaKey = "updates:beta";
     /// <summary>
     /// Updates paused (the Mac's Developer ▸ Pause updates; here --pause-updates on|off, with Simpl quit): the hourly look
     /// is made all the same, but nothing found installs by itself — except a Critical Update, which nothing holds back.
@@ -298,6 +296,10 @@ public static partial class Updates
     {
         if (!Prefs.Bool(OldInstallKey, true)) Log.Write("update: Install updates automatically was off; updates install themselves now");
         Prefs.Remove(OldInstallKey);
+        // (0.3.103: Get beta updates let go of — every copy takes the newest version now, a beta or not)
+        if (Prefs.All().Any(k => k.Key == OldBetaKey)) Log.Write($"update: Get beta updates was {(Prefs.Bool(OldBetaKey) ? "on" : "off")}; every copy takes the newest version now, a beta or not");
+        Prefs.Remove(OldBetaKey);
+        SettleWaiting();
         if (StayingFrom is { } from && CurrentRun >= from)
         {
             Log.Write($"update: on {Version}, so no longer staying back from v{from:000}");
@@ -407,10 +409,11 @@ public static partial class Updates
                 feedTag = res.Headers.ETag?.ToString();
             }
             using var doc = JsonDocument.Parse(body);
-            var critical = CriticalRun(doc.RootElement, Beta);
+            // (0.3.103: the betas' too, as every copy takes them)
+            var critical = CriticalRun(doc.RootElement, true);
             // (0.3.89: any version newer than this copy, not a Critical Update alone — but not the one already found,
             //  nor, a Critical Update aside, one an earlier version put back stays below)
-            var run = Math.Max(critical, NewestRun(doc.RootElement, Beta));
+            var run = Math.Max(critical, NewestRun(doc.RootElement, true));
             if (run <= CurrentRun || run == lookedFor || Found?.Run >= run || restarting || checking) return;
             if (run != critical && StayingFrom is { } back && run <= back) return;
             lookedFor = run;
@@ -451,8 +454,8 @@ public static partial class Updates
             var list = await Releases();
             // (an update that began going in meanwhile is left to finish)
             if (restarting) { checking = false; return; }
-            // (the newest this copy may take: a beta only with Get beta updates on)
-            var (newest, critical) = Choose(list, CurrentRun, Beta);
+            // (0.3.103: the newest of all, a beta or not — no copy is left on the last usual release while betas go on)
+            var (newest, critical) = Choose(list, CurrentRun, true);
             if (newest != null)
             {
                 // (the same version downloaded already: ready to go in as it was)
@@ -465,8 +468,10 @@ public static partial class Updates
                 // (one an earlier version put back stays back from says so: it waits for Update now)
                 if (was is not (Mode.Available or Mode.Ready))
                     Log.Write($"update: {newest.Version} found{(Critical ? " (a Critical Update)" : "")}{(KeptBack ? $", kept back: staying back from v{StayingFrom:000}" : "")}");
+                // (0.3.103: one that goes in by itself is waited for from now — a day of it, and it asks for the half hour)
+                if (GoesInByItself) NoteWaiting();
             }
-            else { Found = null; Critical = false; downloaded = null; State = Mode.UpToDate; }
+            else { Found = null; Critical = false; downloaded = null; State = Mode.UpToDate; EndWaiting(); }
         }
         catch (Exception e) when (restarting)
         {
@@ -1006,21 +1011,6 @@ public static partial class Updates
     public static void Proceed()
     {
         if (!started || restarting) return;
-        // (a beta found, or still downloading, as Get beta updates was turned off: let go, not fetched or put in by
-        //  itself, and the versions read again. Not one asked for in Earlier versions, which nothing puts in by itself)
-        if (Found is { Beta: true } r && !Beta && GoesInByItself && State is Mode.Available or Mode.Ready or Mode.Failed)
-        {
-            Log.Write($"update: {r.Version} is a beta, and Get beta updates is off: let go");
-            Found = null;
-            Critical = false;
-            downloaded = null;
-            retryAt = null;
-            State = Mode.Idle;
-            Message = null;
-            Changed?.Invoke();
-            _ = Check();
-            return;
-        }
         if (State == Mode.Available && InstallsHere && GoesInByItself)
         {
             if (!Critical && Metered)
@@ -1035,8 +1025,11 @@ public static partial class Updates
         {
             waiter?.Stop();
             SetWaiting(null);
+            ShowPrompt(null);
             return;
         }
+        // (0.3.103: one that has waited a day asks for the half hour, then goes in whatever is open — but a quiz)
+        if (ForceIfDue()) return;
         if (HeldBy() is { } hold)
         {
             SetWaiting(hold);

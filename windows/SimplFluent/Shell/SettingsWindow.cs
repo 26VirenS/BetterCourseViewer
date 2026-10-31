@@ -960,17 +960,14 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
         var auto = new ToggleSwitch { IsChecked = Updates.Automatic, IsEnabled = !dev };
         auto.Checked += (_, _) => Updates.Automatic = true;
         auto.Unchecked += (_, _) => Updates.Automatic = false;
-        var beta = new ToggleSwitch { IsChecked = Updates.Beta, IsEnabled = !dev };
-        beta.Checked += (_, _) => Updates.Beta = true;
-        beta.Unchecked += (_, _) => Updates.Beta = false;
         v.Children.Add(K.Group(
             K.Row(SymbolRegular.Info24, "Version", Updates.Installed ? "Installed with Simpl-Setup.exe" : null, K.Text(Updates.Version, Ty.Body, B.Text2)),
             K.Row(SymbolRegular.ArrowSync24, "Check for updates automatically", "Simpl looks for a new version when it opens and every hour, for a critical update every minute, and says so here when there is one.", auto),
             // (0.3.7: where Install updates automatically was — an update always installs itself now: an earlier version
             //  put back says it stays, and until when; a copy run from its zip says why it can't put a version in)
             StayingRow(found) ?? (Updates.Installed || dev ? null
-                : K.Row(SymbolRegular.ArrowDownload24, "Installing updates", "This copy wasn’t installed with Simpl-Setup.exe, so it can’t put a new version in its own place: Download opens the version’s page.")),
-            K.Row(SymbolRegular.Beaker24, "Get beta updates", "Get test versions of Simpl before everyone else. A beta may have rough edges. Turn this off to stop getting betas: Simpl keeps the version you have until a newer regular version comes out.", beta)));
+                : K.Row(SymbolRegular.ArrowDownload24, "Installing updates", "This copy wasn’t installed with Simpl-Setup.exe, so it can’t put a new version in its own place: Download opens the version’s page."))));
+        // (0.3.103: no Get beta updates — every copy takes the newest version, a beta or not, so none is left behind)
 
         // the versions published before (onboarding-6): folded away, as the Mac's are; for the copy the installer put here,
         // each one installs in this one's place (the Mac's Install…), else opens on the website

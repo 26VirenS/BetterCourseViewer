@@ -1,3 +1,9 @@
+**What's new in 0.3.103**
+
+- **Never stuck updating** — every PC gets the newest version, betas included (Get beta updates is gone).
+- **A day, then updated** — an update kept waiting a day by something open asks for half an hour, then goes in (Later puts the prompt away; Update Now puts it in at once).
+- **Quizzes come first** — no update, a Critical Update neither, ever restarts Simpl while a quiz is open; it goes in once the quiz is closed.
+
 **What's new in 0.3.51** (beta)
 
 - **Crash log** — the developer tools have a Crashes page: a run of Simpl that goes down, or ends without quitting, is kept the next time it opens, with what stopped it, Windows' own report of it and the last of simpl.log; Copy, Save, Delete and Crash now… (to try it).

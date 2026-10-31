@@ -80,8 +80,8 @@ Updates (`Support/Updates.cs`, below): a copy the installer put here — its uni
 runs from — downloads the new release's Simpl-Setup.exe to `%TEMP%\Simpl-Update\<tag>` and runs it with the arguments
 above as Simpl quits: by itself at a quiet moment, or when **Restart to Update** is pressed. A portable copy opens the
 release's page, as before. Every Windows 11-look build is published as a GitHub pre-release, so a **beta** is marked
-by its tag, `windows-fluent-beta-v<run>` (or "beta" in the release's title), not by that flag: with Get beta updates
-off (the default), the usual previews are offered. CI tries the installer on every build: it installs silently into a folder of its own,
+by its tag, `windows-fluent-beta-v<run>` (or "beta" in the release's title), not by that flag: (0.3.103) every copy
+takes the newest of both; 0.3.102 and earlier, with Get beta updates off (their default), the usual previews alone. CI tries the installer on every build: it installs silently into a folder of its own,
 checks Simpl.exe, the Start menu shortcut (and its app id) and the Settings ▸ Apps entry, opens the installed Simpl
 against the mock to picture the Dashboard (`installed-dashboard`; its log must say it knows it was installed); plays an
 update that comes by itself through the installed Simpl (below: held while a quiz is open, put in once it closes,
@@ -103,8 +103,8 @@ window's side of it, `Shell/UpdateWatch.cs`:
   hours) — one request for GitHub's releases of
   this repository (the first 100 it lists, compressed: the Mac's share the list; 0.3.0 and earlier read 40), the
   usual releases' `windows-fluent-v<run>` and the betas' `windows-fluent-beta-v<run>`, compared
-  by run number (`Support/UpdatesChoice.cs`: the newest newer than this copy that it may take — a beta only with Get
-  beta updates on, Betas below). **Check for updates automatically** (on) turns it off. A development run (the mock,
+  by run number (`Support/UpdatesChoice.cs`: the newest newer than this copy that it may take — a beta too since
+  0.3.103, Betas below). **Check for updates automatically** (on) turns it off. A development run (the mock,
   a demo, a picture) never looks.
 - **The half-minute look** (0.3.22, `Updates.LookForNew`; every half minute and for any newer version since 0.3.89 —
   every minute, and for a Critical Update alone, before): between the hourly looks, every half minute while Simpl runs
@@ -118,8 +118,8 @@ window's side of it, `Shell/UpdateWatch.cs`:
   copies: a look every half minute each would use it up and hold every copy's updates back. The feed is asked with its
   last ETag (`If-None-Match`), so a feed unchanged comes back empty as 304. GitHub is asked once an hour (with the last
   list's ETag, which saves the download but not the count), and when the feed names a new version. The look is silent:
-  nothing is shown, logged or changed unless the feed names a version newer than this copy that it may take (`newest`,
-  and with Get beta updates on `newestBeta`; or a Critical Update; `update: v132 found in the half-minute look`, `update:
+  nothing is shown, logged or changed unless the feed names a version newer than this copy that it may take (`newest`
+  and, since 0.3.103 always, `newestBeta`; or a Critical Update; `update: v132 found in the half-minute look`, `update:
   a Critical Update (v132) found in the half-minute look`) — not the version already found, nor one at or below the
   version an earlier one was put back from (Earlier versions, below) unless it is a Critical Update; then the versions
   are read from GitHub as Check for updates reads them and it goes in as below (one run handed on once, unless GitHub
@@ -154,6 +154,19 @@ window's side of it, `Shell/UpdateWatch.cs`:
   student was doing): in front as it was; minimized, taking nothing from the app in front, when it was behind; in the
   notification area, out of sight, when the installer's own reopening after a failed install comes back there
   (`updates:resume`, used once, within half an hour).
+- **Kept waiting a day** (0.3.103, `Support/UpdatesForce.cs`, the Mac's 1.3.207): an update that goes in by itself
+  (a Critical Update too) is waited for from when it is found (`updates:waitingSince`, with the version it was found
+  on, `updates:waitingFrom`). Once it has waited 24 hours for what is open — any of the above, or the half minute
+  without a key that never came — a popup over the window ("Simpl Needs to Update", `UpdateWatch.Prompt`) says it
+  goes in in half an hour and counts it down: **Later** puts it away, and it comes back once with five minutes left
+  (and at the next start while the time runs: `updates:forceAt` is kept); **Update Now** puts it in at once. When the
+  half hour is up it goes in, whatever is open, as Restart to Update does (`update: v132 goes in now, its half hour
+  up`). The half hour begins only with the window in view, not in the notification area. **Never during a quiz**:
+  while one is open — Simpl's own (held as "quiz") or a page of the school's that is one, in a window of its own or the
+  window's (a New Quiz's `quiz-lti`/`quiz-api` host, a Classic Quiz's `/quizzes/…/take`) — nothing is asked and nothing
+  goes in (`update: v132 waits for the quiz to close`), and it goes in once the quiz is closed. All three are let go
+  once Simpl is up to date, or on another version. `--update-test-waited` plays one through with its day already up
+  (the `update-force-prompt` pictures).
 - **What the student sees**: Settings ▸ Updates says where it stands — found ("Version v133 (beta) is available" for a
   beta), downloading, "Version v132 is ready —
   Simpl updates when you close the quiz, and opens again where you were", installing — with Restart to update to put it
@@ -168,13 +181,15 @@ window's side of it, `Shell/UpdateWatch.cs`:
   a hand-in, a dialog — though only five seconds for the student's own typing; its notice stays while it waits
   ("Critical Update v132 installs when you close the quiz."). Turning Check for updates automatically off stops every
   look, a Critical Update's too: the student asked Simpl not to look. A usual release's Critical Update reaches every
-  copy; a beta's (Run workflow ▸ beta and critical) only the copies with Get beta updates on.
-- **Betas** (**Get beta updates**, off; the Mac's beta feed): a beta is published under a tag of its own,
-  `windows-fluent-beta-v<run>` (Run workflow ▸ beta; titled "Simpl for Windows 0.3.1 beta (v105)"), and offered only
-  to a copy with Get beta updates on; a release under the usual tag whose title says "beta" counts as one too. A copy
-  taking betas takes the newest of all, so a usual release newer than a beta takes over from it. Turned off, a beta
-  found and not yet in is let go, and a copy on a beta stays on it — never back to an older version — until a usual
-  release newer than it comes. Simpl 0.3.0 and earlier list `windows-fluent-v<run>` alone (and took any 0.x version
+  copy; a beta's (Run workflow ▸ beta and critical) every copy on 0.3.103 or newer, and of those before, only the
+  copies with Get beta updates on. It too goes in after a day kept waiting (above), and never during a quiz.
+- **Betas**: a beta is published under a tag of its own,
+  `windows-fluent-beta-v<run>` (Run workflow ▸ beta; titled "Simpl for Windows 0.3.1 beta (v105)"); a release under
+  the usual tag whose title says "beta" counts as one too. (0.3.103) Every copy takes the newest of all, a beta or
+  not, so a usual release newer than a beta takes over from it, and no copy is left on the last usual release while
+  the betas go on: Get beta updates is gone, and the setting (`updates:beta`) is let go of at the first start. 0.3.102
+  and earlier offered a beta only with Get beta updates on (off by default), so a copy with it off reaches 0.3.103 only
+  when it comes out as a usual release (Run workflow with beta off). Simpl 0.3.0 and earlier list `windows-fluent-v<run>` alone (and took any 0.x version
   there, a beta too): a beta's own tag keeps it from them. The same run published both ways (a beta promoted) is
   listed once, as the usual release.
 - **Paused** (the Mac's Developer ▸ Pause updates): `Simpl.exe --pause-updates on` (with Simpl quit; `off` again) keeps

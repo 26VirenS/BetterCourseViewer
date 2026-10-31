@@ -443,6 +443,9 @@ public sealed class WebWindow : FluentWindow
         System.Windows.Automation.AutomationProperties.SetName(lookButton, on ? "Simpl Look, on" : "Simpl Look, off");
     }
 
+    /// <summary>(0.3.103) The address showing now (or the one to open): an update never goes in over a quiz on it.</summary>
+    public Uri? Showing => Current();
+
     /// <summary>The address showing now (or the one to open).</summary>
     private Uri? Current()
     {
