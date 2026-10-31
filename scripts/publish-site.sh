@@ -31,13 +31,16 @@ cp extension/lib/theme.js build/site-sync/public/js/theme.js
 # hand.
 if command -v gh >/dev/null 2>&1 && [ -n "${GH_TOKEN:-}" ]; then
   REPO="${GITHUB_REPOSITORY:-26VirenS/BetterCourseViewer}"
-  # (1.3.152) every update file's signature beside it (scripts/sign-releases.py, with the UPDATE_SIGNING_KEY secret)
+  # (1.3.207) The feed names the newest version of all, a beta (a pre-release) too: with most versions out as betas, a Mac
+# on the usual feed found nothing newer and stayed where it was. /download/mac-app stays the newest release proper.
+# (1.3.152) every update file's signature beside it (scripts/sign-releases.py, with the UPDATE_SIGNING_KEY secret)
   # before the feeds below name it — a release made since the last run, and any file replaced since it was signed. The
   # apps install only a signed file; Simpl for Windows reads GitHub's releases itself and takes one once it is signed.
   python3 scripts/sign-releases.py || echo "⚠ update signing failed: the feeds are written all the same, and the apps wait"
   # (the highest version, as numbers: GitHub's own order put mac-v1.2.10 after mac-v1.2.3)
   MAC_REL="$(gh api "repos/$REPO/releases?per_page=100" --jq '[.[] | select((.draft | not) and (.prerelease | not) and (.tag_name | startswith("mac-v")))] | sort_by(.tag_name | ltrimstr("mac-v") | split(".") | map(tonumber? // 0)) | last' 2>/dev/null || true)"
   MAC_TAG="$(printf '%s' "$MAC_REL" | python3 -c 'import json,sys; d=json.loads(sys.stdin.read() or "null"); print(d["tag_name"] if d else "")' 2>/dev/null || true)"
+  MAC_ALL="$(gh api "repos/$REPO/releases?per_page=100" --jq '[.[] | select((.draft | not) and (.tag_name | startswith("mac-v")))] | sort_by(.tag_name | ltrimstr("mac-v") | split(".") | map(tonumber? // 0)) | last' 2>/dev/null || true)"
   # (1.3.72) the newest Critical Update (a mac-v* release whose notes carry the mark): both feeds name it, and a Mac on
   # an older version installs the feed's newest at its next check, whatever its settings (Updater.swift)
   CRITICAL="$(gh api "repos/$REPO/releases?per_page=100" --jq '[.[] | select((.draft | not) and (.prerelease | not) and (.tag_name | startswith("mac-v")) and ((.body // "") | contains("<!-- simpl-critical -->")))] | sort_by(.tag_name | ltrimstr("mac-v") | split(".") | map(tonumber? // 0)) | last | (.tag_name // "") | ltrimstr("mac-v")' 2>/dev/null || true)"
@@ -49,7 +52,7 @@ if command -v gh >/dev/null 2>&1 && [ -n "${GH_TOKEN:-}" ]; then
     mv "$REDIRECTS.new" "$REDIRECTS"
     echo "/download/mac-app → $MAC_TAG"
     mkdir -p build/site-sync/public/app
-    printf '%s' "$MAC_REL" | python3 -c '
+    printf '%s' "${MAC_ALL:-$MAC_REL}" | python3 -c '
 import json, sys
 rel, repo = json.loads(sys.stdin.read()), sys.argv[1]
 tag = rel["tag_name"]; version = tag[len("mac-v"):]
@@ -64,45 +67,29 @@ feed = {
   "minimumOS": "14.0",
   "notes": rel.get("html_url") or f"https://github.com/{repo}/releases/tag/{tag}",
   "published": rel.get("published_at"),
+  "beta": bool(rel.get("prerelease")),
 }
 if len(sys.argv) > 2 and sys.argv[2]: feed["criticalVersion"] = sys.argv[2]
 json.dump(feed, open("build/site-sync/public/app/mac-latest.json", "w"), indent=2)
-print("/app/mac-latest.json → " + version)
+print("/app/mac-latest.json → " + version + (" (beta)" if feed["beta"] else ""))
 ' "$REPO" "$CRITICAL" || echo "no Simpl for Mac feed written"
   fi
-  # The Safari app (Simpl Courses for Mac, the extension's own): /download/mac and its update feed /app/latest.json at
-  # the newest v* release with its zip — kept as scripts/release-mac-app.sh writes them, here too so the site always
-  # catches up (a release published, promoted, edited or deleted by hand; the hourly run). Left as they are when the
-  # site already says that version, or when GitHub gives no checksum for the zip (the app checks it).
+  # The Safari app (Simpl Courses for Mac, the extension's own): /download/mac at the newest v* release with its zip,
+  # kept as scripts/release-mac-app.sh writes it, here too so the site always catches up (a release published, promoted,
+  # edited or deleted by hand; the hourly run). (2.99.133) Its update feed, /app/latest.json, is written with the beta
+  # feed below, at the newest of all: with most versions out as betas, an app on the usual feed found nothing newer and
+  # stayed where it was.
   SAFARI_REL="$(gh api "repos/$REPO/releases?per_page=100" --jq '[.[] | select((.draft | not) and (.prerelease | not) and (.tag_name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")) and any(.assets[]; .name | startswith("Simpl-Courses-Mac-")))] | sort_by(.tag_name | ltrimstr("v") | split(".") | map(tonumber? // 0)) | last' 2>/dev/null || true)"
   if [ -n "$SAFARI_REL" ] && [ "$SAFARI_REL" != "null" ]; then
     mkdir -p build/site-sync/public/app
     printf '%s' "$SAFARI_REL" | python3 -c '
-import json, os, sys
-rel, repo = json.loads(sys.stdin.read()), sys.argv[1]
+import json, sys
+rel = json.loads(sys.stdin.read())
 tag = rel["tag_name"]; version = tag[1:]
 asset = next((a for a in rel.get("assets", []) if a.get("name") == f"Simpl-Courses-Mac-{version}.zip"), None)
 if not asset: sys.exit("no Safari app zip on " + tag)
-feed_path = "build/site-sync/public/app/latest.json"
-try: had = json.load(open(feed_path)).get("version")
-except Exception: had = None
-digest = asset.get("digest") or ""
-if had != version and digest.startswith("sha256:"):
-    json.dump({
-        "version": version,
-        "url": "https://simplcourses.com/download/mac",
-        "download": asset["browser_download_url"],
-        "sha256": digest[7:],
-        "size": asset.get("size"),
-        "minimumOS": "13.0",
-        "notes": rel.get("html_url") or f"https://github.com/{repo}/releases/tag/{tag}",
-        "published": rel.get("published_at"),
-    }, open(feed_path, "w"), indent=2)
-    print("/app/latest.json → " + version)
-elif had != version:
-    print("no checksum for " + asset["name"] + ": /app/latest.json left at " + str(had))
 open("build/site-sync/safari-zip", "w").write(asset["browser_download_url"])
-' "$REPO" || echo "no Safari app feed written"
+' || echo "no Safari app download written"
     if [ -s build/site-sync/safari-zip ]; then
       REDIRECTS=build/site-sync/public/_redirects
       { grep -v '^/download/mac ' "$REDIRECTS" 2>/dev/null || true; echo "/download/mac $(cat build/site-sync/safari-zip) 302"; } > "$REDIRECTS.new"
@@ -113,7 +100,8 @@ open("build/site-sync/safari-zip", "w").write(asset["browser_download_url"])
   fi
   # (2.99.38) the Safari app's beta feed, /app/latest-beta.json, for a Simpl Courses with Get beta updates on: the newest
   # v* release with the app's zip of all, a beta (a pre-release) or not — so a beta Mac also moves on to a release newer
-  # than its beta. /download/mac and /app/latest.json never name a beta (above).
+  # than its beta. (2.99.133) /app/latest.json the same: every app takes the newest, beta or not. /download/mac never
+  # names a beta (above).
   SAFARI_BETA="$(gh api "repos/$REPO/releases?per_page=100" --jq '[.[] | select((.draft | not) and (.tag_name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")) and any(.assets[]; .name | startswith("Simpl-Courses-Mac-")))] | sort_by(.tag_name | ltrimstr("v") | split(".") | map(tonumber? // 0)) | last' 2>/dev/null || true)"
   if [ -n "$SAFARI_BETA" ] && [ "$SAFARI_BETA" != "null" ]; then
     mkdir -p build/site-sync/public/app
@@ -136,6 +124,9 @@ json.dump({
     "beta": bool(rel.get("prerelease")),
 }, open("build/site-sync/public/app/latest-beta.json", "w"), indent=2)
 print("/app/latest-beta.json → " + version + (" (beta)" if rel.get("prerelease") else ""))
+import shutil
+shutil.copyfile("build/site-sync/public/app/latest-beta.json", "build/site-sync/public/app/latest.json")
+print("/app/latest.json → " + version + (" (beta)" if rel.get("prerelease") else ""))
 ' "$REPO" || echo "no Safari app beta feed written"
   fi
   # (1.3.17) the beta feed, /app/mac-beta.json, for Macs with Get beta updates on: the newest mac-v* release of all, a
