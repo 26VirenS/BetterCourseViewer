@@ -1069,6 +1069,13 @@ jobs:
           # ahead, as an account that uses Alta has one (--alta-spare: one made just before; picture runs make none
           # otherwise): its timeline must say "web view spare" (checked below)
           Shot 'alta-spare' '1366x778' 50 ($mock + @('--appearance', 'light', '--alta-spare', '--open', 'alta:104:4003'))
+          # (0.3.103, at the end so the pictures before keep their parts) an update kept waiting a day by something open
+          # (--update-test-hold) asks for its half hour, then goes in (--update-test-waited: its day already up): the
+          # prompt over the window, light and dark — its log must say it is up; and one kept waiting a day by a quiz asks
+          # nothing and waits for it (checked below)
+          Shot 'update-force-prompt' '1024x681' 45 ($mock + $next + @('--appearance', 'light', '--update-test-installed', '--update-test-waited', '--update-test-hold', 'dialog'))
+          Shot 'update-force-prompt-dark' '1366x778' 45 ($mock + $next + @('--appearance', 'dark', '--update-test-installed', '--update-test-waited', '--update-test-hold', 'dialog'))
+          Shot 'update-force-quiz' '1024x681' 45 ($mock + $next + @('--appearance', 'light', '--update-test-installed', '--update-test-waited', '--open', 'quiz:101:9011'))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
@@ -1149,6 +1156,19 @@ jobs:
             # (the page's own errors, when it had any: Support/PageErrors.cs, read by the checks)
             $pageLog = Join-Path $_.FullName 'page-errors.log'
             if (Test-Path $pageLog) { Copy-Item $pageLog "shots/$($_.Name).page-errors.log" }
+          }
+          # (0.3.103) an update kept waiting a day: the prompt up over a dialog, and nothing asked or put in over a quiz
+          foreach ($p in @('update-force-prompt', 'update-force-prompt-dark')) {
+            if ($script:mine -notcontains $p) { continue }
+            $l = if (Test-Path "shots/profile-$p.log") { Get-Content "shots/profile-$p.log" -Raw } else { '' }
+            Write-Host "${p}: $((@($l -split "`n" | Where-Object { $_ -match 'update: ' }) | Select-Object -Last 6) -join ' | ')"
+            if (-not $l.Contains('update: the prompt is up')) { Write-Host "::error::${p}: an update kept waiting a day did not ask for its half hour (shots/profile-$p.log)"; exit 1 }
+          }
+          if ($script:mine -contains 'update-force-quiz') {
+            $l = if (Test-Path 'shots/profile-update-force-quiz.log') { Get-Content 'shots/profile-update-force-quiz.log' -Raw } else { '' }
+            Write-Host "update-force-quiz: $((@($l -split "`n" | Where-Object { $_ -match 'update: ' }) | Select-Object -Last 6) -join ' | ')"
+            if ($l.Contains('update: the prompt is up') -or $l.Contains('goes in now')) { Write-Host "::error::update-force-quiz: an update asked or went in over a quiz (shots/profile-update-force-quiz.log)"; exit 1 }
+            if (-not $l.Contains('waits for the quiz to close')) { Write-Host "::error::update-force-quiz: an update kept waiting a day did not say it waits for the quiz (shots/profile-update-force-quiz.log)"; exit 1 }
           }
           # Send from Phone took the files: the server's answers, and the log saying each file is in the hand-in
           $phoneBad = @()
@@ -2499,11 +2519,11 @@ jobs:
             notes="$RUNNER_TEMP/notes.md"
             {
               if [ "$beta" = "true" ]; then
-                printf '**A beta, to try before everyone else.** Simpl offers it only to a PC with **Settings ▸ Updates ▸ Get beta updates** on. To try it: download **Simpl-Setup.exe** below and open it (it installs over the Simpl you have, your settings and sign-in as they were), then turn on **Get beta updates**, so each next beta comes by itself. Turning it off later keeps this version until a newer usual release comes out.\n\n'
+                printf '**A beta.** Simpl 0.3.103 and newer take it by themselves; 0.3.102 and earlier offer it only with **Settings ▸ Updates ▸ Get beta updates** on. To get it now: download **Simpl-Setup.exe** below and open it (it installs over the Simpl you have, your settings and sign-in as they were).\n\n'
               fi
               cat windows/SimplFluent/RELEASE_NOTES.md
               if [ "$critical" = "true" ] && [ "$beta" = "true" ]; then
-                printf '\n\n**This is a Critical Update for beta testers.** Every Simpl for Windows installed with Simpl-Setup.exe that gets beta updates installs it at its next update check, whatever its other update settings.\n<!-- simpl-critical -->\n'
+                printf '\n\n**This is a Critical Update.** Every Simpl for Windows 0.3.103 or newer installed with Simpl-Setup.exe installs it at its next update check, whatever its update settings (0.3.102 and earlier, only with Get beta updates on).\n<!-- simpl-critical -->\n'
               elif [ "$critical" = "true" ]; then
                 printf '\n\n**This is a Critical Update.** Every Simpl for Windows installed with Simpl-Setup.exe installs it at its next update check, whatever its update settings.\n<!-- simpl-critical -->\n'
               fi
