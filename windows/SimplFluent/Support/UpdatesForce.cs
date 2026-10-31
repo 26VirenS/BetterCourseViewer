@@ -33,6 +33,30 @@ public static partial class Updates
     private static readonly TimeSpan ForceGrace = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan ForceReminder = TimeSpan.FromMinutes(5);
     private static bool promptedThisRun, reminded;
+    /// <summary>What holds an update while Simpl opens (UpdateWatch's).</summary>
+    public const string Opening = "Simpl opening";
+    /// <summary>When Simpl was first seen opened this run (0: not yet): nothing is asked or put in for ten seconds after,
+    /// so what it opens with — a quiz asked for, a page — is open first.</summary>
+    private static long openedAt;
+    private static readonly TimeSpan AfterOpening = TimeSpan.FromSeconds(10);
+    /// <summary>An update played through for the prompt's picture (--update-test-waited): the picture waits until the
+    /// prompt is up, or a quiz holds the update.</summary>
+    private static bool pictureWaits;
+
+    /// <summary>As the checks begin, an update played through for the prompt's picture holds the picture back.</summary>
+    private static void WaitForPrompt()
+    {
+        if (!Testing || !Launch.Flag("update-test-waited") || !Shot.Asked || pictureWaits) return;
+        pictureWaits = true;
+        Shot.Began();
+    }
+
+    private static void PictureMayGo()
+    {
+        if (!pictureWaits) return;
+        pictureWaits = false;
+        Shot.Ended();
+    }
 
     /// <summary>For the Developer window: how long the update found has waited, and when it goes in.</summary>
     public static string WaitingText
@@ -135,7 +159,7 @@ public static partial class Updates
         if (HeldByQuiz != (quiz && due))
         {
             HeldByQuiz = quiz && due;
-            if (HeldByQuiz) Log.Write($"update: {r.Version} waits for the quiz to close");
+            if (HeldByQuiz) { Log.Write($"update: {r.Version} waits for the quiz to close"); PictureMayGo(); }
             Changed?.Invoke();
         }
         if (NowSeconds - since < WaitBeforeForcing.TotalSeconds) return false;
@@ -144,6 +168,10 @@ public static partial class Updates
             if (Prompt != null) { ShowPrompt(null); promptedThisRun = false; }
             return false;
         }
+        // (Simpl still opening, and ten seconds after: what it opens with is open first — a quiz, never asked over)
+        if (HeldBy()?.What == Opening) return false;
+        if (openedAt == 0) openedAt = Environment.TickCount64;
+        if (Environment.TickCount64 - openedAt < AfterOpening.TotalMilliseconds) return false;
         var shown = WindowShown?.Invoke() == true;
         var now = DateTime.UtcNow;
         var kept = Prefs.Double(ForceKey);
@@ -157,6 +185,7 @@ public static partial class Updates
             Log.Write($"update: {r.Version} has waited a day for what is open; it goes in in {ForceGrace.TotalMinutes:0} minutes");
             Log.Write($"update: the prompt is up ({r.Version})");
             ShowPrompt(new ForcePrompt(r.Version, at));
+            PictureMayGo();
             return false;
         }
         var due2 = DateTime.UnixEpoch.AddSeconds(kept);

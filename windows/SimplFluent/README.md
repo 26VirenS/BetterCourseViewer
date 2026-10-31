@@ -161,7 +161,8 @@ window's side of it, `Shell/UpdateWatch.cs`:
   goes in in half an hour and counts it down: **Later** puts it away, and it comes back once with five minutes left
   (and at the next start while the time runs: `updates:forceAt` is kept); **Update Now** puts it in at once. When the
   half hour is up it goes in, whatever is open, as Restart to Update does (`update: v132 goes in now, its half hour
-  up`). The half hour begins only with the window in view, not in the notification area. **Never during a quiz**:
+  up`). The half hour begins only with the window in view, not in the notification area, and nothing is asked
+  while Simpl opens nor for ten seconds after, so what it opens with (a quiz asked for) is open first. **Never during a quiz**:
   while one is open — Simpl's own (held as "quiz") or a page of the school's that is one, in a window of its own or the
   window's (a New Quiz's `quiz-lti`/`quiz-api` host, a Classic Quiz's `/quizzes/…/take`) — nothing is asked and nothing
   goes in (`update: v132 waits for the quiz to close`), and it goes in once the quiz is closed. All three are let go

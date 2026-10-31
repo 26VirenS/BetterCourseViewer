@@ -128,7 +128,7 @@ public static class UpdateWatch
     {
         // (Simpl opening, a moment; the sign-in while it is on screen — finding the school, the card, "Logging you in",
         // the school's own page — not one left waiting in the notification area)
-        if (e is { Phase: Phase.Starting }) return new Updates.Holding("Simpl opening", null);
+        if (e is { Phase: Phase.Starting }) return new Updates.Holding(Updates.Opening, null);
         if (main.IsVisible && main.WindowState != WindowState.Minimized && (e == null || e.Login.Covers || e.Phase == Phase.Web))
             return new Updates.Holding("the sign-in", "when you’ve signed in");
         if (touring) return new Updates.Holding("the tour", "when the tour is over");

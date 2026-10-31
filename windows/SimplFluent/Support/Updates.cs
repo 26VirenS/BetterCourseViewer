@@ -279,6 +279,7 @@ public static partial class Updates
         {
             Log.Write($"update test: {TestFile}{(Installed ? ", as an installed copy" : "")}{(Launch.Flag("update-test-critical") ? ", a Critical Update" : "")}{(StayingFrom is { } from ? $", staying back from v{from:000}" : "")}");
             if (Launch.Get("update-test-hold") is { Length: > 0 } what) Hold(what, $"when you close the {what}");
+            WaitForPrompt();
             _ = Check();
             return;
         }
