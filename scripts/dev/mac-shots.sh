@@ -1080,6 +1080,20 @@ quicklook_check() {
 # read again under it was still open after the read, and no copy of the app crashed (a crash report is kept beside the
 # pictures by keep_crashes: 1.3.81's was a popover sized again and again until AppKit stopped the app). (1.3.80: the
 # crash reports looked for on this Mac and among the parts' files put together, where SHOTS=check finds them.)
+# (1.3.207) update_prompt_check: an update kept waiting a day put to the student over the window
+# (light-23h-update-prompt, dark-23h-update-prompt: the prompt asked for with -SimplForceUpdateShot), as
+# update-prompt-check.txt
+update_prompt_check() {
+  local out="$OUT_ABS/update-prompt-check.txt" f
+  : > "$out"
+  for f in "$OUT_ABS"/console-light-23h-update-prompt.txt "$OUT_ABS"/console-dark-23h-update-prompt.txt; do
+    if grep -q 'update: the prompt is up (1.3.300)' "$f" 2>/dev/null; then echo "ok   the prompt was put up over the window ($(basename "$f" .txt))" >> "$out"
+    else echo "FAIL the prompt was not put up ($(basename "$f" .txt): $(grep -o 'update: .*' "$f" 2>/dev/null | head -2 | tr '\n' ';'))" >> "$out"; fi
+  done
+  cat "$out"
+  if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::update prompt: /'; return 1; fi
+}
+
 tool_list_check() {
   local out="$OUT_ABS/tool-list-check.txt" r="$OUT_ABS/console-light-36d-external-tools-list-reread.txt" f crashes=0
   : > "$out"
@@ -1272,6 +1286,7 @@ if [ "${SHOTS:-full}" = check ]; then
   newwin_check || exit 1 # (1.3.104)
   record_check || exit 1 # (1.3.196)
   look_check || exit 1 # (1.3.197)
+  update_prompt_check || exit 1 # (1.3.207)
   exit 0
 fi
 
@@ -1359,6 +1374,9 @@ the_set() {
   # (1.3.86) a version put back: Simpl stays on it, said where Install updates automatically was (the hold's key given
   # for this run alone; a development run never installs anything)
   shoot light-23g-settings-updates-held 12 -SimplOpen settings -SimplSettingsTab updates -SimplRolledBackFrom 9.9.9
+  # (1.3.207) an update kept waiting a day by what is open: the prompt over the window, its half hour counting down
+  shoot light-23h-update-prompt 14 -SimplForceUpdateShot 1.3.300
+  MODE=dark shoot dark-23h-update-prompt 14 -SimplForceUpdateShot 1.3.300
   shoot light-28-tour-grades 16 -SimplOpen tour:2
   shoot light-29-tour-last 16 -SimplOpen tour:6 # (1.3.78: the tour's last step, Report a Bug at the account menu)
   shoot light-31-command-grades 16 -SimplOpen "palette:/grades "
@@ -1445,6 +1463,7 @@ if [ "$SHARDS" = 1 ]; then
   newwin_check || true # (1.3.104)
   record_check || true # (1.3.196)
   look_check || true # (1.3.197)
+  update_prompt_check || true # (1.3.207)
 fi
 keep_crashes
 exit 0

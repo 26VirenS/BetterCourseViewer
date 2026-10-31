@@ -76,7 +76,7 @@ final class DevMode: ObservableObject {
             "App: \(AppPlacement.runningURL.path)\(AppPlacement.isTranslocated ? " (translocated from \(AppPlacement.originalURL.path))" : "")",
             "Development run: \(Updater.isDevelopmentRun)",
             "Data: encrypted (AES-256), its key \(Vault.protection == .keychain ? "in the login Keychain" : "in vault.key itself (the Keychain would not take it)"); sign-in and cookies in the login Keychain", // (1.3.76, Support/Vault.swift)
-            "Updates: feed \(u.feedURL.absoluteString), beta \(u.beta), paused \(u.paused), put back from \(u.rolledBackFrom ?? "none"), state \(Self.describe(u.state)), last check \(u.lastCheck.map { $0.formatted(date: .abbreviated, time: .standard) } ?? "never")",
+            "Updates: feed \(u.feedURL.absoluteString), paused \(u.paused), put back from \(u.rolledBackFrom ?? "none"), state \(Self.describe(u.state)), last check \(u.lastCheck.map { $0.formatted(date: .abbreviated, time: .standard) } ?? "never")",
         ]
         if let e {
             lines.append("School: \(e.host) (\(e.lmsName)), phase \(e.phase), data version \(e.dataVersion), counts live \(e.countsLive), courses \(e.courses.count), groups \(e.groups.count)")
@@ -245,10 +245,9 @@ private struct DevUpdates: View {
                 if let from = u.rolledBackFrom { LabeledContent("Put back from", value: from) }
             }
             Section {
-                Toggle("Get beta updates", isOn: $u.beta)
                 Toggle("Pause updates", isOn: $u.paused)
             } footer: {
-                Text("Paused: no hourly check acts and nothing installs by itself — for testing; otherwise updates always install by themselves. A Critical Update still installs at once — nothing here, nor anywhere else, holds one back.")
+                Text("Paused: no hourly check acts and nothing installs by itself — for testing; otherwise updates always install by themselves. A Critical Update still installs at once — nothing here holds one back, only a quiz under way.")
             }
             Section {
                 TextField("Feed address (empty: the site's)", text: $feed)
@@ -625,14 +624,22 @@ struct CriticalUpdateNotice: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// The version the notice is up for: a Critical Update's under way, or (1.3.189) this one, played through as one from
-    /// Developer ▸ Updates.
+    /// Developer ▸ Updates — (1.3.207) or one going in, its half hour up after a day's wait (`Updater.forcing`).
     private var shown: String? {
-        u.criticalNotice ?? (rehearsal.critical && rehearsal.step != nil ? MacWhatsNew.current : nil)
+        u.criticalNotice ?? (rehearsal.critical && rehearsal.step != nil ? MacWhatsNew.current : nil) ?? forced
+    }
+
+    /// (1.3.207) The update going in, its half hour up, while it downloads and goes in.
+    private var forced: String? {
+        switch u.state {
+        case .downloading, .installing: return u.forcing
+        default: return nil
+        }
     }
 
     /// How far its download has come, while it downloads.
     private var fraction: Double? {
-        if u.criticalNotice != nil {
+        if u.criticalNotice != nil || forced != nil {
             if case .downloading(let f) = u.state { return f }
             return nil
         }
@@ -646,7 +653,7 @@ struct CriticalUpdateNotice: View {
                 HStack(spacing: 10) {
                     Image(systemName: "exclamationmark.shield.fill").foregroundStyle(.orange)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("Installing a Critical Update").font(.sCallout.weight(.semibold))
+                        Text(u.criticalNotice == nil && forced != nil ? "Installing an Update" : "Installing a Critical Update").font(.sCallout.weight(.semibold))
                         Text(status(v)).font(.sFootnote).foregroundStyle(.secondary)
                     }
                     if let f = fraction {
@@ -667,6 +674,99 @@ struct CriticalUpdateNotice: View {
 
     private func status(_ v: String) -> String {
         if u.criticalNotice != nil, case .failed = u.state { return "Simpl \(v) could not be installed yet; it will try again shortly." }
+        // (1.3.207: a quiz under way holds it, even a Critical Update)
+        if u.criticalNotice != nil, u.heldByQuiz { return "Simpl \(v) — it goes in once your quiz is closed." }
         return "Simpl \(v) — Simpl restarts on it in a moment."
+    }
+}
+
+/// (1.3.207) An update kept waiting a day by what is open, put to the student over the window: it goes in at its time,
+/// half an hour on, whatever is open then — but a quiz, which it waits for. Update Now puts it in now; Later (its ×,
+/// Escape) puts this away, and it comes back once, five minutes before. In the window in front of Simpl's alone (`show`).
+struct ForcedUpdatePrompt: View {
+    let prompt: Updater.ForcePrompt
+    @Environment(\.popup) private var popup
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 12) {
+                IconTile(symbol: "arrow.down.circle.fill", color: Theme.accent, size: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Simpl Needs to Update").font(.sTitle3)
+                    Text("Simpl \(prompt.version) is ready").font(.sCallout).foregroundStyle(.secondary)
+                }
+            }
+            Text("It has waited a day for open windows to close. Save your work: when the time is up, Simpl restarts on the new version, whatever is open. A quiz is never interrupted.")
+                .font(.sBody)
+                .fixedSize(horizontal: false, vertical: true)
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                Label(Self.left(until: prompt.at, from: context.date), systemImage: "clock")
+                    .font(.sCallout.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(.orange)
+            }
+            HStack(spacing: 10) {
+                Spacer()
+                Button("Later") {
+                    Updater.shared.dismissForcePrompt()
+                    popup.close()
+                }
+                .glassButton()
+                .keyboardShortcut(.cancelAction)
+                Button("Update Now") {
+                    popup.close()
+                    Updater.shared.installFromPrompt()
+                }
+                .glassButton(prominent: true)
+                .keyboardShortcut(.defaultAction)
+            }
+            .controlSize(.large)
+        }
+        .padding(22)
+        .frame(width: 400)
+    }
+
+    /// "Updates in 29:41", counting down.
+    static func left(until at: Date, from now: Date) -> String {
+        let s = max(0, Int(at.timeIntervalSince(now).rounded(.up)))
+        return s == 0 ? "Updating now" : "Updates in \(s / 60):\(String(format: "%02d", s % 60))"
+    }
+
+    static let key = "forceupdate"
+
+    /// The prompt put up over the window `engine` is in when that is the window in front of Simpl's own (one prompt,
+    /// not one a window) — tried again a moment on while the window is still coming up — or taken down (nil).
+    @MainActor
+    static func show(_ prompt: Updater.ForcePrompt?, over engine: Engine, tries: Int = 8) {
+        guard let prompt else {
+            engine.popups.close(key)
+            return
+        }
+        guard let window = engine.hostView.window, window === front else {
+            if engine.hostView.window == nil, tries > 0 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    guard Updater.shared.forcePrompt == prompt else { return }
+                    show(prompt, over: engine, tries: tries - 1)
+                }
+            }
+            return
+        }
+        NSLog("[Simpl] update: the prompt is up (%@)", prompt.version)
+        engine.popups.present(key, title: "Update Simpl", onClose: { Updater.shared.dismissForcePrompt() }) {
+            ForcedUpdatePrompt(prompt: prompt)
+        }
+    }
+
+    /// The window in front of those that show Simpl (each holds an engine's view), on screen or in the Dock.
+    @MainActor
+    private static var front: NSWindow? {
+        NSApp.orderedWindows.first { w in (w.isVisible || w.isMiniaturized) && hasEngine(w.contentView) }
+    }
+
+    @MainActor
+    private static func hasEngine(_ view: NSView?) -> Bool {
+        guard let view else { return false }
+        if view is EngineView { return true }
+        return view.subviews.contains { hasEngine($0) }
     }
 }

@@ -1448,7 +1448,19 @@ Simpl for Mac keeps itself up to date (`Support/Updater.swift`, a port of the Sa
   test): `{ "version": "1.2", "url": "<the zip>", "sha256": "<hex>", "size": 41404983, "notes": "…",
   "published": "<ISO 8601>", "minimumOS": "14.0" }`. Only `version` and `url` are required. A version newer
   than the app's `CFBundleShortVersionString` is offered unless its `minimumOS` is above the Mac's macOS.
-- **Betas (1.3.17).** *Settings ▸ Updates ▸ Get beta updates* reads `https://simplcourses.com/app/mac-beta.json`
+- **Every Mac takes the newest (1.3.207).** The app reads `https://simplcourses.com/app/mac-beta.json` (the usual
+  feed when there is none): the newest `mac-v*` release of all, a beta or not, with `"beta": true` when it is one — and
+  the usual feed names the same now (`scripts/publish-site.sh`), so a copy from before 1.3.207 is not left behind
+  either. *Get beta updates* is gone: with most versions out as betas, a Mac on the usual feed (releases proper alone)
+  found nothing newer for weeks.
+- **An update kept waiting (1.3.207).** One that would go in by itself but has waited a day for what is open (a tool,
+  an assignment, a popup) is put to the student over the window in front: *Simpl Needs to Update*, with a countdown —
+  half an hour, then it goes in whatever is open. Later puts the prompt away; it comes back once, five minutes before.
+  Nothing is shown or put in while Simpl has no window open, nor while a quiz is under way (the quiz screen, or a quiz's
+  page in any window: New Quizzes' `quiz-lti` hosts, Canvas's `/quizzes/…/take`) — it goes in once the quiz is over. A
+  Critical Update waits for a quiz too now. The day is counted from when the update was first found, kept across
+  launches (`SimplUpdateWaitingSince`).
+- **Betas (1.3.17).** *Settings ▸ Updates ▸ Get beta updates* read `https://simplcourses.com/app/mac-beta.json`
   instead (the usual feed when there is none yet): the newest `mac-v*` release of all, a beta or not, with
   `"beta": true` when it is one. A beta is released with the release workflow's **beta** switch on: a GitHub
   pre-release, *Simpl for Mac <version> Beta*, which the usual feed passes over (`scripts/publish-site.sh` writes both

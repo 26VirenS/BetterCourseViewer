@@ -81,10 +81,14 @@ struct RootView: View {
 /// never do (Shell/FloatingPopup.swift).
 struct EngineSheets: ViewModifier {
     @ObservedObject var engine: Engine
+    @ObservedObject private var updater = Updater.shared
     @Environment(\.openWindow) private var openWindow
 
     func body(content: Content) -> some View {
         content
+            // (1.3.207) an update kept waiting a day: put to the student, in the window in front
+            .onChange(of: updater.forcePrompt) { _, p in ForcedUpdatePrompt.show(p, over: engine) }
+            .onAppear { ForcedUpdatePrompt.show(updater.forcePrompt, over: engine) }
             .floatingPopup("whatsnew", title: "What’s New", item: $engine.whatsNew, engine: engine) { item in
                 WhatsNewSheet(data: item.data) { MacWhatsNew.markSeen() }
             }
@@ -95,7 +99,7 @@ struct EngineSheets: ViewModifier {
             .sheet(item: $engine.quiz) { q in
                 QuizScreen(launch: q)
                     .environmentObject(engine)
-                    .modifier(UpdateHold()) // (1.2.19: nor while a quiz is open)
+                    .modifier(UpdateHold(quiz: true)) // (1.2.19: nor while a quiz is open — 1.3.207: not even a forced or Critical one)
             }
             .floatingPopup("alta", title: "Knewton Alta", item: $engine.alta, layout: .large, engine: engine) { a in
                 AltaQuizScreen(launch: a, engine: engine)

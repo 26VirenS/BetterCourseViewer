@@ -660,13 +660,6 @@ private struct UpdatesPane: View {
                 if let from = holdFrom {
                     RollbackHoldRow(updater: updater, from: from)
                 }
-                Toggle(isOn: $updater.beta) {
-                    Text("Get beta updates").font(.sBody)
-                    Text("Try new features before everyone else. A beta may have rough edges; turn this off to go back to the usual releases when the next one comes out.")
-                        .font(.sCallout)
-                        .foregroundStyle(.secondary)
-                }
-                .disabled(Updater.isDevelopmentRun)
                 UpdateStatusRow(updater: updater)
                 if let notes {
                     Text(notes)

@@ -4,6 +4,7 @@ import CryptoKit
 import Foundation
 import Network
 import SwiftUI
+import WebKit
 
 /// A version of Simpl for Mac that can be installed: the feed's newest, or one of the releases published on GitHub.
 struct AppRelease: Equatable, Identifiable, Sendable {
@@ -42,6 +43,11 @@ private struct UpdateFailure: LocalizedError {
 /// Update alone, before) (`scanFeed`), and as the Mac wakes or Simpl comes to the front when the last look is older than
 /// that: the feed read without the cache, and nothing shown unless it names a newer version — then the usual check runs
 /// and the update goes in as ever.
+/// (1.3.207) Every Mac takes the newest version, a beta or not (the feed of all, `betaFeed`): with most versions out as
+/// betas, a Mac on the usual feed found nothing newer and stayed where it was. An update kept waiting a day by what is
+/// open (`waitBeforeForcing`) is put to the student over the window — it goes in half an hour on (`forceGrace`) whatever
+/// is open, Later putting the prompt away till then — and no update goes in while a quiz is under way (`quizOpen`), not
+/// a forced one, not a Critical one.
 @MainActor
 final class Updater: ObservableObject {
 
@@ -57,26 +63,21 @@ final class Updater: ObservableObject {
 
     static let shared = Updater()
 
-    /// The feed: Info.plist's `SimplUpdateFeed` when it names one (a test feed), else the site's — its beta feed
-    /// (1.3.17) for a Mac that asked for betas: the newest version of all, a beta or not.
+    /// The feed: Info.plist's `SimplUpdateFeed` when it names one (a test feed), else the site's — (1.3.207) its feed of
+    /// the newest version of all, a beta or not, for every Mac (1.3.17 to 1.3.206: only for a Mac with Get beta updates
+    /// on, the rest reading the usual feed, which named releases proper alone and so, with most versions out as betas,
+    /// nothing newer for weeks).
     var feedURL: URL {
         // (1.3.72) the Developer window's own feed, when one is set there
         if let o = UserDefaults.standard.string(forKey: "SimplUpdateFeedOverride"), !o.isEmpty, let url = URL(string: o) { return url }
         let s = (Bundle.main.object(forInfoDictionaryKey: "SimplUpdateFeed") as? String) ?? ""
         if !s.isEmpty, !s.hasPrefix("$("), let url = URL(string: s) { return url }
-        return beta ? Self.betaFeed : Self.stableFeed
+        return Self.betaFeed
     }
     static let stableFeed = URL(string: "https://simplcourses.com/app/mac-latest.json")!
     static let betaFeed = URL(string: "https://simplcourses.com/app/mac-beta.json")!
-    /// (1.3.17) Betas too (Settings ▸ Updates): the beta feed is read in place of the usual one. Turned off, Simpl stays
-    /// on a beta it has until a release newer than it comes.
-    @Published var beta: Bool = UserDefaults.standard.bool(forKey: "SimplBetaUpdates") {
-        didSet {
-            guard beta != oldValue else { return }
-            UserDefaults.standard.set(beta, forKey: "SimplBetaUpdates")
-            check()
-        }
-    }
+    /// (1.3.17 to 1.3.206) Get beta updates' setting: forgotten — every Mac takes the newest now.
+    private static let oldBetaKey = "SimplBetaUpdates"
     /// Simpl for Mac's releases, for Earlier Versions (each `mac-v<version>`, its zip `Simpl-Mac-<version>.zip`).
     private static let releasesAPI = "https://api.github.com/repos/26VirenS/BetterCourseViewer/releases"
     let interval: TimeInterval = 3600 // (1.2.19: every hour; a check is one small request)
@@ -101,7 +102,9 @@ final class Updater: ObservableObject {
     let currentVersion: String = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "0"
     private static let lastKey = "lastUpdateCheck" // (kept across launches: a relaunch inside the hour does not read the feed again)
 
-    @Published private(set) var state: State = .idle
+    @Published private(set) var state: State = .idle {
+        didSet { if case .failed = state, forcing != nil { forcing = nil } } // (1.3.207: a forced one that failed is tried again)
+    }
     @Published private(set) var lastCheck: Date? = nil
     /// A newer version this Mac's macOS cannot run, in words ("Simpl 1.4 needs macOS 15.0 or later."); nil otherwise.
     @Published private(set) var heldBack: String? = nil
@@ -140,6 +143,13 @@ final class Updater: ObservableObject {
         }
         let last = UserDefaults.standard.double(forKey: Self.lastKey)
         lastCheck = last > 0 ? Date(timeIntervalSince1970: last) : nil
+        defaults.removeObject(forKey: Self.oldBetaKey)
+        // (1.3.207) an update waiting, as this copy left it — not once this copy is another version (it went in)
+        if defaults.string(forKey: Self.waitingFromKey) != currentVersion {
+            for key in [Self.waitingKey, Self.waitingFromKey, Self.forceKey] { defaults.removeObject(forKey: key) }
+        } else if defaults.double(forKey: Self.forceKey) > 0 {
+            forceAt = Date(timeIntervalSince1970: defaults.double(forKey: Self.forceKey))
+        }
     }
 
     /// A development run — the mock Canvas or a demo (`-SimplBaseURL`, `-SimplDemo`), the screenshot suite
@@ -164,6 +174,10 @@ final class Updater: ObservableObject {
     /// hour is not up (`scanFeed`), and as the Mac wakes. One timer does all of it. An update waiting to install itself goes in
     /// as soon as nothing holds it back (`quiet`).
     func start() {
+        // (1.3.207: the screenshot suite's picture of the prompt — -SimplForceUpdateShot <version>; nothing goes in)
+        if let v = UserDefaults.standard.string(forKey: "SimplForceUpdateShot"), !v.isEmpty {
+            forcePrompt = ForcePrompt(version: v, at: Date().addingTimeInterval(Self.forceGrace))
+        }
         guard !started, !Self.isDevelopmentRun else { return }
         started = true
         _ = AppPlacement.originalURL // (where this copy is, worked out before an update moves anything)
@@ -197,6 +211,7 @@ final class Updater: ObservableObject {
         if criticalNotice != nil, case .failed = state { check() }
         lookIfDue()
         installIfQuiet()
+        forceIfDue()
     }
 
     /// (1.3.102) The hourly check when it is due, else the look at the feed: never both at once.
@@ -384,13 +399,16 @@ final class Updater: ObservableObject {
         UserDefaults.standard.set(now.timeIntervalSince1970, forKey: Self.lastKey)
         guard case .checking = state else { return } // (a version put back meanwhile is under way: not undone by this)
         state = outcome
-        // (1.3.72) a Critical Update: in now — paused, a version put back, a quiz open, none of it holds it back
+        if case .upToDate = outcome { endWaiting() }
+        // (1.3.72) a Critical Update: in now — paused, a version put back, nothing open holds it back; (1.3.207) but a
+        // quiz under way does, and a Simpl with no window open (installIfQuiet)
         if case .available(let release) = outcome, release.critical {
             if let kept = ready, !Self.same(kept.release, release) { UpdateInstall.discard(kept.unpacked); ready = nil }
             criticalNotice = release.version
-            begin(asked: true)
+            installIfQuiet()
             return
         }
+        if case .available(let release) = outcome, !paused, !waitsForUpdateNow(release) { noteWaiting() }
         if paused, case .available = outcome { return } // (paused: offered in Settings, never installed by itself)
         if case .available(let release) = outcome {
             if let kept = ready, !Self.same(kept.release, release) {
@@ -463,8 +481,12 @@ final class Updater: ObservableObject {
     func install() {
         guard case .available = state else { return }
         endHold()
+        userAsked = true
         begin(asked: true)
     }
+    /// (1.3.207) The install under way was the student's own (Update Now, a version put back): it goes in even over a
+    /// quiz, as they asked. A Critical Update or a forced one never does.
+    private var userAsked = false
 
     /// (1.3.86) A version found that a version put back holds back: no newer than the one it replaced. A Critical
     /// Update never is.
@@ -489,15 +511,20 @@ final class Updater: ObservableObject {
     @Published private(set) var criticalNotice: String?
 
     /// An update that came by itself goes in when nothing holds it back: no quiz or tool open (`quiet`), updates not
-    /// paused, and (1.3.86) newer than any version put back replaced. A Critical Update goes in whatever holds it.
+    /// paused, and (1.3.86) newer than any version put back replaced. A Critical Update goes in whatever holds it — but
+    /// (1.3.207) a quiz under way (`quizOpen`).
     /// (1.3.204) Neither goes in while Simpl has no window open (`windowOpen`): a Critical Update downloads, and waits.
     func installIfQuiet() {
         if started, case .available(let r) = state, r.critical {
-            if ready != nil, !windowOpen { return }
+            let quiz = quizOpen
+            if heldByQuiz != quiz { heldByQuiz = quiz }
+            if ready != nil, !windowOpen || quiz { return }
+            userAsked = false
             begin(asked: true)
             return
         }
         guard started, !paused, case .available(let r) = state, !waitsForUpdateNow(r), quiet, windowOpen else { return }
+        userAsked = false
         begin(asked: false)
     }
 
@@ -512,13 +539,135 @@ final class Updater: ObservableObject {
 
     /// (1.2.19) What is open that an update waits for: a quiz, an external tool's window (`UpdateHold`).
     private var holds = 0
+    /// (1.3.207) The quiz screens among them (`UpdateHold(quiz: true)`).
+    private var quizzes = 0
 
-    func hold() { holds += 1 }
+    func hold(quiz: Bool = false) {
+        holds += 1
+        if quiz { quizzes += 1 }
+    }
 
     /// One closed: with none left, a waiting update goes in.
-    func release() {
+    func release(quiz: Bool = false) {
         holds = max(0, holds - 1)
+        if quiz { quizzes = max(0, quizzes - 1) }
         if holds == 0 { installIfQuiet() }
+        forceIfDue()
+    }
+
+    /// (1.3.207) A quiz under way: the quiz screen open, or a quiz's page in any of Simpl's windows — Canvas's New
+    /// Quizzes (its pages on quiz-lti hosts), a quiz taken on Canvas's own page. No update goes in over it, not a forced
+    /// one (`forceIfDue`), not a Critical one; the prompt is not put over it either.
+    var quizOpen: Bool {
+        if quizzes > 0 { return true }
+        return NSApp.windows.contains { w in
+            (w.isVisible || w.isMiniaturized) && Self.webViews(in: w.contentView).contains { Self.isQuizPage($0.url) }
+        }
+    }
+
+    /// (1.3.207) A page a quiz is taken on: New Quizzes' (quiz-lti, quiz-api hosts), or Canvas's own quiz being taken
+    /// (…/quizzes/<id>/take).
+    nonisolated static func isQuizPage(_ url: URL?) -> Bool {
+        guard let url, let host = url.host?.lowercased() else { return false }
+        if host.contains("quiz-lti") || host.contains("quiz-api") { return true }
+        let path = url.path.lowercased()
+        return path.contains("/quizzes/") && (path.hasSuffix("/take") || path.contains("/take/"))
+    }
+
+    private static func webViews(in view: NSView?) -> [WKWebView] {
+        guard let view else { return [] }
+        if let w = view as? WKWebView { return [w] }
+        return view.subviews.flatMap { webViews(in: $0) }
+    }
+
+    /// (1.3.207) A Critical Update, or one forced, waits for a quiz under way: the notice says so.
+    @Published private(set) var heldByQuiz = false
+
+    // MARK: - An update kept waiting
+
+    /// (1.3.207) How long an update may wait for what is open before it is put to the student, and how long they then
+    /// have before it goes in whatever is open (but a quiz), and when Later's prompt comes back once before that.
+    static let waitBeforeForcing: TimeInterval = 24 * 3600
+    static let forceGrace: TimeInterval = 30 * 60
+    static let forceReminder: TimeInterval = 5 * 60
+    /// Since when an update has waited (kept across launches, for this copy's version), and when it goes in.
+    private static let waitingKey = "SimplUpdateWaitingSince", waitingFromKey = "SimplUpdateWaitingFrom", forceKey = "SimplUpdateForceAt"
+    private var forceAt: Date?
+    private var promptedThisRun = false, reminded = false
+
+    /// (1.3.207) The prompt over the window: the version waiting, and when it goes in.
+    struct ForcePrompt: Equatable {
+        let version: String
+        let at: Date
+    }
+    @Published private(set) var forcePrompt: ForcePrompt?
+    /// (1.3.207) An update going in, its half hour up — its version: the notice over the window says so.
+    @Published private(set) var forcing: String?
+
+    /// An update found that would go in by itself: since now, unless it has waited already (a newer one since keeps
+    /// the first one's start — the student has waited that long).
+    private func noteWaiting() {
+        let defaults = UserDefaults.standard
+        guard defaults.double(forKey: Self.waitingKey) == 0 else { return }
+        defaults.set(Date().timeIntervalSince1970, forKey: Self.waitingKey)
+        defaults.set(currentVersion, forKey: Self.waitingFromKey)
+    }
+
+    /// Up to date: nothing waits.
+    private func endWaiting() {
+        for key in [Self.waitingKey, Self.waitingFromKey, Self.forceKey] { UserDefaults.standard.removeObject(forKey: key) }
+        forceAt = nil
+        if forcePrompt != nil { forcePrompt = nil }
+    }
+
+    /// Later: the prompt put away — it comes back once, five minutes before the update goes in.
+    func dismissForcePrompt() {
+        if forcePrompt != nil { forcePrompt = nil }
+    }
+
+    /// Update Now, from the prompt.
+    func installFromPrompt() {
+        forcePrompt = nil
+        install()
+    }
+
+    /// (1.3.207) An update that would go in by itself — not paused, not held back by a version put back — kept waiting a
+    /// day by what is open: with a window open and no quiz under way, put to the student (the prompt, with when it goes
+    /// in, half an hour on), put to them again five minutes before, and — the half hour up — put in, whatever is open
+    /// then but a quiz. With no window open, or a quiz under way, nothing is shown or put in until there is one / it is
+    /// over: the half hour up meanwhile, it goes in then.
+    private func forceIfDue() {
+        guard started, !paused, case .available(let r) = state, !r.critical, !waitsForUpdateNow(r) else { return }
+        let since = UserDefaults.standard.double(forKey: Self.waitingKey)
+        guard since > 0, Date().timeIntervalSince1970 - since >= Self.waitBeforeForcing else { return }
+        let quiz = quizOpen
+        if heldByQuiz != quiz { heldByQuiz = quiz }
+        guard windowOpen, !quiz else {
+            if forcePrompt != nil { forcePrompt = nil; promptedThisRun = false } // (shown again once it is over)
+            return
+        }
+        let now = Date()
+        guard let at = forceAt else {
+            let at = now.addingTimeInterval(Self.forceGrace)
+            forceAt = at
+            UserDefaults.standard.set(at.timeIntervalSince1970, forKey: Self.forceKey)
+            promptedThisRun = true
+            NSLog("[Simpl] update: %@ has waited a day for what is open; it goes in in %.0f minutes", r.version, Self.forceGrace / 60)
+            forcePrompt = ForcePrompt(version: r.version, at: at)
+            return
+        }
+        if now >= at {
+            if forcePrompt != nil { forcePrompt = nil }
+            NSLog("[Simpl] update: %@ goes in now, its half hour up", r.version)
+            forcing = r.version
+            userAsked = false
+            begin(asked: true)
+        } else if !promptedThisRun || (!reminded && at.timeIntervalSince(now) <= Self.forceReminder) {
+            // (shown in the last five minutes, by the reminder or not: not shown again after Later)
+            if at.timeIntervalSince(now) <= Self.forceReminder { reminded = true }
+            promptedThisRun = true
+            forcePrompt = ForcePrompt(version: r.version, at: at)
+        }
     }
 
     /// No quiz and no external tool open (1.2.19: in front or not), and no window with a sheet or (1.3.79) a popup over
@@ -596,9 +745,10 @@ final class Updater: ObservableObject {
             state = .failed(error.localizedDescription)
             return
         }
-        if (!asked && !quiet) || !windowOpen {
-            // (a quiz or a tool opened meanwhile, or — 1.3.204 — the window closed: in at the next quiet moment with a
-            //  window open, no second download)
+        if (!asked && !quiet) || !windowOpen || (!userAsked && quizOpen) {
+            // (a quiz or a tool opened meanwhile, or — 1.3.204 — the window closed, or — 1.3.207 — a quiz under way for
+            //  a Critical Update or one forced: in at the next quiet moment with a window open, no second download)
+            forcing = nil
             ready = (release: release, unpacked: unpacked)
             state = .available(release)
             return
@@ -680,16 +830,20 @@ final class Updater: ObservableObject {
         defaults.set(false, forKey: Self.oldAutomaticKey)
         let sum = sha256?.trimmingCharacters(in: .whitespacesAndNewlines)
         state = .available(AppRelease(version: version, url: url, sha256: (sum ?? "").isEmpty ? nil : sum))
+        userAsked = true
         begin(asked: true)
     }
 }
 
-/// (1.2.19) A view an update waits for while it is shown: the quiz screen, an external tool's window.
+/// (1.2.19) A view an update waits for while it is shown: the quiz screen, an external tool's window. (1.3.207) `quiz`:
+/// a quiz under way, which not even a forced or a Critical Update goes in over.
 struct UpdateHold: ViewModifier {
+    var quiz = false
+
     func body(content: Content) -> some View {
         content
-            .onAppear { Updater.shared.hold() }
-            .onDisappear { Updater.shared.release() }
+            .onAppear { Updater.shared.hold(quiz: quiz) }
+            .onDisappear { Updater.shared.release(quiz: quiz) }
     }
 }
 
