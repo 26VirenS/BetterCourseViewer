@@ -275,6 +275,8 @@
     // the sheet a shade lighter, as a card is in Dark Mode)
     'html.simpl-mm.simpl-rail.simpl-front-dark:not(.simpl-front-glass){--mm-ground:radial-gradient(900px 620px at 6% -12%,rgba(0,122,255,.16),transparent 62%),radial-gradient(760px 560px at 104% 14%,rgba(175,82,222,.12),transparent 62%),radial-gradient(980px 640px at 46% 118%,rgba(48,176,199,.12),transparent 60%),#e9eaee;',
     '--mm-sheet-glass:linear-gradient(168deg,rgba(0,0,0,.085),rgba(0,0,0,.05) 55%,rgba(0,0,0,.07))}',
+    // (its own scroll bar, drawn outside the turn: dark as the rest — the page under it still drawn for light)
+    'html.simpl-mm.simpl-front-dark:not(.simpl-front-glass):not(.simpl-under){color-scheme:dark}html.simpl-mm.simpl-front-dark:not(.simpl-front-glass) body{color-scheme:light}',
   ].join('\n');
 
   var style = document.createElement('style');
