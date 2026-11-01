@@ -14,6 +14,12 @@ import Foundation
 /// both unless developer mode is on; a version with nothing else is left out whole.
 enum MacWhatsNew {
     static let releases: [Release] = [
+        Release(version: "1.3.212", date: "2026-11-01", notes: [
+            ReleaseNote(kind: "improved", title: "One Kind of Popup", body: "Every popup has the same header, its × at the top right."),
+            ReleaseNote(kind: "improved", title: "A Calendar That Fits", body: "Narrow months show dots, and To Do keeps each course."),
+            ReleaseNote(kind: "improved", title: "Easier to Read", body: "Each counter its own colour, and plainer words throughout."),
+            ReleaseNote(kind: "fixed", title: "Every Grade in View", body: "The What-If bar no longer hides the last grades."),
+        ]),
         Release(version: "1.3.211", date: "2026-11-01", notes: [
             ReleaseNote(kind: "new", title: "Community Tools", body: "Add tools other students made from Simpl Community."),
             ReleaseNote(kind: "new", title: "Try One Before Adding", body: "Each tool works right in the browser, then add it."),
