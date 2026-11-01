@@ -1076,6 +1076,10 @@ jobs:
           Shot 'update-force-prompt' '1024x681' 45 ($mock + $next + @('--appearance', 'light', '--update-test-installed', '--update-test-waited', '--update-test-hold', 'dialog'))
           Shot 'update-force-prompt-dark' '1366x778' 45 ($mock + $next + @('--appearance', 'dark', '--update-test-installed', '--update-test-waited', '--update-test-hold', 'dialog'))
           Shot 'update-force-quiz' '1024x681' 45 ($mock + $next + @('--appearance', 'light', '--update-test-installed', '--update-test-waited', '--open', 'quiz:101:9011'))
+          # (0.3.104, at the end so the pictures before keep their parts) this theme shared from Community's Share yours:
+          # Ocean's colour and a photo in every place, named and sent to the mock's gallery as Share sends it
+          # (--community-share), the form saying it went — its log must say it went with its photos (checked below)
+          Shot 'community-share' '1366x778' 45 ($mock + $community + @('--appearance', 'light', '--appearance-mode', 'yes', '--appearance-tab', 'community', '--theme', 'Ocean', '--theme-photo', $themePhoto, '--community-share', 'Ocean Notes'))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
@@ -1698,6 +1702,12 @@ jobs:
             Write-Host "${p}: $((@($l -split "`n" | Where-Object { $_ -match 'community' }) -join ' | '))"
             if ($l -notmatch 'community: [1-9]\d* themes read') { Write-Host "::error::${p}: Simpl Community's gallery was not read before the picture (shots/profile-$p.log)"; exit 1 }
             if ($p -eq 'community-worn' -and $l -notmatch 'community: wore ') { Write-Host "::error::${p}: the Harbour theme was not worn before the picture (shots/profile-$p.log)"; exit 1 }
+          }
+          # (0.3.104) this theme shared from Share yours reached the mock's gallery, its photos with it
+          if ($script:mine -contains 'community-share') {
+            $l = PhoneLog 'community-share'
+            Write-Host "community-share: $((@($l -split "`n" | Where-Object { $_ -match 'community' }) -join ' | '))"
+            if ($l -notmatch 'community: shared Ocean Notes \([a-z0-9]+, [1-9]\d* photos\)') { Write-Host "::error::community-share: the theme was not shared with its photos (shots/profile-community-share.log)"; exit 1 }
           }
           # (0.3.64) To Do & Calendar: To Do's menu and Week's menu open, the week pinched to the whole day, and the week
           # scrolled with something waiting at its edges, before each picture (Screens/Calendar/CalendarTodo.cs TodoShots,
