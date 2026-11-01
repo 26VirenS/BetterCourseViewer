@@ -1,0 +1,1291 @@
+{
+ "about": "Simpl Community tools in the mock school (scripts/dev/mock-community.mjs serves it at /api/community/tools and /api/community/tools/<id> until the site’s own gallery has tools): two students’ tools, one in a later format (listed as needing a newer Simpl), then Simpl’s starters (site/src/tool-starters.js on the site’s branch), each checked by the reference (tool-format.js). The apps’ pictures browse it and add from it.",
+ "ok": true,
+ "tools": [
+  {
+   "format": 1,
+   "id": "k3m9x2pa",
+   "version": 2,
+   "name": "Reading Time",
+   "maker": "Viren",
+   "summary": "How long a reading takes at your pace.",
+   "group": "study",
+   "symbol": "clock",
+   "color": "#30b0c7",
+   "inputs": [
+    {
+     "id": "pages",
+     "kind": "number",
+     "label": "Pages",
+     "unit": "",
+     "default": 24,
+     "min": 1,
+     "max": 2000,
+     "step": 1
+    },
+    {
+     "id": "words",
+     "kind": "number",
+     "label": "Words a page",
+     "unit": "",
+     "default": 300,
+     "min": 50,
+     "max": 1200,
+     "step": 25
+    },
+    {
+     "id": "pace",
+     "kind": "choice",
+     "label": "Pace",
+     "options": [
+      {
+       "label": "Careful (150 wpm)",
+       "value": 150
+      },
+      {
+       "label": "Steady (200 wpm)",
+       "value": 200
+      },
+      {
+       "label": "Average (238 wpm)",
+       "value": 238
+      },
+      {
+       "label": "Brisk (275 wpm)",
+       "value": 275
+      },
+      {
+       "label": "Fast (325 wpm)",
+       "value": 325
+      },
+      {
+       "label": "Skimming (450 wpm)",
+       "value": 450
+      }
+     ],
+     "default": 238
+    },
+    {
+     "id": "notes",
+     "kind": "toggle",
+     "label": "Taking notes (half speed)",
+     "default": false
+    }
+   ],
+   "outputs": [
+    {
+     "id": "mins",
+     "label": "Time",
+     "value": "pages * words / (pace * (notes ? 0.5 : 1))",
+     "unit": "min",
+     "decimals": 0
+    },
+    {
+     "label": "Hours",
+     "value": "mins / 60",
+     "unit": "h",
+     "decimals": 1,
+     "when": "mins >= 60"
+    },
+    {
+     "label": "Sittings of 25 min",
+     "value": "ceil(mins / 25)",
+     "unit": "",
+     "decimals": 0
+    }
+   ],
+   "note": "Average adult reading speed is about 238 words a minute; a textbook with notes goes slower.",
+   "created": "2026-11-01"
+  },
+  {
+   "format": 1,
+   "id": "p7q2w9zd",
+   "version": 1,
+   "name": "Fuel Cost",
+   "maker": "Ana",
+   "summary": "What a drive costs in fuel, there or there and back.",
+   "group": "everyday",
+   "symbol": "car",
+   "color": "#ff9f0a",
+   "inputs": [
+    {
+     "id": "km",
+     "kind": "number",
+     "label": "Distance",
+     "unit": "km",
+     "default": 120,
+     "min": 0,
+     "step": 5
+    },
+    {
+     "id": "use",
+     "kind": "number",
+     "label": "Uses",
+     "unit": "L/100 km",
+     "default": 6.5,
+     "min": 0,
+     "step": 0.1
+    },
+    {
+     "id": "price",
+     "kind": "number",
+     "label": "Fuel price",
+     "unit": "$/L",
+     "default": 1.85,
+     "min": 0,
+     "step": 0.05
+    },
+    {
+     "id": "back",
+     "kind": "toggle",
+     "label": "There and back",
+     "default": true
+    }
+   ],
+   "outputs": [
+    {
+     "id": "litres",
+     "label": "Fuel",
+     "value": "km * (back ? 2 : 1) * use / 100",
+     "unit": "L",
+     "decimals": 1
+    },
+    {
+     "label": "Cost",
+     "value": "litres * price",
+     "unit": "$",
+     "decimals": 2
+    }
+   ],
+   "created": "2026-11-01"
+  },
+  {
+   "format": 2,
+   "id": "x4n8b2cv",
+   "version": 1,
+   "name": "Unit Circle",
+   "maker": "Lee",
+   "summary": "Angles, sine and cosine, drawn on the circle.",
+   "group": "math",
+   "symbol": "triangle",
+   "color": "#5e5ce6",
+   "inputs": [
+    {
+     "id": "deg",
+     "kind": "angle",
+     "label": "Angle"
+    }
+   ],
+   "outputs": [
+    {
+     "label": "sin",
+     "value": "sin(rad(deg))"
+    }
+   ],
+   "drawing": {
+    "kind": "circle"
+   },
+   "created": "2026-11-01"
+  },
+  {
+   "format": 1,
+   "id": "s-ohms",
+   "version": 1,
+   "name": "Ohm’s Law",
+   "maker": "Simpl",
+   "summary": "Any two of volts, amps and ohms give the third.",
+   "group": "science",
+   "symbol": "bolt",
+   "color": "#ff9500",
+   "inputs": [
+    {
+     "id": "find",
+     "kind": "choice",
+     "label": "Find",
+     "options": [
+      {
+       "label": "Current",
+       "value": 1
+      },
+      {
+       "label": "Voltage",
+       "value": 2
+      },
+      {
+       "label": "Resistance",
+       "value": 3
+      }
+     ],
+     "default": 1
+    },
+    {
+     "id": "v",
+     "kind": "number",
+     "label": "Voltage",
+     "unit": "V",
+     "default": 12,
+     "min": 0,
+     "step": 0.5
+    },
+    {
+     "id": "i",
+     "kind": "number",
+     "label": "Current",
+     "unit": "A",
+     "default": 2,
+     "min": 0,
+     "step": 0.1
+    },
+    {
+     "id": "r",
+     "kind": "number",
+     "label": "Resistance",
+     "unit": "Ω",
+     "default": 6,
+     "min": 0,
+     "step": 1
+    }
+   ],
+   "outputs": [
+    {
+     "id": "amps",
+     "label": "Current",
+     "value": "find == 1 ? v / r : i",
+     "unit": "A",
+     "decimals": 4,
+     "when": "find == 1"
+    },
+    {
+     "id": "volts",
+     "label": "Voltage",
+     "value": "find == 2 ? i * r : v",
+     "unit": "V",
+     "decimals": 4,
+     "when": "find == 2"
+    },
+    {
+     "label": "Resistance",
+     "value": "find == 3 ? v / i : r",
+     "unit": "Ω",
+     "decimals": 4,
+     "when": "find == 3"
+    },
+    {
+     "label": "Power",
+     "value": "volts * amps",
+     "unit": "W",
+     "decimals": 3
+    }
+   ],
+   "note": "V = I × R, and the power P = V × I. Choose what to find; the other two boxes are what you know.",
+   "created": "2026-11-01"
+  },
+  {
+   "format": 1,
+   "id": "s-quadratic",
+   "version": 1,
+   "name": "Quadratic Formula",
+   "maker": "Simpl",
+   "summary": "Solve ax² + bx + c = 0: its real roots and vertex.",
+   "group": "math",
+   "symbol": "function",
+   "color": "#5e5ce6",
+   "inputs": [
+    {
+     "id": "a",
+     "kind": "number",
+     "label": "a",
+     "unit": "",
+     "default": 1,
+     "step": 1
+    },
+    {
+     "id": "b",
+     "kind": "number",
+     "label": "b",
+     "unit": "",
+     "default": -3,
+     "step": 1
+    },
+    {
+     "id": "c",
+     "kind": "number",
+     "label": "c",
+     "unit": "",
+     "default": 2,
+     "step": 1
+    }
+   ],
+   "outputs": [
+    {
+     "label": "x₁",
+     "value": "a == 0 ? -c / b : (-b + sqrt(b^2 - 4*a*c)) / (2*a)",
+     "unit": "",
+     "decimals": 4
+    },
+    {
+     "label": "x₂",
+     "value": "(-b - sqrt(b^2 - 4*a*c)) / (2*a)",
+     "unit": "",
+     "decimals": 4,
+     "when": "a != 0"
+    },
+    {
+     "id": "disc",
+     "label": "Discriminant",
+     "value": "b^2 - 4*a*c",
+     "unit": "",
+     "decimals": 4
+    },
+    {
+     "label": "Real roots",
+     "value": "a == 0 ? (b != 0 ? 1 : 0) : disc > 0 ? 2 : disc == 0 ? 1 : 0",
+     "unit": "",
+     "decimals": 0
+    },
+    {
+     "label": "Vertex x",
+     "value": "-b / (2*a)",
+     "unit": "",
+     "decimals": 4,
+     "when": "a != 0"
+    },
+    {
+     "label": "Vertex y",
+     "value": "c - b^2 / (4*a)",
+     "unit": "",
+     "decimals": 4,
+     "when": "a != 0"
+    }
+   ],
+   "note": "x = (−b ± √(b² − 4ac)) / 2a. With no real roots (a negative discriminant) the roots show “—”. With a = 0 it is the line bx + c = 0.",
+   "created": "2026-11-01"
+  },
+  {
+   "format": 1,
+   "id": "s-percent",
+   "version": 1,
+   "name": "Percent Change",
+   "maker": "Simpl",
+   "summary": "How much something went up or down, in percent.",
+   "group": "math",
+   "symbol": "percent",
+   "color": "#ff375f",
+   "inputs": [
+    {
+     "id": "from",
+     "kind": "number",
+     "label": "Old value",
+     "unit": "",
+     "default": 80,
+     "step": 1
+    },
+    {
+     "id": "to",
+     "kind": "number",
+     "label": "New value",
+     "unit": "",
+     "default": 100,
+     "step": 1
+    }
+   ],
+   "outputs": [
+    {
+     "label": "Change",
+     "value": "(to - from) / abs(from) * 100",
+     "unit": "%",
+     "decimals": 2
+    },
+    {
+     "label": "Difference",
+     "value": "to - from",
+     "unit": "",
+     "decimals": 4
+    },
+    {
+     "label": "New as a share of old",
+     "value": "to / from * 100",
+     "unit": "%",
+     "decimals": 2
+    }
+   ],
+   "note": "Change = (new − old) ÷ old × 100. Below zero is a drop. From 0 there is no percent change.",
+   "created": "2026-11-01"
+  },
+  {
+   "format": 1,
+   "id": "s-tip",
+   "version": 1,
+   "name": "Tip & Split",
+   "maker": "Simpl",
+   "summary": "The tip, the total, and what each person pays.",
+   "group": "everyday",
+   "symbol": "money",
+   "color": "#34c759",
+   "inputs": [
+    {
+     "id": "bill",
+     "kind": "number",
+     "label": "Bill",
+     "unit": "",
+     "default": 64,
+     "min": 0,
+     "step": 1
+    },
+    {
+     "id": "tip",
+     "kind": "number",
+     "label": "Tip",
+     "unit": "%",
+     "default": 18,
+     "min": 0,
+     "max": 100,
+     "step": 1
+    },
+    {
+     "id": "people",
+     "kind": "number",
+     "label": "People",
+     "unit": "",
+     "default": 3,
+     "min": 1,
+     "max": 100,
+     "step": 1
+    },
+    {
+     "id": "roundup",
+     "kind": "toggle",
+     "label": "Round each share up",
+     "default": false
+    }
+   ],
+   "outputs": [
+    {
+     "id": "each",
+     "label": "Each pays",
+     "value": "roundup ? ceil(bill * (1 + tip / 100) / floor(people)) : bill * (1 + tip / 100) / floor(people)",
+     "unit": "",
+     "decimals": 2
+    },
+    {
+     "label": "Tip",
+     "value": "bill * tip / 100",
+     "unit": "",
+     "decimals": 2
+    },
+    {
+     "label": "Total",
+     "value": "bill * (1 + tip / 100)",
+     "unit": "",
+     "decimals": 2
+    },
+    {
+     "label": "Paid in all",
+     "value": "each * floor(people)",
+     "unit": "",
+     "decimals": 2,
+     "when": "roundup"
+    },
+    {
+     "label": "Tip with rounding",
+     "value": "(each * floor(people) - bill) / bill * 100",
+     "unit": "%",
+     "decimals": 1,
+     "when": "roundup"
+    }
+   ],
+   "note": "Rounding up makes each share a whole amount; what it adds goes to the tip.",
+   "created": "2026-11-01"
+  },
+  {
+   "format": 1,
+   "id": "s-compound",
+   "version": 1,
+   "name": "Compound Interest",
+   "maker": "Simpl",
+   "summary": "Savings growing with interest, and money added monthly.",
+   "group": "money",
+   "symbol": "chart",
+   "color": "#30b0c7",
+   "inputs": [
+    {
+     "id": "p",
+     "kind": "number",
+     "label": "Starting amount",
+     "unit": "",
+     "default": 1000,
+     "min": 0,
+     "step": 100
+    },
+    {
+     "id": "rate",
+     "kind": "number",
+     "label": "Interest a year",
+     "unit": "%",
+     "default": 5,
+     "min": 0,
+     "max": 100,
+     "step": 0.25
+    },
+    {
+     "id": "years",
+     "kind": "number",
+     "label": "Years",
+     "unit": "",
+     "default": 10,
+     "min": 0,
+     "max": 100,
+     "step": 1
+    },
+    {
+     "id": "n",
+     "kind": "choice",
+     "label": "Compounded",
+     "options": [
+      {
+       "label": "Yearly",
+       "value": 1
+      },
+      {
+       "label": "Quarterly",
+       "value": 4
+      },
+      {
+       "label": "Monthly",
+       "value": 12
+      },
+      {
+       "label": "Daily",
+       "value": 365
+      }
+     ],
+     "default": 12
+    },
+    {
+     "id": "add",
+     "kind": "number",
+     "label": "Added each month",
+     "unit": "",
+     "default": 0,
+     "min": 0,
+     "step": 10
+    }
+   ],
+   "outputs": [
+    {
+     "id": "bal",
+     "label": "Balance",
+     "value": "p * (1 + rate / 100 / n) ^ (n * years) + (rate == 0 ? add * 12 * years : add * ((1 + rate / 100 / n) ^ (n * years) - 1) / ((1 + rate / 100 / n) ^ (n / 12) - 1))",
+     "unit": "",
+     "decimals": 2
+    },
+    {
+     "id": "put",
+     "label": "Put in",
+     "value": "p + add * 12 * years",
+     "unit": "",
+     "decimals": 2
+    },
+    {
+     "label": "Interest earned",
+     "value": "bal - put",
+     "unit": "",
+     "decimals": 2
+    },
+    {
+     "label": "Doubling time",
+     "value": "ln(2) / (n * ln(1 + rate / 100 / n))",
+     "unit": "years",
+     "decimals": 1,
+     "when": "rate > 0"
+    }
+   ],
+   "note": "Money added goes in at the end of each month. No taxes or fees are counted.",
+   "created": "2026-11-01"
+  },
+  {
+   "format": 1,
+   "id": "s-density",
+   "version": 1,
+   "name": "Density, Mass & Volume",
+   "maker": "Simpl",
+   "summary": "Any two of density, mass and volume give the third.",
+   "group": "science",
+   "symbol": "scale",
+   "color": "#af52de",
+   "inputs": [
+    {
+     "id": "find",
+     "kind": "choice",
+     "label": "Find",
+     "options": [
+      {
+       "label": "Density",
+       "value": 1
+      },
+      {
+       "label": "Mass",
+       "value": 2
+      },
+      {
+       "label": "Volume",
+       "value": 3
+      }
+     ],
+     "default": 1
+    },
+    {
+     "id": "m",
+     "kind": "number",
+     "label": "Mass",
+     "unit": "g",
+     "default": 27,
+     "min": 0,
+     "step": 1
+    },
+    {
+     "id": "vol",
+     "kind": "number",
+     "label": "Volume",
+     "unit": "cm³",
+     "default": 10,
+     "min": 0,
+     "step": 1
+    },
+    {
+     "id": "rho",
+     "kind": "number",
+     "label": "Density",
+     "unit": "g/cm³",
+     "default": 2.7,
+     "min": 0,
+     "step": 0.1
+    }
+   ],
+   "outputs": [
+    {
+     "id": "d",
+     "label": "Density",
+     "value": "find == 1 ? m / vol : rho",
+     "unit": "g/cm³",
+     "decimals": 4,
+     "when": "find == 1"
+    },
+    {
+     "label": "Mass",
+     "value": "find == 2 ? rho * vol : m",
+     "unit": "g",
+     "decimals": 4,
+     "when": "find == 2"
+    },
+    {
+     "label": "Volume",
+     "value": "find == 3 ? m / rho : vol",
+     "unit": "cm³",
+     "decimals": 4,
+     "when": "find == 3"
+    },
+    {
+     "label": "Density in SI",
+     "value": "d * 1000",
+     "unit": "kg/m³",
+     "decimals": 1
+    }
+   ],
+   "table": {
+    "title": "Densities at room temperature",
+    "columns": [
+     "Substance",
+     "g/cm³"
+    ],
+    "rows": [
+     [
+      "Air",
+      "0.0012"
+     ],
+     [
+      "Ethanol",
+      "0.789"
+     ],
+     [
+      "Ice",
+      "0.917"
+     ],
+     [
+      "Water",
+      "0.998"
+     ],
+     [
+      "Seawater",
+      "1.03"
+     ],
+     [
+      "Aluminium",
+      "2.70"
+     ],
+     [
+      "Iron",
+      "7.87"
+     ],
+     [
+      "Copper",
+      "8.96"
+     ],
+     [
+      "Silver",
+      "10.5"
+     ],
+     [
+      "Lead",
+      "11.3"
+     ],
+     [
+      "Mercury",
+      "13.5"
+     ],
+     [
+      "Gold",
+      "19.3"
+     ]
+    ]
+   },
+   "note": "ρ = m ÷ V. 1 cm³ is 1 mL. Choose what to find; the other two boxes are what you know.",
+   "created": "2026-11-01"
+  },
+  {
+   "format": 1,
+   "id": "s-energy",
+   "version": 1,
+   "name": "Kinetic & Potential Energy",
+   "maker": "Simpl",
+   "summary": "Energy of motion and of height, and the speed at the ground.",
+   "group": "science",
+   "symbol": "gauge",
+   "color": "#ff3b30",
+   "inputs": [
+    {
+     "id": "m",
+     "kind": "number",
+     "label": "Mass",
+     "unit": "kg",
+     "default": 2,
+     "min": 0,
+     "step": 0.5
+    },
+    {
+     "id": "v",
+     "kind": "number",
+     "label": "Speed",
+     "unit": "m/s",
+     "default": 3,
+     "min": 0,
+     "step": 0.5
+    },
+    {
+     "id": "h",
+     "kind": "number",
+     "label": "Height",
+     "unit": "m",
+     "default": 5,
+     "min": 0,
+     "step": 0.5
+    },
+    {
+     "id": "g",
+     "kind": "choice",
+     "label": "Gravity",
+     "options": [
+      {
+       "label": "Earth",
+       "value": 9.81
+      },
+      {
+       "label": "Moon",
+       "value": 1.62
+      },
+      {
+       "label": "Mars",
+       "value": 3.71
+      },
+      {
+       "label": "Jupiter",
+       "value": 24.79
+      }
+     ],
+     "default": 9.81
+    }
+   ],
+   "outputs": [
+    {
+     "id": "ke",
+     "label": "Kinetic energy",
+     "value": "0.5 * m * v^2",
+     "unit": "J",
+     "decimals": 2
+    },
+    {
+     "id": "pe",
+     "label": "Potential energy",
+     "value": "m * g * h",
+     "unit": "J",
+     "decimals": 2
+    },
+    {
+     "label": "Total energy",
+     "value": "ke + pe",
+     "unit": "J",
+     "decimals": 2
+    },
+    {
+     "label": "Speed at the ground",
+     "value": "sqrt(v^2 + 2 * g * h)",
+     "unit": "m/s",
+     "decimals": 2
+    },
+    {
+     "label": "Momentum",
+     "value": "m * v",
+     "unit": "kg·m/s",
+     "decimals": 2
+    }
+   ],
+   "note": "KE = ½mv², PE = mgh. The speed at the ground is with no air in the way: all the energy becomes motion.",
+   "created": "2026-11-01"
+  },
+  {
+   "format": 1,
+   "id": "s-gpa",
+   "version": 1,
+   "name": "Grade Points",
+   "maker": "Simpl",
+   "summary": "Your GPA from up to five courses’ grades and credits.",
+   "group": "study",
+   "symbol": "book",
+   "color": "#0a84ff",
+   "inputs": [
+    {
+     "id": "g1",
+     "kind": "choice",
+     "label": "Course 1",
+     "options": [
+      {
+       "label": "A",
+       "value": 4
+      },
+      {
+       "label": "A−",
+       "value": 3.7
+      },
+      {
+       "label": "B+",
+       "value": 3.3
+      },
+      {
+       "label": "B",
+       "value": 3
+      },
+      {
+       "label": "B−",
+       "value": 2.7
+      },
+      {
+       "label": "C+",
+       "value": 2.3
+      },
+      {
+       "label": "C",
+       "value": 2
+      },
+      {
+       "label": "C−",
+       "value": 1.7
+      },
+      {
+       "label": "D+",
+       "value": 1.3
+      },
+      {
+       "label": "D",
+       "value": 1
+      },
+      {
+       "label": "D−",
+       "value": 0.7
+      },
+      {
+       "label": "F",
+       "value": 0
+      }
+     ],
+     "default": 4
+    },
+    {
+     "id": "c1",
+     "kind": "number",
+     "label": "Course 1 credits",
+     "unit": "",
+     "default": 3,
+     "min": 0,
+     "max": 20,
+     "step": 0.5
+    },
+    {
+     "id": "g2",
+     "kind": "choice",
+     "label": "Course 2",
+     "options": [
+      {
+       "label": "A",
+       "value": 4
+      },
+      {
+       "label": "A−",
+       "value": 3.7
+      },
+      {
+       "label": "B+",
+       "value": 3.3
+      },
+      {
+       "label": "B",
+       "value": 3
+      },
+      {
+       "label": "B−",
+       "value": 2.7
+      },
+      {
+       "label": "C+",
+       "value": 2.3
+      },
+      {
+       "label": "C",
+       "value": 2
+      },
+      {
+       "label": "C−",
+       "value": 1.7
+      },
+      {
+       "label": "D+",
+       "value": 1.3
+      },
+      {
+       "label": "D",
+       "value": 1
+      },
+      {
+       "label": "D−",
+       "value": 0.7
+      },
+      {
+       "label": "F",
+       "value": 0
+      }
+     ],
+     "default": 3.3
+    },
+    {
+     "id": "c2",
+     "kind": "number",
+     "label": "Course 2 credits",
+     "unit": "",
+     "default": 3,
+     "min": 0,
+     "max": 20,
+     "step": 0.5
+    },
+    {
+     "id": "g3",
+     "kind": "choice",
+     "label": "Course 3",
+     "options": [
+      {
+       "label": "A",
+       "value": 4
+      },
+      {
+       "label": "A−",
+       "value": 3.7
+      },
+      {
+       "label": "B+",
+       "value": 3.3
+      },
+      {
+       "label": "B",
+       "value": 3
+      },
+      {
+       "label": "B−",
+       "value": 2.7
+      },
+      {
+       "label": "C+",
+       "value": 2.3
+      },
+      {
+       "label": "C",
+       "value": 2
+      },
+      {
+       "label": "C−",
+       "value": 1.7
+      },
+      {
+       "label": "D+",
+       "value": 1.3
+      },
+      {
+       "label": "D",
+       "value": 1
+      },
+      {
+       "label": "D−",
+       "value": 0.7
+      },
+      {
+       "label": "F",
+       "value": 0
+      }
+     ],
+     "default": 3.7
+    },
+    {
+     "id": "c3",
+     "kind": "number",
+     "label": "Course 3 credits",
+     "unit": "",
+     "default": 3,
+     "min": 0,
+     "max": 20,
+     "step": 0.5
+    },
+    {
+     "id": "g4",
+     "kind": "choice",
+     "label": "Course 4",
+     "options": [
+      {
+       "label": "A",
+       "value": 4
+      },
+      {
+       "label": "A−",
+       "value": 3.7
+      },
+      {
+       "label": "B+",
+       "value": 3.3
+      },
+      {
+       "label": "B",
+       "value": 3
+      },
+      {
+       "label": "B−",
+       "value": 2.7
+      },
+      {
+       "label": "C+",
+       "value": 2.3
+      },
+      {
+       "label": "C",
+       "value": 2
+      },
+      {
+       "label": "C−",
+       "value": 1.7
+      },
+      {
+       "label": "D+",
+       "value": 1.3
+      },
+      {
+       "label": "D",
+       "value": 1
+      },
+      {
+       "label": "D−",
+       "value": 0.7
+      },
+      {
+       "label": "F",
+       "value": 0
+      }
+     ],
+     "default": 3
+    },
+    {
+     "id": "c4",
+     "kind": "number",
+     "label": "Course 4 credits",
+     "unit": "",
+     "default": 0,
+     "min": 0,
+     "max": 20,
+     "step": 0.5
+    },
+    {
+     "id": "g5",
+     "kind": "choice",
+     "label": "Course 5",
+     "options": [
+      {
+       "label": "A",
+       "value": 4
+      },
+      {
+       "label": "A−",
+       "value": 3.7
+      },
+      {
+       "label": "B+",
+       "value": 3.3
+      },
+      {
+       "label": "B",
+       "value": 3
+      },
+      {
+       "label": "B−",
+       "value": 2.7
+      },
+      {
+       "label": "C+",
+       "value": 2.3
+      },
+      {
+       "label": "C",
+       "value": 2
+      },
+      {
+       "label": "C−",
+       "value": 1.7
+      },
+      {
+       "label": "D+",
+       "value": 1.3
+      },
+      {
+       "label": "D",
+       "value": 1
+      },
+      {
+       "label": "D−",
+       "value": 0.7
+      },
+      {
+       "label": "F",
+       "value": 0
+      }
+     ],
+     "default": 3
+    },
+    {
+     "id": "c5",
+     "kind": "number",
+     "label": "Course 5 credits",
+     "unit": "",
+     "default": 0,
+     "min": 0,
+     "max": 20,
+     "step": 0.5
+    }
+   ],
+   "outputs": [
+    {
+     "label": "GPA",
+     "value": "(g1 * c1 + g2 * c2 + g3 * c3 + g4 * c4 + g5 * c5) / (c1 + c2 + c3 + c4 + c5)",
+     "unit": "",
+     "decimals": 2
+    },
+    {
+     "label": "Credits",
+     "value": "c1 + c2 + c3 + c4 + c5",
+     "unit": "",
+     "decimals": 1
+    },
+    {
+     "label": "Quality points",
+     "value": "g1 * c1 + g2 * c2 + g3 * c3 + g4 * c4 + g5 * c5",
+     "unit": "",
+     "decimals": 2
+    }
+   ],
+   "table": {
+    "title": "The usual 4.0 scale",
+    "columns": [
+     "Letter",
+     "Percent",
+     "Points"
+    ],
+    "rows": [
+     [
+      "A",
+      "93–100",
+      "4.0"
+     ],
+     [
+      "A−",
+      "90–92",
+      "3.7"
+     ],
+     [
+      "B+",
+      "87–89",
+      "3.3"
+     ],
+     [
+      "B",
+      "83–86",
+      "3.0"
+     ],
+     [
+      "B−",
+      "80–82",
+      "2.7"
+     ],
+     [
+      "C+",
+      "77–79",
+      "2.3"
+     ],
+     [
+      "C",
+      "73–76",
+      "2.0"
+     ],
+     [
+      "C−",
+      "70–72",
+      "1.7"
+     ],
+     [
+      "D+",
+      "67–69",
+      "1.3"
+     ],
+     [
+      "D",
+      "63–66",
+      "1.0"
+     ],
+     [
+      "D−",
+      "60–62",
+      "0.7"
+     ],
+     [
+      "F",
+      "below 60",
+      "0.0"
+     ]
+    ]
+   },
+   "note": "A course at 0 credits is left out. Schools’ scales differ, so check yours.",
+   "created": "2026-11-01"
+  }
+ ]
+}
