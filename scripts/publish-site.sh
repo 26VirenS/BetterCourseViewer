@@ -183,6 +183,37 @@ json.dump(feed, open("build/site-sync/public/app/mac-beta.json", "w"), indent=2)
 print("/app/mac-beta.json → " + version + (" (beta)" if feed["beta"] else ""))
 ' "$REPO" "$CRITICAL" || echo "no Simpl for Mac beta feed written"
   fi
+  # (1.3.209) the test channel's feed, /app/test/<key>.json, for the Macs that joined it (Developer ▸ Updates ▸ Test
+  # Builds, with its code — mac/Simpl/Support/Updater.swift TestChannel): the newest of the test builds (mac-test-v*,
+  # a tag no other feed reads) and every mac-v* release, a beta or not. The key is a hash of the code; the code itself
+  # is in no file anywhere.
+  TEST_CHANNEL=5bb9622dc6e931d2543c3d247ee72208
+  TEST_REL="$(gh api "repos/$REPO/releases?per_page=100" --jq '[.[] | select((.draft | not) and ((.tag_name | startswith("mac-v")) or (.tag_name | startswith("mac-test-v"))))] | sort_by(.tag_name | sub("^mac-(test-)?v"; "") | split(".") | map(tonumber? // 0)) | last' 2>/dev/null || true)"
+  if [ -n "$TEST_REL" ] && [ "$TEST_REL" != "null" ]; then
+    mkdir -p build/site-sync/public/app/test
+    printf '%s' "$TEST_REL" | python3 -c '
+import json, re, sys
+rel, repo, channel = json.loads(sys.stdin.read()), sys.argv[1], sys.argv[2]
+tag = rel["tag_name"]; version = re.sub(r"^mac-(test-)?v", "", tag)
+asset = next((a for a in rel.get("assets", []) if a.get("name") == f"Simpl-Mac-{version}.zip"), None)
+if not asset: sys.exit("no zip on " + tag)
+digest = asset.get("digest") or ""
+feed = {
+  "version": version,
+  "url": asset["browser_download_url"],
+  "sha256": digest[7:] if digest.startswith("sha256:") else "",
+  "size": asset.get("size"),
+  "minimumOS": "14.0",
+  "notes": rel.get("html_url") or f"https://github.com/{repo}/releases/tag/{tag}",
+  "published": rel.get("published_at"),
+  "beta": bool(rel.get("prerelease")),
+  "test": tag.startswith("mac-test-v"),
+}
+if len(sys.argv) > 3 and sys.argv[3]: feed["criticalVersion"] = sys.argv[3]
+json.dump(feed, open(f"build/site-sync/public/app/test/{channel}.json", "w"), indent=2)
+print("/app/test/(the channel).json → " + version + (" (a test build)" if feed["test"] else ""))
+' "$REPO" "$TEST_CHANNEL" "$CRITICAL" || echo "no test channel feed written"
+  fi
   # Simpl for Windows (a beta: the landing page's Windows button), /download/windows: the newest windows-fluent-v*
   # release's installer, Simpl-Setup.exe (every one of them is a pre-release, the app's previews)
   WIN_EXE="$(gh api "repos/$REPO/releases?per_page=100" --jq '[.[] | select((.draft | not) and (.tag_name | test("^windows-fluent-v[0-9]+$")) and any(.assets[]; .name == "Simpl-Setup.exe"))] | sort_by(.tag_name | ltrimstr("windows-fluent-v") | tonumber) | last | (.assets // [] | map(select(.name == "Simpl-Setup.exe")) | first | .browser_download_url) // ""' 2>/dev/null || true)"

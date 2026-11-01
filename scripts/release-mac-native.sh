@@ -48,6 +48,16 @@ PY
 )
 INTERFACE="$(python3 -c "import json;print(json.load(open('extension/manifest.json'))['version'])")"
 TAG="mac-v$VERSION"
+# (1.3.209) a test build (MAC_TEST=1, the workflow's test switch): a pre-release under a tag of its own, mac-test-v<version>,
+# which only the test channel's feed names (/app/test/<key>.json, scripts/publish-site.sh) — no Mac that has not joined
+# the channel with its code is offered it. Its version is never released for everyone: the next release is newer.
+if [ -n "${MAC_TEST:-}" ]; then
+  if gh release view "$TAG" >/dev/null 2>&1; then
+    echo "$TAG is already released for everyone: a test build needs a newer version (MARKETING_VERSION in scripts/dev/make-mac-project.py)." >&2
+    exit 1
+  fi
+  TAG="mac-test-v$VERSION"
+fi
 ZIP_NAME="Simpl-Mac-$VERSION.zip"
 KIND="${MAC_BETA:+beta}"
 KIND="${KIND:-stable}"
@@ -224,7 +234,10 @@ fi
 # (1.3.72) a Critical Update (MAC_CRITICAL=1, the workflow's critical switch): a release proper (never a beta), marked
 # in its notes; the feeds name it (criticalVersion, scripts/publish-site.sh), and every Mac on an older version installs
 # the newest release at its next check, whatever its update settings (Updater.swift)
-if [ -n "${MAC_CRITICAL:-}" ]; then
+if [ -n "${MAC_TEST:-}" ]; then
+  BETA_TITLE=" Test Build"; BETA_FLAG=(--prerelease)
+  BETA_LINE=$'\n**This is a test build.** Only Macs on the test channel (Developer ▸ Updates ▸ Test Builds, joined with its code) are offered it.\n'
+elif [ -n "${MAC_CRITICAL:-}" ]; then
   BETA_TITLE=" Critical Update"; BETA_FLAG=()
   BETA_LINE=$'\n**This is a Critical Update.** Every Mac running an older Simpl installs it at its next update check, whatever its update settings.\n<!-- simpl-critical -->\n'
 fi

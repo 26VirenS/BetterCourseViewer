@@ -31,6 +31,8 @@ import tempfile
 REPO = os.environ.get("GITHUB_REPOSITORY") or "26VirenS/BetterCourseViewer"
 TARGETS = [
     (re.compile(r"^mac-v(\d+(?:\.\d+)+)$"), lambda m: f"Simpl-Mac-{m.group(1)}.zip"),
+    # (1.3.209) a test build's, for the test channel alone (scripts/release-mac-native.sh MAC_TEST)
+    (re.compile(r"^mac-test-v(\d+(?:\.\d+)+)$"), lambda m: f"Simpl-Mac-{m.group(1)}.zip"),
     (re.compile(r"^v(\d+\.\d+\.\d+)$"), lambda m: f"Simpl-Courses-Mac-{m.group(1)}.zip"),
     (re.compile(r"^windows-fluent-(?:beta-)?v\d+$"), lambda m: "Simpl-Setup.exe"),
 ]

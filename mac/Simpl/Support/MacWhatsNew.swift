@@ -9,6 +9,9 @@ import Foundation
 /// seen); a first run sees none (its setup comes instead). Help ▸ What's New shows them all.
 enum MacWhatsNew {
     static let releases: [Release] = [
+        Release(version: "1.3.209", date: "2026-11-01", notes: [
+            ReleaseNote(kind: "new", title: "Test Builds", body: "Developer tools can join a test channel for early builds."),
+        ]),
         Release(version: "1.3.208", date: "2026-11-01", notes: [
             ReleaseNote(kind: "new", title: "Share Your Theme", body: "Send your theme to Simpl Community from Appearance."),
         ]),

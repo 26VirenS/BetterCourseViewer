@@ -72,6 +72,9 @@ final class Updater: ObservableObject {
         if let o = UserDefaults.standard.string(forKey: "SimplUpdateFeedOverride"), !o.isEmpty, let url = URL(string: o) { return url }
         let s = (Bundle.main.object(forInfoDictionaryKey: "SimplUpdateFeed") as? String) ?? ""
         if !s.isEmpty, !s.hasPrefix("$("), let url = URL(string: s) { return url }
+        // (1.3.209) a Mac on the test channel (Developer ▸ Updates ▸ Test Builds, joined with its code): its own feed,
+        // the newest test build or the newest version of all, whichever is newer
+        if let channel = TestChannel.channel { return TestChannel.feed(channel) }
         return Self.betaFeed
     }
     static let stableFeed = URL(string: "https://simplcourses.com/app/mac-latest.json")!
@@ -325,7 +328,12 @@ final class Updater: ObservableObject {
         do {
             var url = feedURL
             var (data, response) = try await Self.ask(url, timeout: 10, tag: criticalTag?.url == url ? criticalTag?.tag : nil)
-            if feedURL == Self.betaFeed, (response as? HTTPURLResponse)?.statusCode == 404 {
+            // (1.3.209) the test channel's feed not written yet: the feed every Mac reads
+            if url != Self.betaFeed, TestChannel.channel != nil, (response as? HTTPURLResponse)?.statusCode == 404 {
+                url = Self.betaFeed
+                (data, response) = try await Self.ask(url, timeout: 10, tag: criticalTag?.url == url ? criticalTag?.tag : nil)
+            }
+            if url == Self.betaFeed, (response as? HTTPURLResponse)?.statusCode == 404 {
                 url = Self.stableFeed
                 (data, response) = try await Self.ask(url, timeout: 10, tag: criticalTag?.url == url ? criticalTag?.tag : nil)
             }
@@ -385,9 +393,15 @@ final class Updater: ObservableObject {
         lastAsked = Date()
         let outcome: State
         do {
-            var (data, response) = try await Self.ask(feedURL, timeout: 20)
+            var url = feedURL
+            var (data, response) = try await Self.ask(url, timeout: 20)
+            // (1.3.209) the test channel's feed not written yet: the feed every Mac reads
+            if url != Self.betaFeed, TestChannel.channel != nil, (response as? HTTPURLResponse)?.statusCode == 404 {
+                url = Self.betaFeed
+                (data, response) = try await Self.ask(url, timeout: 20)
+            }
             // (no beta feed yet: the usual one, which is the newest there is)
-            if feedURL == Self.betaFeed, (response as? HTTPURLResponse)?.statusCode == 404 {
+            if url == Self.betaFeed, (response as? HTTPURLResponse)?.statusCode == 404 {
                 (data, response) = try await Self.ask(Self.stableFeed, timeout: 20)
             }
             outcome = evaluate(data, response)
@@ -1050,5 +1064,96 @@ enum ShellCommand {
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         p.waitUntilExit()
         return (p.terminationStatus, String(data: data, encoding: .utf8) ?? "")
+    }
+}
+
+
+/// (1.3.209) The test channel: test builds — released under a tag of their own, mac-test-v<version>, which no other feed
+/// names — reach only the Macs that joined it, in Developer ▸ Updates ▸ Test Builds, with its code. The code itself is
+/// never kept, in this app or anywhere in the repository: what the app holds is a one-way hash of it (salted SHA-256),
+/// enough to tell the right code from a wrong one and nothing more. Joined, the channel's key — a second hash of the
+/// code, which names the channel's feed on the site, /app/test/<key>.json (scripts/publish-site.sh) — is kept sealed
+/// with Simpl's vault (AES-256-GCM, its key in the Keychain: Vault.swift), never in the clear. Left, it is forgotten,
+/// and the Mac goes on as every Mac does: a test build it is on stays until a newer version comes out.
+enum TestChannel {
+    /// SHA-256 of "simpl-test-code-v1|" and the code (capitals, letters and digits only).
+    private static let codeHash = "da6c28a5521916586b3ac940299c4780aceebac37caa124b6c16ef1941ff9957"
+    private static let key = "SimplTestChannel"
+    private static let purpose = "test-channel"
+    /// Wrong codes in a row, and when the next try may be made (a minute after five).
+    nonisolated(unsafe) private static var misses = 0
+    nonisolated(unsafe) private static var waitUntil: Date?
+    /// The channel's key once opened this run (nil: not joined, or not read yet).
+    nonisolated(unsafe) private static var opened: String??
+
+    /// The code as it is compared: capitals, its letters and digits alone (dashes and spaces dropped).
+    static func normalized(_ code: String) -> String {
+        var out = ""
+        for c in code.uppercased().unicodeScalars where (c.value >= 65 && c.value <= 90) || (c.value >= 48 && c.value <= 57) {
+            out.unicodeScalars.append(c)
+        }
+        return out
+    }
+
+    private static func hex(_ text: String) -> String {
+        SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// The channel's feed on the site.
+    static func feed(_ channel: String) -> URL {
+        URL(string: "https://simplcourses.com/app/test/\(channel).json")!
+    }
+
+    /// The channel this Mac reads, opened from the vault; nil when it has not joined (or what is kept cannot be opened).
+    static var channel: String? {
+        if let known = opened { return known }
+        var found: String?
+        if let b64 = UserDefaults.standard.string(forKey: key), let sealed = Data(base64Encoded: b64),
+           let data = Vault.open(sealed, purpose: purpose), let id = String(data: data, encoding: .utf8),
+           id.range(of: "^[0-9a-f]{32}$", options: .regularExpression) != nil {
+            found = id
+        }
+        opened = .some(found)
+        return found
+    }
+
+    /// Joined: the code right, the channel's key sealed and kept, and the feed read at once. Else why not.
+    static func join(_ code: String) -> String? {
+        if let until = waitUntil, until > Date() { return "Too many tries. Wait a minute, then try again." }
+        let n = normalized(code)
+        guard !n.isEmpty else { return "Type the code first." }
+        guard hex("simpl-test-code-v1|" + n) == codeHash else {
+            misses += 1
+            if misses >= 5 { misses = 0; waitUntil = Date().addingTimeInterval(60) }
+            NSLog("[Simpl] test channel: a wrong code")
+            return "That code is not right."
+        }
+        misses = 0
+        let id = String(hex("simpl-test-channel-v1|" + n).prefix(32))
+        guard let sealed = Vault.seal(Data(id.utf8), purpose: purpose) else {
+            return "The channel could not be kept safely on this Mac (its vault is not open). Try again in a moment."
+        }
+        UserDefaults.standard.set(sealed.base64EncodedString(), forKey: key)
+        opened = .some(id)
+        NSLog("[Simpl] test channel: joined")
+        return nil
+    }
+
+    /// Left: the channel's key forgotten; the feed every Mac reads from now on.
+    static func leave() {
+        UserDefaults.standard.removeObject(forKey: key)
+        opened = .some(nil)
+        NSLog("[Simpl] test channel: left")
+    }
+
+    /// What the channel's feed names now: its version, and whether that is a test build (nil: not joined, or not read).
+    static func peek() async -> (version: String, test: Bool)? {
+        guard let channel else { return nil }
+        var req = URLRequest(url: feed(channel), cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
+        req.httpShouldHandleCookies = false
+        guard let (data, res) = try? await URLSession.shared.data(for: req), (res as? HTTPURLResponse)?.statusCode == 200,
+              let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let version = json["version"] as? String else { return nil }
+        return (version, json["test"] as? Bool ?? false)
     }
 }

@@ -233,9 +233,47 @@ private struct DevUpdates: View {
     @State private var from = MacWhatsNew.older.first ?? ""
     @State private var critical = false
     @State private var restart = true
+    // (1.3.209) the test channel (TestChannel, Updater.swift)
+    @State private var testCode = ""
+    @State private var testJoined = TestChannel.channel != nil
+    @State private var testNote: String?
+    @State private var testFeed = ""
 
     var body: some View {
         Form {
+            Section {
+                LabeledContent("Channel", value: testJoined ? "Test builds" : "Everyone's")
+                    .foregroundStyle(testJoined ? Color.orange : Color.primary)
+                if testJoined {
+                    if !testFeed.isEmpty { LabeledContent("Test feed", value: testFeed) }
+                    Button("Leave the Test Channel") {
+                        TestChannel.leave()
+                        testJoined = false
+                        testFeed = ""
+                        testNote = "Left. A test build this Mac is on stays until a newer version comes out."
+                        u.check()
+                    }
+                } else {
+                    HStack {
+                        SecureField("Code", text: $testCode)
+                            .textFieldStyle(.roundedBorder)
+                            .onSubmit { joinTest() }
+                        Button("Join") { joinTest() }
+                            .disabled(testCode.isEmpty)
+                    }
+                }
+                if let note = testNote {
+                    Text(note).font(.caption).foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Test builds")
+            } footer: {
+                Text("Test builds come only to Macs that joined with the code. The code is never kept: the app checks it against a one-way hash, and keeps the channel's key sealed in Simpl's vault, in your Keychain.")
+            }
+            .task(id: testJoined) {
+                guard testJoined, let p = await TestChannel.peek() else { return }
+                testFeed = p.test ? "\(p.version) (test build)" : "\(p.version) (no test build newer)"
+            }
             Section {
                 LabeledContent("State", value: DevMode.describe(u.state))
                 LabeledContent("Last check", value: u.lastCheck.map { $0.formatted(date: .abbreviated, time: .standard) } ?? "never")
@@ -287,6 +325,17 @@ private struct DevUpdates: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private func joinTest() {
+        if let why = TestChannel.join(testCode) {
+            testNote = why
+            return
+        }
+        testCode = ""
+        testJoined = true
+        testNote = "Joined. This Mac now takes test builds; looking for one now."
+        u.check()
     }
 
     private var stepText: String {
