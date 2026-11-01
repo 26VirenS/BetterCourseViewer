@@ -13,6 +13,8 @@ enum MacWhatsNew {
             ReleaseNote(kind: "new", title: "Community Tools", body: "Add tools other students made from Simpl Community."),
             ReleaseNote(kind: "new", title: "Try One Before Adding", body: "Each tool works right in the browser, then add it."),
             ReleaseNote(kind: "improved", title: "Yours, Even Offline", body: "Added tools keep your numbers and need no connection."),
+            ReleaseNote(kind: "fixed", title: "Tests Stay Open", body: "Updates wait while Alta, ALEKS or Macmillan is open."),
+            ReleaseNote(kind: "fixed", title: "Steadier Calendar Sync", body: "Google and Outlook no longer get duplicate events."),
         ]),
         Release(version: "1.3.210", date: "2026-11-01", notes: [
             ReleaseNote(kind: "improved", title: "Where Updates Come From", body: "Developer tools say which feed this Mac updates from."),

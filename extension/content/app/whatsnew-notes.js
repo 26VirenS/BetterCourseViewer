@@ -30,6 +30,7 @@
   self.BCV_WHATS_NEW = [
     { version: '2.99.135', date: '2026-11-01', notes: [
       { kind: 'new', title: 'Send From Your Phone', body: 'Photos and files from your phone land in your hand-in.', icon: P.phone },
+      { kind: 'fixed', title: 'Grades Match Canvas', body: 'Dropped scores and weighted totals add up as Canvas does.', icon: P.check },
     ] },
     { version: '2.99.134', date: '2026-11-01', notes: [
       { kind: 'fixed', title: 'No False Warning', body: 'Simpl no longer says Safari is running an old copy.', icon: P.check },

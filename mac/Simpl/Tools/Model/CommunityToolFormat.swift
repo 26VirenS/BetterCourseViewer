@@ -801,11 +801,13 @@ enum ToolFormat {
         return String(out)
     }
 
-    /// Text cut at `n` UTF-16 units, as JavaScript's slice cuts it.
+    /// Text cut at `n` UTF-16 units, as the reference cuts it: a character that would straddle the limit (the first half
+    /// of a surrogate pair at the last place kept) is left out whole, never split into a U+FFFD.
     static func cut(_ s: String, _ n: Int) -> String {
-        let u = s.utf16
+        let u = Array(s.utf16)
         guard u.count > n else { return s }
-        return String(decoding: Array(u.prefix(n)), as: UTF16.self)
+        let keep = n > 0 && (0xD800...0xDBFF).contains(u[n - 1]) ? n - 1 : n
+        return String(decoding: u.prefix(keep), as: UTF16.self)
     }
 
     private static func isID(_ s: String) -> Bool {
