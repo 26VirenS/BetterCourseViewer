@@ -1,5 +1,5 @@
 {
- "about": "Simpl Community tools, format 1: the answers every app must give (docs/community-tools.md). Written by scripts/dev/tool-vectors.mjs from site/src/tool-format.js — do not edit by hand. Numbers JSON cannot hold are strings: \"NaN\", \"Infinity\", \"-Infinity\", \"-0\".",
+ "about": "Simpl Community tools, format 1: the answers every app must give (docs/community-tools.md). Written by scripts/dev/tool-vectors.mjs from site/public/community/tool-format.js — do not edit by hand. Numbers JSON cannot hold are strings: \"NaN\", \"Infinity\", \"-Infinity\", \"-0\".",
  "eval": [
   {
    "expr": "1 + 2 * 3",
@@ -967,6 +967,14 @@
   {
    "expr": "1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
    "names": []
+  },
+  {
+   "expr": "constructor(1)",
+   "names": []
+  },
+  {
+   "expr": "constructor",
+   "names": []
   }
  ],
  "tools": [
@@ -1372,6 +1380,161 @@
      "results": [
       {
        "text": "3",
+       "shown": true
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "text cleaned: control characters and every kind of space are white space; a table title cut at 40",
+   "tool": {
+    "format": 1,
+    "name": "Tip\u0007Split\u00a0\u00a0Pro",
+    "maker": "\ufeffSam\u2028",
+    "summary": "\tSplit the bill\n among\u3000friends ",
+    "group": "everyday",
+    "symbol": "money",
+    "color": "#30D158",
+    "inputs": [
+     {
+      "id": "a",
+      "kind": "number",
+      "label": "A\u0000B",
+      "unit": " kg\r"
+     }
+    ],
+    "outputs": [
+     {
+      "label": "Twice",
+      "value": " a * 2 "
+     }
+    ],
+    "table": {
+     "title": "A table title that runs on and on past forty characters",
+     "columns": [
+      " One\u000b"
+     ],
+     "rows": [
+      [
+       "x\u001fy"
+      ]
+     ]
+    }
+   },
+   "valid": true,
+   "checked": {
+    "format": 1,
+    "name": "Tip Split Pro",
+    "maker": "Sam",
+    "summary": "Split the bill among friends",
+    "group": "everyday",
+    "symbol": "money",
+    "color": "#30d158",
+    "inputs": [
+     {
+      "id": "a",
+      "kind": "number",
+      "label": "A B",
+      "unit": "kg",
+      "default": 0,
+      "step": 1
+     }
+    ],
+    "outputs": [
+     {
+      "label": "Twice",
+      "value": "a * 2",
+      "unit": "",
+      "decimals": 4
+     }
+    ],
+    "table": {
+     "title": "A table title that runs on and on past f",
+     "columns": [
+      "One"
+     ],
+     "rows": [
+      [
+       "x y"
+      ]
+     ]
+    }
+   },
+   "runs": [
+    {
+     "given": {
+      "a": 1.5
+     },
+     "results": [
+      {
+       "text": "3",
+       "shown": true
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "a cut never splits a character in two: one that would straddle the limit is left out",
+   "tool": {
+    "format": 1,
+    "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa😀tail",
+    "maker": "mmmmmmmmmmmmmmmmmmmmmmmmmmmm😀",
+    "summary": "Emoji 📐 kept whole",
+    "group": "math",
+    "symbol": "triangle",
+    "color": "#5e5ce6",
+    "inputs": [
+     {
+      "id": "a",
+      "kind": "number",
+      "label": "A"
+     }
+    ],
+    "outputs": [
+     {
+      "label": "Same",
+      "value": "a"
+     }
+    ]
+   },
+   "valid": true,
+   "checked": {
+    "format": 1,
+    "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "maker": "mmmmmmmmmmmmmmmmmmmmmmmmmmmm😀",
+    "summary": "Emoji 📐 kept whole",
+    "group": "math",
+    "symbol": "triangle",
+    "color": "#5e5ce6",
+    "inputs": [
+     {
+      "id": "a",
+      "kind": "number",
+      "label": "A",
+      "unit": "",
+      "default": 0,
+      "step": 1
+     }
+    ],
+    "outputs": [
+     {
+      "label": "Same",
+      "value": "a",
+      "unit": "",
+      "decimals": 4
+     }
+    ]
+   },
+   "runs": [
+    {
+     "given": {
+      "a": 2
+     },
+     "results": [
+      {
+       "text": "2",
        "shown": true
       }
      ]

@@ -10,7 +10,7 @@ and a formula can't loop. So adding a tool from a stranger is safe in a way a sc
 
 | Where | What |
 | --- | --- |
-| `site/src/tool-format.js` | **the reference**: checking a tool, the language, the number format |
+| `site/public/community/tool-format.js` | **the reference**: checking a tool, the language, the number format. One file: the website's pages load it as it is (`/community/tool-format.js`), and the site's Worker bundles it (`site/src/tool-format.js` only re-exports it) |
 | `docs/community-tools-vectors.json` | the answers every copy must give (written by `scripts/dev/tool-vectors.mjs`) |
 | `site/src/community.js` | the site's endpoints (below) |
 | the apps | each has its own copy, checked against the vectors |
@@ -36,8 +36,14 @@ and a formula can't loop. So adding a tool from a stranger is safe in a way a sc
 }
 ```
 
-All text is plain text: never HTML or Markdown, shown as it is. Text is trimmed, runs of white space become one
-space, control characters are dropped, and it is cut at its limit.
+All text is plain text: never HTML or Markdown, shown as it is. Text is trimmed, runs of white space become one space,
+and it is cut at its limit, counted in UTF-16 code units (as JavaScript counts a string's length) — never between the
+two halves of a surrogate pair: a character that would straddle the limit is left out (39 letters and an emoji, cut at
+40, are the 39 letters). A lone half of a pair (only JSON's `\u` escapes can carry one) becomes U+FFFD, so what the site
+serves is always well-formed. White space is exactly what JavaScript's `\s` matches — tab, line feed, vertical tab, form
+feed, carriage return, the Unicode space separators (U+0020, U+00A0, U+1680, U+2000–U+200A, U+202F, U+205F, U+3000),
+U+2028, U+2029 and U+FEFF — and the control characters U+0000–U+001F and U+007F count as white space too:
+`"Tip\u0007Split"` is `Tip Split`.
 
 **Inputs** — each has an `id` and a `label` (1–32):
 
@@ -56,15 +62,17 @@ result still has its value. The first result shown is drawn largest.
 **Ids** match `^[a-z][a-z0-9_]{0,15}$`, are unique across inputs and results, and are none of the reserved names:
 `pi e true false` and every function name.
 
-**Table** — `{"title"?, "columns":[…], "rows":[[…]]}`: 1–6 column names (1–24), 1–100 rows, each exactly one cell per
-column (0–48; a number is written as text). Shown under the results, as it is.
+**Table** — `{"title"?, "columns":[…], "rows":[[…]]}`: a title (0–40), 1–6 column names (1–24), 1–100 rows, each
+exactly one cell per column (0–48; a number is written as text, as JavaScript writes it: `90`, not `90.0`). Shown under
+the results, as it is.
 
 **Symbols** — `bolt percent function sum divide ruler scale thermometer clock calendar money chart atom flask leaf heart
 book pencil globe car drop flame gauge star lightbulb music dice triangle`. Each app maps them to its own icons (the Mac:
 SF Symbols `bolt.fill percent function sum divide ruler scalemass thermometer.medium clock calendar dollarsign.circle
 chart.bar atom flask leaf heart book pencil globe car drop flame gauge.medium star lightbulb music.note dice triangle`).
 
-**Size** — the JSON is at most 32 KB.
+**Size** — the tool as JSON text is at most 32,768 characters (UTF-16 code units, as JavaScript counts them). The site
+checks it on a tool sent in and never serves a bigger one.
 
 Checking: the site refuses any key format 1 doesn't have (`strict`); an app reads leniently and passes over unknown
 keys. A tool that fails a check is refused whole, with a code (`SC-T-…`: see `validateTool`) and a plain message.
@@ -101,7 +109,9 @@ True is anything but 0 and NaN. Division by zero and the like follow IEEE (∞, 
 
 **Functions** (radians throughout): `abs sqrt cbrt exp ln log`(base 10)` log2 sin cos tan asin acos atan floor ceil
 trunc` (one value each); `atan2(y, x) pow(x, y) hypot(x, y)`; `round(x)` / `round(x, n)`; `sign(x)`; `min(…)` /
-`max(…)` (1–16 values); `rad(degrees) deg(radians) clamp(x, lo, hi) fact(n)`.
+`max(…)` (1–16 values); `rad(degrees) deg(radians) clamp(x, lo, hi) fact(n)`. These and nothing else: a copy looks a
+name up among the language's own functions and the tool's own names only, never among what its platform's objects
+happen to have (`constructor(1)` is refused, as is any other name that is none of these).
 
 Where platforms differ, the reference decides — every copy must do exactly this:
 

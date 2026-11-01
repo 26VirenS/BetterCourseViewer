@@ -1,11 +1,11 @@
-// Writes docs/community-tools-vectors.json from the reference (site/src/tool-format.js): the answers every app's own
+// Writes docs/community-tools-vectors.json from the reference (site/public/community/tool-format.js): the answers every app's own
 // copy of Simpl Community tools' language must give. Run it again whenever the reference changes:
 //   node scripts/dev/tool-vectors.mjs          (writes the file)
 //   node scripts/dev/tool-vectors.mjs --check  (exit 1 when the file is not what the reference gives)
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CONSTANTS, evaluate, formatNumber, parse, runTool, validateTool } from '../../site/src/tool-format.js';
+import { CONSTANTS, evaluate, formatNumber, parse, runTool, validateTool } from '../../site/public/community/tool-format.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const file = join(root, 'docs', 'community-tools-vectors.json');
@@ -51,6 +51,8 @@ const ERRORS = [
   ['foo(1)', []], ['sqrt()', []], ['sqrt(1, 2)', []], ['atan2(1)', []], ['round(1, 2, 3)', []], ['clamp(1, 2)', []],
   ['x + 1', []], ['X + 1', ['x']], ['1 # 2', []], ['1 = 2', []], ['1 & 2', []], ['a.b', ['a']], ['2(3)', []], ['"1"', []],
   ['1..2', []], ['sqrt', []], ['pi()', []], ['min(' + Array(17).fill('1').join(',') + ')', []], ['1'.repeat(301), []],
+  // (a name every JavaScript object has is still no function nor input: an app's lookup must not find it either)
+  ['constructor(1)', []], ['constructor', []],
 ];
 
 const TOOLS = [
@@ -80,6 +82,22 @@ const TOOLS = [
       table: { title: 'The scale', columns: ['Letter', 'From', 'Points'], rows: [['A', '93', '4.0'], ['A-', 90, '3.7']] } },
     runs: [{}, { pct: 120 }, { pct: 84 }],
   },
+  {
+    name: 'text cleaned: control characters and every kind of space are white space; a table title cut at 40',
+    tool: { format: 1, name: 'Tip\u0007Split\u00a0\u00a0Pro', maker: '\ufeffSam\u2028', summary: '\tSplit the bill\n among\u3000friends ', group: 'everyday', symbol: 'money', color: '#30D158',
+      inputs: [{ id: 'a', kind: 'number', label: 'A\u0000B', unit: ' kg\r' }],
+      outputs: [{ label: 'Twice', value: ' a * 2 ' }],
+      table: { title: 'A table title that runs on and on past forty characters', columns: [' One\u000b'], rows: [['x\u001fy']] } },
+    runs: [{ a: 1.5 }],
+  },
+  {
+    // (a lone half of a pair, which the site turns to U+FFFD, is not here: some apps' JSON readers refuse one outright,
+    // and the site never serves one)
+    name: 'a cut never splits a character in two: one that would straddle the limit is left out',
+    tool: { format: 1, name: `${'a'.repeat(39)}\u{1F600}tail`, maker: `${'m'.repeat(28)}\u{1F600}`, summary: 'Emoji \u{1F4D0} kept whole', group: 'math', symbol: 'triangle', color: '#5e5ce6',
+      inputs: [{ id: 'a', kind: 'number', label: 'A' }], outputs: [{ label: 'Same', value: 'a' }] },
+    runs: [{ a: 2 }],
+  },
   { name: 'an extra key, read leniently', tool: { format: 1, name: 'X', summary: 'Y', group: 'math', symbol: 'sum', color: '#000000', inputs: [{ id: 'a', kind: 'number', label: 'A', colour: 'red' }], outputs: [{ label: 'Twice', value: 'a * 2' }], later: true }, runs: [{ a: 21 }] },
   { name: 'needs a newer Simpl', tool: { format: 2, name: 'X', summary: 'Y', group: 'math', symbol: 'sum', color: '#000000', inputs: [], outputs: [] } },
   { name: 'no name', tool: { format: 1, name: ' ', summary: 'Y', group: 'math', symbol: 'sum', color: '#000000', inputs: [{ id: 'a', kind: 'number', label: 'A' }], outputs: [{ label: 'B', value: 'a' }] } },
@@ -104,7 +122,7 @@ const TOOLS = [
 ];
 
 const out = {
-  about: 'Simpl Community tools, format 1: the answers every app must give (docs/community-tools.md). Written by scripts/dev/tool-vectors.mjs from site/src/tool-format.js — do not edit by hand. Numbers JSON cannot hold are strings: "NaN", "Infinity", "-Infinity", "-0".',
+  about: 'Simpl Community tools, format 1: the answers every app must give (docs/community-tools.md). Written by scripts/dev/tool-vectors.mjs from site/public/community/tool-format.js — do not edit by hand. Numbers JSON cannot hold are strings: "NaN", "Infinity", "-Infinity", "-0".',
   eval: EVAL.map(([expr, names, decimals]) => {
     const v = evaluate(parse(expr), { ...CONSTANTS, ...names });
     return { expr, names, decimals, text: formatNumber(v, decimals) };
@@ -127,11 +145,12 @@ const out = {
 };
 for (const e of out.eval) e.names = Object.fromEntries(Object.entries(e.names).map(([k, v]) => [k, enc(v)]));
 
-const json = `${JSON.stringify(out, null, 1)}\n`;
+// (the characters a reader cannot see — odd spaces, line separators — written as \u escapes, so none is lost to an editor)
+const json = `${JSON.stringify(out, null, 1).replace(/[\u007f-\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`)}\n`;
 if (process.argv.includes('--check')) {
   let have = '';
   try { have = readFileSync(file, 'utf8'); } catch { /* none */ }
-  if (have !== json) { console.error('docs/community-tools-vectors.json is not what site/src/tool-format.js gives: run node scripts/dev/tool-vectors.mjs'); process.exit(1); }
+  if (have !== json) { console.error('docs/community-tools-vectors.json is not what site/public/community/tool-format.js gives: run node scripts/dev/tool-vectors.mjs'); process.exit(1); }
   console.log(`✓ community tool vectors: ${out.eval.length} formulas, ${out.errors.length} refusals, ${out.tools.length} tools`);
 } else {
   writeFileSync(file, json);
