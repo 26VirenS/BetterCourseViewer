@@ -40,6 +40,8 @@ on:
       - 'scripts/dev/*-checks.json'
       - 'scripts/dev/baselines/mac-*'
       - 'scripts/dev/swift-checks/**'
+      - 'docs/community-tools-vectors.json'
+      - 'scripts/dev/fixtures/community-tools.json'
       - 'scripts/release-mac-native.sh'
       - '.github/workflows/mac.yml'
   workflow_dispatch:
@@ -81,7 +83,9 @@ jobs:
   # models and self-check (every Foundation-only file in mac/Simpl/Tools/Biology/Model, so a tool's builder adds files
   # there without touching this), (1.3.80) the chemistry tools' (every file in mac/Simpl/Tools/Chemistry/Model), (tools)
   # the Study Planner's planner (mac/Simpl/Tools/Planner/Model), Verb Conjugations' engine (mac/Simpl/Tools/Verbs/Model,
-  # read with the languages' data files in mac/Simpl/Resources/Verbs) and the
+  # read with the languages' data files in mac/Simpl/Resources/Verbs), (1.3.211) Simpl Community tools' format
+  # (mac/Simpl/Tools/Model/CommunityToolFormat.swift, against docs/community-tools-vectors.json: CommunityToolChecks.swift,
+  # every answer the reference gives) and the
   # live checks' plan, fingerprint and comparison (mac/Simpl/Engine/LivePlan.swift): scripts/dev/swift-checks/main.swift
   # compiled with the files it checks and run. Compiling takes four minutes and running them under a second, so what
   # was compiled is kept (a cache keyed by every file it is compiled from, this workflow and the compiler's version)
@@ -150,7 +154,7 @@ jobs:
             swiftc -O -o model-checks/run mac/Simpl/Tools/PeriodicData.swift mac/Simpl/Tools/PeriodicExtraData.swift \
               mac/Simpl/Tools/MoleculeShape.swift mac/Simpl/Tools/Biology/Model/*.swift mac/Simpl/Tools/Chemistry/Model/*.swift \
               mac/Simpl/Tools/Physics/Model/*.swift mac/Simpl/Tools/Model/*.swift mac/Simpl/Tools/Planner/Model/*.swift mac/Simpl/Tools/Verbs/Model/*.swift mac/Simpl/Engine/LivePlan.swift \
-              scripts/dev/swift-checks/main.swift scripts/dev/swift-checks/StudyChecks.swift
+              scripts/dev/swift-checks/main.swift scripts/dev/swift-checks/StudyChecks.swift scripts/dev/swift-checks/CommunityToolChecks.swift
           fi
           model-checks/run
       # (kept once they have passed, whatever the release app's build did)

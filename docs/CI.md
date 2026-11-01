@@ -54,7 +54,9 @@ own Tests workflow on its own copy of the extension and suites.
   tools' arithmetic in `mac/Simpl/Tools/Model` — the numbers they show and read, word counts, statistics, matrices —
   checked by `scripts/dev/swift-checks/StudyChecks.swift` against the specification's test vectors, and the Study
   Planner's planner, `mac/Simpl/Tools/Planner/Model`, and Verb Conjugations' engine, `mac/Simpl/Tools/Verbs/Model`, run against
-  the languages' data files in `mac/Simpl/Resources/Verbs` and the reference test vectors).
+  the languages' data files in `mac/Simpl/Resources/Verbs` and the reference test vectors; (1.3.211) and Simpl Community
+  tools' format, `mac/Simpl/Tools/Model/CommunityToolFormat.swift`, checked by
+  `scripts/dev/swift-checks/CommunityToolChecks.swift` against every answer in `docs/community-tools-vectors.json`).
 - The checks that were already there stay as they were: the Mac's project as the generator writes it and its What's
   New entry, kept data sealed (Mac, Windows), Send from Phone, the installer tried, the test school as the mock makes it.
 
