@@ -13,9 +13,10 @@ namespace Simpl.Tools;
 
 // The graphing calculator, as the web's and the Mac's (GraphTool.swift): Desmos, embedded, not reimplemented — their
 // calculator page in a web view of its own. Each web view is kept for as long as the app runs, so a graph survives the
-// tool closing or its pin's flyout folding. Where Desmos cannot load, a plain message and the way out to desmos.com
-// instead of a blank pane. (0.3.5) The pin's graph goes on in the whole one when its flyout is opened full screen
-// (GraphWeb.CarryOver).
+// tool closing or its pin's flyout folding. Where Desmos cannot load — its navigation fails, or its page's process stops
+// — Simpl's own failure (Kit/WebFailure.cs: "Graphing calculator couldn’t load", Try again, Open in browser) instead
+// of a blank pane or the web view's own error page. (0.3.5) The pin's graph goes on in the whole one when its flyout is
+// opened full screen (GraphWeb.CarryOver).
 
 #pragma warning disable CA2255
 internal static class GraphRegistration
@@ -43,6 +44,8 @@ internal sealed class GraphWeb
     private FrameworkElement? view;
     private CoreWebView2? core;
     private bool starting;
+    /// <summary>The web view went with its browser's process: Try again makes another.</summary>
+    private bool dead;
     /// <summary>(0.3.5) What is to be done to the graph once its page has loaded (<see cref="WhenReady"/>): a script,
     /// the text it is given (<c>s</c>), and what it does, for the log.</summary>
     private readonly List<(string Script, string S, string Said)> pending = new();
@@ -51,6 +54,8 @@ internal sealed class GraphWeb
 
     public bool Loading { get; private set; } = true;
     public bool Failed { get; private set; }
+    /// <summary>Why it could not load, in a line the student can act on.</summary>
+    public string Why { get; private set; } = "";
     public bool Compact => compact;
 
     /// <summary>Loaded, failed, or covered (the panes show it, or why not).</summary>
@@ -98,7 +103,15 @@ internal sealed class GraphWeb
             core.NavigationCompleted += (_, e) =>
             {
                 if (e.IsSuccess) Finished();
-                else if (e.WebErrorStatus != CoreWebView2WebErrorStatus.OperationCanceled) CouldNotLoad();
+                else if (e.WebErrorStatus != CoreWebView2WebErrorStatus.OperationCanceled) CouldNotLoad($"its page, {e.WebErrorStatus}", WebFailure.Why(e.WebErrorStatus));
+            };
+            // (its page's process stopped — it crashed, or stopped answering: the same failure; with the browser's own
+            //  process gone, the web view went too, and Try again makes another)
+            core.ProcessFailed += (_, e) =>
+            {
+                if (!WebFailure.TookPage(e.ProcessFailedKind)) return;
+                dead |= e.ProcessFailedKind == CoreWebView2ProcessFailedKind.BrowserProcessExited;
+                CouldNotLoad($"its page's process, {e.ProcessFailedKind}", WebFailure.Stopped);
             };
             core.NavigationStarting += (_, e) =>
             {
@@ -117,7 +130,7 @@ internal sealed class GraphWeb
         catch (Exception e)
         {
             Log.Write("graph: " + e.Message);
-            CouldNotLoad();
+            CouldNotLoad("its web view", "Simpl couldn’t start its web view. Try again, or open Desmos in your browser.");
         }
         finally
         {
@@ -132,6 +145,7 @@ internal sealed class GraphWeb
         Loading = true;
         pending.Clear(); // (an empty graph asked for: nothing put into it)
         Changed?.Invoke();
+        if (dead) { Renew(); return; }
         if (core != null) core.Navigate(Desmos.ToString());
         else if (view is WebView2 w) Start(e => w.EnsureCoreWebView2Async(e), () => w.CoreWebView2);
         else if (view is WebView2CompositionControl c) Start(e => c.EnsureCoreWebView2Async(e), () => c.CoreWebView2);
@@ -218,11 +232,30 @@ internal sealed class GraphWeb
         if (Shot.Asked || Launch.IsDevelopment) Log.Write(line);
     }
 
-    private void CouldNotLoad()
+    private void CouldNotLoad(string what, string why)
     {
+        Log.Write($"graph: could not load ({what}): Simpl's own error shown in its place");
         Loading = false;
         Failed = true;
+        Why = why;
         Changed?.Invoke();
+    }
+
+    /// <summary>The web view that went with its browser's process let go, and another made in the pane shown last (or the
+    /// next one shown), Desmos asked for in it.</summary>
+    private void Renew()
+    {
+        dead = false;
+        starting = false;
+        var old = view;
+        view = null;
+        core = null;
+        if (old != null)
+        {
+            FileKit.Detach(old);
+            try { (old as IDisposable)?.Dispose(); } catch { /* (gone with its process) */ }
+        }
+        Place();
     }
 
     /// <summary>A pane shown: the web view moves into it (and has its pace again).</summary>
@@ -270,8 +303,8 @@ internal sealed class GraphWeb
 
 /// <summary>
 /// Desmos, or why it is not here (the Mac's GraphPane): the web view while it loaded, a spinner while it loads, and
-/// "Desmos could not load" with Try Again and Open desmos.com where it could not. The whole tool's web view, a window of
-/// its own, steps aside while a sheet is over the window (as the school's pages do).
+/// Simpl's "Graphing calculator couldn’t load" with Try again and Open in browser where it could not (Kit/WebFailure.cs).
+/// The whole tool's web view, a window of its own, steps aside while a sheet is over the window (as the school's pages do).
 /// </summary>
 internal sealed class GraphPane : Grid
 {
@@ -288,7 +321,6 @@ internal sealed class GraphPane : Grid
         Children.Add(Host);
         Children.Add(spinner);
         Children.Add(failed);
-        failed.Content = Unavailable();
         Loaded += (_, _) =>
         {
             web.Changed -= Paint;
@@ -349,6 +381,9 @@ internal sealed class GraphPane : Grid
     {
         var holds = ReferenceEquals(Host.Child, web.View);
         spinner.Visibility = web.Loading && !web.Failed ? Visibility.Visible : Visibility.Collapsed;
+        // (made as it shows, with why: it comes in then)
+        if (web.Failed && failed.Content == null) failed.Content = Unavailable();
+        else if (!web.Failed) failed.Content = null;
         failed.Visibility = web.Failed ? Visibility.Visible : Visibility.Collapsed;
         // (the whole tool's web view is a window of its own, drawn over everything here: it waits out of sight while
         // Desmos loads, so the spinner shows, and while something is over it)
@@ -357,23 +392,9 @@ internal sealed class GraphPane : Grid
         if (!holds) Host.Visibility = Visibility.Hidden;
     }
 
-    private FrameworkElement Unavailable()
-    {
-        var again = K.Button("Try again", () => web.Reload(), accent: true);
-        var open = K.Button("Open desmos.com", () => Engine.Engine.OpenExternally(GraphWeb.Desmos));
-        var v = K.V(12,
-            K.Icon(SymbolRegular.WifiWarning24, 40, B.Text3),
-            K.Text("Desmos could not load", Ty.Subtitle).Center(),
-            K.Wrapped("Check your connection, or open desmos.com in the browser instead.", Ty.Body, B.Text2).Center(),
-            K.H(8, again, open).Align(HorizontalAlignment.Center));
-        v.HorizontalAlignment = HorizontalAlignment.Center;
-        v.VerticalAlignment = VerticalAlignment.Center;
-        v.MaxWidth = 360;
-        v.Margin = new Thickness(16);
-        var g = new Grid { Children = { v } };
-        g.Bg(B.Card);
-        return g;
-    }
+    private FrameworkElement Unavailable() =>
+        WebFailure.View($"{ToolsCenter.KindOf("graph")?.Name ?? "Graphing calculator"} couldn’t load", web.Why, () => web.Reload(),
+            () => Engine.Engine.OpenExternally(GraphWeb.Desmos), offline: web.Why == WebFailure.Why(CoreWebView2WebErrorStatus.Disconnected), compact: web.Compact);
 }
 
 /// <summary>Graphing calculator (the Mac's GraphTool): Desmos, filling the page under the tool's heading.</summary>

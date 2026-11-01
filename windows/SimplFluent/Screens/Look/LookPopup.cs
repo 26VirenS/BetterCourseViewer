@@ -218,6 +218,12 @@ internal sealed class LookPopupView
                 LightPages.Tell(core, $"{kind.Name} popup");
                 if (e.IsSuccess && !loadedOnce) { loadedOnce = true; Ready(); }
                 if (e.IsSuccess) SendLaunch();
+                // (a page that did not load: Simpl's failure in its place, never the web view's own error page)
+                else if (WebFailure.ShowsOwnPage(e)) CouldNotLoad($"its page, {e.WebErrorStatus}", WebFailure.Why(e.WebErrorStatus));
+            };
+            core.ProcessFailed += (_, e) =>
+            {
+                if (WebFailure.TookPage(e.ProcessFailedKind)) CouldNotLoad($"its page's process, {e.ProcessFailedKind}", WebFailure.Stopped);
             };
             // (a window the page opens — a sign-in, a resource — shown in place, as a tab would be)
             core.NewWindowRequested += (_, e) => { e.Handled = true; core.Navigate(e.Uri); };
@@ -248,8 +254,30 @@ internal sealed class LookPopupView
             Log.Write($"{kind.Name} popup: could not open: {e.Message}");
             if (closed) return;
             web.Visibility = Visibility.Hidden;
-            state.Content = AltaLook.Failure($"{FullName} could not open", e.Message);
+            state.Content = WebFailure.View($"{FullName} couldn’t open", e.Message, Reopen, null);
         }
+    }
+
+    /// <summary>Its page could not load (<paramref name="what"/>, for the log): the web view out of sight (nothing can be
+    /// drawn over it) and Simpl's failure in its place, Try again opening the assignment afresh — its launch is one-time,
+    /// so the page itself cannot simply be asked for again.</summary>
+    private void CouldNotLoad(string what, string why)
+    {
+        if (closed) return;
+        Log.Write($"{kind.Name} popup: could not load ({what}): Simpl's own error shown in its place");
+        webShown = false;
+        web.Visibility = Visibility.Hidden;
+        coverSlot.Visibility = Visibility.Collapsed;
+        coverSlot.Content = null;
+        coverSig = "";
+        state.Content = WebFailure.View($"{FullName} couldn’t load", why, Reopen, null);
+    }
+
+    /// <summary>Try again: this popup closed and the assignment opened afresh in another, by a new launch.</summary>
+    private void Reopen()
+    {
+        Close();
+        LookPopup.Show(engine, launch, over);
     }
 
     /// <summary>The page there (loaded once, or heard from): the opening card fades away over it.</summary>

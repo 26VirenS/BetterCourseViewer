@@ -588,7 +588,9 @@ public sealed class GradesScreen : Screen
   `toolLaunch`) — the tool alone, its school page only as the fallback, and on that page (0.3.24) Canvas's launch form,
   aimed at a new window behind "Load … in a new window", sent on in the window itself so the tool opens at once —; Back, Forward and Refresh at the title bar's
   left (Alt+←, Alt+→, F5), More at its right (Open in browser, Copy link), a thin line under the title bar while a page
-  loads, and why it could not open in the window with Try again. The page is in light, whatever Simpl's appearance or
+  loads, and why it could not open in the window with Try again — or, a page that did not load (its navigation failed,
+  its process stopped), Simpl's own failure in its place with Try again and Open in browser (`Kit/WebFailure.cs`),
+  never the web view's error page. The page is in light, whatever Simpl's appearance or
   Windows' (`LightPages`: the page and its frames are told the student prefers light, through the browser's DevTools
   protocol, per web view — the profile's preference is shared with the school's pages in the app, which follow the
   app; a frame in a process of its own is held at its start until it has been told, so a script that reads the
@@ -913,6 +915,16 @@ the room (`ShowNote`); a tool handing something to another from its popup (`Tool
 element's See it in 3D, Lewis Structures' Open in Molecule Builder, the Biomolecule Builder's molecule for the Molecule
 Builder) turns that popup into the other tool in place (`ToolsCenter.PopUp`), the other taking what it was handed once
 (`TakeInfo`). `--tool calc` opens one over the Tools page for a picture.
+
+A web tool never shows the web view's own error page ("File not found", ERR_…): the Calculator (GeoGebra's page,
+`extension/tools/geogebra/index.html`, which loads GeoGebra from geogebra.org — until the UI review it was shipped one
+folder up, and every Calculator showed Chromium's "File not found"), the graphing calculator (Desmos), a tool's window
+and Macmillan and ALEKS in their popup each put Simpl's own failure in its place (`Kit/WebFailure.cs`) where their page
+does not load — its navigation failed, its process stopped, or (the Calculator) GeoGebra did not answer, the page's
+"offline": "Calculator couldn’t load", why in a line the student can act on, Try again (the web view made afresh; for
+Macmillan and ALEKS, the assignment launched afresh) and Open in browser. The log says "calculator: could not load (…):
+Simpl's own error shown in its place" (`graph:`, `web window:`, `macmillan popup:` the same). For pictures,
+`--web-tool-error calc` has the Calculator ask for a page that is not there.
 
 A pin's flyout is the tool's quick version, under its whole name and (0.3.5) *Open full screen* at its top right (the
 Fluent FullScreenMaximize icon, its tooltip and screen-reader name "Open full screen"; `PinBar.QuickHead`), where Pop

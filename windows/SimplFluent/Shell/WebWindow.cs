@@ -22,8 +22,10 @@ namespace Simpl.Shell;
 /// under the title bar while a page loads. An external tool opens by the school's one-time launch (the engine's
 /// toolLaunch, as the Mac's window asks it): the tool alone, at the top of the window, not inside a second copy of the
 /// school's page — the school's own page for it only when the launch cannot be had. A tool that will not open says why
-/// in the window, with Try again. A window the page opens (window.open, a link to a new window) opens as another of
-/// these, its page in light too and the page that opened it still its opener.
+/// in the window, with Try again — and so does a page that will not load (its navigation failed, or its process
+/// stopped): Simpl's own failure in its place (Kit/WebFailure.cs), with Try again and Open in browser, never the web
+/// view's own error page. A window the page opens (window.open, a link to a new window) opens as another of these, its
+/// page in light too and the page that opened it still its opener.
 /// </summary>
 public sealed class WebWindow : FluentWindow
 {
@@ -75,6 +77,8 @@ public sealed class WebWindow : FluentWindow
     /// in this one instead.</summary>
     private DateTime pressedAt = DateTime.MinValue;
     private int loadTries;
+    /// <summary>When a download last began: the navigation that turned into it ends unfinished, which is no failure.</summary>
+    private DateTime downloadAt = DateTime.MinValue;
     /// <summary>A window a page asked for, still to be given this one's web view (<see cref="Opened"/>).</summary>
     private (CoreWebView2NewWindowRequestedEventArgs Asked, CoreWebView2Deferral Deferral)? asked;
 
@@ -218,17 +222,38 @@ public sealed class WebWindow : FluentWindow
                     Title = web.CoreWebView2.DocumentTitle;
                     bar.Title = Title;
                 };
-                web.CoreWebView2.DownloadStarting += (_, e) => { e.Handled = true; FilePreview.Downloading(e); };
+                web.CoreWebView2.DownloadStarting += (_, e) => { downloadAt = DateTime.UtcNow; e.Handled = true; FilePreview.Downloading(e); };
                 web.CoreWebView2.NavigationStarting += (_, _) => { loading.Visibility = Visibility.Visible; Paint(); };
                 web.CoreWebView2.NavigationCompleted += (_, e) =>
                 {
                     loading.Visibility = Visibility.Collapsed;
                     Paint();
                     LightPages.Tell(web.CoreWebView2, "web window");
+                    // (a page that did not load — no connection, a site that does not answer — Simpl's failure in its
+                    //  place, not the web view's own error page; a page the site sent, an error of its own, stays)
+                    if (WebFailure.ShowsOwnPage(e) && DateTime.UtcNow - downloadAt > TimeSpan.FromSeconds(3))
+                    {
+                        var at = Uri.TryCreate(web.CoreWebView2.Source, UriKind.Absolute, out var failedAt) && failedAt.Scheme is "http" or "https" ? failedAt : start;
+                        CouldNotLoad($"its page, {e.WebErrorStatus}", WebFailure.Why(e.WebErrorStatus), at, () => Again(at));
+                    }
                     if (e.IsSuccess) LoadToolOnPage();
                     if (recordAsked && e.IsSuccess && DevMode.On && recorder is { On: false } r) { recordAsked = false; _ = r.Start(Title); }
                 };
                 web.CoreWebView2.HistoryChanged += (_, _) => Paint();
+                // (the page's process stopped — it crashed, or stopped answering: loaded afresh by Try again; with the
+                //  browser's own process gone, the web view went with it, and Try again opens the window afresh)
+                web.CoreWebView2.ProcessFailed += (_, e) =>
+                {
+                    if (!WebFailure.TookPage(e.ProcessFailedKind)) return;
+                    Uri? at;
+                    try { at = Current(); } catch (Exception) { at = start; } // (the web view gone with its process)
+                    if (e.ProcessFailedKind == CoreWebView2ProcessFailedKind.BrowserProcessExited)
+                    {
+                        ready = false;
+                        CouldNotLoad($"its page's process, {e.ProcessFailedKind}", WebFailure.Stopped, at, Reopen);
+                    }
+                    else CouldNotLoad($"its page's process, {e.ProcessFailedKind}", WebFailure.Stopped, at, () => Again(at));
+                };
                 // (a window the page opens — "Open in a new window", a sign-in's popup — is another of these, in light: left
                 //  to the web view, it was a bare window of the browser's, dark when Windows is)
                 web.CoreWebView2.NewWindowRequested += (_, e) =>
@@ -490,21 +515,43 @@ public sealed class WebWindow : FluentWindow
     }
 
     /// <summary>Why it could not open, in the window (it stays open), and Try again.</summary>
-    private FrameworkElement Failed(string why)
+    private FrameworkElement Failed(string why) =>
+        WebFailure.View($"{name} couldn’t open", why, Open, start is { } u ? () => Engine.Engine.OpenExternally(u) : null);
+
+    /// <summary>The page could not load (<paramref name="what"/>, for the log): the web view out of sight — it is a window
+    /// of its own, which nothing drawn here can cover — and Simpl's failure over its row: Try again
+    /// (<paramref name="retry"/>) and Open in browser (<paramref name="at"/>, where there is one).</summary>
+    private void CouldNotLoad(string what, string why, Uri? at, Action retry)
     {
-        var again = K.Button("Try again", Open, accent: true);
-        again.HorizontalAlignment = HorizontalAlignment.Center;
-        var v = K.V(12,
-            K.Icon(SymbolRegular.PuzzlePiece24, 40, B.Text3),
-            K.Text($"{name} could not open", Ty.Subtitle).Center(),
-            K.Wrapped(why, Ty.Body, B.Text2).Center(),
-            again.Margin(0, 4, 0, 0));
-        v.HorizontalAlignment = HorizontalAlignment.Center;
-        v.VerticalAlignment = VerticalAlignment.Center;
-        v.MaxWidth = 440;
-        v.Margin = new Thickness(24);
-        Motion.FadeIn(v);
-        return new Grid { Children = { v } };
+        Log.Write($"web window: could not load ({what}): Simpl's own error shown in its place");
+        loading.Visibility = Visibility.Collapsed;
+        web.Visibility = Visibility.Hidden;
+        state.Content = WebFailure.View($"{name} couldn’t load", why, retry, at != null ? () => Engine.Engine.OpenExternally(at) : null);
+        Paint();
+    }
+
+    /// <summary>Try again on a page that did not load: asked for again, in this web view.</summary>
+    private void Again(Uri? at)
+    {
+        if (!ready || web.CoreWebView2 is not { } core) { Reopen(); return; }
+        state.Content = null;
+        web.Visibility = Visibility.Visible;
+        try
+        {
+            if (at != null) core.Navigate(at.ToString());
+            else core.Reload();
+        }
+        catch (Exception x) { Log.Write("web window: trying again: " + x.Message); Reopen(); }
+    }
+
+    /// <summary>Try again once the web view itself has gone (its browser's process with it): the window opened afresh in
+    /// its place, on what it was opened for.</summary>
+    private void Reopen()
+    {
+        var again = engine != null && launch != null ? new WebWindow(engine, launch, Owner) : start != null ? new WebWindow(start, name, Owner) : null;
+        if (again == null) return;
+        again.Show();
+        Close();
     }
 
     /// <summary>Where a launch leads on the school's site: its own page for the tool (the launch's fallback), or the page.</summary>
