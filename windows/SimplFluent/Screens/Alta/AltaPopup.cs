@@ -62,6 +62,10 @@ internal sealed class AltaPopupView
     /// <summary>(the UI review's W9) Simpl look — every publisher's popup's one look control: off is Alta's own page, as
     /// in a browser — and Alta's page dark or light, icon buttons in the heading where a switch and "Browser" were.</summary>
     private readonly System.Windows.Controls.Button lookButton, pageButton;
+    /// <summary>(0.3.107) Export questions: Alta gives one question at a time (each comes from the answer before), so
+    /// it is a picture of the one on screen, in a zip in Downloads.</summary>
+    private readonly System.Windows.Controls.Button exportButton;
+    private bool exporting;
     private readonly ContentControl startSlot = new() { Focusable = false, Visibility = Visibility.Collapsed };
     private readonly FrameworkElement skeleton = AltaParts.Skeleton();
     private readonly ContentControl stateSlot = new() { Focusable = false, Visibility = Visibility.Collapsed };
@@ -94,8 +98,10 @@ internal sealed class AltaPopupView
         // (0.3.41) Simpl look and Dark page in the heading, where they were above the objectives
         lookButton = PopupHeader.Look(() => SetBrowser(!session.Browser));
         pageButton = PopupHeader.Icon(SymbolRegular.WeatherMoon24, "Dark page", () => SetDark(!session.Dark));
+        exportButton = PopupHeader.Icon(SymbolRegular.ArrowDownload24, "Export questions", ExportQuestion);
+        exportButton.ToolTip = "Export questions: a picture of the question on screen, in a zip in Downloads";
         var head = AltaLook.Header(engine, tileSlot, title, subtitle, Close, "Close — your progress is kept by Alta", codeSlot, logsSlot);
-        head.Buttons(lookButton, pageButton);
+        head.Buttons(lookButton, pageButton, exportButton);
         header = head;
         PaintPage();
         root.Children.Add(header.Row(0));
@@ -239,6 +245,26 @@ internal sealed class AltaPopupView
             : dark ? "Alta’s page is dark: make it light" : "Alta’s page is light: make it dark";
         System.Windows.Automation.AutomationProperties.SetName(pageButton, "Dark page");
         System.Windows.Automation.AutomationProperties.SetItemStatus(pageButton, dark ? "On" : "Off");
+    }
+
+    /// <summary>(0.3.107) The question on screen pictured, in a zip in Downloads ("Week 3 questions.zip").</summary>
+    private async void ExportQuestion()
+    {
+        if (exporting || closed || session.Web.CoreWebView2 == null) return;
+        exporting = true;
+        exportButton.IsEnabled = false;
+        var ground = session.Dark && !session.Browser ? Color.FromRgb(0x1C, 0x1C, 0x1C) : Colors.White;
+        var result = await Support.QuestionExport.Run(session.Web, title.Text, "alta", Array.Empty<int>(), _ => Task.FromResult(true), ground);
+        exporting = false;
+        exportButton.IsEnabled = true;
+        if (closed) return;
+        if (result.Zip is { } zip)
+        {
+            if (Support.Launch.Get("shot") != null) return;
+            if (await Dialogs.Ask(over, "Questions exported", $"A picture of the question is in Downloads, in “{Path.GetFileName(zip)}”.", "Show in File Explorer", "OK"))
+                try { Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{zip}\"") { UseShellExecute = true }); } catch { /* (Explorer did not open) */ }
+        }
+        else Dialogs.Fail("Questions not exported", result.Why ?? "The question could not be pictured.", over);
     }
 
     /// <summary>(0.3.5) The page's part of the popup dressed in the page's look — nothing of its own when that is the

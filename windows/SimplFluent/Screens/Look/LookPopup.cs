@@ -107,6 +107,10 @@ internal sealed class LookPopupView
     private readonly TextBlock title = K.Text("", Ty.Subtitle);
     private readonly TextBlock subtitle = K.Text("", Ty.Body, B.Text2);
     private readonly System.Windows.Controls.Button lookButton;
+    /// <summary>(0.3.107) Export questions: a picture of each question, zipped into Downloads — and the question that was
+    /// open, opened again once it is done.</summary>
+    private readonly System.Windows.Controls.Button exportButton;
+    private bool exporting;
     private readonly FrameworkElement header;
     private PageLook? look;
     private Sheet? sheet;
@@ -147,8 +151,9 @@ internal sealed class LookPopupView
         lookButton = PopupHeader.Look(ToggleLook);
         var reload = PopupHeader.Icon(SymbolRegular.ArrowClockwise24, "Reload the page", () => { if (web.CoreWebView2 is { } c) c.Reload(); });
         var window = PopupHeader.Icon(SymbolRegular.WindowNew24, "Open in a window of its own, with Back, Forward and Open in browser", OpenInWindow);
+        exportButton = PopupHeader.Icon(SymbolRegular.ArrowDownload24, "Export questions", ExportQuestions);
         var head = AltaLook.Header(engine, K.IconTile(Symbol, Color, 32), title, subtitle, Close, $"Close — your work is kept by {kind.Title}");
-        head.Buttons(lookButton, reload, window);
+        head.Buttons(lookButton, exportButton, reload, window);
         header = head;
         root.Children.Add(header.Row(0));
 
@@ -378,8 +383,11 @@ internal sealed class LookPopupView
                     var k = S(r, "kind");
                     list.Add(new Question(n, k.Length > 0 ? k : "default", S(r, "label") is { Length: > 0 } l ? l : $"Q{n}", S(r, "sub"), S(r, "points")));
                 }
+            var firstHeard = questions.Count == 0 && list.Count > 0;
             questions = list;
             here = Math.Max(0, I(o, "here"));
+            // (the picture suite's --export-questions: exported once the questions are heard)
+            if (firstHeard && Launch.Take("", "export-questions") != null) System.Windows.Threading.Dispatcher.CurrentDispatcher.BeginInvoke(ExportQuestions);
             if (moving is { } m && m == here) moving = null;
             var was = cover;
             cover = o.TryGetProperty("cover", out var cv) && cv.ValueKind == JsonValueKind.Object ? CoverOf(cv) : null;
@@ -589,6 +597,49 @@ internal sealed class LookPopupView
         if (Math.Abs(zoomSaid - z) < 0.004) return;
         zoomSaid = z;
         Log.Write($"look popup: page at {Math.Round(z * 100)}% (its {wide:0} wide in {room:0})");
+    }
+
+    // ---- export questions ----
+
+    /// <summary>Macmillan's every question, opened in turn; ALEKS's the one on screen (it gives one at a time).</summary>
+    private bool ExportsAll => kind.Name == PageLook.Macmillan.Name && questions.Count > 0;
+
+    private async void ExportQuestions()
+    {
+        if (exporting || closed || web.CoreWebView2 == null || cover != null) return;
+        exporting = true;
+        exportButton.IsEnabled = false;
+        var from = here;
+        var list = ExportsAll ? questions.Select(q => q.N).ToList() : new List<int>();
+        Log.Write($"export questions: {Math.Max(list.Count, 1)} to picture ({kind.Name})");
+        var dark = Support.Appearance.Dark;
+        var result = await QuestionExport.Run(web, launch.Title, kind.Name, list, OpenQuestion,
+            dark ? Color.FromRgb(0x1C, 0x1C, 0x1C) : Colors.White,
+            (i, n) => exportButton.ToolTip = n > 1 && i < n ? $"Exporting {i + 1} of {n}…" : "Exporting…");
+        exporting = false;
+        exportButton.IsEnabled = true;
+        exportButton.ToolTip = "Export questions";
+        if (closed) return;
+        if (from > 0 && here != from) Go(from);
+        if (result.Zip is { } zip)
+        {
+            var file = System.IO.Path.GetFileName(zip);
+            if (Launch.Get("shot") != null) return; // (the picture suite: the dialog is in the picture its own way)
+            if (await Dialogs.Ask(over, "Questions exported", $"A picture of each question is in Downloads, in “{file}”.", "Show in File Explorer", "OK"))
+                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{zip}\"") { UseShellExecute = true }); } catch { /* (Explorer did not open) */ }
+        }
+        else Dialogs.Fail("Questions not exported", result.Why ?? "No question could be pictured.", over);
+    }
+
+    /// <summary>One of Macmillan's questions opened (its tile pressed, as the student would), and given a moment once it
+    /// is open for its maths and pictures to be drawn: false if the page never opened it.</summary>
+    private async Task<bool> OpenQuestion(int n)
+    {
+        if (here != n) { moving = null; Go(n); }
+        for (var i = 0; i < 80 && here != n; i++) await Task.Delay(100);
+        if (here != n) return false;
+        await Task.Delay(900);
+        return true;
     }
 
     private async void Go(int n)
