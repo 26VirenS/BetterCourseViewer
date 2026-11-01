@@ -157,9 +157,9 @@ window's side of it, `Shell/UpdateWatch.cs`:
 - **Kept waiting a day** (0.3.103, `Support/UpdatesForce.cs`, the Mac's 1.3.207): an update that goes in by itself
   (a Critical Update too) is waited for from when it is found (`updates:waitingSince`, with the version it was found
   on, `updates:waitingFrom`). Once it has waited 24 hours for what is open — any of the above, or the half minute
-  without a key that never came — a popup over the window ("Simpl Needs to Update", `UpdateWatch.Prompt`) says it
+  without a key that never came — a popup over the window ("Simpl needs to update", `UpdateWatch.Prompt`) says it
   goes in in half an hour and counts it down: **Later** puts it away, and it comes back once with five minutes left
-  (and at the next start while the time runs: `updates:forceAt` is kept); **Update Now** puts it in at once. When the
+  (and at the next start while the time runs: `updates:forceAt` is kept); **Update now** puts it in at once. When the
   half hour is up it goes in, whatever is open, as Restart to Update does (`update: v132 goes in now, its half hour
   up`). The half hour begins only with the window in view, not in the notification area, and nothing is asked
   while Simpl opens nor for ten seconds after, so what it opens with (a quiz asked for) is open first. **Never during a quiz**:
@@ -1311,7 +1311,14 @@ says "popup …: the window dimmed under it". The rest take nothing from the win
 ALEKS, feedback and the rubric (large, used beside the page), the light ones only there to be read or switched, and a
 plan's beside its block — the pane, the title bar, the search and the page behind go on working, and another place
 opened under one leaves it where it is; Windows' own shadow and rounded corners set it apart (pictures draw them,
-`Support/Shot.cs`). Its window is as large as its card,
+`Support/Shot.cs`). (The UI review's W9) Every popup has the one heading (`Kit/PopupHeader.cs`; a titled sheet's is its
+title with × at its right, a tool's `ToolHeading` is laid out the same): on the left a way back where there is one, the
+popup's tile and its title over a line about it; on the right what it adds (the tools pinned to the title bar, a quiz's
+clock, Ring | Grid), its icon buttons, each with its tooltip (Simpl look — the one look control of Knewton Alta,
+Macmillan and ALEKS, and of their pages in a tool's window — Dark page, Reload, Open in a window, Instructions, ⋯, a
+tool's pin), and a single × at the far right, where there were "× Close", "Close", "Done" and a bare ×. ALEKS says its
+topic once, in the question's heading over the page (in its rail only while that heading does not show), and its part of
+the course not at all where it is the assignment's own name. Its window is as large as its card,
 however small (WPF-UI's least window size, 460 × 320, let go). It opens centred over the page beside
 the pane (`MainWindow.PopupRoom`); it moves with the window, keeping where it was put, and its heading moves it (a
 press there that is not on a control, `Kit/Drag.cs`; `Handle` names the heading, else its top 60).
@@ -1447,7 +1454,8 @@ shown, and writes "alta: a pop-up shown as the app's own: …" with its words, f
 
 Alta's page is light (0.3.5), as it is made — the owner's choice for every outside tool (0.3.1) — whatever the app's
 appearance; until then Alta's popup followed the app, its question's colours turned over on a dark ground in dark mode.
-In the header, left of the tools (0.3.41; above the objectives before), the Light/Dark switch (`AltaPageBar`) chooses, and the choice is kept for
+In the heading (0.3.41; above the objectives before), Dark page — an icon button with its tooltip, the moon to make the
+page dark, the sun to make it light (the UI review's W9: a sun-and-moon switch before) — chooses, and the choice is kept for
 every assignment (`altaDark`; `--alta-look dark` starts a development run in Dark). Dark is the old dark look. The
 page is told the student prefers light (`LightPages`, as an outside tool's), and turned over by the page script when
 Dark is chosen. What the popup shows in the page's place — the page's ground, the panels behind its question, its
@@ -1457,12 +1465,13 @@ solid as the app's, and the accent's shades for it written as WPF-UI writes them
 when the look is the app's). The header, the objectives and the popup's own dialogs keep the app's appearance; a
 graph's window takes the page's look.
 
-Beside Light and Dark, Show browser (0.3.5; "Browser" where the column is narrow) shows Alta's own page as it is, as in
+Simpl look off (0.3.5's Show browser, a "Browser" button until the UI review's W9 made it the look control every
+publisher's popup has, Kit/PopupHeader.cs `Look`) shows Alta's own page as it is, as in
 a browser — the same web view, signed in, on white: its header, title and mastery, its own buttons, its cover, its
 pop-ups in it — in place of the question laid out; the objectives stay and keep reading the page. Off, the question is
 laid out again (a pop-up open in the page taken up as the app's again). The page script is told before each page and
 at once (`window.__simplBrowser`, `__simplBrowserNow`): it lays nothing out, hides nothing, gives the app no buttons or
-panels and never veils the page; Light and Dark wait meanwhile. Kept for every assignment (`altaBrowser`;
+panels and never veils the page; Dark page waits meanwhile. Kept for every assignment (`altaBrowser`;
 `--alta-browser` starts a development run with it).
 
 ## Icons

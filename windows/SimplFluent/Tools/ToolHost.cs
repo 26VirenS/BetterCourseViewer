@@ -658,10 +658,11 @@ public sealed class ToolPopup
         var told = new ToolHeading.Told();
         var c = new ToolContext { Engine = engine, Key = toolKey, Owner = window, Close = CloseSoon, ShowPage = told.Page, ShowNote = told.Note };
         var body = ToolRegistry.Full(c) ?? Missing(kind);
-        var close = K.IconButton(SymbolRegular.Dismiss24, () => sheet.Close(), $"Close {kind.Name} (Esc)", 16, 36);
+        var close = PopupHeader.Icon(SymbolRegular.Dismiss24, $"Close {kind.Name} (Esc)", () => sheet.Close());
         var head = ToolHeader.Make(kind, c, close);
         told.Heading = head;
-        head.Margin = new Thickness(28, 16, 14, 12);
+        // (every popup's heading's room — Kit/PopupHeader.cs — but 28 in from the left, where the tool's page starts)
+        head.Margin = new Thickness(28, 12, 12, 12);
         var g = K.Rows("auto, *", head.Row(0), ToolKit.Edged(body).Row(1));
         g.Bg(B.Window);
         host.Content = g;
@@ -698,10 +699,10 @@ public sealed class ToolPopup
 }
 
 /// <summary>
-/// A tool's heading in its popup: its tile, its name — and the page of its own that shows, after it ("Tool › Page", the
-/// tool's name going back to its first page) — and its line, its own controls (a biology tool's pages, the Periodic
-/// Table's search and tour), its pin and the popup's ×. Where the popup is too narrow for its controls beside its name,
-/// they go on a line of their own under it.
+/// A tool's heading in its popup, laid out as every popup's (Kit/PopupHeader.cs): its tile, its name — and the page of its
+/// own that shows, after it ("Tool › Page", the tool's name going back to its first page) — over its line, its own
+/// controls (a biology tool's pages, the Periodic Table's search and tour), its pin (an icon button with its tooltip) and
+/// the popup's ×. Where the popup is too narrow for its controls beside its name, they go on a line of their own under it.
 /// </summary>
 public sealed class ToolHeading : Grid
 {
@@ -726,16 +727,16 @@ public sealed class ToolHeading : Grid
         foreach (var w in new[] { "auto", "*", "auto", "auto", "auto" }) ColumnDefinitions.Add(new ColumnDefinition { Width = K.Length(w) });
         RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        tile = K.IconTile(kind.Symbol, kind.Color, 44).Margin(0, 0, 14, 0);
+        tile = K.IconTile(kind.Symbol, kind.Color, 32).Margin(0, 0, 12, 0);
         Children.Add(tile.Col(0));
         words.VerticalAlignment = VerticalAlignment.Center;
         Children.Add(words.Col(1));
         if (ToolRegistry.Header(c) is { } e) { extra = e; e.VerticalAlignment = VerticalAlignment.Center; Children.Add(e.Col(2)); }
         // (a header full of the tool's own controls — a biology tool's pages — the pin a symbol alone; (0.3.105) a Simpl
         //  Community tool has none: the title bar's pins are Simpl's own tools)
-        pin = CommunityTools.IsKey(kind.Key) ? new Border() : ToolHeader.PinButton(kind, squished: ToolHeader.Squished(kind.Key));
+        pin = CommunityTools.IsKey(kind.Key) ? new Border() : ToolHeader.PinButton(kind);
         Children.Add(pin.Col(3));
-        if (close is FrameworkElement x) { this.close = x; x.Margin = new Thickness(8, 0, 0, 0); x.VerticalAlignment = VerticalAlignment.Center; Children.Add(x.Col(4)); }
+        if (close is FrameworkElement x) { this.close = x; x.Margin = new Thickness(4, 0, 0, 0); x.VerticalAlignment = VerticalAlignment.Center; Children.Add(x.Col(4)); }
         Lay(false);
         SizeChanged += (_, e2) => { if (e2.WidthChanged) Fits(); };
     }
@@ -778,11 +779,11 @@ public sealed class ToolHeading : Grid
         titleRow.Children.Clear();
         if (name == null)
         {
-            titleRow.Children.Add(K.Text(kind.Name, Ty.Title));
+            titleRow.Children.Add(K.Text(kind.Name, Ty.Subtitle));
             Note(noteWanted);
             return;
         }
-        var t = K.Text(kind.Name, Ty.Title, back != null ? B.Text2 : B.Text);
+        var t = K.Text(kind.Name, Ty.Subtitle, back != null ? B.Text2 : B.Text);
         if (back != null)
         {
             var b = K.Subtle(t, back, new Thickness(2, 0, 2, 0));
@@ -791,8 +792,8 @@ public sealed class ToolHeading : Grid
             titleRow.Children.Add(b);
         }
         else titleRow.Children.Add(t);
-        titleRow.Children.Add(K.Icon(SymbolRegular.ChevronRight20, 16, B.Text2).Margin(10, 6, 10, 0));
-        var shown = K.Text(name, Ty.Title);
+        titleRow.Children.Add(K.Icon(SymbolRegular.ChevronRight20, 14, B.Text2).Margin(8, 4, 8, 0));
+        var shown = K.Text(name, Ty.Subtitle);
         shown.TextTrimming = TextTrimming.CharacterEllipsis;
         shown.ToolTip = name;
         titleRow.Children.Add(shown);
@@ -846,28 +847,19 @@ public static class ToolHeader
 {
     public static ToolHeading Make(ToolsScreen.Kind kind, ToolContext c, UIElement? close) => new(kind, c, close);
 
-    /// <summary>A tool whose own controls fill its heading (a biology tool's pages): its pin a symbol alone.</summary>
-    public static bool Squished(string key) => BioTools.Pages(key).Count > 1;
-
     /// <summary>
-    /// A tool's pin in its heading, named for what a press does (the Mac's "Pin to Toolbar" / "Unpin from Toolbar"): "Pin
-    /// to title bar", or "Unpin" while it is pinned — or, in a heading full of the tool's own controls, its symbol alone.
+    /// A tool's pin in its heading, an icon button as every popup heading's are (Kit/PopupHeader.cs), named for what a press
+    /// does (the Mac's "Pin to Toolbar" / "Unpin from Toolbar"): the pin to keep it in the title bar, the crossed pin while it
+    /// is there — its tooltip saying which.
     /// </summary>
-    public static FrameworkElement PinButton(ToolsScreen.Kind kind, bool squished = false)
+    public static FrameworkElement PinButton(ToolsScreen.Kind kind)
     {
         var host = new ContentControl { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
         void Draw()
         {
             var on = ToolsPins.IsPinned(kind.Key);
-            var b = K.Button(on ? "Unpin" : "Pin to title bar", () => ToolsPins.Toggle(kind.Key), icon: on ? SymbolRegular.PinOff24 : SymbolRegular.Pin24);
-            if (squished)
-            {
-                b.Icon = null;
-                b.Content = K.Icon(on ? SymbolRegular.PinOff24 : SymbolRegular.Pin24, 16, B.Text);
-                b.MinWidth = 0;
-                b.Padding = new Thickness(10, 6, 10, 6);
-            }
-            b.ToolTip = on ? $"Take {kind.Name} out of the title bar" : $"Keep {kind.Name} in the title bar on every screen";
+            var b = PopupHeader.Icon(on ? SymbolRegular.PinOff24 : SymbolRegular.Pin24,
+                on ? $"Unpin {kind.Name} from the title bar" : $"Pin {kind.Name} to the title bar: it stays there on every screen", () => ToolsPins.Toggle(kind.Key));
             System.Windows.Automation.AutomationProperties.SetName(b, on ? $"Unpin {kind.Name}" : $"Pin {kind.Name} to the title bar");
             host.Content = b;
         }

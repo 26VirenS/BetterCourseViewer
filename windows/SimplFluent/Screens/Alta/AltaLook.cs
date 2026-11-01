@@ -13,8 +13,9 @@ namespace Simpl.Screens;
 /// What the Knewton Alta popup is drawn with (the Mac's quiz-style popup): a popup floating over the
 /// window (Shell/FloatPopup.cs: homework, not a quiz — the rest of the window stays at hand while it is open), as large as
 /// the window under its title bar less a margin — over the pane too — and sized by its edges, the size kept for the next
-/// time (each vendor's apart), its own header row — the vendor's tile, the assignment's name over a line
-/// about it, and Close — that it is moved by, the ground under the vendor's page, the popup's Loading and failure in its
+/// time (each vendor's apart), its own heading — every popup's (Kit/PopupHeader.cs): the vendor's tile, the assignment's
+/// name over a line about it, the tools pinned to the title bar, the popup's icon buttons (Simpl look first) and × — that
+/// it is moved by, the ground under the vendor's page, the popup's Loading and failure in its
 /// place, and dialogs of the popup's own (a Windows 11 ContentDialog over the popup, the page stepped aside: nothing can
 /// be drawn over a web view).
 /// </summary>
@@ -45,19 +46,15 @@ internal static class AltaLook
         Keyboard.Focus(body);
     }
 
-    /// <summary>The popup's header row: the vendor's tile, the assignment's name over its line, what the popup adds, the
-    /// tools pinned to the title bar, and Close.</summary>
-    public static FrameworkElement Header(Engine.Engine engine, FrameworkElement tile, TextBlock title, TextBlock subtitle, UIElement? extra, Action close, string closeTip)
+    /// <summary>The popup's heading (every popup's: Kit/PopupHeader.cs): the vendor's tile, the assignment's name over its
+    /// line, what the popup adds (<paramref name="extra"/>, a developer's buttons) and the tools pinned to the title bar —
+    /// the popup's icon buttons go in after (<see cref="PopupHeader.Buttons"/>), Simpl look first — and ×.</summary>
+    public static PopupHeader Header(Engine.Engine engine, UIElement tile, TextBlock title, TextBlock subtitle, Action close, string closeTip, params UIElement?[] extra)
     {
-        var words = K.V(0, title, subtitle);
-        words.VerticalAlignment = VerticalAlignment.Center;
-        var closeButton = K.Button("Close", close, icon: SymbolRegular.Dismiss24);
-        closeButton.ToolTip = closeTip;
-        var trailing = K.H(8, extra, new Simpl.Tools.PinBar(engine, inPopup: true), closeButton);
-        trailing.VerticalAlignment = VerticalAlignment.Center;
-        var row = K.Columns("auto, *, auto", tile.Margin(0, 0, 14, 0).Col(0), words.Col(1), trailing.Margin(12, 0, 0, 0).Col(2));
-        row.Margin = new Thickness(24, 14, 16, 14);
-        return row;
+        var h = new PopupHeader(title, subtitle, close, closeTip, tile);
+        h.Extra(extra);
+        h.Extra(new Simpl.Tools.PinBar(engine, inPopup: true));
+        return h;
     }
 
     /// <summary>(2.99.33) The Canvas assignment a vendor's popup opens — its name, and its due line as every screen writes it

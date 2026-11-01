@@ -58,8 +58,9 @@ public sealed class WebWindow : FluentWindow
     private PageRecorder? recorder;
     /// <summary>(a picture run's --record: the recording begun by itself once the page has loaded)</summary>
     private bool recordAsked = Simpl.Support.Launch.Flag("record");
-    /// <summary>(0.3.92) On Macmillan Learning's pages, (0.3.93) and ALEKS's, Simpl Look: Simpl's look over the page
-    /// (<see cref="PageLook"/>), or the page as the tool draws it.</summary>
+    /// <summary>(0.3.92) On Macmillan Learning's pages, (0.3.93) and ALEKS's, Simpl look — every publisher's popup's one
+    /// look control (Kit/PopupHeader.cs): Simpl's look over the page (<see cref="PageLook"/>), or the page as the tool
+    /// draws it.</summary>
     private readonly Button lookButton;
     private PageLook? look;
     /// <summary>The line under the title bar while a page loads.</summary>
@@ -120,7 +121,7 @@ public sealed class WebWindow : FluentWindow
         rec.VerticalAlignment = VerticalAlignment.Center;
         recSaid.VerticalAlignment = VerticalAlignment.Center;
         recSaid.Margin = new Thickness(0, 0, 4, 0);
-        lookButton = K.IconButton(SymbolRegular.Sparkle24, ToggleLook, "Simpl Look", 16, 40);
+        lookButton = K.IconButton(SymbolRegular.Sparkle24, ToggleLook, "Simpl look", 16, 40);
         lookButton.Height = 36;
         lookButton.VerticalAlignment = VerticalAlignment.Center;
         var lead = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(4, 6, 0, 6), VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Left, Children = { back, forward, refresh } };
@@ -454,18 +455,13 @@ public sealed class WebWindow : FluentWindow
         PaintLook();
     }
 
-    /// <summary>Simpl Look, on a page of Macmillan's or ALEKS's: lit while that tool's look is on.</summary>
+    /// <summary>Simpl look, on a page of Macmillan's or ALEKS's: lit while that tool's look is on, as in their popup.</summary>
     private void PaintLook()
     {
         var k = PageLook.For(Current());
         var on = k != null && look?.On(k) != false;
         lookButton.Visibility = look != null && k != null ? Visibility.Visible : Visibility.Collapsed;
-        lookButton.Content = K.Icon(SymbolRegular.Sparkle24, 16, on ? B.Accent : B.Text, filled: on);
-        var title = k?.Title ?? "the tool";
-        lookButton.ToolTip = on
-            ? $"Simpl's look is on: {title}'s page laid out as an Alta question is. Click to show it as {title} draws it."
-            : $"Show {title}'s page in Simpl's look, laid out as an Alta question is";
-        System.Windows.Automation.AutomationProperties.SetName(lookButton, on ? "Simpl Look, on" : "Simpl Look, off");
+        PopupHeader.PaintLook(lookButton, on, k?.Title ?? "the tool");
     }
 
     /// <summary>(0.3.103) The address showing now (or the one to open): an update never goes in over a quiz on it.</summary>

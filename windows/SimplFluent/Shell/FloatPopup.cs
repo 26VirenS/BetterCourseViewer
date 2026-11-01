@@ -168,7 +168,7 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
 
         // what it shows: the sheet's title (and × beside it), what it holds, its buttons — or a sheet of its own making
         // edge to edge, the × over its top right corner unless its heading has a Close of its own
-        var close = s.OwnClose ? null : K.IconButton(SymbolRegular.Dismiss24, Dismiss, "Close (Esc)", 16, 36);
+        var close = s.OwnClose ? null : PopupHeader.Icon(SymbolRegular.Dismiss24, "Close (Esc)", Dismiss);
         var titled = !s.Bare && !string.IsNullOrEmpty(s.Title);
         var content = SheetHost.Content(s, Press, titled ? close : null);
         root.Children.Add(content);

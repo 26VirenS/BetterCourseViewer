@@ -21,7 +21,8 @@ namespace Simpl.Screens;
 /// there are several; on the right the comments on the submission. With none, there is no column saying "No comments"
 /// beside the notes the teacher left on the page (which Canvas's API cannot read): the file has the whole width, and the
 /// header says there are no comments on this submission. A file the school has no viewer for is fetched and shown here;
-/// work with no file at all shows the submission's own page; handed-in text shows as text. Escape or Done closes it.
+/// work with no file at all shows the submission's own page; handed-in text shows as text. Its heading is every popup's
+/// (Kit/PopupHeader.cs): which file, ⋯ for it, and ×; Escape or × closes it.
 /// </summary>
 internal sealed class SubmissionReview : Grid
 {
@@ -92,11 +93,9 @@ internal sealed class SubmissionReview : Grid
     {
         // (with no comments on the submission, the header says so: no column beside the page saying it)
         var line = a.Comments.Count == 0 ? $"{a.Title} · No comments on this submission" : a.Title;
-        var titles = K.V(1, K.Text("Feedback", Ty.BodyStrong), K.Text(line, Ty.Body, B.Text2));
-        titles.VerticalAlignment = VerticalAlignment.Center;
-        var g = K.Columns("auto, *, auto, auto, auto",
-            K.IconTile(SymbolRegular.Comment24, K.Hex(a.Color, Appearance.Accent), 30).Margin(0, 0, 12, 0).Col(0),
-            titles.Col(1));
+        // (the UI review's W9: every popup's heading, × at its far right where Done was)
+        var g = new PopupHeader(K.Text("Feedback", Ty.Subtitle), K.Text(line, Ty.Body, B.Text2), () => Done?.Invoke(), "Close (Esc)",
+            K.IconTile(SymbolRegular.Comment24, K.Hex(a.Color, Appearance.Accent), 32));
         if (files.Count > 1)
         {
             // which file to look at
@@ -109,28 +108,24 @@ internal sealed class SubmissionReview : Grid
                 picked = files[pick.SelectedIndex];
                 ShowWork();
             };
-            g.Children.Add(pick.Margin(12, 0, 0, 0).Col(2));
+            g.Extra(pick);
         }
-        g.Children.Add(more.Margin(8, 0, 0, 0).Col(3));
-        var done = K.Button("Done", () => Done?.Invoke(), accent: true);
-        done.ToolTip = "Close (Esc)";
-        g.Children.Add(done.Margin(8, 0, 0, 0).Col(4));
-        g.Margin = new Thickness(20, 14, 20, 14);
+        g.Buttons(more);
         return g;
     }
 
-    /// <summary>The More menu for the file looked at (its app, Download, Copy Link).</summary>
+    /// <summary>The More menu for the file looked at (its app, Download, Copy link).</summary>
     private void PaintMore()
     {
         if (picked is not { } f) { more.Content = null; return; }
         Button? b = null;
-        b = K.IconButton(SymbolRegular.MoreHorizontal24, () =>
+        b = PopupHeader.Icon(SymbolRegular.MoreHorizontal24, $"More for {f.Name}", () =>
         {
             var m = AssignKit.FileMenu(engine, f.Url, f.Name);
             m.PlacementTarget = b;
             m.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
             m.IsOpen = true;
-        }, $"More for {f.Name}");
+        });
         more.Content = b;
     }
 
