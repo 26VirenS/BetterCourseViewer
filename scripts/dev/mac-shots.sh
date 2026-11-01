@@ -543,8 +543,9 @@ ui_review() {
   MODE=dark shoot dark-05m-calendar-month-todo 22 -SimplPlace calendar -SimplCalView month -SimplSidebar hidden
   MODE=light shoot light-05k-calendar-todo-menu 24 -SimplPlace calendar -SimplCalView month -SimplSidebar hidden -SimplTodoMenu YES
   # (M5) the month with the sidebar shown, 1024 points wide: To Do put away by the month, so its days are wide enough to
-  # name their items; and To Do kept beside it as Show To Do keeps it (-SimplTodoKept), its days too narrow for names
-  # showing their items as dots and "+N" (month_check)
+  # name their items — (M29) the head's tools on a line of their own, named where there is room; and To Do kept beside
+  # it as Show To Do keeps it (-SimplTodoKept), its days too narrow for names showing their items as dots and "+N"
+  # (month_check)
   MODE=light shoot light-05n-calendar-month-narrow 22 -SimplPlace calendar -SimplCalView month
   MODE=light shoot light-05o-calendar-month-dots 22 -SimplPlace calendar -SimplCalView month -SimplTodoKept YES
   MODE=light shoot light-05x-calendar-week-seven 22 -SimplPlace calendar -SimplCalView week -SimplCalWeekDays 7 -SimplSidebar hidden
@@ -1202,11 +1203,13 @@ whatsnew_check() {
 
 # (M5) month_check: To Do & Calendar's month 1024 points wide with the sidebar shown, as month-check.txt — the month
 # put To Do away and its days named their items (light-05n-calendar-month-narrow); with To Do kept beside it
-# (-SimplTodoKept), its days, too narrow for names, showed their items as dots (light-05o-calendar-month-dots). What
-# each said last is what it settled on (CalendarView.swift: "calendar month: …", in the screenshot suite only).
+# (-SimplTodoKept), its days, too narrow for names, showed their items as dots (light-05o-calendar-month-dots); (M29)
+# and the head, its tools on a line of their own there, named To Do and Sync at least, not their symbols alone. What
+# each said last is what it settled on (CalendarView.swift: "calendar month: …", "calendar head: …", in the
+# screenshot suite only).
 month_check() {
   local out="$OUT_ABS/month-check.txt" n="$OUT_ABS/console-light-05n-calendar-month-narrow.txt" k="$OUT_ABS/console-light-05o-calendar-month-dots.txt"
-  local todo days
+  local todo days head
   : > "$out"
   say() { if [ "$1" = 0 ]; then echo "ok   $2" >> "$out"; else echo "FAIL $2" >> "$out"; fi; }
   todo="$(grep -o 'calendar month: To Do .*' "$n" 2>/dev/null | tail -1)"
@@ -1218,6 +1221,9 @@ month_check() {
   days="$(grep -o 'calendar month: days .*' "$k" 2>/dev/null | tail -1)"
   [ "$todo" = 'calendar month: To Do beside the month' ] && printf '%s' "$days" | grep -q 'items as dots$'
   say $? "with To Do kept beside it, days too narrow for names showed dots: ${todo:-nothing said}; ${days:-nothing said}"
+  head="$(grep -o 'calendar head: .*' "$n" 2>/dev/null | tail -1)"
+  printf '%s' "$head" | grep -q 'named: .*To Do' && printf '%s' "$head" | grep -q 'named: .*Sync'
+  say $? "the head named its tools where it had the room: ${head:-nothing said}"
   cat "$out"
   if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::month: /'; return 1; fi
 }

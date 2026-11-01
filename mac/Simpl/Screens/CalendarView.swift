@@ -369,7 +369,8 @@ struct CalendarView: View {
 
     /// (1.3.170, the web's 2.99.112) The period's big title and what it holds under it, ‹ › Today beside it; then To Do,
     /// Find Appointment, Sync, Calendars and Week, Month, Agenda at the line's end — their words given up for their
-    /// symbols, and then a line of their own, as the page narrows.
+    /// symbols, and then a line of their own, as the page narrows. (M29) The words given up one tool at a time, the widest
+    /// first, so a narrower page still names what it can (on a line of their own, the tools named again as there is room).
     /// `todoAway`: the month has put To Do away for its days' room (M5): its button shows it as not beside.
     private func heading(_ d: CalendarData, room: CGFloat, todoAway: Bool = false) -> some View {
         let fit = headLayout(room)
@@ -398,6 +399,21 @@ struct CalendarView: View {
             }
         }
         .animation(Motion.gentle, value: loading)
+        // (M29, the screenshot suite: how the head was laid out and which tools it named, for month_check)
+        .task(id: "\(fit.oneLine)|\(fit.words)|\(mode)") {
+            guard Self.shooting else { return }
+            NSLog("[Simpl] calendar head: %@, its tools named: %@", fit.oneLine ? "one line" : "two lines", namedTools(fit.words))
+        }
+    }
+
+    /// (M29) The tools `words` names, as the console says them: "To Do, Sync, Calendars", or "none".
+    private func namedTools(_ words: Int) -> String {
+        var named: [String] = []
+        if mode != "list" && words >= 1 { named.append("To Do") }
+        if !engine.onBrightspace && words >= 3 { named.append("Find Appointment") }
+        if words >= 1 { named.append("Sync") }
+        if words >= 2 { named.append("Calendars") }
+        return named.isEmpty ? "none" : named.joined(separator: ", ")
     }
 
     @ViewBuilder
@@ -409,28 +425,41 @@ struct CalendarView: View {
         }
     }
 
-    /// How the head is laid out in `room`: on one line or two, the tools with their words or their symbols alone — by
-    /// how wide the title is at its size and how wide the tools are (measured once, as drawn at the large control size).
-    private func headLayout(_ room: CGFloat) -> (oneLine: Bool, words: Bool) {
+    /// How the head is laid out in `room`: on one line or two, and (M29) how many of the tools carry their words
+    /// (`toolsWidth`) — the most that fit beside the title, else the most that fit on a line of their own — by how wide
+    /// the title is at its size and how wide the tools are (measured once, as drawn at the large control size).
+    private func headLayout(_ room: CGFloat) -> (oneLine: Bool, words: Int) {
         let title = max(Self.textWidth(periodTitle, NSFont.systemFont(ofSize: 34, weight: .bold)),
                         Self.textWidth(data.map(periodLine) ?? "", NSFont.systemFont(ofSize: 14)))
         let lead = title + 14 + Self.pagerWidth + 22
-        let appointments = engine.onBrightspace ? 0 : 1
-        let words = Self.toolsFixed + Self.wordsWidth + CGFloat(appointments) * Self.findWords
-        let symbols = Self.toolsFixed + Self.symbolsWidth + CGFloat(appointments) * Self.findSymbol
-        if lead + words <= room { return (true, true) }
-        if lead + symbols <= room { return (true, false) }
-        return (false, words <= room)
+        let levels = Array(0...Self.wordsMost)
+        if let w = levels.last(where: { lead + toolsWidth(words: $0) <= room }) { return (true, w) }
+        return (false, levels.last(where: { toolsWidth(words: $0) <= room }) ?? 0)
+    }
+
+    /// (M29) How wide the tools are with `words` of them named: 1, To Do and Sync; 2, Calendars too; 3, Find Appointment
+    /// too (the widest, so the last named) — the rest as their symbols alone.
+    private func toolsWidth(words: Int) -> CGFloat {
+        let todo: CGFloat = mode != "list" && words >= 1 ? Self.todoWords : 0
+        let sync = words >= 1 ? Self.syncWords : Self.syncSymbol
+        let calendars = words >= 2 ? Self.calendarsWords : Self.calendarsSymbol
+        let find: CGFloat = engine.onBrightspace ? 0 : (words >= 3 ? Self.findWords : Self.findSymbol)
+        return Self.toolsFixed + todo + sync + calendars + find
     }
 
     /// The widths the head is laid out by: ‹ › Today; To Do's button, Week Month Agenda and the room between the tools;
-    /// Sync and Calendars with their words or without; Find Appointment with or without.
+    /// Sync, Calendars and Find Appointment with their words or without; (M29) what To Do's word adds beside its symbol.
     private static let pagerWidth: CGFloat = 158
     private static let toolsFixed: CGFloat = 42 + 236 + 4 * 8
-    private static let wordsWidth: CGFloat = 82 + 142
-    private static let symbolsWidth: CGFloat = 42 + 70
+    private static let syncWords: CGFloat = 82
+    private static let syncSymbol: CGFloat = 42
+    private static let calendarsWords: CGFloat = 142
+    private static let calendarsSymbol: CGFloat = 70
     private static let findWords: CGFloat = 170
     private static let findSymbol: CGFloat = 42
+    private static let todoWords: CGFloat = 48
+    /// (M29) Every tool named.
+    private static let wordsMost = 3
 
     private static func textWidth(_ s: String, _ font: NSFont) -> CGFloat {
         ceil((s as NSString).size(withAttributes: [.font: font]).width)
@@ -482,8 +511,10 @@ struct CalendarView: View {
         }
     }
 
-    /// To Do beside the calendar or not; Find Appointment, Sync and Calendars (how many are shown); and the view.
-    private func tools(_ d: CalendarData, words: Bool, todoAway: Bool) -> some View {
+    /// To Do beside the calendar or not; Find Appointment, Sync and Calendars (how many are shown); and the view. (M29)
+    /// `words`: how many of them carry their words beside their symbols (`toolsWidth`); the rest, their symbols alone,
+    /// say their names while the pointer rests on them.
+    private func tools(_ d: CalendarData, words: Int, todoAway: Bool) -> some View {
         let shown = d.calendars.filter(\.on).count + linkedShown
         // (M5) To Do as it is now: put away by a narrow month, it reads as hidden, and Show To Do keeps it beside the month
         let todoNow = todoOn && !todoAway
@@ -495,11 +526,13 @@ struct CalendarView: View {
                         todoKept = !todoNow
                     }
                 } label: {
-                    Label(todoNow ? "Hide To Do" : "Show To Do", systemImage: "sidebar.left")
-                        .labelStyle(HoverWordsLabel())
+                    // (M29) its word where there is room — "To Do", lit while it is beside the calendar — else its symbol
+                    Label(words >= 1 ? "To Do" : (todoNow ? "Hide To Do" : "Show To Do"), systemImage: "sidebar.left")
+                        .labelStyle(ToolLabel(words: words >= 1))
                 }
                 .glassButton(tint: todoNow ? Theme.accent : nil)
-                .hoverName(todoNow ? "Hide To Do" : "Show To Do")
+                .hoverName(todoNow ? "Hide To Do" : "Show To Do", when: words < 1)
+                .accessibilityLabel(todoNow ? "Hide To Do" : "Show To Do")
                 .accessibilityHint(todoNow ? "Hides To Do beside the calendar" : todoAway ? "To Do was put away to give the month’s days room; shows it beside the month anyway" : "Shows To Do beside the calendar, to drag work onto a day or a time")
                 .accessibilityAddTraits(todoNow ? .isSelected : [])
             }
@@ -510,27 +543,27 @@ struct CalendarView: View {
                     // (1.3.171) a person with a clock — office hours, a time with someone — where a calendar with a clock
                     // was taken at a glance for Calendars' calendar with a tick
                     Label("Find Appointment", systemImage: "person.badge.clock")
-                        .labelStyle(ToolLabel(words: words))
+                        .labelStyle(ToolLabel(words: words >= 3))
                 }
                 .glassButton()
-                .hoverName("Find Appointment", when: !words)
+                .hoverName("Find Appointment", when: words < 3)
                 .accessibilityHint("Office hours, conferences and sign-ups with a time to reserve")
             }
             Button {
                 syncing = true
             } label: {
                 Label("Sync", systemImage: "arrow.triangle.2.circlepath")
-                    .labelStyle(ToolLabel(words: words))
+                    .labelStyle(ToolLabel(words: words >= 1))
             }
             .glassButton()
-            .hoverName("Sync", when: !words)
+            .hoverName("Sync", when: words < 1)
             .accessibilityHint("Connect Apple, Google or Outlook calendars, and send Simpl to them")
             Button {
                 choosing.toggle()
             } label: {
                 HStack(spacing: 6) {
                     Label("Calendars", systemImage: "calendar.badge.checkmark")
-                        .labelStyle(ToolLabel(words: words))
+                        .labelStyle(ToolLabel(words: words >= 2))
                     Text("\(shown)")
                         .font(.sCaption.weight(.semibold).monospacedDigit())
                         .foregroundStyle(Theme.accentText)
@@ -541,7 +574,7 @@ struct CalendarView: View {
                 }
             }
             .glassButton()
-            .hoverName("Calendars", when: !words && !choosing)
+            .hoverName("Calendars", when: words < 2 && !choosing)
             .accessibilityHint("Choose the calendars shown (\(shown) shown)")
             .popover(isPresented: $choosing) {
                 CalendarsPopover(choices: data?.calendars ?? [], openSync: openSync) { Task { await load(animated: true) } }
