@@ -1445,10 +1445,10 @@ on('POST', /^\/__upload\/(\w+)$/, (url, m, body, raw, bin) => {
   const fname = (part.match(/filename="([^"]*)"/) || [])[1] || pre.name;
   const bytes = part.slice(part.indexOf('\r\n\r\n') + 4).replace(/\r\n$/, '');
   const id = `uf${++fileSeq}`;
-  if (bin?.length) { // (2.99.135) the file's own bytes, kept for a suite to read back (GET /__mock/uploaded/<id>)
-    const b = bin.toString('latin1'), bnd = b.slice(0, b.indexOf('\r\n'));
+  if (bin?.length) { // (2.99.135) the file's own bytes, kept for a suite to read back (GET /__mock/uploaded/<id>), a byte a character
+    const b = bin.map((c) => c.toString('latin1')).join(''), bnd = b.slice(0, b.indexOf('\r\n'));
     const p2 = b.split(bnd).find((x) => /filename="/.test(x)) || '';
-    uploadedBytes.set(id, Buffer.from(p2.slice(p2.indexOf('\r\n\r\n') + 4).replace(/\r\n$/, ''), 'latin1'));
+    uploadedBytes.set(id, p2.slice(p2.indexOf('\r\n\r\n') + 4).replace(/\r\n$/, ''));
   }
   storedFiles.set(id, { id, display_name: fname, filename: fname, size: bytes.length, 'content-type': pre.content_type || 'application/octet-stream', url: `/files/${id}/download` });
   pendingUploads.delete(m[1]);
@@ -1456,7 +1456,7 @@ on('POST', /^\/__upload\/(\w+)$/, (url, m, body, raw, bin) => {
 });
 on('GET', /^\/api\/v1\/progress\/(\w+)$/, (url, m) => progresses.get(m[1]) || null);
 const uploadedBytes = new Map();
-on('GET', /^\/__mock\/uploaded\/(\w+)$/, (url, m) => (uploadedBytes.has(m[1]) ? { id: m[1], size: uploadedBytes.get(m[1]).length, b64: uploadedBytes.get(m[1]).toString('base64') } : null));
+on('GET', /^\/__mock\/uploaded\/(\w+)$/, (url, m) => (uploadedBytes.has(m[1]) ? { id: m[1], size: uploadedBytes.get(m[1]).length, latin1: uploadedBytes.get(m[1]) } : null));
 on('POST', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)\/submissions$/, (url, m, body) => {
   const a = allAssignments(m[1]).find((x) => x.id === m[2]);
   if (!a) return null;
@@ -1560,8 +1560,8 @@ const server = http.createServer((req, res) => {
   if (mockConfig.siteNames) renaming(res);
   const path = url.pathname.replace(/\/+$/, '') || '/';
   let raw = '';
-  const bin = []; // (the same bytes, as they came: a file's, for /__mock/uploaded)
-  req.on('data', (c) => { raw += c; bin.push(c); });
+  const bin = []; // (the same bytes, as they came — a file's, for /__mock/uploaded; the test school's come as text and are not kept)
+  req.on('data', (c) => { raw += c; if (typeof c !== 'string') bin.push(c); });
   req.on('end', async () => {
     let body = {};
     try {
@@ -1847,7 +1847,7 @@ if (sample === 'right' || sample === 'wrong') window.mockVerdict(sample === 'rig
       if (method !== req.method) continue;
       const m = path.match(re);
       if (!m) continue;
-      const data = await handler(url, m, body, raw, Buffer.concat(bin)); // (a handler may answer later: a save held, as a busy Canvas does)
+      const data = await handler(url, m, body, raw, bin); // (a handler may answer later: a save held, as a busy Canvas does)
       if (data === null) return json(res, { errors: [{ message: 'not found' }] }, 404);
       if (data && data.__status) return json(res, { errors: data.errors || [] }, data.__status);
       return json(res, data);

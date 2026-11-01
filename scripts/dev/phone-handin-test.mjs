@@ -181,8 +181,8 @@ try {
   const landed = await page.waitForSelector('.bcv-sb__done', { timeout: 20000 }).then(() => true).catch(() => false);
   const sub1 = await canvas(`/api/v1/courses/104/assignments/4002/submissions/self`);
   const names1 = (sub1.attachments || []).map((x) => x.display_name);
-  const gotPdf = sub1.attachments?.[0] ? Buffer.from((await canvas(`/__mock/uploaded/${sub1.attachments[0].id}`))?.b64 || '', 'base64') : Buffer.alloc(0);
-  const gotConv = sub1.attachments?.[1] ? Buffer.from((await canvas(`/__mock/uploaded/${sub1.attachments[1].id}`))?.b64 || '', 'base64') : Buffer.alloc(0);
+  const gotPdf = sub1.attachments?.[0] ? Buffer.from((await canvas(`/__mock/uploaded/${sub1.attachments[0].id}`))?.latin1 || '', 'latin1') : Buffer.alloc(0);
+  const gotConv = sub1.attachments?.[1] ? Buffer.from((await canvas(`/__mock/uploaded/${sub1.attachments[1].id}`))?.latin1 || '', 'latin1') : Buffer.alloc(0);
   check(landed && names1.join() === 'Lab notes.pdf,notes.pdf' && Buffer.compare(gotPdf, Buffer.from(pdfText)) === 0 && gotConv.subarray(0, 5).toString() === '%PDF-', `Submit hands both in: the PDF byte for byte as the phone had it, the text file converted (${names1.join(', ')}; ${gotPdf.length} and ${gotConv.length} bytes)`);
   const handed = await until(() => p1.ph.evaluate(() => !document.getElementById('handed').hidden && document.querySelector('#handed strong').textContent), 10000);
   check(handed === 'Handed in ✓' && (await p1.ph.evaluate(() => document.getElementById('sent').hidden && document.getElementById('files').disabled)), `and the phone says so: "${handed}"`);
@@ -225,7 +225,7 @@ try {
   await page.click('.bcv-sb__go');
   const landed2 = await page.waitForSelector('.bcv-sb__done', { timeout: 20000 }).then(() => true).catch(() => false);
   const sub2 = await canvas(`/api/v1/courses/104/assignments/4002/submissions/self`);
-  const pdf = sub2.attachments?.length === 1 ? Buffer.from((await canvas(`/__mock/uploaded/${sub2.attachments[0].id}`))?.b64 || '', 'base64').toString('latin1') : '';
+  const pdf = sub2.attachments?.length === 1 ? ((await canvas(`/__mock/uploaded/${sub2.attachments[0].id}`))?.latin1 || '') : '';
   const boxes = [...pdf.matchAll(/MediaBox \[0 0 (\d+) (\d+)\]/g)].map((m) => `${m[1]}x${m[2]}`);
   const dims = [...pdf.matchAll(/\/Width (\d+) \/Height (\d+)/g)].map((m) => `${m[1]}x${m[2]}`);
   check(landed2 && pdf.startsWith('%PDF-1.4') && /\/Count 2/.test(pdf) && boxes.join() === '612x792,792x612' && (pdf.match(/\/DCTDecode/g) || []).length === 2, `handed in as one PDF of two pages, a tall one and a wide one turned to landscape: ${boxes.join(', ')}`);
