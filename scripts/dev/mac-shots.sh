@@ -1316,7 +1316,8 @@ push_set() {
   shoot light-50-theme-dusk 12 -SimplTheme Dusk
   shoot light-50b-theme-ocean-todo 12 -SimplTheme Ocean -SimplPlace todo
   shoot light-50d-theme-photo 12 -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg"
-  # (1.3.164) the same photo with its Ink off: shown as it is, the words on it dark with a white border
+  # (1.3.164) the same photo with its Ink off: shown as it is — (M22) the counters' words on a frosted plate each, the
+  # sidebar's on frost, all in their usual colours (no white ring round every letter)
   shoot light-50e-theme-photo-plain 12 -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg" -SimplThemePlain YES
   # (1.3.113) Appearance, from the ⋯ menu: the window darkened but the sidebar and the cards, their photo buttons, the bar
   shoot light-51-appearance-mode 16 -SimplAppearanceMode YES -SimplTheme Ocean

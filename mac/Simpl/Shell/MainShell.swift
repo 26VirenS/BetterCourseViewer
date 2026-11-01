@@ -355,8 +355,6 @@ struct Sidebar: View {
     @Environment(\.openWindow) private var openWindow
     @State private var open: Set<String> = []
     @ObservedObject private var appearanceMode = AppearanceMode.shared
-    /// (1.3.164) Whether its photo has its Ink switch off: the words over it then dark, with a white border.
-    @ObservedObject private var appearance = AppearanceStore.shared
     /// (1.3.190) Silent mode is up: words alone, in black, white and grey — no glyphs, no course colours, no photo, no
     /// picture of anyone — the rows where they were and pressed as before (the web's, 2.99.126).
     @Environment(\.silentUp) private var silent
@@ -421,10 +419,10 @@ struct Sidebar: View {
             }
             AccountBar()
         }
-        .plainPhotoWords(appearance.isPlain(.side) && !silent) // (1.3.164: its photo's Ink off — dark words, a white border round them)
-        // (and the list's own words, drawn natively, in the light look; 1.3.190: in the dark look while Silent mode is up —
-        //  the window's own dark look never reached the sidebar's column)
-        .background { ColumnAppearance(light: appearance.isPlain(.side) && !silent, dark: silent) }
+        // (1.3.164; M22) its photo's Ink off: the photo frosted under the words (SidebarGround), which keep their usual
+        // colours — no longer dark words with a hard white ring round every letter. (1.3.190) The list's own words, drawn
+        // natively, in the dark look while Silent mode is up: the window's own dark look never reached the sidebar's column
+        .background { ColumnAppearance(dark: silent) }
         .environment(\.colorScheme, silent ? .dark : scheme)
         .background {
             // (1.3.1) the sidebar's photo, frosted, behind its rows; (1.3.190) black while Silent mode is up

@@ -165,7 +165,8 @@ struct DashCounterTile: View {
     @State private var editing = false
     /// (1.3.113) Appearance on: its photo button over it, and a press on it opens nothing else.
     @ObservedObject private var appearanceMode = AppearanceMode.shared
-    /// (1.3.164) Whether its photo has its Ink switch off: shown as it is, no wash over it, its words dark with a white border.
+    /// (1.3.164) Whether its photo has its Ink switch off: shown as it is, no wash over it — (M22) its words on a frosted
+    /// plate.
     @ObservedObject private var appearance = AppearanceStore.shared
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -178,15 +179,15 @@ struct DashCounterTile: View {
         Button(action: { if !appearanceMode.on { action() } }) {
             VStack(alignment: .leading, spacing: 6) {
                 head
-                // (1.3.164: over a photo with its Ink off, the words solid — a faint number or a grey line is lost on a photo)
-                DashCount(value: value, alert: alert, stale: stale && !plain)
+                DashCount(value: value, alert: alert, stale: stale)
                 Text(shownNote ?? " ")
                     .font(.sCaption)
-                    .foregroundStyle(plain ? AnyShapeStyle(Color.primary) : AnyShapeStyle(.secondary))
+                    .foregroundStyle(.secondary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
-                    .opacity(stale && !plain ? 0.6 : 1)
+                    .opacity(stale ? 0.6 : 1)
             }
+            // (1.3.164; M22: over a photo with its Ink off, the words on a frosted plate of their own, in their usual colours)
             .plainPhotoWords(plain)
             .padding(.horizontal, Self.padding(style))
             .padding(.vertical, 14)

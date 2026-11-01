@@ -781,7 +781,8 @@ struct PhotoLayer: View {
 
 /// The sidebar's ground: its photo, frosted, behind its rows — (home-26) a drawn scene kept faint behind them; (1.3.177)
 /// and its own colour, where Appearance gave it one, a wash over its glass and its photo (not over a photo with its Ink
-/// off, shown as it is).
+/// off, shown as it is). (M22) A photo with its Ink off has the window's own frost over it: the sidebar's words, every
+/// row of them, read in their usual colours.
 struct SidebarGround: View {
     @ObservedObject private var store = AppearanceStore.shared
     @Environment(\.colorScheme) private var scheme
@@ -794,51 +795,54 @@ struct SidebarGround: View {
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }
+            if store.isPlain(.side) {
+                Rectangle()
+                    .fill(.thinMaterial)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
         }
         .ignoresSafeArea()
     }
 }
 
-/// (1.3.164) The words on a photo with its Ink switch off (the web's .bcv-side--plain): the light look's dark words in
-/// either look, each with a white border — a ring of white round every letter (four sharp copies a hair out each way, as
-/// the web's ring is), solid (1.3.166: no soft glow round it) — so they read on any photo. Where the photo is inked
-/// nothing changes.
+/// (1.3.164) The words on a photo with its Ink switch off (the web's .bcv-side--plain) — (M22) on a frosted plate of the
+/// window's own material, hugging them, in their usual colours and look, the photo as it is all round it, so they read
+/// on any photo. (They were the light look's dark words with a hard white ring round every letter, which read as a
+/// glitch, and grey words still sat on pale sky.) Where the photo is inked nothing changes.
 struct PlainPhotoWords: ViewModifier {
     let on: Bool
 
     @ViewBuilder
     func body(content: Content) -> some View {
         if on {
+            // (the plate reaches a little past the words, into the room round them, so they stay where they were)
             content
-                .environment(\.colorScheme, .light)
-                // (1.3.166: a solid white edge, each shadow hard and each over the last — no glow fading out of it)
-                .shadow(color: .white, radius: 0, x: 1, y: 0)
-                .shadow(color: .white, radius: 0, x: -1, y: 0)
-                .shadow(color: .white, radius: 0, x: 0, y: 1)
-                .shadow(color: .white, radius: 0, x: 0, y: -1)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 7)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .padding(.horizontal, -9)
+                .padding(.vertical, -7)
         } else {
             content
         }
     }
 }
 
-/// (1.3.164) The native views of the window's column it sits in drawn in the light look, or given the window's own back.
-/// The sidebar's list draws its words in the window's look whatever SwiftUI's colour scheme says, so over a photo with
-/// its Ink off in the dark look they were light on it; with the column in the light look they are the light look's, dark.
+/// (1.3.164) The native views of the window's column it sits in drawn in another look, or given the window's own back.
+/// The sidebar's list draws its words in the window's look whatever SwiftUI's colour scheme says. (M22: a photo with its
+/// Ink off no longer asks for the light look — its words sit on frost, in the window's own.)
 struct ColumnAppearance: NSViewRepresentable {
-    let light: Bool
     /// (1.3.190) Silent mode: the column drawn in the dark look (its list's selection, its words) over its black.
     var dark = false
 
     func makeNSView(context: Context) -> Probe { Probe() }
     func updateNSView(_ view: Probe, context: Context) {
-        view.light = light
         view.dark = dark
         view.apply()
     }
 
     final class Probe: NSView {
-        var light = false
         var dark = false
         private var owned = false
 
@@ -848,7 +852,7 @@ struct ColumnAppearance: NSViewRepresentable {
             // (SwiftUI puts the column under its split view after this one is in the window: asked again once it has)
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.window != nil else { return }
-                if !self.apply() && (self.light || self.dark) { NSLog("ColumnAppearance: no split view above the sidebar") }
+                if !self.apply() && self.dark { NSLog("ColumnAppearance: no split view above the sidebar") }
             }
         }
         override func layout() {
@@ -866,9 +870,6 @@ struct ColumnAppearance: NSViewRepresentable {
             if dark {
                 if view.appearance?.name != .darkAqua { view.appearance = NSAppearance(named: .darkAqua) }
                 owned = true
-            } else if light {
-                if view.appearance?.name != .aqua { view.appearance = NSAppearance(named: .aqua) }
-                owned = true
             } else if owned {
                 view.appearance = nil // (given back only where it was set here)
                 owned = false
@@ -879,7 +880,7 @@ struct ColumnAppearance: NSViewRepresentable {
 }
 
 extension View {
-    /// (1.3.164) The words of a place whose photo has its Ink switch off: dark, with a gentle white border.
+    /// (1.3.164) The words of a place whose photo has its Ink switch off: (M22) on a frosted plate of their own.
     func plainPhotoWords(_ on: Bool) -> some View { modifier(PlainPhotoWords(on: on)) }
 }
 
