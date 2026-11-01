@@ -758,19 +758,9 @@ private struct ToolPlacesList: View {
         .background(LinearGradient(colors: [tint.opacity(0.18), tint.opacity(0.02)], startPoint: .top, endPoint: .bottom))
     }
 
-    /// (1.3.204) The popup's ×, as a floating panel's.
+    /// (1.3.204) The popup's × — (UI review) every popup's.
     private var closeButton: some View {
-        Button(action: close) {
-            Image(systemName: "xmark")
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(.secondary)
-                .frame(width: 22, height: 22)
-                .background(Circle().fill(Color.primary.opacity(0.08)))
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .help("Close (Esc)")
-        .accessibilityLabel("Close")
+        PopupCloseButton(action: close)
     }
 
     /// (1.3.204) Escape, wherever the keys are in the window: the filter emptied first, then the list closed.

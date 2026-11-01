@@ -32,24 +32,9 @@ struct AppointmentsPopup: View {
         .task { await load() }
     }
 
+    /// (UI review) Every popup's head (Shell/FloatingPopup.swift).
     private var header: some View {
-        HStack(spacing: 12) {
-            IconTile(symbol: "person.badge.clock", color: Theme.accent, size: 36)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Find Appointment")
-                    .font(.sTitle3.weight(.semibold))
-                Text("Office hours and sign-ups with a time to reserve")
-                    .font(.sCallout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 0)
-            PopupCloseButton()
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 18)
-        .padding(.bottom, 12)
-        .popupHeader()
+        PopupHead(symbol: "person.badge.clock", title: "Find Appointment", subtitle: "Office hours and sign-ups with a time to reserve")
     }
 
     @ViewBuilder

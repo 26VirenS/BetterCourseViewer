@@ -107,58 +107,56 @@ struct AltaQuizScreen: View {
     // MARK: The top
 
     /// Alta's mark, the assignment and when it is due across the top; (1.3.78) Close at the right end, where every full
-    /// popup has it.
+    /// popup has it — (UI review) every popup's head (PopupHead): its × in the same corner as every popup's, and Simpl
+    /// Look, as Macmillan's and ALEKS's popups have it, where 1.3.131 had a sun-and-moon switch and Browser. Alta's page
+    /// light or dark is in its ⋯ menu (Dark Page).
     private var topBar: some View {
-        HStack(spacing: 14) {
-            IconTile(symbol: "brain.head.profile", color: Theme.accent, size: 32)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.sTitle3)
-                    .lineLimit(1)
-                if !subtitle.isEmpty {
-                    Text(subtitle)
-                        .font(.sCallout)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-            Spacer(minLength: 8)
-            // (1.3.131) Light / Dark — a switch now — and Browser in the bar, left of the tools, no longer above the
-            // objectives
-            AltaLookSwitch(dark: $pageDark)
-            AltaBrowserToggle(on: $showBrowser, label: "Browser")
+        // (Escape for the ×, so it closes the popup from inside Alta's page too — (1.3.84) the pop-up's while one is up)
+        PopupHead(symbol: "brain.head.profile", title: title, subtitle: subtitle,
+                  close: { dismiss() }, closeHelp: "Close (Esc) — your progress is kept by Alta", escape: session.dialog == nil) {
+            SimplLookToggle(on: Binding(get: { !showBrowser }, set: { showBrowser = !$0 }), publisher: "Knewton Alta",
+                            helpOn: "Simpl's look is on: Alta's objectives beside its question, on Liquid Glass. Click to show Knewton Alta's own page, as Alta draws it.")
             PopupPins() // (1.3.73: the toolbar's pins, here too)
             GlassGroup(spacing: 8) {
-                // (1.3.47) shown once Alta's page was not recognised (and given back as it is); (1.3.72) to developers
-                if dev.unlocked && !session.errorLogs.isEmpty {
-                    Button { showLogs = true } label: {
-                        Label("Error Logs (\(session.errorLogs.count))", systemImage: "exclamationmark.triangle")
+                HStack(spacing: 8) { // (in a row: the glass container stacks what it holds)
+                    // (1.3.47) shown once Alta's page was not recognised (and given back as it is); (1.3.72) to developers
+                    if dev.unlocked && !session.errorLogs.isEmpty {
+                        Button { showLogs = true } label: {
+                            Label("Error Logs (\(session.errorLogs.count))", systemImage: "exclamationmark.triangle")
+                        }
+                        .glassButton()
+                        .help("Alta's page was not recognised, so it is shown as it is: see why")
+                        .popover(isPresented: $showLogs, arrowEdge: .bottom) { logs }
+                        .transition(.opacity)
                     }
-                    .glassButton()
-                    .help("Alta's page was not recognised, so it is shown as it is: see why")
-                    .popover(isPresented: $showLogs, arrowEdge: .bottom) { logs }
-                    .transition(.opacity)
+                    moreMenu
                 }
-                // (1.3.109) Save Page Code here too, to developers (and in the Developer menu): the page as it is now
-                if dev.unlocked {
-                    Button { DevMode.saveAltaCode(withLogs: false) } label: {
-                        Label("Save Page Code", systemImage: "chevron.left.forwardslash.chevron.right")
-                    }
-                    .glassButton()
-                    .help("Save every bit of Alta's page code to Downloads (developer mode)")
-                    .transition(.opacity)
-                }
-                Button("Close") { dismiss() }
-                    .glassButton()
-                    .keyboardShortcut(session.dialog == nil ? KeyboardShortcut.cancelAction : nil) // (1.3.84: Escape the pop-up's while one is up)
-                    .help("Close — your progress is kept by Alta")
             }
         }
-        .controlSize(.large)
-        .padding(.horizontal, 22)
-        .padding(.top, 16)
-        .padding(.bottom, 12)
-        .popupHeader() // (1.3.79: dragged by its head, the popup moves)
+    }
+
+    /// (UI review) Alta's ⋯ menu: its page light or dark — the sun-and-moon switch of 1.3.131, which sat beside Browser —
+    /// and (1.3.109, to developers) Save Page Code.
+    private var moreMenu: some View {
+        Menu {
+            Toggle(isOn: $pageDark) { Label("Dark Page", systemImage: "moon") }
+            if dev.unlocked {
+                Divider()
+                // (1.3.109) the page as it is now, to Downloads (and in the Developer menu)
+                Button { DevMode.saveAltaCode(withLogs: false) } label: {
+                    Label("Save Page Code", systemImage: "chevron.left.forwardslash.chevron.right")
+                }
+            }
+        } label: {
+            Label("More", systemImage: "ellipsis")
+        }
+        .labelStyle(.iconOnly)
+        .menuStyle(.button)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .glassButton()
+        .help("More: Alta's page light or dark")
+        .accessibilityLabel("More")
     }
 
     /// (1.3.47) The Error Logs: each time Alta's page was not recognised — when, why, what it held — to copy, or to save
@@ -725,62 +723,27 @@ private struct AltaRail: View {
     }
 }
 
-/// (1.3.131) In the popup's bar: Alta's side of the popup Light or Dark, as a switch (two chips above the objectives
-/// since 1.3.83) — (1.3.132) its sun and moon in the switch itself: each at its end of the track, and the knob, sliding
-/// over to the side chosen, carrying it. Light (the default since 1.3.79) shows Alta's page as Alta draws it; Dark lays
-/// the question on dark glass, its colours turned over, and Alta's page as it is drawn dark.
-private struct AltaLookSwitch: View {
-    @Binding var dark: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private let width: CGFloat = 58, height: CGFloat = 30, inset: CGFloat = 3
+/// (UI review) Simpl Look, the one control every publisher's popup has — Knewton Alta's, Macmillan Learning's and
+/// ALEKS's — first at the right of its head: on, the assignment in Simpl's look; off, the publisher's own page as it
+/// draws it. (Alta's said Browser, the other way round, beside a sun-and-moon switch, until the UI review.)
+struct SimplLookToggle: View {
+    @Binding var on: Bool
+    /// The publisher's name, for its tooltip ("Knewton Alta", "Macmillan Learning", "ALEKS").
+    let publisher: String
+    var helpOn: String? = nil
 
     var body: some View {
-        let knob = height - inset * 2
-        Button {
-            withAnimation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.3, dampingFraction: 0.85)) { dark.toggle() }
-        } label: {
-            ZStack {
-                Capsule(style: .continuous)
-                    .fill(dark ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(Color.primary.opacity(0.12)))
-                // the side not chosen, faint in the track
-                HStack {
-                    Image(systemName: "sun.max.fill").opacity(dark ? 0.75 : 0)
-                    Spacer(minLength: 0)
-                    Image(systemName: "moon.fill").opacity(dark ? 0 : 0.55)
-                }
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(dark ? Color.white : Color.primary)
-                .padding(.horizontal, 8)
-                // the knob, carrying the side chosen
-                Circle()
-                    .fill(Color.white)
-                    .shadow(color: .black.opacity(0.22), radius: 2, y: 1)
-                    .frame(width: knob, height: knob)
-                    .overlay {
-                        Image(systemName: dark ? "moon.fill" : "sun.max.fill")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(dark ? Theme.accent : Color.orange)
-                            .contentTransition(.symbolEffect(.replace))
-                    }
-                    .frame(maxWidth: .infinity, alignment: dark ? .trailing : .leading)
-                    .padding(inset)
-            }
-            .frame(width: width, height: height)
-            .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .fixedSize()
-        .help(dark ? "Knewton Alta's page is dark — switch for light, as Alta draws it" : "Knewton Alta's page is light — switch for dark")
-        .accessibilityLabel("Dark page")
-        .accessibilityValue(dark ? "On" : "Off")
+        AltaBrowserToggle(on: $on, label: "Simpl Look", icon: "sparkles",
+                          helpOn: helpOn ?? "Simpl's look is on. Click to show the assignment as \(publisher) draws it.",
+                          helpOff: "Show \(publisher)'s assignment in Simpl's look")
     }
 }
 
 /// (1.3.83) Beside Light / Dark (1.3.131: in the popup's bar): Show Browser — Knewton Alta's own page on the right, as Alta
 /// draws it, in place of the app's view of it. (1.3.170) A toggle that still says Browser: a glass pill holding the
 /// globe, the word and a small switch — its knob sliding over, its track filled in the accent while it is on — as the
-/// Light / Dark switch beside it has them. (1.3.199) The Macmillan and ALEKS popup's Simpl Look too, with its sparkles.
+/// Light / Dark switch beside it has them. (1.3.199) The Macmillan and ALEKS popup's Simpl Look too, with its sparkles —
+/// (UI review) and now Alta's too: drawn for every publisher's popup by SimplLookToggle.
 struct AltaBrowserToggle: View {
     @Binding var on: Bool
     let label: String

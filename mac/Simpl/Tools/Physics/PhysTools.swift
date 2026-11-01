@@ -109,7 +109,7 @@ struct PhysToolsSection: View {
                     .font(.sCallout)
                     .foregroundStyle(.secondary)
             }
-            LazyVGrid(columns: ToolTile.columns, spacing: 14) {
+            ToolTileRows {
                 ForEach(PhysTools.kinds) { k in ToolTile(kind: k) }
             }
         }

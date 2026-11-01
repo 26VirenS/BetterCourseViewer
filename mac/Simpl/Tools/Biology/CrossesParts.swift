@@ -463,54 +463,55 @@ struct AssortmentSheet: View {
         let ps = pairs
         let hets = ps.filter { $0.het }.count
         let made = gametesNow(ps)
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("Why these gametes?").font(.sTitle3)
-                Spacer()
-                Button("Done", action: close).glassButton().keyboardShortcut(.cancelAction)
-            }
-            Picker("", selection: $parent) {
-                Text(setup.xIndex != nil ? "Mother" : "Parent 1").tag(1)
-                Text(setup.xIndex != nil ? "Father" : "Parent 2").tag(2)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(maxWidth: 260)
-            Text(explanation(hets))
-                .font(.sCallout)
-                .fixedSize(horizontal: false, vertical: true)
-            metaphase(ps)
-            HStack(spacing: 10) {
-                Button {
-                    if reduceMotion { flipOne(ps) } else { withAnimation(.spring(response: 0.5, dampingFraction: 1)) { flipOne(ps) } }
-                } label: {
-                    Label("Line up the other way", systemImage: "arrow.left.arrow.right")
+        VStack(alignment: .leading, spacing: 0) {
+            // (UI review) every popup's head: the tool's symbol, the question, and the × in the same corner as every popup's
+            PopupHead(symbol: ToolKind.cross.symbol, color: ToolKind.cross.color, title: "Why these gametes?", inset: 24,
+                      close: close, escape: true)
+            VStack(alignment: .leading, spacing: 16) {
+                Picker("", selection: $parent) {
+                    Text(setup.xIndex != nil ? "Mother" : "Parent 1").tag(1)
+                    Text(setup.xIndex != nil ? "Father" : "Parent 2").tag(2)
                 }
-                .glassButton(prominent: true)
-                .disabled(hets == 0)
-                .help("Turn a pair round at the plate: the other arrangement, just as likely")
-                Button {
-                    BioNav.shared.set(.divide, "meiosis")
-                    close()
-                    BioTools.open(.divide, info: ["focus": "assortment"])
-                } label: {
-                    Label("See it in Cell Division", systemImage: "arrow.triangle.branch")
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(maxWidth: 260)
+                Text(explanation(hets))
+                    .font(.sCallout)
+                    .fixedSize(horizontal: false, vertical: true)
+                metaphase(ps)
+                HStack(spacing: 10) {
+                    Button {
+                        if reduceMotion { flipOne(ps) } else { withAnimation(.spring(response: 0.5, dampingFraction: 1)) { flipOne(ps) } }
+                    } label: {
+                        Label("Line up the other way", systemImage: "arrow.left.arrow.right")
+                    }
+                    .glassButton(prominent: true)
+                    .disabled(hets == 0)
+                    .help("Turn a pair round at the plate: the other arrangement, just as likely")
+                    Button {
+                        BioNav.shared.set(.divide, "meiosis")
+                        close()
+                        BioTools.open(.divide, info: ["focus": "assortment"])
+                    } label: {
+                        Label("See it in Cell Division", systemImage: "arrow.triangle.branch")
+                    }
+                    .glassButton()
+                    .help("Open meiosis in Cell Division")
                 }
-                .glassButton()
-                .help("Open meiosis in Cell Division")
-            }
-            HStack(spacing: 6) {
-                Text("This arrangement gives").font(.sCallout).foregroundStyle(.secondary)
-                ForEach(made.indices, id: \.self) { i in
-                    Allele.text(made[i], size: 15, weight: .bold)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(Capsule().fill(ToolKind.cross.color.opacity(0.14)))
+                HStack(spacing: 6) {
+                    Text("This arrangement gives").font(.sCallout).foregroundStyle(.secondary)
+                    ForEach(made.indices, id: \.self) { i in
+                        Allele.text(made[i], size: 15, weight: .bold)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Capsule().fill(ToolKind.cross.color.opacity(0.14)))
+                    }
                 }
+                .accessibilityElement(children: .combine)
             }
-            .accessibilityElement(children: .combine)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 24)
         }
-        .padding(24)
         .frame(width: 560)
     }
 

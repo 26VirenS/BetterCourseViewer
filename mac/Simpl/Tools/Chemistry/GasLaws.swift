@@ -108,7 +108,7 @@ struct GasLawsTool: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .frame(maxWidth: 320)
+            .fixedSize() // (UI review: at the page's left edge, over the card's — a frame wider than it centred it)
             .accessibilityLabel("Which law")
             ToolColumns(sideWidth: 360, breakpoint: 980) {
                 switch tab {
@@ -171,7 +171,9 @@ struct GasLawsTool: View {
         let result = idealResult
         let solved = try? result.get()
         return VStack(alignment: .leading, spacing: 20) {
-            VStack(spacing: 10) {
+            // (UI review) a grid: the letters and names, the fields and the units each a column of their own, so every
+            // unit menu starts where the others do and is as wide as they are
+            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
                 gasRow("P", "Pressure", gasBinding($ideal, "P"), solved: solved?.0 == .P ? idealShown(solved) : nil) {
                     Picker("Unit", selection: $idealUnits.p) { ForEach(ChemGas.PressureUnit.allCases, id: \.self) { Text($0.label).tag($0) } }
                 }
@@ -183,11 +185,13 @@ struct GasLawsTool: View {
                         Text("mol").tag(false)
                         Text("g of…").tag(true)
                     }
+                } after: {
                     if idealUnits.grams {
                         TextField("H2", text: $idealUnits.formula)
                             .textFieldStyle(.roundedBorder)
                             .font(.sBody)
                             .frame(width: 90)
+                            .labelsHidden()
                             .accessibilityLabel("The gas's formula")
                     }
                 }
@@ -195,9 +199,11 @@ struct GasLawsTool: View {
                     Picker("Unit", selection: $idealUnits.t) { ForEach(ChemGas.TemperatureUnit.allCases, id: \.self) { Text($0.label).tag($0) } }
                 }
             }
-            .padding(.vertical, 6)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .card(radius: 14)
-            Text("Leave the one you want blank.").font(.sFootnote).foregroundStyle(.secondary)
+            Text("Leave one field blank and Simpl solves for it.").font(.sFootnote).foregroundStyle(.secondary)
             answerCard(law: lawText(solved: solved?.0.rawValue, pieces: [("P", "P"), ("V", "V"), (" = ", nil), ("n", "n"), ("R", nil), ("T", "T")]),
                        result: result.map { v in (Self.name(v.0), idealShown(v) ?? "") }, note: "R = 0.082057 L·atm/(mol·K); the fields are converted to atm, L, mol and K.")
         }
@@ -226,34 +232,38 @@ struct GasLawsTool: View {
         }
     }
 
-    /// A field's row: its letter and name, the field, its unit, and — when it is the one solved — the answer in place.
-    private func gasRow<U: View>(_ letter: String, _ name: String, _ text: Binding<String>, solved: String?, @ViewBuilder unit: () -> U) -> some View {
-        HStack(spacing: 10) {
+    /// The unit menus' column: each menu at its start, as wide as the column where a menu stretches (UI review: each was
+    /// as wide as its longest unit, centred in the room it had, so no two started at the same place).
+    private static let unitWidth: CGFloat = 130
+
+    /// A field's row of the Ideal gas grid: its letter and name, the field — or, when it is the one solved, the answer in
+    /// its place — its unit, as wide as every other, and anything after it (`after`: the formula of an amount in grams).
+    private func gasRow<U: View, A: View>(_ letter: String, _ name: String, _ text: Binding<String>, solved: String?,
+                                          @ViewBuilder unit: () -> U, @ViewBuilder after: () -> A = { EmptyView() }) -> some View {
+        GridRow {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(letter).font(.system(size: 17, weight: .bold, design: .serif).italic()).frame(width: 18, alignment: .trailing)
                 Text(name).font(.sCallout).foregroundStyle(.secondary)
             }
-            .frame(width: 130, alignment: .leading)
             if let solved {
                 Text(solved)
                     .font(.sBody.weight(.semibold).monospacedDigit())
                     .foregroundStyle(ToolKind.gas.color)
-                    .frame(minWidth: 120, alignment: .leading)
+                    .fixedSize()
+                    .frame(minWidth: 100, alignment: .leading)
                     .accessibilityLabel("\(name), solved: \(solved)")
             } else {
                 TextField(letter, text: text)
                     .textFieldStyle(.roundedBorder)
                     .font(.sBody)
-                    .frame(width: 120)
+                    .frame(width: 100)
                     .accessibilityLabel(name)
             }
             unit()
                 .labelsHidden()
-                .frame(maxWidth: 150)
-            Spacer(minLength: 0)
+                .frame(width: Self.unitWidth, alignment: .leading)
+            after()
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 4)
     }
 
     /// The law written out, the solved letter lit: `pieces` are its parts, each with the letter it stands for (nil: none).
@@ -350,7 +360,7 @@ struct GasLawsTool: View {
                     stateCard(2, hidden: hidden, solved: solved)
                 }
             }
-            Text("Leave the one you want blank.").font(.sFootnote).foregroundStyle(.secondary)
+            Text("Leave one field blank and Simpl solves for it.").font(.sFootnote).foregroundStyle(.secondary)
             answerCard(law: combinedLaw(solved: solved?.0), result: result.map { ($0.0, combinedShown($0) ?? "") },
                        note: constant.map { "\($0.law): the same gas, its \($0.rawValue) unchanged." } ?? "The same amount of gas in two states; temperatures in kelvin.")
         }
@@ -363,7 +373,7 @@ struct GasLawsTool: View {
                 ForEach(all, id: \.self) { u in Text(u[keyPath: label]).tag(u) }
             }
             .labelsHidden()
-            .frame(width: 120)
+            .frame(width: Self.unitWidth, alignment: .leading) // (UI review: under its name's start, as the Ideal gas tab's)
         }
     }
 
@@ -386,7 +396,7 @@ struct GasLawsTool: View {
                             TextField(key, text: gasBinding($combined, key))
                                 .textFieldStyle(.roundedBorder)
                                 .font(.sBody)
-                                .frame(width: 110)
+                                .frame(width: 100)
                                 .accessibilityLabel(key)
                             Text(q == "P" ? combinedUnits.p.label : (q == "V" ? combinedUnits.v.label : combinedUnits.t.label)).font(.sCallout).foregroundStyle(.secondary)
                         }

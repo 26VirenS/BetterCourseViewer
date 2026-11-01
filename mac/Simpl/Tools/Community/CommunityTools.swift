@@ -337,7 +337,7 @@ struct CommunityToolsSection: View {
                     .font(.sCallout)
                     .foregroundStyle(.secondary)
             }
-            LazyVGrid(columns: ToolTile.columns, spacing: 14) {
+            ToolTileRows {
                 ForEach(store.added, id: \.key) { t in CommunityToolTile(tool: t) }
                 CommunityBrowseTile()
             }
@@ -378,7 +378,7 @@ struct CommunityToolTile: View {
                 Spacer(minLength: 12)
             }
             .padding(16)
-            .frame(maxWidth: .infinity, minHeight: 84, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 84, maxHeight: .infinity, alignment: .topLeading) // (UI review: as tall as its row)
         }
         .buttonStyle(CardButtonStyle(radius: 20))
         .contextMenu {
@@ -419,7 +419,7 @@ struct CommunityBrowseTile: View {
                 Spacer(minLength: 12)
             }
             .padding(16)
-            .frame(maxWidth: .infinity, minHeight: 84, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 84, maxHeight: .infinity, alignment: .topLeading) // (UI review: as tall as its row)
         }
         .buttonStyle(CardButtonStyle(radius: 20))
         .help("Browse the tools shared in Simpl Community")
@@ -459,8 +459,9 @@ struct CommunityPopupView: View {
     }
 }
 
-/// The heading of what Simpl Community shows in the tool's popup, as a tool's heading is (ToolHeader): its tile, its
-/// name and line, what it adds (`extra`) and — at its right end — the popup's ×. Dragged, the popup moves.
+/// The heading of what Simpl Community shows in the tool's popup, as a tool's heading is (ToolHeader): (UI review) every
+/// popup's head (PopupHead) — its tile, its name and line, what it adds (`extra`) and, at its right end, the popup's ×
+/// — at the tool's page margin. Dragged, the popup moves.
 struct CommunityHeading<Extra: View>: View {
     let symbol: String
     let color: Color
@@ -470,39 +471,12 @@ struct CommunityHeading<Extra: View>: View {
     @ObservedObject private var tools = ToolsCenter.shared
 
     var body: some View {
-        HStack(alignment: .center, spacing: 14) {
-            IconTile(symbol: symbol, color: color, size: 44)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.sTitle)
-                    .lineLimit(1)
-                Text(line)
-                    .font(.sCallout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            .layoutPriority(1)
-            Spacer(minLength: 12)
+        PopupHead(symbol: symbol, color: color, title: title, subtitle: line, inset: 40,
+                  close: { tools.closePopup() }, closeHelp: "Close \(title) (Esc)", closeLabel: "Close \(title)") {
             extra
-            Button {
-                tools.closePopup()
-            } label: {
-                Label("Close", systemImage: "xmark")
-                    .font(.sCallout.weight(.semibold))
-                    .labelStyle(.iconOnly)
-                    .frame(minWidth: 16)
-            }
-            .glassButton()
-            .controlSize(.large)
-            .help("Close \(title) (Esc)")
-            .accessibilityLabel("Close \(title)")
         }
-        .padding(.horizontal, 40)
-        .padding(.top, 20)
-        .padding(.bottom, 12)
         .frame(maxWidth: 1480 + 80)
         .frame(maxWidth: .infinity)
-        .popupHeader()
         .zIndex(2)
     }
 }

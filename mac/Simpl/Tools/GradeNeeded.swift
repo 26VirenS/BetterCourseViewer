@@ -106,6 +106,9 @@ struct GradeNeededTool: View {
     @State private var goal = ""
     @State private var letter = "custom"
 
+    /// (UI review) A percentage's field and its % sign: about 90 points of field, never the column's whole width.
+    static let percentWidth: CGFloat = 112
+
     private var lms: String { engine.lmsName }
     private var chosen: CourseRow? { engine.courses.first { $0.id == course } }
     private var pieces: [NeedPiece] { data?.pieces ?? [] }
@@ -125,7 +128,7 @@ struct GradeNeededTool: View {
                 VStack(alignment: .leading, spacing: 26) {
                     answerCard
                     inputs
-                    PageSection(title: "Every letter") { letters }
+                    PageSection(title: "Every letter grade") { letters }
                 }
             }
         }
@@ -143,7 +146,7 @@ struct GradeNeededTool: View {
                             Text(c.score == nil ? c.code : "\(c.code) · \(c.scoreText)").tag(c.id)
                         }
                         Divider()
-                        Text("Not from \(lms): my own numbers").tag("")
+                        Text("My own numbers (not from \(lms))").tag("")
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
@@ -156,13 +159,14 @@ struct GradeNeededTool: View {
             }
             HStack(alignment: .top, spacing: 22) {
                 PageSection(title: "Now") {
-                    ToolField(label: "Your grade now", text: $now, placeholder: "e.g. 88", hint: nowHint, suffix: "%")
+                    // (UI review: a field as wide as a percentage, its % beside it — not stretched across the column)
+                    ToolField(label: "Your grade now", text: $now, placeholder: "e.g. 88", hint: nowHint, suffix: "%", width: Self.percentWidth)
                 }
-                PageSection(title: "What is left") {
+                PageSection(title: "Still to come") {
                     VStack(alignment: .leading, spacing: 10) {
                         if chosen != nil {
                             // (tools-23: "Midterm 2 · 28.5% of your grade" — the share said for what it is)
-                            Picker("What is left", selection: Binding(get: { piece }, set: { choosePiece($0) })) {
+                            Picker("Still to come", selection: Binding(get: { piece }, set: { choosePiece($0) })) {
                                 ForEach(pieces) { p in Text(PreviewFormat.text(p.label) ?? "\(p.name) · \(NeedMath.text(p.worth))% of your grade").tag(p.id) }
                                 if !pieces.isEmpty { Divider() }
                                 Text("Something else…").tag("custom")
@@ -172,7 +176,7 @@ struct GradeNeededTool: View {
                             .controlSize(.large)
                         }
                         if pickedPiece == nil {
-                            ToolField(label: "Worth this much of the final grade", text: $worth, placeholder: "e.g. 25", suffix: "%")
+                            ToolField(label: "Share of the final grade", text: $worth, placeholder: "e.g. 25", suffix: "%", width: Self.percentWidth)
                         }
                         Text(pieceHint)
                             .font(.sFootnote)
@@ -181,21 +185,23 @@ struct GradeNeededTool: View {
                     }
                 }
             }
+            // (UI review: each control named for what it is — a letter grade, or a percentage of one's own — not
+            // "A letter" and "A number of my own")
             PageSection(title: "Goal") {
                 HStack(alignment: .bottom, spacing: 16) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("A letter").font(.sSubheadline.weight(.semibold)).foregroundStyle(.secondary)
-                        Picker("The grade you want", selection: Binding(get: { letter }, set: { chooseLetter($0) })) {
+                        Text("Letter grade").font(.sSubheadline.weight(.semibold)).foregroundStyle(.secondary)
+                        Picker("Letter grade", selection: Binding(get: { letter }, set: { chooseLetter($0) })) {
                             ForEach(NeedMath.scale, id: \.letter) { s in Text("\(s.letter) · \(NeedMath.text(s.cut))%").tag(s.letter) }
                             Divider()
-                            Text("A number of my own").tag("custom")
+                            Text("Custom percentage").tag("custom")
                         }
                         .labelsHidden()
                         .pickerStyle(.menu)
                         .controlSize(.large)
                         .frame(width: 200, alignment: .leading)
                     }
-                    ToolField(label: "The grade you want", text: Binding(get: { goal }, set: { goal = $0; letter = "custom" }), placeholder: "e.g. 90", suffix: "%", width: 160)
+                    ToolField(label: "Percentage", text: Binding(get: { goal }, set: { goal = $0; letter = "custom" }), placeholder: "e.g. 90", suffix: "%", width: Self.percentWidth)
                 }
             }
             if let w = worthValue, w <= 0 || w > 100 {
@@ -232,7 +238,7 @@ struct GradeNeededTool: View {
         }
         if loading { return "Reading the assignments…" }
         if chosen != nil && data != nil && pieces.isEmpty { return "Nothing left ungraded that \(lms) knows of. Type what the work is worth." }
-        return "How much of the final grade the work still to come is worth."
+        return "How much of your final grade the work still to come is worth."
     }
 
     // MARK: The answer
@@ -240,7 +246,7 @@ struct GradeNeededTool: View {
     private var results: some View {
         VStack(alignment: .leading, spacing: 24) {
             answerCard
-            PageSection(title: "Every letter") {
+            PageSection(title: "Every letter grade") {
                 letters
             }
         }
@@ -277,7 +283,7 @@ struct GradeNeededTool: View {
     }
 
     private func lineText(_ r: NeedMath.Answer?) -> String {
-        guard let r else { return "Fill in the three numbers." }
+        guard let r else { return "Enter your grade now, what the work still to come is worth, and your goal." }
         let place = pickedPiece.map { "on \($0.name)" } ?? "on what is left"
         switch r.kind {
         case .ok: return "\(place) to finish with \(goalWord)."
@@ -296,7 +302,7 @@ struct GradeNeededTool: View {
     private var letters: some View {
         let rows = letterRows
         if rows.isEmpty {
-            Text("The price of each letter shows once the numbers are in.")
+            Text("What each letter grade takes shows here once the numbers are in.")
                 .font(.sCallout)
                 .foregroundStyle(.secondary)
         } else {
@@ -488,7 +494,7 @@ struct GradeNeededCompact: View {
     }
 
     private func sub(_ r: NeedMath.Answer?) -> String {
-        guard let r else { return "Your grade now, the share still to come, and your goal." }
+        guard let r else { return "Enter your grade now, the share still to come, and your goal." }
         switch r.kind {
         case .ok: return "on everything still to come"
         case .over: return "not even full marks would get there"

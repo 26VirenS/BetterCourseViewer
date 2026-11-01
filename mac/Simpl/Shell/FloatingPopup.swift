@@ -139,28 +139,117 @@ extension View {
     }
 }
 
-/// (1.3.79) A popup's ×, for one with no Close of its own: a plain ✕ in a small circle, as a floating panel's, brighter
-/// under the pointer.
+// MARK: - A popup's head (UI review)
+
+/// (UI review) Every popup's ×, one and the same: a glass circle with a plain ✕, at the right end of its head — the
+/// top-right corner of every popup alike — where 1.3.79 to 1.3.211 had a word ("Close": Knewton Alta, Macmillan, ALEKS,
+/// a quiz, the feedback), a small circle (Sync, a tool) or a ✕ at the top left (the rubric). It closes the popup as
+/// Escape does (`action`: what closes it instead — a tool's popup, a quiz saving its answers); `escape` gives it the
+/// Escape key too, for a sheet that has no popup to take it (a quiz).
 struct PopupCloseButton: View {
+    var help = "Close (Esc)"
+    var label = "Close"
+    var escape = false
+    var action: (() -> Void)? = nil
     @Environment(\.popup) private var popup
-    @State private var hover = false
+
+    /// Its size: as tall as the large glass buttons beside it.
+    static let size: CGFloat = 30
 
     var body: some View {
         Button {
-            popup.userClose()
+            if let action { action() } else { popup.userClose() }
         } label: {
             Image(systemName: "xmark")
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(.secondary)
-                .frame(width: 22, height: 22)
-                .background(Circle().fill(Color.primary.opacity(hover ? 0.16 : 0.08)))
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.primary)
+                .frame(width: Self.size, height: Self.size)
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .onHover { hover = $0 }
-        .animation(Motion.hover, value: hover)
-        .help("Close (Esc)")
-        .accessibilityLabel("Close")
+        .glass(Circle(), interactive: true)
+        .keyboardShortcut(escape ? KeyboardShortcut.cancelAction : nil)
+        .help(help)
+        .accessibilityLabel(label)
+    }
+}
+
+/// (UI review) A popup's symbol, title and the line under it, as every popup's head has them (`PopupHead`, a tool's
+/// heading): its symbol on a tile of its colour, its title in the third title size, the line in the callout size.
+struct PopupHeadTitle: View {
+    let symbol: String
+    var color: Color = Theme.accent
+    let title: String
+    var subtitle: String? = nil
+    /// The most lines the line under the title takes (one, as a rule; a popup whose line is a sentence, two).
+    var subtitleLines = 1
+
+    /// The tile's size in every popup's head.
+    static let icon: CGFloat = 36
+
+    var body: some View {
+        HStack(spacing: 12) {
+            IconTile(symbol: symbol, color: color, size: Self.icon)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.sTitle3)
+                    .lineLimit(1)
+                    .contentTransition(.opacity)
+                if let subtitle, !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.sCallout)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(subtitleLines)
+                        .fixedSize(horizontal: false, vertical: subtitleLines > 1)
+                        .transition(.opacity)
+                }
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+        }
+    }
+}
+
+/// (UI review) Every popup's head, one way — Knewton Alta's, Macmillan's and ALEKS's, a quiz's, the feedback's, Sync,
+/// Find Appointment, More from Canvas, Simpl Community's (a tool's heading is built of the same parts): its symbol and
+/// title, with a line under it, at the left; what it does at the right (`actions`); and its × last, in the same corner of
+/// every popup. Dragged, the popup moves. `inset`: the room at its sides, as the page under it has (a tool's 40).
+struct PopupHead<Actions: View>: View {
+    let symbol: String
+    var color: Color = Theme.accent
+    let title: String
+    var subtitle: String? = nil
+    var subtitleLines = 1
+    var inset: CGFloat = 20
+    /// What its × does instead of closing the popup as Escape does, and what its tooltip and VoiceOver say.
+    var close: (() -> Void)? = nil
+    var closeHelp = "Close (Esc)"
+    var closeLabel = "Close"
+    /// Escape for its × too (a sheet's head: no popup takes the key).
+    var escape = false
+    @ViewBuilder var actions: () -> Actions
+
+    var body: some View {
+        HStack(spacing: 12) {
+            PopupHeadTitle(symbol: symbol, color: color, title: title, subtitle: subtitle, subtitleLines: subtitleLines)
+            Spacer(minLength: 8)
+            actions()
+            PopupCloseButton(help: closeHelp, label: closeLabel, escape: escape, action: close)
+        }
+        .controlSize(.large)
+        .padding(.horizontal, inset)
+        .padding(.top, 16)
+        .padding(.bottom, 12)
+        .popupHeader()
+    }
+}
+
+extension PopupHead where Actions == EmptyView {
+    init(symbol: String, color: Color = Theme.accent, title: String, subtitle: String? = nil, subtitleLines: Int = 1,
+         inset: CGFloat = 20, close: (() -> Void)? = nil, closeHelp: String = "Close (Esc)", closeLabel: String = "Close",
+         escape: Bool = false) {
+        self.init(symbol: symbol, color: color, title: title, subtitle: subtitle, subtitleLines: subtitleLines, inset: inset,
+                  close: close, closeHelp: closeHelp, closeLabel: closeLabel, escape: escape, actions: { EmptyView() })
     }
 }
 

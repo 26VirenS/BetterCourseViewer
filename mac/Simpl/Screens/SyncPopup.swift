@@ -54,24 +54,9 @@ struct SyncPopup: View {
         }
     }
 
+    /// (UI review) Every popup's head (Shell/FloatingPopup.swift).
     private var header: some View {
-        HStack(spacing: 12) {
-            IconTile(symbol: "arrow.triangle.2.circlepath", color: Theme.accent, size: 36)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Sync")
-                    .font(.sTitle3.weight(.semibold))
-                Text("Connect your calendar apps to Simpl")
-                    .font(.sCallout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 0)
-            PopupCloseButton()
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 18)
-        .padding(.bottom, 12)
-        .popupHeader()
+        PopupHead(symbol: "arrow.triangle.2.circlepath", title: "Sync", subtitle: "Connect your calendar apps to Simpl")
     }
 
     @ViewBuilder

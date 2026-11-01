@@ -49,7 +49,7 @@ enum BioTools {
                                          symbol: "arrow.triangle.branch", fallback: nil, hex: "#14b8a6")
         case .popgen: return BioToolInfo(name: "Hardy–Weinberg", shortName: "Hardy–Weinberg", note: "Allele frequencies, equilibrium and evolution.",
                                          symbol: "person.3", fallback: nil, hex: "#8bbf3f")
-        case .biolab: return BioToolInfo(name: "Bio Lab Calculator", shortName: "Lab maths", note: "Dilutions, microscopy, stats and the AP formula sheet.",
+        case .biolab: return BioToolInfo(name: "Bio Lab Calculator", shortName: "Lab Maths", note: "Dilutions, microscopy, stats and the AP formula sheet.",
                                          symbol: "testtube.2", fallback: nil, hex: "#c27c4a")
         case .enzyme: return BioToolInfo(name: "Enzyme Lab", shortName: "Enzymes", note: "How temperature, pH and inhibitors change rate.",
                                          symbol: "bolt", fallback: nil, hex: "#d9a406")
@@ -250,7 +250,9 @@ struct BioHeaderControls: View {
                     }
                     .glassButton(prominent: nav.page(kind) == p.id)
                     .controlSize(.large)
-                    .help(p.help.isEmpty ? p.title : p.help)
+                    // (UI review: drawn as its symbol alone, its name said in its tooltip and to VoiceOver)
+                    .help(p.help.isEmpty ? p.title : (squished ? "\(p.title): \(p.help)" : p.help))
+                    .accessibilityLabel(p.title)
                     .accessibilityAddTraits(nav.page(kind) == p.id ? .isSelected : [])
                 }
             }
@@ -274,7 +276,7 @@ struct BioToolsSection: View {
                     .font(.sCallout)
                     .foregroundStyle(.secondary)
             }
-            LazyVGrid(columns: ToolTile.columns, spacing: 14) {
+            ToolTileRows {
                 ForEach(BioTools.kinds) { k in ToolTile(kind: k) }
             }
         }

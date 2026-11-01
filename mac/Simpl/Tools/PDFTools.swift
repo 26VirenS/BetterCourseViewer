@@ -340,7 +340,7 @@ struct PDFMergeSplitTool: View {
                     .glassButton()
                     .disabled(removed.count >= f.count)
                     // (tools-28) the two things a page does, said plainly
-                    Text("Click a page to leave it out. ⟳ turns it.")
+                    Text("Click a page to leave it out; ⟳ rotates it.")
                         .font(.sFootnote)
                         .foregroundStyle(.secondary)
                 }

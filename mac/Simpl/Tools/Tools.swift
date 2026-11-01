@@ -45,18 +45,18 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
 
     var name: String {
         switch self {
-        case .cite: return "Citation generator"
-        case .pomo: return "Focus timer"
+        case .cite: return "Citation Generator"
+        case .pomo: return "Focus Timer"
         case .calc: return "Calculator"
-        case .graph: return "Graphing calculator"
+        case .graph: return "Graphing Calculator"
         case .motion, .vectors, .circuit: return PhysTools.info(self).name
         case .ptable, .lewis, .molecule, .atoms, .balance, .moles, .gas, .solution: return ChemTools.info(self).name
-        case .need: return "Grade needed"
-        case .conv: return "File converter"
-        case .units: return "Unit converter"
-        case .pdfx: return "Merge & split PDFs"
-        case .mark: return "PDF annotator"
-        case .ocr: return "Image to text"
+        case .need: return "Grade Needed"
+        case .conv: return "File Converter"
+        case .units: return "Unit Converter"
+        case .pdfx: return "Merge & Split PDFs"
+        case .mark: return "PDF Annotator"
+        case .ocr: return "Image to Text"
         case .fc: return "Flashcards"
         case .words: return "Word Counter"
         case .stats: return "Statistics"
@@ -78,12 +78,12 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .graph: return "Graphing"
         case .motion, .vectors, .circuit: return PhysTools.info(self).shortName
         case .ptable, .lewis, .molecule, .atoms, .balance, .moles, .gas, .solution: return ChemTools.info(self).shortName
-        case .need: return "Grade needed"
+        case .need: return "Grade Needed"
         case .conv: return "Convert"
         case .units: return "Units"
-        case .pdfx: return "Merge & split"
-        case .mark: return "Mark up"
-        case .ocr: return "Image to text"
+        case .pdfx: return "Merge & Split"
+        case .mark: return "Mark Up"
+        case .ocr: return "Image to Text"
         case .fc: return "Flashcards"
         case .words: return "Words"
         case .stats: return "Stats"
@@ -418,7 +418,7 @@ enum ToolGroup: CaseIterable {
     var title: String {
         switch self {
         case .study: return "Study"
-        case .science: return "Math & science"
+        case .science: return "Math & Science"
         case .files: return "Files"
         case .chemistry: return "Chemistry"
         case .physics: return "Physics"
@@ -476,15 +476,60 @@ struct ToolGroupSection: View {
             Text(title)
                 .font(.sTitle3)
                 .accessibilityAddTraits(.isHeader)
-            LazyVGrid(columns: ToolTile.columns, spacing: 14) {
+            ToolTileRows {
                 ForEach(kinds) { k in ToolTile(kind: k) }
             }
         }
     }
 }
 
+/// (UI review) The Tools page's tiles in rows: as many columns as the page holds at `minimum` points each — three from
+/// about 900 points of page, two below, as the adaptive grid had them (tools-32) — and every tile in a row as tall as the
+/// row's tallest, so a row reads as one band rather than cards of three heights.
+struct ToolTileRows: Layout {
+    var minimum: CGFloat = 280
+    var spacing: CGFloat = 14
+
+    /// How many columns `width` holds, and how wide each is.
+    private func columns(_ width: CGFloat) -> (count: Int, width: CGFloat) {
+        let n = max(1, Int(((width + spacing) / (minimum + spacing)).rounded(.down)))
+        return (n, max(0, (width - spacing * CGFloat(n - 1)) / CGFloat(n)))
+    }
+
+    /// Each row's height: its tallest tile's, at the column's width.
+    private func rowHeights(_ subviews: Subviews, columns c: (count: Int, width: CGFloat)) -> [CGFloat] {
+        stride(from: 0, to: subviews.count, by: c.count).map { start in
+            subviews[start..<min(start + c.count, subviews.count)]
+                .map { $0.sizeThatFits(ProposedViewSize(width: c.width, height: nil)).height }
+                .max() ?? 0
+        }
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? (minimum * 2 + spacing)
+        let rows = rowHeights(subviews, columns: columns(width))
+        return CGSize(width: width, height: rows.reduce(0, +) + spacing * CGFloat(max(rows.count - 1, 0)))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let c = columns(bounds.width)
+        var y = bounds.minY
+        for (row, height) in rowHeights(subviews, columns: c).enumerated() {
+            for col in 0..<c.count {
+                let i = row * c.count + col
+                guard i < subviews.count else { break }
+                subviews[i].place(at: CGPoint(x: bounds.minX + CGFloat(col) * (c.width + spacing), y: y), anchor: .topLeading,
+                                  proposal: ProposedViewSize(width: c.width, height: height))
+            }
+            y += height + spacing
+        }
+    }
+}
+
 /// A tool's tile: its symbol on a wash of its colour, its name and line, and its pin; the focus timer's says how long is
-/// left while a session goes.
+/// left while a session goes. (UI review) As tall as its row (`ToolTileRows`), and its line takes the tile's whole
+/// width: only its name keeps clear of the pin in the corner, so "Cite in MLA, APA or Chicago." no longer wraps at half
+/// the tile.
 struct ToolTile: View {
     let kind: ToolKind
     @ObservedObject private var tools = ToolsCenter.shared
@@ -492,8 +537,8 @@ struct ToolTile: View {
     /// (1.3.79) The window's engine, for its tool's popup to open over this window.
     @Environment(\.engineLink) private var link
 
-    /// (tools-32) Three across from about 900 points of page, two below.
-    static let columns = [GridItem(.adaptive(minimum: 280), spacing: 14)]
+    /// The room a tile's name leaves at its right for the pin (30 points, and a little air).
+    static let pinRoom: CGFloat = 30
 
     var body: some View {
         Button {
@@ -505,16 +550,18 @@ struct ToolTile: View {
                     Text(kind.name)
                         .font(.sHeadline)
                         .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.trailing, Self.pinRoom)
                     Text(kind.note)
                         .font(.sCallout)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     if kind == .pomo && focus.active { FocusTileLine() }
                 }
-                Spacer(minLength: 36)
+                Spacer(minLength: 0)
             }
             .padding(16)
-            .frame(maxWidth: .infinity, minHeight: 84, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 84, maxHeight: .infinity, alignment: .topLeading)
         }
         .buttonStyle(CardButtonStyle(radius: 20))
         .overlay(alignment: .topTrailing) { pinButton.padding(10) }
@@ -564,9 +611,10 @@ struct ToolScreen: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // (UI review: every popup's head — its parts and its × as PopupHead has them — at the tool's page margin)
             ToolHeader(kind: kind)
                 .padding(.horizontal, 40)
-                .padding(.top, 20)
+                .padding(.top, 16)
                 .padding(.bottom, 12)
                 .frame(maxWidth: 1480 + 80)
                 .frame(maxWidth: .infinity)
@@ -615,10 +663,11 @@ struct ToolScreen: View {
 }
 
 /// A tool's heading: the tool's tile, its name and line, its pin and — (1.3.79) at its right end, where every full popup
-/// has its Close — its popup's ×. (tools-4) The Periodic Table's has its search and Tour left of its pin — (1.3.87) on
-/// the heading's own row, where the window has room for them with the search open; else on a row of their own under it,
-/// as before (1.3.80: no longer its pages — Lewis Structures and the Molecule Builder are tools of their own, with
-/// headings of their own); (tools-29) while one of its elements is open, "‹ Table" leads it, back to the table.
+/// has its Close — its popup's ×; (UI review) built of every popup's head's parts (PopupHeadTitle, PopupCloseButton).
+/// (tools-4) The Periodic Table's has its search and Tour left of its pin — (1.3.87) on the heading's own row, where the
+/// window has room for them with the search open; else on a row of their own under it, as before (1.3.80: no longer its
+/// pages — Lewis Structures and the Molecule Builder are tools of their own, with headings of their own); (tools-29)
+/// while one of its elements is open, "‹ Table" leads it, back to the table.
 struct ToolHeader: View {
     let kind: ToolKind
     @ObservedObject private var tools = ToolsCenter.shared
@@ -631,10 +680,20 @@ struct ToolHeader: View {
         if kind.isBiology && BioTools.pages(kind).count > 1 {
             ViewThatFits(in: .horizontal) {
                 row(pages: false, pinWords: true)
-                row(pages: true, pinWords: true)
-                row(pages: true, pinWords: false)
-                // (and where even their symbols leave the name no room — "Cell Explo…", "Bio La…" — the pages under the
-                // name, in place of its line)
+                // (UI review) the pages keep their names — a paw, a leaf and an oval said nothing of Animal, Plant and
+                // Bacterium: the pin draws in to its symbol first, then the pages go to a row of their own under the
+                // heading, named still, as the Periodic Table's controls do
+                row(pages: false, pinWords: false)
+                VStack(alignment: .leading, spacing: 12) {
+                    row(pages: nil, pinWords: true, bioPages: false)
+                    BioHeaderControls(kind: kind, squished: false)
+                }
+                VStack(alignment: .leading, spacing: 12) {
+                    row(pages: nil, pinWords: false, bioPages: false)
+                    BioHeaderControls(kind: kind, squished: false)
+                }
+                // (and only where even a row of their own has no room for their names, their symbols under the name, in
+                // place of its line — each named in its tooltip)
                 stacked
             }
         } else if kind == .ptable {
@@ -675,49 +734,32 @@ struct ToolHeader: View {
         }
     }
 
-    /// (1.3.79) The popup's ×: the tool closed, the window under it as it was.
+    /// (1.3.79) The popup's ×: the tool closed, the window under it as it was — (UI review) every popup's ×.
     private var closeButton: some View {
-        Button {
-            tools.closePopup()
-        } label: {
-            Label("Close", systemImage: "xmark")
-                .font(.sCallout.weight(.semibold))
-                .labelStyle(.iconOnly)
-                .frame(minWidth: 16)
-        }
-        .glassButton()
-        .controlSize(.large)
-        .help("Close \(kind.name) (Esc)")
-        .accessibilityLabel("Close \(kind.name)")
+        PopupCloseButton(help: "Close \(kind.name) (Esc)", label: "Close \(kind.name)") { tools.closePopup() }
+    }
+
+    /// (1.3.62) The Periodic Table's heading its name alone; (tools-30) a tool may quiet its line for a while.
+    private var shownNote: String? {
+        kind != .ptable && !tools.quietHeadings.contains(kind) ? kind.note : nil
     }
 
     /// (1.3.87) What the Periodic Table's search and Tour take beside the pin with the search open (its field, its
     /// symbol and its ×, and Tour drawn in to its symbol): kept for them on the heading's row whether it is open or not.
     private static let ptRoom: CGFloat = 340
 
-    /// The heading's row: `pages` squishes a biology tool's page buttons to their symbols (nil: as they fit);
-    /// (1.3.87) `ptControls`, the Periodic Table's search and Tour left of the pin.
-    private func row(pages squished: Bool?, pinWords: Bool, ptControls: Bool = false) -> some View {
-        HStack(alignment: .center, spacing: 14) {
+    /// The heading's row: `pages` squishes a biology tool's page buttons to their symbols (nil: as they fit) —
+    /// (UI review) `bioPages` false leaves them out, for a row of their own under it; (1.3.87) `ptControls`, the
+    /// Periodic Table's search and Tour left of the pin.
+    private func row(pages squished: Bool?, pinWords: Bool, ptControls: Bool = false, bioPages: Bool = true) -> some View {
+        HStack(alignment: .center, spacing: 12) {
             leading
-            IconTile(symbol: kind.symbol, color: kind.color, size: 44)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(kind.name)
-                    .font(.sTitle)
-                    .lineLimit(1)
-                    .contentTransition(.opacity)
-                // (1.3.62) the Periodic Table's header its name alone; (tools-30) a tool may quiet its line for a while
-                if kind != .ptable && !tools.quietHeadings.contains(kind) {
-                    Text(kind.note)
-                        .font(.sCallout)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .transition(.opacity)
-                }
-            }
+            // (UI review: its tile, name and line as every popup's head has them — 36 points and the third title size,
+            // where a tool's alone were 44 and 28)
+            PopupHeadTitle(symbol: kind.symbol, color: kind.color, title: kind.name, subtitle: shownNote)
             Spacer(minLength: 12)
             // (1.3.78) a biology tool's pages
-            if kind.isBiology { BioHeaderControls(kind: kind, squished: squished) }
+            if kind.isBiology && bioPages { BioHeaderControls(kind: kind, squished: squished) }
             // (a width of its own, not a least: the button growing into the field, both drawn a moment as it opens, never
             // widens the row, or the heading would go to its two rows as the search opened)
             if ptControls { PTHeaderBar().frame(width: Self.ptRoom, alignment: .trailing) }
@@ -741,12 +783,12 @@ struct ToolHeader: View {
     /// (1.3.78) A biology tool's heading in a narrow window: its name whole, its pages' symbols under it, its pin a
     /// symbol.
     private var stacked: some View {
-        HStack(alignment: .center, spacing: 14) {
+        HStack(alignment: .center, spacing: 12) {
             leading
-            IconTile(symbol: kind.symbol, color: kind.color, size: 44)
+            IconTile(symbol: kind.symbol, color: kind.color, size: PopupHeadTitle.icon)
             VStack(alignment: .leading, spacing: 6) {
                 Text(kind.name)
-                    .font(.sTitle)
+                    .font(.sTitle3)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
                     .help(kind.note)

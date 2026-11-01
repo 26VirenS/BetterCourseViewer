@@ -40,7 +40,7 @@ struct PinnedToolButton: View {
                 }
             }
         }
-        .help(live ? "Focus timer: \(focus.rec.phase.name.lowercased())\(focus.paused ? ", paused" : "")" : kind.name)
+        .help(live ? "Focus Timer: \(focus.rec.phase.name.lowercased())\(focus.paused ? ", paused" : "")" : kind.name)
         .accessibilityLabel(kind.name)
         .popover(isPresented: $shown, arrowEdge: .bottom) {
             PinnedToolPopover(kind: kind, engine: engine) { shown = false }

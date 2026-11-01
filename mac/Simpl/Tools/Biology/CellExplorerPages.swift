@@ -440,47 +440,44 @@ enum CEWobble {
 
 /// "See a real phospholipid": POPC (§6.9), atom by atom, as the Biomolecule Builder draws it.
 struct CEPOPCSheet: View {
-    /// (1.3.79) Its popup over the window, which Done closes.
+    /// (1.3.79) Its popup over the window, which its × closes (and Open in Biomolecule Builder).
     @Environment(\.popup) private var dismiss
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         let molecule = BioData.molecule("POV")
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("POPC, a phospholipid").font(.sTitle3)
-                    Text([molecule?.formula, molecule?.mass.map { String(halfUp: "%.1f g/mol", $0) }].compactMap { $0 }.joined(separator: " · "))
-                        .font(.sCallout)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
+        VStack(alignment: .leading, spacing: 0) {
+            // (UI review) every popup's head: the Biomolecule Builder's symbol, the molecule and its formula, the way to the
+            // builder, and the × in the same corner as every popup's (Done, until the UI review)
+            PopupHead(symbol: ToolKind.biomol.symbol, color: ToolKind.biomol.color, title: "POPC, a phospholipid",
+                      subtitle: [molecule?.formula, molecule?.mass.map { String(halfUp: "%.1f g/mol", $0) }].compactMap { $0 }.joined(separator: " · "),
+                      inset: 22) {
                 Button("Open in Biomolecule Builder") {
                     dismiss()
                     BioNav.shared.set(.biomol, "lipids")
                     BioTools.open(.biomol, info: ["molecule": "POV"])
                 }
                 .glassButton()
-                Button("Done") { dismiss() }
-                    .glassButton(prominent: true)
-                    .keyboardShortcut(.defaultAction)
             }
-            BioSceneView(key: "popc|\(scheme == .dark)",
-                         build: BioSceneBuild {
-                             guard let mol = BioData.molecule("POV") else { return BioSceneContent() }
-                             return BioSceneContent(items: BioMoleculeScene.items(mol.model(), style: .ballStick))
-                         },
-                         selection: .constant(nil),
-                         showLabels: false,
-                         accessibility: "3D model of POPC, a phospholipid, ball and stick")
-                .frame(minHeight: 400)
-                .card(radius: 16)
-            Text("Its head (choline and phosphate) is polar and faces the water; its two fatty-acid tails are not: palmitate is straight, oleate bends at its cis double bond. In the membrane, two layers of these meet tail to tail. Atoms: carbon grey, hydrogen white, oxygen red, nitrogen blue, phosphorus orange.")
-                .font(.sCallout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 14) {
+                BioSceneView(key: "popc|\(scheme == .dark)",
+                             build: BioSceneBuild {
+                                 guard let mol = BioData.molecule("POV") else { return BioSceneContent() }
+                                 return BioSceneContent(items: BioMoleculeScene.items(mol.model(), style: .ballStick))
+                             },
+                             selection: .constant(nil),
+                             showLabels: false,
+                             accessibility: "3D model of POPC, a phospholipid, ball and stick")
+                    .frame(minHeight: 400)
+                    .card(radius: 16)
+                Text("Its head (choline and phosphate) is polar and faces the water; its two fatty-acid tails are not: palmitate is straight, oleate bends at its cis double bond. In the membrane, two layers of these meet tail to tail. Atoms: carbon grey, hydrogen white, oxygen red, nitrogen blue, phosphorus orange.")
+                    .font(.sCallout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 22)
+            .padding(.bottom, 22)
         }
-        .padding(22)
         .frame(width: 680, height: 620)
     }
 }
