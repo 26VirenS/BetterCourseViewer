@@ -157,6 +157,7 @@ internal sealed class HandInSheet
         phone = new PhoneHandIn(Accent);
         phone.Arrived += FromPhone;
         phone.Closed += Paint;
+        phone.MakingChanged += Paint;
         filesSection = FilesSection();
 
         // (a popup floating over the window: the assignment, its files and the rest of Simpl at hand while it is open)
@@ -337,8 +338,8 @@ internal sealed class HandInSheet
         filesFoot.Text = allowed.Count > 0 ? $"This assignment takes {AllowedList} files." + (convertible.Line.Length == 0 ? "" : $" {convertible.Line}.") + (ZipOK ? " Any file or folder can go as a .zip." : "") : "A folder goes as a .zip.";
         filesFoot.Visibility = Visibility.Visible;
         zipSubmit.Visible = ZipOffered;
-        zipSubmit.Enabled = ZipOffered && !sending && !phone.IsOpen;
-        submit.Enabled = Ready && !(type == "online_upload" && MustZip) && !sending && !phone.IsOpen;
+        zipSubmit.Enabled = ZipOffered && !StillComing && !sending && !phone.IsOpen;
+        submit.Enabled = Ready && !(type == "online_upload" && MustZip) && !StillComing && !sending && !phone.IsOpen;
         cancel.Enabled = !sending;
         sheet.Modal = sending || phone.IsOpen;
         foreach (var e in new UIElement[] { text, url, note, filesSection }) e.IsEnabled = !sending;
@@ -404,6 +405,10 @@ internal sealed class HandInSheet
 
     /// <summary>(0.3.50) Submit as ZIP beside Submit: two or more files, or one the assignment takes only zipped.</summary>
     private bool ZipOffered => type == "online_upload" && ZipOK && (files.Count >= 2 || MustZip) && converting.Count == 0;
+
+    /// <summary>A file still on its way into the hand-in — being converted, or the photos' PDF being made again with the
+    /// latest photo: Submit waits for it, or the hand-in would go without it (and it would arrive in a closed dialog).</summary>
+    private bool StillComing => type == "online_upload" && (converting.Count > 0 || phone.Making);
 
     private bool Ready => type switch
     {
@@ -678,7 +683,7 @@ internal sealed class HandInSheet
 
     private async void Submit(bool asZip = false)
     {
-        if (!Ready || sending || phone.IsOpen) return;
+        if (!Ready || sending || phone.IsOpen || StillComing) return;
         if (asZip ? !ZipOffered : type == "online_upload" && MustZip) return;
         zipping = asZip;
         sending = true;

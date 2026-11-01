@@ -51,6 +51,11 @@ internal sealed class PhoneHandIn
     public event Action<string, string, byte[], bool>? Arrived;
     /// <summary>The panel was put away (its server stopped).</summary>
     public event Action? Closed;
+    /// <summary>The photos' PDF is being made again (<see cref="Making"/> changed): Submit waits for it.</summary>
+    public event Action? MakingChanged;
+
+    /// <summary>A photo still on its way into the photos' PDF: the PDF in the hand-in is not yet the one with every photo.</summary>
+    public bool Making => makingCount > 0;
 
     public FrameworkElement View => root;
     public bool IsOpen { get; private set; }
@@ -84,6 +89,7 @@ internal sealed class PhoneHandIn
     /// <summary>The photos as PDF pages, in the order they came, and whether the hand-in has the PDF of them.</summary>
     private readonly List<PhotoPdf.Page> pages = new();
     private Task making = Task.CompletedTask;
+    private int makingCount;
     private bool holding;
     private System.Windows.Threading.DispatcherTimer? hold;
 
@@ -386,12 +392,19 @@ internal sealed class PhoneHandIn
     private void MakePage(Item it, byte[] data)
     {
         var before = making;
+        makingCount++;
+        MakingChanged?.Invoke();
         making = Run();
         async Task Run()
         {
             try { await before; } catch { }
             try { await Make(); }
             catch (Exception e) { Log.Write("phone hand-in: photos: " + e.Message); }
+            finally
+            {
+                makingCount--;
+                MakingChanged?.Invoke();
+            }
         }
         async Task Make()
         {
