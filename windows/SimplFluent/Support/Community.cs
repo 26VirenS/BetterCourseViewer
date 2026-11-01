@@ -249,14 +249,22 @@ public static class Community
             }
             var look = Appearance.Look is "light" or "dark" ? Appearance.Look : null;
             var theme = new Dictionary<string, object?> { ["name"] = name, ["maker"] = maker, ["accent"] = Appearance.AccentHex?.ToLowerInvariant(), ["look"] = look, ["places"] = places };
-            using var form = new MultipartFormDataContent();
-            form.Add(new StringContent(JsonSerializer.Serialize(theme), System.Text.Encoding.UTF8, "application/json"), "theme");
+            // (the form written out as the Mac and the web send it: every name in quotes, the boundary bare — .NET's own
+            //  MultipartFormDataContent leaves the names unquoted and adds filename*=, which the site's form reader turns
+            //  down: "That did not arrive as a form.")
+            var boundary = "SimplCommunity-" + Guid.NewGuid().ToString("N");
+            using var sent = new MemoryStream();
+            void Text(string t) { var b = System.Text.Encoding.UTF8.GetBytes(t); sent.Write(b, 0, b.Length); }
+            Text($"--{boundary}\r\nContent-Disposition: form-data; name=\"theme\"\r\nContent-Type: application/json; charset=utf-8\r\n\r\n{JsonSerializer.Serialize(theme)}\r\n");
             foreach (var (slot, bytes) in photos)
             {
-                var part = new ByteArrayContent(bytes);
-                part.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
-                form.Add(part, $"photo-{slot}", $"{slot}.jpg");
+                Text($"--{boundary}\r\nContent-Disposition: form-data; name=\"photo-{slot}\"; filename=\"{slot}.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n");
+                sent.Write(bytes, 0, bytes.Length);
+                Text("\r\n");
             }
+            Text($"--{boundary}--\r\n");
+            using var form = new ByteArrayContent(sent.ToArray());
+            form.Headers.TryAddWithoutValidation("Content-Type", $"multipart/form-data; boundary={boundary}");
             using var res = await Upload.PostAsync(new Uri(Site, "api/community/submit"), form);
             var body = await res.Content.ReadAsStringAsync();
             string? id = null, message = null;
