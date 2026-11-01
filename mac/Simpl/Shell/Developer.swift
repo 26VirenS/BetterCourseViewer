@@ -204,6 +204,8 @@ private struct DevOverview: View {
                 LabeledContent("Interface", value: AppSession.extensionVersion)
                 LabeledContent("Bundle", value: Bundle.main.bundleIdentifier ?? "?")
                 LabeledContent("Development run", value: Updater.isDevelopmentRun ? "Yes" : "No")
+                // (1.3.210) where this Mac's updates come from: everyone's feed, or the test channel's (Updates ▸ Test builds)
+                LabeledContent("Updates from", value: TestChannel.channel != nil ? "The test channel" : "Everyone's feed")
                 LabeledContent("Translocated", value: AppPlacement.isTranslocated ? "Yes" : "No")
                 // (1.3.146) the newest crash kept (Crashes has them all)
                 LabeledContent("Last crash", value: CrashLog.all().first.map { "\($0.at.formatted(date: .abbreviated, time: .shortened)) — \($0.title)" } ?? "None kept")
