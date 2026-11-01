@@ -106,6 +106,9 @@ struct GradeNeededTool: View {
     @State private var goal = ""
     @State private var letter = "custom"
 
+    /// (UI review) A percentage's field and its % sign: about 90 points of field, never the column's whole width.
+    static let percentWidth: CGFloat = 112
+
     private var lms: String { engine.lmsName }
     private var chosen: CourseRow? { engine.courses.first { $0.id == course } }
     private var pieces: [NeedPiece] { data?.pieces ?? [] }
@@ -156,7 +159,8 @@ struct GradeNeededTool: View {
             }
             HStack(alignment: .top, spacing: 22) {
                 PageSection(title: "Now") {
-                    ToolField(label: "Your grade now", text: $now, placeholder: "e.g. 88", hint: nowHint, suffix: "%")
+                    // (UI review: a field as wide as a percentage, its % beside it — not stretched across the column)
+                    ToolField(label: "Your grade now", text: $now, placeholder: "e.g. 88", hint: nowHint, suffix: "%", width: Self.percentWidth)
                 }
                 PageSection(title: "What is left") {
                     VStack(alignment: .leading, spacing: 10) {
@@ -172,7 +176,7 @@ struct GradeNeededTool: View {
                             .controlSize(.large)
                         }
                         if pickedPiece == nil {
-                            ToolField(label: "Worth this much of the final grade", text: $worth, placeholder: "e.g. 25", suffix: "%")
+                            ToolField(label: "Worth this much of the final grade", text: $worth, placeholder: "e.g. 25", suffix: "%", width: Self.percentWidth)
                         }
                         Text(pieceHint)
                             .font(.sFootnote)
@@ -195,7 +199,7 @@ struct GradeNeededTool: View {
                         .controlSize(.large)
                         .frame(width: 200, alignment: .leading)
                     }
-                    ToolField(label: "The grade you want", text: Binding(get: { goal }, set: { goal = $0; letter = "custom" }), placeholder: "e.g. 90", suffix: "%", width: 160)
+                    ToolField(label: "The grade you want", text: Binding(get: { goal }, set: { goal = $0; letter = "custom" }), placeholder: "e.g. 90", suffix: "%", width: Self.percentWidth)
                 }
             }
             if let w = worthValue, w <= 0 || w > 100 {
