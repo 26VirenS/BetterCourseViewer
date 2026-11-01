@@ -4064,6 +4064,18 @@ try {
   await page.waitForFunction(() => !document.querySelector('.bcv-viewer'), null, { timeout: 3000 });
   check(tabsOpened.length === 1, 'and only that press ever opened a tab');
   context.off('page', onTab);
+  // an HTML page among the files (a classmate's, in a group): its new tab shows its text, never the page itself — the copy
+  // is made by this Canvas page, so drawn as a page it would run as this Canvas, signed in as the student
+  await sw.evaluate(async (base) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: () => { self.BCV.viewer.open({ id: 'h1', display_name: 'study-notes.html', filename: 'study-notes.html', 'content-type': 'text/html', size: 900, url: '/mock-tool-newwindow' }); } }); }, BASE);
+  await page.waitForSelector('.bcv-viewer button.bcv-viewer__tab', { timeout: 5000 });
+  const [htmlTab] = await Promise.all([context.waitForEvent('page', { timeout: 8000 }), page.click('.bcv-viewer__tab')]);
+  await htmlTab.waitForFunction(() => location.protocol === 'blob:' && /Smartwork/.test(document.documentElement?.textContent || ''), null, { timeout: 8000 }).catch(() => {});
+  const htmlShown = await htmlTab.evaluate(() => ({ url: location.href.slice(0, 40), page: !!document.getElementById('mock-tool-newwindow') || !!document.querySelector('header, main, button'), text: /<header/.test(document.body?.textContent || '') }));
+  await htmlTab.close();
+  await page.bringToFront();
+  await page.click('.bcv-viewer .bcv-sheet__close');
+  await page.waitForFunction(() => !document.querySelector('.bcv-viewer'), null, { timeout: 3000 });
+  check(!htmlShown.page && htmlShown.text, `Open in new tab on an HTML file shows its source as text, not a page running on this Canvas: ${JSON.stringify(htmlShown)}`);
   // a document a browser cannot show: the button is a link to Canvas's own page for the file
   await page.click('.bcv-body .bcv-row:has-text("planned lecture schedule.xlsx")');
   await page.waitForSelector('.bcv-viewer .bcv-viewer__frame', { timeout: 5000 });
