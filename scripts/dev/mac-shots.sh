@@ -573,7 +573,7 @@ ui_review() {
   MODE=dark shoot dark-03p-todo-plan-rail 16 -SimplPlace todo -SimplPlanFirst YES
   MODE=light shoot light-11w-course-grades-whatif 16 -SimplPlace section:courses/101:grades -SimplWhatIf YES
   # (M11) the same scrolled to its foot (-SimplWhatIfFoot): the last group clear of What-If's bar (whatif_check)
-  MODE=light shoot light-11x-course-grades-whatif-foot 18 -SimplPlace section:courses/101:grades -SimplWhatIf YES -SimplWhatIfFoot YES
+  MODE=light shoot light-11x-course-grades-whatif-foot 30 -SimplPlace section:courses/101:grades -SimplWhatIf YES -SimplWhatIfFoot YES
   MODE=light shoot light-25b-compose-attached 16 -SimplPlace inbox -SimplOpen compose -SimplAttach "$PWD/docs/screenshots/calendar.png"
   MODE=light SIZE=1720x1040 shoot light-45-wide-grades 14 -SimplPlace grades
   MODE=light SIZE=1440x900 shoot light-46-wide-todo 12 -SimplPlace todo
@@ -1340,7 +1340,7 @@ push_set() {
   # (1.3.177) a colour of a place's own: Due today's, Next 7 days' and the sidebar's over Ocean's drawings (each inked
   # in its own colour); and Due today's Colour… open from its photo button
   shoot light-50f-place-colours 12 -SimplTheme Ocean -SimplTints "today=#d97900,next=#65499d,side=#e71f63"
-  shoot light-51t-appearance-colour 18 -SimplAppearanceMode YES -SimplTheme Ocean -SimplTints "today=#d97900" -SimplPlaceColour today
+  shoot light-51t-appearance-colour 30 -SimplAppearanceMode YES -SimplTheme Ocean -SimplTints "today=#d97900" -SimplPlaceColour today
   # (1.3.173) Appearance's Community: the mock's gallery, three themes shared there; and its photo theme worn (its photos
   # kept, so a home of its own)
   shoot light-51k-appearance-community 20 -SimplAppearanceMode YES -SimplAppearanceTab community -SimplCommunityBase http://localhost:8800
