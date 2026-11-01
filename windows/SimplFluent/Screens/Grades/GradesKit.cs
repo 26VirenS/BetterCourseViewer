@@ -50,9 +50,13 @@ internal static class GradesKit
         !string.IsNullOrEmpty(text) && text != "N/A" ? text! : v is { } x ? Half(x, 1).ToString("0.#", Inv) + "%" : "–";
 
     /// <summary>A number rounded as every Simpl writes it: half up on its decimal value (3.425 is 3.43, 81.25 is 81.3), not
-    /// on the binary double (which holds 3.425 as 3.42499…) nor to even (.NET's own Math.Round).</summary>
+    /// on the binary double (which holds 3.425 as 3.42499…) nor to even (.NET's own Math.Round). One past what a decimal
+    /// holds (a what-if score of 1e30, or out of 1e-27) is held to the most it does: the cast would throw.</summary>
     public static decimal Half(double v, int places) =>
-        double.IsFinite(v) ? Math.Round((decimal)v, places, MidpointRounding.AwayFromZero) : 0;
+        double.IsFinite(v) ? Math.Round((decimal)Math.Clamp(v, -DecimalMost, DecimalMost), places, MidpointRounding.AwayFromZero) : 0;
+
+    /// <summary>Near the most a decimal holds (7.92e28), as a double that casts to one.</summary>
+    private const double DecimalMost = 7.9e28;
 
     /// <summary>A GPA or a goal to two places, half up ("3.43", "4.00").</summary>
     public static string Gpa(double v) => Half(v, 2).ToString("0.00", Inv);
