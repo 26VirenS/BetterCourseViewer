@@ -702,6 +702,13 @@ try {
   const lockedPg34 = await nc('page', { ctx: 'courses/101', slug: 'locked-notes' });
   await sp.unroute('**/api/v1/courses/101/pages/locked-notes*');
   check(lockedPg34.lockText === 'This page is locked until Oct 20 at 12:00 AM. The unit closes Oct 19 at 11:59 PM.' && lockedPg34.html === '', `a lock's reason in Canvas's words, its times written as every other: ${JSON.stringify(lockedPg34.lockText)}`);
+  // a page's HTML made safe for the app's text view keeps no javascript: address however it is spelled (a tab inside it,
+  // a newline before it — the browser reads both as javascript:, and making the address whole wrote it out plainly) and
+  // no frame with its page inline; a plain link stays, made whole
+  await sp.route('**/api/v1/courses/101/pages/scripted-notes*', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ title: 'Scripted notes', url: 'scripted-notes', body: '<p><a href="java&#x09;script:alert(1)">a</a> <a href="&#x0a;javascript:alert(2)">b</a> <a href="/courses/101/files/f1">file</a></p><iframe src="java&#x0a;script:alert(3)"></iframe><iframe srcdoc="&lt;script&gt;alert(4)&lt;/script&gt;"></iframe>', locked_for_user: false }) }));
+  const scriptedPg = await nc('page', { ctx: 'courses/101', slug: 'scripted-notes' });
+  await sp.unroute('**/api/v1/courses/101/pages/scripted-notes*');
+  check(!/javascript:/i.test(scriptedPg.html || '') && !/srcdoc/i.test(scriptedPg.html || '') && /href="https?:\/\/[^"]+\/courses\/101\/files\/f1"/.test(scriptedPg.html || ''), `a page's HTML for the app keeps no javascript: address however spelled and no inline frame page: ${JSON.stringify(scriptedPg.html)}`);
   // (1.3) a quiz taken in the app's own screens: every Classic kind, saved, flagged, handed in, its feedback read
   await sp.evaluate(() => fetch('/__mock/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ richQuestions: true, moreTypes: true }) }));
   const qi = await nc('quizIntro', { course: '101', quiz: '9011' });

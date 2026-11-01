@@ -24,9 +24,11 @@
     doc.querySelectorAll('*').forEach((n) => {
       for (const a of Array.from(n.attributes)) if (/^on/i.test(a.name)) n.removeAttribute(a.name);
     });
+    // (as the browser reads an address: spaces before it dropped, tabs and newlines in it ignored — " java&#9;script:" runs too)
+    const scripted = (v) => /^javascript:/i.test(String(v || '').replace(/[\u0000-\u0020]/g, ''));
     doc.querySelectorAll('a[href]').forEach((a) => {
       const href = a.getAttribute('href') || '';
-      if (/^javascript:/i.test(href)) a.removeAttribute('href');
+      if (scripted(href)) a.removeAttribute('href');
       if (/^https?:/i.test(href) && !href.startsWith(location.origin)) {
         a.target = '_blank';
         a.rel = 'noopener noreferrer';
@@ -35,7 +37,9 @@
     doc.querySelectorAll('iframe').forEach((f) => {
       // Safari stalls lazy iframes that start off-screen; let embeds load normally.
       f.removeAttribute('loading');
+      f.removeAttribute('srcdoc'); // (a page written inline runs as this site, script and all)
       if (!f.getAttribute('src') && f.dataset.src) f.setAttribute('src', f.dataset.src);
+      if (scripted(f.getAttribute('src'))) f.removeAttribute('src');
       f.setAttribute('allowfullscreen', '');
       if (!f.getAttribute('allow')) f.setAttribute('allow', 'fullscreen; microphone; camera; display-capture; autoplay; clipboard-write');
       // An embed its author gave a size to — Canvas's editor writes one on every video it puts in,
