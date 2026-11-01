@@ -90,7 +90,7 @@ struct MergedIntroSheet: View {
         }
         .frame(width: 460)
         .background(PageGround())
-        .overlay(alignment: .topLeading) { PopupCloseButton().padding(14) } // (its ×, as Got It)
+        .overlay(alignment: .topTrailing) { PopupCloseButton().padding(14) } // (its ×, as Got It — UI review: at the top right, as every popup's)
         .onAppear { onShown?() }
     }
 }

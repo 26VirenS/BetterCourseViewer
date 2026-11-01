@@ -50,18 +50,11 @@ struct SubmissionReview: View {
 
     // MARK: The top
 
+    /// (UI review) Every popup's head (PopupHead): "Feedback" and the work's name, what there is to look at, and the × in
+    /// the same corner as every popup's (Close, in words, until the UI review).
     private var top: some View {
-        HStack(spacing: 12) {
-            IconTile(symbol: "text.bubble.fill", color: Color(hex: assignment.color), size: 30)
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Feedback")
-                    .font(.sHeadline)
-                Text(assignment.title)
-                    .font(.sCallout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 12)
+        PopupHead(symbol: "text.bubble.fill", color: Color(hex: assignment.color), title: "Feedback", subtitle: assignment.title,
+                  close: { dismiss() }, closeHelp: "Close the feedback (Esc)", closeLabel: "Close the feedback", escape: true) {
             if assignment.comments.isEmpty {
                 // (1.3.78) said once, in the bar, rather than an empty pane beside the teacher's marks on the work
                 ViewThatFits(in: .horizontal) {
@@ -93,16 +86,7 @@ struct SubmissionReview: View {
                 .fixedSize()
                 .help("More for \(f.name)")
             }
-            // (1.3.78) Close, as the quiz and Knewton Alta popups have it: the same word in the same place
-            Button("Close") { dismiss() }
-                .glassButton()
-                .keyboardShortcut(.cancelAction)
-                .help("Close the feedback")
         }
-        .controlSize(.large)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
-        .popupHeader() // (1.3.79: dragged by its head, the popup moves)
     }
 
     // MARK: The work

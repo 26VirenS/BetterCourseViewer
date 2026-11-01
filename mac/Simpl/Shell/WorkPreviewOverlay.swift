@@ -520,14 +520,11 @@ struct PreviewCard: View {
                         .transition(.opacity)
                 }
                 Spacer(minLength: 8)
-                // (1.2.15: a close that reads as one — a labelled button, not a faint ×)
-                Button { if inline { WorkPreview.shared.closeInline() } else { WorkPreview.shared.close() } } label: {
-                    Label("Close", systemImage: "xmark.circle.fill")
-                        .font(.sCallout.weight(.medium))
+                // (1.2.15: a close that reads as one, not a faint × — UI review: every popup's ×, a glass circle at its top
+                // right, in place of a bordered "Close")
+                PopupCloseButton(help: "Close (Esc, or click anywhere else)") {
+                    if inline { WorkPreview.shared.closeInline() } else { WorkPreview.shared.close() }
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
-                .help("Close (Esc, or click anywhere else)")
             }
             if !inline {
                 Text(assignment?.title ?? page?.title ?? item.title)

@@ -121,22 +121,14 @@ struct LookQuizScreen: View {
 
     // MARK: The top
 
+    /// (UI review) Every popup's head (PopupHead): the assignment and when it is due, Simpl Look — as Knewton Alta's popup
+    /// has it — the pins, Reload and Open in Window, and the × in the same corner as every popup's (Close, in words, until
+    /// the UI review).
     private var topBar: some View {
-        HStack(spacing: 14) {
-            IconTile(symbol: look.symbol, color: look.color, size: 32)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(launch.title)
-                    .font(.sTitle3)
-                    .lineLimit(1)
-                Text(subtitle)
-                    .font(.sCallout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 8)
-            AltaBrowserToggle(on: lookOn, label: "Simpl Look", icon: "sparkles",
-                              helpOn: "Simpl's look is on: \(look.fullName)'s question on Liquid Glass, its buttons the popup's own. Click to show it as \(look.fullName) draws it.",
-                              helpOff: "Show \(look.fullName)'s page in Simpl's look")
+        PopupHead(symbol: look.symbol, color: look.color, title: launch.title, subtitle: subtitle,
+                  close: { dismiss() }, closeHelp: "Close (Esc) — your work is kept by \(look.fullName)", escape: true) {
+            SimplLookToggle(on: lookOn, publisher: look.fullName,
+                            helpOn: "Simpl's look is on: \(look.fullName)'s question on Liquid Glass, its buttons the popup's own. Click to show it as \(look.fullName) draws it.")
             PopupPins()
             GlassGroup(spacing: 8) {
                 HStack(spacing: 8) { // (in a row: the glass container stacks what it holds)
@@ -157,18 +149,9 @@ struct LookQuizScreen: View {
                         .labelStyle(.iconOnly)
                         .glassButton()
                         .help("Open in a window of its own, with Back, Forward and Open in Browser")
-                    Button("Close") { dismiss() }
-                        .glassButton()
-                        .keyboardShortcut(.cancelAction)
-                        .help("Close — your work is kept by \(look.fullName)")
                 }
             }
         }
-        .controlSize(.large)
-        .padding(.horizontal, 22)
-        .padding(.top, 16)
-        .padding(.bottom, 12)
-        .popupHeader()
     }
 
     /// "Macmillan Learning · Due Oct 12 at 11:59 PM".

@@ -83,6 +83,9 @@ enum MoreList: String, Identifiable {
     /// Its title and line while it is read (the engine's own words replace them).
     var title: String { self == .history ? "History" : "Help" }
     var note: String { self == .history ? "What you opened lately." : "Your school’s help links." }
+
+    /// (UI review) Its symbol in its popup's head, as the sidebar's row has it.
+    var symbol: String { self == .history ? "clock" : "questionmark.circle" }
 }
 
 extension Engine {
@@ -329,24 +332,9 @@ struct MorePopup: View {
         .frame(width: 440)
     }
 
+    /// (UI review) Every popup's head (Shell/FloatingPopup.swift): the list's symbol, its title and note, its ×.
     private var head: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(data?.title ?? list.title)
-                    .font(.sTitle3)
-                    .accessibilityAddTraits(.isHeader)
-                Text(data?.note ?? list.note)
-                    .font(.sCallout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 8)
-            PopupCloseButton()
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 18)
-        .padding(.bottom, 14)
-        .popupHeader() // (dragged by its head, the popup moves)
+        PopupHead(symbol: list.symbol, title: data?.title ?? list.title, subtitle: data?.note ?? list.note, subtitleLines: 2)
     }
 
     @ViewBuilder

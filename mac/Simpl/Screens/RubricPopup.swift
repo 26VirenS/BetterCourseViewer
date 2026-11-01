@@ -205,23 +205,26 @@ struct RubricPopupView: View {
             .position(x: size.width / 2, y: size.height / 2 + 26)
     }
 
-    /// The title over the ring, × at the top left, Ring / Grid at the top right, and what to do at the foot.
+    /// The title over the ring, Ring / Grid and × at the top right (UI review: × at the top left before), and what to do at
+    /// the foot.
     private var chrome: some View {
         let ring = view == "ring"
         return ZStack(alignment: .top) {
             header
                 .opacity(ring ? 1 : 0)
-            HStack(alignment: .top, spacing: 10) {
-                closeButton
-                // (planning-20) the way back from a criterion, in words, beside × (the little ring on the bar and Esc
-                // still go back too)
+            HStack(alignment: .center, spacing: 10) {
+                // (planning-20) the way back from a criterion, in words (the little ring on the bar and Esc still go back
+                // too) — (UI review) at the left on its own, where a way back goes
                 if ring && motion.target(.open) > 0.5 {
                     backButton
                         .transition(.opacity)
                 }
                 Spacer(minLength: 12)
                 RubricViewSwitch(view: Binding(get: { view }, set: { setView($0) }))
+                // (UI review) every popup's ×, in the same corner as every popup's — the top right, no longer the left
+                PopupCloseButton(help: "Close the rubric (Esc)", label: "Close the rubric", action: close)
             }
+            .frame(minHeight: 38)
             .padding(.horizontal, 20)
             .padding(.top, 16)
             .popupHeader() // (1.3.79: dragged by its head, the popup moves)
@@ -261,24 +264,11 @@ struct RubricPopupView: View {
         .lineLimit(1)
         .multilineTextAlignment(.center)
         .shadow(color: Color.black.opacity(0.5), radius: 6)
-        .padding(.horizontal, 130)
+        // (clear of the corners' controls on either side, centred: UI review, Ring / Grid and × together at the right)
+        .padding(.horizontal, 230)
         .padding(.top, 14)
         .allowsHitTesting(false)
         .accessibilityElement(children: .combine)
-    }
-
-    private var closeButton: some View {
-        Button(action: close) {
-            Image(systemName: "xmark")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(Color.white.opacity(0.9))
-                .frame(width: 38, height: 38)
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .glass(Circle(), interactive: true)
-        .help("Close the rubric (Esc)")
-        .accessibilityLabel("Close the rubric")
     }
 
     /// "‹ Ring": the open criterion's bar back into the ring.

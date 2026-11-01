@@ -142,8 +142,10 @@ struct QuizScreen: View {
     /// the clock and the instructions in glass; the quiz on Canvas in its menu. Submit is at the foot of the attempt,
     /// with Next. (1.3.78) Close at the right end, where every full popup has it (the quiz, Knewton Alta, the
     /// feedback on a file) — and the feedback's way back to the quiz a chevron by the title, apart from it.
+    /// (UI review) Built of every popup's head's parts (Shell/FloatingPopup.swift): the quiz's symbol, title and line, and
+    /// its × in the same corner as every popup's — Close, in words, until the UI review — saving the answers as it did.
     private var topBar: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 12) {
             if run.stage == .feedback {
                 Button { run.leaveFeedback() } label: { Label("Quiz", systemImage: "chevron.left") }
                     .glassButton()
@@ -151,18 +153,7 @@ struct QuizScreen: View {
                     .accessibilityLabel("Back to the Quiz")
                     .transition(.opacity)
             }
-            IconTile(symbol: "questionmark.square", color: tint, size: 32)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.sTitle3)
-                    .lineLimit(1)
-                if !subtitle.isEmpty {
-                    Text(subtitle)
-                        .font(.sCallout)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
+            PopupHeadTitle(symbol: "questionmark.square", color: tint, title: title, subtitle: subtitle)
             Spacer(minLength: 8)
             PopupPins() // (1.3.73: the toolbar's pins, here too — the toolbar is under the sheet)
             GlassGroup(spacing: 8) {
@@ -172,16 +163,14 @@ struct QuizScreen: View {
                         instructionsButton
                     }
                     moreMenu
-                    Button("Close", action: close)
-                        .glassButton()
-                        .keyboardShortcut(.cancelAction)
-                        .disabled(run.stage == .submitting)
-                        .help(inAttempt ? "Save your answers and close — the attempt stays open" : "Close the quiz")
                 }
             }
+            PopupCloseButton(help: inAttempt ? "Save your answers and close (Esc) — the attempt stays open" : "Close the quiz (Esc)",
+                             label: inAttempt ? "Save and Close" : "Close the Quiz", escape: true, action: close)
+                .disabled(run.stage == .submitting)
         }
         .controlSize(.large)
-        .padding(.horizontal, 22)
+        .padding(.horizontal, 20)
         .padding(.top, 16)
         .padding(.bottom, 12)
     }
