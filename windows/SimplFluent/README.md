@@ -302,8 +302,9 @@ key in this PC's TPM — and opened with nothing to unlock as Simpl starts. The 
 **Windows Hello** besides: Windows asks for the student's face, fingerprint or PIN before Simpl can type it in.
 
 - **Encrypted** (`Support/Vault.cs`): the preferences (`prefs.json`), the extension's storage (`storage.json`:
-  settings, grade history, goals), the answers kept for a quick start (`Answers\`), the flashcards (`flashcards.json`)
-  and the saved sign-in (`login.bin`; no longer Windows' Credential Manager). Each is AES-256-GCM, its file beginning
+  settings, grade history, goals), the answers kept for a quick start (`Answers\`), the flashcards (`flashcards.json`),
+  (0.3.105) the Simpl Community tools added (`community-tools.json`) and the saved sign-in (`login.bin`; no longer
+  Windows' Credential Manager). Each is AES-256-GCM, its file beginning
   `SIMPLENC`, bound to what it is (one file cannot be passed off as another); an answer's file and its school's folder
   are named by an HMAC under the key, so the names say nothing either.
 - **The key**: 32 random bytes made the first time, kept in `vault.key` wrapped twice: by an RSA-2048 key in this PC's
@@ -977,9 +978,58 @@ biology views' own share to 70% or more.
 fields, notes, the drop zone and the scroll edge; `Files` has Windows' file dialogs.
 
 The Tools page lists the tools under what they are for — Study, Math & science, Files, then Chemistry, Physics and
-Biology — a one-line note on each tile, three across from about 900 wide (a section's four in full rows); a tile opens
-its tool's popup over the page. Windows' sentence case on every button and menu ("Pin to title bar", "Copy result",
-"Skip tour"). `--tools-scroll chemistry` (or `physics`, `biology`) opens the page scrolled to that section.
+Biology, and (0.3.105) Community — a one-line note on each tile, three across from about 900 wide (a section's four in
+full rows); a tile opens its tool's popup over the page. Windows' sentence case on every button and menu ("Pin to title
+bar", "Copy result", "Skip tour"). `--tools-scroll chemistry` (or `physics`, `biology`, `community`) opens the page
+scrolled to that section.
+
+**Simpl Community tools** (0.3.105, `Tools/Community/`; the format is the site's `docs/community-tools.md`, format 1):
+small tools students make — Ohm's law, a tip splitter, a grade-points table — shared in Simpl Community. A tool is data,
+never code: inputs (numbers, choices, toggles), results (formulas in a small language over the inputs and the results
+before them), an optional table and a note; nothing in one can reach the network, the files, Canvas or another tool,
+and a formula cannot loop.
+
+- **The format** (`ToolFormat.cs`, pure — no WPF): the app's own copy of the site's reference (`tool-format.js`), line
+  for line — the check (lenient: keys format 1 does not have are passed over; a later format is refused as "This tool
+  needs a newer Simpl."), the formulas' tokens, grammar and values (`^`, `round`, `sign`, `min`/`max`, `fact` as the
+  reference has them — never `Math.Sign`, which throws on NaN; a function or a name is only ever one of the format's
+  own), and a number as a tool shows it ("1,234.5", "6.022 × 10²³", "—"), invariant, its decimals rounded from the
+  number's exact value as JavaScript's `toFixed` rounds them. `SimplFluent.Tests/CommunityToolFormatTests.cs` checks
+  it against the answers every app's copy must give (`SimplFluent.Tests/Vectors/community-tools-vectors.json`, a copy
+  of the site's `docs/community-tools-vectors.json`, as it is): every formula's text, every refusal, every tool's
+  verdict, the tool as checked, and every run's texts and shown results.
+- **The Tools page's Community section** (`Screens/More/ToolsScreen.cs`): the tools added, a tile each as Simpl's own
+  (its symbol — the spec's names as Fluent icons, `CommunityTools.SymbolOf`, the nearest at most U+FFFF — on a wash of
+  its colour, its name, its line, who made it), then **Browse Community**; there with none added too. A tile's ⋯ and
+  its context menu open it or **Remove…** it (asked first; its values are forgotten with it). Only the section is drawn
+  again when a tool is added or removed, so the page keeps its scroll.
+- **The browser** (`CommunityBrowser.cs`): a popup over the window as a tool's is (large, sized by its edges, its size
+  kept as `community-browser`), reading `https://simplcourses.com/api/community/tools` over Appearance's Community
+  connection (`Support/Community.cs`; `--community-base` points it at the mock). A search, the five groups (All, Study,
+  Math, Science, Money, Everyday), and each tool's card: its tile, name, maker and group, its line, **Add** (Adding…,
+  then **Added**; **Update** when the gallery has a later version), and the tool itself under them, working — a live
+  preview drawn with the same controls, its values its own. While it reads, a ring and a line; offline, "You're offline"
+  and Try again (the tools added still work); refused, the site's reason and Try again; nothing shared, or nothing that
+  matches, said so. One in a later format is listed as needing a newer Simpl, with no Add.
+- **Add** (`CommunityTools.Add`): downloads the tool (`api/community/tools/<id>`), checks it again on this PC, and keeps
+  it — or says why under its card ("Couldn't add it: …") and keeps nothing. The tools added are kept in
+  `community-tools.json`, sealed by the vault (Data and encryption, above), each as the site gave it and checked again
+  every time it is read.
+- **The tool** (`CommunityToolView.cs`, key `community:<id>`, through `ToolRegistry.RegisterFamily`): in a popup like
+  Simpl's own tools — its heading its tile, name and line (no pin: the title bar's pins are Simpl's own tools, and a
+  Community tool's key is never kept among them). Number boxes with their unit, − and + (and ↑ ↓) that step by the
+  tool's step within its min and max — what is not a number is its default in the formulas, and one out of range the
+  nearest end, said under the box; a choice as buttons side by side with four short options or fewer, a menu with
+  more; toggles. The results are worked out as anything is typed, the first one shown large in a card of the tool's
+  colour, the rest under it, Copy results (and Ctrl+C) beside them; then its table, its note and who made it. The values
+  last put in are remembered per tool (`community-values:<id>` in the preferences). It needs no connection.
+- **For pictures**: `--community-add s-ohms,k3m9x2pa` adds those gallery tools as Add does; `--community-open s-ohms`
+  opens one once it is in, `--community-values "v=9,r=3"` put in it first; `--community-browse yes` (or a group,
+  `science`, or words to search for) opens the browser over the Tools page. The log says what happened (`community
+  tools: 11 read (10 to add, 1 need a newer Simpl)`, `community tools: added s-ohms (Ohm’s Law, version 1)`, `tools:
+  community section shows 2 added`, `community browser: shows 3 tools (science)`, `community tool s-ohms: shows Current
+  3 A | Power 27 W`), and CI checks it (windows-fluent.yml). The mock school serves its gallery from
+  `scripts/dev/fixtures/community-tools.json` while the site's own handler has no tools.
 
 The chemistry tools (`Tools/Chemistry/ChemTools.cs`, a "Chemistry" section of their own just before Biology) were one
 tool until 0.3.2, the Periodic Table with its Lewis structures and Molecule builder pages and its element pages' atom in

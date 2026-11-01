@@ -82,6 +82,8 @@ public static class ToolRegistry
     private static readonly Dictionary<string, Func<ToolContext, FrameworkElement>> full = new();
     private static readonly Dictionary<string, Func<ToolContext, FrameworkElement>> quick = new();
     private static readonly Dictionary<string, Func<ToolContext, FrameworkElement>> header = new();
+    /// <summary>(0.3.105) Tools whose keys share a beginning, made by one view (Simpl Community's: "community:&lt;id&gt;").</summary>
+    private static readonly List<(string Prefix, Func<ToolContext, FrameworkElement> Full)> families = new();
 
     /// <param name="key">The tool's key.</param>
     /// <param name="full">The whole tool (on the Tools page, or over the window).</param>
@@ -95,15 +97,22 @@ public static class ToolRegistry
         if (headerControls != null) header[key] = headerControls;
     }
 
-    public static bool Has(string key) => full.ContainsKey(key);
+    /// <summary>(0.3.105) Every tool whose key begins so, made whole by this view (Simpl Community's tools: no quick
+    /// version, nothing in the heading — they are never pinned).</summary>
+    public static void RegisterFamily(string prefix, Func<ToolContext, FrameworkElement> full) => families.Add((prefix, full));
 
-    public static FrameworkElement? Full(ToolContext c) => Make(full, c);
+    private static Func<ToolContext, FrameworkElement>? FamilyOf(string key) =>
+        families.FirstOrDefault(f => key.StartsWith(f.Prefix, StringComparison.Ordinal)).Full;
+
+    public static bool Has(string key) => full.ContainsKey(key) || FamilyOf(key) != null;
+
+    public static FrameworkElement? Full(ToolContext c) => Make(full, c, FamilyOf(c.Key));
     public static FrameworkElement? Quick(ToolContext c) => Make(quick, c);
     public static FrameworkElement? Header(ToolContext c) => Make(header, c);
 
-    private static FrameworkElement? Make(Dictionary<string, Func<ToolContext, FrameworkElement>> d, ToolContext c)
+    private static FrameworkElement? Make(Dictionary<string, Func<ToolContext, FrameworkElement>> d, ToolContext c, Func<ToolContext, FrameworkElement>? family = null)
     {
-        if (!d.TryGetValue(c.Key, out var f)) return null;
+        if (!d.TryGetValue(c.Key, out var f) && (f = family) == null) return null;
         try { return f(c); }
         catch (Exception e)
         {
@@ -248,7 +257,8 @@ public static class ToolsCenter
         _ => null,
     };
 
-    public static ToolsScreen.Kind? KindOf(string key) => ToolsScreen.Kinds.FirstOrDefault(k => k.Key == key);
+    /// <summary>A tool by its key: one of Simpl's own, or (0.3.105) a Simpl Community tool added ("community:&lt;id&gt;").</summary>
+    public static ToolsScreen.Kind? KindOf(string key) => ToolsScreen.Kinds.FirstOrDefault(k => k.Key == key) ?? CommunityTools.KindOf(key);
 }
 
 // ---- what the tools share (the Mac's ToolPage, ToolColumns, ToolField, ToolNote, ToolDropZone, ToolFiles) ----
@@ -609,6 +619,12 @@ public sealed class ToolPopup
         if (Shot.Asked || Launch.IsDevelopment) Log.Write($"tool popup open: {key}");
     }
 
+    /// <summary>(0.3.105) A tool's popups closed (a Simpl Community tool removed from the Tools page).</summary>
+    public static void CloseAll(string key)
+    {
+        foreach (var p in Open.Where(p => p.key == key).ToList()) p.sheet.Close();
+    }
+
     /// <summary>A tool handing something to another from inside its popup (<paramref name="from"/>, the popup's window):
     /// the popup turns into the other tool where it is — another popup of that tool closing — and comes forward. False
     /// when <paramref name="from"/> is not a tool's popup.</summary>
@@ -715,8 +731,9 @@ public sealed class ToolHeading : Grid
         words.VerticalAlignment = VerticalAlignment.Center;
         Children.Add(words.Col(1));
         if (ToolRegistry.Header(c) is { } e) { extra = e; e.VerticalAlignment = VerticalAlignment.Center; Children.Add(e.Col(2)); }
-        // (a header full of the tool's own controls — a biology tool's pages — the pin a symbol alone)
-        pin = ToolHeader.PinButton(kind, squished: ToolHeader.Squished(kind.Key));
+        // (a header full of the tool's own controls — a biology tool's pages — the pin a symbol alone; (0.3.105) a Simpl
+        //  Community tool has none: the title bar's pins are Simpl's own tools)
+        pin = CommunityTools.IsKey(kind.Key) ? new Border() : ToolHeader.PinButton(kind, squished: ToolHeader.Squished(kind.Key));
         Children.Add(pin.Col(3));
         if (close is FrameworkElement x) { this.close = x; x.Margin = new Thickness(8, 0, 0, 0); x.VerticalAlignment = VerticalAlignment.Center; Children.Add(x.Col(4)); }
         Lay(false);

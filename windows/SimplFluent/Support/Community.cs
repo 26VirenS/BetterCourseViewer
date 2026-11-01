@@ -73,7 +73,8 @@ public static class Community
     public static readonly string[] TileSlots = { "side", "today", "overdue" };
 
     private static readonly Dictionary<string, BitmapSource> Thumbs = new();
-    private static readonly HttpClient Http = new(new HttpClientHandler { UseCookies = false, AutomaticDecompression = DecompressionMethods.All }) { Timeout = TimeSpan.FromSeconds(20) };
+    /// <summary>The connection to the site, Community tools' too (Tools/Community/CommunityTools.cs): no cookies.</summary>
+    internal static readonly HttpClient Http = new(new HttpClientHandler { UseCookies = false, AutomaticDecompression = DecompressionMethods.All }) { Timeout = TimeSpan.FromSeconds(20) };
     private static readonly Regex PhotoPath = new(@"^/api/community/photo/[a-z0-9]+/[a-z]+$", RegexOptions.CultureInvariant);
 
     /// <summary>The site (the screenshot suite's --community-base: the mock's own stand-in for it).</summary>

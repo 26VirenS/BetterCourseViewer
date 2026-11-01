@@ -18,6 +18,8 @@ public static class AppPaths
     public static string Storage => Path.Combine(Root, "storage.json");
     public static string PrefsFile => Path.Combine(Root, "prefs.json");
     public static string Flashcards => Path.Combine(Root, "flashcards.json");
+    /// <summary>(0.3.105) The Simpl Community tools added (Tools/Community/CommunityTools.cs), sealed as the flashcards are.</summary>
+    public static string CommunityTools => Path.Combine(Root, "community-tools.json");
     public static string Login => Path.Combine(Root, "login.bin");
     public static string VaultKey => Path.Combine(Root, "vault.key");
     /// <summary>The folder the app runs from: the extension and the bridge are beside it.</summary>
