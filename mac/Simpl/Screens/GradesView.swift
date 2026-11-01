@@ -959,7 +959,7 @@ struct GradeWeightBar: View {
             }
             .transition(.opacity)
         } else if parts.contains(where: { $0.graded != true }) {
-            Text("Dashed: nothing graded there yet.")
+            Text("A dashed part is a group with nothing graded yet.")
                 .font(.sFootnote)
                 .foregroundStyle(.tertiary)
                 .transition(.opacity)

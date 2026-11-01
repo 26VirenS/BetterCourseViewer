@@ -138,7 +138,7 @@ struct DashSkyline: View {
 
     private var legend: some View {
         HStack(spacing: 12) {
-            Text("Window colour = score")
+            Text("Window colour shows the grade")
                 .font(.sCaption)
                 .foregroundStyle(.secondary)
             HStack(spacing: 8) {

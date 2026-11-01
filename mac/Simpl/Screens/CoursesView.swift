@@ -64,10 +64,11 @@ struct CoursesView: View {
             } else if others.isEmpty || chosen.isEmpty {
                 grid(d.current)
             } else {
-                PageSection(title: "In the Sidebar", count: chosen.count) { grid(chosen) }
-                PageSection(title: "Not in the Sidebar", count: others.count) {
+                // (M19: Canvas's own word for the courses in the sidebar)
+                PageSection(title: "Favourites", count: chosen.count) { grid(chosen) }
+                PageSection(title: "Other Courses", count: others.count) {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Courses you left out in the setup. Choose Courses puts them in the sidebar.")
+                        Text("These aren’t in your sidebar. To add one, click Choose Courses.")
                             .font(.sCallout)
                             .foregroundStyle(.secondary)
                         grid(others)

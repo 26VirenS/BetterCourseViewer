@@ -141,7 +141,7 @@ struct TodoPanel: View {
             .buttonStyle(.plain)
             .background { PreviewProbe(anchor: menuAnchor).allowsHitTesting(false) }
             .disabled(model.data == nil)
-            .help("Group and show")
+            .help("Group by date, priority or course, and show or hide what’s done")
             .accessibilityLabel("To Do options")
         }
         .padding(.leading, 14)
@@ -619,7 +619,7 @@ private struct TodoPanelRow: View {
             Button("Restore") { restore() }
         } else {
             Button("Dismiss") { dismiss() }
-                .help("Off To Do, not done")
+                .help("Take it off To Do without marking it done")
         }
         if row.custom != true, let url = PreviewFormat.text(row.url) {
             Divider()
