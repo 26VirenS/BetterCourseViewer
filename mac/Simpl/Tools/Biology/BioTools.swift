@@ -250,7 +250,9 @@ struct BioHeaderControls: View {
                     }
                     .glassButton(prominent: nav.page(kind) == p.id)
                     .controlSize(.large)
-                    .help(p.help.isEmpty ? p.title : p.help)
+                    // (UI review: drawn as its symbol alone, its name said in its tooltip and to VoiceOver)
+                    .help(p.help.isEmpty ? p.title : (squished ? "\(p.title): \(p.help)" : p.help))
+                    .accessibilityLabel(p.title)
                     .accessibilityAddTraits(nav.page(kind) == p.id ? .isSelected : [])
                 }
             }

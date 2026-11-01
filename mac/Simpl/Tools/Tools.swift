@@ -678,10 +678,20 @@ struct ToolHeader: View {
         if kind.isBiology && BioTools.pages(kind).count > 1 {
             ViewThatFits(in: .horizontal) {
                 row(pages: false, pinWords: true)
-                row(pages: true, pinWords: true)
-                row(pages: true, pinWords: false)
-                // (and where even their symbols leave the name no room — "Cell Explo…", "Bio La…" — the pages under the
-                // name, in place of its line)
+                // (UI review) the pages keep their names — a paw, a leaf and an oval said nothing of Animal, Plant and
+                // Bacterium: the pin draws in to its symbol first, then the pages go to a row of their own under the
+                // heading, named still, as the Periodic Table's controls do
+                row(pages: false, pinWords: false)
+                VStack(alignment: .leading, spacing: 12) {
+                    row(pages: nil, pinWords: true, bioPages: false)
+                    BioHeaderControls(kind: kind, squished: false)
+                }
+                VStack(alignment: .leading, spacing: 12) {
+                    row(pages: nil, pinWords: false, bioPages: false)
+                    BioHeaderControls(kind: kind, squished: false)
+                }
+                // (and only where even a row of their own has no room for their names, their symbols under the name, in
+                // place of its line — each named in its tooltip)
                 stacked
             }
         } else if kind == .ptable {
@@ -742,9 +752,10 @@ struct ToolHeader: View {
     /// symbol and its ×, and Tour drawn in to its symbol): kept for them on the heading's row whether it is open or not.
     private static let ptRoom: CGFloat = 340
 
-    /// The heading's row: `pages` squishes a biology tool's page buttons to their symbols (nil: as they fit);
-    /// (1.3.87) `ptControls`, the Periodic Table's search and Tour left of the pin.
-    private func row(pages squished: Bool?, pinWords: Bool, ptControls: Bool = false) -> some View {
+    /// The heading's row: `pages` squishes a biology tool's page buttons to their symbols (nil: as they fit) —
+    /// (UI review) `bioPages` false leaves them out, for a row of their own under it; (1.3.87) `ptControls`, the
+    /// Periodic Table's search and Tour left of the pin.
+    private func row(pages squished: Bool?, pinWords: Bool, ptControls: Bool = false, bioPages: Bool = true) -> some View {
         HStack(alignment: .center, spacing: 14) {
             leading
             IconTile(symbol: kind.symbol, color: kind.color, size: 44)
@@ -764,7 +775,7 @@ struct ToolHeader: View {
             }
             Spacer(minLength: 12)
             // (1.3.78) a biology tool's pages
-            if kind.isBiology { BioHeaderControls(kind: kind, squished: squished) }
+            if kind.isBiology && bioPages { BioHeaderControls(kind: kind, squished: squished) }
             // (a width of its own, not a least: the button growing into the field, both drawn a moment as it opens, never
             // widens the row, or the heading would go to its two rows as the search opened)
             if ptControls { PTHeaderBar().frame(width: Self.ptRoom, alignment: .trailing) }
