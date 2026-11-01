@@ -32,4 +32,11 @@
     <ProjectReference Include="..\SimplFluent\SimplFluent.csproj" />
   </ItemGroup>
 
+  <!-- (0.3.105) Simpl Community tools' answers, which every app's copy of the format must give: a copy, as it is, of the
+       site's docs/community-tools-vectors.json (written by scripts/dev/tool-vectors.mjs from the reference,
+       tool-format.js; never edited by hand) — CommunityToolFormatTests reads it beside the tests -->
+  <ItemGroup>
+    <None Include="Vectors\community-tools-vectors.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
