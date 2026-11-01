@@ -302,12 +302,12 @@ internal static class PlanSheet
         if (CalendarKit.Date(ev.Date) is not { } a) return ev.Time ?? "";
         var day = a.ToString("ddd, MMM d", En);
         if (ev.AllDay == true) return $"{day} · all day";
-        var from = a.ToString("h:mm tt", En);
-        return CalendarKit.Date(ev.End) is { } b && b > a ? $"{day} · {from} – {b.ToString("h:mm tt", En)}" : $"{day} · {from}";
+        var from = Simpl.Support.Clock.Time(a);
+        return CalendarKit.Date(ev.End) is { } b && b > a ? $"{day} · {from} – {Simpl.Support.Clock.Time(b)}" : $"{day} · {from}";
     }
 
     /// <summary>"4:15 PM", <paramref name="minutes"/> into a day.</summary>
-    private static string Clock(int minutes) => DateTime.Today.AddMinutes(minutes).ToString("h:mm tt", En);
+    private static string Clock(int minutes) => Simpl.Support.Clock.Time(DateTime.Today.AddMinutes(minutes));
 
     /// <summary>"45m", "1h", "1h 15m".</summary>
     private static string Length(int m) => m < 60 ? $"{m}m" : m % 60 == 0 ? $"{m / 60}h" : $"{m / 60}h {m % 60}m";

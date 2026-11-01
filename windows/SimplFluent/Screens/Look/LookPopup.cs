@@ -197,7 +197,7 @@ internal sealed class LookPopupView
         PaintSubtitle();
     }
 
-    private void PaintSubtitle() => subtitle.Text = string.Join(" · ", new[] { FullName, due ?? "" }.Where(s => s.Length > 0));
+    private void PaintSubtitle() => subtitle.Text = string.Join(" · ", new[] { FullName, Simpl.Support.Clock.Tidy(due) }.Where(s => s.Length > 0)); // (W22: the publisher's "11:59 pm" in the one clock)
 
     /// <summary>The web view made, the look put in from the page's start (its rail mode), Canvas's one-time launch asked
     /// for, and the tool's page opened in it.</summary>
@@ -490,7 +490,7 @@ internal sealed class LookPopupView
         }
         Detail("Status", "Not started");
         if (c.Count > 0) Detail("Questions", c.Count.ToString(CultureInfo.CurrentCulture));
-        if (string.IsNullOrEmpty(due) && c.Due.Length > 0) Detail("Due", c.Due);
+        if (string.IsNullOrEmpty(due) && c.Due.Length > 0) Detail("Due", Simpl.Support.Clock.Tidy(c.Due));
         var label = c.Start?.Label is { Length: > 0 } l && !Regex.IsMatch(l, @"^open( (the )?(assignment|assessment|homework))?$", RegexOptions.IgnoreCase) ? AltaParts.Capital(l) : "Start";
         var words = new TextBlock { Text = label, FontSize = 16, FontWeight = FontWeights.SemiBold, FontFamily = K.TextFace, VerticalAlignment = VerticalAlignment.Center };
         UIElement mark = going ? K.Spinner(16) : new SymbolIcon { Symbol = SymbolRegular.Play24, Filled = true, FontSize = 16, VerticalAlignment = VerticalAlignment.Center };

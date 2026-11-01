@@ -21,7 +21,7 @@ public static class SilentWords
     private static readonly System.Globalization.CultureInfo En = System.Globalization.CultureInfo.GetCultureInfo("en-US");
 
     /// <summary>"11:59 PM"</summary>
-    public static string Time(DateTime d) => d.ToString("h:mm tt", En);
+    public static string Time(DateTime d) => Simpl.Support.Clock.Time(d); // (W22: the one clock)
 
     /// <summary>"Today", "Tomorrow", "Friday" (within the week), else "November 3" (or the brief forms: "Fri", "Nov 3").</summary>
     public static string Day(DateTime d, DateTime at, bool brief = false)

@@ -367,7 +367,7 @@ internal sealed class StudyPlannerTool : ContentControl
         return v;
     }
 
-    private static string Clock(DateTime t) => t.ToString("h:mm tt", CultureInfo.InvariantCulture).Replace("AM", "am").Replace("PM", "pm");
+    private static string Clock(DateTime t) => Simpl.Support.Clock.Time(t); // (W22: the one clock, not "11:59 pm")
 
     /// <summary>A block in the week: its tick, its length and course, its work, its time; done, struck through.</summary>
     private FrameworkElement BlockCard(PlanBlock b, bool compact)

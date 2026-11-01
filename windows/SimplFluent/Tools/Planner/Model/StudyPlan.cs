@@ -244,7 +244,7 @@ internal static class StudyPlan
             sb.Append("DTSTART:").Append(b.Start.ToString("yyyyMMdd'T'HHmmss", CultureInfo.InvariantCulture)).Append("\r\n");
             sb.Append("DTEND:").Append(b.End.ToString("yyyyMMdd'T'HHmmss", CultureInfo.InvariantCulture)).Append("\r\n");
             sb.Append("SUMMARY:").Append(Escape(title)).Append("\r\n");
-            if (it != null) sb.Append("DESCRIPTION:").Append(Escape($"{KindWord(it.Kind)} due {it.Due.ToString("ddd, MMM d 'at' h:mm tt", CultureInfo.InvariantCulture)}{(b.Done ? " · done" : "")}")).Append("\r\n");
+            if (it != null) sb.Append("DESCRIPTION:").Append(Escape($"{KindWord(it.Kind)} due {it.Due.ToString("ddd, MMM d", CultureInfo.InvariantCulture)} at {Simpl.Support.Clock.Time(it.Due)}{(b.Done ? " · done" : "")}")).Append("\r\n");
             sb.Append("END:VEVENT\r\n");
         }
         sb.Append("END:VCALENDAR\r\n");

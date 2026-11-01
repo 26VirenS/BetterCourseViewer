@@ -898,7 +898,7 @@
         if (shown++ >= 8) break;
         const d = new Date(k);
         const day = U.el('bcv-day', [
-          U.el('bcv-day__head', [U.h2(U.dayTitle(d), 'bcv-h2--19'), U.text('bcv-day__date', U.fmtLong(d), 'span')]),
+          U.el('bcv-day__head', [U.h2(U.dayTitle(d), 'bcv-h2--19'), U.dayNamed(d) ? null : U.text('bcv-day__date', U.fmtLong(d), 'span')]), // (past the week the heading is the date: "Monday, Nov 9", not "Nov 9 · November 9")
           U.card(items.map((it) => plannerRow(it)), 'bcv-card--list'),
         ]);
         out.push(first ? U.enter(day, out.length, 70, 420) : day);
