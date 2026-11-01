@@ -16,7 +16,8 @@
   const SCALE = [['A+', 97, 4], ['A', 93, 4], ['A−', 90, 3.7], ['B+', 87, 3.3], ['B', 83, 3], ['B−', 80, 2.7], ['C+', 77, 2.3], ['C', 73, 2], ['C−', 70, 1.7], ['D', 60, 1], ['F', 0, 0]];
   const OLD_SCALE = ['A', 'A−', 'B+', 'B', 'B−', 'C+', 'C', 'C−', 'D', 'F']; // targets saved before A+ existed were indices into this
   const POINTS = { 'A+': 4, A: 4, 'A-': 3.7, 'B+': 3.3, B: 3, 'B-': 2.7, 'C+': 2.3, C: 2, 'C-': 1.7, 'D+': 1.3, D: 1, 'D-': 0.7, F: 0 };
-  const DEFAULT_GOAL = 4; // the goal the setup starts from, for anyone who skipped it
+  const DEFAULT_GOAL = 4; // where the goal's stepper starts while none is set (the setup's own starting point)
+  const TARGET = 'M12 3a9 9 0 100 18 9 9 0 000-18zM12 7.5a4.5 4.5 0 100 9 4.5 4.5 0 000-9zM12 11a1 1 0 100 2 1 1 0 000-2z'; // (a goal not set yet: no arrow up or down)
   const norm = (g) => String(g || '').replace(/−/g, '-').toUpperCase().trim();
   /** A saved target (a letter, or an index into the scale before A+) → its index on SCALE, or -1. */
   const targetIndex = (t) => {
@@ -57,7 +58,6 @@
   const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const GEAR = 'M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-2.9 1.2v.2a2 2 0 11-4 0v-.1a1.7 1.7 0 00-2.9-1.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00-1.2-2.9H3a2 2 0 110-4h.2a1.7 1.7 0 001.2-2.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 002.9-1.2V3a2 2 0 114 0v.2a1.7 1.7 0 002.9 1.2l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 001.2 2.9H21a2 2 0 110 4h-.2a1.7 1.7 0 00-1.4 1z';
   const TREND = 'M4 17l5-6 4 3 6-8';
-  const BARS = 'M4 19h16M7 16V9M12 16V5M17 16v-4';
   const EYE_OFF = 'M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6zM4 4l16 16';
   const MIN_Y = 2.4, MAX_Y = 4.0;
   const LOWER_BY = 10; // the "if ungraded work lands lower" what-if: every remaining score 10 points under today's
@@ -237,13 +237,38 @@
     };
   }
 
+  // ---- the screen's own placeholder (E34) ------------------------------------------------------------------------
+  /** The header, as the page draws it: Grades, and under it `sub` (a placeholder bar the sub's size while it loads). */
+  const headOf = (sub) => U.el('bcv-head', U.el('bcv-head__in', U.el('bcv-head__row', h('div', {}, [h('h1', { class: 'bcv-h1', text: 'Grades' }), sub]))));
+  /** The page's shapes while it loads, as it will stand: the GPA card and what stands beside it — the trend with
+   *  tracking on, else the two stats and the slim tracking card — Momentum and the stats under them with tracking on,
+   *  the course cards' title, then the cards. Read from what this tab already holds: nothing waited for. */
+  function skeletonParts(tracking = !!store.prefNow?.('gpaTracking')) {
+    const b = (cls) => h('span', { class: `bcv-skel__b ${cls}` });
+    const stat = () => U.el('bcv-gpa__skstat', [b('bcv-skel__l2'), b('bcv-skel__l3'), b('bcv-skel__l1')]);
+    return U.el('bcv-skel bcv-gpa__skel', [
+      U.el('bcv-gpa__top', [
+        b('bcv-gpa__skhero'),
+        tracking ? b('bcv-gpa__sktrend') : U.el('bcv-gpa__side', [stat(), stat(), b('bcv-gpa__sktrack')]),
+      ]),
+      tracking ? U.el('bcv-gpa__stats', [stat(), stat(), stat()]) : null,
+      b('bcv-gpa__sktitle'),
+      U.loading('cards', 6),
+    ].filter(Boolean), { 'aria-hidden': 'true', role: 'presentation' });
+  }
+  /** What the app shows while the page loads (app.js, after 150ms): the real header at once, the page's shapes under it. */
+  function skeleton() {
+    const sub = h('div', { class: 'bcv-head__sub bcv-skel bcv-gpa__sksub', 'aria-hidden': 'true' }, h('span', { class: 'bcv-skel__b' }));
+    return U.el('bcv-screen bcv-screen--gpa bcv-screen--skel bcv-screen--skelhead', [headOf(sub), U.el('bcv-body bcv-body--16', skeletonParts())], { style: { '--w': '1180px' }, 'aria-busy': 'true' });
+  }
+
   async function render(ctx) {
     // a dense screen: fills the column up to the 1180px cap (mockup 7's layout notes)
     const screen = U.el('bcv-screen bcv-screen--gpa', null, { style: { '--w': '1180px' } });
     const sub = U.text('bcv-head__sub', 'Loading…');
     const body = U.el('bcv-body bcv-body--16');
-    screen.append(U.el('bcv-head', U.el('bcv-head__in', U.el('bcv-head__row', h('div', {}, [h('h1', { class: 'bcv-h1', text: 'Grades' }), sub])))), body);
-    body.append(U.loading('cards', 6)); // course-card skeletons: the layout does not jump when the data lands
+    screen.append(headOf(sub), body);
+    body.append(skeletonParts()); // the page's own shapes: the layout does not jump when the data lands
 
     introIfFirst(ctx.app).catch(() => {}); // the first opening: the tour's steps, waiting for the cards as they draw
     await loadScales(); // (2.99.27) each course's own grading scale, where entered
@@ -268,11 +293,12 @@
     if (!ctx.alive()) return screen;
 
     // tracking is on with or without a record from before this term (the setup asks for none:
-    // cumulative GPA fills in as snapshots accumulate); a goal of 0 means no goal was set
+    // cumulative GPA fills in as snapshots accumulate); a goal never set (or set to 0) is no goal: the card asks for one,
+    // in neutral words, rather than measure the term against a 4.00 nobody chose
     let tracking = trackingPref && typeof trackingPref === 'object' && (trackingPref.since || Number.isFinite(trackingPref.priorGpa))
       ? { ...trackingPref, priorGpa: Number.isFinite(trackingPref.priorGpa) ? trackingPref.priorGpa : null, priorCourses: Number.isFinite(trackingPref.priorCourses) ? trackingPref.priorCourses : 0 }
       : null;
-    let goal = Number.isFinite(goalPref) ? goalPref : DEFAULT_GOAL;
+    let goal = Number.isFinite(goalPref) ? goalPref : 0;
     const hasGoal = () => goal > 0;
     const hasPrior = () => !!tracking && Number.isFinite(tracking.priorGpa) && tracking.priorCourses > 0;
     const targets = targetsPref && typeof targetsPref === 'object' ? { ...targetsPref } : {};
@@ -360,7 +386,8 @@
       await store.setPref('gpaSnapshots', snaps);
     }
 
-    const save = () => Promise.all([store.setPref('gpaTracking', tracking), store.setPref('gpaGoal', goal), store.setPref('gradeTargets', targets)]).catch(() => {});
+    let goalKept = Number.isFinite(goalPref); // (a goal never set stays unset: nothing is written for it until one is chosen)
+    const save = () => { if (hasGoal()) goalKept = true; return Promise.all([store.setPref('gpaTracking', tracking), goalKept ? store.setPref('gpaGoal', goal) : null, store.setPref('gradeTargets', targets)]).catch(() => {}); };
     const saveHidden = () => store.setPref('gpaHidden', [...hidden]);
 
     // ---- pieces ----------------------------------------------------------------------------
@@ -386,14 +413,22 @@
               U.el('bcv-gpa__line', [U.text('bcv-gpa__line-k', 'Cumulative', 'span'), gpaFigure('bcv-gpa__line-v', hasPrior() ? m.cum : m.termGpa, 1.3)]),
               U.text('bcv-gpa__hero-sub', hasPrior() ? `${gpa2(tracking.priorGpa)} across ${U.plural(tracking.priorCourses, 'course')} before this term${tracking.record?.name ? ` · from ${tracking.record.name}` : ''}` : 'This term so far; add your record before this term in settings, or upload a CSV of past courses there'),
             ])
-            : U.text('bcv-gpa__hero-hint bcv-pretty', 'Cumulative GPA needs your past record — turn on tracking above.'),
+            : null, // (E16: tracking off, the cumulative line waits on it; the one ask to turn it on is the History card beside)
           U.el('bcv-gpa__line', [U.text('bcv-gpa__line-k bcv-gpa__line-k--sm', `If ungraded work lands ${LOWER_BY} pts lower`, 'span'), U.text('bcv-gpa__line-v bcv-gpa__line-v--sm', m.termGpa === null ? '—' : `${gpa2(m.lowGpa)} – ${gpa2(m.termGpa)}`, 'span')]),
-          U.el('bcv-gpa__goal', [
+          // (E15) no goal set: a neutral ask that opens the settings at the goal, never "below your goal"
+          hasGoal() ? U.el('bcv-gpa__goal', [
             U.svg(goalMet ? 'M5 13l4 4L19 7' : 'M12 5v14M6 13l6 6 6-6', { size: 16, stroke: '#fff', width: 2.1, style: { flex: 'none' } }),
             h('div', { style: { flex: '1', minWidth: '0' } }, [
-              U.text('bcv-gpa__goal-h', !hasGoal() ? 'No goal set' : gap === null ? 'No score to compare yet' : goalMet ? `+${gpa2(gap)} above your goal` : `${gpa2(gap)} below your goal`),
-              U.text('bcv-gpa__goal-s', hasGoal() ? `Goal ${gpa2(goal)} · set it in settings` : 'Set one in settings'),
+              U.text('bcv-gpa__goal-h', gap === null ? 'No score to compare yet' : goalMet ? `+${gpa2(gap)} above your goal` : `${gpa2(gap)} below your goal`),
+              U.text('bcv-gpa__goal-s', `Goal ${gpa2(goal)} · set it in settings`),
             ]),
+          ]) : h('button', { type: 'button', class: 'bcv-gpa__goal bcv-gpa__goal--set', onclick: (e) => openSettings(m, { from: e.currentTarget }) }, [
+            U.svg(TARGET, { size: 16, stroke: '#fff', width: 2, style: { flex: 'none' } }),
+            h('div', { style: { flex: '1', minWidth: '0' } }, [
+              U.text('bcv-gpa__goal-h', 'Set a goal'),
+              U.text('bcv-gpa__goal-s', 'The term GPA you are aiming for, and how far off it you are'),
+            ]),
+            U.svg(IC.chevron, { size: 13, stroke: 'rgba(255,255,255,.8)', width: 2.2, style: { flex: 'none' } }),
           ]),
         ]),
       ]);
@@ -414,7 +449,7 @@
       } else {
         chart = [U.el('bcv-gpa__empty', [
           U.svg(TREND, { size: 22, stroke: 'var(--bcv-ink3)', width: 1.8 }),
-          h('span', { class: 'bcv-pretty', text: !tracking ? 'No history yet. Tracking records one snapshot a day from the moment you turn it on; past points can be added in settings.' : 'One snapshot so far. The line appears with the second — on the next day you open this page, or a past point added in settings.' }),
+          h('span', { class: 'bcv-pretty', text: 'One snapshot so far. The line appears with the second — on the next day you open this page, or a past point added in settings.' }), // (drawn with tracking on alone: off, trackCard stands in)
         ])];
       }
       return U.el('bcv-gpa__trend', [
@@ -423,7 +458,8 @@
       ]);
     }
 
-    function stats(m) {
+    /** The stat cards: Momentum (with tracking on: it compares snapshots), On-time submissions, Grade mix. */
+    function statCards(m) {
       const momentum = tracking && m.prev && m.termGpa !== null ? m.termGpa - m.prev.gpa : null;
       const best = [...m.rows].sort((a, b) => b.pct - a.pct)[0];
       const worst = [...m.rows].sort((a, b) => a.pct - b.pct)[0];
@@ -438,11 +474,11 @@
         value !== null ? U.text('bcv-gpa__stat-value', value, 'span') : null,
         U.text('bcv-gpa__stat-note bcv-pretty', note, 'span'),
       ]);
-      return U.el('bcv-gpa__stats', [
-        card('momentum', 'Momentum', IC.chart, momentum !== null && momentum < 0 ? '#ff453a' : '#34c759',
+      return [
+        tracking ? card('momentum', 'Momentum', IC.chart, momentum !== null && momentum < 0 ? '#ff453a' : '#34c759',
           momentum === null ? '—' : `${momentum >= 0 ? '+' : ''}${gpa2(momentum)}`,
           !tracking ? 'Turn on tracking to compare snapshots' : !m.prev ? 'Needs a second snapshot, on another day' : `Change since the ${U.fmtShort(`${m.prev.date}T12:00:00`)} snapshot`,
-          null, `Momentum is today’s term GPA minus the GPA in the last daily snapshot this page saved. Positive means your scores moved up since then. It needs at least two snapshots, and it only changes when a score in ${BCV.lms.name} changes.`),
+          null, `Momentum is today’s term GPA minus the GPA in the last daily snapshot this page saved. Positive means your scores moved up since then. It needs at least two snapshots, and it only changes when a score in ${BCV.lms.name} changes.`) : null,
         card('ontime', 'On-time submissions', IC.clock, '#0a84ff', m.submitted ? `${Math.round((m.onTime / m.submitted) * 100)}%` : '—', m.submitted ? `${m.onTime} of ${m.submitted} submitted before the due time` : 'Nothing submitted yet'),
         card('mix', 'Grade mix', IC.check, '#5856d6', null,
           best ? `Highest ${shortCode(best.c)} at ${best.pct}% · lowest ${shortCode(worst.c)} at ${worst.pct}%` : 'No scores yet',
@@ -450,7 +486,21 @@
             h('span', { class: 'bcv-gpa__chip-l', style: { background: r.c.palette.tint, color: r.c.palette.text }, text: r.letter }),
             U.text('bcv-gpa__chip-p', `${r.pct}%`, 'span'),
           ]))) : null),
-      ].map((el, i) => U.enter(el, i, 50)));
+      ].filter(Boolean).map((el, i) => U.enter(el, i, 50));
+    }
+    const stats = (m) => U.el('bcv-gpa__stats', statCards(m));
+    /** (E16) Tracking off: the trend and the momentum, which both need the page's own daily record, folded into one slim
+     *  card — the page's one ask to turn tracking on — rather than an empty chart, an empty stat, a banner and a line in
+     *  the GPA card all asking the same. */
+    function trackCard(m) {
+      return U.el('bcv-gpa__track', [
+        U.el('bcv-gpa__track-head', [
+          U.svg(TREND, { size: 15, stroke: 'var(--bcv-blue)', width: 2, style: { flex: 'none' } }),
+          U.text('bcv-gpa__stat-label', 'Trend and momentum', 'span'),
+        ]),
+        U.text('bcv-gpa__track-text bcv-pretty', `${BCV.lms.name} keeps no GPA history. With tracking on, this page saves a snapshot a day: the trend, the change since the last one, and a cumulative GPA.`, 'p'),
+        U.btn('Turn on tracking', { kind: 'primary', cls: 'bcv-btn--fill36 bcv-gpa__track-btn', onClick: (e) => openSettings(m, { wantTracking: true, from: e.currentTarget }) }),
+      ]);
     }
 
     // ---- course cards ------------------------------------------------------------------------
@@ -873,7 +923,8 @@
     function openSettings(m, { wantTracking = false, from = null } = {}) {
       document.querySelector('.bcv-sheet-ov')?.remove();
       const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': 'GPA settings' });
-      let pendingGoal = goal;
+      let pendingGoal = hasGoal() ? goal : DEFAULT_GOAL;
+      let goalTouched = hasGoal(); // (no goal yet: the stepper's 4.00 is a starting point, kept only once it is stepped)
       let on = !!tracking || wantTracking;
       const priorGpa = h('input', { class: 'bcv-input bcv-gpa-set__input', id: 'bcv-gpa-prior', type: 'number', min: '0', max: '4', step: '0.01', placeholder: '3.42', value: hasPrior() ? String(tracking.priorGpa) : '' });
       const priorN = h('input', { class: 'bcv-input bcv-gpa-set__input', id: 'bcv-gpa-prior-n', type: 'number', min: '1', max: '200', step: '1', placeholder: '8', value: hasPrior() ? String(tracking.priorCourses) : '' });
@@ -881,7 +932,7 @@
       const goalGap = U.text('bcv-gpa-set__s bcv-pretty', '');
       const syncGoal = () => {
         goalVal.textContent = gpa2(pendingGoal);
-        goalGap.textContent = m.termGpa === null ? 'Set the term GPA you are aiming for' : m.termGpa >= pendingGoal ? `You are ${gpa2(m.termGpa - pendingGoal)} above this goal` : `You are ${gpa2(pendingGoal - m.termGpa)} below this goal`;
+        goalGap.textContent = !goalTouched ? 'No goal yet: step to the term GPA you are aiming for' : m.termGpa === null ? 'Set the term GPA you are aiming for' : m.termGpa >= pendingGoal ? `You are ${gpa2(m.termGpa - pendingGoal)} above this goal` : `You are ${gpa2(pendingGoal - m.termGpa)} below this goal`;
       };
       syncGoal();
       // Upload CSV: a CSV of past courses (lib/record-csv.js says what it reads) fills the two fields in
@@ -992,7 +1043,7 @@
       const trackSwitch = U.switchEl(on, (v) => { on = v; trackBody.hidden = !on; }, 'Track GPA over time');
       const close = () => { BCV.ui.dismiss(ov); if (histTouched) { histTouched = false; refresh(); } };
       const done = async () => {
-        goal = clamp(pendingGoal, 0, 4);
+        if (goalTouched) goal = clamp(pendingGoal, 0, 4);
         if (on) {
           // the record before this term is optional: without it, cumulative fills in from snapshots
           const blank = !priorGpa.value.trim() && !priorN.value.trim();
@@ -1023,9 +1074,9 @@
           U.el('bcv-gpa-set__sec bcv-gpa-set__sec--tint', [
             U.el('bcv-gpa-set__body', [U.text('bcv-gpa-set__k', 'Term GPA goal'), goalGap]),
             U.el('bcv-gpa-set__ctl', [
-              h('button', { type: 'button', class: 'bcv-gpa-set__step', text: '−', 'aria-label': 'Lower the goal', onclick: () => { pendingGoal = clamp(+(pendingGoal - 0.05).toFixed(2), 0, 4); syncGoal(); } }),
+              h('button', { type: 'button', class: 'bcv-gpa-set__step', text: '−', 'aria-label': 'Lower the goal', onclick: () => { pendingGoal = goalTouched ? clamp(+(pendingGoal - 0.05).toFixed(2), 0, 4) : DEFAULT_GOAL - 0.05; goalTouched = true; syncGoal(); } }),
               goalVal,
-              h('button', { type: 'button', class: 'bcv-gpa-set__step', text: '+', 'aria-label': 'Raise the goal', onclick: () => { pendingGoal = clamp(+(pendingGoal + 0.05).toFixed(2), 0, 4); syncGoal(); } }),
+              h('button', { type: 'button', class: 'bcv-gpa-set__step', text: '+', 'aria-label': 'Raise the goal', onclick: () => { pendingGoal = clamp(+(pendingGoal + 0.05).toFixed(2), 0, 4); goalTouched = true; syncGoal(); } }),
             ]),
           ]),
           U.el('bcv-gpa-set__sec', [
@@ -1067,20 +1118,19 @@
       const m = current || model();
       sub.textContent = `${term ? `${term} · ` : ''}${m.shownCount ? courseLabel(m) : 'no current courses'}`;
       body.replaceChildren(...[
-        tracking ? null : U.el('bcv-gpa__banner', [
-          U.svg(BARS, { size: 19, stroke: 'var(--bcv-blue)', width: 1.9, style: { flex: 'none' } }),
-          U.el('bcv-gpa__banner-body', [U.text('bcv-gpa__banner-title', 'Track GPA over time?'), U.text('bcv-gpa__banner-sub bcv-pretty', `${BCV.lms.name} stores no GPA and no history. Add your GPA before this term and how many courses it covers, and this page keeps its own daily record.`)]),
-          U.btn('Turn on tracking', { kind: 'primary', cls: 'bcv-btn--fill36', onClick: (e) => openSettings(m, { wantTracking: true, from: e.currentTarget }) }),
-        ]),
-        U.el('bcv-gpa__top', [U.enter(hero(m), 1, 40, 400), U.enter(trend(), 1, 110, 400)]), // hero, then trend
-        stats(m),
+        // tracking on: the hero and the trend, the stats under them; off (E16): the hero, and beside it the two stats that
+        // need no history with the one slim card that asks for tracking — no empty chart, no empty Momentum
+        tracking
+          ? U.el('bcv-gpa__top', [U.enter(hero(m), 1, 40, 400), U.enter(trend(), 1, 110, 400)]) // hero, then trend
+          : U.el('bcv-gpa__top', [U.enter(hero(m), 1, 40, 400), U.el('bcv-gpa__side', [...statCards(m), U.enter(trackCard(m), 2, 50)])]),
+        tracking ? stats(m) : null,
         courseGrid(m),
         hiddenTray(m),
         itemGrades(),
         U.el('bcv-gpa__foot', [
           h('p', { class: 'bcv-pretty', text: tracking
             ? `Course scores come straight from ${BCV.lms.name}. GPA, targets and history are computed here from the standard 4.0 scale and the prior record you entered — your school’s official GPA may differ.`
-            : `Course scores and target maths come straight from ${BCV.lms.name}. Term GPA is the plain 4.0-scale average of your courses; cumulative GPA and history stay empty until you turn on tracking.` }),
+            : `Course scores and target maths come straight from ${BCV.lms.name}. Term GPA is the plain 4.0-scale average of your courses — your school’s official GPA may differ.` }),
           tracking ? h('button', { type: 'button', class: 'bcv-gpa__linkbtn', text: 'Reset setup', onclick: resetTracking }) : null,
         ]),
       ].filter(Boolean));
@@ -1178,5 +1228,5 @@
     ]);
   }
 
-  BCV.screens.gpa = { render, courseMath, SCALE, letterFor, pointsFor, targetIndex, prefetch, trendChart, gradedItems, MIN_Y, MAX_Y, scaleOf, hasScale, loadScales, setScale };
+  BCV.screens.gpa = { render, skeleton, courseMath, SCALE, letterFor, pointsFor, targetIndex, prefetch, trendChart, gradedItems, MIN_Y, MAX_Y, scaleOf, hasScale, loadScales, setScale };
 })();

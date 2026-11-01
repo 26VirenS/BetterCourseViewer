@@ -1472,18 +1472,24 @@
     for (const nav of document.querySelectorAll('#bcv-topsearch .bcv-asg__nav--bar')) nav.remove();
     histButtons();
     syncSide(); // the sidebar follows the route in place; it is rebuilt only when what it shows changes
-    BCV.search?.dock?.(BCV.app, r); // the search box at the left of the top bar on every screen but the Dashboard, whose header has it (kept as it is when it is already there)
+    BCV.search?.dock?.(BCV.app); // the search box in the top bar on every screen, the Dashboard too (E33; kept as it is when it is already there)
     barLayout();
     // ctx.swap: a screen that keeps its shell (a course's tabs) puts its new column in through it, so the column moves as a screen would
     const ctx = { app: BCV.app, route: r, alive, dark: state.dark, swap: (update, scope) => (alive() ? swap(update, kind, scope) : Promise.resolve(update())) };
     // Screens build off-DOM and land whole. A screen still fetching after 150ms gets a
-    // skeleton in its place, shaped like its content (course cards on Grades, list rows
+    // skeleton in its place, shaped like its content (Grades draws its own, list rows
     // elsewhere); a cached screen lands before that and never flashes it.
     // a course or a group keeps its header and rail between its own tabs: the skeleton must not wipe them
     const keepsShell = () => (r.screen === 'course' || r.screen === 'group')
       && main.firstElementChild?.dataset?.bcvCtx === `${r.screen === 'group' ? 'groups' : 'courses'}:${r.courseId}`;
+    // (E34) a screen that draws its own placeholder (screens[x].skeleton: its real header at once, its layout's shapes
+    // under it — Grades) has that; the rest, rows of the list they hold
     const skeleton = setTimeout(() => {
-      if (alive() && !quiet && !keepsShell()) main.replaceChildren(U.el('bcv-screen bcv-screen--skel', U.el('bcv-body', U.loading(r.screen === 'gpa' ? 'cards' : 'rows', 6))));
+      if (!alive() || quiet || keepsShell()) return;
+      let own = null;
+      try { own = !phone() ? screens[r.screen]?.skeleton?.(r) || null : null; } catch { own = null; }
+      if (own) own.dataset.bcvSkelFor = r.screen;
+      main.replaceChildren(own || U.el('bcv-screen bcv-screen--skel', U.el('bcv-body', U.loading('rows', 6))));
     }, 150);
     const nativeWanted = r.params.get('bcv') === 'native' || (!screens[r.screen] && !(phone() && BCV.phone.screens[r.screen])) || r.screen === 'native';
     if (state.themeImages && !nativeWanted) await BCV.theme?.ensureAssets?.(state.themeImages, picSlots(r.screen))?.catch?.(() => {}); // this screen's pictures, read in before it draws (nothing to read once they are here)
@@ -1511,7 +1517,7 @@
     }
     if (!gaveWay && !nativeWanted && el) {
       const only = el.querySelector('.bcv-body > .bcv-error:only-child, .bcv-body > .bcv-error:first-child:last-child');
-      if (only) gaveWay = only.textContent.trim();
+      if (only) gaveWay = (only.querySelector('.bcv-error__text') || only).textContent.trim(); // (its words, not its buttons)
     }
     if (gaveWay && alive()) {
       // an answer that never came: a fresh load clears most of what wedges, so that is tried once
@@ -1534,7 +1540,7 @@
       try {
         el = await screens.native.render(ctx);
       } catch (e2) {
-        el = U.el('bcv-screen', U.el('bcv-body', U.errorBox(`This page could not be drawn: ${e2?.message || e2}`)));
+        el = U.el('bcv-screen', U.el('bcv-body', U.errorBox(`This page could not be drawn: ${e2?.message || e2}`, null, { retry: () => location.reload(), canvas: false })));
       }
       if (alive() && BCV.canvas.sessionOk?.() !== false) U.toast(`Showing ${BCV.lms.name}'s own page: ${gaveWay}`, { error: true, ms: 6000 }); // (a session that ended has its own note up)
     }
@@ -1549,6 +1555,7 @@
     if (el.parentNode !== main) { // a screen that kept its shell (a course's rail) stays put
       const from = main.firstElementChild;
       const moving = !!kind && !!from && !from.classList.contains('bcv-screen--skel'); // (over a skeleton the content simply lands: the move was the press's, a moment ago)
+      if (from?.classList.contains('bcv-screen--skelhead') && from.dataset.bcvSkelFor === r.screen) el.classList.add('bcv-screen--landed'); // (over a placeholder that drew this screen's own header, the header stays put: no entrance moves it)
       if (moving && vtHere()) el.classList.add('bcv-screen--vt'); // (the transition carries it: no entrance of its own on top)
       await swap(() => main.replaceChildren(el), moving ? kind : null, main);
       if (!alive()) return;

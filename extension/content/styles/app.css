@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.135"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.136"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -112,6 +112,7 @@ html.bcv-phone .bcv-main > .bcv-screen--fwd { animation: bcv-push-in var(--bcv-t
 html.bcv-phone .bcv-main > .bcv-screen--back { animation: bcv-pop-in var(--bcv-t-phone) var(--bcv-spring-phone) both; }
 html.bcv-phone .bcv-main > .bcv-screen--tab { animation: bcv-fade-in var(--bcv-t-scrim) var(--bcv-spring-scrim) both; }
 .bcv-main > .bcv-screen--skel { animation: none; } /* the placeholder does not rise; the real screen does when it lands */
+.bcv-main > .bcv-screen--landed { animation: none; } /* (E34) over a placeholder that drew its header (gpa.js skeleton): the header was already there, what is under it comes in on its own */
 .bcv-main > .bcv-screen--still { animation: none; } /* a screen drawn again in place (ui.still): it is already here, so it does not arrive */
 /* The move as a view transition (app.js swap): the screen's column (#bcv-main, or a course's own column within its kept
    header and rail) is the one thing that moves; the rest of the page is its own picture and holds still. The screen left
@@ -222,6 +223,19 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 .bcv-skel__l3 { height: 16px; border-radius: 7px; width: 34%; }
 .bcv-skel__bar { height: 6px; border-radius: 3px; }
 .bcv-skel__btn { height: 34px; border-radius: 17px; }
+/* (E34) Grades' own placeholder (gpa.js skeleton): its header drawn at once, then the page's shapes as they will stand — the
+   GPA card, what stands beside it (the trend, or the two stats and the tracking card), the course cards */
+.bcv-gpa__skel { gap: 16px; }
+.bcv-gpa__sksub { height: 1.2em; justify-content: center; }
+.bcv-gpa__sksub > .bcv-skel__b { width: 270px; max-width: 70%; height: 11px; }
+.bcv-gpa__skhero { flex: 1 1 250px; max-width: 560px; min-width: 0; height: 352px; border-radius: 24px; }
+.bcv-gpa__sktrend { flex: 1 1 330px; min-width: 0; height: 352px; border-radius: 24px; }
+.bcv-gpa__skstat { padding: 15px 16px; border-radius: 18px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); display: flex; flex-direction: column; gap: 9px; }
+.bcv-gpa__skstat > .bcv-skel__l2 { width: 44%; }
+.bcv-gpa__skstat > .bcv-skel__l3 { height: 22px; width: 28%; }
+.bcv-gpa__skstat > .bcv-skel__l1 { width: 62%; }
+.bcv-gpa__side > .bcv-gpa__sktrack { flex: 1 1 auto; min-height: 84px; border-radius: 18px; }
+.bcv-gpa__sktitle { width: 110px; height: 16px; margin: 6px 4px 0; border-radius: 7px; }
 @media (prefers-reduced-motion: reduce) {
   /* screens, sheets, menus, toasts and panels still arrive — as a 150ms fade, nothing moving (a sheet with its scrim,
      not on its own; a screen drawn again in place not at all); data lands on its final value at once; the loading
@@ -709,7 +723,16 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
 .bcv-group__sub { font: 400 12.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-strike { text-decoration: line-through; }
 .bcv-empty { padding: 26px 18px; text-align: center; font: 400 13.5px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
-.bcv-error { padding: 14px 18px; font: 400 13px/1.45 var(--bcv-font); color: var(--bcv-red-text); background: var(--bcv-red-soft); border-radius: 14px; }
+.bcv-error { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 14px 18px; font: 400 13px/1.45 var(--bcv-font); color: var(--bcv-red-text); background: var(--bcv-red-soft); border-radius: 14px; }
+/* (E10) the words, the code's tag after them, and under them a way on: Try Again, Open in Canvas */
+.bcv-error__text { min-width: 0; overflow-wrap: anywhere; }
+.bcv-error__acts { order: 2; flex: 1 0 100%; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.bcv-error__btn { appearance: none; border: 0; border-radius: 999px; padding: 6px 14px; min-height: 30px; box-sizing: border-box; display: inline-flex; align-items: center; font: 600 13px/1.2 var(--bcv-font); color: var(--bcv-red-text); background: color-mix(in srgb, var(--bcv-red-text) 16%, transparent); text-decoration: none; cursor: pointer; transition: background-color .15s ease, transform .1s ease-out; }
+.bcv-error__btn--plain { background: transparent; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bcv-red-text) 38%, transparent); }
+.bcv-error__btn:active:not(:disabled) { transform: scale(.97); }
+.bcv-error__btn:disabled { opacity: .6; cursor: default; }
+@media (hover: hover) and (pointer: fine) { .bcv-error__btn:hover:not(:disabled) { background: color-mix(in srgb, var(--bcv-red-text) 24%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .bcv-error__btn:active:not(:disabled) { transform: none; } }
 @keyframes bcv-pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
 
 /* ---- dashboard ---------------------------------------------------------- */
@@ -2202,10 +2225,6 @@ html[data-bcv-theme="dark"] .bcv-rr-ov { --rr-dim0: .52; --rr-dim1: .78; }
 .bcv-banner__sub { margin-top: 3px; font: 500 13px/1.4 var(--bcv-font); color: var(--bcv-red); }
 
 /* ---- grades panel (sidebar Grades): GPA, trend, stats, targets ---------------- */
-.bcv-gpa__banner { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 18px; background: var(--bcv-blue-soft); flex-wrap: wrap; }
-.bcv-gpa__banner-body { flex: 1 1 260px; min-width: 0; }
-.bcv-gpa__banner-title { font: 600 13.5px/1.3 var(--bcv-font); }
-.bcv-gpa__banner-sub { margin-top: 2px; font: 400 12.5px/1.4 var(--bcv-font); color: var(--bcv-ink2); }
 .bcv-gpa__top { display: flex; gap: 16px; flex-wrap: wrap; align-items: stretch; }
 .bcv-gpa__hero { flex: 1 1 250px; max-width: 560px; min-width: 0; background: linear-gradient(158deg, #5856d6, #3f3ea8); border-radius: 24px; padding: 22px; box-shadow: var(--bcv-shadow-hi); display: flex; flex-direction: column; gap: 12px; color: #fff; }
 .bcv-gpa__hero-head { display: flex; align-items: center; gap: 10px; }
@@ -2227,6 +2246,10 @@ html[data-bcv-theme="dark"] .bcv-rr-ov { --rr-dim0: .52; --rr-dim1: .78; }
 .bcv-gpa__goal { margin-top: 6px; display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-radius: 14px; background: rgba(255,255,255,.16); }
 .bcv-gpa__goal-h { font: 600 13px/1.3 var(--bcv-font); color: #fff; }
 .bcv-gpa__goal-s { margin-top: 2px; font: 400 11.5px/1.35 var(--bcv-font); color: rgba(255,255,255,.8); }
+.bcv-gpa__goal--set { width: 100%; border: 0; color: #fff; font: inherit; text-align: left; cursor: pointer; transition: background .15s ease, scale .1s ease-out; } /* (E15: no goal yet, a neutral ask that opens the settings) */
+@media (hover: hover) { .bcv-gpa__goal--set:hover { background: rgba(255,255,255,.22); } }
+.bcv-gpa__goal--set:active { scale: .99; }
+.bcv-gpa__goal--set:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .bcv-gpa__trend { flex: 1 1 330px; min-width: 0; background: var(--bcv-card); border-radius: 24px; padding: 20px 22px; box-shadow: var(--bcv-shadow); display: flex; flex-direction: column; gap: 12px; border: 1px solid var(--bcv-edge); }
 .bcv-gpa__trend-head { display: flex; align-items: baseline; gap: 8px; }
 .bcv-gpa__trend-range { margin-left: auto; font: 400 11.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
@@ -2253,6 +2276,15 @@ html[data-bcv-theme="dark"] .bcv-rr-ov { --rr-dim0: .52; --rr-dim1: .78; }
 .bcv-gpa__note { margin: 0; font: 400 11px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-gpa__empty { height: 140px; border-radius: 16px; background: var(--bcv-fill2); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 0 22px; font: 500 13px/1.45 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-gpa__stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(196px, 1fr)); gap: 12px; }
+/* (E16) tracking off: beside the GPA card, the two stats that need no history and one slim card in place of the trend and
+   Momentum — the page's one ask to turn tracking on; wrapped under the GPA card where the row is narrow */
+.bcv-gpa__side { flex: 1 1 330px; min-width: 0; display: flex; flex-direction: column; gap: 12px; container: bcv-gpa-side / inline-size; }
+.bcv-gpa__side > .bcv-gpa__stat { flex: none; }
+.bcv-gpa__track { margin-top: auto; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "head btn" "text btn"; align-items: center; column-gap: 14px; row-gap: 5px; padding: 14px 16px; border-radius: 18px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); border: 1px dashed var(--bcv-edge); }
+.bcv-gpa__track-head { grid-area: head; display: flex; align-items: center; gap: 8px; }
+.bcv-gpa__track-text { grid-area: text; margin: 0; font: 400 12px/1.45 var(--bcv-font); color: var(--bcv-ink2); }
+.bcv-gpa__track-btn { grid-area: btn; }
+@container bcv-gpa-side (max-width: 440px) { .bcv-gpa__track { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "text" "btn"; } .bcv-gpa__track-btn { justify-self: start; margin-top: 6px; } }
 .bcv-gpa__stat { background: var(--bcv-card); border-radius: 18px; padding: 15px 16px; box-shadow: var(--bcv-shadow); display: flex; flex-direction: column; gap: 7px; position: relative; }
 .bcv-gpa__stat-head { display: flex; align-items: center; gap: 8px; }
 .bcv-gpa__stat-label { font: 600 10.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); text-transform: uppercase; letter-spacing: .06em; }
@@ -3609,6 +3641,7 @@ html.bcv-side-plain #bcv-sidetoggle { color: #1c1c1e; filter: var(--bcv-plain-gl
 /* ---- toast ---------------------------------------------------------------- */
 /* an error's code (lib/errors.js), after its words: a small grey tag drawn from data-code, so it is never part of the words themselves */
 .bcv-toast[data-code]::after, .bcv-error[data-code]::after { content: attr(data-code); display: inline-block; margin-left: 8px; padding: 2px 6px; border-radius: 6px; background: var(--bcv-fill2, rgba(120,120,128,.16)); color: var(--bcv-ink2); font: 600 11px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0; vertical-align: 1px; white-space: nowrap; }
+.bcv-error[data-code]::after { margin-left: 0; } /* (a flex item beside the words: the box's gap spaces it) */
 .bcv-toast { position: fixed; left: 50%; top: calc(10px + env(safe-area-inset-top, 0px)); translate: -50% 0; z-index: var(--bcv-z-toast); display: flex; align-items: center; gap: 10px; box-sizing: border-box; min-height: 44px; padding: 6px 18px 6px 7px; border-radius: 999px; background: rgba(28,28,30,.9); -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4); border: 1px solid rgba(255,255,255,.14); box-shadow: 0 10px 34px rgba(0,0,0,.34); font: 500 13.5px/1.3 var(--bcv-font); color: #fff; width: max-content; max-width: min(540px, calc(100vw - 32px)); pointer-events: auto; } /* (as wide as its words, up to the cap: placed from the middle of the window, a pill that sized itself had only the right half of the window to fit in, and on a phone a sentence wrapped a word to a line) */
 /* Notifications are the Away Refresh pill's kind (#bcv-away): a dark pill that floats down from the top centre
  * of the window and goes back up, the same in both appearances — a mark in a disc (a bell; on an error a red
@@ -3868,6 +3901,8 @@ html.bcv-phone .bcv-datepop__q { padding: 11px 0; font-size: 13px; }
 .bcv-ph-hero__diffic { display: flex; flex: none; }
 .bcv-ph-hero__diff { font: 600 12.5px/1.3 var(--bcv-font); color: #fff; }
 .bcv-ph-hero__goalnote { font: 400 12px/1.3 var(--bcv-font); color: rgba(255,255,255,.72); }
+.bcv-ph-hero__set { margin: 0; padding: 0; border: 0; background: none; font: 600 12.5px/1.3 var(--bcv-font); color: #fff; text-decoration: underline; text-decoration-color: rgba(255,255,255,.5); text-underline-offset: 3px; cursor: pointer; } /* (E15: no goal yet — a neutral ask, which starts it at 4.00) */
+.bcv-ph-hero__set[hidden], .bcv-ph-hero__diff[hidden] { display: none; }
 .bcv-ph-whatif { flex-direction: row; align-items: center; gap: 12px; padding: 13px 15px; border-radius: 16px; }
 .bcv-ph-whatif__t { font: 600 14px/1.3 var(--bcv-font); color: var(--bcv-ink); }
 .bcv-ph-whatif__s { margin-top: 2px; font: 400 11.5px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
@@ -4300,7 +4335,7 @@ html.bcv-setup-open #bcv-bar { display: none !important; }
  * the app's root, so it stays put as the screens change); it goes up with the bar for a quiz, and is not there where the bar is not */
 #bcv-topsearch { display: none; }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-topsearch { display: flex; align-items: center; position: fixed; top: 0; left: calc(var(--bcv-side-w) + 96px); height: 44px; z-index: calc(var(--bcv-z-bar) + 1); pointer-events: none; transition: left .45s var(--bcv-ease), translate .45s var(--bcv-ease), opacity .3s ease; }
-html.bcv-setup-open #bcv-topsearch, #bcv-topsearch[hidden] { display: none !important; } /* (hidden: the Dashboard, whose header has the box) */
+html.bcv-setup-open #bcv-topsearch, #bcv-topsearch[hidden] { display: none !important; }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab).bcv-quiz #bcv-topsearch { translate: 0 -64px; opacity: 0; pointer-events: none; }
 #bcv-topsearch .bcv-omni__box, .bcv-spot .bcv-omni__box { box-sizing: border-box; } /* (outside the app's root nothing sets it: the pill is 29 tall in the bar and as it sets off, as it was in the header) */
 #bcv-topsearch .bcv-omni { pointer-events: auto; flex: none; order: 0; width: clamp(220px, 26vw, 340px); max-width: none; min-width: 0; margin: 0; align-self: center; }
@@ -5386,7 +5421,9 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
  * Spotlight's way — a large pill over a light dim, the four kinds to search in under it — its root moved into a
  * fixed palette that eases from the header's place (left, top, width; the box's height and corners with them) while a
  * ghost keeps the header's row; the veil takes no pointer, so a press anywhere on the page lands, and puts it back */
-.bcv-spot-ov { position: fixed; inset: 0; z-index: calc(var(--bcv-z-sheet) - 2); pointer-events: none; background: transparent; animation: bcv-card-veil .2s ease both; } /* (2.98.69: the page around the search stays sharp, only a little dimmer) */
+.bcv-spot-ov { position: fixed; inset: 0; z-index: calc(var(--bcv-z-sheet) - 2); pointer-events: none; background: transparent; animation: bcv-card-veil .2s ease both; } /* (2.98.69: the page around the search stays sharp; 2.99.97: nothing behind a popup is darkened — E11 is the results' own slab, below) */
+/* (E11) the results' slab is near-solid (.84–.9): where the blur is not drawn (no graphics acceleration, Reduce Transparency) the page's words never read through it */
+@media (prefers-reduced-transparency: reduce) { .bcv-spot .bcv-omni__panel, .bcv-spot .bcv-omni__panel.bcv-squircle { -webkit-backdrop-filter: none; backdrop-filter: none; } }
 html.bcv-noblur .bcv-spot:not(.is-far) .bcv-omni__box, html.bcv-noblur .bcv-spot .bcv-omni__panel { background: linear-gradient(rgba(40,40,44,.97), rgba(40,40,44,.97)) padding-box, var(--bcv-glass-rim) border-box; -webkit-backdrop-filter: none; backdrop-filter: none; } /* (solid, the rim kept) */
 .bcv-spot-ov.is-folding { opacity: 0; transition: opacity .3s ease; }
 .bcv-spot { position: fixed; z-index: calc(var(--bcv-z-sheet) - 1); display: flex; /* (under the sheets: a hand-in box or a question opened from a row comes up over the pill) */ flex-direction: column; gap: 10px; } /* (2.99.4: laid out in the middle at once; the pill is moved there by transform — search.js drawAs) */
@@ -5422,7 +5459,7 @@ html[data-bcv-theme="light"] .bcv-spot { --bcv-spot-shade: .24; }
 @keyframes bcv-spot-in { from { opacity: 0; transform: translateY(-6px) scale(.97); } to { opacity: 1; transform: none; } }
 .bcv-spot.is-still, .bcv-spot.is-still .bcv-omni__box, .bcv-spot.is-still .bcv-omni__panel { transition: none; }
 /* the panel: a slab of its own under the pill, the page through it blurred soft and dimmed so the words hold on any page */
-.bcv-spot .bcv-omni__panel { position: relative; margin: 14px 0 0; max-height: min(58vh, 600px); padding: 12px; border-radius: 34px; background: linear-gradient(180deg, rgba(46,44,50,.4), rgba(28,26,30,.5)) padding-box, var(--bcv-glass-rim) border-box; border: 1px solid transparent; animation: none; transition: opacity .18s ease, transform .18s ease; -webkit-backdrop-filter: blur(20px) saturate(1.8) brightness(.66); backdrop-filter: blur(20px) saturate(1.8) brightness(.66); box-shadow: var(--bcv-glass-shade); scrollbar-color: rgba(255,255,255,.25) transparent; }
+.bcv-spot .bcv-omni__panel { position: relative; margin: 14px 0 0; max-height: min(58vh, 600px); padding: 12px; border-radius: 34px; background: linear-gradient(180deg, rgba(46,44,50,.84), rgba(28,26,30,.9)) padding-box, var(--bcv-glass-rim) border-box; border: 1px solid transparent; animation: none; transition: opacity .18s ease, transform .18s ease; -webkit-backdrop-filter: blur(20px) saturate(1.8) brightness(.66); backdrop-filter: blur(20px) saturate(1.8) brightness(.66); box-shadow: var(--bcv-glass-shade); scrollbar-color: rgba(255,255,255,.25) transparent; }
 /* (2.99.4) the panel's shadow, a layer of its own under it: the panel changes size through a clip, which would cut a shadow
    drawn on the panel itself; this one is scaled with it (search.js shadeOf) */
 .bcv-omni__pshade { display: none; }
@@ -6519,7 +6556,7 @@ html.bcv-on:not(.bcv-phone) .bcv-screen--ctx:has(.bcv-qz.is-page) > .bcv-head--c
    scrolls. The pill's outer shadow, which the clip would cut, is the palette's shade behind it. */
 .bcv-spot .bcv-omni__box.bcv-squircle, .bcv-spot .bcv-omni__panel.bcv-squircle { border-color: transparent; }
 .bcv-spot:not(.is-far) .bcv-omni__box.bcv-squircle { background: var(--bcv-sq-ring, none) 0 0 / 100% 100% no-repeat border-box, linear-gradient(180deg, rgba(6,6,8,.84), rgba(34,34,38,.62)) padding-box; box-shadow: var(--bcv-glass-shade); }
-.bcv-spot .bcv-omni__panel.bcv-squircle { background: var(--bcv-sq-ring, none) 0 0 / 100% 100% no-repeat border-box, linear-gradient(180deg, rgba(46,44,50,.4), rgba(28,26,30,.5)) padding-box; box-shadow: var(--bcv-glass-shade); }
+.bcv-spot .bcv-omni__panel.bcv-squircle { background: var(--bcv-sq-ring, none) 0 0 / 100% 100% no-repeat border-box, linear-gradient(180deg, rgba(46,44,50,.84), rgba(28,26,30,.9)) padding-box; box-shadow: var(--bcv-glass-shade); }
 html.bcv-noblur .bcv-spot:not(.is-far) .bcv-omni__box.bcv-squircle, html.bcv-noblur .bcv-spot .bcv-omni__panel.bcv-squircle { background: var(--bcv-sq-ring, none) 0 0 / 100% 100% no-repeat border-box, linear-gradient(rgba(40,40,44,.97), rgba(40,40,44,.97)) padding-box; }
 /* (2.99.86) every rounded rectangle with continuous corners (ui.js squircleAll): where the browser draws corner shapes
    itself, a gentle superellipse at each element's own radius — nearest Apple's continuous corner without changing the radius

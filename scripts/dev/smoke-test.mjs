@@ -404,9 +404,9 @@ try {
   const barInfo = await page.evaluate(() => { const bar = document.getElementById('bcv-bar'); const r = bar?.getBoundingClientRect(); const look = document.getElementById('bcv-look')?.getBoundingClientRect(); const side = document.querySelector('.bcv-side')?.getBoundingClientRect(); return { shown: !!bar && getComputedStyle(bar).display !== 'none', top: r ? Math.round(r.top) : null, left: r ? Math.round(r.left) : null, h: r ? Math.round(r.height) : null, w: r ? Math.round(r.width) : null, pad: getComputedStyle(document.getElementById('bcv-main')).paddingTop, appPad: getComputedStyle(document.getElementById('bcv-app')).paddingTop, lookIn: !!look && look.top >= 0 && look.bottom <= (r?.height || 0), sideTop: side ? Math.round(side.top) : null, sideRight: side ? Math.round(side.right) : null, sideH: side ? Math.round(side.height) : null, vh: window.innerHeight, headTop: getComputedStyle(document.querySelector('.bcv-head')).top }; });
   check(barInfo.shown && barInfo.top === 0 && barInfo.h === 44 && barInfo.left === barInfo.sideRight && barInfo.w === 1400 - barInfo.sideRight && barInfo.pad === '44px' && barInfo.appPad === '0px' && barInfo.lookIn && barInfo.sideTop === 0 && barInfo.sideH === barInfo.vh && barInfo.headTop === '44px', `the widgets have a bar of their own beside the sidebar, over the page alone: the sidebar runs from the very top, the page starts under the bar: ${JSON.stringify(barInfo)}`);
   check(!(await visible('#application')), 'stock Canvas hidden');
-  const lookBtn = await page.$eval('#bcv-look', (e) => { const r = e.getBoundingClientRect(); const m = e.querySelector('.bcv-look__main'); const mk = m.querySelector('.bcv-look__mark'); const opts = [...e.querySelectorAll('.bcv-look__opt')]; const lbl = (b) => (b.querySelector('.bcv-look__offhead .bcv-look__optlbl') || b.querySelector('.bcv-look__optlbl')).textContent; const colour = (b) => { const cs = getComputedStyle(b); return cs.backgroundImage !== 'none' ? (cs.backgroundImage.match(/rgb\([^)]+\)/) || [''])[0] : cs.backgroundColor; }; return { fixed: getComputedStyle(e).position === 'fixed', top: Math.round(r.top), right: Math.round(window.innerWidth - r.right), w: Math.round(r.width), h: Math.round(r.height), disc: `${Math.round(m.getBoundingClientRect().width)}x${Math.round(m.getBoundingClientRect().height)}`, radius: getComputedStyle(m).borderRadius, popup: m.getAttribute('aria-haspopup'), label: m.getAttribute('aria-label'), pos: e.dataset.pos, markImg: getComputedStyle(mk).backgroundImage.startsWith('linear-gradient'), markFill: `${Math.round(mk.getBoundingClientRect().width)}x${Math.round(mk.getBoundingClientRect().height)}:${getComputedStyle(mk).borderRadius}:${Math.round(mk.querySelector('svg').getBoundingClientRect().width)}`, text: m.querySelector('.bcv-look__text').textContent.trim(), textShown: m.querySelector('.bcv-look__text').getBoundingClientRect().width, menu: getComputedStyle(e.querySelector('.bcv-look__menu')).visibility, opts: opts.map((b) => `${b.dataset.pos}:${lbl(b)}:${getComputedStyle(b).opacity}:${b.classList.contains('is-selected')}`).join(' '), colors: opts.map(colour).join(' '), fors: [...e.querySelectorAll('.bcv-look__forbtn')].map((b) => b.textContent).join(' | ') }; }).catch(() => null);
-  // (2.99.53) in the shell the switch is the Mac's ⋯ button in the bar: a round button of the bar's fill, ⋯ in it, at the right (the search box is the Dashboard's header's here)
-  check(!!lookBtn && lookBtn.fixed && lookBtn.top === 7 && lookBtn.right === 12 && lookBtn.w === 30 && lookBtn.h === 30 && lookBtn.disc === '30x30' && lookBtn.radius === '15px' && lookBtn.popup === 'true' && lookBtn.label === 'Simpl Courses switch: Active' && lookBtn.pos === '1' && !lookBtn.markImg && lookBtn.text === 'Active' && lookBtn.textShown === 0 && lookBtn.menu === 'hidden' && lookBtn.opts === '1:Active:0:true -1:Turn off Simpl:0:false' && lookBtn.colors === 'rgb(52, 199, 89) rgb(255, 69, 58)' && lookBtn.fors === 'This page only | For 30 minutes | For 1 hour | For 4 hours | For 1 day | Indefinitely', `the switch sits at the top right as ⋯; its two buttons — green (the state, so it reads Active) and red Turn off Simpl, with how long folded inside it — out of sight: ${JSON.stringify(lookBtn)}`);
+  const lookBtn = await page.$eval('#bcv-look', (e) => { const r = e.getBoundingClientRect(); const m = e.querySelector('.bcv-look__main'); const mk = m.querySelector('.bcv-look__mark'); const opts = [...e.querySelectorAll('.bcv-look__opt')]; const lbl = (b) => (b.querySelector('.bcv-look__offhead .bcv-look__optlbl') || b.querySelector('.bcv-look__optlbl')).textContent; const colour = (b) => { const cs = getComputedStyle(b); return cs.backgroundImage !== 'none' ? (cs.backgroundImage.match(/rgb\([^)]+\)/) || [''])[0] : cs.backgroundColor; }; const box = document.querySelector('#bcv-topsearch .bcv-omni')?.getBoundingClientRect(); return { fixed: getComputedStyle(e).position === 'fixed', top: Math.round(r.top), right: Math.round(window.innerWidth - r.right), boxW: box ? Math.round(box.width) : 0, w: Math.round(r.width), h: Math.round(r.height), disc: `${Math.round(m.getBoundingClientRect().width)}x${Math.round(m.getBoundingClientRect().height)}`, radius: getComputedStyle(m).borderRadius, popup: m.getAttribute('aria-haspopup'), label: m.getAttribute('aria-label'), pos: e.dataset.pos, markImg: getComputedStyle(mk).backgroundImage.startsWith('linear-gradient'), markFill: `${Math.round(mk.getBoundingClientRect().width)}x${Math.round(mk.getBoundingClientRect().height)}:${getComputedStyle(mk).borderRadius}:${Math.round(mk.querySelector('svg').getBoundingClientRect().width)}`, text: m.querySelector('.bcv-look__text').textContent.trim(), textShown: m.querySelector('.bcv-look__text').getBoundingClientRect().width, menu: getComputedStyle(e.querySelector('.bcv-look__menu')).visibility, opts: opts.map((b) => `${b.dataset.pos}:${lbl(b)}:${getComputedStyle(b).opacity}:${b.classList.contains('is-selected')}`).join(' '), colors: opts.map(colour).join(' '), fors: [...e.querySelectorAll('.bcv-look__forbtn')].map((b) => b.textContent).join(' | ') }; }).catch(() => null);
+  // (2.99.53) in the shell the switch is the Mac's ⋯ button in the bar: a round button of the bar's fill, ⋯ in it, at the right beside the search box
+  check(!!lookBtn && lookBtn.fixed && lookBtn.top === 7 && lookBtn.boxW > 0 && lookBtn.right === 12 + lookBtn.boxW + 8 && lookBtn.w === 30 && lookBtn.h === 30 && lookBtn.disc === '30x30' && lookBtn.radius === '15px' && lookBtn.popup === 'true' && lookBtn.label === 'Simpl Courses switch: Active' && lookBtn.pos === '1' && !lookBtn.markImg && lookBtn.text === 'Active' && lookBtn.textShown === 0 && lookBtn.menu === 'hidden' && lookBtn.opts === '1:Active:0:true -1:Turn off Simpl:0:false' && lookBtn.colors === 'rgb(52, 199, 89) rgb(255, 69, 58)' && lookBtn.fors === 'This page only | For 30 minutes | For 1 hour | For 4 hours | For 1 day | Indefinitely', `the switch sits at the top right as ⋯, left of the bar's search box (E33: the Dashboard's too); its two buttons — green (the state, so it reads Active) and red Turn off Simpl, with how long folded inside it — out of sight: ${JSON.stringify(lookBtn)}`);
   // under the pointer the two buttons float down under the disc, one under the other; the one hovered opens out to the left with its words
   await page.hover('#bcv-look');
   const menuOpen = await eventually(() => page.$eval('#bcv-look', (e) => { const m = e.querySelector('.bcv-look__menu'); const opts = [...e.querySelectorAll('.bcv-look__opt')]; const d = e.querySelector('.bcv-look__main').getBoundingClientRect(); return getComputedStyle(m).visibility === 'visible' && opts.length === 2 && opts.every((b) => getComputedStyle(b).opacity === '1' && Math.round(b.getBoundingClientRect().width) === 24 && Math.round(b.getBoundingClientRect().height) === 24 && Math.abs(b.getBoundingClientRect().right - d.right) < 2 && b.querySelector('.bcv-look__optlbl').getBoundingClientRect().width === 0) && opts[1].getBoundingClientRect().top > opts[0].getBoundingClientRect().bottom && opts[0].getBoundingClientRect().top > d.bottom; }));
@@ -451,6 +451,12 @@ try {
   await page.waitForSelector('#bcv-app .bcv-error', { timeout: 10000 });
   const errShown = await page.$eval('#bcv-app .bcv-error', (e) => ({ code: e.dataset.code, words: e.textContent, after: getComputedStyle(e, '::after').content, font: getComputedStyle(e, '::after').fontFamily }));
   check(errShown.code === 'SC-C-404' && errShown.after === '"SC-C-404"' && !/SC-/.test(errShown.words) && /monospace|Menlo|SFMono/i.test(errShown.font), `an assignment Canvas says is not there: the error block carries SC-C-404 (a course's page, Canvas's 404), drawn after its words in a small tag: ${JSON.stringify(errShown)}`);
+  // (E10) never a dead end: the box is an alert, with Try Again and Open in Canvas under its words
+  const errWays = await page.$eval('#bcv-app .bcv-error', (e) => ({ role: e.getAttribute('role'), words: e.querySelector('.bcv-error__text')?.textContent || '', btns: [...e.querySelectorAll('.bcv-error__btn')].map((b) => b.textContent), href: e.querySelector('a.bcv-error__btn')?.getAttribute('href') || '' }));
+  check(errWays.role === 'alert' && /could not be loaded/.test(errWays.words) && errWays.btns.join(' | ') === 'Try Again | Open in Canvas' && errWays.href === '/courses/101/assignments/77777?bcv=native', `an error says itself to a screen reader and offers a way on — Try Again, and the address on Canvas's own page: ${JSON.stringify(errWays)}`);
+  await page.click('#bcv-app .bcv-error .bcv-error__btn');
+  await page.waitForFunction(() => document.querySelector('#bcv-app .bcv-error .bcv-error__btn')?.textContent === 'Try Again', null, { timeout: 10000 }).catch(() => {});
+  check((await page.$('#bcv-app .bcv-error[role="alert"] .bcv-error__btn')) !== null && page.url() === `${BASE}/courses/101/assignments/77777`, `Try Again asks again in place: still not there, the box is back with its buttons, the address unchanged: ${page.url()}`);
   await shot(page, '01f-error-code');
   const ru2 = await reportOpens();
   check(ru2.searchParams.get('c') === 'Error' && ru2.searchParams.get('codes') === 'SC-C-404' && ru2.searchParams.get('p') === '/courses/101/assignments/77777', `and the report it opens carries it: the kind Error, codes=SC-C-404, the page's path: ${ru2.search}`);
@@ -894,6 +900,9 @@ try {
   await page.waitForSelector('.bcv-day .bcv-row', { timeout: 10000 });
   const dayHeads = await texts('.bcv-day__head');
   check(dayHeads[0].startsWith('Today') && dayHeads[1].startsWith('Tomorrow'), `list view day groups: ${dayHeads.slice(0, 3).join(' | ')}`);
+  // (E14) a day within the week is named and dated ("Wednesday November 4"); past it the heading is the date itself,
+  // "Monday, Nov 9", never "Nov 9 November 9"
+  check(dayHeads.every((t) => /^(Today|Tomorrow|Yesterday|[A-Z][a-z]+day) [A-Z][a-z]+ \d{1,2}$/.test(t) || /^[A-Z][a-z]+day, [A-Z][a-z]{2} \d{1,2}(, \d{4})?$/.test(t)), `day headings: named and dated within the week, "Monday, Nov 9" past it: ${dayHeads.join(' | ')}`);
   const listRows = await texts('.bcv-day .bcv-row');
   check(listRows.some((t) => /Dis01.*10 pts.*Due 11:59 PM/.test(t)) && listRows.some((t) => /Quiz.*Qz01/.test(t)), 'list rows show course · kind, points and due time');
   check(listRows.some((t) => /to-do date/.test(t)), 'to-do-dated items are labelled, not shown as due');
@@ -923,7 +932,8 @@ try {
   // nothing is covered or dimmed: the interface stays live beside the panel, so pressing another
   // item we can read swaps what the panel shows rather than putting it away
   const wasTitle = await page.$eval('.bcv-pv__title', (e) => e.textContent);
-  const nextRow = (await page.$$(`.bcv-day a.bcv-row[href*="/assignments/"]:not([href="${assignHref}"])`))[0];
+  // (a row the card does not lie over: it floats beside the row pressed, over whatever is there)
+  const nextRow = (await page.evaluateHandle((href) => { const p = document.querySelector('.bcv-pv').getBoundingClientRect(); return [...document.querySelectorAll(`.bcv-day a.bcv-row[href*="/assignments/"]:not([href="${href}"])`)].find((r) => { const b = r.getBoundingClientRect(); const x = b.left + 220, y = b.top + 22; return b.height > 0 && y > 0 && y < innerHeight && !(x >= p.left && x <= p.right && y >= p.top && y <= p.bottom); }) || null; }, assignHref)).asElement();
   await nextRow.click({ position: { x: 220, y: 22 } });
   await page.waitForFunction((was) => document.querySelector('.bcv-pv__title')?.textContent !== was && !document.querySelector('.bcv-pv .bcv-skel'), wasTitle, { timeout: 10000 });
   const pvSwap = await page.$eval('.bcv-pv__kicker', (e) => e.textContent);
@@ -1635,7 +1645,7 @@ try {
   const apptCells = await texts('.bcv-appt__slot');
   const apptOpen = (await page.$$('.bcv-appt__slot:not(:disabled)')).length;
   check(apptTitle === 'Research Proposal Feedback Conferences (Online Option)' && apptMeta === 'Online (the Zoom link is in the course) · 15 min each · one time each'
-    && apptClass.join('|') === 'F26-MATH 021 20*' && apptDays.length === 2 && /^[A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2} · 6 times open · 11:15am – 12:30pm \[open\]$/.test(apptDays[0]) && /5 times open · 11:15am – 12:30pm$/.test(apptDays[1]) && !/\[open\]/.test(apptDays[1])
+    && apptClass.join('|') === 'F26-MATH 021 20*' && apptDays.length === 2 && /^[A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2} · 6 times open · 11:15 AM – 12:30 PM \[open\]$/.test(apptDays[0]) && /5 times open · 11:15 AM – 12:30 PM$/.test(apptDays[1]) && !/\[open\]/.test(apptDays[1])
     && apptHours.join('|') === '11 am|12 pm' && apptCells.join('|') === ':15|:30|:45|:00|:15|:30' && apptOpen === 6 && !(await page.$('.bcv-appt__mine')) && /A time you reserve goes on the calendar/.test((await texts('.bcv-appt .bcv-hint'))[0]),
   `the sheet: the class first, the group as a card with its place and length, its days as rows (how many times open, the span), the first open to its hours — a row an hour, a cell a time: ${JSON.stringify({ apptTitle, apptMeta, apptClass, apptDays, apptHours, apptCells, apptOpen })}`);
   await shot(page, '06b-calendar-appointments');
@@ -1649,7 +1659,7 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.bcv-appt__slot:not(:disabled)').length === 0, null, { timeout: 5000 });
   const mineText = (await texts('.bcv-appt__minetext'))[0];
   const heldRow = (await texts('.bcv-appt__dayrow.is-held .bcv-appt__daysub'))[0];
-  check(/^Your time: [A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2} at 11:15am$/.test(mineText) && (await texts('.bcv-appt__slot.is-mine')).join() === ':15' && (await page.$$('.bcv-appt__slot:disabled')).length === 12 && heldRow === 'Your time · 11:15am' && (await texts('.bcv-appt__cancel'))[0] === 'Cancel',
+  check(/^Your time: [A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2} at 11:15 AM$/.test(mineText) && (await texts('.bcv-appt__slot.is-mine')).join() === ':15' && (await page.$$('.bcv-appt__slot:disabled')).length === 12 && heldRow === 'Your time · 11:15 AM' && (await texts('.bcv-appt__cancel'))[0] === 'Cancel',
     `a press reserves the time: held at the top with Cancel, its cell filled, its day row saying so, every other cell waiting (one time each): "${mineText}" / "${heldRow}"`);
   await shot(page, '06c-calendar-appointment-held');
   await closeAppt();
@@ -1660,7 +1670,7 @@ try {
   await page.click('.bcv-ev:has-text("Research Proposal")');
   await page.waitForSelector('.bcv-evsheet', { timeout: 5000 });
   const apptSheet = await evSheet();
-  check(apptSheet.kicker === 'Appointment' && apptSheet.title === 'Research Proposal Feedback Conferences (Online Option)' && /^[A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2} · 11:15am – 11:30am$/.test(apptSheet.rows.When) && apptSheet.rows.Calendar === 'F26-MATH 021 20' && apptSheet.rows.Where === 'Online (the Zoom link is in the course)' && /Fifteen minutes to go over your research proposal/.test(apptSheet.rows.Details) && apptSheet.foot.join('|') === 'Un-reserve|Other times' && apptSheet.grid && /\/calendar$/.test(page.url()),
+  check(apptSheet.kicker === 'Appointment' && apptSheet.title === 'Research Proposal Feedback Conferences (Online Option)' && /^[A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2} · 11:15 AM – 11:30 AM$/.test(apptSheet.rows.When) && apptSheet.rows.Calendar === 'F26-MATH 021 20' && apptSheet.rows.Where === 'Online (the Zoom link is in the course)' && /Fifteen minutes to go over your research proposal/.test(apptSheet.rows.Details) && apptSheet.foot.join('|') === 'Un-reserve|Other times' && apptSheet.grid && /\/calendar$/.test(page.url()),
     `a press on the reservation opens its sheet — Appointment, the title, when, the calendar, the place, the details, Un-reserve and Other times — the month still behind it: ${JSON.stringify(apptSheet)}`);
   await shot(page, '06d-calendar-event-sheet');
   await page.keyboard.press('Escape');
@@ -1686,7 +1696,7 @@ try {
   await page.click('.bcv-ev:has-text("Lec05 lecture")');
   await page.waitForSelector('.bcv-evsheet', { timeout: 5000 });
   const lecSheet = await evSheet();
-  check(lecSheet.kicker === 'Event' && lecSheet.title === 'Lec05 lecture' && /· 10:30am – 11:45am$/.test(lecSheet.rows.When) && lecSheet.rows.Calendar === 'F26-MATH 021 20' && lecSheet.rows.Where === 'COB2 140 5200 N Lake Rd' && lecSheet.rows.Details === 'Composition of functions, section 1.4.' && lecSheet.bold && lecSheet.foot.length === 0,
+  check(lecSheet.kicker === 'Event' && lecSheet.title === 'Lec05 lecture' && /· 10:30 AM – 11:45 AM$/.test(lecSheet.rows.When) && lecSheet.rows.Calendar === 'F26-MATH 021 20' && lecSheet.rows.Where === 'COB2 140 5200 N Lake Rd' && lecSheet.rows.Details === 'Composition of functions, section 1.4.' && lecSheet.bold && lecSheet.foot.length === 0,
     `a lecture opens its sheet too — Event, when, the calendar, the room and its address, the details as rich text, nothing to un-reserve: ${JSON.stringify(lecSheet)}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-evsheet'), null, { timeout: 3000 });
@@ -1730,6 +1740,23 @@ try {
   check((!weekGeo.quiz || (weekGeo.quiz.top === 504 && weekGeo.quiz.h >= 20 && /^(Due )?10:30a/.test(weekGeo.quiz.t))) && weekGeo.now && weekGeo.nowShown && weekGeo.abs && /^[A-Z][a-z]+ \d{4}$|^[A-Z][a-z]{2} – [A-Z][a-z]{2} \d{4}$/.test(weekGeo.title) && /^[A-Z][a-z]{2} \d+ – [A-Z][a-z]{2} \d+ · \d+ items?/.test(weekGeo.sub),
     `week as a time grid: blocks placed by their time, the now line on today, the week named by its month: ${JSON.stringify(weekGeo)}`);
   await shot(page, '07-calendar-week');
+  // (E14) one clock: the hours down the grid's edge as every time is written — midnight "12 AM", never "0a"; noon "Noon"
+  const gutter = await texts('.bcv-week__hour');
+  check(gutter[0] === '12 AM' && gutter[8] === '8 AM' && gutter[12] === 'Noon' && gutter[13] === '1 PM' && gutter[23] === '11 PM' && !gutter.some((t) => /^\d+[ap]$/.test(t)), `the week's hours: 12 AM, … 8 AM, … Noon, 1 PM, … 11 PM (never "0a" or "8a"): ${gutter.slice(0, 3).join(', ')} … ${gutter.slice(11, 14).join(', ')}`);
+  // and the formatter itself, in the page: "11:59 PM" style everywhere, the compact "10:30a" only for a week's chips,
+  // a heading past the week "Monday, Nov 9" with no second date beside it
+  const clockSaid = await sw.evaluate(async (base) => {
+    const [tab] = await chrome.tabs.query({ url: `${base}/*` });
+    const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => {
+      const U = self.BCV.ui;
+      const at = (hh, mm) => new Date(2026, 10, 2, hh, mm);
+      const now = new Date(2026, 10, 1, 12);
+      return { midnight: U.fmtTime(at(0, 0)), late: U.fmtTime(at(23, 59)), chip: U.fmtTime(at(10, 30), { compact: true }), chipPm: U.fmtTime(at(23, 59), { compact: true }), at: U.fmtAt(at(23, 59)), by: U.fmtBy(at(10, 30)), hours: [0, 12, 13].map(U.fmtHour), far: U.dayTitle(new Date(2026, 10, 9), now), farNamed: U.dayNamed(new Date(2026, 10, 9), now), near: U.dayTitle(new Date(2026, 10, 4), now), nearNamed: U.dayNamed(new Date(2026, 10, 4), now), lower: typeof U.fmtTimeLower };
+    } });
+    return result;
+  }, BASE);
+  check(clockSaid.midnight === '12:00 AM' && clockSaid.late === '11:59 PM' && clockSaid.chip === '10:30a' && clockSaid.chipPm === '11:59p' && clockSaid.at === 'Nov 2 at 11:59 PM' && clockSaid.by === 'Nov 2 by 10:30 AM' && clockSaid.hours.join('|') === '12 AM|Noon|1 PM' && clockSaid.far === 'Monday, Nov 9' && clockSaid.farNamed && clockSaid.near === 'Wednesday' && !clockSaid.nearNamed && clockSaid.lower === 'undefined',
+    `one time formatter (ui.js fmtTime): "11:59 PM", midnight "12:00 AM", the compact "10:30a" for chips alone, a far day's heading "Monday, Nov 9": ${JSON.stringify(clockSaid)}`);
   await page.click('.bcv-seg__btn[data-value="agenda"]');
   await page.waitForSelector('.bcv-agenda', { timeout: 5000 });
   check((await texts('.bcv-h1'))[0].includes(' – '), `agenda title: ${(await texts('.bcv-h1'))[0]}`);
@@ -1749,6 +1776,8 @@ try {
   const agendaHeads = await texts('.bcv-agenda .bcv-group__head');
   check(agendaHeads[0].includes('Today ·') && /\d items?/.test(agendaHeads[0]), `agenda day heads: ${agendaHeads[0]}`);
   // a row says the course, then what the work is worth or where the event is
+  const agendaDue = await texts('.bcv-agenda .bcv-agenda__due');
+  check(agendaDue.length > 0 && agendaDue.every((t) => /^(Due|At|Plan) \d{1,2}:\d{2} [AP]M$|^All day$/.test(t)) && agendaDue.some((t) => t === 'Due 11:59 PM'), `the agenda writes its times as everywhere else ("Due 11:59 PM", "At 3:00 PM"), never "11:59pm": ${[...new Set(agendaDue)].slice(0, 4).join(' | ')}`);
   const agendaCourse = await texts('.bcv-agenda .bcv-agenda__course');
   check(agendaCourse.some((t) => /^F26-MATH 021 20 · 10 pts$/.test(t)) && agendaCourse.some((t) => /· COB2 140$/.test(t) || /· Online \(the Zoom link is in the course\)$/.test(t)), `agenda rows carry the points and the place: ${agendaCourse.slice(0, 4).join(' | ')}`);
   await shot(page, '08-calendar-agenda');
@@ -1864,7 +1893,7 @@ try {
   await page.click('.bcv-ev--ext:has-text("Shift at the library")');
   await page.waitForSelector('.bcv-evsheet', { timeout: 5000 });
   const extSheet = await page.evaluate(() => { const sh = document.querySelector('.bcv-evsheet'); return { kicker: sh.querySelector('.bcv-evsheet__kicker').textContent, rows: Object.fromEntries([...sh.querySelectorAll('.bcv-evsheet__row')].map((r) => [r.querySelector('.bcv-evsheet__k').textContent, r.querySelector('.bcv-evsheet__v').textContent.trim()])) }; });
-  check(extSheet.kicker === 'Your calendar' && extSheet.rows.Calendar === 'Sam\'s calendar' && extSheet.rows.Where === 'Kolligian Library' && /4:00pm – 8:00pm$/.test(extSheet.rows.When), `a press on one opens its sheet: ${JSON.stringify(extSheet)}`);
+  check(extSheet.kicker === 'Your calendar' && extSheet.rows.Calendar === 'Sam\'s calendar' && extSheet.rows.Where === 'Kolligian Library' && /4:00 PM – 8:00 PM$/.test(extSheet.rows.When), `a press on one opens its sheet: ${JSON.stringify(extSheet)}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-evsheet'), null, { timeout: 3000 });
   // (2.99.124) shown or hidden with Calendars, as an account's calendars are
@@ -2346,6 +2375,9 @@ try {
   const gt1 = await tourAt();
   check(gt1.steps === 'grade-ring,grade-details,grade-try,grade-field,grade-close' && gt1.pos === '1/5' && gt1.title === 'What makes a grade' && gt1.doing === 'Hover over a ring' && gt1.act === 'hover' && gt1.bg === 'rgba(0, 0, 0, 0)' && await ringHolds(gt1.ring, '.bcv-gpa__card .bcv-gpa__ringbox[title]'), `the first opening lights a card's ring on the page itself and asks for a hover: ${JSON.stringify(gt1)}`);
   await shot(page, '09c0-grades-tour-ring');
+  // (a shorter window for the next step: the page opens compact since the tracking ask folded into one card — E16 — and the
+  // cards' Details fit a 900px window; the step that says "scroll down" wants one below the window's foot)
+  await page.setViewportSize({ width: 1400, height: 700 });
   await page.hover('.bcv-gpa__card .bcv-gpa__ringbox[title]');
   check(await eventually(async () => !!(await page.$('.bcv-gpa__card.is-hover')), 3000), 'the hover opens the ring into its groups');
   await tourStep('grade-details');
@@ -2354,6 +2386,7 @@ try {
   await page.mouse.move(700, 500);
   await page.mouse.wheel(0, 360);
   check(await eventually(async () => { const t = await tourAt(); return t && !t.away && t.doing === 'Click Details' && await ringHolds(t.ring, '.bcv-gpa__card .bcv-gpa__details'); }, 4000), 'the wheel scrolls the page under the tour; Details comes into view, lit');
+  await page.setViewportSize({ width: 1400, height: 900 });
   await page.click('.bcv-gpa__card .bcv-gpa__details');
   await tourStep('grade-try');
   await page.click('.bcv-sheet-ov .bcv-whatif-btn');
@@ -2370,11 +2403,36 @@ try {
   await page.waitForSelector('.bcv-gpa__value', { timeout: 15000 });
   await page.waitForTimeout(600);
   check((await page.$('#bcv-tour')) === null, 'and it does not come back');
+  // (E34) Grades' own placeholder while it loads: the real header at once, and under it the page's shapes as they will stand
+  // (the GPA card, the stats and the tracking card beside it, the course cards) — the header stays put as the page lands
+  await mockConfig({ apiDelay: { assignment_groups: 1500 } });
+  await page.reload();
+  const rectOf = 'const r = (e) => { if (!e) return null; const b = e.getBoundingClientRect(); return { x: Math.round(b.left), y: Math.round(b.top), w: Math.round(b.width), h: Math.round(b.height) }; };';
+  const skelAt = await page.waitForFunction(new Function(`${rectOf} const s = document.querySelector('#bcv-main > .bcv-screen--skel'); const h1 = s && s.querySelector('.bcv-h1'); const hero = s && s.querySelector('.bcv-gpa__skhero'); if (!h1 || !hero) return null; return { text: h1.textContent, h1: r(h1), hero: r(hero), side: !!s.querySelector('.bcv-gpa__top > .bcv-gpa__side > .bcv-gpa__sktrack'), cards: s.querySelectorAll('.bcv-skel__card').length, generic: !!s.querySelector(':scope > .bcv-body > .bcv-skel--cards') };`), null, { timeout: 8000, polling: 50 }).then((hd) => hd.jsonValue()).catch(() => null);
+  await page.waitForSelector('#bcv-main > .bcv-screen--gpa:not(.bcv-screen--skel) .bcv-gpa__hero', { timeout: 15000 });
+  const landedH1 = await page.evaluate(new Function(`${rectOf} const s = document.querySelector('#bcv-main > .bcv-screen--gpa'); return { h1: r(s.querySelector('.bcv-h1')), still: s.classList.contains('bcv-screen--landed') };`));
+  await mockConfig({ apiDelay: null });
+  await page.waitForTimeout(400); // (the cards' own entrance done)
+  const landedHero = await page.evaluate(new Function(`${rectOf} return r(document.querySelector('#bcv-main .bcv-gpa__hero'));`));
+  check(!!skelAt && skelAt.text === 'Grades' && skelAt.side && skelAt.cards === 6 && !skelAt.generic && landedH1.still && skelAt.h1.x === landedH1.h1.x && Math.abs(skelAt.h1.y - landedH1.h1.y) <= 1
+    && Math.abs(skelAt.hero.x - landedHero.x) <= 1 && Math.abs(skelAt.hero.y - landedHero.y) <= 2 && Math.abs(skelAt.hero.w - landedHero.w) <= 2 && Math.abs(skelAt.hero.h - landedHero.h) <= 40,
+    `Grades loads behind its own placeholder: the header drawn at once (and still where it was as the page lands), the GPA card's shape where the card comes, the stats and tracking card beside it, six course cards: ${JSON.stringify({ skelAt, landedH1, landedHero })}`);
   await rolled(); // the GPA rolls up to its value on a fresh draw: read it once it has landed
   check(page.url() === `${BASE}/grades` && (await texts('.bcv-h1'))[0] === 'Grades' && (await texts('.bcv-head__sub'))[0] === 'Fall 2026 · 5 courses · 4 with grades so far', `grades panel header: ${(await texts('.bcv-head__sub'))[0]}`);
-  check(/^3\.4[23]$/.test((await texts('.bcv-gpa__value'))[0]) && (await page.$('.bcv-gpa__banner')) && /needs your past record/.test((await texts('.bcv-gpa__hero'))[0]) && /No history yet/.test((await texts('.bcv-gpa__trend'))[0]), 'term GPA is the plain 4.0 average of the four scored courses; cumulative and trend wait for setup');
+  // (E16) tracking off: one ask to turn it on — a slim Trend and momentum card beside the GPA card — and no banner, no line in
+  // the GPA card, no empty trend chart, no empty Momentum asking the same
+  const trackAsk = await page.evaluate(() => {
+    const words = document.querySelector('.bcv-screen--gpa .bcv-body')?.innerText || '';
+    const card = document.querySelector('.bcv-gpa__top > .bcv-gpa__side > .bcv-gpa__track');
+    const hero = document.querySelector('.bcv-gpa__hero')?.getBoundingClientRect(), r = card?.getBoundingClientRect();
+    return { asks: (words.match(/turn (on )?tracking|turn it on|Turn on tracking/gi) || []).length, buttons: [...document.querySelectorAll('.bcv-screen--gpa button')].filter((b) => /tracking/i.test(b.textContent)).length, card: !!card, h: r ? Math.round(r.height) : null, beside: !!(hero && r && r.left >= hero.right - 1), banner: !!document.querySelector('.bcv-gpa__banner'), trend: !!document.querySelector('.bcv-gpa__trend'), momentum: /Momentum/.test(words), heroAsk: /tracking/i.test(document.querySelector('.bcv-gpa__hero')?.innerText || '') };
+  });
+  check(/^3\.4[23]$/.test((await texts('.bcv-gpa__value'))[0]) && trackAsk.card && trackAsk.buttons === 1 && trackAsk.asks === 1 && trackAsk.h <= 160 && trackAsk.beside && !trackAsk.banner && !trackAsk.trend && !trackAsk.momentum && !trackAsk.heroAsk, `term GPA is the plain 4.0 average of the four scored courses; tracking off, the trend and Momentum fold into one slim card beside the GPA card, the page's one ask to turn tracking on: ${JSON.stringify(trackAsk)}`);
+  // (E15) no goal set: the card asks for one in neutral words — never "below your goal" against a 4.00 nobody chose
+  const goalAsk = await page.evaluate(() => { const g = document.querySelector('.bcv-gpa__hero .bcv-gpa__goal'); return { tag: g?.tagName, set: g?.classList.contains('bcv-gpa__goal--set'), words: g?.innerText.replace(/\s+/g, ' ').trim(), below: /(below|above) your goal/.test(document.querySelector('.bcv-gpa__hero')?.innerText || '') }; });
+  check(goalAsk.tag === 'BUTTON' && goalAsk.set && /^Set a goal\b/.test(goalAsk.words) && !goalAsk.below, `no goal set: the GPA card says "Set a goal" (a button into the settings), nothing above or below: ${JSON.stringify(goalAsk)}`);
   const gpaStats = await texts('.bcv-gpa__stat');
-  check(gpaStats.length === 3 && /^Momentum.*Turn on tracking to compare snapshots$/i.test(gpaStats[0]) && /On-time submissions \d+% \d+ of \d+ submitted before the due time/i.test(gpaStats[1]) && (await page.$$('.bcv-gpa__chip')).length === 4 && /Highest .* at \d+% · lowest .* at \d+%/.test(gpaStats[2]), `stats: ${gpaStats.join(' | ')}`);
+  check(gpaStats.length === 2 && /On-time submissions \d+% \d+ of \d+ submitted before the due time/i.test(gpaStats[0]) && (await page.$$('.bcv-gpa__chip')).length === 4 && /Highest .* at \d+% · lowest .* at \d+%/.test(gpaStats[1]), `stats beside the GPA card (Momentum waits on tracking): ${gpaStats.join(' | ')}`);
   const gpaCards = await texts('.bcv-gpa__card');
   check(gpaCards.length === 5 && /^A− F26-MATH 021 20 MATH-021-20 92\.4% 3\.7 GPA Needs \d+% of the remaining 517 pts 93 pts earned so far Target A− Details$/.test(gpaCards[0]) && gpaCards.filter((t) => /^N\/A .*N\/A no GPA The teacher hides the total — no score to project from Canvas sends no score while the total is hidden.*No grade yet Details$/.test(t)).length === 1, `course cards (grade points said as GPA; a hidden total says why there is no score): ${gpaCards[0]} || ${gpaCards[4]}`);
   // a course saved as pass/fail (the setup's switch, P/F in place of a letter): its card says so, its score still shows, and the GPA leaves it out
@@ -2497,7 +2555,7 @@ try {
   await page.click('.bcv-gpa__traychip');
   await waitText('.bcv-gpa__value', /^3\.4[23]$/);
   check(!(await page.$('.bcv-gpa__tray')) && (await page.$$('.bcv-gpa__card')).length === 5, 'Show returns it to the overview and the GPA');
-  await page.click('.bcv-gpa__banner .bcv-btn');
+  await page.click('.bcv-gpa__track .bcv-btn');
   await page.waitForSelector('.bcv-gpa-set', { timeout: 5000 });
   // Upload CSV on the sheet itself (the Mac app's window has no Grades section): the file fills the two
   // fields in and says what it read; numbers typed over them are the record instead
@@ -2518,7 +2576,7 @@ try {
   await page.click('.bcv-gpa-set__ctl .bcv-gpa-set__step:first-child');
   check((await texts('.bcv-gpa-set__val'))[0] === '3.95', 'goal steps by 0.05 in the settings sheet');
   await page.click('.bcv-gpa-set__foot .bcv-btn');
-  await page.waitForFunction(() => !document.querySelector('.bcv-gpa__banner'), null, { timeout: 5000 });
+  await page.waitForFunction(() => !document.querySelector('.bcv-gpa__track') && !!document.querySelector('.bcv-gpa__trend'), null, { timeout: 5000 });
   const hero = (await texts('.bcv-gpa__hero'))[0];
   check(/Cumulative 3\.4[23]/.test(hero) && /3\.42 across 8 courses before this term/.test(hero) && /Goal 3\.95/.test(hero) && /One snapshot so far/.test((await texts('.bcv-gpa__trend'))[0]) && (await texts('.bcv-gpa__stat'))[0].includes('Needs a second snapshot'), `tracking on: ${hero.slice(0, 120)}`);
   // prefs live in chrome.storage.local under `prefs:<canvas host>`; the first snapshot lands the day tracking starts
@@ -2593,8 +2651,8 @@ try {
   await shot(page, '09e-grades-panel-tracking');
   page.once('dialog', (d) => d.accept());
   await page.click('.bcv-gpa__linkbtn');
-  await page.waitForSelector('.bcv-gpa__banner', { timeout: 5000 });
-  check(await eventually(async () => { const p = await readPrefs(); return p?.gpaTracking === null && Array.isArray(p?.gpaSnapshots) && p.gpaSnapshots.length === 0 && p.gpaGoal === 3.95; }) && /needs your past record/.test((await texts('.bcv-gpa__hero'))[0]), 'Reset setup forgets the prior record and snapshots but keeps the goal');
+  await page.waitForSelector('.bcv-gpa__track', { timeout: 5000 });
+  check(await eventually(async () => { const p = await readPrefs(); return p?.gpaTracking === null && Array.isArray(p?.gpaSnapshots) && p.gpaSnapshots.length === 0 && p.gpaGoal === 3.95; }) && !/Cumulative/.test((await texts('.bcv-gpa__hero'))[0]) && /Goal 3\.95/.test((await texts('.bcv-gpa__hero'))[0]), 'Reset setup forgets the prior record and snapshots but keeps the goal');
   } // grades panel
   if (on('submission')) {
 
@@ -2690,7 +2748,7 @@ try {
   })));
   check(subCards.length === 2 && subCards[0].n === 'Attempt 2' && subCards[0].latest && subCards[1].n === 'Attempt 1' && !subCards[1].latest, `one card per attempt, latest first: ${subCards.map((x) => `${x.n}${x.latest ? '*' : ''}`).join(' | ')}`);
   // the mock dates everything from today, so the expected strings come from its own answer, formatted the way the app formats a time
-  const fmtAtLike = (iso) => { const d = new Date(iso); const h = d.getHours() % 12 || 12; return `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()]} ${d.getDate()} at ${h}:${String(d.getMinutes()).padStart(2, '0')}${d.getHours() < 12 ? 'am' : 'pm'}`; };
+  const fmtAtLike = (iso) => { const d = new Date(iso); const h = d.getHours() % 12 || 12; return `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()]} ${d.getDate()} at ${h}:${String(d.getMinutes()).padStart(2, '0')}${d.getHours() < 12 ? ' AM' : ' PM'}`; }; // (ui.js fmtAt: the one clock, "Oct 25 at 3:52 PM")
   const sub4001 = await readSub('104', '4001');
   const latestHist = sub4001.submission_history.find((x) => Number(x.attempt) === 2);
   check(subCards[0].score === '10 / 10' && subCards[0].facts === `Submitted=${fmtAtLike(latestHist.submitted_at)} | Type=File upload | Graded=${fmtAtLike(sub4001.graded_at)}`, `the latest attempt's own facts, from Canvas's own dates: ${subCards[0].facts}`);
@@ -3095,12 +3153,12 @@ try {
   const facts4002 = await texts('.bcv-asg__fact');
   const facts4002b = (await texts('.bcv-asg__facts .bcv-asg__fact')).map((f) => f.replace(/\s+/g, ' '));
   check(/^DUE [A-Z][a-z]{2} \d+ at \d+:\d\d [AP]M$/.test(facts4002b[0]) && facts4002b.includes('HANDED IN AS Text, file or link') && facts4002b.includes('ATTEMPTS Unlimited attempts') && /^AVAILABLE Opens .* · Closes /.test(facts4002b.find((f) => f.startsWith('AVAILABLE')) || '') && (await texts('.bcv-asg__drophint'))[0] === 'Or drop files on this page.', `the facts say when it opens and closes and how it is handed in, and files may be dropped on the page: ${facts4002b.join(' | ')}`);
-  const pillAt = await page.$eval('.bcv-asg__pill', (e) => { const r = e.getBoundingClientRect(); return { cx: Math.round(r.left + r.width / 2), cy: Math.round(r.top + r.height / 2) }; });
+  const pillAt = await page.$eval('.bcv-asg__pill', (e) => { const r = e.getBoundingClientRect(); return { cx: Math.round(r.left + r.width / 2), cy: Math.round(r.top + r.height / 2), top: Math.round(r.top) }; });
   await page.click('.bcv-asg__pill');
   await page.waitForSelector('.bcv-sheet-ov--card .bcv-hand #bcv-submit .bcv-sb__pane input[type=file]', { state: 'attached', timeout: 10000 });
   await page.waitForTimeout(600);
-  const pop = await page.evaluate(() => { const b = document.querySelector('.bcv-sheet-ov--card .bcv-hand'), r = b.getBoundingClientRect(), k = document.querySelector('.bcv-asg__card').getBoundingClientRect(); return { inCard: r.left >= k.left + 15 && r.right <= k.right - 15, cy: Math.round(r.top + r.height / 2), w: Math.round(r.width), src: getComputedStyle(document.querySelector('.bcv-asg__pill')).opacity, tabs: [...b.querySelectorAll('.bcv-sb__tab')].map((t) => t.textContent).join(' | '), close: !!b.querySelector('.bcv-sb__poptop .bcv-sb__close'), foot: b.querySelector('.bcv-sb__footnote')?.textContent, off: b.querySelector('.bcv-sb__go')?.disabled, bubble: !!b.querySelector('.bcv-sb__bubble'), comment: !!b.querySelector('.bcv-sb__comment'), expanded: document.querySelector('.bcv-asg__pill').getAttribute('aria-expanded'), url: location.href }; });
-  check(pop.inCard && Math.abs(pop.cy - pillAt.cy) <= 1 && pop.src === '0' && pop.w === 380 && pop.tabs === 'File upload | Text entry | Other' && pop.close && pop.foot === 'Attempt 1 · attach a file' && pop.off && pop.bubble && !pop.comment && pop.expanded === 'true' && pop.url === `${BASE}/courses/104/assignments/4002` && (await visible('#bcv-side')), `Submit assignment grows into the panel out of its own middle, kept over the page's card, the button itself stepping out while it is up — tabs and × on a row, Submit off until there is something to send, the comment behind its bubble — the page staying put: ${JSON.stringify(pop)}`);
+  const pop = await page.evaluate(() => { const b = document.querySelector('.bcv-sheet-ov--card .bcv-hand'), r = b.getBoundingClientRect(), k = document.querySelector('.bcv-asg__card').getBoundingClientRect(); const hits = (sel) => { const e = document.querySelector(sel)?.getBoundingClientRect(); return !!e && e.left < r.right && e.right > r.left && e.top < r.bottom && e.bottom > r.top; }; return { inCard: r.left >= k.left + 15 && r.right <= k.right - 15, top: Math.round(r.top), beside: Math.round(document.querySelector('.bcv-asg__rail').getBoundingClientRect().left - r.right), overTitle: hits('.bcv-asg__head'), overDue: hits('.bcv-asg__rail .bcv-asg__fact'), w: Math.round(r.width), src: getComputedStyle(document.querySelector('.bcv-asg__pill')).opacity, tabs: [...b.querySelectorAll('.bcv-sb__tab')].map((t) => t.textContent).join(' | '), close: !!b.querySelector('.bcv-sb__poptop .bcv-sb__close'), foot: b.querySelector('.bcv-sb__footnote')?.textContent, off: b.querySelector('.bcv-sb__go')?.disabled, bubble: !!b.querySelector('.bcv-sb__bubble'), comment: !!b.querySelector('.bcv-sb__comment'), expanded: document.querySelector('.bcv-asg__pill').getAttribute('aria-expanded'), url: location.href }; });
+  check(pop.inCard && Math.abs(pop.top - pillAt.top) <= 1 && pop.beside === 16 && !pop.overTitle && !pop.overDue && pop.src === '0' && pop.w === 380 && pop.tabs === 'File upload | Text entry | Other' && pop.close && pop.foot === 'Attempt 1 · attach a file' && pop.off && pop.bubble && !pop.comment && pop.expanded === 'true' && pop.url === `${BASE}/courses/104/assignments/4002` && (await visible('#bcv-side')), `Submit assignment grows into the panel beside the rail, level with the button (E7: the title and the due date never covered), kept over the page's card, the button itself stepping out while it is up — tabs and × on a row, Submit off until there is something to send, the comment behind its bubble — the page staying put: ${JSON.stringify(pop)}`);
   // (2.99.73) a box grown out of the page — the hand-in panel — leaves the pinned tools in the bar: never in its head, where
   // they sat over its tabs
   const handTray = await page.evaluate(() => { const t = document.getElementById('bcv-tray')?.getBoundingClientRect(), b = document.querySelector('.bcv-sheet-ov--card .bcv-hand').getBoundingClientRect(); return { pop: document.documentElement.classList.contains('bcv-tray-pop'), over: !!t && t.width > 0 && t.left < b.right && t.right > b.left && t.top < b.bottom && t.bottom > b.top }; });
@@ -3512,7 +3570,7 @@ try {
   const aEnter = await page.$$eval('.bcv-body .bcv-card--list .bcv-row', (els) => els.map((e) => [e.classList.contains('bcv-enter'), e.style.getPropertyValue('--bcv-delay'), e.style.getPropertyValue('--bcv-dur')]));
   check(aEnter.length >= 6 && aEnter.every(([on, , dur], i) => on && dur === '200ms' && aEnter[i][1] === `${Math.min(i * 20, 420)}ms`), `assignment rows fade in one at a time, 20ms apart: ${aEnter.slice(0, 4).map((a) => a[1]).join(',')}…`);
   const arows = await texts('.bcv-body .bcv-row');
-  check(arows.some((t) => /Qz01.*Quiz · 10 pts · Due .* at 11:59pm.*Not submitted/.test(t)) && arows.some((t) => /Lec05-PreQuiz.*19\/19 pts.*Graded/.test(t)) && !arows.some((t) => /–\//.test(t)), 'assignment rows, as the Mac reads them: the kind, what it is worth (no dash standing in for a score), when it is due, the status badge');
+  check(arows.some((t) => /Qz01.*Quiz · 10 pts · Due .* at 11:59 PM.*Not submitted/.test(t)) && arows.some((t) => /Lec05-PreQuiz.*19\/19 pts.*Graded/.test(t)) && !arows.some((t) => /–\//.test(t)), 'assignment rows, as the Mac reads them: the kind, what it is worth (no dash standing in for a score), when it is due, the status badge');
   await shot(page, '13-course-assignments');
   await page.click('.bcv-seg__btn[data-value="type"]');
   await page.waitForFunction(() => [...document.querySelectorAll('.bcv-group__head')].some((e) => /Discussion Quizzes/.test(e.textContent)), null, { timeout: 5000 });
@@ -3610,7 +3668,7 @@ try {
   check((await page.$$('.bcv-wbar__seg')).length === 3 && (await page.$$('.bcv-wbar__seg--ungraded')).length === 2 && wbar.join(' | ') === 'Discussion Quizzes 18% of grade 100% | Midterms 57% of grade ungraded | Final 25% of grade ungraded' && (await texts('.bcv-gr__hsub'))[0] === '100% of final grade', `weight bar: ${wbar.join(' | ')}`);
   check((await texts('.bcv-gr__wnote'))[0] === 'Effort, Collaboration and Coursework (Knewton Alta) carry 0% weight — they show as rings but never move the total.', `0%-weight note: ${(await texts('.bcv-gr__wnote'))[0]}`);
   const gradeRows = await texts('.bcv-grades__main .bcv-row');
-  check(gradeRows.length === 18 && gradeRows.some((t) => /^Lec01-PreQuiz.*due .* by 10:30am · submitted .*13 \/ 16/.test(t)) && !gradeRows.some((t) => /^Lec01-PreQuiz.*Effort · due/.test(t)), `grade rows (the group no longer said in each): ${gradeRows.find((t) => /Lec01-PreQuiz/.test(t))}`);
+  check(gradeRows.length === 18 && gradeRows.some((t) => /^Lec01-PreQuiz.*due .* by 10:30 AM · submitted .*13 \/ 16/.test(t)) && !gradeRows.some((t) => /^Lec01-PreQuiz.*Effort · due/.test(t)), `grade rows (the group no longer said in each): ${gradeRows.find((t) => /Lec01-PreQuiz/.test(t))}`);
   // (2.99.36) the work partitioned by group: a head per group with work, in Canvas's order, each over its own card of rows
   const gheads = await texts('.bcv-gr__ghead .bcv-gr__gname');
   const gsecRows = await page.$$eval('.bcv-gr__gsec', (els) => els.map((e) => e.querySelectorAll('.bcv-row').length));
@@ -4102,7 +4160,7 @@ try {
   await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
   const qlabels = await texts('.bcv-body .bcv-label');
   check(qlabels.join(',').toLowerCase() === 'assignment quizzes,practice quizzes', `quiz groups: ${qlabels.join(', ')}`);
-  check((await texts('.bcv-body .bcv-row')).some((t) => /Lec06-PreQuiz Due .* at 10:30am · 17 pts · 4 questions/.test(t)), 'quiz rows');
+  check((await texts('.bcv-body .bcv-row')).some((t) => /Lec06-PreQuiz Due .* at 10:30 AM · 17 pts · 4 questions/.test(t)), 'quiz rows');
   await shot(page, '21-course-quizzes');
   await page.click('.bcv-body .bcv-row');
   await page.waitForSelector('.bcv-qzi', { timeout: 10000 });
@@ -5109,9 +5167,11 @@ try {
   // (2.98.70) the box sits in the top bar — the widgets' bar — at its left, on every screen; the Dashboard's header has none of its own
   const barBox = () => page.evaluate(() => { const host = document.getElementById('bcv-topsearch'); const box = document.getElementById('bcv-omni-box'); const s = box.getBoundingClientRect(); const bar = document.getElementById('bcv-bar').getBoundingClientRect(); const hit = document.elementFromPoint((s.left + s.right) / 2, (s.top + s.bottom) / 2); return { inBar: !!host && host.contains(box), left: Math.round(s.left - bar.left), right: Math.round(innerWidth - s.right), mid: Math.round((s.top + s.bottom) / 2 - (bar.top + bar.bottom) / 2), h: Math.round(s.height), w: Math.round(s.width), headBox: !!document.querySelector('.bcv-head #bcv-omni-box'), hit: !!hit && box.contains(hit), placeholder: document.getElementById('bcv-omni').placeholder, pills: getComputedStyle(document.getElementById('bcv-omni-root')).backgroundColor === 'rgba(0, 0, 0, 0)', key: document.querySelector('.bcv-omni__key')?.textContent, panelHidden: document.getElementById('bcv-omni-panel').hidden }; });
   const inTheBar = (b) => b.inBar && Math.abs(b.right - 12) <= 1 /* (2.99.53: at the bar's right end, as the Mac's search field) */ && Math.abs(b.mid) <= 1 && b.h === 29 && b.w >= 170 && !b.headBox && b.hit && b.panelHidden;
-  const sBox = await page.evaluate(() => { const row = document.querySelector('.bcv-head__in'); const s = row.querySelector('#bcv-omni-box').getBoundingClientRect(); const h1 = row.querySelector('.bcv-h1').getBoundingClientRect(); const seg = row.querySelector('.bcv-seg').getBoundingClientRect(); return { placeholder: document.getElementById('bcv-omni').placeholder, between: s.left > h1.right && (s.bottom <= seg.top + 1 || s.right <= seg.left + 1 || s.top >= seg.bottom - 1), level: Math.abs(s.height - seg.height) <= 1, pills: getComputedStyle(document.getElementById('bcv-omni-root')).backgroundColor === 'rgba(0, 0, 0, 0)', key: document.querySelector('.bcv-omni__key')?.textContent, panelHidden: document.getElementById('bcv-omni-panel').hidden }; });
-  check(sBox.placeholder === 'Search or type /' && sBox.between && sBox.level && sBox.pills && sBox.key === '/' && sBox.panelHidden, `the Dashboard's header carries a search box right of the greeting, above the view switcher's row (2.99.41) — one pill, the switcher's height — its panel closed (2.98.71: on the Dashboard the box is the header's, as it always was): ${JSON.stringify(sBox)}`);
-  check(await page.evaluate(() => !!document.getElementById('bcv-topsearch')?.hidden && !document.querySelector('#bcv-topsearch #bcv-omni-box')), 'and the top bar shows no box of its own on the Dashboard');
+  // (E33) the Dashboard's too: the box stands in the bar there as on every screen, ⋯ beside it, the header holding none
+  const sBox = await barBox();
+  check(inTheBar(sBox) && sBox.placeholder === 'Search or type /' && sBox.pills && sBox.key === '/', `on the Dashboard the box is the top bar's, at its right end as on every other screen (E33: it no longer moves into the header) — its panel closed: ${JSON.stringify(sBox)}`);
+  const lookAt = () => page.evaluate(() => { const l = document.getElementById('bcv-look')?.getBoundingClientRect(); return l && l.width ? Math.round(innerWidth - l.right) : null; });
+  const lookDash = await lookAt();
   // the input draws nothing of its own: Canvas styles input[type=search] as a white field with a border, a shadow on focus
   const bare = () => page.evaluate(() => { const c = getComputedStyle(document.getElementById('bcv-omni')); const box = document.getElementById('bcv-omni-box').getBoundingClientRect(); return { bg: c.backgroundColor, border: c.borderTopWidth, shadow: c.boxShadow, outline: c.outlineStyle, pad: c.paddingLeft, inside: document.getElementById('bcv-omni').getBoundingClientRect().height <= box.height - 1 }; });
   const bareOff = await bare();
@@ -5122,7 +5182,7 @@ try {
   check([bareOff, bareOn].every((b) => b.bg === 'rgba(0, 0, 0, 0)' && b.border === '0px' && b.shadow === 'none' && b.outline === 'none' && b.pad === '0px' && b.inside), `the input draws no field of its own inside the pill, focused or not, whatever Canvas says of search inputs: ${JSON.stringify({ bareOff, bareOn })}`);
   // (2.98.54) the box afloat: with the cursor in it, it lifts out of the header to the middle of the window as a large pill over a
   // dim and a blur, the four kinds to search in under it, a ghost keeping the header's row; a kind narrows it; Escape puts it back
-  const afloat = await page.evaluate(() => { const pal = document.querySelector('.bcv-spot'); const ov = document.querySelector('.bcv-spot-ov'); const box = document.getElementById('bcv-omni-box'); const b = box.getBoundingClientRect(); const ghost = document.querySelector('.bcv-head__row .bcv-omni--ghost'); return { pal: !!pal, inPal: !!pal && pal.contains(box), ov: !!ov, ovPointer: ov ? getComputedStyle(ov).pointerEvents : null, ovBlur: ov ? (getComputedStyle(ov).backdropFilter || getComputedStyle(ov).webkitBackdropFilter || '') : null, pageFilter: [...document.querySelectorAll('#bcv-app > #bcv-main, #bcv-app > #bcv-side, body > #bcv-bar')].map((e) => getComputedStyle(e).filter).filter((f) => f !== 'none').join(','), noblur: document.documentElement.classList.contains('bcv-noblur'), centred: Math.abs((b.left + b.right) / 2 - innerWidth / 2) <= 2, top: Math.round(b.top), w: Math.round(b.width), hgt: Math.round(b.height), font: getComputedStyle(document.getElementById('bcv-omni')).fontSize, ghost: !!ghost, ghostH: ghost ? Math.round(ghost.getBoundingClientRect().height) : 0, rows: [...document.querySelectorAll('.bcv-omni__panel .bcv-omni__item')].map((e) => `${e.querySelector('.bcv-omni__t').textContent}:${e.querySelector('.bcv-omni__cmdkey')?.textContent}`).join(','), title: document.querySelector('.bcv-omni__gtitle')?.textContent, panelInPal: !!pal && pal.contains(document.getElementById('bcv-omni-panel')), cur: document.querySelector('.bcv-omni__item.is-cur .bcv-omni__t')?.textContent }; });
+  const afloat = await page.evaluate(() => { const pal = document.querySelector('.bcv-spot'); const ov = document.querySelector('.bcv-spot-ov'); const box = document.getElementById('bcv-omni-box'); const b = box.getBoundingClientRect(); const ghost = document.querySelector('#bcv-topsearch .bcv-omni--ghost'); return { pal: !!pal, inPal: !!pal && pal.contains(box), ov: !!ov, ovPointer: ov ? getComputedStyle(ov).pointerEvents : null, ovBlur: ov ? (getComputedStyle(ov).backdropFilter || getComputedStyle(ov).webkitBackdropFilter || '') : null, pageFilter: [...document.querySelectorAll('#bcv-app > #bcv-main, #bcv-app > #bcv-side, body > #bcv-bar')].map((e) => getComputedStyle(e).filter).filter((f) => f !== 'none').join(','), noblur: document.documentElement.classList.contains('bcv-noblur'), centred: Math.abs((b.left + b.right) / 2 - innerWidth / 2) <= 2, top: Math.round(b.top), w: Math.round(b.width), hgt: Math.round(b.height), font: getComputedStyle(document.getElementById('bcv-omni')).fontSize, ghost: !!ghost, ghostH: ghost ? Math.round(ghost.getBoundingClientRect().height) : 0, rows: [...document.querySelectorAll('.bcv-omni__panel .bcv-omni__item')].map((e) => `${e.querySelector('.bcv-omni__t').textContent}:${e.querySelector('.bcv-omni__cmdkey')?.textContent}`).join(','), title: document.querySelector('.bcv-omni__gtitle')?.textContent, panelInPal: !!pal && pal.contains(document.getElementById('bcv-omni-panel')), cur: document.querySelector('.bcv-omni__item.is-cur .bcv-omni__t')?.textContent }; });
   check(afloat.pal && afloat.inPal && afloat.ov && afloat.ovPointer === 'none' && (!afloat.ovBlur || afloat.ovBlur === 'none') && !afloat.pageFilter && afloat.centred && afloat.top === 160 && afloat.w === 580 && afloat.hgt >= 72 && afloat.hgt <= 74 && afloat.font === '26px' && afloat.ghost && afloat.ghostH === 29 && afloat.title === 'Search in' && afloat.rows === 'Courses:⌘1,Work:⌘2,Files:⌘3,Actions:⌘4' && afloat.panelInPal && afloat.cur === 'Courses', `the box floats to the middle of the window as a 580×72 pill (2.99.84: narrower, as Spotlight's) (26px words) over a light veil that takes no pointer and blurs nothing (2.98.69: the page stays sharp), a ghost holding its place in the header, the four kinds under it with ⌘1–⌘4: ${JSON.stringify(afloat)}`);
   // (2.98.68) Spotlight's glass, whatever the page's look: a smoky pill, the panel a slab of its own under it with the page
   // blurred soft through it, white words, a plain white line drawing for each row's mark, the ⌘ keys large and quiet
@@ -5208,9 +5268,9 @@ try {
   await page.focus('#bcv-omni');
   await page.waitForFunction(() => document.querySelector('.bcv-omni__gtitle')?.textContent === 'Search in', null, { timeout: 8000 });
   await page.keyboard.press('Escape');
-  check(await eventually(() => page.evaluate(() => !document.querySelector('.bcv-spot') && !document.querySelector('.bcv-spot-ov') && !document.querySelector('.bcv-omni--ghost') && document.querySelector('.bcv-head__row').contains(document.getElementById('bcv-omni-box')) && document.activeElement?.id !== 'bcv-omni'), 3000), 'Escape on the empty box puts it back in the header, the veil and the ghost gone');
-  const homeAgain = await page.evaluate(() => { const row = document.querySelector('.bcv-head__in'); const s = row.querySelector('#bcv-omni-box').getBoundingClientRect(); const h1 = row.querySelector('.bcv-h1').getBoundingClientRect(); const seg = row.querySelector('.bcv-seg').getBoundingClientRect(); return { between: s.left > h1.right && (s.bottom <= seg.top + 1 || s.right <= seg.left + 1 || s.top >= seg.bottom - 1), level: Math.abs(s.height - seg.height) <= 1, h: Math.round(s.height), panelHidden: document.getElementById('bcv-omni-panel').hidden }; });
-  check(homeAgain.between && homeAgain.level && homeAgain.h === 29 && homeAgain.panelHidden, `home, it is the header's pill again, between the title and the switcher: ${JSON.stringify(homeAgain)}`);
+  check(await eventually(() => page.evaluate(() => !document.querySelector('.bcv-spot') && !document.querySelector('.bcv-spot-ov') && !document.querySelector('.bcv-omni--ghost') && document.getElementById('bcv-topsearch').contains(document.getElementById('bcv-omni-box')) && document.activeElement?.id !== 'bcv-omni'), 3000), 'Escape on the empty box puts it back in the bar, the veil and the ghost gone');
+  const homeAgain = await barBox();
+  check(inTheBar(homeAgain), `home, it is the top bar's pill again, where it stands on every screen (E33): ${JSON.stringify(homeAgain)}`);
   // on any other screen it is there too, and "/" lifts it where it is — the page stays
   await page.goto(`${BASE}/courses/101`);
   await page.waitForSelector('#bcv-topsearch #bcv-omni', { timeout: 10000 });
@@ -5220,10 +5280,12 @@ try {
   await page.keyboard.press('/');
   await page.waitForFunction(() => document.querySelector('.bcv-spot:not(.is-far)') && document.querySelector('.bcv-omni__gtitle')?.textContent === 'Search in', null, { timeout: 5000 });
   check(inTheBar(elsewhere) && new URL(page.url()).pathname === '/courses/101' && (await page.evaluate(() => document.activeElement?.id)) === 'bcv-omni', `on a course's page the box is in the top bar too, and "/" lifts it there without leaving the page: ${JSON.stringify(elsewhere)}`);
+  const lookCourse = await lookAt();
+  check(lookDash !== null && lookDash === lookCourse, `(E33) ⋯ stands in one place on every screen, the box beside it: ${lookDash}px from the right on the Dashboard, ${lookCourse}px on a course`);
   await page.keyboard.press('Escape');
   await eventually(() => page.evaluate(() => !document.querySelector('.bcv-spot')), 3000);
   await page.goto(`${BASE}/`);
-  await page.waitForSelector('.bcv-head__row #bcv-omni', { timeout: 10000 });
+  await page.waitForSelector('#bcv-topsearch #bcv-omni', { timeout: 10000 });
   await page.focus('#bcv-omni'); // (the fold took the cursor: back in, afloat again, for the searches below)
   await page.waitForTimeout(600);
   await page.keyboard.type('dis01');
@@ -5280,7 +5342,7 @@ try {
   await page.click('.bcv-h1'); // (the cursor out of the box: a press on the title, above the pill afloat)
   await page.waitForFunction(() => !document.querySelector('.bcv-spot'), null, { timeout: 5000 }).catch(() => {});
   const wikiHidden = await wikiRead();
-  check(!wikiHidden.shown && wikiHidden.key !== 'none', `with the cursor out of the box there is no switch, only the "/" hint: ${JSON.stringify(wikiHidden)}`);
+  check(!wikiHidden.shown && (wikiHidden.key !== 'none' || (await page.$eval('#bcv-omni', (e) => e.placeholder)) === 'Search or type /'), `with the cursor out of the box there is no switch, only the "/" hint (in the bar, the placeholder's words — E33: the Dashboard's box is the bar's): ${JSON.stringify(wikiHidden)}`);
   await page.click('#bcv-omni');
   const wikiShown = await wikiRead();
   check(wikiShown.shown && wikiShown.inside && wikiShown.role === 'switch' && wikiShown.checked === 'true' && wikiShown.label === 'Wikipedia' && wikiShown.key === 'none', `pressing the box brings a real switch, labelled Wikipedia, inside the box at its right in the hint's place, on: ${JSON.stringify(wikiShown)}`);
@@ -6213,11 +6275,12 @@ try {
   await page.waitForSelector('.bcv-gpa__card', { timeout: 10000 });
   const gpaStagger = await page.evaluate(() => ({
     top: [...document.querySelectorAll('.bcv-gpa__top > .bcv-enter')].map((e) => e.style.getPropertyValue('--bcv-delay')),
+    side: [...document.querySelectorAll('.bcv-gpa__top > .bcv-gpa__side > .bcv-enter')].map((e) => e.style.getPropertyValue('--bcv-delay')),
     cards: [...document.querySelectorAll('.bcv-gpa__card.bcv-enter')].map((e) => e.style.getPropertyValue('--bcv-delay')),
     rings: [...document.querySelectorAll('.bcv-gpa__card .bcv-ring--fill')].map((e) => `${getComputedStyle(e).animationName}@${getComputedStyle(e).animationDelay}`),
     value: document.querySelector('.bcv-gpa__value').textContent,
   }));
-  check(gpaStagger.top.join(',') === '40ms,110ms' && gpaStagger.cards[0] === '0ms' && gpaStagger.cards[1] === '55ms' && Math.max(...gpaStagger.cards.map(parseFloat)) <= 420, `Grades: hero, then trend, then cards on 55ms, capped at 420ms: ${JSON.stringify(gpaStagger)}`);
+  check((gpaStagger.top.join(',') === '40ms,110ms' || (gpaStagger.top.join(',') === '40ms' && gpaStagger.side.length >= 1 && parseFloat(gpaStagger.side[gpaStagger.side.length - 1]) > 40)) && gpaStagger.cards[0] === '0ms' && gpaStagger.cards[1] === '55ms' && Math.max(...gpaStagger.cards.map(parseFloat)) <= 420, `Grades: hero, then trend (E16: tracking off, the slim card that asks for it), then cards on 55ms, capped at 420ms: ${JSON.stringify(gpaStagger)}`);
   check(gpaStagger.rings.length === 4 && gpaStagger.rings.slice(0, 3).join(',') === 'bcv-ring-fill@0s,bcv-ring-fill@0.07s,bcv-ring-fill@0.14s' && /^3\.4[23]$/.test(gpaStagger.value), `course rings sweep to their score 70ms apart and the GPA has landed: ${gpaStagger.rings.join(',')} · ${gpaStagger.value}`);
   await page.hover('.bcv-gpa__card .bcv-gpa__ringbox');
   await waitText('.bcv-gpa__card', /By group/);

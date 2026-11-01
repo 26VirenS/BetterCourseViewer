@@ -504,7 +504,7 @@
       const targets = { ...((targetsPref && typeof targetsPref === 'object') ? targetsPref : {}) };
       for (const c of st.courses) if (st.favs.has(c.id)) targets[c.id] = GRADES.includes(st.targets[c.id]) || st.targets[c.id] === PASS_FAIL ? st.targets[c.id] : 'A+';
       await Promise.all([
-        store.setPref('gpaGoal', st.goal),
+        st.tracking ? store.setPref('gpaGoal', st.goal) : null, // (the goal is asked with tracking: off, it was never shown, so none is set)
         store.setPref('gpaTracking', st.tracking ? { priorGpa: null, priorCourses: 0, since: new Date().toISOString().slice(0, 10) } : null),
         store.setPref('gradeTargets', targets),
         S.update({ appearance: { sidebar: st.sidebar } }).catch(() => {}), // (2.99.39: a new install has one sidebar, never the chooser; 2.99.74: Appearance's Next asks one or two. Where the courses sit is no longer asked: listed, as the settings have it)

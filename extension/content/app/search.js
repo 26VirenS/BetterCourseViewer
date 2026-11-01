@@ -967,17 +967,15 @@
     // (summoned from another screen: summon() lands the words typed on the way once the Dashboard's draw resolves)
     return root;
   }
-  /** The box in the widgets' bar, at its left (2.98.70): built once for the desktop shell and kept across screens (it lives
-   *  outside the app's root, beside the bar); built again after the phone's Today, or the Dashboard, had one of its own.
-   *  Each screen's draw asks. On the Dashboard (2.98.71) the box stands where it always did, in the header between the
-   *  title and the view switcher (dashboard.js builds it): the bar's is not shown there. */
-  function dock(app, route = null) {
+  /** The box in the widgets' bar (2.98.70): built once for the desktop shell and kept across screens (it lives outside the
+   *  app's root, beside the bar); built again after the phone's Today had one of its own. Each screen's draw asks.
+   *  (E33) The Dashboard too: the box no longer moves into its header there, so it — and ⋯ beside it — stand in one place
+   *  on every screen. */
+  function dock(app) {
     if (BCV.phone?.active?.()) return;
     let host = document.getElementById('bcv-topsearch');
     if (!host) { host = h('div', { id: 'bcv-topsearch', class: 'bcv-topsearch' }); document.body.append(host); }
-    const dash = route?.screen === 'dashboard';
-    host.hidden = dash; // (the Dashboard's own box takes over as its draw lands)
-    if (dash) return;
+    host.hidden = false;
     if (docked && ui?.root === docked && docked.isConnected) return; // (in the bar — or afloat from it)
     const root = field(app);
     host.replaceChildren(root);

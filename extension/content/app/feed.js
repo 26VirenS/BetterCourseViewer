@@ -44,7 +44,7 @@
   }
 
   const abs = (url) => { try { return url && !/^#/.test(url) ? new URL(url, location.origin).href : ''; } catch { return ''; } };
-  const when = (ms) => `${U.fmtDow(ms)} at ${U.fmtTimeLower(ms)}`;
+  const when = (ms) => `${U.fmtDow(ms)} at ${U.fmtTime(ms)}`;
   const KIND = { assignment: 'Assignment', quiz: 'Quiz', discussion_topic: 'Discussion', assessment_request: 'Peer review', planner_note: 'Your task', calendar_event: 'Event' };
 
   /** The calendar's events: { uid, title, start, end, allDay, day, days, description, url, location, free }. */

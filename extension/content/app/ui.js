@@ -218,11 +218,34 @@
     return el(`bcv-skel ${kind === 'cards' ? 'bcv-skel--cards' : kind === 'inset' ? 'bcv-skel--inset' : ''}`, items, { 'aria-hidden': 'true', role: 'presentation' });
   }
   /** A block saying something could not be loaded, with its error code (lib/errors.js) at its end —
-   *  drawn from data-code (app.css), so the words stay the words; the code is kept for a report. */
-  const errorBox = (str, err = null) => {
-    const box = el('bcv-error', str);
+   *  drawn from data-code (app.css), so the words stay the words; the code is kept for a report.
+   *  (E10) Never a dead end: under the words, Try Again (the screen asked for afresh, as its tab
+   *  pressed again asks — or `retry`, the caller's own) and Open in Canvas (this address on
+   *  Canvas's own page); `retry: false` / `canvas: false` leave either out (a panel over a screen,
+   *  which drawing the screen again would close). role=alert: a screen reader says it at once. */
+  const errorBox = (str, err = null, { retry, canvas = true } = {}) => {
+    const box = el('bcv-error', el('bcv-error__text', str), { role: 'alert' });
     const c = BCV.errors?.codeFor?.(err);
     if (c) { box.dataset.code = c; BCV.errors.note(c); }
+    const acts = [];
+    if (retry !== false) {
+      const again = typeof retry === 'function' ? retry : () => { BCV.canvas?.clearAll?.(); return BCV.app?.render?.({ quiet: true }); };
+      const b = h('button', { type: 'button', class: 'bcv-error__btn', text: 'Try Again' });
+      b.onclick = async () => {
+        if (b.disabled) return;
+        b.disabled = true;
+        b.textContent = 'Trying…';
+        try { await again(); } catch { /* (what went wrong is drawn by the screen) */ }
+        if (b.isConnected) { b.disabled = false; b.textContent = 'Try Again'; }
+      };
+      acts.push(b);
+    }
+    const route = BCV.app?.state?.route;
+    if (canvas && route?.screen !== 'native' && route?.params?.get?.('bcv') !== 'native') {
+      const here = location.pathname + location.search;
+      acts.push(h('a', { class: 'bcv-error__btn bcv-error__btn--plain', href: `${here}${here.includes('?') ? '&' : '?'}bcv=native`, text: `Open in ${BCV.lms?.name || 'Canvas'}` }));
+    }
+    if (acts.length) box.append(el('bcv-error__acts', acts));
     return box;
   };
   const hint = (str, mod = '') => h('p', { class: `bcv-hint ${mod}`, text: str });
@@ -702,18 +725,45 @@
   const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const DAYS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-  /** "11:59 PM" */
-  function fmtTime(v) {
+  // One clock for every time the interface writes: the reader's own, from the browser's locale — "11:59 PM" where the
+  // day has an AM and a PM, "23:59" where it runs to 24 — never "11:59pm" in one place and "11:59 PM" in the next. The
+  // compact form ("10:30a") is for a week's chips alone, where a line is a few dozen pixels wide.
+  let clock = null; // (Intl.DateTimeFormat, made once: { hour, minute } in the reader's locale)
+  const clockOf = () => {
+    if (clock === null) { try { clock = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }); } catch { clock = false; } }
+    return clock || null;
+  };
+  /** The time's parts in the reader's clock: { hour, minute, period } (period '' on a 24-hour clock). */
+  function clockParts(d) {
+    const f = clockOf();
+    if (f?.formatToParts) {
+      try {
+        const p = f.formatToParts(d);
+        const of = (t) => p.find((x) => x.type === t)?.value || '';
+        return { hour: of('hour'), minute: of('minute'), period: of('dayPeriod'), text: p.map((x) => x.value).join('') };
+      } catch { /* the plain clock below */ }
+    }
+    const hr = d.getHours(), min = String(d.getMinutes()).padStart(2, '0');
+    return { hour: String(hr % 12 || 12), minute: min, period: hr >= 12 ? 'PM' : 'AM', text: `${hr % 12 || 12}:${min} ${hr >= 12 ? 'PM' : 'AM'}` };
+  }
+  /** "11:59 PM" (the reader's clock: "23:59" on a 24-hour one). `compact`: "11:59p" — a week's chips only. */
+  function fmtTime(v, { compact = false } = {}) {
     const d = parse(v);
     if (!d) return '';
-    let hr = d.getHours();
-    const min = d.getMinutes();
-    const ampm = hr >= 12 ? 'PM' : 'AM';
-    hr = hr % 12 || 12;
-    return `${hr}:${String(min).padStart(2, '0')} ${ampm}`;
+    const c = clockParts(d);
+    if (compact) {
+      if (!c.period) return `${c.hour}:${c.minute}`;
+      if (/^[ap]\.?\s?m\.?$/i.test(c.period)) return `${c.hour}:${c.minute}${c.period[0].toLowerCase()}`;
+    }
+    return c.text.replace(/[\u202f\u00a0]/g, ' '); // (a narrow space before PM, as newer browsers write it, is a plain one here)
   }
-  /** "11:59pm" */
-  const fmtTimeLower = (v) => fmtTime(v).replace(' ', '').toLowerCase();
+  /** An hour on its own, as a time grid's edge labels it: "8 AM", "Noon", "12 AM" (midnight) — "08", "13" on a 24-hour clock. */
+  function fmtHour(hh) {
+    const d = new Date(2000, 0, 1, hh, 0);
+    let t = '';
+    try { t = new Intl.DateTimeFormat(undefined, { hour: 'numeric' }).format(d).replace(/[\u202f\u00a0]/g, ' '); } catch { t = `${hh % 12 || 12} ${hh >= 12 ? 'PM' : 'AM'}`; }
+    return hh === 12 && /PM/i.test(t) ? 'Noon' : t;
+  }
   /** "Sep 10" */
   const fmtShort = (v) => {
     const d = parse(v);
@@ -729,22 +779,20 @@
     const d = parse(v);
     return d ? `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}` : '';
   };
-  /** "Sep 10 at 11:59pm" */
+  /** "Sep 10 at 11:59 PM" */
   const fmtAt = (v) => {
-    const d = parse(v);
-    return d ? `${fmtShort(d)} at ${fmtTimeLower(d)}` : '';
-  };
-  /** "Sep 10 at 5:47 AM" */
-  const fmtAtUpper = (v) => {
     const d = parse(v);
     return d ? `${fmtShort(d)} at ${fmtTime(d)}` : '';
   };
-  /** "Sep 10 by 10:30am" (grades table) */
+  /** "Sep 10 at 5:47 AM" (fmtAt, by its older name) */
+  const fmtAtUpper = fmtAt;
+  /** "Sep 10 by 10:30 AM" (grades table) */
   const fmtBy = (v) => {
     const d = parse(v);
-    return d ? `${fmtShort(d)} by ${fmtTimeLower(d)}` : '';
+    return d ? `${fmtShort(d)} by ${fmtTime(d)}` : '';
   };
-  /** Day heading like the dashboard list: Today / Tomorrow / Sunday / Sep 21 */
+  /** Day heading like the dashboard list: Today / Tomorrow / Sunday — and past the week, the day and its date in one:
+   *  "Monday, Nov 9" (a heading that is a date needs no second date beside it: dayNamed). */
   function dayTitle(v, now = new Date()) {
     const d = parse(v);
     if (!d) return 'No date';
@@ -753,8 +801,10 @@
     if (diff === 1) return 'Tomorrow';
     if (diff === -1) return 'Yesterday';
     if (diff > 1 && diff < 7) return DAYS_LONG[d.getDay()];
-    return fmtShort(d);
+    return `${DAYS_LONG[d.getDay()]}, ${fmtShort(d)}${d.getFullYear() !== now.getFullYear() ? `, ${d.getFullYear()}` : ''}`;
   }
+  /** Whether dayTitle already says the date (past the week): its heading then wants no date beside it. */
+  const dayNamed = (v, now = new Date()) => { const d = parse(v); if (!d) return false; const diff = dayDiff(d, now); return !(diff >= -1 && diff < 7); };
   /** "Thu, Sep 10" */
   const fmtDow = (v) => {
     const d = parse(v);
@@ -1755,7 +1805,7 @@
     squircle, squirclePath, squircleFit, superPillPath, squircleAll,
     empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, picker, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField, promptSheet, askSheet,
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,
-    fmtTime, fmtTimeLower, fmtShort, fmtLong, fmtDateComma, fmtAt, fmtAtUpper, fmtBy, dayTitle, fmtDow, fmtRecent, whenShort, plural,
+    fmtTime, fmtHour, fmtShort, fmtLong, fmtDateComma, fmtAt, fmtAtUpper, fmtBy, dayTitle, dayNamed, fmtDow, fmtRecent, whenShort, plural,
     hexToRgb, rgba, palette, quiet, FALLBACK_COLORS, initials, enter, still, isStill, roll, morphFrom, reducedMotion, flipList, drawCheck, collapsible, dpr, onDprChange, dismiss, recall,
     afterMotion, onGone, watchLayout, anchor, keepOnScreen, boundsOf, hoverOpens, hoverCool, hoverHold, cardBox,
   };

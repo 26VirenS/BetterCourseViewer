@@ -92,6 +92,9 @@
     const p = await prefs();
     return p[key] === undefined ? fallback : p[key];
   }
+  /** A pref as this tab already holds it, without waiting (undefined → `fallback`, as is one not read yet): for a
+   *  placeholder drawn before the screen's own read lands (gpa.js skeleton). */
+  const prefNow = (key, fallback = null) => (prefsCache && prefsCache[key] !== undefined ? prefsCache[key] : fallback);
   let writing = Promise.resolve();
   function write(op) {
     pending.push(op);
@@ -1896,7 +1899,7 @@
   BCV.store = {
     keptAssignments, // (2.98.92)
     restoreKept, forgetKept, // (2.99.33)
-    env, pref, setPref, mergePref, me, account, colors, courses, favorites, cards, setFavorite, setNickname, currentTerm, dashboardView, setDashboardView, freshness, invalidateGrades,
+    env, pref, prefNow, setPref, mergePref, me, account, colors, courses, favorites, cards, setFavorite, setNickname, currentTerm, dashboardView, setDashboardView, freshness, invalidateGrades,
     planner, classify, todo, todoWindow, setComplete, dismiss, restore, invalidatePlanner, plannerOverrides, createNote, createNotes, deleteNote, deleteNotes, REPEATS, repeatDates, activity, activitySummary, unreadCount, groups, group, workStatus, workFlags,
     announcementsFeed, streamSeen, markStreamSeen, setColor, history, helpLinks,
     calendarContexts, ownContexts, selectedContexts, setSelectedContexts, calendarEvents, plannerRange, appointmentGroups, reserveAppointment, cancelReservation,

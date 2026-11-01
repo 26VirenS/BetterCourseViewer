@@ -58,7 +58,7 @@
    *  can call api.swap(make2) to turn it into something else in place (the card's Submit again), api.relayout() when what
    *  it holds changes height, api.close() to fold it back. `anchor` is where it grows from: 'right' (hung from a chip's
    *  corner at the end of a row), 'left' (from a button's start), or 'center' (out of the button's middle, every way). */
-  function growBox(ctx, from, { label = '', W = 400, H = 560, anchor = 'right', hover = false, onClosed = null, vars = null, within = null } = {}, make) {
+  function growBox(ctx, from, { label = '', W = 400, H = 560, anchor = 'right', hover = false, onClosed = null, vars = null, within = null, beside = null, clear = null } = {}, make) {
     const prev = document.querySelector('.bcv-sheet-ov');
     if (prev?.bcvReopen && prev.bcvCard === from && prev.classList.contains('is-folding')) { prev.bcvReopen(); return prev.bcvApi; } // (pressed again as it folds: it opens again from where it is)
     if (prev) { clearTimeout(prev._bcvFoldT); prev.remove(); }
@@ -76,6 +76,16 @@
       // (2.99.15) `within`: kept inside the page's own card (over the assignment, not the course's rail beside it)
       const b = within?.isConnected ? within.getBoundingClientRect() : null;
       const lo = b ? Math.max(M, b.left + 16) : M, hi = b ? Math.min(vw - M, b.right - 16) : vw - M;
+      // (E7) `beside`: the box stands to the left of that column (the rail the button is in), its top level with the
+      // button's — over the instructions, never over the title above it or the facts beside it (the due date). Where the
+      // column has no room to its left (a narrow page: the rail over the instructions), it stands under `clear` (the facts).
+      const col = !back && beside?.isConnected ? beside.getBoundingClientRect() : null;
+      if (col && col.width) {
+        const top = Math.max(M, Math.min(r.top, vh - M - hgt));
+        if (col.left - 16 - w >= lo) return { x: col.left - 16 - w, y: top, w, h: hgt };
+        const u = clear?.isConnected ? clear.getBoundingClientRect() : null;
+        if (u && u.height) return { x: Math.max(lo, Math.min(col.left, hi - w)), y: Math.max(M, Math.min(u.bottom + 12, vh - M - hgt)), w, h: hgt };
+      }
       return { x: Math.max(lo, Math.min(x, hi - w)), y: Math.max(M, Math.min(y, vh - M - hgt)), w, h: hgt };
     }
     // Escape from anywhere on the page folds the box (a reply just sent leaves the cursor nowhere in particular); a file's viewer or a question over the box takes its own Escape first
@@ -583,7 +593,7 @@
         return { cls: 'bcv-hand', kids: [handScreen], measure: () => handScreen.scrollHeight + 2, after: () => setTimeout(() => (handScreen.querySelector('.bcv-sb__tab.is-active, .bcv-sb__tab, .bcv-sb__drop, .bcv-sb__ta') || handScreen).focus?.({ preventScroll: true }), 60) };
       };
       if (api) { api.swap(content, { W: 400 }); return; }
-      growBox(ctx, pill, { label: `${a.name}: hand in`, W: 380, H: 600, anchor: 'center', within: pill.closest('.bcv-asg__card'), onClosed: afterClose, vars: courseVars(c) }, content);
+      growBox(ctx, pill, { label: `${a.name}: hand in`, W: 380, H: 600, anchor: 'center', within: pill.closest('.bcv-asg__card'), beside: pill.closest('.bcv-asg__rail'), clear: pill.closest('.bcv-asg__rail')?.querySelector('.bcv-asg__facts'), onClosed: afterClose, vars: courseVars(c) }, content); // (E7: beside the rail, the title and the due date left in view)
     };
     let sentOff = false;
     const afterClose = () => { if (sentOff && ctx.alive()) app.go(`${c.url}/assignments/${a.id}`, { confirmed: true }); }; // (handed in: the page redraws, Submitted)

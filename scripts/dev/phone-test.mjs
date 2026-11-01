@@ -475,7 +475,12 @@ try {
   await page.waitForSelector('.bcv-ph-hero', { timeout: 15000 });
   await rolled();
   check((await page.$eval('.bcv-tabbar__item.is-active', (e) => e.dataset.tab)) === 'gpa' && (await texts('.bcv-ph-h1'))[0] === 'Grades', 'Grades tab lands');
-  check(/^\d\.\d\d$/.test((await texts('.bcv-ph-hero__gpa'))[0]) && /^goal \d\.\d\d$/.test((await texts('.bcv-ph-hero__goalnote'))[0]) && /(above|below) goal/.test((await texts('.bcv-ph-hero__diff'))[0]) && (await page.$eval('.bcv-ph-hero__gpa', (e) => getComputedStyle(e).color)) === 'rgb(255, 255, 255)', `GPA hero, white on indigo: ${(await texts('.bcv-ph-hero'))[0]}`);
+  // (E15) no goal set: a neutral "Set a goal" under the bar, the stepper empty — never "below goal" against a 4.00 nobody chose
+  const unset = await page.evaluate(() => ({ foot: document.querySelector('.bcv-ph-hero__foot')?.innerText.replace(/\s+/g, ' ').trim(), set: !!document.querySelector('.bcv-ph-hero__set:not([hidden])'), v: document.querySelector('.bcv-ph-hero__goalv')?.textContent }));
+  check(/^\d\.\d\d$/.test((await texts('.bcv-ph-hero__gpa'))[0]) && unset.set && unset.foot === 'Set a goal' && unset.v === '—' && (await page.$eval('.bcv-ph-hero__gpa', (e) => getComputedStyle(e).color)) === 'rgb(255, 255, 255)', `GPA hero, white on indigo; no goal set, it asks for one in neutral words: ${JSON.stringify(unset)}`);
+  await page.click('.bcv-ph-hero__set');
+  const setNow = await page.evaluate(() => ({ foot: document.querySelector('.bcv-ph-hero__foot')?.innerText.replace(/\s+/g, ' ').trim(), v: document.querySelector('.bcv-ph-hero__goalv')?.textContent }));
+  check(setNow.v === '4.00' && /^\d\.\d\d (above|below) goal$|^\+\d\.\d\d above goal$/.test(setNow.foot) && (setNow.foot.match(/goal/g) || []).length === 1, `Set a goal starts it at 4.00 in the stepper; the line under the bar says how far off it is, "goal" once (not "below goal  goal 4.00"): ${JSON.stringify(setNow)}`);
   const cards = await page.$$('.bcv-ph-gcard');
   const ringFills = await page.$$eval('.bcv-ph-gcard', (els) => els.map((e) => e.querySelectorAll('.bcv-ph-ring svg circle').length));
   const scoredN = (await texts('.bcv-ph-gcard__pct')).filter((t) => /%$/.test(t)).length;
@@ -510,7 +515,7 @@ try {
   const before = (await texts('.bcv-ph-hero__goalv'))[0]; // 4.00, the top of the scale: so it steps down first
   await page.click('.bcv-ph-hero__step:first-child');
   const after = (await texts('.bcv-ph-hero__goalv'))[0];
-  check(/^\d\.\d\d$/.test(before) && Math.abs(Number(before) - Number(after) - 0.05) < 0.001 && (await texts('.bcv-ph-hero__goalnote'))[0] === `goal ${after}`, `goal stepper: ${before} → ${after}, the note follows`);
+  check(/^\d\.\d\d$/.test(before) && Math.abs(Number(before) - Number(after) - 0.05) < 0.001 && !/goal \d/.test((await texts('.bcv-ph-hero__foot'))[0]), `goal stepper: ${before} → ${after}, the goal said once, in the stepper: ${(await texts('.bcv-ph-hero__foot'))[0]}`);
   await page.click('.bcv-ph-hero__step:last-child');
   await eventually(async () => (await texts('.bcv-ph-hero__goalv'))[0] === before);
   // a ring expands on a tap, one at a time

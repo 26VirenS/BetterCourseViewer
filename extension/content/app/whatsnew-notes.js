@@ -28,6 +28,12 @@
     lock: 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.136', date: '2026-11-01', notes: [
+      { kind: 'improved', title: 'Due Date Stays in View', body: 'Handing in no longer covers the title or due date.', icon: P.clip },
+      { kind: 'improved', title: 'Never a Dead End', body: 'Errors offer Try Again and Open in Canvas.', icon: P.arrows },
+      { kind: 'improved', title: 'Search Stays Put', body: 'The search box sits in the top bar on every screen.', icon: P.pin },
+      { kind: 'improved', title: 'One Way to Write Time', body: 'Every time reads like 11:59 PM, in your own clock.', icon: P.clock },
+    ] },
     { version: '2.99.135', date: '2026-11-01', notes: [
       { kind: 'new', title: 'Send From Your Phone', body: 'Photos and files from your phone land in your hand-in.', icon: P.phone },
       { kind: 'fixed', title: 'Grades Match Canvas', body: 'Dropped scores and weighted totals add up as Canvas does.', icon: P.check },
