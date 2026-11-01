@@ -27,9 +27,11 @@ final class InboxStore: ObservableObject {
             }
     }
 
-    /// The engine whose school is showing: another one (another school) lets go of what the last one read.
+    /// The engine whose school is showing: another one (another school) lets go of what the last one read. A window more
+    /// is its main window's (`primary`), the same school: the Inbox opened in one let go of the reply being written in the
+    /// other.
     func bind(_ engine: Engine) {
-        let id = ObjectIdentifier(engine)
+        let id = ObjectIdentifier(engine.primary ?? engine)
         guard id != owner else { return }
         forget()
         owner = id
