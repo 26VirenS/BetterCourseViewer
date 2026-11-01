@@ -16,6 +16,10 @@ on:
         description: 'Publish as a beta (a pre-release: only Macs with Get beta updates on take it)'
         type: boolean
         default: false
+      test:
+        description: 'Publish as a test build (mac-test-v<version>: only Macs on the test channel, joined in Developer with its code, take it; never a Critical Update)'
+        type: boolean
+        default: false
       critical:
         description: 'Publish as a Critical Update (every Mac on an older version installs it at its next check, whatever its settings; never a beta)'
         type: boolean
@@ -35,7 +39,7 @@ jobs:
     env:
       # (the kind of build: a beta's compiled a file at a time, a release proper's — a Critical Update's too — whole;
       #  1.3.82: a Critical Update asked for as a beta as well is a release proper's, and its cache is now named so)
-      KIND: ${{ (inputs.beta && !inputs.critical) && 'beta' || 'stable' }}
+      KIND: ${{ ((inputs.beta || inputs.test) && (inputs.test || !inputs.critical)) && 'beta' || 'stable' }}
     steps:
       - uses: actions/checkout@v4
       # (1.3.82) the app the Mac app workflow built ahead for this very commit and kind (mac.yml: a beta's), a cache
@@ -66,8 +70,9 @@ jobs:
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           GH_TOKEN: ${{ github.token }}
-          MAC_BETA: ${{ (inputs.beta && !inputs.critical) && '1' || '' }}
-          MAC_CRITICAL: ${{ inputs.critical && '1' || '' }}
+          MAC_BETA: ${{ ((inputs.beta || inputs.test) && (inputs.test || !inputs.critical)) && '1' || '' }}
+          MAC_CRITICAL: ${{ (inputs.critical && !inputs.test) && '1' || '' }}
+          MAC_TEST: ${{ inputs.test && '1' || '' }}
           MAC_PREBUILT: ${{ steps.ahead.outputs.cache-hit == 'true' && 'prebuilt' || '' }}
           UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }} # (the zip signed as it is released: scripts/sign-releases.py)
         run: bash scripts/release-mac-native.sh
