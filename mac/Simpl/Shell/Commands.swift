@@ -86,7 +86,7 @@ struct SimplCommands: Commands {
             Button("Report a Bug…") { ReportBug.open() } // (1.2.1)
             Divider()
             Button("What’s New in Simpl for Mac") {
-                engine?.whatsNew = WhatsNewSheetItem(data: MacWhatsNew.all) // (1.3.3: the Mac app's own notes)
+                engine?.whatsNew = WhatsNewSheetItem(data: MacWhatsNew.recent) // (1.3.3: the Mac app's own notes; M16: its newest highlights)
             }
             .disabled(!ready)
             Button("Open \(session.lmsName) in Browser") {

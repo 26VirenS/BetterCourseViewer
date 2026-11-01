@@ -25,6 +25,7 @@ enum DashCounterLook {
     /// (1.3.1) A colour worn: every counter's glyph in it; Regular, each in its own. Red means late and nothing else:
     /// Overdue keeps it whatever is worn, and Due today wears the accent. (1.3.177) A counter given a colour of its own
     /// (Appearance, its photo button's Colour…) wears that one, Overdue too: a late count's number and wash stay red.
+    /// (M17) No two in the same hue: Announcements in teal, where its orange was Tomorrow's beside it.
     static func color(_ key: String) -> Color {
         if let own = tint(key) { return Theme.icon(own) }
         if key == "overdue" { return alert }
@@ -32,7 +33,7 @@ enum DashCounterLook {
         switch key {
         case "today": return Theme.accent
         case "next": return Color(hex: "#34c759")
-        case "unread": return Color(hex: "#ff9500")
+        case "unread": return Color(hex: "#30b0c7")
         case "tomorrow": return Color(hex: "#ff9f0a")
         case "graded": return Color(hex: "#5856d6")
         default: return Theme.accent
@@ -145,8 +146,8 @@ struct DashCounterTile: View {
     }
 
     let counter: Counter
-    /// (home-17) The name the row chose for it — its full one ("Announcements", "Graded this week") where every tile in
-    /// the row has room for its own, else its short one ("Unread", "Graded") — and the line that goes with that name.
+    /// (home-17) Its name — (M17) its full one always ("Announcements", "Graded this week") — and the line that goes
+    /// with it.
     let name: String
     let value: Int?
     let note: String?
@@ -157,9 +158,6 @@ struct DashCounterTile: View {
     var width: CGFloat = 0
     /// (1.3.80) How many lines its line may take: two; one in a row of six, so the row stays as low as 1.3.77's.
     var lines = 2
-    /// (1.3.80) The line that goes with its other name ("19 / 49 points", said with "Graded this week"), shown in place
-    /// of its own where only this one fits whole in `lines`.
-    var spare: String? = nil
     /// (1.3.79) What it counts, in full words, for its tooltip with its count: a line left out stays said there.
     var tip: String? = nil
     let action: () -> Void
@@ -167,7 +165,8 @@ struct DashCounterTile: View {
     @State private var editing = false
     /// (1.3.113) Appearance on: its photo button over it, and a press on it opens nothing else.
     @ObservedObject private var appearanceMode = AppearanceMode.shared
-    /// (1.3.164) Whether its photo has its Ink switch off: shown as it is, no wash over it, its words dark with a white border.
+    /// (1.3.164) Whether its photo has its Ink switch off: shown as it is, no wash over it — (M22) its words on a frosted
+    /// plate.
     @ObservedObject private var appearance = AppearanceStore.shared
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -180,15 +179,15 @@ struct DashCounterTile: View {
         Button(action: { if !appearanceMode.on { action() } }) {
             VStack(alignment: .leading, spacing: 6) {
                 head
-                // (1.3.164: over a photo with its Ink off, the words solid — a faint number or a grey line is lost on a photo)
-                DashCount(value: value, alert: alert, stale: stale && !plain)
+                DashCount(value: value, alert: alert, stale: stale)
                 Text(shownNote ?? " ")
                     .font(.sCaption)
-                    .foregroundStyle(plain ? AnyShapeStyle(Color.primary) : AnyShapeStyle(.secondary))
+                    .foregroundStyle(.secondary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
-                    .opacity(stale && !plain ? 0.6 : 1)
+                    .opacity(stale ? 0.6 : 1)
             }
+            // (1.3.164; M22: over a photo with its Ink off, the words on a frosted plate of their own, in their usual colours)
             .plainPhotoWords(plain)
             .padding(.horizontal, Self.padding(style))
             .padding(.vertical, 14)
@@ -242,8 +241,8 @@ struct DashCounterTile: View {
     static let alertWash = Theme.dynamic(light: NSColor.systemRed.withAlphaComponent(0.22), dark: NSColor.systemRed.withAlphaComponent(0.24))
 
     /// (1.3.80) The wash every tile wears: the colour its symbol wears (Due today the accent, Tomorrow orange, Next 7
-    /// days green, Overdue red, Unread orange, Graded purple; a colour worn, that one), soft enough that its number and
-    /// words read as plainly as on bare glass — a little more of it by night, where dark glass takes more to show it.
+    /// days green, Overdue red, Announcements teal (M17), Graded indigo; a colour worn, that one), soft enough that its
+    /// number and words read as plainly as on bare glass — a little more of it by night, where dark glass takes more.
     private var wash: Color {
         // (1.3.177: a colour of its own, as it is, and a little more of it — the card is that colour, not a hint of it)
         if let slot = PhotoSlot.card(counter.key), appearance.tints[slot] != nil, let own = DashCounterLook.tint(counter.key) {
@@ -265,11 +264,14 @@ struct DashCounterTile: View {
         let symbol = Image(systemName: DashCounterLook.symbol(counter.key))
             .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(DashCounterLook.color(counter.key))
+        // (M17: its full name always — over its symbol in a narrow tile, on a second line where it must, else a little
+        //  smaller; never cut short)
         let title = Text(name)
             .font(.sCallout.weight(.medium))
             .foregroundStyle(.secondary)
-            .lineLimit(1)
+            .lineLimit(style == .beside ? 1 : 2)
             .minimumScaleFactor(style == .beside ? 0.85 : 0.75) // (a sidebar dragged wide: smaller, never cut short)
+            .fixedSize(horizontal: false, vertical: true)
         switch style {
         case .beside:
             HStack(spacing: 7) {
@@ -284,15 +286,12 @@ struct DashCounterTile: View {
         }
     }
 
-    /// (1.3.79) The line under the number, whole in up to two lines at the tile's width (1.3.80: in one, in a row of six
-    /// — its other name's line where only that one fits); else left out (its words stay in the tooltip) — never cut in
-    /// the middle of a word.
+    /// (1.3.79) The line under the number, whole in up to two lines at the tile's width (1.3.80: in one, in a row of
+    /// six); else left out (its words stay in the tooltip) — never cut in the middle of a word.
     private var shownNote: String? {
-        let candidates = [note, spare == note ? nil : spare].compactMap { $0 }.filter { !$0.isEmpty }.map(Self.bound)
-        guard let first = candidates.first else { return nil }
-        guard width > 0 else { return first }
-        let room = width - Self.padding(style) * 2
-        return candidates.first { Self.noteFits($0, room: room, lines: lines) }
+        guard let line = note.flatMap({ $0.isEmpty ? nil : Self.bound($0) }) else { return nil }
+        guard width > 0 else { return line }
+        return Self.noteFits(line, room: width - Self.padding(style) * 2, lines: lines) ? line : nil
     }
 
     /// (1.3.80) A line with its sum held together — "19 / 49 points" never breaks after "19 /" — by no-break spaces

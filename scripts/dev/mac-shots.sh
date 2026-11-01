@@ -542,6 +542,12 @@ ui_review() {
   MODE=light shoot light-05m-calendar-month-todo 22 -SimplPlace calendar -SimplCalView month -SimplSidebar hidden
   MODE=dark shoot dark-05m-calendar-month-todo 22 -SimplPlace calendar -SimplCalView month -SimplSidebar hidden
   MODE=light shoot light-05k-calendar-todo-menu 24 -SimplPlace calendar -SimplCalView month -SimplSidebar hidden -SimplTodoMenu YES
+  # (M5) the month with the sidebar shown, 1024 points wide: To Do put away by the month, so its days are wide enough to
+  # name their items — (M29) the head's tools on a line of their own, named where there is room; and To Do kept beside
+  # it as Show To Do keeps it (-SimplTodoKept), its days too narrow for names showing their items as dots and "+N"
+  # (month_check)
+  MODE=light shoot light-05n-calendar-month-narrow 22 -SimplPlace calendar -SimplCalView month
+  MODE=light shoot light-05o-calendar-month-dots 22 -SimplPlace calendar -SimplCalView month -SimplTodoKept YES
   MODE=light shoot light-05x-calendar-week-seven 22 -SimplPlace calendar -SimplCalView week -SimplCalWeekDays 7 -SimplSidebar hidden
   MODE=light shoot light-05y-calendar-week-pinched 22 -SimplPlace calendar -SimplCalView week -SimplCalHourHeight 18 -SimplSidebar hidden
   MODE=light shoot light-05z-calendar-week-peeks 22 -SimplPlace calendar -SimplCalView week -SimplCalHourHeight 90 -SimplCalScrollHour 12 -SimplSidebar hidden
@@ -566,6 +572,8 @@ ui_review() {
   MODE=light shoot light-03p-todo-plan-rail 16 -SimplPlace todo -SimplPlanFirst YES
   MODE=dark shoot dark-03p-todo-plan-rail 16 -SimplPlace todo -SimplPlanFirst YES
   MODE=light shoot light-11w-course-grades-whatif 16 -SimplPlace section:courses/101:grades -SimplWhatIf YES
+  # (M11) the same scrolled to its foot (-SimplWhatIfFoot): the last group clear of What-If's bar (whatif_check)
+  MODE=light shoot light-11x-course-grades-whatif-foot 18 -SimplPlace section:courses/101:grades -SimplWhatIf YES -SimplWhatIfFoot YES
   MODE=light shoot light-25b-compose-attached 16 -SimplPlace inbox -SimplOpen compose -SimplAttach "$PWD/docs/screenshots/calendar.png"
   MODE=light SIZE=1720x1040 shoot light-45-wide-grades 14 -SimplPlace grades
   MODE=light SIZE=1440x900 shoot light-46-wide-todo 12 -SimplPlace todo
@@ -1156,6 +1164,70 @@ community_tools_check() {
   if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::community tools: /'; return 1; fi
 }
 
+# (M11) whatif_check: a course's grades with What-If on, scrolled to the page's foot (light-11x-course-grades-whatif-foot),
+# as whatif-check.txt — the last row ended at least 16 points above What-If's bar (GradesView.swift's WhatIfFootProbe:
+# "grades what-if: at the page's foot the last row ends N pt above the bar"; a point given for rounding)
+whatif_check() {
+  local out="$OUT_ABS/whatif-check.txt" f="$OUT_ABS/console-light-11x-course-grades-whatif-foot.txt" line n
+  : > "$out"
+  line="$(grep -o 'grades what-if: at the page.s foot .*' "$f" 2>/dev/null | tail -1)"
+  n="$(printf '%s' "$line" | sed -n 's/.* ends \(-\{0,1\}[0-9]*\) pt above the bar.*/\1/p')"
+  if [ -n "$n" ] && [ "$n" -ge 15 ]; then echo "ok   the last row scrolls clear of What-If's bar ($line)" >> "$out"
+  else echo "FAIL the last row stays under What-If's bar (${line:-nothing said})" >> "$out"; fi
+  cat "$out"
+  if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::what-if: /'; return 1; fi
+}
+
+# (M16) whatsnew_check: What's New, as whatsnew-check.txt — from Help (light-53-whats-new) and as if just updated from
+# 1.3.206 (light-53u-whats-new-update), it opened on five highlights at most (WhatsNewSheet.swift: "what's new: N
+# highlights of M notes from K versions (…), L for developers left out: <titles>"); after the update, at least three,
+# from the versions since, the notes for developers in them (1.3.209's Test Builds, 1.3.210's Where Updates Come From)
+# left out and never among the highlights
+whatsnew_check() {
+  local out="$OUT_ABS/whatsnew-check.txt" h="$OUT_ABS/console-light-53-whats-new.txt" u="$OUT_ABS/console-light-53u-whats-new-update.txt"
+  local line n left
+  : > "$out"
+  say() { if [ "$1" = 0 ]; then echo "ok   $2" >> "$out"; else echo "FAIL $2" >> "$out"; fi; }
+  line="$(grep -o "what's new: .*" "$h" 2>/dev/null | tail -1)"
+  n="$(printf '%s' "$line" | sed -n 's/^what.s new: \([0-9]*\) highlights.*/\1/p')"
+  [ -n "$n" ] && [ "$n" -ge 1 ] && [ "$n" -le 5 ]
+  say $? "Help's What's New opened on its newest highlights: ${line:-nothing said}"
+  line="$(grep -o "what's new: .*" "$u" 2>/dev/null | tail -1)"
+  n="$(printf '%s' "$line" | sed -n 's/^what.s new: \([0-9]*\) highlights.*/\1/p')"
+  left="$(printf '%s' "$line" | sed -n 's/.*, \([0-9]*\) for developers left out.*/\1/p')"
+  [ -n "$n" ] && [ "$n" -ge 3 ] && [ "$n" -le 5 ] && [ "${left:-0}" -ge 2 ] && ! printf '%s' "$line" | grep -q 'Test Builds\|Where Updates Come From'
+  say $? "after an update, at most five highlights, the developers' notes left out: ${line:-nothing said}"
+  cat "$out"
+  if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed "s/^/::error::what's new: /"; return 1; fi
+}
+
+# (M5) month_check: To Do & Calendar's month 1024 points wide with the sidebar shown, as month-check.txt — the month
+# put To Do away and its days named their items (light-05n-calendar-month-narrow); with To Do kept beside it
+# (-SimplTodoKept), its days, too narrow for names, showed their items as dots (light-05o-calendar-month-dots); (M29)
+# and the head, its tools on a line of their own there, named To Do and Sync at least, not their symbols alone. What
+# each said last is what it settled on (CalendarView.swift: "calendar month: …", "calendar head: …", in the
+# screenshot suite only).
+month_check() {
+  local out="$OUT_ABS/month-check.txt" n="$OUT_ABS/console-light-05n-calendar-month-narrow.txt" k="$OUT_ABS/console-light-05o-calendar-month-dots.txt"
+  local todo days head
+  : > "$out"
+  say() { if [ "$1" = 0 ]; then echo "ok   $2" >> "$out"; else echo "FAIL $2" >> "$out"; fi; }
+  todo="$(grep -o 'calendar month: To Do .*' "$n" 2>/dev/null | tail -1)"
+  days="$(grep -o 'calendar month: days .*' "$n" 2>/dev/null | tail -1)"
+  # (To Do never squeezing the month: put away by it — or, a window too short to hold still, above it)
+  [ -n "$todo" ] && [ "$todo" != 'calendar month: To Do beside the month' ] && printf '%s' "$days" | grep -q 'items by name$'
+  say $? "a narrow month put To Do away and named its items: ${todo:-nothing said}; ${days:-nothing said}"
+  todo="$(grep -o 'calendar month: To Do .*' "$k" 2>/dev/null | tail -1)"
+  days="$(grep -o 'calendar month: days .*' "$k" 2>/dev/null | tail -1)"
+  [ "$todo" = 'calendar month: To Do beside the month' ] && printf '%s' "$days" | grep -q 'items as dots$'
+  say $? "with To Do kept beside it, days too narrow for names showed dots: ${todo:-nothing said}; ${days:-nothing said}"
+  head="$(grep -o 'calendar head: .*' "$n" 2>/dev/null | tail -1)"
+  printf '%s' "$head" | grep -q 'named: .*To Do' && printf '%s' "$head" | grep -q 'named: .*Sync'
+  say $? "the head named its tools where it had the room: ${head:-nothing said}"
+  cat "$out"
+  if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::month: /'; return 1; fi
+}
+
 tool_list_check() {
   local out="$OUT_ABS/tool-list-check.txt" r="$OUT_ABS/console-light-36d-external-tools-list-reread.txt" f crashes=0
   : > "$out"
@@ -1250,7 +1322,8 @@ push_set() {
   shoot light-50-theme-dusk 12 -SimplTheme Dusk
   shoot light-50b-theme-ocean-todo 12 -SimplTheme Ocean -SimplPlace todo
   shoot light-50d-theme-photo 12 -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg"
-  # (1.3.164) the same photo with its Ink off: shown as it is, the words on it dark with a white border
+  # (1.3.164) the same photo with its Ink off: shown as it is — (M22) the counters' words on a frosted plate each, the
+  # sidebar's on frost, all in their usual colours (no white ring round every letter)
   shoot light-50e-theme-photo-plain 12 -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg" -SimplThemePlain YES
   # (1.3.113) Appearance, from the ⋯ menu: the window darkened but the sidebar and the cards, their photo buttons, the bar
   shoot light-51-appearance-mode 16 -SimplAppearanceMode YES -SimplTheme Ocean
@@ -1283,7 +1356,10 @@ push_set() {
   fi
   shoot light-12d-hand-in-phone-connected 40 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES -SimplPhoneTest YES
   phone_send light-12d-hand-in-phone-connected "$PWD/scripts/dev/fixtures/photo.jpg=Photo from phone.jpg" "$HOMES/phone-notes.txt=Notes.txt"
-  shoot light-53-whats-new 32 -SimplOpen whatsnew
+  shoot light-53-whats-new 32 -SimplOpen whatsnew -SimplDeveloperMode NO
+  # (M16) as if just updated from 1.3.206 (-SimplWhatsNewFrom, in a home of its own: it marks the notes seen): the
+  # highlights of the versions since, the notes for developers left out (whatsnew_check)
+  OWN_HOME=1 shoot light-53u-whats-new-update 32 -SimplOpen whatsnew -SimplWhatsNewFrom 1.3.206 -SimplDeveloperMode NO
   # (1.3.182) after an update, once: To Do and the calendar as one, and Quick Plan (its scene caught as it plays)
   shoot light-53m-merged-intro 32 -SimplOpen mergedintro
   MODE=dark shoot dark-53m-merged-intro 34 -SimplOpen mergedintro -SimplTheme Forest
@@ -1354,6 +1430,9 @@ if [ "${SHOTS:-full}" = check ]; then
   update_prompt_check || exit 1 # (1.3.207)
   share_check || exit 1 # (1.3.208)
   community_tools_check || exit 1 # (1.3.211)
+  month_check || exit 1 # (M5)
+  whatif_check || exit 1 # (M11)
+  whatsnew_check || exit 1 # (M16)
   exit 0
 fi
 
@@ -1534,6 +1613,9 @@ if [ "$SHARDS" = 1 ]; then
   update_prompt_check || true # (1.3.207)
   share_check || true # (1.3.208)
   community_tools_check || true # (1.3.211)
+  month_check || true # (M5)
+  whatif_check || true # (M11)
+  whatsnew_check || true # (M16)
 fi
 keep_crashes
 exit 0

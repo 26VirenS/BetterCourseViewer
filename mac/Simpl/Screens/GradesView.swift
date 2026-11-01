@@ -959,7 +959,7 @@ struct GradeWeightBar: View {
             }
             .transition(.opacity)
         } else if parts.contains(where: { $0.graded != true }) {
-            Text("Dashed: nothing graded there yet.")
+            Text("A dashed part is a group with nothing graded yet.")
                 .font(.sFootnote)
                 .foregroundStyle(.tertiary)
                 .transition(.opacity)
@@ -1171,6 +1171,12 @@ struct CourseGradesView: View {
     /// (1.3.80) What the live checks know of the grades shown (LiveRefresh), and who holds them back while What-If is on.
     @State private var marks = LiveMarks()
     @State private var holdToken = UUID()
+    /// (M11) How tall What-If's bar stands over the foot of the page, its gap under it included: the page leaves that
+    /// much room under its last row, so the row scrolls clear of it.
+    @State private var whatIfBarHeight: CGFloat = 0
+    /// (M11) The screenshot suite's -SimplWhatIfFoot YES: the page scrolled to its foot under What-If's bar, and how far
+    /// the last row ends above the bar said on the console (WhatIfFootProbe).
+    private static let footShot = UserDefaults.standard.bool(forKey: "SimplWhatIfFoot")
     @FocusState private var focused: String?
 
     // (written out: the state above is of this file's own types, which would keep a synthesized one in this file)
@@ -1185,15 +1191,33 @@ struct CourseGradesView: View {
                     ScreenHeading(title: sectionTitle, sub: headline(d), color: Color(hex: d.color))
                     overview(d)
                     assignments(d)
+                    if whatIf {
+                        // (M11) room under the last row for What-If's bar and 16 points more, less the page's own foot (40)
+                        // and the room before this (22): the last group's weight was under the bar, with no way to
+                        // scroll it clear
+                        Color.clear
+                            .frame(height: max(0, whatIfBarHeight + 16 - 40 - 22))
+                            .background { if Self.footShot { WhatIfFootProbe(bar: whatIfBarHeight) } }
+                            .accessibilityHidden(true)
+                    }
                 }
                 .font(.sBody)
             } else {
                 LoadState(error: error) { Task { await load(fresh: true) } }
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        // (M11) floating over the page's foot, the page leaving room under its last row for it (it was a safe-area
+        // inset, which the page's scroll view never made room for)
+        .overlay(alignment: .bottom) {
             if whatIf, let d = data {
                 WhatIfBar(total: d.totalText, value: d.total, letter: d.letter, gpaIf: d.gpaIf, gpaIfText: d.gpaIfText)
+                    .background {
+                        GeometryReader { g in
+                            Color.clear
+                                .onAppear { whatIfBarHeight = g.size.height }
+                                .onChange(of: g.size.height) { _, h in whatIfBarHeight = h }
+                        }
+                    }
                     .transition(slide(.bottom))
             }
         }
@@ -1890,6 +1914,55 @@ struct CourseGradesView: View {
         } catch {
             guard read == reads else { return }
             if data == nil { self.error = error.localizedDescription }
+        }
+    }
+}
+
+/// (M11, the screenshot suite: -SimplWhatIfFoot YES) In the room under the last row of a course's grades with What-If
+/// on: the page scrolled to its foot once it is laid out, and how far its last row then ends above What-If's bar said on
+/// the console — "grades what-if: at the page's foot the last row ends 16 pt above the bar" — for mac-shots.sh's
+/// whatif_check.
+private struct WhatIfFootProbe: NSViewRepresentable {
+    /// What-If's bar, the gap under it included.
+    let bar: CGFloat
+
+    func makeNSView(context: Context) -> WhatIfFootView { WhatIfFootView() }
+
+    func updateNSView(_ v: WhatIfFootView, context: Context) {
+        v.bar = bar
+        v.look()
+    }
+}
+
+private final class WhatIfFootView: NSView {
+    var bar: CGFloat = 0
+    private var asked = false
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        look()
+    }
+
+    /// Once, when the bar has been measured: the page scrolled to its foot, then where the last row ends — in the
+    /// window's own space, upward: 22 points over this room's top (the page's room between two parts), against the bar's
+    /// top over the foot of the scroll view.
+    func look() {
+        guard !asked, bar > 0, window != nil else { return }
+        asked = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            guard let self, self.window != nil, let sv = self.enclosingScrollView, let doc = sv.documentView else { return }
+            let clip = sv.contentView
+            let most = max(0, doc.frame.height - clip.bounds.height)
+            clip.scroll(to: NSPoint(x: clip.bounds.minX, y: doc.isFlipped ? most : 0))
+            sv.reflectScrolledClipView(clip)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                guard let self, self.window != nil, let sv = self.enclosingScrollView else { return }
+                let foot = sv.convert(sv.bounds, to: nil).minY
+                let rowEnd = self.convert(self.bounds, to: nil).maxY + 22
+                NSLog("[Simpl] grades what-if: at the page's foot the last row ends %ld pt above the bar", Int((rowEnd - (foot + self.bar)).rounded()))
+            }
         }
     }
 }

@@ -535,7 +535,7 @@ private struct DevInterface: View {
         Form {
             Section("First-run steps") {
                 HStack {
-                    Button("Show What's New") { engine?.whatsNew = WhatsNewSheetItem(data: MacWhatsNew.all) }
+                    Button("Show What's New") { engine?.whatsNew = WhatsNewSheetItem(data: MacWhatsNew.recent) }
                     Button("Take the Tour") { MacTour.shared.start() }
                     Button("Open the Setup") { engine?.setup = true }
                 }

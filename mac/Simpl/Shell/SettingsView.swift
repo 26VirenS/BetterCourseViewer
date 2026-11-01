@@ -299,17 +299,18 @@ private struct GeneralPane: View {
 
     var body: some View {
         Pane {
+            // (M9) Change School… beside the school it changes; Sign Out… on its own, last, in red — not where a primary
+            // action goes
             Section("School") {
-                LabeledContent(session.lmsName, value: session.host ?? "None chosen")
-                HStack {
+                LabeledContent {
                     Button("Change School…") {
                         session.changeSchool()
                         NSApp.keyWindow?.performClose(nil)
                     }
                     .disabled(session.host == nil)
-                    Spacer()
-                    Button("Sign Out…", role: .destructive) { confirmSignOut = true }
-                        .disabled(session.host == nil)
+                } label: {
+                    Text(session.host ?? "None chosen")
+                    Text(session.lmsName)
                 }
             }
             Section {
@@ -317,6 +318,7 @@ private struct GeneralPane: View {
                     LabeledContent("Saved for", value: s.user)
                     LabeledContent("Sign-in page", value: s.host)
                     Button("Forget Saved Sign-In…", role: .destructive) { confirmForget = true }
+                        .destructiveStyle()
                 } else {
                     // (onboarding-5) not a dead end: a sign-in is saved from the card, so the way to save one is to
                     // come back to the card — offered here, and done for the student
@@ -348,6 +350,16 @@ private struct GeneralPane: View {
                         Text("Courses shown and goals")
                         Text("Which courses Simpl shows, and what you aim for in each.")
                     }
+                }
+            }
+            Section {
+                LabeledContent {
+                    Button("Sign Out…", role: .destructive) { confirmSignOut = true }
+                        .destructiveStyle()
+                        .disabled(session.host == nil)
+                } label: {
+                    Text("Sign Out of \(session.lmsName)")
+                    Text("Ends your session on this Mac and forgets a saved sign-in. Your settings stay.")
                 }
             }
         }
@@ -528,6 +540,7 @@ private struct GradesPane: View {
                                 .disabled(settings.busy)
                             if info.record != nil {
                                 Button("Clear", role: .destructive) { Task { await settings.clearRecord() } }
+                                    .destructiveStyle()
                                     .disabled(settings.busy)
                             }
                         }
@@ -608,15 +621,18 @@ private struct DataPane: View {
                     Text(DataPane.encryptionNote)
                 }
             }
-            // (1.2.4) always here, signed in or not: the way out of anything
+            // (1.2.4) always here, signed in or not: the way out of anything — (M9) in a group of its own, last, in red
             Section {
                 LabeledContent {
                     Button("Reset Everything…", role: .destructive) { confirmReset = true }
+                        .destructiveStyle()
                         .disabled(settings.busy)
                 } label: {
-                    Text("Reset")
+                    Text("Reset Simpl")
                     Text("Erases everything Simpl keeps on this Mac, signs you out and restarts Simpl.")
                 }
+            } header: {
+                Text("Reset")
             }
         }
         .fileImporter(isPresented: $importing, allowedContentTypes: SettingsImport.settings.types, allowsMultipleSelection: false) { result in
@@ -1012,5 +1028,13 @@ private struct AboutPane: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+private extension View {
+    /// (M9) A button that erases or signs out, in red — the Mac's own look for one (the window's accent, on every other
+    /// button here, made Reset Everything… look like Import… and Export…).
+    func destructiveStyle() -> some View {
+        buttonStyle(.bordered).tint(.red)
     }
 }

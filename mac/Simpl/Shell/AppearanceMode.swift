@@ -113,7 +113,7 @@ enum PhotoControls {
         menu.addItem(Item("Colour…") { AppearanceMode.shared.colouring = slot })
         if store.photos[slot] != nil {
             menu.addItem(.separator())
-            // (1.3.164) a photo of one's own: inked, or (off) shown as it is, the words on it white-bordered
+            // (1.3.164) a photo of one's own: inked, or (off) shown as it is, the words on it on frost (M22)
             if case .upload? = store.photos[slot]?.source {
                 let plain = store.isPlain(slot)
                 let ink = Item("Ink Photo") { store.setInk(plain, in: slot) }

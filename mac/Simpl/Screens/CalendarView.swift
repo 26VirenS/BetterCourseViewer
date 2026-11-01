@@ -90,6 +90,10 @@ struct CalendarView: View {
     /// day of the week — the day and the minute it would be planned for — or over a day of the month or the agenda; and
     /// what came of the last one let go.
     @AppStorage(TodoShown.key) private var todoOn = true
+    /// (M5) Show To Do pressed while the month had put it away (a window too narrow for To Do beside the month and the
+    /// days' names), or To Do asked for by name (TodoShown.reveal): kept beside it anyway, until it is hidden or Month is
+    /// chosen again. (The screenshot suite's -SimplTodoKept YES: kept from the start.)
+    @State private var todoKept = UserDefaults.standard.bool(forKey: "SimplTodoKept")
     @State private var todoDrop: TodoDrop? = CalendarView.shotDrop
     @State private var dayDrop: Date?
     @State private var todoSaid: String?
@@ -191,6 +195,11 @@ struct CalendarView: View {
         }
         .onAppear(perform: seed)
         .onDisappear { weekScroll.detach() }
+        // (M5) To Do asked for by name (Go ▸ To Do & Calendar, /todo, a new task): kept beside even a narrow month
+        .onAppear { if TodoShown.takeAsked() { todoKept = true } }
+        .onReceive(NotificationCenter.default.publisher(for: TodoShown.askedNote)) { _ in
+            if TodoShown.takeAsked() { todoKept = true }
+        }
         // (1.3.184) a calendar account's calendars read again, shown or hidden: laid over the calendar as they are now
         .onReceive(NotificationCenter.default.publisher(for: .simplCalendarAccountsSynced)) { _ in Task { await load(animated: true) } }
         .overlay(alignment: .topTrailing) {
@@ -263,10 +272,17 @@ struct CalendarView: View {
     /// a month — the agenda being a list of the work already, To Do's own list is not shown beside it.
     private var leftColumn: Bool { mode == "list" || todoOn }
 
+    /// (M5) To Do put away by the month itself, on a page that holds still: beside it, the days would be too narrow for
+    /// their items' names (under `monthNamesLeast`) — unless Show To Do was pressed since (`todoKept`).
+    private func todoPutAway(_ room: CGFloat) -> Bool {
+        mode == "month" && todoOn && !todoKept && (room - TodoPanel.width - Self.todoGap) / 7 < Self.monthNamesLeast
+    }
+
     /// The page holding still: its head, then To Do and the calendar side by side, as tall as the window leaves them.
     private func filled(_ d: CalendarData, room: CGFloat, pad: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            heading(d, room: room)
+        let away = todoPutAway(room)
+        return VStack(alignment: .leading, spacing: 14) {
+            heading(d, room: room, todoAway: away)
             if let note = notice(d) {
                 noticeBar(note.text, problem: note.problem)
             }
@@ -276,7 +292,7 @@ struct CalendarView: View {
                         .frame(width: TodoPanel.width)
                         .frame(maxHeight: .infinity, alignment: .top)
                         .transition(.opacity)
-                } else if todoOn {
+                } else if todoOn && !away {
                     TodoPanel(said: todoSaid)
                         .frame(width: TodoPanel.width)
                         .frame(maxHeight: .infinity)
@@ -290,6 +306,7 @@ struct CalendarView: View {
             }
             .frame(maxHeight: .infinity)
             .animation(reduceMotion ? nil : Motion.snappy, value: todoOn)
+            .animation(reduceMotion ? nil : Motion.snappy, value: away)
             .animation(reduceMotion ? nil : Motion.snappy, value: mode == "list")
         }
         .padding(.horizontal, pad)
@@ -300,7 +317,15 @@ struct CalendarView: View {
         .background(PageGround())
         .onAppear { todoBeside = true }
         .onDisappear { todoBeside = false }
+        // (M5, the screenshot suite: whether the month put To Do away, on the console for mac-shots.sh's month_check)
+        .task(id: "\(mode)|\(todoOn)|\(away)") {
+            guard Self.shooting, mode == "month", todoOn else { return }
+            NSLog("[Simpl] calendar month: To Do %@", away ? "put away, to give the days room" : "beside the month")
+        }
     }
+
+    /// The screenshot suite is taking a picture (`-SimplShotFile`): what the month did is said on the console.
+    private static let shooting = UserDefaults.standard.string(forKey: "SimplShotFile") != nil
 
     /// A window too narrow or too short to hold still: the page scrolls, To Do over the calendar.
     private func scrolling(_ d: CalendarData) -> some View {
@@ -329,6 +354,10 @@ struct CalendarView: View {
                 }
         }
         .animation(reduceMotion ? nil : Motion.snappy, value: todoOn)
+        .task(id: "\(mode)|\(todoOn)") { // (M5, the screenshot suite: month_check)
+            guard Self.shooting, mode == "month", todoOn else { return }
+            NSLog("[Simpl] calendar month: To Do above the month, the page scrolling")
+        }
     }
 
     /// The calendar, taking ← and → once it has been clicked.
@@ -345,8 +374,10 @@ struct CalendarView: View {
 
     /// (1.3.170, the web's 2.99.112) The period's big title and what it holds under it, ‹ › Today beside it; then To Do,
     /// Find Appointment, Sync, Calendars and Week, Month, Agenda at the line's end — their words given up for their
-    /// symbols, and then a line of their own, as the page narrows.
-    private func heading(_ d: CalendarData, room: CGFloat) -> some View {
+    /// symbols, and then a line of their own, as the page narrows. (M29) The words given up one tool at a time, the widest
+    /// first, so a narrower page still names what it can (on a line of their own, the tools named again as there is room).
+    /// `todoAway`: the month has put To Do away for its days' room (M5): its button shows it as not beside.
+    private func heading(_ d: CalendarData, room: CGFloat, todoAway: Bool = false) -> some View {
         let fit = headLayout(room)
         return Group {
             if fit.oneLine {
@@ -355,7 +386,7 @@ struct CalendarView: View {
                     pager
                     spinner
                     Spacer(minLength: 8)
-                    tools(d, words: fit.words)
+                    tools(d, words: fit.words, todoAway: todoAway)
                 }
             } else {
                 VStack(alignment: .leading, spacing: 12) {
@@ -367,12 +398,27 @@ struct CalendarView: View {
                     }
                     HStack(spacing: 0) {
                         Spacer(minLength: 0)
-                        tools(d, words: fit.words)
+                        tools(d, words: fit.words, todoAway: todoAway)
                     }
                 }
             }
         }
         .animation(Motion.gentle, value: loading)
+        // (M29, the screenshot suite: how the head was laid out and which tools it named, for month_check)
+        .task(id: "\(fit.oneLine)|\(fit.words)|\(mode)") {
+            guard Self.shooting else { return }
+            NSLog("[Simpl] calendar head: %@, its tools named: %@", fit.oneLine ? "one line" : "two lines", namedTools(fit.words))
+        }
+    }
+
+    /// (M29) The tools `words` names, as the console says them: "To Do, Sync, Calendars", or "none".
+    private func namedTools(_ words: Int) -> String {
+        var named: [String] = []
+        if mode != "list" && words >= 1 { named.append("To Do") }
+        if !engine.onBrightspace && words >= 3 { named.append("Find Appointment") }
+        if words >= 1 { named.append("Sync") }
+        if words >= 2 { named.append("Calendars") }
+        return named.isEmpty ? "none" : named.joined(separator: ", ")
     }
 
     @ViewBuilder
@@ -384,28 +430,41 @@ struct CalendarView: View {
         }
     }
 
-    /// How the head is laid out in `room`: on one line or two, the tools with their words or their symbols alone — by
-    /// how wide the title is at its size and how wide the tools are (measured once, as drawn at the large control size).
-    private func headLayout(_ room: CGFloat) -> (oneLine: Bool, words: Bool) {
+    /// How the head is laid out in `room`: on one line or two, and (M29) how many of the tools carry their words
+    /// (`toolsWidth`) — the most that fit beside the title, else the most that fit on a line of their own — by how wide
+    /// the title is at its size and how wide the tools are (measured once, as drawn at the large control size).
+    private func headLayout(_ room: CGFloat) -> (oneLine: Bool, words: Int) {
         let title = max(Self.textWidth(periodTitle, NSFont.systemFont(ofSize: 34, weight: .bold)),
                         Self.textWidth(data.map(periodLine) ?? "", NSFont.systemFont(ofSize: 14)))
         let lead = title + 14 + Self.pagerWidth + 22
-        let appointments = engine.onBrightspace ? 0 : 1
-        let words = Self.toolsFixed + Self.wordsWidth + CGFloat(appointments) * Self.findWords
-        let symbols = Self.toolsFixed + Self.symbolsWidth + CGFloat(appointments) * Self.findSymbol
-        if lead + words <= room { return (true, true) }
-        if lead + symbols <= room { return (true, false) }
-        return (false, words <= room)
+        let levels = Array(0...Self.wordsMost)
+        if let w = levels.last(where: { lead + toolsWidth(words: $0) <= room }) { return (true, w) }
+        return (false, levels.last(where: { toolsWidth(words: $0) <= room }) ?? 0)
+    }
+
+    /// (M29) How wide the tools are with `words` of them named: 1, To Do and Sync; 2, Calendars too; 3, Find Appointment
+    /// too (the widest, so the last named) — the rest as their symbols alone.
+    private func toolsWidth(words: Int) -> CGFloat {
+        let todo: CGFloat = mode != "list" && words >= 1 ? Self.todoWords : 0
+        let sync = words >= 1 ? Self.syncWords : Self.syncSymbol
+        let calendars = words >= 2 ? Self.calendarsWords : Self.calendarsSymbol
+        let find: CGFloat = engine.onBrightspace ? 0 : (words >= 3 ? Self.findWords : Self.findSymbol)
+        return Self.toolsFixed + todo + sync + calendars + find
     }
 
     /// The widths the head is laid out by: ‹ › Today; To Do's button, Week Month Agenda and the room between the tools;
-    /// Sync and Calendars with their words or without; Find Appointment with or without.
+    /// Sync, Calendars and Find Appointment with their words or without; (M29) what To Do's word adds beside its symbol.
     private static let pagerWidth: CGFloat = 158
     private static let toolsFixed: CGFloat = 42 + 236 + 4 * 8
-    private static let wordsWidth: CGFloat = 82 + 142
-    private static let symbolsWidth: CGFloat = 42 + 70
+    private static let syncWords: CGFloat = 82
+    private static let syncSymbol: CGFloat = 42
+    private static let calendarsWords: CGFloat = 142
+    private static let calendarsSymbol: CGFloat = 70
     private static let findWords: CGFloat = 170
     private static let findSymbol: CGFloat = 42
+    private static let todoWords: CGFloat = 48
+    /// (M29) Every tool named.
+    private static let wordsMost = 3
 
     private static func textWidth(_ s: String, _ font: NSFont) -> CGFloat {
         ceil((s as NSString).size(withAttributes: [.font: font]).width)
@@ -457,21 +516,30 @@ struct CalendarView: View {
         }
     }
 
-    /// To Do beside the calendar or not; Find Appointment, Sync and Calendars (how many are shown); and the view.
-    private func tools(_ d: CalendarData, words: Bool) -> some View {
+    /// To Do beside the calendar or not; Find Appointment, Sync and Calendars (how many are shown); and the view. (M29)
+    /// `words`: how many of them carry their words beside their symbols (`toolsWidth`); the rest, their symbols alone,
+    /// say their names while the pointer rests on them.
+    private func tools(_ d: CalendarData, words: Int, todoAway: Bool) -> some View {
         let shown = d.calendars.filter(\.on).count + linkedShown
+        // (M5) To Do as it is now: put away by a narrow month, it reads as hidden, and Show To Do keeps it beside the month
+        let todoNow = todoOn && !todoAway
         return HStack(spacing: 8) {
             if mode != "list" { // (1.3.171: the agenda's column is its month, not To Do)
                 Button {
-                    withAnimation(reduceMotion ? nil : Motion.snappy) { todoOn.toggle() }
+                    withAnimation(reduceMotion ? nil : Motion.snappy) {
+                        todoOn = !todoNow
+                        todoKept = !todoNow
+                    }
                 } label: {
-                    Label(todoOn ? "Hide To Do" : "Show To Do", systemImage: "sidebar.left")
-                        .labelStyle(HoverWordsLabel())
+                    // (M29) its word where there is room — "To Do", lit while it is beside the calendar — else its symbol
+                    Label(words >= 1 ? "To Do" : (todoNow ? "Hide To Do" : "Show To Do"), systemImage: "sidebar.left")
+                        .labelStyle(ToolLabel(words: words >= 1))
                 }
-                .glassButton(tint: todoOn ? Theme.accent : nil)
-                .hoverName(todoOn ? "Hide To Do" : "Show To Do")
-                .accessibilityHint(todoOn ? "Hides To Do beside the calendar" : "Shows To Do beside the calendar, to drag work onto a day or a time")
-                .accessibilityAddTraits(todoOn ? .isSelected : [])
+                .glassButton(tint: todoNow ? Theme.accent : nil)
+                .hoverName(todoNow ? "Hide To Do" : "Show To Do", when: words < 1)
+                .accessibilityLabel(todoNow ? "Hide To Do" : "Show To Do")
+                .accessibilityHint(todoNow ? "Hides To Do beside the calendar" : todoAway ? "To Do was put away to give the month’s days room; shows it beside the month anyway" : "Shows To Do beside the calendar, to drag work onto a day or a time")
+                .accessibilityAddTraits(todoNow ? .isSelected : [])
             }
             if !engine.onBrightspace { // (Brightspace has no Scheduler)
                 Button {
@@ -480,27 +548,27 @@ struct CalendarView: View {
                     // (1.3.171) a person with a clock — office hours, a time with someone — where a calendar with a clock
                     // was taken at a glance for Calendars' calendar with a tick
                     Label("Find Appointment", systemImage: "person.badge.clock")
-                        .labelStyle(ToolLabel(words: words))
+                        .labelStyle(ToolLabel(words: words >= 3))
                 }
                 .glassButton()
-                .hoverName("Find Appointment", when: !words)
+                .hoverName("Find Appointment", when: words < 3)
                 .accessibilityHint("Office hours, conferences and sign-ups with a time to reserve")
             }
             Button {
                 syncing = true
             } label: {
                 Label("Sync", systemImage: "arrow.triangle.2.circlepath")
-                    .labelStyle(ToolLabel(words: words))
+                    .labelStyle(ToolLabel(words: words >= 1))
             }
             .glassButton()
-            .hoverName("Sync", when: !words)
+            .hoverName("Sync", when: words < 1)
             .accessibilityHint("Connect Apple, Google or Outlook calendars, and send Simpl to them")
             Button {
                 choosing.toggle()
             } label: {
                 HStack(spacing: 6) {
                     Label("Calendars", systemImage: "calendar.badge.checkmark")
-                        .labelStyle(ToolLabel(words: words))
+                        .labelStyle(ToolLabel(words: words >= 2))
                     Text("\(shown)")
                         .font(.sCaption.weight(.semibold).monospacedDigit())
                         .foregroundStyle(Theme.accentText)
@@ -511,7 +579,7 @@ struct CalendarView: View {
                 }
             }
             .glassButton()
-            .hoverName("Calendars", when: !words && !choosing)
+            .hoverName("Calendars", when: words < 2 && !choosing)
             .accessibilityHint("Choose the calendars shown (\(shown) shown)")
             .popover(isPresented: $choosing) {
                 CalendarsPopover(choices: data?.calendars ?? [], openSync: openSync) { Task { await load(animated: true) } }
@@ -644,29 +712,53 @@ struct CalendarView: View {
 
     // MARK: Month
 
-    /// The day panel's width beside the month, and the least the grid keeps beside it.
+    /// The day panel's width beside the month, and the least the grid keeps beside it: (M5) days wide enough for their
+    /// items' names — the day is listed beside the month only where the grid still names them.
     private static let dayWidth: CGFloat = 300
-    private static let gridLeast: CGFloat = 476
+    private static let gridLeast: CGFloat = 7 * monthNamesLeast
+    /// (M5) The least a day of the month is across for its items' names: in a narrower day ("Pre-…", "4 m…" in 60
+    /// points) each item is a dot in its calendar's colour — its name under the pointer, its preview a click away — and
+    /// what does not fit is "+4".
+    private static let monthNamesLeast: CGFloat = 84
+    /// (M5) A dot's room in a day: the dot (8 points) in a square a pointer can find.
+    private static let dotSlot: CGFloat = 13
+
+    /// (M5) How many dots fit on a line of a day `cell` points across, or nil where the day names its items.
+    private static func dotsPerLine(_ cell: CGFloat) -> Int? {
+        cell < monthNamesLeast ? max(2, Int(((cell - 10) / dotSlot).rounded(.down))) : nil
+    }
     /// (1.3.170) The least a week of the month is tall on a page that holds still: past that, its weeks scroll.
     private static let weekRowLeast: CGFloat = 76
 
     /// The month's grid with the day picked beside it on a wide window, under it on a narrow one that scrolls. (1.3.78)
     /// Chosen by the width, not by building both and measuring them: the grid is the heaviest thing drawn. (1.3.147) On a
     /// page that scrolls, the grid's weeks as tall as its days are wide (84 to 118 points), so a narrow window is not
-    /// given a month taller than wide; the day beside it from a grid of 476 points. (1.3.170) On a page that holds still,
-    /// the grid as tall as the window leaves it, its weeks stretched to fill it (scrolling inside it when they cannot),
-    /// the day beside it only where there is room for both; else a day's "2 more" opens it in the Agenda.
-    @ViewBuilder
+    /// given a month taller than wide; the day beside it from a grid of 588 points (M5: 476 before, its days too narrow
+    /// to name anything). (1.3.170) On a page that holds still, the grid as tall as the window leaves it, its weeks
+    /// stretched to fill it (scrolling inside it when they cannot), the day beside it only where there is room for both;
+    /// else a day's "2 more" opens it in the Agenda. (M5) Days narrower than `monthNamesLeast` show their items as dots.
     private func monthView(_ byDay: [String: [CalEvent]], size: CGSize?) -> some View {
         let width = size?.width ?? room
         let beside = width >= Self.gridLeast + 20 + Self.dayWidth
         let gridWidth = beside ? width - 20 - Self.dayWidth : width
+        let cell = gridWidth / 7
+        let dots = Self.dotsPerLine(cell)
+        return monthLayout(byDay, size: size, beside: beside, gridWidth: gridWidth, dots: dots)
+            // (M5, the screenshot suite: how wide the days are and how they show their items, for month_check)
+            .task(id: "\(Int(cell))|\(dots ?? 0)") {
+                guard Self.shooting else { return }
+                NSLog("[Simpl] calendar month: days %ld pt across, %@", Int(cell), dots == nil ? "items by name" : "items as dots")
+            }
+    }
+
+    @ViewBuilder
+    private func monthLayout(_ byDay: [String: [CalEvent]], size: CGSize?, beside: Bool, gridWidth: CGFloat, dots: Int?) -> some View {
         if let size {
             let weeks = CGFloat(weekCount())
             let fit = ((size.height - Self.monthHead - (weeks - 1)) / weeks).rounded(.down) // (less the hairlines between)
             let row = max(Self.weekRowLeast, fit)
             HStack(alignment: .top, spacing: 20) {
-                monthGrid(byDay, row: row, scrolls: fit < Self.weekRowLeast, beside: beside)
+                monthGrid(byDay, row: row, scrolls: fit < Self.weekRowLeast, beside: beside, dots: dots)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 if beside {
                     dayPanel(selected, events: byDay[key(selected)] ?? [], fills: true)
@@ -679,14 +771,14 @@ struct CalendarView: View {
             let per = (total / CGFloat(weekCount())).rounded(.down)
             if beside {
                 HStack(alignment: .top, spacing: 20) {
-                    monthGrid(byDay, row: per, scrolls: false, beside: true)
+                    monthGrid(byDay, row: per, scrolls: false, beside: true, dots: dots)
                         .frame(maxWidth: .infinity)
                     dayPanel(selected, events: byDay[key(selected)] ?? [], fills: false)
                         .frame(width: Self.dayWidth)
                 }
             } else {
                 VStack(alignment: .leading, spacing: 22) {
-                    monthGrid(byDay, row: per, scrolls: false, beside: true)
+                    monthGrid(byDay, row: per, scrolls: false, beside: true, dots: dots)
                     dayPanel(selected, events: byDay[key(selected)] ?? [], fills: false)
                 }
             }
@@ -697,8 +789,9 @@ struct CalendarView: View {
     private static let monthHead: CGFloat = 38
 
     /// `row`: each week's height; `scrolls`: the weeks scroll inside the grid (a page that holds still, too short for
-    /// them); `beside`: the day picked is listed with the month (else a day's "2 more" opens it in the Agenda).
-    private func monthGrid(_ byDay: [String: [CalEvent]], row: CGFloat, scrolls: Bool, beside: Bool) -> some View {
+    /// them); `beside`: the day picked is listed with the month (else a day's "2 more" opens it in the Agenda); `dots`:
+    /// (M5) how many of a day's items stand on a line as dots, in days too narrow for their names (nil: by name).
+    private func monthGrid(_ byDay: [String: [CalEvent]], row: CGFloat, scrolls: Bool, beside: Bool, dots: Int? = nil) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
                 ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, s in
@@ -716,10 +809,10 @@ struct CalendarView: View {
             ZStack(alignment: .top) {
                 Group {
                     if scrolls {
-                        ScrollView { monthWeeks(byDay, row: row, beside: beside) }
+                        ScrollView { monthWeeks(byDay, row: row, beside: beside, dots: dots) }
                             .scrollIndicators(.automatic)
                     } else {
-                        monthWeeks(byDay, row: row, beside: beside)
+                        monthWeeks(byDay, row: row, beside: beside, dots: dots)
                     }
                 }
                 .id(anchor) // (a new month is a new grid: it slides in from the side the move went)
@@ -749,7 +842,7 @@ struct CalendarView: View {
     }
 
     /// The month's weeks from the first day of the week it starts in, each `row` tall.
-    private func monthWeeks(_ byDay: [String: [CalEvent]], row: CGFloat, beside: Bool) -> some View {
+    private func monthWeeks(_ byDay: [String: [CalEvent]], row: CGFloat, beside: Bool, dots: Int?) -> some View {
         let first = Self.firstOfWeek(anchor)
         let weeks = weekCount()
         let days = (0..<(weeks * 7)).compactMap { cal.date(byAdding: .day, value: $0, to: first) }
@@ -758,7 +851,7 @@ struct CalendarView: View {
                 if w > 0 { Self.line.frame(height: 1) }
                 HStack(spacing: 0) {
                     ForEach(Array(days.dropFirst(w * 7).prefix(7).enumerated()), id: \.element) { i, day in
-                        dayCell(day, events: byDay[key(day)] ?? [], height: row, beside: beside)
+                        dayCell(day, events: byDay[key(day)] ?? [], height: row, beside: beside, dots: dots)
                             .overlay(alignment: .leading) {
                                 if i > 0 { Self.line.frame(width: 1) }
                             }
@@ -772,21 +865,12 @@ struct CalendarView: View {
     /// calendar's colour — (1.2) flat on the grid, no box round each. (planning-13) The open ones first, as many as the
     /// day has room for, a name taking a second line while there is room for it; work handed in folded into one line
     /// ("3 done", with what did not fit: "2 more · 3 done"), so the names still to do get the room. (1.3.170) A row of To
-    /// Do held over it rings it, "Plan here" in it; let go, the work is planned at the day's first free time.
-    private func dayCell(_ day: Date, events evs: [CalEvent], height: CGFloat, beside: Bool) -> some View {
+    /// Do held over it rings it, "Plan here" in it; let go, the work is planned at the day's first free time. (M5) A day
+    /// too narrow for names (`dots`: how many stand on a line) shows its items as dots (`dayDots`).
+    private func dayCell(_ day: Date, events evs: [CalEvent], height: CGFloat, beside: Bool, dots: Int?) -> some View {
         let off = !cal.isDate(day, equalTo: anchor, toGranularity: .month)
         let isToday = cal.isDateInToday(day)
         let isSel = cal.isDate(day, inSameDayAs: selected)
-        let open = evs.filter { !$0.isStruck }
-        let done = evs.count - open.count
-        // (lines of about 18 points under the day's number: four in a day of 112 points, five in one of 134)
-        let lines = max(2, Int(((height - 39 + 2) / 18.3).rounded(.down)))
-        let tail = done > 0 || open.count > lines
-        let room = lines - (tail ? 1 : 0)
-        let shown = Array(open.prefix(room))
-        let spare = room - shown.count
-        let hidden = open.count - shown.count
-        let rest = [hidden > 0 ? "\(hidden) more" : nil, done > 0 ? "\(done) done" : nil].compactMap { $0 }.joined(separator: " · ")
         let over = dayDrop.map { cal.isDate($0, inSameDayAs: day) } ?? false
         return Button {
             pick(day)
@@ -806,34 +890,11 @@ struct CalendarView: View {
                             }
                         }
                 }
-                VStack(alignment: .leading, spacing: 2) {
-                    // (1.2.3) an item clicked on the grid grows its preview out of it; the rest of the day picks the day
-                    ForEach(Array(shown.enumerated()), id: \.element.id) { i, ev in
-                        eventLink(ev, padded: false, radius: 5) {
-                            CalendarChip(event: ev, lines: i < spare ? 2 : 1)
-                        }
-                        .help(ev.title)
-                    }
-                    if tail {
-                        if beside || hidden == 0 {
-                            Text(rest)
-                                .font(.sCaption.weight(.medium))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .padding(.leading, 11)
-                        } else {
-                            // (no day beside the month: its whole list in the Agenda, as the web's "2 more")
-                            Button { showDay(day) } label: {
-                                Text(rest)
-                                    .font(.sCaption.weight(.semibold))
-                                    .foregroundStyle(Theme.accentText)
-                                    .lineLimit(1)
-                                    .padding(.leading, 11)
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .help("Everything on \(Self.dateWords(day, weekday: true))")
-                        }
+                Group {
+                    if let dots {
+                        dayDots(day, events: evs, height: height, perLine: dots, beside: beside)
+                    } else {
+                        dayNames(day, events: evs, height: height, beside: beside)
                     }
                 }
                 .opacity(off ? 0.6 : 1)
@@ -856,6 +917,83 @@ struct CalendarView: View {
         .onDrop(of: [.text], delegate: TodoDayDropDelegate(day: day, enabled: todoOn, over: $dayDrop) { id in planOnDay(id, day) })
         .accessibilityLabel(Self.spoken(day, count: evs.count))
         .accessibilityAddTraits(isSel ? .isSelected : [])
+    }
+
+    /// A day's items by name: the open ones first, as many as the day has room for, a name taking a second line while
+    /// there is room for it; what is done, and what did not fit, folded into one line ("2 more · 3 done").
+    private func dayNames(_ day: Date, events evs: [CalEvent], height: CGFloat, beside: Bool) -> some View {
+        let open = evs.filter { !$0.isStruck }
+        let done = evs.count - open.count
+        // (lines of about 18 points under the day's number: four in a day of 112 points, five in one of 134)
+        let lines = max(2, Int(((height - 39 + 2) / 18.3).rounded(.down)))
+        let tail = done > 0 || open.count > lines
+        let room = lines - (tail ? 1 : 0)
+        let shown = Array(open.prefix(room))
+        let spare = room - shown.count
+        let hidden = open.count - shown.count
+        let rest = [hidden > 0 ? "\(hidden) more" : nil, done > 0 ? "\(done) done" : nil].compactMap { $0 }.joined(separator: " · ")
+        return VStack(alignment: .leading, spacing: 2) {
+            // (1.2.3) an item clicked on the grid grows its preview out of it; the rest of the day picks the day
+            ForEach(Array(shown.enumerated()), id: \.element.id) { i, ev in
+                eventLink(ev, padded: false, radius: 5) {
+                    CalendarChip(event: ev, lines: i < spare ? 2 : 1)
+                }
+                .help(ev.title)
+            }
+            if tail {
+                dayTail(rest, day: day, opensDay: !beside && hidden > 0)
+                    .padding(.leading, 11)
+            }
+        }
+    }
+
+    /// (M5) A narrow day's items as dots in their calendar's colour, as many lines of them as the day has room for — the
+    /// open ones first, then what is done, fainter — each one's name under the pointer and its preview a click away (as a
+    /// name's); what does not fit, "+4" on the last line.
+    private func dayDots(_ day: Date, events evs: [CalEvent], height: CGFloat, perLine: Int, beside: Bool) -> some View {
+        let items = evs.filter { !$0.isStruck } + evs.filter(\.isStruck)
+        // (a line of dots is 13 points, 2 between: three lines in a day of 87 points)
+        let lines = max(2, Int(((height - 39 + 2) / (Self.dotSlot + 2)).rounded(.down)))
+        let drawn = items.count > perLine * lines ? Array(items.prefix(perLine * (lines - 1))) : items
+        let more = items.count - drawn.count
+        return VStack(alignment: .leading, spacing: 2) {
+            ForEach(Array(stride(from: 0, to: drawn.count, by: perLine)), id: \.self) { start in
+                HStack(spacing: 0) {
+                    ForEach(drawn[start..<min(start + perLine, drawn.count)], id: \.id) { ev in
+                        eventLink(ev, padded: false, radius: 4) {
+                            CalendarDot(event: ev)
+                        }
+                        .help(ev.title)
+                    }
+                }
+            }
+            if more > 0 {
+                dayTail("+\(more)", day: day, opensDay: !beside)
+                    .padding(.leading, 2)
+            }
+        }
+    }
+
+    /// The line under a day's items: what did not fit and what is done, plain where the day beside the month lists them
+    /// (a click on the day picks it) — else (`opensDay`) a link to the day alone in the Agenda, as the web's "2 more".
+    @ViewBuilder
+    private func dayTail(_ words: String, day: Date, opensDay: Bool) -> some View {
+        if opensDay {
+            Button { showDay(day) } label: {
+                Text(words)
+                    .font(.sCaption.weight(.semibold))
+                    .foregroundStyle(Theme.accentText)
+                    .lineLimit(1)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Everything on \(Self.dateWords(day, weekday: true))")
+        } else {
+            Text(words)
+                .font(.sCaption.weight(.medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
     }
 
     /// (1.3.195, the web's 2.99.114) To Do with a plan's block held over it: ringed, and a tag saying letting go there
@@ -1973,6 +2111,7 @@ struct CalendarView: View {
             if v == "month" { anchor = Self.monthStart(selected) }
             mode = v
         }
+        if v == "month" { todoKept = false } // (M5: a narrow window's month puts To Do away again, as it opens)
         Task {
             await engine.act("calView", ["view": v])
             await load(animated: true)
@@ -2416,6 +2555,30 @@ extension CalEvent {
 
     /// Greyed: over (its due time or its end gone by), or struck.
     var isPast: Bool { (past ?? (done == true)) || isStruck }
+}
+
+/// (M5) A piece of work or an event on a day of the month too narrow for its name: a dot in its calendar's colour — red
+/// when it is missing, a ring when it is a plan — fainter once over, faintest once handed in; in a square a pointer can
+/// find (its name is its tooltip, its preview a click away).
+private struct CalendarDot: View {
+    let event: CalEvent
+
+    var body: some View {
+        let missing = event.missing == true
+        let c = missing ? Color.red : Color(hex: event.color)
+        Group {
+            if event.layer == "plan" {
+                Circle().strokeBorder(c, lineWidth: 1.5)
+            } else {
+                Circle().fill(c)
+            }
+        }
+        .frame(width: 8, height: 8)
+        .opacity(missing ? 1 : (event.isStruck ? 0.35 : (event.isPast ? 0.6 : 1)))
+        .frame(width: 13, height: 13) // (CalendarView.dotSlot)
+        .contentShape(Rectangle())
+        .accessibilityHidden(true)
+    }
 }
 
 /// A piece of work or an event on a day of the month: (1.2) a line on the grid, (planning-13) a thin bar in its

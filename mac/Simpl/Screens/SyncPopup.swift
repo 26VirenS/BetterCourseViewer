@@ -45,7 +45,7 @@ struct SyncPopup: View {
         .confirmationDialog("Unlink \(unlinking?.name ?? "this calendar")?", isPresented: Binding(get: { unlinking != nil }, set: { if !$0 { unlinking = nil } }), presenting: unlinking) { l in
             Button("Unlink", role: .destructive) { Task { await unlink(l) } }
         } message: { _ in
-            Text("Its events leave Simpl's Calendar. The calendar itself is not touched.")
+            Text("Its events are removed from Simpl’s calendar. The calendar itself isn’t changed.")
         }
         .confirmationDialog("Stop sharing your Simpl calendar?", isPresented: $stopping) {
             Button("Stop Sharing", role: .destructive) { Task { await stopSimpl() } }
@@ -81,8 +81,9 @@ struct SyncPopup: View {
                 // (1.3.184) the calendar accounts signed in to — the real sync — first; the private link and the calendars
                 // linked by their address after, for a calendar app Simpl does not sign in to
                 section("Your calendar accounts") { SyncAccounts(changed: changed) }
-                section("Or add Simpl by its link") { simplCard(d.simpl) }
-                section("Or link a calendar by its address") { linksCard(d.links) }
+                // (M19: what each way does, in plain words — Simpl into a calendar app, another calendar into Simpl)
+                section("Or subscribe to Simpl with a link") { simplCard(d.simpl) }
+                section("Or add another calendar by its link") { linksCard(d.links) }
                 DisclosureGroup("Where is my calendar's link?", isExpanded: $showWhere) {
                     VStack(alignment: .leading, spacing: 6) {
                         whereLine("Google", "Settings → your calendar → Integrate calendar → Secret address in iCal format.")
@@ -98,7 +99,7 @@ struct SyncPopup: View {
                 .font(.sCallout)
                 // (1.3.167) what the copy did, said under it (a link's outcome is said under its field)
                 if let said { saidLine(said) }
-                Text("Choose which calendars show with Calendars, beside Sync.")
+                Text("To choose which calendars appear, use Calendars, next to Sync.")
                     .font(.sCaption)
                     .foregroundStyle(.secondary)
             }
@@ -141,11 +142,11 @@ struct SyncPopup: View {
                     }
                     appButton("Copy Link", symbol: "doc.on.doc") {
                         copyToPasteboard(link)
-                        say("Your Simpl calendar's link is copied. Paste it where your calendar app adds one by address.", bad: false)
+                        say("Your Simpl calendar’s link is copied. In your calendar app, add a calendar by its address and paste it there.", bad: false)
                     }
                 }
                 simplStatus(f)
-                Text("Your work, your own tasks and your plans, sent again while Simpl is open. It is sealed: only this private link opens it, so keep it to yourself. Google and Outlook look for changes every few hours.")
+                Text("Your work, your own tasks and your plans, kept up to date while Simpl is open. Only this private link opens it, so keep it to yourself. Google and Outlook check for changes every few hours.")
                     .font(.sCaption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -164,7 +165,7 @@ struct SyncPopup: View {
                     IconTile(symbol: "calendar.badge.plus", color: Theme.accent, size: 36)
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Your work, your tasks and your plans").font(.sBody.weight(.semibold))
-                        Text("As one calendar, Simpl, in Apple Calendar, Google Calendar or Outlook, kept up to date. It is sealed: only your private link opens it.")
+                        Text("In Apple Calendar, Google Calendar or Outlook, as one calendar named Simpl that stays up to date. Only your private link opens it.")
                             .font(.sCallout)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)

@@ -144,7 +144,7 @@ struct SyncAccounts: View {
                 status(a, syncing: syncing)
                 if !a.calendars.isEmpty {
                     let on = a.calendars.filter(\.on).count
-                    Text("\(on) of \(a.calendars.count) calendars shown · choose them with Calendars")
+                    Text("\(on) of \(a.calendars.count) calendars shown · choose which in Calendars")
                         .font(.sCaption)
                         .foregroundStyle(.secondary)
                 }

@@ -1390,11 +1390,11 @@ private struct HandInSheet: View {
             if !kindNamed { Text("Files") }
         } footer: {
             if let a = assignment.allowed, !a.isEmpty {
-                Text("This assignment takes \(allowedList) files." + (convertible.line.isEmpty ? "" : " \(convertible.line).") + (zipOK ? " Any file or folder can go as a .zip." : ""))
+                Text("This assignment takes \(allowedList) files." + (convertible.line.isEmpty ? "" : " \(convertible.line).") + (zipOK ? " Any file or folder can be uploaded as a .zip file." : ""))
                     .font(.sCallout)
                     .foregroundStyle(.secondary)
             } else {
-                Text("A folder goes as a .zip.")
+                Text("Folders are uploaded as .zip files.")
                     .font(.sCallout)
                     .foregroundStyle(.secondary)
             }
