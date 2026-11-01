@@ -513,11 +513,24 @@ private struct TodoPanelRow: View {
         .accessibilityLabel(row.done ? "Mark not done: \(row.title)" : "Mark done: \(row.title)")
     }
 
-    /// Its course and its repeat ("BIO 101", "My task · repeats weekly"), cut short before when it is due is.
+    /// A task of your own's repeat ("repeats weekly"), said after its course.
+    private var repeats: String? {
+        guard row.custom == true else { return nil }
+        return (row.meta?.components(separatedBy: " · ") ?? []).first(where: { $0.hasPrefix("repeats") })
+    }
+
+    /// Its course and its repeat ("BIO 101: Biology I", "My task · repeats weekly").
     private var course: String {
-        let parts = row.meta?.components(separatedBy: " · ") ?? []
-        let repeats = row.custom == true ? parts.first(where: { $0.hasPrefix("repeats") }) : nil
-        return [row.courseName, repeats].compactMap { PreviewFormat.text($0) }.joined(separator: " · ")
+        [row.courseName, repeats].compactMap { PreviewFormat.text($0) }.joined(separator: " · ")
+    }
+
+    /// (M3) Its course's code — "MATH 140" of "MATH 140: Calculus I" — and its repeat, for a row too narrow for the whole
+    /// name and when it is due on one line; nil when the name has no shorter code before a colon.
+    private var courseCode: String? {
+        guard let name = PreviewFormat.text(row.courseName), let colon = name.firstIndex(of: ":") else { return nil }
+        let code = name[..<colon].trimmingCharacters(in: .whitespaces)
+        guard !code.isEmpty, code.count <= 16 else { return nil }
+        return [code, repeats].compactMap { PreviewFormat.text($0) }.joined(separator: " · ")
     }
 
     private var words: some View {
@@ -528,19 +541,9 @@ private struct TodoPanelRow: View {
                 .foregroundStyle(finished ? Color.secondary : Color.primary)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
-            // ("MATH 140: Calc… · Due Today 11:59 PM": the course gives way, when it is due never does)
-            HStack(spacing: 0) {
-                Circle().fill(Color(hex: row.color)).frame(width: 6, height: 6).padding(.trailing, 5)
-                Text(course)
-                    .lineLimit(1)
-                if let due = PreviewFormat.text(row.dueText) {
-                    Text(course.isEmpty ? due : " · \(due)")
-                        .lineLimit(1)
-                        .fixedSize()
-                }
-            }
-            .font(.sCaption)
-            .foregroundStyle(row.late == true ? Color.red : Color.secondary)
+            dueLine
+                .font(.sCaption)
+                .foregroundStyle(row.late == true ? Color.red : Color.secondary)
             if let p = row.plan, !finished {
                 Label(p.words, systemImage: "clock")
                     .font(.sCaption2.weight(.semibold))
@@ -551,6 +554,45 @@ private struct TodoPanelRow: View {
         }
         .padding(.vertical, 1)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// (M3) Its course and when it is due: on one line where the whole name fits beside it ("MATH 140: Calculus I · Due
+    /// Today 11:59 PM"); else its course's code ("MATH 140 · Due Today 11:59 PM"); else when it is due on a line of its
+    /// own under the course — never the course squeezed to nothing before a dangling "·" (the due words never give way).
+    @ViewBuilder
+    private var dueLine: some View {
+        let due = PreviewFormat.text(row.dueText)
+        if let due, !course.isEmpty {
+            ViewThatFits(in: .horizontal) {
+                courseLine(course, due: due)
+                if let code = courseCode, code != course { courseLine(code, due: due) }
+                VStack(alignment: .leading, spacing: 1) {
+                    courseLine(course, due: nil)
+                    Text(due)
+                        .lineLimit(1)
+                        .padding(.leading, 11) // (under the course's name, past its dot)
+                }
+            }
+        } else {
+            courseLine(course, due: due)
+        }
+    }
+
+    /// The course's dot, its name (or code) and, if given, " · " and when it is due. The separator only ever between two
+    /// things: a course with no name says when it is due alone.
+    private func courseLine(_ name: String, due: String?) -> some View {
+        HStack(spacing: 0) {
+            Circle().fill(Color(hex: row.color)).frame(width: 6, height: 6).padding(.trailing, 5)
+            if !name.isEmpty {
+                Text(name)
+                    .lineLimit(1)
+            }
+            if let due {
+                Text(name.isEmpty ? due : " · \(due)")
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+        }
     }
 
     /// A plain assignment still to hand in (Submit opens it at its hand-in).
