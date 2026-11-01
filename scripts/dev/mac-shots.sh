@@ -571,6 +571,8 @@ ui_review() {
   MODE=light shoot light-03p-todo-plan-rail 16 -SimplPlace todo -SimplPlanFirst YES
   MODE=dark shoot dark-03p-todo-plan-rail 16 -SimplPlace todo -SimplPlanFirst YES
   MODE=light shoot light-11w-course-grades-whatif 16 -SimplPlace section:courses/101:grades -SimplWhatIf YES
+  # (M11) the same scrolled to its foot (-SimplWhatIfFoot): the last group clear of What-If's bar (whatif_check)
+  MODE=light shoot light-11x-course-grades-whatif-foot 18 -SimplPlace section:courses/101:grades -SimplWhatIf YES -SimplWhatIfFoot YES
   MODE=light shoot light-25b-compose-attached 16 -SimplPlace inbox -SimplOpen compose -SimplAttach "$PWD/docs/screenshots/calendar.png"
   MODE=light SIZE=1720x1040 shoot light-45-wide-grades 14 -SimplPlace grades
   MODE=light SIZE=1440x900 shoot light-46-wide-todo 12 -SimplPlace todo
@@ -1161,6 +1163,20 @@ community_tools_check() {
   if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::community tools: /'; return 1; fi
 }
 
+# (M11) whatif_check: a course's grades with What-If on, scrolled to the page's foot (light-11x-course-grades-whatif-foot),
+# as whatif-check.txt — the last row ended at least 16 points above What-If's bar (GradesView.swift's WhatIfFootProbe:
+# "grades what-if: at the page's foot the last row ends N pt above the bar"; a point given for rounding)
+whatif_check() {
+  local out="$OUT_ABS/whatif-check.txt" f="$OUT_ABS/console-light-11x-course-grades-whatif-foot.txt" line n
+  : > "$out"
+  line="$(grep -o 'grades what-if: at the page.s foot .*' "$f" 2>/dev/null | tail -1)"
+  n="$(printf '%s' "$line" | sed -n 's/.* ends \(-\{0,1\}[0-9]*\) pt above the bar.*/\1/p')"
+  if [ -n "$n" ] && [ "$n" -ge 15 ]; then echo "ok   the last row scrolls clear of What-If's bar ($line)" >> "$out"
+  else echo "FAIL the last row stays under What-If's bar (${line:-nothing said})" >> "$out"; fi
+  cat "$out"
+  if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::what-if: /'; return 1; fi
+}
+
 # (M5) month_check: To Do & Calendar's month 1024 points wide with the sidebar shown, as month-check.txt — the month
 # put To Do away and its days named their items (light-05n-calendar-month-narrow); with To Do kept beside it
 # (-SimplTodoKept), its days, too narrow for names, showed their items as dots (light-05o-calendar-month-dots). What
@@ -1382,6 +1398,7 @@ if [ "${SHOTS:-full}" = check ]; then
   share_check || exit 1 # (1.3.208)
   community_tools_check || exit 1 # (1.3.211)
   month_check || exit 1 # (M5)
+  whatif_check || exit 1 # (M11)
   exit 0
 fi
 
@@ -1563,6 +1580,7 @@ if [ "$SHARDS" = 1 ]; then
   share_check || true # (1.3.208)
   community_tools_check || true # (1.3.211)
   month_check || true # (M5)
+  whatif_check || true # (M11)
 fi
 keep_crashes
 exit 0
