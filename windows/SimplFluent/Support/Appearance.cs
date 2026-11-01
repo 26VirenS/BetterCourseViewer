@@ -484,4 +484,32 @@ public static class Appearance
         static double Kept(double v) => Math.Abs(v) < 0.001 ? 0 : Math.Round(Math.Clamp(v, -0.5, 0.5), 3);
         return (Kept(px), Kept(py));
     }
+
+    /// <summary>(0.3.104) <see cref="PanFrom"/> the other way: where a place's picture is kept here, as the web and the Mac
+    /// put it — the point of it at x%, y% on the place's same point — for a theme shared with Simpl Community. A picture
+    /// that does not overflow its place one way is where it is pinned that way.</summary>
+    public static (double X, double Y) PlaceFrom(string slot, double px, double py, double z, double aspect)
+    {
+        var side = slot == "side";
+        var place = side ? PaneShape : CounterShape;
+        if (!(aspect > 0) || !double.IsFinite(aspect)) aspect = place;
+        z = Math.Clamp(z, 0.5, 3);
+        var overX = Math.Max(1, aspect / place) * z - 1;
+        var overY = Math.Max(1, place / aspect) * z - 1;
+        var pinned = side ? 0.5 : 1;
+        var x = overX > 0.0001 ? (pinned - px / overX) * 100 : pinned * 100;
+        var y = overY > 0.0001 ? (1 - py / overY) * 100 : 100;
+        return (Math.Round(Math.Clamp(x, 0, 100), 1), Math.Round(Math.Clamp(y, 0, 100), 1));
+    }
+
+    /// <summary>(0.3.104) What a place shows, to share it: its drawing (by name, and its shape), or its photo (its file),
+    /// and where it sits and how large; null when it shows nothing.</summary>
+    public static (string? Scene, string? File, double Aspect, double PanX, double PanY, double Zoom, bool Plain)? ShareablePlace(string slot)
+    {
+        var (px, py) = Pan(slot);
+        var z = Math.Clamp(Zoom(slot), 0.5, 3);
+        if (PhotoKind(slot) == "photo" && Photo(slot) is { } file) return (null, file, 0, px, py, z, Plain(slot));
+        if (SceneFor(slot) is { } scene) return (scene, null, Kit.Scenes.Aspect(scene, slot) ?? 0, px, py, z, false);
+        return null;
+    }
 }

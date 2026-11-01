@@ -1,3 +1,7 @@
+**What's new in 0.3.104**
+
+- **Share your theme** — Appearance ▸ Community has a Share yours tile: name your theme (and sign it if you like) and it goes to Simpl Community, where it shows once it's been looked at.
+
 **What's new in 0.3.103**
 
 - **Never stuck updating** — every PC gets the newest version, betas included (Get beta updates is gone).

@@ -815,9 +815,11 @@ public sealed class AppearanceOverlay : Grid
         if (Community.State == Community.Phase.Failed)
             return Line(K.Wrapped(Community.Why ?? "Simpl Community could not be reached.", Ty.Body, B.Text2, 2).Align(HorizontalAlignment.Left, VerticalAlignment.Center),
                 K.Button("Try again", () => _ = Community.Load(force: true)));
+        ShareOnLaunch();
         if (Community.Themes.Count == 0)
-            return Line(K.Text("No themes shared yet.", Ty.Body, B.Text2), K.Link("Simpl Community", () => engine.OpenBrowser(new Uri(Community.Site, "community"))));
+            return Line(ShareTile(), K.Text("No themes shared yet. Be the first: share yours.", Ty.Body, B.Text2), K.Link("Simpl Community", () => engine.OpenBrowser(new Uri(Community.Site, "community"))));
         var row = K.H(10);
+        row.Children.Add(ShareTile());
         foreach (var t in Community.Themes) row.Children.Add(CommunityTile(t));
         var scroll = new ScrollViewer { Content = row, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, Padding = new Thickness(0, 2, 0, 2) };
         if (Community.Problem is not { } problem) return scroll;
@@ -825,6 +827,100 @@ public sealed class AppearanceOverlay : Grid
         why.MaxWidth = 170;
         why.VerticalAlignment = VerticalAlignment.Center;
         return K.Columns("*, 12, auto", scroll.Col(0), why.Col(2));
+    }
+
+    /// <summary>(0.3.104, the Mac's 1.3.208 and the web's Share yours) The first tile of Community: this theme shared —
+    /// a click opens the form (<see cref="OpenShare"/>).</summary>
+    private FrameworkElement ShareTile()
+    {
+        var face = new Border { Width = 78, Height = 48, CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1), Child = K.Icon(SymbolRegular.Share24, 20, B.AccentText).Align(HorizontalAlignment.Center, VerticalAlignment.Center) };
+        face.SetResourceReference(Border.BorderBrushProperty, B.Accent);
+        var a = Appearance.Accent;
+        face.Background = K.Brush(Color.FromArgb(0x22, a.R, a.G, a.B));
+        var ring = new Border { Padding = new Thickness(2), CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(2), BorderBrush = Brushes.Transparent, Child = face };
+        var label = K.Text("Share yours", Ty.Caption).Center();
+        label.FontWeight = FontWeights.SemiBold;
+        var b = K.Subtle(K.V(4, ring, label), OpenShare, new Thickness(2), 8);
+        b.ToolTip = "Share this theme with Simpl Community";
+        System.Windows.Automation.AutomationProperties.SetName(b, "Share this theme with Simpl Community");
+        return b;
+    }
+
+    private static bool shareAsked;
+
+    /// <summary>The screenshot suite's --community-share &lt;name&gt;: the form opened with that name (signed as Sam) and
+    /// sent, as Share sends it, once the gallery shows.</summary>
+    private void ShareOnLaunch()
+    {
+        if (shareAsked || Launch.Get("community-share") is not { Length: > 0 } name) return;
+        shareAsked = true;
+        // (the picture waits until the theme has gone, or could not)
+        Shot.Began();
+        Dispatcher.BeginInvoke(() => OpenShare(name, "Sam", send: true), DispatcherPriority.ApplicationIdle);
+    }
+
+    private void OpenShare() => OpenShare("", "", send: false);
+
+    /// <summary>
+    /// The form Share yours opens (the Mac's CommunityShareForm): a name (up to 40 letters) and Signed as (up to 30,
+    /// optional), what goes and what does not, and Share — which sends this theme (Community.Share) and says so here: on
+    /// its way, why it could not go, or that it went and shows once it has been looked at.
+    /// </summary>
+    private void OpenShare(string name, string maker, bool send)
+    {
+        Community.ShareAgain();
+        var nameBox = new TextBox { PlaceholderText = "Its name", Text = name, MaxLength = 40 };
+        var byBox = new TextBox { PlaceholderText = "Signed as (optional)", Text = maker, MaxLength = 30 };
+        var note = K.Wrapped("Its colour, look and pictures go to Simpl Community. Nothing else of yours is sent.", Ty.Caption, B.Text2);
+        var status = K.Wrapped("", Ty.Caption, B.Caution);
+        status.Visibility = Visibility.Collapsed;
+        if (!Community.CanShare) { status.Text = "Pick a colour or a picture first."; status.Visibility = Visibility.Visible; }
+        var form = K.V(10, note, nameBox, byBox, status);
+        var s = new Sheet { Title = "Share this theme", Body = form, Width = 400, Floats = true, Name = "Share this theme" };
+        SheetButton? go = null, cancel = null;
+        async void Send()
+        {
+            if (Community.Sharing == Community.ShareState.Sending || go == null) return;
+            go.Enabled = false;
+            go.Relabel("Sharing…");
+            nameBox.IsEnabled = byBox.IsEnabled = false;
+            status.Visibility = Visibility.Collapsed;
+            var ok = await Community.Share(nameBox.Text, byBox.Text);
+            if (ok)
+            {
+                form.Children.Clear();
+                var done = K.Columns("auto, *", K.Icon(SymbolRegular.CheckmarkCircle24, 22, Color.FromRgb(0x10, 0x7c, 0x10), filled: true).Col(0),
+                    K.Wrapped("Shared. It shows in Simpl Community once it’s been looked at.", Ty.Body, B.Text).Margin(10, 0, 0, 0).Col(1));
+                form.Children.Add(done);
+                go.Visible = false;
+                cancel?.Relabel("Done");
+                Shot.Moved();
+                return;
+            }
+            status.Text = Community.ShareWhy ?? "That did not go through. Try again later.";
+            status.Visibility = Visibility.Visible;
+            go.Relabel("Share");
+            go.Enabled = Community.CanShare;
+            nameBox.IsEnabled = byBox.IsEnabled = true;
+        }
+        go = s.Add("Share", SheetButtonKind.Primary, Send, closes: false);
+        cancel = s.Add("Cancel", SheetButtonKind.Close);
+        nameBox.KeyDown += (_, e) => { if (e.Key == Key.Enter) { e.Handled = true; Send(); } };
+        byBox.KeyDown += (_, e) => { if (e.Key == Key.Enter) { e.Handled = true; Send(); } };
+        window.Sheets.Show(s);
+        go.Enabled = Community.CanShare;
+        if (send) _ = Later(1000, async () =>
+        {
+            Send();
+            while (Community.Sharing == Community.ShareState.Sending) await Task.Delay(200);
+            Shot.Ended();
+        });
+    }
+
+    private static async Task Later(int ms, Func<Task> then)
+    {
+        await Task.Delay(ms);
+        await then();
     }
 
     private FrameworkElement CommunityTile(Community.Theme t)

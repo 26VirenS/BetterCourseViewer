@@ -11,7 +11,9 @@ namespace Simpl.Support;
 /// (0.3.67, the Mac's 1.3.173 and the web's 2.99.106) Simpl Community in Appearance: themes students made and shared,
 /// read from the site's gallery (simplcourses.com/api/community/themes, open to the apps), each worn in full with a
 /// click — its colour, its look, and its pictures, each where it was pinned: one of Simpl's drawings by name, or a photo
-/// read from the site. What was worn before is replaced.
+/// read from the site. What was worn before is replaced. (0.3.104, the Mac's 1.3.208 and the web's Share yours) And this
+/// theme shared: named, signed if the student likes, and sent to the site (simplcourses.com/api/community/submit) to be
+/// looked at before it shows in the gallery.
 /// </summary>
 public static class Community
 {
@@ -185,6 +187,159 @@ public static class Community
         {
             Busy = null;
             Changed?.Invoke();
+        }
+    }
+
+    // ---- this theme shared ----
+
+    public enum ShareState { Idle, Sending, Sent, Failed }
+
+    /// <summary>Where sharing this theme stands, and why it could not go.</summary>
+    public static ShareState Sharing { get; private set; }
+    public static string? ShareWhy { get; private set; }
+
+    /// <summary>A theme's photos can be several megabytes: a minute for them to go.</summary>
+    private static readonly HttpClient Upload = new(new HttpClientHandler { UseCookies = false }) { Timeout = TimeSpan.FromSeconds(60) };
+
+    /// <summary>Something to share: a colour, or a drawing or a photo in one of the places (the site takes nothing less).</summary>
+    public static bool CanShare => Appearance.AccentHex != null || Appearance.Slots.Any(s => Appearance.ShareablePlace(s.Key) != null);
+
+    /// <summary>
+    /// This theme sent to Simpl Community (the web's lib/theme.js communityOf, background.js community 'share'): its name
+    /// and maker, the colour, the look chosen (light, dark, or none for Windows' own), and in each place its drawing, or
+    /// its photo — sent beside it as a JPEG small enough for the site — where it sits, a photo's Ink switch as it is. No
+    /// cookie, nothing else of the student's. A place's own colour is not part of a shared theme (the web's is not either).
+    /// True when the site took it; it shows in the gallery once the owner has looked at it.
+    /// </summary>
+    public static async Task<bool> Share(string name, string maker)
+    {
+        if (Sharing == ShareState.Sending) return false;
+        name = name.Trim();
+        maker = maker.Trim();
+        if (name.Length > 40) name = name[..40];
+        if (maker.Length > 30) maker = maker[..30];
+        if (name.Length == 0) return Refused("Give the theme a name.");
+        if (!CanShare) return Refused("Pick a colour or a picture first.");
+        Sharing = ShareState.Sending;
+        ShareWhy = null;
+        Changed?.Invoke();
+        try
+        {
+            var places = new Dictionary<string, object?>();
+            var photos = new Dictionary<string, byte[]>();
+            foreach (var (slot, _) in Appearance.Slots)
+            {
+                if (Appearance.ShareablePlace(slot) is not { } p) continue;
+                var aspect = p.Aspect;
+                var d = new Dictionary<string, object?>();
+                if (p.Scene is { } scene) d["scene"] = scene;
+                else if (p.File is { } file)
+                {
+                    if (await Task.Run(() => ShareJpeg(file)) is not { } jpeg) continue;
+                    photos[slot] = jpeg.Bytes;
+                    aspect = jpeg.Aspect;
+                    d["photo"] = true;
+                    if (p.Plain) d["ink"] = false;
+                }
+                var (x, y) = Appearance.PlaceFrom(slot, p.PanX, p.PanY, p.Zoom, aspect);
+                d["x"] = x;
+                d["y"] = y;
+                d["z"] = Math.Round(p.Zoom, 3);
+                places[slot] = d;
+            }
+            var look = Appearance.Look is "light" or "dark" ? Appearance.Look : null;
+            var theme = new Dictionary<string, object?> { ["name"] = name, ["maker"] = maker, ["accent"] = Appearance.AccentHex?.ToLowerInvariant(), ["look"] = look, ["places"] = places };
+            using var form = new MultipartFormDataContent();
+            form.Add(new StringContent(JsonSerializer.Serialize(theme), System.Text.Encoding.UTF8, "application/json"), "theme");
+            foreach (var (slot, bytes) in photos)
+            {
+                var part = new ByteArrayContent(bytes);
+                part.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
+                form.Add(part, $"photo-{slot}", $"{slot}.jpg");
+            }
+            using var res = await Upload.PostAsync(new Uri(Site, "api/community/submit"), form);
+            var body = await res.Content.ReadAsStringAsync();
+            string? id = null, message = null;
+            var ok = false;
+            try
+            {
+                using var doc = JsonDocument.Parse(body);
+                ok = doc.RootElement.TryGetProperty("ok", out var o) && o.ValueKind == JsonValueKind.True;
+                if (doc.RootElement.TryGetProperty("id", out var i) && i.ValueKind == JsonValueKind.String) id = i.GetString();
+                if (doc.RootElement.TryGetProperty("message", out var m) && m.ValueKind == JsonValueKind.String) message = m.GetString();
+            }
+            catch (JsonException) { /* not the site's answer */ }
+            if (!res.IsSuccessStatusCode || !ok)
+            {
+                Log.Write($"community: share refused ({message ?? ((int)res.StatusCode).ToString()})");
+                return Refused(message ?? "That did not go through. Try again later.");
+            }
+            Sharing = ShareState.Sent;
+            Log.Write($"community: shared {name} ({id}, {photos.Count} photos)");
+            Changed?.Invoke();
+            return true;
+        }
+        catch (Exception e)
+        {
+            Log.Write("community: share failed: " + e.Message);
+            return Refused("Simpl Community could not be reached. Check your connection and try again.");
+        }
+    }
+
+    private static bool Refused(string why)
+    {
+        Sharing = ShareState.Failed;
+        ShareWhy = why;
+        Changed?.Invoke();
+        return false;
+    }
+
+    /// <summary>Back to not yet (the form opened afresh).</summary>
+    public static void ShareAgain()
+    {
+        if (Sharing == ShareState.Sending) return;
+        Sharing = ShareState.Idle;
+        ShareWhy = null;
+    }
+
+    /// <summary>A photo made small enough to share: no more than 1,600 pixels on its longer side, then 1,200 and 900 at
+    /// less quality while it is still over 1.4 MB (the site takes up to 1.5 MB a photo); and its shape.</summary>
+    private static (byte[] Bytes, double Aspect)? ShareJpeg(string file)
+    {
+        try
+        {
+            var bytes = File.ReadAllBytes(file);
+            int w, h;
+            using (var probe = new MemoryStream(bytes))
+            {
+                var frame = BitmapFrame.Create(probe, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None);
+                w = frame.PixelWidth;
+                h = frame.PixelHeight;
+            }
+            if (w <= 0 || h <= 0) return null;
+            foreach (var (side, quality) in new[] { (1600, 82), (1200, 75), (900, 70) })
+            {
+                using var ms = new MemoryStream(bytes);
+                var img = new BitmapImage();
+                img.BeginInit();
+                img.StreamSource = ms;
+                img.CacheOption = BitmapCacheOption.OnLoad;
+                if (w >= h && w > side) img.DecodePixelWidth = side;
+                else if (h > w && h > side) img.DecodePixelHeight = side;
+                img.EndInit();
+                img.Freeze();
+                var enc = new JpegBitmapEncoder { QualityLevel = quality };
+                enc.Frames.Add(BitmapFrame.Create(img));
+                using var outStream = new MemoryStream();
+                enc.Save(outStream);
+                if (outStream.Length <= 1_400_000) return (outStream.ToArray(), w / (double)h);
+            }
+            return null;
+        }
+        catch (Exception e)
+        {
+            Log.Write("community: a photo could not be made ready to share: " + e.Message);
+            return null;
         }
     }
 
