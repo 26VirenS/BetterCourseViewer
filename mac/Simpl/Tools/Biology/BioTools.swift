@@ -49,7 +49,7 @@ enum BioTools {
                                          symbol: "arrow.triangle.branch", fallback: nil, hex: "#14b8a6")
         case .popgen: return BioToolInfo(name: "Hardy–Weinberg", shortName: "Hardy–Weinberg", note: "Allele frequencies, equilibrium and evolution.",
                                          symbol: "person.3", fallback: nil, hex: "#8bbf3f")
-        case .biolab: return BioToolInfo(name: "Bio Lab Calculator", shortName: "Lab maths", note: "Dilutions, microscopy, stats and the AP formula sheet.",
+        case .biolab: return BioToolInfo(name: "Bio Lab Calculator", shortName: "Lab Maths", note: "Dilutions, microscopy, stats and the AP formula sheet.",
                                          symbol: "testtube.2", fallback: nil, hex: "#c27c4a")
         case .enzyme: return BioToolInfo(name: "Enzyme Lab", shortName: "Enzymes", note: "How temperature, pH and inhibitors change rate.",
                                          symbol: "bolt", fallback: nil, hex: "#d9a406")

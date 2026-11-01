@@ -45,18 +45,18 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
 
     var name: String {
         switch self {
-        case .cite: return "Citation generator"
-        case .pomo: return "Focus timer"
+        case .cite: return "Citation Generator"
+        case .pomo: return "Focus Timer"
         case .calc: return "Calculator"
-        case .graph: return "Graphing calculator"
+        case .graph: return "Graphing Calculator"
         case .motion, .vectors, .circuit: return PhysTools.info(self).name
         case .ptable, .lewis, .molecule, .atoms, .balance, .moles, .gas, .solution: return ChemTools.info(self).name
-        case .need: return "Grade needed"
-        case .conv: return "File converter"
-        case .units: return "Unit converter"
-        case .pdfx: return "Merge & split PDFs"
-        case .mark: return "PDF annotator"
-        case .ocr: return "Image to text"
+        case .need: return "Grade Needed"
+        case .conv: return "File Converter"
+        case .units: return "Unit Converter"
+        case .pdfx: return "Merge & Split PDFs"
+        case .mark: return "PDF Annotator"
+        case .ocr: return "Image to Text"
         case .fc: return "Flashcards"
         case .words: return "Word Counter"
         case .stats: return "Statistics"
@@ -78,12 +78,12 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable {
         case .graph: return "Graphing"
         case .motion, .vectors, .circuit: return PhysTools.info(self).shortName
         case .ptable, .lewis, .molecule, .atoms, .balance, .moles, .gas, .solution: return ChemTools.info(self).shortName
-        case .need: return "Grade needed"
+        case .need: return "Grade Needed"
         case .conv: return "Convert"
         case .units: return "Units"
-        case .pdfx: return "Merge & split"
-        case .mark: return "Mark up"
-        case .ocr: return "Image to text"
+        case .pdfx: return "Merge & Split"
+        case .mark: return "Mark Up"
+        case .ocr: return "Image to Text"
         case .fc: return "Flashcards"
         case .words: return "Words"
         case .stats: return "Stats"
@@ -418,7 +418,7 @@ enum ToolGroup: CaseIterable {
     var title: String {
         switch self {
         case .study: return "Study"
-        case .science: return "Math & science"
+        case .science: return "Math & Science"
         case .files: return "Files"
         case .chemistry: return "Chemistry"
         case .physics: return "Physics"
