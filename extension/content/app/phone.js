@@ -1188,7 +1188,9 @@
     const currentAll = all.filter((c) => c.state === 'current');
     const starredAll = currentAll.filter((c) => c.favorite); // the one course list, chosen in setup
     const courseList = (starredAll.length ? starredAll : currentAll).filter((c) => !hidden.has(String(c.id)));
-    let goal = Number.isFinite(goalPref) ? goalPref : 4; // the same goal the setup starts from
+    // (E15) a goal never set (or set to 0) is none: the hero asks for one in neutral words rather than measure the term
+    // against a 4.00 nobody chose; the stepper starts from 4.00, the setup's own starting point
+    let goal = Number.isFinite(goalPref) && goalPref > 0 ? goalPref : null;
     const targets = targetsPref && typeof targetsPref === 'object' ? { ...targetsPref } : {};
     let whatIf = false; // nothing here is saved
     const whatIfVals = {};
@@ -1231,26 +1233,31 @@
     const diffText = U.text('bcv-ph-hero__diff', '', 'span');
     const goalNote = U.text('bcv-ph-hero__goalnote', '', 'span');
     let rolled = false;
-    const saveGoal = () => store.setPref('gpaGoal', goal).catch(() => {});
+    const saveGoal = () => store.setPref('gpaGoal', goal ?? 0).catch(() => {});
+    const step = (by) => { goal = goal === null ? (by < 0 ? 3.95 : 4) : Math.max(0, Math.min(4, +(goal + by).toFixed(2))); if (goal === 0) goal = null; saveGoal(); paintHero(); };
+    const setGoal = h('button', { type: 'button', class: 'bcv-ph-hero__set', text: 'Set a goal', title: 'Aim for a term GPA: 4.00 to start, − and + to change it', onclick: () => step(0.05) });
     const hero = U.el('bcv-ph-hero', [
       U.el('bcv-ph-hero__line', [valueEl, U.text('bcv-ph-hero__k', 'term GPA', 'span'), U.el('bcv-ph-hero__goal', [
-        h('button', { type: 'button', class: 'bcv-ph-hero__step', text: '−', 'aria-label': 'Lower the goal', onclick: () => { goal = Math.max(0, +(goal - 0.05).toFixed(2)); saveGoal(); paintHero(); } }),
+        h('button', { type: 'button', class: 'bcv-ph-hero__step', text: '−', 'aria-label': 'Lower the goal', onclick: () => step(-0.05) }),
         goalVal,
-        h('button', { type: 'button', class: 'bcv-ph-hero__step', text: '+', 'aria-label': 'Raise the goal', onclick: () => { goal = Math.min(4, +(goal + 0.05).toFixed(2)); saveGoal(); paintHero(); } }),
+        h('button', { type: 'button', class: 'bcv-ph-hero__step', text: '+', 'aria-label': 'Raise the goal', onclick: () => step(0.05) }),
       ])]),
       U.el('bcv-ph-hero__bar', barFill),
-      U.el('bcv-ph-hero__foot', [diffIcon, diffText, goalNote]),
+      U.el('bcv-ph-hero__foot', [diffIcon, diffText, setGoal, goalNote]),
     ]);
     function paintHero() {
       const rows = rowsFor();
       const g = termGpaOf(rows);
       if (!rolled && g !== null) { U.roll(valueEl, g, { decimals: 2 }); rolled = true; } else valueEl.textContent = gpa2(g);
-      goalVal.textContent = gpa2(goal);
+      goalVal.textContent = goal === null ? '—' : gpa2(goal);
       barFill.style.width = `${g === null ? 0 : Math.round((g / 4) * 100)}%`;
-      const diff = g === null ? null : g - goal;
-      diffIcon.replaceChildren(U.svg(diff === null || diff >= 0 ? 'M12 19V5M6 11l6-6 6 6' : 'M12 5v14M6 13l6 6 6-6', { size: 13, stroke: '#fff', width: 2.4 }));
-      diffText.textContent = diff === null ? 'no score to compare yet' : diff >= 0 ? `+${gpa2(diff)} above goal` : `${gpa2(Math.abs(diff))} below goal`; // (below says it: no minus sign doubling it)
-      goalNote.textContent = `goal ${gpa2(goal)}${whatIf ? ' · what-if' : ''}`;
+      const diff = g === null || goal === null ? null : g - goal;
+      // (E15) the goal is said once, in the stepper: the line under the bar says only how far off it the term is
+      diffIcon.replaceChildren(U.svg(goal === null ? 'M12 3a9 9 0 100 18 9 9 0 000-18zM12 7.5a4.5 4.5 0 100 9 4.5 4.5 0 000-9zM12 11a1 1 0 100 2 1 1 0 000-2z' : diff === null || diff >= 0 ? 'M12 19V5M6 11l6-6 6 6' : 'M12 5v14M6 13l6 6 6-6', { size: 13, stroke: '#fff', width: 2.4 }));
+      diffText.hidden = goal === null;
+      setGoal.hidden = goal !== null;
+      diffText.textContent = goal === null ? '' : diff === null ? 'no score to compare yet' : diff >= 0 ? `+${gpa2(diff)} above goal` : `${gpa2(Math.abs(diff))} below goal`; // (below says it: no minus sign doubling it)
+      goalNote.textContent = whatIf ? 'what-if' : '';
     }
 
     // ---- one card per course: a disclosure that opens the category rings, the breakdown and the target ----

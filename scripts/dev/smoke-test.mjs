@@ -2395,6 +2395,9 @@ try {
   await rolled(); // the GPA rolls up to its value on a fresh draw: read it once it has landed
   check(page.url() === `${BASE}/grades` && (await texts('.bcv-h1'))[0] === 'Grades' && (await texts('.bcv-head__sub'))[0] === 'Fall 2026 · 5 courses · 4 with grades so far', `grades panel header: ${(await texts('.bcv-head__sub'))[0]}`);
   check(/^3\.4[23]$/.test((await texts('.bcv-gpa__value'))[0]) && (await page.$('.bcv-gpa__banner')) && /needs your past record/.test((await texts('.bcv-gpa__hero'))[0]) && /No history yet/.test((await texts('.bcv-gpa__trend'))[0]), 'term GPA is the plain 4.0 average of the four scored courses; cumulative and trend wait for setup');
+  // (E15) no goal set: the card asks for one in neutral words — never "below your goal" against a 4.00 nobody chose
+  const goalAsk = await page.evaluate(() => { const g = document.querySelector('.bcv-gpa__hero .bcv-gpa__goal'); return { tag: g?.tagName, set: g?.classList.contains('bcv-gpa__goal--set'), words: g?.innerText.replace(/\s+/g, ' ').trim(), below: /(below|above) your goal/.test(document.querySelector('.bcv-gpa__hero')?.innerText || '') }; });
+  check(goalAsk.tag === 'BUTTON' && goalAsk.set && /^Set a goal\b/.test(goalAsk.words) && !goalAsk.below, `no goal set: the GPA card says "Set a goal" (a button into the settings), nothing above or below: ${JSON.stringify(goalAsk)}`);
   const gpaStats = await texts('.bcv-gpa__stat');
   check(gpaStats.length === 3 && /^Momentum.*Turn on tracking to compare snapshots$/i.test(gpaStats[0]) && /On-time submissions \d+% \d+ of \d+ submitted before the due time/i.test(gpaStats[1]) && (await page.$$('.bcv-gpa__chip')).length === 4 && /Highest .* at \d+% · lowest .* at \d+%/.test(gpaStats[2]), `stats: ${gpaStats.join(' | ')}`);
   const gpaCards = await texts('.bcv-gpa__card');

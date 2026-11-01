@@ -16,7 +16,8 @@
   const SCALE = [['A+', 97, 4], ['A', 93, 4], ['A−', 90, 3.7], ['B+', 87, 3.3], ['B', 83, 3], ['B−', 80, 2.7], ['C+', 77, 2.3], ['C', 73, 2], ['C−', 70, 1.7], ['D', 60, 1], ['F', 0, 0]];
   const OLD_SCALE = ['A', 'A−', 'B+', 'B', 'B−', 'C+', 'C', 'C−', 'D', 'F']; // targets saved before A+ existed were indices into this
   const POINTS = { 'A+': 4, A: 4, 'A-': 3.7, 'B+': 3.3, B: 3, 'B-': 2.7, 'C+': 2.3, C: 2, 'C-': 1.7, 'D+': 1.3, D: 1, 'D-': 0.7, F: 0 };
-  const DEFAULT_GOAL = 4; // the goal the setup starts from, for anyone who skipped it
+  const DEFAULT_GOAL = 4; // where the goal's stepper starts while none is set (the setup's own starting point)
+  const TARGET = 'M12 3a9 9 0 100 18 9 9 0 000-18zM12 7.5a4.5 4.5 0 100 9 4.5 4.5 0 000-9zM12 11a1 1 0 100 2 1 1 0 000-2z'; // (a goal not set yet: no arrow up or down)
   const norm = (g) => String(g || '').replace(/−/g, '-').toUpperCase().trim();
   /** A saved target (a letter, or an index into the scale before A+) → its index on SCALE, or -1. */
   const targetIndex = (t) => {
@@ -268,11 +269,12 @@
     if (!ctx.alive()) return screen;
 
     // tracking is on with or without a record from before this term (the setup asks for none:
-    // cumulative GPA fills in as snapshots accumulate); a goal of 0 means no goal was set
+    // cumulative GPA fills in as snapshots accumulate); a goal never set (or set to 0) is no goal: the card asks for one,
+    // in neutral words, rather than measure the term against a 4.00 nobody chose
     let tracking = trackingPref && typeof trackingPref === 'object' && (trackingPref.since || Number.isFinite(trackingPref.priorGpa))
       ? { ...trackingPref, priorGpa: Number.isFinite(trackingPref.priorGpa) ? trackingPref.priorGpa : null, priorCourses: Number.isFinite(trackingPref.priorCourses) ? trackingPref.priorCourses : 0 }
       : null;
-    let goal = Number.isFinite(goalPref) ? goalPref : DEFAULT_GOAL;
+    let goal = Number.isFinite(goalPref) ? goalPref : 0;
     const hasGoal = () => goal > 0;
     const hasPrior = () => !!tracking && Number.isFinite(tracking.priorGpa) && tracking.priorCourses > 0;
     const targets = targetsPref && typeof targetsPref === 'object' ? { ...targetsPref } : {};
@@ -360,7 +362,8 @@
       await store.setPref('gpaSnapshots', snaps);
     }
 
-    const save = () => Promise.all([store.setPref('gpaTracking', tracking), store.setPref('gpaGoal', goal), store.setPref('gradeTargets', targets)]).catch(() => {});
+    let goalKept = Number.isFinite(goalPref); // (a goal never set stays unset: nothing is written for it until one is chosen)
+    const save = () => { if (hasGoal()) goalKept = true; return Promise.all([store.setPref('gpaTracking', tracking), goalKept ? store.setPref('gpaGoal', goal) : null, store.setPref('gradeTargets', targets)]).catch(() => {}); };
     const saveHidden = () => store.setPref('gpaHidden', [...hidden]);
 
     // ---- pieces ----------------------------------------------------------------------------
@@ -388,12 +391,20 @@
             ])
             : U.text('bcv-gpa__hero-hint bcv-pretty', 'Cumulative GPA needs your past record — turn on tracking above.'),
           U.el('bcv-gpa__line', [U.text('bcv-gpa__line-k bcv-gpa__line-k--sm', `If ungraded work lands ${LOWER_BY} pts lower`, 'span'), U.text('bcv-gpa__line-v bcv-gpa__line-v--sm', m.termGpa === null ? '—' : `${gpa2(m.lowGpa)} – ${gpa2(m.termGpa)}`, 'span')]),
-          U.el('bcv-gpa__goal', [
+          // (E15) no goal set: a neutral ask that opens the settings at the goal, never "below your goal"
+          hasGoal() ? U.el('bcv-gpa__goal', [
             U.svg(goalMet ? 'M5 13l4 4L19 7' : 'M12 5v14M6 13l6 6 6-6', { size: 16, stroke: '#fff', width: 2.1, style: { flex: 'none' } }),
             h('div', { style: { flex: '1', minWidth: '0' } }, [
-              U.text('bcv-gpa__goal-h', !hasGoal() ? 'No goal set' : gap === null ? 'No score to compare yet' : goalMet ? `+${gpa2(gap)} above your goal` : `${gpa2(gap)} below your goal`),
-              U.text('bcv-gpa__goal-s', hasGoal() ? `Goal ${gpa2(goal)} · set it in settings` : 'Set one in settings'),
+              U.text('bcv-gpa__goal-h', gap === null ? 'No score to compare yet' : goalMet ? `+${gpa2(gap)} above your goal` : `${gpa2(gap)} below your goal`),
+              U.text('bcv-gpa__goal-s', `Goal ${gpa2(goal)} · set it in settings`),
             ]),
+          ]) : h('button', { type: 'button', class: 'bcv-gpa__goal bcv-gpa__goal--set', onclick: (e) => openSettings(m, { from: e.currentTarget }) }, [
+            U.svg(TARGET, { size: 16, stroke: '#fff', width: 2, style: { flex: 'none' } }),
+            h('div', { style: { flex: '1', minWidth: '0' } }, [
+              U.text('bcv-gpa__goal-h', 'Set a goal'),
+              U.text('bcv-gpa__goal-s', 'The term GPA you are aiming for, and how far off it you are'),
+            ]),
+            U.svg(IC.chevron, { size: 13, stroke: 'rgba(255,255,255,.8)', width: 2.2, style: { flex: 'none' } }),
           ]),
         ]),
       ]);
@@ -873,7 +884,8 @@
     function openSettings(m, { wantTracking = false, from = null } = {}) {
       document.querySelector('.bcv-sheet-ov')?.remove();
       const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': 'GPA settings' });
-      let pendingGoal = goal;
+      let pendingGoal = hasGoal() ? goal : DEFAULT_GOAL;
+      let goalTouched = hasGoal(); // (no goal yet: the stepper's 4.00 is a starting point, kept only once it is stepped)
       let on = !!tracking || wantTracking;
       const priorGpa = h('input', { class: 'bcv-input bcv-gpa-set__input', id: 'bcv-gpa-prior', type: 'number', min: '0', max: '4', step: '0.01', placeholder: '3.42', value: hasPrior() ? String(tracking.priorGpa) : '' });
       const priorN = h('input', { class: 'bcv-input bcv-gpa-set__input', id: 'bcv-gpa-prior-n', type: 'number', min: '1', max: '200', step: '1', placeholder: '8', value: hasPrior() ? String(tracking.priorCourses) : '' });
@@ -881,7 +893,7 @@
       const goalGap = U.text('bcv-gpa-set__s bcv-pretty', '');
       const syncGoal = () => {
         goalVal.textContent = gpa2(pendingGoal);
-        goalGap.textContent = m.termGpa === null ? 'Set the term GPA you are aiming for' : m.termGpa >= pendingGoal ? `You are ${gpa2(m.termGpa - pendingGoal)} above this goal` : `You are ${gpa2(pendingGoal - m.termGpa)} below this goal`;
+        goalGap.textContent = !goalTouched ? 'No goal yet: step to the term GPA you are aiming for' : m.termGpa === null ? 'Set the term GPA you are aiming for' : m.termGpa >= pendingGoal ? `You are ${gpa2(m.termGpa - pendingGoal)} above this goal` : `You are ${gpa2(pendingGoal - m.termGpa)} below this goal`;
       };
       syncGoal();
       // Upload CSV: a CSV of past courses (lib/record-csv.js says what it reads) fills the two fields in
@@ -992,7 +1004,7 @@
       const trackSwitch = U.switchEl(on, (v) => { on = v; trackBody.hidden = !on; }, 'Track GPA over time');
       const close = () => { BCV.ui.dismiss(ov); if (histTouched) { histTouched = false; refresh(); } };
       const done = async () => {
-        goal = clamp(pendingGoal, 0, 4);
+        if (goalTouched) goal = clamp(pendingGoal, 0, 4);
         if (on) {
           // the record before this term is optional: without it, cumulative fills in from snapshots
           const blank = !priorGpa.value.trim() && !priorN.value.trim();
@@ -1023,9 +1035,9 @@
           U.el('bcv-gpa-set__sec bcv-gpa-set__sec--tint', [
             U.el('bcv-gpa-set__body', [U.text('bcv-gpa-set__k', 'Term GPA goal'), goalGap]),
             U.el('bcv-gpa-set__ctl', [
-              h('button', { type: 'button', class: 'bcv-gpa-set__step', text: '−', 'aria-label': 'Lower the goal', onclick: () => { pendingGoal = clamp(+(pendingGoal - 0.05).toFixed(2), 0, 4); syncGoal(); } }),
+              h('button', { type: 'button', class: 'bcv-gpa-set__step', text: '−', 'aria-label': 'Lower the goal', onclick: () => { pendingGoal = goalTouched ? clamp(+(pendingGoal - 0.05).toFixed(2), 0, 4) : DEFAULT_GOAL - 0.05; goalTouched = true; syncGoal(); } }),
               goalVal,
-              h('button', { type: 'button', class: 'bcv-gpa-set__step', text: '+', 'aria-label': 'Raise the goal', onclick: () => { pendingGoal = clamp(+(pendingGoal + 0.05).toFixed(2), 0, 4); syncGoal(); } }),
+              h('button', { type: 'button', class: 'bcv-gpa-set__step', text: '+', 'aria-label': 'Raise the goal', onclick: () => { pendingGoal = clamp(+(pendingGoal + 0.05).toFixed(2), 0, 4); goalTouched = true; syncGoal(); } }),
             ]),
           ]),
           U.el('bcv-gpa-set__sec', [
