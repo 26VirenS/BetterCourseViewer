@@ -227,6 +227,8 @@ async function answer(request, env, fetchImpl, now) {
     };
     if (path === 'decide') {
       if (rec.status !== 'pending') return refuse(409, 'SC-C-409', 'That theme has been decided already.');
+      // (refused before the pending list is touched: a theme taken off it undecided would wait for good, seen by no review)
+      if (body.decision !== 'approve' && body.decision !== 'deny') return refuse(400, 'SC-C-400', 'Approve or deny.');
       await kv.put('list:pending', JSON.stringify((await readList(kv, 'list:pending')).filter((x) => x !== id)));
       if (body.decision === 'approve') {
         const done = { ...rec, status: 'approved' };
@@ -234,8 +236,8 @@ async function answer(request, env, fetchImpl, now) {
         await kv.put('list:approved', JSON.stringify([done, ...(await readList(kv, 'list:approved')).filter((r) => r.id !== id)].slice(0, LIMITS.approvedMax)));
         return json({ ok: true, status: 'approved' });
       }
-      if (body.decision === 'deny') { await drop(); return json({ ok: true, status: 'denied' }); }
-      return refuse(400, 'SC-C-400', 'Approve or deny.');
+      await drop(); // (deny)
+      return json({ ok: true, status: 'denied' });
     }
     // remove: an approved theme taken down, its photos with it
     await kv.put('list:approved', JSON.stringify((await readList(kv, 'list:approved')).filter((r) => r.id !== id)));

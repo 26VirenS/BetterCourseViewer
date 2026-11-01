@@ -65,7 +65,10 @@
       const r = await fetch(f.url, { credentials: 'same-origin' });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const raw = await r.blob();
-      const type = f['content-type'] || raw.type || 'application/octet-stream';
+      const given = f['content-type'] || raw.type || 'application/octet-stream';
+      // (the copy is this Canvas page's own address: a file that is a page — HTML, an SVG, XML — would run there, as
+      // the student, so it shows as its text; Canvas itself serves those from a domain of their own)
+      const type = /html|xml|svg|xsl|^multipart\//i.test(given) ? 'text/plain;charset=utf-8' : given;
       const blob = raw.type === type ? raw : new Blob([raw], { type });
       const url = URL.createObjectURL(blob);
       w.location.href = url;

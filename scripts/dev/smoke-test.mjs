@@ -1568,12 +1568,21 @@ try {
   await nav('calendar');
   await page.waitForSelector('.bcv-cal__grid', { timeout: 10000 });
   check((await page.$$('.bcv-cal__day')).length === 42 && (await page.$('.bcv-cal__day--today')), 'month grid with today highlighted');
+  // The month's checks read work due yesterday (W2 HW, Lec05-PreQuiz, the Lec05 lecture) beside today's and the days
+  // after. On the 1st of a month yesterday is last month's, in this grid only when the month opens mid-week: then the
+  // month before is drawn for them — its grid runs at least five days into this month, so today, Reading day (four
+  // days on) and the open appointment times (two and three) are in it too — and Today brings this month back before
+  // the week. (A day's cell carries its local midnight: data-day.)
+  const yesterdayCell = () => page.evaluate(() => { const y = new Date(); y.setHours(0, 0, 0, 0); y.setDate(y.getDate() - 1); return `.bcv-cal__day[data-day="${y.getTime()}"]`; });
+  const monthBack = !(await page.$(await yesterdayCell()));
+  if (monthBack) {
+    await page.click('.bcv-cal__nav .bcv-iconbtn:nth-child(1)'); // (Previous)
+    await page.waitForSelector(`${await yesterdayCell()} .bcv-ev`, { timeout: 10000 });
+  }
   // (2.99.44) the Mac's month: a ruled grid, items by a bar of their course's colour, "n items · m missing" under the month's name
   await page.waitForFunction(() => /^\d+ items?( · \d+ missing)?$/.test(document.querySelector('.bcv-cal__sub')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
   const macMonth = await page.evaluate(() => { const ev = document.querySelector('.bcv-cal--month .bcv-ev'); const day = document.querySelector('.bcv-cal--month .bcv-cal__day'); return { sub: document.querySelector('.bcv-cal__sub')?.textContent, bar: ev ? getComputedStyle(ev).borderLeftWidth : null, gap: getComputedStyle(document.querySelector('.bcv-cal--month .bcv-cal__grid')).rowGap, rule: day ? getComputedStyle(day).borderRightStyle : null, missing: [...document.querySelectorAll('.bcv-cal--month .bcv-ev.is-missing')].map((e) => e.textContent.trim()) }; });
-  // (W2 HW is due yesterday: on the 1st of a month that is last month, in this grid only when the month opens mid-week)
-  const yesterdayShown = await page.evaluate(() => { if (new Date().getDate() > 1) return true; const nums = [...document.querySelectorAll('.bcv-cal--month .bcv-cal__day .bcv-cal__num')].map((e) => e.textContent.trim()); return nums.indexOf('1') > 0; });
-  check(/^\d+ items?( · \d+ missing)?$/.test(macMonth.sub || '') && macMonth.bar === '3px' && macMonth.gap === '0px' && macMonth.rule === 'solid' && (macMonth.missing.includes('W2 HW') || !yesterdayShown), `the month as the Mac draws it: ${JSON.stringify(macMonth)}`);
+  check(/^\d+ items?( · \d+ missing)?$/.test(macMonth.sub || '') && macMonth.bar === '3px' && macMonth.gap === '0px' && macMonth.rule === 'solid' && macMonth.missing.includes('W2 HW') && !!(await page.$('.bcv-cal__day--today')), `the month as the Mac draws it${monthBack ? ' (last month: yesterday is in it, and today)' : ''}: ${JSON.stringify(macMonth)}`);
   await page.waitForSelector('.bcv-ev', { timeout: 10000 });
   const evs = await texts('.bcv-ev');
   check(evs.length >= 10 && evs.some((t) => /Dis01/.test(t)), `month view events: ${evs.length}`);
@@ -1584,7 +1593,7 @@ try {
   // handed-in work is struck through; work past its due date with nothing in (W2 HW, yesterday) stays
   // legible — it is missing, not done — and the chip's tip says so, with the points it is worth
   const calMarks = await page.$$eval('.bcv-ev', (els) => ({ struck: els.filter((e) => e.querySelector('.bcv-ev__label.bcv-strike')).map((e) => e.querySelector('.bcv-ev__label').textContent), w2: els.filter((e) => /W2 HW/.test(e.textContent)).map((e) => ({ struck: !!e.querySelector('.bcv-strike'), tip: e.title })) }));
-  check((calMarks.struck.some((t) => /Lec05-PreQuiz/.test(t)) || (!yesterdayShown && calMarks.struck.length > 0)) && ((calMarks.w2.length === 1 && !calMarks.w2[0].struck && /^W2 HW · .+ · 15 pts · Missing$/.test(calMarks.w2[0].tip)) || (!yesterdayShown && !calMarks.w2.length)), `handed-in work is struck through, missing work is not (its tip says so): ${JSON.stringify(calMarks)}`);
+  check(calMarks.struck.some((t) => /Lec05-PreQuiz/.test(t)) && calMarks.w2.length === 1 && !calMarks.w2[0].struck && /^W2 HW · .+ · 15 pts · Missing$/.test(calMarks.w2[0].tip), `handed-in work is struck through, missing work is not (its tip says so): ${JSON.stringify(calMarks)}`);
   // the calendars live in a sheet off the Calendars button (which counts the ones on), so the month
   // has the width of the page to itself — but for To Do, beside it on the left (2.99.112: To Do & Calendar)
   const calWide = await page.evaluate(() => { const c = document.querySelector('.bcv-cal').getBoundingClientRect(); const t = document.querySelector('.bcv-cal__todo').getBoundingClientRect(); return { w: Math.round(c.width), todoLeft: t.right <= c.left, todoW: Math.round(t.width) }; });
@@ -1689,6 +1698,11 @@ try {
   check(/\/calendar/.test(page.url()) && (await page.$eval('.bcv-pv', (e) => e.classList.contains('bcv-pv--float') && e.classList.contains('bcv-pv--card'))) && /^Assignment · /.test((await texts('.bcv-pv__kicker'))[0]) && (await texts('.bcv-pv__title'))[0] === chipTitle && /^Due /.test((await texts('.bcv-pv__fact'))[0]) && (await page.$eval('.bcv-pv__go', (e) => e.getAttribute('aria-label'))) === 'Open the assignment' && (await page.$('.bcv-cal__grid')) !== null, `pressing an assignment on the calendar previews it beside the month: ${JSON.stringify({ chip: chipTitle, url: page.url(), html: await page.$eval('html', (e) => e.className), kicker: (await texts('.bcv-pv__kicker'))[0], title: (await texts('.bcv-pv__title'))[0], meta: (await texts('.bcv-pv__meta'))[0], go: (await texts('.bcv-pv__go'))[0], grid: !!(await page.$('.bcv-cal__grid')) })}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-pv'), null, { timeout: 5000 });
+  if (monthBack) { // (the month before was drawn for yesterday's work: Today brings this one back, the week to open on it)
+    const ySel = await yesterdayCell();
+    await page.click('.bcv-cal__nav .bcv-roundbtn');
+    await page.waitForFunction((sel) => !document.querySelector(sel) && !!document.querySelector('.bcv-cal__day--today'), ySel, { timeout: 10000 });
+  }
   await page.click('.bcv-seg__btn[data-value="week"]');
   await page.waitForSelector('.bcv-week__body', { timeout: 5000 });
   // (2.99.112) the week is five days by default, Monday to Friday (on a Saturday the next); Week pressed again offers seven
@@ -2181,6 +2195,25 @@ try {
   const chipsNow = await page.$$eval('.bcv-ev--plan', (els) => els.map((e) => e.textContent.trim()));
   check(editRows.join('|') === 'Day|All day|Repeat|Alert|Colour' && !!edited && chipsNow.length >= 1 && chipsNow.every((t) => t === 'Read and outline') && !!fed && /RRULE:FREQ=WEEKLY/.test(fed) && /TRIGGER:-PT15M/.test(fed) && fed.includes('DESCRIPTION:Pages 1 to 20'),
     `Edit names the plan, repeats it weekly with an alert a quarter of an hour before and notes — on the month by its name, and in Simpl's calendar with its repeat and alert: ${JSON.stringify({ editRows, chipsNow, rrule: /RRULE:FREQ=WEEKLY/.test(fed || ''), alarm: /TRIGGER:-PT15M/.test(fed || '') })}`);
+  // a monthly plan keeps its day of the month: one on the 31st comes round on the 31st, and not in a month without one —
+  // as the RRULE:FREQ=MONTHLY Simpl's calendar sends has it — never on the 3rd of March and every 3rd after
+  const monthly = await sw.evaluate(async (base) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: () => { const y = new Date().getFullYear() + 1; const day = (ms) => { const d = new Date(ms); return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`; }; const occ = (at, repeat, m0, m1) => self.BCV.plan.occurrences({ at: at.toISOString(), repeat }, new Date(y, m0, 1).getTime(), new Date(y, m1, 1).getTime()).map(day); return { last: occ(new Date(y, 0, 31, 9, 0), 'month', 0, 6), mid: occ(new Date(y, 0, 15, 9, 30), 'month', 2, 5), weekly: occ(new Date(y, 0, 28, 18, 0), 'week', 1, 2) }; } }); return result; }, BASE);
+  check(monthly.last.join() === '1/31 9:00,3/31 9:00,5/31 9:00' && monthly.mid.join() === '3/15 9:30,4/15 9:30,5/15 9:30' && monthly.weekly.join() === '2/4 18:00,2/11 18:00,2/18 18:00,2/25 18:00', `a plan repeating monthly keeps its day of the month (the 31st only where a month has one), and weekly across a month's end: ${JSON.stringify(monthly)}`);
+  // a repeating plan's time is taken each time it comes round, not only the first: a piece of work let go on the day of its
+  // second time (a weekly plan from 10 to 11) is planned clear of it — never at 8 for two and a half hours, over it
+  const clash = await sw.evaluate(async (base) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: async () => {
+    const P = self.BCV.plan; const id = 'assignment:probe-weekly';
+    const first = new Date(); first.setDate(first.getDate() + 1); first.setHours(10, 0, 0, 0);
+    await P.put({ id, title: 'Weekly probe', url: '', courseName: '', date: null }, first.getTime(), 60);
+    await P.edit(id, { repeat: 'week' });
+    const second = new Date(first); second.setDate(second.getDate() + 7);
+    const day = new Date(second); day.setHours(0, 0, 0, 0);
+    let at = null;
+    try { at = await P.slotOn({ id: 'assignment:probe-other', title: 'Other', date: null }, day.getTime(), 150); } finally { await P.clear(id); }
+    return { at: at && new Date(at).toTimeString().slice(0, 5), clear: !!at && (at + 150 * 60000 <= second.getTime() || at >= second.getTime() + 60 * 60000), gone: !P.get(id) };
+  } }); return result; }, BASE);
+  check(clash.clear && clash.gone, `a weekly plan's second time is taken: work let go on that day is planned clear of 10–11 (at ${clash.at})`);
+  await page.waitForFunction(() => !document.querySelector('.bcv-ev--plan[data-plan="assignment:probe-weekly"]'), null, { timeout: 5000 });
   // and Delete plan, in Edit, takes it away
   await page.click('.bcv-ev--plan');
   await page.waitForSelector('.bcv-evsheet__edit', { timeout: 5000 });
@@ -3680,6 +3713,22 @@ try {
   // the grade model applies a group's drop rules the way Canvas does (a dropped zero no longer drags the group down), and what-if junk is cleared
   const dropModel = await sw.evaluate(async (base) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: () => { const S = self.BCV.store; const g = [{ id: 'g1', name: 'Homework', group_weight: 0, position: 1, rules: { drop_lowest: 1, never_drop: ['a3'] }, assignments: [1, 2, 3].map((i) => ({ id: `a${i}`, name: `HW ${i}`, points_possible: 100, submission: { workflow_state: 'graded', score: i === 1 ? 50 : i === 3 ? 60 : 100 } })) }]; const m = S.gradeModel(g, { id: 'x', weighted: false, score: null }, {}, false, false); const nan = S.gradeModel(g, { id: 'x', weighted: false, score: null }, { a2: '1.2.3' }, true, false); return { total: m.total, legend: m.legend[0]?.detail || '', nanTotal: nan.total }; } }); return result; }, BASE);
   check(dropModel.total === 80 && /HW 1 dropped/.test(dropModel.legend) && Number.isFinite(dropModel.nanTotal), `drop_lowest drops the lowest scored item (never_drop held): total ${dropModel.total} (100 + 60 of 200), legend "${dropModel.legend}", junk what-if total ${dropModel.nanTotal}`);
+  // with points that differ, the drop is the one Canvas makes — whatever leaves the group its best grade (Kane & Kane's
+  // "Dropping Lowest Grades", as Canvas's grade calculator has it), not the item with the lowest fraction: of 8/10, 0/1
+  // and 50/100 with the lowest dropped, the 50/100 goes (8 of 11, 72.7%), not the 0/1 (58 of 110, 52.7%); and the highest
+  // dropped, whatever leaves it worst
+  const dropMixed = await sw.evaluate(async (base) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: () => { const S = self.BCV.store; const grp = (rules) => [{ id: 'g1', name: 'Quizzes', group_weight: 0, position: 1, rules, assignments: [['q1', 8, 10], ['q2', 0, 1], ['q3', 50, 100]].map(([id, score, pts]) => ({ id, name: id, points_possible: pts, submission: { workflow_state: 'graded', score } })) }]; const c = { id: 'x', weighted: false, score: null }; const low = S.gradeModel(grp({ drop_lowest: 1 }), c, {}, false, false); const high = S.gradeModel(grp({ drop_highest: 1 }), c, {}, false, false); return { low: low.total, lowDropped: low.rows.filter((r) => r.dropped).map((r) => r.id).join(), high: high.total, highDropped: high.rows.filter((r) => r.dropped).map((r) => r.id).join() }; } }); return result; }, BASE);
+  check(dropMixed.low === 72.7 && dropMixed.lowDropped === 'q3' && dropMixed.high === 49.5 && dropMixed.highDropped === 'q1', `a drop with points that differ is the one that leaves the group best (lowest dropped) or worst (highest dropped), as Canvas makes it: ${JSON.stringify(dropMixed)}`);
+  // a weighted total is worked out from each group's own fraction, as Canvas works it out, never from the whole percent
+  // the legend shows: two groups at half the grade each, 2 of 3 in both, is 66.7% (what-if, your own weights, a hidden
+  // total) — not the 67% two rounded 67s make
+  const weightedModel = await sw.evaluate(async (base) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: () => { const S = self.BCV.store; const grp = (id, w) => ({ id, name: `G${id}`, group_weight: w, position: Number(id), rules: {}, assignments: [{ id: `${id}a`, name: `A${id}`, points_possible: 3, submission: { workflow_state: 'graded', score: 2 } }] }); const g = [grp('1', 50), grp('2', 50)]; const c = { id: 'w', weighted: true, score: 66.67 }; const wi = S.gradeModel(g, c, {}, true, false); const own = S.gradeModel(g, { ...c, weighted: false, score: null }, {}, false, false, [], { ownWeights: { 1: 50, 2: 50 } }); return { whatIf: wi.total, own: own.total, legend: wi.legend.map((r) => r.value) }; } }); return result; }, BASE);
+  check(weightedModel.whatIf === 66.7 && weightedModel.own === 66.7 && weightedModel.legend.join() === '67%,67%', `a weighted total from the groups' own fractions: two groups of 2/3 at 50% each are 66.7% (what-if ${weightedModel.whatIf}, own weights ${weightedModel.own}), each group still shown as ${weightedModel.legend.join(' and ')}`);
+  // rich text drawn into the page keeps no way to run a script: a javascript: link however it is spelled (the browser
+  // drops spaces before it and tabs or newlines inside it), a frame whose address is one (nor its Open in new tab), or a frame
+  // with its page inline
+  const proseLeft = await sw.evaluate(async (base) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: () => { const w = self.BCV.screens.course.prose('<p><a href=" javascript:alert(1)">a</a> <a href="java&#x09;script:alert(2)">b</a> <a href="&#x0a;JavaScript:alert(3)">c</a> <a href="https://example.edu/ok">ok</a> <a href="/courses/101/files/f1">file</a></p><iframe src=" javascript:alert(4)"></iframe><iframe srcdoc="&lt;script&gt;alert(5)&lt;/script&gt;" src="/media_objects_iframe/m1"></iframe>'); return { links: [...w.querySelectorAll('a')].map((a) => a.getAttribute('href')), frames: [...w.querySelectorAll('iframe')].map((f) => `${f.getAttribute('src') ?? ''}|${f.hasAttribute('srcdoc') ? 'srcdoc' : ''}`) }; } }); return result; }, BASE);
+  check(JSON.stringify(proseLeft.links) === JSON.stringify([null, null, null, 'https://example.edu/ok', '/courses/101/files/f1', '#', '/media_objects_iframe/m1']) && JSON.stringify(proseLeft.frames) === JSON.stringify(['|', '/media_objects_iframe/m1|']), `rich text keeps no javascript: link however spelled, no javascript: frame and no inline frame page; plain links and frames stay: ${JSON.stringify(proseLeft)}`);
   // (2.98.38) what-if assignments put in a group of your choosing: every group offered with its weight; pressing a
   // group points the box at it; one added counts in its group with that weight, tops the list marked What-if, and goes with its X
   const adderOpts = await page.$$eval('.bcv-wfadd__group option', (os) => os.map((o) => o.textContent));
@@ -3721,20 +3770,20 @@ try {
   check((await texts('.bcv-gr__wsum'))[0] === 'Total 110% · shares taken in proportion' && (await page.$eval('.bcv-gr__wsum', (e) => e.classList.contains('is-off'))), `the sum stays in view and says when it is not 100: ${(await texts('.bcv-gr__wsum'))[0]}`);
   await wInputs[1].fill('0');
   await page.click('.bcv-gr__wsave');
-  await page.waitForFunction(() => !document.querySelector('.bcv-gr__wedit') && document.querySelector('.bcv-gr__total')?.textContent === '76%', null, { timeout: 5000 });
+  await page.waitForFunction(() => !document.querySelector('.bcv-gr__wedit') && document.querySelector('.bcv-gr__total')?.textContent === '76.2%', null, { timeout: 5000 });
   const ownRows = await texts('.bcv-wbar__row');
-  check(ownRows.join(' | ') === 'Discussion Quizzes 50% of grade 100% | Effort 50% of grade 52%' && (await texts('.bcv-gr__hsub'))[0] === '100% · your own weights' && (await texts('.bcv-gr__note'))[0] === 'Weighted by your own weights, not your instructor’s — Canvas shows 92.4%.' && (await texts('.bcv-gr__ownbtn'))[0] === 'Edit my weights' && /never reach Canvas/.test((await texts('.bcv-gr__wnote--own'))[0]) && (await page.$$('.bcv-rings__svg > circle')).length === 8, `saved: the bar, the total (half of 100% and half of 52% = 76%) and the note follow your weights, Canvas's figure kept in view: ${ownRows.join(' | ')} · ${(await texts('.bcv-gr__note'))[0]}`);
+  check(ownRows.join(' | ') === 'Discussion Quizzes 50% of grade 100% | Effort 50% of grade 52%' && (await texts('.bcv-gr__hsub'))[0] === '100% · your own weights' && (await texts('.bcv-gr__note'))[0] === 'Weighted by your own weights, not your instructor’s — Canvas shows 92.4%.' && (await texts('.bcv-gr__ownbtn'))[0] === 'Edit my weights' && /never reach Canvas/.test((await texts('.bcv-gr__wnote--own'))[0]) && (await page.$$('.bcv-rings__svg > circle')).length === 8, `saved: the bar, the total (half of 100% and half of Effort's 43 of 82, 52.4% — shown 52% — = 76.2%) and the note follow your weights, Canvas's figure kept in view: ${ownRows.join(' | ')} · ${(await texts('.bcv-gr__note'))[0]}`);
   const ownPref = await sw.evaluate(async () => Object.entries(await chrome.storage.local.get(null)).find(([k]) => k.startsWith('prefs:'))?.[1]?.gradeWeights);
   check(ownPref && ownPref['101'] && ownPref['101']['g101-0'] === 50 && ownPref['101']['g101-3'] === 50 && Object.keys(ownPref['101']).length === 2, `the weights live in the site's preferences by course, zeros dropped, nothing sent to Canvas: ${JSON.stringify(ownPref)}`);
   await page.reload();
   await page.waitForSelector('.bcv-rings__svg', { timeout: 10000 });
-  await page.waitForFunction(() => document.querySelector('.bcv-gr__total')?.textContent === '76%', null, { timeout: 5000 });
+  await page.waitForFunction(() => document.querySelector('.bcv-gr__total')?.textContent === '76.2%', null, { timeout: 5000 });
   check(true, 'and they survive a reload');
-  // the Grades page follows them: the course's score, its letter and the GPA all from the 76%
+  // the Grades page follows them: the course's score, its letter and the GPA all from the 76.2%
   await page.goto(`${BASE}/grades`); // (the course shell's sidebar carries the course's tabs, not the main nav)
   await page.waitForSelector('.bcv-gpa__card', { timeout: 15000 });
   const ownCard = await page.evaluate(() => { const c = [...document.querySelectorAll('.bcv-gpa__card')].find((x) => /F26-MATH 021 20/.test(x.textContent)); return c ? { pct: c.querySelector('.bcv-gpa__cpct')?.textContent, letter: c.querySelector('.bcv-gpa__ringletter')?.textContent, note: c.querySelector('.bcv-gpa__cnote')?.textContent } : null; });
-  check(ownCard && ownCard.pct === '76%' && ownCard.letter === 'C' && /^By your own weights/.test(ownCard.note), `the Grades page scores the course by your weights, with a letter from them and a note saying so: ${JSON.stringify(ownCard)}`);
+  check(ownCard && ownCard.pct === '76.2%' && ownCard.letter === 'C' && /^By your own weights/.test(ownCard.note), `the Grades page scores the course by your weights, with a letter from them and a note saying so: ${JSON.stringify(ownCard)}`);
   await page.goto(`${BASE}/courses/101/grades`);
   await page.waitForSelector('.bcv-gr__ownbtn', { timeout: 15000 });
   await page.click('.bcv-gr__ownbtn');
@@ -4026,6 +4075,18 @@ try {
   await page.waitForFunction(() => !document.querySelector('.bcv-viewer'), null, { timeout: 3000 });
   check(tabsOpened.length === 1, 'and only that press ever opened a tab');
   context.off('page', onTab);
+  // an HTML page among the files (a classmate's, in a group): its new tab shows its text, never the page itself — the copy
+  // is made by this Canvas page, so drawn as a page it would run as this Canvas, signed in as the student
+  await sw.evaluate(async (base) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: () => { self.BCV.viewer.open({ id: 'h1', display_name: 'study-notes.html', filename: 'study-notes.html', 'content-type': 'text/html', size: 900, url: '/mock-tool-newwindow' }); } }); }, BASE);
+  await page.waitForSelector('.bcv-viewer button.bcv-viewer__tab', { timeout: 5000 });
+  const [htmlTab] = await Promise.all([context.waitForEvent('page', { timeout: 8000 }), page.click('.bcv-viewer__tab')]);
+  await htmlTab.waitForFunction(() => location.protocol === 'blob:' && /Smartwork/.test(document.documentElement?.textContent || ''), null, { timeout: 8000 }).catch(() => {});
+  const htmlShown = await htmlTab.evaluate(() => ({ url: location.href.slice(0, 40), page: !!document.getElementById('mock-tool-newwindow') || !!document.querySelector('header, main, button'), text: /<header/.test(document.body?.textContent || '') }));
+  await htmlTab.close();
+  await page.bringToFront();
+  await page.click('.bcv-viewer .bcv-sheet__close');
+  await page.waitForFunction(() => !document.querySelector('.bcv-viewer'), null, { timeout: 3000 });
+  check(!htmlShown.page && htmlShown.text, `Open in new tab on an HTML file shows its source as text, not a page running on this Canvas: ${JSON.stringify(htmlShown)}`);
   // a document a browser cannot show: the button is a link to Canvas's own page for the file
   await page.click('.bcv-body .bcv-row:has-text("planned lecture schedule.xlsx")');
   await page.waitForSelector('.bcv-viewer .bcv-viewer__frame', { timeout: 5000 });

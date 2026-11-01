@@ -1706,19 +1706,39 @@
     const ordered = [...groups].sort((a, b) => (weighted ? Number(b.weight > 0) - Number(a.weight > 0) : 0) || (a.position || 0) - (b.position || 0));
     const GROUP_COLORS = ['#0a84ff', '#5856d6', '#ff2d55', '#ff9500', '#30b0c7', '#af52de', '#ff6b22', '#c8901c'];
     // A group's rules (drop the lowest N, the highest N, never drop these) are applied the way
-    // Canvas applies them: the scored items sorted by their fraction, the drops taken from the
-    // ends, the never-drop ones held. Without this a group with a dropped zero read too low.
+    // Canvas applies them: the lowest N dropped are the ones whose going leaves the group its best
+    // grade, the highest N the ones whose going leaves it its worst — with the never-drop ones held
+    // and counted (Kane & Kane's "Dropping Lowest Grades", which Canvas's grade calculator follows).
+    // With equal points that is the lowest (highest) fractions; with points that differ it is not:
+    // of 8/10, 0/1 and 50/100 Canvas drops the 50/100 (72.7%), not the 0/1 (52.7%). Without this a
+    // group with a dropped zero read too low.
     const applyRules = (items, rules) => {
       const dropLow = Math.max(0, Number(rules?.drop_lowest) || 0);
       const dropHigh = Math.max(0, Number(rules?.drop_highest) || 0);
       if (!dropLow && !dropHigh) return { kept: items, dropped: [] };
       const never = new Set((rules?.never_drop || []).map(String));
-      const cands = items.filter((r) => !never.has(String(r.id))).sort((a, b) => (a.effective / a.possible) - (b.effective / b.possible));
-      const low = cands.slice(0, Math.min(dropLow, Math.max(0, cands.length - 1)));
-      const rest = cands.slice(low.length);
-      const high = dropHigh ? rest.slice(Math.max(0, rest.length - Math.min(dropHigh, Math.max(0, rest.length - 1)))) : [];
-      const dropped = new Set([...low, ...high]);
-      return { kept: items.filter((r) => !dropped.has(r)), dropped: [...dropped] };
+      const held = items.filter((r) => never.has(String(r.id)));
+      const frac = (r) => r.effective / r.possible;
+      /** n of `list` kept, with `held` beside them: the set whose grade is best (or worst) — Dinkelbach's steps from the
+       *  set the fractions pick, each the n with the most (least) over the grade of the last, until it holds. */
+      const keep = (list, n, best) => {
+        if (n >= list.length) return list;
+        const pick = (by) => [...list].sort((a, b) => (best ? by(b) - by(a) : by(a) - by(b))).slice(0, n);
+        let kept = pick(frac);
+        for (let i = 0; i < 50 && !BCV.lms?.d2l; i++) { // (Brightspace's own drops, by fraction, as before)
+          const all = [...held, ...kept];
+          const q = all.reduce((s, r) => s + r.effective, 0) / (all.reduce((s, r) => s + r.possible, 0) || 1);
+          const next = pick((r) => r.effective - q * r.possible);
+          if (next.every((r) => kept.includes(r))) break;
+          kept = next;
+        }
+        return kept;
+      };
+      const cands = items.filter((r) => !never.has(String(r.id)));
+      const lowKept = keep(cands, cands.length - Math.min(dropLow, Math.max(0, cands.length - 1)), true);
+      const kept = dropHigh ? keep(lowKept, lowKept.length - Math.min(dropHigh, Math.max(0, lowKept.length - 1)), false) : lowKept;
+      const dropped = cands.filter((r) => !kept.includes(r));
+      return { kept: items.filter((r) => !dropped.includes(r)), dropped };
     };
     const groupStats = ordered.map((g, i) => {
       const scoredItems = rows.filter((r) => r.groupId === g.id && r.counted && r.possible > 0 && r.effective !== null);
@@ -1731,6 +1751,7 @@
         ...g, color: GROUP_COLORS[i % GROUP_COLORS.length], graded: items.length > 0, earned, possible, omitted, dropped: dropped.map((r) => r.name),
         // (2.99.33) a whole percent, half up on the decimal figure (87 of 120 is 72.5: 73, where Math.round read 72.4999…)
         pct: possible > 0 ? roundHalfUp((earned / possible) * 100, 0) : null, hypothetical: items.some((r) => r.hypothetical), zero: weighted && g.weight === 0,
+        exact: possible > 0 ? (earned / possible) * 100 : null, // (the unrounded figure: what a weighted total is worked out from, as Canvas works it out)
       };
     });
     const scored = groupStats.filter((g) => g.graded);
@@ -1739,7 +1760,7 @@
     let note = '';
     if (weighted) {
       const denom = scored.reduce((s, g) => s + g.weight, 0);
-      total = denom > 0 ? round1(scored.reduce((s, g) => s + g.weight * g.pct, 0) / denom) : null;
+      total = denom > 0 ? round1(scored.reduce((s, g) => s + g.weight * g.exact, 0) / denom) : null; // (each group's own fraction, never its whole percent: two groups at 2/3 are 66.7%, not 67%)
       note = denom > 0 ? (own ? 'Weighted by your own weights, across the groups with graded work.' : 'Weighted across the groups that have graded work.') : 'No weighted group has graded work yet.';
     } else {
       const earned = scored.reduce((s, g) => s + g.earned, 0);

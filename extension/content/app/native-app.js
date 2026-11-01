@@ -1585,10 +1585,11 @@
     for (const el of root.querySelectorAll('*')) {
       for (const at of [...el.attributes]) {
         const n = at.name.toLowerCase();
-        if (n.startsWith('on')) { el.removeAttribute(at.name); continue; }
+        if (n.startsWith('on') || n === 'srcdoc') { el.removeAttribute(at.name); continue; } // (srcdoc: a frame's page inline, script and all)
         if (n === 'href' || n === 'src' || n === 'data-src' || n === 'poster') {
           const v = at.value.trim();
-          if (/^javascript:/i.test(v)) { el.removeAttribute(at.name); continue; }
+          // (as the browser reads an address — tabs and newlines in it ignored — or "java&#9;script:" is made whole below, as javascript:)
+          if (/^javascript:/i.test(v.replace(/[\u0000-\u0020]/g, ''))) { el.removeAttribute(at.name); continue; }
           if (v && !/^(data:|mailto:|tel:|#)/i.test(v)) { const a = absUrl(v); if (a) el.setAttribute(n === 'data-src' ? 'src' : at.name, a); }
         }
       }

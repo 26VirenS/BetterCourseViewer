@@ -148,14 +148,18 @@
     if (!a) return [];
     if (!p.repeat) return a >= from && a < to ? [a] : [];
     const out = [];
-    const d = new Date(a);
-    for (let i = 0; i < 400 && d.getTime() < to && out.length < 100; i++) {
+    const d0 = new Date(a);
+    const step = { day: 1, week: 7, '2week': 14 }[p.repeat];
+    if (!step && p.repeat !== 'month') return a >= from && a < to ? [a] : [];
+    // each time counted from the first (its time of day kept across a change of clocks); a monthly one on its own day of
+    // the month, and in a month without that day (the 31st in April) not at all — as the RRULE Simpl's calendar sends
+    // reads it — never carried over into the next month and kept there (the 31st became the 3rd of every month after)
+    for (let i = 0; i < 400 && out.length < 100; i++) {
+      const d = step ? new Date(d0.getFullYear(), d0.getMonth(), d0.getDate() + i * step, d0.getHours(), d0.getMinutes(), d0.getSeconds(), d0.getMilliseconds())
+        : new Date(d0.getFullYear(), d0.getMonth() + i, d0.getDate(), d0.getHours(), d0.getMinutes(), d0.getSeconds(), d0.getMilliseconds());
+      if (d.getTime() >= to) break;
+      if (!step && d.getDate() !== d0.getDate()) continue;
       if (d.getTime() >= from) out.push(d.getTime());
-      if (p.repeat === 'day') d.setDate(d.getDate() + 1);
-      else if (p.repeat === 'week') d.setDate(d.getDate() + 7);
-      else if (p.repeat === '2week') d.setDate(d.getDate() + 14);
-      else if (p.repeat === 'month') d.setMonth(d.getMonth() + 1);
-      else break;
     }
     return out;
   }
@@ -269,11 +273,16 @@
     }
     return out.slice(0, MAX_SLOTS);
   }
+  /** The times the plans take between from and to (but `except`'s own): each time a repeating one comes round, not only its first. */
+  function plansBusy(from, to, except) {
+    const out = [];
+    for (const [k, p] of Object.entries(plans)) if (k !== except) for (const a of occurrences(p, from - DAY, to)) out.push({ a, b: a + p.mins * MIN }); // (from a day before: one begun then may run on into the span)
+    return out;
+  }
   async function slotsFor(it, mins) {
     const now = Date.now();
     const due = it.date ? new Date(it.date).getTime() : null;
-    const busy = [...await busyTimes(now, now + LOOK_AHEAD + DAY)]; // (a copy: the memo is shared)
-    for (const [k, p] of Object.entries(plans)) if (k !== it.id) { const a = Date.parse(p.at); busy.push({ a, b: a + p.mins * MIN }); }
+    const busy = [...await busyTimes(now, now + LOOK_AHEAD + DAY), ...plansBusy(now, now + LOOK_AHEAD + DAY, it.id)]; // (a copy: the memo is shared)
     return freeSlots({ now, due, mins, busy });
   }
   /** (2.99.112) A piece of work let go on a day (the Calendar's month or agenda): that day's first free time — from now on
@@ -285,8 +294,7 @@
     const len = mins * MIN;
     const soon = Math.ceil((Date.now() + 15 * MIN) / half) * half;
     if (Math.max(dayA, soon) + len > dayB) throw new Error('That day is already over');
-    const busy = [...await busyTimes(dayA, dayB)];
-    for (const [k, p] of Object.entries(plans)) if (k !== it.id) { const a = Date.parse(p.at); busy.push({ a, b: a + p.mins * MIN }); }
+    const busy = [...await busyTimes(dayA, dayB), ...plansBusy(dayA, dayB, it.id)];
     const slot = freeSlots({ now: Math.max(Date.now(), dayA - 15 * MIN), due: dayB, mins, busy }).find((x) => x.at >= dayA && x.end <= dayB);
     return slot ? slot.at : Math.max(dayA, soon);
   }
