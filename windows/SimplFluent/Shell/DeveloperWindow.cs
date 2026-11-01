@@ -395,13 +395,13 @@ public sealed class DeveloperWindow : FluentWindow
             K.Button("Open folder", () => { Directory.CreateDirectory(CrashLog.Folder); OpenFolder(CrashLog.Folder); }, icon: SymbolRegular.Folder24),
             K.Button("Delete all", async () =>
             {
-                if (!await Dialogs.Ask(this, "Delete every crash kept?", "Windows’ own reports stay in its Application log.", "Delete All", "Cancel", danger: true)) return;
+                if (!await Dialogs.Ask(this, "Delete every crash kept?", "Windows’ own reports stay in its Application log.", "Delete all", "Cancel", danger: true)) return;
                 CrashLog.DeleteAll();
                 Load();
             }, icon: SymbolRegular.DeleteDismiss24),
             K.Button("Crash now…", async () =>
             {
-                if (!await Dialogs.Ask(this, "Stop Simpl now, as a crash would?", "For trying the crash log: Simpl stops at once, and the next time it opens the crash is here.", "Crash Now", "Cancel", danger: true)) return;
+                if (!await Dialogs.Ask(this, "Stop Simpl now, as a crash would?", "For trying the crash log: Simpl stops at once, and the next time it opens the crash is here.", "Crash now", "Cancel", danger: true)) return;
                 CrashLog.CrashNow();
             }, icon: SymbolRegular.ErrorCircle24));
         var body = new Grid();
@@ -807,8 +807,8 @@ public sealed class DeveloperWindow : FluentWindow
             var since = WhatsNew.Since(f, WhatsNew.Number);
             var versions = since.Count == 1 ? since[0].Version : $"{since.Count} versions, {since[^1].Version} to {since[0].Version}";
             brings.Text = since.Count == 0 ? "Then: nothing new to show."
-                : MergedIntro.ComesAfter(f) ? $"Then: To Do & Calendar’s intro, in place of What’s New ({versions})."
-                : $"Then: What’s New with {versions}.";
+                : MergedIntro.ComesAfter(f) ? $"Then: To Do & Calendar’s intro, in place of What’s new ({versions})."
+                : $"Then: What’s new with {versions}.";
         }
         void Moved()
         {
@@ -839,12 +839,12 @@ public sealed class DeveloperWindow : FluentWindow
             K.SectionHeader("Channel"),
             K.Group(
                 K.Row(SymbolRegular.Beaker24, "Betas", "Every copy takes the newest version, a beta or not (0.3.103).", Value(Updates.WaitingText)),
-                K.Row(SymbolRegular.Pause24, "Pause updates", "Looked for all the same, but nothing installs by itself (a Critical Update still does).", paused),
+                K.Row(SymbolRegular.Pause24, "Pause updates", "Looked for all the same, but nothing installs by itself (a critical update still does).", paused),
                 K.Row(SymbolRegular.ArrowDownload24, "Look now", Updates.Off ? "A development run never updates." : null, K.Button("Check for updates", () => _ = Updates.Check()))),
             K.SectionHeader("Simulate an update"),
             K.Group(
                 K.Row(SymbolRegular.History24, "From version", "Simpl acts as if it was just updated from this version to this one. Nothing is downloaded or installed.", from),
-                K.Row(SymbolRegular.Warning24, "As a Critical Update", "The notice at the top of the window says so.", critical),
+                K.Row(SymbolRegular.Warning24, "As a critical update", "The notice at the top of the window says so.", critical),
                 K.Row(SymbolRegular.ArrowClockwise24, "Restart Simpl", "Quit and open again, as an update does. Off: the popups come up at once.", restart),
                 K.Row(SymbolRegular.Play24, "Play it through", "The download, the notice as it goes in, then the popups that version would see.", K.H(12, step, go))),
             brings.Margin(2, 8, 0, 0));

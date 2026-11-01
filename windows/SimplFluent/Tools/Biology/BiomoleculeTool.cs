@@ -491,7 +491,7 @@ internal static class BiomolHandOver
         var owner = c.Owner ?? Application.Current?.MainWindow;
         var m = MoleculeModel.Shared;
         if (Made(m))
-            Simpl.Shell.Dialogs.Confirm(owner, "Replace the molecule in the Molecule Builder?",
+            Simpl.Shell.Dialogs.Confirm(owner, "Replace the molecule in the molecule builder?",
                 $"{name} takes the place of the molecule there ({ToolKit.Plural(m.Atoms.Count, "atom")}), which is not kept.", "Replace",
                 () => Hand(c, owner, model, name, hydrogens));
         else Hand(c, owner, model, name, hydrogens);
@@ -555,7 +555,7 @@ internal sealed class BiomolViewControls : ContentControl
     private int atoms;
     private bool syncing;
 
-    /// <summary>What "Open in Molecule Builder" hands over (null: nothing to open).</summary>
+    /// <summary>What "Open in Molecule builder" hands over (null: nothing to open).</summary>
     public Func<(BioMoleculeModel Model, string Name)?>? Molecule { get; set; }
     public Action<BioMoleculeModel, string>? Open { get; set; }
 
@@ -583,7 +583,7 @@ internal sealed class BiomolViewControls : ContentControl
         Toggle(hydrogens, "Show H atoms", on => BiomoleculeBuilderModel.HydrogensChosen[page] = on);
         Toggle(ph7, "pH 7 form", on => BiomoleculeBuilderModel.Ph7 = on);
         Toggle(labels, "Labels", on => BiomoleculeBuilderModel.Labels = on);
-        open = ChemKit.Wide("Open in Molecule Builder", () =>
+        open = ChemKit.Wide("Open in Molecule builder", () =>
         {
             if (Molecule?.Invoke() is { } m) Open?.Invoke(m.Model, m.Name);
         }, icon: SymbolRegular.Molecule20);

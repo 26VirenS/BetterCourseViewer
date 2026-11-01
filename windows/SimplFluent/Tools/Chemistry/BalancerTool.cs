@@ -130,7 +130,7 @@ internal sealed class BalancerQuick : ContentControl
         });
         field = ChemCalc.Field("balance", "equation", "Fe + O2 → Fe2O3", later, BalancerExamples.Start(c), "The equation to balance");
         var copy = ChemCalc.Copy(() => shown.Ok ? shown.PlainText : null);
-        var open = BioUI.OpenButton("Open Equation Balancer", () => c.OpenFull(field.Text.Trim().Length > 0 ? new Dictionary<string, string> { ["equation"] = field.Text } : null, null), "Open the whole tool on this equation");
+        var open = BioUI.OpenButton("Open Equation balancer", () => c.OpenFull(field.Text.Trim().Length > 0 ? new Dictionary<string, string> { ["equation"] = field.Text } : null, null), "Open the whole tool on this equation");
         // (0.3.5) Open full screen hands the whole tool the equation typed here
         c.Carry = () => field.Text.Trim().Length > 0 ? new Dictionary<string, string> { ["equation"] = field.Text } : null;
         ChemCalc.CopyOnCtrlC(this, () => shown.Ok ? shown.PlainText : null);

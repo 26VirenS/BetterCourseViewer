@@ -79,7 +79,7 @@ internal static class AppointmentsSheet
         {
             var words = K.Text($"Your time: {h.When}", Ty.Body);
             words.FontWeight = FontWeights.Medium;
-            var give = K.Button("Give Back", () => _ = GiveBack(h));
+            var give = K.Button("Give back", () => _ = GiveBack(h));
             give.MinWidth = 0;
             give.IsEnabled = busy == null;
             give.ToolTip = "Give this time back, so someone else can take it";
@@ -259,7 +259,7 @@ internal static class AppointmentsSheet
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Padding = new Thickness(0, 0, 4, 0),
         };
         Paint();
-        var sheet = new Sheet { Title = "Find Appointment", Body = K.V(12, lede, body), Width = 580, Floats = true, Light = true };
+        var sheet = new Sheet { Title = "Find appointment", Body = K.V(12, lede, body), Width = 580, Floats = true, Light = true };
         sheet.Add("Done", SheetButtonKind.Primary);
         Dialogs.Show(sheet, over);
         _ = Load();

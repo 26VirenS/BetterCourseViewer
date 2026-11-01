@@ -32,7 +32,7 @@ public static class CalendarKinds
     public static readonly string[] All = { ICloud, Google, Microsoft };
 
     public static string Name(string kind) => kind switch { ICloud => "iCloud Calendar", Google => "Google Calendar", _ => "Outlook" };
-    public static string Action(string kind) => kind switch { ICloud => "Sign In with iCloud", Google => "Sign In with Google", _ => "Sign In with Microsoft" };
+    public static string Action(string kind) => kind switch { ICloud => "Sign in with iCloud", Google => "Sign in with Google", _ => "Sign in with Microsoft" };
     public static string Subtitle(string kind) => kind switch { ICloud => "Your Apple ID and an app password", Google => "Google Calendar", _ => "Outlook, Microsoft 365, school accounts" };
     public static string Tint(string kind) => kind switch { ICloud => "#0a84ff", Google => "#4285f4", _ => "#0078d4" };
 

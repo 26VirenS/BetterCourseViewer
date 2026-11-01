@@ -179,8 +179,8 @@ public sealed partial class DashboardScreen
         {
             menu.Items.Clear();
             var planned = row.Plan != null;
-            menu.Items.Add(CalendarKit.Item(planned ? "Move Plan…" : "Plan a Time…", SymbolRegular.Clock24, () => PlanRail.Open(holder, row.Id, row.Title, engine)));
-            if (planned) menu.Items.Add(CalendarKit.Item("Clear Plan", SymbolRegular.CalendarCancel24, () => PlanRail.Clear(row.Id, engine)));
+            menu.Items.Add(CalendarKit.Item(planned ? "Move plan…" : "Plan a time…", SymbolRegular.Clock24, () => PlanRail.Open(holder, row.Id, row.Title, engine)));
+            if (planned) menu.Items.Add(CalendarKit.Item("Clear plan", SymbolRegular.CalendarCancel24, () => PlanRail.Clear(row.Id, engine)));
         };
         return holder;
     }

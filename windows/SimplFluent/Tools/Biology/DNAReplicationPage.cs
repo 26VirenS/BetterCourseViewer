@@ -101,10 +101,10 @@ internal sealed class DnaReplicationPage : Grid
             (BioPalette.Rna.ToColor(), "RNA primer (U, not T)"),
             (K.Hex("#ff9f0a"), "◆ a nick: a missing backbone bond"),
         })));
-        var go = K.Link("Open the Biomolecule Builder", () => BioTools.Open(c, "biomol"));
+        var go = K.Link("Open the biomolecule builder", () => BioTools.Open(c, "biomol"));
         right.Children.Add(BioUI.Card("Where the energy comes from", null, null,
             BioUI.FactRow("dNTPs", "The cell’s nucleotides arrive as dNTPs: deoxynucleoside triphosphates. As each joins a strand’s 3′ end it lets go of two of its phosphates as pyrophosphate, and that pays for the new phosphodiester bond."),
-            BioUI.FactRow("Dehydration", "The Biomolecule Builder shows the same bond as a dehydration reaction (a water lost): the textbook simplification."),
+            BioUI.FactRow("Dehydration", "The biomolecule builder shows the same bond as a dehydration reaction (a water lost): the textbook simplification."),
             go));
     }
 }

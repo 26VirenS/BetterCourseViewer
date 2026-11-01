@@ -228,7 +228,7 @@ internal sealed class FCRoundView : FCStudyPart
     {
         var all = learning.Count == 0;
         var buttons = new List<UIElement>();
-        if (!all) buttons.Add(K.Button($"Keep Reviewing {ToolKit.Plural(learning.Count, "Term")}", () => Act(() => Begin(d, learning.ToList())), accent: true));
+        if (!all) buttons.Add(K.Button($"Keep reviewing {ToolKit.Plural(learning.Count, "Term")}", () => Act(() => Begin(d, learning.ToList())), accent: true));
         buttons.Add(K.Button("Restart flashcards", () => Act(() => Begin(d, null)), accent: all));
         buttons.Add(K.Button("Back to set", back));
         var counts = K.H(40, BigCount(know.Count, "Know", StudyKit.Green), BigCount(learning.Count, "Still learning", StudyKit.Orange));

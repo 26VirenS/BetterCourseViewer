@@ -23,7 +23,7 @@ public class EverydayToolsTests
         var kind = ToolsCenter.KindOf("words");
         Assert.NotNull(kind);
         Assert.Same(kind, ToolsScreen.Kinds.First(k => k.Key == "words"));
-        Assert.Equal("Word Counter", kind!.Name);
+        Assert.Equal("Word counter", kind!.Name);
         Assert.Equal("Words, characters, reading time.", kind.Note);
         Assert.Equal("#8e8e93", kind.Hex);
         Assert.Equal("Words", ToolsCenter.ShortName("words"));
@@ -36,7 +36,7 @@ public class EverydayToolsTests
         Assert.Equal("matrix", maths[^1]);
         var kind = ToolsCenter.KindOf("matrix");
         Assert.NotNull(kind);
-        Assert.Equal("Matrix Calculator", kind!.Name);
+        Assert.Equal("Matrix calculator", kind!.Name);
         Assert.Equal("Determinant, inverse, solve, RREF.", kind.Note);
         Assert.Equal("#5e5ce6", kind.Hex);
         Assert.Equal("Matrix", ToolsCenter.ShortName("matrix"));

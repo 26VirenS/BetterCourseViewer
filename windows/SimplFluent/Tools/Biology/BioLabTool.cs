@@ -165,7 +165,7 @@ internal sealed class LabPageView : ScrollViewer
         body.MaxWidth = 1480;
         body.HorizontalAlignment = HorizontalAlignment.Stretch;
         Content = body;
-        AutomationProperties.SetName(this, $"Bio Lab Calculator, {info?.Title ?? page}");
+        AutomationProperties.SetName(this, $"Bio lab calculator, {info?.Title ?? page}");
 
         void Changed(string id)
         {
@@ -706,7 +706,7 @@ internal sealed class BioLabCompact : ContentControl
             Build();
         };
         // (an accent button across the flyout, as every biology pin's is)
-        var open = BioUI.OpenButton("Open Bio Lab Calculator", Open, "The whole calculator, with these numbers (Enter)");
+        var open = BioUI.OpenButton("Open Bio lab calculator", Open, "The whole calculator, with these numbers (Enter)");
         Content = K.V(12, pick, body, answer, open);
         // (0.3.5) Open full screen opens the whole tool at this calculator, as Open does (its numbers are the whole
         //  tool's already)

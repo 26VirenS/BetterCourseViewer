@@ -223,7 +223,7 @@ public sealed partial class CalendarScreen : Screen
             System.Windows.Automation.AutomationProperties.SetHelpText(calendars, "Choose the calendars shown");
             // (0.3.53) Canvas's Scheduler: office hours and sign-ups with a time to reserve — (0.3.65) a person and a speech
             // bubble, where the calendar with a clock was taken at a glance for the calendars' calendar with a tick
-            var finder = finderButton = K.IconButton(SymbolRegular.PersonChat24, FindAppointment, "Find Appointment", 16, 32);
+            var finder = finderButton = K.IconButton(SymbolRegular.PersonChat24, FindAppointment, "Find appointment", 16, 32);
             System.Windows.Automation.AutomationProperties.SetHelpText(finder, "Office hours, conferences and sign-ups with a time to reserve");
             // (0.3.60) Sync: (0.3.63) Simpl's own calendar into a calendar app, and the student's own calendars in here
             var sync = syncButton = K.IconButton(SymbolRegular.ArrowSync24, OpenSync, "Sync", 16, 32);
@@ -330,7 +330,7 @@ public sealed partial class CalendarScreen : Screen
         var menu = new ContextMenu { PlacementTarget = at, Placement = PlacementMode.Bottom };
         if (Compact)
         {
-            menu.Items.Add(CalendarKit.Item("Find Appointment…", SymbolRegular.PersonChat24, FindAppointment));
+            menu.Items.Add(CalendarKit.Item("Find appointment…", SymbolRegular.PersonChat24, FindAppointment));
             menu.Items.Add(CalendarKit.Item("Sync…", SymbolRegular.ArrowSync24, OpenSync));
             menu.Items.Add(CalendarKit.Item("Calendars…", SymbolRegular.CalendarCheckmark24, ChooseCalendars));
             menu.Items.Add(new Separator());

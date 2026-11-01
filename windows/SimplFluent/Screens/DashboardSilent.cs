@@ -410,7 +410,7 @@ public sealed partial class DashboardScreen
     /// <summary>Exit Silent Mode, at the top right: grey words and the moon; under the pointer white, on a faint pill.</summary>
     private Button ExitButton()
     {
-        var words = new TextBlock { Text = "Exit Silent Mode", FontFamily = K.TextFace, FontSize = 13, FontWeight = FontWeights.Medium, VerticalAlignment = VerticalAlignment.Center };
+        var words = new TextBlock { Text = "Exit Silent mode", FontFamily = K.TextFace, FontSize = 13, FontWeight = FontWeights.Medium, VerticalAlignment = VerticalAlignment.Center };
         var moon = new SymbolIcon { Symbol = SymbolRegular.WeatherMoon24, FontSize = 14, Margin = new Thickness(0, 0, 7, 0), VerticalAlignment = VerticalAlignment.Center };
         var ink = new SolidColorBrush(White(0.45));
         words.Foreground = ink;
@@ -422,7 +422,7 @@ public sealed partial class DashboardScreen
             HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 16, 20, 0),
             Cursor = Cursors.Hand, ToolTip = "Back to the whole Dashboard",
         };
-        AutomationProperties.SetName(b, "Exit Silent Mode");
+        AutomationProperties.SetName(b, "Exit Silent mode");
         b.MouseEnter += (_, _) => { Fade(ink, White(0.92)); b.Background = new SolidColorBrush(White(0.1)); };
         b.MouseLeave += (_, _) => { Fade(ink, White(0.45)); b.Background = Brushes.Transparent; };
         b.Click += (_, _) => SilentMode.Set(false);

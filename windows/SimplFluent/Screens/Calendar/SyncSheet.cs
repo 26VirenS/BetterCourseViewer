@@ -89,7 +89,7 @@ internal static class SyncSheet
                     K.Text("Your work, your tasks and your plans", Ty.BodyStrong),
                     K.Wrapped("As one calendar, Simpl, in Outlook, Google Calendar or your calendar app, kept up to date. It is sealed: only your private link opens it.", Ty.Body, B.Text2));
                 var intro = K.Columns("auto, *", tile.Margin(0, 0, 12, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Top).Col(0), words.Col(1));
-                var make_ = K.Button(turning ? "Making It…" : "Make My Simpl Calendar", () => _ = Make(), accent: true);
+                var make_ = K.Button(turning ? "Making it…" : "Make my Simpl calendar", () => _ = Make(), accent: true);
                 make_.IsEnabled = !turning;
                 make_.HorizontalAlignment = HorizontalAlignment.Stretch;
                 make_.MinHeight = 36;
@@ -101,12 +101,12 @@ internal static class SyncSheet
             outlook = AppButton("Outlook", SymbolRegular.CalendarAdd24, () =>
             {
                 var menu = new ContextMenu { PlacementTarget = outlook, Placement = PlacementMode.Bottom };
-                menu.Items.Add(CalendarKit.Item("School or Work Account (Microsoft 365)", SymbolRegular.Building24, () => Simpl.Engine.Engine.OpenExternally(links.Office)));
-                menu.Items.Add(CalendarKit.Item("Personal Account (Outlook.com)", SymbolRegular.Person24, () => Simpl.Engine.Engine.OpenExternally(links.Outlook)));
+                menu.Items.Add(CalendarKit.Item("School or work account (Microsoft 365)", SymbolRegular.Building24, () => Simpl.Engine.Engine.OpenExternally(links.Office)));
+                menu.Items.Add(CalendarKit.Item("Personal account (Outlook.com)", SymbolRegular.Person24, () => Simpl.Engine.Engine.OpenExternally(links.Outlook)));
                 menu.IsOpen = true;
             }, "Add it to Outlook: your school's account or a personal one");
             var google = AppButton("Google Calendar", SymbolRegular.CalendarAdd24, () => Simpl.Engine.Engine.OpenExternally(links.Google), "Opens Google Calendar's page to add it");
-            var app = AppButton("Calendar App", SymbolRegular.CalendarAdd24, () =>
+            var app = AppButton("Calendar app", SymbolRegular.CalendarAdd24, () =>
             {
                 // (no app on this PC takes webcal links: the link copied instead, and said so)
                 try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(links.Webcal.ToString()) { UseShellExecute = true }); }
@@ -117,7 +117,7 @@ internal static class SyncSheet
                     Paint();
                 }
             }, "Subscribes in the calendar app Windows opens calendar links in");
-            var copy = AppButton("Copy Link", SymbolRegular.Copy24, () =>
+            var copy = AppButton("Copy link", SymbolRegular.Copy24, () =>
             {
                 CalendarKit.Copy(links.Https);
                 Say("Your Simpl calendar's link is copied. Paste it where your calendar app adds one by address.", false);
@@ -136,7 +136,7 @@ internal static class SyncSheet
             FrameworkElement stop;
             if (stopping)
             {
-                var yes = K.Button("Stop Sharing", () => _ = Stop());
+                var yes = K.Button("Stop sharing", () => _ = Stop());
                 yes.Foreground = K.Brush(K.Tone("red"));
                 yes.IsEnabled = !turning;
                 var no = K.Button("Cancel", () => { stopping = false; Paint(); });
@@ -146,7 +146,7 @@ internal static class SyncSheet
             }
             else
             {
-                var ask = K.Subtle(K.Text("Stop Sharing This Calendar…", Ty.Body, B.Critical), () => { stopping = true; Paint(); }, new Thickness(4, 4, 8, 4), 6);
+                var ask = K.Subtle(K.Text("Stop sharing this calendar…", Ty.Body, B.Critical), () => { stopping = true; Paint(); }, new Thickness(4, 4, 8, 4), 6);
                 ask.HorizontalAlignment = HorizontalAlignment.Left;
                 System.Windows.Automation.AutomationProperties.SetName(ask, "Stop sharing this calendar");
                 stop = ask;

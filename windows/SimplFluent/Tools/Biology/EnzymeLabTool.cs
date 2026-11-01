@@ -64,7 +64,7 @@ internal sealed class EnzymeLabTool : Grid
     {
         if (state != null) FromLaunch(state);
         Build();
-        AutomationProperties.SetName(this, "Enzyme Lab");
+        AutomationProperties.SetName(this, "Enzyme lab");
         Draw();
         void Changed() => Draw();
         void Look() { Build(); Draw(); }

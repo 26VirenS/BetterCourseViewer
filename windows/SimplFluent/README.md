@@ -528,7 +528,7 @@ public sealed class GradesScreen : Screen
   Simpl's — the main one, a place's own, a popup, a tool's, the file preview — is laid out as it was but in black and
   white (Kit/SilentGrey.cs: a small pixel shader over each window's content, and a filter on the page in each web view,
   which draws out of WPF's reach). The Dashboard keeps its large Next and Then and the black title bar. Silent Mode in
-  the account's menu turns it on from anywhere, and Exit Silent Mode there turns it off.
+  the account's menu turns it on from anywhere, and Exit Silent mode there turns it off.
 - **Files previewed first (0.3.85; the Mac's 1.3.191).** A file opened — a click on it anywhere, its menu's Preview, a
   download a page starts itself — is fetched with the session into a folder of Simpl's own (`FilePreview.Previews`,
   `…\Simpl\Previews`, each file in a folder of its own, cleared of what is a day old), not Downloads, and shown in
@@ -546,7 +546,7 @@ public sealed class GradesScreen : Screen
   read says); Open beside them, while the pointer or the keyboard is on the item, opens it. The page has no header
   (`Screen.Bare`) and lays itself out edge to edge; the pane goes black, in words alone (`NavList.Plain`, the theme's
   words made white and grey under it, `AppShell.Quiet`), its search box away, and the title bar black over it
-  (`MainWindow.SilentLook`). Kept on this PC (`SilentMode`, `dashSilent`); Exit Silent Mode at the top right brings the
+  (`MainWindow.SilentLook`). Kept on this PC (`SilentMode`, `dashSilent`); Exit Silent mode at the top right brings the
   Dashboard back. The tour and Appearance put it by while they are on. Checked live on its own: only `dashSilent`; its
   words drawn again each half minute when they say something else. (The screenshot suite: `--dash-silent`.)
 - Colours are theme resources (`B.Text`, `B.Text2`, `B.Card`, `B.Accent` …), set with `.Fg()`, `.Bg()`, `.Stroke()`, so
@@ -987,9 +987,13 @@ biology views' own share to 70% or more.
 fields, notes, the drop zone and the scroll edge; `Files` has Windows' file dialogs.
 
 The Tools page lists the tools under what they are for — Study, Math & science, Files, then Chemistry, Physics and
-Biology, and (0.3.105) Community — a one-line note on each tile, three across from about 900 wide (a section's four in
-full rows); a tile opens its tool's popup over the page. Windows' sentence case on every button and menu ("Pin to title
-bar", "Copy result", "Skip tour"). `--tools-scroll chemistry` (or `physics`, `biology`, `community`) opens the page
+Biology, and (0.3.105) Community — a one-line note on each tile, three across from about 900 wide, every section as
+many across as every other, so the columns line up down the page; a tile opens its tool's popup over the page. Windows'
+sentence case on every name, title, button and menu ("Word counter", "Matrix calculator", "Pin to title bar", "Find
+appointment…", "Make my Simpl calendar", "Exit Silent mode"); a label that names a tool keeps its name's capital ("Open in
+Molecule builder"). `UiWordsTests` (SimplFluent.Tests) holds every tool's name and every label written in the sources
+(buttons, links, menu items, dialog titles, Settings rows, headings) to it, keys, names and the labels of what they name
+apart (`SentenceCase.Names`). `--tools-scroll chemistry` (or `physics`, `biology`, `community`) opens the page
 scrolled to that section.
 
 **Simpl Community tools** (0.3.105, `Tools/Community/`; the format is the site's `docs/community-tools.md`, format 1):
@@ -1194,7 +1198,7 @@ The tools program's everyday tools (`Tools/Everyday/`, each at the end of its gr
 box opens each by its name and words, `PaletteCommand.EverydayTools`; `--tool <key> --tool-state …` for the pictures,
 `Everyday.LaunchState`):
 
-- **Word Counter** (`words`, Study; `Tools/Everyday/WordCounter.cs`, `Model/WordCount.cs`): an essay pasted or typed,
+- **Word counter** (`words`, Study; `Tools/Everyday/WordCounter.cs`, `Model/WordCount.cs`): an essay pasted or typed,
   counted as it changes — words (a run of non-spaces with a letter or a figure in it), characters with and without
   spaces, sentences (ending at . ! or ? before a space or the end), paragraphs (blocks between blank lines), reading
   time at 238 words a minute and speaking time at 150, the average and the longest word — a target of so many words
@@ -1219,7 +1223,7 @@ box opens each by its name and words, `PaletteCommand.EverydayTools`; `--tool <k
   `--stats-b`, `--stats-mu0`, `--stats-test one|two|paired`, `--stats-normal "μ,σ,x,a,b,p"` and `--stats-t "df,t,p"` fill
   the fields for a picture; the log says `stats: shows <page>`. The search box: `/stats`, `statistics`, `mean`,
   `standard deviation`, `regression`, `normal`, `z-score`, `t-test`.
-- **Matrix Calculator** (`matrix`, Math & science; `Tools/Everyday/MatrixCalculator.cs`, `Model/Matrix.cs`): A and B
+- **Matrix calculator** (`matrix`, Math & science; `Tools/Everyday/MatrixCalculator.cs`, `Model/Matrix.cs`): A and B
   in editors of cells (1 to 6 rows and columns by − and +, Tab from cell to cell, a block pasted into any cell —
   rows on lines or after semicolons, cells apart by spaces, commas or tabs — fills and sizes the matrix), k and n
   beside them, the operations as a row of buttons (A + B, A − B, A × B, kA, Aᵀ, det A, A⁻¹, rank A, RREF A, trace A,

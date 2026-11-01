@@ -101,7 +101,7 @@ public sealed class SearchScreen : Screen
     {
         if (Q.Length == 0) return Start();
         if (data is { } d0 && d0.Groups.Count == 0 && !searching)
-            return K.V(26, Actions(Q), MoreKit.Unavailable(SymbolRegular.Search24, $"No Results for “{answered}”", "Check the spelling or try a new search.", 240));
+            return K.V(26, Actions(Q), MoreKit.Unavailable(SymbolRegular.Search24, $"No results for “{answered}”", "Check the spelling or try a new search.", 240));
         if (data is { } d) return Results(d);
         return new Grid { MinHeight = 200, Children = { K.Spinner(32) } };
     }
@@ -198,7 +198,7 @@ public sealed class SearchScreen : Screen
         var b = K.Subtle(g, Open, new Thickness(8, 9, 8, 9), 6);
         var menu = new List<(string, SymbolRegular, Action)?> { ("Open", SymbolRegular.Open24, Open) };
         if (!external) menu.Add(($"Open in {engine.LmsName}", SymbolRegular.Globe24, () => engine.OpenWebScreen(r.Url, r.Title)));
-        menu.Add(("Copy Link", SymbolRegular.Link24, () => MoreKit.Copy(engine.Absolute(r.Url)?.ToString())));
+        menu.Add(("Copy link", SymbolRegular.Link24, () => MoreKit.Copy(engine.Absolute(r.Url)?.ToString())));
         b.ContextMenu = MoreKit.Menu(menu.ToArray());
         return b;
     }

@@ -416,7 +416,7 @@ internal sealed class GasQuick : ContentControl
         t = new GasField("T", later, quick: true);
         FrameworkElement Labelled(string label, GasField g) => K.V(4, K.Text(label, Ty.Caption, B.Text2), g.View);
         var grid = K.V(8, K.Columns("*, 8, *", Labelled("P", p).Col(0), Labelled("V", v).Col(2)), K.Columns("*, 8, *", Labelled("n", n).Col(0), Labelled("T", t).Col(2)));
-        var open = BioUI.OpenButton("Open Gas Laws", () => c.OpenFull(new Dictionary<string, string> { ["carry"] = "pin" }, null), "Open the whole tool");
+        var open = BioUI.OpenButton("Open Gas laws", () => c.OpenFull(new Dictionary<string, string> { ["carry"] = "pin" }, null), "Open the whole tool");
         // (the whole tool reads the same remembered fields, so it goes on from these)
         c.Carry = () => new[] { p, v, n, t }.Any(g => !g.Blank) ? new Dictionary<string, string> { ["carry"] = "pin" } : null;
         ChemCalc.CopyOnCtrlC(this, () => plain);

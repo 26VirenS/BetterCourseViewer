@@ -71,15 +71,15 @@ internal sealed class SyncAccounts(Action repaint)
         var who = K.V(2, K.Text(CalendarKinds.Name(a.Kind), Ty.BodyStrong), K.Text(a.Name, Ty.Caption, B.Text2));
         who.VerticalAlignment = VerticalAlignment.Center;
         FrameworkElement act;
-        if (a.SignedOut) act = K.Button("Sign In Again", () => Again(a));
+        if (a.SignedOut) act = K.Button("Sign in again", () => Again(a));
         else if (syncing) act = K.Spinner(16).Margin(6, 0, 6, 0);
-        else act = K.IconButton(SymbolRegular.ArrowSync24, () => _ = CalendarAccounts.Sync(a.Id), "Sync Now", 14, 28);
+        else act = K.IconButton(SymbolRegular.ArrowSync24, () => _ = CalendarAccounts.Sync(a.Id), "Sync now", 14, 28);
         act.VerticalAlignment = VerticalAlignment.Center;
         Button? more = null;
         more = K.IconButton(SymbolRegular.MoreHorizontal24, () =>
         {
             var menu = new ContextMenu { PlacementTarget = more, Placement = PlacementMode.Bottom };
-            menu.Items.Add(CalendarKit.Item("Sign Out…", SymbolRegular.SignOut24, () => { leaving = a.Id; repaint(); }));
+            menu.Items.Add(CalendarKit.Item("Sign out…", SymbolRegular.SignOut24, () => { leaving = a.Id; repaint(); }));
             menu.IsOpen = true;
         }, "More", 14, 28);
         more.Margin = new Thickness(4, 0, 0, 0);
@@ -99,7 +99,7 @@ internal sealed class SyncAccounts(Action repaint)
         FrameworkElement foot;
         if (leaving == a.Id)
         {
-            var yes = K.Button("Sign Out", () => _ = SignOut(a));
+            var yes = K.Button("Sign out", () => _ = SignOut(a));
             yes.Foreground = K.Brush(K.Tone("red"));
             var no = K.Button("Cancel", () => { leaving = null; repaint(); });
             var words = a.Push
@@ -110,10 +110,10 @@ internal sealed class SyncAccounts(Action repaint)
         else
         {
             var push = new ToggleSwitch { IsChecked = a.Push, IsEnabled = !a.SignedOut, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
-            System.Windows.Automation.AutomationProperties.SetName(push, "Add My Work and Plans");
+            System.Windows.Automation.AutomationProperties.SetName(push, "Add my work and plans");
             push.Click += (_, _) => CalendarAccounts.SetPush(a.Id, push.IsChecked == true);
             var label = K.V(2,
-                K.Text("Add My Work and Plans", Ty.Body),
+                K.Text("Add my work and plans", Ty.Body),
                 K.Wrapped($"Due dates, your own tasks and your plans, in a calendar named Simpl in {CalendarKinds.Name(a.Kind)}.", Ty.Caption, B.Text2));
             foot = K.Columns("*, auto", label.Col(0), push.Col(1));
         }
@@ -150,7 +150,7 @@ internal sealed class SyncAccounts(Action repaint)
             var adding = CalendarAccounts.Busy.Contains("new:" + kind);
             var available = CalendarKinds.Available(kind);
             var another = CalendarAccounts.Accounts.Any(a => a.Kind == kind);
-            var title = another ? $"Add Another {(kind == CalendarKinds.ICloud ? "iCloud" : kind == CalendarKinds.Google ? "Google" : "Microsoft")} Account" : CalendarKinds.Action(kind);
+            var title = another ? $"Add another {(kind == CalendarKinds.ICloud ? "iCloud" : kind == CalendarKinds.Google ? "Google" : "Microsoft")} Account" : CalendarKinds.Action(kind);
             FrameworkElement mark = adding ? K.Spinner(16) : K.Icon(Symbol(kind), 16, available ? K.Hex(CalendarKinds.Tint(kind)) : K.Hex("#8a8a8a"));
             var words = K.V(1, K.Text(title, Ty.Body), K.Text(available ? CalendarKinds.Subtitle(kind) : "Coming in a later beta", Ty.Caption, B.Text2));
             var k = kind;
@@ -189,14 +189,14 @@ internal sealed class SyncAccounts(Action repaint)
             K.Text("Sign in to iCloud Calendar", Ty.BodyStrong),
             K.Wrapped("Use your Apple ID and an app-specific password, not your Apple ID's own password. Make one at account.apple.com, under Sign-In and Security, App-Specific Passwords.", Ty.Caption, B.Text2));
         var head = K.Columns("auto, *", tile.Margin(0, 0, 12, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Top).Col(0), intro.Col(1));
-        var make = K.Subtle(K.H(6, K.Icon(SymbolRegular.Key24, 14, B.AccentText), K.Text("Make an App-Specific Password", Ty.Body, B.AccentText)),
+        var make = K.Subtle(K.H(6, K.Icon(SymbolRegular.Key24, 14, B.AccentText), K.Text("Make an app-specific password", Ty.Body, B.AccentText)),
             () => Simpl.Engine.Engine.OpenExternally(new Uri("https://account.apple.com/account/manage")), new Thickness(4, 4, 8, 4), 6);
         make.HorizontalAlignment = HorizontalAlignment.Left;
         System.Windows.Automation.AutomationProperties.SetName(appleId, "Apple ID");
         System.Windows.Automation.AutomationProperties.SetName(appPassword, "App-specific password");
         appleId.IsEnabled = !busy;
         appPassword.IsEnabled = !busy;
-        var go = K.Button(busy ? "Signing In…" : "Sign In", () => _ = SignInICloud(), accent: true);
+        var go = K.Button(busy ? "Signing in…" : "Sign in", () => _ = SignInICloud(), accent: true);
         go.IsEnabled = !busy;
         var cancel = K.Button("Cancel", () => { askingICloud = false; problem = null; appPassword.Password = ""; repaint(); });
         cancel.IsEnabled = !busy;

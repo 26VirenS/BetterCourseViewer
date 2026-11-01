@@ -18,13 +18,13 @@ public class ChemistryToolsTests
     /// <summary>The section's tools in their order: the Periodic Table's four, then the calculators as they shipped.</summary>
     private static readonly (string Key, string Name, string Short, string Hex)[] Expected =
     {
-        ("ptable", "Periodic Table", "Elements", "#e5484d"),
-        ("lewis", "Lewis Structures", "Lewis", "#0ea5c6"),
-        ("molecule", "Molecule Builder", "Molecules", "#3faa4b"),
-        ("atoms", "Atoms & Orbitals", "Atoms", "#b452e0"),
-        ("balance", "Equation Balancer", "Balance", "#ff6b35"),
-        ("moles", "Molar Mass & Stoichiometry", "Moles", "#2fb37a"),
-        ("gas", "Gas Laws", "Gas", "#3f8ef7"),
+        ("ptable", "Periodic table", "Elements", "#e5484d"),
+        ("lewis", "Lewis structures", "Lewis", "#0ea5c6"),
+        ("molecule", "Molecule builder", "Molecules", "#3faa4b"),
+        ("atoms", "Atoms & orbitals", "Atoms", "#b452e0"),
+        ("balance", "Equation balancer", "Balance", "#ff6b35"),
+        ("moles", "Molar mass & stoichiometry", "Moles", "#2fb37a"),
+        ("gas", "Gas laws", "Gas", "#3f8ef7"),
         ("solution", "Solutions & pH", "pH", "#a259ff"),
     };
 

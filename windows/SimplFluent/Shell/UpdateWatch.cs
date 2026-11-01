@@ -132,7 +132,7 @@ public static class UpdateWatch
         if (main.IsVisible && main.WindowState != WindowState.Minimized && (e == null || e.Login.Covers || e.Phase == Phase.Web))
             return new Updates.Holding("the sign-in", "when you’ve signed in");
         if (touring) return new Updates.Holding("the tour", "when the tour is over");
-        if (Simpl.Screens.HandInSheet.Open) return new Updates.Holding("Hand In", "when you close Hand In");
+        if (Simpl.Screens.HandInSheet.Open) return new Updates.Holding("Hand in", "when you close Hand in");
         if (main.Sheets.Current is { HoldsUpdates: true }) return new Updates.Holding("a dialog", "when you close the dialog");
         foreach (var w in Application.Current.Windows.OfType<Window>())
         {

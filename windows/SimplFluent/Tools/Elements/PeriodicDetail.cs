@@ -188,15 +188,15 @@ internal sealed class PTElementPage : Grid
         var tile = kind != null ? K.IconTile(kind.Symbol, kind.Color, 44) : new Border();
         tile.VerticalAlignment = VerticalAlignment.Top;
         var words = K.V(3, K.Text("See it in 3D", Ty.BodyStrong),
-            K.Wrapped($"{e.Name}’s shells, orbitals and electron cloud, to turn and zoom, in Atoms & Orbitals.", Ty.Body, B.Text2));
+            K.Wrapped($"{e.Name}’s shells, orbitals and electron cloud, to turn and zoom, in Atoms & orbitals.", Ty.Body, B.Text2));
         words.VerticalAlignment = VerticalAlignment.Center;
         var chevron = K.Icon(SymbolRegular.ChevronRight20, 16, B.Text2);
         chevron.VerticalAlignment = VerticalAlignment.Center;
         var row = K.Columns("auto, *, auto", tile.Margin(0, 0, 14, 0).Col(0), words.Col(1), chevron.Margin(12, 0, 0, 0).Col(2));
         var b = K.CardButton(row, () => openAtoms(e), 8, new Thickness(16));
         b.VerticalContentAlignment = VerticalAlignment.Center;
-        b.ToolTip = $"Open Atoms & Orbitals for {e.Name}";
-        System.Windows.Automation.AutomationProperties.SetName(b, $"See {e.Name} in 3D, in Atoms & Orbitals");
+        b.ToolTip = $"Open Atoms & orbitals for {e.Name}";
+        System.Windows.Automation.AutomationProperties.SetName(b, $"See {e.Name} in 3D, in Atoms & orbitals");
         return b.TourTarget("ptAtoms");
     }
 

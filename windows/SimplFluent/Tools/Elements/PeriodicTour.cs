@@ -34,7 +34,7 @@ internal sealed record PTTourStep(string Title, string Text, string Doing, strin
         new("Find anything", "A symbol, name or number; Enter opens it.", "Search for an element", "type", PTTourAct.Typed, "ptSearch"),
         new("Every element, in depth", "Its page has its electrons and every fact.", "Click an element", "click", PTTourAct.Open, "ptGrid"),
         // (pressed, the popup turns into Atoms & Orbitals for the element: the tour ends there, counted as seen)
-        new("See it in 3D", "Atoms & Orbitals shows its shells, orbitals and electron cloud.", "Click See it in 3D", "click", PTTourAct.Event, "ptAtoms", Event: PTTourEvent.Atoms, Element: 6),
+        new("See it in 3D", "Atoms & orbitals shows its shells, orbitals and electron cloud.", "Click See it in 3D", "click", PTTourAct.Event, "ptAtoms", Event: PTTourEvent.Atoms, Element: 6),
     };
 }
 

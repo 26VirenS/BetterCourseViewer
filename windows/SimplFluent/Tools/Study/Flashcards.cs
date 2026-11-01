@@ -51,7 +51,7 @@ internal static class FCKit
     public static void Save(string path, string text, Window? owner)
     {
         try { File.WriteAllText(path, text); }
-        catch (Exception e) { Simpl.Shell.Dialogs.Fail("Couldn’t Save the File", e.Message, owner); }
+        catch (Exception e) { Simpl.Shell.Dialogs.Fail("Couldn’t save the file", e.Message, owner); }
     }
 
     /// <summary>A set's cards saved as a CSV of two columns, term and definition.</summary>

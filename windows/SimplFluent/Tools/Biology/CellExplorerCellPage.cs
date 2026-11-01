@@ -126,7 +126,7 @@ internal sealed class CellPage : Grid
         var cards = ChemKit.Wide("Make flashcards", MakeFlashcards, icon: SymbolRegular.Library20);
         cards.ToolTip = "A Flashcards set of this cell's parts and what each does";
         var why = ChemKit.Wide("Why are cells small?", WhySmall, icon: SymbolRegular.Cube20);
-        why.ToolTip = "Surface area to volume, in the Bio Lab Calculator, with this cell's size";
+        why.ToolTip = "Surface area to volume, in the bio lab calculator, with this cell's size";
         madeNote.Visibility = Visibility.Collapsed;
 
         left.Children.Add(BioUI.Heading("Parts"));
@@ -635,7 +635,7 @@ internal sealed class CellPage : Grid
         var id = deck?.Id ?? FlashcardStore.Add(new FCDeck
         {
             Name = title,
-            Desc = $"The parts of {kind.Phrase()} and what they do, from Cell Explorer.",
+            Desc = $"The parts of {kind.Phrase()} and what they do, from Cell explorer.",
             Cards = CEParts.All(kind).Select(p => new FCCard(p.Name, CellUI.Plain(p.Function))).ToList(),
         });
         madeNote.Text = $"Made “{title}” in Flashcards.";

@@ -607,7 +607,7 @@ internal sealed class LewisMakerView : Grid
             if (Averages(r) is { } av) facts.Children.Add(av);
         }
         // (the structure shown, built in 3D: the Molecule Builder in this tool's place, named for the tool it opens)
-        var open = ChemKit.Wide("Open in Molecule Builder", () =>
+        var open = ChemKit.Wide("Open in Molecule builder", () =>
         {
             var rr = st.Result();
             if (ShownStructure(rr) is not { } shown) return;

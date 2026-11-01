@@ -357,16 +357,16 @@ public sealed partial class CalendarScreen
             if (held != null)
             {
                 if (m.Items.Count > 0) m.Items.Add(new Separator());
-                m.Items.Add(CalendarKit.Item("Give Back This Time", SymbolRegular.CalendarCancel24, () => _ = GiveBack(held)));
-                m.Items.Add(CalendarKit.Item("Find Another Time…", SymbolRegular.CalendarClock24, FindAppointment));
+                m.Items.Add(CalendarKit.Item("Give back this time", SymbolRegular.CalendarCancel24, () => _ = GiveBack(held)));
+                m.Items.Add(CalendarKit.Item("Find another time…", SymbolRegular.CalendarClock24, FindAppointment));
             }
             // (0.3.60) a plan: moved (the rail under it) or cleared — (0.3.66) edited, or deleted with its group
             if (planned != null)
             {
                 if (m.Items.Count > 0) m.Items.Add(new Separator());
-                m.Items.Add(CalendarKit.Item("Edit Plan…", SymbolRegular.Edit24, () => PlanSheet.Show(engine, ev, Window.GetWindow(page), PlanChanged, editing: true, beside: b)));
-                m.Items.Add(CalendarKit.Item("Move Plan…", SymbolRegular.Clock24, () => PlanRail.Open(b, planned, ev.Title, engine, Read)));
-                m.Items.Add(CalendarKit.Item("Delete Plan", SymbolRegular.CalendarCancel24, () => _ = DeletePlan(planned)));
+                m.Items.Add(CalendarKit.Item("Edit plan…", SymbolRegular.Edit24, () => PlanSheet.Show(engine, ev, Window.GetWindow(page), PlanChanged, editing: true, beside: b)));
+                m.Items.Add(CalendarKit.Item("Move plan…", SymbolRegular.Clock24, () => PlanRail.Open(b, planned, ev.Title, engine, Read)));
+                m.Items.Add(CalendarKit.Item("Delete plan", SymbolRegular.CalendarCancel24, () => _ = DeletePlan(planned)));
             }
             b.ContextMenu = m;
         }

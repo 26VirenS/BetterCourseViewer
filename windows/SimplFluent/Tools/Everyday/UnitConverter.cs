@@ -224,7 +224,7 @@ internal sealed class UnitConverterTool
         AutomationProperties.SetName(from, "From");
         AutomationProperties.SetName(to, "To");
         // (Swap between From and To, in one column with them: ⇅)
-        var swap = K.IconButton(SymbolRegular.ArrowSort24, () => s.Swap(), "Swap From and To", 16, 36);
+        var swap = K.IconButton(SymbolRegular.ArrowSort24, () => s.Swap(), "Swap the two units", 16, 36);
         swap.HorizontalAlignment = HorizontalAlignment.Left;
         copy = K.Button("Copy", () => { if (s.Result is { } r) Everyday.Copy(UnitMath.WithUnit(r, s.To).Replace("−", "-")); }, icon: SymbolRegular.Copy24);
         copy.HorizontalAlignment = HorizontalAlignment.Left;

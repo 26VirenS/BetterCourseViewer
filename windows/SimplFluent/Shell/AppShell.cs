@@ -795,7 +795,7 @@ public sealed partial class AppShell : Grid, IDisposable
         // (0.3.31) the theme, the photos and the courses' colours, over the window itself
         menu.Items.Add(Item("Appearance…", SymbolRegular.PaintBrush24, () => { ClosePane(); window.StartAppearance(); }));
         // (0.3.86) Silent mode from any screen, and the way out of it off the Dashboard (the web's 2.99.127)
-        menu.Items.Add(Item(SilentMode.On ? "Exit Silent Mode" : "Silent Mode", SymbolRegular.WeatherMoon24, () => SilentMode.Set(!SilentMode.On)));
+        menu.Items.Add(Item(SilentMode.On ? "Exit Silent mode" : "Silent mode", SymbolRegular.WeatherMoon24, () => SilentMode.Set(!SilentMode.On)));
         menu.Items.Add(Item("What’s new", SymbolRegular.Sparkle24, () => engine.ShowWhatsNew(WhatsNew.All)));
         menu.Items.Add(Item("Take the tour", SymbolRegular.Map24, window.StartTour));
         menu.Items.Add(Item($"{engine.LmsName} profile", SymbolRegular.Person24, () => engine.OpenWebScreen("/profile", "Profile")));

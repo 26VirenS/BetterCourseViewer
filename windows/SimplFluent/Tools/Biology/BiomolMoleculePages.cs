@@ -726,7 +726,7 @@ internal sealed class BiomolLipidPage : BiomolPageView
             BiomolPrefs.Changed();
         };
         var bilayer = ChemKit.Wide("Make a bilayer", () => BiomolHandOver.ToTool(C, "cell", "membrane"), icon: SymbolRegular.Layer20);
-        bilayer.ToolTip = "Phospholipids in a membrane: the Cell Explorer's Membrane page";
+        bilayer.ToolTip = "Phospholipids in a membrane: Cell explorer's Membrane page";
         Left.Children.Add(list);
         Left.Children.Add(K.V(8, bilayer, BioUI.Caption("In a membrane the tails face inward and the heads outward, toward the water.")));
         Left.Children.Add(view);
