@@ -1,6 +1,6 @@
 # Simpl Courses — the website
 
-Five pages, no build step, no dependencies: `public/index.html` (the landing page, its pictures in
+Five pages (and Simpl Community's, below), no build step, no dependencies: `public/index.html` (the landing page, its pictures in
 `public/img/`), `public/compare.html` (Simpl, BetterCampus and plain Canvas side by side, every fact about the other
 two linked to its source, at `/compare`), `public/trust.html` (what Simpl can and can't see, in plain words, at
 `/trust`), `public/privacy.html` (the privacy policy, served at `/privacy`) and `public/report/` (Report a bug,
@@ -102,6 +102,74 @@ Object, `FeedStore` (`src/feed-store.js`). `https://<your-domain>/api/feed` says
 2. The Pages project → Settings → Bindings → Add → **Durable Object namespace**: variable name `FEEDS`, the
    namespace `simpl-feeds` → `FeedStore`. Save.
 3. The Pages project → Deployments → the newest → ⋯ → Retry deployment (a binding takes effect from the next one).
+
+## Hand in from your phone
+
+(2.99.135) The extension's **Hand in from your phone** shows a QR code of `https://<your-domain>/handin/#<secret>`:
+`public/handin/index.html`, the phone's page — self-contained (inline styles and script, a Content-Security-Policy that
+allows that one script by its hash and no request but to `/api/handin`), in light and dark, drawn as the Mac app's own
+Send from Phone page. The secret after `#` never reaches the server; from it the phone and the computer work out the
+hand-in's id, an AES-256-GCM key and the phone's token. The phone sends each file chosen or photographed there to the
+computer through `/api/handin/<id>/…` (`src/handin.js`), sealed: an offer (what the computer is handing in to), then
+per file a sealed description and sealed parts of 512 KiB, in order. The computer fetches and opens them, adds each to
+the hand-in, and the student presses Submit there; the phone is then told "Handed in ✓". Each hand-in is a Durable
+Object, `HandInStore` (`src/handin-store.js`, SQL rows, a BLOB a part), that keeps only sealed bytes, the two tokens'
+hashes and a few plain facts; a file is forgotten as soon as the computer takes it, everything when the code is closed
+or the work handed in, and all of it 30 minutes after it was last used (an alarm). Limits: 10 files and 50 MB a
+hand-in, 30 hand-ins started from one address an hour. Refusals are `SC-H-…` (`docs/ERROR-CODES.md` on the development
+branch). `https://<your-domain>/api/handin` says whether the store is attached: `{"ok":true,"store":true}`.
+
+**On Workers** nothing is needed: `wrangler.jsonc` defines `HandInStore` and its own migration (`handin-v1`, after
+`feeds-v1`), and the deploy makes it. **On Pages** the store lives in the `simpl-feeds` Worker beside `FeedStore`
+(`feeds.jsonc` defines both); bind it as for calendars — Settings → Bindings → Durable Object namespace, variable name
+`HANDIN`, the namespace `simpl-feeds` → `HandInStore` — and retry the newest deployment. Until it is bound the endpoint
+answers `SC-H-503`, and the extension shows its old code instead (the assignment, opened in Canvas on the phone).
+
+While the code is open the computer asks the relay what has come about once a second (once in two before the phone
+opens it, once in five when its tab is out of sight), and the phone asks every two and a half seconds; each is a
+request to the Worker and its Durable Object — worth knowing against the Free plan's 100,000 requests a day.
+## Simpl Community
+
+Themes students make in Simpl's Appearance and tools they make here, shared, looked at by the owner, then offered to
+everyone. Three pages, plain HTML like the rest:
+
+- `public/community/` — the gallery at `/community`, two tabs. **Themes**: each drawn on Simpl's Dashboard
+  (`preview.js`, with the extension's own theme code at `/js/theme.js`, copied in by `scripts/publish-site.sh`).
+  **Tools** (`/community?tab=tools`, or `?tool=<id>` for one): each working in its card — change an input and its
+  results follow — with a search and the five groups, and the nudge to add them from the Tools page of Simpl for Mac
+  and Simpl for Windows.
+- `public/community/make/` — the maker at `/community/make/`: a tool's name, line, maker, group, symbol and colour, its
+  inputs and results (each formula checked as it is typed), a table and a note, working beside the form as it is
+  built; **Share with Community** sends it in. The draft stays in the browser. `?from=<id>` starts from a gallery tool.
+- `public/community/review/` — the owner's review at `/community/review`, behind a passcode: the themes and tools
+  waiting, each drawn (a tool working, with its JSON), to approve or turn down, and what is in the gallery, to take down.
+
+A tool is data, never code (`docs/community-tools.md`, format 1). The one check of a tool and its formulas, the
+reference, is `public/community/tool-format.js`: the pages load it as it is, an ES module, and the Worker bundles the
+same file (`src/tool-format.js` re-exports it), so the website and the site's own check can't drift apart.
+`public/community/tool-view.js` draws a tool with it. Simpl's own starter tools (Ohm's Law, the quadratic formula,
+percent change, tip & split, compound interest, density, energy, grade points) are `src/tool-starters.js`, served
+beside the approved ones.
+
+The endpoints, `src/community.js` (on Pages, `functions/api/community/[[path]].js`, the same handler):
+
+| | |
+| --- | --- |
+| `GET /api/community/themes` | the approved themes |
+| `POST /api/community/submit` | a theme sent in from Appearance (a form: the theme and its photos) |
+| `GET /api/community/photo/<id>/<place>` | a theme's photo |
+| `GET /api/community/tools` | the approved tools and Simpl's starters, newest first (open to any app, cached a minute) |
+| `GET /api/community/tools/<id>` | one tool |
+| `POST /api/community/tools` | a tool sent in from the maker: JSON `{ tool, website }`, checked strictly |
+| `POST /api/community/login`, `logout`; `GET review`; `POST decide`, `remove` | the review (`decide` and `remove` take `{ kind: "tool", id }` for a tool) |
+
+Everything is kept in the Workers KV namespace bound as `COMMUNITY`; the review's passcode is the `COMMUNITY_KEY`
+secret (both already set up). Each theme or tool sent in is announced where reports go (`REPORT_WEBHOOK`, below), with
+the review's address. Limits: three themes and five tools an hour from one address, two hundred of each waiting at
+once; every refusal carries a code (`SC-C-…`, and `SC-T-…` for what is wrong with a tool: `docs/ERROR-CODES.md`).
+Until `COMMUNITY` is bound, the endpoints say Simpl Community is not switched on yet (`SC-C-503`), and the tools list
+is Simpl's starters alone. `scripts/dev/community-test.mjs` and `scripts/dev/community-tools-test.mjs` (the pages too,
+in Chromium) cover it.
 
 ## Report a bug
 

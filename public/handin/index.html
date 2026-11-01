@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-qShXjJm46Wun6nuF/YIP2kvloMnq0clDmDJTPXU5yaQ='; style-src 'unsafe-inline'; img-src blob: data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<meta name="format-detection" content="telephone=no">
+<title>Send to Simpl</title>
+<!--
+  (2.99.135) Hand in from your phone, for the Simpl Courses extension: the page a phone opens from the QR code in a
+  hand-in on the computer. The secret after # in its address never reaches a server; from it this page works out the
+  hand-in's id, its key and its token, opens what the computer said it is handing in to (the offer), and sends each file
+  chosen or photographed here to the computer through simplcourses.com/api/handin (site/src/handin.js), sealed with that
+  key (AES-256-GCM) — the site keeps sealed bytes it cannot open, and forgets them once the computer has them. The
+  student hands in on the computer: nothing is ever handed in from here. Drawn as the Mac app's own page is
+  (mac/Simpl/Resources/PhoneHandIn.html). Self-contained: no request but to /api/handin, and the script is the one its
+  Content-Security-Policy hash allows (scripts/dev/handin-test.mjs checks the two agree).
+-->
+<style>
+:root {
+  --page: #f2f2f7; --card: #ffffff; --text: #1c1c1e; --text2: rgba(60, 60, 67, 0.72); --text3: rgba(60, 60, 67, 0.45);
+  --line: rgba(60, 60, 67, 0.14); --well: rgba(118, 118, 128, 0.12); --ok: #248a3d; --bad: #d70015; --warn: #b25000;
+  --accent: #0a6cff; --on-accent: #ffffff; --accent-soft: rgba(10, 108, 255, 0.12); --accent-text: var(--accent-text-light, #0a5ad4);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 6px 20px rgba(0, 0, 0, 0.05);
+  --ease: cubic-bezier(0.23, 1, 0.32, 1);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #000000; --card: #1c1c1e; --text: #f5f5f7; --text2: rgba(235, 235, 245, 0.68); --text3: rgba(235, 235, 245, 0.4);
+    --line: rgba(84, 84, 88, 0.6); --well: rgba(118, 118, 128, 0.24); --ok: #30d158; --bad: #ff453a; --warn: #ff9f0a;
+    --accent-soft: rgba(64, 140, 255, 0.2); --accent-text: var(--accent-text-dark, #6aa8ff); --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body {
+  margin: 0; min-height: 100vh; min-height: 100dvh; background: var(--page); color: var(--text);
+  font: 17px/1.4 -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  -webkit-tap-highlight-color: transparent; -webkit-font-smoothing: antialiased; overscroll-behavior-y: none;
+}
+main {
+  max-width: 520px; margin: 0 auto;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+.vh { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); border: 0; opacity: 0; }
+.top { display: flex; align-items: center; gap: 8px; padding: 6px 4px 14px; color: var(--text2); font-size: 15px; font-weight: 600; }
+.top svg { width: 22px; height: 22px; flex: none; }
+.top .link { margin-left: auto; display: flex; align-items: center; gap: 6px; min-width: 0; font-weight: 500; font-size: 13px; }
+.top .link span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text3); flex: none; transition: background-color 200ms ease; }
+.top.on .dot { background: var(--ok); }
+.top.lost .dot { background: var(--bad); }
+.card { background: var(--card); border-radius: 18px; box-shadow: var(--shadow); }
+.intro { padding: 18px 18px 16px; }
+.course { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; font-size: 14px; font-weight: 600; color: var(--text2); }
+.course i { width: 10px; height: 10px; border-radius: 3px; background: var(--accent); flex: none; }
+.course span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+h1 { margin: 6px 0 0; font-size: 23px; line-height: 1.22; font-weight: 700; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.takes { margin: 8px 0 0; font-size: 15px; color: var(--text2); }
+.skeleton h1, .skeleton .takes { color: transparent; border-radius: 6px; background: var(--well); }
+.skeleton .course { visibility: hidden; }
+.actions { display: grid; gap: 10px; margin: 16px 0 0; }
+.btn {
+  position: relative; display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 54px; padding: 0 18px;
+  border-radius: 15px; font-size: 17px; font-weight: 600; cursor: pointer; user-select: none; -webkit-user-select: none;
+  touch-action: manipulation; transition: transform 160ms var(--ease), opacity 160ms ease, background-color 160ms ease;
+  background: var(--accent-soft); color: var(--accent-text);
+}
+.btn.primary { background: var(--accent); color: var(--on-accent); }
+.btn svg { width: 22px; height: 22px; flex: none; }
+.btn:active { transform: scale(0.97); }
+.btn:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
+.btn.off { opacity: 0.45; pointer-events: none; }
+.combine { display: flex; align-items: center; gap: 12px; margin: 12px 0 0; padding: 12px 14px 12px 16px; cursor: pointer; -webkit-user-select: none; user-select: none; }
+.combine .words { flex: 1; min-width: 0; }
+.combine strong { display: block; font-size: 16px; font-weight: 500; }
+.combine small { display: block; margin-top: 1px; font-size: 13.5px; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.switch { position: relative; flex: none; width: 51px; height: 31px; border-radius: 16px; background: var(--well); transition: background-color 200ms ease; }
+.switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2); transition: transform 240ms var(--ease); }
+.combine input:checked + .switch { background: var(--ok); }
+.combine input:checked + .switch::after { transform: translateX(20px); }
+.combine input:focus-visible + .switch { outline: 3px solid var(--accent); outline-offset: 2px; }
+.note { margin: 10px 4px 0; font-size: 14px; color: var(--text2); }
+.list { margin: 18px 0 0; padding: 4px 0; list-style: none; }
+.list:empty { display: none; }
+.row { display: grid; grid-template-columns: 46px 1fr auto; align-items: center; gap: 12px; padding: 10px 14px; animation: in 260ms var(--ease) both; }
+.row + .row { border-top: 1px solid var(--line); }
+.thumb { width: 46px; height: 46px; border-radius: 9px; background: var(--well); overflow: hidden; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.02em; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.what { min-width: 0; }
+.name { font-size: 16px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meta { margin-top: 2px; font-size: 13.5px; color: var(--text2); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.row.added .meta { color: var(--ok); }
+.row.failed .meta, .row.refused .meta { color: var(--bad); }
+.bar { height: 4px; margin-top: 7px; border-radius: 2px; background: var(--well); overflow: hidden; }
+.bar b { display: block; height: 100%; width: 100%; border-radius: 2px; background: var(--accent); transform-origin: left center; transform: scaleX(0); transition: transform 180ms linear; }
+.end { display: flex; align-items: center; }
+.retry { appearance: none; -webkit-appearance: none; border: 0; border-radius: 10px; padding: 9px 13px; font-family: inherit; font-size: 15px; font-weight: 600; line-height: 1; background: var(--accent-soft); color: var(--accent-text); cursor: pointer; touch-action: manipulation; }
+.retry:active { transform: scale(0.96); }
+.tick { width: 24px; height: 24px; color: var(--text3); }
+.row.added .tick { color: var(--ok); }
+.tick path { stroke-dasharray: 24; stroke-dashoffset: 0; animation: draw 360ms var(--ease) both; }
+.banner { display: flex; gap: 14px; align-items: flex-start; margin: 16px 0 0; padding: 16px 18px; animation: in 300ms var(--ease) both; }
+.banner svg { width: 30px; height: 30px; flex: none; margin-top: 1px; }
+.banner.ok svg { color: var(--ok); }
+.banner.ok svg path { stroke-dasharray: 24; animation: draw 420ms 80ms var(--ease) both; }
+.banner.sent svg { color: var(--accent-text); }
+.banner.gone svg { color: var(--warn); }
+.banner strong { display: block; font-size: 17px; }
+.banner span { display: block; margin-top: 2px; font-size: 15px; color: var(--text2); }
+.banner button { margin-top: 10px; }
+.foot { margin: 22px 6px 0; font-size: 13px; line-height: 1.45; color: var(--text3); text-align: center; }
+.code { font-size: 12px; color: var(--text3); }
+[hidden] { display: none !important; }
+@keyframes in { from { opacity: 0; transform: translateY(6px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes draw { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
+@media (hover: hover) { .btn:hover { filter: brightness(1.04); } }
+@media (prefers-reduced-motion: reduce) {
+  .row, .banner { animation: fade 150ms ease both; }
+  .tick path, .banner.ok svg path { animation: none; }
+  .btn, .bar b, .switch, .switch::after { transition: none; }
+  .btn:active { transform: none; }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+}
+</style>
+</head>
+<body>
+<main>
+  <div class="top" id="top">
+    <svg viewBox="22.9 22.4 75 75" width="22" height="22" aria-hidden="true"><path d="M50.55 24.94L50.27 25.03L46.73 25.11L46.23 25.29L44.82 25.39L44.32 25.57L43.28 25.64L42.95 25.84L42.19 25.91L41.86 26.11L41.05 26.20L40.77 26.38L40.45 26.39L39.36 26.76L39.09 26.94L38.55 27.03L38.32 27.20L37.18 27.57L34.61 28.91L32.18 30.57L30.07 32.50L28.15 34.82L28.00 35.21L27.57 35.68L27.18 36.57L26.77 37.01L26.56 37.50L26.58 37.73L26.01 38.86L26.03 39.09L25.68 39.82L25.08 42.55L25.03 44.27L24.84 45.64L25.03 46.77L25.11 48.68L25.29 49.18L25.39 50.32L25.56 50.55L25.65 51.09L25.84 51.36L26.19 52.59L27.03 54.27L28.41 56.34L30.02 58.05L31.55 59.36L32.41 59.93L32.76 60.05L34.05 61.02L36.68 62.30L36.91 62.29L38.86 63.12L39.09 63.11L40.50 63.67L44.64 64.63L44.86 64.76L51.91 66.11L55.45 66.92L56.05 67.21L56.27 67.20L56.86 67.49L57.09 67.47L57.68 67.76L57.91 67.74L59.05 68.30L59.27 68.29L59.55 68.55L59.82 68.56L60.19 68.91L61.05 69.30L62.32 70.50L62.92 71.27L63.47 72.36L63.56 72.91L63.75 73.18L63.79 76.00L63.38 77.32L63.39 77.55L63.13 78.09L62.16 79.55L61.30 80.41L59.86 81.47L58.23 82.29L56.86 82.65L56.59 82.84L55.85 82.91L55.05 83.15L53.82 83.21L53.32 83.39L49.23 83.39L46.50 83.03L43.92 82.32L43.18 81.92L42.91 81.92L42.64 81.65L42.36 81.64L42.09 81.38L41.82 81.37L40.67 80.50L40.28 80.36L38.82 78.91L38.23 78.17L37.12 75.95L37.02 75.09L36.84 74.86L36.83 74.55L36.68 74.40L23.77 74.39L23.55 74.44L23.47 74.64L23.47 75.36L23.66 75.91L23.75 77.32L23.92 77.77L24.01 78.64L24.21 78.95L24.29 79.73L24.50 80.09L24.57 80.86L25.56 82.73L25.67 83.32L26.10 83.82L26.47 84.55L27.82 86.39L29.86 88.50L30.59 88.95L31.45 89.82L32.49 90.32L33.68 91.22L34.23 91.49L34.45 91.47L34.77 91.76L35.00 91.74L35.41 91.91L36.77 92.62L39.95 93.67L44.09 94.49L44.55 94.47L47.05 94.84L49.59 94.89L54.68 94.84L55.45 94.66L58.64 94.32L59.39 94.09L60.14 94.02L60.36 93.85L61.18 93.76L61.45 93.57L62.23 93.50L63.41 93.01L63.95 92.93L64.36 92.69L64.82 92.64L68.59 90.74L69.91 89.76L70.23 89.65L72.15 88.00L73.77 86.27L74.23 85.55L74.91 84.85L75.59 83.38L76.02 82.91L77.30 79.45L77.85 76.73L77.83 75.73L77.98 74.50L77.93 71.27L77.75 70.77L77.66 69.64L77.49 69.18L77.38 68.27L77.20 68.00L76.84 66.64L75.73 64.42L74.64 62.80L73.03 61.09L72.46 60.73L71.77 60.05L71.10 59.64L70.67 59.23L69.68 58.77L69.27 58.39L67.05 57.28L66.64 57.10L66.41 57.12L65.27 56.56L65.05 56.58L64.41 56.26L62.82 55.74L62.59 55.76L59.82 54.92L57.59 54.51L57.36 54.38L48.95 52.76L45.56 51.77L44.14 51.20L42.50 50.38L42.04 49.95L41.65 49.82L40.18 48.36L39.85 47.86L39.30 46.77L39.02 44.59L39.12 44.23L39.11 43.50L39.40 42.64L39.38 42.41L40.41 40.44L41.47 39.27L42.09 38.76L42.41 38.65L42.91 38.21L44.50 37.41L44.95 37.35L45.36 37.12L46.23 37.02L46.45 36.85L47.59 36.75L48.14 36.56L51.00 36.47L53.82 36.66L55.87 37.14L56.77 37.44L57.95 38.03L58.23 38.04L58.56 38.36L59.41 38.76L60.43 39.59L61.27 40.44L62.08 41.50L62.65 42.64L62.76 43.23L62.93 43.45L63.20 44.50L63.27 45.32L63.41 45.49L76.45 45.52L76.65 45.41L76.57 43.77L76.39 43.23L76.30 41.59L76.10 41.27L75.52 38.95L75.30 38.59L74.92 37.45L74.36 36.33L73.00 34.16L71.64 32.53L69.32 30.33L68.92 30.18L68.45 29.75L68.10 29.64L67.67 29.23L67.28 29.09L66.85 28.68L64.64 27.57L61.18 26.29L58.36 25.63L55.41 25.19Z" fill="currentColor"/><circle cx="89.73" cy="87.0" r="7.56" fill="#0A84FF"/></svg>
+    Simpl
+    <span class="link" role="status" aria-live="polite"><i class="dot"></i><span id="link">Connecting…</span></span>
+  </div>
+
+  <section class="card intro skeleton" id="intro" aria-labelledby="title">
+    <div class="course" id="courseRow"><i aria-hidden="true"></i><span id="course"></span></div>
+    <h1 id="title">Your assignment</h1>
+    <p class="takes" id="takes">What it takes</p>
+  </section>
+
+  <div class="actions" id="actions">
+    <label class="btn primary off" id="photoBtn">
+      <input class="vh" id="photo" type="file" accept="image/*" capture="environment" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.6l1.5-2h6.8l1.5 2h1.6A2.5 2.5 0 0 1 21 8.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/><circle cx="12" cy="12.8" r="3.8"/></svg>
+      Take Photo
+    </label>
+    <label class="btn off" id="filesBtn">
+      <input class="vh" id="files" type="file" multiple disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5A2.5 2.5 0 0 1 6 5h3.6l2 2.2H18a2.5 2.5 0 0 1 2.5 2.5v7.8A2.5 2.5 0 0 1 18 20H6a2.5 2.5 0 0 1-2.5-2.5z"/></svg>
+      Choose Files
+    </label>
+  </div>
+  <label class="combine card" id="combineRow" hidden>
+    <span class="words"><strong>Combine photos into one PDF</strong><small id="combineSub">Photos become one PDF</small></span>
+    <input class="vh" id="combine" type="checkbox" checked>
+    <span class="switch" aria-hidden="true"></span>
+  </label>
+
+  <ul class="list card" id="list" aria-label="Files sent"></ul>
+
+  <div class="banner card sent" id="sent" role="status" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8 20h8M12 16.5V20"/></svg>
+    <div><strong>Sent — hand it in on your computer</strong><span id="sentSub">Press Submit there. Nothing is handed in until you do.</span></div>
+  </div>
+  <div class="banner card ok" id="handed" role="status" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" opacity="0.25"/><path d="M7.5 12.4l3 3 6-6.4"/></svg>
+    <div><strong>Handed in ✓</strong><span>Your computer handed it in. You can close this page.</span></div>
+  </div>
+  <div class="banner card gone" id="gone" role="alert" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 7.5v5.2M12 16.3v.2"/></svg>
+    <div><strong id="goneTitle">This code has expired</strong><span id="goneSub">On your computer, open Hand in from your phone again and scan the new code.</span><button class="retry" id="tryAgain" type="button" hidden>Try Again</button><span class="code" id="goneCode"></span></div>
+  </div>
+
+  <p class="foot" id="foot">Files go to your computer through simplcourses.com, sealed with a key only your phone and your computer hold — the site can’t open them, and forgets them once your computer has them.</p>
+</main>
+<noscript><p class="foot">This page needs JavaScript to send your files.</p></noscript>
+<script>
+(function () {
+  'use strict';
+  // The protocol, as site/src/handin.js says it (and the extension's content/app/handin.js does it on the computer).
+  var API = '/api/handin/';
+  var CHUNK = 524288;
+  var IMAGE = ['jpg', 'jpeg', 'png', 'heic', 'heif', 'gif', 'webp'];
+  var enc = new TextEncoder(), dec = new TextDecoder();
+
+  function $(id) { return document.getElementById(id); }
+  function lower(s) { return String(s).toLowerCase().replace(/^\./, ''); }
+  function ext(name) { var m = /\.([^.\/\\]+)$/.exec(name || ''); return m ? m[1].toLowerCase() : ''; }
+  function size(n) {
+    if (n < 1024) return n + ' bytes';
+    if (n < 1024 * 1024) return Math.round(n / 1024) + ' KB';
+    return (n / 1048576).toFixed(n < 10 * 1048576 ? 1 : 0) + ' MB';
+  }
+  function list(xs) { return xs.map(function (x) { return '.' + x; }).join(', '); }
+  function b64u(u8) { var s = ''; for (var i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+  function unb64u(s) { var t = atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)); var u = new Uint8Array(t.length); for (var i = 0; i < t.length; i++) u[i] = t.charCodeAt(i); return u; }
+  function rand(n) { var b = new Uint8Array(n); crypto.getRandomValues(b); return b; }
+  function aad() { return enc.encode(['simpl-handin/1'].concat([].slice.call(arguments)).join('|')); }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function bytesOf(blob) {
+    return new Promise(function (resolve, reject) {
+      var r = new FileReader();
+      r.onload = function () { resolve(new Uint8Array(r.result)); };
+      r.onerror = function () { reject(r.error || new Error('unreadable')); };
+      r.readAsArrayBuffer(blob);
+    });
+  }
+
+  // ---- the secret after #: the hand-in's id, its key and this phone's token ----
+  var secret = location.hash.slice(1), id = '', key = null, token = '';
+  async function derive() {
+    var ikm = await crypto.subtle.importKey('raw', unb64u(secret), 'HKDF', false, ['deriveBits']);
+    async function bits(info, n) { return new Uint8Array(await crypto.subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt: enc.encode('simpl-handin-v1'), info: enc.encode(info) }, ikm, n * 8)); }
+    id = b64u(await bits('id', 16));
+    token = b64u(await bits('send', 32));
+    key = await crypto.subtle.importKey('raw', await bits('key', 32), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+  }
+  async function seal(ad, plain) {
+    var iv = rand(12);
+    var body = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv, additionalData: ad }, key, plain));
+    var out = new Uint8Array(12 + body.length);
+    out.set(iv, 0);
+    out.set(body, 12);
+    return out;
+  }
+  async function unseal(ad, sealed) {
+    var u = new Uint8Array(sealed);
+    return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: u.subarray(0, 12), additionalData: ad }, key, u.subarray(12)));
+  }
+  function ask(method, path, body, headers) {
+    var h = { authorization: 'Bearer ' + token };
+    for (var k in headers || {}) h[k] = headers[k];
+    return fetch(API + id + path, { method: method, headers: h, body: body, cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer' });
+  }
+  async function said(res) { try { return await res.json(); } catch (e) { return {}; } }
+
+  // ---- what the computer said it is handing in to ----
+  var cfg = null, allowed = [], accept = [], photos = 'yes', total = 50 * 1024 * 1024, most = 10, nameDevice = 'your computer';
+  function show(o) {
+    cfg = o;
+    allowed = (o.allowed || []).map(lower);
+    accept = (o.accept || []).map(lower);
+    photos = o.photos || 'yes';
+    total = o.total || total;
+    most = o.files || most;
+    $('intro').classList.remove('skeleton');
+    $('title').textContent = o.title || 'Your assignment';
+    document.title = 'Send to Simpl · ' + (o.title || 'Hand In');
+    if (o.course) $('course').textContent = o.course; else $('courseRow').hidden = true;
+    $('takes').textContent = allowed.length ? 'This assignment takes ' + list(allowed) + ' files.' : 'This assignment takes any kind of file.';
+    if (accept.length) $('files').setAttribute('accept', accept.map(function (x) { return '.' + x; }).join(','));
+    if (photos === 'no') $('photoBtn').hidden = true;
+    if (photos === 'pdf') {
+      $('combineRow').hidden = false;
+      var paint = function () { $('combineSub').textContent = $('combine').checked ? 'Photos become one PDF: ' + (o.pdfName || 'one PDF') : 'Each photo is sent on its own'; };
+      $('combine').addEventListener('change', paint);
+      paint();
+    }
+    tint(o.color);
+    connected(true);
+    enable(true);
+  }
+  // The page in the course's colour (readable words on it either way), as the apps' page is.
+  function tint(color) {
+    var hex = /^#?([0-9a-f]{6})$/i.exec(color || '');
+    if (!hex) return;
+    var n = parseInt(hex[1], 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+    var lum = function (c) { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    var L = function (c) { return 0.2126 * lum(c[0]) + 0.7152 * lum(c[1]) + 0.0722 * lum(c[2]); };
+    var ratio = function (a, z) { var x = L(a), y = L(z); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+    var readable = function (c, card, toward) {
+      for (var k = 0; k <= 1.001; k += 0.05) {
+        var m = c.map(function (v, i) { return Math.round(v + (toward[i] - v) * k); });
+        if (ratio(m, card) >= 4.5) return 'rgb(' + m.join(',') + ')';
+      }
+      return 'rgb(' + toward.join(',') + ')';
+    };
+    var c = [r, g, b], root = document.documentElement.style;
+    root.setProperty('--accent', '#' + hex[1]);
+    root.setProperty('--on-accent', ratio(c, [255, 255, 255]) >= 3 ? '#ffffff' : '#111111');
+    root.setProperty('--accent-soft', 'rgba(' + r + ',' + g + ',' + b + ',0.16)');
+    root.setProperty('--accent-text-light', readable(c, [255, 255, 255], [0, 0, 0]));
+    root.setProperty('--accent-text-dark', readable(c, [28, 28, 30], [255, 255, 255]));
+  }
+  function enable(on) {
+    ['photo', 'files'].forEach(function (k) { $(k).disabled = !on; $(k + 'Btn').classList.toggle('off', !on); });
+    $('combine').disabled = !on;
+  }
+  function connected(on, words) {
+    $('top').classList.toggle('on', on);
+    $('top').classList.toggle('lost', !on);
+    $('link').textContent = words || (on ? 'Connected to ' + nameDevice : 'Can’t reach simplcourses.com');
+  }
+  /** The code is spent (closed on the computer, expired) or never worked: said, and nothing more can be sent. */
+  function stop(title, sub, code, retry) {
+    gone = !retry;
+    enable(false);
+    $('goneTitle').textContent = title;
+    $('goneSub').textContent = sub;
+    $('goneCode').textContent = code ? ' ' + code : '';
+    $('tryAgain').hidden = !retry;
+    $('gone').hidden = false;
+    if (!retry) {
+      for (var i = 0; i < items.length; i++) if (open(items[i])) { items[i].state = 'stopped'; paint(items[i]); }
+      connected(false, 'Disconnected');
+    }
+    banners();
+  }
+
+  async function start() {
+    if (!/^[A-Za-z0-9_-]{43}$/.test(secret)) { stop('This link is incomplete', 'Scan the code on your computer again: the whole link is needed.', 'SC-H-LINK'); return; }
+    if (!window.crypto || !crypto.subtle || !window.fetch) { stop('This browser can’t seal files', 'Open the link in Safari or Chrome.', 'SC-H-CRYPTO'); return; }
+    $('gone').hidden = true;
+    connected(false, 'Connecting…');
+    $('top').classList.remove('lost');
+    try {
+      if (!key) await derive();
+      var res = await ask('GET', '/offer');
+      if (res.status === 404 || res.status === 410) { var b = await said(res); stop(res.status === 410 ? 'Closed on your computer' : 'This code has expired', 'On your computer, open Hand in from your phone again and scan the new code.', b.code); return; }
+      if (!res.ok) { var w = await said(res); stop('Simpl couldn’t open this hand-in', w.message || 'Try again in a moment.', w.code || 'SC-H-' + res.status, true); return; }
+      show(JSON.parse(dec.decode(await unseal(aad(id, 'offer'), await res.arrayBuffer()))));
+      look();
+    } catch (e) {
+      connected(false);
+      stop('Can’t reach simplcourses.com', 'Check this phone is online, then try again.', 'SC-H-NET', true);
+    }
+  }
+  $('tryAgain').addEventListener('click', start);
+
+  // ---- the files: what may go, named as the apps name them, sent one at a time ----
+  function refuse(file, name) {
+    if (!file.size) return 'This file is empty.';
+    if (file.size > total) return 'Too large to send — the most is ' + size(total) + '.';
+    var count = 0, bytes = 0;
+    for (var i = 0; i < items.length; i++) if (items[i].state !== 'refused' && items[i].state !== 'stopped') { count++; bytes += items[i].file.size; }
+    if (count >= most) return 'One hand-in takes ' + most + ' files at most.';
+    if (bytes + file.size > total) return 'That would be more than one hand-in takes (' + size(total) + ').';
+    if (!accept.length) return null;
+    var x = ext(name);
+    if (accept.indexOf(x) >= 0) return null;
+    if (photos !== 'no' && IMAGE.indexOf(x) >= 0) return null;
+    return 'This assignment takes ' + list(allowed.length ? allowed : accept) + ' files.';
+  }
+  // A photo named as the phone names every one ("image.jpg") is named for when it was taken.
+  var stamps = {};
+  function named(file, fromCamera) {
+    var name = file.name || '';
+    if (fromCamera || /^image\.(jpe?g|png|heic|heif)$/i.test(name) || !name) {
+      var d = new Date(), p = function (v) { return (v < 10 ? '0' : '') + v; };
+      var base = 'Photo ' + d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' at ' + p(d.getHours()) + '.' + p(d.getMinutes()) + '.' + p(d.getSeconds());
+      stamps[base] = (stamps[base] || 0) + 1;
+      var x = ext(name) || (file.type === 'image/png' ? 'png' : file.type === 'image/heic' ? 'heic' : 'jpg');
+      name = base + (stamps[base] > 1 ? ' ' + stamps[base] : '') + '.' + (x === 'jpeg' ? 'jpg' : x);
+    }
+    return name;
+  }
+  function isImage(file, name) { return /^image\//.test(file.type || '') || IMAGE.indexOf(ext(name)) >= 0; }
+
+  var items = [], busy = false, gone = false, handedIn = false, closedThere = false, seq = 0, pages = 0;
+  var listEl = $('list');
+  function open(it) { return it.state === 'waiting' || it.state === 'sending' || it.state === 'preparing' || it.state === 'failed'; }
+
+  function add(fileList, fromCamera) {
+    if (gone || !cfg) return;
+    for (var i = 0; i < fileList.length; i++) {
+      var f = fileList[i], name = named(f, fromCamera);
+      var it = { id: ++seq, file: f, name: name, state: 'waiting', sent: 0, why: refuse(f, name), next: 0, f: '' };
+      it.page = photos === 'pdf' && $('combine').checked && isImage(f, name);
+      if (it.why) it.state = 'refused';
+      it.el = row(it);
+      listEl.appendChild(it.el);
+      items.push(it);
+      paint(it);
+    }
+    banners();
+    pump();
+  }
+
+  function row(it) {
+    var li = document.createElement('li');
+    li.className = 'row';
+    var th = document.createElement('div');
+    th.className = 'thumb';
+    th.setAttribute('aria-hidden', 'true');
+    if (/^image\/(jpeg|png|gif|webp)$/.test(it.file.type) && window.URL && URL.createObjectURL) {
+      var img = new Image();
+      img.alt = '';
+      img.onload = function () { URL.revokeObjectURL(img.src); };
+      img.src = URL.createObjectURL(it.file);
+      th.appendChild(img);
+    } else {
+      th.textContent = (ext(it.name) || 'file').slice(0, 4);
+    }
+    var what = document.createElement('div');
+    what.className = 'what';
+    var nm = document.createElement('div');
+    nm.className = 'name';
+    nm.textContent = it.name;
+    var meta = document.createElement('div');
+    meta.className = 'meta';
+    var bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.appendChild(document.createElement('b'));
+    what.appendChild(nm); what.appendChild(meta); what.appendChild(bar);
+    var end = document.createElement('div');
+    end.className = 'end';
+    li.appendChild(th); li.appendChild(what); li.appendChild(end);
+    it.meta = meta; it.bar = bar; it.end = end;
+    return li;
+  }
+  var TICK = '<svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg>';
+  function paint(it) {
+    it.el.className = 'row ' + it.state;
+    it.el.setAttribute('data-state', it.state);
+    it.bar.hidden = it.state !== 'sending' && it.state !== 'waiting' && it.state !== 'preparing';
+    var whole = it.size || it.file.size;
+    var pct = whole ? Math.min(1, it.sent / whole) : 0;
+    it.bar.firstChild.style.transform = 'scaleX(' + (it.state === 'sending' ? pct : 0) + ')';
+    var where = it.page && it.n ? 'Page ' + it.n + ' of the PDF' : ''; // (the PDF's name is said once, by the switch)
+    it.end.innerHTML = '';
+    switch (it.state) {
+      case 'waiting': it.meta.textContent = size(it.file.size) + ' · Waiting…'; break;
+      case 'preparing': it.meta.textContent = 'Making it a page…'; break;
+      case 'sending': it.meta.textContent = size(whole) + ' · Sending… ' + Math.round(pct * 100) + '%'; break;
+      case 'sent': it.meta.textContent = (where || size(whole)) + ' · Sent'; it.end.innerHTML = TICK; break;
+      case 'added': it.meta.textContent = where ? where + ', in your hand-in' : 'In your hand-in on ' + nameDevice; it.end.innerHTML = TICK; break;
+      case 'failed': {
+        it.meta.textContent = it.why || 'Couldn’t send.';
+        var b = document.createElement('button');
+        b.className = 'retry';
+        b.type = 'button';
+        b.textContent = 'Retry';
+        b.setAttribute('aria-label', 'Retry sending ' + it.name);
+        b.onclick = function () { it.state = 'waiting'; it.why = null; paint(it); banners(); pump(); };
+        it.end.appendChild(b);
+        break;
+      }
+      case 'refused': it.meta.textContent = it.why; break;
+      case 'stopped': it.meta.textContent = it.f ? 'Didn’t reach ' + nameDevice : 'Not sent'; break;
+    }
+  }
+
+  function banners() {
+    var sent = 0, opened = 0;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].state === 'sent' || items[i].state === 'added') sent++;
+      if (open(items[i])) opened++;
+    }
+    $('handed').hidden = !handedIn;
+    $('sent').hidden = handedIn || !(sent > 0 && opened === 0);
+    $('sentSub').textContent = closedThere ? 'Closed on ' + nameDevice + ' — finish handing in there.' : 'Press Submit there. Nothing is handed in until you do.';
+    if (handedIn) $('gone').hidden = true;
+  }
+
+  function pump() {
+    if (busy || gone) return;
+    for (var i = 0; i < items.length; i++) if (items[i].state === 'waiting') { send(items[i]); return; }
+    banners();
+  }
+
+  /** A photo made a page of the computer's PDF: upright (as the phone shows it), no larger than 2200 pixels on its long
+   *  side, a JPEG of good quality — as the apps make their pages. Null: it can't be read here (it goes as it is). */
+  function toPage(file) {
+    return new Promise(function (resolve) {
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () {
+        try {
+          var w = img.naturalWidth, h = img.naturalHeight, k = Math.min(1, 2200 / Math.max(w, h));
+          var c = document.createElement('canvas');
+          c.width = Math.max(1, Math.round(w * k));
+          c.height = Math.max(1, Math.round(h * k));
+          var g = c.getContext('2d');
+          g.fillStyle = '#fff';
+          g.fillRect(0, 0, c.width, c.height);
+          g.drawImage(img, 0, 0, c.width, c.height);
+          URL.revokeObjectURL(url);
+          c.toBlob(function (b) { resolve(b ? { blob: b, w: c.width, h: c.height } : null); }, 'image/jpeg', 0.72);
+        } catch (e) { URL.revokeObjectURL(url); resolve(null); }
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); resolve(null); };
+      img.src = url;
+    });
+  }
+
+  /** One part, sealed and sent, its progress told as it goes. Resolves to { status, body }; status 0: no answer. */
+  function put(path, body, onProgress) {
+    return new Promise(function (resolve) {
+      var xhr = new XMLHttpRequest();
+      xhr.open('PUT', API + id + path, true);
+      xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+      xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+      xhr.upload.onprogress = function (e) { if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total); };
+      xhr.onload = function () { var b = {}; try { b = JSON.parse(xhr.responseText); } catch (e) { b = {}; } resolve({ status: xhr.status, body: b }); };
+      xhr.onerror = xhr.ontimeout = function () { resolve({ status: 0, body: {} }); };
+      xhr.timeout = 120000;
+      xhr.send(body);
+    });
+  }
+  /** What the relay said, as this row says it: true to go on. */
+  function heard(it, r) {
+    if (r.status >= 200 && r.status < 300) { connected(true); return true; }
+    var b = r.body || {}, code = b.code ? ' (' + b.code + ')' : '';
+    if (r.status === 410 || r.status === 404) {
+      closedThere = r.status === 410;
+      stop(r.status === 410 ? 'Closed on your computer' : 'This code has expired', 'On your computer, open Hand in from your phone again and scan the new code.', b.code);
+      return false;
+    }
+    if (r.status === 413 || r.status === 400) { it.state = 'refused'; it.why = (b.message || 'This file can’t be sent.') + code; return false; }
+    if (r.status === 0) connected(false);
+    it.state = 'failed';
+    it.why = (r.status ? (b.message || 'Couldn’t send.') + code : 'Couldn’t reach simplcourses.com. Check this phone is online') + ' — tap Retry.';
+    return false;
+  }
+
+  async function send(it) {
+    busy = true;
+    try {
+      if (it.page && !it.blob) {
+        it.state = 'preparing';
+        paint(it);
+        var p = await toPage(it.file);
+        if (p) { it.blob = p.blob; it.w = p.w; it.h = p.h; } else it.page = false;
+      }
+      var blob = it.blob || it.file;
+      it.size = blob.size;
+      var chunks = Math.max(1, Math.ceil(blob.size / CHUNK));
+      it.state = 'sending';
+      it.sent = it.next * CHUNK;
+      paint(it);
+      if (!it.f) {
+        var f = b64u(rand(8));
+        var meta = { name: it.name, type: it.page ? 'image/jpeg' : (it.file.type || ''), size: blob.size, chunks: chunks };
+        if (it.page) { meta.page = true; meta.w = it.w; meta.h = it.h; }
+        it.metaSealed = await seal(aad(id, 'meta', f), enc.encode(JSON.stringify(meta)));
+        it.f = f;
+      }
+      if (!it.described) {
+        var m;
+        try {
+          var res = await ask('PUT', '/file/' + it.f, it.metaSealed, { 'content-type': 'application/octet-stream', 'x-chunks': String(chunks) });
+          m = { status: res.status, body: await said(res) };
+        } catch (e) { m = { status: 0, body: {} }; }
+        if (!heard(it, m)) { paint(it); return; }
+        it.described = true;
+      }
+      var last = 0;
+      while (it.next < chunks) {
+        var i = it.next, from = i * CHUNK, part = blob.slice(from, Math.min(blob.size, from + CHUNK));
+        var sealed = await seal(aad(id, 'chunk', it.f, String(i)), await bytesOf(part));
+        var r = null;
+        for (var tries = 0; tries < 4; tries++) { // (a moment without signal: tried again by itself, then Retry)
+          if (tries) await wait(1000 * Math.pow(2, tries - 1));
+          r = await put('/file/' + it.f + '/' + i, sealed, function (k) {
+            it.sent = from + k * part.size;
+            var now = Date.now();
+            if (now - last > 80) { last = now; paint(it); }
+          });
+          if (r.status !== 0 && r.status < 500) break;
+        }
+        if (!heard(it, r)) { paint(it); return; }
+        it.next = i + 1;
+        it.sent = Math.min(blob.size, from + part.size);
+      }
+      it.state = 'sent';
+      if (it.page) it.n = ++pages;
+      it.blob = null;
+      paint(it);
+      look();
+    } catch (e) {
+      it.state = 'failed';
+      it.why = 'Couldn’t send this file — tap Retry.';
+      paint(it);
+    } finally {
+      busy = false;
+      banners();
+      pump();
+    }
+  }
+
+  // ---- what the computer has done: taken each file into the hand-in, closed the sheet, handed it in ----
+  var looking = 0, lookStarted = 0;
+  async function look() {
+    clearTimeout(looking);
+    if (!lookStarted) lookStarted = Date.now();
+    if (handedIn || !id || Date.now() - lookStarted > 35 * 60e3) return;
+    if (document.hidden) { looking = setTimeout(look, 4000); return; }
+    try {
+      var res = await ask('GET', '/status');
+      if (res.status === 404) { if (!gone) stop('This code has expired', 'On your computer, open Hand in from your phone again and scan the new code.', 'SC-H-404'); return; }
+      if (res.ok) {
+        var s = await res.json();
+        var byF = {};
+        (s.files || []).forEach(function (x) { byF[x.f] = x; });
+        for (var i = 0; i < items.length; i++) {
+          var x = byF[items[i].f];
+          if (x && x.taken && items[i].state === 'sent') { items[i].state = 'added'; paint(items[i]); }
+        }
+        if (s.state === 'handed-in') { handedIn = true; gone = true; enable(false); connected(true, 'Handed in'); banners(); return; }
+        if (s.state === 'closed' && !closedThere) {
+          closedThere = true;
+          for (var j = 0; j < items.length; j++) if (open(items[j]) || items[j].state === 'sent') { items[j].state = 'stopped'; paint(items[j]); } // (what the computer never took did not reach it)
+          if (items.some(function (it) { return it.state === 'added'; })) {
+            gone = true;
+            enable(false);
+            connected(false, 'Closed on ' + nameDevice);
+          } else stop('Closed on your computer', 'On your computer, open Hand in from your phone again and scan the new code.', '');
+        }
+        banners();
+      }
+    } catch (e) { /* (no answer this time: asked again) */ }
+    looking = setTimeout(look, 2500);
+  }
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && cfg) look(); });
+
+  $('photo').addEventListener('change', function (e) { add(e.target.files, true); e.target.value = ''; });
+  $('files').addEventListener('change', function (e) { add(e.target.files, false); e.target.value = ''; });
+  start();
+})();
+</script>
+</body>
+</html>

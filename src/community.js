@@ -1,25 +1,40 @@
-// simplcourses.com/api/community/* — Simpl Community: themes students make in Appearance, shared, checked by the owner,
-// then offered to everyone (the website's /community, and Appearance's Community in the apps and the extensions).
+// simplcourses.com/api/community/* — Simpl Community: themes students make in Appearance, and tools they make on the
+// website (/community/make), shared, checked by the owner, then offered to everyone (the website's /community,
+// Appearance's Community in the apps and the extensions, and the Tools page's Community in the Mac and Windows apps).
 //
 // A theme is what Appearance keeps: an accent colour, light or dark, and a picture in each of seven places (the sidebar
 // and the Dashboard's six counters) — one of the drawn scenes, or a photo — each with where it sits (x%, y%, zoom).
+// A tool is data, never code: inputs, results as formulas, a table and a note (docs/community-tools.md, format 1),
+// checked by the reference (public/community/tool-format.js) strictly as it comes in, and again before it is approved.
 //
 // Kept in the COMMUNITY namespace (Workers KV, in the owner's Cloudflare account):
-//   theme:<id>          the theme (name, maker, colour, look, places), its status: pending or approved
-//   photo:<id>:<place>  a photo's bytes
-//   list:approved       every approved theme as the gallery shows it, newest first (one read for the whole gallery)
-//   list:pending        the ids waiting for a decision
-// Nothing about the people who send or add themes is kept: no accounts, no counts, no addresses.
+//   theme:<id>           the theme (name, maker, colour, look, places), its status: pending or approved
+//   photo:<id>:<place>   a photo's bytes
+//   list:approved        every approved theme as the gallery shows it, newest first (one read for the whole gallery)
+//   list:pending         the ids waiting for a decision
+//   tool:<id>            a tool: { status: pending or approved, submitted, tool } (the tool as checked)
+//   list:tools-approved  every approved tool as the apps take it, newest first
+//   list:tools-pending   the tools' ids waiting for a decision
+// Simpl's own starter tools (src/tool-starters.js) are not kept: they are served beside the approved ones.
+// Nothing about the people who send or add themes or tools is kept: no accounts, no counts, no addresses.
 //
 // The review (/community/review): a passcode, the COMMUNITY_KEY secret, opens a signed cookie good for twelve hours;
-// with it the pending themes can be seen, approved or turned down, and an approved one taken down. Each new theme is
-// announced where reports go (REPORT_WEBHOOK, src/report.js `deliver`). Every refusal carries a code (SC-C-…).
+// with it the pending themes and tools can be seen, approved or turned down, and an approved one taken down. Each new
+// one is announced where reports go (REPORT_WEBHOOK, src/report.js `deliver`). Every refusal carries a code: SC-C-…,
+// and for what is wrong with a tool sent in, the format's own SC-T-… (validateTool).
 
 import { deliver, reportId } from './report.js';
+import { FORMAT, LIMITS as TOOL, validateTool } from './tool-format.js';
+import { STARTERS } from './tool-starters.js';
 
 export const PLACES = ['side', 'today', 'tomorrow', 'next', 'overdue', 'unread', 'graded'];
 export const SCENES = ['Dusk', 'Ocean', 'Forest', 'Sand', 'Peaks', 'City'];
-export const LIMITS = { name: 40, maker: 30, photoBytes: 1536 * 1024, totalBytes: 8 * 1024 * 1024, pendingMax: 200, approvedMax: 1000, submitsPerHour: 3, loginTries: 8, sessionHours: 12 };
+export const LIMITS = {
+  name: 40, maker: 30, photoBytes: 1536 * 1024, totalBytes: 8 * 1024 * 1024, pendingMax: 200, approvedMax: 1000, submitsPerHour: 3, loginTries: 8, sessionHours: 12,
+  // tools: a request's body is the tool (at most TOOL.json characters as JSON) and a little more; the approved ones are
+  // one KV value, kept well under KV's 25 MiB however large each is
+  toolBody: TOOL.json + 1024, toolsPendingMax: 200, toolsApprovedMax: 500, toolSubmitsPerHour: 5,
+};
 const COOKIE = 'simpl_review';
 
 const json = (body, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...headers } });
@@ -89,6 +104,8 @@ export function publicTheme(rec, origin) {
 }
 
 const readList = async (kv, key) => { try { return JSON.parse((await kv.get(key)) || '[]'); } catch { return []; } };
+const readRec = async (kv, key) => { try { return JSON.parse((await kv.get(key)) || 'null'); } catch { return null; } };
+const today = (now) => new Date(now).toISOString().slice(0, 10);
 
 // ---- the review's passcode and its cookie --------------------------------------------------------------------
 const enc = new TextEncoder();
@@ -123,8 +140,8 @@ const sameSite = (request) => { const o = request.headers.get('origin'); return 
 /** /api/community/…: the gallery, a photo, a theme sent in, and the review. */
 export async function handleCommunity(request, env = {}, fetchImpl = fetch, now = Date.now()) {
   const res = await answer(request, env, fetchImpl, now);
-  // (the gallery, a photo and a theme sent in are open to the apps and the extensions, from wherever they ask)
-  if (/^\/api\/community\/(themes|photo\/|submit)/.test(new URL(request.url).pathname)) res.headers.set('access-control-allow-origin', '*');
+  // (the gallery, a photo, a theme sent in and the tools are open to the apps and the extensions, from wherever they ask)
+  if (/^\/api\/community\/(themes|photo\/|submit|tools(\/|$))/.test(new URL(request.url).pathname)) res.headers.set('access-control-allow-origin', '*');
   return res;
 }
 
@@ -133,6 +150,7 @@ async function answer(request, env, fetchImpl, now) {
   const path = url.pathname.replace(/^\/api\/community\/?/, '');
   const kv = env.COMMUNITY;
   const ip = request.headers.get('cf-connecting-ip');
+  if (path === 'tools' || path.startsWith('tools/')) return answerTools(request, env, fetchImpl, now, url, path, ip);
   if (!kv) return refuse(503, 'SC-C-503', 'Simpl Community is not switched on yet.');
 
   // the gallery: every approved theme, newest first
@@ -212,12 +230,19 @@ async function answer(request, env, fetchImpl, now) {
       const ids = await readList(kv, 'list:pending');
       const pending = (await Promise.all(ids.map(async (id) => JSON.parse((await kv.get(`theme:${id}`)) || 'null')))).filter(Boolean);
       const approved = await readList(kv, 'list:approved');
-      return json({ ok: true, pending: pending.map((r) => publicTheme(r, url.origin)), approved: approved.map((r) => publicTheme(r, url.origin)) });
+      // (the tools beside them: each waiting one with the day it came in, and the approved ones as the apps take them)
+      const toolIds = await readList(kv, 'list:tools-pending');
+      const toolRecs = (await Promise.all(toolIds.map((id) => readRec(kv, `tool:${id}`)))).filter((r) => r?.tool);
+      return json({
+        ok: true, pending: pending.map((r) => publicTheme(r, url.origin)), approved: approved.map((r) => publicTheme(r, url.origin)),
+        tools: { pending: toolRecs.map((r) => ({ id: r.tool.id, submitted: r.submitted, tool: r.tool })), approved: await readList(kv, 'list:tools-approved') },
+      });
     }
     if (request.method !== 'POST') return refuse(405, 'SC-C-405', 'Decide with POST.');
     if (!sameSite(request)) return refuse(403, 'SC-C-403', 'Decide from the review page.');
     let body = {};
-    try { body = await request.json(); } catch { /* none */ }
+    try { body = (await request.json()) || {}; } catch { /* none */ }
+    if (body.kind === 'tool') return decideTool(path, body, kv, now);
     const id = /^[a-z0-9]{6,16}$/.test(body.id || '') ? body.id : '';
     const rec = id ? JSON.parse((await kv.get(`theme:${id}`)) || 'null') : null;
     if (!rec) return refuse(404, 'SC-C-404', 'No such theme.');
@@ -227,6 +252,8 @@ async function answer(request, env, fetchImpl, now) {
     };
     if (path === 'decide') {
       if (rec.status !== 'pending') return refuse(409, 'SC-C-409', 'That theme has been decided already.');
+      // (refused before the pending list is touched: a theme taken off it undecided would wait for good, seen by no review)
+      if (body.decision !== 'approve' && body.decision !== 'deny') return refuse(400, 'SC-C-400', 'Approve or deny.');
       await kv.put('list:pending', JSON.stringify((await readList(kv, 'list:pending')).filter((x) => x !== id)));
       if (body.decision === 'approve') {
         const done = { ...rec, status: 'approved' };
@@ -234,8 +261,8 @@ async function answer(request, env, fetchImpl, now) {
         await kv.put('list:approved', JSON.stringify([done, ...(await readList(kv, 'list:approved')).filter((r) => r.id !== id)].slice(0, LIMITS.approvedMax)));
         return json({ ok: true, status: 'approved' });
       }
-      if (body.decision === 'deny') { await drop(); return json({ ok: true, status: 'denied' }); }
-      return refuse(400, 'SC-C-400', 'Approve or deny.');
+      await drop(); // (deny)
+      return json({ ok: true, status: 'denied' });
     }
     // remove: an approved theme taken down, its photos with it
     await kv.put('list:approved', JSON.stringify((await readList(kv, 'list:approved')).filter((r) => r.id !== id)));
@@ -244,4 +271,98 @@ async function answer(request, env, fetchImpl, now) {
   }
 
   return refuse(404, 'SC-C-404', 'Nothing here.');
+}
+
+// ---- tools ------------------------------------------------------------------------------------------------------
+/** A tool as the apps take it, approved: the site's id, version 1 and the day it went into the gallery. */
+const approvedTool = (tool, id, now) => {
+  const { id: _id, version: _v, created: _c, ...rest } = tool;
+  return { format: FORMAT, id, version: 1, ...rest, created: today(now) };
+};
+const newestFirst = (tools) => tools.filter((t) => t && t.id).sort((a, b) => String(b.created || '').localeCompare(String(a.created || '')));
+const refuseTool = (error) => json({ ok: false, code: error.code, message: error.message, path: error.path }, error.code === 'SC-T-BIG' ? 413 : 400);
+
+/** /api/community/tools…: the gallery's tools (Simpl's starters with them, even before the namespace is bound), one
+ *  tool, and a tool sent in from the maker. */
+async function answerTools(request, env, fetchImpl, now, url, path, ip) {
+  const kv = env.COMMUNITY;
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'access-control-allow-methods': 'GET, POST, OPTIONS', 'access-control-allow-headers': 'content-type', 'access-control-max-age': '86400' } });
+  const cached = { 'cache-control': 'public, max-age=60' };
+
+  // the gallery: every approved tool and Simpl's own, newest first
+  if (path === 'tools' && request.method === 'GET') {
+    const approved = kv ? await readList(kv, 'list:tools-approved') : [];
+    return json({ ok: true, tools: newestFirst([...approved, ...STARTERS]) }, 200, cached);
+  }
+  // one tool: a starter, or an approved one (a pending one is the review's alone)
+  const m = /^tools\/([a-z0-9-]{3,24})$/.exec(path);
+  if (m && request.method === 'GET') {
+    const starter = STARTERS.find((t) => t.id === m[1]);
+    if (starter) return json({ ok: true, tool: starter }, 200, cached);
+    const rec = kv ? await readRec(kv, `tool:${m[1]}`) : null;
+    if (rec?.status !== 'approved' || !rec.tool) return refuse(404, 'SC-C-404', 'No such tool.');
+    return json({ ok: true, tool: rec.tool }, 200, cached);
+  }
+  if (path !== 'tools') return refuse(404, 'SC-C-404', 'No such tool.');
+
+  // a tool sent in: JSON { tool, website }, checked strictly, kept as pending, and the owner told
+  if (request.method !== 'POST') return refuse(405, 'SC-C-405', 'Send a tool with POST.');
+  if (!kv) return refuse(503, 'SC-C-503', 'Simpl Community is not switched on yet.');
+  if (tooMany('tool', ip, LIMITS.toolSubmitsPerHour, 3600 * 1000, now)) return refuse(429, 'SC-C-429', 'That is a lot of tools at once. Try again in an hour.');
+  if (Number(request.headers.get('content-length') || 0) > LIMITS.toolBody * 4) return refuse(413, 'SC-T-BIG', 'That tool is too big.');
+  let text = '';
+  try { text = await request.text(); } catch { /* none: refused below */ }
+  if (text.length > LIMITS.toolBody) return refuse(413, 'SC-T-BIG', 'That tool is too big.');
+  let body = null;
+  try { body = JSON.parse(text); } catch { /* refused below */ }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return refuse(400, 'SC-T-JSON', 'That tool could not be read.');
+  if (clip(body.website, 200)) return json({ ok: true, id: 'thanks', status: 'pending' }); // (filled in: not a person)
+  const got = validateTool(body.tool, { strict: true });
+  if (got.error) return refuseTool(got.error);
+  const pending = await readList(kv, 'list:tools-pending');
+  if (pending.length >= LIMITS.toolsPendingMax) return refuse(503, 'SC-C-FULL', 'So many tools are waiting to be looked at that no more can come in for now.');
+  const id = newId();
+  // (an id, a version or a day the sender gave are not theirs to give: the site's own are set when it is approved)
+  const { id: _id, version: _v, created: _c, ...rest } = got.tool;
+  const tool = { format: FORMAT, id, ...rest };
+  await kv.put(`tool:${id}`, JSON.stringify({ status: 'pending', submitted: today(now), tool }));
+  await kv.put('list:tools-pending', JSON.stringify([id, ...pending]));
+  if (env.REPORT_WEBHOOK) {
+    const entry = { category: 'Community tool', text: `A tool to look at: “${tool.name}”${tool.maker ? ` by ${tool.maker}` : ''} — ${tool.summary} Approve or turn it down at ${url.origin}/community/review`, email: '', phone: '', shots: [], codes: [], version: '', browser: '', page: 'Simpl Community', agent: '' };
+    try { await deliver(entry, reportId(now), env.REPORT_WEBHOOK, fetchImpl); } catch { /* the tool is kept all the same */ }
+  }
+  return json({ ok: true, id, status: 'pending' });
+}
+
+/** The review's decision on a tool ({ kind: 'tool', id, decision }), or one taken down. */
+async function decideTool(path, body, kv, now) {
+  const id = /^[a-z0-9]{6,16}$/.test(body.id || '') ? body.id : '';
+  if (!id && STARTERS.some((t) => t.id === body.id)) return refuse(409, 'SC-C-409', 'Simpl’s own tools are part of the site and stay.');
+  const rec = id ? await readRec(kv, `tool:${id}`) : null;
+  if (!rec?.tool) return refuse(404, 'SC-C-404', 'No such tool.');
+  const withoutIt = async (key, keep) => kv.put(key, JSON.stringify((await readList(kv, key)).filter(keep)));
+  if (path === 'decide') {
+    if (rec.status !== 'pending') return refuse(409, 'SC-C-409', 'That tool has been decided already.');
+    if (body.decision === 'approve') {
+      // (checked again: what was taken under an older reference must still be a tool now)
+      const again = validateTool(rec.tool, { strict: true });
+      if (again.error) return refuseTool(again.error);
+      const tool = approvedTool(again.tool, id, now);
+      await kv.put(`tool:${id}`, JSON.stringify({ ...rec, status: 'approved', tool }));
+      await kv.put('list:tools-approved', JSON.stringify([tool, ...(await readList(kv, 'list:tools-approved')).filter((t) => t?.id !== id)].slice(0, LIMITS.toolsApprovedMax)));
+      await withoutIt('list:tools-pending', (x) => x !== id);
+      return json({ ok: true, status: 'approved', tool });
+    }
+    if (body.decision === 'deny') {
+      await withoutIt('list:tools-pending', (x) => x !== id);
+      await kv.delete(`tool:${id}`);
+      return json({ ok: true, status: 'denied' });
+    }
+    return refuse(400, 'SC-C-400', 'Approve or deny.');
+  }
+  // remove: an approved tool taken out of the gallery (an app that added it keeps its own copy)
+  await withoutIt('list:tools-approved', (t) => t?.id !== id);
+  await withoutIt('list:tools-pending', (x) => x !== id);
+  await kv.delete(`tool:${id}`);
+  return json({ ok: true, status: 'removed' });
 }

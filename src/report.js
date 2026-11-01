@@ -119,7 +119,10 @@ export async function deliver(r, id, hook, fetchImpl = fetch) {
     for (const s of r.shots) body.set(`files[${n++}]`, new Blob([s.bytes], { type: s.type }), s.name);
     res = await fetchImpl(hook, { method: 'POST', body });
   } else if (/(^|\.)slack\.com$/.test(host)) {
-    res = await fetchImpl(hook, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: r.shots.length ? `${text}\n(screenshots are not carried to Slack)` : text }) });
+    // Slack: the words, with &, < and > escaped as Slack asks — unescaped, <!channel> in what anyone typed pings the whole
+    // channel and <url|words> hides a link (Discord's mentions are switched off above for the same reason)
+    const slack = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    res = await fetchImpl(hook, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: slack(r.shots.length ? `${text}\n(screenshots are not carried to Slack)` : text) }) });
   } else {
     const { shots, ...rest } = r;
     res = await fetchImpl(hook, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, ...rest, summary: text, screenshots: shots.map((s) => ({ name: s.name, type: s.type, dataUrl: `data:${s.type};base64,${b64(s.bytes)}` })) }) });
