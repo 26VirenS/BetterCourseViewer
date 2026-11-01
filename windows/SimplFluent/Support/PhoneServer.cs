@@ -216,8 +216,15 @@ internal sealed class PhoneServer
         var name = PhoneLan.CleanName(headers.GetValueOrDefault("X-File-Name") ?? "", type);
         string? refusal = null;
         var code = 0;
-        if (Interlocked.Read(ref taken) + length > totalLimit) { refusal = "That’s all this hand-in can take from your phone. Hand in what is there first."; code = 413; }
-        else if (refuse(name) is { } why) { refusal = why; code = 415; }
+        if (refuse(name) is { } why) { refusal = why; code = 415; }
+        // (its length counted against the session's at once, as one sum: two files coming at once — two phones, two tabs —
+        //  each checked against what the other had not yet added would together pass the limit)
+        else if (Interlocked.Add(ref taken, length) > totalLimit)
+        {
+            Interlocked.Add(ref taken, -length);
+            refusal = "That’s all this hand-in can take from your phone. Hand in what is there first.";
+            code = 413;
+        }
         if (refusal != null)
         {
             // (read through to the end first, so the phone hears why rather than a dropped connection)
@@ -227,13 +234,13 @@ internal sealed class PhoneServer
         }
         var id = Interlocked.Increment(ref nextId);
         var file = PhoneLan.Unique(name, folder);
-        Interlocked.Add(ref taken, length);
         Tell(new PhoneEvent.Began(id, Path.GetFileName(file), length));
-        var done = false;
+        bool done = false, made = false;
         try
         {
             await using (var f = new FileStream(file, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, true))
             {
+                made = true;
                 long got = 0, told = 0;
                 var part = start.Length > length ? start[..(int)length] : start;
                 if (part.Length > 0) { await f.WriteAsync(part, stop.Token); got = part.Length; }
@@ -259,7 +266,9 @@ internal sealed class PhoneServer
             if (!done)
             {
                 Interlocked.Add(ref taken, -length);
-                try { File.Delete(file); } catch { }
+                // (only a file this one made: one of the same name that came at the same moment made it first, and is not
+                //  this one's to delete)
+                if (made) { try { File.Delete(file); } catch { } }
                 Tell(new PhoneEvent.Lost(id));
             }
         }
