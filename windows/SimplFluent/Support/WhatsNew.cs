@@ -28,6 +28,9 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.107", "2026-11-01",
+            ("new", "Export questions", "Macmillan, ALEKS and Alta questions saved as pictures."),
+            ("new", "Every question at once", "In Macmillan, every question goes into one zip in Downloads.")),
         R("0.3.106", "2026-11-01",
             ("improved", "One kind of popup", "Every popup has the same heading, with × at the top right."),
             ("improved", "Fits smaller windows", "A compact menu and a calendar that fits narrow windows."),
