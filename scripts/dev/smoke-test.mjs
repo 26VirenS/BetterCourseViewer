@@ -894,6 +894,9 @@ try {
   await page.waitForSelector('.bcv-day .bcv-row', { timeout: 10000 });
   const dayHeads = await texts('.bcv-day__head');
   check(dayHeads[0].startsWith('Today') && dayHeads[1].startsWith('Tomorrow'), `list view day groups: ${dayHeads.slice(0, 3).join(' | ')}`);
+  // (E14) a day within the week is named and dated ("Wednesday November 4"); past it the heading is the date itself,
+  // "Monday, Nov 9", never "Nov 9 November 9"
+  check(dayHeads.every((t) => /^(Today|Tomorrow|Yesterday|[A-Z][a-z]+day) [A-Z][a-z]+ \d{1,2}$/.test(t) || /^[A-Z][a-z]+day, [A-Z][a-z]{2} \d{1,2}(, \d{4})?$/.test(t)), `day headings: named and dated within the week, "Monday, Nov 9" past it: ${dayHeads.join(' | ')}`);
   const listRows = await texts('.bcv-day .bcv-row');
   check(listRows.some((t) => /Dis01.*10 pts.*Due 11:59 PM/.test(t)) && listRows.some((t) => /Quiz.*Qz01/.test(t)), 'list rows show course · kind, points and due time');
   check(listRows.some((t) => /to-do date/.test(t)), 'to-do-dated items are labelled, not shown as due');
@@ -1635,7 +1638,7 @@ try {
   const apptCells = await texts('.bcv-appt__slot');
   const apptOpen = (await page.$$('.bcv-appt__slot:not(:disabled)')).length;
   check(apptTitle === 'Research Proposal Feedback Conferences (Online Option)' && apptMeta === 'Online (the Zoom link is in the course) · 15 min each · one time each'
-    && apptClass.join('|') === 'F26-MATH 021 20*' && apptDays.length === 2 && /^[A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2} · 6 times open · 11:15am – 12:30pm \[open\]$/.test(apptDays[0]) && /5 times open · 11:15am – 12:30pm$/.test(apptDays[1]) && !/\[open\]/.test(apptDays[1])
+    && apptClass.join('|') === 'F26-MATH 021 20*' && apptDays.length === 2 && /^[A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2} · 6 times open · 11:15 AM – 12:30 PM \[open\]$/.test(apptDays[0]) && /5 times open · 11:15 AM – 12:30 PM$/.test(apptDays[1]) && !/\[open\]/.test(apptDays[1])
     && apptHours.join('|') === '11 am|12 pm' && apptCells.join('|') === ':15|:30|:45|:00|:15|:30' && apptOpen === 6 && !(await page.$('.bcv-appt__mine')) && /A time you reserve goes on the calendar/.test((await texts('.bcv-appt .bcv-hint'))[0]),
   `the sheet: the class first, the group as a card with its place and length, its days as rows (how many times open, the span), the first open to its hours — a row an hour, a cell a time: ${JSON.stringify({ apptTitle, apptMeta, apptClass, apptDays, apptHours, apptCells, apptOpen })}`);
   await shot(page, '06b-calendar-appointments');
@@ -1649,7 +1652,7 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.bcv-appt__slot:not(:disabled)').length === 0, null, { timeout: 5000 });
   const mineText = (await texts('.bcv-appt__minetext'))[0];
   const heldRow = (await texts('.bcv-appt__dayrow.is-held .bcv-appt__daysub'))[0];
-  check(/^Your time: [A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2} at 11:15am$/.test(mineText) && (await texts('.bcv-appt__slot.is-mine')).join() === ':15' && (await page.$$('.bcv-appt__slot:disabled')).length === 12 && heldRow === 'Your time · 11:15am' && (await texts('.bcv-appt__cancel'))[0] === 'Cancel',
+  check(/^Your time: [A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2} at 11:15 AM$/.test(mineText) && (await texts('.bcv-appt__slot.is-mine')).join() === ':15' && (await page.$$('.bcv-appt__slot:disabled')).length === 12 && heldRow === 'Your time · 11:15 AM' && (await texts('.bcv-appt__cancel'))[0] === 'Cancel',
     `a press reserves the time: held at the top with Cancel, its cell filled, its day row saying so, every other cell waiting (one time each): "${mineText}" / "${heldRow}"`);
   await shot(page, '06c-calendar-appointment-held');
   await closeAppt();
@@ -1660,7 +1663,7 @@ try {
   await page.click('.bcv-ev:has-text("Research Proposal")');
   await page.waitForSelector('.bcv-evsheet', { timeout: 5000 });
   const apptSheet = await evSheet();
-  check(apptSheet.kicker === 'Appointment' && apptSheet.title === 'Research Proposal Feedback Conferences (Online Option)' && /^[A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2} · 11:15am – 11:30am$/.test(apptSheet.rows.When) && apptSheet.rows.Calendar === 'F26-MATH 021 20' && apptSheet.rows.Where === 'Online (the Zoom link is in the course)' && /Fifteen minutes to go over your research proposal/.test(apptSheet.rows.Details) && apptSheet.foot.join('|') === 'Un-reserve|Other times' && apptSheet.grid && /\/calendar$/.test(page.url()),
+  check(apptSheet.kicker === 'Appointment' && apptSheet.title === 'Research Proposal Feedback Conferences (Online Option)' && /^[A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2} · 11:15 AM – 11:30 AM$/.test(apptSheet.rows.When) && apptSheet.rows.Calendar === 'F26-MATH 021 20' && apptSheet.rows.Where === 'Online (the Zoom link is in the course)' && /Fifteen minutes to go over your research proposal/.test(apptSheet.rows.Details) && apptSheet.foot.join('|') === 'Un-reserve|Other times' && apptSheet.grid && /\/calendar$/.test(page.url()),
     `a press on the reservation opens its sheet — Appointment, the title, when, the calendar, the place, the details, Un-reserve and Other times — the month still behind it: ${JSON.stringify(apptSheet)}`);
   await shot(page, '06d-calendar-event-sheet');
   await page.keyboard.press('Escape');
@@ -1686,7 +1689,7 @@ try {
   await page.click('.bcv-ev:has-text("Lec05 lecture")');
   await page.waitForSelector('.bcv-evsheet', { timeout: 5000 });
   const lecSheet = await evSheet();
-  check(lecSheet.kicker === 'Event' && lecSheet.title === 'Lec05 lecture' && /· 10:30am – 11:45am$/.test(lecSheet.rows.When) && lecSheet.rows.Calendar === 'F26-MATH 021 20' && lecSheet.rows.Where === 'COB2 140 5200 N Lake Rd' && lecSheet.rows.Details === 'Composition of functions, section 1.4.' && lecSheet.bold && lecSheet.foot.length === 0,
+  check(lecSheet.kicker === 'Event' && lecSheet.title === 'Lec05 lecture' && /· 10:30 AM – 11:45 AM$/.test(lecSheet.rows.When) && lecSheet.rows.Calendar === 'F26-MATH 021 20' && lecSheet.rows.Where === 'COB2 140 5200 N Lake Rd' && lecSheet.rows.Details === 'Composition of functions, section 1.4.' && lecSheet.bold && lecSheet.foot.length === 0,
     `a lecture opens its sheet too — Event, when, the calendar, the room and its address, the details as rich text, nothing to un-reserve: ${JSON.stringify(lecSheet)}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-evsheet'), null, { timeout: 3000 });
@@ -1730,6 +1733,23 @@ try {
   check((!weekGeo.quiz || (weekGeo.quiz.top === 504 && weekGeo.quiz.h >= 20 && /^(Due )?10:30a/.test(weekGeo.quiz.t))) && weekGeo.now && weekGeo.nowShown && weekGeo.abs && /^[A-Z][a-z]+ \d{4}$|^[A-Z][a-z]{2} – [A-Z][a-z]{2} \d{4}$/.test(weekGeo.title) && /^[A-Z][a-z]{2} \d+ – [A-Z][a-z]{2} \d+ · \d+ items?/.test(weekGeo.sub),
     `week as a time grid: blocks placed by their time, the now line on today, the week named by its month: ${JSON.stringify(weekGeo)}`);
   await shot(page, '07-calendar-week');
+  // (E14) one clock: the hours down the grid's edge as every time is written — midnight "12 AM", never "0a"; noon "Noon"
+  const gutter = await texts('.bcv-week__hour');
+  check(gutter[0] === '12 AM' && gutter[8] === '8 AM' && gutter[12] === 'Noon' && gutter[13] === '1 PM' && gutter[23] === '11 PM' && !gutter.some((t) => /^\d+[ap]$/.test(t)), `the week's hours: 12 AM, … 8 AM, … Noon, 1 PM, … 11 PM (never "0a" or "8a"): ${gutter.slice(0, 3).join(', ')} … ${gutter.slice(11, 14).join(', ')}`);
+  // and the formatter itself, in the page: "11:59 PM" style everywhere, the compact "10:30a" only for a week's chips,
+  // a heading past the week "Monday, Nov 9" with no second date beside it
+  const clockSaid = await sw.evaluate(async (base) => {
+    const [tab] = await chrome.tabs.query({ url: `${base}/*` });
+    const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => {
+      const U = self.BCV.ui;
+      const at = (hh, mm) => new Date(2026, 10, 2, hh, mm);
+      const now = new Date(2026, 10, 1, 12);
+      return { midnight: U.fmtTime(at(0, 0)), late: U.fmtTime(at(23, 59)), chip: U.fmtTime(at(10, 30), { compact: true }), chipPm: U.fmtTime(at(23, 59), { compact: true }), at: U.fmtAt(at(23, 59)), by: U.fmtBy(at(10, 30)), hours: [0, 12, 13].map(U.fmtHour), far: U.dayTitle(new Date(2026, 10, 9), now), farNamed: U.dayNamed(new Date(2026, 10, 9), now), near: U.dayTitle(new Date(2026, 10, 4), now), nearNamed: U.dayNamed(new Date(2026, 10, 4), now), lower: typeof U.fmtTimeLower };
+    } });
+    return result;
+  }, BASE);
+  check(clockSaid.midnight === '12:00 AM' && clockSaid.late === '11:59 PM' && clockSaid.chip === '10:30a' && clockSaid.chipPm === '11:59p' && clockSaid.at === 'Nov 2 at 11:59 PM' && clockSaid.by === 'Nov 2 by 10:30 AM' && clockSaid.hours.join('|') === '12 AM|Noon|1 PM' && clockSaid.far === 'Monday, Nov 9' && clockSaid.farNamed && clockSaid.near === 'Wednesday' && !clockSaid.nearNamed && clockSaid.lower === 'undefined',
+    `one time formatter (ui.js fmtTime): "11:59 PM", midnight "12:00 AM", the compact "10:30a" for chips alone, a far day's heading "Monday, Nov 9": ${JSON.stringify(clockSaid)}`);
   await page.click('.bcv-seg__btn[data-value="agenda"]');
   await page.waitForSelector('.bcv-agenda', { timeout: 5000 });
   check((await texts('.bcv-h1'))[0].includes(' – '), `agenda title: ${(await texts('.bcv-h1'))[0]}`);
@@ -1749,6 +1769,8 @@ try {
   const agendaHeads = await texts('.bcv-agenda .bcv-group__head');
   check(agendaHeads[0].includes('Today ·') && /\d items?/.test(agendaHeads[0]), `agenda day heads: ${agendaHeads[0]}`);
   // a row says the course, then what the work is worth or where the event is
+  const agendaDue = await texts('.bcv-agenda .bcv-agenda__due');
+  check(agendaDue.length > 0 && agendaDue.every((t) => /^(Due|At|Plan) \d{1,2}:\d{2} [AP]M$|^All day$/.test(t)) && agendaDue.some((t) => t === 'Due 11:59 PM'), `the agenda writes its times as everywhere else ("Due 11:59 PM", "At 3:00 PM"), never "11:59pm": ${[...new Set(agendaDue)].slice(0, 4).join(' | ')}`);
   const agendaCourse = await texts('.bcv-agenda .bcv-agenda__course');
   check(agendaCourse.some((t) => /^F26-MATH 021 20 · 10 pts$/.test(t)) && agendaCourse.some((t) => /· COB2 140$/.test(t) || /· Online \(the Zoom link is in the course\)$/.test(t)), `agenda rows carry the points and the place: ${agendaCourse.slice(0, 4).join(' | ')}`);
   await shot(page, '08-calendar-agenda');
@@ -1864,7 +1886,7 @@ try {
   await page.click('.bcv-ev--ext:has-text("Shift at the library")');
   await page.waitForSelector('.bcv-evsheet', { timeout: 5000 });
   const extSheet = await page.evaluate(() => { const sh = document.querySelector('.bcv-evsheet'); return { kicker: sh.querySelector('.bcv-evsheet__kicker').textContent, rows: Object.fromEntries([...sh.querySelectorAll('.bcv-evsheet__row')].map((r) => [r.querySelector('.bcv-evsheet__k').textContent, r.querySelector('.bcv-evsheet__v').textContent.trim()])) }; });
-  check(extSheet.kicker === 'Your calendar' && extSheet.rows.Calendar === 'Sam\'s calendar' && extSheet.rows.Where === 'Kolligian Library' && /4:00pm – 8:00pm$/.test(extSheet.rows.When), `a press on one opens its sheet: ${JSON.stringify(extSheet)}`);
+  check(extSheet.kicker === 'Your calendar' && extSheet.rows.Calendar === 'Sam\'s calendar' && extSheet.rows.Where === 'Kolligian Library' && /4:00 PM – 8:00 PM$/.test(extSheet.rows.When), `a press on one opens its sheet: ${JSON.stringify(extSheet)}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-evsheet'), null, { timeout: 3000 });
   // (2.99.124) shown or hidden with Calendars, as an account's calendars are
@@ -2690,7 +2712,7 @@ try {
   })));
   check(subCards.length === 2 && subCards[0].n === 'Attempt 2' && subCards[0].latest && subCards[1].n === 'Attempt 1' && !subCards[1].latest, `one card per attempt, latest first: ${subCards.map((x) => `${x.n}${x.latest ? '*' : ''}`).join(' | ')}`);
   // the mock dates everything from today, so the expected strings come from its own answer, formatted the way the app formats a time
-  const fmtAtLike = (iso) => { const d = new Date(iso); const h = d.getHours() % 12 || 12; return `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()]} ${d.getDate()} at ${h}:${String(d.getMinutes()).padStart(2, '0')}${d.getHours() < 12 ? 'am' : 'pm'}`; };
+  const fmtAtLike = (iso) => { const d = new Date(iso); const h = d.getHours() % 12 || 12; return `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()]} ${d.getDate()} at ${h}:${String(d.getMinutes()).padStart(2, '0')}${d.getHours() < 12 ? ' AM' : ' PM'}`; }; // (ui.js fmtAt: the one clock, "Oct 25 at 3:52 PM")
   const sub4001 = await readSub('104', '4001');
   const latestHist = sub4001.submission_history.find((x) => Number(x.attempt) === 2);
   check(subCards[0].score === '10 / 10' && subCards[0].facts === `Submitted=${fmtAtLike(latestHist.submitted_at)} | Type=File upload | Graded=${fmtAtLike(sub4001.graded_at)}`, `the latest attempt's own facts, from Canvas's own dates: ${subCards[0].facts}`);
@@ -3512,7 +3534,7 @@ try {
   const aEnter = await page.$$eval('.bcv-body .bcv-card--list .bcv-row', (els) => els.map((e) => [e.classList.contains('bcv-enter'), e.style.getPropertyValue('--bcv-delay'), e.style.getPropertyValue('--bcv-dur')]));
   check(aEnter.length >= 6 && aEnter.every(([on, , dur], i) => on && dur === '200ms' && aEnter[i][1] === `${Math.min(i * 20, 420)}ms`), `assignment rows fade in one at a time, 20ms apart: ${aEnter.slice(0, 4).map((a) => a[1]).join(',')}…`);
   const arows = await texts('.bcv-body .bcv-row');
-  check(arows.some((t) => /Qz01.*Quiz · 10 pts · Due .* at 11:59pm.*Not submitted/.test(t)) && arows.some((t) => /Lec05-PreQuiz.*19\/19 pts.*Graded/.test(t)) && !arows.some((t) => /–\//.test(t)), 'assignment rows, as the Mac reads them: the kind, what it is worth (no dash standing in for a score), when it is due, the status badge');
+  check(arows.some((t) => /Qz01.*Quiz · 10 pts · Due .* at 11:59 PM.*Not submitted/.test(t)) && arows.some((t) => /Lec05-PreQuiz.*19\/19 pts.*Graded/.test(t)) && !arows.some((t) => /–\//.test(t)), 'assignment rows, as the Mac reads them: the kind, what it is worth (no dash standing in for a score), when it is due, the status badge');
   await shot(page, '13-course-assignments');
   await page.click('.bcv-seg__btn[data-value="type"]');
   await page.waitForFunction(() => [...document.querySelectorAll('.bcv-group__head')].some((e) => /Discussion Quizzes/.test(e.textContent)), null, { timeout: 5000 });
@@ -3610,7 +3632,7 @@ try {
   check((await page.$$('.bcv-wbar__seg')).length === 3 && (await page.$$('.bcv-wbar__seg--ungraded')).length === 2 && wbar.join(' | ') === 'Discussion Quizzes 18% of grade 100% | Midterms 57% of grade ungraded | Final 25% of grade ungraded' && (await texts('.bcv-gr__hsub'))[0] === '100% of final grade', `weight bar: ${wbar.join(' | ')}`);
   check((await texts('.bcv-gr__wnote'))[0] === 'Effort, Collaboration and Coursework (Knewton Alta) carry 0% weight — they show as rings but never move the total.', `0%-weight note: ${(await texts('.bcv-gr__wnote'))[0]}`);
   const gradeRows = await texts('.bcv-grades__main .bcv-row');
-  check(gradeRows.length === 18 && gradeRows.some((t) => /^Lec01-PreQuiz.*due .* by 10:30am · submitted .*13 \/ 16/.test(t)) && !gradeRows.some((t) => /^Lec01-PreQuiz.*Effort · due/.test(t)), `grade rows (the group no longer said in each): ${gradeRows.find((t) => /Lec01-PreQuiz/.test(t))}`);
+  check(gradeRows.length === 18 && gradeRows.some((t) => /^Lec01-PreQuiz.*due .* by 10:30 AM · submitted .*13 \/ 16/.test(t)) && !gradeRows.some((t) => /^Lec01-PreQuiz.*Effort · due/.test(t)), `grade rows (the group no longer said in each): ${gradeRows.find((t) => /Lec01-PreQuiz/.test(t))}`);
   // (2.99.36) the work partitioned by group: a head per group with work, in Canvas's order, each over its own card of rows
   const gheads = await texts('.bcv-gr__ghead .bcv-gr__gname');
   const gsecRows = await page.$$eval('.bcv-gr__gsec', (els) => els.map((e) => e.querySelectorAll('.bcv-row').length));
@@ -4102,7 +4124,7 @@ try {
   await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
   const qlabels = await texts('.bcv-body .bcv-label');
   check(qlabels.join(',').toLowerCase() === 'assignment quizzes,practice quizzes', `quiz groups: ${qlabels.join(', ')}`);
-  check((await texts('.bcv-body .bcv-row')).some((t) => /Lec06-PreQuiz Due .* at 10:30am · 17 pts · 4 questions/.test(t)), 'quiz rows');
+  check((await texts('.bcv-body .bcv-row')).some((t) => /Lec06-PreQuiz Due .* at 10:30 AM · 17 pts · 4 questions/.test(t)), 'quiz rows');
   await shot(page, '21-course-quizzes');
   await page.click('.bcv-body .bcv-row');
   await page.waitForSelector('.bcv-qzi', { timeout: 10000 });

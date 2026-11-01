@@ -15,7 +15,7 @@
 
   const HOURS = [];
   for (let i = 0; i <= 23; i++) HOURS.push(i); // (2.99.112: the whole day, scrolled to the morning; a pinch shows more or less of it)
-  const hourLabel = (hh) => (hh === 12 ? '12p' : hh < 12 ? `${hh}a` : `${hh - 12}p`);
+  const hourLabel = (hh) => U.fmtHour(hh); // ("8 AM", "Noon", midnight "12 AM": ui.js, the one clock)
   // (2.99.109) the week as a time grid, as a calendar app draws it: each hour this tall (2.99.112: a pinch changes it,
   // between a day that fits the card and a few hours that fill it; remembered)
   const HOUR_PX = 48;
@@ -544,7 +544,7 @@
       const hgt = Math.max(20, ((b - a) / 60) * hourPx - 2); // (as drawn now: a pinch moves it with the scale, drawn again once it ends)
       const roomy = hgt >= 44;
       const tiny = hgt < 32;
-      const timeWord = (U.fmtTimeLower(ev.date) || '').replace(/m$/, '');
+      const timeWord = U.fmtTime(ev.date, { compact: true });
       const el = h('a', {
         class: `bcv-wev ${kindCls(ev)} ${ev.done ? 'is-done' : ''} ${ev.missing ? 'is-missing' : ''} ${tiny ? 'is-tiny' : ''}`,
         href: ev.url, dataset: { ev: ev.id, ...(ev.planId ? { plan: ev.planId } : {}) },
@@ -698,8 +698,8 @@
         const shiftX = cols[at.i].getBoundingClientRect().left - col0.getBoundingClientRect().left;
         el.style.transform = `translate(${shiftX}px, ${((at.m - a0) / 60) * hourPx}px)`;
         const when = new Date(Number(cols[at.i].dataset.day) + at.m * 60000);
-        if (timeEl) timeEl.textContent = (U.fmtTimeLower(when) || '').replace(/m$/, '');
-        el.setAttribute('aria-label', `Move to ${U.fmtDow(when)} ${U.fmtTimeLower(when)}`);
+        if (timeEl) timeEl.textContent = U.fmtTime(when, { compact: true });
+        el.setAttribute('aria-label', `Move to ${U.fmtDow(when)} ${U.fmtTime(when)}`);
         U.haptic?.('select');
       };
       const end = (letGo) => {
@@ -762,7 +762,7 @@
       let mins = len;
       let engaged = false;
       try { el.setPointerCapture(pid); } catch { /* the window still hears it */ }
-      const say = () => { if (timeEl) timeEl.textContent = `${(U.fmtTimeLower(ev.date) || '').replace(/m$/, '')} – ${(U.fmtTimeLower(new Date(ev.date.getTime() + mins * 60000)) || '').replace(/m$/, '')}`; };
+      const say = () => { if (timeEl) timeEl.textContent = `${U.fmtTime(ev.date, { compact: true })} – ${U.fmtTime(new Date(ev.date.getTime() + mins * 60000), { compact: true })}`; };
       const move = (m) => {
         if (m.pointerId !== pid) return;
         const dy = m.clientY - y0;
@@ -814,7 +814,7 @@
           U.groupHead(U.fmtDow(d), `${rel}${U.plural(evs.length, 'item')}`),
           U.card(evs.map((ev) => U.row([
             U.tile(ev.icon, { color: ev.color, tint: ev.tint }),
-            U.text('bcv-agenda__due', ev.allDay ? 'All day' : `${ev.isAssignment ? 'Due' : ev.kind === 'plan' ? 'Plan' : 'At'} ${U.fmtTimeLower(ev.date)}`, 'span'),
+            U.text('bcv-agenda__due', ev.allDay ? 'All day' : `${ev.isAssignment ? 'Due' : ev.kind === 'plan' ? 'Plan' : 'At'} ${U.fmtTime(ev.date)}`, 'span'),
             h('span', { class: `bcv-agenda__title bcv-pretty ${ev.done ? 'bcv-strike' : ''}`, text: ev.title }),
             ev.missing ? U.statusBadge({ word: 'Missing', kind: 'bad' }) : ev.excused ? U.statusBadge({ word: 'Excused', kind: 'muted' }) : null,
             U.text('bcv-agenda__course', [ev.contextName, ...facts(ev)].filter(Boolean).join(' · '), 'span'),
@@ -931,7 +931,7 @@
         load();
         loadAppointments({ force: true });
       };
-      const whenOf = (date, end, allDay) => (allDay ? `${U.fmtDow(date)} · all day` : `${U.fmtDow(date)} · ${U.fmtTimeLower(date)}${end && end > date ? ` – ${U.fmtTimeLower(end)}` : ''}`);
+      const whenOf = (date, end, allDay) => (allDay ? `${U.fmtDow(date)} · all day` : `${U.fmtDow(date)} · ${U.fmtTime(date)}${end && end > date ? ` – ${U.fmtTime(end)}` : ''}`);
       const repeatWord = (k) => BCV.plan?.REPEATS.find(([x]) => x === (k || ''))?.[1] || 'Never';
       const alertWord = (m) => BCV.plan?.ALERTS.find(([x]) => x === (Number.isFinite(m) ? m : null))?.[1] || 'None';
 
@@ -962,7 +962,7 @@
           U.el('bcv-sheet__list bcv-evsheet__list', [
             row('When', whenOf(ev.date, ev.end, ev.allDay)),
             group ? null : row('For', [U.dot(p.color || ev.contextColor, 'bcv-dot--9'), h('span', { text: p.name ? `${p.title}${p.course ? ` · ${p.course}` : ''}` : p.course || '—' })]),
-            !group && p.due ? row('Due', `${U.fmtDow(new Date(p.due))} · ${U.fmtTimeLower(new Date(p.due))}`) : null,
+            !group && p.due ? row('Due', `${U.fmtDow(new Date(p.due))} · ${U.fmtTime(new Date(p.due))}`) : null,
             Number.isFinite(p.alert) ? row('Alert', alertWord(p.alert)) : null,
             p.notes ? row('Notes', h('span', { class: 'bcv-evpop__notes', text: p.notes })) : null,
           ].filter(Boolean)),
@@ -1319,7 +1319,7 @@
       }
       const mine = g.mine.map((s) => U.el('bcv-appt__mine', [
         U.svg(IC.calendarPlus, { size: 14, stroke: 'currentColor', width: 2 }),
-        h('span', { class: 'bcv-appt__minetext', text: `Your time: ${U.fmtDow(s.start)} at ${U.fmtTimeLower(s.start)}` }),
+        h('span', { class: 'bcv-appt__minetext', text: `Your time: ${U.fmtDow(s.start)} at ${U.fmtTime(s.start)}` }),
         U.btn('Cancel', { kind: 'xs', cls: 'bcv-appt__cancel', onClick: (e) => cancel(g, s, e.currentTarget) }),
       ]));
       // the days as rows — the date, how many times are open and the span — each opening to its hours;
@@ -1340,7 +1340,7 @@
         const held = list.find((s) => s.reserved);
         const open = openOf(list);
         const rel = U.sameDay(d, now) ? 'Today' : U.dayDiff(d, now) === 1 ? 'Tomorrow' : U.DAYS[d.getDay()];
-        const sub = held ? `Your time · ${U.fmtTimeLower(held.start)}` : open ? `${U.plural(open, 'time')} open · ${U.fmtTimeLower(list[0].start)} – ${U.fmtTimeLower(list[list.length - 1].start)}` : 'Full';
+        const sub = held ? `Your time · ${U.fmtTime(held.start)}` : open ? `${U.plural(open, 'time')} open · ${U.fmtTime(list[0].start)} – ${U.fmtTime(list[list.length - 1].start)}` : 'Full';
         const row = h('button', { type: 'button', class: `bcv-appt__dayrow ${held ? 'is-held' : ''} ${!open && !held ? 'is-full' : ''}`, 'aria-expanded': isOpen ? 'true' : 'false', onclick: () => {
           if (apptUi.open.has(key)) apptUi.open.delete(key); else apptUi.open.add(key);
           apptSheet?.list.replaceChildren(...appointmentsBody());
@@ -1372,7 +1372,7 @@
     function slotCell(g, s, full) {
       const gone = s.left <= 0 && !s.reserved;
       const past = s.start < now;
-      const when = U.fmtTimeLower(s.start);
+      const when = U.fmtTime(s.start);
       const title = s.reserved ? `Your time, ${when}` : gone ? `${when}: taken` : past ? `${when}: past` : full ? 'Cancel your time first to pick another' : `Reserve ${U.fmtDow(s.start)} at ${when}`;
       const btn = h('button', { type: 'button', class: `bcv-appt__slot ${s.reserved ? 'is-mine' : ''} ${gone ? 'is-gone' : ''}`, text: `:${String(s.start.getMinutes()).padStart(2, '0')}`, title, 'aria-label': title, disabled: (s.reserved || gone || past || full) || null, onclick: () => reserve(g, s, btn) });
       return btn;
@@ -1391,7 +1391,7 @@
         return;
       }
       if (!ctx.alive()) return;
-      U.toast(`Reserved: ${U.fmtDow(s.start)} at ${U.fmtTimeLower(s.start)}`);
+      U.toast(`Reserved: ${U.fmtDow(s.start)} at ${U.fmtTime(s.start)}`);
       await loadAppointments({ force: true });
       loadedRange = null; // the reservation is an event of the student's own: the grid reads it
       load();
@@ -1877,7 +1877,7 @@
         joinEl = el;
         el?.classList.add('is-join');
       }
-      const label = (day, m) => { const a = new Date(day + m * 60000); const b = new Date(a.getTime() + mins * 60000); return `${U.fmtTimeLower(a).replace(/m$/, '')} – ${U.fmtTimeLower(b).replace(/m$/, '')}`; };
+      const label = (day, m) => { const a = new Date(day + m * 60000); const b = new Date(a.getTime() + mins * 60000); return `${U.fmtTime(a, { compact: true })} – ${U.fmtTime(b, { compact: true })}`; };
       function paintDrop(col) {
         if (!drop) {
           drop = h('div', { class: 'bcv-wev bcv-ev--plan bcv-wev--drop', 'aria-hidden': 'true', style: { background: row.style.getPropertyValue('--bcv-tdrag-tint'), '--bcv-ev-bar': row.style.getPropertyValue('--bcv-tdrag-c') } }, [
