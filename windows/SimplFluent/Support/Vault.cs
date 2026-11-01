@@ -564,7 +564,7 @@ public static class Vault
     {
         var moved = new List<string>();
         dir = null;
-        foreach (var f in new[] { AppPaths.PrefsFile, AppPaths.Storage, AppPaths.Flashcards, AppPaths.Login, AppPaths.VaultKey })
+        foreach (var f in new[] { AppPaths.PrefsFile, AppPaths.Storage, AppPaths.Flashcards, AppPaths.CommunityTools, AppPaths.Login, AppPaths.VaultKey })
         {
             try
             {

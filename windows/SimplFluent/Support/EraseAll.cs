@@ -50,7 +50,7 @@ public static class EraseAll
         Engine.SessionKeep.Clear(); // (0.3.55: the school's session kept for a restart)
         try { Engine.Bridge.Shared.EraseStorage(); } catch (Exception e) { Log.Write("erase storage: " + e.Message); }
         Prefs.Erase();
-        foreach (var f in new[] { AppPaths.Storage, AppPaths.Login, AppPaths.Flashcards })
+        foreach (var f in new[] { AppPaths.Storage, AppPaths.Login, AppPaths.Flashcards, AppPaths.CommunityTools })
         {
             try { File.Delete(f); } catch { }
             try { File.Delete(f + ".tmp"); } catch { }

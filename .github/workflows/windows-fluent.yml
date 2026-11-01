@@ -1080,6 +1080,21 @@ jobs:
           # Ocean's colour and a photo in every place, named and sent to the mock's gallery as Share sends it
           # (--community-share), the form saying it went — its log must say it went with its photos (checked below)
           Shot 'community-share' '1366x778' 45 ($mock + $community + @('--appearance', 'light', '--appearance-mode', 'yes', '--appearance-tab', 'community', '--theme', 'Ocean', '--theme-photo', $themePhoto, '--community-share', 'Ocean Notes'))
+          # (0.3.105, at the end so the pictures before keep their parts) Simpl Community tools (windows/SimplFluent/Tools/
+          # Community): the Tools page's Community section with tools added from the mock's gallery as Add adds them
+          # (--community-add: downloaded, checked again on the PC, kept), light and dark; the browser over the mock's gallery
+          # (scripts/dev/fixtures/community-tools.json, served by mock-community.mjs: every tool's live preview, one being
+          # added, one that needs a newer Simpl), and filtered to Science in dark; offline (nothing at the address it is
+          # given): why, and Try again; and an added tool open in its popup, with values put in (--community-values) — and
+          # one with menus and a table, in dark. Their logs must say each tool was added, the gallery read, and what the
+          # open tool worked out (checked below)
+          Shot 'tools-community' '1366x778' 45 ($mock + $community + @('--appearance', 'light', '--place', 'tools', '--tools-scroll', 'community', '--community-add', 's-ohms,k3m9x2pa'))
+          Shot 'tools-community-dark' '1024x681' 45 ($mock + $community + @('--appearance', 'dark', '--place', 'tools', '--tools-scroll', 'community', '--community-add', 's-gpa'))
+          Shot 'community-browser' '1366x778' 45 ($mock + $community + @('--appearance', 'light', '--place', 'tools', '--community-add', 's-ohms', '--community-browse', 'yes'))
+          Shot 'community-browser-dark' '1366x778' 45 ($mock + $community + @('--appearance', 'dark', '--place', 'tools', '--community-browse', 'science'))
+          Shot 'community-browser-offline' '1024x681' 30 ($mock + @('--community-base', 'http://localhost:9', '--appearance', 'light', '--place', 'tools', '--community-browse', 'yes'))
+          Shot 'community-tool-open' '1366x778' 45 ($mock + $community + @('--appearance', 'light', '--place', 'tools', '--community-add', 's-ohms', '--community-open', 's-ohms', '--community-values', 'v=9,r=3'))
+          Shot 'community-tool-open-dark' '1024x681' 45 ($mock + $community + @('--appearance', 'dark', '--place', 'tools', '--community-add', 's-gpa', '--community-open', 's-gpa'))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
@@ -1709,6 +1724,25 @@ jobs:
             Write-Host "community-share: $((@($l -split "`n" | Where-Object { $_ -match 'community' }) -join ' | '))"
             if ($l -notmatch 'community: shared Ocean Notes \([a-z0-9]+, [1-9]\d* photos\)') { Write-Host "::error::community-share: the theme was not shared with its photos (shots/profile-community-share.log)"; exit 1 }
           }
+          # (0.3.105) Simpl Community tools: each tool asked for was added — downloaded from the mock's gallery and checked
+          # again on the PC — before its picture, the section showed them, the browser read the gallery (or, offline, said
+          # why), and the open tool worked out its results from the values put in (Tools/Community/CommunityTools.cs,
+          # CommunityBrowser.cs, CommunityToolView.cs: "community tools: …", "community browser: …", "community tool …")
+          $toolChecks = @(
+            @('tools-community', @('community tools: added s-ohms ', 'community tools: added k3m9x2pa ', 'tools: community section shows 2 added')),
+            @('tools-community-dark', @('community tools: added s-gpa ', 'tools: community section shows 1 added')),
+            @('community-browser', @('community tools: [1-9]\d* read \([1-9]\d* to add, 1 need a newer Simpl\)', 'community tools: added s-ohms ', 'community browser: shows [1-9]\d* tools')),
+            @('community-browser-dark', @('community tools: [1-9]\d* read', 'community browser: shows [1-9]\d* tools \(science\)')),
+            @('community-browser-offline', @('community tools: the gallery could not be read', 'community browser: shows failed')),
+            @('community-tool-open', @('community tools: added s-ohms ', 'tool popup open: community:s-ohms', 'community tool s-ohms: shows Current 3 A \| Power 27 W')),
+            @('community-tool-open-dark', @('community tools: added s-gpa ', 'tool popup open: community:s-gpa', 'community tool s-gpa: shows GPA '))
+          )
+          foreach ($tc in $toolChecks) {
+            if ($script:mine -notcontains $tc[0]) { continue }
+            $l = PhoneLog $tc[0]
+            Write-Host "$($tc[0]): $((@($l -split "`n" | Where-Object { $_ -match 'community|tool popup' }) | Select-Object -Last 8) -join ' | ')"
+            foreach ($want in $tc[1]) { if ($l -notmatch $want) { Write-Host "::error::$($tc[0]): the log does not say '$want' before the picture (shots/profile-$($tc[0]).log)"; exit 1 } }
+          }
           # (0.3.64) To Do & Calendar: To Do's menu and Week's menu open, the week pinched to the whole day, and the week
           # scrolled with something waiting at its edges, before each picture (Screens/Calendar/CalendarTodo.cs TodoShots,
           # CalendarWeek.cs ShotPinch and ShotPeeks: "calendar: …")
@@ -1730,7 +1764,8 @@ jobs:
           }
           Get-ChildItem shots
       # (what Simpl keeps is encrypted — windows/SimplFluent/Support/Vault.cs — checked in this part's profiles as the
-      #  pictures left them, sign-in-stay's among them: prefs.json, storage.json, flashcards.json, login.bin and every
+      #  pictures left them, sign-in-stay's among them: prefs.json, storage.json, flashcards.json, community-tools.json
+      #  (0.3.105: the Simpl Community tools added), login.bin and every
       #  answer kept must begin with the vault's SIMPLENC, vault.key with SIMPLVK1; and no file in them, WebView2's
       #  included, may hold the mock's sign-in in plain text — scripts/dev/mock-canvas.mjs lets in any login with the
       #  password "demo", and the shots type student, slow and code. The vault's own lines say whether this runner's TPM
@@ -1748,7 +1783,7 @@ jobs:
           # posts it — in UTF-8 and in UTF-16 (Windows' and Chromium's own strings)
           $plain = @('student:demo', 'slow:demo', 'code:demo', '"pass":"demo"', '"pass": "demo"', '"password":"demo"', '"password": "demo"', 'password]=demo', 'password%5D=demo')
           $needles = @($plain | ForEach-Object { @{ Name = $_; Text = $_ }; @{ Name = "$_ (UTF-16)"; Text = $latin1.GetString($utf16.GetBytes($_)) } })
-          $mustSeal = @('prefs.json', 'storage.json', 'flashcards.json', 'login.bin')
+          $mustSeal = @('prefs.json', 'storage.json', 'flashcards.json', 'community-tools.json', 'login.bin')
           $bad = [System.Collections.Generic.List[string]]::new()
           $seen = @{}; $files = 0; $bytes = 0L; $held = 0
           $profiles = @(Get-ChildItem $env:RUNNER_TEMP -Filter 'profile-*' -Directory)
@@ -1773,7 +1808,7 @@ jobs:
           }
           $took = [Math]::Round(((Get-Date) - $began).TotalSeconds, 1)
           Write-Host "checked $($profiles.Count) profiles: $files files, $([Math]::Round($bytes / 1MB)) MB, in $took s ($held still held by a web view, left out)"
-          foreach ($k in @('prefs.json', 'storage.json', 'flashcards.json', 'login.bin', 'answers', 'vault.key')) { Write-Host "  $k sealed: $([int]$seen[$k])" }
+          foreach ($k in @('prefs.json', 'storage.json', 'flashcards.json', 'community-tools.json', 'login.bin', 'answers', 'vault.key')) { Write-Host "  $k sealed: $([int]$seen[$k])" }
           # (each start's vault, as its log says: made or opened, and whether the TPM took its key)
           $profiles | ForEach-Object { $l = Join-Path $_.FullName 'simpl.log'; if (Test-Path $l) { Select-String -Path $l -Pattern ' vault: ' | ForEach-Object { ($_.Line -replace '^\S+ ', '') -replace '\d+ ms', 'n ms' } } } | Sort-Object -Unique | ForEach-Object { Write-Host "  $_" }
           if ([int]$seen['storage.json'] -eq 0 -or [int]$seen['answers'] -eq 0 -or [int]$seen['vault.key'] -eq 0) { $bad.Add("nothing to check: no storage.json, kept answer or vault.key in this part's profiles") }

@@ -1,3 +1,7 @@
+**What's new in 0.3.105**
+
+- **Community tools** — the Tools page has a Community section: Browse Community lists the small tools other students made and shared (Ohm's law, a tip splitter, a reading-time counter…), each working right there as a preview. Add keeps one on your Tools page; it opens like Simpl's own tools, remembers the numbers you put in, and works with no connection. Remove it from its tile's menu.
+
 **What's new in 0.3.104**
 
 - **Share your theme** — Appearance ▸ Community has a Share yours tile: name your theme (and sign it if you like) and it goes to Simpl Community, where it shows once it's been looked at.

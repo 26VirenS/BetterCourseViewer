@@ -26,6 +26,9 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.105", "2026-11-01",
+            ("new", "Community Tools", "Add tools other students made, from the Tools page."),
+            ("new", "Kept and Offline", "Added tools remember your numbers and work offline.")),
         R("0.3.104", "2026-11-01", ("new", "Share Your Theme", "Send your theme to Simpl Community from Appearance.")),
         R("0.3.103", "2026-10-31",
             ("fixed", "Never Stuck Updating", "Every PC gets the newest version, betas included."),

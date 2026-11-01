@@ -67,8 +67,9 @@ public static class ToolsPins
 /// timer, citations, Grade needed, the Word Counter), Math &amp; science (the calculators, the unit converter, Statistics, the Matrix Calculator), Files (the file converter,
 /// Merge &amp; split PDFs, the PDF annotator, Image to text), Chemistry (the Periodic Table, Lewis Structures, the Molecule
 /// Builder, Atoms &amp; Orbitals and the calculators: Tools/Chemistry/ChemTools.cs), Physics (Kinematics &amp; Projectiles and
-/// the rest: Tools/Physics/PhysTools.cs) and Biology (the biology toolkit's ten, Tools/Biology). A tile opens its tool in a
-/// popup over this page (Tools/ToolHost.cs, ToolPopup), the page and the rest of the window still at hand under it.
+/// the rest: Tools/Physics/PhysTools.cs) and Biology (the biology toolkit's ten, Tools/Biology) — and (0.3.105) Community:
+/// the Simpl Community tools the student added (Tools/Community), and a tile to browse for more. A tile opens its tool in
+/// a popup over this page (Tools/ToolHost.cs, ToolPopup), the page and the rest of the window still at hand under it.
 /// </summary>
 public sealed class ToolsScreen : Screen
 {
@@ -159,6 +160,14 @@ public sealed class ToolsScreen : Screen
         // (a pin changed anywhere — here, a sheet, the title bar — shows on the tiles while the page is up)
         ToolsPins.Changed -= PinsChanged;
         ToolsPins.Changed += PinsChanged;
+        // (0.3.105) the Community tools added or removed — from the browser, a tile's menu — show in their section at once
+        Simpl.Tools.CommunityTools.Changed -= CommunityChanged;
+        Simpl.Tools.CommunityTools.Changed += CommunityChanged;
+        // (the screenshot suite: --community-add s-ohms adds that Community tool as Add does, --community-open opens it
+        //  once it is in; --community-browse yes|science|"tip" opens the browser over this page, at that group or search)
+        _ = Simpl.Tools.CommunityTools.OnLaunch(engine);
+        if (Launch.Take("", "community-browse") is { Length: > 0 } browse)
+            Application.Current.Dispatcher.BeginInvoke(() => Simpl.Tools.CommunityBrowser.Show(engine, null, browse), System.Windows.Threading.DispatcherPriority.Loaded);
         // (the screenshot suite: --tool calc opens the Calculator in its popup over this page, as the Mac's -SimplTool)
         if (Launch.Take("", "tool") is { Length: > 0 } k && Kinds.FirstOrDefault(t => t.Key == k) is { } kind)
             Application.Current.Dispatcher.BeginInvoke(() => OpenTool(engine, kind), System.Windows.Threading.DispatcherPriority.Loaded);
@@ -178,6 +187,7 @@ public sealed class ToolsScreen : Screen
     {
         base.Hide();
         ToolsPins.Changed -= PinsChanged;
+        Simpl.Tools.CommunityTools.Changed -= CommunityChanged;
         clock.Stop();
         if (watched != null) { watched.Changed -= TimerChanged; watched = null; }
     }
@@ -215,12 +225,17 @@ public sealed class ToolsScreen : Screen
         var biology = Heading("Biology", "Cells, DNA, genes and biomolecules in 3D, and the maths of crosses, populations and the lab.");
         page.Children.Add(biology);
         page.Children.Add(new MoreGrid(TileWidth, 16, Simpl.Tools.BioTools.Kinds.Select(k2 => (UIElement)Tile(k2)), stretch: true));
+        // (0.3.105) Simpl Community: the tools added from it and a tile to browse for more — there with none added too
+        var community = Heading("Community", "Tools other students made and shared in Simpl Community. Add one and it stays here, working offline too.");
+        page.Children.Add(community);
+        communityHost = new ContentControl { Focusable = false, HorizontalContentAlignment = HorizontalAlignment.Stretch, Content = CommunityTiles() };
+        page.Children.Add(communityHost);
         var sv = new ScrollViewer { Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false };
         sv.SizeChanged += (_, _) => sv.Padding = sv.ActualWidth < 560 ? new Thickness(20, 0, 20, 32) : new Thickness(40, 0, 40, 40);
         sv.Padding = new Thickness(40, 0, 40, 40);
         // (the screenshot suite: --tools-scroll chemistry, physics or biology, the page scrolled to that section, as the
         //  Mac's -SimplToolsScroll)
-        var scrollTo = Launch.Take("", "tools-scroll")?.Trim().ToLowerInvariant() switch { "chemistry" => chemistry, "physics" => physics, "biology" => biology, _ => null };
+        var scrollTo = Launch.Take("", "tools-scroll")?.Trim().ToLowerInvariant() switch { "chemistry" => chemistry, "physics" => physics, "biology" => biology, "community" => community, _ => null };
         if (scrollTo != null)
             sv.Loaded += (_, _) => sv.Dispatcher.BeginInvoke(() => sv.ScrollToVerticalOffset(Math.Max(0, scrollTo.TranslatePoint(new Point(0, 0), page).Y - 8)),
                 System.Windows.Threading.DispatcherPriority.Loaded);
@@ -257,6 +272,79 @@ public sealed class ToolsScreen : Screen
         var pin = Pin(kind, on);
         if (kind.Key == "graph") Shell.Tour.Mark(pin, Shell.TourSpot.ToolPin);
         return new Grid { Children = { card, pin } };
+    }
+
+    // ---- (0.3.105) Simpl Community ----
+
+    private ContentControl? communityHost;
+    /// <summary>The Community tools the section shows (their ids and versions), so it is drawn again only when they change.</summary>
+    private string communityDrawn = "";
+
+    private static string CommunityNow() => string.Join(",", Simpl.Tools.CommunityTools.Added.Select(t => $"{t.Id}@{t.Version}"));
+
+    /// <summary>A Community tool added or removed: its section drawn again where it is (the page keeps its scroll).</summary>
+    private void CommunityChanged()
+    {
+        if (communityHost == null || CommunityNow() == communityDrawn) return;
+        communityHost.Content = CommunityTiles();
+        Support.Shot.Moved();
+    }
+
+    /// <summary>The Community tools added, a tile each, and Browse Community after them.</summary>
+    private FrameworkElement CommunityTiles()
+    {
+        communityDrawn = CommunityNow();
+        var tiles = Simpl.Tools.CommunityTools.Added.Select(t => (UIElement)CommunityTile(t)).Append(BrowseTile()).ToList();
+        if (Launch.IsDevelopment || Support.Shot.Asked) Support.Log.Write($"tools: community section shows {tiles.Count - 1} added");
+        return new MoreGrid(TileWidth, 16, tiles, stretch: true);
+    }
+
+    /// <summary>
+    /// A Community tool's tile, as Simpl's own are — its symbol on a wash of its colour, its name, its line, who made it —
+    /// with no pin (the title bar's pins are Simpl's own tools): its corner's ⋯, and its context menu, open it or remove it.
+    /// </summary>
+    private FrameworkElement CommunityTile(Simpl.Tools.CommunityTool t)
+    {
+        var kind = Simpl.Tools.CommunityTools.Kind(t);
+        var by = t.Maker.Length > 0 ? $"by {t.Maker}" : "Simpl Community";
+        var words = K.V(4, K.Wrapped(kind.Name, Ty.BodyStrong, maxLines: 2).Margin(0, 0, 36, 0), K.Wrapped(kind.Note, Ty.Body, B.Text2), K.Text(by, Ty.Caption, B.Text3));
+        var g = K.Columns("auto, *", K.IconTile(kind.Symbol, kind.Color, 44).Align(HorizontalAlignment.Left, VerticalAlignment.Top).Margin(0, 0, 14, 0).Col(0), words.Col(1));
+        var card = K.CardButton(g, () => OpenTool(engine, kind), 8, new Thickness(16));
+        card.VerticalContentAlignment = VerticalAlignment.Top;
+        card.MinHeight = 84;
+        System.Windows.Automation.AutomationProperties.SetName(card, $"{kind.Name}. {kind.Note} From Simpl Community, {by}.");
+        ContextMenu Menu() => MoreKit.Menu(
+            ("Open", SymbolRegular.Open24, () => OpenTool(engine, kind)),
+            null,
+            ("Remove…", SymbolRegular.Delete24, () => AskRemove(t)));
+        card.ContextMenu = Menu();
+        Button? more = null;
+        more = K.IconButton(SymbolRegular.MoreHorizontal20, () => MoreKit.Open(Menu(), more!), $"More for {kind.Name}", 16, 32);
+        more.HorizontalAlignment = HorizontalAlignment.Right;
+        more.VerticalAlignment = VerticalAlignment.Top;
+        more.Margin = new Thickness(0, 10, 10, 0);
+        return new Grid { Children = { card, more } };
+    }
+
+    /// <summary>A Community tool taken off the page, once the student says so: its values forgotten with it.</summary>
+    private void AskRemove(Simpl.Tools.CommunityTool t)
+    {
+        if (t.Id is not { } id) return;
+        Shell.Dialogs.Confirm(View != null ? Window.GetWindow(View) : null, $"Remove “{t.Name}”?",
+            "It comes off your Tools page, and the values you put in it are forgotten. You can add it again from Simpl Community.",
+            "Remove", () => Simpl.Tools.CommunityTools.Remove(id));
+    }
+
+    /// <summary>The tile that opens Simpl Community's browser.</summary>
+    private FrameworkElement BrowseTile()
+    {
+        var words = K.V(4, K.Wrapped("Browse Community", Ty.BodyStrong, maxLines: 2), K.Wrapped("Find tools other students made, and add them here.", Ty.Body, B.Text2));
+        var g = K.Columns("auto, *", K.IconTile(SymbolRegular.PeopleCommunity24, Appearance.Accent, 44).Align(HorizontalAlignment.Left, VerticalAlignment.Top).Margin(0, 0, 14, 0).Col(0), words.Col(1));
+        var card = K.CardButton(g, () => Simpl.Tools.CommunityBrowser.Show(engine, View != null ? Window.GetWindow(View) : null), 8, new Thickness(16));
+        card.VerticalContentAlignment = VerticalAlignment.Top;
+        card.MinHeight = 84;
+        System.Windows.Automation.AutomationProperties.SetName(card, "Browse Community. Find tools other students made, and add them here.");
+        return card;
     }
 
     /// <summary>A tile's pin: filled in the tool's colour while it is pinned.</summary>

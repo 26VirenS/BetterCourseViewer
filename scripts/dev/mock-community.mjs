@@ -3,7 +3,17 @@
 // passcode 'mock-passcode'; and, for the suites alone, /__mock/community/approve-all (what is waiting, approved) and
 // /__mock/community/pending (what is, each with the places whose photos are kept). The iPhone app's test school, made
 // from the mock, leaves it out (scripts/dev/make-test-school.mjs).
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { handleCommunity } from '../../site/src/community.js';
+
+// (Community tools, docs/community-tools.md) the gallery's tools — GET /api/community/tools ({ ok, tools }) and
+// /api/community/tools/<id> ({ ok, tool }): the site's own handler's, with the fixture's beside them
+// (scripts/dev/fixtures/community-tools.json: two students' tools, one in a later format, and Simpl's starters — those
+// the site already has are its own), so the apps' browsers are pictured over the same gallery, and add from it, whether
+// or not the site's handler has tools yet
+const fixtureTools = () => JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'community-tools.json'), 'utf8')).tools;
 
 const store = new Map();
 const kv = {
@@ -30,6 +40,21 @@ export async function communityMock(req, res, url) {
     return send({ ok: true, pending: recs.map((r) => ({ ...r, photos: [...store.keys()].filter((k) => k.startsWith(`photo:${r.id}:`)).map((k) => k.split(':')[2]).sort() })) });
   }
   const r = await handleCommunity(new Request(url.href, { method: req.method, headers: req.headers, body: ['GET', 'HEAD'].includes(req.method) ? undefined : Buffer.concat(chunks), duplex: 'half' }), { COMMUNITY: kv, COMMUNITY_KEY: 'mock-passcode' });
+  const tools = req.method === 'GET' && /^\/api\/community\/tools(?:\/([a-z0-9-]{3,24}))?$/.exec(url.pathname);
+  if (tools) {
+    let site = null;
+    try { site = await r.clone().json(); } catch { /* not JSON: the site has no such endpoint yet */ }
+    const fixture = fixtureTools();
+    if (!tools[1]) {
+      const theirs = r.ok && Array.isArray(site?.tools) ? site.tools : [];
+      return send({ ok: true, tools: [...theirs, ...fixture.filter((t) => !theirs.some((s) => s.id === t.id))] });
+    }
+    if (!(r.ok && site?.tool)) {
+      const tool = fixture.find((t) => t.id === tools[1]);
+      if (!tool) { res.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); return void res.end(JSON.stringify({ ok: false, code: 'SC-C-404', message: 'No such tool.' })); }
+      return send({ ok: true, tool });
+    }
+  }
   res.writeHead(r.status, Object.fromEntries(r.headers));
   res.end(Buffer.from(await r.arrayBuffer()));
 }
