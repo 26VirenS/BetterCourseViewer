@@ -779,9 +779,12 @@ final class Engine: ObservableObject, ShellListener {
     }
 
     /// (1.3.78) The page's answer to a call, as JSON data (its error thrown) — a read asked again while it is on its way
-    /// is not asked twice: whoever asks waits for the same answer.
+    /// is not asked twice: whoever asks waits for the same answer. Only one asked since the last thing done (the memo's
+    /// generation): a read on its way from before a tick or a hand-in answers as things were before it, and the screen
+    /// asking after it was given that answer, held as fresh for a minute — the row just ticked shown undone again.
     private func answer(_ name: String, _ args: [String: Any], shared: Bool) async throws -> Data {
-        guard shared, let key = AnswerMemo.callKey(name, args) else { return try await ask(name, args) }
+        guard shared, let call = AnswerMemo.callKey(name, args) else { return try await ask(name, args) }
+        let key = "\(memo.generation)|\(call)"
         if let running = inflight[key] { return try await running.value }
         let task = Task { try await self.ask(name, args) }
         inflight[key] = task
