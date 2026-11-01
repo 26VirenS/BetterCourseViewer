@@ -1623,8 +1623,10 @@ struct CalendarView: View {
                                         }
                                         return
                                     }
+                                    // (whole days by the calendar, then the minutes: a move across a change of the clocks
+                                    //  keeps the time it was let go at, as a row from To Do is planned — PlanMove.swift)
                                     guard d.days != 0 || d.minutes != 0, let start = PreviewFormat.date(item.ev.date),
-                                          let moved = cal.date(byAdding: .minute, value: d.days * 24 * 60 + d.minutes, to: start) else {
+                                          let moved = PlanMove.moved(start, days: d.days, minutes: d.minutes, in: cal) else {
                                         withAnimation(reduceMotion ? nil : Self.settle) { // (back where it was)
                                             planDrag = nil
                                             planFollow.clear()

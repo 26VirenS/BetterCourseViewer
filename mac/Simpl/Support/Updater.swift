@@ -209,9 +209,16 @@ final class Updater: ObservableObject {
     }
 
     private func tick() {
-        // (1.3.72) a Critical Update that failed (no network, a download cut off) is tried again at each tick (1.3.194:
-        // every half minute)
-        if criticalNotice != nil, case .failed = state { check() }
+        // (1.3.72) a Critical Update that failed (no network, a download cut off) is tried again at the next tick (1.3.194:
+        // half a minute on) — then each try waits twice as long as the one before, ten minutes at most: one that downloads
+        // whole but cannot go in (a checksum or a signature that does not match, a copy that cannot be replaced) was
+        // downloaded, unpacked and checked again every half minute for as long as Simpl ran
+        if criticalNotice != nil, case .failed = state,
+           Date().timeIntervalSince(criticalTried) >= min(600, lookInterval * pow(2, Double(min(criticalTries, 5)))) {
+            criticalTries += 1
+            criticalTried = Date()
+            check()
+        }
         lookIfDue()
         installIfQuiet()
         forceIfDue()
@@ -523,6 +530,9 @@ final class Updater: ObservableObject {
 
     /// (1.3.72) A Critical Update under way: its version, for the notice over the window.
     @Published private(set) var criticalNotice: String?
+    /// A Critical Update that failed, tried again (`tick`): how many times this run, and when last.
+    private var criticalTries = 0
+    private var criticalTried = Date.distantPast
 
     /// An update that came by itself goes in when nothing holds it back: no quiz or tool open (`quiet`), updates not
     /// paused, and (1.3.86) newer than any version put back replaced. A Critical Update goes in whatever holds it — but

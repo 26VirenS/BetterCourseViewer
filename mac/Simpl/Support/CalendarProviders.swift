@@ -519,6 +519,7 @@ final class GoogleCalendar: CalendarService {
         ]
         if e.isAllDay, let d = e.day {
             let f = DateFormatter()
+            f.locale = Locale(identifier: "en_US_POSIX") // (the date as Google reads it, whatever the Mac's language and digits)
             f.calendar = Calendar(identifier: .gregorian)
             f.dateFormat = "yyyy-MM-dd"
             b["start"] = ["date": d]
@@ -646,6 +647,7 @@ final class OutlookCalendar: CalendarService {
         guard let span = e.span else { return nil }
         let zone = TimeZone.current
         let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX") // (24-hour and Western digits, whatever the Mac is set to: Graph reads no other)
         f.calendar = Calendar(identifier: .gregorian)
         f.timeZone = zone
         f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
@@ -738,6 +740,7 @@ final class AppleCalendar: CalendarService {
         guard let c = store.calendar(withIdentifier: calendar) else { throw CalendarError.notFound }
         let p = store.predicateForEvents(withStart: from, end: to, calendars: [c])
         let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX") // (a day as the page names it: "2026-10-27", whatever the Mac's digits)
         f.calendar = Calendar(identifier: .gregorian)
         f.dateFormat = "yyyy-MM-dd"
         return store.events(matching: p).prefix(4000).compactMap { e -> PulledEvent? in

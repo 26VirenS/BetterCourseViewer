@@ -547,6 +547,8 @@ final class Loader<T: Decodable>: ObservableObject {
     let marks = LiveMarks()
     private(set) var readName: String?
     private var readArgs: [String: Any] = [:]
+    /// The reads asked of the engine so far: each answer is shown only while it is the latest's.
+    private var reads = 0
 
     func load(_ engine: Engine, _ name: String, _ args: [String: Any] = [:], animated: Bool = false) async {
         readName = name
@@ -570,8 +572,13 @@ final class Loader<T: Decodable>: ObservableObject {
         }
         // (answered moments ago, and nothing done since: nothing to ask)
         if !animated, settled, data != nil, !AnswerMemo.sets(name, args), engine.recent(name, args, as: T.self)?.fresh == true { return }
+        // (only the latest read asked is shown: one from before an action, or To Do's grouping before the one just
+        //  picked, coming back after it never puts back what it said)
+        reads += 1
+        let read = reads
         do {
             let d = try await engine.read(name, args, as: T.self)
+            guard read == reads else { return }
             if animated || (!settled && data != nil) {
                 // (the live answer over the kept one, or this session's earlier one: what changed moves to where it is now)
                 withAnimation(Motion.gentle) {
@@ -588,6 +595,7 @@ final class Loader<T: Decodable>: ObservableObject {
             settled = true
             marks.shown(name, args, by: engine)
         } catch {
+            guard read == reads else { return }
             if data == nil { self.error = error.localizedDescription }
         }
     }

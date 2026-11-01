@@ -267,6 +267,10 @@ final class CalendarAccounts: ObservableObject {
     private func push(_ events: [PushEvent], via service: CalendarService, account id: String, into cal: String) async throws -> Int {
         var book = readBook(id)
         if book.calendar != cal { book = PushedBook(calendar: cal, events: [:]) } // (a new calendar: everything again)
+        // (kept however this ends — a write the account refuses, a rate limit, the network gone part way: what was written
+        //  before it is in the book, or the next sync wrote each again as a new event, the student's calendar filling with
+        //  copies every fifteen minutes)
+        defer { saveBook(book, id) }
         var wanted: [String: PushEvent] = [:]
         for e in events where e.span != nil { wanted[e.uid] = e }
         var written = 0
@@ -282,7 +286,6 @@ final class CalendarAccounts: ObservableObject {
             try await service.remove(had.id, from: cal)
             book.events[uid] = nil
         }
-        saveBook(book, id)
         return wanted.count
     }
 

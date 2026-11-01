@@ -262,10 +262,11 @@ final class FilePreview: NSObject, ObservableObject, WKDownloadDelegate {
         if Thread.isMainThread { work() } else { DispatchQueue.main.async(execute: work) }
     }
 
-    /// A name Finder can hold.
+    /// A name Finder can hold — and never "." or "..", which name the folder it would go in or the one above it (a
+    /// school's server says what a file is called: one called ".." was aimed above Downloads, not into it).
     private static func clean(_ name: String) -> String {
         let s = name.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-").trimmingCharacters(in: .whitespaces)
-        return s.isEmpty ? "File" : s
+        return s.isEmpty || s.allSatisfy({ $0 == "." }) ? "File" : s
     }
 
     private static var downloads: URL {

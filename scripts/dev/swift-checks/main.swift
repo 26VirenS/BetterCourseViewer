@@ -10,13 +10,14 @@ import simd
 // projectiles, vectors, the circuit solver), (tools) every file in mac/Simpl/Tools/Model (the study and maths tools'
 // arithmetic: the Word Counter's, Statistics' and the Matrix Calculator's, checked by StudyChecks.swift beside this
 // file), (tools) every file in mac/Simpl/Tools/Planner/Model (the Study Planner's planner) and
-// mac/Simpl/Engine/LivePlan.swift (1.3.80: the live checks' plan, fingerprint and comparison) — and run, in seconds,
-// by the Mac app's workflow (Models). By hand on a Mac: swiftc -o /tmp/model-checks
+// mac/Simpl/Engine/LivePlan.swift (1.3.80: the live checks' plan, fingerprint and comparison) and
+// mac/Simpl/Screens/PlanMove.swift (where a plan dragged on the week lands, across a change of the clocks) — and run,
+// in seconds, by the Mac app's workflow (Models). By hand on a Mac: swiftc -o /tmp/model-checks
 // mac/Simpl/Tools/{PeriodicData,PeriodicExtraData,MoleculeShape}.swift mac/Simpl/Tools/Biology/Model/*.swift
 // mac/Simpl/Tools/Chemistry/Model/*.swift mac/Simpl/Tools/Physics/Model/*.swift mac/Simpl/Tools/Model/*.swift
-// mac/Simpl/Tools/Planner/Model/*.swift mac/Simpl/Engine/LivePlan.swift scripts/dev/swift-checks/main.swift
-// scripts/dev/swift-checks/StudyChecks.swift && /tmp/model-checks. A failed check is printed with what was found, and
-// the exit code is the number that failed.
+// mac/Simpl/Tools/Planner/Model/*.swift mac/Simpl/Engine/LivePlan.swift mac/Simpl/Screens/PlanMove.swift
+// scripts/dev/swift-checks/main.swift scripts/dev/swift-checks/StudyChecks.swift && /tmp/model-checks. A failed check
+// is printed with what was found, and the exit code is the number that failed.
 
 var passed = 0, failed = 0
 func check(_ ok: Bool, _ what: String) {
@@ -555,6 +556,38 @@ let change = LivePlan.devChange("done:8"), plainChange = LivePlan.devChange("tas
 check(change?.what == "done" && change?.after == 8 && plainChange?.what == "task" && plainChange?.after == 8
       && LivePlan.devChange(":8") == nil && LivePlan.devChange("done:soon") == nil && LivePlan.devChange(nil) == nil,
       "the screenshot suite's change to the mock school (-SimplLiveChange done:8)")
+
+// ---- a plan moved on the week -----------------------------------------------------------------------------------
+// (mac/Simpl/Screens/PlanMove.swift: a plan's block dragged to another day keeps its time of day, across a change of the
+// clocks too — whole days by the calendar, never 24 hours each)
+print("a plan moved on the week")
+var newYork = Calendar(identifier: .gregorian)
+newYork.timeZone = TimeZone(identifier: "America/New_York") ?? newYork.timeZone
+func newYorkTime(_ month: Int, _ day: Int, _ hour: Int) -> Date? {
+    newYork.date(from: DateComponents(year: 2026, month: month, day: day, hour: hour, minute: 0))
+}
+func wallClock(_ d: Date?) -> String {
+    guard let d else { return "none" }
+    let c = newYork.dateComponents([.month, .day, .hour, .minute], from: d)
+    let h = c.hour ?? 0, m = c.minute ?? 0
+    return "\(c.month ?? 0)/\(c.day ?? 0) \(h < 10 ? "0" : "")\(h):\(m < 10 ? "0" : "")\(m)"
+}
+if let sat = newYorkTime(10, 31, 15), let springSat = newYorkTime(3, 7, 15), let fri = newYorkTime(10, 30, 9), let mon = newYorkTime(11, 2, 15) {
+    let sunday = PlanMove.moved(sat, days: 1, minutes: 0, in: newYork)
+    check(wallClock(sunday) == "11/1 15:00" && sunday.map { $0.timeIntervalSince(sat) } == TimeInterval(25 * 3600),
+          "Saturday 3 PM dragged to Sunday, the clocks going back that night, is Sunday 3 PM, 25 hours on (\(wallClock(sunday)))")
+    let spring = PlanMove.moved(springSat, days: 1, minutes: 0, in: newYork)
+    check(wallClock(spring) == "3/8 15:00" && spring.map { $0.timeIntervalSince(springSat) } == TimeInterval(23 * 3600),
+          "and over the night the clocks go forward, 23 hours on (\(wallClock(spring)))")
+    let later = PlanMove.moved(fri, days: 2, minutes: 90, in: newYork)
+    check(wallClock(later) == "11/1 10:30", "two days on and an hour and a half later, at that time of day (\(wallClock(later)))")
+    let back = PlanMove.moved(mon, days: -2, minutes: 0, in: newYork)
+    check(wallClock(back) == "10/31 15:00", "back over the change, the same (\(wallClock(back)))")
+    let earlier = PlanMove.moved(sat, days: 0, minutes: -45, in: newYork)
+    check(wallClock(earlier) == "10/31 14:15", "within its day, by the minutes alone (\(wallClock(earlier)))")
+} else {
+    check(false, "New York's times made")
+}
 
 // ---- the 3D views' framing (1.3.80) ------------------------------------------------------------------------------
 // (SceneFill: a model put where it says, seen through a 40° camera, fills 84% of its view's limiting side — the height,
