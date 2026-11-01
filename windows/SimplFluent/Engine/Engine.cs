@@ -954,7 +954,14 @@ public sealed partial class Engine : Observable, IShellListener
         var ok = true;
         try
         {
-            if (name == "bcv" && m["msg"] is JsonObject body) answer = await Bridge.Shared.Handle(body, Web);
+            // (the bridge only for the school's own pages, where bridge.js runs: the native channel is on every page in
+            //  the main frame — a single sign-on page's on another host too — and a page there could otherwise read the
+            //  extension's storage, or have Simpl fetch an address of its choosing and read it the answer)
+            if (name == "bcv" && m["msg"] is JsonObject body)
+            {
+                if (!Uri.TryCreate(e.Source, UriKind.Absolute, out var from) || !IsSchool(from)) throw new EngineException("Not the school's page.");
+                answer = await Bridge.Shared.Handle(body, Web);
+            }
             else if (name == "bcvLogin" && m["msg"] is JsonObject said) Login.Said(said, e.Source); // (the page's own address, as WebView2 knows it)
         }
         catch (Exception ex)
