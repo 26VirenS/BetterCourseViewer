@@ -2396,6 +2396,20 @@ try {
   await page.waitForSelector('.bcv-gpa__value', { timeout: 15000 });
   await page.waitForTimeout(600);
   check((await page.$('#bcv-tour')) === null, 'and it does not come back');
+  // (E34) Grades' own placeholder while it loads: the real header at once, and under it the page's shapes as they will stand
+  // (the GPA card, the stats and the tracking card beside it, the course cards) — the header stays put as the page lands
+  await mockConfig({ apiDelay: { assignment_groups: 1500 } });
+  await page.reload();
+  const rectOf = 'const r = (e) => { if (!e) return null; const b = e.getBoundingClientRect(); return { x: Math.round(b.left), y: Math.round(b.top), w: Math.round(b.width), h: Math.round(b.height) }; };';
+  const skelAt = await page.waitForFunction(new Function(`${rectOf} const s = document.querySelector('#bcv-main > .bcv-screen--skel'); const h1 = s && s.querySelector('.bcv-h1'); const hero = s && s.querySelector('.bcv-gpa__skhero'); if (!h1 || !hero) return null; return { text: h1.textContent, h1: r(h1), hero: r(hero), side: !!s.querySelector('.bcv-gpa__top > .bcv-gpa__side > .bcv-gpa__sktrack'), cards: s.querySelectorAll('.bcv-skel__card').length, generic: !!s.querySelector(':scope > .bcv-body > .bcv-skel--cards') };`), null, { timeout: 8000, polling: 50 }).then((hd) => hd.jsonValue()).catch(() => null);
+  await page.waitForSelector('#bcv-main > .bcv-screen--gpa:not(.bcv-screen--skel) .bcv-gpa__hero', { timeout: 15000 });
+  const landedH1 = await page.evaluate(new Function(`${rectOf} const s = document.querySelector('#bcv-main > .bcv-screen--gpa'); return { h1: r(s.querySelector('.bcv-h1')), still: s.classList.contains('bcv-screen--landed') };`));
+  await mockConfig({ apiDelay: null });
+  await page.waitForTimeout(400); // (the cards' own entrance done)
+  const landedHero = await page.evaluate(new Function(`${rectOf} return r(document.querySelector('#bcv-main .bcv-gpa__hero'));`));
+  check(!!skelAt && skelAt.text === 'Grades' && skelAt.side && skelAt.cards === 6 && !skelAt.generic && landedH1.still && skelAt.h1.x === landedH1.h1.x && Math.abs(skelAt.h1.y - landedH1.h1.y) <= 1
+    && Math.abs(skelAt.hero.x - landedHero.x) <= 1 && Math.abs(skelAt.hero.y - landedHero.y) <= 2 && Math.abs(skelAt.hero.w - landedHero.w) <= 2 && Math.abs(skelAt.hero.h - landedHero.h) <= 40,
+    `Grades loads behind its own placeholder: the header drawn at once (and still where it was as the page lands), the GPA card's shape where the card comes, the stats and tracking card beside it, six course cards: ${JSON.stringify({ skelAt, landedH1, landedHero })}`);
   await rolled(); // the GPA rolls up to its value on a fresh draw: read it once it has landed
   check(page.url() === `${BASE}/grades` && (await texts('.bcv-h1'))[0] === 'Grades' && (await texts('.bcv-head__sub'))[0] === 'Fall 2026 · 5 courses · 4 with grades so far', `grades panel header: ${(await texts('.bcv-head__sub'))[0]}`);
   // (E16) tracking off: one ask to turn it on — a slim Trend and momentum card beside the GPA card — and no banner, no line in

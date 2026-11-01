@@ -112,6 +112,7 @@ html.bcv-phone .bcv-main > .bcv-screen--fwd { animation: bcv-push-in var(--bcv-t
 html.bcv-phone .bcv-main > .bcv-screen--back { animation: bcv-pop-in var(--bcv-t-phone) var(--bcv-spring-phone) both; }
 html.bcv-phone .bcv-main > .bcv-screen--tab { animation: bcv-fade-in var(--bcv-t-scrim) var(--bcv-spring-scrim) both; }
 .bcv-main > .bcv-screen--skel { animation: none; } /* the placeholder does not rise; the real screen does when it lands */
+.bcv-main > .bcv-screen--landed { animation: none; } /* (E34) over a placeholder that drew its header (gpa.js skeleton): the header was already there, what is under it comes in on its own */
 .bcv-main > .bcv-screen--still { animation: none; } /* a screen drawn again in place (ui.still): it is already here, so it does not arrive */
 /* The move as a view transition (app.js swap): the screen's column (#bcv-main, or a course's own column within its kept
    header and rail) is the one thing that moves; the rest of the page is its own picture and holds still. The screen left
@@ -222,6 +223,19 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 .bcv-skel__l3 { height: 16px; border-radius: 7px; width: 34%; }
 .bcv-skel__bar { height: 6px; border-radius: 3px; }
 .bcv-skel__btn { height: 34px; border-radius: 17px; }
+/* (E34) Grades' own placeholder (gpa.js skeleton): its header drawn at once, then the page's shapes as they will stand — the
+   GPA card, what stands beside it (the trend, or the two stats and the tracking card), the course cards */
+.bcv-gpa__skel { gap: 16px; }
+.bcv-gpa__sksub { height: 1.2em; justify-content: center; }
+.bcv-gpa__sksub > .bcv-skel__b { width: 270px; max-width: 70%; height: 11px; }
+.bcv-gpa__skhero { flex: 1 1 250px; max-width: 560px; min-width: 0; height: 352px; border-radius: 24px; }
+.bcv-gpa__sktrend { flex: 1 1 330px; min-width: 0; height: 352px; border-radius: 24px; }
+.bcv-gpa__skstat { padding: 15px 16px; border-radius: 18px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); display: flex; flex-direction: column; gap: 9px; }
+.bcv-gpa__skstat > .bcv-skel__l2 { width: 44%; }
+.bcv-gpa__skstat > .bcv-skel__l3 { height: 22px; width: 28%; }
+.bcv-gpa__skstat > .bcv-skel__l1 { width: 62%; }
+.bcv-gpa__side > .bcv-gpa__sktrack { flex: 1 1 auto; min-height: 84px; border-radius: 18px; }
+.bcv-gpa__sktitle { width: 110px; height: 16px; margin: 6px 4px 0; border-radius: 7px; }
 @media (prefers-reduced-motion: reduce) {
   /* screens, sheets, menus, toasts and panels still arrive — as a 150ms fade, nothing moving (a sheet with its scrim,
      not on its own; a screen drawn again in place not at all); data lands on its final value at once; the loading

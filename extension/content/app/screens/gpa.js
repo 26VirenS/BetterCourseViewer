@@ -237,13 +237,38 @@
     };
   }
 
+  // ---- the screen's own placeholder (E34) ------------------------------------------------------------------------
+  /** The header, as the page draws it: Grades, and under it `sub` (a placeholder bar the sub's size while it loads). */
+  const headOf = (sub) => U.el('bcv-head', U.el('bcv-head__in', U.el('bcv-head__row', h('div', {}, [h('h1', { class: 'bcv-h1', text: 'Grades' }), sub]))));
+  /** The page's shapes while it loads, as it will stand: the GPA card and what stands beside it — the trend with
+   *  tracking on, else the two stats and the slim tracking card — Momentum and the stats under them with tracking on,
+   *  the course cards' title, then the cards. Read from what this tab already holds: nothing waited for. */
+  function skeletonParts(tracking = !!store.prefNow?.('gpaTracking')) {
+    const b = (cls) => h('span', { class: `bcv-skel__b ${cls}` });
+    const stat = () => U.el('bcv-gpa__skstat', [b('bcv-skel__l2'), b('bcv-skel__l3'), b('bcv-skel__l1')]);
+    return U.el('bcv-skel bcv-gpa__skel', [
+      U.el('bcv-gpa__top', [
+        b('bcv-gpa__skhero'),
+        tracking ? b('bcv-gpa__sktrend') : U.el('bcv-gpa__side', [stat(), stat(), b('bcv-gpa__sktrack')]),
+      ]),
+      tracking ? U.el('bcv-gpa__stats', [stat(), stat(), stat()]) : null,
+      b('bcv-gpa__sktitle'),
+      U.loading('cards', 6),
+    ].filter(Boolean), { 'aria-hidden': 'true', role: 'presentation' });
+  }
+  /** What the app shows while the page loads (app.js, after 150ms): the real header at once, the page's shapes under it. */
+  function skeleton() {
+    const sub = h('div', { class: 'bcv-head__sub bcv-skel bcv-gpa__sksub', 'aria-hidden': 'true' }, h('span', { class: 'bcv-skel__b' }));
+    return U.el('bcv-screen bcv-screen--gpa bcv-screen--skel bcv-screen--skelhead', [headOf(sub), U.el('bcv-body bcv-body--16', skeletonParts())], { style: { '--w': '1180px' }, 'aria-busy': 'true' });
+  }
+
   async function render(ctx) {
     // a dense screen: fills the column up to the 1180px cap (mockup 7's layout notes)
     const screen = U.el('bcv-screen bcv-screen--gpa', null, { style: { '--w': '1180px' } });
     const sub = U.text('bcv-head__sub', 'Loading…');
     const body = U.el('bcv-body bcv-body--16');
-    screen.append(U.el('bcv-head', U.el('bcv-head__in', U.el('bcv-head__row', h('div', {}, [h('h1', { class: 'bcv-h1', text: 'Grades' }), sub])))), body);
-    body.append(U.loading('cards', 6)); // course-card skeletons: the layout does not jump when the data lands
+    screen.append(headOf(sub), body);
+    body.append(skeletonParts()); // the page's own shapes: the layout does not jump when the data lands
 
     introIfFirst(ctx.app).catch(() => {}); // the first opening: the tour's steps, waiting for the cards as they draw
     await loadScales(); // (2.99.27) each course's own grading scale, where entered
@@ -1203,5 +1228,5 @@
     ]);
   }
 
-  BCV.screens.gpa = { render, courseMath, SCALE, letterFor, pointsFor, targetIndex, prefetch, trendChart, gradedItems, MIN_Y, MAX_Y, scaleOf, hasScale, loadScales, setScale };
+  BCV.screens.gpa = { render, skeleton, courseMath, SCALE, letterFor, pointsFor, targetIndex, prefetch, trendChart, gradedItems, MIN_Y, MAX_Y, scaleOf, hasScale, loadScales, setScale };
 })();
