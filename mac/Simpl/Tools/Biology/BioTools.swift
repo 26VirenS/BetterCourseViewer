@@ -274,7 +274,7 @@ struct BioToolsSection: View {
                     .font(.sCallout)
                     .foregroundStyle(.secondary)
             }
-            LazyVGrid(columns: ToolTile.columns, spacing: 14) {
+            ToolTileRows {
                 ForEach(BioTools.kinds) { k in ToolTile(kind: k) }
             }
         }

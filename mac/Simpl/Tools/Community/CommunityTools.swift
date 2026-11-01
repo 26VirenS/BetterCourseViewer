@@ -337,7 +337,7 @@ struct CommunityToolsSection: View {
                     .font(.sCallout)
                     .foregroundStyle(.secondary)
             }
-            LazyVGrid(columns: ToolTile.columns, spacing: 14) {
+            ToolTileRows {
                 ForEach(store.added, id: \.key) { t in CommunityToolTile(tool: t) }
                 CommunityBrowseTile()
             }
@@ -378,7 +378,7 @@ struct CommunityToolTile: View {
                 Spacer(minLength: 12)
             }
             .padding(16)
-            .frame(maxWidth: .infinity, minHeight: 84, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 84, maxHeight: .infinity, alignment: .topLeading) // (UI review: as tall as its row)
         }
         .buttonStyle(CardButtonStyle(radius: 20))
         .contextMenu {
@@ -419,7 +419,7 @@ struct CommunityBrowseTile: View {
                 Spacer(minLength: 12)
             }
             .padding(16)
-            .frame(maxWidth: .infinity, minHeight: 84, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 84, maxHeight: .infinity, alignment: .topLeading) // (UI review: as tall as its row)
         }
         .buttonStyle(CardButtonStyle(radius: 20))
         .help("Browse the tools shared in Simpl Community")

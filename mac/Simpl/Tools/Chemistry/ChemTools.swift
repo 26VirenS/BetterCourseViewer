@@ -165,7 +165,7 @@ struct ChemToolsSection: View {
                     .font(.sCallout)
                     .foregroundStyle(.secondary)
             }
-            LazyVGrid(columns: ToolTile.columns, spacing: 14) {
+            ToolTileRows {
                 ForEach(ChemTools.kinds) { k in ToolTile(kind: k) }
             }
         }

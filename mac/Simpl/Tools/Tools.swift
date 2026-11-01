@@ -476,15 +476,60 @@ struct ToolGroupSection: View {
             Text(title)
                 .font(.sTitle3)
                 .accessibilityAddTraits(.isHeader)
-            LazyVGrid(columns: ToolTile.columns, spacing: 14) {
+            ToolTileRows {
                 ForEach(kinds) { k in ToolTile(kind: k) }
             }
         }
     }
 }
 
+/// (UI review) The Tools page's tiles in rows: as many columns as the page holds at `minimum` points each — three from
+/// about 900 points of page, two below, as the adaptive grid had them (tools-32) — and every tile in a row as tall as the
+/// row's tallest, so a row reads as one band rather than cards of three heights.
+struct ToolTileRows: Layout {
+    var minimum: CGFloat = 280
+    var spacing: CGFloat = 14
+
+    /// How many columns `width` holds, and how wide each is.
+    private func columns(_ width: CGFloat) -> (count: Int, width: CGFloat) {
+        let n = max(1, Int(((width + spacing) / (minimum + spacing)).rounded(.down)))
+        return (n, max(0, (width - spacing * CGFloat(n - 1)) / CGFloat(n)))
+    }
+
+    /// Each row's height: its tallest tile's, at the column's width.
+    private func rowHeights(_ subviews: Subviews, columns c: (count: Int, width: CGFloat)) -> [CGFloat] {
+        stride(from: 0, to: subviews.count, by: c.count).map { start in
+            subviews[start..<min(start + c.count, subviews.count)]
+                .map { $0.sizeThatFits(ProposedViewSize(width: c.width, height: nil)).height }
+                .max() ?? 0
+        }
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? (minimum * 2 + spacing)
+        let rows = rowHeights(subviews, columns: columns(width))
+        return CGSize(width: width, height: rows.reduce(0, +) + spacing * CGFloat(max(rows.count - 1, 0)))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let c = columns(bounds.width)
+        var y = bounds.minY
+        for (row, height) in rowHeights(subviews, columns: c).enumerated() {
+            for col in 0..<c.count {
+                let i = row * c.count + col
+                guard i < subviews.count else { break }
+                subviews[i].place(at: CGPoint(x: bounds.minX + CGFloat(col) * (c.width + spacing), y: y), anchor: .topLeading,
+                                  proposal: ProposedViewSize(width: c.width, height: height))
+            }
+            y += height + spacing
+        }
+    }
+}
+
 /// A tool's tile: its symbol on a wash of its colour, its name and line, and its pin; the focus timer's says how long is
-/// left while a session goes.
+/// left while a session goes. (UI review) As tall as its row (`ToolTileRows`), and its line takes the tile's whole
+/// width: only its name keeps clear of the pin in the corner, so "Cite in MLA, APA or Chicago." no longer wraps at half
+/// the tile.
 struct ToolTile: View {
     let kind: ToolKind
     @ObservedObject private var tools = ToolsCenter.shared
@@ -492,8 +537,8 @@ struct ToolTile: View {
     /// (1.3.79) The window's engine, for its tool's popup to open over this window.
     @Environment(\.engineLink) private var link
 
-    /// (tools-32) Three across from about 900 points of page, two below.
-    static let columns = [GridItem(.adaptive(minimum: 280), spacing: 14)]
+    /// The room a tile's name leaves at its right for the pin (30 points, and a little air).
+    static let pinRoom: CGFloat = 30
 
     var body: some View {
         Button {
@@ -505,16 +550,18 @@ struct ToolTile: View {
                     Text(kind.name)
                         .font(.sHeadline)
                         .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.trailing, Self.pinRoom)
                     Text(kind.note)
                         .font(.sCallout)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     if kind == .pomo && focus.active { FocusTileLine() }
                 }
-                Spacer(minLength: 36)
+                Spacer(minLength: 0)
             }
             .padding(16)
-            .frame(maxWidth: .infinity, minHeight: 84, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 84, maxHeight: .infinity, alignment: .topLeading)
         }
         .buttonStyle(CardButtonStyle(radius: 20))
         .overlay(alignment: .topTrailing) { pinButton.padding(10) }
