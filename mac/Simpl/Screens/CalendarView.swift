@@ -91,8 +91,8 @@ struct CalendarView: View {
     /// what came of the last one let go.
     @AppStorage(TodoShown.key) private var todoOn = true
     /// (M5) Show To Do pressed while the month had put it away (a window too narrow for To Do beside the month and the
-    /// days' names): kept beside it anyway, until it is hidden or Month is chosen again. (The screenshot suite's
-    /// -SimplTodoKept YES: kept from the start.)
+    /// days' names), or To Do asked for by name (TodoShown.reveal): kept beside it anyway, until it is hidden or Month is
+    /// chosen again. (The screenshot suite's -SimplTodoKept YES: kept from the start.)
     @State private var todoKept = UserDefaults.standard.bool(forKey: "SimplTodoKept")
     @State private var todoDrop: TodoDrop? = CalendarView.shotDrop
     @State private var dayDrop: Date?
@@ -195,6 +195,11 @@ struct CalendarView: View {
         }
         .onAppear(perform: seed)
         .onDisappear { weekScroll.detach() }
+        // (M5) To Do asked for by name (Go ▸ To Do & Calendar, /todo, a new task): kept beside even a narrow month
+        .onAppear { if TodoShown.takeAsked() { todoKept = true } }
+        .onReceive(NotificationCenter.default.publisher(for: TodoShown.askedNote)) { _ in
+            if TodoShown.takeAsked() { todoKept = true }
+        }
         // (1.3.184) a calendar account's calendars read again, shown or hidden: laid over the calendar as they are now
         .onReceive(NotificationCenter.default.publisher(for: .simplCalendarAccountsSynced)) { _ in Task { await load(animated: true) } }
         .overlay(alignment: .topTrailing) {

@@ -926,7 +926,25 @@ enum PopMenu {
 /// next.
 enum TodoShown {
     static let key = "SimplCalTodo"
+    /// (M5) Said as To Do is asked for by name (`reveal`), for the calendar on show to keep To Do beside even a month too
+    /// narrow for both.
+    static let askedNote = Notification.Name("SimplTodoAsked")
+    /// (M5) To Do asked for by name since the calendar last looked: kept beside the month however narrow it is (the
+    /// calendar takes it as it opens, or on `askedNote`).
+    nonisolated(unsafe) static var asked = false
 
-    /// To Do shown beside the calendar from now on (what went to To Do goes to To Do & Calendar).
-    static func reveal() { UserDefaults.standard.set(true, forKey: key) }
+    /// To Do shown beside the calendar from now on (what went to To Do goes to To Do & Calendar) — (M5) and beside the
+    /// month this time even where the month would put it away for its days' room: To Do itself was asked for (Go ▸ To Do
+    /// & Calendar, /todo, a new task, whose composer is in To Do).
+    static func reveal() {
+        UserDefaults.standard.set(true, forKey: key)
+        asked = true
+        NotificationCenter.default.post(name: askedNote, object: nil)
+    }
+
+    /// (M5) Whether To Do was asked for by name since the last look (and it is taken: asked once, kept once).
+    static func takeAsked() -> Bool {
+        defer { asked = false }
+        return asked
+    }
 }
