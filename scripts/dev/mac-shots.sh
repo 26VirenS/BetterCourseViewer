@@ -891,7 +891,7 @@ live_shots() {
   wait_shot
   # (1.3.204: seven checks, not five — To Do & Calendar's checks take turns, To Do's and the calendar's, and with five
   #  the picture could come before To Do was checked again after its new row)
-  PART=$LIVE_PART MODE=light BASE=http://localhost:8810 shoot light-48c-live-todo 50 -SimplLiveEvery 4 -SimplLiveShotAfter 7 -SimplPlace todo -SimplLiveChange task:6
+  PART=$LIVE_PART MODE=light BASE=http://localhost:8810 shoot light-48c-live-todo 50 -SimplLiveEvery 4 -SimplLiveShotAfter 7 -SimplPlace todo -SimplLiveChange task:6 -SimplTodoKept YES
   wait_shot
   # (a course's page at its own pace: every 4 seconds here too, -SimplLiveCourseEvery, ten minutes in the app)
   PART=$LIVE_PART MODE=light BASE=http://localhost:8810 shoot light-48d-live-course 40 -SimplLiveEvery 4 -SimplLiveCourseEvery 4 -SimplLiveShotAfter 3 \
@@ -1172,7 +1172,7 @@ whatif_check() {
   : > "$out"
   line="$(grep -o 'grades what-if: at the page.s foot .*' "$f" 2>/dev/null | tail -1)"
   n="$(printf '%s' "$line" | sed -n 's/.* ends \(-\{0,1\}[0-9]*\) pt above the bar.*/\1/p')"
-  if [ -n "$n" ] && [ "$n" -ge 15 ]; then echo "ok   the last row scrolls clear of What-If's bar ($line)" >> "$out"
+  if [ -n "$n" ] && [ "$n" -ge 15 ] && ! printf '%s' "$line" | grep -q 'not at the foot'; then echo "ok   the last row scrolls clear of What-If's bar ($line)" >> "$out"
   else echo "FAIL the last row stays under What-If's bar (${line:-nothing said})" >> "$out"; fi
   cat "$out"
   if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::what-if: /'; return 1; fi

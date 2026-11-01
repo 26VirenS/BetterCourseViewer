@@ -1951,17 +1951,29 @@ private final class WhatIfFootView: NSView {
     func look() {
         guard !asked, bar > 0, window != nil else { return }
         asked = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+        settle(1, last: -1, wait: 1.5)
+    }
+
+    /// Scrolled to the foot again until the page stops growing under it: rows laid out as they come into sight push the
+    /// foot further down (once scrolled, the page had grown by the time it was measured, and the last row was read under
+    /// the bar). Ten tries at most; then measured, and whether it was at the foot said with it.
+    private func settle(_ tries: Int, last: CGFloat, wait: Double) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [weak self] in
             guard let self, self.window != nil, let sv = self.enclosingScrollView, let doc = sv.documentView else { return }
             let clip = sv.contentView
-            let most = max(0, doc.frame.height - clip.bounds.height)
+            let tall = doc.frame.height
+            let most = max(0, tall - clip.bounds.height)
             clip.scroll(to: NSPoint(x: clip.bounds.minX, y: doc.isFlipped ? most : 0))
             sv.reflectScrolledClipView(clip)
+            if abs(tall - last) > 0.5 && tries < 10 { self.settle(tries + 1, last: tall, wait: 0.4); return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                guard let self, self.window != nil, let sv = self.enclosingScrollView else { return }
+                guard let self, self.window != nil, let sv = self.enclosingScrollView, let doc = sv.documentView else { return }
+                let clip = sv.contentView
+                let atFoot = doc.isFlipped ? clip.bounds.maxY >= doc.frame.height - 1 : clip.bounds.minY <= 1
                 let foot = sv.convert(sv.bounds, to: nil).minY
                 let rowEnd = self.convert(self.bounds, to: nil).maxY + 22
-                NSLog("[Simpl] grades what-if: at the page's foot the last row ends %ld pt above the bar", Int((rowEnd - (foot + self.bar)).rounded()))
+                NSLog("[Simpl] grades what-if: at the page's foot the last row ends %ld pt above the bar (%@, %ld scrolls)",
+                      Int((rowEnd - (foot + self.bar)).rounded()), atFoot ? "at the foot" : "not at the foot", tries)
             }
         }
     }
