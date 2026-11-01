@@ -9,15 +9,18 @@ import simd
 // the balancer), (tools) every file in mac/Simpl/Tools/Physics/Model (the physics tools' arithmetic: kinematics,
 // projectiles, vectors, the circuit solver), (tools) every file in mac/Simpl/Tools/Model (the study and maths tools'
 // arithmetic: the Word Counter's, Statistics' and the Matrix Calculator's, checked by StudyChecks.swift beside this
-// file), (tools) every file in mac/Simpl/Tools/Planner/Model (the Study Planner's planner) and
-// mac/Simpl/Engine/LivePlan.swift (1.3.80: the live checks' plan, fingerprint and comparison) and
+// file; (1.3.211) and Simpl Community tools' format, checked by CommunityToolChecks.swift against the reference's
+// answers, docs/community-tools-vectors.json), (tools) every file in mac/Simpl/Tools/Planner/Model (the Study Planner's
+// planner) and mac/Simpl/Engine/LivePlan.swift (1.3.80: the live checks' plan, fingerprint and comparison) and
 // mac/Simpl/Screens/PlanMove.swift (where a plan dragged on the week lands, across a change of the clocks) — and run,
 // in seconds, by the Mac app's workflow (Models). By hand on a Mac: swiftc -o /tmp/model-checks
 // mac/Simpl/Tools/{PeriodicData,PeriodicExtraData,MoleculeShape}.swift mac/Simpl/Tools/Biology/Model/*.swift
 // mac/Simpl/Tools/Chemistry/Model/*.swift mac/Simpl/Tools/Physics/Model/*.swift mac/Simpl/Tools/Model/*.swift
 // mac/Simpl/Tools/Planner/Model/*.swift mac/Simpl/Engine/LivePlan.swift mac/Simpl/Screens/PlanMove.swift
-// scripts/dev/swift-checks/main.swift scripts/dev/swift-checks/StudyChecks.swift && /tmp/model-checks. A failed check
-// is printed with what was found, and the exit code is the number that failed.
+// scripts/dev/swift-checks/main.swift scripts/dev/swift-checks/StudyChecks.swift
+// scripts/dev/swift-checks/CommunityToolChecks.swift && /tmp/model-checks (from the repository's root: the verbs' data
+// and the community tools' vectors are read from it). A failed check is printed with what was found, and the exit code
+// is the number that failed.
 
 var passed = 0, failed = 0
 func check(_ ok: Bool, _ what: String) {
@@ -650,6 +653,11 @@ check(max(spin.across, spin.up) < 0.845 && max(spin.across, spin.up) > 0.83, "a 
 // (mac/Simpl/Tools/Model, checked in StudyChecks.swift: the numbers shown and read, and each tool's arithmetic against
 // the specification's test vectors)
 studyChecks(check)
+
+// ---- Simpl Community tools (1.3.211) -------------------------------------------------------------------------------
+// (mac/Simpl/Tools/Model/CommunityToolFormat.swift, checked in CommunityToolChecks.swift: every answer in
+// docs/community-tools-vectors.json — formulas, refusals, tools and their runs — as the reference gives it)
+communityToolChecks(check)
 
 // ---- the Study Planner (tools) ------------------------------------------------------------------------------------
 // (mac/Simpl/Tools/Planner/Model/StudyPlan.swift: the specification's checks — never past a due date, minutes in

@@ -745,7 +745,8 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   Focus timer, Citation generator, Grade needed; since the tools of their own, the Word Counter, the Study Planner and Verb Conjugations), *Math & science*
   (Calculator, Graphing calculator, Unit converter, since then Statistics and the Matrix Calculator; the Periodic table
   until 1.3.80 moved it to *Chemistry*), *Files*
-  (File converter, Merge & split PDFs, PDF annotator, Image to text; (tools) Compress Files) and *Biology*, as on
+  (File converter, Merge & split PDFs, PDF annotator, Image to text; (tools) Compress Files), (1.3.211) *Community*
+  (the tools added from Simpl Community and *Browse Community*: below) and *Biology*, as on
   Windows — each tile's line one short line, three tiles across from about 900 points of page (`ToolGroup`, `ToolGroupSection`,
   `ToolTile.columns`). An open tool has one pin control, in its heading, named for what a press does (*Unpin* / *Pin to
   Toolbar*); the window's toolbar no longer adds a second. The pins past the toolbar's room go into a *Tools*
@@ -1336,6 +1337,49 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   es|fr|de|it|pt`, `-SimplVerb "<infinitive>"`. Pictures (`verbs_tool`): `light-76-tool-verbs` (Spanish, tener),
   `dark-76-tool-verbs` (French, aller), `light-76b-tool-verbs-narrow` (German, anfangen), `light-54r-pin-verbs`.
 
+- **Simpl Community tools (1.3.211).** Small tools students make and share in Simpl Community — a tip splitter, Ohm's
+  law, a quadratic solver, a grade-points table — that the Mac downloads and draws among its own (`docs/community-tools.md`,
+  format 1, is the spec). A tool is data, never code: inputs (numbers, choices, switches), results (formulas in the
+  format's small language), an optional table and note. The Tools page has a **Community** section between *Files* and
+  *Chemistry* (`Tools/Community/CommunityTools.swift`: `CommunityToolsSection`, which `-SimplToolsScroll community`
+  scrolls to): a tile for each tool added — its symbol (the format's 28, each an SF Symbol: `ToolFormat.sfSymbols`) on
+  its colour, its name, line and maker; a press opens it, its menu opens it or removes it (asked first: *Remove from
+  Tools…*) — and a last tile, *Browse Community*, alone until one is added. **The format's own copy** is
+  `Tools/Model/CommunityToolFormat.swift` (Foundation only): a tool checked leniently (keys a later format adds passed
+  over; `format` above 1 refused as needing a newer Simpl, SC-T-FORMAT; every refusal its `SC-T-…` code and plain
+  message), its formulas tokenized, parsed and worked out, and its numbers written — all as `site/src/tool-format.js`
+  does them, step for step, down to JavaScript's `toFixed` taking an exact half up (`ToolFormat.fixed`), V8's
+  `Math.pow(10, n)` where it is a double off 10ⁿ (`referencePow10`) and `String(n)` for a table's numbers (`jsString`).
+  The Models job holds it to the reference's answers (`scripts/dev/swift-checks/CommunityToolChecks.swift`: every
+  formula, refusal, tool and run in `docs/community-tools-vectors.json`, a tool as checked key for key, and a few
+  answers of the reference's beyond the file). **The browser** (`Tools/Community/CommunityBrowser.swift`) opens in the
+  tool's popup (`ToolsCenter.popUpCommunity(.browse)`): the site's gallery (`GET /api/community/tools`, read as
+  Appearance's Community themes are — `CommunityStore.site`, no cookie), searched by name, line and maker and filtered
+  by the five groups, each tool a card with its preview working as it will once added (`CommunityToolPreview`) and
+  *Add* (*Added* and *Open* once it is); one this Mac refuses says why and cannot be added. A spinner while it is read;
+  with no connection, or an answer that is not one, why and *Try Again*. **Add** (`CommunityToolStore.add`) downloads the
+  tool by its id (`GET /api/community/tools/<id>`; the gallery's copy when the site does not answer; nothing when it is
+  gone), checks it again on this Mac and keeps it — never one that fails here — in
+  `Application Support/Simpl/community-tools.json`, the tools as checked with the values last put in each, every tool
+  checked again as the file is read. **An added tool** opens in the tool's popup as Simpl's own do
+  (`Tools/Community/CommunityToolView.swift`, its popup's size kept under `tool.community.<id>`): a number is a field
+  with its unit and a stepper by its step that stops at its range (one typed outside it is worked out at its end, and
+  said so), a choice a segmented control (a menu past four options), a toggle a switch; the results worked out as the
+  values change, the first shown large in the tool's colour, the rest in rows (each copied from its menu), a result its
+  `when` hides left out and a value that is not a number "—"; then its table, its note and who made it. *Reset* puts its
+  own values back. It needs no connection. Community tools are **not pinned**: a pin is one of Simpl's own tools (a
+  `ToolKind`, kept by its key), and a tool from the gallery is not one. Launch flags (the screenshot suite):
+  `-SimplCommunityToolsAdd "mockohms|mocktip"` (added at launch, by id or name, as Add adds them),
+  `-SimplCommunityOpen browse|<id or name>`, `-SimplCommunityValues "bill=64.4,up=true"`, `-SimplCommunityGroup math`,
+  `-SimplCommunitySearch "…"`, with `-SimplCommunityBase` the site; a picture's launch keeps the tools in a file of its
+  own that starts empty (`community-tools-picture.json`). The mock's gallery is `scripts/dev/fixtures/community-tools.json`
+  (served by `scripts/dev/mock-community.mjs` ahead of the site handler's own: one tool of each group, two of the
+  vectors' tools, one of a later format). Pictures (`community_tools`): `light-35e-tools-community`,
+  `dark-35e-tools-community-empty`, `light-35f-community-browse`, `dark-35f-community-browse-math`,
+  `light-35h-community-browse-offline`, `light-35g-community-tool`, `dark-35g-community-tool-table`,
+  `light-35g-community-tool-narrow`; `community_tools_check` reads their consoles (the gallery read — six tools, five to
+  add, one needing a newer Simpl —, the tools added, Ohm's law worked out as it starts, the browser offline).
+
 ## Data and encryption
 
 (1.3.76) Simpl for Mac keeps what it holds secret in the Mac's own **Keychain**, which macOS encrypts under the
@@ -1375,7 +1419,8 @@ Signing out deletes the sign-in and cookie items. **Reset Everything** deletes t
 it sealed can be read again; the flashcards, which Reset has never erased, are sealed again under the new key.
 
 Plain on purpose: the preferences (UserDefaults: the theme, the layout, what was seen), the console, the theme's photos
-(`Application Support/Simpl/Photos`), the screenshot suite's pictures, files the student exports or saves elsewhere, and
+(`Application Support/Simpl/Photos`), (1.3.211) the Simpl Community tools added and their values
+(`Application Support/Simpl/community-tools.json`: public tools, and numbers put in them), the screenshot suite's pictures, files the student exports or saves elsewhere, and
 WebKit's own website data.
 
 **What it protects, and what it does not.** It protects data at rest from anyone without the student's login password:

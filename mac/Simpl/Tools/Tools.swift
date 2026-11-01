@@ -13,7 +13,8 @@ import UniformTypeIdentifiers
 // (Statistics.swift, MatrixCalculator.swift); their arithmetic in Model/, checked by the Models job — and (tools)
 // Compress Files among the file tools (CompressFiles.swift) and the Study Planner and Verb Conjugations among the study
 // tools (Planner/StudyPlanner.swift, Verbs/VerbConjugations.swift). One row in the sidebar opens a page of tiles,
-// (tools-32) in sections by what they are for: Study, Math & science, Files, Chemistry, Physics and Biology;
+// (tools-32) in sections by what they are for: Study, Math & science, Files, (1.3.211) Community — the tools added from
+// Simpl Community and a tile to browse for more (Community/) — Chemistry, Physics and Biology;
 // (1.3.79) a tile opens its tool in a popup over the window — the Tools page staying behind it, and the whole window
 // usable round it (Shell/FloatingPopup.swift) — as its pin, a hand-off from another tool and a launch do. Any tool can be
 // pinned: it then sits in the toolbar on every screen and opens a compact version of itself in a popover
@@ -215,6 +216,9 @@ final class ToolsCenter: ObservableObject {
     /// (1.3.83) How many times the tool open has been made afresh in its popup — something begun in its pin's panel
     /// handed to it while it was open already (`popUp`'s `afresh`) — so it is drawn anew and takes it.
     @Published private(set) var popupMade = 0
+    /// (1.3.211) What of Simpl Community the tool's popup shows instead of one of Simpl's own tools — the browser, or a
+    /// tool added from it (Community/CommunityTools.swift) — nil while it shows one of Simpl's (or nothing).
+    @Published private(set) var community: CommunityPopup?
     /// The window its popup is over.
     private weak var popupEngine: Engine?
     /// The tool's popup among its window's popups.
@@ -324,6 +328,7 @@ final class ToolsCenter: ObservableObject {
         withAnimation(Motion.gentle) {
             if afresh && popup == k { popupMade += 1 }
             popup = k
+            community = nil
         }
         popupEngine = host
         host.popups.present(Self.popupKey, title: k.name, layout: .large, sizeKey: "tool.\(k.rawValue)",
@@ -332,9 +337,29 @@ final class ToolsCenter: ObservableObject {
         }
     }
 
+    /// (1.3.211) Simpl Community's browser, or a tool added from it, opened in the tool's popup over the window — as one of
+    /// Simpl's own tools opens there (`popUp`), in its place if one is open, its size kept as a tool's is.
+    func popUpCommunity(_ what: CommunityPopup, engine: Engine? = nil) {
+        handoff = []
+        handoffTool = nil
+        handoffInfo = [:]
+        guard let host = engine ?? popupEngine ?? AppModel.shared.engine else { return }
+        if let was = popupEngine, was !== host { was.popups.close(Self.popupKey) }
+        withAnimation(Motion.gentle) {
+            popup = nil
+            community = what
+        }
+        popupEngine = host
+        host.popups.present(Self.popupKey, title: what.title, layout: .large, sizeKey: what.sizeKey,
+                            onClose: { [weak self] in self?.popupClosed() }) {
+            CommunityPopupView()
+        }
+    }
+
     /// The tool's popup closed (its ×, Escape, ⌘W, or its window closing).
     private func popupClosed() {
         popup = nil
+        community = nil
         popupEngine = nil
     }
 
@@ -343,8 +368,10 @@ final class ToolsCenter: ObservableObject {
         popupEngine?.popups.close(Self.popupKey)
     }
 
-    /// (the screenshot suite) The tool its launch asked for (-SimplTool), opened in its popup over the main window.
+    /// (the screenshot suite) The tool its launch asked for (-SimplTool), opened in its popup over the main window — and
+    /// (1.3.211) Simpl Community's tools the launch adds or opens (CommunityToolStore.launch).
     func openLaunchTool(_ engine: Engine) {
+        CommunityToolStore.shared.launch(engine)
         guard let k = launchTool else { return }
         launchTool = nil
         popUp(k, engine: engine)
@@ -422,13 +449,16 @@ struct ToolsGrid: View {
                 ForEach([ToolGroup.study, .science, .files], id: \.self) { g in
                     ToolGroupSection(title: g.title, kinds: g.kinds)
                 }
+                // (1.3.211) the tools added from Simpl Community, and the tile that browses for more
+                CommunityToolsSection()
                 ChemToolsSection()
                 PhysToolsSection()
                 BioToolsSection()
             }
             .task {
-                // (the screenshot suite: -SimplToolsScroll chemistry, physics or biology, the page scrolled to that section)
-                guard let to = UserDefaults.standard.string(forKey: "SimplToolsScroll"), ["chemistry", "physics", "biology"].contains(to) else { return }
+                // (the screenshot suite: -SimplToolsScroll community, chemistry, physics or biology, the page scrolled to
+                //  that section)
+                guard let to = UserDefaults.standard.string(forKey: "SimplToolsScroll"), ["community", "chemistry", "physics", "biology"].contains(to) else { return }
                 try? await Task.sleep(nanoseconds: 400_000_000)
                 proxy.scrollTo(to, anchor: .top)
             }

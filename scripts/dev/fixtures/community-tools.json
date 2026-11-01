@@ -1,0 +1,92 @@
+{
+ "about": "Simpl Community tools for the suites (scripts/dev/mock-community.mjs serves them at /api/community/tools and /api/community/tools/<id>, ahead of whatever the site's own handler has): one of each of the five groups, the first two of docs/community-tools-vectors.json's tools among them, and one of a later format that an app must call too new.",
+ "ok": true,
+ "tools": [
+  {
+   "format": 1, "id": "mocktip", "version": 1, "name": "Tip Splitter", "maker": "Sam",
+   "summary": "Split a bill and its tip.", "group": "money", "symbol": "money", "color": "#30b0c7",
+   "inputs": [
+    { "id": "bill", "kind": "number", "label": "Bill", "unit": "$", "default": 52, "min": 0, "step": 1 },
+    { "id": "tip", "kind": "choice", "label": "Tip", "options": [{ "label": "10%", "value": 10 }, { "label": "15%", "value": 15 }, { "label": "18%", "value": 18 }, { "label": "20%", "value": 20 }], "default": 18 },
+    { "id": "people", "kind": "number", "label": "People", "default": 2, "min": 1, "max": 20, "step": 1 },
+    { "id": "up", "kind": "toggle", "label": "Round each share up" }
+   ],
+   "outputs": [
+    { "id": "each", "label": "Each pays", "value": "bill * (1 + tip / 100) / floor(people)", "unit": "$", "decimals": 2, "when": "!up" },
+    { "label": "Each pays, rounded up", "value": "ceil(each)", "unit": "$", "decimals": 0, "when": "up" },
+    { "label": "Tip", "value": "bill * tip / 100", "unit": "$", "decimals": 2 },
+    { "label": "Total", "value": "bill * (1 + tip / 100)", "unit": "$", "decimals": 2 }
+   ],
+   "note": "Each share is the bill and its tip over the people paying.",
+   "created": "2026-10-30"
+  },
+  {
+   "format": 1, "id": "mockquad", "version": 2, "name": "Quadratic Solver", "maker": "Lee",
+   "summary": "The roots of ax² + bx + c = 0.", "group": "math", "symbol": "function", "color": "#5856d6",
+   "inputs": [
+    { "id": "a", "kind": "number", "label": "a", "default": 1 },
+    { "id": "b", "kind": "number", "label": "b", "default": -3 },
+    { "id": "c", "kind": "number", "label": "c", "default": 2 }
+   ],
+   "outputs": [
+    { "label": "x₁", "value": "(-b + sqrt(b^2 - 4*a*c)) / (2*a)", "when": "b^2 - 4*a*c >= 0 && a != 0" },
+    { "label": "x₂", "value": "(-b - sqrt(b^2 - 4*a*c)) / (2*a)", "when": "b^2 - 4*a*c > 0 && a != 0" },
+    { "id": "d", "label": "Discriminant", "value": "b^2 - 4*a*c" },
+    { "label": "Vertex at x", "value": "-b / (2*a)", "when": "a != 0" }
+   ],
+   "note": "x = (−b ± √(b² − 4ac)) / 2a. Below 0, the discriminant means there are no real roots.",
+   "created": "2026-10-29"
+  },
+  {
+   "format": 2, "id": "mockcircle", "version": 1, "name": "Unit Circle", "maker": "Ana",
+   "summary": "Sine and cosine on the circle.", "group": "math", "symbol": "triangle", "color": "#af52de",
+   "inputs": [{ "id": "deg", "kind": "angle", "label": "Angle" }],
+   "outputs": [{ "label": "sin", "value": "sin(rad(deg))" }],
+   "graph": { "kind": "circle", "point": "deg" },
+   "created": "2026-10-28"
+  },
+  {
+   "format": 1, "id": "mockcook", "version": 1, "name": "Oven Temperatures", "maker": "Mia",
+   "summary": "Fahrenheit, Celsius and gas marks.", "group": "everyday", "symbol": "thermometer", "color": "#ff3b30",
+   "inputs": [
+    { "id": "t", "kind": "number", "label": "Temperature", "unit": "°", "default": 350, "min": -100, "max": 1000, "step": 25 },
+    { "id": "way", "kind": "choice", "label": "Convert", "options": [{ "label": "°F to °C", "value": 1 }, { "label": "°C to °F", "value": 2 }], "default": 1 }
+   ],
+   "outputs": [
+    { "label": "In Celsius", "value": "(t - 32) * 5 / 9", "unit": "°C", "decimals": 0, "when": "way == 1" },
+    { "label": "In Fahrenheit", "value": "t * 9 / 5 + 32", "unit": "°F", "decimals": 0, "when": "way == 2" }
+   ],
+   "table": {
+    "title": "Gas marks",
+    "columns": ["Gas mark", "°F", "°C", "Oven"],
+    "rows": [[1, 275, 140, "Very cool"], [2, 300, 150, "Cool"], [4, 350, 180, "Moderate"], [6, 400, 200, "Fairly hot"], [7, 425, 220, "Hot"], [9, 475, 240, "Very hot"]]
+   },
+   "note": "Fan ovens run hotter: take about 20 °C off.",
+   "created": "2026-10-27"
+  },
+  {
+   "format": 1, "id": "mockohms", "version": 1, "name": "Ohm’s Law", "maker": "Simpl", "summary": "Volts, amps and ohms.", "group": "science", "symbol": "bolt", "color": "#FF9500",
+   "inputs": [
+    { "id": "mode", "kind": "choice", "label": "Solve for", "options": [{ "label": "Current", "value": 1 }, { "label": "Voltage", "value": 2 }], "default": 1 },
+    { "id": "v", "kind": "number", "label": "Voltage", "unit": "V", "default": 12, "min": 0 },
+    { "id": "i", "kind": "number", "label": "Current", "unit": "A", "default": 2, "min": 0, "max": 100, "step": 0.1 },
+    { "id": "r", "kind": "number", "label": "Resistance", "unit": "Ω", "default": 4, "min": 0 },
+    { "id": "mw", "kind": "toggle", "label": "Power in milliwatts" }
+   ],
+   "outputs": [
+    { "id": "amps", "label": "Current", "value": "v / r", "unit": "A", "when": "mode == 1" },
+    { "id": "volts", "label": "Voltage", "value": "i * r", "unit": "V", "when": "mode == 2", "decimals": 2 },
+    { "label": "Power", "value": "(mode == 1 ? v * amps : volts * i) * (mw ? 1000 : 1)", "unit": "W", "decimals": 1 }
+   ],
+   "note": "V = I × R. Power is V × I.",
+   "created": "2026-10-26"
+  },
+  {
+   "format": 1, "id": "mockgrade", "version": 1, "name": "  Grade   points  ", "summary": "Letter grades as points.", "group": "study", "symbol": "book", "color": "#34c759",
+   "inputs": [{ "id": "pct", "kind": "number", "label": "Percent", "unit": "%", "default": 91.5, "min": 0, "max": 100 }],
+   "outputs": [{ "label": "Points", "value": "pct >= 93 ? 4 : pct >= 90 ? 3.7 : pct >= 87 ? 3.3 : pct >= 83 ? 3 : pct >= 80 ? 2.7 : 0", "decimals": 1 }],
+   "table": { "title": "The scale", "columns": ["Letter", "From", "Points"], "rows": [["A", "93", "4.0"], ["A-", 90, "3.7"]] },
+   "created": "2026-10-25"
+  }
+ ]
+}
