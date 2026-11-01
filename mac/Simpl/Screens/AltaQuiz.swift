@@ -18,6 +18,9 @@ struct AltaQuizScreen: View {
     @State private var saved: URL?
     @State private var showLogs = false
     @ObservedObject private var dev = DevMode.shared
+    /// (1.3.213) Export Questions: the question on screen pictured, in a zip in Downloads (Alta gives one at a time).
+    @StateObject private var export = QuestionExport()
+    @Environment(\.colorScheme) private var scheme
     /// (1.3.78) The Canvas assignment's own due line ("Due Oct 12 at 11:59 PM"), as every other screen writes it.
     @State private var dueLine: String?
     /// (1.3.83) Alta's side of the popup light or dark, as the student picks it above the objectives: light unless Dark is
@@ -119,6 +122,11 @@ struct AltaQuizScreen: View {
             PopupPins() // (1.3.73: the toolbar's pins, here too)
             GlassGroup(spacing: 8) {
                 HStack(spacing: 8) { // (in a row: the glass container stacks what it holds)
+                    ExportQuestionsButton(export: export, enabled: true,
+                                          help: "Export Questions: a picture of the question on screen, in a zip in Downloads (Knewton Alta gives one question at a time)") {
+                        export.run(title: title, tool: "alta", web: session.web,
+                                   ground: scheme == .dark || pageDark ? NSColor(white: 0.11, alpha: 1) : .white, questions: []) { _ in true }
+                    }
                     // (1.3.47) shown once Alta's page was not recognised (and given back as it is); (1.3.72) to developers
                     if dev.unlocked && !session.errorLogs.isEmpty {
                         Button { showLogs = true } label: {

@@ -1060,6 +1060,10 @@ look_check() {
   local s="$OUT_ABS/console-light-21s-macmillan-from-module.txt"
   if grep -q 'macmillan popup: opened from a module (its tool on lmslink.bfwpub.com)' "$s" 2>/dev/null && grep -q 'macmillan popup: cover heard' "$s" 2>/dev/null; then echo "ok   a module's Macmillan item opened in the popup, on its cover" >> "$out"
   else echo "FAIL a module's Macmillan item did not open in the popup ($(grep -o 'macmillan popup: .*\|moduletool: .*\|tool window: .*' "$s" 2>/dev/null | head -3 | tr '\n' ';'))" >> "$out"; fi
+  # (1.3.213) Export Questions: every one of the mock's 4 questions opened and pictured, and the zip saved in Downloads
+  local x="$OUT_ABS/console-light-21x-macmillan-export.txt"
+  if grep -q 'export questions: 4 of 4 pictured, saved to .* questions\.zip (macmillan)$' "$x" 2>/dev/null; then echo "ok   Export Questions pictured all 4 questions into a zip ($(grep -o 'saved to .*' "$x" | tail -1))" >> "$out"
+  else echo "FAIL Export Questions did not picture all 4 questions ($(grep -o 'export questions: .*' "$x" 2>/dev/null | head -3 | tr '\n' ';'))" >> "$out"; fi
   # (1.3.202) Macmillan's cover heard and drawn as the popup's own start page, Alta's way: its questions and its grading settings
   local d="$OUT_ABS/console-light-21d-macmillan.txt"
   if grep -q 'macmillan popup: cover heard, 4 questions, 5 grading settings' "$d" 2>/dev/null; then echo "ok   the popup's start page heard Macmillan's cover (4 questions, 5 grading settings)" >> "$out"
@@ -1272,6 +1276,9 @@ push_set() {
   # — then the same with the toolbar's Simpl Look off, as Macmillan draws it (look_check)
   shoot light-21n-macmillan-look 26 -SimplOpen macmillan:104:4006
   shoot light-21o-macmillan-look-off 26 -SimplOpen macmillan:104:4006 -SimplMacmillanLook NO
+  # (1.3.213) Export Questions run as the popup opens (-SimplExportQuestions): each of the mock's 4 questions opened in
+  # turn and pictured, zipped into Downloads, and the alert saying where (look_check)
+  shoot light-21x-macmillan-export 40 -SimplOpen macmillan:104:4006 -SimplExportQuestions YES
   # (1.3.198) Simpl's look over ALEKS's page (extension/tools/aleks/look.js), the mock's learning page with a wrong answer
   # checked: the light bar with the topic and its progress, the sheet, the tools' column beside it, Explanation and
   # Recheck under the answer — then with Simpl Look off, as ALEKS draws it (look_check)

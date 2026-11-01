@@ -77,6 +77,10 @@ struct LookQuizScreen: View {
     @AppStorage(PageLook.aleks.key) private var aleksLook = true
     /// (1.3.206) The app's appearance: the question's glass, and the page over it, follow it.
     @Environment(\.colorScheme) private var scheme
+    /// (1.3.213) Export Questions: a picture of each question, zipped into Downloads — and the question that was open,
+    /// opened again once it is done.
+    @StateObject private var export = QuestionExport()
+    @State private var exportFrom = 0
 
     init(launch: LookLaunch) {
         self.launch = launch
@@ -116,6 +120,12 @@ struct LookQuizScreen: View {
         .onChange(of: macmillanLook) { _, on in if look.name == PageLook.macmillan.name { look.set(on, in: browser.webView) } }
         .onChange(of: aleksLook) { _, on in if look.name == PageLook.aleks.name { look.set(on, in: browser.webView) } }
         .onChange(of: scheme) { _, s in PageLook.setDark(s == .dark, in: browser.webView) }
+        // (1.3.213: done exporting, the question that was open is opened again)
+        .onChange(of: export.running) { _, on in if !on, exportFrom > 0, rail.here != exportFrom { rail.go(exportFrom) } }
+        // (the screenshot suite's -SimplExportQuestions YES: exported once the questions are heard)
+        .onChange(of: rail.questions.count) { _, n in
+            if n > 0, LaunchOpen.take("", key: "SimplExportQuestions") != nil { exportQuestions() }
+        }
         .onDisappear { browser.webView?.stopLoading() }
     }
 
@@ -132,6 +142,7 @@ struct LookQuizScreen: View {
             PopupPins()
             GlassGroup(spacing: 8) {
                 HStack(spacing: 8) { // (in a row: the glass container stacks what it holds)
+                    ExportQuestionsButton(export: export, enabled: url != nil && ready && rail.cover == nil, help: exportHelp) { exportQuestions() }
                     Button { browser.reload() } label: { Label("Reload", systemImage: "arrow.clockwise") }
                         .labelStyle(.iconOnly)
                         .glassButton()
@@ -152,6 +163,36 @@ struct LookQuizScreen: View {
                 }
             }
         }
+    }
+
+    // MARK: Export Questions
+
+    /// Macmillan's every question, opened in turn; ALEKS's the one on screen (it gives one at a time).
+    private var exportsAll: Bool { look.name == PageLook.macmillan.name && !rail.questions.isEmpty }
+
+    private var exportHelp: String {
+        exportsAll ? "Export Questions: a picture of each of this assignment's \(rail.questions.count) questions, in a zip in Downloads"
+            : "Export Questions: a picture of the question on screen, in a zip in Downloads (\(look.fullName) gives one question at a time)"
+    }
+
+    private func exportQuestions() {
+        exportFrom = rail.here
+        let list = exportsAll ? rail.questions.map(\.n) : []
+        NSLog("[Simpl] export questions: %ld to picture (%@)", max(list.count, 1), look.name)
+        export.run(title: launch.title, tool: look.name, web: browser.webView,
+                   ground: scheme == .dark ? NSColor(white: 0.11, alpha: 1) : .white, questions: list) { n in
+            await openQuestion(n)
+        }
+    }
+
+    /// One of Macmillan's questions opened (its tile pressed, as the student would), and given a moment once it is open
+    /// for its maths and pictures to be drawn: false if the page never opened it.
+    private func openQuestion(_ n: Int) async -> Bool {
+        if rail.here != n { rail.go(n) }
+        for _ in 0..<80 where rail.here != n { try? await Task.sleep(nanoseconds: 100_000_000) }
+        guard rail.here == n else { return false }
+        try? await Task.sleep(nanoseconds: 900_000_000)
+        return true
     }
 
     /// "Macmillan Learning · Due Oct 12 at 11:59 PM".
