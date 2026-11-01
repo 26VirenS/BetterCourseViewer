@@ -1177,7 +1177,7 @@ whatif_check() {
   line="$(grep -o 'grades what-if: at the page.s foot .*' "$f" 2>/dev/null | tail -1)"
   n="$(printf '%s' "$line" | sed -n 's/.* ends \(-\{0,1\}[0-9]*\) pt above the bar.*/\1/p')"
   if [ -n "$n" ] && [ "$n" -ge 15 ] && ! printf '%s' "$line" | grep -q 'not at the foot'; then echo "ok   the last row scrolls clear of What-If's bar ($line)" >> "$out"
-  else echo "FAIL the last row stays under What-If's bar (${line:-nothing said})" >> "$out"; fi
+  else echo "FAIL the last row stays under What-If's bar (${line:-nothing said$(grep -o 'grades what-if: the probe left.*' "$f" 2>/dev/null | tail -1 | sed 's/^/: /')})" >> "$out"; fi
   cat "$out"
   if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::what-if: /'; return 1; fi
 }

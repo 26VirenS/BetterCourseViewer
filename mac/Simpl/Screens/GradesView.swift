@@ -1937,11 +1937,15 @@ private struct WhatIfFootProbe: NSViewRepresentable {
 private final class WhatIfFootView: NSView {
     var bar: CGFloat = 0
     private var asked = false
+    /// Each look's own number: a look begun again (the probe put back in the page) leaves the one before it unanswered.
+    private var round = 0
+    private var losses = 0
 
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        if window == nil { asked = false } // (taken out of the page: looked at again once it is back in one)
         look()
     }
 
@@ -1951,34 +1955,48 @@ private final class WhatIfFootView: NSView {
     func look() {
         guard !asked, bar > 0, window != nil else { return }
         asked = true
-        settle(1, last: -1, wait: 1.5)
+        round += 1
+        settle(1, last: -1, wait: 1.5, round: round)
     }
 
     /// Scrolled to the foot again until the page stops growing under it: rows laid out as they come into sight push the
     /// foot further down (once scrolled, the page had grown by the time it was measured, and the last row was read under
     /// the bar), and again if it grew in the wait before it was measured. Ten tries at most; then measured, and whether it
     /// was at the foot said with it.
-    private func settle(_ tries: Int, last: CGFloat, wait: Double) {
+    private func settle(_ tries: Int, last: CGFloat, wait: Double, round: Int) {
         DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [weak self] in
-            guard let self, self.window != nil, let sv = self.enclosingScrollView, let doc = sv.documentView else { return }
+            guard let self, round == self.round else { return }
+            guard self.window != nil, let sv = self.enclosingScrollView, let doc = sv.documentView else { self.lost(); return }
             let clip = sv.contentView
             let tall = doc.frame.height
             let most = max(0, tall - clip.bounds.height)
             clip.scroll(to: NSPoint(x: clip.bounds.minX, y: doc.isFlipped ? most : 0))
             sv.reflectScrolledClipView(clip)
-            if abs(tall - last) > 0.5 && tries < 10 { self.settle(tries + 1, last: tall, wait: 0.4); return }
+            if abs(tall - last) > 0.5 && tries < 10 { self.settle(tries + 1, last: tall, wait: 0.4, round: round); return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                guard let self, self.window != nil, let sv = self.enclosingScrollView, let doc = sv.documentView else { return }
+                guard let self, round == self.round else { return }
+                guard self.window != nil, let sv = self.enclosingScrollView, let doc = sv.documentView else { self.lost(); return }
                 let clip = sv.contentView
                 let atFoot = doc.isFlipped ? clip.bounds.maxY >= doc.frame.height - 1 : clip.bounds.minY <= 1
                 // (grown again in the wait: scrolled to the new foot and measured again)
-                if !atFoot && tries < 10 { self.settle(tries + 1, last: -1, wait: 0.1); return }
+                if !atFoot && tries < 10 { self.settle(tries + 1, last: -1, wait: 0.1, round: round); return }
                 let foot = sv.convert(sv.bounds, to: nil).minY
                 let rowEnd = self.convert(self.bounds, to: nil).maxY + 22
                 NSLog("[Simpl] grades what-if: at the page's foot the last row ends %ld pt above the bar (%@, %ld scrolls)",
                       Int((rowEnd - (foot + self.bar)).rounded()), atFoot ? "at the foot" : "not at the foot", tries)
             }
         }
+    }
+
+    /// Out of its page (or its scroll view) before it was measured, as the grades are drawn again: said, and looked at
+    /// again once it is back — five times at most, so a page that never keeps it says so instead of nothing.
+    private func lost() {
+        losses += 1
+        NSLog("[Simpl] grades what-if: the probe left the page before it was measured (%@, %@; %ld)",
+              window == nil ? "no window" : "in its window", enclosingScrollView == nil ? "no scroll view" : "in its scroll view", losses)
+        asked = false
+        guard losses < 5, window != nil else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.look() }
     }
 }
 
