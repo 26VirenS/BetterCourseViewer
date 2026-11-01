@@ -252,7 +252,7 @@
         if (cur?.card) place(owner, cur.host, cur.anchor);
       }).catch((e) => {
         if (!mine()) return;
-        body.replaceChildren(U.errorBox(e.message || 'This could not be read.'));
+        body.replaceChildren(U.errorBox(e.message || 'This could not be read.', null, { retry: false, canvas: false }));
       });
     };
     const panel = h('aside', { class: 'bcv-pv', role: 'dialog', 'aria-modal': 'false', 'aria-label': `Preview of this ${KINDS[r.tab].label}` }, [

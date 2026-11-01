@@ -2026,7 +2026,7 @@
 
     function draw() {
       const noticeEl = loading ? U.el('bcv-cal__notice bcv-cal__notice--hint', 'Loading events…')
-        : !notice ? null : notice.kind === 'error' ? U.errorBox(notice.text) : U.el(`bcv-cal__notice bcv-cal__notice--${notice.kind}`, notice.text);
+        : !notice ? null : notice.kind === 'error' ? U.errorBox(notice.text, null, { retry: false, canvas: false }) : U.el(`bcv-cal__notice bcv-cal__notice--${notice.kind}`, notice.text);
       const scWas = mainCol.querySelector('.bcv-week__scroll');
       if (scWas) weekScroll = scWas.scrollTop;
       mainCol.replaceChildren(...[noticeEl, view === 'week' ? weekGrid() : view === 'agenda' ? agendaList() : monthGrid()].filter(Boolean));

@@ -1472,7 +1472,7 @@
     for (const nav of document.querySelectorAll('#bcv-topsearch .bcv-asg__nav--bar')) nav.remove();
     histButtons();
     syncSide(); // the sidebar follows the route in place; it is rebuilt only when what it shows changes
-    BCV.search?.dock?.(BCV.app, r); // the search box at the left of the top bar on every screen but the Dashboard, whose header has it (kept as it is when it is already there)
+    BCV.search?.dock?.(BCV.app); // the search box in the top bar on every screen, the Dashboard too (E33; kept as it is when it is already there)
     barLayout();
     // ctx.swap: a screen that keeps its shell (a course's tabs) puts its new column in through it, so the column moves as a screen would
     const ctx = { app: BCV.app, route: r, alive, dark: state.dark, swap: (update, scope) => (alive() ? swap(update, kind, scope) : Promise.resolve(update())) };
@@ -1517,7 +1517,7 @@
     }
     if (!gaveWay && !nativeWanted && el) {
       const only = el.querySelector('.bcv-body > .bcv-error:only-child, .bcv-body > .bcv-error:first-child:last-child');
-      if (only) gaveWay = only.textContent.trim();
+      if (only) gaveWay = (only.querySelector('.bcv-error__text') || only).textContent.trim(); // (its words, not its buttons)
     }
     if (gaveWay && alive()) {
       // an answer that never came: a fresh load clears most of what wedges, so that is tried once
@@ -1540,7 +1540,7 @@
       try {
         el = await screens.native.render(ctx);
       } catch (e2) {
-        el = U.el('bcv-screen', U.el('bcv-body', U.errorBox(`This page could not be drawn: ${e2?.message || e2}`)));
+        el = U.el('bcv-screen', U.el('bcv-body', U.errorBox(`This page could not be drawn: ${e2?.message || e2}`, null, { retry: () => location.reload(), canvas: false })));
       }
       if (alive() && BCV.canvas.sessionOk?.() !== false) U.toast(`Showing ${BCV.lms.name}'s own page: ${gaveWay}`, { error: true, ms: 6000 }); // (a session that ended has its own note up)
     }

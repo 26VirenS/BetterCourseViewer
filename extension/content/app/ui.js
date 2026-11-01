@@ -218,11 +218,34 @@
     return el(`bcv-skel ${kind === 'cards' ? 'bcv-skel--cards' : kind === 'inset' ? 'bcv-skel--inset' : ''}`, items, { 'aria-hidden': 'true', role: 'presentation' });
   }
   /** A block saying something could not be loaded, with its error code (lib/errors.js) at its end —
-   *  drawn from data-code (app.css), so the words stay the words; the code is kept for a report. */
-  const errorBox = (str, err = null) => {
-    const box = el('bcv-error', str);
+   *  drawn from data-code (app.css), so the words stay the words; the code is kept for a report.
+   *  (E10) Never a dead end: under the words, Try Again (the screen asked for afresh, as its tab
+   *  pressed again asks — or `retry`, the caller's own) and Open in Canvas (this address on
+   *  Canvas's own page); `retry: false` / `canvas: false` leave either out (a panel over a screen,
+   *  which drawing the screen again would close). role=alert: a screen reader says it at once. */
+  const errorBox = (str, err = null, { retry, canvas = true } = {}) => {
+    const box = el('bcv-error', el('bcv-error__text', str), { role: 'alert' });
     const c = BCV.errors?.codeFor?.(err);
     if (c) { box.dataset.code = c; BCV.errors.note(c); }
+    const acts = [];
+    if (retry !== false) {
+      const again = typeof retry === 'function' ? retry : () => { BCV.canvas?.clearAll?.(); return BCV.app?.render?.({ quiet: true }); };
+      const b = h('button', { type: 'button', class: 'bcv-error__btn', text: 'Try Again' });
+      b.onclick = async () => {
+        if (b.disabled) return;
+        b.disabled = true;
+        b.textContent = 'Trying…';
+        try { await again(); } catch { /* (what went wrong is drawn by the screen) */ }
+        if (b.isConnected) { b.disabled = false; b.textContent = 'Try Again'; }
+      };
+      acts.push(b);
+    }
+    const route = BCV.app?.state?.route;
+    if (canvas && route?.screen !== 'native' && route?.params?.get?.('bcv') !== 'native') {
+      const here = location.pathname + location.search;
+      acts.push(h('a', { class: 'bcv-error__btn bcv-error__btn--plain', href: `${here}${here.includes('?') ? '&' : '?'}bcv=native`, text: `Open in ${BCV.lms?.name || 'Canvas'}` }));
+    }
+    if (acts.length) box.append(el('bcv-error__acts', acts));
     return box;
   };
   const hint = (str, mod = '') => h('p', { class: `bcv-hint ${mod}`, text: str });

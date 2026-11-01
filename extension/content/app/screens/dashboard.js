@@ -237,7 +237,7 @@
     paintSilent();
     screen.append(
       U.el('bcv-head bcv-head--hello', U.el('bcv-head__in', [
-        U.el('bcv-head__row', [U.el('bcv-dash__title', [hello, U.text('bcv-dash__date', `${U.DAYS_LONG[today.getDay()]}, ${U.MONTHS_LONG[today.getMonth()]} ${today.getDate()}`, 'div')]), BCV.search?.field?.(app) || null]),
+        U.el('bcv-head__row', [U.el('bcv-dash__title', [hello, U.text('bcv-dash__date', `${U.DAYS_LONG[today.getDay()]}, ${U.MONTHS_LONG[today.getMonth()]} ${today.getDate()}`, 'div')])]), // (E33: the search box is the top bar's here too)
         U.el('bcv-dash__bar', [segWrap, silentBtn, newTask].filter(Boolean)),
       ])),
       body,

@@ -149,7 +149,7 @@
     if (!f) {
       try { f = await store().file(file.id); } catch (e) {
         if (current?.ov !== ov) return;
-        body.replaceChildren(U.el('bcv-viewer__none', [U.errorBox(`This file could not be read: ${e?.message || e}`)]));
+        body.replaceChildren(U.el('bcv-viewer__none', [U.errorBox(`This file could not be read: ${e?.message || e}`, null, { retry: false, canvas: false })]));
         return;
       }
     }

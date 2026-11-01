@@ -862,7 +862,7 @@
       if (name && !title) titleEl.textContent = name;
       body.replaceChildren(el);
     } catch (e) {
-      if (live) body.replaceChildren(U.errorBox(`This assignment could not be loaded: ${e?.message || e}`));
+      if (live) body.replaceChildren(U.errorBox(`This assignment could not be loaded: ${e?.message || e}`, null, { retry: false, canvas: false }));
     }
     return { close, el: ov };
   }
