@@ -2199,6 +2199,21 @@ try {
   // as the RRULE:FREQ=MONTHLY Simpl's calendar sends has it — never on the 3rd of March and every 3rd after
   const monthly = await sw.evaluate(async (base) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: () => { const y = new Date().getFullYear() + 1; const day = (ms) => { const d = new Date(ms); return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`; }; const occ = (at, repeat, m0, m1) => self.BCV.plan.occurrences({ at: at.toISOString(), repeat }, new Date(y, m0, 1).getTime(), new Date(y, m1, 1).getTime()).map(day); return { last: occ(new Date(y, 0, 31, 9, 0), 'month', 0, 6), mid: occ(new Date(y, 0, 15, 9, 30), 'month', 2, 5), weekly: occ(new Date(y, 0, 28, 18, 0), 'week', 1, 2) }; } }); return result; }, BASE);
   check(monthly.last.join() === '1/31 9:00,3/31 9:00,5/31 9:00' && monthly.mid.join() === '3/15 9:30,4/15 9:30,5/15 9:30' && monthly.weekly.join() === '2/4 18:00,2/11 18:00,2/18 18:00,2/25 18:00', `a plan repeating monthly keeps its day of the month (the 31st only where a month has one), and weekly across a month's end: ${JSON.stringify(monthly)}`);
+  // a repeating plan's time is taken each time it comes round, not only the first: a piece of work let go on the day of its
+  // second time (a weekly plan from 10 to 11) is planned clear of it — never at 8 for two and a half hours, over it
+  const clash = await sw.evaluate(async (base) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: async () => {
+    const P = self.BCV.plan; const id = 'assignment:probe-weekly';
+    const first = new Date(); first.setDate(first.getDate() + 1); first.setHours(10, 0, 0, 0);
+    await P.put({ id, title: 'Weekly probe', url: '', courseName: '', date: null }, first.getTime(), 60);
+    await P.edit(id, { repeat: 'week' });
+    const second = new Date(first); second.setDate(second.getDate() + 7);
+    const day = new Date(second); day.setHours(0, 0, 0, 0);
+    let at = null;
+    try { at = await P.slotOn({ id: 'assignment:probe-other', title: 'Other', date: null }, day.getTime(), 150); } finally { await P.clear(id); }
+    return { at: at && new Date(at).toTimeString().slice(0, 5), clear: !!at && (at + 150 * 60000 <= second.getTime() || at >= second.getTime() + 60 * 60000), gone: !P.get(id) };
+  } }); return result; }, BASE);
+  check(clash.clear && clash.gone, `a weekly plan's second time is taken: work let go on that day is planned clear of 10–11 (at ${clash.at})`);
+  await page.waitForFunction(() => !document.querySelector('.bcv-ev--plan[data-plan="assignment:probe-weekly"]'), null, { timeout: 5000 });
   // and Delete plan, in Edit, takes it away
   await page.click('.bcv-ev--plan');
   await page.waitForSelector('.bcv-evsheet__edit', { timeout: 5000 });

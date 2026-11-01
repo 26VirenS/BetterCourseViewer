@@ -273,11 +273,16 @@
     }
     return out.slice(0, MAX_SLOTS);
   }
+  /** The times the plans take between from and to (but `except`'s own): each time a repeating one comes round, not only its first. */
+  function plansBusy(from, to, except) {
+    const out = [];
+    for (const [k, p] of Object.entries(plans)) if (k !== except) for (const a of occurrences(p, from - DAY, to)) out.push({ a, b: a + p.mins * MIN }); // (from a day before: one begun then may run on into the span)
+    return out;
+  }
   async function slotsFor(it, mins) {
     const now = Date.now();
     const due = it.date ? new Date(it.date).getTime() : null;
-    const busy = [...await busyTimes(now, now + LOOK_AHEAD + DAY)]; // (a copy: the memo is shared)
-    for (const [k, p] of Object.entries(plans)) if (k !== it.id) { const a = Date.parse(p.at); busy.push({ a, b: a + p.mins * MIN }); }
+    const busy = [...await busyTimes(now, now + LOOK_AHEAD + DAY), ...plansBusy(now, now + LOOK_AHEAD + DAY, it.id)]; // (a copy: the memo is shared)
     return freeSlots({ now, due, mins, busy });
   }
   /** (2.99.112) A piece of work let go on a day (the Calendar's month or agenda): that day's first free time — from now on
@@ -289,8 +294,7 @@
     const len = mins * MIN;
     const soon = Math.ceil((Date.now() + 15 * MIN) / half) * half;
     if (Math.max(dayA, soon) + len > dayB) throw new Error('That day is already over');
-    const busy = [...await busyTimes(dayA, dayB)];
-    for (const [k, p] of Object.entries(plans)) if (k !== it.id) { const a = Date.parse(p.at); busy.push({ a, b: a + p.mins * MIN }); }
+    const busy = [...await busyTimes(dayA, dayB), ...plansBusy(dayA, dayB, it.id)];
     const slot = freeSlots({ now: Math.max(Date.now(), dayA - 15 * MIN), due: dayB, mins, busy }).find((x) => x.at >= dayA && x.end <= dayB);
     return slot ? slot.at : Math.max(dayA, soon);
   }
