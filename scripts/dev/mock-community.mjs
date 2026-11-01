@@ -3,7 +3,16 @@
 // passcode 'mock-passcode'; and, for the suites alone, /__mock/community/approve-all (what is waiting, approved) and
 // /__mock/community/pending (what is, each with the places whose photos are kept). The iPhone app's test school, made
 // from the mock, leaves it out (scripts/dev/make-test-school.mjs).
+import { readFileSync } from 'node:fs';
 import { handleCommunity } from '../../site/src/community.js';
+
+// (Mac 1.3.211) Simpl Community tools for the suites: the small gallery in scripts/dev/fixtures/community-tools.json (one
+// tool of each group, two of docs/community-tools-vectors.json's among them, and one of a later format) is
+// /api/community/tools — ahead of what the site's own handler lists, once it lists any — and each of its tools is
+// /api/community/tools/<id>; an id it does not have is the site's to answer.
+const fixtureTools = () => {
+  try { return JSON.parse(readFileSync(new URL('./fixtures/community-tools.json', import.meta.url), 'utf8')).tools || []; } catch { return []; }
+};
 
 const store = new Map();
 const kv = {
@@ -28,6 +37,22 @@ export async function communityMock(req, res, url) {
   if (url.pathname === '/__mock/community/pending') {
     const recs = (await Promise.all((await list('list:pending')).map(async (id) => JSON.parse((await kv.get(`theme:${id}`)) || 'null')))).filter(Boolean);
     return send({ ok: true, pending: recs.map((r) => ({ ...r, photos: [...store.keys()].filter((k) => k.startsWith(`photo:${r.id}:`)).map((k) => k.split(':')[2]).sort() })) });
+  }
+  const tools = req.method === 'GET' && /^\/api\/community\/tools(?:\/([a-z0-9-]+))?\/?$/.exec(url.pathname);
+  if (tools) {
+    const mine = fixtureTools();
+    if (tools[1]) {
+      const t = mine.find((x) => x.id === tools[1]);
+      if (t) return send({ ok: true, tool: t });
+    } else {
+      let theirs = [];
+      try {
+        const r = await handleCommunity(new Request(url.href, { method: 'GET', headers: req.headers }), { COMMUNITY: kv, COMMUNITY_KEY: 'mock-passcode' });
+        const j = r.ok ? await r.json() : null;
+        if (j?.ok && Array.isArray(j.tools)) theirs = j.tools;
+      } catch { /* (the site's handler has no tools yet) */ }
+      return send({ ok: true, tools: [...mine, ...theirs.filter((t) => !mine.some((m) => m.id === t.id))] });
+    }
   }
   const r = await handleCommunity(new Request(url.href, { method: req.method, headers: req.headers, body: ['GET', 'HEAD'].includes(req.method) ? undefined : Buffer.concat(chunks), duplex: 'half' }), { COMMUNITY: kv, COMMUNITY_KEY: 'mock-passcode' });
   res.writeHead(r.status, Object.fromEntries(r.headers));

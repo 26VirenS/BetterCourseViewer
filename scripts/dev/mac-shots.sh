@@ -809,6 +809,26 @@ verbs_tool() {
   MODE=light shoot light-54r-pin-verbs 14 -SimplPinnedTools verbs -SimplPinOpen verbs
 }
 
+# (1.3.211) Simpl Community tools (Tools/Community; the format's own copy, Tools/Model/CommunityToolFormat.swift, is the
+# Models job's to check). The Tools page's Community section with two tools of the mock's gallery added at launch as
+# their Add adds them (-SimplCommunityToolsAdd: each downloaded by its id, checked again on this Mac and kept — a
+# picture's launch keeps them in a file of its own that starts empty), and with none added (its Browse tile alone); the
+# browser over the mock's gallery (scripts/dev/fixtures/community-tools.json, served by mock-community.mjs: one tool of
+# each group and one of a later format, said as needing a newer Simpl), Grade points added before it opens, in light,
+# and filtered to Math (-SimplCommunityGroup) in dark; the browser with no connection (a port nothing answers on); and
+# an added tool open in the tool's popup — Ohm's law as it starts, the oven's table and note in dark (-SimplCommunityValues
+# its values), the tip splitter rounded up, narrow. community_tools_check reads what their apps said.
+community_tools() {
+  MODE=light SIZE=1280x900 shoot light-35e-tools-community 16 -SimplPlace tools -SimplToolsScroll community -SimplCommunityBase http://localhost:8800 -SimplCommunityToolsAdd "mockohms|mocktip"
+  MODE=dark SIZE=1280x900 shoot dark-35e-tools-community-empty 12 -SimplPlace tools -SimplToolsScroll community
+  MODE=light SIZE=1440x920 shoot light-35f-community-browse 18 -SimplPlace tools -SimplCommunityBase http://localhost:8800 -SimplCommunityToolsAdd mockgrade -SimplCommunityOpen browse
+  MODE=dark SIZE=1440x920 shoot dark-35f-community-browse-math 18 -SimplPlace tools -SimplCommunityBase http://localhost:8800 -SimplCommunityOpen browse -SimplCommunityGroup math
+  MODE=light SIZE=1280x820 shoot light-35h-community-browse-offline 16 -SimplPlace tools -SimplCommunityBase http://localhost:9 -SimplCommunityOpen browse
+  MODE=light SIZE=1440x920 shoot light-35g-community-tool 16 -SimplPlace tools -SimplCommunityBase http://localhost:8800 -SimplCommunityToolsAdd mockohms -SimplCommunityOpen mockohms
+  MODE=dark SIZE=1440x920 shoot dark-35g-community-tool-table 16 -SimplPlace tools -SimplCommunityBase http://localhost:8800 -SimplCommunityToolsAdd mockcook -SimplCommunityOpen mockcook -SimplCommunityValues "t=425"
+  MODE=light SIZE=780x700 shoot light-35g-community-tool-narrow 16 -SimplPlace tools -SimplCommunityBase http://localhost:8800 -SimplCommunityToolsAdd mocktip -SimplCommunityOpen mocktip -SimplCommunityValues "bill=64.4,people=3,up=true"
+}
+
 # (1.3.80) how each 3D model was framed, from the consoles ("[Simpl] bio frame <scene>: view W × H, model X% across,
 # Y% up", and the atom's and the molecule's frames): each picture's last framing and its model's share of its view's
 # limiting side (the larger of the two) in frame-check.txt — 75% to 85% is as framed (SceneFill); under 70% is said
@@ -1107,6 +1127,32 @@ update_prompt_check() {
   if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::update prompt: /'; return 1; fi
 }
 
+# (1.3.211) community_tools_check: Simpl Community tools, as community-tools-check.txt — the browser read the mock's
+# gallery (six tools: five to add, one of a later format needing a newer Simpl), tools of it were added at launch as Add
+# adds them (downloaded by id, checked again on this Mac, kept) and none was refused, an added tool opened and worked
+# out (Ohm's law as it starts: 3 A and 36 W, as docs/community-tools-vectors.json has it), and with no connection the
+# browser read nothing and said so
+community_tools_check() {
+  local out="$OUT_ABS/community-tools-check.txt" b="$OUT_ABS/console-light-35f-community-browse.txt" s="$OUT_ABS/console-light-35e-tools-community.txt"
+  local t="$OUT_ABS/console-light-35g-community-tool.txt" o="$OUT_ABS/console-light-35h-community-browse-offline.txt"
+  : > "$out"
+  say() { if [ "$1" = 0 ]; then echo "ok   $2" >> "$out"; else echo "FAIL $2" >> "$out"; fi; }
+  grep -q 'community tools: the gallery read: 6 tools, 5 to add, 1 needing a newer Simpl' "$b" 2>/dev/null
+  say $? "the browser read the mock's gallery: $(grep -o 'community tools: the gallery read: .*' "$b" 2>/dev/null | head -1)"
+  grep -q 'community tools: added mockgrade (' "$b" 2>/dev/null
+  say $? "a tool added before the browser opened: $(grep -o 'community tools: added .*' "$b" 2>/dev/null | head -1)"
+  grep -q 'community tools: added mockohms (' "$s" 2>/dev/null && grep -q 'community tools: added mocktip (' "$s" 2>/dev/null
+  say $? "two tools added to the Community section: $(grep -o 'community tools: added [a-z]*' "$s" 2>/dev/null | tr '\n' ' ')"
+  grep -q 'community tools: mockohms worked out: Current 3 A' "$t" 2>/dev/null && grep -q 'community tools: mockohms worked out: .*Power 36 W' "$t" 2>/dev/null
+  say $? "an added tool opened and worked out: $(grep -o 'community tools: mockohms worked out: .*' "$t" 2>/dev/null | head -1)"
+  ! grep -q 'community tools: the gallery read' "$o" 2>/dev/null && grep -q 'community tools: Simpl Community not reached' "$o" 2>/dev/null
+  say $? "with no connection the browser read nothing and said so: $(grep -o 'community tools: .*' "$o" 2>/dev/null | head -1)"
+  ! grep -q 'community tools: .* not added\|community tools: no tool ' "$b" "$s" "$t" 2>/dev/null
+  say $? "no tool was refused or missing as it was added: $(grep -ho 'community tools: .* not added .*\|community tools: no tool .*' "$b" "$s" "$t" 2>/dev/null | head -2 | tr '\n' ' ')"
+  cat "$out"
+  if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::community tools: /'; return 1; fi
+}
+
 tool_list_check() {
   local out="$OUT_ABS/tool-list-check.txt" r="$OUT_ABS/console-light-36d-external-tools-list-reread.txt" f crashes=0
   : > "$out"
@@ -1304,6 +1350,7 @@ if [ "${SHOTS:-full}" = check ]; then
   look_check || exit 1 # (1.3.197)
   update_prompt_check || exit 1 # (1.3.207)
   share_check || exit 1 # (1.3.208)
+  community_tools_check || exit 1 # (1.3.211)
   exit 0
 fi
 
@@ -1378,6 +1425,7 @@ the_set() {
   files_tools # (tools) Compress Files
   planner_tool # (tools) the Study Planner
   verbs_tool # (tools) Verb Conjugations
+  community_tools # (1.3.211) Simpl Community tools: the section, the browser, an added tool
   # (1.3.78) a PDF-only assignment (1013, made so here) waiting for the phone: Combine photos under the code
   mock_config '{"ext":{"1013":["pdf"]}}'
   MODE=dark shoot dark-12f-hand-in-phone-photos-waiting 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1013 -SimplOpen handin -SimplPhone YES
@@ -1482,6 +1530,7 @@ if [ "$SHARDS" = 1 ]; then
   look_check || true # (1.3.197)
   update_prompt_check || true # (1.3.207)
   share_check || true # (1.3.208)
+  community_tools_check || true # (1.3.211)
 fi
 keep_crashes
 exit 0
