@@ -148,14 +148,18 @@
     if (!a) return [];
     if (!p.repeat) return a >= from && a < to ? [a] : [];
     const out = [];
-    const d = new Date(a);
-    for (let i = 0; i < 400 && d.getTime() < to && out.length < 100; i++) {
+    const d0 = new Date(a);
+    const step = { day: 1, week: 7, '2week': 14 }[p.repeat];
+    if (!step && p.repeat !== 'month') return a >= from && a < to ? [a] : [];
+    // each time counted from the first (its time of day kept across a change of clocks); a monthly one on its own day of
+    // the month, and in a month without that day (the 31st in April) not at all — as the RRULE Simpl's calendar sends
+    // reads it — never carried over into the next month and kept there (the 31st became the 3rd of every month after)
+    for (let i = 0; i < 400 && out.length < 100; i++) {
+      const d = step ? new Date(d0.getFullYear(), d0.getMonth(), d0.getDate() + i * step, d0.getHours(), d0.getMinutes(), d0.getSeconds(), d0.getMilliseconds())
+        : new Date(d0.getFullYear(), d0.getMonth() + i, d0.getDate(), d0.getHours(), d0.getMinutes(), d0.getSeconds(), d0.getMilliseconds());
+      if (d.getTime() >= to) break;
+      if (!step && d.getDate() !== d0.getDate()) continue;
       if (d.getTime() >= from) out.push(d.getTime());
-      if (p.repeat === 'day') d.setDate(d.getDate() + 1);
-      else if (p.repeat === 'week') d.setDate(d.getDate() + 7);
-      else if (p.repeat === '2week') d.setDate(d.getDate() + 14);
-      else if (p.repeat === 'month') d.setMonth(d.getMonth() + 1);
-      else break;
     }
     return out;
   }
