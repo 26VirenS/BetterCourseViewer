@@ -28,8 +28,11 @@
     lock: 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.134', date: '2026-11-01', notes: [
+      { kind: 'fixed', title: 'No False Warning', body: 'Simpl no longer says Safari is running an old copy.', icon: P.check },
+    ] },
     { version: '2.99.133', date: '2026-11-01', notes: [
-      { kind: 'improved', title: 'Every Version, Any Time', body: 'Developer: roll the Mac app back to any version.', icon: P.check },
+      { kind: 'improved', title: 'Any Version, Any Time', body: 'Developer: roll the Mac app back to any version.', icon: P.check },
     ] },
     { version: '2.99.132', date: '2026-10-30', notes: [
       { kind: 'improved', title: 'Two Dashboard Views', body: 'The List or Recent activity: the course cards are gone.', icon: P.list },

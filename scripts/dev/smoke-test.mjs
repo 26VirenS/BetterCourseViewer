@@ -1571,7 +1571,9 @@ try {
   // (2.99.44) the Mac's month: a ruled grid, items by a bar of their course's colour, "n items · m missing" under the month's name
   await page.waitForFunction(() => /^\d+ items?( · \d+ missing)?$/.test(document.querySelector('.bcv-cal__sub')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
   const macMonth = await page.evaluate(() => { const ev = document.querySelector('.bcv-cal--month .bcv-ev'); const day = document.querySelector('.bcv-cal--month .bcv-cal__day'); return { sub: document.querySelector('.bcv-cal__sub')?.textContent, bar: ev ? getComputedStyle(ev).borderLeftWidth : null, gap: getComputedStyle(document.querySelector('.bcv-cal--month .bcv-cal__grid')).rowGap, rule: day ? getComputedStyle(day).borderRightStyle : null, missing: [...document.querySelectorAll('.bcv-cal--month .bcv-ev.is-missing')].map((e) => e.textContent.trim()) }; });
-  check(/^\d+ items?( · \d+ missing)?$/.test(macMonth.sub || '') && macMonth.bar === '3px' && macMonth.gap === '0px' && macMonth.rule === 'solid' && macMonth.missing.includes('W2 HW'), `the month as the Mac draws it: ${JSON.stringify(macMonth)}`);
+  // (W2 HW is due yesterday: on the 1st of a month that is last month, in this grid only when the month opens mid-week)
+  const yesterdayShown = await page.evaluate(() => { if (new Date().getDate() > 1) return true; const nums = [...document.querySelectorAll('.bcv-cal--month .bcv-cal__day .bcv-cal__num')].map((e) => e.textContent.trim()); return nums.indexOf('1') > 0; });
+  check(/^\d+ items?( · \d+ missing)?$/.test(macMonth.sub || '') && macMonth.bar === '3px' && macMonth.gap === '0px' && macMonth.rule === 'solid' && (macMonth.missing.includes('W2 HW') || !yesterdayShown), `the month as the Mac draws it: ${JSON.stringify(macMonth)}`);
   await page.waitForSelector('.bcv-ev', { timeout: 10000 });
   const evs = await texts('.bcv-ev');
   check(evs.length >= 10 && evs.some((t) => /Dis01/.test(t)), `month view events: ${evs.length}`);
@@ -1582,7 +1584,7 @@ try {
   // handed-in work is struck through; work past its due date with nothing in (W2 HW, yesterday) stays
   // legible — it is missing, not done — and the chip's tip says so, with the points it is worth
   const calMarks = await page.$$eval('.bcv-ev', (els) => ({ struck: els.filter((e) => e.querySelector('.bcv-ev__label.bcv-strike')).map((e) => e.querySelector('.bcv-ev__label').textContent), w2: els.filter((e) => /W2 HW/.test(e.textContent)).map((e) => ({ struck: !!e.querySelector('.bcv-strike'), tip: e.title })) }));
-  check(calMarks.struck.some((t) => /Lec05-PreQuiz/.test(t)) && calMarks.w2.length === 1 && !calMarks.w2[0].struck && /^W2 HW · .+ · 15 pts · Missing$/.test(calMarks.w2[0].tip), `handed-in work is struck through, missing work is not (its tip says so): ${JSON.stringify(calMarks)}`);
+  check((calMarks.struck.some((t) => /Lec05-PreQuiz/.test(t)) || (!yesterdayShown && calMarks.struck.length > 0)) && ((calMarks.w2.length === 1 && !calMarks.w2[0].struck && /^W2 HW · .+ · 15 pts · Missing$/.test(calMarks.w2[0].tip)) || (!yesterdayShown && !calMarks.w2.length)), `handed-in work is struck through, missing work is not (its tip says so): ${JSON.stringify(calMarks)}`);
   // the calendars live in a sheet off the Calendars button (which counts the ones on), so the month
   // has the width of the page to itself — but for To Do, beside it on the left (2.99.112: To Do & Calendar)
   const calWide = await page.evaluate(() => { const c = document.querySelector('.bcv-cal').getBoundingClientRect(); const t = document.querySelector('.bcv-cal__todo').getBoundingClientRect(); return { w: Math.round(c.width), todoLeft: t.right <= c.left, todoW: Math.round(t.width) }; });
