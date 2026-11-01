@@ -89,14 +89,38 @@ public class PlanningWordsTests
         var model = new RubricModel(new[] { Adjusted() });
         var c = model.Criteria[0];
         Assert.True(c.Adjusted);
-        Assert.Equal("Your mark · 4 pts", c.MarkText);
+        // (the UI review's W18: where the points fall, not "Your mark · 4 pts" in the 3-point Partial column)
+        Assert.Equal("4 pts (between Partial and Full marks)", c.MarkText);
+        Assert.Equal("between Partial and Full marks", c.Where);
+        Assert.Equal("Correctness, 4 of 6, between Partial and Full marks", model.Spoken(c));
         Assert.Equal(1, c.Mark); // (the level picked is still Partial)
         // the mark's dot at 4 on a bar from 0 (its foot) to 6 (its top)
         var y = new RubricGeometry(model).MarkY(0, 500);
         Assert.NotNull(y);
         Assert.Equal(500 - (500 - RubricRing.BarTop) * 4 / 6.0, y!.Value, 6);
-        // the engine's words, when it sends them
-        Assert.Equal("Your mark · 4 pts", new RubricModel(new[] { Adjusted(true, "Your mark · 4 pts") }).Criteria[0].MarkText);
+        // the engine's words, when it sends them, give way to where the points fall
+        Assert.Equal("4 pts (between Partial and Full marks)", new RubricModel(new[] { Adjusted(true, "Your mark · 4 pts") }).Criteria[0].MarkText);
+    }
+
+    [Fact]
+    public void AMarkWithNoLevelNamedSaysWhereItFalls()
+    {
+        // (no level picked, 4 given: drawn in the nearest level's column, Partial's 3 — and saying it is not Partial's)
+        var row = Adjusted(false, "Your mark · 4 pts");
+        foreach (var r in row.Ratings!) r.Got = false;
+        var c = new RubricModel(new[] { row }).Criteria[0];
+        Assert.Equal(1, c.Mark);
+        Assert.Equal("4 pts (between Partial and Full marks)", c.MarkText);
+    }
+
+    [Fact]
+    public void AMarkPastEveryLevelSaysSo()
+    {
+        var levels = new List<RubricModel.Level> { new("Full marks", "", 6), new("Partial", "", 3), new("No marks", "", 0) };
+        Assert.Equal("above Full marks", RubricModel.Where(levels, 7));
+        Assert.Equal("below No marks", RubricModel.Where(levels, -1));
+        Assert.Equal("between No marks and Partial", RubricModel.Where(levels, 2));
+        Assert.Equal("Full marks", RubricModel.Where(levels, 6));
     }
 
     [Fact]

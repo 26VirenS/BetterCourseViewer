@@ -1095,6 +1095,12 @@ jobs:
           Shot 'community-browser-offline' '1024x681' 30 ($mock + @('--community-base', 'http://localhost:9', '--appearance', 'light', '--place', 'tools', '--community-browse', 'yes'))
           Shot 'community-tool-open' '1366x778' 45 ($mock + $community + @('--appearance', 'light', '--place', 'tools', '--community-add', 's-ohms', '--community-open', 's-ohms', '--community-values', 'v=9,r=3'))
           Shot 'community-tool-open-dark' '1024x681' 45 ($mock + $community + @('--appearance', 'dark', '--place', 'tools', '--community-add', 's-gpa', '--community-open', 's-gpa'))
+          # (the UI review, at the end so the pictures before keep their parts) a web tool whose page does not load: the
+          # Calculator told to ask for a page that is not there (--web-tool-error calc) — whole in its popup in light, and
+          # its pin's flyout in dark — shows Simpl's own "Calculator couldn't load" with Try again and Open in browser, never
+          # the web view's error page (its log must say so, checked below; 'tool-open' and 'pin-popout' show GeoGebra itself)
+          Shot 'tool-calc-unloaded' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'tools', '--tool', 'calc', '--web-tool-error', 'calc'))
+          Shot 'pin-calc-unloaded-dark' '1366x778' 45 ($mock + @('--appearance', 'dark', '--pin', 'calc,ptable', '--pin-open', 'calc', '--web-tool-error', 'calc'))
           # a pin's flyout used as a student uses it — opened as a press opens it (not kept for its picture), clicked in
           # and typed in (Tools/ToolHost.cs, PinTry) — alone on the runner, so no other copy of Simpl takes the window's
           # focus: five seconds on, its log must say it is still open (checked below)
@@ -1188,6 +1194,36 @@ jobs:
             Write-Host "update-force-quiz: $((@($l -split "`n" | Where-Object { $_ -match 'update: ' }) | Select-Object -Last 6) -join ' | ')"
             if ($l.Contains('update: the prompt is up') -or $l.Contains('goes in now')) { Write-Host "::error::update-force-quiz: an update asked or went in over a quiz (shots/profile-update-force-quiz.log)"; exit 1 }
             if (-not $l.Contains('waits for the quiz to close')) { Write-Host "::error::update-force-quiz: an update kept waiting a day did not say it waits for the quiz (shots/profile-update-force-quiz.log)"; exit 1 }
+          }
+          # (the UI review) a web tool whose page does not load shows Simpl's own failure in its place, and the Calculator's
+          # page is where the app asks for it (until the review it was shipped one folder up: every Calculator showed
+          # Chromium's "File not found")
+          foreach ($w in @('tool-calc-unloaded', 'pin-calc-unloaded-dark')) {
+            if ($script:mine -notcontains $w) { continue }
+            $l = if (Test-Path "shots/profile-$w.log") { Get-Content "shots/profile-$w.log" -Raw } else { '' }
+            if ($l -notmatch "calculator: could not load \(.+\): Simpl's own error shown in its place") { Write-Host "::error::${w}: the Calculator's page did not load and Simpl's own failure was not shown in its place (shots/profile-$w.log)"; exit 1 }
+            Write-Host "${w}: Simpl's own failure shown in the Calculator's place"
+          }
+          foreach ($w in @('tool-open', 'pin-popout')) {
+            if ($script:mine -notcontains $w) { continue }
+            $l = if (Test-Path "shots/profile-$w.log") { Get-Content "shots/profile-$w.log" -Raw } else { '' }
+            if ($l.Contains('calculator: could not load (its page,')) { Write-Host "::error::${w}: the Calculator's own page did not load (shots/profile-$w.log)"; exit 1 }
+            # (GeoGebra itself comes from geogebra.org: said, not held to — the runner's internet is not Simpl's)
+            Write-Host "${w}: the Calculator's page loaded; GeoGebra $(if ($l.Contains('calculator: GeoGebra is ready')) { 'ready' } else { 'not ready by the picture (geogebra.org)' })"
+          }
+          # (the UI review) a popup with a form or a decision in it dims the window under it (Sheet.Dims: Sync, Hand in,
+          # Find appointment, New message, New task, the update's prompt); a tool's popup, used beside the page, never does
+          foreach ($d in @('calendar-sync', 'hand-in', 'find-appointment', 'compose', 'new-task', 'update-force-prompt')) {
+            if ($script:mine -notcontains $d) { continue }
+            $l = if (Test-Path "shots/profile-$d.log") { Get-Content "shots/profile-$d.log" -Raw } else { '' }
+            if ($l -notmatch 'popup .+: the window dimmed under it') { Write-Host "::error::${d}: the popup did not dim the window under it (shots/profile-$d.log)"; exit 1 }
+            Write-Host "${d}: the window dimmed under the popup"
+          }
+          foreach ($d in @('tool-open', 'rubric', 'alta-overview')) {
+            if ($script:mine -notcontains $d) { continue }
+            $l = if (Test-Path "shots/profile-$d.log") { Get-Content "shots/profile-$d.log" -Raw } else { '' }
+            if ($l.Contains('the window dimmed under it')) { Write-Host "::error::${d}: a large popup, used beside the page, dimmed the window under it (shots/profile-$d.log)"; exit 1 }
+            Write-Host "${d}: the window left undimmed under the large popup"
           }
           # Send from Phone took the files: the server's answers, and the log saying each file is in the hand-in
           $phoneBad = @()

@@ -261,6 +261,8 @@ internal static class AppointmentsSheet
         Paint();
         var sheet = new Sheet { Title = "Find Appointment", Body = K.V(12, lede, body), Width = 580, Floats = true, Light = true };
         sheet.Add("Done", SheetButtonKind.Primary);
+        // (the UI review's W2: a time reserved here is a decision — the window dimmed under it, a click there still closing it)
+        sheet.Dims = true;
         Dialogs.Show(sheet, over);
         _ = Load();
     }

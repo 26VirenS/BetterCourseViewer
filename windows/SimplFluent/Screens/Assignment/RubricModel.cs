@@ -154,10 +154,12 @@ internal sealed class RubricModel
 
     /// <summary>A criterion: its levels, what it is worth and the score given, the level given (<c>Mark</c>), and — when
     /// the score given is not that level's points (a marker picks Partial, 3 pts, and gives 4, as Canvas lets them) —
-    /// <c>Adjusted</c>, its mark then drawn at the points given; <c>MarkText</c> is the mark's badge ("Your mark", "Your
-    /// mark · 4 pts").</summary>
+    /// <c>Adjusted</c>, its mark then drawn at the points given; <c>MarkText</c> is the mark's badge: "Your mark", or — the
+    /// points given apart from the level's column it sits in — where they fall (the UI review's W18: "Your mark · 4 pts" in
+    /// the 3-point Partial column read as a contradiction), "4 pts (between Partial and Full marks)"; <c>Where</c> is that
+    /// "between Partial and Full marks" alone ("" on its level).</summary>
     public sealed record Criterion(string Id, int Index, string Name, string Short, string Desc, List<Level> Levels, double Worth,
-        double? Score, int Mark, string Comment, double Frac, bool Adjusted = false, string MarkText = "Your mark");
+        double? Score, int Mark, string Comment, double Frac, bool Adjusted = false, string MarkText = "Your mark", string Where = "");
 
     public List<Criterion> Criteria { get; }
     /// <summary>Marked and posted: at least one criterion has a score.</summary>
@@ -252,9 +254,28 @@ internal sealed class RubricModel
         var given = mark >= 0 ? levels[mark].Pts : null;
         var adjusted = row.Adjusted ?? (score is { } sc && given is { } gv && Math.Abs(sc - gv) > 1e-9);
         var points = score is { } sp ? $"{RubricRing.Num(sp)} {(sp == 1 ? "pt" : "pts")}" : "";
-        var badge = !string.IsNullOrEmpty(row.MarkText) ? row.MarkText! : adjusted && points.Length > 0 ? $"Your mark · {points}" : "Your mark";
+        // (the points given apart from the level whose column the mark sits in — adjusted, or no level named and the
+        //  nearest taken — say where they fall, whatever the engine's words: "4 pts (between Partial and Full marks)")
+        var where = score is { } sw && given is { } gw && Math.Abs(sw - gw) > 1e-9 ? Where(levels, sw) : "";
+        var badge = where.Length > 0 ? $"{points} ({where})"
+            : score != null && given != null ? "Your mark"
+            : !string.IsNullOrEmpty(row.MarkText) ? row.MarkText! : adjusted && points.Length > 0 ? $"Your mark · {points}" : "Your mark";
         return new Criterion(row.Id ?? "", k, full, Short(full), PlainLines(row.Desc ?? ""), levels, worth, score, mark, comment,
-            Fraction(levels, worth, score, mark), adjusted, badge);
+            Fraction(levels, worth, score, mark), adjusted, badge, where);
+    }
+
+    /// <summary>Where points given fall among a criterion's levels, by their names: "between Partial and Full marks" (the
+    /// lower first), "above Full marks", "below Partial" — or a level's own name where they are its points.</summary>
+    internal static string Where(IReadOnlyList<Level> levels, double given)
+    {
+        var at = levels.FirstOrDefault(l => l.Pts is { } p && Math.Abs(p - given) <= 1e-9);
+        if (at != null) return at.Label;
+        var lower = levels.Where(l => l.Pts is { } p && p < given).OrderByDescending(l => l.Pts).FirstOrDefault();
+        var upper = levels.Where(l => l.Pts is { } p && p > given).OrderBy(l => l.Pts).FirstOrDefault();
+        if (lower != null && upper != null) return $"between {lower.Label} and {upper.Label}";
+        if (lower != null) return $"above {lower.Label}";
+        if (upper != null) return $"below {upper.Label}";
+        return "";
     }
 
     private static Level LevelOf(RubricRating r)
@@ -331,7 +352,7 @@ internal sealed class RubricModel
         if (Graded)
         {
             if (c.Score is not { } s) return $"{c.Name}, not marked yet, worth {RubricRing.Num(c.Worth)}";
-            var level = c.Mark >= 0 ? $", {c.Levels[c.Mark].Label}{(c.Adjusted ? ", adjusted" : "")}" : "";
+            var level = c.Where.Length > 0 ? $", {c.Where}" : c.Mark >= 0 ? $", {c.Levels[c.Mark].Label}" : "";
             return $"{c.Name}, {RubricRing.Num(s)} of {RubricRing.Num(c.Worth)}{level}";
         }
         return $"{c.Name}, worth {RubricRing.Num(c.Worth)} {(c.Worth == 1 ? "point" : "points")}";

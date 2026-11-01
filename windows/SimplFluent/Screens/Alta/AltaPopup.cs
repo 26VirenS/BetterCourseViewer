@@ -19,13 +19,13 @@ namespace Simpl.Screens;
 
 /// <summary>
 /// (Mac 1.3.17) A Knewton Alta assignment in a popup over the window, as a quiz is taken (the Mac's AltaQuizScreen): the
-/// assignment's name and Close across the top; down the left, (0.3.5) Light or Dark for Alta's page and Show browser, then its objectives
-/// as the quiz's question tiles — the one being worked on filled, a mastered one ticked, the others filling as they are
-/// mastered — each by name, and the total mastery bar. In the rest, Alta's own page, the student working on it there: its
-/// question alone on panels, its buttons as the popup's own at its foot, its cover as the popup's start screen, its
-/// pop-ups as the popup's dialogs, and the popup's skeleton while it loads — all of it in the page's look, light unless
-/// the student chose dark; or, with Show browser on, Alta's own page as it is, as in a browser. AltaSession reads it all
-/// from the page.
+/// assignment's name across the top (every popup's heading, Kit/PopupHeader.cs), with Simpl look, Dark page and ×; down
+/// the left, its objectives as the quiz's question tiles — the one being worked on filled, a mastered one ticked, the
+/// others filling as they are mastered — each by name, and the total mastery bar. In the rest, Alta's own page, the
+/// student working on it there: its question alone on panels, its buttons as the popup's own at its foot, its cover as the
+/// popup's start screen, its pop-ups as the popup's dialogs, and the popup's skeleton while it loads — all of it in the
+/// page's look, light unless the student chose dark; or, with Simpl look off (0.3.5's Show browser), Alta's own page as it
+/// is, as in a browser. AltaSession reads it all from the page.
 /// </summary>
 public static class AltaPopup
 {
@@ -59,7 +59,9 @@ internal sealed class AltaPopupView
     /// <summary>(0.3.5) Where Alta's page and what the popup shows in its place are, dressed in the page's look
     /// (AltaLook.Look): an opaque ground of the look's own under the frame, its corner rounded as the frame's.</summary>
     private readonly Border region = new() { CornerRadius = new CornerRadius(8, 0, 0, 0) };
-    private readonly AltaPageBar pageBar;
+    /// <summary>(the UI review's W9) Simpl look — every publisher's popup's one look control: off is Alta's own page, as
+    /// in a browser — and Alta's page dark or light, icon buttons in the heading where a switch and "Browser" were.</summary>
+    private readonly System.Windows.Controls.Button lookButton, pageButton;
     private readonly ContentControl startSlot = new() { Focusable = false, Visibility = Visibility.Collapsed };
     private readonly FrameworkElement skeleton = AltaParts.Skeleton();
     private readonly ContentControl stateSlot = new() { Focusable = false, Visibility = Visibility.Collapsed };
@@ -89,9 +91,13 @@ internal sealed class AltaPopupView
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         tileSlot.Content = Tile(32);
         title.Text = launch.Title;
-        // (0.3.41) Light or Dark and Browser in the header, left of the tools, where they were above the objectives
-        pageBar = new AltaPageBar(session.Dark, session.Browser, SetDark, SetBrowser);
-        header = AltaLook.Header(engine, tileSlot, title, subtitle, K.H(8, codeSlot, logsSlot, pageBar), Close, "Close — your progress is kept by Alta");
+        // (0.3.41) Simpl look and Dark page in the heading, where they were above the objectives
+        lookButton = PopupHeader.Look(() => SetBrowser(!session.Browser));
+        pageButton = PopupHeader.Icon(SymbolRegular.WeatherMoon24, "Dark page", () => SetDark(!session.Dark));
+        var head = AltaLook.Header(engine, tileSlot, title, subtitle, Close, "Close — your progress is kept by Alta", codeSlot, logsSlot);
+        head.Buttons(lookButton, pageButton);
+        header = head;
+        PaintPage();
         root.Children.Add(header.Row(0));
 
         // the rail, and Alta's page in its frame (the popup's own in its place while it loads, and its buttons under it)
@@ -204,7 +210,7 @@ internal sealed class AltaPopupView
         if (closed || dark == session.Dark) return;
         Dress(dark);
         session.SetDark(dark);
-        pageBar.Show(dark, session.Browser);
+        PaintPage();
         startSig = footerSig = stateSig = "";
         ground = null;
         Update();
@@ -216,9 +222,23 @@ internal sealed class AltaPopupView
     {
         if (closed || on == session.Browser) return;
         session.SetBrowser(on);
-        pageBar.Show(session.Dark, on);
+        PaintPage();
         startSig = footerSig = stateSig = "";
         Update();
+    }
+
+    /// <summary>Simpl look on or off (off: Alta's own page, as in a browser), and the page's light or dark — the moon to
+    /// make it dark, the sun to make it light — which only Simpl look lays out.</summary>
+    private void PaintPage()
+    {
+        PopupHeader.PaintLook(lookButton, !session.Browser, "Knewton Alta");
+        var dark = session.Dark;
+        pageButton.Content = K.Icon(dark ? SymbolRegular.WeatherSunny24 : SymbolRegular.WeatherMoon24, 16, B.Text);
+        pageButton.IsEnabled = !session.Browser;
+        pageButton.ToolTip = session.Browser ? "Alta’s own page shows as Alta draws it: light and dark come back with Simpl look"
+            : dark ? "Alta’s page is dark: make it light" : "Alta’s page is light: make it dark";
+        System.Windows.Automation.AutomationProperties.SetName(pageButton, "Dark page");
+        System.Windows.Automation.AutomationProperties.SetItemStatus(pageButton, dark ? "On" : "Off");
     }
 
     /// <summary>(0.3.5) The page's part of the popup dressed in the page's look — nothing of its own when that is the
@@ -520,7 +540,7 @@ internal sealed class AltaPopupView
         {
             if (dev)
             {
-                var save = K.Button("Save Page Code", () => SaveCode(false), icon: SymbolRegular.Code24);
+                var save = K.Button("Save page code", () => SaveCode(false), icon: SymbolRegular.Code24);
                 save.ToolTip = "Every bit of Alta’s page code, in one text file in Downloads";
                 codeSlot.Content = save;
                 Motion.FadeIn(save);

@@ -41,9 +41,10 @@ internal interface IQuizPane
 }
 
 /// <summary>
-/// The popup (the Mac's QuizScreen): its own header — the quiz and where it stands, the clock and the instructions during
-/// an attempt, the quiz on Canvas in its ⋯ menu, Close — then the stage's pane, a note at its top when a save fails or the
-/// clock runs low, and the questions it asks over itself (Leave the quiz?, Submit this attempt?).
+/// The popup (the Mac's QuizScreen): its heading — every popup's (Kit/PopupHeader.cs): the quiz and where it stands, the
+/// clock and the instructions during an attempt, the quiz on Canvas in its ⋯ menu, × — then the stage's pane, a note at
+/// its top when a save fails or the clock runs low, and the questions it asks over itself (Leave the quiz?, Submit this
+/// attempt?).
 /// </summary>
 internal sealed class QuizSheet
 {
@@ -71,13 +72,14 @@ internal sealed class QuizSheet
     private readonly Button back;
     private readonly ContentControl tileHost = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBlock title = K.Text("", Ty.Subtitle);
-    private readonly TextBlock subtitle = K.Text("", Ty.Caption, B.Text2);
+    private readonly TextBlock subtitle = K.Text("", Ty.Body, B.Text2);
     private readonly Border clockPill = new() { CornerRadius = new CornerRadius(15), Padding = new Thickness(12, 5, 14, 6), VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBlock clockText = K.Text("", Ty.BodyStrong).Digits();
     private readonly SymbolIcon clockIcon = new() { Symbol = SymbolRegular.Timer24, FontSize = 16, VerticalAlignment = VerticalAlignment.Center };
     private readonly Button instructionsButton;
     private readonly Button moreButton;
-    private readonly Wpf.Ui.Controls.Button closeButton;
+    private readonly PopupHeader header;
+    private Button closeButton => header.Close;
     private Popup? instructions;
 
     public QuizSheet(Engine.Engine engine, Simpl.Engine.QuizLaunch launch, Window over)
@@ -89,17 +91,16 @@ internal sealed class QuizSheet
         var room = Room();
         sheet = new Sheet { Bare = true, Width = room.Width, Height = room.Height, Body = root };
 
-        back = K.IconButton(SymbolRegular.ArrowLeft24, () => Run.LeaveFeedback(), "Back", 16, 36);
-        instructionsButton = K.IconButton(SymbolRegular.BookOpen24, ToggleInstructions, "Instructions", 18, 36);
-        moreButton = K.IconButton(SymbolRegular.MoreHorizontal24, MoreMenu, "More", 18, 36);
-        closeButton = K.Button("Close", Close);
-        closeButton.MinWidth = 80;
+        back = PopupHeader.Icon(SymbolRegular.ArrowLeft24, "Back to the quiz", () => Run.LeaveFeedback());
+        instructionsButton = PopupHeader.Icon(SymbolRegular.BookOpen24, "Instructions", ToggleInstructions);
+        moreButton = PopupHeader.Icon(SymbolRegular.MoreHorizontal24, "More", MoreMenu);
         clockPill.Child = K.H(8, clockIcon, clockText);
+        header = BuildHeader();
 
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        root.Children.Add(BuildHeader().Row(0));
+        root.Children.Add(header.Row(0));
         root.Children.Add(K.Divider().Row(1));
         body.Children.Add(paneHost);
         body.Children.Add(bannerHost);
@@ -273,18 +274,16 @@ internal sealed class QuizSheet
 
     // ---- the header ----
 
-    private FrameworkElement BuildHeader()
+    /// <summary>Every popup's heading (Kit/PopupHeader.cs): Back (the feedback's way back to the quiz), the quiz's tile,
+    /// its name over where it stands; the tools pinned to the title bar (the popup covers the title bar while it is up)
+    /// and the clock; Instructions and ⋯; and ×, which during an attempt asks first.</summary>
+    private PopupHeader BuildHeader()
     {
-        var words = K.V(2, title, subtitle);
-        words.VerticalAlignment = VerticalAlignment.Center;
-        // (the tools pinned to the title bar, here too: the popup covers the title bar while it is up)
-        var trailing = K.H(8, new Simpl.Tools.PinBar(Engine, inPopup: true), clockPill, instructionsButton, moreButton, closeButton);
-        trailing.VerticalAlignment = VerticalAlignment.Center;
-        back.VerticalAlignment = VerticalAlignment.Center;
-        back.Margin = new Thickness(0, 0, 8, 0);
-        var g = K.Columns("auto, auto, *, auto", back.Col(0), tileHost.Col(1), words.Margin(14, 0, 16, 0).Col(2), trailing.Col(3));
-        g.Margin = new Thickness(20, 16, 16, 14);
-        return g;
+        var h = new PopupHeader(title, subtitle, Close, "Close the quiz", tileHost);
+        h.Lead(back);
+        h.Extra(new Simpl.Tools.PinBar(Engine, inPopup: true), clockPill);
+        h.Buttons(instructionsButton, moreButton);
+        return h;
     }
 
     private string TitleNow => Run.Attempt?.Title ?? Run.Intro?.Title ?? launch.Title;

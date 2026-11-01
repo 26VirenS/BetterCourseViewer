@@ -157,9 +157,9 @@ window's side of it, `Shell/UpdateWatch.cs`:
 - **Kept waiting a day** (0.3.103, `Support/UpdatesForce.cs`, the Mac's 1.3.207): an update that goes in by itself
   (a Critical Update too) is waited for from when it is found (`updates:waitingSince`, with the version it was found
   on, `updates:waitingFrom`). Once it has waited 24 hours for what is open — any of the above, or the half minute
-  without a key that never came — a popup over the window ("Simpl Needs to Update", `UpdateWatch.Prompt`) says it
+  without a key that never came — a popup over the window ("Simpl needs to update", `UpdateWatch.Prompt`) says it
   goes in in half an hour and counts it down: **Later** puts it away, and it comes back once with five minutes left
-  (and at the next start while the time runs: `updates:forceAt` is kept); **Update Now** puts it in at once. When the
+  (and at the next start while the time runs: `updates:forceAt` is kept); **Update now** puts it in at once. When the
   half hour is up it goes in, whatever is open, as Restart to Update does (`update: v132 goes in now, its half hour
   up`). The half hour begins only with the window in view, not in the notification area, and nothing is asked
   while Simpl opens nor for ten seconds after, so what it opens with (a quiz asked for) is open first. **Never during a quiz**:
@@ -588,7 +588,9 @@ public sealed class GradesScreen : Screen
   `toolLaunch`) — the tool alone, its school page only as the fallback, and on that page (0.3.24) Canvas's launch form,
   aimed at a new window behind "Load … in a new window", sent on in the window itself so the tool opens at once —; Back, Forward and Refresh at the title bar's
   left (Alt+←, Alt+→, F5), More at its right (Open in browser, Copy link), a thin line under the title bar while a page
-  loads, and why it could not open in the window with Try again. The page is in light, whatever Simpl's appearance or
+  loads, and why it could not open in the window with Try again — or, a page that did not load (its navigation failed,
+  its process stopped), Simpl's own failure in its place with Try again and Open in browser (`Kit/WebFailure.cs`),
+  never the web view's error page. The page is in light, whatever Simpl's appearance or
   Windows' (`LightPages`: the page and its frames are told the student prefers light, through the browser's DevTools
   protocol, per web view — the profile's preference is shared with the school's pages in the app, which follow the
   app; a frame in a process of its own is held at its start until it has been told, so a script that reads the
@@ -913,6 +915,16 @@ the room (`ShowNote`); a tool handing something to another from its popup (`Tool
 element's See it in 3D, Lewis Structures' Open in Molecule Builder, the Biomolecule Builder's molecule for the Molecule
 Builder) turns that popup into the other tool in place (`ToolsCenter.PopUp`), the other taking what it was handed once
 (`TakeInfo`). `--tool calc` opens one over the Tools page for a picture.
+
+A web tool never shows the web view's own error page ("File not found", ERR_…): the Calculator (GeoGebra's page,
+`extension/tools/geogebra/index.html`, which loads GeoGebra from geogebra.org — until the UI review it was shipped one
+folder up, and every Calculator showed Chromium's "File not found"), the graphing calculator (Desmos), a tool's window
+and Macmillan and ALEKS in their popup each put Simpl's own failure in its place (`Kit/WebFailure.cs`) where their page
+does not load — its navigation failed, its process stopped, or (the Calculator) GeoGebra did not answer, the page's
+"offline": "Calculator couldn’t load", why in a line the student can act on, Try again (the web view made afresh; for
+Macmillan and ALEKS, the assignment launched afresh) and Open in browser. The log says "calculator: could not load (…):
+Simpl's own error shown in its place" (`graph:`, `web window:`, `macmillan popup:` the same). For pictures,
+`--web-tool-error calc` has the Calculator ask for a page that is not there.
 
 A pin's flyout is the tool's quick version, under its whole name and (0.3.5) *Open full screen* at its top right (the
 Fluent FullScreenMaximize icon, its tooltip and screen-reader name "Open full screen"; `PinBar.QuickHead`), where Pop
@@ -1288,11 +1300,29 @@ list in `ToolsScreen.Everyday` and `Groups`, and the search box opens each by it
 
 ## Popups
 
-Every popup floats over the window without holding it (`Shell/FloatPopup.cs`, a `Sheet` with `Floats`): a window of
-its own owned by Simpl's window — kept above it, minimized and brought back with it, hidden with it in the notification
-area and shown again with it — so nothing takes the window's clicks: the pane, the title bar, the search and the page
-behind it go on working, and another place opened under a popup leaves it where it is. Nothing is dimmed; Windows' own
-shadow and rounded corners set it apart (pictures draw them, `Support/Shot.cs`). Its window is as large as its card,
+Every popup floats over the window (`Shell/FloatPopup.cs`, a `Sheet` with `Floats`): a window of its own owned by
+Simpl's window — kept above it, minimized and brought back with it, hidden with it in the notification area and shown
+again with it. (The UI review's W2) One with a form or a decision in it (`Sheet.Dims`: Hand in, New message, New task,
+Sync, Find appointment, the update's prompt, What-if, Grading scale, Nickname, Share this theme) dims the window under
+it as Windows 11's ContentDialog does — the window's own smoke (`SheetHost.Dim`: no card of its own, its web pages
+stepping aside as for a sheet), every other popup over the window dimmed with it — and nothing there takes a click
+until it goes (a light one, Find appointment, still closes with a click on the dimmed window); a development run's log
+says "popup …: the window dimmed under it". The rest take nothing from the window: a tool, Knewton Alta, Macmillan,
+ALEKS, feedback and the rubric (large, used beside the page), the light ones only there to be read or switched, and a
+plan's beside its block — the pane, the title bar, the search and the page behind go on working, and another place
+opened under one leaves it where it is; Windows' own shadow and rounded corners set it apart (pictures draw them,
+`Support/Shot.cs`). (The UI review's W9) Every popup has the one heading (`Kit/PopupHeader.cs`; a titled sheet's is its
+title with × at its right, a tool's `ToolHeading` is laid out the same): on the left a way back where there is one, the
+popup's tile and its title over a line about it; on the right what it adds (the tools pinned to the title bar, a quiz's
+clock, Ring | Grid), its icon buttons, each with its tooltip (Simpl look — the one look control of Knewton Alta,
+Macmillan and ALEKS, and of their pages in a tool's window — Dark page, Reload, Open in a window, Instructions, ⋯, a
+tool's pin), and a single × at the far right, where there were "× Close", "Close", "Done" and a bare ×. ALEKS says its
+topic once, in the question's heading over the page (in its rail only while that heading does not show), and its part of
+the course not at all where it is the assignment's own name. (W18) The rubric's heading is the same: ← back to the ring
+while a criterion is open, the assignment over the rubric and where it stands, Ring | Grid and × at the right (its ×
+had been at its top left); its grid starts at the top of the room under it, not in its middle; and a mark given between
+two levels says where it falls, "4 pts (between Partial and Full marks)", not "Your mark · 4 pts" in the 3-point
+column (`RubricModel.Where`). Its window is as large as its card,
 however small (WPF-UI's least window size, 460 × 320, let go). It opens centred over the page beside
 the pane (`MainWindow.PopupRoom`); it moves with the window, keeping where it was put, and its heading moves it (a
 press there that is not on a control, `Kit/Drag.cs`; `Handle` names the heading, else its top 60).
@@ -1428,7 +1458,8 @@ shown, and writes "alta: a pop-up shown as the app's own: …" with its words, f
 
 Alta's page is light (0.3.5), as it is made — the owner's choice for every outside tool (0.3.1) — whatever the app's
 appearance; until then Alta's popup followed the app, its question's colours turned over on a dark ground in dark mode.
-In the header, left of the tools (0.3.41; above the objectives before), the Light/Dark switch (`AltaPageBar`) chooses, and the choice is kept for
+In the heading (0.3.41; above the objectives before), Dark page — an icon button with its tooltip, the moon to make the
+page dark, the sun to make it light (the UI review's W9: a sun-and-moon switch before) — chooses, and the choice is kept for
 every assignment (`altaDark`; `--alta-look dark` starts a development run in Dark). Dark is the old dark look. The
 page is told the student prefers light (`LightPages`, as an outside tool's), and turned over by the page script when
 Dark is chosen. What the popup shows in the page's place — the page's ground, the panels behind its question, its
@@ -1438,12 +1469,13 @@ solid as the app's, and the accent's shades for it written as WPF-UI writes them
 when the look is the app's). The header, the objectives and the popup's own dialogs keep the app's appearance; a
 graph's window takes the page's look.
 
-Beside Light and Dark, Show browser (0.3.5; "Browser" where the column is narrow) shows Alta's own page as it is, as in
+Simpl look off (0.3.5's Show browser, a "Browser" button until the UI review's W9 made it the look control every
+publisher's popup has, Kit/PopupHeader.cs `Look`) shows Alta's own page as it is, as in
 a browser — the same web view, signed in, on white: its header, title and mastery, its own buttons, its cover, its
 pop-ups in it — in place of the question laid out; the objectives stay and keep reading the page. Off, the question is
 laid out again (a pop-up open in the page taken up as the app's again). The page script is told before each page and
 at once (`window.__simplBrowser`, `__simplBrowserNow`): it lays nothing out, hides nothing, gives the app no buttons or
-panels and never veils the page; Light and Dark wait meanwhile. Kept for every assignment (`altaBrowser`;
+panels and never veils the page; Dark page waits meanwhile. Kept for every assignment (`altaBrowser`;
 `--alta-browser` starts a development run with it).
 
 ## Icons

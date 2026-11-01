@@ -20,11 +20,12 @@ namespace Simpl.Screens;
 /// <summary>
 /// (0.3.94, the Mac's 1.3.199 LookQuizScreen) A Macmillan Learning or ALEKS assignment in a popup over the window, as a
 /// Knewton Alta one is — no longer the tool window 0.3.92 and 0.3.93 opened it in: the assignment's name and when it is
-/// due across the top, with Simpl Look, Reload, Open in window and Close; down the left, a rail of the assignment as Simpl
-/// reads it from the tool's own page — Macmillan's questions as tiles (the one open filled, a solved one ticked, one tried
-/// and not solved marked so), how many are done and the points; ALEKS's topic, its progress step by step, and ALEKS's
-/// word on the last answer — and in the rest, the tool's own page in Simpl's look (PageLook's rail mode), where every
-/// question is answered as on the tool's own page. A tile clicked opens that question (Macmillan's own row clicked in the
+/// due across the top (every popup's heading, Kit/PopupHeader.cs), with Simpl look, Reload, Open in a window and ×; down
+/// the left, a rail of the assignment as Simpl reads it from the tool's own page — Macmillan's questions as tiles (the one
+/// open filled, a solved one ticked, one tried and not solved marked so), how many are done and the points; ALEKS's
+/// progress step by step and its word on the last answer (its topic too, while the question's heading over the page does
+/// not say it) — and in the rest, the tool's own page in Simpl's look (PageLook's rail mode), where every question is
+/// answered as on the tool's own page. A tile clicked opens that question (Macmillan's own row clicked in the
 /// page). The page is zoomed out, as the browser's own zoom would, while the popup is narrower than the tool lays it out.
 /// (0.3.95, the Mac's 1.3.200) And the popup's own front end around the page: over it, the question's heading the popup's
 /// (which question, Previous and Next; ALEKS's topic and its steps); under it, the tool's buttons and its verdict as the
@@ -105,7 +106,7 @@ internal sealed class LookPopupView
     private readonly Border footer = new() { Visibility = Visibility.Collapsed, Padding = new Thickness(16, 12, 16, 12), BorderThickness = new Thickness(0, 1, 0, 0) };
     private readonly TextBlock title = K.Text("", Ty.Subtitle);
     private readonly TextBlock subtitle = K.Text("", Ty.Body, B.Text2);
-    private readonly Wpf.Ui.Controls.Button lookButton;
+    private readonly System.Windows.Controls.Button lookButton;
     private readonly FrameworkElement header;
     private PageLook? look;
     private Sheet? sheet;
@@ -142,10 +143,13 @@ internal sealed class LookPopupView
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
-        lookButton = K.Button("Simpl Look", ToggleLook, icon: SymbolRegular.Sparkle24);
-        var reload = K.IconButton(SymbolRegular.ArrowClockwise24, () => { if (web.CoreWebView2 is { } c) c.Reload(); }, "Reload");
-        var window = K.IconButton(SymbolRegular.WindowNew24, OpenInWindow, "Open in a window of its own, with Back, Forward and Open in browser");
-        header = AltaLook.Header(engine, K.IconTile(Symbol, Color, 32), title, subtitle, K.H(8, lookButton, reload, window), Close, $"Close — your work is kept by {kind.Title}");
+        // (the UI review's W9) icon buttons with their tooltips, Simpl look first — every publisher's popup's look control
+        lookButton = PopupHeader.Look(ToggleLook);
+        var reload = PopupHeader.Icon(SymbolRegular.ArrowClockwise24, "Reload the page", () => { if (web.CoreWebView2 is { } c) c.Reload(); });
+        var window = PopupHeader.Icon(SymbolRegular.WindowNew24, "Open in a window of its own, with Back, Forward and Open in browser", OpenInWindow);
+        var head = AltaLook.Header(engine, K.IconTile(Symbol, Color, 32), title, subtitle, Close, $"Close — your work is kept by {kind.Title}");
+        head.Buttons(lookButton, reload, window);
+        header = head;
         root.Children.Add(header.Row(0));
 
         var body = new Grid();
@@ -218,6 +222,12 @@ internal sealed class LookPopupView
                 LightPages.Tell(core, $"{kind.Name} popup");
                 if (e.IsSuccess && !loadedOnce) { loadedOnce = true; Ready(); }
                 if (e.IsSuccess) SendLaunch();
+                // (a page that did not load: Simpl's failure in its place, never the web view's own error page)
+                else if (WebFailure.ShowsOwnPage(e)) CouldNotLoad($"its page, {e.WebErrorStatus}", WebFailure.Why(e.WebErrorStatus));
+            };
+            core.ProcessFailed += (_, e) =>
+            {
+                if (WebFailure.TookPage(e.ProcessFailedKind)) CouldNotLoad($"its page's process, {e.ProcessFailedKind}", WebFailure.Stopped);
             };
             // (a window the page opens — a sign-in, a resource — shown in place, as a tab would be)
             core.NewWindowRequested += (_, e) => { e.Handled = true; core.Navigate(e.Uri); };
@@ -248,8 +258,30 @@ internal sealed class LookPopupView
             Log.Write($"{kind.Name} popup: could not open: {e.Message}");
             if (closed) return;
             web.Visibility = Visibility.Hidden;
-            state.Content = AltaLook.Failure($"{FullName} could not open", e.Message);
+            state.Content = WebFailure.View($"{FullName} couldn’t open", e.Message, Reopen, null);
         }
+    }
+
+    /// <summary>Its page could not load (<paramref name="what"/>, for the log): the web view out of sight (nothing can be
+    /// drawn over it) and Simpl's failure in its place, Try again opening the assignment afresh — its launch is one-time,
+    /// so the page itself cannot simply be asked for again.</summary>
+    private void CouldNotLoad(string what, string why)
+    {
+        if (closed) return;
+        Log.Write($"{kind.Name} popup: could not load ({what}): Simpl's own error shown in its place");
+        webShown = false;
+        web.Visibility = Visibility.Hidden;
+        coverSlot.Visibility = Visibility.Collapsed;
+        coverSlot.Content = null;
+        coverSig = "";
+        state.Content = WebFailure.View($"{FullName} couldn’t load", why, Reopen, null);
+    }
+
+    /// <summary>Try again: this popup closed and the assignment opened afresh in another, by a new launch.</summary>
+    private void Reopen()
+    {
+        Close();
+        LookPopup.Show(engine, launch, over);
     }
 
     /// <summary>The page there (loaded once, or heard from): the opening card fades away over it.</summary>
@@ -307,7 +339,7 @@ internal sealed class LookPopupView
     /// <summary>(0.3.102) The app turned light or dark: the question's card follows.</summary>
     private void OnAppearance() => root.Dispatcher.BeginInvoke(async () => { if (!closed && look != null) await look.SetDark(Support.Appearance.Dark); });
 
-    // ---- Simpl Look ----
+    // ---- Simpl look ----
 
     private async void ToggleLook()
     {
@@ -319,14 +351,11 @@ internal sealed class LookPopupView
     private void PaintLook()
     {
         var on = look?.On(kind) ?? true;
-        lookButton.Appearance = on ? ControlAppearance.Primary : ControlAppearance.Secondary;
+        PopupHeader.PaintLook(lookButton, on, FullName);
         lookButton.IsEnabled = look != null;
-        lookButton.ToolTip = on
-            ? $"Simpl's look is on: {FullName}'s question on glass, its buttons the popup's own. Click to show it as {FullName} draws it."
-            : $"Show {FullName}'s page in Simpl's look";
-        System.Windows.Automation.AutomationProperties.SetName(lookButton, on ? "Simpl Look, on" : "Simpl Look, off");
         UpdateFront();
         UpdateCover();
+        DrawRail();
     }
 
     // ---- what the page says ----
@@ -459,7 +488,7 @@ internal sealed class LookPopupView
         return new Cover(S(c, "title"), count, S(c, "due"), start, settings);
     }
 
-    /// <summary>(0.3.98) Macmillan's cover, while it shows and Simpl Look is on, as the popup's own start screen: the web view
+    /// <summary>(0.3.98) Macmillan's cover, while it shows and Simpl look is on, as the popup's own start screen: the web view
     /// hidden under it until Start (Macmillan's Open Assignment pressed) has the page move on.</summary>
     private void UpdateCover()
     {
@@ -596,6 +625,9 @@ internal sealed class LookPopupView
 
     private bool OnItem => heard && (kind.Name == PageLook.Aleks.Name ? topic.Length > 0 : total > 0 && here > 0);
 
+    /// <summary>The question's heading over the page shows (Simpl look on, a question open).</summary>
+    private bool HeadingShown => (look?.On(kind) ?? true) && OnItem;
+
     private void UpdateFront()
     {
         if (closed) return;
@@ -707,10 +739,12 @@ internal sealed class LookPopupView
         return K.Columns("*, auto", words.Col(0), buttons.Col(1));
     }
 
-    /// <summary>ALEKS's: the topic, its part of the course, and the topic's steps as ALEKS fills them.</summary>
+    /// <summary>ALEKS's: the topic, its part of the course (not where it is the assignment's own name, which the popup's
+    /// heading says already), and the topic's steps as ALEKS fills them.</summary>
     private FrameworkElement AleksHeading()
     {
-        var words = K.V(2, slice.Length > 0 ? K.Text(slice.ToUpperInvariant(), Ty.Caption, B.Text2).Strong() : null, K.Wrapped(topic, Ty.Subtitle));
+        var part = slice.Length > 0 && !SameWords(slice, launch.Title) ? K.Text(slice.ToUpperInvariant(), Ty.Caption, B.Text2).Strong() : null;
+        var words = K.V(2, part, K.Wrapped(topic, Ty.Subtitle));
         words.VerticalAlignment = VerticalAlignment.Center;
         if (total <= 0) return words;
         var steps = fills.Count == total ? fills : Enumerable.Range(0, total).Select(i => i < done ? 1.0 : 0.0).ToList();
@@ -754,9 +788,13 @@ internal sealed class LookPopupView
 
     // ---- the rail ----
 
+    /// <summary>The same words, whatever their case and spacing (ALEKS's part of the course and the assignment's name).</summary>
+    private static bool SameWords(string a, string b) =>
+        string.Equals(Regex.Replace(a, @"\s+", " ").Trim(), Regex.Replace(b, @"\s+", " ").Trim(), StringComparison.OrdinalIgnoreCase);
+
     private void DrawRail()
     {
-        var sig = JsonSerializer.Serialize(new object[] { heard, questions.Select(q => $"{q.N}{q.Kind}{q.Sub}{q.Points}"), here, done, total, score, policy, slice, topic, status, onQuestion, fills, cover?.Count ?? -1 });
+        var sig = JsonSerializer.Serialize(new object[] { heard, questions.Select(q => $"{q.N}{q.Kind}{q.Sub}{q.Points}"), here, done, total, score, policy, slice, topic, status, onQuestion, fills, cover?.Count ?? -1, HeadingShown });
         if (sig == railSig) { PaintTiles(); return; }
         railSig = sig;
         var v = K.V(16);
@@ -909,9 +947,14 @@ internal sealed class LookPopupView
 
     private void Aleks(Panel v)
     {
-        var group = K.Text(slice.Length > 0 ? slice.ToUpperInvariant() : "ALEKS", Ty.Caption, B.Text2).Strong();
-        var name = K.Wrapped(topic.Length > 0 ? topic : heard ? "Choose a class or a topic in ALEKS" : "Your topic", Ty.Subtitle);
-        v.Children.Add(K.Card(K.V(6, group, name), new Thickness(14), 12));
+        // (the UI review's W9: the topic once — in the question's heading over the page while that shows, here only
+        //  while it does not; the part of the course is the popup's own title, mostly, and said there)
+        if (!HeadingShown)
+        {
+            var group = K.Text(slice.Length > 0 && !SameWords(slice, launch.Title) ? slice.ToUpperInvariant() : "ALEKS", Ty.Caption, B.Text2).Strong();
+            var name = K.Wrapped(topic.Length > 0 ? topic : heard ? "Choose a class or a topic in ALEKS" : "Your topic", Ty.Subtitle);
+            v.Children.Add(K.Card(K.V(6, group, name), new Thickness(14), 12));
+        }
         if (total <= 0 && heard) return;
 
         var n = heard ? total : 5;

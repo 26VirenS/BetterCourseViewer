@@ -15,13 +15,16 @@ using Wpf.Ui.Controls;
 namespace Simpl.Shell;
 
 /// <summary>
-/// A popup that floats over the window without holding it — every popup but a quiz being taken, the first setup, the
-/// sign-in's questions, the tour and the questions that must be answered first ("Discard changes?"), which stay sheets
-/// over the window (Kit/Sheets.cs). A sheet marked <see cref="Sheet.Floats"/> shows here, in a window of its own owned
-/// by the window it was asked over: kept above that window, minimized and brought back with it, gone with it. Nothing
-/// takes the window's clicks while it is up — no dimming, only the shadow Windows draws round a window — so the pane,
-/// the title bar, the search and the page behind it all go on working, and a place opened under it leaves it where it
-/// was. It is moved by its heading (a press there that is not on a control), closed by its × (or its own Close), by
+/// A popup that floats over the window — every popup but a quiz being taken, the first setup, the sign-in's questions,
+/// the tour and the questions that must be answered first ("Discard changes?"), which stay sheets over the window
+/// (Kit/Sheets.cs). A sheet marked <see cref="Sheet.Floats"/> shows here, in a window of its own owned by the window it
+/// was asked over: kept above that window, minimized and brought back with it, gone with it. One with a form or a
+/// decision in it (<see cref="Sheet.Dims"/>: Hand in, New message, Sync, the update's prompt…) dims the window under it,
+/// as Windows 11's ContentDialog does — the window's smoke, and every other popup over it dimmed too — and nothing there
+/// takes a click until it goes. The rest — a tool, Knewton Alta, feedback, a rubric, something only to read — take
+/// nothing from the window: only the shadow Windows draws round a window sets them apart, so the pane, the title bar, the
+/// search and the page behind go on working, and a place opened under one leaves it where it was. It is moved by its
+/// heading (a press there that is not on a control), closed by its × (or its own Close), by
 /// Escape while it has the keyboard, or by Alt+F4 — and (0.3.64) a light one, with no form in it, by a click anywhere in
 /// the window it floats over (<see cref="Sheet.Light"/>). It opens in the middle of the window (0.3.4), and moves with the
 /// window, keeping the place it was moved to. A large one (a tool, Knewton Alta, feedback, a rubric) spans the
@@ -56,6 +59,9 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
     private Size sizedFrom;
     private Size? chosenBefore;
     private bool placing, closing, ended, shown;
+    /// <summary>(<see cref="Sheet.Dims"/>) What it dims while it is up: the window's own sheets' host and those of the
+    /// other popups over that window, as they were when it first showed.</summary>
+    private List<SheetHost>? dimmed;
 
     /// <summary>The least a large one is sized to by its edges — less than the room of the smallest window Simpl allows (720
     /// by 520: 688 by 440).</summary>
@@ -109,6 +115,7 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
         {
             shown = true;
             Owner = over;
+            DimUnder();
             PlaceFirst();
             Show();
             Shot.Moved();
@@ -161,7 +168,7 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
 
         // what it shows: the sheet's title (and × beside it), what it holds, its buttons — or a sheet of its own making
         // edge to edge, the × over its top right corner unless its heading has a Close of its own
-        var close = s.OwnClose ? null : K.IconButton(SymbolRegular.Dismiss24, Dismiss, "Close (Esc)", 16, 36);
+        var close = s.OwnClose ? null : PopupHeader.Icon(SymbolRegular.Dismiss24, "Close (Esc)", Dismiss);
         var titled = !s.Bare && !string.IsNullOrEmpty(s.Title);
         var content = SheetHost.Content(s, Press, titled ? close : null);
         root.Children.Add(content);
@@ -226,6 +233,29 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
             else if (Launch.IsDevelopment && Launch.Get("popup-drag") is { } drag) DragSoon(drag);
         }
         Fit();
+    }
+
+    // ---- (the UI review's W2) a form or a decision: the window dimmed under it ----
+
+    /// <summary>One with a form or a decision in it (<see cref="Sheet.Dims"/>), first shown: the window it floats over
+    /// dimmed and out of reach — its own sheets' host's smoke — and every other popup over that window with it, until it
+    /// goes (<see cref="Ended"/>).</summary>
+    private void DimUnder()
+    {
+        if (!sheet.Dims || dimmed != null) return;
+        dimmed = new List<SheetHost>();
+        if (over is ISheetWindow { Sheets: { } host }) dimmed.Add(host);
+        foreach (var p in All) if (!ReferenceEquals(p, this) && ReferenceEquals(p.over, over) && p.shown && !p.ended) dimmed.Add(p.sheets);
+        foreach (var h in dimmed) h.Dim(true);
+        if (Launch.IsDevelopment) Log.Write($"popup {sheet.Name ?? sheet.Title ?? "?"}: the window dimmed under it");
+    }
+
+    /// <summary>Gone: what it dimmed lit again.</summary>
+    private void Undim()
+    {
+        if (dimmed == null) return;
+        foreach (var h in dimmed) h.Dim(false);
+        dimmed = null;
     }
 
     // ---- where it is, and how large ----
@@ -452,7 +482,8 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
     private void OverClosed(object? sender, EventArgs e) => End();
 
     /// <summary>(0.3.64, the owner's #241) A press in the window it floats over: a light one (<see cref="Sheet.Light"/>)
-    /// closes, as its × would, and the press still does what it does there; one with a form, or its own question up, stays.</summary>
+    /// closes, as its × would, and the press still does what it does there — or, a light one that dims the window (Find
+    /// appointment), lands on the dimmed window and does nothing more; one with a form, or its own question up, stays.</summary>
     private void OverPressed(object sender, MouseButtonEventArgs e)
     {
         if (!sheet.Light || ended || sheets.IsOpen || e.ChangedButton is not (MouseButton.Left or MouseButton.Right)) return;
@@ -748,6 +779,7 @@ public sealed class FloatPopup : FluentWindow, ISheetWindow
         if (over is MainWindow m) m.PopupRoomChanged -= OverMoved;
         sheet.CloseFloat = null;
         sheet.SizeKeyChanged = null;
+        Undim();
         sheet.RaiseClosed();
         // (the keyboard back with the window it was over, when it was in front)
         if (over.IsVisible && Application.Current?.Windows.OfType<Window>().Any(w => w.IsActive) != true) over.Activate();

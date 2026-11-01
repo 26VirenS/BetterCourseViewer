@@ -132,7 +132,7 @@ public static class UpdateWatch
         if (main.IsVisible && main.WindowState != WindowState.Minimized && (e == null || e.Login.Covers || e.Phase == Phase.Web))
             return new Updates.Holding("the sign-in", "when you’ve signed in");
         if (touring) return new Updates.Holding("the tour", "when the tour is over");
-        if (Simpl.Screens.HandInSheet.Open) return new Updates.Holding("Hand In", "when you close Hand In");
+        if (Simpl.Screens.HandInSheet.Open) return new Updates.Holding("Hand in", "when you close Hand in");
         if (main.Sheets.Current is { HoldsUpdates: true }) return new Updates.Holding("a dialog", "when you close the dialog");
         foreach (var w in Application.Current.Windows.OfType<Window>())
         {
@@ -266,7 +266,7 @@ public static class UpdateWatch
     /// <summary>
     /// (0.3.103, the Mac's ForcedUpdatePrompt) An update that has waited a day for what is open says, in a popup over the
     /// window, that it goes in in half an hour, and counts it down: Later puts it away (it comes back with five minutes
-    /// left), Update Now puts it in now. It holds nothing up itself, and goes once the update does, or a quiz opens.
+    /// left), Update now puts it in now. It holds nothing up itself, and goes once the update does, or a quiz opens.
     /// </summary>
     private static void Prompt(MainWindow main)
     {
@@ -289,8 +289,8 @@ public static class UpdateWatch
         var body = K.V(14, head,
             K.Wrapped("Save your work: when the time is up, Simpl restarts on the new version, whatever is open. A quiz is never interrupted.", Ty.Body, B.Text),
             promptLeft);
-        var s = new Sheet { Title = "Simpl Needs to Update", Body = body, Width = 420, Floats = true, HoldsUpdates = false, Name = "Update Simpl" };
-        s.Add("Update Now", SheetButtonKind.Primary, Updates.InstallFromPrompt);
+        var s = new Sheet { Title = "Simpl needs to update", Body = body, Width = 420, Floats = true, HoldsUpdates = false, Name = "Update Simpl" };
+        s.Add("Update now", SheetButtonKind.Primary, Updates.InstallFromPrompt);
         s.Add("Later", SheetButtonKind.Close, Updates.DismissPrompt);
         s.Closed += () =>
         {
