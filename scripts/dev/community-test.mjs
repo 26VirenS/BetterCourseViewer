@@ -134,6 +134,14 @@ let cookie;
   check(again.status === 409, 'decided twice: refused (SC-C-409)');
   check(JSON.parse(await kv.get('list:pending')).length === 0, 'no longer pending');
 }
+// a decision that is neither: refused, and the theme still waits to be decided (not dropped from the review's list)
+{
+  const b = await body(await submit({ name: 'Undecided', accent: '#0a84ff' }));
+  const res = await call('decide', { method: 'POST', body: JSON.stringify({ id: b.id, decision: 'maybe' }), headers: { cookie, 'x-simpl-review': '1' } });
+  const review = await body(await call('review', { headers: { cookie } }));
+  check(res.status === 400 && JSON.parse(await kv.get('list:pending')).includes(b.id) && review.pending.some((t) => t.id === b.id), `neither approve nor deny: refused (SC-C-400), the theme still pending in the review (${JSON.stringify({ status: res.status, pending: review.pending.map((t) => t.name) })})`);
+  await call('decide', { method: 'POST', body: JSON.stringify({ id: b.id, decision: 'deny' }), headers: { cookie, 'x-simpl-review': '1' } });
+}
 // one turned down
 {
   const b = await body(await submit({ name: 'Nope', accent: '#30d158', places: { graded: { photo: true } } }, { graded: PNG }));
