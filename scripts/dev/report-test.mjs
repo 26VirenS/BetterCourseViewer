@@ -77,6 +77,12 @@ check(dcAns.ok && payload.content.length <= 2000 && payload.content.startsWith(`
 const sl = hookFetch();
 await R.handleReport(post(form({}, [{ blob: new Blob([PNG], { type: 'image/png' }), name: 'shot.png' }])), { REPORT_WEBHOOK: 'https://hooks.slack.com/services/T/B/C' }, sl);
 check(sl.calls.length === 1 && /The calendar skips a day\./.test(JSON.parse(sl.calls[0].init.body).text) && /not carried to Slack/.test(JSON.parse(sl.calls[0].init.body).text), 'a Slack webhook gets the words, and is told the screenshots stay behind');
+// Slack reads <!channel>, <@U…> and <url|words> in a message's text as a mention or a link: what anyone typed is sent
+// with &, < and > escaped, as Slack asks, so it reads as typed (Discord's mentions are switched off the same way)
+const slm = hookFetch();
+await R.handleReport(post(form({ text: '<!channel> look at <https://evil.example|your grades> & <@U0123>' })), { REPORT_WEBHOOK: 'https://hooks.slack.com/services/T/B/C' }, slm);
+const slmText = slm.calls[0] ? JSON.parse(slm.calls[0].init.body).text : '';
+check(slmText.includes('&lt;!channel&gt; look at &lt;https://evil.example|your grades&gt; &amp; &lt;@U0123&gt;') && !/<[!@h]/.test(slmText), `a Slack webhook gets what was typed escaped — no @channel, no hidden link: ${JSON.stringify(slmText)}`);
 const bad = await answer(await R.handleReport(post(form()), { REPORT_WEBHOOK: 'https://hooks.example.com/down' }, async () => new Response('no', { status: 500 })));
 check(bad.status === 502 && bad.code === 'SC-B-502', 'a webhook that refuses it: SC-B-502, try again');
 let limited = null;
