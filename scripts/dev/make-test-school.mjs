@@ -67,6 +67,10 @@ src = src.replace(CM_IMPORT, () => 'const communityMock = null; // (mock-communi
 // (2.99.110: and the stand-in for Simpl's calendar feed, scripts/dev/mock-feed.mjs, the website's too)
 const FD_IMPORT = "import { feedMock } from './mock-feed.mjs'; // (2.99.110: Simpl's own calendar feed, as simplcourses.com has it)";
 src = src.replace(FD_IMPORT, () => 'const feedMock = null; // (mock-feed.mjs: the website\'s calendar feed, not the test school\'s)');
+// (2.99.135: and Hand in from your phone's relay, scripts/dev/mock-handin.mjs, the website's too — its page is the phone's)
+const HI_IMPORT = "const { handinMock = null, isHandinPath = () => false } = await import('./mock-handin.mjs').catch(() => ({}));";
+if (!src.includes(HI_IMPORT)) fail(`the mock no longer loads its relay with ${HI_IMPORT} — stand it in for here`);
+src = src.replace(HI_IMPORT, () => 'const handinMock = null, isHandinPath = () => false; // (mock-handin.mjs: the website\'s relay, not the test school\'s)');
 // (the test school is no real school: the mock's few words of the university it was first drawn from — an address, a
 // notice's title, a mascot's greeting — are made the test school's own, here only; CI's mock keeps them)
 src = src.replaceAll('ucmerced.edu', 'test.simpl.com').replaceAll('UC Merced', 'Simpl Test School').replaceAll('Hello Bobcat!', 'Hello!').replaceAll('Bobcat', 'Student');

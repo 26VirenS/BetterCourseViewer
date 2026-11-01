@@ -553,6 +553,9 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
       case 'feed': // (2.99.110) Simpl's own calendar: made, sent (sealed) to simplcourses.com, or stopped (content/app/feed.js)
         reply(feed(msg));
         return true;
+      case 'handin': // (2.99.135) Hand in from your phone: a request to its sealed relay on simplcourses.com (content/app/handin.js)
+        reply(handin(msg));
+        return true;
       case 'canvasSeen': // the Chrome build's sniffer found Canvas on a site of the school's own
         reply(canvasSeen(sender, msg));
         return true;
@@ -850,6 +853,31 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
       return { ...feedPublic(next, site), sent: !next.error };
     }
     throw new Error('Nothing here');
+  }
+  // (2.99.135) Hand in from your phone (content/app/handin.js): the hand-in's requests to its relay on simplcourses.com
+  // (site/src/handin.js), sent from here — a school's Canvas need not let its page reach another site. Only the relay's
+  // own paths go, each with the token the page gives and no cookie; what goes and comes is sealed already, with a key
+  // that stays in the page and never comes here. (dev:handinBase: the suites point it at a relay of their own; a Canvas on
+  // this computer is only ever a test school, whose own /api/handin stands in, as for the calendar feed.)
+  const handinBase = async (host) => {
+    const dev = (await api.storage.local.get('dev:handinBase').catch(() => ({})))['dev:handinBase'];
+    return String(dev || (/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(String(host || '')) ? `http://${host}` : 'https://simplcourses.com')).replace(/\/+$/, '');
+  };
+  const HANDIN_PATH = /^\/api\/handin\/[A-Za-z0-9_-]{22}(\/(offer|status|file\/[A-Za-z0-9_-]{11}(\/(0|[1-9]\d{0,3}))?))?$/;
+  async function handin(msg) {
+    const base = await handinBase(msg.host);
+    if (msg.op === 'base') return { ok: true, base };
+    const path = String(msg.path || ''), method = String(msg.method || 'GET').toUpperCase();
+    if (!HANDIN_PATH.test(path) || !['GET', 'PUT', 'POST', 'DELETE'].includes(method)) throw new Error('Not here');
+    const headers = { authorization: `Bearer ${String(msg.token || '')}` };
+    let body;
+    if (msg.json !== undefined && msg.json !== null) { headers['content-type'] = 'application/json'; body = JSON.stringify(msg.json); }
+    else if (typeof msg.bytes === 'string') { headers['content-type'] = 'application/octet-stream'; body = fromB64(msg.bytes); }
+    if (msg.chunks) headers['x-chunks'] = String(Number(msg.chunks) || 0);
+    let res;
+    try { res = await fetch(`${base}${path}`, { method, headers, body, credentials: 'omit', cache: 'no-store', redirect: 'error' }); } catch { return { ok: false, status: 0 }; }
+    if (/json/.test(res.headers.get('content-type') || '')) return { status: res.status, json: await res.json().catch(() => null) };
+    return { status: res.status, bytes: res.ok ? toB64(await res.arrayBuffer()) : '' };
   }
   // The interface's own on-demand modules (content/app/lazy.js): a page may ask for the files that
   // content/app/lazy-modules.js names, and nothing outside that list. The source manifest lists the

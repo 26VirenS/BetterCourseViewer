@@ -10,13 +10,23 @@
   // (2.99.110) The one binding is FEEDS, Simpl's own calendar feeds (src/feed.js): a Durable Object
   // class this Worker defines itself (src/feed-store.js), which the deploy makes from the migration
   // below — nothing to make first. SQLite-backed, the kind the Workers Free plan has.
+  //
+  // (2.99.135) The second is HANDIN, Hand in from your phone's sealed relay (src/handin.js): a Durable Object class of
+  // its own (src/handin-store.js), made by the deploy from its own migration, "handin-v1" — added after "feeds-v1",
+  // which is never edited (a migration already applied is never applied again). Nothing to make first either.
   "name": "simpl-courses",
   "main": "src/worker.js",
   "compatibility_date": "2026-09-12",
   "durable_objects": {
-    "bindings": [{ "name": "FEEDS", "class_name": "FeedStore" }]
+    "bindings": [
+      { "name": "FEEDS", "class_name": "FeedStore" },
+      { "name": "HANDIN", "class_name": "HandInStore" }
+    ]
   },
-  "migrations": [{ "tag": "feeds-v1", "new_sqlite_classes": ["FeedStore"] }],
+  "migrations": [
+    { "tag": "feeds-v1", "new_sqlite_classes": ["FeedStore"] },
+    { "tag": "handin-v1", "new_sqlite_classes": ["HandInStore"] }
+  ],
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",

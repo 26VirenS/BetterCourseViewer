@@ -1,14 +1,24 @@
 # Simpl Courses privacy policy
 
-_Last updated: 13 October 2026_
+_Last updated: 1 November 2026_
 
-Simpl Courses is a browser extension that redraws the Canvas learning-management system in your browser. It has no servers, no accounts and no analytics. This page describes exactly what the extension touches and where that data goes.
+Simpl Courses is a browser extension that redraws the Canvas learning-management system in your browser. It has no accounts and no analytics. This page describes exactly what the extension touches and where that data goes.
 
 ## What the extension reads
 
 - **Your Canvas data.** On Canvas pages the extension calls the same Canvas REST API your browser already uses, with the session you are already signed in with, to draw your dashboard, courses, assignments, grades, calendar, inbox, groups, quizzes and submissions. Responses are cached briefly in the extension's storage in your browser so pages open quickly, and are never sent anywhere else.
 - **Your Canvas settings.** Course colours, nicknames, favourites and the dashboard view come from your Canvas profile and are changed only when you change them in the interface, through the same Canvas endpoints Canvas's own pages use.
 - **Files you convert, only through CloudConvert and only if you connected it.** The file converter under Tools runs on this device. If you paste a CloudConvert API key into it, Word, PDF, slides, spreadsheets and HEIC photos you drop in are uploaded from your browser to CloudConvert (api.cloudconvert.com) with that key, converted there, and downloaded back; images, text, CSV and JSON never leave the device either way, and a switch keeps Word and PDF on the device too. Nothing is uploaded unless you connected a key and pressed Convert. Those files are governed by CloudConvert's own privacy policy.
+
+## Hand in from your phone
+
+When you choose **Hand in from your phone** on a hand-in, the extension shows a QR code for your phone's camera. The photos and files you then take or choose on your phone travel to your computer through simplcourses.com, the project's own site, because a browser extension cannot receive them directly; they are added to your hand-in on the computer, and nothing is handed in until you press Submit there.
+
+- **Sealed with a key only your two devices hold.** Before your files, their names or the assignment's details leave your phone or your computer they are encrypted (AES-256-GCM) with a key that your computer makes and puts in the QR code, in the part of the link (after `#`) that browsers never send to a server. The site receives and stores only encrypted bytes it cannot open: not your files, not their names, not the assignment's name or course.
+- **What the site keeps in readable form** is only what it needs to pass the files on: a hashed token for each of the two devices, how many files and parts have arrived and whether your computer has taken them, and whether the hand-in was closed or handed in.
+- **When it is deleted.** Each file is deleted from the site as soon as your computer has it. The rest of the files and the assignment's details are deleted when you hand in or close the code on your computer, or after 30 minutes without use, whichever comes first. The small record left after you close the code or hand in — no file and no name in it, only that it was closed or handed in, so your phone can show it — is deleted 30 minutes later.
+- The site sees the network address each device connects from, as any website does. It uses it only, in memory, to limit how many hand-ins are started from one place in an hour.
+- If the site cannot be reached, the code instead opens the assignment in Canvas on your phone, where you hand in as you would in Canvas, and nothing passes through the site.
 
 ## What the extension stores
 
@@ -22,7 +32,7 @@ Everything below lives in the extension's local storage in your browser. **Reset
 
 ## What the extension never does
 
-- It never sends your Canvas data, keys or usage to the extension's authors or to any server of its own. There is none.
+- It never sends your Canvas data, keys or usage to the extension's authors. Files you send with Hand in from your phone pass through simplcourses.com sealed, so its authors cannot read them (above).
 - It never sells, shares or transfers your data to third parties, and never uses it for advertising, tracking, or determining creditworthiness.
 - It never performs an action on Canvas that you did not take in the interface: marking items done, dismissing, favouriting, replying, messaging and handing in work all happen only when you press the button, through the same endpoints Canvas's own pages use.
 - It never runs code from a remote source.
@@ -32,6 +42,7 @@ Everything below lives in the extension's local storage in your browser. **Reset
 - **Canvas sites (`*.instructure.com`)** — to draw the new interface on Canvas pages and read Canvas's API for them.
 - **Access to every site (the Chrome and Edge build)** — schools often host Canvas at their own address (for example `canvas.university.edu`), which cannot be known in advance. So the Chrome build may look at any page, and on every page it runs one short script that reads the page's own markup to tell whether it is a Canvas page — Canvas's page wrapper, its stylesheet bundle, its navigation. That is all it does there: it keeps nothing, sends nothing anywhere and changes nothing on a page that is not Canvas. When it finds a Canvas page you are signed in to (or Canvas's sign-in page), it turns the interface on for that site, the same as **Enable on this site** does. Chrome's *Site access* setting for the extension can narrow this to sites you choose.
 - **Optional access to a site you choose (the Safari and Firefox builds)** — these builds keep to Canvas's own domain plus the sites you add. The extension asks for a site only when you click **Enable on this site**, and it can be revoked from the browser's extension settings.
+- **simplcourses.com** — the project's own site, reached only for features you use, such as Hand in from your phone (above), never with a cookie.
 - **`storage`** — to keep the settings and cache described above in your browser.
 - **`scripting`** — to register the interface on a site recognised as Canvas, or one you added with **Enable on this site**.
 - **`activeTab`** — so the toolbar popup can tell which site is open and whether the extension is enabled there.

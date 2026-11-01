@@ -5,12 +5,20 @@
   // Deployed from the site branch: Workers & Pages → Create → Workers → Import a repository, the Worker named
   // simpl-feeds, deploy command `npx wrangler deploy -c feeds.jsonc` (README.md, "Simpl calendars on Pages").
   // On the Workers path (wrangler.jsonc) the site's own Worker defines FeedStore itself, and this one is not needed.
+  // (2.99.135) It keeps Hand in from your phone's HandInStore too (src/handin-store.js), from a migration of its own
+  // after "feeds-v1": the Pages project binds it as HANDIN the same way (README.md, "Hand in from your phone").
   "name": "simpl-feeds",
   "main": "src/feeds-worker.js",
   "compatibility_date": "2026-09-12",
   "workers_dev": false,
   "durable_objects": {
-    "bindings": [{ "name": "FEEDS", "class_name": "FeedStore" }]
+    "bindings": [
+      { "name": "FEEDS", "class_name": "FeedStore" },
+      { "name": "HANDIN", "class_name": "HandInStore" }
+    ]
   },
-  "migrations": [{ "tag": "feeds-v1", "new_sqlite_classes": ["FeedStore"] }]
+  "migrations": [
+    { "tag": "feeds-v1", "new_sqlite_classes": ["FeedStore"] },
+    { "tag": "handin-v1", "new_sqlite_classes": ["HandInStore"] }
+  ]
 }

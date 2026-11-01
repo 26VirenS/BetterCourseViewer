@@ -11,6 +11,9 @@ import http from 'node:http';
 import { renameNames } from './site-names.mjs';
 import { communityMock } from './mock-community.mjs'; // (2.99.106: Simpl Community, as simplcourses.com has it)
 import { feedMock } from './mock-feed.mjs'; // (2.99.110: Simpl's own calendar feed, as simplcourses.com has it)
+// (2.99.135: Hand in from your phone's sealed relay and the phone's page, as simplcourses.com has them — loaded only where
+//  this Node has node:sqlite, which its store's SQL runs on: without it the extension shows its old code, as it would offline)
+const { handinMock = null, isHandinPath = () => false } = await import('./mock-handin.mjs').catch(() => ({}));
 
 const port = Number(process.argv[2] || process.env.PORT || 8787);
 const simPort = Number(process.argv[3] || process.env.SIM_PORT || 8791);
@@ -1434,7 +1437,7 @@ on('POST', /^\/api\/v1\/users\/self\/files$/, (url, m, body) => {
   return { upload_url: `http://localhost:${port}/__upload/${token}`, upload_params: { key: `users/${token}`, acl: 'private', success_action_status: '201' }, file_param: 'file' };
 });
 // the storage step: a multipart POST with no CSRF token, like S3 or inst-fs; the file is the last field
-on('POST', /^\/__upload\/(\w+)$/, (url, m, body, raw) => {
+on('POST', /^\/__upload\/(\w+)$/, (url, m, body, raw, bin) => {
   const pre = pendingUploads.get(m[1]);
   if (!pre) return null;
   const boundary = raw.slice(0, raw.indexOf('\r\n'));
@@ -1442,11 +1445,18 @@ on('POST', /^\/__upload\/(\w+)$/, (url, m, body, raw) => {
   const fname = (part.match(/filename="([^"]*)"/) || [])[1] || pre.name;
   const bytes = part.slice(part.indexOf('\r\n\r\n') + 4).replace(/\r\n$/, '');
   const id = `uf${++fileSeq}`;
+  if (bin?.length) { // (2.99.135) the file's own bytes, kept for a suite to read back (GET /__mock/uploaded/<id>), a byte a character
+    const b = bin.map((c) => c.toString('latin1')).join(''), bnd = b.slice(0, b.indexOf('\r\n'));
+    const p2 = b.split(bnd).find((x) => /filename="/.test(x)) || '';
+    uploadedBytes.set(id, p2.slice(p2.indexOf('\r\n\r\n') + 4).replace(/\r\n$/, ''));
+  }
   storedFiles.set(id, { id, display_name: fname, filename: fname, size: bytes.length, 'content-type': pre.content_type || 'application/octet-stream', url: `/files/${id}/download` });
   pendingUploads.delete(m[1]);
   return storedFiles.get(id);
 });
 on('GET', /^\/api\/v1\/progress\/(\w+)$/, (url, m) => progresses.get(m[1]) || null);
+const uploadedBytes = new Map();
+on('GET', /^\/__mock\/uploaded\/(\w+)$/, (url, m) => (uploadedBytes.has(m[1]) ? { id: m[1], size: uploadedBytes.get(m[1]).length, latin1: uploadedBytes.get(m[1]) } : null));
 on('POST', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)\/submissions$/, (url, m, body) => {
   const a = allAssignments(m[1]).find((x) => x.id === m[2]);
   if (!a) return null;
@@ -1545,11 +1555,13 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${port}`);
   if (communityMock && /^\/(api|__mock)\/community\//.test(url.pathname)) return void communityMock(req, res, url).catch((e) => { res.writeHead(500); res.end(String(e?.message || e)); }); // (bytes, not text: before the reading below)
   if (feedMock && /^\/(api\/feed|__mock\/feed)(\/|$)/.test(url.pathname)) return void feedMock(req, res, url).catch((e) => { res.writeHead(500); res.end(String(e?.message || e)); }); // (2.99.110: Simpl's calendar feed, its bytes sealed)
+  if (handinMock && isHandinPath(url.pathname)) return void handinMock(req, res, url).catch((e) => { res.writeHead(500); res.end(String(e?.message || e)); }); // (2.99.135: Hand in from your phone, its files sealed)
   if (url.pathname.startsWith('/__mock/caldav/')) return void caldavMock(req, res, url); // (2.99.124: an iCloud account's calendars)
   if (mockConfig.siteNames) renaming(res);
   const path = url.pathname.replace(/\/+$/, '') || '/';
   let raw = '';
-  req.on('data', (c) => (raw += c));
+  const bin = []; // (the same bytes, as they came — a file's, for /__mock/uploaded; the test school's come as text and are not kept)
+  req.on('data', (c) => { raw += c; if (typeof c !== 'string') bin.push(c); });
   req.on('end', async () => {
     let body = {};
     try {
@@ -1835,7 +1847,7 @@ if (sample === 'right' || sample === 'wrong') window.mockVerdict(sample === 'rig
       if (method !== req.method) continue;
       const m = path.match(re);
       if (!m) continue;
-      const data = await handler(url, m, body, raw); // (a handler may answer later: a save held, as a busy Canvas does)
+      const data = await handler(url, m, body, raw, bin); // (a handler may answer later: a save held, as a busy Canvas does)
       if (data === null) return json(res, { errors: [{ message: 'not found' }] }, 404);
       if (data && data.__status) return json(res, { errors: data.errors || [] }, data.__status);
       return json(res, data);

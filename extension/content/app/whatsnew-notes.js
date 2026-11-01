@@ -28,6 +28,9 @@
     lock: 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.135', date: '2026-11-01', notes: [
+      { kind: 'new', title: 'Send From Your Phone', body: 'Photos and files from your phone land in your hand-in.', icon: P.phone },
+    ] },
     { version: '2.99.134', date: '2026-11-01', notes: [
       { kind: 'fixed', title: 'No False Warning', body: 'Simpl no longer says Safari is running an old copy.', icon: P.check },
     ] },

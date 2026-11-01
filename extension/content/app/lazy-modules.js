@@ -14,6 +14,7 @@ self.BCV_LAZY_MODULES = {
   quizsim: { needs: ['quiz'], files: ['content/app/quiz-sim.js'] }, // the simulation quiz (Settings → Developer → Quiz)
   submit: { files: ['content/app/screens/submit.js', 'content/app/screens/feedback.js'] },
   qr: { files: ['lib/vendor/qrcode.js'] }, // (2.99.96) the QR code of Hand in from Phone: loaded when its sheet is opened
+  handin: { needs: ['qr'], files: ['content/app/handin.js'] }, // (2.99.135) Hand in from your phone: the sealed relay and its sheet, loaded with the code
   hub: { files: ['content/app/hub.js'] }, // the search box's commands, answers and row actions: loaded when the box is focused
   widgets: { files: ['content/app/tools/widgets.js'] }, // widgets of your own: the frame, the importer (loaded by Tools, and by the tray when one is kept)
   starters: { files: ['content/app/tools/widget-starters.js'] }, // the example widgets the importer offers

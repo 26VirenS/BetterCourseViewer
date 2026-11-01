@@ -103,6 +103,32 @@ Object, `FeedStore` (`src/feed-store.js`). `https://<your-domain>/api/feed` says
    namespace `simpl-feeds` → `FeedStore`. Save.
 3. The Pages project → Deployments → the newest → ⋯ → Retry deployment (a binding takes effect from the next one).
 
+## Hand in from your phone
+
+(2.99.135) The extension's **Hand in from your phone** shows a QR code of `https://<your-domain>/handin/#<secret>`:
+`public/handin/index.html`, the phone's page — self-contained (inline styles and script, a Content-Security-Policy that
+allows that one script by its hash and no request but to `/api/handin`), in light and dark, drawn as the Mac app's own
+Send from Phone page. The secret after `#` never reaches the server; from it the phone and the computer work out the
+hand-in's id, an AES-256-GCM key and the phone's token. The phone sends each file chosen or photographed there to the
+computer through `/api/handin/<id>/…` (`src/handin.js`), sealed: an offer (what the computer is handing in to), then
+per file a sealed description and sealed parts of 512 KiB, in order. The computer fetches and opens them, adds each to
+the hand-in, and the student presses Submit there; the phone is then told "Handed in ✓". Each hand-in is a Durable
+Object, `HandInStore` (`src/handin-store.js`, SQL rows, a BLOB a part), that keeps only sealed bytes, the two tokens'
+hashes and a few plain facts; a file is forgotten as soon as the computer takes it, everything when the code is closed
+or the work handed in, and all of it 30 minutes after it was last used (an alarm). Limits: 10 files and 50 MB a
+hand-in, 30 hand-ins started from one address an hour. Refusals are `SC-H-…` (`docs/ERROR-CODES.md` on the development
+branch). `https://<your-domain>/api/handin` says whether the store is attached: `{"ok":true,"store":true}`.
+
+**On Workers** nothing is needed: `wrangler.jsonc` defines `HandInStore` and its own migration (`handin-v1`, after
+`feeds-v1`), and the deploy makes it. **On Pages** the store lives in the `simpl-feeds` Worker beside `FeedStore`
+(`feeds.jsonc` defines both); bind it as for calendars — Settings → Bindings → Durable Object namespace, variable name
+`HANDIN`, the namespace `simpl-feeds` → `HandInStore` — and retry the newest deployment. Until it is bound the endpoint
+answers `SC-H-503`, and the extension shows its old code instead (the assignment, opened in Canvas on the phone).
+
+While the code is open the computer asks the relay what has come about once a second (once in two before the phone
+opens it, once in five when its tab is out of sight), and the phone asks every two and a half seconds; each is a
+request to the Worker and its Durable Object — worth knowing against the Free plan's 100,000 requests a day.
+
 ## Report a bug
 
 The page at `/report/` takes a kind (Bug, Error, Crash, Reason to disable, Missing feature,
