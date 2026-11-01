@@ -1333,15 +1333,19 @@ there takes the pointer); round a submission's file that room is painted in the 
 
 What each is now: a tool opened whole (its `ToolPopup`; a tool handing something to another turns into it there); Knewton Alta
 and Macmillan (homework, not quizzes); Hand In (with its Send from Phone panel and its files' preview); a submission's
-review; the rubric; New message (the Inbox's and a course's People's); New task; What's New; What-if assignment and
+review; the rubric; New message (the Inbox's and a course's People's); New task; What-if assignment and
 Grading scale; the Calendar's Calendars; a course's Nickname; the pane's History and Help — popups; (0.3.64) the light
-ones, with no form in them (`Sheet.Light`: What's New, the Calendar's Calendars and Find Appointment, History and Help),
+ones, with no form in them (`Sheet.Light`: the Calendar's Calendars and Find appointment, History and Help),
 close on a click anywhere in the window they float over, which still does what it does. The quick look and
 a counter's panel stay cards on the page that grow out of their rows and cards, taking nothing from the window either
 (The quick look, above). Pinned tools' flyouts and their pulled-out windows, menus and the search's suggestions are as they were.
 Staying sheets over the window, dimming it: a quiz being taken (`QuizPopup`: its integrity and its clock), the first
 setup, the sign-in's "Stay logged in?", the tour (its own veil), and the questions that must be answered first (Sign
-out?, Delete this task?, Uninstall, Keep Simpl on your taskbar?) — and a development run's biology foundation demo.
+out?, Delete this task?, Uninstall, Keep Simpl on your taskbar?) — and a development run's biology foundation demo. What's
+New is a dialog over the window too, dimming it as Windows 11's dialogs do (`Shell/WhatsNewSheet.cs`; light: a click on
+the dimmed window closes it, and it holds no update): it leads with the one to three changes a student notices
+(`WhatsNew.Leading`: the newest version's first, new before better before fixed, never a note for the developer tools,
+kind `dev`), See all changes opening every version's notes under them (`--whatsnew-all yes` opens them for a picture).
 
 ## Knewton Alta
 
