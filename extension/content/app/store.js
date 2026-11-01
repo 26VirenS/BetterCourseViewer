@@ -1731,6 +1731,7 @@
         ...g, color: GROUP_COLORS[i % GROUP_COLORS.length], graded: items.length > 0, earned, possible, omitted, dropped: dropped.map((r) => r.name),
         // (2.99.33) a whole percent, half up on the decimal figure (87 of 120 is 72.5: 73, where Math.round read 72.4999…)
         pct: possible > 0 ? roundHalfUp((earned / possible) * 100, 0) : null, hypothetical: items.some((r) => r.hypothetical), zero: weighted && g.weight === 0,
+        exact: possible > 0 ? (earned / possible) * 100 : null, // (the unrounded figure: what a weighted total is worked out from, as Canvas works it out)
       };
     });
     const scored = groupStats.filter((g) => g.graded);
@@ -1739,7 +1740,7 @@
     let note = '';
     if (weighted) {
       const denom = scored.reduce((s, g) => s + g.weight, 0);
-      total = denom > 0 ? round1(scored.reduce((s, g) => s + g.weight * g.pct, 0) / denom) : null;
+      total = denom > 0 ? round1(scored.reduce((s, g) => s + g.weight * g.exact, 0) / denom) : null; // (each group's own fraction, never its whole percent: two groups at 2/3 are 66.7%, not 67%)
       note = denom > 0 ? (own ? 'Weighted by your own weights, across the groups with graded work.' : 'Weighted across the groups that have graded work.') : 'No weighted group has graded work yet.';
     } else {
       const earned = scored.reduce((s, g) => s + g.earned, 0);

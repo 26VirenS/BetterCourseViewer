@@ -3694,6 +3694,11 @@ try {
   // the grade model applies a group's drop rules the way Canvas does (a dropped zero no longer drags the group down), and what-if junk is cleared
   const dropModel = await sw.evaluate(async (base) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: () => { const S = self.BCV.store; const g = [{ id: 'g1', name: 'Homework', group_weight: 0, position: 1, rules: { drop_lowest: 1, never_drop: ['a3'] }, assignments: [1, 2, 3].map((i) => ({ id: `a${i}`, name: `HW ${i}`, points_possible: 100, submission: { workflow_state: 'graded', score: i === 1 ? 50 : i === 3 ? 60 : 100 } })) }]; const m = S.gradeModel(g, { id: 'x', weighted: false, score: null }, {}, false, false); const nan = S.gradeModel(g, { id: 'x', weighted: false, score: null }, { a2: '1.2.3' }, true, false); return { total: m.total, legend: m.legend[0]?.detail || '', nanTotal: nan.total }; } }); return result; }, BASE);
   check(dropModel.total === 80 && /HW 1 dropped/.test(dropModel.legend) && Number.isFinite(dropModel.nanTotal), `drop_lowest drops the lowest scored item (never_drop held): total ${dropModel.total} (100 + 60 of 200), legend "${dropModel.legend}", junk what-if total ${dropModel.nanTotal}`);
+  // a weighted total is worked out from each group's own fraction, as Canvas works it out, never from the whole percent
+  // the legend shows: two groups at half the grade each, 2 of 3 in both, is 66.7% (what-if, your own weights, a hidden
+  // total) — not the 67% two rounded 67s make
+  const weightedModel = await sw.evaluate(async (base) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: () => { const S = self.BCV.store; const grp = (id, w) => ({ id, name: `G${id}`, group_weight: w, position: Number(id), rules: {}, assignments: [{ id: `${id}a`, name: `A${id}`, points_possible: 3, submission: { workflow_state: 'graded', score: 2 } }] }); const g = [grp('1', 50), grp('2', 50)]; const c = { id: 'w', weighted: true, score: 66.67 }; const wi = S.gradeModel(g, c, {}, true, false); const own = S.gradeModel(g, { ...c, weighted: false, score: null }, {}, false, false, [], { ownWeights: { 1: 50, 2: 50 } }); return { whatIf: wi.total, own: own.total, legend: wi.legend.map((r) => r.value) }; } }); return result; }, BASE);
+  check(weightedModel.whatIf === 66.7 && weightedModel.own === 66.7 && weightedModel.legend.join() === '67%,67%', `a weighted total from the groups' own fractions: two groups of 2/3 at 50% each are 66.7% (what-if ${weightedModel.whatIf}, own weights ${weightedModel.own}), each group still shown as ${weightedModel.legend.join(' and ')}`);
   // (2.98.38) what-if assignments put in a group of your choosing: every group offered with its weight; pressing a
   // group points the box at it; one added counts in its group with that weight, tops the list marked What-if, and goes with its X
   const adderOpts = await page.$$eval('.bcv-wfadd__group option', (os) => os.map((o) => o.textContent));
@@ -3735,20 +3740,20 @@ try {
   check((await texts('.bcv-gr__wsum'))[0] === 'Total 110% · shares taken in proportion' && (await page.$eval('.bcv-gr__wsum', (e) => e.classList.contains('is-off'))), `the sum stays in view and says when it is not 100: ${(await texts('.bcv-gr__wsum'))[0]}`);
   await wInputs[1].fill('0');
   await page.click('.bcv-gr__wsave');
-  await page.waitForFunction(() => !document.querySelector('.bcv-gr__wedit') && document.querySelector('.bcv-gr__total')?.textContent === '76%', null, { timeout: 5000 });
+  await page.waitForFunction(() => !document.querySelector('.bcv-gr__wedit') && document.querySelector('.bcv-gr__total')?.textContent === '76.2%', null, { timeout: 5000 });
   const ownRows = await texts('.bcv-wbar__row');
-  check(ownRows.join(' | ') === 'Discussion Quizzes 50% of grade 100% | Effort 50% of grade 52%' && (await texts('.bcv-gr__hsub'))[0] === '100% · your own weights' && (await texts('.bcv-gr__note'))[0] === 'Weighted by your own weights, not your instructor’s — Canvas shows 92.4%.' && (await texts('.bcv-gr__ownbtn'))[0] === 'Edit my weights' && /never reach Canvas/.test((await texts('.bcv-gr__wnote--own'))[0]) && (await page.$$('.bcv-rings__svg > circle')).length === 8, `saved: the bar, the total (half of 100% and half of 52% = 76%) and the note follow your weights, Canvas's figure kept in view: ${ownRows.join(' | ')} · ${(await texts('.bcv-gr__note'))[0]}`);
+  check(ownRows.join(' | ') === 'Discussion Quizzes 50% of grade 100% | Effort 50% of grade 52%' && (await texts('.bcv-gr__hsub'))[0] === '100% · your own weights' && (await texts('.bcv-gr__note'))[0] === 'Weighted by your own weights, not your instructor’s — Canvas shows 92.4%.' && (await texts('.bcv-gr__ownbtn'))[0] === 'Edit my weights' && /never reach Canvas/.test((await texts('.bcv-gr__wnote--own'))[0]) && (await page.$$('.bcv-rings__svg > circle')).length === 8, `saved: the bar, the total (half of 100% and half of Effort's 43 of 82, 52.4% — shown 52% — = 76.2%) and the note follow your weights, Canvas's figure kept in view: ${ownRows.join(' | ')} · ${(await texts('.bcv-gr__note'))[0]}`);
   const ownPref = await sw.evaluate(async () => Object.entries(await chrome.storage.local.get(null)).find(([k]) => k.startsWith('prefs:'))?.[1]?.gradeWeights);
   check(ownPref && ownPref['101'] && ownPref['101']['g101-0'] === 50 && ownPref['101']['g101-3'] === 50 && Object.keys(ownPref['101']).length === 2, `the weights live in the site's preferences by course, zeros dropped, nothing sent to Canvas: ${JSON.stringify(ownPref)}`);
   await page.reload();
   await page.waitForSelector('.bcv-rings__svg', { timeout: 10000 });
-  await page.waitForFunction(() => document.querySelector('.bcv-gr__total')?.textContent === '76%', null, { timeout: 5000 });
+  await page.waitForFunction(() => document.querySelector('.bcv-gr__total')?.textContent === '76.2%', null, { timeout: 5000 });
   check(true, 'and they survive a reload');
-  // the Grades page follows them: the course's score, its letter and the GPA all from the 76%
+  // the Grades page follows them: the course's score, its letter and the GPA all from the 76.2%
   await page.goto(`${BASE}/grades`); // (the course shell's sidebar carries the course's tabs, not the main nav)
   await page.waitForSelector('.bcv-gpa__card', { timeout: 15000 });
   const ownCard = await page.evaluate(() => { const c = [...document.querySelectorAll('.bcv-gpa__card')].find((x) => /F26-MATH 021 20/.test(x.textContent)); return c ? { pct: c.querySelector('.bcv-gpa__cpct')?.textContent, letter: c.querySelector('.bcv-gpa__ringletter')?.textContent, note: c.querySelector('.bcv-gpa__cnote')?.textContent } : null; });
-  check(ownCard && ownCard.pct === '76%' && ownCard.letter === 'C' && /^By your own weights/.test(ownCard.note), `the Grades page scores the course by your weights, with a letter from them and a note saying so: ${JSON.stringify(ownCard)}`);
+  check(ownCard && ownCard.pct === '76.2%' && ownCard.letter === 'C' && /^By your own weights/.test(ownCard.note), `the Grades page scores the course by your weights, with a letter from them and a note saying so: ${JSON.stringify(ownCard)}`);
   await page.goto(`${BASE}/courses/101/grades`);
   await page.waitForSelector('.bcv-gr__ownbtn', { timeout: 15000 });
   await page.click('.bcv-gr__ownbtn');
