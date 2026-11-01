@@ -542,6 +542,11 @@ ui_review() {
   MODE=light shoot light-05m-calendar-month-todo 22 -SimplPlace calendar -SimplCalView month -SimplSidebar hidden
   MODE=dark shoot dark-05m-calendar-month-todo 22 -SimplPlace calendar -SimplCalView month -SimplSidebar hidden
   MODE=light shoot light-05k-calendar-todo-menu 24 -SimplPlace calendar -SimplCalView month -SimplSidebar hidden -SimplTodoMenu YES
+  # (M5) the month with the sidebar shown, 1024 points wide: To Do put away by the month, so its days are wide enough to
+  # name their items; and To Do kept beside it as Show To Do keeps it (-SimplTodoKept), its days too narrow for names
+  # showing their items as dots and "+N" (month_check)
+  MODE=light shoot light-05n-calendar-month-narrow 22 -SimplPlace calendar -SimplCalView month
+  MODE=light shoot light-05o-calendar-month-dots 22 -SimplPlace calendar -SimplCalView month -SimplTodoKept YES
   MODE=light shoot light-05x-calendar-week-seven 22 -SimplPlace calendar -SimplCalView week -SimplCalWeekDays 7 -SimplSidebar hidden
   MODE=light shoot light-05y-calendar-week-pinched 22 -SimplPlace calendar -SimplCalView week -SimplCalHourHeight 18 -SimplSidebar hidden
   MODE=light shoot light-05z-calendar-week-peeks 22 -SimplPlace calendar -SimplCalView week -SimplCalHourHeight 90 -SimplCalScrollHour 12 -SimplSidebar hidden
@@ -1156,6 +1161,28 @@ community_tools_check() {
   if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::community tools: /'; return 1; fi
 }
 
+# (M5) month_check: To Do & Calendar's month 1024 points wide with the sidebar shown, as month-check.txt — the month
+# put To Do away and its days named their items (light-05n-calendar-month-narrow); with To Do kept beside it
+# (-SimplTodoKept), its days, too narrow for names, showed their items as dots (light-05o-calendar-month-dots). What
+# each said last is what it settled on (CalendarView.swift: "calendar month: …", in the screenshot suite only).
+month_check() {
+  local out="$OUT_ABS/month-check.txt" n="$OUT_ABS/console-light-05n-calendar-month-narrow.txt" k="$OUT_ABS/console-light-05o-calendar-month-dots.txt"
+  local todo days
+  : > "$out"
+  say() { if [ "$1" = 0 ]; then echo "ok   $2" >> "$out"; else echo "FAIL $2" >> "$out"; fi; }
+  todo="$(grep -o 'calendar month: To Do .*' "$n" 2>/dev/null | tail -1)"
+  days="$(grep -o 'calendar month: days .*' "$n" 2>/dev/null | tail -1)"
+  # (To Do never squeezing the month: put away by it — or, a window too short to hold still, above it)
+  [ -n "$todo" ] && [ "$todo" != 'calendar month: To Do beside the month' ] && printf '%s' "$days" | grep -q 'items by name$'
+  say $? "a narrow month put To Do away and named its items: ${todo:-nothing said}; ${days:-nothing said}"
+  todo="$(grep -o 'calendar month: To Do .*' "$k" 2>/dev/null | tail -1)"
+  days="$(grep -o 'calendar month: days .*' "$k" 2>/dev/null | tail -1)"
+  [ "$todo" = 'calendar month: To Do beside the month' ] && printf '%s' "$days" | grep -q 'items as dots$'
+  say $? "with To Do kept beside it, days too narrow for names showed dots: ${todo:-nothing said}; ${days:-nothing said}"
+  cat "$out"
+  if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::month: /'; return 1; fi
+}
+
 tool_list_check() {
   local out="$OUT_ABS/tool-list-check.txt" r="$OUT_ABS/console-light-36d-external-tools-list-reread.txt" f crashes=0
   : > "$out"
@@ -1354,6 +1381,7 @@ if [ "${SHOTS:-full}" = check ]; then
   update_prompt_check || exit 1 # (1.3.207)
   share_check || exit 1 # (1.3.208)
   community_tools_check || exit 1 # (1.3.211)
+  month_check || exit 1 # (M5)
   exit 0
 fi
 
@@ -1534,6 +1562,7 @@ if [ "$SHARDS" = 1 ]; then
   update_prompt_check || true # (1.3.207)
   share_check || true # (1.3.208)
   community_tools_check || true # (1.3.211)
+  month_check || true # (M5)
 fi
 keep_crashes
 exit 0
