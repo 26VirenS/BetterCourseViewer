@@ -296,30 +296,84 @@ final class Updater {
         Placement.relaunch(target, quietly: !asked) // the new copy opens once this one has quit (2.99.104: one that came by itself, out of sight)
     }
 
-    /// The releases published on GitHub, newest first, each with its Mac zip: for the Developer
-    /// section's rollback. A release without a Mac zip is left out.
+    /// The versions published, newest first, each with its Mac zip: for the Developer section's rollback. A release
+    /// without a Mac zip is left out. (2.99.133) Every one of them: the site's list of all the app's versions
+    /// (/app/safari-versions.json, written by scripts/publish-site.sh) — one small file — or, when it cannot be read,
+    /// GitHub's releases a hundred to a page, up to ten pages. Until 2.99.132 only the first 40 of GitHub's releases were
+    /// read, and with the Mac app's and Windows' releases among them only the last few versions were offered.
     func releases(_ completion: @escaping ([[String: Any]]) -> Void) {
-        var request = URLRequest(url: URL(string: "https://api.github.com/repos/26VirenS/BetterCourseViewer/releases?per_page=40")!)
+        fetchJSON(URL(string: "https://simplcourses.com/app/safari-versions.json")!, github: false) { json in
+            let listed = ((json as? [String: Any])?["versions"] as? [[String: Any]]) ?? []
+            let fromSite = Self.newestFirst(listed.compactMap { Self.siteVersion($0) })
+            if !fromSite.isEmpty {
+                completion(fromSite)
+                return
+            }
+            self.githubReleases(page: 1, found: []) { all in completion(Self.newestFirst(all)) }
+        }
+    }
+
+    /// Where every version's zip is published: a version listed anywhere else is not offered.
+    private static let releaseDownloads = "https://github.com/26VirenS/BetterCourseViewer/releases/download/"
+
+    /// One version from the site's list, as the Developer section takes it.
+    private static func siteVersion(_ r: [String: Any]) -> [String: Any]? {
+        guard let version = r["version"] as? String, !version.isEmpty,
+              let url = r["url"] as? String, url.hasPrefix(releaseDownloads) else { return nil }
+        var d: [String: Any] = ["version": version, "url": url]
+        if let s = r["size"] as? Int { d["size"] = s }
+        if let p = r["published"] as? String { d["published"] = p }
+        if let h = r["sha256"] as? String, !h.isEmpty { d["sha256"] = h }
+        if let b = r["beta"] as? Bool { d["beta"] = b }
+        return d
+    }
+
+    /// Newest first, each version once.
+    private static func newestFirst(_ list: [[String: Any]]) -> [[String: Any]] {
+        var seen = Set<String>()
+        let once = list.filter { seen.insert(($0["version"] as? String) ?? "").inserted }
+        return once.sorted { isNewer(($0["version"] as? String) ?? "", than: ($1["version"] as? String) ?? "") }
+    }
+
+    /// A JSON file read, handed back on the main queue (as every answer here is); nil when it could not be.
+    private func fetchJSON(_ url: URL, github: Bool, _ done: @escaping (Any?) -> Void) {
+        var request = URLRequest(url: url)
         request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
         request.timeoutInterval = 20
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        URLSession.shared.dataTask(with: request) { data, _, _ in
-            var out: [[String: Any]] = []
-            if let data = data, let list = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
-                for r in list {
-                    guard let tag = r["tag_name"] as? String, let assets = r["assets"] as? [[String: Any]] else { continue }
-                    let version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
-                    guard let asset = assets.first(where: { ($0["name"] as? String) == "Simpl-Courses-Mac-\(version).zip" }),
-                          let url = asset["browser_download_url"] as? String else { continue }
-                    var d: [String: Any] = ["version": version, "url": url]
-                    if let s = asset["size"] as? Int { d["size"] = s }
-                    if let p = r["published_at"] as? String { d["published"] = p }
-                    if let digest = asset["digest"] as? String, digest.hasPrefix("sha256:") { d["sha256"] = String(digest.dropFirst(7)) }
-                    out.append(d)
-                }
+        if github { request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept") }
+        URLSession.shared.dataTask(with: request) { data, response, _ in
+            let ok = (response as? HTTPURLResponse)?.statusCode == 200
+            DispatchQueue.main.async {
+                guard ok, let data = data else { done(nil); return }
+                done(try? JSONSerialization.jsonObject(with: data))
             }
-            DispatchQueue.main.async { completion(out) }
         }.resume()
+    }
+
+    /// GitHub's releases, page after page (the site's list could not be read): every one with the app's zip.
+    private func githubReleases(page: Int, found: [[String: Any]], _ done: @escaping ([[String: Any]]) -> Void) {
+        let url = URL(string: "https://api.github.com/repos/26VirenS/BetterCourseViewer/releases?per_page=100&page=\(page)")!
+        fetchJSON(url, github: true) { json in
+            let list = (json as? [[String: Any]]) ?? []
+            var out = found
+            for r in list {
+                guard let tag = r["tag_name"] as? String, let assets = r["assets"] as? [[String: Any]] else { continue }
+                let version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+                guard let asset = assets.first(where: { ($0["name"] as? String) == "Simpl-Courses-Mac-\(version).zip" }),
+                      let zip = asset["browser_download_url"] as? String else { continue }
+                var d: [String: Any] = ["version": version, "url": zip]
+                if let s = asset["size"] as? Int { d["size"] = s }
+                if let p = r["published_at"] as? String { d["published"] = p }
+                if let digest = asset["digest"] as? String, digest.hasPrefix("sha256:") { d["sha256"] = String(digest.dropFirst(7)) }
+                if let b = r["prerelease"] as? Bool { d["beta"] = b }
+                out.append(d)
+            }
+            if list.count == 100 && page < 10 {
+                self.githubReleases(page: page + 1, found: out, done)
+            } else {
+                done(out)
+            }
+        }
     }
 
     /// The Developer section's rollback: the version named, put in this copy's place — the same

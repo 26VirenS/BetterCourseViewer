@@ -35,7 +35,13 @@ simplcourses.com rather than the App Store. The app is more than a wrapper now:
   switch was: "Staying on 2.99.35 — You put this version back. Update now installs 2.99.36; a
   version newer than 2.99.36 installs by itself." A version from before 2.99.35 knows no hold, so
   a rollback also writes the old `autoUpdate` key off for it: it stays too, on its switch; 2.99.35
-  and later forget the key.
+  and later forget the key. (2.99.133) *Roll back the app* offers every version ever published, not
+  just the last few: the app reads the site's list of them all, `/app/safari-versions.json`
+  (`scripts/publish-site.sh` writes it at every Site run from all of GitHub's pages of releases:
+  each version's zip, checksum, size, date and whether it was a beta), and, when that cannot be
+  read, GitHub's releases a hundred to a page, up to ten pages. 2.99.132 and earlier read only the
+  first 40 of GitHub's releases, which the Mac app's and Windows' share, so only about four
+  versions showed. Only zips under this repository's release downloads are offered.
 - **It opens on a first screen, and lives in the Applications folder.** The first launch shows a
   black screen — *Let’s make Canvas simpler*, *Open Safari* — and the button opens Safari's
   Extensions settings on the extension. A downloaded app opened straight from Downloads is run by

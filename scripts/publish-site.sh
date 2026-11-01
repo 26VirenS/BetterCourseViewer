@@ -129,6 +129,33 @@ shutil.copyfile("build/site-sync/public/app/latest-beta.json", "build/site-sync/
 print("/app/latest.json → " + version + (" (beta)" if rel.get("prerelease") else ""))
 ' "$REPO" || echo "no Safari app beta feed written"
   fi
+  # (2.99.133) every version of the Safari app published, newest first, for its Developer section's rollback
+  # (/app/safari-versions.json): every v* release with the app's zip, a beta too, across all GitHub's pages of releases —
+  # the app read only the first 40 releases, which the Mac's and Windows' share, so only the last few were offered
+  SAFARI_ALL="$(gh api --paginate "repos/$REPO/releases?per_page=100" --jq '.[] | select((.draft | not) and (.tag_name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")) and any(.assets[]; .name | startswith("Simpl-Courses-Mac-")))' 2>/dev/null || true)"
+  if [ -n "$SAFARI_ALL" ]; then
+    mkdir -p build/site-sync/public/app
+    printf '%s' "$SAFARI_ALL" | python3 -c '
+import json, sys
+dec, text, i, seen, out = json.JSONDecoder(), sys.stdin.read(), 0, set(), []
+while i < len(text):
+    while i < len(text) and text[i].isspace(): i += 1
+    if i >= len(text): break
+    rel, i = dec.raw_decode(text, i)
+    version = rel["tag_name"][1:]
+    asset = next((a for a in rel.get("assets", []) if a.get("name") == f"Simpl-Courses-Mac-{version}.zip"), None)
+    if not asset or version in seen: continue
+    seen.add(version)
+    digest = asset.get("digest") or ""
+    out.append({"version": version, "url": asset["browser_download_url"], "sha256": digest[7:] if digest.startswith("sha256:") else None,
+                "size": asset.get("size"), "published": rel.get("published_at"), "beta": bool(rel.get("prerelease"))})
+out.sort(key=lambda r: [int(p) if p.isdigit() else 0 for p in r["version"].split(".")], reverse=True)
+if not out: sys.exit("no Safari app versions found")
+json.dump({"versions": out}, open("build/site-sync/public/app/safari-versions.json", "w"), indent=1)
+newest, oldest = out[0]["version"], out[-1]["version"]
+print(f"/app/safari-versions.json → {len(out)} versions, {newest} to {oldest}")
+' || echo "no Safari app version list written"
+  fi
   # (1.3.17) the beta feed, /app/mac-beta.json, for Macs with Get beta updates on: the newest mac-v* release of all, a
   # beta (a pre-release) or not — so a beta Mac also moves on to a release newer than its beta
   BETA_REL="$(gh api "repos/$REPO/releases?per_page=100" --jq '[.[] | select((.draft | not) and (.tag_name | startswith("mac-v")))] | sort_by(.tag_name | ltrimstr("mac-v") | split(".") | map(tonumber? // 0)) | last' 2>/dev/null || true)"
