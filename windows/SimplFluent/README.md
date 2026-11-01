@@ -499,10 +499,11 @@ public sealed class GradesScreen : Screen
 ```
 
 - The shell gives the page its title (a breadcrumb when something is pushed, and the screen's own `Before` parts ahead
-  of its title: a course's Grades reads "F26-MATH 021 20 › Grades", as Windows 11's Settings names where a page is — on
-  one line, as WinUI's BreadcrumbBar keeps it: steps that do not fit fold into "…" from the first, `Shell/CrumbLine.cs`),
-  the
-  commands at the title's right, a scroll viewer and the padding; `Build` returns only the content. `Width` is the content's width; override
+  of its title: a course's Grades is under "F26-MATH 021 20", as Windows 11's Settings names where a page is — the
+  breadcrumb on a line of its own with the commands at its right, as WinUI's BreadcrumbBar keeps it, and the title under
+  it the header's whole width; steps that do not fit are cut short with "…" first, the longest first, to 96 each, and
+  only then fold into "…" from the first, `Shell/CrumbLine.cs`; a page with no breadcrumb has its title beside its
+  commands), a scroll viewer and the padding; `Build` returns only the content. `Width` is the content's width; override
   `LayoutChanges` to be built again when a width threshold is crossed. `WindowWidth` is the whole window's (the pane
   and the page together), for a layout told by the window rather than by the page left beside the pane, with
   `WindowLayoutChanges` for its thresholds. The Dashboard's six counters are cards as tall as their words (0.2.9's, the
@@ -569,8 +570,8 @@ public sealed class GradesScreen : Screen
   says `Busy`.
 - A screen of a course or a group says its colour (`TitleColor`): the shell draws a square in it before the title, as
   the Mac's headings have (a section's comes from `CoursePart`, the course's colour in the pane). A screen whose title
-  is often long (a discussion, a page, an assignment) lets it wrap (`TitleLines`), the commands staying at the top
-  right; cut, its whole words are its tooltip. The line under the title never repeats a part the breadcrumb already
+  is often long (a discussion, a page, an assignment) lets it wrap (`TitleLines`) under its breadcrumb; cut, its whole
+  words are its tooltip. The line under the title never repeats a part the breadcrumb already
   says (`AppShell.WithoutCrumbs`: "Discussion", not "Discussion · F26-MATH 021 20" under "F26-MATH 021 20 ›").
 - Words on a course's own colour (a card's band, the pane's letter squares) are `K.InkOn(color)`: white where white
   reads 3:1 on it, else near-black — students pick their colours, and many are light. A course's second name is shown

@@ -58,6 +58,8 @@ public sealed partial class AppShell : Grid, IDisposable
     private readonly SearchPalette palette;
     private readonly Grid header = new();
     private readonly ContentControl titleHost = new() { Focusable = false };
+    /// <summary>The title under the breadcrumb, the header's whole width (a page opened on a place), and the line under it.</summary>
+    private readonly ContentControl belowHost = new() { Focusable = false, Visibility = Visibility.Collapsed };
     // (a little room between the title and the first command, so a long title never runs into "Previous")
     private readonly ContentControl commandsHost = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
     private readonly Border toast = new();
@@ -169,8 +171,11 @@ public sealed partial class AppShell : Grid, IDisposable
         // ---- the page: its header, then the screen ----
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        header.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         header.Children.Add(titleHost.Col(0));
         header.Children.Add(commandsHost.Col(1));
+        header.Children.Add(belowHost.Row(1).Col(0, 2));
         header.Margin = new Thickness(40, 4, 40, 20);
         page.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         page.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -907,36 +912,63 @@ public sealed partial class AppShell : Grid, IDisposable
         (Screen Screen, string Words, FrameworkElement? Commands) drawn = (current, words, commands);
         if (headerDrawn is { } was && was.Equals(drawn)) return;
         headerDrawn = drawn;
-        // (one line, as Windows 11's BreadcrumbBar: steps that do not fit fold into "…" from the first, so the title never
-        //  sits alone under a "›" — CrumbLine)
+        // (a page opened on a place — a discussion, an assignment, a course's own Grades — has the way back to it as a
+        //  breadcrumb on a line of its own, sharing it with the commands, and its title under it with the header's whole
+        //  width: beside the commands, a long title wrapped to three lines and was cut, and the course in the breadcrumb
+        //  shrank to a bare "…". A place's own page keeps its title beside its commands, on one line)
         var steps = new List<(FrameworkElement Step, string Title, Action Go)>();
         FrameworkElement? titleText = null;
         for (var i = 0; i < crumbs.Count; i++)
         {
             var (title, go) = crumbs[i];
             var last = i == crumbs.Count - 1;
-            var t = last && current.TitleLines > 1 ? K.Wrapped(title, Ty.Title, B.Text, current.TitleLines) : K.Text(title, Ty.Title, last ? B.Text : B.Text2);
-            if (last) TipWhenCut(t);
             if (go != null && !last)
             {
-                var b = K.Subtle(t, go, new Thickness(2, 0, 2, 0));
+                // (each step cut short with "…" when the line is too narrow for all of them, its whole name its tooltip)
+                var name = K.Text(title, Ty.Body, B.Text2);
+                TipWhenCut(name);
+                var b = K.Subtle(name, go, new Thickness(4, 3, 4, 3));
                 b.Cursor = Cursors.Hand;
+                b.VerticalAlignment = VerticalAlignment.Center;
+                System.Windows.Automation.AutomationProperties.SetName(b, $"Back to {title}");
                 steps.Add((b, title, go));
             }
-            else titleText = t;
+            else
+            {
+                var t = current.TitleLines > 1 ? K.Wrapped(title, Ty.Title, B.Text, current.TitleLines) : K.Text(title, Ty.Title, B.Text);
+                TipWhenCut(t);
+                titleText = t;
+            }
         }
-        // (a page of a course's: a square in its colour at the heading's start, as the Mac's headings have — the page's
-        //  course at a glance, the colour of its card and its square in the pane — beside the title's first line, or,
-        //  where a breadcrumb leads ("F26-MATH 021 20 › Grades"), before the breadcrumb, never between its parts)
-        Border? square = current.TitleColor is { } tint
-            ? new Border { Width = 14, Height = 14, CornerRadius = new CornerRadius(4), Background = K.Brush(tint), VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 11, 10, 0) }
-            : null;
-        var line = new CrumbLine(square, steps, titleText ?? K.Text(current.Title, Ty.Title));
-        // (a title that may wrap keeps the commands at the top right, beside its first line)
-        commandsHost.VerticalAlignment = current.TitleLines > 1 ? VerticalAlignment.Top : VerticalAlignment.Center;
-        var stack = K.V(2, line);
+        titleText ??= K.Text(current.Title, Ty.Title);
+        var stack = K.V(2);
+        if (steps.Count > 0)
+        {
+            // (a page of a course's: the square in its colour at the breadcrumb's start, never between its parts)
+            Border? lead = current.TitleColor is { } tint
+                ? new Border { Width = 10, Height = 10, CornerRadius = new CornerRadius(3), Background = K.Brush(tint), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 4, 0) }
+                : null;
+            titleHost.Content = new CrumbLine(lead, steps, null, small: true) { MinHeight = 32 };
+            commandsHost.VerticalAlignment = VerticalAlignment.Center;
+            stack.Children.Add(titleText.Margin(0, 6, 0, 0));
+            belowHost.Content = stack;
+            belowHost.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            // (a page of a course's: a square in its colour beside the title's first line, as the Mac's headings have —
+            //  the page's course at a glance, the colour of its card and its square in the pane)
+            Border? square = current.TitleColor is { } tint
+                ? new Border { Width = 14, Height = 14, CornerRadius = new CornerRadius(4), Background = K.Brush(tint), VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 11, 10, 0) }
+                : null;
+            stack.Children.Add(new CrumbLine(square, steps, titleText));
+            titleHost.Content = stack;
+            belowHost.Content = null;
+            belowHost.Visibility = Visibility.Collapsed;
+            // (a title that may wrap keeps the commands at the top right, beside its first line)
+            commandsHost.VerticalAlignment = current.TitleLines > 1 ? VerticalAlignment.Top : VerticalAlignment.Center;
+        }
         if (subtitle is { Length: > 0 } sub) stack.Children.Add(K.Text(sub, Ty.Body, B.Text2));
-        titleHost.Content = stack;
         commandsHost.Content = commands;
         HeaderWidth();
     }
