@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Make a Tool · Simpl Community</title>
+<meta name="description" content="Make a small tool for Simpl Courses — inputs, results worked out by formulas, a table and a note — try it as you build it, and share it with Simpl Community.">
+<meta name="theme-color" content="#fbfbfd" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<link rel="canonical" href="https://simplcourses.com/community/make/">
+<link rel="icon" href="/img/icon-128.png">
+<link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+<style>
+:root {
+  color-scheme: light dark;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --bg: #fff; --bg-2: #f5f5f7; --tile: #f5f5f7; --text: #1d1d1f; --text-2: #6e6e73; --text-3: #86868b;
+  --hair: rgba(0, 0, 0, .08); --blue: #0071e3; --blue-hover: #0077ed; --link: #0066cc; --soft: #e8e8ed; --soft-hover: #dedee3;
+  --red: #d70015; --green: #1f9d48;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #000; --bg-2: #0e0e10; --tile: #161618; --text: #f5f5f7; --text-2: #a1a1a6; --text-3: #86868b; --hair: rgba(255, 255, 255, .1); --link: #2997ff; --soft: #2c2c2e; --soft-hover: #3a3a3c; --red: #ff6961; --green: #30d158; }
+}
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { overflow-x: hidden; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 400 17px/1.5 var(--font); letter-spacing: -.01em; -webkit-font-smoothing: antialiased; }
+a { color: var(--link); }
+:focus-visible { outline: 3px solid color-mix(in srgb, var(--blue) 60%, transparent); outline-offset: 2px; }
+.wrap { width: min(1180px, 100% - 32px); margin-inline: auto; }
+.top { display: flex; align-items: center; height: 52px; border-bottom: 1px solid var(--hair); }
+.brand { display: inline-flex; align-items: center; gap: 9px; color: var(--text); text-decoration: none; font: 600 17px/1 var(--font-display); letter-spacing: -.02em; }
+.brand img { width: 26px; height: 26px; border-radius: 7px; }
+.top nav { margin-left: auto; display: flex; gap: 20px; font-size: 14px; }
+.top nav a { color: var(--text-2); text-decoration: none; }
+.top nav a[aria-current] { color: var(--text); font-weight: 600; }
+@media (max-width: 560px) { .top nav a:not([aria-current]):not(:last-child) { display: none; } }
+.back { display: inline-block; margin-top: 28px; font-size: 15px; text-decoration: none; }
+h1 { margin: 10px 0 0; font: 700 clamp(34px, 5vw, 52px)/1.05 var(--font-display); letter-spacing: -.035em; }
+.lead { margin: 12px 0 0; max-width: 680px; font: 500 clamp(17px, 1.9vw, 20px)/1.4 var(--font-display); color: var(--text-2); letter-spacing: -.015em; }
+.btn { --h: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: var(--h); padding: 0 16px; border: 0; border-radius: 999px; font: 500 15px/1 var(--font); letter-spacing: -.01em; cursor: pointer; text-decoration: none; white-space: nowrap; -webkit-tap-highlight-color: transparent; transition: transform 140ms var(--ease-out), background-color 160ms ease; }
+.btn:active { transform: scale(.97); }
+.btn--blue { background: var(--blue); color: #fff; }
+.btn--soft { background: var(--soft); color: var(--text); }
+.btn--small { --h: 32px; padding: 0 12px; font-size: 14px; }
+@media (hover: hover) and (pointer: fine) { .btn--blue:hover { background: var(--blue-hover); } .btn--soft:hover { background: var(--soft-hover); } }
+.btn[disabled] { opacity: .45; cursor: default; transform: none; }
+
+/* the maker: the form, and beside it (below it, on a phone) the tool working as it is built */
+.mk { margin-top: 36px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 32px; align-items: start; }
+@media (max-width: 920px) { .mk { grid-template-columns: minmax(0, 1fr); } }
+.mk-side { position: sticky; top: 20px; display: grid; gap: 16px; }
+@media (max-width: 920px) { .mk-side { position: static; } }
+.mk-sec { padding: 22px; border-radius: 22px; background: var(--tile); }
+.mk-sec + .mk-sec { margin-top: 18px; }
+.mk-sec h2 { margin: 0; font: 700 21px/1.2 var(--font-display); letter-spacing: -.02em; }
+.mk-sec h2 small { font: 500 14px var(--font); color: var(--text-3); letter-spacing: 0; margin-left: 6px; }
+.hint { margin: 6px 0 0; font-size: 14px; color: var(--text-2); }
+.hint code, .help code { font: 500 13px var(--mono); padding: 1px 5px; border-radius: 5px; background: var(--soft); }
+.fields { margin-top: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 14px 16px; }
+.fields--small { grid-template-columns: repeat(auto-fill, minmax(min(100%, 104px), 1fr)); gap: 10px 12px; margin-top: 12px; }
+.f { display: grid; align-content: start; gap: 5px; min-width: 0; }
+.f--wide { grid-column: 1 / -1; }
+.f > span:first-child { font-size: 13px; font-weight: 500; color: var(--text-2); }
+.f > span:first-child small { color: var(--text-3); font-weight: 400; }
+.in { width: 100%; min-width: 0; height: 40px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--bg); color: var(--text); box-shadow: inset 0 0 0 1px var(--hair); font: 400 15px var(--font); outline: none; transition: box-shadow 140ms ease; }
+.in:focus { box-shadow: inset 0 0 0 2px var(--blue); }
+.in[aria-invalid="true"] { box-shadow: inset 0 0 0 2px var(--red); }
+textarea.in { height: auto; min-height: 84px; padding: 10px 12px; resize: vertical; line-height: 1.45; }
+select.in { padding-right: 6px; cursor: pointer; }
+.mono { font: 500 14px var(--mono); letter-spacing: 0; }
+.err { margin: 0; font-size: 13px; line-height: 1.35; color: var(--red); }
+.err:empty { display: none; }
+.can { margin: 0; font-size: 12.5px; color: var(--text-3); overflow-wrap: anywhere; }
+.can code { font: 500 12px var(--mono); color: var(--text-2); }
+.count { font-size: 12px; color: var(--text-3); justify-self: end; }
+
+/* the symbol and the colour */
+.syms { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 6px; }
+.syms button { aspect-ratio: 1; display: grid; place-items: center; padding: 0; border: 0; border-radius: 10px; background: var(--bg); color: var(--text-2); box-shadow: inset 0 0 0 1px var(--hair); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.syms button svg { width: 22px; height: 22px; }
+.syms button[aria-checked="true"] { background: var(--tool, var(--blue)); color: #fff; box-shadow: none; }
+.syms button[aria-checked="true"].is-light { color: #1d1d1f; }
+.swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.swatches button { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12); -webkit-tap-highlight-color: transparent; }
+.swatches button[aria-checked="true"] { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--text); }
+.swatches label { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--text-2); cursor: pointer; }
+.swatches input[type="color"] { width: 34px; height: 30px; padding: 0; border: 0; border-radius: 8px; background: none; cursor: pointer; }
+
+/* inputs and results: one card each, in order */
+.items { margin-top: 14px; display: grid; gap: 12px; }
+.item { display: grid; gap: 12px; padding: 14px; border-radius: 16px; background: var(--bg); box-shadow: inset 0 0 0 1px var(--hair); }
+.item__top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.item__top b { font: 600 15px var(--font-display); margin-right: auto; }
+.item .in { background: var(--tile); }
+.acts { display: inline-flex; gap: 4px; margin-left: auto; }
+.icon { display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 9px; background: var(--soft); color: var(--text); font: 600 15px/1 var(--font); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.icon[disabled] { opacity: .35; cursor: default; }
+.icon--x { color: var(--red); }
+.seg { display: inline-flex; padding: 3px; border-radius: 10px; background: var(--soft); }
+.seg button { border: 0; background: none; color: var(--text); font: 500 13.5px/1 var(--font); padding: 8px 12px; border-radius: 7px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.seg button[aria-checked="true"] { background: var(--bg); box-shadow: 0 1px 3px rgba(0, 0, 0, .15); font-weight: 600; }
+.opts { display: grid; gap: 8px; }
+.opt { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 110px) 32px; gap: 8px; align-items: center; }
+.check { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; cursor: pointer; }
+.check input { width: 18px; height: 18px; accent-color: var(--blue); }
+.add { margin-top: 12px; }
+.help { margin-top: 14px; font-size: 14px; color: var(--text-2); }
+.help summary { cursor: pointer; color: var(--link); font-weight: 500; }
+.help dl { margin: 10px 0 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; }
+.help dt { font: 500 13px var(--mono); color: var(--text); }
+.help dd { margin: 0; overflow-wrap: anywhere; }
+
+/* the table's editor: scrolls inside itself on a phone, never the page */
+.tbl { margin-top: 12px; overflow-x: auto; padding-bottom: 4px; }
+.tbl table { border-collapse: separate; border-spacing: 6px; margin: -6px; }
+.tbl td { padding: 0; vertical-align: middle; }
+.tbl .in { width: 140px; height: 36px; background: var(--bg); }
+.tbl thead .in { font-weight: 600; }
+
+/* the preview and sharing */
+.pv, .sh { padding: 20px; border-radius: 22px; background: var(--tile); }
+.pv h2, .sh h2 { margin: 0 0 14px; font: 700 21px/1.2 var(--font-display); letter-spacing: -.02em; }
+.pv__empty { padding: 26px 16px; border-radius: 14px; background: var(--bg); box-shadow: inset 0 0 0 1px var(--hair); text-align: center; color: var(--text-2); font-size: 15px; }
+.pv__empty b { display: block; color: var(--text); margin-bottom: 4px; }
+.pv.is-placeholder .tv-name, .pv.is-placeholder .tv-summary { color: var(--text-3); font-style: italic; }
+.sh p { margin: 0; font-size: 15px; color: var(--text-2); }
+.sh .row { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.sh .note { margin-top: 12px; font-size: 14.5px; }
+.note[data-kind="bad"] { color: var(--red); } .note[data-kind="ok"] { color: var(--green); font-weight: 500; }
+.sh pre { margin: 10px 0 0; max-height: 320px; overflow: auto; padding: 12px; border-radius: 12px; background: var(--bg); box-shadow: inset 0 0 0 1px var(--hair); font: 12px/1.45 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.sh details { margin-top: 14px; font-size: 14px; }
+.sh summary { cursor: pointer; color: var(--link); font-weight: 500; }
+.trap { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+@media (prefers-reduced-motion: reduce) { .btn, .in { transition: none; } }
+
+footer { margin-top: 96px; padding: 22px 0 40px; background: var(--bg-2); font-size: 12px; color: var(--text-3); }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 10px 22px; }
+footer nav { margin-left: auto; display: flex; gap: 18px; }
+footer a { color: var(--text-2); text-decoration: none; }
+</style>
+</head>
+<body>
+<header class="wrap top">
+  <a class="brand" href="/"><img src="/img/icon-128.png" alt="" width="26" height="26"> Simpl Courses</a>
+  <nav aria-label="Pages"><a href="/#moments">Features</a><a href="/community?tab=tools" aria-current="page">Community</a><a href="/compare">Compare</a><a href="/trust">Trust</a><a href="/#get">Get Simpl</a></nav>
+</header>
+
+<main class="wrap">
+  <a class="back" href="/community?tab=tools">‹ Community tools</a>
+  <h1>Make a tool</h1>
+  <p class="lead">What it asks for, what it works out, and a table or a note if it needs them. It works on the right as you build it. Share it, and once it’s been looked at it shows in Simpl Community and on Simpl’s Tools page.</p>
+
+  <div class="mk">
+    <form class="mk-form" data-form novalidate autocomplete="off" onsubmit="return false">
+      <section class="mk-sec" aria-labelledby="h-about">
+        <h2 id="h-about">About it</h2>
+        <div class="fields">
+          <label class="f"><span>Name</span><input class="in" data-top="name" maxlength="40" placeholder="Ohm’s Law"><p class="err" data-err="name"></p></label>
+          <label class="f"><span>Made by <small>(optional)</small></span><input class="in" data-top="maker" maxlength="30" placeholder="Your first name"><p class="err" data-err="maker"></p></label>
+          <label class="f f--wide"><span>What it does, in a line</span><input class="in" data-top="summary" maxlength="60" placeholder="Volts, amps and ohms."><p class="err" data-err="summary"></p></label>
+          <label class="f"><span>Group</span><select class="in" data-top="group"></select><p class="err" data-err="group"></p></label>
+          <div class="f f--wide"><span id="l-color">Colour</span><div class="swatches" role="radiogroup" aria-labelledby="l-color" data-swatches></div><p class="err" data-err="color"></p></div>
+          <div class="f f--wide"><span id="l-symbol">Symbol</span><div class="syms" role="radiogroup" aria-labelledby="l-symbol" data-syms></div><p class="err" data-err="symbol"></p></div>
+        </div>
+      </section>
+
+      <section class="mk-sec" aria-labelledby="h-inputs">
+        <h2 id="h-inputs">Inputs</h2>
+        <p class="hint">What it asks for: a number, a choice, or a switch (1 when on, 0 when off). Each has a name to use in formulas.</p>
+        <div class="items" data-inputs></div>
+        <p class="err" data-err="inputs"></p>
+        <button class="btn btn--soft btn--small add" type="button" data-add-input>+ Add an input</button>
+      </section>
+
+      <section class="mk-sec" aria-labelledby="h-results">
+        <h2 id="h-results">Results</h2>
+        <p class="hint">Each is a formula over the inputs and the results above it, worked out in order. The first one shown is the big one.</p>
+        <div class="items" data-outputs></div>
+        <p class="err" data-err="outputs"></p>
+        <button class="btn btn--soft btn--small add" type="button" data-add-output>+ Add a result</button>
+        <details class="help">
+          <summary>How formulas work</summary>
+          <dl>
+            <dt>+ - * / %</dt><dd>add, take away, times, divide, remainder</dd>
+            <dt>^</dt><dd>to the power of: <code>v^2</code>, <code>2^-1</code></dd>
+            <dt>( )</dt><dd>work this out first</dd>
+            <dt>&lt; &lt;= &gt; &gt;= == !=</dt><dd>compare: 1 when true, 0 when not</dd>
+            <dt>&amp;&amp; || !</dt><dd>and, or, not</dd>
+            <dt>c ? a : b</dt><dd>a when c is true, else b: <code>mode == 1 ? v / r : v * r</code></dd>
+            <dt>pi e true false</dt><dd>3.14159…, 2.71828…, 1, 0</dd>
+            <dt>sqrt cbrt abs</dt><dd>square root, cube root, size without sign</dd>
+            <dt>round(x, 2)</dt><dd>to 2 decimals (<code>round(x)</code>: whole); also <code>floor ceil trunc sign</code></dd>
+            <dt>min max</dt><dd>the smallest, the largest of up to 16: <code>max(a, b, c)</code></dd>
+            <dt>ln log log2 exp</dt><dd>natural log, log base 10, base 2, e to the power</dd>
+            <dt>sin cos tan</dt><dd>in radians; <code>asin acos atan atan2(y, x)</code>; <code>rad(deg)</code>, <code>deg(rad)</code></dd>
+            <dt>pow hypot clamp fact</dt><dd><code>pow(x, y)</code>, <code>hypot(x, y)</code>, <code>clamp(x, lo, hi)</code>, <code>fact(n)</code> (n!)</dd>
+          </dl>
+          <p>Something that can’t be worked out, such as dividing by 0, shows “—”. A result can be hidden with <b>Show only when</b>: it shows when that formula is not 0.</p>
+        </details>
+      </section>
+
+      <section class="mk-sec" aria-labelledby="h-table">
+        <h2 id="h-table">Table <small>optional</small></h2>
+        <p class="hint">Facts to look up, shown under the results as they are: a scale, a list of values.</p>
+        <label class="check" style="margin-top:12px"><input type="checkbox" data-table-on> Add a table</label>
+        <div data-table hidden></div>
+        <p class="err" data-err="table"></p>
+      </section>
+
+      <section class="mk-sec" aria-labelledby="h-note">
+        <h2 id="h-note">Note <small>optional</small></h2>
+        <p class="hint">Shown at the foot: the formula in words, where it comes from, what to watch for.</p>
+        <label class="f" style="margin-top:12px"><textarea class="in" data-top="note" maxlength="400" rows="3" placeholder="V = I × R." aria-label="Note"></textarea><span class="count" data-count="note"></span></label>
+        <p class="err" data-err="note"></p>
+      </section>
+    </form>
+
+    <aside class="mk-side" aria-label="Preview and share">
+      <section class="pv" data-pv aria-labelledby="h-pv">
+        <h2 id="h-pv">Preview</h2>
+        <div data-preview></div>
+      </section>
+      <section class="sh" aria-labelledby="h-sh">
+        <h2 id="h-sh">Share with Community</h2>
+        <p>Every tool is looked at before it shows up in the gallery. It’s plain data — numbers and formulas — so it can’t reach anything on anyone’s device.</p>
+        <label class="trap" aria-hidden="true">Website <input type="text" name="website" tabindex="-1" autocomplete="off" data-trap></label>
+        <p class="note" data-problem role="status"></p>
+        <div class="row">
+          <button class="btn btn--blue" type="button" data-share disabled>Share with Community</button>
+          <button class="btn btn--soft" type="button" data-reset>Start over</button>
+        </div>
+        <p class="note" data-sent role="status" aria-live="polite"></p>
+        <details data-json-box><summary>The tool as data (JSON)</summary><pre data-json></pre></details>
+      </section>
+    </aside>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Simpl Courses is independent. Not affiliated with Instructure, D2L or BetterCampus. Themes and tools are their makers’ own.</span>
+    <nav aria-label="More"><a href="/">Home</a><a href="/community">Community</a><a href="/privacy">Privacy</a><a href="/report/">Report a bug</a></nav>
+  </div>
+</footer>
+
+<script type="module">
+// The maker: a draft (kept in this browser as it is typed), built into a format 1 tool and checked by the reference
+// itself (/community/tool-format.js: the same file the site checks a tool sent in with) at every change — each
+// formula's problem shown under it as it is typed, the first thing standing in the way above Share — and drawn
+// working on the right (/community/tool-view.js). Share sends it to /api/community/tools.
+import { validateTool, formulaProblem, GROUPS, SYMBOLS, LIMITS } from '/community/tool-format.js';
+import { drawTool, symbolIcon, readTool, GROUP_NAMES, RESERVED } from '/community/tool-view.js';
+
+const $ = (s, root = document) => root.querySelector(s);
+const STORE = 'simpl:tool-draft';
+const ID = /^[a-z][a-z0-9_]{0,15}$/;
+const COLOURS = ['#ff3b30', '#ff9500', '#ffcc00', '#34c759', '#00c7be', '#30b0c7', '#0a84ff', '#5e5ce6', '#af52de', '#ff2d55', '#a2845e', '#8e8e93'];
+const KINDS = [['number', 'Number'], ['choice', 'Choice'], ['toggle', 'Switch']];
+let keyN = 0;
+const key = () => `k${++keyN}`;
+
+// ---- the draft --------------------------------------------------------------------------------------------------
+const blankInput = (o = {}) => ({ key: key(), kind: 'number', label: '', id: '', auto: true, unit: '', def: '', min: '', max: '', step: '', options: [{ label: 'One', value: '1' }, { label: 'Two', value: '2' }], pick: 0, on: false, ...o });
+const blankOutput = (o = {}) => ({ key: key(), label: '', id: '', auto: true, value: '', unit: '', decimals: '2', when: '', ...o });
+const fresh = () => ({
+  name: '', summary: '', maker: '', group: 'math', symbol: 'ruler', color: '#0a84ff',
+  inputs: [blankInput({ label: 'Width', id: 'width', unit: 'cm', def: '4' }), blankInput({ label: 'Height', id: 'height', unit: 'cm', def: '3' })],
+  outputs: [blankOutput({ label: 'Area', id: 'area', value: 'width * height', unit: 'cm²' })],
+  table: null, note: '',
+});
+const str = (v, d = '') => (typeof v === 'string' ? v : typeof v === 'number' && Number.isFinite(v) ? String(v) : d);
+/** A draft read back (from this browser, or from an older page): whatever is in it, its shape made right. */
+function sane(d) {
+  const f = fresh();
+  if (!d || typeof d !== 'object') return f;
+  const list = (a) => (Array.isArray(a) ? a.filter((x) => x && typeof x === 'object') : []);
+  return {
+    name: str(d.name), summary: str(d.summary), maker: str(d.maker),
+    group: GROUPS.includes(d.group) ? d.group : f.group, symbol: SYMBOLS.includes(d.symbol) ? d.symbol : f.symbol,
+    color: /^#[0-9a-f]{6}$/i.test(d.color || '') ? d.color.toLowerCase() : f.color,
+    inputs: list(d.inputs).slice(0, LIMITS.inputs).map((i) => blankInput({
+      kind: KINDS.some(([k]) => k === i.kind) ? i.kind : 'number', label: str(i.label), id: str(i.id), auto: i.auto !== false,
+      unit: str(i.unit), def: str(i.def), min: str(i.min), max: str(i.max), step: str(i.step),
+      options: list(i.options).length >= 2 ? list(i.options).slice(0, LIMITS.options).map((o) => ({ label: str(o.label), value: str(o.value) })) : blankInput().options,
+      pick: Number.isInteger(i.pick) ? i.pick : 0, on: i.on === true,
+    })),
+    outputs: list(d.outputs).slice(0, LIMITS.outputs).map((o) => blankOutput({ label: str(o.label), id: str(o.id), auto: o.auto !== false, value: str(o.value), unit: str(o.unit), decimals: /^(10|\d)$/.test(str(o.decimals)) ? str(o.decimals) : '2', when: str(o.when) })),
+    table: d.table && typeof d.table === 'object' && Array.isArray(d.table.columns) && Array.isArray(d.table.rows)
+      ? { title: str(d.table.title), columns: d.table.columns.slice(0, LIMITS.tableCols).map((c) => str(c)), rows: d.table.rows.slice(0, LIMITS.tableRows).filter(Array.isArray).map((r) => r.map((c) => str(c))) }
+      : null,
+    note: str(d.note),
+  };
+}
+/** A tool from the gallery made into a draft: "Make your own from it". */
+function fromTool(t) {
+  return sane({
+    name: t.name, summary: t.summary, maker: '', group: t.group, symbol: t.symbol, color: t.color, note: t.note || '',
+    inputs: t.inputs.map((i) => ({
+      kind: i.kind, label: i.label, id: i.id, auto: false, unit: i.unit || '',
+      def: i.kind === 'number' ? String(i.default) : '', min: i.min != null ? String(i.min) : '', max: i.max != null ? String(i.max) : '', step: i.step != null && i.step !== 1 ? String(i.step) : '',
+      options: i.kind === 'choice' ? i.options.map((o) => ({ label: o.label, value: String(o.value) })) : undefined,
+      pick: i.kind === 'choice' ? Math.max(0, i.options.findIndex((o) => o.value === i.default)) : 0, on: i.kind === 'toggle' && i.default === true,
+    })),
+    outputs: t.outputs.map((o) => ({ label: o.label, id: o.id || '', auto: false, value: o.value, unit: o.unit || '', decimals: String(o.decimals ?? 4), when: o.when || '' })),
+    table: t.table ? { title: t.table.title || '', columns: [...t.table.columns], rows: t.table.rows.map((r) => [...r]) } : null,
+  });
+}
+let draft = fresh();
+try { const kept = localStorage.getItem(STORE); if (kept) draft = sane(JSON.parse(kept)); } catch { /* none kept, or no storage here */ }
+let saveTimer = 0;
+const keep = () => { clearTimeout(saveTimer); saveTimer = 0; try { localStorage.setItem(STORE, JSON.stringify(draft)); } catch { /* storage full or off: the draft lives on this page alone */ } };
+const save = () => { clearTimeout(saveTimer); saveTimer = setTimeout(keep, 250); };
+addEventListener('pagehide', () => { if (saveTimer) keep(); });
+
+// ---- the draft as a tool ----------------------------------------------------------------------------------------
+// (a number box's text: nothing is "not given", a number is that number, anything else is passed on as it is, for
+// the reference to say what is wrong with it)
+const num = (s) => { const t = String(s ?? '').trim(); if (!t) return undefined; const n = Number(t); return Number.isFinite(n) ? n : t; };
+function build(d = draft) {
+  const tool = { format: 1, name: d.name, maker: d.maker, summary: d.summary, group: d.group, symbol: d.symbol, color: d.color };
+  tool.inputs = d.inputs.map((i) => {
+    const base = { id: i.id, kind: i.kind, label: i.label };
+    if (i.kind === 'toggle') return { ...base, default: i.on };
+    if (i.kind === 'choice') {
+      const options = i.options.map((o) => ({ label: o.label, value: num(o.value) }));
+      return { ...base, options, ...(options[i.pick] ? { default: options[i.pick].value } : {}) };
+    }
+    const out = { ...base };
+    if (i.unit.trim()) out.unit = i.unit;
+    for (const [k, f] of [['default', 'def'], ['min', 'min'], ['max', 'max'], ['step', 'step']]) { const v = num(i[f]); if (v !== undefined) out[k] = v; }
+    return out;
+  });
+  tool.outputs = d.outputs.map((o) => ({
+    ...(o.id.trim() ? { id: o.id.trim() } : {}), label: o.label, value: o.value, ...(o.unit.trim() ? { unit: o.unit } : {}),
+    decimals: Number(o.decimals), ...(o.when.trim() ? { when: o.when } : {}),
+  }));
+  if (d.table) tool.table = { ...(d.table.title.trim() ? { title: d.table.title } : {}), columns: d.table.columns, rows: d.table.rows };
+  if (d.note.trim()) tool.note = d.note;
+  return tool;
+}
+/** A name in formulas made from a label: lower case, _ for anything else, none of Simpl's own, none taken. */
+function suggestId(label, taken) {
+  let base = String(label).normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  if (!base) return '';
+  if (!/^[a-z]/.test(base)) base = `n_${base}`;
+  base = base.slice(0, 16).replace(/_+$/, '');
+  let id = base;
+  for (let k = 2; RESERVED.has(id) || taken.has(id); k++) { const tail = `_${k}`; id = `${base.slice(0, 16 - tail.length)}${tail}`; }
+  return id;
+}
+const takenBut = (item) => new Set([...draft.inputs, ...draft.outputs].filter((x) => x !== item).map((x) => x.id.trim()).filter(Boolean));
+
+// ---- drawing the form -------------------------------------------------------------------------------------------
+const h = (tag, attrs = {}, kids = []) => {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === 'class') e.className = v; else if (k === 'value') e.value = v; else if (k === 'text') e.textContent = v; else e.setAttribute(k, v === true ? '' : String(v));
+  }
+  for (const k of [].concat(kids)) if (k != null) e.append(k);
+  return e;
+};
+const field = (label, input, err, { wide = false, extra = null } = {}) => h('label', { class: `f${wide ? ' f--wide' : ''}` }, [h('span', {}, label), input, extra, err ? h('p', { class: 'err', 'data-err': err }) : null]);
+const text = (attrs) => h('input', { class: 'in', type: 'text', ...attrs });
+const formulaBox = (attrs) => text({ class: 'in mono', spellcheck: 'false', autocapitalize: 'off', autocorrect: 'off', maxlength: LIMITS.expr, ...attrs });
+const seg = (label, options, now, attrs) => h('div', { class: 'seg', role: 'radiogroup', 'aria-label': label, ...attrs }, options.map(([v, l]) => h('button', { type: 'button', role: 'radio', 'aria-checked': String(v === now), 'data-v': v, text: l })));
+const moves = (i, count, what) => h('span', { class: 'acts' }, [
+  h('button', { type: 'button', class: 'icon', 'data-move': '-1', 'aria-label': `Move this ${what} up`, title: 'Move up', disabled: i === 0, text: '↑' }),
+  h('button', { type: 'button', class: 'icon', 'data-move': '1', 'aria-label': `Move this ${what} down`, title: 'Move down', disabled: i === count - 1, text: '↓' }),
+  h('button', { type: 'button', class: 'icon icon--x', 'data-remove': '', 'aria-label': `Remove this ${what}`, title: 'Remove', disabled: count === 1, text: '×' }),
+]);
+
+const top = {
+  group: $('[data-top="group"]'), swatches: $('[data-swatches]'), syms: $('[data-syms]'),
+  inputs: $('[data-inputs]'), outputs: $('[data-outputs]'), table: $('[data-table]'), tableOn: $('[data-table-on]'),
+};
+for (const g of GROUPS) top.group.append(h('option', { value: g, text: GROUP_NAMES[g] }));
+for (const c of COLOURS) top.swatches.append(h('button', { type: 'button', role: 'radio', 'aria-label': c, title: c, 'data-color': c, style: `background:${c}` }));
+const picker = h('input', { type: 'color', 'aria-label': 'Another colour', 'data-color-pick': '' });
+top.swatches.append(h('label', {}, [picker, 'Other']));
+for (const s of SYMBOLS) top.syms.append(h('button', { type: 'button', role: 'radio', 'aria-label': s, title: s, 'data-symbol': s }, symbolIcon(s)));
+
+function paintTop() {
+  for (const k of ['name', 'summary', 'maker', 'note']) { const e = $(`[data-top="${k}"]`); if (e.value !== draft[k]) e.value = draft[k]; }
+  top.group.value = draft.group;
+  for (const b of top.swatches.querySelectorAll('[data-color]')) b.setAttribute('aria-checked', String(b.dataset.color === draft.color));
+  picker.value = draft.color;
+  const light = (() => { const n = parseInt(draft.color.slice(1), 16); const y = 0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255); return y > 190; })();
+  top.syms.style.setProperty('--tool', draft.color);
+  for (const b of top.syms.children) { b.setAttribute('aria-checked', String(b.dataset.symbol === draft.symbol)); b.classList.toggle('is-light', light); b.tabIndex = b.dataset.symbol === draft.symbol ? 0 : -1; }
+  $('[data-count="note"]').textContent = `${draft.note.length} / ${LIMITS.note}`;
+}
+
+function inputCard(it, i) {
+  const p = `inputs.${i}`;
+  const kids = [
+    h('div', { class: 'item__top' }, [h('b', { text: `Input ${i + 1}` }), seg('Kind', KINDS, it.kind, { 'data-f': 'kind' }), moves(i, draft.inputs.length, 'input')]),
+    h('div', { class: 'fields', style: 'margin-top:0' }, [
+      field('Label', text({ 'data-f': 'label', value: it.label, maxlength: LIMITS.label, placeholder: 'Voltage' }), `${p}.label`),
+      field(h('span', {}, ['Name in formulas ', h('small', { text: '(a–z, 0–9, _)' })]), formulaBox({ 'data-f': 'id', value: it.id, maxlength: 16, placeholder: 'v' }), `${p}.id`),
+    ]),
+  ];
+  if (it.kind === 'number') {
+    kids.push(h('div', { class: 'fields fields--small', style: 'margin-top:0' }, [
+      field('Unit', text({ 'data-f': 'unit', value: it.unit, maxlength: LIMITS.unit, placeholder: 'V' }), `${p}.unit`),
+      field('Starts at', text({ 'data-f': 'def', value: it.def, inputmode: 'decimal', placeholder: '0' }), `${p}.default`),
+      field('Lowest', text({ 'data-f': 'min', value: it.min, inputmode: 'decimal', placeholder: 'none' }), `${p}.min`),
+      field('Highest', text({ 'data-f': 'max', value: it.max, inputmode: 'decimal', placeholder: 'none' }), `${p}.max`),
+      field('Step', text({ 'data-f': 'step', value: it.step, inputmode: 'decimal', placeholder: '1' }), `${p}.step`),
+    ]));
+  } else if (it.kind === 'choice') {
+    const opts = h('div', { class: 'opts' }, it.options.map((o, j) => h('div', { class: 'opt', 'data-opt': j }, [
+      text({ 'data-o': 'label', value: o.label, maxlength: LIMITS.label, placeholder: 'Option', 'aria-label': `Option ${j + 1}` }),
+      text({ class: 'in mono', 'data-o': 'value', value: o.value, inputmode: 'decimal', placeholder: 'value', 'aria-label': `Option ${j + 1}’s value` }),
+      h('button', { type: 'button', class: 'icon icon--x', 'data-o-remove': j, 'aria-label': `Remove option ${j + 1}`, disabled: it.options.length <= 2, text: '×' }),
+    ])));
+    const pick = h('select', { class: 'in', 'data-f': 'pick' }, it.options.map((o, j) => h('option', { value: String(j), text: o.label || `Option ${j + 1}` })));
+    pick.value = String(Math.min(it.pick, it.options.length - 1));
+    kids.push(h('div', { class: 'f' }, [h('span', { text: 'Options: each a label, and the number it stands for in formulas' }), opts, h('p', { class: 'err', 'data-err': `${p}.options` })]));
+    kids.push(h('div', { class: 'item__top' }, [
+      h('button', { type: 'button', class: 'btn btn--soft btn--small', 'data-o-add': '', disabled: it.options.length >= LIMITS.options, text: '+ Add an option' }),
+      h('label', { class: 'f', style: 'margin-left:auto;min-width:160px' }, [h('span', { text: 'Starts at' }), pick]),
+    ]));
+  } else {
+    kids.push(h('label', { class: 'check' }, [h('input', { type: 'checkbox', 'data-f': 'on', checked: it.on }), 'Starts on']));
+  }
+  kids.push(h('p', { class: 'err', 'data-err': p }));
+  return h('div', { class: 'item', 'data-key': it.key, 'data-kind': it.kind }, kids);
+}
+function outputCard(it, i) {
+  const p = `outputs.${i}`;
+  const dec = h('select', { class: 'in', 'data-f': 'decimals' }, Array.from({ length: LIMITS.decimals + 1 }, (_, k) => h('option', { value: String(k), text: String(k) })));
+  dec.value = it.decimals;
+  return h('div', { class: 'item', 'data-key': it.key }, [
+    h('div', { class: 'item__top' }, [h('b', { text: i === 0 ? 'Result 1 (the big one)' : `Result ${i + 1}` }), moves(i, draft.outputs.length, 'result')]),
+    h('div', { class: 'fields', style: 'margin-top:0' }, [
+      field('Label', text({ 'data-f': 'label', value: it.label, maxlength: LIMITS.label, placeholder: 'Current' }), `${p}.label`),
+      field(h('span', {}, ['Name in formulas ', h('small', { text: '(optional)' })]), formulaBox({ 'data-f': 'id', value: it.id, maxlength: 16, placeholder: 'none' }), `${p}.id`),
+      field('Formula', formulaBox({ 'data-f': 'value', value: it.value, placeholder: 'v / r', 'aria-describedby': `can-${it.key}` }), `${p}.value`, { wide: true, extra: h('p', { class: 'can', id: `can-${it.key}`, 'data-can': '' }) }),
+    ]),
+    h('div', { class: 'fields fields--small', style: 'margin-top:0' }, [
+      field('Unit', text({ 'data-f': 'unit', value: it.unit, maxlength: LIMITS.unit, placeholder: 'A' }), `${p}.unit`),
+      field('Decimals', dec, `${p}.decimals`),
+      field(h('span', {}, ['Show only when ', h('small', { text: '(optional)' })]), formulaBox({ 'data-f': 'when', value: it.when, placeholder: 'always shown' }), `${p}.when`, { wide: true }),
+    ]),
+    h('p', { class: 'err', 'data-err': p }),
+  ]);
+}
+function tableEditor() {
+  const t = draft.table;
+  if (!t) return [];
+  const cols = t.columns.length;
+  return [
+    h('div', { class: 'fields' }, [field('Title', text({ 'data-t': 'title', value: t.title, maxlength: LIMITS.tableTitle, placeholder: 'The scale' }), 'table.title')]),
+    h('div', { class: 'tbl' }, h('table', {}, [
+      h('thead', {}, h('tr', {}, [...t.columns.map((c, j) => h('td', {}, h('div', { style: 'display:flex;gap:4px' }, [
+        text({ 'data-col': j, value: c, maxlength: LIMITS.colName, placeholder: `Column ${j + 1}`, 'aria-label': `Column ${j + 1}’s name` }),
+        cols > 1 ? h('button', { type: 'button', class: 'icon icon--x', 'data-col-remove': j, 'aria-label': `Remove column ${j + 1}`, text: '×' }) : null,
+      ]))), h('td', {}, h('button', { type: 'button', class: 'icon', 'data-col-add': '', 'aria-label': 'Add a column', title: 'Add a column', disabled: cols >= LIMITS.tableCols, text: '+' }))])),
+      h('tbody', {}, t.rows.map((r, i) => h('tr', { 'data-row': i }, [...t.columns.map((_, j) => h('td', {}, text({ 'data-cell': j, value: r[j] ?? '', maxlength: LIMITS.cell, 'aria-label': `Row ${i + 1}, column ${j + 1}` }))),
+        h('td', {}, h('button', { type: 'button', class: 'icon icon--x', 'data-row-remove': i, 'aria-label': `Remove row ${i + 1}`, disabled: t.rows.length <= 1, text: '×' }))]))),
+    ])),
+    h('button', { type: 'button', class: 'btn btn--soft btn--small add', 'data-row-add': '', disabled: t.rows.length >= LIMITS.tableRows, text: '+ Add a row' }),
+  ];
+}
+function paintLists() {
+  top.inputs.replaceChildren(...draft.inputs.map(inputCard));
+  top.outputs.replaceChildren(...draft.outputs.map(outputCard));
+  $('[data-add-input]').disabled = draft.inputs.length >= LIMITS.inputs;
+  $('[data-add-output]').disabled = draft.outputs.length >= LIMITS.outputs;
+  top.tableOn.checked = !!draft.table;
+  top.table.hidden = !draft.table;
+  top.table.replaceChildren(...tableEditor());
+}
+
+// ---- checking, the preview, sharing -----------------------------------------------------------------------------
+const preview = $('[data-preview]');
+const pvBox = $('[data-pv]');
+const problemLine = $('[data-problem]');
+const shareBtn = $('[data-share]');
+let pvValues = {};
+let pvKey = '';
+let checked = null;
+
+function check() {
+  const raw = build();
+  const full = validateTool(raw, { strict: true });
+  checked = full.tool || null;
+  const errs = new Map();
+  const put = (path, message) => { if (!errs.has(path)) errs.set(path, message); };
+  // each formula, as it is typed: what it can read, and what is wrong with it (the reference's own words)
+  const inputIds = draft.inputs.map((x) => x.id.trim()).filter(Boolean);
+  const outIds = draft.outputs.map((x) => x.id.trim());
+  draft.inputs.forEach((it, i) => {
+    if (!it.label.trim()) put(`inputs.${i}.label`, 'Every input needs a label.');
+    const id = it.id.trim();
+    if (!id) put(`inputs.${i}.id`, 'Give it a name to use in formulas.');
+    else if (!ID.test(id)) put(`inputs.${i}.id`, 'A lower-case letter, then letters, digits or _ (16 at most).');
+    else if (RESERVED.has(id)) put(`inputs.${i}.id`, `“${id}” is a name Simpl keeps for itself.`);
+    else if (inputIds.indexOf(id) !== i || outIds.includes(id)) put(`inputs.${i}.id`, `“${id}” is used twice.`);
+  });
+  draft.outputs.forEach((it, i) => {
+    const before = [...inputIds, ...outIds.slice(0, i).filter(Boolean)];
+    const later = outIds.slice(i).filter(Boolean);
+    const card = top.outputs.children[i];
+    const can = card && $('[data-can]', card);
+    if (can) {
+      can.replaceChildren(...(before.length ? ['Can use: ', ...before.flatMap((n, k) => [k ? ', ' : '', h('code', { text: n })]), ' · pi, e'] : ['Give the inputs names first.']));
+    }
+    if (!it.label.trim()) put(`outputs.${i}.label`, 'Every result needs a label.');
+    const v = formulaProblem(it.value, before, later);
+    if (v) put(`outputs.${i}.value`, v.message);
+    const id = it.id.trim();
+    if (id && !ID.test(id)) put(`outputs.${i}.id`, 'A lower-case letter, then letters, digits or _ (16 at most).');
+    else if (id && RESERVED.has(id)) put(`outputs.${i}.id`, `“${id}” is a name Simpl keeps for itself.`);
+    else if (id && (inputIds.includes(id) || outIds.indexOf(id) !== i)) put(`outputs.${i}.id`, `“${id}” is used twice.`);
+    if (it.when.trim()) { const w = formulaProblem(it.when, [...before, ...(id ? [id] : [])], later.filter((x) => x !== id)); if (w) put(`outputs.${i}.when`, w.message); }
+  });
+  // and the first thing the reference refuses, where it belongs
+  if (full.error) put(full.error.path || '', full.error.message);
+  for (const e of document.querySelectorAll('[data-err]')) e.textContent = '';
+  for (const e of document.querySelectorAll('.in[aria-invalid]')) e.removeAttribute('aria-invalid');
+  const slotFor = (path) => { for (let p = path; p; p = p.includes('.') ? p.slice(0, p.lastIndexOf('.')) : '') { const s = document.querySelector(`[data-err="${CSS.escape(p)}"]`); if (s) return s; } return null; };
+  for (const [path, message] of errs) {
+    const slot = slotFor(path);
+    if (!slot || slot.textContent) continue;
+    slot.textContent = message;
+    const box = slot.parentElement?.querySelector('.in');
+    if (box && slot.dataset.err === path) box.setAttribute('aria-invalid', 'true');
+  }
+
+  // the preview: the tool as it would be, a name and a line stood in until they are given
+  const stand = { ...raw, name: raw.name.trim() ? raw.name : 'Your tool', summary: raw.summary.trim() ? raw.summary : 'What it does, in a line.' };
+  const pv = validateTool(stand, { strict: true });
+  pvBox.classList.toggle('is-placeholder', !raw.name.trim() || !raw.summary.trim());
+  if (pv.tool) {
+    const k = JSON.stringify(pv.tool);
+    if (k !== pvKey || !$('.tv', preview)) { pvKey = k; preview.replaceChildren(drawTool(pv.tool, { values: pvValues, onChange: (v) => { pvValues = v; }, table: 'open' })); }
+  } else {
+    pvKey = '';
+    preview.replaceChildren(h('div', { class: 'pv__empty', 'data-preview-problem': '' }, [h('b', { text: 'Almost there.' }), pv.error.message]));
+  }
+
+  // sharing: ready, or the first thing in the way
+  problemLine.textContent = full.error ? `Before it can be shared: ${full.error.message}` : 'Ready to share.';
+  problemLine.dataset.kind = full.error ? 'bad' : 'ok';
+  if (!sending && !sentOk) shareBtn.disabled = !!full.error;
+  $('[data-json]').textContent = JSON.stringify(full.tool || raw, null, 2);
+}
+
+// ---- changes ----------------------------------------------------------------------------------------------------
+let sending = false;
+let sentOk = false;
+const changed = () => {
+  if (sentOk) { sentOk = false; $('[data-sent]').textContent = ''; shareBtn.hidden = false; }
+  save();
+  check();
+};
+const itemOf = (target, list) => { const card = target.closest('[data-key]'); return card ? list.find((x) => x.key === card.dataset.key) : null; };
+/** Focus, once the list is drawn again, the first of these in that item that is there to take it. */
+const focusIn = (container, key, ...sels) => requestAnimationFrame(() => {
+  const card = container.querySelector(`[data-key="${key}"]`);
+  for (const sel of sels) { const e = card?.querySelector(sel); if (e) { e.focus(); return; } }
+});
+
+document.querySelector('[data-form]').addEventListener('input', (e) => {
+  const t = e.target;
+  if (t.dataset.top) { draft[t.dataset.top] = t.value; if (t.dataset.top === 'note') paintTop(); return changed(); }
+  const inItem = itemOf(t, draft.inputs);
+  const outItem = itemOf(t, draft.outputs);
+  const it = inItem || outItem;
+  if (inItem && t.dataset.o) {
+    // a choice's option: its label (the Starts at list follows) or its value
+    const j = Number(t.closest('[data-opt]').dataset.opt);
+    if (inItem.options[j]) inItem.options[j][t.dataset.o] = t.value;
+    if (t.dataset.o === 'label') { const o = t.closest('[data-key]').querySelector('[data-f="pick"]')?.options[j]; if (o) o.textContent = t.value || `Option ${j + 1}`; }
+    return changed();
+  }
+  if (it && t.dataset.f) {
+    const f = t.dataset.f;
+    if (f === 'on') it.on = t.checked;
+    else if (f === 'pick') it.pick = Number(t.value);
+    else it[f] = t.value;
+    if (f === 'id') it.auto = t.value.trim() === '';
+    // the name in formulas follows the label until it is given one of its own
+    if (f === 'label' && it.auto) {
+      it.id = suggestId(t.value, takenBut(it));
+      const idBox = t.closest('[data-key]').querySelector('[data-f="id"]');
+      if (idBox) idBox.value = it.id;
+    }
+    return changed();
+  }
+  if (draft.table) {
+    if (t.dataset.t === 'title') { draft.table.title = t.value; return changed(); }
+    if (t.dataset.col != null) { draft.table.columns[Number(t.dataset.col)] = t.value; return changed(); }
+    if (t.dataset.cell != null) { draft.table.rows[Number(t.closest('[data-row]').dataset.row)][Number(t.dataset.cell)] = t.value; return changed(); }
+  }
+});
+document.querySelector('[data-form]').addEventListener('change', (e) => {
+  const t = e.target;
+  if (t.dataset.top === 'group') { draft.group = t.value; return changed(); }
+  if (t.dataset.f === 'on' || t.dataset.f === 'pick' || t.dataset.f === 'decimals') {
+    const it = itemOf(t, draft.inputs) || itemOf(t, draft.outputs);
+    if (it) { if (t.dataset.f === 'on') it.on = t.checked; else if (t.dataset.f === 'pick') it.pick = Number(t.value); else it.decimals = t.value; changed(); }
+  }
+  if (t.dataset.colorPick != null) { draft.color = t.value.toLowerCase(); paintTop(); changed(); }
+  if (t === top.tableOn) {
+    draft.table = t.checked ? (draft.table || { title: '', columns: ['', ''], rows: [['', '']] }) : null;
+    paintLists(); changed();
+    if (t.checked) requestAnimationFrame(() => top.table.querySelector('[data-col="0"]')?.focus());
+  }
+});
+picker.addEventListener('input', () => { draft.color = picker.value.toLowerCase(); paintTop(); changed(); });
+
+document.querySelector('[data-form]').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b || b.disabled) return;
+  if (b.dataset.color) { draft.color = b.dataset.color; paintTop(); return changed(); }
+  if (b.dataset.symbol) { draft.symbol = b.dataset.symbol; paintTop(); return changed(); }
+  if (b.matches('[data-add-input]')) {
+    const it = blankInput({ label: '', id: '' });
+    draft.inputs.push(it); paintLists(); changed(); return focusIn(top.inputs, it.key, '[data-f="label"]');
+  }
+  if (b.matches('[data-add-output]')) {
+    const it = blankOutput();
+    draft.outputs.push(it); paintLists(); changed(); return focusIn(top.outputs, it.key, '[data-f="label"]');
+  }
+  const list = b.closest('[data-inputs]') ? draft.inputs : b.closest('[data-outputs]') ? draft.outputs : null;
+  const it = list && itemOf(b, list);
+  if (it) {
+    const i = list.indexOf(it);
+    const where = list === draft.inputs ? top.inputs : top.outputs;
+    if (b.dataset.move) {
+      const j = i + Number(b.dataset.move);
+      if (j < 0 || j >= list.length) return;
+      [list[i], list[j]] = [list[j], list[i]];
+      paintLists(); changed();
+      return focusIn(where, it.key, `[data-move="${b.dataset.move}"]:not([disabled])`, '[data-move]:not([disabled])');
+    }
+    if (b.dataset.remove != null) { list.splice(i, 1); paintLists(); return changed(); }
+    if (b.closest('[data-f="kind"]')) {
+      it.kind = b.dataset.v; paintLists(); changed();
+      return focusIn(where, it.key, `[data-f="kind"] [data-v="${it.kind}"]`);
+    }
+    if (b.dataset.oAdd != null) { it.options.push({ label: '', value: String(it.options.length + 1) }); paintLists(); changed(); return focusIn(where, it.key, `[data-opt="${it.options.length - 1}"] [data-o="label"]`); }
+    if (b.dataset.oRemove != null) { it.options.splice(Number(b.dataset.oRemove), 1); it.pick = Math.min(it.pick, it.options.length - 1); paintLists(); return changed(); }
+  }
+  if (draft.table) {
+    const t = draft.table;
+    if (b.dataset.colAdd != null) { t.columns.push(''); t.rows.forEach((r) => r.push('')); }
+    else if (b.dataset.colRemove != null) { const j = Number(b.dataset.colRemove); t.columns.splice(j, 1); t.rows.forEach((r) => r.splice(j, 1)); }
+    else if (b.dataset.rowAdd != null) t.rows.push(t.columns.map(() => ''));
+    else if (b.dataset.rowRemove != null) t.rows.splice(Number(b.dataset.rowRemove), 1);
+    else return;
+    paintLists(); changed();
+    if (b.dataset.rowAdd != null) requestAnimationFrame(() => top.table.querySelector(`[data-row="${t.rows.length - 1}"] [data-cell="0"]`)?.focus());
+  }
+});
+// (the symbols and the colours: arrows move along them, as in any radio group)
+for (const [group, attr] of [[top.syms, 'symbol'], [top.swatches, 'color']]) {
+  group.addEventListener('keydown', (e) => {
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+    if (!step || !e.target.dataset[attr]) return;
+    e.preventDefault();
+    const all = [...group.querySelectorAll(`[data-${attr}]`)];
+    const next = all[(all.indexOf(e.target) + step + all.length) % all.length];
+    draft[attr] = next.dataset[attr]; paintTop(); changed(); next.focus();
+  });
+}
+
+$('[data-reset]').addEventListener('click', () => {
+  if (!confirm('Start over? This tool’s draft is cleared.')) return;
+  draft = fresh(); pvValues = {}; sentOk = false;
+  $('[data-sent]').textContent = ''; shareBtn.hidden = false;
+  try { localStorage.removeItem(STORE); } catch { /* none */ }
+  paintTop(); paintLists(); check();
+});
+
+shareBtn.addEventListener('click', async () => {
+  check();
+  if (!checked || sending) return;
+  const note = $('[data-sent]');
+  sending = true; shareBtn.disabled = true;
+  note.textContent = 'Sending…'; delete note.dataset.kind;
+  try {
+    const r = await fetch('/api/community/tools', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ tool: checked, website: $('[data-trap]').value }) });
+    const b = await r.json().catch(() => ({}));
+    if (r.ok && b.ok) {
+      sentOk = true; shareBtn.hidden = true;
+      note.textContent = `Thanks! “${checked.name}” is waiting to be looked at. Once it’s approved it shows in the gallery, and on Simpl’s Tools page under Community.`;
+      note.dataset.kind = 'ok';
+      note.dataset.id = b.id || '';
+    } else {
+      note.textContent = `${b.message || 'That did not go through. Try again in a minute.'}${b.code ? ` (${b.code})` : ''}`;
+      note.dataset.kind = 'bad';
+      if (b.path) document.querySelector(`[data-err="${CSS.escape(b.path)}"]`)?.parentElement?.querySelector('.in')?.focus();
+    }
+  } catch {
+    note.textContent = 'Simpl Community could not be reached. Check your connection and try again.';
+    note.dataset.kind = 'bad';
+  } finally {
+    sending = false;
+    if (!sentOk) shareBtn.disabled = !checked;
+  }
+});
+
+// ---- off we go: the draft as it was left, or a gallery tool to start from (?from=<id>) ------------------------------
+paintTop(); paintLists(); check();
+const from = new URLSearchParams(location.search).get('from');
+if (from) {
+  fetch(`/api/community/tools/${encodeURIComponent(from)}`).then((r) => r.json()).then((b) => {
+    const t = b.ok && readTool(b.tool);
+    if (!t) return;
+    draft = fromTool(t); pvValues = {};
+    paintTop(); paintLists(); changed();
+  }).catch(() => { /* the draft as it was */ }).finally(() => {
+    const u = new URL(location.href); u.searchParams.delete('from'); history.replaceState(null, '', u);
+  });
+}
+</script>
+</body>
+</html>

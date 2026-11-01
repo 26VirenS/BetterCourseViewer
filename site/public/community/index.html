@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Simpl Community</title>
-<meta name="description" content="Themes for Simpl Courses, made by students: colours, drawings and photos for the sidebar and the Dashboard. Preview any of them.">
+<meta name="description" content="Themes and tools for Simpl Courses, made by students: colours, drawings and photos for the sidebar and the Dashboard, and small calculators. Preview a theme, or try a tool right here.">
 <meta name="theme-color" content="#fbfbfd" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <meta property="og:title" content="Simpl Community">
-<meta property="og:description" content="Themes for Simpl Courses, made by students.">
+<meta property="og:description" content="Themes and tools for Simpl Courses, made by students.">
 <meta property="og:image" content="https://simplcourses.com/img/og.png">
 <link rel="canonical" href="https://simplcourses.com/community">
 <link rel="icon" href="/img/icon-128.png">
@@ -79,7 +79,28 @@ dialog.pv::backdrop { background: rgba(0, 0, 0, .45); -webkit-backdrop-filter: b
 .pv__stage .sp-box { border-radius: 14px; box-shadow: var(--shadow); }
 .pv__note { margin: 0; padding: 0 18px 18px; font-size: 14px; color: var(--text-2); }
 .note[data-kind="ok"] { color: #1f9d48; } .note[data-kind="bad"] { color: #d70015; }
-@media (prefers-reduced-motion: reduce) { .btn, .theme .sp-box { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .btn, .theme .sp-box, .tcard { transition: none; } }
+
+/* Themes and Tools: two tabs */
+.tabs { margin-top: 30px; display: inline-flex; padding: 3px; border-radius: 999px; background: var(--soft); }
+.tabs button { border: 0; background: none; color: var(--text); font: 500 15px/1 var(--font); padding: 10px 18px; border-radius: 999px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.tabs button[aria-selected="true"] { background: var(--bg); box-shadow: 0 1px 3px rgba(0, 0, 0, .15); font-weight: 600; }
+.panel > .grid:first-child, .panel > .state:first-child { margin-top: 32px; }
+
+/* Tools: a search, the five groups, the cards — each tool working in its card */
+.tbar { margin-top: 32px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.tsearch { flex: 1 1 220px; max-width: 360px; height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--tile); box-shadow: inset 0 0 0 1px var(--hair); color: var(--text); font: 400 15px var(--font); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button { height: 32px; padding: 0 13px; border: 0; border-radius: 999px; background: var(--soft); color: var(--text); font: 500 14px/1 var(--font); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.chips button[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+.tbar .btn { margin-left: auto; }
+@media (max-width: 640px) { .tbar .btn { margin-left: 0; } .tsearch { max-width: none; } }
+.tgrid { margin-top: 26px; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 22px; align-items: start; }
+.tcard { display: grid; gap: 14px; padding: 18px; border-radius: 22px; background: var(--tile); scroll-margin-top: 24px; transition: box-shadow 300ms ease; }
+.tcard.is-picked { box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 55%, transparent); }
+.tcard__foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 13px; color: var(--text-3); }
+.tcard__foot a { margin-left: auto; color: var(--link); text-decoration: none; font-weight: 500; }
+.tcard__foot b { font-weight: 500; color: var(--text-2); }
 
 footer { margin-top: 96px; padding: 22px 0 40px; background: var(--bg-2); font-size: 12px; color: var(--text-3); }
 footer .wrap { display: flex; flex-wrap: wrap; gap: 10px 22px; }
@@ -95,17 +116,42 @@ footer a { color: var(--text-2); text-decoration: none; }
 
 <main class="wrap">
   <h1>Simpl Community</h1>
-  <p class="lead">Themes made by students: a colour, drawings and photos for the sidebar and the Dashboard. Preview any of them here. Add one in Simpl, under Appearance.</p>
+  <p class="lead">Themes and tools made by students. Preview a theme on Simpl’s Dashboard, or try a tool right here, then add it in Simpl.</p>
 
-  <div class="grid" data-grid aria-live="polite"></div>
-  <div class="state" data-state hidden></div>
+  <div class="tabs" role="tablist" aria-label="Simpl Community">
+    <button type="button" role="tab" id="tab-themes" aria-controls="panel-themes" aria-selected="true" data-tab="themes">Themes</button>
+    <button type="button" role="tab" id="tab-tools" aria-controls="panel-tools" aria-selected="false" tabindex="-1" data-tab="tools">Tools</button>
+  </div>
 
-  <section class="share">
-    <div>
-      <h2>Made one you like?</h2>
-      <p>In Simpl, open Appearance, make your theme, then choose Community and Share. Every theme is looked at before it shows up here.</p>
+  <section class="panel" id="panel-themes" role="tabpanel" aria-labelledby="tab-themes" data-panel="themes">
+    <div class="grid" data-grid aria-live="polite"></div>
+    <div class="state" data-state hidden></div>
+
+    <section class="share">
+      <div>
+        <h2>Made one you like?</h2>
+        <p>In Simpl, open Appearance, make your theme, then choose Community and Share. Every theme is looked at before it shows up here.</p>
+      </div>
+      <a class="btn btn--blue" href="/#get">Get Simpl</a>
+    </section>
+  </section>
+
+  <section class="panel" id="panel-tools" role="tabpanel" aria-labelledby="tab-tools" data-panel="tools" hidden>
+    <div class="tbar">
+      <input class="tsearch" type="search" placeholder="Search tools" aria-label="Search tools" data-tsearch>
+      <div class="chips" role="group" aria-label="Group" data-chips></div>
+      <a class="btn btn--soft" href="/community/make/">Make a tool</a>
     </div>
-    <a class="btn btn--blue" href="/#get">Get Simpl</a>
+    <div class="tgrid" data-tools aria-live="polite"></div>
+    <div class="state" data-tools-state hidden></div>
+
+    <section class="share">
+      <div>
+        <h2>Add these in Simpl</h2>
+        <p>Tools are added from the Tools page of Simpl for Mac and Simpl for Windows: open Tools, then Community. Each one works there just as it does here, even with no connection. Made a tool? Share it, and it shows up here once it’s been looked at.</p>
+      </div>
+      <a class="btn btn--blue" href="/#get">Get Simpl</a>
+    </section>
   </section>
 </main>
 
@@ -122,8 +168,8 @@ footer a { color: var(--text-2); text-decoration: none; }
 
 <footer>
   <div class="wrap">
-    <span>Simpl Courses is independent. Not affiliated with Instructure, D2L or BetterCampus. Themes are their makers’ own.</span>
-    <nav aria-label="More"><a href="/">Home</a><a href="/trust">Trust</a><a href="/privacy">Privacy</a><a href="/report/">Report a theme</a></nav>
+    <span>Simpl Courses is independent. Not affiliated with Instructure, D2L or BetterCampus. Themes and tools are their makers’ own.</span>
+    <nav aria-label="More"><a href="/">Home</a><a href="/trust">Trust</a><a href="/privacy">Privacy</a><a href="/report/">Report a theme or a tool</a></nav>
   </div>
 </footer>
 
@@ -223,6 +269,93 @@ footer a { color: var(--text-2); text-decoration: none; }
     if (t) preview(t);
   }).catch(() => say('The themes could not be loaded.', 'Check your connection and reload the page.'));
 })();
+</script>
+<script type="module">
+// Tools: every approved tool and Simpl's own, each working in its card — drawn by /community/tool-view.js, worked out
+// by the reference (/community/tool-format.js) the site checks tools with. ?tab=tools (or #tools) opens the tab, and
+// ?tool=<id> the tab at that tool.
+import { drawTool, readTool, GROUP_NAMES } from '/community/tool-view.js';
+
+const tabs = [...document.querySelectorAll('[data-tab]')];
+const params = new URLSearchParams(location.search);
+const show = (name, { focus = false, remember = true } = {}) => {
+  for (const t of tabs) {
+    const on = t.dataset.tab === name;
+    t.setAttribute('aria-selected', String(on));
+    t.tabIndex = on ? 0 : -1;
+    if (on && focus) t.focus();
+    document.querySelector(`[data-panel="${t.dataset.tab}"]`).hidden = !on;
+  }
+  if (remember) {
+    const u = new URL(location.href);
+    if (name === 'tools') u.searchParams.set('tab', 'tools'); else { u.searchParams.delete('tab'); u.searchParams.delete('tool'); }
+    u.hash = '';
+    history.replaceState(null, '', u);
+  }
+};
+tabs.forEach((t, i) => {
+  t.addEventListener('click', () => show(t.dataset.tab));
+  t.addEventListener('keydown', (e) => {
+    const step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+    if (step) { e.preventDefault(); show(tabs[(i + step + tabs.length) % tabs.length].dataset.tab, { focus: true }); }
+  });
+});
+if (params.get('tab') === 'tools' || params.has('tool') || location.hash === '#tools') show('tools', { remember: false });
+
+const grid = document.querySelector('[data-tools]');
+const state = document.querySelector('[data-tools-state]');
+const search = document.querySelector('[data-tsearch]');
+const chips = document.querySelector('[data-chips]');
+let group = '';
+const say = (title, text) => { state.hidden = false; state.replaceChildren(Object.assign(document.createElement('b'), { textContent: title }), text); };
+for (const [key, label] of [['', 'All'], ...Object.entries(GROUP_NAMES)]) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.textContent = label;
+  b.dataset.group = key;
+  b.setAttribute('aria-pressed', String(key === group));
+  b.addEventListener('click', () => { group = key; for (const c of chips.children) c.setAttribute('aria-pressed', String(c.dataset.group === key)); filter(); });
+  chips.append(b);
+}
+
+const card = (tool) => {
+  const art = document.createElement('article');
+  art.className = 'tcard';
+  art.id = `tool-${tool.id}`;
+  art.dataset.tool = tool.id;
+  art.dataset.group = tool.group;
+  art.dataset.words = `${tool.name} ${tool.summary} ${tool.maker} ${GROUP_NAMES[tool.group]}`.toLowerCase();
+  const foot = document.createElement('div');
+  foot.className = 'tcard__foot';
+  const by = document.createElement('span');
+  by.append('by ', Object.assign(document.createElement('b'), { textContent: tool.maker || 'a Simpl student' }));
+  const make = Object.assign(document.createElement('a'), { href: `/community/make/?from=${encodeURIComponent(tool.id)}`, textContent: 'Make your own from it' });
+  foot.append(by, GROUP_NAMES[tool.group], make);
+  art.append(drawTool(tool), foot);
+  return art;
+};
+function filter() {
+  const words = search.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  let shown = 0;
+  for (const c of grid.children) {
+    const ok = (!group || c.dataset.group === group) && words.every((w) => c.dataset.words.includes(w));
+    c.hidden = !ok;
+    if (ok) shown++;
+  }
+  if (grid.children.length && !shown) say('No tools match.', 'Try another word, or another group.');
+  else if (grid.children.length) state.hidden = true;
+}
+search.addEventListener('input', filter);
+
+fetch('/api/community/tools').then((r) => r.json().then((b) => [r, b])).then(([r, b]) => {
+  if (!r.ok) { say('The tools could not be loaded.', b.message || 'Try again in a minute.'); return; }
+  const tools = (b.tools || []).map(readTool).filter((t) => t && t.id);
+  if (!tools.length) { say('No tools yet.', 'Be the first: make one and share it.'); return; }
+  grid.append(...tools.map(card));
+  const want = params.get('tool');
+  const picked = want && grid.querySelector(`[data-tool="${CSS.escape(want)}"]`);
+  if (picked) { picked.classList.add('is-picked'); picked.scrollIntoView({ block: 'start' }); }
+}).catch(() => say('The tools could not be loaded.', 'Check your connection and reload the page.'));
 </script>
 </body>
 </html>
