@@ -1956,7 +1956,8 @@ private final class WhatIfFootView: NSView {
 
     /// Scrolled to the foot again until the page stops growing under it: rows laid out as they come into sight push the
     /// foot further down (once scrolled, the page had grown by the time it was measured, and the last row was read under
-    /// the bar). Ten tries at most; then measured, and whether it was at the foot said with it.
+    /// the bar), and again if it grew in the wait before it was measured. Ten tries at most; then measured, and whether it
+    /// was at the foot said with it.
     private func settle(_ tries: Int, last: CGFloat, wait: Double) {
         DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [weak self] in
             guard let self, self.window != nil, let sv = self.enclosingScrollView, let doc = sv.documentView else { return }
@@ -1970,6 +1971,8 @@ private final class WhatIfFootView: NSView {
                 guard let self, self.window != nil, let sv = self.enclosingScrollView, let doc = sv.documentView else { return }
                 let clip = sv.contentView
                 let atFoot = doc.isFlipped ? clip.bounds.maxY >= doc.frame.height - 1 : clip.bounds.minY <= 1
+                // (grown again in the wait: scrolled to the new foot and measured again)
+                if !atFoot && tries < 10 { self.settle(tries + 1, last: -1, wait: 0.1); return }
                 let foot = sv.convert(sv.bounds, to: nil).minY
                 let rowEnd = self.convert(self.bounds, to: nil).maxY + 22
                 NSLog("[Simpl] grades what-if: at the page's foot the last row ends %ld pt above the bar (%@, %ld scrolls)",

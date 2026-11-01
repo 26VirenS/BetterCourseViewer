@@ -188,7 +188,7 @@ final class PageRecorder: ObservableObject {
                 fresh.append(u)
             }
         }
-        if !fresh.isEmpty, let got = await run(Self.fetch, in: nil, view: view, args: ["urls": fresh]) as? [[String: Any]] {
+        if !fresh.isEmpty, let got = await run(Self.fetch, in: nil, view: view, args: ["urls": fresh], wait: 30) as? [[String: Any]] {
             for g in got {
                 guard let u = g["url"] as? String else { continue }
                 let short = Self.strip(u)
@@ -259,12 +259,8 @@ final class PageRecorder: ObservableObject {
     /// The window's page as a picture: a JPEG at most 1280 pixels wide.
     private func picture(_ view: WKWebView) async -> Data? {
         guard view.bounds.width > 4, view.bounds.height > 4 else { return nil }
-        let image: NSImage? = await withCheckedContinuation { (go: CheckedContinuation<NSImage?, Never>) in
-            let config = WKSnapshotConfiguration()
-            config.afterScreenUpdates = true
-            config.snapshotWidth = NSNumber(value: Double(min(view.bounds.width, Self.shotWidth)))
-            view.takeSnapshot(with: config) { image, _ in go.resume(returning: image) }
-        }
+        // (1.3.212: in a time that can be waited for — a window out of sight held the step, and every step after it)
+        let image = await WebSnapshot.take(view, width: min(view.bounds.width, Self.shotWidth))
         guard let image, image.size.width > 0 else { return nil }
         let scale = min(1, Self.shotWidth / image.size.width)
         let w = Int((image.size.width * scale).rounded()), h = Int((image.size.height * scale).rounded())
@@ -278,14 +274,19 @@ final class PageRecorder: ObservableObject {
         return rep.representation(using: .jpeg, properties: [.compressionFactor: 0.6])
     }
 
-    private func run(_ js: String, in frame: WKFrameInfo?, view: WKWebView, args: [String: Any] = [:]) async -> Any? {
+    /// The script's answer in one frame, or nil: an error, or (1.3.212) no answer in `wait` seconds — a frame on its way
+    /// out may never answer, and the step waited on it for good.
+    private func run(_ js: String, in frame: WKFrameInfo?, view: WKWebView, args: [String: Any] = [:], wait: Double = 8) async -> Any? {
         await withCheckedContinuation { (go: CheckedContinuation<Any?, Never>) in
+            let once = Once()
             view.callAsyncJavaScript(js, arguments: args, in: frame, in: .page) { result in
+                guard once.first() else { return }
                 switch result {
                 case .success(let v): go.resume(returning: v)
                 case .failure: go.resume(returning: nil)
                 }
             }
+            DispatchQueue.main.asyncAfter(deadline: .now() + wait) { if once.first() { go.resume(returning: nil) } }
         }
     }
 
