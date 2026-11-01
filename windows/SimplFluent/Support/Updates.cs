@@ -1022,7 +1022,10 @@ public static partial class Updates
             _ = Download(asked: false);
             return;
         }
-        if (State != Mode.Ready || !GoesInByItself)
+        // (the version that just failed to go in — the installer opened this one again — is not put in by itself again
+        //  this run: put in again at once, failing again, Simpl closed and opened every few seconds, a forced update ten
+        //  seconds after each opening; Restart to Update, or Simpl opened again, still tries it)
+        if (State != Mode.Ready || !GoesInByItself || (notTaken is { } failed && Found?.Run == failed))
         {
             waiter?.Stop();
             SetWaiting(null);
@@ -1217,8 +1220,28 @@ public static partial class Updates
             if (since < 0 || since > 30) return;
             Resumed = r;
             Log.Write($"update: back after updating to {r.To} ({Version}), the window {r.Window}, at {r.Place ?? "(no place)"}");
+            if (NotTaken(r.To, CurrentRun) is { } run)
+            {
+                notTaken = run;
+                Log.Write($"update: v{run:000} did not go in (the installer opened this version again); it is not put in by itself again until Simpl is next opened — Restart to Update still puts it in");
+            }
         }
         catch (Exception e) { Log.Write("update: where it was could not be read: " + e.Message); }
+    }
+
+    /// <summary>The run an update that did not take went to put in (null: none, or it took).</summary>
+    private static int? notTaken;
+
+    /// <summary>
+    /// Opened again after an update to <paramref name="to"/> (its release's "v124") on a version that is not it: the run
+    /// that did not go in — the installer could not put it in place (a file it could not replace, another Simpl that
+    /// would not quit) and opened the version that was there again (Installer/Simpl.iss, DeinitializeSetup). Null when
+    /// it went in, or nothing says where it went.
+    /// </summary>
+    internal static int? NotTaken(string? to, int currentRun)
+    {
+        if (currentRun <= 0 || to == null || Regex.Match(to, @"\bv(\d+)\b") is not { Success: true } m || !int.TryParse(m.Groups[1].Value, out var run) || run <= 0) return null;
+        return run == currentRun ? null : run;
     }
 
     /// <summary>The place and what was opened on it, as the update left them (the engine's launch place; once).</summary>

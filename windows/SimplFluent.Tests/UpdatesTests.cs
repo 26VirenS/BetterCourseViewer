@@ -216,4 +216,21 @@ public class UpdatesTests
         Assert.Equal(0, Updates.NewestRun(usual.RootElement, betas: true));
         Assert.Equal(0, Updates.NewestRun(odd.RootElement, betas: false));
     }
+
+    [Fact]
+    public void AnUpdateThatDidNotGoInIsToldFromOneThatDid()
+    {
+        // (opened again on v123 after going to put v124 in: the installer could not, and opened v123 again — v124 is not
+        //  put in by itself again this run, or Simpl would close and open over and over)
+        Assert.Equal(124, Updates.NotTaken("v124", 123));
+        // (an earlier version put back that did not go in, either)
+        Assert.Equal(120, Updates.NotTaken("v120", 123));
+        // (it went in: opened on the version it went to)
+        Assert.Null(Updates.NotTaken("v124", 124));
+        Assert.Null(Updates.NotTaken("0.3.104 (v124)", 124));
+        // (nothing said where it went, or a build of one's own: nothing held back)
+        Assert.Null(Updates.NotTaken(null, 123));
+        Assert.Null(Updates.NotTaken("", 123));
+        Assert.Null(Updates.NotTaken("v124", 0));
+    }
 }

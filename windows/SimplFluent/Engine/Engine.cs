@@ -417,6 +417,7 @@ public sealed partial class Engine : Observable, IShellListener
     /// <summary>Signed out: the school's sign-in page at once, and the next account starts afresh.</summary>
     public void SignedOut()
     {
+        Notices.Stop(); // (again: the window, its screens still up while the session was cleared, may have started them)
         Answers.Clear();
         SessionKeep.Clear(); // (0.3.55: the session kept for a restart goes with it)
         // (0.3.25) nothing of this account's Alta kept for the next: its web view made ahead let go, and whether it used
@@ -841,7 +842,9 @@ public sealed partial class Engine : Observable, IShellListener
                 var finished = await Task.WhenAny(done.Task, Task.Delay(90_000, wait.Token));
                 wait.Cancel(); // (its timer let go of as soon as the answer is in)
                 if (finished != done.Task) throw new EngineException("The page did not answer.");
-                var (ok, text) = done.Task.Result;
+                // (awaited, not .Result: a call failed because the page went away throws its own EngineException, which
+                //  the catch below tries again — .Result would wrap it in an AggregateException that nothing catches)
+                var (ok, text) = await done.Task;
                 if (ok) { answered = true; return text; }
                 if (text == "not ready") { last = new EngineException("not ready"); await Task.Delay(400); continue; }
                 throw new EngineException(text);
@@ -952,7 +955,14 @@ public sealed partial class Engine : Observable, IShellListener
         var ok = true;
         try
         {
-            if (name == "bcv" && m["msg"] is JsonObject body) answer = await Bridge.Shared.Handle(body, Web);
+            // (the bridge only for the school's own pages, where bridge.js runs: the native channel is on every page in
+            //  the main frame — a single sign-on page's on another host too — and a page there could otherwise read the
+            //  extension's storage, or have Simpl fetch an address of its choosing and read it the answer)
+            if (name == "bcv" && m["msg"] is JsonObject body)
+            {
+                if (!Uri.TryCreate(e.Source, UriKind.Absolute, out var from) || !IsSchool(from)) throw new EngineException("Not the school's page.");
+                answer = await Bridge.Shared.Handle(body, Web);
+            }
             else if (name == "bcvLogin" && m["msg"] is JsonObject said) Login.Said(said, e.Source); // (the page's own address, as WebView2 knows it)
         }
         catch (Exception ex)

@@ -34,24 +34,24 @@ public static class Notices
     private static readonly List<DispatcherTimer> due = new();
     private static DispatcherTimer? watch, settle, first;
     private static int lastData = -1;
+    /// <summary>The engine whose changes are listened to (once each, however often it is started again).</summary>
+    private static Engine.Engine? listened;
+    /// <summary>Bumped as the reminders are set again, and as they stop: a read of them that began before is not set.</summary>
+    private static int scheduling;
 
-    /// <summary>The app's screens up: reminders set from what is due now, and the look for new activity begun.</summary>
+    /// <summary>The app's screens up: reminders set from what is due now, and the look for new activity begun — again after
+    /// a sign-out and a sign-in on the same engine (the window's screens stay up between them).</summary>
     public static void Start(Engine.Engine e, Shell.MainWindow w)
     {
         if (Launch.Get("shot") != null || Launch.Flag("demo")) return;
         if (engine == e) return;
         engine = e;
         window = w;
-        e.PropertyChanged += (_, a) =>
+        if (listened != e)
         {
-            if (a.PropertyName != nameof(Engine.Engine.DataVersion) || e.DataVersion == lastData) return;
-            lastData = e.DataVersion;
-            // (a tick, a hand-in: set again once things are still)
-            settle?.Stop();
-            settle = new DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
-            settle.Tick += (_, _) => { settle?.Stop(); _ = Reschedule(); };
-            settle.Start();
-        };
+            listened = e;
+            e.PropertyChanged += (_, a) => Changed(e, a.PropertyName);
+        }
         // (the first reminders and look half a minute on: the first screen's reads go first)
         first = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
         first.Tick += (_, _) =>
@@ -67,11 +67,25 @@ public static class Notices
         watch.Start();
     }
 
+    /// <summary>What the screens show may have changed (a tick, a hand-in): the reminders set again once things are still.</summary>
+    private static void Changed(Engine.Engine e, string? property)
+    {
+        if (property != nameof(Engine.Engine.DataVersion) || engine != e || e.DataVersion == lastData) return;
+        lastData = e.DataVersion;
+        settle?.Stop();
+        settle = new DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
+        settle.Tick += (_, _) => { settle?.Stop(); _ = Reschedule(); };
+        settle.Start();
+    }
+
     /// <summary>Signed out, another school: no reminder nor alert of that account's left.</summary>
     public static void Stop()
     {
+        scheduling++;
         foreach (var t in due) t.Stop();
         due.Clear();
+        settle?.Stop();
+        settle = null;
         first?.Stop();
         first = null;
         watch?.Stop();
@@ -102,12 +116,16 @@ public static class Notices
     /// <summary>The reminders set again from what the school says now: the old ones taken away, the new ones set.</summary>
     public static async Task Reschedule()
     {
+        var mine = ++scheduling;
         foreach (var t in due) t.Stop();
         due.Clear();
-        if (engine == null || !Prefs.Bool("reminders:on")) return;
+        if (engine is not { } e || !Prefs.Bool("reminders:on")) return;
         RemindersData data;
-        try { data = await engine.Call<RemindersData>("reminders"); }
-        catch (Exception e) { Log.Write("reminders: " + e.Message); return; }
+        try { data = await e.Call<RemindersData>("reminders"); }
+        catch (Exception x) { Log.Write("reminders: " + x.Message); return; }
+        // (set again meanwhile — two reads under way at once each set every reminder, and each came twice — or signed
+        //  out: that account's reminders are not set)
+        if (mine != scheduling || engine != e) return;
         var now = DateTimeOffset.Now;
         foreach (var item in data.Items)
         {
@@ -166,10 +184,11 @@ public static class Notices
     /// most, then how many more); everything read noted as seen.</summary>
     private static async Task Look(bool notify)
     {
-        if (engine == null || !Prefs.Bool("activity:on") || engine.OnBrightspace) return;
+        if (engine is not { } e0 || !Prefs.Bool("activity:on") || e0.OnBrightspace) return;
         DashActivityData data;
-        try { data = await engine.Call<DashActivityData>("dashActivity"); }
+        try { data = await e0.Call<DashActivityData>("dashActivity"); }
         catch (Exception e) { Log.Write("activity: " + e.Message); return; }
+        if (engine != e0) return; // (signed out meanwhile: nothing of that account's noted, nor said)
         var seen = Seen();
         var kinds = (Prefs.String("activity:kinds") ?? string.Join(",", Standard)).Split(',', StringSplitOptions.RemoveEmptyEntries).ToHashSet();
         var fresh = data.Rows.Where(r => r.Unread == true && !seen.Contains(r.Id) && KindOf(r) is { } k && kinds.Contains(k)).ToList();
@@ -177,13 +196,13 @@ public static class Notices
         Prefs.Set("activity:seen", JsonSerializer.Serialize(seen.TakeLast(500).ToList()));
         Prefs.Set("activity:last", DateTime.UtcNow.ToString("o"));
         if (!notify || fresh.Count == 0) return;
-        var e0 = engine;
         foreach (var r in fresh.Take(4))
         {
             var sub = string.Join(" · ", new[] { r.Kind, r.Course }.Where(s => !string.IsNullOrEmpty(s)));
             var row = r;
             window?.Notify(r.Title, string.IsNullOrEmpty(r.Preview) ? sub : $"{sub}\n{r.Preview}", row.Url is { Length: > 0 } u ? () => e0.OpenWeb(u, row.Title) : null);
             await Task.Delay(1500); // (one after another, each read)
+            if (engine != e0) return;
         }
         if (fresh.Count > 4) window?.Notify($"{fresh.Count - 4} more new in your courses", "Open Simpl to see them.", () => e0.Go(Engine.Place.Dashboard));
     }
