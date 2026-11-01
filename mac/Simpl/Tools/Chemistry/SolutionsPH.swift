@@ -281,7 +281,7 @@ struct SolutionsPHTool: View {
         func shown(_ s: (String, Double)?) -> String? { s.map { "\(ChemNumber.sig($0.1)) \($0.0.hasPrefix("M") ? "M" : unit)" } }
         return ToolColumns(sideWidth: 360, breakpoint: 960) {
             VStack(alignment: .leading, spacing: 20) {
-                Text("How much stock? Leave the one you want blank.").font(.sBody).foregroundStyle(.secondary)
+                Text("How much stock? Leave one field blank and Simpl solves for it.").font(.sBody).foregroundStyle(.secondary)
                 HStack(alignment: .top, spacing: 14) {
                     dilutionCard("Stock", "1", unit: unit, solved: solved)
                     dilutionCard("Final", "2", unit: unit, solved: solved)

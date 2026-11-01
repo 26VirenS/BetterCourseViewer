@@ -203,7 +203,7 @@ struct GasLawsTool: View {
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .card(radius: 14)
-            Text("Leave the one you want blank.").font(.sFootnote).foregroundStyle(.secondary)
+            Text("Leave one field blank and Simpl solves for it.").font(.sFootnote).foregroundStyle(.secondary)
             answerCard(law: lawText(solved: solved?.0.rawValue, pieces: [("P", "P"), ("V", "V"), (" = ", nil), ("n", "n"), ("R", nil), ("T", "T")]),
                        result: result.map { v in (Self.name(v.0), idealShown(v) ?? "") }, note: "R = 0.082057 L·atm/(mol·K); the fields are converted to atm, L, mol and K.")
         }
@@ -360,7 +360,7 @@ struct GasLawsTool: View {
                     stateCard(2, hidden: hidden, solved: solved)
                 }
             }
-            Text("Leave the one you want blank.").font(.sFootnote).foregroundStyle(.secondary)
+            Text("Leave one field blank and Simpl solves for it.").font(.sFootnote).foregroundStyle(.secondary)
             answerCard(law: combinedLaw(solved: solved?.0), result: result.map { ($0.0, combinedShown($0) ?? "") },
                        note: constant.map { "\($0.law): the same gas, its \($0.rawValue) unchanged." } ?? "The same amount of gas in two states; temperatures in kelvin.")
         }

@@ -972,7 +972,7 @@ private struct FCRoundView: View {
                 Spacer()
                 Color.clear.frame(width: 44, height: 1)
             }
-            Text("Space flips. ← still learning, → know.")
+            Text("Space flips the card. ← Still Learning · → Know")
                 .font(.sFootnote)
                 .foregroundStyle(.secondary)
         }
