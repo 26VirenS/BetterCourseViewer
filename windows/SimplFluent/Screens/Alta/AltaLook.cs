@@ -69,7 +69,7 @@ internal static class AltaLook
     /// <summary>A due time the popup writes itself (no Canvas assignment to say it), as the engine writes one: "Due Oct 12
     /// at 11:59 PM", the year only when it is not this year.</summary>
     public static string DueText(DateTime d) =>
-        $"Due {d.ToString(d.Year == DateTime.Now.Year ? "MMM d" : "MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)} at {d.ToString("h:mm tt", System.Globalization.CultureInfo.InvariantCulture)}";
+        $"Due {d.ToString(d.Year == DateTime.Now.Year ? "MMM d" : "MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)} at {Simpl.Support.Clock.Time(d)}";
 
     /// <summary>A time zone's letters after a time ("11:59pm PDT"): the page runs in the PC's own zone, so it says nothing.</summary>
     private static readonly System.Text.RegularExpressions.Regex Zone = new(@"(?<=\d\s?[AaPp]\.?[Mm]\.?)\s+(?:[A-Z]{2,4}T|UTC|GMT)(?:[+-]\d{1,2}(?::?\d{2})?)?\b");

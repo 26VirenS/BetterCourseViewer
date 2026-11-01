@@ -155,7 +155,7 @@ internal sealed class PTMiniWindow : FluentWindow
         full.ToolTip = $"{e.Name}'s whole page in the table";
         var atoms = K.Button("Atom in 3D", () => { var x = element; Close(); openAtoms(x); }, icon: SymbolRegular.Cube24);
         atoms.HorizontalAlignment = HorizontalAlignment.Stretch;
-        atoms.ToolTip = $"{e.Name}'s atom, orbitals and electron cloud, in Atoms & Orbitals";
+        atoms.ToolTip = $"{e.Name}'s atom, orbitals and electron cloud, in Atoms & orbitals";
         var buttons = K.Columns("*, 8, *", full.Col(0), atoms.Col(2));
 
         var content = K.Rows("auto, auto, auto, auto, auto, *, auto",

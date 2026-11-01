@@ -35,11 +35,17 @@ namespace Simpl.Screens;
 /// </summary>
 public sealed partial class CalendarScreen
 {
-    private const double TodoWidth = 272;
+    /// <summary>To Do's column beside the calendar: 272 wide, or 248 on a page under <see cref="TodoFullFrom"/>, so the
+    /// month keeps the room it had.</summary>
+    private double TodoWidth => Width >= TodoFullFrom ? 272 : 248;
+    private const double TodoFullFrom = 960;
     private const double TodoGap = 16;
-    /// <summary>To Do beside the calendar from a page this wide: the calendar keeps 632 of it.</summary>
-    private const double TodoBesideFrom = 920;
-    /// <summary>To Do over the calendar, on a page too narrow for both side by side: this tall, its list scrolling within.</summary>
+    /// <summary>To Do beside the calendar from a page this wide (a 1024 window beside the compact rail is 896): the page
+    /// holds still, the calendar and To Do each scrolling within themselves, the calendar keeping 616 of it — never To
+    /// Do's list scrolling inside the page's scroll, as it did over the calendar on a 1024 window beside the whole pane.</summary>
+    private const double TodoBesideFrom = 880;
+    /// <summary>To Do over the calendar, on a page too narrow for both side by side: this tall, its list scrolling within
+    /// — the wheel handed on to the page at either end of it (<see cref="WheelOnAtEnds"/>).</summary>
     private const double TodoAbove = 300;
     private const string TodoFormat = "simpl-work";
     private const string TodoPref = "calTodo";

@@ -194,7 +194,7 @@ internal sealed class BiomolProteinPage : BiomolPageView
         denature = ChemKit.Wide("Denature", Denature, icon: SymbolRegular.Fire20);
         tertiaryPanel = K.V(10, BioUI.Heading("Side chains"), centroids, BioUI.Caption("Spheres are the side chains' centres, coloured by class."), denature);
         var sickle = ChemKit.Wide("Sickle-cell mutation", () => BiomolHandOver.ToTool(C, "gene", "mutations", new Dictionary<string, string> { ["mutation"] = "sickle" }), icon: SymbolRegular.ArrowSwap20);
-        sickle.ToolTip = "Opens Gene Expression's Mutations page: HBB c.20A>T, β6 Glu → Val";
+        sickle.ToolTip = "Opens Gene expression's Mutations page: HBB c.20A>T, β6 Glu → Val";
         quaternaryPanel = K.V(10, BioUI.Heading("Haemoglobin"), BioUI.Caption("Four chains in their colours; each heme a dark red disk with its iron."), sickle);
         levelsPanel = K.V(14, levels, tertiaryPanel, quaternaryPanel);
 
@@ -665,7 +665,7 @@ internal sealed class BiomolProteinPage : BiomolPageView
                     BioUI.FactRow("Held together by", "The same weak bonds as tertiary structure, between the chains: no peptide bond joins them."),
                     BioUI.FactRow("Sickle-cell", "β6 Glu → Val: a charged R group becomes a nonpolar one, so deoxy-haemoglobin sticks together into long fibres that bend red cells."),
                     BioUI.FactRow("Its gene", $"The β chains here are the HBB gene's protein without its first Met: {BioGenes.HbbProtein[1..11]}…"),
-                    BiomolKit.Action("Open the sickle-cell mutation", SymbolRegular.ArrowSwap20, () => BiomolHandOver.ToTool(C, "gene", "mutations", new Dictionary<string, string> { ["mutation"] = "sickle" }), "Gene Expression ▸ Mutations")));
+                    BiomolKit.Action("Open the sickle-cell mutation", SymbolRegular.ArrowSwap20, () => BiomolHandOver.ToTool(C, "gene", "mutations", new Dictionary<string, string> { ["mutation"] = "sickle" }), "Gene expression ▸ Mutations")));
                 Right.Children.Add(BioUI.Legend(new[] { 'A', 'B', 'C', 'D' }.Select(ch => (K.Hex(BiomolProteins.ChainHex[ch]), $"{BiomolProteins.ChainName[ch]} chain ({(ch is 'A' or 'C' ? "α" : "β")})"))
                     .Append((K.Hex(BiomolProteins.HemeHex), "Heme")).Append((K.Hex(BiomolProteins.IronHex), "Iron (Fe²⁺)")).Append((BioPalette.Acidic.ToColor(), "β6 Glu"))));
                 if (Picked is { } id && id.Split(':') is { Length: >= 2 } f)

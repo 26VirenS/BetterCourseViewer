@@ -24,13 +24,13 @@ public static class ChemTools
     /// </summary>
     public static readonly ToolsScreen.Kind[] Kinds =
     {
-        new("ptable", "Periodic Table", "Every element, its trends and its facts.", SymbolRegular.SlideGrid24, "#e5484d"),
-        new("lewis", "Lewis Structures", "Bonds, lone pairs, formal charges and resonance.", SymbolRegular.GridDots24, "#0ea5c6"),
-        new("molecule", "Molecule Builder", "Build molecules in 3D, shaped by VSEPR.", SymbolRegular.Molecule24, "#3faa4b"),
-        new("atoms", "Atoms & Orbitals", "Any element’s shells, orbitals and cloud in 3D.", SymbolRegular.Target24, "#b452e0"),
-        new("balance", "Equation Balancer", "Balance any chemical equation.", SymbolRegular.ArrowSwap24, "#ff6b35"),
-        new("moles", "Molar Mass & Stoichiometry", "Molar mass, moles and yields.", SymbolRegular.Scales24, "#2fb37a"),
-        new("gas", "Gas Laws", "PV = nRT and the combined law.", SymbolRegular.Balloon24, "#3f8ef7"),
+        new("ptable", "Periodic table", "Every element, its trends and its facts.", SymbolRegular.SlideGrid24, "#e5484d"),
+        new("lewis", "Lewis structures", "Bonds, lone pairs, formal charges and resonance.", SymbolRegular.GridDots24, "#0ea5c6"),
+        new("molecule", "Molecule builder", "Build molecules in 3D, shaped by VSEPR.", SymbolRegular.Molecule24, "#3faa4b"),
+        new("atoms", "Atoms & orbitals", "Any element’s shells, orbitals and cloud in 3D.", SymbolRegular.Target24, "#b452e0"),
+        new("balance", "Equation balancer", "Balance any chemical equation.", SymbolRegular.ArrowSwap24, "#ff6b35"),
+        new("moles", "Molar mass & stoichiometry", "Molar mass, moles and yields.", SymbolRegular.Scales24, "#2fb37a"),
+        new("gas", "Gas laws", "PV = nRT and the combined law.", SymbolRegular.Balloon24, "#3f8ef7"),
         new("solution", "Solutions & pH", "Molarity, dilution, pH, titration.", SymbolRegular.Drop24, "#a259ff"),
     };
 

@@ -9,7 +9,7 @@
 
   const HOURS = [];
   for (let i = 8; i <= 23; i++) HOURS.push(i);
-  const hourLabel = (hh) => (hh === 12 ? '12p' : hh < 12 ? `${hh}a` : `${hh - 12}p`);
+  const hourLabel = (hh) => U.fmtHour(hh); // ("8 AM", "Noon": ui.js, the one clock)
   const sundayStart = (d) => U.addDays(U.startOfDay(d), -U.startOfDay(d).getDay());
 
   async function render(ctx) {
@@ -284,7 +284,7 @@
         for (const d of days) {
           const evs = eventsOn(d).filter((ev) => !ev.allDay && (ev.date.getHours() === hh || (hh === 8 && ev.date.getHours() < 8)));
           grid.append(U.el(`bcv-week__cell ${U.sameDay(d, now) ? 'bcv-week__cell--today' : ''}`, evs.map((ev) => h('a', { class: 'bcv-wev', href: ev.url, style: { background: ev.tint }, title: [ev.title, ev.contextName, ...facts(ev), ev.missing ? 'Missing' : ''].filter(Boolean).join(' · '), onclick: onEvent(ev) }, [
-            h('div', { class: 'bcv-wev__time', style: { color: ev.color }, text: U.fmtTimeLower(ev.date).replace(/m$/, '') }),
+            h('div', { class: 'bcv-wev__time', style: { color: ev.color }, text: U.fmtTime(ev.date, { compact: true }) }),
             h('div', { class: `bcv-wev__title ${ev.done ? 'bcv-strike' : ''}`, style: { color: ev.color }, text: ev.title }),
             facts(ev).length ? h('div', { class: 'bcv-wev__facts', style: { color: ev.color }, text: facts(ev).join(' · ') }) : null,
           ]))));
@@ -311,7 +311,7 @@
           U.groupHead(U.fmtDow(d), `${rel}${U.plural(evs.length, 'item')}`),
           U.card(evs.map((ev) => U.row([
             U.tile(ev.icon, { color: ev.color, tint: ev.tint }),
-            U.text('bcv-agenda__due', ev.allDay ? 'All day' : `${ev.isAssignment ? 'Due' : 'At'} ${U.fmtTimeLower(ev.date)}`, 'span'),
+            U.text('bcv-agenda__due', ev.allDay ? 'All day' : `${ev.isAssignment ? 'Due' : 'At'} ${U.fmtTime(ev.date)}`, 'span'),
             h('span', { class: `bcv-agenda__title bcv-pretty ${ev.done ? 'bcv-strike' : ''}`, text: ev.title }),
             ev.missing ? U.statusBadge({ word: 'Missing', kind: 'bad' }) : ev.excused ? U.statusBadge({ word: 'Excused', kind: 'muted' }) : null,
             U.text('bcv-agenda__course', [ev.contextName, ...facts(ev)].filter(Boolean).join(' · '), 'span'),
@@ -381,7 +381,7 @@
       ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
       ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
       const appt = ev.kind === 'appointment';
-      const when = ev.allDay ? `${U.fmtDow(ev.date)} · all day` : `${U.fmtDow(ev.date)} · ${U.fmtTimeLower(ev.date)}${ev.end && ev.end > ev.date ? ` – ${U.fmtTimeLower(ev.end)}` : ''}`;
+      const when = ev.allDay ? `${U.fmtDow(ev.date)} · all day` : `${U.fmtDow(ev.date)} · ${U.fmtTime(ev.date)}${ev.end && ev.end > ev.date ? ` – ${U.fmtTime(ev.end)}` : ''}`;
       const row = (k, v) => (v == null || v === '' || (Array.isArray(v) && !v.length) ? null : U.el('bcv-evsheet__row', [U.text('bcv-evsheet__k', k, 'span'), h('span', { class: 'bcv-evsheet__v' }, v)]));
       const prose = ev.description ? BCV.screens.course?.prose?.(ev.description, { cls: 'bcv-evsheet__prose' }) || h('p', { text: htmlToText(ev.description, 2000) }) : null;
       let busy = false;
@@ -608,7 +608,7 @@
       }
       const mine = g.mine.map((s) => U.el('bcv-appt__mine', [
         U.svg(IC.calendarPlus, { size: 14, stroke: 'currentColor', width: 2 }),
-        h('span', { class: 'bcv-appt__minetext', text: `Your time: ${U.fmtDow(s.start)} at ${U.fmtTimeLower(s.start)}` }),
+        h('span', { class: 'bcv-appt__minetext', text: `Your time: ${U.fmtDow(s.start)} at ${U.fmtTime(s.start)}` }),
         U.btn('Cancel', { kind: 'xs', cls: 'bcv-appt__cancel', onClick: (e) => cancel(g, s, e.currentTarget) }),
       ]));
       // the days as rows — the date, how many times are open and the span — each opening to its hours;
@@ -629,7 +629,7 @@
         const held = list.find((s) => s.reserved);
         const open = openOf(list);
         const rel = U.sameDay(d, now) ? 'Today' : U.dayDiff(d, now) === 1 ? 'Tomorrow' : U.DAYS[d.getDay()];
-        const sub = held ? `Your time · ${U.fmtTimeLower(held.start)}` : open ? `${U.plural(open, 'time')} open · ${U.fmtTimeLower(list[0].start)} – ${U.fmtTimeLower(list[list.length - 1].start)}` : 'Full';
+        const sub = held ? `Your time · ${U.fmtTime(held.start)}` : open ? `${U.plural(open, 'time')} open · ${U.fmtTime(list[0].start)} – ${U.fmtTime(list[list.length - 1].start)}` : 'Full';
         const row = h('button', { type: 'button', class: `bcv-appt__dayrow ${held ? 'is-held' : ''} ${!open && !held ? 'is-full' : ''}`, 'aria-expanded': isOpen ? 'true' : 'false', onclick: () => {
           if (apptUi.open.has(key)) apptUi.open.delete(key); else apptUi.open.add(key);
           apptSheet?.list.replaceChildren(...appointmentsBody());
@@ -661,7 +661,7 @@
     function slotCell(g, s, full) {
       const gone = s.left <= 0 && !s.reserved;
       const past = s.start < now;
-      const when = U.fmtTimeLower(s.start);
+      const when = U.fmtTime(s.start);
       const title = s.reserved ? `Your time, ${when}` : gone ? `${when}: taken` : past ? `${when}: past` : full ? 'Cancel your time first to pick another' : `Reserve ${U.fmtDow(s.start)} at ${when}`;
       const btn = h('button', { type: 'button', class: `bcv-appt__slot ${s.reserved ? 'is-mine' : ''} ${gone ? 'is-gone' : ''}`, text: `:${String(s.start.getMinutes()).padStart(2, '0')}`, title, 'aria-label': title, disabled: (s.reserved || gone || past || full) || null, onclick: () => reserve(g, s, btn) });
       return btn;
@@ -680,7 +680,7 @@
         return;
       }
       if (!ctx.alive()) return;
-      U.toast(`Reserved: ${U.fmtDow(s.start)} at ${U.fmtTimeLower(s.start)}`);
+      U.toast(`Reserved: ${U.fmtDow(s.start)} at ${U.fmtTime(s.start)}`);
       await loadAppointments({ force: true });
       loadedRange = null; // the reservation is an event of the student's own: the grid reads it
       load();

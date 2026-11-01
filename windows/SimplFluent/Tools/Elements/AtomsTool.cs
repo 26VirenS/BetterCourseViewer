@@ -557,9 +557,9 @@ internal sealed class AtomsTool : Grid
             ("Valence electrons", e.ValenceElectrons is { } ve ? $"{ve}" : "—", null),
             ("Atomic mass", $"{e.MassText} u", null),
         }));
-        var open = ChemKit.Wide("Open in Periodic Table", () =>
+        var open = ChemKit.Wide("Open in Periodic table", () =>
             ToolsCenter.HandTo(ctx, "ptable", new Dictionary<string, string> { ["element"] = e.Number.ToString(CultureInfo.InvariantCulture) }), icon: SymbolRegular.SlideGrid24);
-        open.ToolTip = $"{e.Name}’s page in the Periodic Table: every fact, where it sits, its neighbours";
+        open.ToolTip = $"{e.Name}’s page in the periodic table: every fact, where it sits, its neighbours";
         facts.Children.Add(open);
     }
 
@@ -591,7 +591,7 @@ internal sealed class AtomsQuick : ContentControl
     {
         Focusable = false;
         var kind = ToolsCenter.KindOf(c.Key);
-        var name = kind?.Name ?? "Atoms & Orbitals";
+        var name = kind?.Name ?? "Atoms & orbitals";
         var words = K.V(3, K.Text(name, Ty.BodyStrong), K.Wrapped(kind?.Note ?? "", Ty.Body, B.Text2));
         words.VerticalAlignment = VerticalAlignment.Center;
         var top = K.Columns("auto, *", (kind != null ? K.IconTile(kind.Symbol, kind.Color, 40) : new Border()).Margin(0, 0, 12, 0).Col(0), words.Col(1));

@@ -100,10 +100,10 @@ public sealed class ToolsScreen : Screen
         new("ocr", "Image to text", "Copy the words in a picture.", SymbolRegular.ScanText24, "#00b3a4"),
         new("fc", "Flashcards", "Flip, learn, test, match.", SymbolRegular.SquareMultiple24, "#0a84ff"),
         // (tools) the tools program's: each at the end of its group below
-        new("words", "Word Counter", "Words, characters, reading time.", SymbolRegular.TextWordCount24, "#8e8e93"),
+        new("words", "Word counter", "Words, characters, reading time.", SymbolRegular.TextWordCount24, "#8e8e93"),
         new("stats", "Statistics", "Mean, SD, regression, z and t.", SymbolRegular.DataHistogram24, "#ff2d55"),
         // (a table of cells, not the Grid24 the biology Crosses tile wears a few rows below)
-        new("matrix", "Matrix Calculator", "Determinant, inverse, solve, RREF.", SymbolRegular.TableSimple24, "#5e5ce6"),
+        new("matrix", "Matrix calculator", "Determinant, inverse, solve, RREF.", SymbolRegular.TableSimple24, "#5e5ce6"),
         new("shrink", "Compress files", "Shrink images and PDFs to fit.", SymbolRegular.ArrowMinimize24, "#ff9500"),
         new("plan", "Study planner", "Study blocks from your due dates.", SymbolRegular.CalendarClock24, "#34c759"),
         new("verbs", "Verb conjugations", "Conjugate verbs in 5 languages.", SymbolRegular.BookLetter24, "#30b0c7"),
@@ -196,7 +196,8 @@ public sealed class ToolsScreen : Screen
     {
         timerLine = null;
         var page = new Stack { Orientation = Orientation.Vertical, Spacing = 12 };
-        // (a heading for what each set of tools is for, its tiles under it: two across, four from about 1200 wide)
+        // (a heading for what each set of tools is for, its tiles under it — every section as many across as the page
+        //  holds, the same for all of them, so the columns line up down the page; a section's last row may be short)
         FrameworkElement Heading(string title, string? line)
         {
             var h = K.V(2, K.Text(title, Ty.Subtitle));
@@ -209,22 +210,19 @@ public sealed class ToolsScreen : Screen
         {
             page.Children.Add(Heading(title, null));
             var kinds = keys.Select(k2 => Kinds.FirstOrDefault(t => t.Key == k2)).OfType<Kind>().ToList();
-            // (each set's four in full rows: four across on a wide page, else two — never three and one left alone; Math &
-            //  science's three three across where they fit, else two and one — one column of three read as a list)
-            page.Children.Add(new MoreGrid(TileWidth, 16, kinds.Select(k2 => (UIElement)Tile(k2)), stretch: true) { Even = kinds.Count % 2 == 0 });
+            page.Children.Add(Tiles(kinds));
         }
-        // (the chemistry tools, then the biology toolkit's ten, each under a heading of their own, as the Mac's Tools
-        //  page has them — the chemistry's in full rows while they are an even number, as a section's four above)
+        // (the chemistry tools, then the physics tools, then the biology toolkit's ten, each under a heading of their own,
+        //  as the Mac's Tools page has them)
         var chemistry = Heading("Chemistry", "The periodic table, Lewis structures, molecules and atoms in 3D, and the calculators: equations, moles, gases, solutions.");
         page.Children.Add(chemistry);
-        page.Children.Add(new MoreGrid(TileWidth, 16, Simpl.Tools.ChemTools.Kinds.Select(k2 => (UIElement)Tile(k2)), stretch: true) { Even = Simpl.Tools.ChemTools.Kinds.Length % 2 == 0 });
-        // (the physics tools between them, as the Mac's Tools page has them: in full rows where their count is even)
+        page.Children.Add(Tiles(Simpl.Tools.ChemTools.Kinds));
         var physics = Heading("Physics", "Motion and projectiles, vectors, and DC circuits built and read.");
         page.Children.Add(physics);
-        page.Children.Add(new MoreGrid(TileWidth, 16, Simpl.Tools.PhysTools.Kinds.Select(k2 => (UIElement)Tile(k2)), stretch: true) { Even = Simpl.Tools.PhysTools.Kinds.Length % 2 == 0 });
+        page.Children.Add(Tiles(Simpl.Tools.PhysTools.Kinds));
         var biology = Heading("Biology", "Cells, DNA, genes and biomolecules in 3D, and the maths of crosses, populations and the lab.");
         page.Children.Add(biology);
-        page.Children.Add(new MoreGrid(TileWidth, 16, Simpl.Tools.BioTools.Kinds.Select(k2 => (UIElement)Tile(k2)), stretch: true));
+        page.Children.Add(Tiles(Simpl.Tools.BioTools.Kinds));
         // (0.3.105) Simpl Community: the tools added from it and a tile to browse for more — there with none added too
         var community = Heading("Community", "Tools other students made and shared in Simpl Community. Add one and it stays here, working offline too.");
         page.Children.Add(community);
@@ -246,6 +244,10 @@ public sealed class ToolsScreen : Screen
 
     /// <summary>The narrowest a tile is: three across from about 900 of the page's width.</summary>
     private const double TileWidth = 280;
+
+    /// <summary>A section's tiles: as many across as the page holds — one count for every section on the page (it once
+    /// went from three across to two between sections, keeping an even section's rows full), so the columns line up.</summary>
+    private FrameworkElement Tiles(IEnumerable<Kind> kinds) => new MoreGrid(TileWidth, 16, kinds.Select(k => (UIElement)Tile(k)), stretch: true);
 
     /// <summary>A tool's tile: its symbol on a wash of its colour, its name and line, and its pin at its corner.</summary>
     private FrameworkElement Tile(Kind kind)

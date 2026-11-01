@@ -74,7 +74,7 @@ internal sealed class CellMembranePage : Grid
         left.Children.Add(CellUI.Toggle("Osmosis", osmosis, "Water moving through the aquaporin channel"));
         left.Children.Add(BioUI.Heading("Up close").Margin(0, 6, 0, 0));
         var popc = ChemKit.Wide("See a real phospholipid", ShowPopc, icon: SymbolRegular.Molecule20);
-        popc.ToolTip = "POPC, atom by atom, from the Biomolecule Builder";
+        popc.ToolTip = "POPC, atom by atom, from the biomolecule builder";
         left.Children.Add(popc);
 
         // (the middle: the patch in its card, a scale bar in nanometres, a caption over it)
@@ -372,7 +372,7 @@ internal sealed class CellMembranePage : Grid
         view.Show($"popc|{dark}", () => PopcScene(popc), "popc", () => BioMoleculeScene.Symbols(popc.Model(hydrogens: false), BioAtomStyle.BallStick, hydrogens: false));
         var close = K.Button("Done", ClosePopc, accent: true);
         close.ToolTip = "Back to the membrane (Esc)";
-        var builder = K.Button("Open in Biomolecule Builder", () => BioTools.Open(c, "biomol", new Dictionary<string, string> { ["molecule"] = "POV" }), icon: SymbolRegular.Open20);
+        var builder = K.Button("Open in Biomolecule builder", () => BioTools.Open(c, "biomol", new Dictionary<string, string> { ["molecule"] = "POV" }), icon: SymbolRegular.Open20);
         builder.MinWidth = 0;
         var head = K.Columns("*, auto, auto", K.V(2, K.Text("POPC, a phospholipid", Ty.Subtitle), K.Text("C₄₂H₈₂NO₈P · the commonest phospholipid in animal membranes", Ty.Body, B.Text2)).Col(0),
             builder.Margin(0, 0, 10, 0).Col(1), close.Col(2));

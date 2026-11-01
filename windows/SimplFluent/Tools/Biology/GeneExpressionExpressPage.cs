@@ -490,7 +490,7 @@ internal sealed class GXExpressPage : Grid
         if (g.Protein.Length == 0)
             return BioUI.Card("The protein", Appearance.Accent, "None", K.Wrapped("Without an AUG there is no reading frame, so no protein.", Ty.Body, B.Text2));
         var protein = PTKit.Selectable(g.Protein, 14, FontWeights.SemiBold, B.Text, BioUI.Mono);
-        var open = ChemKit.Wide("Open in Biomolecule Builder", () => BioTools.Open(c, "biomol", new() { ["protein"] = g.Protein, ["page"] = "proteins" }), accent: true, icon: SymbolRegular.Cube24);
+        var open = ChemKit.Wide("Open in Biomolecule builder", () => BioTools.Open(c, "biomol", new() { ["protein"] = g.Protein, ["page"] = "proteins" }), accent: true, icon: SymbolRegular.Cube24);
         open.ToolTip = "Build this chain in 3D (folded as an α-helix to start)";
         return BioUI.Card("The protein", Appearance.Accent, "N- to C-terminus", protein,
             BioUI.Facts(new (string, string, Color?)[]

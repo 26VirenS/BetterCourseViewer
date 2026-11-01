@@ -988,10 +988,14 @@ public sealed class SettingsWindow : FluentWindow, ISheetWindow
                 : inPlace ? Enabled(K.Button("Install…", () => AskInstallEarlier(r)), !dev)
                 : Enabled(K.Button("Open…", () => Updates.Open(r)), !dev)));
         }
+        // (its symbol and words where every other card's are — K.Row's 16 in, the symbol at 20 with 20 after it — not
+        //  WPF-UI's expander's own 14 in and 24-wide symbol, which set them 6 to the left of the cards above)
+        var earlierWords = K.V(0, K.Text("Earlier versions", Ty.Body), K.Text(Updates.Installed ? "Put an earlier version back in this one’s place." : "Each opens on the website, with its downloads.", Ty.Caption, B.Text2));
+        earlierWords.VerticalAlignment = VerticalAlignment.Center;
         var earlier = new CardExpander
         {
-            Header = K.V(0, K.Text("Earlier versions", Ty.Body), K.Text(Updates.Installed ? "Put an earlier version back in this one’s place." : "Each opens on the website, with its downloads.", Ty.Caption, B.Text2)),
-            Icon = new SymbolIcon { Symbol = SymbolRegular.History24 },
+            Header = K.Columns("auto, *", K.Icon(SymbolRegular.History24, 20, B.Text).Margin(2, 0, 20, 0).Col(0), earlierWords.Col(1)),
+            Padding = new Thickness(16, 16, 16, 16),
             Content = list,
             IsExpanded = Launch.Flag("settings-earlier"),
         };

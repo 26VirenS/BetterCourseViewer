@@ -9,44 +9,53 @@ using MenuItem = System.Windows.Controls.MenuItem;
 namespace Simpl.Shell;
 
 /// <summary>
-/// The page's title as a breadcrumb on one line, as Windows 11's BreadcrumbBar keeps it: the steps that lead back
-/// ("Courses ›", "MATH 021 ›") and the page's own title last. When they do not all fit beside the page's commands,
-/// the leading steps fold into "…" (a menu of them) one by one, from the first, so the line never breaks after a "›"
-/// and leaves the title alone on a line of its own; a title still too long for what is left is cut (or, a title that
-/// may wrap, wrapped in its own room). A course's square, when there is one, comes first and always shows.
+/// The way back to where a page was opened from, on one line as Windows 11's BreadcrumbBar keeps it ("F26-MATH 021 20 ›
+/// Discussions"), each step going back to it; the page's own title on the line too (<c>last</c>), or — a page opened on
+/// a place, whose title has the header's whole width on a line of its own under this one — not (<c>last</c> null: no
+/// "›" after the last step). When the steps do not all fit, the longest are cut short first (a course's name to its
+/// first words and "…", never to nothing), down to <see cref="StepLeast"/> each; only then do the leading steps fold into
+/// "…" (a menu of them) one by one, from the first. A course's square, when there is one, comes first and always shows.
 /// </summary>
 internal sealed class CrumbLine : Panel
 {
     private readonly FrameworkElement? lead;
     private readonly List<(FrameworkElement Step, FrameworkElement Chevron, string Title, Action Go)> steps = new();
-    private readonly FrameworkElement last;
+    private readonly FrameworkElement? last;
     private readonly Button more;
     private readonly FrameworkElement moreChevron;
     private int folded;
+    /// <summary>The widest a step is drawn now (cut short with "…" past it).</summary>
+    private double cap = double.PositiveInfinity;
 
-    public CrumbLine(FrameworkElement? lead, IEnumerable<(FrameworkElement Step, string Title, Action Go)> steps, FrameworkElement last)
+    /// <summary>The narrowest a step is cut to before the steps fold into "…".</summary>
+    public const double StepLeast = 96;
+
+    public CrumbLine(FrameworkElement? lead, IEnumerable<(FrameworkElement Step, string Title, Action Go)> steps, FrameworkElement? last, bool small = false)
     {
         this.lead = lead;
         this.last = last;
         if (lead != null) Children.Add(lead);
-        more = K.Subtle(K.Text("…", Ty.Title, B.Text2), Menu, new Thickness(6, 0, 6, 0));
+        more = K.Subtle(K.Text("…", small ? Ty.Body : Ty.Title, B.Text2), Menu, small ? new Thickness(6, 2, 6, 2) : new Thickness(6, 0, 6, 0));
         more.ToolTip = "More of the path";
+        more.VerticalAlignment = VerticalAlignment.Center;
         System.Windows.Automation.AutomationProperties.SetName(more, "More of the path");
-        moreChevron = Chevron();
+        moreChevron = Chevron(small);
         Children.Add(more);
         Children.Add(moreChevron);
         foreach (var (step, title, go) in steps)
         {
-            var chevron = Chevron();
+            var chevron = Chevron(small);
             this.steps.Add((step, chevron, title, go));
             Children.Add(step);
             Children.Add(chevron);
         }
-        Children.Add(last);
+        if (last != null) Children.Add(last);
     }
 
-    /// <summary>The "›" after a step.</summary>
-    public static FrameworkElement Chevron() => K.Icon(SymbolRegular.ChevronRight20, 16, B.Text2).Margin(10, 6, 10, 0);
+    /// <summary>The "›" after a step: the title's size, or (<paramref name="small"/>) the breadcrumb line's over a title.</summary>
+    public static FrameworkElement Chevron(bool small = false) => small
+        ? K.Icon(SymbolRegular.ChevronRight20, 12, B.Text2).Margin(2, 0, 2, 0).Align(HorizontalAlignment.Left, VerticalAlignment.Center)
+        : K.Icon(SymbolRegular.ChevronRight20, 16, B.Text2).Margin(10, 6, 10, 0);
 
     /// <summary>The steps folded into "…", to go back to.</summary>
     private void Menu()
@@ -62,25 +71,49 @@ internal sealed class CrumbLine : Panel
         menu.IsOpen = true;
     }
 
+    /// <summary>The "›" after step <paramref name="i"/>: none after the last when no title follows on the line.</summary>
+    private bool ChevronShown(int i) => last != null || i < steps.Count - 1;
+
     protected override Size MeasureOverride(Size available)
     {
         var free = new Size(double.PositiveInfinity, double.PositiveInfinity);
         foreach (UIElement c in InternalChildren) if (!ReferenceEquals(c, last)) c.Measure(free);
-        last.Measure(free);
+        last?.Measure(free);
         static double W(UIElement e) => e.DesiredSize.Width;
         var leadWidth = lead == null ? 0 : W(lead);
-        var stepWidths = steps.Select(s => W(s.Step) + W(s.Chevron)).ToList();
+        var natural = steps.Select(s => W(s.Step)).ToList();
+        var chevrons = steps.Select((s, i) => ChevronShown(i) ? W(s.Chevron) : 0).ToList();
         var moreWidth = W(more) + W(moreChevron);
-        double Before(int f) => leadWidth + (f > 0 ? moreWidth : 0) + stepWidths.Skip(f).Sum();
+        var lastWidth = last == null ? 0 : W(last);
+        double Before(int f, double c) => leadWidth + (f > 0 ? moreWidth : 0) + natural.Select((w, i) => i < f ? 0 : Math.Min(w, c) + chevrons[i]).Sum();
         folded = 0;
+        cap = double.PositiveInfinity;
         if (!double.IsInfinity(available.Width))
-            while (folded < steps.Count && Before(folded) + W(last) > available.Width + 0.5) folded++;
-        var used = Before(folded);
-        var room = double.IsInfinity(available.Width) ? double.PositiveInfinity : Math.Max(0, available.Width - used);
-        last.Measure(new Size(room, available.Height));
-        var height = last.DesiredSize.Height;
+        {
+            var room = available.Width + 0.5 - lastWidth;
+            if (Before(0, cap) > room && natural.Count > 0)
+            {
+                // (the longest steps cut short first, all to the same width, down to StepLeast; then the first ones fold)
+                var widest = natural.Max();
+                cap = widest;
+                while (cap > StepLeast && Before(0, cap) > room) cap = Math.Max(StepLeast, cap - 4);
+                while (folded < steps.Count && Before(folded, cap) > room) folded++;
+            }
+        }
+        // (each step measured again at the width it is given: its words cut with "…" where it is narrower than they are)
+        for (var i = 0; i < steps.Count; i++)
+            if (natural[i] > cap) steps[i].Step.Measure(new Size(cap, double.PositiveInfinity));
+        var used = leadWidth + (folded > 0 ? moreWidth : 0) + steps.Select((s, i) => i < folded ? 0 : W(s.Step) + chevrons[i]).Sum();
+        double height = 0;
+        if (last != null)
+        {
+            var titleRoom = double.IsInfinity(available.Width) ? double.PositiveInfinity : Math.Max(0, available.Width - used);
+            last.Measure(new Size(titleRoom, available.Height));
+            height = last.DesiredSize.Height;
+            used += last.DesiredSize.Width;
+        }
         foreach (var e in Shown()) height = Math.Max(height, e.DesiredSize.Height);
-        return new Size(used + last.DesiredSize.Width, height);
+        return new Size(used, height);
     }
 
     /// <summary>What shows before the title: the square, "…" while steps are folded, and the steps left.</summary>
@@ -88,7 +121,11 @@ internal sealed class CrumbLine : Panel
     {
         if (lead != null) yield return lead;
         if (folded > 0) { yield return more; yield return moreChevron; }
-        foreach (var (step, chevron, _, _) in steps.Skip(folded)) { yield return step; yield return chevron; }
+        for (var i = folded; i < steps.Count; i++)
+        {
+            yield return steps[i].Step;
+            if (ChevronShown(i)) yield return steps[i].Chevron;
+        }
     }
 
     protected override Size ArrangeOverride(Size final)
@@ -100,7 +137,10 @@ internal sealed class CrumbLine : Panel
             if (ReferenceEquals(c, last)) continue;
             if (c is FrameworkElement f && shown.Contains(f))
             {
-                c.Arrange(new Rect(x, 0, c.DesiredSize.Width, c.DesiredSize.Height));
+                // (the breadcrumb line's parts centred on it; the title's, at its top, by its first line)
+                var h = c.DesiredSize.Height;
+                var y = last == null ? Math.Max(0, (final.Height - h) / 2) : 0;
+                c.Arrange(new Rect(x, y, c.DesiredSize.Width, h));
                 x += c.DesiredSize.Width;
             }
             // (a folded step: nowhere, and out of reach of the keyboard and the pointer)
@@ -108,7 +148,16 @@ internal sealed class CrumbLine : Panel
             c.IsHitTestVisible = c is FrameworkElement g && shown.Contains(g);
             if (c is Control k) k.IsTabStop = k.IsHitTestVisible;
         }
-        last.Arrange(new Rect(x, 0, Math.Max(0, final.Width - x), Math.Max(last.DesiredSize.Height, final.Height)));
+        last?.Arrange(new Rect(x, 0, Math.Max(0, final.Width - x), Math.Max(last.DesiredSize.Height, final.Height)));
+        // (a picture run says how the breadcrumb over a title fitted, for the screenshot suite's checks)
+        if (last == null && Support.Shot.Asked)
+        {
+            var now = $"header: the breadcrumb shows {steps.Count - folded} of {steps.Count} steps{(double.IsInfinity(cap) ? "" : $", cut to {cap:0}")}, the title under it";
+            if (now != said) { said = now; Support.Log.Write(now); }
+        }
         return final;
     }
+
+    /// <summary>What a picture run last said of this breadcrumb.</summary>
+    private string? said;
 }

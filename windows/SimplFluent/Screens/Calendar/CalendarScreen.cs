@@ -182,7 +182,7 @@ public sealed partial class CalendarScreen : Screen
     protected override bool LayoutChanges(double before, double now)
     {
         bool Crossed(double at) => (before >= at) != (now >= at);
-        return Crossed(MonthBeside) || Crossed(MonthBeside + TodoWidth + TodoGap) || Crossed(WeekColumnsFrom) || Crossed(TodoBesideFrom) || Crossed(480)
+        return Crossed(MonthBeside) || Crossed(MonthBeside + TodoWidth + TodoGap) || Crossed(WeekColumnsFrom) || Crossed(TodoBesideFrom) || Crossed(TodoFullFrom) || Crossed(480)
             || Crossed(CommandsCompactBelow);
     }
 
@@ -223,7 +223,7 @@ public sealed partial class CalendarScreen : Screen
             System.Windows.Automation.AutomationProperties.SetHelpText(calendars, "Choose the calendars shown");
             // (0.3.53) Canvas's Scheduler: office hours and sign-ups with a time to reserve — (0.3.65) a person and a speech
             // bubble, where the calendar with a clock was taken at a glance for the calendars' calendar with a tick
-            var finder = finderButton = K.IconButton(SymbolRegular.PersonChat24, FindAppointment, "Find Appointment", 16, 32);
+            var finder = finderButton = K.IconButton(SymbolRegular.PersonChat24, FindAppointment, "Find appointment", 16, 32);
             System.Windows.Automation.AutomationProperties.SetHelpText(finder, "Office hours, conferences and sign-ups with a time to reserve");
             // (0.3.60) Sync: (0.3.63) Simpl's own calendar into a calendar app, and the student's own calendars in here
             var sync = syncButton = K.IconButton(SymbolRegular.ArrowSync24, OpenSync, "Sync", 16, 32);
@@ -330,7 +330,7 @@ public sealed partial class CalendarScreen : Screen
         var menu = new ContextMenu { PlacementTarget = at, Placement = PlacementMode.Bottom };
         if (Compact)
         {
-            menu.Items.Add(CalendarKit.Item("Find Appointment…", SymbolRegular.PersonChat24, FindAppointment));
+            menu.Items.Add(CalendarKit.Item("Find appointment…", SymbolRegular.PersonChat24, FindAppointment));
             menu.Items.Add(CalendarKit.Item("Sync…", SymbolRegular.ArrowSync24, OpenSync));
             menu.Items.Add(CalendarKit.Item("Calendars…", SymbolRegular.CalendarCheckmark24, ChooseCalendars));
             menu.Items.Add(new Separator());
@@ -458,6 +458,7 @@ public sealed partial class CalendarScreen : Screen
             above.Height = mode == "list" ? double.NaN : TodoAbove;
             above.VerticalAlignment = VerticalAlignment.Top;
             v.Children.Add(above);
+            WheelOnAtEnds(todoScroller, pageScroller);
         }
         if (notice != null) v.Children.Add(notice);
         if (LeftBeside)
@@ -472,6 +473,26 @@ public sealed partial class CalendarScreen : Screen
         pageScroller.Padding = new Thickness(pad, 0, pad, 0);
         Adopt(pageScroller).Content = v;
         return pageScroller;
+    }
+
+    /// <summary>
+    /// A list scrolling inside the page's own scroll (To Do over the calendar on a narrow page): the wheel scrolls the list
+    /// until it is at its top or its foot, then the page — never a wheel that seems to do nothing because the list under
+    /// the pointer has no further to go. Hooked once.
+    /// </summary>
+    private static void WheelOnAtEnds(ScrollViewer inner, ScrollViewer outer)
+    {
+        if (inner.Tag is "wheel-on") return;
+        inner.Tag = "wheel-on";
+        inner.PreviewMouseWheel += (_, e) =>
+        {
+            var up = e.Delta > 0;
+            var atEnd = up ? inner.VerticalOffset <= 0 : inner.VerticalOffset >= inner.ScrollableHeight - 0.5;
+            if (!atEnd) return;
+            if (!outer.IsAncestorOf(inner)) return;
+            e.Handled = true;
+            outer.ScrollToVerticalOffset(outer.VerticalOffset - e.Delta / 3.0);
+        };
     }
 
     /// <summary>Out of the page it was last in (an element has one parent): what is kept goes from build to build.</summary>

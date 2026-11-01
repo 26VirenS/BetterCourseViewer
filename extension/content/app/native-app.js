@@ -1254,7 +1254,7 @@
         minutes: first?.end ? Math.round((first.end - first.start) / 60000) : 0, max: Number(g.max_appointments_per_participant) || 0,
         groupSignup: g.participant_type === 'Group', url: g.html_url || '/calendar',
         full: (Number(g.max_appointments_per_participant) || 0) > 0 && slots.filter((x) => x.reserved).length >= Number(g.max_appointments_per_participant),
-        mine: slots.filter((x) => x.reserved).map((x) => ({ id: x.id, reservationId: x.reservationId, when: `${U.fmtDow(x.start)} at ${U.fmtTimeLower(x.start)}` })),
+        mine: slots.filter((x) => x.reserved).map((x) => ({ id: x.id, reservationId: x.reservationId, when: `${U.fmtDow(x.start)} at ${U.fmtTime(x.start)}` })),
         days: days.map(({ k, list: ds }) => {
           const d = new Date(k);
           const rel = U.sameDay(d, now) ? 'Today' : U.dayDiff(d, now) === 1 ? 'Tomorrow' : U.DAYS[d.getDay()];
@@ -1262,9 +1262,9 @@
           const open = ds.filter((x) => x.open).length;
           return {
             key: `${g.id}:${k}`, label: `${rel}, ${U.fmtShort(d)}`,
-            sub: heldOne ? `Your time · ${U.fmtTimeLower(heldOne.start)}` : open ? `${U.plural(open, 'time')} open · ${U.fmtTimeLower(ds[0].start)} – ${U.fmtTimeLower(ds[ds.length - 1].start)}` : 'Full',
+            sub: heldOne ? `Your time · ${U.fmtTime(heldOne.start)}` : open ? `${U.plural(open, 'time')} open · ${U.fmtTime(ds[0].start)} – ${U.fmtTime(ds[ds.length - 1].start)}` : 'Full',
             held: !!heldOne, open,
-            slots: ds.map((x) => ({ id: x.id, time: U.fmtTimeLower(x.start), start: iso(x.start), reserved: x.reserved, open: x.open, reservationId: x.reservationId })),
+            slots: ds.map((x) => ({ id: x.id, time: U.fmtTime(x.start), start: iso(x.start), reserved: x.reserved, open: x.open, reservationId: x.reservationId })),
           };
         }),
       };
@@ -3209,7 +3209,7 @@
     return {
       id: ids[0], name: p.name || '', title: p.title, course: p.course || '', color: p.color || '#0a84ff', tint: p.tint || null,
       at: p.at, mins: p.mins, allDay: !!p.allDay, repeat: p.repeat || '', alert: Number.isFinite(p.alert) ? p.alert : null, notes: p.notes || '',
-      due: p.due || null, dueWords: p.due ? `${U.fmtDow(new Date(p.due))} · ${U.fmtTimeLower(new Date(p.due))}` : '', url: p.url || null,
+      due: p.due || null, dueWords: p.due ? `${U.fmtDow(new Date(p.due))} · ${U.fmtTime(new Date(p.due))}` : '', url: p.url || null,
       tasks: ids.length > 1 ? ids.map(task) : [],
       repeats: BCV.plan.REPEATS.map(([key, label]) => ({ key, label })), alerts: BCV.plan.ALERTS.map(([minutes, label]) => ({ minutes, label })), tints: PLAN_TINTS,
     };

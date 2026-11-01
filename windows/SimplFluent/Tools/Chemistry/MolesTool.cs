@@ -485,7 +485,7 @@ internal sealed class MolesQuick : ContentControl
             ChemCalc.Say(under, r == null && field.Text.Trim().Length > 0 ? "Can’t read that formula." : null, problem: true);
         });
         field = ChemCalc.Field("moles", "formula", "Ca(OH)2", later, ChemCalc.Flag("moles-formula"), "The formula");
-        var open = BioUI.OpenButton("Open Molar Mass & Stoichiometry", () => c.OpenFull(Carry(), null), "Open the whole tool on this formula");
+        var open = BioUI.OpenButton("Open Molar mass & stoichiometry", () => c.OpenFull(Carry(), null), "Open the whole tool on this formula");
         Dictionary<string, string>? Carry() => field.Text.Trim().Length > 0 ? new Dictionary<string, string> { ["formula"] = field.Text.Trim() } : null;
         c.Carry = Carry;
         ChemCalc.CopyOnCtrlC(this, () => r == null ? null : $"{r.Formula.Text}: {ChemNum.Fixed(r.Total, 3)} g/mol");

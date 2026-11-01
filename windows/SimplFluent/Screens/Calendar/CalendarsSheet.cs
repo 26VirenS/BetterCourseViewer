@@ -155,7 +155,7 @@ internal static class CalendarsSheet
                 foreach (var c in own) list.Children.Add(CanvasRow(c));
                 if (other.Count > 0)
                 {
-                    list.Children.Add(K.Text("Other Calendars", Ty.Caption, B.Text2).Strong().Margin(0, own.Count == 0 ? 0 : 8, 0, 4));
+                    list.Children.Add(K.Text("Other calendars", Ty.Caption, B.Text2).Strong().Margin(0, own.Count == 0 ? 0 : 8, 0, 4));
                     foreach (var c in other) list.Children.Add(CanvasRow(c));
                 }
                 list.Children.Add(foot.Margin(0, 4, 0, 0));
@@ -171,7 +171,7 @@ internal static class CalendarsSheet
             }
             if (links.Count > 0)
             {
-                list.Children.Add(Heading("Linked by Address", null, choices.Count == 0 && CalendarAccounts.Accounts.Count == 0));
+                list.Children.Add(Heading("Linked by address", null, choices.Count == 0 && CalendarAccounts.Accounts.Count == 0));
                 foreach (var l in links) list.Children.Add(LinkRow(l));
             }
             Paint();
@@ -196,7 +196,7 @@ internal static class CalendarsSheet
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Padding = new Thickness(0, 0, 4, 0),
         };
         Sheet? s = null;
-        var sync = K.Subtle(K.H(8, K.Icon(SymbolRegular.ArrowSync24, 14, B.AccentText), K.Text("Add or Remove Calendars in Sync…", Ty.Body, B.AccentText)),
+        var sync = K.Subtle(K.H(8, K.Icon(SymbolRegular.ArrowSync24, 14, B.AccentText), K.Text("Add or remove calendars in Sync…", Ty.Body, B.AccentText)),
             () =>
             {
                 s?.Close();

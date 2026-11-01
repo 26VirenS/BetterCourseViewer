@@ -276,7 +276,7 @@ internal sealed class LiveCheck : IDisposable
         }
         if (LiveRules.Typing(now, lastKey)) return "typing";
         if (s?.LiveHold is { } own) return own;
-        if (HandInSheet.Open) return "Hand In";
+        if (HandInSheet.Open) return "Hand in";
         // (a dialog over this window or the main one; a popup floating over either — but not a tool's, used beside the
         //  page and open all day, nor one only there to be read, What's New, History or Help: those that hold an update)
         var home = Application.Current?.MainWindow as MainWindow;

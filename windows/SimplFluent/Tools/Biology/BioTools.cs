@@ -27,16 +27,16 @@ public static class BioTools
     /// (README, Icons) — a grid of circles, as the Mac's fallback circle.hexagongrid is.</summary>
     public static readonly ToolsScreen.Kind[] Kinds =
     {
-        new("cell", "Cell Explorer", "Animal, plant and bacterial cells in 3D.", SymbolRegular.GridCircles24, "#2fb67c"),
+        new("cell", "Cell explorer", "Animal, plant and bacterial cells in 3D.", SymbolRegular.GridCircles24, "#2fb67c"),
         new("dna", "DNA & RNA", "The double helix, nucleotides and RNA, in 3D.", SymbolRegular.Ribbon24, "#7d5cf5"),
-        new("gene", "Gene Expression", "Transcribe and translate a gene, step by step.", SymbolRegular.Translate24, "#f2994a"),
-        new("biomol", "Biomolecule Builder", "Build proteins, nucleic acids, sugars and lipids.", SymbolRegular.PuzzleCube24, "#e8508a"),
-        new("cross", "Genetics Crosses", "Punnett squares, probability and chi-square.", SymbolRegular.Grid24, "#3b82f6"),
-        new("divide", "Cell Division", "Mitosis and meiosis, stage by stage, with counts.", SymbolRegular.ArrowSplit24, "#14b8a6"),
+        new("gene", "Gene expression", "Transcribe and translate a gene, step by step.", SymbolRegular.Translate24, "#f2994a"),
+        new("biomol", "Biomolecule builder", "Build proteins, nucleic acids, sugars and lipids.", SymbolRegular.PuzzleCube24, "#e8508a"),
+        new("cross", "Genetics crosses", "Punnett squares, probability and chi-square.", SymbolRegular.Grid24, "#3b82f6"),
+        new("divide", "Cell division", "Mitosis and meiosis, stage by stage, with counts.", SymbolRegular.ArrowSplit24, "#14b8a6"),
         new("popgen", "Hardy–Weinberg", "Allele frequencies, equilibrium and evolution.", SymbolRegular.PeopleCommunity24, "#8bbf3f"),
-        new("biolab", "Bio Lab Calculator", "Dilutions, microscopy, stats and the AP formula sheet.", SymbolRegular.Beaker24, "#c27c4a"),
-        new("enzyme", "Enzyme Lab", "How temperature, pH and inhibitors change rate.", SymbolRegular.Flash24, "#d9a406"),
-        new("energy", "Photosynthesis & Respiration", "Where each step happens and what goes in and out.", SymbolRegular.LeafTwo24, "#65a30d"),
+        new("biolab", "Bio lab calculator", "Dilutions, microscopy, stats and the AP formula sheet.", SymbolRegular.Beaker24, "#c27c4a"),
+        new("enzyme", "Enzyme lab", "How temperature, pH and inhibitors change rate.", SymbolRegular.Flash24, "#d9a406"),
+        new("energy", "Photosynthesis & respiration", "Where each step happens and what goes in and out.", SymbolRegular.LeafTwo24, "#65a30d"),
     };
 
     /// <summary>One of the biology toolkit's ten (they have a section of their own on the Tools page).</summary>

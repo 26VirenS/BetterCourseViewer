@@ -18,7 +18,7 @@ public class PhysicsToolsTests
     public void ThePhysicsSectionHasItsToolsInOrder()
     {
         Assert.Equal(new[] { "motion", "vectors", "circuit" }, PhysTools.Kinds.Select(k => k.Key));
-        Assert.Equal(new[] { "Kinematics & Projectiles", "Vectors", "Circuit Builder" }, PhysTools.Kinds.Select(k => k.Name));
+        Assert.Equal(new[] { "Kinematics & projectiles", "Vectors", "Circuit builder" }, PhysTools.Kinds.Select(k => k.Name));
         Assert.All(PhysTools.Kinds, k => Assert.False(string.IsNullOrWhiteSpace(k.Note)));
         Assert.All(PhysTools.Kinds, k => Assert.True(k.Note.Length <= 32 && k.Note.EndsWith('.')));
     }

@@ -499,10 +499,11 @@ public sealed class GradesScreen : Screen
 ```
 
 - The shell gives the page its title (a breadcrumb when something is pushed, and the screen's own `Before` parts ahead
-  of its title: a course's Grades reads "F26-MATH 021 20 › Grades", as Windows 11's Settings names where a page is — on
-  one line, as WinUI's BreadcrumbBar keeps it: steps that do not fit fold into "…" from the first, `Shell/CrumbLine.cs`),
-  the
-  commands at the title's right, a scroll viewer and the padding; `Build` returns only the content. `Width` is the content's width; override
+  of its title: a course's Grades is under "F26-MATH 021 20", as Windows 11's Settings names where a page is — the
+  breadcrumb on a line of its own with the commands at its right, as WinUI's BreadcrumbBar keeps it, and the title under
+  it the header's whole width; steps that do not fit are cut short with "…" first, the longest first, to 96 each, and
+  only then fold into "…" from the first, `Shell/CrumbLine.cs`; a page with no breadcrumb has its title beside its
+  commands), a scroll viewer and the padding; `Build` returns only the content. `Width` is the content's width; override
   `LayoutChanges` to be built again when a width threshold is crossed. `WindowWidth` is the whole window's (the pane
   and the page together), for a layout told by the window rather than by the page left beside the pane, with
   `WindowLayoutChanges` for its thresholds. The Dashboard's six counters are cards as tall as their words (0.2.9's, the
@@ -527,7 +528,7 @@ public sealed class GradesScreen : Screen
   Simpl's — the main one, a place's own, a popup, a tool's, the file preview — is laid out as it was but in black and
   white (Kit/SilentGrey.cs: a small pixel shader over each window's content, and a filter on the page in each web view,
   which draws out of WPF's reach). The Dashboard keeps its large Next and Then and the black title bar. Silent Mode in
-  the account's menu turns it on from anywhere, and Exit Silent Mode there turns it off.
+  the account's menu turns it on from anywhere, and Exit Silent mode there turns it off.
 - **Files previewed first (0.3.85; the Mac's 1.3.191).** A file opened — a click on it anywhere, its menu's Preview, a
   download a page starts itself — is fetched with the session into a folder of Simpl's own (`FilePreview.Previews`,
   `…\Simpl\Previews`, each file in a folder of its own, cleared of what is a day old), not Downloads, and shown in
@@ -545,7 +546,7 @@ public sealed class GradesScreen : Screen
   read says); Open beside them, while the pointer or the keyboard is on the item, opens it. The page has no header
   (`Screen.Bare`) and lays itself out edge to edge; the pane goes black, in words alone (`NavList.Plain`, the theme's
   words made white and grey under it, `AppShell.Quiet`), its search box away, and the title bar black over it
-  (`MainWindow.SilentLook`). Kept on this PC (`SilentMode`, `dashSilent`); Exit Silent Mode at the top right brings the
+  (`MainWindow.SilentLook`). Kept on this PC (`SilentMode`, `dashSilent`); Exit Silent mode at the top right brings the
   Dashboard back. The tour and Appearance put it by while they are on. Checked live on its own: only `dashSilent`; its
   words drawn again each half minute when they say something else. (The screenshot suite: `--dash-silent`.)
 - Colours are theme resources (`B.Text`, `B.Text2`, `B.Card`, `B.Accent` …), set with `.Fg()`, `.Bg()`, `.Stroke()`, so
@@ -569,8 +570,8 @@ public sealed class GradesScreen : Screen
   says `Busy`.
 - A screen of a course or a group says its colour (`TitleColor`): the shell draws a square in it before the title, as
   the Mac's headings have (a section's comes from `CoursePart`, the course's colour in the pane). A screen whose title
-  is often long (a discussion, a page, an assignment) lets it wrap (`TitleLines`), the commands staying at the top
-  right; cut, its whole words are its tooltip. The line under the title never repeats a part the breadcrumb already
+  is often long (a discussion, a page, an assignment) lets it wrap (`TitleLines`) under its breadcrumb; cut, its whole
+  words are its tooltip. The line under the title never repeats a part the breadcrumb already
   says (`AppShell.WithoutCrumbs`: "Discussion", not "Discussion · F26-MATH 021 20" under "F26-MATH 021 20 ›").
 - Words on a course's own colour (a card's band, the pane's letter squares) are `K.InkOn(color)`: white where white
   reads 3:1 on it, else near-black — students pick their colours, and many are light. A course's second name is shown
@@ -728,6 +729,14 @@ their tests; the Mac's are the same):
   animations off) at its left. Below 880 wide the pane folds away and the pane's button and Search join them; Search
   lends the pane's own search box to the title bar (`AppShell.OpenSearchBar`, also Ctrl+F and Ctrl+K), and it goes back
   to the pane once let go of.
+- **The pane's three widths** (`AppShell.WindowWidth`, WinUI's NavigationView in Auto): whole from 1200 wide; from 880
+  to 1200 the **compact rail**, 48 wide (`NavList.Compact`): the pane's button and Search at its head, then each place
+  as its symbol alone, a count as a small badge over the symbol's corner, each course as a square in its colour with its
+  first letter, More from Canvas under a line, and Settings and who is signed in at its foot — every name a tooltip, a
+  course's sections not listed (the course is marked while one shows). The rail's button opens the whole pane over the
+  page, sliding out of the rail (the page behind takes a click to close it; a place chosen closes it too); below 880 the
+  pane folds away behind the title bar's button. A picture run logs which (`pane: the compact rail (1024 wide)`), and
+  `--pane-open` opens it over the page on either.
 - **Pane** (`AppShell.BuildPane`, `NavPane`): the course open folds out its sections (as the Mac's sidebar does; the
   chevron folds out any other); a course's unread announcements are a badge like Notifications', its tooltip and screen
   reader saying what it counts ("2 unread announcements"); one Groups row opens the Groups page and its chevron lists
@@ -990,9 +999,13 @@ biology views' own share to 70% or more.
 fields, notes, the drop zone and the scroll edge; `Files` has Windows' file dialogs.
 
 The Tools page lists the tools under what they are for — Study, Math & science, Files, then Chemistry, Physics and
-Biology, and (0.3.105) Community — a one-line note on each tile, three across from about 900 wide (a section's four in
-full rows); a tile opens its tool's popup over the page. Windows' sentence case on every button and menu ("Pin to title
-bar", "Copy result", "Skip tour"). `--tools-scroll chemistry` (or `physics`, `biology`, `community`) opens the page
+Biology, and (0.3.105) Community — a one-line note on each tile, three across from about 900 wide, every section as
+many across as every other, so the columns line up down the page; a tile opens its tool's popup over the page. Windows'
+sentence case on every name, title, button and menu ("Word counter", "Matrix calculator", "Pin to title bar", "Find
+appointment…", "Make my Simpl calendar", "Exit Silent mode"); a label that names a tool keeps its name's capital ("Open in
+Molecule builder"). `UiWordsTests` (SimplFluent.Tests) holds every tool's name and every label written in the sources
+(buttons, links, menu items, dialog titles, Settings rows, headings) to it, keys, names and the labels of what they name
+apart (`SentenceCase.Names`). `--tools-scroll chemistry` (or `physics`, `biology`, `community`) opens the page
 scrolled to that section.
 
 **Simpl Community tools** (0.3.105, `Tools/Community/`; the format is the site's `docs/community-tools.md`, format 1):
@@ -1197,7 +1210,7 @@ The tools program's everyday tools (`Tools/Everyday/`, each at the end of its gr
 box opens each by its name and words, `PaletteCommand.EverydayTools`; `--tool <key> --tool-state …` for the pictures,
 `Everyday.LaunchState`):
 
-- **Word Counter** (`words`, Study; `Tools/Everyday/WordCounter.cs`, `Model/WordCount.cs`): an essay pasted or typed,
+- **Word counter** (`words`, Study; `Tools/Everyday/WordCounter.cs`, `Model/WordCount.cs`): an essay pasted or typed,
   counted as it changes — words (a run of non-spaces with a letter or a figure in it), characters with and without
   spaces, sentences (ending at . ! or ? before a space or the end), paragraphs (blocks between blank lines), reading
   time at 238 words a minute and speaking time at 150, the average and the longest word — a target of so many words
@@ -1222,7 +1235,7 @@ box opens each by its name and words, `PaletteCommand.EverydayTools`; `--tool <k
   `--stats-b`, `--stats-mu0`, `--stats-test one|two|paired`, `--stats-normal "μ,σ,x,a,b,p"` and `--stats-t "df,t,p"` fill
   the fields for a picture; the log says `stats: shows <page>`. The search box: `/stats`, `statistics`, `mean`,
   `standard deviation`, `regression`, `normal`, `z-score`, `t-test`.
-- **Matrix Calculator** (`matrix`, Math & science; `Tools/Everyday/MatrixCalculator.cs`, `Model/Matrix.cs`): A and B
+- **Matrix calculator** (`matrix`, Math & science; `Tools/Everyday/MatrixCalculator.cs`, `Model/Matrix.cs`): A and B
   in editors of cells (1 to 6 rows and columns by − and +, Tab from cell to cell, a block pasted into any cell —
   rows on lines or after semicolons, cells apart by spaces, commas or tabs — fills and sizes the matrix), k and n
   beside them, the operations as a row of buttons (A + B, A − B, A × B, kA, Aᵀ, det A, A⁻¹, rank A, RREF A, trace A,
@@ -1354,15 +1367,19 @@ there takes the pointer); round a submission's file that room is painted in the 
 
 What each is now: a tool opened whole (its `ToolPopup`; a tool handing something to another turns into it there); Knewton Alta
 and Macmillan (homework, not quizzes); Hand In (with its Send from Phone panel and its files' preview); a submission's
-review; the rubric; New message (the Inbox's and a course's People's); New task; What's New; What-if assignment and
+review; the rubric; New message (the Inbox's and a course's People's); New task; What-if assignment and
 Grading scale; the Calendar's Calendars; a course's Nickname; the pane's History and Help — popups; (0.3.64) the light
-ones, with no form in them (`Sheet.Light`: What's New, the Calendar's Calendars and Find Appointment, History and Help),
+ones, with no form in them (`Sheet.Light`: the Calendar's Calendars and Find appointment, History and Help),
 close on a click anywhere in the window they float over, which still does what it does. The quick look and
 a counter's panel stay cards on the page that grow out of their rows and cards, taking nothing from the window either
 (The quick look, above). Pinned tools' flyouts and their pulled-out windows, menus and the search's suggestions are as they were.
 Staying sheets over the window, dimming it: a quiz being taken (`QuizPopup`: its integrity and its clock), the first
 setup, the sign-in's "Stay logged in?", the tour (its own veil), and the questions that must be answered first (Sign
-out?, Delete this task?, Uninstall, Keep Simpl on your taskbar?) — and a development run's biology foundation demo.
+out?, Delete this task?, Uninstall, Keep Simpl on your taskbar?) — and a development run's biology foundation demo. What's
+New is a dialog over the window too, dimming it as Windows 11's dialogs do (`Shell/WhatsNewSheet.cs`; light: a click on
+the dimmed window closes it, and it holds no update): it leads with the one to three changes a student notices
+(`WhatsNew.Leading`: the newest version's first, new before better before fixed, never a note for the developer tools,
+kind `dev`), See all changes opening every version's notes under them (`--whatsnew-all yes` opens them for a picture).
 
 ## Knewton Alta
 

@@ -707,12 +707,12 @@ internal sealed class AssortmentPanel : ContentControl
         turn.Uid = "assort:turn";
         turn.IsEnabled = hets > 0;
         turn.ToolTip = "Turn a pair round at the plate: the other arrangement, just as likely";
-        var divide = K.Button("See it in Cell Division", () =>
+        var divide = K.Button("See it in Cell division", () =>
         {
             BioNav.Set("divide", "meiosis");
             BioTools.Open(c, "divide", new Dictionary<string, string> { ["focus"] = "assortment" });
         }, icon: SymbolRegular.ArrowSplit24);
-        divide.ToolTip = "Open meiosis in Cell Division";
+        divide.ToolTip = "Open meiosis in Cell division";
         divide.Uid = "assort:divide";
         var made = Made(ps);
         var gives = new WrapPanel();

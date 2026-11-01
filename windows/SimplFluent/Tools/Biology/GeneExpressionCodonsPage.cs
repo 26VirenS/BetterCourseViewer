@@ -249,7 +249,7 @@ internal sealed class GXCodonsPage : Grid
         rows.Add(BioUI.FactRow("Mass", $"{a.Mass.ToString("0.00", CultureInfo.InvariantCulture)} g/mol free · {a.ResidueMass.ToString("0.00", CultureInfo.InvariantCulture)} g/mol in a chain · {BiomolText.Formula(a.Formula)}"));
         rows.Add(BioUI.FactRow("Note", a.Note));
         var see = ChemKit.Wide("See in 3D", () => BioTools.Open(c, "biomol", new() { ["molecule"] = a.Three.ToUpperInvariant(), ["page"] = "amino" }), icon: SymbolRegular.Cube24);
-        see.ToolTip = $"Open {a.Name} in the Biomolecule Builder";
+        see.ToolTip = $"Open {a.Name} in the biomolecule builder";
         rows.Add(see);
         return BioUI.Card(a.Name, BioColors.Of(a.Group), $"{a.Three} · {a.One} · {a.Group.Label()}", rows.ToArray());
     }

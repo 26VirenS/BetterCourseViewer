@@ -148,10 +148,10 @@ public sealed partial class CalendarScreen
     private double WeekY(int minutes) => minutes / 60.0 * hourPx;
 
     /// <summary>"8 AM", "Noon", "1 PM": an hour as the Calendar writes it ("12 AM" for midnight).</summary>
-    private static string HourName(int h) => h == 12 ? "Noon" : new DateTime(2000, 1, 1, h, 0, 0).ToString("h tt", CultureInfo.InvariantCulture);
+    private static string HourName(int h) => Simpl.Support.Clock.Hour(h);
 
     /// <summary>"10:30 AM", a time of day as every time in Simpl is written.</summary>
-    private static string ClockWords(DateTime t) => t.ToString("h:mm tt", CultureInfo.InvariantCulture);
+    private static string ClockWords(DateTime t) => Simpl.Support.Clock.Time(t);
 
     /// <summary>The week's days over the whole day's hours, in one card: the days' names and the day-long ones stay over
     /// the hours, which scroll under them — (0.3.64) the page holding still (<paramref name="fit"/>), as tall as the room

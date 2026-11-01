@@ -22,7 +22,7 @@ public static class MergedIntroSheet
         sub.TextAlignment = TextAlignment.Center;
         var head = K.V(6, K.Text("To Do and Calendar are one", Ty.Subtitle).Center(), sub);
         head.Margin = new Thickness(28, 14, 28, 0);
-        var words = K.V(2, K.Text("Quick Plan", Ty.BodyStrong),
+        var words = K.V(2, K.Text("Quick plan", Ty.BodyStrong),
                         K.Wrapped("Drag a task onto the calendar to set time aside for it. Drop it on a day and Simpl finds a free spot.", Ty.Body, B.Text2));
         var tile = K.IconTile(SymbolRegular.HandDraw24, MergeScene.AccentIcon, 32).Align(HorizontalAlignment.Left, VerticalAlignment.Top);
         var card = K.Card(K.Columns("auto, *", tile.Col(0), words.Margin(12, 0, 0, 0).Col(1)), new Thickness(14));

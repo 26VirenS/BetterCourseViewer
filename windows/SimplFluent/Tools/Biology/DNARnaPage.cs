@@ -255,7 +255,7 @@ internal sealed class DnaRnaPage : Grid
             case DnaRnaView.Mrna:
                 foreach (var r in DnaMrna.Regions())
                     right.Children.Add(BioUI.Card(r.Name, null, null, BioUI.FactRow("What it is", r.About)));
-                right.Children.Add(K.Link("Transcribe and translate it in Gene Expression", () => BioTools.Open(c, "gene")).Align(HorizontalAlignment.Left));
+                right.Children.Add(K.Link("Transcribe and translate it in Gene expression", () => BioTools.Open(c, "gene")).Align(HorizontalAlignment.Left));
                 break;
             case DnaRnaView.Cloverleaf:
                 right.Children.Add(BioUI.Facts(new (string, string, Color?)[]
@@ -297,7 +297,7 @@ internal sealed class DnaRnaPage : Grid
                     BioUI.FactRow("Not additive", "Svedberg units measure how fast a particle settles in a centrifuge, which depends on its shape as well as its mass: a 30S and a 50S subunit make a 70S ribosome, not an 80S one."),
                     BioUI.FactRow("Organelles", "Mitochondria and chloroplasts have 70S-type ribosomes, like bacteria."),
                     BioUI.FactRow("rRNA’s job", "The ribosome’s RNA, not its proteins, joins the amino acids: the ribosome is a ribozyme.")));
-                right.Children.Add(K.Link("See a ribosome at work in Gene Expression", () => BioTools.Open(c, "gene")).Align(HorizontalAlignment.Left));
+                right.Children.Add(K.Link("See a ribosome at work in Gene expression", () => BioTools.Open(c, "gene")).Align(HorizontalAlignment.Left));
                 break;
         }
     }

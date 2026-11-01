@@ -46,7 +46,7 @@ internal sealed class DnaSequencePage : Grid
 
         var show = K.Button("Show in 3D", () => BioNav.Set("dna", "helix"), accent: true, icon: SymbolRegular.Cube20);
         var transcribe = K.Button("Transcribe", Transcribe, icon: SymbolRegular.Translate20);
-        transcribe.ToolTip = "Open Gene Expression with this strand as the coding strand";
+        transcribe.ToolTip = "Open Gene expression with this strand as the coding strand";
         var random = K.Button("Random", () => DNAToolModel.SetSequence(DNAToolModel.RandomStrand((ulong)DateTime.UtcNow.Ticks)), icon: SymbolRegular.ArrowShuffle20);
         random.ToolTip = "A random strand of 20 bases";
         var reset = K.Subtle(K.Text("Back to the example", Ty.Body, B.Text2), () => DNAToolModel.SetSequence(DNAToolModel.DefaultSequence), new Thickness(8, 5, 8, 6));
