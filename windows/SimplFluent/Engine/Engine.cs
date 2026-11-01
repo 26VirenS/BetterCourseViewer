@@ -841,7 +841,9 @@ public sealed partial class Engine : Observable, IShellListener
                 var finished = await Task.WhenAny(done.Task, Task.Delay(90_000, wait.Token));
                 wait.Cancel(); // (its timer let go of as soon as the answer is in)
                 if (finished != done.Task) throw new EngineException("The page did not answer.");
-                var (ok, text) = done.Task.Result;
+                // (awaited, not .Result: a call failed because the page went away throws its own EngineException, which
+                //  the catch below tries again — .Result would wrap it in an AggregateException that nothing catches)
+                var (ok, text) = await done.Task;
                 if (ok) { answered = true; return text; }
                 if (text == "not ready") { last = new EngineException("not ready"); await Task.Delay(400); continue; }
                 throw new EngineException(text);
