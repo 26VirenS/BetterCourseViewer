@@ -554,6 +554,9 @@ struct ReleaseNote: Codable, Hashable {
     var kind: String
     var title: String
     var body: String?
+    /// (Mac, M16) A note for developers (developer tools, the test channel): left out of what students see — unless
+    /// developer mode is on. Off (nil) by default.
+    var developer: Bool?
 }
 
 struct Release: Codable, Identifiable, Hashable {

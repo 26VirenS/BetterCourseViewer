@@ -356,7 +356,7 @@ final class SearchPalette: ObservableObject {
         case .reloadPage: engine.reload()
         case .settings: NotificationCenter.default.post(name: .simplOpenSettings, object: nil)
         case .whatsNew:
-            engine.whatsNew = WhatsNewSheetItem(data: MacWhatsNew.all)
+            engine.whatsNew = WhatsNewSheetItem(data: MacWhatsNew.recent)
         case .setup: engine.setup = true
         case .tour: MacTour.shared.start()
         case .look(let look): AppLook.set(look)

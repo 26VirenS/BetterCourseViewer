@@ -733,7 +733,7 @@ struct AccountBar: View {
                 Button(SilentMode.shared.on ? "Exit Silent Mode" : "Silent Mode") {
                     withAnimation(Motion.gentle) { SilentMode.shared.on.toggle() }
                 }
-                Button("What’s New") { engine.whatsNew = WhatsNewSheetItem(data: MacWhatsNew.all) }
+                Button("What’s New") { engine.whatsNew = WhatsNewSheetItem(data: MacWhatsNew.recent) }
                 Button("\(engine.lmsName) Profile") { engine.openWebScreen("/profile", title: "Profile") }
                 Divider()
                 Button("Report a Bug…") { ReportBug.open() } // (1.2.1: the web's purple button)

@@ -1177,6 +1177,29 @@ whatif_check() {
   if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::what-if: /'; return 1; fi
 }
 
+# (M16) whatsnew_check: What's New, as whatsnew-check.txt — from Help (light-53-whats-new) and as if just updated from
+# 1.3.206 (light-53u-whats-new-update), it opened on five highlights at most (WhatsNewSheet.swift: "what's new: N
+# highlights of M notes from K versions (…), L for developers left out: <titles>"); after the update, at least three,
+# from the versions since, the notes for developers in them (1.3.209's Test Builds, 1.3.210's Where Updates Come From)
+# left out and never among the highlights
+whatsnew_check() {
+  local out="$OUT_ABS/whatsnew-check.txt" h="$OUT_ABS/console-light-53-whats-new.txt" u="$OUT_ABS/console-light-53u-whats-new-update.txt"
+  local line n left
+  : > "$out"
+  say() { if [ "$1" = 0 ]; then echo "ok   $2" >> "$out"; else echo "FAIL $2" >> "$out"; fi; }
+  line="$(grep -o "what's new: .*" "$h" 2>/dev/null | tail -1)"
+  n="$(printf '%s' "$line" | sed -n 's/^what.s new: \([0-9]*\) highlights.*/\1/p')"
+  [ -n "$n" ] && [ "$n" -ge 1 ] && [ "$n" -le 5 ]
+  say $? "Help's What's New opened on its newest highlights: ${line:-nothing said}"
+  line="$(grep -o "what's new: .*" "$u" 2>/dev/null | tail -1)"
+  n="$(printf '%s' "$line" | sed -n 's/^what.s new: \([0-9]*\) highlights.*/\1/p')"
+  left="$(printf '%s' "$line" | sed -n 's/.*, \([0-9]*\) for developers left out.*/\1/p')"
+  [ -n "$n" ] && [ "$n" -ge 3 ] && [ "$n" -le 5 ] && [ "${left:-0}" -ge 2 ] && ! printf '%s' "$line" | grep -q 'Test Builds\|Where Updates Come From'
+  say $? "after an update, at most five highlights, the developers' notes left out: ${line:-nothing said}"
+  cat "$out"
+  if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed "s/^/::error::what's new: /"; return 1; fi
+}
+
 # (M5) month_check: To Do & Calendar's month 1024 points wide with the sidebar shown, as month-check.txt — the month
 # put To Do away and its days named their items (light-05n-calendar-month-narrow); with To Do kept beside it
 # (-SimplTodoKept), its days, too narrow for names, showed their items as dots (light-05o-calendar-month-dots). What
@@ -1326,7 +1349,10 @@ push_set() {
   fi
   shoot light-12d-hand-in-phone-connected 40 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplPhone YES -SimplPhoneTest YES
   phone_send light-12d-hand-in-phone-connected "$PWD/scripts/dev/fixtures/photo.jpg=Photo from phone.jpg" "$HOMES/phone-notes.txt=Notes.txt"
-  shoot light-53-whats-new 32 -SimplOpen whatsnew
+  shoot light-53-whats-new 32 -SimplOpen whatsnew -SimplDeveloperMode NO
+  # (M16) as if just updated from 1.3.206 (-SimplWhatsNewFrom, in a home of its own: it marks the notes seen): the
+  # highlights of the versions since, the notes for developers left out (whatsnew_check)
+  OWN_HOME=1 shoot light-53u-whats-new-update 32 -SimplOpen whatsnew -SimplWhatsNewFrom 1.3.206 -SimplDeveloperMode NO
   # (1.3.182) after an update, once: To Do and the calendar as one, and Quick Plan (its scene caught as it plays)
   shoot light-53m-merged-intro 32 -SimplOpen mergedintro
   MODE=dark shoot dark-53m-merged-intro 34 -SimplOpen mergedintro -SimplTheme Forest
@@ -1399,6 +1425,7 @@ if [ "${SHOTS:-full}" = check ]; then
   community_tools_check || exit 1 # (1.3.211)
   month_check || exit 1 # (M5)
   whatif_check || exit 1 # (M11)
+  whatsnew_check || exit 1 # (M16)
   exit 0
 fi
 
@@ -1581,6 +1608,7 @@ if [ "$SHARDS" = 1 ]; then
   community_tools_check || true # (1.3.211)
   month_check || true # (M5)
   whatif_check || true # (M11)
+  whatsnew_check || true # (M16)
 fi
 keep_crashes
 exit 0

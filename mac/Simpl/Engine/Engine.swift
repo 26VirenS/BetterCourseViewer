@@ -526,7 +526,10 @@ final class Engine: ObservableObject, ShellListener {
         }
         Task { await NotificationAsk.afterSetup(self, delay: 4) } // (1.2.1: a setup made before this one asks, once)
         if LaunchOpen.take("whatsnew") != nil {
-            queuePopup(.whatsNew(MacWhatsNew.due() ?? MacWhatsNew.all))
+            // (M16, the screenshot suite: -SimplWhatsNewFrom 1.3.206 — as if just updated from that version, the highlights of
+            //  the versions since)
+            if let from = UserDefaults.standard.string(forKey: "SimplWhatsNewFrom"), !from.isEmpty { MacWhatsNew.pretend(from: from) }
+            queuePopup(.whatsNew(MacWhatsNew.due() ?? MacWhatsNew.recent))
             return
         }
         if LaunchOpen.take("mergedintro") != nil {

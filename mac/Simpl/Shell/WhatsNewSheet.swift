@@ -3,12 +3,20 @@ import SwiftUI
 /// What changed in Simpl for Mac (1.3.3: its own notes, Support/MacWhatsNew.swift), after an update (or from Help ▸ What's New): each version's notes with their kind's symbol —
 /// new, better, fixed — under the app's mark, and Continue. (home-36) The version said once: under the title for a
 /// single version, else at the head of each version's notes, with its day as every date is written ("Oct 13").
+/// (M16) It opens on a few highlights of the versions it is about — five at most, new before improved before fixed,
+/// the newest first, no notes for developers (MacWhatsNew) — with See All Changes for every version's notes; its × at
+/// the top right, where every popup's is.
 struct WhatsNewSheet: View {
     let data: WhatsNewData
     /// The popup is up (What's New after an update is marked seen only then).
     var onShown: (() -> Void)? = nil
     /// (1.3.79) Its popup over the window, which Continue closes.
     @Environment(\.popup) private var dismiss
+    /// (M16) Every version's notes shown, in place of the highlights.
+    @State private var everything = false
+
+    /// (M16) What it opens on: the highlights of the versions it is about.
+    private var highlights: [ReleaseNote] { MacWhatsNew.highlights(data.releases) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -20,9 +28,8 @@ struct WhatsNewSheet: View {
                 Text("What’s New in Simpl for Mac")
                     .font(.system(size: 24, weight: .bold))
                     .tracking(-0.3)
-                if data.releases.count <= 1, let v = data.version ?? data.releases.first?.version {
-                    let day = data.releases.first.flatMap(WhatsNewSheet.day)
-                    Text(day.map { "Version \(v) · \($0)" } ?? "Version \(v)")
+                if let line = versionLine {
+                    Text(line)
                         .font(.sCallout)
                         .foregroundStyle(.secondary)
                 }
@@ -32,24 +39,13 @@ struct WhatsNewSheet: View {
             .frame(maxWidth: .infinity)
             .popupHeader() // (1.3.79: dragged by its head, the popup moves)
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    ForEach(data.releases) { release in
-                        VStack(alignment: .leading, spacing: 10) {
-                            if data.releases.count > 1 {
-                                CardHeading(text: "Version \(release.version)", trailing: WhatsNewSheet.day(release))
-                            }
-                            ForEach(release.notes, id: \.self) { note in
-                                HStack(alignment: .top, spacing: 12) {
-                                    IconTile(symbol: icon(note.kind), color: tone(note.kind), size: 30)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(note.title).font(.sBody.weight(.semibold))
-                                        if let body = note.body, !body.isEmpty {
-                                            Text(body).font(.sCallout).foregroundStyle(.secondary)
-                                                .fixedSize(horizontal: false, vertical: true)
-                                        }
-                                    }
-                                    Spacer(minLength: 0)
-                                }
+                Group {
+                    if everything {
+                        allChanges
+                    } else {
+                        VStack(alignment: .leading, spacing: 14) {
+                            ForEach(Array(highlights.enumerated()), id: \.offset) { _, note in
+                                noteRow(note)
                             }
                         }
                     }
@@ -59,6 +55,11 @@ struct WhatsNewSheet: View {
             }
             Divider()
             HStack {
+                // (M16) every version's notes, and back to the highlights
+                Button(everything ? "Show Highlights" : "See All Changes") {
+                    withAnimation(Motion.gentle) { everything.toggle() }
+                }
+                .controlSize(.large)
                 Spacer()
                 Button("Continue") { dismiss() }
                     .buttonStyle(.borderedProminent)
@@ -69,8 +70,61 @@ struct WhatsNewSheet: View {
         }
         .frame(width: 500, height: 560)
         .background(PageGround())
-        .overlay(alignment: .topLeading) { PopupCloseButton().padding(14) } // (1.3.79: its ×, as Continue)
-        .onAppear { onShown?() }
+        // (1.3.79: its ×, as Continue — (M16) at the top right, where the tools' popups and every other popup have it)
+        .overlay(alignment: .topTrailing) { PopupCloseButton().padding(14) }
+        .onAppear {
+            said()
+            onShown?()
+        }
+    }
+
+    /// Under the title: the version it is about ("Version 1.3.211 · Nov 1"), or the versions ("Versions 1.3.207 to
+    /// 1.3.211").
+    private var versionLine: String? {
+        guard let newest = data.releases.first else { return data.version.map { "Version \($0)" } }
+        if data.releases.count == 1 {
+            return WhatsNewSheet.day(newest).map { "Version \(newest.version) · \($0)" } ?? "Version \(newest.version)"
+        }
+        return "Versions \(data.releases.last?.version ?? newest.version) to \(newest.version)"
+    }
+
+    /// See All Changes: every version's notes a student sees, each under its version and its day.
+    private var allChanges: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            ForEach(MacWhatsNew.all.releases) { release in
+                VStack(alignment: .leading, spacing: 10) {
+                    CardHeading(text: "Version \(release.version)", trailing: WhatsNewSheet.day(release))
+                    ForEach(Array(release.notes.enumerated()), id: \.offset) { _, note in
+                        noteRow(note)
+                    }
+                }
+            }
+        }
+    }
+
+    private func noteRow(_ note: ReleaseNote) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            IconTile(symbol: icon(note.kind), color: tone(note.kind), size: 30)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(note.title).font(.sBody.weight(.semibold))
+                if let body = note.body, !body.isEmpty {
+                    Text(body).font(.sCallout).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    /// (M16) What it opened on, on the console: how many highlights of how many notes, from which versions, how many
+    /// notes for developers were left out of them, and the highlights' titles (mac-shots.sh's whatsnew_check).
+    private func said() {
+        let notes = data.releases.reduce(0) { $0 + $1.notes.count }
+        let newest = data.releases.first?.version ?? "?"
+        let oldest = data.releases.last?.version ?? newest
+        NSLog("[Simpl] what's new: %ld highlights of %ld notes from %ld versions (%@ to %@), %ld for developers left out: %@",
+              highlights.count, notes, data.releases.count, oldest, newest, MacWhatsNew.leftOut(from: oldest, to: newest),
+              highlights.map(\.title).joined(separator: "; "))
     }
 
     /// (home-36) A release's day as every date is written: the engine's words where it sends them, else its ISO day as

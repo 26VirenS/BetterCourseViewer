@@ -7,6 +7,11 @@ import Foundation
 ///
 /// After an update, the versions since the one last seen are shown once (when the sheet is really up they are marked
 /// seen); a first run sees none (its setup comes instead). Help ▸ What's New shows them all.
+///
+/// (M16) What a student sees: a few highlights — five at most, new before improved before fixed, the newest first —
+/// from the versions since the one last seen (Help ▸ What's New: from the newest versions), and every version's notes
+/// behind See All Changes. A note for developers (`developer: true`: developer tools, the test channel) is left out of
+/// both unless developer mode is on; a version with nothing else is left out whole.
 enum MacWhatsNew {
     static let releases: [Release] = [
         Release(version: "1.3.211", date: "2026-11-01", notes: [
@@ -17,10 +22,10 @@ enum MacWhatsNew {
             ReleaseNote(kind: "fixed", title: "Steadier Calendar Sync", body: "Google and Outlook no longer get duplicate events."),
         ]),
         Release(version: "1.3.210", date: "2026-11-01", notes: [
-            ReleaseNote(kind: "improved", title: "Where Updates Come From", body: "Developer tools say which feed this Mac updates from."),
+            ReleaseNote(kind: "improved", title: "Where Updates Come From", body: "Developer tools say which feed this Mac updates from.", developer: true),
         ]),
         Release(version: "1.3.209", date: "2026-11-01", notes: [
-            ReleaseNote(kind: "new", title: "Test Builds", body: "Developer tools can join a test channel for early builds."),
+            ReleaseNote(kind: "new", title: "Test Builds", body: "Developer tools can join a test channel for early builds.", developer: true),
         ]),
         Release(version: "1.3.208", date: "2026-11-01", notes: [
             ReleaseNote(kind: "new", title: "Share Your Theme", body: "Send your theme to Simpl Community from Appearance."),
@@ -66,7 +71,7 @@ enum MacWhatsNew {
             ReleaseNote(kind: "new", title: "Macmillan, Simpler", body: "Macmillan homework gets a cleaner look. Simpl Look turns it off."),
         ]),
         Release(version: "1.3.196", date: "2026-10-30", notes: [
-            ReleaseNote(kind: "new", title: "Record a Tool's Page", body: "Developers can record a tool's page as it changes."),
+            ReleaseNote(kind: "new", title: "Record a Tool's Page", body: "Developers can record a tool's page as it changes.", developer: true),
         ]),
         Release(version: "1.3.195", date: "2026-10-29", notes: [
             ReleaseNote(kind: "new", title: "Drag to Unplan", body: "Drag a plan onto To Do to take it off the calendar."),
@@ -88,7 +93,7 @@ enum MacWhatsNew {
             ReleaseNote(kind: "new", title: "Silent Mode", body: "Only what's next, in big type on black. Strike items out."),
         ]),
         Release(version: "1.3.189", date: "2026-10-28", notes: [
-            ReleaseNote(kind: "new", title: "Simulate an Update", body: "Developer tools can replay an update from any older version."),
+            ReleaseNote(kind: "new", title: "Simulate an Update", body: "Developer tools can replay an update from any older version.", developer: true),
         ]),
         Release(version: "1.3.188", date: "2026-10-27", notes: [
             ReleaseNote(kind: "improved", title: "Sidebar Like the Web", body: "Courses sit under All Courses, each in its own colour."),
@@ -246,7 +251,7 @@ enum MacWhatsNew {
         ]),
         Release(version: "1.3.146", date: "2026-10-21", notes: [
             ReleaseNote(kind: "fixed", title: "Adding a Second File", body: "Adding files one after another no longer quits."),
-            ReleaseNote(kind: "new", title: "Crash Log", body: "Developer mode keeps each crash and what led to it."),
+            ReleaseNote(kind: "new", title: "Crash Log", body: "Developer mode keeps each crash and what led to it.", developer: true),
         ]),
         Release(version: "1.3.145", date: "2026-10-21", notes: [
             ReleaseNote(kind: "fixed", title: "Several Files at Once", body: "Adding more than one file to Hand In no longer quits."),
@@ -284,7 +289,7 @@ enum MacWhatsNew {
             ReleaseNote(kind: "improved", title: "Atoms in the Table", body: "Each element's page turns its atom in 3D."),
         ]),
         Release(version: "1.3.134", date: "2026-10-19", notes: [
-            ReleaseNote(kind: "fixed", title: "Developer Logs", body: "Logs shows Simpl's own lines again."),
+            ReleaseNote(kind: "fixed", title: "Developer Logs", body: "Logs shows Simpl's own lines again.", developer: true),
         ]),
         Release(version: "1.3.133", date: "2026-10-19", notes: [
             ReleaseNote(kind: "fixed", title: "Alta Graphs Show", body: "A question's Desmos graph shows instead of a blank box."),
@@ -366,7 +371,7 @@ enum MacWhatsNew {
             ReleaseNote(kind: "improved", title: "Precise Atomic Masses", body: "Every atomic mass as precisely as it is known."),
         ]),
         Release(version: "1.3.109", date: "2026-10-18", notes: [
-            ReleaseNote(kind: "new", title: "Developer Tools", body: "Logs, system use and stats, for those who know the way in."),
+            ReleaseNote(kind: "new", title: "Developer Tools", body: "Logs, system use and stats, for those who know the way in.", developer: true),
             ReleaseNote(kind: "improved", title: "Critical Fixes Sooner", body: "Simpl looks for a critical update every minute."),
         ]),
         Release(version: "1.3.108", date: "2026-10-17", notes: [
@@ -859,14 +864,59 @@ enum MacWhatsNew {
     private static let seenKey = "macWhatsNewSeen"
     static var current: String { (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "0" }
 
-    /// Every version's notes (Help ▸ What's New).
-    static var all: WhatsNewData { WhatsNewData(version: current, releases: releases) }
+    /// (M16) The most highlights shown before See All Changes.
+    static let highlightsMost = 5
 
-    /// After an update, the versions since the one last seen (nil: nothing to show). Never seen before: this
-    /// version's own notes alone — an update from a version that showed the web's notes.
+    /// (M16) Developer mode is on (Shell/Developer.swift's DevMode keeps it under this key): notes for developers show.
+    static var forDevelopers: Bool { UserDefaults.standard.bool(forKey: "SimplDeveloperMode") }
+
+    /// Every version's notes a student sees — the developers' too in developer mode (See All Changes).
+    static var all: WhatsNewData { WhatsNewData(version: current, releases: shown(releases)) }
+
+    /// (M16) What Help ▸ What's New opens on: the newest versions, until they hold three notes a student sees.
+    static var recent: WhatsNewData {
+        var picked: [Release] = []
+        for r in shown(releases).filter({ !Updater.isNewer($0.version, than: current) }) {
+            picked.append(r)
+            if picked.reduce(0, { $0 + $1.notes.count }) >= 3 { break }
+        }
+        return WhatsNewData(version: current, releases: picked)
+    }
+
+    /// After an update, the versions since the one last seen (nil: nothing to show — (M16) nor when they hold only notes
+    /// for developers). Never seen before: this version's own notes alone — an update from a version that showed the
+    /// web's notes.
     static func due() -> WhatsNewData? {
-        let newer = since(UserDefaults.standard.string(forKey: seenKey))
+        let newer = shown(since(UserDefaults.standard.string(forKey: seenKey)))
         return newer.isEmpty ? nil : WhatsNewData(version: current, releases: newer)
+    }
+
+    /// (M16) `list` as a student sees it: notes for developers left out (unless `developers`), and a version left with
+    /// none left out whole.
+    static func shown(_ list: [Release], developers: Bool = forDevelopers) -> [Release] {
+        guard !developers else { return list }
+        return list.compactMap { r in
+            var r = r
+            r.notes = r.notes.filter { $0.developer != true }
+            return r.notes.isEmpty ? nil : r
+        }
+    }
+
+    /// (M16) The highlights of `list` (newest first, as `releases` is): five at most — every new thing first, then what
+    /// was improved, then what was fixed, each kind newest first.
+    static func highlights(_ list: [Release]) -> [ReleaseNote] {
+        func rank(_ kind: String) -> Int { ["new", "improved", "fixed"].firstIndex(of: kind) ?? 3 }
+        let notes = list.enumerated().flatMap { v, r in r.notes.enumerated().map { (v: v, i: $0.offset, note: $0.element) } }
+        return notes.sorted { a, b in
+            (rank(a.note.kind), a.v, a.i) < (rank(b.note.kind), b.v, b.i)
+        }.prefix(highlightsMost).map(\.note)
+    }
+
+    /// (M16) How many notes for developers the versions from `oldest` to `newest` hold that a student is not shown.
+    static func leftOut(from oldest: String, to newest: String) -> Int {
+        guard !forDevelopers else { return 0 }
+        return releases.filter { !Updater.isNewer(oldest, than: $0.version) && !Updater.isNewer($0.version, than: newest) }
+            .reduce(0) { $0 + $1.notes.filter { $0.developer == true }.count }
     }
 
     /// The versions an update from `seen` to `version` brings, newest first (none seen before: that version's own alone).
