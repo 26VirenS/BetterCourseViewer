@@ -182,7 +182,7 @@ public sealed partial class CalendarScreen : Screen
     protected override bool LayoutChanges(double before, double now)
     {
         bool Crossed(double at) => (before >= at) != (now >= at);
-        return Crossed(MonthBeside) || Crossed(MonthBeside + TodoWidth + TodoGap) || Crossed(WeekColumnsFrom) || Crossed(TodoBesideFrom) || Crossed(480)
+        return Crossed(MonthBeside) || Crossed(MonthBeside + TodoWidth + TodoGap) || Crossed(WeekColumnsFrom) || Crossed(TodoBesideFrom) || Crossed(TodoFullFrom) || Crossed(480)
             || Crossed(CommandsCompactBelow);
     }
 
@@ -458,6 +458,7 @@ public sealed partial class CalendarScreen : Screen
             above.Height = mode == "list" ? double.NaN : TodoAbove;
             above.VerticalAlignment = VerticalAlignment.Top;
             v.Children.Add(above);
+            WheelOnAtEnds(todoScroller, pageScroller);
         }
         if (notice != null) v.Children.Add(notice);
         if (LeftBeside)
@@ -472,6 +473,26 @@ public sealed partial class CalendarScreen : Screen
         pageScroller.Padding = new Thickness(pad, 0, pad, 0);
         Adopt(pageScroller).Content = v;
         return pageScroller;
+    }
+
+    /// <summary>
+    /// A list scrolling inside the page's own scroll (To Do over the calendar on a narrow page): the wheel scrolls the list
+    /// until it is at its top or its foot, then the page — never a wheel that seems to do nothing because the list under
+    /// the pointer has no further to go. Hooked once.
+    /// </summary>
+    private static void WheelOnAtEnds(ScrollViewer inner, ScrollViewer outer)
+    {
+        if (inner.Tag is "wheel-on") return;
+        inner.Tag = "wheel-on";
+        inner.PreviewMouseWheel += (_, e) =>
+        {
+            var up = e.Delta > 0;
+            var atEnd = up ? inner.VerticalOffset <= 0 : inner.VerticalOffset >= inner.ScrollableHeight - 0.5;
+            if (!atEnd) return;
+            if (!outer.IsAncestorOf(inner)) return;
+            e.Handled = true;
+            outer.ScrollToVerticalOffset(outer.VerticalOffset - e.Delta / 3.0);
+        };
     }
 
     /// <summary>Out of the page it was last in (an element has one parent): what is kept goes from build to build.</summary>

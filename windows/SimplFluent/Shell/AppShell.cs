@@ -22,12 +22,18 @@ namespace Simpl.Shell;
 /// External Tools), the courses (the one open with its sections under it), one Groups row that lists the groups and what
 /// the school added to Canvas's own navigation (More from Canvas: History, its tools, Help); and at its foot Settings,
 /// then who is signed in, where and as whom (the Mac's account bar, with the account menu) — and the page at the right:
-/// its title (a breadcrumb once something is opened on it), its commands, and the screen. Below 880 wide the pane folds
-/// away behind the title bar's button, and Search moves up into the title bar.
+/// its title (a breadcrumb once something is opened on it), its commands, and the screen. As WinUI's NavigationView
+/// does, below 1200 wide the pane is a compact rail of symbols (its button at its head opens the whole pane over the
+/// page), and below 880 it folds away behind the title bar's button, Search moving up into the title bar.
 /// </summary>
 public sealed partial class AppShell : Grid, IDisposable
 {
     public const double PaneWidth = 304;
+    /// <summary>The compact rail's width (WinUI's CompactPaneLength): a 40-wide row and 4 on each side.</summary>
+    public const double RailWidth = 48;
+    /// <summary>Below this wide the pane is the compact rail, so the page keeps its room (a 1024 window's month
+    /// cut every name short beside the whole pane); at 1200 and over, the whole pane.</summary>
+    public const double CompactBelow = 1200;
     public const double NarrowBelow = 880;
 
     private readonly Engine.Engine engine;
@@ -76,7 +82,10 @@ public sealed partial class AppShell : Grid, IDisposable
     /// <summary>The screen on show checked against the school while the window shows (Shell/LiveCheck.cs).</summary>
     private readonly LiveCheck live;
     private Screen? current;
-    private bool narrow, paneOpen, sheetOpen;
+    private bool narrow, compact, paneOpen, sheetOpen;
+    /// <summary>The compact rail's head: the button that opens the whole pane over the page (kept at the head of the pane
+    /// while it is open, to close it again), and Search.</summary>
+    private readonly Button railMenu, railSearch;
     private int lastNav = -1;
     /// <summary>Who the account tile shows, as last drawn (null: to be drawn).</summary>
     private (string? Name, string? Initials, string? Avatar, string? Email, string Host, string? Site)? accountDrawn;
@@ -114,13 +123,25 @@ public sealed partial class AppShell : Grid, IDisposable
         // (0.3.56) the search as the web's box afloat, over the page (the Mac's FloatingSearch): the pane's box only brings
         //  it up — it never takes the keyboard itself, so a window come back to never reopens the search
         palette = SearchPalette.Attach(engine, window);
-        palette.Ran += () => { if (narrow) ClosePane(); };
+        palette.Ran += ClosePane;
         searchBox.Focusable = false;
         searchBox.IsTabStop = false;
         searchBox.Cursor = Cursors.Arrow;
         searchBox.ToolTip = "Search (Ctrl+F)";
         System.Windows.Automation.AutomationProperties.SetName(searchBox, "Search (Ctrl+F)");
         searchBox.PreviewMouseLeftButtonDown += (_, e) => { e.Handled = true; FocusSearch(); };
+        // (the compact rail's head, WinUI's: the pane's button, then Search as a symbol — the box needs the whole pane)
+        railMenu = K.IconButton(SymbolRegular.LineHorizontal320, TogglePane, "Navigation", 16, 40);
+        railSearch = K.IconButton(SymbolRegular.Search24, FocusSearch, "Search (Ctrl+F)", 16, 40);
+        foreach (var b in new[] { railMenu, railSearch })
+        {
+            b.Height = 36;
+            b.HorizontalAlignment = HorizontalAlignment.Left;
+            b.Margin = new Thickness(4, 0, 4, 4);
+            b.Visibility = Visibility.Collapsed;
+        }
+        railMenu.Margin = new Thickness(4, 6, 4, 4);
+        railSearch.Mark(TourSpot.Search);
         navScroll = new ScrollViewer { Content = nav, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Padding = new Thickness(0, 0, 0, 8) };
         // (the Mac's sidebar: the search at the top, the places and courses; at the foot Settings — Windows 11's place
         // for it — and who is signed in, whose menu holds Settings too, as the Mac's account bar does)
@@ -131,7 +152,7 @@ public sealed partial class AppShell : Grid, IDisposable
         pane.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         pane.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         pane.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        pane.Children.Add(searchBox.Row(0));
+        pane.Children.Add(K.V(0, railMenu, railSearch, searchBox).Row(0));
         pane.Children.Add(navScroll.Row(1));
         pane.Children.Add(foot.Row(2));
         paneHolder.Child = new Grid { Children = { paneScene, paneTint, pane } };
@@ -308,7 +329,7 @@ public sealed partial class AppShell : Grid, IDisposable
     /// <summary>The pane's foot: Settings (Windows 11's NavigationView keeps it there).</summary>
     private NavEntry[] FootEntries() => new[]
     {
-        new NavEntry { Key = "settings", Title = "Settings", Icon = SymbolRegular.Settings24, Tint = Gray, Tip = "Settings (Ctrl+,)", Go = () => { if (narrow) ClosePane(); window.OpenSettings(); } },
+        new NavEntry { Key = "settings", Title = "Settings", Icon = SymbolRegular.Settings24, Tint = Gray, Tip = "Settings (Ctrl+,)", Go = () => { ClosePane(); window.OpenSettings(); } },
     };
 
     // ---- (0.3.84) Silent mode's look ----
@@ -336,7 +357,7 @@ public sealed partial class AppShell : Grid, IDisposable
         silentLook = on;
         paneScene.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
         paneTint.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
-        searchBox.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
+        HeadShown();
         Scenes.PlainWords(pane, Appearance.Plain("side") && !on);
         Quiet(paneHolder, on);
         PaneGround();
@@ -366,13 +387,24 @@ public sealed partial class AppShell : Grid, IDisposable
         Log.Write($"silent mode: the courses' colours quiet: {(on ? "yes" : "no")}");
     }
 
-    /// <summary>The pane's ground: black in Silent mode; the flyout's while it is open over the page on a narrow window;
-    /// else none (the window's own shows through).</summary>
+    /// <summary>The pane's ground: black in Silent mode; the flyout's while it is open over the page (a narrow window, or
+    /// the compact rail's); else none (the window's own shows through).</summary>
     private void PaneGround()
     {
         if (silentLook) paneHolder.Background = Brushes.Black;
-        else if (narrow && paneOpen) paneHolder.Bg(B.Flyout);
+        else if (paneOpen) paneHolder.Bg(B.Flyout);
         else paneHolder.Background = null;
+    }
+
+    /// <summary>The pane's head as the pane is drawn: the search box in the whole pane; in the compact rail its button and
+    /// Search as symbols; the rail's button kept over the search box while the whole pane is open over the page, to close
+    /// it where it was opened. Silent mode puts Search away (Ctrl+F still searches).</summary>
+    private void HeadShown()
+    {
+        var rail = Rail;
+        railMenu.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
+        railSearch.Visibility = rail && !silentLook ? Visibility.Visible : Visibility.Collapsed;
+        searchBox.Visibility = !rail && !silentLook ? Visibility.Visible : Visibility.Collapsed;
     }
 
     /// <summary>(0.3.84) The theme's words, lines and soft fills under <paramref name="e"/> in Silent mode's white and greys
@@ -467,7 +499,8 @@ public sealed partial class AppShell : Grid, IDisposable
             var unread = engine.CoursesLive ? c.Unread ?? 0 : 0;
             var entry = new NavEntry
             {
-                Key = ctx, Title = label, Ink = CourseInk(K.Hex(c.Color, Blue)),
+                // (its colour and first letter: its square in the compact rail)
+                Key = ctx, Title = label, Ink = CourseInk(K.Hex(c.Color, Blue)), Tint = K.Hex(c.Color, Blue), Letter = Initial(label ?? ""),
                 Badge = unread,
                 BadgeLabel = !string.IsNullOrEmpty(c.UnreadLabel) ? c.UnreadLabel : unread == 1 ? "1 unread announcement" : $"{unread} unread announcements",
                 Go = () => GoPlace(Place.Home(ctx)),
@@ -528,7 +561,7 @@ public sealed partial class AppShell : Grid, IDisposable
             list.Add(new NavEntry { Key = "externaltools", Title = "External tools", Icon = SymbolRegular.PuzzlePiece24, Tint = Orchid, Go = () => GoPlace(Place.ExternalTools), Prepare = Ready(Place.ExternalTools) });
         // (what the school added to Canvas's own navigation — History, its tools, Help —, under Simpl's own places as the
         //  extension's sidebar has it; nothing when it adds nothing)
-        list.AddRange(MoreFromCanvas.Entries(more, it => { if (narrow) ClosePane(); MoreFromCanvas.Open(engine, it, window); }));
+        list.AddRange(MoreFromCanvas.Entries(more, it => { ClosePane(); MoreFromCanvas.Open(engine, it, window); }));
         ShadePlaces(list);
         foreach (var e in list) Apart(e);
         if (redraw) nav.Set(list, SelectedKey(engine.Nav.Current.Place));
@@ -558,7 +591,8 @@ public sealed partial class AppShell : Grid, IDisposable
     /// more:help, more:tool presses that item's row too, as a click does.</summary>
     private async void MoreAsked()
     {
-        // (a narrow window's pane too, opened over the page for the picture by --pane-open)
+        // (a narrow window's pane too, opened over the page for the picture by --pane-open; the compact rail's, which names
+        //  none of it, opened over the page for it as a click on its button does)
         if (disposed || (narrow && !Launch.Flag("pane-open")) || !MoreFromCanvas.Shown(more) || Launch.Take("more") is not { } asked) return;
         // (once the first screen is up and the pane has marked its row — which scrolls that row into sight —, as a
         //  student's press comes after; the section can be read before the first screen shows. And once WPF-UI's styles
@@ -570,9 +604,10 @@ public sealed partial class AppShell : Grid, IDisposable
             for (var i = 0; i < 60 && current == null; i++) await Task.Delay(250);
             await Task.Delay(1200);
             for (var i = 0; i < 50 && FlatResources.Copying; i++) await Task.Delay(100);
-            // (a narrow window's pane: once it is open over the page and has slid in)
-            for (var i = 0; i < 40 && narrow && !paneOpen; i++) await Task.Delay(250);
-            if (narrow) await Task.Delay(600);
+            // (a narrow window's pane, or the rail's: once it is open over the page and has slid in)
+            if (compact && !paneOpen) OpenPane();
+            for (var i = 0; i < 40 && (narrow || compact) && !paneOpen; i++) await Task.Delay(250);
+            if (narrow || compact) await Task.Delay(600);
             if (disposed) return;
             // (scrolled, its item pressed, and the pane scrolled again over the next two seconds whenever something has laid
             //  it out afresh at its top meanwhile — the narrow pane's picture, and once Help's, showed its first rows; where
@@ -644,7 +679,7 @@ public sealed partial class AppShell : Grid, IDisposable
     {
         if (engine.Nav.Current.Place == p && engine.Nav.Current.Path.Count > 0) engine.PopToRoot();
         else engine.Go(p);
-        if (narrow) ClosePane();
+        ClosePane();
     }
 
     /// <summary>The pane shorter than this (a 1024×681 window, a 1366×768 laptop) keeps its foot compact, so the courses
@@ -654,13 +689,14 @@ public sealed partial class AppShell : Grid, IDisposable
 
     private bool footCompact;
 
-    /// <summary>The foot as compact as the pane's height asks (drawn again only when that changes).</summary>
+    /// <summary>The foot as compact as the pane's height asks (drawn again only when that changes); the compact rail's
+    /// always has Settings and who is signed in as symbols, one over the other.</summary>
     private void FootFits()
     {
-        var compact = paneHolder.ActualHeight > 0 && paneHolder.ActualHeight < CompactFootBelow;
-        if (compact == footCompact) return;
-        footCompact = compact;
-        footNav.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+        var shorter = paneHolder.ActualHeight > 0 && paneHolder.ActualHeight < CompactFootBelow;
+        if (shorter == footCompact) return;
+        footCompact = shorter;
+        footNav.Visibility = footCompact && !Rail ? Visibility.Collapsed : Visibility.Visible;
         if (accountDrawn != null) account.Content = AccountTile();
     }
 
@@ -672,6 +708,7 @@ public sealed partial class AppShell : Grid, IDisposable
         var me = engine.Snapshot?.Me;
         var name = me?.Name ?? "Signed in";
         var school = engine.Snapshot?.Site is { Length: > 0 } site ? site : engine.Host;
+        if (Rail) return RailAccount(name, school);
         // (0.3.84: Silent mode — no picture of anyone, the name in white, ⋯ in words)
         FrameworkElement avatar = silentLook ? new Border { Width = 0 } : K.Avatar(name, me?.Initials, me?.Avatar, 36);
         var nameText = K.Text(name, Ty.BodyStrong);
@@ -701,7 +738,7 @@ public sealed partial class AppShell : Grid, IDisposable
         tile.Mark(TourSpot.Account);
         if (!footCompact) return tile;
         // (a short pane: Settings as a gear at the account's right, the row it had given back to the courses)
-        var gear = K.IconButton(SymbolRegular.Settings24, () => { if (narrow) ClosePane(); window.OpenSettings(); }, "Settings (Ctrl+,)", 16, 36);
+        var gear = K.IconButton(SymbolRegular.Settings24, () => { ClosePane(); window.OpenSettings(); }, "Settings (Ctrl+,)", 16, 36);
         gear.Height = 36;
         gear.VerticalAlignment = VerticalAlignment.Center;
         System.Windows.Automation.AutomationProperties.SetName(gear, "Settings");
@@ -710,6 +747,32 @@ public sealed partial class AppShell : Grid, IDisposable
     }
 
     private Button? accountTile;
+
+    /// <summary>Who is signed in, at the compact rail's foot: their picture (in Silent mode, a symbol — no picture of
+    /// anyone), their name, email and school its tooltip, a click the account menu, as the whole pane's tile.</summary>
+    private FrameworkElement RailAccount(string name, string school)
+    {
+        var me = engine.Snapshot?.Me;
+        var lines = new List<string> { name };
+        if (me?.Email is { Length: > 0 } email) lines.Add(email);
+        if (!lines.Contains(school, StringComparer.OrdinalIgnoreCase)) lines.Add(school);
+        FrameworkElement face = silentLook ? K.Icon(SymbolRegular.Person24, 16, B.Text) : K.Avatar(name, me?.Initials, me?.Avatar, 26);
+        face.HorizontalAlignment = HorizontalAlignment.Center;
+        face.VerticalAlignment = VerticalAlignment.Center;
+        Button? tile = null;
+        tile = K.Subtle(face, () => AccountMenu(tile!), new Thickness(0), 4);
+        tile.Width = 40;
+        tile.Height = 40;
+        tile.HorizontalContentAlignment = HorizontalAlignment.Center;
+        tile.HorizontalAlignment = HorizontalAlignment.Left;
+        tile.Margin = new Thickness(4, 0, 4, 0);
+        tile.ToolTip = string.Join("\n", lines);
+        System.Windows.Automation.AutomationProperties.SetName(tile, $"{string.Join(", ", lines)}, account menu");
+        accountTile = tile;
+        tile.Mark(TourSpot.Account);
+        tile.Mark(TourSpot.AccountMenu);
+        return tile;
+    }
 
     /// <summary>The account menu (the Mac's ⋯ by your name), over the account bar, in Windows 11's sentence case:
     /// Settings…, What's new, Take the tour, the school's profile, Report a bug…, Sign out…, and Quit Simpl (closing the
@@ -725,7 +788,7 @@ public sealed partial class AppShell : Grid, IDisposable
         }
         menu.Items.Add(Item("Settings…", SymbolRegular.Settings24, window.OpenSettings));
         // (0.3.31) the theme, the photos and the courses' colours, over the window itself
-        menu.Items.Add(Item("Appearance…", SymbolRegular.PaintBrush24, () => { if (narrow) ClosePane(); window.StartAppearance(); }));
+        menu.Items.Add(Item("Appearance…", SymbolRegular.PaintBrush24, () => { ClosePane(); window.StartAppearance(); }));
         // (0.3.86) Silent mode from any screen, and the way out of it off the Dashboard (the web's 2.99.127)
         menu.Items.Add(Item(SilentMode.On ? "Exit Silent Mode" : "Silent Mode", SymbolRegular.WeatherMoon24, () => SilentMode.Set(!SilentMode.On)));
         menu.Items.Add(Item("What’s new", SymbolRegular.Sparkle24, () => engine.ShowWhatsNew(WhatsNew.All)));
@@ -945,78 +1008,140 @@ public sealed partial class AppShell : Grid, IDisposable
         WebScreen.SheetOver(open);
     }
 
-    // ---- narrow: the pane over the page ----
+    // ---- the pane's three ways: whole, the compact rail, folded away ----
 
+    /// <summary>The pane is the compact rail now: the window between <see cref="NarrowBelow"/> and
+    /// <see cref="CompactBelow"/> wide, the whole pane not opened over the page.</summary>
+    private bool Rail => compact && !paneOpen;
+
+    /// <summary>
+    /// The pane as wide as the window lets it be, as WinUI's NavigationView (Auto) is: whole from 1200 wide; below that
+    /// the compact rail, its symbols, counts and courses' squares (its button opening the whole pane over the page); below
+    /// 880 folded away behind the title bar's button. Laid out again only when the way changes.
+    /// </summary>
     public void WindowWidth(double w)
     {
         var n = w < NarrowBelow;
-        if (n == narrow) return;
-        narrow = n;
-        if (narrow)
+        var c = !n && w < CompactBelow;
+        if (n == narrow && c == compact && laidOut) return;
+        laidOut = true;
+        // (the pane open over the page closes at once: it is laid out afresh for the new width)
+        if (paneOpen)
         {
-            ColumnDefinitions[0].Width = new GridLength(0);
-            Grid.SetColumn(paneHolder, 0);
-            Grid.SetColumnSpan(paneHolder, 2);
-            paneHolder.HorizontalAlignment = HorizontalAlignment.Left;
-            paneHolder.Width = PaneWidth;
-            paneHolder.Visibility = Visibility.Collapsed;
-            Grid.SetColumn(page, 0);
-            Grid.SetColumnSpan(page, 2);
-            Grid.SetColumn(toast, 0);
-            Grid.SetColumnSpan(toast, 2);
-            Grid.SetColumn(previewLayer, 0);
-            Grid.SetColumnSpan(previewLayer, 2);
+            paneOpen = false;
+            scrim.Visibility = Visibility.Collapsed;
+            WebScreen.SheetOver(sheetOpen);
+        }
+        narrow = n;
+        compact = c;
+        ColumnDefinitions[0].Width = new GridLength(narrow ? 0 : compact ? RailWidth : PaneWidth);
+        InColumn();
+        Grid.SetColumn(page, narrow ? 0 : 1);
+        Grid.SetColumnSpan(page, narrow ? 2 : 1);
+        Grid.SetColumn(toast, narrow ? 0 : 1);
+        Grid.SetColumnSpan(toast, narrow ? 2 : 1);
+        Grid.SetColumn(previewLayer, narrow ? 0 : 1);
+        Grid.SetColumnSpan(previewLayer, narrow ? 2 : 1);
+        Panel.SetZIndex(paneHolder, narrow || compact ? 10 : 0);
+        Panel.SetZIndex(scrim, 9);
+        PaneLook();
+        // (a picture run says which, for the screenshot suite's checks)
+        if (Shot.Asked || Launch.IsDevelopment) Log.Write($"pane: {(narrow ? "folded away" : compact ? "the compact rail" : "whole")} ({w:0} wide)");
+    }
+
+    /// <summary>The pane has been laid out for a width once.</summary>
+    private bool laidOut;
+
+    /// <summary>The pane back where it lives while it is not open over the page: its column (whole, or the rail), or —
+    /// a narrow window — folded away at the window's left, ready to slide over the page.</summary>
+    private void InColumn()
+    {
+        paneHolder.RenderTransform = Transform.Identity;
+        Grid.SetColumn(paneHolder, 0);
+        Grid.SetColumnSpan(paneHolder, narrow ? 2 : 1);
+        paneHolder.HorizontalAlignment = narrow ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
+        paneHolder.Width = narrow ? PaneWidth : double.NaN;
+        paneHolder.Visibility = narrow ? Visibility.Collapsed : Visibility.Visible;
+        Chrome(over: false);
+    }
+
+    /// <summary>The flyout's ground, line and shadow while the pane is open over the page; none in its column.</summary>
+    private void Chrome(bool over)
+    {
+        if (over)
+        {
+            paneHolder.Stroke(B.FlyoutStroke);
+            paneHolder.BorderThickness = new Thickness(0, 1, 1, 0);
+            paneHolder.CornerRadius = new CornerRadius(0, 8, 0, 0);
+            paneHolder.Effect = K.Shadow(32, 0, 0.28);
         }
         else
         {
-            ClosePane();
-            ColumnDefinitions[0].Width = new GridLength(PaneWidth);
-            Grid.SetColumnSpan(paneHolder, 1);
-            paneHolder.Width = double.NaN;
-            paneHolder.Visibility = Visibility.Visible;
-            paneHolder.Background = null;
-            PaneGround(); // (0.3.84: black in Silent mode)
-            paneHolder.Effect = null;
             paneHolder.BorderThickness = new Thickness(0);
-            Grid.SetColumn(page, 1);
-            Grid.SetColumnSpan(page, 1);
-            Grid.SetColumn(toast, 1);
-            Grid.SetColumnSpan(toast, 1);
-            Grid.SetColumn(previewLayer, 1);
-            Grid.SetColumnSpan(previewLayer, 1);
+            paneHolder.CornerRadius = new CornerRadius(0);
+            paneHolder.Effect = null;
         }
-        Panel.SetZIndex(paneHolder, narrow ? 10 : 0);
-        Panel.SetZIndex(scrim, 9);
+        PaneGround(); // (0.3.84: black in Silent mode)
+    }
+
+    /// <summary>The pane's rows, head and foot drawn for the way it is now: the rail's symbols, or the whole pane's names.</summary>
+    private void PaneLook()
+    {
+        var rail = Rail;
+        nav.Compact = rail;
+        footNav.Compact = rail;
+        HeadShown();
+        // (the rail scrolls by the wheel, its bar out of the way of its 40-wide rows)
+        navScroll.VerticalScrollBarVisibility = rail ? ScrollBarVisibility.Hidden : ScrollBarVisibility.Auto;
+        footNav.Visibility = footCompact && !rail ? Visibility.Collapsed : Visibility.Visible;
+        footNav.Set(FootEntries(), null);
+        accountDrawn = null;
+        BuildPane();
+        sceneMasked = null;
+        MaskScene();
     }
 
     public void TogglePane() { if (paneOpen) ClosePane(); else OpenPane(); }
 
+    /// <summary>The whole pane over the page (the title bar's button on a narrow window, the rail's own): it slides in
+    /// from the left — out of the rail, which it covers — on the flyout's ground, the page behind it taking a click to close it.</summary>
     private void OpenPane()
     {
-        if (!narrow) return;
+        if ((!narrow && !compact) || paneOpen) return;
         paneOpen = true;
+        Grid.SetColumnSpan(paneHolder, 2);
+        paneHolder.HorizontalAlignment = HorizontalAlignment.Left;
+        paneHolder.Width = PaneWidth;
         paneHolder.Visibility = Visibility.Visible;
-        paneHolder.Bg(B.Flyout).Stroke(B.FlyoutStroke);
-        PaneGround(); // (0.3.84: black in Silent mode)
-        paneHolder.BorderThickness = new Thickness(0, 1, 1, 0);
-        paneHolder.CornerRadius = new CornerRadius(0, 8, 0, 0);
-        paneHolder.Effect = K.Shadow(32, 0, 0.28);
+        Chrome(over: true);
+        if (compact) PaneLook();
         scrim.Visibility = Visibility.Visible;
         WebScreen.SheetOver(true);
-        var t = new TranslateTransform(-PaneWidth, 0);
+        var hidden = -(PaneWidth - (compact ? RailWidth : 0));
+        if (Shot.Asked) Log.Write($"pane: opened over the page ({(compact ? "from the compact rail" : "folded away")})");
+        var t = new TranslateTransform(hidden, 0);
         paneHolder.RenderTransform = t;
-        Motion.FromTo(t, TranslateTransform.XProperty, -PaneWidth, 0, Motion.Medium, Motion.Decelerate);
+        Motion.FromTo(t, TranslateTransform.XProperty, hidden, 0, Motion.Medium, Motion.Decelerate);
     }
 
+    /// <summary>The pane open over the page put away: it slides back the way it came, then is folded away again (a narrow
+    /// window) or the rail again.</summary>
     private void ClosePane()
     {
         if (!paneOpen) return;
         paneOpen = false;
         scrim.Visibility = Visibility.Collapsed;
         WebScreen.SheetOver(sheetOpen);
+        var hidden = -(PaneWidth - (compact ? RailWidth : 0));
         if (paneHolder.RenderTransform is TranslateTransform t)
-            Motion.FromTo(t, TranslateTransform.XProperty, 0, -PaneWidth, Motion.Normal, Motion.Accelerate, 0, () => { if (!paneOpen && narrow) paneHolder.Visibility = Visibility.Collapsed; });
-        else paneHolder.Visibility = Visibility.Collapsed;
+            Motion.FromTo(t, TranslateTransform.XProperty, 0, hidden, Motion.Normal, Motion.Accelerate, 0, () => { if (!paneOpen) Closed(); });
+        else Closed();
+
+        void Closed()
+        {
+            InColumn();
+            if (compact) PaneLook();
+        }
     }
 
     private void Updates()
@@ -1024,7 +1149,7 @@ public sealed partial class AppShell : Grid, IDisposable
         // (a picture asked for with the narrow window: the pane shown open)
         Loaded += async (_, _) =>
         {
-            if (narrow && Launch.Flag("pane-open")) OpenPane();
+            if ((narrow || compact) && Launch.Flag("pane-open")) OpenPane();
             // (the screenshot suite: --search-bar presses a narrow window's Search, a moment before --open palette:… types)
             if (narrow && Launch.Flag("search-bar")) { await Task.Delay(2500); FocusSearch(); }
             // (the screenshot suite: --open menu shows the account menu once the window has settled)

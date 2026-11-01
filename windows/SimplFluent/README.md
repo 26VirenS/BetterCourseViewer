@@ -726,6 +726,14 @@ their tests; the Mac's are the same):
   animations off) at its left. Below 880 wide the pane folds away and the pane's button and Search join them; Search
   lends the pane's own search box to the title bar (`AppShell.OpenSearchBar`, also Ctrl+F and Ctrl+K), and it goes back
   to the pane once let go of.
+- **The pane's three widths** (`AppShell.WindowWidth`, WinUI's NavigationView in Auto): whole from 1200 wide; from 880
+  to 1200 the **compact rail**, 48 wide (`NavList.Compact`): the pane's button and Search at its head, then each place
+  as its symbol alone, a count as a small badge over the symbol's corner, each course as a square in its colour with its
+  first letter, More from Canvas under a line, and Settings and who is signed in at its foot — every name a tooltip, a
+  course's sections not listed (the course is marked while one shows). The rail's button opens the whole pane over the
+  page, sliding out of the rail (the page behind takes a click to close it; a place chosen closes it too); below 880 the
+  pane folds away behind the title bar's button. A picture run logs which (`pane: the compact rail (1024 wide)`), and
+  `--pane-open` opens it over the page on either.
 - **Pane** (`AppShell.BuildPane`, `NavPane`): the course open folds out its sections (as the Mac's sidebar does; the
   chevron folds out any other); a course's unread announcements are a badge like Notifications', its tooltip and screen
   reader saying what it counts ("2 unread announcements"); one Groups row opens the Groups page and its chevron lists

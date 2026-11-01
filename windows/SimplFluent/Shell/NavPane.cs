@@ -71,7 +71,25 @@ public sealed class NavList : Grid
     /// <summary>(0.3.84) Each row's name, for Silent mode to light the one chosen.</summary>
     private readonly Dictionary<string, TextBlock> names = new();
     private string? selected;
-    private bool plain;
+    private bool plain, compact;
+
+    /// <summary>
+    /// The rows as WinUI's NavigationView draws them in its compact mode (a window too narrow for the whole pane, wide
+    /// enough to keep a rail): 40 by 36, the symbol alone in the middle, a count as a small badge at the symbol's top
+    /// right, the name a tooltip. A course is a square in its colour with its first letter; a heading is a line, and a
+    /// course's sections are not drawn (the course is marked while one of them shows). Set, the rows are built again at
+    /// the next Set or Show.
+    /// </summary>
+    public bool Compact
+    {
+        get => compact;
+        set
+        {
+            if (compact == value) return;
+            compact = value;
+            drawn = null;
+        }
+    }
 
     /// <summary>
     /// (0.3.84) Silent mode's rows, as the web's sidebar draws them then: words alone — no symbols, squares, chevrons or
@@ -167,9 +185,9 @@ public sealed class NavList : Grid
 
     private void Add(NavEntry e, int depth)
     {
-        if (e.Separator)
+        if (e.Separator || (e.Header && compact))
         {
-            items.Children.Add(K.Divider().Margin(16, 6, 16, 6));
+            items.Children.Add(K.Divider().Margin(compact ? 10 : 16, 6, compact ? 10 : 16, 6));
             return;
         }
         if (e.Header)
@@ -181,14 +199,85 @@ public sealed class NavList : Grid
             items.Children.Add(head.Margin(16, 14, 16, 4));
             return;
         }
-        var row = Row(e, depth);
+        var row = compact ? CompactRow(e) : Row(e, depth);
         rows[e.Key] = row;
         if (e.Spot is { } spot) row.Mark(spot);
         if (e.Hover is { } hover) row.MouseEnter += (_, _) => hover();
         if (e.Prepare is { } prepare) Ahead.On(row, prepare);
         items.Children.Add(row);
-        if (e.Expanded && e.Children != null)
+        if (e.Expanded && e.Children != null && !compact)
             foreach (var c in e.Children) Add(c, depth + 1);
+    }
+
+    /// <summary>A row of the compact rail (<see cref="Compact"/>): its symbol (a course's lettered square, a tool's
+    /// picture) in the middle of a 40 by 36 button, its count over the symbol's corner, its name and count a tooltip.</summary>
+    private Button CompactRow(NavEntry e)
+    {
+        FrameworkElement glyph;
+        // (a course: a square in its own colour with its first letter, as a course's square is drawn elsewhere — the
+        //  name it has in the full pane is its tooltip; quiet in Silent mode, as the words there are)
+        var square = e.Square ?? (e.Ink != null ? e.Tint : (Color?)null);
+        if (square is { } sq && (e.Letter != null || e.Picture != null || e.Square != null))
+        {
+            var fill = plain ? Color.FromArgb(0x30, 0xff, 0xff, 0xff) : sq;
+            FrameworkElement inside = e.Letter != null
+                ? new TextBlock { Text = e.Letter, FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = plain ? PlainChosen : K.Brush(K.InkOn(sq)), FontFamily = K.SmallFace }
+                : e.Picture is { } picture ? Picture(picture)
+                : K.Icon(e.Icon, 12, K.InkOn(sq), filled: true);
+            inside.HorizontalAlignment = HorizontalAlignment.Center;
+            inside.VerticalAlignment = VerticalAlignment.Center;
+            glyph = new Border { Width = 18, Height = 18, CornerRadius = new CornerRadius(4), Background = K.Brush(fill), Child = inside };
+        }
+        else if (plain) glyph = new SymbolIcon { Symbol = e.Icon, FontSize = 16, Foreground = PlainName };
+        else glyph = K.Icon(e.Icon, 16, e.Tint, filled: true);
+        glyph.HorizontalAlignment = HorizontalAlignment.Center;
+        glyph.VerticalAlignment = VerticalAlignment.Center;
+        var box = new Grid { Width = 40, Height = 36, Background = Brushes.Transparent };
+        box.Children.Add(glyph);
+        if (e.Badge > 0)
+        {
+            // (WinUI's InfoBadge over a compact item: the count at the symbol's top right, overlapping its corner)
+            var count = new TextBlock { Text = e.Badge > 99 ? "99+" : e.Badge.ToString(), FontSize = 9.5, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            var badge = new Border
+            {
+                MinWidth = 14, Height = 14, CornerRadius = new CornerRadius(7), Padding = new Thickness(3, 0, 3, 0),
+                HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(24, 4, 0, 0), Child = count,
+            };
+            if (plain)
+            {
+                badge.Background = PlainWash;
+                count.Foreground = PlainChosen;
+            }
+            else
+            {
+                badge.SetResourceReference(Border.BackgroundProperty, B.Accent);
+                count.SetResourceReference(TextBlock.ForegroundProperty, B.OnAccent);
+            }
+            box.Children.Add(badge);
+        }
+        var b = K.Subtle(box, () =>
+        {
+            if (e.OpenApart is { } apart && System.Windows.Input.Keyboard.Modifiers == System.Windows.Input.ModifierKeys.Shift) apart();
+            else e.Go?.Invoke();
+        }, new Thickness(0));
+        b.Width = 40;
+        b.Height = 36;
+        b.HorizontalContentAlignment = HorizontalAlignment.Center;
+        b.Margin = new Thickness(4, 0, 4, 0);
+        b.HorizontalAlignment = HorizontalAlignment.Left;
+        // (its name, as the full pane says it, and what its count counts)
+        b.ToolTip = e.Badge > 0 && e.BadgeLabel != null ? $"{e.Tip ?? e.Title} · {e.BadgeLabel}" : e.Tip ?? e.Title;
+        System.Windows.Automation.AutomationProperties.SetName(b, e.Badge > 0 && e.BadgeLabel != null ? $"{e.Title}, {e.BadgeLabel}" : e.Title);
+        if (e.Menu is { } fill2) Screens.CourseKit.Menu(b, fill2);
+        else if (e.OpenApart is { } open)
+        {
+            var menu = new ContextMenu();
+            var item = new System.Windows.Controls.MenuItem { Header = "Open in new window", Icon = new SymbolIcon { Symbol = SymbolRegular.WindowNew24 }, InputGestureText = "Shift+click" };
+            item.Click += (_, _) => open();
+            menu.Items.Add(item);
+            b.ContextMenu = menu;
+        }
+        return b;
     }
 
     private Button Row(NavEntry e, int depth)
@@ -294,6 +383,8 @@ public sealed class NavList : Grid
         if (selected != null && rows.TryGetValue(selected, out var old)) old.Background = Brushes.Transparent;
         if (plain && selected != null && names.TryGetValue(selected, out var oldName)) oldName.Foreground = PlainName;
         if (key != null && !rows.ContainsKey(key) && key.IndexOf(':') is > 0 and var colon && rows.ContainsKey(key[..colon])) key = key[..colon];
+        // (a group whose row is not drawn — the groups folded away, or the compact rail, which lists none — marks Groups)
+        if (key != null && !rows.ContainsKey(key) && key.StartsWith("groups/", StringComparison.Ordinal) && rows.ContainsKey("groups")) key = "groups";
         selected = key;
         if (key != null && rows.TryGetValue(key, out var row))
         {
@@ -310,7 +401,7 @@ public sealed class NavList : Grid
                 // to the top of the pane, its sections opening under it in sight
                 static string CtxOf(string? k) => k == null ? "" : k.IndexOf(':') is > 0 and var c ? k[..c] : k;
                 var course = CtxOf(key);
-                var toTop = course.StartsWith("courses/", StringComparison.Ordinal) && course != CtxOf(shownKey);
+                var toTop = !compact && course.StartsWith("courses/", StringComparison.Ordinal) && course != CtxOf(shownKey);
                 shownKey = key;
                 if (toTop)
                 {
