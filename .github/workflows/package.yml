@@ -28,6 +28,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # (2.99.134) the stylesheet's and the script's own versions must be the manifest's: Simpl compares them on every
+      # page (content/app/app.js) and, when they disagree, says Safari is running an older copy — 2.99.133 shipped so
+      - name: Check every version stamp is the manifest's
+        run: |
+          MANIFEST="$(python3 -c "import json;print(json.load(open('extension/manifest.json'))['version'])")"
+          CSS="$(sed -nE 's/.*--bcv-version: "([^"]+)".*/\1/p' extension/content/styles/app.css | head -1)"
+          JS="$(sed -nE "s/.*self\.BCV_VERSION = '([^']+)'.*/\1/p" extension/lib/settings.js | head -1)"
+          echo "manifest $MANIFEST, stylesheet $CSS, script $JS"
+          [ "$CSS" = "$MANIFEST" ] && [ "$JS" = "$MANIFEST" ] || { echo "::error::the stylesheet ($CSS) or the script ($JS) is not at the manifest's version ($MANIFEST)"; exit 1; }
       - name: Build the zips
         run: ./scripts/package.sh
       - name: Check the version tag matches the manifest
