@@ -75,7 +75,30 @@ take or pass on:
 | SC-B-502 | The report could not be passed on; try again in a minute |
 | SC-B-NET | The page got no answer from simplcourses.com |
 
-## For developers
+## Hand in from your phone's codes
+
+Hand in from your phone passes the phone's files to the computer through a relay on simplcourses.com
+(`site/src/handin.js`), sealed with a key only the two devices hold. A request the relay will not take
+is answered with a code of its own, `SC-H-…`, which the phone's page (`simplcourses.com/handin/`) shows
+under its words; the computer's sheet shows one when it cannot start, and then offers the old code
+instead (the assignment, opened in Canvas on the phone).
+
+| Code | Meaning |
+| --- | --- |
+| SC-H-400 | Not a sealed part of a hand-in (too short, not the right size, not a start the relay understands) |
+| SC-H-401, SC-H-403 | No token sent, or not this hand-in's token (each device has its own: the computer's cannot send, the phone's cannot read) |
+| SC-H-404 | Nothing there: the code expired (30 minutes after the last thing done with it), or the link is wrong |
+| SC-H-405 | Not a way the relay is asked |
+| SC-H-409 | A part that does not fit: out of order, past the file's last, or a file described twice |
+| SC-H-410 | Closed on the computer (the sheet was closed, or the work handed in): the phone can send no more |
+| SC-H-413, SC-H-FILES | More than one hand-in takes: 50 MB, or 10 files |
+| SC-H-429 | Too many hand-ins started from one place in an hour |
+| SC-H-500 | The relay could not keep it; try again |
+| SC-H-503 | Hand in from your phone is not switched on at simplcourses.com |
+| SC-H-NET | No answer from simplcourses.com (the phone's page, or the computer starting) |
+| SC-H-LINK | The phone's page was opened from a link cut short (scan the code again) |
+| SC-H-CRYPTO | The phone's browser cannot seal files (open the link in Safari or Chrome) |
+
 
 - `extension/lib/errors.js` — the codes: `failed(kind)` (said by the request layer and the
   on-demand loader when something fails), `codeFor(err)`, `note(code)`, `recent()`.
@@ -83,3 +106,5 @@ take or pass on:
   put the code on the element as `data-code`; `app.css` draws it after the words, so it is never
   part of the words themselves.
 - `site/src/report.js` — the report page's handler and its `SC-B-…` codes.
+- `site/src/handin.js` — Hand in from your phone's relay and its `SC-H-…` codes (`scripts/dev/handin-test.mjs` holds
+  this list to the codes the relay and the phone's page give).
