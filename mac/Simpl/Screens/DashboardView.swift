@@ -226,12 +226,12 @@ struct DashboardView: View {
             Array(list[start..<min(start + cols, list.count)])
         }
         let tile = (width - Self.counterSpacing * CGFloat(cols - 1)) / CGFloat(cols)
-        let (style, full) = Self.wording(list, tileWidth: tile)
+        let style = Self.wording(list, tileWidth: tile)
         // (a tile's line on one line in a row of six — the row as low as 1.3.77's; on two at most in a row of three or two)
         let lines = cols == 6 ? 1 : 2
         return VStack(alignment: .leading, spacing: Self.counterSpacing) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                counterRow(row, cols: cols, style: style, full: full, tile: tile, lines: lines)
+                counterRow(row, cols: cols, style: style, tile: tile, lines: lines)
             }
         }
         .tourSpot(.counters) // (the tour's first step: everything due, at a glance)
@@ -278,10 +278,10 @@ struct DashboardView: View {
     static let counterSpacing: CGFloat = 14
 
     /// A row of tiles: each as tall as the row's tallest, which is as tall as what is on it.
-    private func counterRow(_ row: [Counter], cols: Int, style: DashCounterTile.Style, full: Bool, tile: CGFloat, lines: Int) -> some View {
+    private func counterRow(_ row: [Counter], cols: Int, style: DashCounterTile.Style, tile: CGFloat, lines: Int) -> some View {
         HStack(alignment: .top, spacing: Self.counterSpacing) {
             ForEach(row) { c in
-                counterSlot(c, style: style, full: full, tile: tile, lines: lines).frame(maxWidth: .infinity, maxHeight: .infinity)
+                counterSlot(c, style: style, tile: tile, lines: lines).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             ForEach(0..<max(cols - row.count, 0), id: \.self) { _ in
                 Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
@@ -290,17 +290,14 @@ struct DashboardView: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    /// (home-17) Which names a row of tiles shows, decided once for the row where it measures them: every counter's full
-    /// name — the one that says exactly what it counts ("Announcements", "Graded this week") — where every one of them
-    /// fits beside its symbol as the tile draws it; else every short name ("Unread", "Graded"), whose line says the rest
-    /// ("announcements · 2 courses"). (1.3.79) A tile too narrow for even those beside their symbols puts each symbol over
-    /// its name. Never a mix, and never a name cut.
-    static func wording(_ list: [Counter], tileWidth: CGFloat) -> (style: DashCounterTile.Style, full: Bool) {
+    /// (home-17) How a row of tiles lays out their names, decided once for the row where it measures them. (M17) Always
+    /// every counter's full name — the one that says exactly what it counts ("Announcements", "Graded this week"), never
+    /// the short "Unread" and "Graded" a narrower window used to swap in: beside its symbol where every one of them fits
+    /// so as the tile draws it; else (1.3.79) each symbol over its name, which wraps to a second line, or is set a little
+    /// smaller, where even that is too narrow (DashCounterTile). Never a mix, and never a name cut.
+    static func wording(_ list: [Counter], tileWidth: CGFloat) -> DashCounterTile.Style {
         let full = list.map { $0.fullLabel ?? $0.label }
-        let short = list.map(\.label)
-        if DashCounterTile.namesFit(full, tileWidth: tileWidth, style: .beside) { return (.beside, true) }
-        if DashCounterTile.namesFit(short, tileWidth: tileWidth, style: .beside) { return (.beside, false) }
-        return (.over, DashCounterTile.namesFit(full, tileWidth: tileWidth, style: .over))
+        return DashCounterTile.namesFit(full, tileWidth: tileWidth, style: .beside) ? .beside : .over
     }
 
     /// A counter's place in its row: the tile, or — while it has grown into its panel — the same tile unseen, so the row
@@ -308,20 +305,18 @@ struct DashboardView: View {
     /// it, and back — 1.3.80: the tile no longer stays under it, its coloured edge showing round the panel's rounder
     /// corners.)
     @ViewBuilder
-    private func counterSlot(_ c: Counter, style: DashCounterTile.Style, full: Bool, tile: CGFloat, lines: Int) -> some View {
-        let name = full ? (c.fullLabel ?? c.label) : c.label
-        let line = full ? fullNote(c) : note(c)
-        // (1.3.80: with its short name, its full name's line — "19 / 49 points" — where only that one fits)
-        let spare = full ? nil : fullNote(c)
+    private func counterSlot(_ c: Counter, style: DashCounterTile.Style, tile: CGFloat, lines: Int) -> some View {
+        let name = c.fullLabel ?? c.label
+        let line = fullNote(c)
         Group {
             if open == c.key {
                 DashCounterTile(counter: c, name: name, value: value(c), note: line, stale: stale(c), style: style,
-                                width: tile, lines: lines, spare: spare, tip: fullNote(c)) {}
+                                width: tile, lines: lines, tip: fullNote(c)) {}
                     .hidden()
                     .accessibilityHidden(true)
             } else {
                 DashCounterTile(counter: c, name: name, value: value(c), note: line, stale: stale(c), style: style,
-                                width: tile, lines: lines, spare: spare, tip: fullNote(c)) { setOpen(open == c.key ? nil : c.key) }
+                                width: tile, lines: lines, tip: fullNote(c)) { setOpen(open == c.key ? nil : c.key) }
                     .tourSpot(c.key == "next" ? .counterNext : nil)
                     .dashMorph(c.key, in: morph, enabled: grows)
                     .transition(.opacity)
@@ -372,15 +367,6 @@ struct DashboardView: View {
         let m = c.overdue ?? 0
         c.overdueNote = m > 0 ? "\(m) not submitted" : "Nothing overdue"
         withAnimation(Motion.snappy) { counts = c }
-    }
-
-    /// The line that goes with a counter's short name ("announcements · 2 courses", "this week · 19 / 49 points").
-    private func note(_ c: Counter) -> String? {
-        switch c.key {
-        case "overdue": return counts?.overdueNote
-        case "graded": return counts?.gradedNote
-        default: return c.note
-        }
     }
 
     /// (home-17) The line that goes with its full name ("3 unread · 2 courses", "19 / 49 points"); the panel's, too.
