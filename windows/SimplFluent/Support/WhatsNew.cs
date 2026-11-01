@@ -28,6 +28,11 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.106", "2026-11-01",
+            ("improved", "One kind of popup", "Every popup has the same heading, with × at the top right."),
+            ("improved", "Fits smaller windows", "A compact menu and a calendar that fits narrow windows."),
+            ("improved", "Clearer words", "Plain words in sentence case, and one way to write times."),
+            ("fixed", "Web tools say why", "A web tool that does not load says so in plain words.")),
         R("0.3.105", "2026-11-01",
             ("new", "Community tools", "Add tools other students made, from the Tools page."),
             ("new", "Tools work offline", "Added tools remember your numbers and work offline."),
