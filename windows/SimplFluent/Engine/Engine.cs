@@ -417,6 +417,7 @@ public sealed partial class Engine : Observable, IShellListener
     /// <summary>Signed out: the school's sign-in page at once, and the next account starts afresh.</summary>
     public void SignedOut()
     {
+        Notices.Stop(); // (again: the window, its screens still up while the session was cleared, may have started them)
         Answers.Clear();
         SessionKeep.Clear(); // (0.3.55: the session kept for a restart goes with it)
         // (0.3.25) nothing of this account's Alta kept for the next: its web view made ahead let go, and whether it used

@@ -375,7 +375,6 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
                 //  left free (a press there puts the search away)
                 Grid.SetRow(shell.SearchLayer, 1);
                 root.Children.Insert(root.Children.IndexOf(sheets), shell.SearchLayer);
-                Notices.Start(engine, this);
                 tour = new TourOverlay(engine, this);
                 // (onboarding-4: Keep Simpl on your taskbar? is asked the third time Simpl is opened, not after the tour)
                 Taskbar.Opened(this, Busy);
@@ -395,6 +394,9 @@ public sealed class MainWindow : FluentWindow, ISheetWindow
                 if (Launch.Get("community-wear") is { } wear) _ = Community.WearNamed(wear);
                 Taskbar.ShowIfAsked(this);
             }
+            // (each time the app's screens are up, not only as they are made: signed out and in again, the screens stay
+            //  and the reminders and alerts Sign Out stopped start again — nothing when they run already)
+            Notices.Start(engine, this);
             shell.WindowWidth(ActualWidth);
             SetCover(shell);
             pageArea.Visibility = Visibility.Collapsed;
