@@ -1,0 +1,2043 @@
+{
+ "about": "Simpl Community tools, format 1: the answers every app must give (docs/community-tools.md). Written by scripts/dev/tool-vectors.mjs from site/src/tool-format.js — do not edit by hand. Numbers JSON cannot hold are strings: \"NaN\", \"Infinity\", \"-Infinity\", \"-0\".",
+ "eval": [
+  {
+   "expr": "1 + 2 * 3",
+   "names": {},
+   "decimals": 4,
+   "text": "7"
+  },
+  {
+   "expr": "(1 + 2) * 3",
+   "names": {},
+   "decimals": 4,
+   "text": "9"
+  },
+  {
+   "expr": "2^3^2",
+   "names": {},
+   "decimals": 4,
+   "text": "512"
+  },
+  {
+   "expr": "-2^2",
+   "names": {},
+   "decimals": 4,
+   "text": "-4"
+  },
+  {
+   "expr": "(-2)^2",
+   "names": {},
+   "decimals": 4,
+   "text": "4"
+  },
+  {
+   "expr": "2^-1",
+   "names": {},
+   "decimals": 4,
+   "text": "0.5"
+  },
+  {
+   "expr": "- -3",
+   "names": {},
+   "decimals": 4,
+   "text": "3"
+  },
+  {
+   "expr": "+4",
+   "names": {},
+   "decimals": 4,
+   "text": "4"
+  },
+  {
+   "expr": "10 / 4",
+   "names": {},
+   "decimals": 4,
+   "text": "2.5"
+  },
+  {
+   "expr": "1 / 3",
+   "names": {},
+   "decimals": 4,
+   "text": "0.3333"
+  },
+  {
+   "expr": "2 / 3",
+   "names": {},
+   "decimals": 2,
+   "text": "0.67"
+  },
+  {
+   "expr": "7 % 3",
+   "names": {},
+   "decimals": 4,
+   "text": "1"
+  },
+  {
+   "expr": "-7 % 3",
+   "names": {},
+   "decimals": 4,
+   "text": "-1"
+  },
+  {
+   "expr": "7.5 % 2",
+   "names": {},
+   "decimals": 4,
+   "text": "1.5"
+  },
+  {
+   "expr": "5 % 0",
+   "names": {},
+   "decimals": 4,
+   "text": "—"
+  },
+  {
+   "expr": "1 / 0",
+   "names": {},
+   "decimals": 4,
+   "text": "—"
+  },
+  {
+   "expr": "0 / 0",
+   "names": {},
+   "decimals": 4,
+   "text": "—"
+  },
+  {
+   "expr": "1e3 + .5",
+   "names": {},
+   "decimals": 4,
+   "text": "1000.5"
+  },
+  {
+   "expr": "2.5e-3 * 4",
+   "names": {},
+   "decimals": 6,
+   "text": "0.01"
+  },
+  {
+   "expr": "3 > 2",
+   "names": {},
+   "decimals": 4,
+   "text": "1"
+  },
+  {
+   "expr": "3 < 2",
+   "names": {},
+   "decimals": 4,
+   "text": "0"
+  },
+  {
+   "expr": "2 >= 2",
+   "names": {},
+   "decimals": 4,
+   "text": "1"
+  },
+  {
+   "expr": "2 <= 1",
+   "names": {},
+   "decimals": 4,
+   "text": "0"
+  },
+  {
+   "expr": "1 == 1",
+   "names": {},
+   "decimals": 4,
+   "text": "1"
+  },
+  {
+   "expr": "1 != 1",
+   "names": {},
+   "decimals": 4,
+   "text": "0"
+  },
+  {
+   "expr": "1 < 2 == 1",
+   "names": {},
+   "decimals": 4,
+   "text": "1"
+  },
+  {
+   "expr": "1 && 0",
+   "names": {},
+   "decimals": 4,
+   "text": "0"
+  },
+  {
+   "expr": "1 || 0",
+   "names": {},
+   "decimals": 4,
+   "text": "1"
+  },
+  {
+   "expr": "0 || 0",
+   "names": {},
+   "decimals": 4,
+   "text": "0"
+  },
+  {
+   "expr": "!0",
+   "names": {},
+   "decimals": 4,
+   "text": "1"
+  },
+  {
+   "expr": "!5",
+   "names": {},
+   "decimals": 4,
+   "text": "0"
+  },
+  {
+   "expr": "!!5",
+   "names": {},
+   "decimals": 4,
+   "text": "1"
+  },
+  {
+   "expr": "(0/0) == (0/0)",
+   "names": {},
+   "decimals": 4,
+   "text": "0"
+  },
+  {
+   "expr": "(0/0) || 1",
+   "names": {},
+   "decimals": 4,
+   "text": "1"
+  },
+  {
+   "expr": "(0/0) ? 1 : 2",
+   "names": {},
+   "decimals": 4,
+   "text": "2"
+  },
+  {
+   "expr": "1 ? 2 : 3",
+   "names": {},
+   "decimals": 4,
+   "text": "2"
+  },
+  {
+   "expr": "0 ? 2 : 3",
+   "names": {},
+   "decimals": 4,
+   "text": "3"
+  },
+  {
+   "expr": "0 ? 1 : 0 ? 2 : 3",
+   "names": {},
+   "decimals": 4,
+   "text": "3"
+  },
+  {
+   "expr": "1 ? 0 ? 5 : 6 : 7",
+   "names": {},
+   "decimals": 4,
+   "text": "6"
+  },
+  {
+   "expr": "1 + 1 > 1 ? 10 : 20",
+   "names": {},
+   "decimals": 4,
+   "text": "10"
+  },
+  {
+   "expr": "1 || 0 && 0",
+   "names": {},
+   "decimals": 4,
+   "text": "1"
+  },
+  {
+   "expr": "pi",
+   "names": {},
+   "decimals": 6,
+   "text": "3.141593"
+  },
+  {
+   "expr": "e",
+   "names": {},
+   "decimals": 6,
+   "text": "2.718282"
+  },
+  {
+   "expr": "true + true",
+   "names": {},
+   "decimals": 4,
+   "text": "2"
+  },
+  {
+   "expr": "false",
+   "names": {},
+   "decimals": 4,
+   "text": "0"
+  },
+  {
+   "expr": "abs(-3.5)",
+   "names": {},
+   "decimals": 4,
+   "text": "3.5"
+  },
+  {
+   "expr": "sqrt(16)",
+   "names": {},
+   "decimals": 4,
+   "text": "4"
+  },
+  {
+   "expr": "sqrt(2)",
+   "names": {},
+   "decimals": 6,
+   "text": "1.414214"
+  },
+  {
+   "expr": "sqrt(-1)",
+   "names": {},
+   "decimals": 4,
+   "text": "—"
+  },
+  {
+   "expr": "cbrt(-27)",
+   "names": {},
+   "decimals": 4,
+   "text": "-3"
+  },
+  {
+   "expr": "exp(1)",
+   "names": {},
+   "decimals": 5,
+   "text": "2.71828"
+  },
+  {
+   "expr": "ln(e^2)",
+   "names": {},
+   "decimals": 4,
+   "text": "2"
+  },
+  {
+   "expr": "log(1000)",
+   "names": {},
+   "decimals": 4,
+   "text": "3"
+  },
+  {
+   "expr": "log2(1024)",
+   "names": {},
+   "decimals": 4,
+   "text": "10"
+  },
+  {
+   "expr": "ln(0)",
+   "names": {},
+   "decimals": 4,
+   "text": "—"
+  },
+  {
+   "expr": "log(-1)",
+   "names": {},
+   "decimals": 4,
+   "text": "—"
+  },
+  {
+   "expr": "sin(pi / 6)",
+   "names": {},
+   "decimals": 4,
+   "text": "0.5"
+  },
+  {
+   "expr": "cos(0)",
+   "names": {},
+   "decimals": 4,
+   "text": "1"
+  },
+  {
+   "expr": "tan(pi / 4)",
+   "names": {},
+   "decimals": 4,
+   "text": "1"
+  },
+  {
+   "expr": "asin(1)",
+   "names": {},
+   "decimals": 4,
+   "text": "1.5708"
+  },
+  {
+   "expr": "acos(2)",
+   "names": {},
+   "decimals": 4,
+   "text": "—"
+  },
+  {
+   "expr": "atan(1) * 4",
+   "names": {},
+   "decimals": 6,
+   "text": "3.141593"
+  },
+  {
+   "expr": "atan2(1, -1)",
+   "names": {},
+   "decimals": 4,
+   "text": "2.3562"
+  },
+  {
+   "expr": "sin(rad(30))",
+   "names": {},
+   "decimals": 4,
+   "text": "0.5"
+  },
+  {
+   "expr": "deg(pi / 3)",
+   "names": {},
+   "decimals": 4,
+   "text": "60"
+  },
+  {
+   "expr": "rad(180)",
+   "names": {},
+   "decimals": 5,
+   "text": "3.14159"
+  },
+  {
+   "expr": "floor(-2.5)",
+   "names": {},
+   "decimals": 4,
+   "text": "-3"
+  },
+  {
+   "expr": "ceil(-2.5)",
+   "names": {},
+   "decimals": 4,
+   "text": "-2"
+  },
+  {
+   "expr": "trunc(-2.7)",
+   "names": {},
+   "decimals": 4,
+   "text": "-2"
+  },
+  {
+   "expr": "round(2.5)",
+   "names": {},
+   "decimals": 4,
+   "text": "3"
+  },
+  {
+   "expr": "round(-2.5)",
+   "names": {},
+   "decimals": 4,
+   "text": "-3"
+  },
+  {
+   "expr": "round(2.4999)",
+   "names": {},
+   "decimals": 4,
+   "text": "2"
+  },
+  {
+   "expr": "round(1.23456, 3)",
+   "names": {},
+   "decimals": 6,
+   "text": "1.235"
+  },
+  {
+   "expr": "round(1.005, 2)",
+   "names": {},
+   "decimals": 4,
+   "text": "1"
+  },
+  {
+   "expr": "round(123.456, -1)",
+   "names": {},
+   "decimals": 4,
+   "text": "123"
+  },
+  {
+   "expr": "round(5.55, 1)",
+   "names": {},
+   "decimals": 4,
+   "text": "5.6"
+  },
+  {
+   "expr": "round(2, 0/0)",
+   "names": {},
+   "decimals": 4,
+   "text": "—"
+  },
+  {
+   "expr": "round(1e300, 2)",
+   "names": {},
+   "decimals": 4,
+   "text": "1 × 10³⁰⁰"
+  },
+  {
+   "expr": "sign(-3)",
+   "names": {},
+   "decimals": 4,
+   "text": "-1"
+  },
+  {
+   "expr": "sign(0)",
+   "names": {},
+   "decimals": 4,
+   "text": "0"
+  },
+  {
+   "expr": "sign(2)",
+   "names": {},
+   "decimals": 4,
+   "text": "1"
+  },
+  {
+   "expr": "sign(0/0)",
+   "names": {},
+   "decimals": 4,
+   "text": "—"
+  },
+  {
+   "expr": "min(3, 1, 2)",
+   "names": {},
+   "decimals": 4,
+   "text": "1"
+  },
+  {
+   "expr": "max(3, 1, 2)",
+   "names": {},
+   "decimals": 4,
+   "text": "3"
+  },
+  {
+   "expr": "min(4)",
+   "names": {},
+   "decimals": 4,
+   "text": "4"
+  },
+  {
+   "expr": "max(1, 0/0)",
+   "names": {},
+   "decimals": 4,
+   "text": "—"
+  },
+  {
+   "expr": "min(0/0, 1)",
+   "names": {},
+   "decimals": 4,
+   "text": "—"
+  },
+  {
+   "expr": "pow(2, 10)",
+   "names": {},
+   "decimals": 4,
+   "text": "1024"
+  },
+  {
+   "expr": "pow(1, 0/0)",
+   "names": {},
+   "decimals": 4,
+   "text": "—"
+  },
+  {
+   "expr": "pow(0/0, 0)",
+   "names": {},
+   "decimals": 4,
+   "text": "1"
+  },
+  {
+   "expr": "pow(-1, 1/0)",
+   "names": {},
+   "decimals": 4,
+   "text": "—"
+  },
+  {
+   "expr": "pow(-8, 1/3)",
+   "names": {},
+   "decimals": 4,
+   "text": "—"
+  },
+  {
+   "expr": "pow(0, -1)",
+   "names": {},
+   "decimals": 4,
+   "text": "—"
+  },
+  {
+   "expr": "hypot(3, 4)",
+   "names": {},
+   "decimals": 4,
+   "text": "5"
+  },
+  {
+   "expr": "clamp(5, 0, 3)",
+   "names": {},
+   "decimals": 4,
+   "text": "3"
+  },
+  {
+   "expr": "clamp(-1, 0, 3)",
+   "names": {},
+   "decimals": 4,
+   "text": "0"
+  },
+  {
+   "expr": "clamp(0/0, 0, 1)",
+   "names": {},
+   "decimals": 4,
+   "text": "—"
+  },
+  {
+   "expr": "fact(0)",
+   "names": {},
+   "decimals": 4,
+   "text": "1"
+  },
+  {
+   "expr": "fact(5)",
+   "names": {},
+   "decimals": 4,
+   "text": "120"
+  },
+  {
+   "expr": "fact(20)",
+   "names": {},
+   "decimals": 0,
+   "text": "2.433 × 10¹⁸"
+  },
+  {
+   "expr": "fact(5.5)",
+   "names": {},
+   "decimals": 4,
+   "text": "—"
+  },
+  {
+   "expr": "fact(-1)",
+   "names": {},
+   "decimals": 4,
+   "text": "—"
+  },
+  {
+   "expr": "fact(171)",
+   "names": {},
+   "decimals": 4,
+   "text": "—"
+  },
+  {
+   "expr": "fact(170)",
+   "names": {},
+   "decimals": 4,
+   "text": "7.257 × 10³⁰⁶"
+  },
+  {
+   "expr": "v / r",
+   "names": {
+    "v": 12,
+    "r": 4
+   },
+   "decimals": 4,
+   "text": "3"
+  },
+  {
+   "expr": "v / r",
+   "names": {
+    "v": 12,
+    "r": 0
+   },
+   "decimals": 4,
+   "text": "—"
+  },
+  {
+   "expr": "p * (1 + r / 100) ^ n",
+   "names": {
+    "p": 1000,
+    "r": 5,
+    "n": 10
+   },
+   "decimals": 2,
+   "text": "1628.89"
+  },
+  {
+   "expr": "(-b + sqrt(b^2 - 4*a*c)) / (2*a)",
+   "names": {
+    "a": 1,
+    "b": -3,
+    "c": 2
+   },
+   "decimals": 4,
+   "text": "2"
+  },
+  {
+   "expr": "(-b - sqrt(b^2 - 4*a*c)) / (2*a)",
+   "names": {
+    "a": 1,
+    "b": 2,
+    "c": 5
+   },
+   "decimals": 4,
+   "text": "—"
+  },
+  {
+   "expr": "mode == 1 ? v / r : v * r",
+   "names": {
+    "mode": 1,
+    "v": 9,
+    "r": 3
+   },
+   "decimals": 4,
+   "text": "3"
+  },
+  {
+   "expr": "mode == 1 ? v / r : v * r",
+   "names": {
+    "mode": 2,
+    "v": 9,
+    "r": 3
+   },
+   "decimals": 4,
+   "text": "27"
+  },
+  {
+   "expr": "x * 9 / 5 + 32",
+   "names": {
+    "x": 37
+   },
+   "decimals": 1,
+   "text": "98.6"
+  },
+  {
+   "expr": "(f - 32) * 5 / 9",
+   "names": {
+    "f": 98.6
+   },
+   "decimals": 2,
+   "text": "37"
+  },
+  {
+   "expr": "a_1 + b2",
+   "names": {
+    "a_1": 0.1,
+    "b2": 0.2
+   },
+   "decimals": 4,
+   "text": "0.3"
+  },
+  {
+   "expr": "0.1 + 0.2",
+   "names": {},
+   "decimals": 10,
+   "text": "0.3"
+  },
+  {
+   "expr": "1e12",
+   "names": {},
+   "decimals": 4,
+   "text": "1 × 10¹²"
+  },
+  {
+   "expr": "999999999999",
+   "names": {},
+   "decimals": 4,
+   "text": "999,999,999,999"
+  },
+  {
+   "expr": "-1e15 / 3",
+   "names": {},
+   "decimals": 4,
+   "text": "-3.333 × 10¹⁴"
+  },
+  {
+   "expr": "1 / 3 * 1e-5",
+   "names": {},
+   "decimals": 4,
+   "text": "3.333 × 10⁻⁶"
+  },
+  {
+   "expr": "6.02214076e23",
+   "names": {},
+   "decimals": 4,
+   "text": "6.022 × 10²³"
+  },
+  {
+   "expr": "1.602e-19",
+   "names": {},
+   "decimals": 4,
+   "text": "1.602 × 10⁻¹⁹"
+  },
+  {
+   "expr": "12345.6789",
+   "names": {},
+   "decimals": 2,
+   "text": "12,345.68"
+  },
+  {
+   "expr": "-12345.6789",
+   "names": {},
+   "decimals": 0,
+   "text": "-12,346"
+  },
+  {
+   "expr": "1234.5",
+   "names": {},
+   "decimals": 1,
+   "text": "1234.5"
+  },
+  {
+   "expr": "99999.99999",
+   "names": {},
+   "decimals": 4,
+   "text": "100,000"
+  },
+  {
+   "expr": "0.00004",
+   "names": {},
+   "decimals": 4,
+   "text": "4 × 10⁻⁵"
+  },
+  {
+   "expr": "0.00005",
+   "names": {},
+   "decimals": 4,
+   "text": "0.0001"
+  },
+  {
+   "expr": "0.3",
+   "names": {},
+   "decimals": 0,
+   "text": "0"
+  },
+  {
+   "expr": "0.5",
+   "names": {},
+   "decimals": 0,
+   "text": "1"
+  },
+  {
+   "expr": "-0.5",
+   "names": {},
+   "decimals": 0,
+   "text": "-1"
+  },
+  {
+   "expr": "1e-7",
+   "names": {},
+   "decimals": 10,
+   "text": "0.0000001"
+  },
+  {
+   "expr": "-0.00001",
+   "names": {},
+   "decimals": 4,
+   "text": "-1 × 10⁻⁵"
+  },
+  {
+   "expr": "9.9995e11",
+   "names": {},
+   "decimals": 4,
+   "text": "999,950,000,000"
+  },
+  {
+   "expr": "9.99999e14",
+   "names": {},
+   "decimals": 4,
+   "text": "1 × 10¹⁵"
+  },
+  {
+   "expr": "123456789",
+   "names": {},
+   "decimals": 0,
+   "text": "123,456,789"
+  },
+  {
+   "expr": "-0",
+   "names": {},
+   "decimals": 4,
+   "text": "0"
+  }
+ ],
+ "errors": [
+  {
+   "expr": "",
+   "names": []
+  },
+  {
+   "expr": "   ",
+   "names": []
+  },
+  {
+   "expr": "1 +",
+   "names": []
+  },
+  {
+   "expr": "(1",
+   "names": []
+  },
+  {
+   "expr": "1)",
+   "names": []
+  },
+  {
+   "expr": "1 2",
+   "names": []
+  },
+  {
+   "expr": "* 3",
+   "names": []
+  },
+  {
+   "expr": "1 ? 2",
+   "names": []
+  },
+  {
+   "expr": "1 : 2",
+   "names": []
+  },
+  {
+   "expr": "foo(1)",
+   "names": []
+  },
+  {
+   "expr": "sqrt()",
+   "names": []
+  },
+  {
+   "expr": "sqrt(1, 2)",
+   "names": []
+  },
+  {
+   "expr": "atan2(1)",
+   "names": []
+  },
+  {
+   "expr": "round(1, 2, 3)",
+   "names": []
+  },
+  {
+   "expr": "clamp(1, 2)",
+   "names": []
+  },
+  {
+   "expr": "x + 1",
+   "names": []
+  },
+  {
+   "expr": "X + 1",
+   "names": [
+    "x"
+   ]
+  },
+  {
+   "expr": "1 # 2",
+   "names": []
+  },
+  {
+   "expr": "1 = 2",
+   "names": []
+  },
+  {
+   "expr": "1 & 2",
+   "names": []
+  },
+  {
+   "expr": "a.b",
+   "names": [
+    "a"
+   ]
+  },
+  {
+   "expr": "2(3)",
+   "names": []
+  },
+  {
+   "expr": "\"1\"",
+   "names": []
+  },
+  {
+   "expr": "1..2",
+   "names": []
+  },
+  {
+   "expr": "sqrt",
+   "names": []
+  },
+  {
+   "expr": "pi()",
+   "names": []
+  },
+  {
+   "expr": "min(1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1)",
+   "names": []
+  },
+  {
+   "expr": "1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+   "names": []
+  }
+ ],
+ "tools": [
+  {
+   "name": "ohms law, every kind of input",
+   "tool": {
+    "format": 1,
+    "name": "Ohm’s Law",
+    "maker": "Simpl",
+    "summary": "Volts, amps and ohms.",
+    "group": "science",
+    "symbol": "bolt",
+    "color": "#FF9500",
+    "inputs": [
+     {
+      "id": "mode",
+      "kind": "choice",
+      "label": "Solve for",
+      "options": [
+       {
+        "label": "Current",
+        "value": 1
+       },
+       {
+        "label": "Voltage",
+        "value": 2
+       }
+      ],
+      "default": 1
+     },
+     {
+      "id": "v",
+      "kind": "number",
+      "label": "Voltage",
+      "unit": "V",
+      "default": 12,
+      "min": 0
+     },
+     {
+      "id": "i",
+      "kind": "number",
+      "label": "Current",
+      "unit": "A",
+      "default": 2,
+      "min": 0,
+      "max": 100,
+      "step": 0.1
+     },
+     {
+      "id": "r",
+      "kind": "number",
+      "label": "Resistance",
+      "unit": "Ω",
+      "default": 4,
+      "min": 0
+     },
+     {
+      "id": "mw",
+      "kind": "toggle",
+      "label": "Power in milliwatts"
+     }
+    ],
+    "outputs": [
+     {
+      "id": "amps",
+      "label": "Current",
+      "value": "v / r",
+      "unit": "A",
+      "when": "mode == 1"
+     },
+     {
+      "id": "volts",
+      "label": "Voltage",
+      "value": "i * r",
+      "unit": "V",
+      "when": "mode == 2",
+      "decimals": 2
+     },
+     {
+      "label": "Power",
+      "value": "(mode == 1 ? v * amps : volts * i) * (mw ? 1000 : 1)",
+      "unit": "W",
+      "decimals": 1
+     }
+    ],
+    "note": "V = I × R. Power is V × I."
+   },
+   "valid": true,
+   "checked": {
+    "format": 1,
+    "name": "Ohm’s Law",
+    "maker": "Simpl",
+    "summary": "Volts, amps and ohms.",
+    "group": "science",
+    "symbol": "bolt",
+    "color": "#ff9500",
+    "inputs": [
+     {
+      "id": "mode",
+      "kind": "choice",
+      "label": "Solve for",
+      "options": [
+       {
+        "label": "Current",
+        "value": 1
+       },
+       {
+        "label": "Voltage",
+        "value": 2
+       }
+      ],
+      "default": 1
+     },
+     {
+      "id": "v",
+      "kind": "number",
+      "label": "Voltage",
+      "unit": "V",
+      "default": 12,
+      "min": 0,
+      "step": 1
+     },
+     {
+      "id": "i",
+      "kind": "number",
+      "label": "Current",
+      "unit": "A",
+      "default": 2,
+      "min": 0,
+      "max": 100,
+      "step": 0.1
+     },
+     {
+      "id": "r",
+      "kind": "number",
+      "label": "Resistance",
+      "unit": "Ω",
+      "default": 4,
+      "min": 0,
+      "step": 1
+     },
+     {
+      "id": "mw",
+      "kind": "toggle",
+      "label": "Power in milliwatts",
+      "default": false
+     }
+    ],
+    "outputs": [
+     {
+      "id": "amps",
+      "label": "Current",
+      "value": "v / r",
+      "unit": "A",
+      "decimals": 4,
+      "when": "mode == 1"
+     },
+     {
+      "id": "volts",
+      "label": "Voltage",
+      "value": "i * r",
+      "unit": "V",
+      "decimals": 2,
+      "when": "mode == 2"
+     },
+     {
+      "label": "Power",
+      "value": "(mode == 1 ? v * amps : volts * i) * (mw ? 1000 : 1)",
+      "unit": "W",
+      "decimals": 1
+     }
+    ],
+    "note": "V = I × R. Power is V × I."
+   },
+   "runs": [
+    {
+     "given": {},
+     "results": [
+      {
+       "text": "3",
+       "shown": true
+      },
+      {
+       "text": "8",
+       "shown": false
+      },
+      {
+       "text": "36",
+       "shown": true
+      }
+     ]
+    },
+    {
+     "given": {
+      "mode": 2,
+      "i": 1.5,
+      "r": 10
+     },
+     "results": [
+      {
+       "text": "1.2",
+       "shown": false
+      },
+      {
+       "text": "15",
+       "shown": true
+      },
+      {
+       "text": "22.5",
+       "shown": true
+      }
+     ]
+    },
+    {
+     "given": {
+      "mode": 1,
+      "v": 9,
+      "r": 0
+     },
+     "results": [
+      {
+       "text": "—",
+       "shown": true
+      },
+      {
+       "text": "0",
+       "shown": false
+      },
+      {
+       "text": "—",
+       "shown": true
+      }
+     ]
+    },
+    {
+     "given": {
+      "mode": 3,
+      "v": -5,
+      "i": 500,
+      "r": 2,
+      "mw": true
+     },
+     "results": [
+      {
+       "text": "0",
+       "shown": true
+      },
+      {
+       "text": "200",
+       "shown": false
+      },
+      {
+       "text": "0",
+       "shown": true
+      }
+     ]
+    },
+    {
+     "given": {
+      "v": "x",
+      "i": 0.25
+     },
+     "results": [
+      {
+       "text": "3",
+       "shown": true
+      },
+      {
+       "text": "1",
+       "shown": false
+      },
+      {
+       "text": "36",
+       "shown": true
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "a table and no note",
+   "tool": {
+    "format": 1,
+    "name": "  Grade   points  ",
+    "summary": "Letter grades as points.",
+    "group": "study",
+    "symbol": "book",
+    "color": "#34c759",
+    "inputs": [
+     {
+      "id": "pct",
+      "kind": "number",
+      "label": "Percent",
+      "unit": "%",
+      "default": 91.5,
+      "min": 0,
+      "max": 100
+     }
+    ],
+    "outputs": [
+     {
+      "label": "Points",
+      "value": "pct >= 93 ? 4 : pct >= 90 ? 3.7 : pct >= 87 ? 3.3 : pct >= 83 ? 3 : pct >= 80 ? 2.7 : 0",
+      "decimals": 1
+     }
+    ],
+    "table": {
+     "title": "The scale",
+     "columns": [
+      "Letter",
+      "From",
+      "Points"
+     ],
+     "rows": [
+      [
+       "A",
+       "93",
+       "4.0"
+      ],
+      [
+       "A-",
+       90,
+       "3.7"
+      ]
+     ]
+    }
+   },
+   "valid": true,
+   "checked": {
+    "format": 1,
+    "name": "Grade points",
+    "maker": "",
+    "summary": "Letter grades as points.",
+    "group": "study",
+    "symbol": "book",
+    "color": "#34c759",
+    "inputs": [
+     {
+      "id": "pct",
+      "kind": "number",
+      "label": "Percent",
+      "unit": "%",
+      "default": 91.5,
+      "min": 0,
+      "max": 100,
+      "step": 1
+     }
+    ],
+    "outputs": [
+     {
+      "label": "Points",
+      "value": "pct >= 93 ? 4 : pct >= 90 ? 3.7 : pct >= 87 ? 3.3 : pct >= 83 ? 3 : pct >= 80 ? 2.7 : 0",
+      "unit": "",
+      "decimals": 1
+     }
+    ],
+    "table": {
+     "title": "The scale",
+     "columns": [
+      "Letter",
+      "From",
+      "Points"
+     ],
+     "rows": [
+      [
+       "A",
+       "93",
+       "4.0"
+      ],
+      [
+       "A-",
+       "90",
+       "3.7"
+      ]
+     ]
+    }
+   },
+   "runs": [
+    {
+     "given": {},
+     "results": [
+      {
+       "text": "3.7",
+       "shown": true
+      }
+     ]
+    },
+    {
+     "given": {
+      "pct": 120
+     },
+     "results": [
+      {
+       "text": "4",
+       "shown": true
+      }
+     ]
+    },
+    {
+     "given": {
+      "pct": 84
+     },
+     "results": [
+      {
+       "text": "3",
+       "shown": true
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "an extra key, read leniently",
+   "tool": {
+    "format": 1,
+    "name": "X",
+    "summary": "Y",
+    "group": "math",
+    "symbol": "sum",
+    "color": "#000000",
+    "inputs": [
+     {
+      "id": "a",
+      "kind": "number",
+      "label": "A",
+      "colour": "red"
+     }
+    ],
+    "outputs": [
+     {
+      "label": "Twice",
+      "value": "a * 2"
+     }
+    ],
+    "later": true
+   },
+   "valid": true,
+   "checked": {
+    "format": 1,
+    "name": "X",
+    "maker": "",
+    "summary": "Y",
+    "group": "math",
+    "symbol": "sum",
+    "color": "#000000",
+    "inputs": [
+     {
+      "id": "a",
+      "kind": "number",
+      "label": "A",
+      "unit": "",
+      "default": 0,
+      "step": 1
+     }
+    ],
+    "outputs": [
+     {
+      "label": "Twice",
+      "value": "a * 2",
+      "unit": "",
+      "decimals": 4
+     }
+    ]
+   },
+   "runs": [
+    {
+     "given": {
+      "a": 21
+     },
+     "results": [
+      {
+       "text": "42",
+       "shown": true
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "needs a newer Simpl",
+   "tool": {
+    "format": 2,
+    "name": "X",
+    "summary": "Y",
+    "group": "math",
+    "symbol": "sum",
+    "color": "#000000",
+    "inputs": [],
+    "outputs": []
+   },
+   "valid": false,
+   "code": "SC-T-FORMAT"
+  },
+  {
+   "name": "no name",
+   "tool": {
+    "format": 1,
+    "name": " ",
+    "summary": "Y",
+    "group": "math",
+    "symbol": "sum",
+    "color": "#000000",
+    "inputs": [
+     {
+      "id": "a",
+      "kind": "number",
+      "label": "A"
+     }
+    ],
+    "outputs": [
+     {
+      "label": "B",
+      "value": "a"
+     }
+    ]
+   },
+   "valid": false,
+   "code": "SC-T-NAME"
+  },
+  {
+   "name": "unknown group",
+   "tool": {
+    "format": 1,
+    "name": "X",
+    "summary": "Y",
+    "group": "games",
+    "symbol": "sum",
+    "color": "#000000",
+    "inputs": [
+     {
+      "id": "a",
+      "kind": "number",
+      "label": "A"
+     }
+    ],
+    "outputs": [
+     {
+      "label": "B",
+      "value": "a"
+     }
+    ]
+   },
+   "valid": false,
+   "code": "SC-T-GROUP"
+  },
+  {
+   "name": "unknown symbol",
+   "tool": {
+    "format": 1,
+    "name": "X",
+    "summary": "Y",
+    "group": "math",
+    "symbol": "rocket",
+    "color": "#000000",
+    "inputs": [
+     {
+      "id": "a",
+      "kind": "number",
+      "label": "A"
+     }
+    ],
+    "outputs": [
+     {
+      "label": "B",
+      "value": "a"
+     }
+    ]
+   },
+   "valid": false,
+   "code": "SC-T-SYMBOL"
+  },
+  {
+   "name": "bad colour",
+   "tool": {
+    "format": 1,
+    "name": "X",
+    "summary": "Y",
+    "group": "math",
+    "symbol": "sum",
+    "color": "red",
+    "inputs": [
+     {
+      "id": "a",
+      "kind": "number",
+      "label": "A"
+     }
+    ],
+    "outputs": [
+     {
+      "label": "B",
+      "value": "a"
+     }
+    ]
+   },
+   "valid": false,
+   "code": "SC-T-COLOUR"
+  },
+  {
+   "name": "no inputs",
+   "tool": {
+    "format": 1,
+    "name": "X",
+    "summary": "Y",
+    "group": "math",
+    "symbol": "sum",
+    "color": "#000000",
+    "inputs": [],
+    "outputs": [
+     {
+      "label": "B",
+      "value": "1"
+     }
+    ]
+   },
+   "valid": false,
+   "code": "SC-T-INPUTS"
+  },
+  {
+   "name": "a reserved id",
+   "tool": {
+    "format": 1,
+    "name": "X",
+    "summary": "Y",
+    "group": "math",
+    "symbol": "sum",
+    "color": "#000000",
+    "inputs": [
+     {
+      "id": "pi",
+      "kind": "number",
+      "label": "A"
+     }
+    ],
+    "outputs": [
+     {
+      "label": "B",
+      "value": "1"
+     }
+    ]
+   },
+   "valid": false,
+   "code": "SC-T-ID"
+  },
+  {
+   "name": "a function name as an id",
+   "tool": {
+    "format": 1,
+    "name": "X",
+    "summary": "Y",
+    "group": "math",
+    "symbol": "sum",
+    "color": "#000000",
+    "inputs": [
+     {
+      "id": "sqrt",
+      "kind": "number",
+      "label": "A"
+     }
+    ],
+    "outputs": [
+     {
+      "label": "B",
+      "value": "1"
+     }
+    ]
+   },
+   "valid": false,
+   "code": "SC-T-ID"
+  },
+  {
+   "name": "an id used twice",
+   "tool": {
+    "format": 1,
+    "name": "X",
+    "summary": "Y",
+    "group": "math",
+    "symbol": "sum",
+    "color": "#000000",
+    "inputs": [
+     {
+      "id": "a",
+      "kind": "number",
+      "label": "A"
+     }
+    ],
+    "outputs": [
+     {
+      "id": "a",
+      "label": "B",
+      "value": "1"
+     }
+    ]
+   },
+   "valid": false,
+   "code": "SC-T-ID"
+  },
+  {
+   "name": "an id with a capital",
+   "tool": {
+    "format": 1,
+    "name": "X",
+    "summary": "Y",
+    "group": "math",
+    "symbol": "sum",
+    "color": "#000000",
+    "inputs": [
+     {
+      "id": "Ab",
+      "kind": "number",
+      "label": "A"
+     }
+    ],
+    "outputs": [
+     {
+      "label": "B",
+      "value": "1"
+     }
+    ]
+   },
+   "valid": false,
+   "code": "SC-T-ID"
+  },
+  {
+   "name": "a later result used too soon",
+   "tool": {
+    "format": 1,
+    "name": "X",
+    "summary": "Y",
+    "group": "math",
+    "symbol": "sum",
+    "color": "#000000",
+    "inputs": [
+     {
+      "id": "a",
+      "kind": "number",
+      "label": "A"
+     }
+    ],
+    "outputs": [
+     {
+      "label": "B",
+      "value": "c + 1"
+     },
+     {
+      "id": "c",
+      "label": "C",
+      "value": "a"
+     }
+    ]
+   },
+   "valid": false,
+   "code": "SC-T-NAME-USE"
+  },
+  {
+   "name": "a result reading itself",
+   "tool": {
+    "format": 1,
+    "name": "X",
+    "summary": "Y",
+    "group": "math",
+    "symbol": "sum",
+    "color": "#000000",
+    "inputs": [
+     {
+      "id": "a",
+      "kind": "number",
+      "label": "A"
+     }
+    ],
+    "outputs": [
+     {
+      "id": "b",
+      "label": "B",
+      "value": "b + 1"
+     }
+    ]
+   },
+   "valid": false,
+   "code": "SC-T-NAME-USE"
+  },
+  {
+   "name": "when may read its own result",
+   "tool": {
+    "format": 1,
+    "name": "X",
+    "summary": "Y",
+    "group": "math",
+    "symbol": "sum",
+    "color": "#000000",
+    "inputs": [
+     {
+      "id": "a",
+      "kind": "number",
+      "label": "A"
+     }
+    ],
+    "outputs": [
+     {
+      "id": "b",
+      "label": "B",
+      "value": "a - 1",
+      "when": "b > 0"
+     }
+    ]
+   },
+   "valid": true,
+   "checked": {
+    "format": 1,
+    "name": "X",
+    "maker": "",
+    "summary": "Y",
+    "group": "math",
+    "symbol": "sum",
+    "color": "#000000",
+    "inputs": [
+     {
+      "id": "a",
+      "kind": "number",
+      "label": "A",
+      "unit": "",
+      "default": 0,
+      "step": 1
+     }
+    ],
+    "outputs": [
+     {
+      "id": "b",
+      "label": "B",
+      "value": "a - 1",
+      "unit": "",
+      "decimals": 4,
+      "when": "b > 0"
+     }
+    ]
+   },
+   "runs": [
+    {
+     "given": {
+      "a": 3
+     },
+     "results": [
+      {
+       "text": "2",
+       "shown": true
+      }
+     ]
+    },
+    {
+     "given": {
+      "a": 1
+     },
+     "results": [
+      {
+       "text": "0",
+       "shown": false
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "a bad formula",
+   "tool": {
+    "format": 1,
+    "name": "X",
+    "summary": "Y",
+    "group": "math",
+    "symbol": "sum",
+    "color": "#000000",
+    "inputs": [
+     {
+      "id": "a",
+      "kind": "number",
+      "label": "A"
+     }
+    ],
+    "outputs": [
+     {
+      "label": "B",
+      "value": "a +"
+     }
+    ]
+   },
+   "valid": false,
+   "code": "SC-T-FORMULA"
+  },
+  {
+   "name": "a choice with one option",
+   "tool": {
+    "format": 1,
+    "name": "X",
+    "summary": "Y",
+    "group": "math",
+    "symbol": "sum",
+    "color": "#000000",
+    "inputs": [
+     {
+      "id": "a",
+      "kind": "choice",
+      "label": "A",
+      "options": [
+       {
+        "label": "One",
+        "value": 1
+       }
+      ]
+     }
+    ],
+    "outputs": [
+     {
+      "label": "B",
+      "value": "a"
+     }
+    ]
+   },
+   "valid": false,
+   "code": "SC-T-OPTIONS"
+  },
+  {
+   "name": "two options alike",
+   "tool": {
+    "format": 1,
+    "name": "X",
+    "summary": "Y",
+    "group": "math",
+    "symbol": "sum",
+    "color": "#000000",
+    "inputs": [
+     {
+      "id": "a",
+      "kind": "choice",
+      "label": "A",
+      "options": [
+       {
+        "label": "One",
+        "value": 1
+       },
+       {
+        "label": "Uno",
+        "value": 1
+       }
+      ]
+     }
+    ],
+    "outputs": [
+     {
+      "label": "B",
+      "value": "a"
+     }
+    ]
+   },
+   "valid": false,
+   "code": "SC-T-OPTIONS"
+  },
+  {
+   "name": "min above max",
+   "tool": {
+    "format": 1,
+    "name": "X",
+    "summary": "Y",
+    "group": "math",
+    "symbol": "sum",
+    "color": "#000000",
+    "inputs": [
+     {
+      "id": "a",
+      "kind": "number",
+      "label": "A",
+      "min": 5,
+      "max": 1
+     }
+    ],
+    "outputs": [
+     {
+      "label": "B",
+      "value": "a"
+     }
+    ]
+   },
+   "valid": false,
+   "code": "SC-T-RANGE"
+  },
+  {
+   "name": "decimals too many",
+   "tool": {
+    "format": 1,
+    "name": "X",
+    "summary": "Y",
+    "group": "math",
+    "symbol": "sum",
+    "color": "#000000",
+    "inputs": [
+     {
+      "id": "a",
+      "kind": "number",
+      "label": "A"
+     }
+    ],
+    "outputs": [
+     {
+      "label": "B",
+      "value": "a",
+      "decimals": 11
+     }
+    ]
+   },
+   "valid": false,
+   "code": "SC-T-DECIMALS"
+  },
+  {
+   "name": "a ragged table",
+   "tool": {
+    "format": 1,
+    "name": "X",
+    "summary": "Y",
+    "group": "math",
+    "symbol": "sum",
+    "color": "#000000",
+    "inputs": [
+     {
+      "id": "a",
+      "kind": "number",
+      "label": "A"
+     }
+    ],
+    "outputs": [
+     {
+      "label": "B",
+      "value": "a"
+     }
+    ],
+    "table": {
+     "columns": [
+      "A",
+      "B"
+     ],
+     "rows": [
+      [
+       "1"
+      ]
+     ]
+    }
+   },
+   "valid": false,
+   "code": "SC-T-TABLE"
+  },
+  {
+   "name": "an unknown input kind",
+   "tool": {
+    "format": 1,
+    "name": "X",
+    "summary": "Y",
+    "group": "math",
+    "symbol": "sum",
+    "color": "#000000",
+    "inputs": [
+     {
+      "id": "a",
+      "kind": "text",
+      "label": "A"
+     }
+    ],
+    "outputs": [
+     {
+      "label": "B",
+      "value": "1"
+     }
+    ]
+   },
+   "valid": false,
+   "code": "SC-T-KIND"
+  }
+ ]
+}
