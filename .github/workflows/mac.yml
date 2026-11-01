@@ -82,7 +82,8 @@ jobs:
   # there without touching this), (1.3.80) the chemistry tools' (every file in mac/Simpl/Tools/Chemistry/Model), (tools)
   # the Study Planner's planner (mac/Simpl/Tools/Planner/Model), Verb Conjugations' engine (mac/Simpl/Tools/Verbs/Model,
   # read with the languages' data files in mac/Simpl/Resources/Verbs) and the
-  # live checks' plan, fingerprint and comparison (mac/Simpl/Engine/LivePlan.swift): scripts/dev/swift-checks/main.swift
+  # live checks' plan, fingerprint and comparison (mac/Simpl/Engine/LivePlan.swift) and where a plan dragged on the
+  # week lands (mac/Simpl/Screens/PlanMove.swift): scripts/dev/swift-checks/main.swift
   # compiled with the files it checks and run. Compiling takes four minutes and running them under a second, so what
   # was compiled is kept (a cache keyed by every file it is compiled from, this workflow and the compiler's version)
   # and only run again while none of those has changed — most runs, in seconds.
@@ -140,7 +141,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: model-checks
-          key: mac-models-${{ steps.swift.outputs.version }}-${{ hashFiles('mac/Simpl/Tools/PeriodicData.swift', 'mac/Simpl/Tools/PeriodicExtraData.swift', 'mac/Simpl/Tools/MoleculeShape.swift', 'mac/Simpl/Tools/Biology/Model/*.swift', 'mac/Simpl/Tools/Chemistry/Model/*.swift', 'mac/Simpl/Tools/Physics/Model/*.swift', 'mac/Simpl/Tools/Model/*.swift', 'mac/Simpl/Tools/Planner/Model/*.swift', 'mac/Simpl/Tools/Verbs/Model/*.swift', 'mac/Simpl/Resources/Verbs/*.json', 'mac/Simpl/Engine/LivePlan.swift', 'scripts/dev/swift-checks/**', '.github/workflows/mac.yml') }}
+          key: mac-models-${{ steps.swift.outputs.version }}-${{ hashFiles('mac/Simpl/Tools/PeriodicData.swift', 'mac/Simpl/Tools/PeriodicExtraData.swift', 'mac/Simpl/Tools/MoleculeShape.swift', 'mac/Simpl/Tools/Biology/Model/*.swift', 'mac/Simpl/Tools/Chemistry/Model/*.swift', 'mac/Simpl/Tools/Physics/Model/*.swift', 'mac/Simpl/Tools/Model/*.swift', 'mac/Simpl/Tools/Planner/Model/*.swift', 'mac/Simpl/Tools/Verbs/Model/*.swift', 'mac/Simpl/Resources/Verbs/*.json', 'mac/Simpl/Engine/LivePlan.swift', 'mac/Simpl/Screens/PlanMove.swift', 'scripts/dev/swift-checks/**', '.github/workflows/mac.yml') }}
       - name: The models' checks
         id: models
         if: ${{ !cancelled() }}
@@ -149,7 +150,7 @@ jobs:
             mkdir -p model-checks
             swiftc -O -o model-checks/run mac/Simpl/Tools/PeriodicData.swift mac/Simpl/Tools/PeriodicExtraData.swift \
               mac/Simpl/Tools/MoleculeShape.swift mac/Simpl/Tools/Biology/Model/*.swift mac/Simpl/Tools/Chemistry/Model/*.swift \
-              mac/Simpl/Tools/Physics/Model/*.swift mac/Simpl/Tools/Model/*.swift mac/Simpl/Tools/Planner/Model/*.swift mac/Simpl/Tools/Verbs/Model/*.swift mac/Simpl/Engine/LivePlan.swift \
+              mac/Simpl/Tools/Physics/Model/*.swift mac/Simpl/Tools/Model/*.swift mac/Simpl/Tools/Planner/Model/*.swift mac/Simpl/Tools/Verbs/Model/*.swift mac/Simpl/Engine/LivePlan.swift mac/Simpl/Screens/PlanMove.swift \
               scripts/dev/swift-checks/main.swift scripts/dev/swift-checks/StudyChecks.swift
           fi
           model-checks/run
