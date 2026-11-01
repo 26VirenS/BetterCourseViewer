@@ -40,11 +40,20 @@ h2 { margin: 40px 0 0; font: 700 22px/1.2 var(--font); letter-spacing: -.02em; }
 .card .acts { display: flex; flex-wrap: wrap; gap: 8px; }
 .seg { display: inline-flex; gap: 6px; }
 .empty { margin-top: 12px; color: var(--text-3); }
+h3 { margin: 22px 0 0; font: 600 17px/1.2 var(--font); color: var(--text-2); }
+/* a tool: working as it will in the apps, with what it is made of beside it */
+.tcard { align-content: start; gap: 12px; padding: 16px; }
+.tcard .tv { padding: 14px; border-radius: 14px; background: var(--bg); box-shadow: var(--shadow); }
+.tcard .tv .tv-box { background: var(--tile); }
+.tcard details { font-size: 13px; }
+.tcard summary { cursor: pointer; color: var(--blue); font-weight: 500; }
+.tcard pre { margin: 8px 0 0; max-height: 300px; overflow: auto; padding: 10px; border-radius: 10px; background: var(--bg); font: 11.5px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.warn { margin: 0; font-size: 13px; color: var(--red); }
 </style>
 </head>
 <body>
 <main class="wrap">
-  <div class="bar"><div><h1>Community Review</h1><p class="sub">Themes sent in from Appearance. Nothing shows in the gallery until it’s approved here.</p></div><button class="btn btn--soft" type="button" data-out hidden>Sign out</button></div>
+  <div class="bar"><div><h1>Community Review</h1><p class="sub">Themes sent in from Appearance, and tools sent in from the maker. Nothing shows in the gallery until it’s approved here.</p></div><button class="btn btn--soft" type="button" data-out hidden>Sign out</button></div>
 
   <form class="login" data-login hidden>
     <label for="key"><b>Passcode</b></label>
@@ -55,18 +64,30 @@ h2 { margin: 40px 0 0; font: 700 22px/1.2 var(--font); letter-spacing: -.02em; }
 
   <section data-desk hidden>
     <h2>Waiting <span data-count></span></h2>
+    <h3>Themes</h3>
     <div class="grid" data-pending></div>
-    <p class="empty" data-pending-empty hidden>Nothing waiting.</p>
+    <p class="empty" data-pending-empty hidden>No themes waiting.</p>
+    <h3>Tools</h3>
+    <div class="grid" data-tools-pending></div>
+    <p class="empty" data-tools-pending-empty hidden>No tools waiting.</p>
     <h2>In the gallery</h2>
+    <h3>Themes</h3>
     <div class="grid" data-approved></div>
     <p class="empty" data-approved-empty hidden>No themes approved yet.</p>
+    <h3>Tools <small class="sub" style="font-size:14px">(Simpl’s own starters are always there and aren’t listed)</small></h3>
+    <div class="grid" data-tools-approved></div>
+    <p class="empty" data-tools-approved-empty hidden>No tools approved yet.</p>
   </section>
 </main>
 
 <script src="/js/theme.js"></script>
 <script src="/community/preview.js"></script>
-<script>
-(() => {
+<script type="module">
+// Themes are drawn by /community/preview.js (on Simpl's Dashboard); tools by /community/tool-view.js, working, and
+// checked again here by the reference (/community/tool-format.js) so anything it would refuse stands out.
+import { drawTool, readTool, GROUP_NAMES } from '/community/tool-view.js';
+import { validateTool } from '/community/tool-format.js';
+{
   const $ = (s) => document.querySelector(s);
   const login = $('[data-login]'), desk = $('[data-desk]'), out = $('[data-out]');
   const api = (path, opts = {}) => fetch(`/api/community/${path}`, { credentials: 'same-origin', ...opts, headers: { 'x-simpl-review': '1', ...(opts.body ? { 'content-type': 'application/json' } : {}), ...(opts.headers || {}) } }).then(async (r) => [r, await r.json().catch(() => ({}))]);
@@ -102,9 +123,38 @@ h2 { margin: 40px 0 0; font: 700 22px/1.2 var(--font); letter-spacing: -.02em; }
     pend.innerHTML = ''; appr.innerHTML = '';
     b.pending.forEach((t) => pend.append(card(t, [['Approve', 'green', decide(t.id, 'approve')], ['Deny', 'red', decide(t.id, 'deny')]])));
     b.approved.forEach((t) => appr.append(card(t, [['Take down', 'red', remove(t)]])));
-    $('[data-count]').textContent = b.pending.length ? `(${b.pending.length})` : '';
+    // tools: approve or turn down what is waiting; take down what is in the gallery
+    const tools = b.tools || { pending: [], approved: [] };
+    const decideTool = (id, decision) => async () => { const [r2, b2] = await api('decide', { method: 'POST', body: JSON.stringify({ kind: 'tool', id, decision }) }); if (!r2.ok) alert(`${b2.message || 'That did not work.'}${b2.code ? ` (${b2.code})` : ''}`); load(); };
+    const removeTool = (t) => async () => { if (confirm(`Take “${t.name}” out of the gallery? Anyone who added it keeps their copy.`)) await api('remove', { method: 'POST', body: JSON.stringify({ kind: 'tool', id: t.id }) }); load(); };
+    const tp = $('[data-tools-pending]'), ta = $('[data-tools-approved]');
+    tp.replaceChildren(...tools.pending.map((p) => toolCard(p.tool, `sent in ${p.submitted || '?'}`, [['Approve', 'green', decideTool(p.id, 'approve')], ['Turn down', 'red', decideTool(p.id, 'deny')]])));
+    ta.replaceChildren(...tools.approved.map((t) => toolCard(t, `in the gallery since ${t.created || '?'}`, [['Take down', 'red', removeTool(t)]])));
+    const waiting = b.pending.length + tools.pending.length;
+    $('[data-count]').textContent = waiting ? `(${waiting})` : '';
     $('[data-pending-empty]').hidden = !!b.pending.length;
     $('[data-approved-empty]').hidden = !!b.approved.length;
+    $('[data-tools-pending-empty]').hidden = !!tools.pending.length;
+    $('[data-tools-approved-empty]').hidden = !!tools.approved.length;
+  }
+
+  /** A tool sent in: drawn working, what it says about itself, its JSON, and what can be done with it. */
+  function toolCard(raw, when, acts) {
+    const c = document.createElement('div'); c.className = 'card tcard'; c.dataset.toolCard = raw?.id || '';
+    const strict = validateTool(raw, { strict: true });
+    const tool = readTool(raw);
+    if (tool) c.append(drawTool(tool, { table: 'open' }));
+    if (strict.error) { const w = document.createElement('p'); w.className = 'warn'; w.textContent = `The reference refuses it now: ${strict.error.message} (${strict.error.code}${strict.error.path ? ` at ${strict.error.path}` : ''})`; c.append(w); }
+    const s = document.createElement('small');
+    s.textContent = `${raw?.maker ? `by ${raw.maker}` : 'no name given'} · ${GROUP_NAMES[raw?.group] || raw?.group} · ${raw?.symbol} · ${raw?.color} · ${when} · ${raw?.id}`;
+    const d = document.createElement('details');
+    const sum = document.createElement('summary'); sum.textContent = 'The tool as data (JSON)';
+    const pre = document.createElement('pre'); pre.textContent = JSON.stringify(raw, null, 2);
+    d.append(sum, pre);
+    const row = document.createElement('div'); row.className = 'acts';
+    row.append(...acts.map(([label, kind, run]) => { const x = document.createElement('button'); x.type = 'button'; x.className = `btn btn--${kind}`; x.textContent = label; x.addEventListener('click', async () => { row.querySelectorAll('button').forEach((y) => (y.disabled = true)); await run(); }); return x; }));
+    c.append(s, d, row);
+    return c;
   }
 
   login.addEventListener('submit', async (e) => {
@@ -119,7 +169,7 @@ h2 { margin: 40px 0 0; font: 700 22px/1.2 var(--font); letter-spacing: -.02em; }
   });
   out.addEventListener('click', async () => { await api('logout', { method: 'POST' }); load(); });
   load();
-})();
+}
 </script>
 </body>
 </html>

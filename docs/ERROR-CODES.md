@@ -75,6 +75,42 @@ take or pass on:
 | SC-B-502 | The report could not be passed on; try again in a minute |
 | SC-B-NET | The page got no answer from simplcourses.com |
 
+## Simpl Community's own codes
+
+Simpl Community (simplcourses.com/community, and Community in Appearance and on the Tools page) has codes of its own.
+They name the service, not a screen: `SC-C-…` here is not a course's page, nor `SC-T-…` To Do.
+
+`SC-C-…`, the service and its themes (`site/src/community.js`):
+
+| Code | Meaning |
+| --- | --- |
+| SC-C-503 | Simpl Community is not switched on yet (its storage is not bound) |
+| SC-C-400, SC-C-405 | The request was not what was expected, or not sent with POST |
+| SC-C-401, SC-C-403 | The review: not signed in, or a decision not sent from the review page |
+| SC-C-404, SC-C-409 | No such theme or tool; or it was decided already (a starter tool can't be taken down) |
+| SC-C-429 | Too many at once from one place: three themes or five tools an hour, eight passcode tries in a quarter of an hour |
+| SC-C-FULL | So many are waiting to be looked at that no more can come in for now |
+| SC-C-KEY | The review has no passcode set yet |
+| SC-C-THEME, SC-C-NAME, SC-C-COLOUR, SC-C-SCENE, SC-C-EMPTY | A theme sent in that could not be read, with no name, a colour Simpl can't use, a drawing Simpl doesn't have, or neither a colour nor a picture |
+| SC-C-PHOTO, SC-C-TYPE, SC-C-BIG | A theme's photo named but not sent, not JPEG, PNG or WebP, or too big |
+
+`SC-T-…`, a Community tool refused (`validateTool` in `site/public/community/tool-format.js`, the reference every app's
+copy follows: `docs/community-tools.md`). The site refuses a tool sent in with one of these, with the part at fault;
+an app refuses to add a tool that fails its own check the same way.
+
+| Code | Meaning |
+| --- | --- |
+| SC-T-JSON, SC-T-BIG | The tool could not be read, or is too big (over 32,768 characters as JSON) |
+| SC-T-FORMAT | Not a Simpl tool, or a later format ("Needs a newer Simpl") |
+| SC-T-KEY | Something format 1 doesn't have (the site checks strictly; the apps pass over it) |
+| SC-T-NAME, SC-T-SUMMARY, SC-T-GROUP, SC-T-SYMBOL, SC-T-COLOUR | No name, no line saying what it does, a group, a symbol or a colour that isn't one of Simpl's |
+| SC-T-INPUTS, SC-T-INPUT, SC-T-KIND, SC-T-LABEL | Not 1 to 16 inputs, one that can't be read or isn't a number, a choice or a switch, or one without a label |
+| SC-T-NUMBER, SC-T-RANGE, SC-T-OPTIONS | A number input's default, min, max or step that isn't a number, a min above its max, a choice without 2 to 12 distinct options |
+| SC-T-ID | A name in formulas that isn't a–z, 0–9 and _, is one Simpl keeps (pi, e, true, false, a function), or is used twice |
+| SC-T-OUTPUTS, SC-T-OUTPUT, SC-T-DECIMALS | Not 1 to 12 results, one that can't be read, or decimals that aren't 0 to 10 |
+| SC-T-FORMULA, SC-T-NAME-USE | A formula that can't be read (a function Simpl doesn't have, the wrong number of values), or one that reads a name that isn't there yet |
+| SC-T-TABLE | A table without 1 to 6 named columns, 1 to 100 rows, or one cell per column in every row |
+
 ## For developers
 
 - `extension/lib/errors.js` — the codes: `failed(kind)` (said by the request layer and the
@@ -83,3 +119,5 @@ take or pass on:
   put the code on the element as `data-code`; `app.css` draws it after the words, so it is never
   part of the words themselves.
 - `site/src/report.js` — the report page's handler and its `SC-B-…` codes.
+- `site/src/community.js` — Simpl Community's endpoints and their `SC-C-…` codes; `site/public/community/tool-format.js`
+  — a tool's check and its `SC-T-…` codes.

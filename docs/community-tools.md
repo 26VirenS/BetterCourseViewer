@@ -12,7 +12,7 @@ and a formula can't loop. So adding a tool from a stranger is safe in a way a sc
 | --- | --- |
 | `site/public/community/tool-format.js` | **the reference**: checking a tool, the language, the number format. One file: the website's pages load it as it is (`/community/tool-format.js`), and the site's Worker bundles it (`site/src/tool-format.js` only re-exports it) |
 | `docs/community-tools-vectors.json` | the answers every copy must give (written by `scripts/dev/tool-vectors.mjs`) |
-| `site/src/community.js` | the site's endpoints (below) |
+| `site/src/community.js` | the site's endpoints (below); `site/src/tool-starters.js`, Simpl's own starter tools |
 | the apps | each has its own copy, checked against the vectors |
 
 ## The document
@@ -138,10 +138,30 @@ Where platforms differ, the reference decides — every copy must do exactly thi
 
 | | |
 | --- | --- |
-| `GET /api/community/tools` | `{ ok, tools: [tool…] }`: every approved tool and Simpl's own starters, newest first |
-| `GET /api/community/tools/<id>` | `{ ok, tool }` |
-| `POST /api/community/tools` | a tool sent in: JSON `{ tool, website }` (website: the honeypot, left empty); checked strictly; kept as pending; the owner told |
-| the review (`/community/review`) | pending tools beside pending themes, with a live preview; approve, turn down, take down |
+| `GET /api/community/tools` | `{ ok, tools: [tool…] }`: every approved tool and Simpl's own starters, newest first (by `created`). Open to any origin (CORS `*`), cached for 60 s. Served even before the site's storage is bound (the starters alone) |
+| `GET /api/community/tools/<id>` | `{ ok, tool }`, a starter or an approved tool; anything else `404` |
+| `POST /api/community/tools` | a tool sent in: JSON `{ tool, website }` (website: the honeypot, left empty); checked strictly; kept as pending; the owner told. `{ ok: true, id, status: "pending" }` |
+| the review (`/community/review`) | pending tools beside pending themes, with a live preview and their JSON; approve, turn down, take down |
+
+A tool sent in is refused with `{ ok: false, code, message, path }`: `path` names the part at fault (`outputs.1.value`).
+What is wrong with the tool carries `validateTool`'s code (`SC-T-…`, 400; `SC-T-BIG`, 413, for a body over 33,792
+characters or a tool over the size above); the service's own refusals are Simpl Community's `SC-C-…`: `SC-C-405` not a
+POST, `SC-C-429` more than five tools an hour from one address, `SC-C-FULL` two hundred already waiting, `SC-C-503` the
+storage not bound yet (`docs/ERROR-CODES.md`). An `id`, `version` or `created` sent in is the sender's to leave out: the
+site gives the tool its own id (eight letters and digits) when it comes in, and `version: 1` and `created` (the day)
+when it is approved; it is checked strictly once more then. Simpl's starters have ids `s-…` and never change id; they
+cannot be taken down.
+
+The review's own calls, behind its passcode cookie: `GET /api/community/review` adds
+`tools: { pending: [{ id, submitted, tool }], approved: [tool…] }` to the themes it lists, and `POST
+/api/community/decide` `{ kind: "tool", id, decision: "approve" | "deny" }` and `POST /api/community/remove`
+`{ kind: "tool", id }` act on a tool (with no `kind`, on a theme, as before).
+
+Kept in Workers KV (the `COMMUNITY` namespace): `tool:<id>` (`{ status, submitted, tool }`), `list:tools-pending` (ids)
+and `list:tools-approved` (the approved tools as served, at most 500). Nothing about who sent a tool is kept.
+
+The website's pages draw tools with the reference itself: `/community` (Themes and Tools; each tool working in its
+card), `/community/make/` (the maker: a tool built, checked as it is typed, tried, and shared) and `/community/review`.
 
 ## The apps
 
