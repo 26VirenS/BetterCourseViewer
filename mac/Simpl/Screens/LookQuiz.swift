@@ -1020,55 +1020,51 @@ private struct LookRailView: View {
 
     // MARK: ALEKS
 
+    /// (UI review) One card: the topic on one line (whole in its tooltip), its progress step by step, and ALEKS's word
+    /// on the last answer — no longer the topic again in 19-point type over six lines, nor the slice the bar and the
+    /// question's heading already name, which pushed "Try again" out of sight. What the steps mean is their tooltip.
     @ViewBuilder
     private var aleks: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(rail.slice.isEmpty ? "ALEKS" : rail.slice.uppercased())
-                .font(.sCaption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .tracking(0.4)
-                .lineLimit(2)
-            Text(rail.topic.isEmpty ? (rail.heard ? "Choose a class or a topic in ALEKS" : "Your topic") : rail.topic)
-                .font(.sTitle3.weight(.semibold))
-                .fixedSize(horizontal: false, vertical: true)
+        let topic = rail.topic.isEmpty ? (rail.heard ? "Choose a class or a topic in ALEKS" : "Your topic") : rail.topic
+        VStack(alignment: .leading, spacing: 12) {
+            Text(topic)
+                .font(.sHeadline)
+                .lineLimit(rail.topic.isEmpty ? 2 : 1)
+                .truncationMode(.tail)
+                .help(topic)
                 .contentTransition(.opacity)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityAddTraits(.isHeader)
+            if rail.total > 0 || !rail.heard {
+                HStack(alignment: .center, spacing: 10) {
+                    LookSteps(fills: steps)
+                        .frame(height: 10)
+                    Text("\(max(rail.done, 0)) of \(rail.total)")
+                        .font(.sCallout.weight(.semibold).monospacedDigit())
+                        .contentTransition(.numericText(value: Double(max(rail.done, 0))))
+                        .fixedSize()
+                }
+                .help("Topic progress: a right answer fills a step, a wrong one can take one back. Fill them all to learn the topic.")
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Topic progress, \(max(rail.done, 0)) of \(rail.total)")
+            }
+            if !rail.status.isEmpty {
+                let tryAgain = rail.status.lowercased().contains("try") || rail.status.lowercased().contains("incorrect")
+                Label(rail.status, systemImage: tryAgain ? "arrow.uturn.backward.circle.fill" : "checkmark.circle.fill")
+                    .font(.sCallout.weight(.semibold))
+                    .foregroundStyle(tryAgain ? Color.orange : Color.green)
+                    .lineLimit(1)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill((tryAgain ? Color.orange : Color.green).opacity(0.14)))
+                    .transition(.scale(scale: 0.92).combined(with: .opacity))
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
         .card(radius: 18)
         .animation(Motion.gentle, value: rail.topic)
-
-        if rail.total > 0 || !rail.heard {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Topic Progress").font(.sHeadline)
-                    Spacer(minLength: 6)
-                    Text("\(max(rail.done, 0)) of \(rail.total)")
-                        .font(.sHeadline.monospacedDigit())
-                        .contentTransition(.numericText(value: Double(max(rail.done, 0))))
-                }
-                LookSteps(fills: steps)
-                    .frame(height: 12)
-                if !rail.status.isEmpty {
-                    let tryAgain = rail.status.lowercased().contains("try") || rail.status.lowercased().contains("incorrect")
-                    Label(rail.status, systemImage: tryAgain ? "arrow.uturn.backward.circle.fill" : "checkmark.circle.fill")
-                        .font(.sCallout.weight(.semibold))
-                        .foregroundStyle(tryAgain ? Color.orange : Color.green)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Capsule().fill((tryAgain ? Color.orange : Color.green).opacity(0.14)))
-                        .transition(.scale(scale: 0.92).combined(with: .opacity))
-                }
-                Text("A right answer fills a step; a wrong one can take one back. Fill them all to learn the topic.")
-                    .font(.sFootnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(14)
-            .card(radius: 18)
-            .animation(Motion.snappy, value: rail.status)
-            .animation(Motion.snappy, value: rail.done)
-        }
+        .animation(Motion.snappy, value: rail.status)
+        .animation(Motion.snappy, value: rail.done)
     }
 
     private var steps: [Double] { rail.steps }
