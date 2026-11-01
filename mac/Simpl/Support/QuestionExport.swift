@@ -84,11 +84,8 @@ final class QuestionExport: ObservableObject {
 
     /// The web view as it is on screen, laid on `ground`, as PNG.
     private static func picture(_ web: WKWebView, ground: NSColor) async -> Data? {
-        let shot: NSImage? = await withCheckedContinuation { done in
-            let config = WKSnapshotConfiguration()
-            config.afterScreenUpdates = true
-            web.takeSnapshot(with: config) { image, _ in done.resume(returning: image) }
-        }
+        // (in a time that can be waited for: a popup out of sight would otherwise hold the export for good)
+        let shot = await WebSnapshot.take(web)
         guard let shot, shot.size.width > 0, shot.size.height > 0 else { return nil }
         let scale = web.window?.backingScaleFactor ?? 2
         let w = Int((shot.size.width * scale).rounded()), h = Int((shot.size.height * scale).rounded())
