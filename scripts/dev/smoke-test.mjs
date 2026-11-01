@@ -1568,12 +1568,21 @@ try {
   await nav('calendar');
   await page.waitForSelector('.bcv-cal__grid', { timeout: 10000 });
   check((await page.$$('.bcv-cal__day')).length === 42 && (await page.$('.bcv-cal__day--today')), 'month grid with today highlighted');
+  // The month's checks read work due yesterday (W2 HW, Lec05-PreQuiz, the Lec05 lecture) beside today's and the days
+  // after. On the 1st of a month yesterday is last month's, in this grid only when the month opens mid-week: then the
+  // month before is drawn for them — its grid runs at least five days into this month, so today, Reading day (four
+  // days on) and the open appointment times (two and three) are in it too — and Today brings this month back before
+  // the week. (A day's cell carries its local midnight: data-day.)
+  const yesterdayCell = () => page.evaluate(() => { const y = new Date(); y.setHours(0, 0, 0, 0); y.setDate(y.getDate() - 1); return `.bcv-cal__day[data-day="${y.getTime()}"]`; });
+  const monthBack = !(await page.$(await yesterdayCell()));
+  if (monthBack) {
+    await page.click('.bcv-cal__nav .bcv-iconbtn:nth-child(1)'); // (Previous)
+    await page.waitForSelector(`${await yesterdayCell()} .bcv-ev`, { timeout: 10000 });
+  }
   // (2.99.44) the Mac's month: a ruled grid, items by a bar of their course's colour, "n items · m missing" under the month's name
   await page.waitForFunction(() => /^\d+ items?( · \d+ missing)?$/.test(document.querySelector('.bcv-cal__sub')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
   const macMonth = await page.evaluate(() => { const ev = document.querySelector('.bcv-cal--month .bcv-ev'); const day = document.querySelector('.bcv-cal--month .bcv-cal__day'); return { sub: document.querySelector('.bcv-cal__sub')?.textContent, bar: ev ? getComputedStyle(ev).borderLeftWidth : null, gap: getComputedStyle(document.querySelector('.bcv-cal--month .bcv-cal__grid')).rowGap, rule: day ? getComputedStyle(day).borderRightStyle : null, missing: [...document.querySelectorAll('.bcv-cal--month .bcv-ev.is-missing')].map((e) => e.textContent.trim()) }; });
-  // (W2 HW is due yesterday: on the 1st of a month that is last month, in this grid only when the month opens mid-week)
-  const yesterdayShown = await page.evaluate(() => { if (new Date().getDate() > 1) return true; const nums = [...document.querySelectorAll('.bcv-cal--month .bcv-cal__day .bcv-cal__num')].map((e) => e.textContent.trim()); return nums.indexOf('1') > 0; });
-  check(/^\d+ items?( · \d+ missing)?$/.test(macMonth.sub || '') && macMonth.bar === '3px' && macMonth.gap === '0px' && macMonth.rule === 'solid' && (macMonth.missing.includes('W2 HW') || !yesterdayShown), `the month as the Mac draws it: ${JSON.stringify(macMonth)}`);
+  check(/^\d+ items?( · \d+ missing)?$/.test(macMonth.sub || '') && macMonth.bar === '3px' && macMonth.gap === '0px' && macMonth.rule === 'solid' && macMonth.missing.includes('W2 HW') && !!(await page.$('.bcv-cal__day--today')), `the month as the Mac draws it${monthBack ? ' (last month: yesterday is in it, and today)' : ''}: ${JSON.stringify(macMonth)}`);
   await page.waitForSelector('.bcv-ev', { timeout: 10000 });
   const evs = await texts('.bcv-ev');
   check(evs.length >= 10 && evs.some((t) => /Dis01/.test(t)), `month view events: ${evs.length}`);
@@ -1584,7 +1593,7 @@ try {
   // handed-in work is struck through; work past its due date with nothing in (W2 HW, yesterday) stays
   // legible — it is missing, not done — and the chip's tip says so, with the points it is worth
   const calMarks = await page.$$eval('.bcv-ev', (els) => ({ struck: els.filter((e) => e.querySelector('.bcv-ev__label.bcv-strike')).map((e) => e.querySelector('.bcv-ev__label').textContent), w2: els.filter((e) => /W2 HW/.test(e.textContent)).map((e) => ({ struck: !!e.querySelector('.bcv-strike'), tip: e.title })) }));
-  check((calMarks.struck.some((t) => /Lec05-PreQuiz/.test(t)) || (!yesterdayShown && calMarks.struck.length > 0)) && ((calMarks.w2.length === 1 && !calMarks.w2[0].struck && /^W2 HW · .+ · 15 pts · Missing$/.test(calMarks.w2[0].tip)) || (!yesterdayShown && !calMarks.w2.length)), `handed-in work is struck through, missing work is not (its tip says so): ${JSON.stringify(calMarks)}`);
+  check(calMarks.struck.some((t) => /Lec05-PreQuiz/.test(t)) && calMarks.w2.length === 1 && !calMarks.w2[0].struck && /^W2 HW · .+ · 15 pts · Missing$/.test(calMarks.w2[0].tip), `handed-in work is struck through, missing work is not (its tip says so): ${JSON.stringify(calMarks)}`);
   // the calendars live in a sheet off the Calendars button (which counts the ones on), so the month
   // has the width of the page to itself — but for To Do, beside it on the left (2.99.112: To Do & Calendar)
   const calWide = await page.evaluate(() => { const c = document.querySelector('.bcv-cal').getBoundingClientRect(); const t = document.querySelector('.bcv-cal__todo').getBoundingClientRect(); return { w: Math.round(c.width), todoLeft: t.right <= c.left, todoW: Math.round(t.width) }; });
@@ -1689,6 +1698,11 @@ try {
   check(/\/calendar/.test(page.url()) && (await page.$eval('.bcv-pv', (e) => e.classList.contains('bcv-pv--float') && e.classList.contains('bcv-pv--card'))) && /^Assignment · /.test((await texts('.bcv-pv__kicker'))[0]) && (await texts('.bcv-pv__title'))[0] === chipTitle && /^Due /.test((await texts('.bcv-pv__fact'))[0]) && (await page.$eval('.bcv-pv__go', (e) => e.getAttribute('aria-label'))) === 'Open the assignment' && (await page.$('.bcv-cal__grid')) !== null, `pressing an assignment on the calendar previews it beside the month: ${JSON.stringify({ chip: chipTitle, url: page.url(), html: await page.$eval('html', (e) => e.className), kicker: (await texts('.bcv-pv__kicker'))[0], title: (await texts('.bcv-pv__title'))[0], meta: (await texts('.bcv-pv__meta'))[0], go: (await texts('.bcv-pv__go'))[0], grid: !!(await page.$('.bcv-cal__grid')) })}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-pv'), null, { timeout: 5000 });
+  if (monthBack) { // (the month before was drawn for yesterday's work: Today brings this one back, the week to open on it)
+    const ySel = await yesterdayCell();
+    await page.click('.bcv-cal__nav .bcv-roundbtn');
+    await page.waitForFunction((sel) => !document.querySelector(sel) && !!document.querySelector('.bcv-cal__day--today'), ySel, { timeout: 10000 });
+  }
   await page.click('.bcv-seg__btn[data-value="week"]');
   await page.waitForSelector('.bcv-week__body', { timeout: 5000 });
   // (2.99.112) the week is five days by default, Monday to Friday (on a Saturday the next); Week pressed again offers seven
