@@ -71,8 +71,10 @@ public static partial class Updates
         }
     }
 
-    /// <summary>A quiz is open now: Simpl's own, or one on a page of the school's.</summary>
-    public static bool QuizOpen => Holds("quiz") || QuizPage?.Invoke() == true;
+    /// <summary>A quiz is open now: Simpl's own, or one on a page of the school's. (0.3.105) Knewton Alta, ALEKS and
+    /// Macmillan Learning count as one too (their popups hold by those names: Screens/Alta, Screens/Look): an
+    /// assignment there can be a timed test, and not even a forced update goes in over it, as on the Mac.</summary>
+    public static bool QuizOpen => Holds("quiz") || Holds("Knewton Alta") || Holds("ALEKS") || Holds("Macmillan Learning") || QuizPage?.Invoke() == true;
 
     /// <summary>A page that is a quiz being taken: a New Quiz (its quiz-lti or quiz-api host), or a Classic Quiz's
     /// /quizzes/…/take.</summary>
