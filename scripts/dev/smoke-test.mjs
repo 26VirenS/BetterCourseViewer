@@ -2368,6 +2368,9 @@ try {
   const gt1 = await tourAt();
   check(gt1.steps === 'grade-ring,grade-details,grade-try,grade-field,grade-close' && gt1.pos === '1/5' && gt1.title === 'What makes a grade' && gt1.doing === 'Hover over a ring' && gt1.act === 'hover' && gt1.bg === 'rgba(0, 0, 0, 0)' && await ringHolds(gt1.ring, '.bcv-gpa__card .bcv-gpa__ringbox[title]'), `the first opening lights a card's ring on the page itself and asks for a hover: ${JSON.stringify(gt1)}`);
   await shot(page, '09c0-grades-tour-ring');
+  // (a shorter window for the next step: the page opens compact since the tracking ask folded into one card — E16 — and the
+  // cards' Details fit a 900px window; the step that says "scroll down" wants one below the window's foot)
+  await page.setViewportSize({ width: 1400, height: 700 });
   await page.hover('.bcv-gpa__card .bcv-gpa__ringbox[title]');
   check(await eventually(async () => !!(await page.$('.bcv-gpa__card.is-hover')), 3000), 'the hover opens the ring into its groups');
   await tourStep('grade-details');
@@ -2376,6 +2379,7 @@ try {
   await page.mouse.move(700, 500);
   await page.mouse.wheel(0, 360);
   check(await eventually(async () => { const t = await tourAt(); return t && !t.away && t.doing === 'Click Details' && await ringHolds(t.ring, '.bcv-gpa__card .bcv-gpa__details'); }, 4000), 'the wheel scrolls the page under the tour; Details comes into view, lit');
+  await page.setViewportSize({ width: 1400, height: 900 });
   await page.click('.bcv-gpa__card .bcv-gpa__details');
   await tourStep('grade-try');
   await page.click('.bcv-sheet-ov .bcv-whatif-btn');
@@ -2394,12 +2398,20 @@ try {
   check((await page.$('#bcv-tour')) === null, 'and it does not come back');
   await rolled(); // the GPA rolls up to its value on a fresh draw: read it once it has landed
   check(page.url() === `${BASE}/grades` && (await texts('.bcv-h1'))[0] === 'Grades' && (await texts('.bcv-head__sub'))[0] === 'Fall 2026 · 5 courses · 4 with grades so far', `grades panel header: ${(await texts('.bcv-head__sub'))[0]}`);
-  check(/^3\.4[23]$/.test((await texts('.bcv-gpa__value'))[0]) && (await page.$('.bcv-gpa__banner')) && /needs your past record/.test((await texts('.bcv-gpa__hero'))[0]) && /No history yet/.test((await texts('.bcv-gpa__trend'))[0]), 'term GPA is the plain 4.0 average of the four scored courses; cumulative and trend wait for setup');
+  // (E16) tracking off: one ask to turn it on — a slim Trend and momentum card beside the GPA card — and no banner, no line in
+  // the GPA card, no empty trend chart, no empty Momentum asking the same
+  const trackAsk = await page.evaluate(() => {
+    const words = document.querySelector('.bcv-screen--gpa .bcv-body')?.innerText || '';
+    const card = document.querySelector('.bcv-gpa__top > .bcv-gpa__side > .bcv-gpa__track');
+    const hero = document.querySelector('.bcv-gpa__hero')?.getBoundingClientRect(), r = card?.getBoundingClientRect();
+    return { asks: (words.match(/turn (on )?tracking|turn it on|Turn on tracking/gi) || []).length, buttons: [...document.querySelectorAll('.bcv-screen--gpa button')].filter((b) => /tracking/i.test(b.textContent)).length, card: !!card, h: r ? Math.round(r.height) : null, beside: !!(hero && r && r.left >= hero.right - 1), banner: !!document.querySelector('.bcv-gpa__banner'), trend: !!document.querySelector('.bcv-gpa__trend'), momentum: /Momentum/.test(words), heroAsk: /tracking/i.test(document.querySelector('.bcv-gpa__hero')?.innerText || '') };
+  });
+  check(/^3\.4[23]$/.test((await texts('.bcv-gpa__value'))[0]) && trackAsk.card && trackAsk.buttons === 1 && trackAsk.asks === 1 && trackAsk.h <= 160 && trackAsk.beside && !trackAsk.banner && !trackAsk.trend && !trackAsk.momentum && !trackAsk.heroAsk, `term GPA is the plain 4.0 average of the four scored courses; tracking off, the trend and Momentum fold into one slim card beside the GPA card, the page's one ask to turn tracking on: ${JSON.stringify(trackAsk)}`);
   // (E15) no goal set: the card asks for one in neutral words — never "below your goal" against a 4.00 nobody chose
   const goalAsk = await page.evaluate(() => { const g = document.querySelector('.bcv-gpa__hero .bcv-gpa__goal'); return { tag: g?.tagName, set: g?.classList.contains('bcv-gpa__goal--set'), words: g?.innerText.replace(/\s+/g, ' ').trim(), below: /(below|above) your goal/.test(document.querySelector('.bcv-gpa__hero')?.innerText || '') }; });
   check(goalAsk.tag === 'BUTTON' && goalAsk.set && /^Set a goal\b/.test(goalAsk.words) && !goalAsk.below, `no goal set: the GPA card says "Set a goal" (a button into the settings), nothing above or below: ${JSON.stringify(goalAsk)}`);
   const gpaStats = await texts('.bcv-gpa__stat');
-  check(gpaStats.length === 3 && /^Momentum.*Turn on tracking to compare snapshots$/i.test(gpaStats[0]) && /On-time submissions \d+% \d+ of \d+ submitted before the due time/i.test(gpaStats[1]) && (await page.$$('.bcv-gpa__chip')).length === 4 && /Highest .* at \d+% · lowest .* at \d+%/.test(gpaStats[2]), `stats: ${gpaStats.join(' | ')}`);
+  check(gpaStats.length === 2 && /On-time submissions \d+% \d+ of \d+ submitted before the due time/i.test(gpaStats[0]) && (await page.$$('.bcv-gpa__chip')).length === 4 && /Highest .* at \d+% · lowest .* at \d+%/.test(gpaStats[1]), `stats beside the GPA card (Momentum waits on tracking): ${gpaStats.join(' | ')}`);
   const gpaCards = await texts('.bcv-gpa__card');
   check(gpaCards.length === 5 && /^A− F26-MATH 021 20 MATH-021-20 92\.4% 3\.7 GPA Needs \d+% of the remaining 517 pts 93 pts earned so far Target A− Details$/.test(gpaCards[0]) && gpaCards.filter((t) => /^N\/A .*N\/A no GPA The teacher hides the total — no score to project from Canvas sends no score while the total is hidden.*No grade yet Details$/.test(t)).length === 1, `course cards (grade points said as GPA; a hidden total says why there is no score): ${gpaCards[0]} || ${gpaCards[4]}`);
   // a course saved as pass/fail (the setup's switch, P/F in place of a letter): its card says so, its score still shows, and the GPA leaves it out
@@ -2522,7 +2534,7 @@ try {
   await page.click('.bcv-gpa__traychip');
   await waitText('.bcv-gpa__value', /^3\.4[23]$/);
   check(!(await page.$('.bcv-gpa__tray')) && (await page.$$('.bcv-gpa__card')).length === 5, 'Show returns it to the overview and the GPA');
-  await page.click('.bcv-gpa__banner .bcv-btn');
+  await page.click('.bcv-gpa__track .bcv-btn');
   await page.waitForSelector('.bcv-gpa-set', { timeout: 5000 });
   // Upload CSV on the sheet itself (the Mac app's window has no Grades section): the file fills the two
   // fields in and says what it read; numbers typed over them are the record instead
@@ -2543,7 +2555,7 @@ try {
   await page.click('.bcv-gpa-set__ctl .bcv-gpa-set__step:first-child');
   check((await texts('.bcv-gpa-set__val'))[0] === '3.95', 'goal steps by 0.05 in the settings sheet');
   await page.click('.bcv-gpa-set__foot .bcv-btn');
-  await page.waitForFunction(() => !document.querySelector('.bcv-gpa__banner'), null, { timeout: 5000 });
+  await page.waitForFunction(() => !document.querySelector('.bcv-gpa__track') && !!document.querySelector('.bcv-gpa__trend'), null, { timeout: 5000 });
   const hero = (await texts('.bcv-gpa__hero'))[0];
   check(/Cumulative 3\.4[23]/.test(hero) && /3\.42 across 8 courses before this term/.test(hero) && /Goal 3\.95/.test(hero) && /One snapshot so far/.test((await texts('.bcv-gpa__trend'))[0]) && (await texts('.bcv-gpa__stat'))[0].includes('Needs a second snapshot'), `tracking on: ${hero.slice(0, 120)}`);
   // prefs live in chrome.storage.local under `prefs:<canvas host>`; the first snapshot lands the day tracking starts
@@ -2618,8 +2630,8 @@ try {
   await shot(page, '09e-grades-panel-tracking');
   page.once('dialog', (d) => d.accept());
   await page.click('.bcv-gpa__linkbtn');
-  await page.waitForSelector('.bcv-gpa__banner', { timeout: 5000 });
-  check(await eventually(async () => { const p = await readPrefs(); return p?.gpaTracking === null && Array.isArray(p?.gpaSnapshots) && p.gpaSnapshots.length === 0 && p.gpaGoal === 3.95; }) && /needs your past record/.test((await texts('.bcv-gpa__hero'))[0]), 'Reset setup forgets the prior record and snapshots but keeps the goal');
+  await page.waitForSelector('.bcv-gpa__track', { timeout: 5000 });
+  check(await eventually(async () => { const p = await readPrefs(); return p?.gpaTracking === null && Array.isArray(p?.gpaSnapshots) && p.gpaSnapshots.length === 0 && p.gpaGoal === 3.95; }) && !/Cumulative/.test((await texts('.bcv-gpa__hero'))[0]) && /Goal 3\.95/.test((await texts('.bcv-gpa__hero'))[0]), 'Reset setup forgets the prior record and snapshots but keeps the goal');
   } // grades panel
   if (on('submission')) {
 
