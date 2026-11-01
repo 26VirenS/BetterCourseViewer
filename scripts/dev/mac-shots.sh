@@ -1128,7 +1128,8 @@ update_prompt_check() {
 }
 
 # (1.3.211) community_tools_check: Simpl Community tools, as community-tools-check.txt — the browser read the mock's
-# gallery (six tools: five to add, one of a later format needing a newer Simpl), tools of it were added at launch as Add
+# gallery (its six tools — five to add, one of a later format needing a newer Simpl — and the site's own starters
+# after them, scripts/dev/mock-community.mjs: every tool but that one to add), tools of it were added at launch as Add
 # adds them (downloaded by id, checked again on this Mac, kept) and none was refused, an added tool opened and worked
 # out (Ohm's law as it starts: 3 A and 36 W, as docs/community-tools-vectors.json has it), and with no connection the
 # browser read nothing and said so
@@ -1137,8 +1138,10 @@ community_tools_check() {
   local t="$OUT_ABS/console-light-35g-community-tool.txt" o="$OUT_ABS/console-light-35h-community-browse-offline.txt"
   : > "$out"
   say() { if [ "$1" = 0 ]; then echo "ok   $2" >> "$out"; else echo "FAIL $2" >> "$out"; fi; }
-  grep -q 'community tools: the gallery read: 6 tools, 5 to add, 1 needing a newer Simpl' "$b" 2>/dev/null
-  say $? "the browser read the mock's gallery: $(grep -o 'community tools: the gallery read: .*' "$b" 2>/dev/null | head -1)"
+  local read; read="$(grep -oE 'community tools: the gallery read: [0-9]+ tools, [0-9]+ to add, [0-9]+ needing a newer Simpl' "$b" 2>/dev/null | head -1)"
+  local n add newer; read -r n add newer <<< "$(echo "$read" | grep -oE '[0-9]+' | tr '\n' ' ')"
+  [ -n "$n" ] && [ "$n" -ge 6 ] && [ "$newer" = 1 ] && [ "$add" = $((n - 1)) ]
+  say $? "the browser read the mock's gallery: ${read:-nothing}"
   grep -q 'community tools: added mockgrade (' "$b" 2>/dev/null
   say $? "a tool added before the browser opened: $(grep -o 'community tools: added .*' "$b" 2>/dev/null | head -1)"
   grep -q 'community tools: added mockohms (' "$s" 2>/dev/null && grep -q 'community tools: added mocktip (' "$s" 2>/dev/null
