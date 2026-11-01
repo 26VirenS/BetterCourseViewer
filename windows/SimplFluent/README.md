@@ -1300,11 +1300,18 @@ list in `ToolsScreen.Everyday` and `Groups`, and the search box opens each by it
 
 ## Popups
 
-Every popup floats over the window without holding it (`Shell/FloatPopup.cs`, a `Sheet` with `Floats`): a window of
-its own owned by Simpl's window — kept above it, minimized and brought back with it, hidden with it in the notification
-area and shown again with it — so nothing takes the window's clicks: the pane, the title bar, the search and the page
-behind it go on working, and another place opened under a popup leaves it where it is. Nothing is dimmed; Windows' own
-shadow and rounded corners set it apart (pictures draw them, `Support/Shot.cs`). Its window is as large as its card,
+Every popup floats over the window (`Shell/FloatPopup.cs`, a `Sheet` with `Floats`): a window of its own owned by
+Simpl's window — kept above it, minimized and brought back with it, hidden with it in the notification area and shown
+again with it. (The UI review's W2) One with a form or a decision in it (`Sheet.Dims`: Hand in, New message, New task,
+Sync, Find appointment, the update's prompt, What-if, Grading scale, Nickname, Share this theme) dims the window under
+it as Windows 11's ContentDialog does — the window's own smoke (`SheetHost.Dim`: no card of its own, its web pages
+stepping aside as for a sheet), every other popup over the window dimmed with it — and nothing there takes a click
+until it goes (a light one, Find appointment, still closes with a click on the dimmed window); a development run's log
+says "popup …: the window dimmed under it". The rest take nothing from the window: a tool, Knewton Alta, Macmillan,
+ALEKS, feedback and the rubric (large, used beside the page), the light ones only there to be read or switched, and a
+plan's beside its block — the pane, the title bar, the search and the page behind go on working, and another place
+opened under one leaves it where it is; Windows' own shadow and rounded corners set it apart (pictures draw them,
+`Support/Shot.cs`). Its window is as large as its card,
 however small (WPF-UI's least window size, 460 × 320, let go). It opens centred over the page beside
 the pane (`MainWindow.PopupRoom`); it moves with the window, keeping where it was put, and its heading moves it (a
 press there that is not on a control, `Kit/Drag.cs`; `Handle` names the heading, else its top 60).

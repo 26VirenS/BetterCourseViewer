@@ -85,11 +85,27 @@ public class Sheet
     public bool Beside { get; set; }
 
     /// <summary>
-    /// A popup that floats over the window without holding it (Shell/FloatPopup.cs): nothing dimmed, the pane, the title
-    /// bar and the page behind it still at hand, there until it is closed. Every popup is one but a quiz being taken, the
-    /// first setup, the sign-in's questions and the questions that must be answered first ("Discard changes?").
+    /// A popup that floats over the window (Shell/FloatPopup.cs), a window of its own, there until it is closed. Every
+    /// popup is one but a quiz being taken, the first setup, the sign-in's questions and the questions that must be
+    /// answered first ("Discard changes?"). One with a form or a decision in it dims the window under it (<see
+    /// cref="Dims"/>); the rest leave the pane, the title bar and the page behind them at hand.
     /// </summary>
     public bool Floats { get; set; }
+
+    /// <summary>
+    /// Floating, a form or a decision (Hand in, New message, New task, Sync, Find appointment, the update's prompt,
+    /// What-if, Grading scale, Nickname): the window under it dimmed — Windows' smoke, as a ContentDialog dims its window
+    /// — and out of reach while it is up, the other popups over that window with it; a light one closes with a click on
+    /// the dimmed window. Unless it is said otherwise, every floating popup but a large one (a tool, Knewton Alta,
+    /// Macmillan, ALEKS, feedback, the rubric: used beside the page), a light one (something to read, a switch to set) and
+    /// one opened beside what it is about (a plan's, as a flyout is).
+    /// </summary>
+    public bool Dims
+    {
+        get => dims ?? (Floats && !Large && !Light && Anchor == null);
+        set => dims = value;
+    }
+    private bool? dims;
     /// <summary>(0.3.79) Floating, opened beside this — a calendar item's popup by its block, as the Mac's popover is —
     /// on its right where there is room, else its left, its top level with it, kept inside the window; moved with the
     /// window after that as any popup is. None (or not in view): centred, as before.</summary>
@@ -158,6 +174,8 @@ public class Sheet
 /// <summary>
 /// Where a window's sheets show: over everything in it, the window dimmed behind (Windows' smoke), one sheet at a time
 /// (another waits its turn). Arrives as WinUI's dialog does — from a touch larger, fading in — and leaves the same way.
+/// A popup with a form in it, floating over the window in a window of its own (<see cref="Sheet.Dims"/>), dims the window
+/// here too: the smoke alone, with no card of its own (<see cref="Dim"/>).
 /// </summary>
 public sealed class SheetHost : Grid
 {
@@ -165,11 +183,43 @@ public sealed class SheetHost : Grid
     private readonly Queue<Sheet> waiting = new();
     private Sheet? current;
     private IInputElement? focusBefore;
+    /// <summary>How many popups floating over the window dim it now (<see cref="Dim"/>).</summary>
+    private int dimmers;
 
-    /// <summary>A sheet came or went (the window's web view, a window of its own, steps aside meanwhile).</summary>
+    /// <summary>A sheet came or went, or the window was dimmed under a popup or no longer is (the window's web view, a
+    /// window of its own, steps aside meanwhile).</summary>
     public event Action<bool>? OpenChanged;
 
-    public bool IsOpen => current != null;
+    /// <summary>A sheet is over the window, or a popup floating over it dims it: the window is out of reach.</summary>
+    public bool IsOpen => current != null || dimmers > 0;
+
+    /// <summary>Dimmed under a popup floating over the window (and no sheet of its own over it).</summary>
+    public bool Dimmed => dimmers > 0;
+
+    /// <summary>
+    /// (the UI review's W2) A popup with a form or a decision in it, floating over the window (<see cref="Sheet.Dims"/>),
+    /// came or went: while one is up the window is dimmed under it — the smoke alone, fading in as a sheet's does — and
+    /// takes no click (one on a light popup's dimmed window closes it: Shell/FloatPopup.cs), its web pages stepping aside
+    /// as for a sheet; once the last goes, the smoke fades away. A sheet of the window's own over it keeps its own smoke.
+    /// </summary>
+    public void Dim(bool on)
+    {
+        var was = dimmers > 0;
+        dimmers = Math.Max(0, dimmers + (on ? 1 : -1));
+        var now = dimmers > 0;
+        if (was == now) return;
+        if (current == null)
+        {
+            if (now)
+            {
+                smoke.Background = K.Brush(Color.FromArgb(Support.Appearance.Dark ? (byte)140 : (byte)102, 0, 0, 0));
+                Visibility = Visibility.Visible;
+                Motion.FadeIn(smoke, Motion.Normal);
+            }
+            else Motion.FadeOut(smoke, () => { if (dimmers == 0 && current == null) Visibility = Visibility.Collapsed; }, Motion.Normal);
+        }
+        OpenChanged?.Invoke(now || current != null);
+    }
 
     /// <summary>A point on the screen (device pixels) is on the open sheet's card — the window's title bar lets it be
     /// the card's (a large sheet reaches up into the title bar's band).</summary>
@@ -211,9 +261,10 @@ public sealed class SheetHost : Grid
         s.Card = card;
         focusBefore = Keyboard.FocusedElement;
         Children.Add(card);
+        var dimmedAlready = dimmers > 0 && Visibility == Visibility.Visible;
         Visibility = Visibility.Visible;
         smoke.Background = K.Brush(Color.FromArgb(Support.Appearance.Dark ? (byte)140 : (byte)102, 0, 0, 0));
-        Motion.FadeIn(smoke, Motion.Normal);
+        if (!dimmedAlready) Motion.FadeIn(smoke, Motion.Normal);
         Motion.Pop(card);
         OpenChanged?.Invoke(true);
         Support.Shot.Moved();
@@ -246,13 +297,14 @@ public sealed class SheetHost : Grid
             if (waiting.Count > 0) { Show(waiting.Dequeue()); return; }
             if (current == null)
             {
-                Visibility = Visibility.Collapsed;
-                OpenChanged?.Invoke(false);
+                // (still dimmed under a popup floating over the window: the smoke stays, and the window out of reach)
+                if (dimmers == 0) Visibility = Visibility.Collapsed;
+                OpenChanged?.Invoke(dimmers > 0);
                 if (focusBefore is UIElement f && f.IsVisible) f.Focus();
             }
         }
         if (waiting.Count > 0 || card == null) { Gone(); return; }
-        Motion.FadeOut(smoke, () => { }, Motion.Normal);
+        if (dimmers == 0) Motion.FadeOut(smoke, () => { }, Motion.Normal);
         Motion.Unpop(card, Gone);
     }
 
