@@ -55,7 +55,9 @@ public static class EraseAll
             try { File.Delete(f); } catch { }
             try { File.Delete(f + ".tmp"); } catch { }
         }
-        var dirs = new List<string> { AppPaths.Answers, Appearance.PhotosDir };
+        // (and the school's files fetched to be previewed, 0.3.85's Previews: not sealed, so the vault's key going does
+        //  not make them unreadable — left, they stayed until a preview was next opened a day on)
+        var dirs = new List<string> { AppPaths.Answers, Appearance.PhotosDir, Path.Combine(AppPaths.Root, "Previews") };
         // (what a vault that could not be opened once set aside: sealed with a key that is gone, or going now)
         try { dirs.AddRange(Directory.EnumerateDirectories(AppPaths.Root, "Unreadable-*")); } catch { }
         foreach (var d in dirs)
