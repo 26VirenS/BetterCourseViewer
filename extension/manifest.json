@@ -189,6 +189,7 @@
         "content/app/screens/submit.js",
         "content/app/screens/feedback.js",
         "lib/vendor/qrcode.js",
+        "content/app/handin.js",
         "content/app/hub.js",
         "content/app/tools/widgets.js",
         "content/app/tools/widget-starters.js",

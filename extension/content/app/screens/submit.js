@@ -268,7 +268,7 @@
         input, dirInput, drop,
         zipOK || phoneOK ? U.el('bcv-sb__alts', [
           zipOK ? h('button', { type: 'button', class: 'bcv-sb__folder', text: 'Choose a folder (sent as a .zip)', onclick: () => dirInput.click() }) : null,
-          phoneOK ? h('button', { type: 'button', class: 'bcv-sb__folder bcv-sb__phonego', text: 'Hand in from your phone', title: 'A code for your phone’s camera: take a photo or pick a file there', onclick: (e) => phoneSheet(e.currentTarget) }) : null,
+          phoneOK ? h('button', { type: 'button', class: 'bcv-sb__folder bcv-sb__phonego', text: 'Hand in from your phone', title: 'A code for your phone’s camera: the photos and files you send from it come here', onclick: (e) => phoneSheet(e.currentTarget) }) : null,
         ]) : null,
         U.text('bcv-sb__count', n === 0 ? 'Nothing attached yet' : `${U.plural(n, 'file')} attached`),
         n ? U.el('bcv-sb__files', st.files.map(fileRow)) : null,
@@ -310,11 +310,13 @@
      *  A file of another type is offered as what it can become (the converter's own engines: a Word
      *  file as a PDF, a text file as a PDF, a photo as a JPEG), converted here and attached under
      *  its new name; one that nothing here can turn into an accepted type is refused, and a sheet
-     *  says so. The sheets come one at a time, so a batch waits on each answer. */
-    async function addFiles(fileList) {
-      let added = 0;
+     *  says so. The sheets come one at a time, so a batch waits on each answer. Resolves to how many
+     *  went into the hand-in (2.99.135: the phone's sheet says so of each file it sent); `source`
+     *  says where they came from, under each one's name ("from your phone"). */
+    async function addFiles(fileList, { source = null } = {}) {
+      let added = 0, converted = 0;
       for (const file of Array.from(fileList || [])) {
-        if (!ctx.alive()) return;
+        if (!ctx.alive()) return added + converted;
         if (!file.size) {
           U.toast(`“${file.name}” is empty.`, { error: true });
           continue;
@@ -323,7 +325,7 @@
           const p = await withConverter(() => BCV.toolsConvert?.plan?.(file, allowedExt) || null).catch(() => null);
           if (!p && zipOK) { // (2.99.70) nothing turns it into a type taken, but a .zip is taken: it goes zipped
             if (st.files.some((f) => f.file && f.name === file.name && f.size === file.size)) continue;
-            st.files.push({ id: ++seq, name: file.name, size: file.size, file, status: 'ready', progress: 0, fileId: null, zipOnly: true });
+            st.files.push({ id: ++seq, name: file.name, size: file.size, file, source, status: 'ready', progress: 0, fileId: null, zipOnly: true });
             added++;
             continue;
           }
@@ -334,14 +336,15 @@
           const yes = await U.askSheet({ title: `Convert to ${p.ext.toUpperCase()}?`, note: `This assignment only takes ${extWords()}. “${file.name}” can be converted ${p.cloud ? 'through CloudConvert' : 'on this device'} and attached as “${p.name}”.`, okLabel: `Convert to ${p.ext.toUpperCase()}`, cancelLabel: 'Cancel' });
           if (!yes || !ctx.alive()) continue;
           if (st.files.some((x) => x.name === p.name)) { U.toast(`“${p.name}” is already attached.`, { error: true }); continue; }
-          const f = { id: ++seq, name: p.name, size: null, file: null, from: file.name, stage: '', status: 'converting', progress: 0, fileId: null };
+          const f = { id: ++seq, name: p.name, size: null, file: null, from: file.name, source, stage: '', status: 'converting', progress: 0, fileId: null };
           st.files.push(f);
           st.tab = 'file';
           draw();
           try {
             const out = await BCV.toolsConvert.convertToFile(file, p, { onStage: (stage) => { f.stage = stage; f.paint?.(); } });
-            if (!ctx.alive()) return;
+            if (!ctx.alive()) return added + converted;
             Object.assign(f, { file: out, size: out.size, status: 'ready', stage: '' });
+            converted++;
           } catch (e) {
             st.files = st.files.filter((x) => x !== f);
             U.toast(`Could not convert “${file.name}”: ${e?.message || e}`, { error: true, ms: 5000 });
@@ -350,13 +353,14 @@
           continue;
         }
         if (st.files.some((f) => f.file && f.name === file.name && f.size === file.size)) continue;
-        st.files.push({ id: ++seq, name: file.name, size: file.size, file, status: 'ready', progress: 0, fileId: null });
+        st.files.push({ id: ++seq, name: file.name, size: file.size, file, source, status: 'ready', progress: 0, fileId: null });
         added++;
       }
       if (added) {
         st.tab = 'file';
         draw();
       }
+      return added + converted;
     }
 
     /** (2.99.70) A file the assignment takes only inside a .zip is attached: the files go zipped, whatever the box says. */
@@ -637,6 +641,9 @@
         app.refreshCounts?.();
         draw();
         toTop();
+        for (const link of phones.splice(0)) link.handedIn(); // (2.99.135) each phone that sent files here is told: "Handed in ✓"
+        phonePdf.pages = [];
+        phonePdf.entry = null;
         if (pop) pop.done?.(st.done);
       } catch (e) {
         U.toast(`Could not submit: ${e.message}`, { error: true, ms: 5000 });
@@ -649,16 +656,63 @@
       }
     }
 
-    // ---- (2.99.96) hand in from your phone ---------------------------------------------------
-    /** A QR code of this assignment's own hand-in, for the phone's camera. The phone opens it in
-     *  the school's site, signed in there — with Simpl on the phone, straight to Hand In — and hands
-     *  in from its camera or its files. An extension cannot be the server the apps are for a phone
-     *  (Send from Phone, mac/Simpl/Support/PhoneServer.swift), so nothing passes between the two:
-     *  the code holds the address alone (no key, no sign-in), and this page asks the school every
-     *  few seconds while the sheet is open, showing the receipt once the hand-in lands. */
+    // ---- (2.99.96; 2.99.135) hand in from your phone -----------------------------------------------
+    /** (2.99.135) As the Mac and Windows apps do it: a QR code the phone's camera opens, and the files the phone sends
+     *  come here, each into the hand-in as if chosen with Choose Files (addFiles: its types checked, converted where
+     *  they can be); the student looks them over and presses Submit here. They pass through simplcourses.com sealed with
+     *  a key only this page and the phone hold (content/app/handin.js, site/src/handin.js). A photo, where the assignment
+     *  takes a PDF and no pictures, is a page of one PDF named after the assignment, made again with each page. Where the
+     *  relay cannot be reached, the old code instead: the assignment, opened in Canvas on the phone (canvasSheet). */
+    const phones = []; // the phones' hand-ins opened from this one: told when it is handed in
+    const phonePdf = { pages: [], entry: null }; // the photos' PDF in the hand-in, and its pages in order
+    let phoneOpening = false;
     async function phoneSheet(from) {
+      if (document.querySelector('.bcv-phone-ov') || phoneOpening) return;
+      phoneOpening = true;
+      try {
+        try { await BCV.lazy.load('handin'); } catch { U.toast('The code could not be drawn.', { error: true }); return; }
+        if (!ctx.alive() || st.stage !== 'edit') return;
+        try {
+          const link = await BCV.handin.sheet({
+            from, title: a.name, course: course.name, color: course.color || '', allowed: allowedExt, convertible: conv?.exts || [], zipOK,
+            pdfName: `${zipNameOf(a.name)}.pdf`,
+            alive: () => ctx.alive() && st.stage === 'edit',
+            add: (file) => addFiles([file], { source: 'your phone' }),
+            page: photoPage,
+          });
+          phones.push(link);
+        } catch (e) {
+          if (!ctx.alive() || st.stage !== 'edit') return;
+          await canvasSheet(from, e);
+        }
+      } finally { phoneOpening = false; }
+    }
+    /** A photo from the phone, a page of the photos' PDF: the PDF made again with it last, in place of the one before
+     *  (one the student took out of the hand-in starts a new one). Resolves to its page number. */
+    function photoPage(page) {
+      if (!phonePdf.entry || !st.files.includes(phonePdf.entry)) { phonePdf.pages = []; phonePdf.entry = null; }
+      phonePdf.pages.push(page);
+      const name = `${zipNameOf(a.name)}.pdf`;
+      const file = new File([BCV.handinCore.pdfOf(phonePdf.pages, { title: a.name })], name, { type: 'application/pdf' });
+      const f = phonePdf.entry;
+      if (f) {
+        if (f.objectUrl) { URL.revokeObjectURL(f.objectUrl); f.objectUrl = null; }
+        Object.assign(f, { file, size: file.size, status: 'ready', progress: 0, fileId: null });
+      } else {
+        phonePdf.entry = { id: ++seq, name, size: file.size, file, source: 'your phone', status: 'ready', progress: 0, fileId: null };
+        st.files.push(phonePdf.entry);
+      }
+      st.tab = 'file';
+      draw();
+      return phonePdf.pages.length;
+    }
+    /** (2.99.96) The old code, where the relay could not be reached: this assignment's own hand-in, for the phone's
+     *  camera. The phone opens it in the school's site, signed in there — with Simpl on the phone, straight to Hand In —
+     *  and hands in from its camera or its files: nothing passes between the two (the code holds the address alone),
+     *  and this page asks the school every few seconds while the sheet is open, showing the receipt once it lands. */
+    async function canvasSheet(from, why = null) {
       if (document.querySelector('.bcv-phone-ov')) return;
-      try { await BCV.lazy.load('qr'); } catch { U.toast('The code could not be drawn.', { error: true }); return; }
+      try { await BCV.lazy.load('handin'); } catch { U.toast('The code could not be drawn.', { error: true }); return; }
       if (!ctx.alive()) return;
       const link = new URL(BCV.lms.toPage(`${course.url}/assignments/${aid}?bcv=submit`), location.origin).href;
       // (what Canvas has now, so a hand-in from here earlier, or a resubmission, is not taken for the phone's)
@@ -689,7 +743,7 @@
         ]),
         U.el('bcv-prompt bcv-phone', [
           U.el('bcv-phone__row', [
-            qrCode(link),
+            BCV.handin.qrCode(link, 'QR code of this assignment’s hand-in'),
             U.el('bcv-phone__steps', [
               U.text('bcv-phone__step', '1. Point your phone’s camera at the code.'),
               U.text('bcv-phone__step', `2. It opens this assignment in ${BCV.lms.name} — signed in there, as you.`),
@@ -697,6 +751,7 @@
               U.text('bcv-phone__note bcv-pretty', 'With Simpl on your phone, it opens straight to Hand In. This page shows the receipt when it lands.'),
             ]),
           ]),
+          why ? U.text('bcv-phone__fallback bcv-pretty', `Simpl couldn’t reach simplcourses.com to take files from your phone here${why.code ? ` (${why.code})` : ''}, so this code opens the assignment in ${BCV.lms.name} on your phone instead.`) : null,
           U.el('bcv-prompt__btns', [wait, h('span', { style: { flex: '1' } }), copy]),
         ]),
       ]));
@@ -739,33 +794,6 @@
       }
       timer = setTimeout(look, 5000);
     }
-    /** The link as a QR code (qrcode-generator, lib/vendor/qrcode.js), drawn as one path: dark on white
-     *  in either theme — a camera reads it so — with the quiet margin a reader needs around it. */
-    function qrCode(text) {
-      const q = self.qrcode(0, 'M');
-      q.addData(text);
-      q.make();
-      const n = q.getModuleCount(), pad = 4, size = n + pad * 2;
-      let d = '';
-      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) d += `M${c + pad} ${r + pad}h1v1h-1z`;
-      const NS = 'http://www.w3.org/2000/svg';
-      const svg = document.createElementNS(NS, 'svg');
-      svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
-      svg.setAttribute('class', 'bcv-phone__qr');
-      svg.setAttribute('role', 'img');
-      svg.setAttribute('aria-label', 'QR code of this assignment’s hand-in');
-      svg.setAttribute('shape-rendering', 'crispEdges');
-      const bg = document.createElementNS(NS, 'rect');
-      bg.setAttribute('width', size);
-      bg.setAttribute('height', size);
-      bg.setAttribute('fill', '#fff');
-      const path = document.createElementNS(NS, 'path');
-      path.setAttribute('d', d);
-      path.setAttribute('fill', '#000');
-      svg.append(bg, path);
-      return svg;
-    }
-
     // ---- done stage -------------------------------------------------------------------
     function donePane() {
       const s = st.done || {};
