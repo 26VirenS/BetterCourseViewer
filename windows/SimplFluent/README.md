@@ -1318,7 +1318,11 @@ clock, Ring | Grid), its icon buttons, each with its tooltip (Simpl look — the
 Macmillan and ALEKS, and of their pages in a tool's window — Dark page, Reload, Open in a window, Instructions, ⋯, a
 tool's pin), and a single × at the far right, where there were "× Close", "Close", "Done" and a bare ×. ALEKS says its
 topic once, in the question's heading over the page (in its rail only while that heading does not show), and its part of
-the course not at all where it is the assignment's own name. Its window is as large as its card,
+the course not at all where it is the assignment's own name. (W18) The rubric's heading is the same: ← back to the ring
+while a criterion is open, the assignment over the rubric and where it stands, Ring | Grid and × at the right (its ×
+had been at its top left); its grid starts at the top of the room under it, not in its middle; and a mark given between
+two levels says where it falls, "4 pts (between Partial and Full marks)", not "Your mark · 4 pts" in the 3-point
+column (`RubricModel.Where`). Its window is as large as its card,
 however small (WPF-UI's least window size, 460 × 320, let go). It opens centred over the page beside
 the pane (`MainWindow.PopupRoom`); it moves with the window, keeping where it was put, and its heading moves it (a
 press there that is not on a control, `Kit/Drag.cs`; `Handle` names the heading, else its top 60).

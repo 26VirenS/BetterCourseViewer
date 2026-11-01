@@ -9,10 +9,11 @@ using TextBlock = System.Windows.Controls.TextBlock;
 namespace Simpl.Screens;
 
 /// <summary>
-/// The rubric as a grid (the Mac's RubricGridPanel): what it is and for which assignment, its score and how many criteria,
-/// Before grading or Graded once it is marked (a segmented control, unlike the Ring | Grid tabs above it), then the grid —
-/// a criterion a row, its levels lined up under columns by what they are worth, the one given marked — as tall as its
-/// rows, scrolling only when it is taller than the room.
+/// The rubric as a grid (the Mac's RubricGridPanel): its score and how many criteria — what it is and for which
+/// assignment are the popup's heading's (the UI review's W18: said twice before) — Before grading or Graded once it is
+/// marked (a segmented control, unlike the Ring | Grid tabs above it), then the grid — a criterion a row, its levels lined
+/// up under columns by what they are worth, the one given marked (a mark given between two levels says so: "4 pts
+/// (between Partial and Full marks)") — as tall as its rows from the top of the room, scrolling only when it is taller.
 /// </summary>
 internal sealed class RubricGridPanel : Grid
 {
@@ -32,17 +33,16 @@ internal sealed class RubricGridPanel : Grid
         RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        // the head: what it is, its score, how many criteria, and Before grading / Graded
-        var names = K.V(5, K.Text(eyebrow, Ty.Caption, B.Text2), K.Wrapped(title, Ty.Subtitle, B.Text, 2));
-        names.VerticalAlignment = VerticalAlignment.Bottom;
+        // the head: its score, how many criteria, and Before grading / Graded (what it is, and for which assignment
+        // — eyebrow and title — are the popup's heading's)
         score = new TextBlock { FontSize = 30, FontWeight = FontWeights.Bold, FontFamily = K.DisplayFace, VerticalAlignment = VerticalAlignment.Bottom };
         score.Fg(B.Text);
         outOf = K.Text("", Ty.BodyStrong, B.Text2).Margin(4, 0, 0, 5);
         outOf.VerticalAlignment = VerticalAlignment.Bottom;
-        var head = K.Columns("*, auto, auto, auto",
-            names.Margin(0, 0, 18, 0).Col(0),
-            K.H(0, score, outOf).Align(HorizontalAlignment.Left, VerticalAlignment.Bottom).Col(1),
-            K.Text(model.Many, Ty.Body, B.Text2).Margin(18, 0, 0, 5).Align(HorizontalAlignment.Left, VerticalAlignment.Bottom).Col(2));
+        var head = K.Columns("auto, auto, *, auto",
+            K.H(0, score, outOf).Align(HorizontalAlignment.Left, VerticalAlignment.Bottom).Col(0),
+            K.Text(model.Many, Ty.Body, B.Text2).Margin(18, 0, 0, 5).Align(HorizontalAlignment.Left, VerticalAlignment.Bottom).Col(1));
+        System.Windows.Automation.AutomationProperties.SetHelpText(head, eyebrow);
         if (model.Graded)
         {
             var shown = Segmented(new[] { "Before grading", "Graded" }, 1, i => { marks = i == 1; Fill(); });

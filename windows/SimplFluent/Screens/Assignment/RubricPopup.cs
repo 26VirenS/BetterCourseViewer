@@ -63,9 +63,11 @@ internal static class RubricPopup
 /// of the points, blooming in and — marked — bending to its marks and turning to its grades' colours; the total in the
 /// middle, or the criterion under the pointer. A slice, its name (a chip beside it), or Enter opens that criterion into
 /// its bar: its levels beside it at the height of their points (a leader to one that had to move), the one given marked, the marker's
-/// note under them, ‹ 1 of 2 › to switch, and "Ring" beside × to go back (the little ring on top only pictures where the bar came from). ← → walk the
-/// criteria; Escape steps back, then closes; a press beside the ring closes it too. Ring or Grid at the top right
-/// (RubricGrid.cs).
+/// note under them, ‹ 1 of 2 › to switch, and ← at the heading's left to go back (the little ring on top only pictures
+/// where the bar came from). ← → walk the criteria; Escape steps back, then closes; a press beside the ring closes it too.
+/// Its heading is every popup's (Kit/PopupHeader.cs; the UI review's W18: × had been at its top left, the title in the
+/// middle over ~150 px of nothing above the grid): the assignment and the rubric on the left, Ring | Grid and × at the
+/// right (RubricGrid.cs).
 /// </summary>
 internal sealed class RubricView : Grid
 {
@@ -90,9 +92,9 @@ internal sealed class RubricView : Grid
     private readonly RubricPinPanel centreHost = new();
     private readonly Border centre = new() { Width = 220 };
     private readonly RubricRingBack back;
-    /// <summary>The way back from a criterion to the ring, in words, beside ×.</summary>
-    private readonly Wpf.Ui.Controls.Button backButton;
-    private readonly FrameworkElement header;
+    /// <summary>The way back from a criterion to the ring, at the heading's left.</summary>
+    private readonly Button backButton;
+    private readonly PopupHeader header;
     private readonly TextBlock foot;
     private FrameworkElement? gridPanel;
 
@@ -118,30 +120,20 @@ internal sealed class RubricView : Grid
         RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        // the title over the ring, × at the top left, Ring / Grid at the top right
-        var close = K.IconButton(SymbolRegular.Dismiss24, () => Close?.Invoke(), "Close the rubric (Esc)", 16, 36);
-        backButton = K.Button("Ring", () => ToRing(), icon: SymbolRegular.ChevronLeft24);
-        backButton.MinWidth = 0;
-        backButton.ToolTip = "Back to the ring (Esc)";
+        // every popup's heading (Kit/PopupHeader.cs): ← back to the ring while a criterion is open, the assignment over
+        // the rubric and where it stands, Ring | Grid, and × at the far right
+        backButton = PopupHeader.Icon(SymbolRegular.ArrowLeft24, "Back to the ring (Esc)", () => ToRing());
         backButton.Visibility = Visibility.Collapsed;
-        backButton.VerticalAlignment = VerticalAlignment.Center;
         System.Windows.Automation.AutomationProperties.SetName(backButton, "Back to the ring");
-        var corner = K.H(8, close, backButton);
-        corner.HorizontalAlignment = HorizontalAlignment.Left;
-        corner.VerticalAlignment = VerticalAlignment.Top;
-        var switcher = new SelectorBar(new[] { "Ring", "Grid" }, view == "grid" ? 1 : 0) { HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top };
+        var switcher = new SelectorBar(new[] { "Ring", "Grid" }, view == "grid" ? 1 : 0);
         switcher.ToolTip = "Show the rubric as a ring or a grid";
         switcher.Changed += i => SetView(i == 1 ? "grid" : "ring");
-        var head = K.V(2,
-            K.Text(eyebrow, Ty.Caption, B.Text2).Center(),
-            K.Text(d.Title, Ty.Subtitle).Center(),
-            K.Text(Status, Ty.Body, B.Text2).Center());
-        head.HorizontalAlignment = HorizontalAlignment.Center;
-        head.Margin = new Thickness(130, 2, 130, 0);
-        head.IsHitTestVisible = false;
-        header = head;
-        var chrome = new Grid { Margin = new Thickness(16, 14, 16, 0), Children = { head, corner, switcher } };
-        Children.Add(chrome.Row(0));
+        var tint = K.Hex(d.Color, Support.Appearance.Accent);
+        header = new PopupHeader(K.Text(d.Title, Ty.Subtitle), K.Text($"{eyebrow} · {Status}", Ty.Body, B.Text2), () => Close?.Invoke(), "Close the rubric (Esc)",
+            K.IconTile(SymbolRegular.ClipboardTextLtr24, tint, 32));
+        header.Lead(backButton);
+        header.Extra(switcher);
+        Children.Add(header.Row(0));
 
         // the stage: the web ring's 760 × 560 units, as large as the room allows
         ringVisual = new RubricRingVisual(geo, clock);
@@ -475,7 +467,8 @@ internal sealed class RubricView : Grid
         KeepKeys();
     }
 
-    /// <summary>"Ring" beside × while a criterion is open (a short fade; at once with Windows' animation effects off).</summary>
+    /// <summary>← at the heading's left while a criterion is open (a short fade; at once with Windows' animation effects
+    /// off).</summary>
     private void ShowBack(bool on)
     {
         if (on == (backButton.Visibility == Visibility.Visible)) return;
@@ -615,8 +608,8 @@ internal sealed class RubricView : Grid
     }
 
     /// <summary>A level of the open criterion: its points in the criterion's colour, its name ("Your mark" on the one
-    /// given — "Your mark · 4 pts" where the points given are not the level's) and what it asks for, on a card of its own
-    /// beside the bar.</summary>
+    /// given — "4 pts (between Partial and Full marks)" where the points given are not the level's) and what it asks for,
+    /// on a card of its own beside the bar.</summary>
     private static FrameworkElement LevelRow(RubricModel.Level level, bool picked, bool dim, RubricRGB tone, int lines, string mark = "Your mark")
     {
         var pts = new TextBlock
@@ -644,11 +637,13 @@ internal sealed class RubricView : Grid
         return g;
     }
 
-    /// <summary>"Your mark" (or "Your mark · 4 pts", the points given where they are not the level's), on the criterion's
-    /// colour.</summary>
+    /// <summary>"Your mark" (or, the points given where they are not the level's, where they fall: "4 pts (between Partial
+    /// and Full marks)"), on the criterion's colour — on a second line in a narrow column, never cut short.</summary>
     public static Border YourMark(RubricRGB tone, string text = "Your mark")
     {
         var t = K.Text(text, Ty.Caption);
+        t.TextWrapping = TextWrapping.Wrap;
+        t.TextTrimming = TextTrimming.None;
         t.FontWeight = FontWeights.SemiBold;
         t.Foreground = K.Brush(tone.Ink);
         return new Border { Child = t, Background = K.Brush(tone.Color), CornerRadius = new CornerRadius(10), Padding = new Thickness(7, 1, 7, 2), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
@@ -751,7 +746,6 @@ internal sealed class RubricView : Grid
                 gp.IsHitTestVisible = false;
                 Motion.FadeOut(gp, () => { if (view == "ring") gp.Visibility = Visibility.Collapsed; });
             }
-            header.Visibility = Visibility.Visible;
             foot.Visibility = Visibility.Visible;
             ShowBack(open);
             Arrive(stageBox);
@@ -765,11 +759,11 @@ internal sealed class RubricView : Grid
         ShowBack(false); // (the grid has no criterion open to go back from)
         if (gridPanel == null)
         {
-            // (as tall as its rows, in the middle of the room: not a sheet left mostly blank under two criteria)
-            gridPanel = new RubricGridPanel(model, eyebrow, data.Title) { Margin = new Thickness(24, 0, 24, 20), VerticalAlignment = VerticalAlignment.Center };
+            // (as tall as its rows, from the top of the room under the heading — the UI review's W18: in its middle, two
+            //  criteria left ~150 px of nothing between the heading and the grid)
+            gridPanel = new RubricGridPanel(model, eyebrow, data.Title) { Margin = new Thickness(24, 8, 24, 20), VerticalAlignment = VerticalAlignment.Top };
             stageHost.Children.Add(gridPanel);
         }
-        header.Visibility = Visibility.Hidden;
         foot.Visibility = Visibility.Hidden;
         if (animate) Leave(stageBox, 0.94);
         else { stageBox.Opacity = 0; stageBox.IsHitTestVisible = false; }
