@@ -327,6 +327,63 @@ final class AppearanceStore: ObservableObject {
 
     private static let inkSuffix = ".ink.png"
 
+    // MARK: - Shared with Simpl Community (lib/theme.js communityOf)
+
+    /// (1.3.208) Something to share: a colour, or a drawing or photo in one of the places (the site takes nothing less).
+    var canShare: Bool { accentHex != nil || !photos.isEmpty }
+
+    /// (1.3.208) What is worn, as Simpl Community takes a theme: its name and maker, the colour, the look asked for (light,
+    /// dark, or none for the Mac's own), and in each place its drawing, or its photo — the photo's bytes beside it, a JPEG
+    /// small enough for the site (under 1.4 MB) — each where it sits, a photo's Ink switch as it is. A place's own colour
+    /// is not part of a shared theme (the web's is not either).
+    func communityShare(name: String, maker: String, look: String?) -> (theme: [String: Any], photos: [String: Data]) {
+        var places: [String: Any] = [:]
+        var bytes: [String: Data] = [:]
+        for slot in PhotoSlot.allCases {
+            guard let p = photos[slot] else { continue }
+            var d: [String: Any] = ["x": p.place.x, "y": p.place.y, "z": p.place.z]
+            switch p.source {
+            case .scene(let scene):
+                guard Self.scenes.contains(scene) else { continue }
+                d["scene"] = scene
+            case .upload(let file):
+                guard let image = images[file] ?? NSImage(contentsOf: Self.folder.appendingPathComponent(file)),
+                      let jpeg = Self.shareJPEG(image) else { continue }
+                bytes[slot.rawValue] = jpeg
+                d["photo"] = true
+                if p.plain == true { d["ink"] = false }
+            }
+            places[slot.rawValue] = d
+        }
+        var theme: [String: Any] = ["name": name, "maker": maker, "places": places]
+        theme["accent"] = accentHex ?? NSNull()
+        theme["look"] = look ?? NSNull()
+        return (theme, bytes)
+    }
+
+    /// A photo made small enough to share: no more than 1,600 pixels on its longer side, then 1,200 and 900 at less
+    /// quality while it is still over 1.4 MB (the site takes up to 1.5 MB a photo).
+    private static func shareJPEG(_ image: NSImage) -> Data? {
+        var rect = NSRect(origin: .zero, size: image.size)
+        guard let cg = image.cgImage(forProposedRect: &rect, context: nil, hints: nil) else { return nil }
+        let w = Double(cg.width), h = Double(cg.height)
+        guard w > 0, h > 0 else { return nil }
+        let steps: [(side: Double, quality: Double)] = [(1600, 0.82), (1200, 0.75), (900, 0.7)]
+        for step in steps {
+            let k = min(1, step.side / max(w, h))
+            let pw = Int((w * k).rounded()), ph = Int((h * k).rounded())
+            guard let ctx = CGContext(data: nil, width: pw, height: ph, bitsPerComponent: 8, bytesPerRow: 0,
+                                      space: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return nil }
+            ctx.interpolationQuality = .high
+            ctx.draw(cg, in: CGRect(x: 0, y: 0, width: pw, height: ph))
+            guard let scaled = ctx.makeImage(),
+                  let data = NSBitmapImageRep(cgImage: scaled).representation(using: .jpeg, properties: [.compressionFactor: step.quality]) else { return nil }
+            if data.count <= 1_400_000 { return data }
+        }
+        return nil
+    }
+
     /// (1.3.173) A Community theme worn in full (CommunityStore.wear): its colour, and in each of its places its drawing or
     /// its photo (read from the site, kept as an upload is, inked unless it was shared with its Ink switch off), each where
     /// it was pinned. What was worn before is replaced.

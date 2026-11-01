@@ -1080,6 +1080,19 @@ quicklook_check() {
 # read again under it was still open after the read, and no copy of the app crashed (a crash report is kept beside the
 # pictures by keep_crashes: 1.3.81's was a popover sized again and again until AppKit stopped the app). (1.3.80: the
 # crash reports looked for on this Mac and among the parts' files put together, where SHOTS=check finds them.)
+# (1.3.208) share_check: this theme shared from Community's Share Yours reached the mock's gallery, its photos with it
+# (the site's own handler answered with the theme's id), as share-check.txt
+share_check() {
+  local out="$OUT_ABS/share-check.txt" f="$OUT_ABS/console-light-51s-community-share.txt" line n
+  : > "$out"
+  line="$(grep -o 'community: shared Ocean Notes ([^)]*)' "$f" 2>/dev/null | head -1)"
+  n="$(printf '%s' "$line" | sed -n 's/.*, \([0-9]*\) photos)/\1/p')"
+  if [ -n "$line" ] && [ "${n:-0}" -ge 1 ]; then echo "ok   the theme was shared with its photos ($line)" >> "$out"
+  else echo "FAIL the theme was not shared ($(grep -o 'community: .*' "$f" 2>/dev/null | head -3 | tr '\n' ';'))" >> "$out"; fi
+  cat "$out"
+  if grep -q '^FAIL' "$out"; then grep '^FAIL' "$out" | sed 's/^/::error::community share: /'; return 1; fi
+}
+
 # (1.3.207) update_prompt_check: an update kept waiting a day put to the student over the window
 # (light-23h-update-prompt, dark-23h-update-prompt: the prompt asked for with -SimplForceUpdateShot), as
 # update-prompt-check.txt
@@ -1203,6 +1216,9 @@ push_set() {
   # kept, so a home of its own)
   shoot light-51k-appearance-community 20 -SimplAppearanceMode YES -SimplAppearanceTab community -SimplCommunityBase http://localhost:8800
   OWN_HOME=1 shoot light-51m-community-worn 20 -SimplCommunityWear Harbour -SimplCommunityBase http://localhost:8800
+  # (1.3.208) this theme shared from Community's Share Yours: Ocean's colour and a photo in every place, named and sent
+  # to the mock's gallery as Share sends it (-SimplCommunityShare), the form saying it went (checked: share_check)
+  shoot light-51s-community-share 24 -SimplAppearanceMode YES -SimplAppearanceTab community -SimplCommunityBase http://localhost:8800 -SimplTheme Ocean -SimplThemePhoto "$PWD/scripts/dev/fixtures/photo.jpg" -SimplCommunityShare "Ocean Notes"
   shoot light-12b-hand-in-preview 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplHandInPreview "$PWD/docs/screenshots/calendar.png"
   # (1.3.145) a preview scrolled by a posted wheel: the console says whether it reached the preview (SimplScrollProbe)
   shoot light-12e-hand-in-preview-scroll 30 -SimplPlace course:101 -SimplPush /courses/101/assignments/1012 -SimplOpen handin -SimplScrollProbe YES -SimplHandInPreview "$PWD/scripts/dev/fixtures/long-reading.pdf"
@@ -1287,6 +1303,7 @@ if [ "${SHOTS:-full}" = check ]; then
   record_check || exit 1 # (1.3.196)
   look_check || exit 1 # (1.3.197)
   update_prompt_check || exit 1 # (1.3.207)
+  share_check || exit 1 # (1.3.208)
   exit 0
 fi
 
@@ -1464,6 +1481,7 @@ if [ "$SHARDS" = 1 ]; then
   record_check || true # (1.3.196)
   look_check || true # (1.3.197)
   update_prompt_check || true # (1.3.207)
+  share_check || true # (1.3.208)
 fi
 keep_crashes
 exit 0
