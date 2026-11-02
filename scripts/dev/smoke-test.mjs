@@ -1381,10 +1381,27 @@ try {
   const readingDay = await page.$$eval('.bcv-cal__day', (cells) => { const c = cells.find((x) => [...x.querySelectorAll('.bcv-ev')].some((e) => /Reading day/.test(e.textContent))); return c ? c.querySelector('.bcv-cal__num')?.textContent.trim() : null; });
   const dayPlus4 = (() => { const d = new Date(); d.setDate(d.getDate() + 4); return String(d.getDate()); })();
   check(readingDay === dayPlus4, `an all-day event made in another time zone sits on the day it names (${dayPlus4}), not the evening before: on ${readingDay}`);
+  // Two checks read work dated yesterday (W2 HW and Lec05-PreQuiz, the Lec05 lecture). On the 1st of a month yesterday
+  // is last month's, in this grid only when the month opens mid-week (today not its first cell): when today is the first
+  // cell, the month before is drawn for those two — its grid runs at least five days into this month, so today is in it
+  // too — and Today brings this month back after each.
+  const monthBack = (await page.$$eval('.bcv-cal__day', (cells) => cells.findIndex((c) => c.classList.contains('bcv-cal__day--today')))) === 0;
+  const toYesterday = async () => {
+    if (!monthBack) return;
+    await page.click('.bcv-cal__nav .bcv-iconbtn:nth-child(1)'); // (Previous)
+    await page.waitForFunction(() => { const cells = [...document.querySelectorAll('.bcv-cal__day')]; const i = cells.findIndex((c) => c.classList.contains('bcv-cal__day--today')); return i > 0 && !!cells[i - 1].querySelector('.bcv-ev'); }, null, { timeout: 10000 });
+  };
+  const backToToday = async () => {
+    if (!monthBack) return;
+    await page.click('.bcv-cal__nav .bcv-roundbtn'); // (Today)
+    await page.waitForFunction((n) => [...document.querySelectorAll('.bcv-cal__day')].findIndex((c) => c.classList.contains('bcv-cal__day--today')) === 0 && document.querySelectorAll('.bcv-ev').length === n, evs.length, { timeout: 10000 });
+  };
   // handed-in work is struck through; work past its due date with nothing in (W2 HW, yesterday) stays
   // legible — it is missing, not done — and the chip's tip says so, with the points it is worth
+  await toYesterday();
   const calMarks = await page.$$eval('.bcv-ev', (els) => ({ struck: els.filter((e) => e.querySelector('.bcv-ev__label.bcv-strike')).map((e) => e.querySelector('.bcv-ev__label').textContent), w2: els.filter((e) => /W2 HW/.test(e.textContent)).map((e) => ({ struck: !!e.querySelector('.bcv-strike'), tip: e.title })) }));
   check(calMarks.struck.some((t) => /Lec05-PreQuiz/.test(t)) && calMarks.w2.length === 1 && !calMarks.w2[0].struck && /^W2 HW · .+ · 15 pts · Missing$/.test(calMarks.w2[0].tip), `handed-in work is struck through, missing work is not (its tip says so): ${JSON.stringify(calMarks)}`);
+  await backToToday();
   // the calendars live in a sheet off the Calendars button (which counts the ones on), so the month
   // has the width of the page to itself
   const calWide = await page.$eval('.bcv-cal', (e) => Math.round(e.getBoundingClientRect().width));
@@ -1474,6 +1491,7 @@ try {
   await page.waitForFunction((n) => !document.querySelector('.bcv-evsheet') && document.querySelectorAll('.bcv-ev').length === n && ![...document.querySelectorAll('.bcv-ev')].some((e) => /Research Proposal/.test(e.textContent)), evs.length, { timeout: 10000 });
   check(!(await page.$('.bcv-evsheet')) && !(await texts('.bcv-ev')).some((t) => /Research Proposal/.test(t)) && /given back/.test((await texts('.bcv-toast')).join(' ')), 'Un-reserve on the sheet gives the time back: the reservation leaves the month, the sheet closes, a toast says so');
   // a plain event's sheet: Event, when, the calendar, the place with its address, the details as rich text, nothing to un-reserve
+  await toYesterday();
   await page.click('.bcv-ev:has-text("Lec05 lecture")');
   await page.waitForSelector('.bcv-evsheet', { timeout: 5000 });
   const lecSheet = await evSheet();
@@ -1481,6 +1499,7 @@ try {
     `a lecture opens its sheet too — Event, when, the calendar, the room and its address, the details as rich text, nothing to un-reserve: ${JSON.stringify(lecSheet)}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-evsheet'), null, { timeout: 3000 });
+  await backToToday();
   // an assignment on the grid opens in the preview panel beside the month rather than leaving the page
   const chipTitle = await page.$eval('.bcv-ev[href*="/assignments/"]', (e) => e.querySelector('.bcv-ev__label').textContent);
   await page.click('.bcv-ev[href*="/assignments/"]');
