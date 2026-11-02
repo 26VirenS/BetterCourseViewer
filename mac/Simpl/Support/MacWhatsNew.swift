@@ -14,6 +14,10 @@ import Foundation
 /// both unless developer mode is on; a version with nothing else is left out whole.
 enum MacWhatsNew {
     static let releases: [Release] = [
+        Release(version: "1.3.214", date: "2026-11-02", notes: [
+            ReleaseNote(kind: "improved", title: "Whole Questions", body: "Exported questions include the parts you scroll to see."),
+            ReleaseNote(kind: "improved", title: "Question on the Glass", body: "Macmillan's question box is the glass itself now."),
+        ]),
         Release(version: "1.3.213", date: "2026-11-01", notes: [
             ReleaseNote(kind: "new", title: "Export Questions", body: "Macmillan, ALEKS and Alta questions saved as pictures."),
             ReleaseNote(kind: "new", title: "Every Question at Once", body: "In Macmillan, every question goes into one zip in Downloads."),
