@@ -413,6 +413,7 @@ internal sealed class AltaSession
         {
             flagsId = await core.AddScriptToExecuteOnDocumentCreatedAsync(flags);
             hookId = await core.AddScriptToExecuteOnDocumentCreatedAsync(AltaHook.Source);
+            await Support.QuestionExport.AddScript(core); // (0.3.108: Export questions pictures the question whole)
         }
         catch (Exception e) { Log.Write("alta script: " + e.Message); }
         return gone() ? null : (flagsId, hookId);

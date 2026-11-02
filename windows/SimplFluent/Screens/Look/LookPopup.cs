@@ -239,6 +239,7 @@ internal sealed class LookPopupView
             await LightPages.Apply(core, $"{kind.Name} popup");
             // (0.3.102: in Dark Mode the question on a dark card, the page turned light on dark by the look)
             look = await PageLook.Attach(core, rail: true, front: "card", dark: Support.Appearance.Dark);
+            await QuestionExport.AddScript(core); // (0.3.108: Export questions pictures each question whole)
             Support.Appearance.Changed += OnAppearance;
             look.Rail += o => root.Dispatcher.BeginInvoke(() => Take(o));
             PaintLook();
