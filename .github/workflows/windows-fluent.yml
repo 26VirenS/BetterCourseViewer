@@ -610,7 +610,7 @@ jobs:
           Shot 'macmillan-from-module' '1366x778' 45 ($mock + @('--appearance', 'light', '--open', 'moduletool:106:i61'))
           # (0.3.107) Export questions in Macmillan's popup: each of its 4 questions opened and pictured in turn, into one zip
           # in Downloads (Support/QuestionExport.cs)
-          Shot 'macmillan-export' '1366x778' 60 ($mock + @('--appearance', 'light', '--open', 'macmillan:104:4006', '--export-questions', 'yes'))
+          Shot 'macmillan-export' '1366x778' 75 ($mock + @('--appearance', 'light', '--open', 'macmillan:104:4006', '--export-questions', 'yes'))
           # Settings, as Windows 11's own Settings app, on each of its categories
           foreach ($tab in @('general', 'notifications', 'grades', 'data', 'updates', 'about')) {
             Shot "settings-$tab" '1024x681' 45 ($mock + @('--appearance', 'light', '--open', 'settings', '--settings-tab', $tab))
@@ -1473,6 +1473,11 @@ jobs:
             $z.Dispose()
             if (($pngs -join ',') -ne 'Question 1.png,Question 2.png,Question 3.png,Question 4.png') { Write-Host "::error::macmillan-export: the zip holds $($pngs -join ', ') ($zipPath)"; exit 1 }
             Write-Host "macmillan-export: 4 of 4 pictured, in ${zipName}: $($pngs -join ', ')"
+            # (0.3.108) the whole question: the mock's fourth, a module of Macmillan's fixed height that scrolls in itself,
+            # pictured from more than one view laid together
+            if ("$l" -notmatch 'export questions: question 4 pictured whole, ([2-9]|\d\d+) views laid together \((\d+) px tall, the view (\d+)\)') { Write-Host "::error::macmillan-export: the long question was not pictured whole (shots/profile-macmillan-export.log)"; exit 1 }
+            if ([int]$Matches[2] -le [int]$Matches[3]) { Write-Host "::error::macmillan-export: the long question's picture is no taller than the view ($($Matches[0]))"; exit 1 }
+            Write-Host "macmillan-export: the long question pictured whole — $($Matches[0])"
           }
           # (0.3.97) an assignment launched on lmslink.bfwpub.com, as a school's Macmillan homework is, opens in the popup
           if ($script:mine -contains 'macmillan-from-assignment') {
