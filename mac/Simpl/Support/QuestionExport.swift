@@ -34,6 +34,9 @@ final class QuestionExport: ObservableObject {
         saved = nil
         failed = nil
         Task { @MainActor in
+            // (1.3.214: the picture suite's picture waits for it — each question, pictured whole, takes a second or two)
+            Shot.began()
+            defer { Shot.ended() }
             let fm = FileManager.default
             let name = Self.fileName(title)
             let work = fm.temporaryDirectory.appendingPathComponent("simpl-questions-\(UUID().uuidString)", isDirectory: true)
