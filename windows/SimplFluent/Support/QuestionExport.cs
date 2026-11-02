@@ -31,7 +31,7 @@ internal static class QuestionExport
 
     /// <summary>One question's picture: PNG, how many views were laid together (1: nothing scrolls), its height and the
     /// view's, in pixels.</summary>
-    private sealed record Shot(byte[] Png, int Views, int Height, int ViewHeight);
+    private sealed record Picture(byte[] Png, int Views, int Height, int ViewHeight);
 
     private static string? shotSource;
 
@@ -56,6 +56,9 @@ internal static class QuestionExport
         var work = Path.Combine(Path.GetTempPath(), "simpl-questions-" + Guid.NewGuid().ToString("N"));
         var folder = Path.Combine(work, name + " questions");
         var missed = new List<int>();
+        // (the picture suite's picture waits for it: each question, pictured whole, takes a second or two — the picture
+        // was taken, and the app closed, part way through)
+        Shot.Began();
         try
         {
             Directory.CreateDirectory(folder);
@@ -86,6 +89,7 @@ internal static class QuestionExport
         }
         finally
         {
+            Shot.Ended();
             try { Directory.Delete(work, recursive: true); } catch { /* (the temporary folder: Windows clears it in time) */ }
         }
     }
@@ -113,7 +117,7 @@ internal static class QuestionExport
         public double? vw { get; set; }
     }
 
-    private static async Task<Shot?> Whole(WebView2 web, Color ground)
+    private static async Task<Picture?> Whole(WebView2 web, Color ground)
     {
         if (web.CoreWebView2 is not { } c) return null;
         var id = "q" + Guid.NewGuid().ToString("N")[..8];
@@ -153,7 +157,7 @@ internal static class QuestionExport
         return views.Count == 0 ? null : Lay(views, begun, ground);
     }
 
-    private static async Task<Shot?> Single(CoreWebView2 c, Color ground) =>
+    private static async Task<Picture?> Single(CoreWebView2 c, Color ground) =>
         await View(c) is { } image ? Lay(new() { (image, 0) }, null, ground) : null;
 
     /// <summary>The page as it is on screen (CapturePreviewAsync), in its own pixels.</summary>
@@ -168,7 +172,7 @@ internal static class QuestionExport
     }
 
     /// <summary>The views laid one under the other on the ground (or the one view as it is, <paramref name="p"/> null).</summary>
-    private static Shot? Lay(List<(BitmapSource Image, double St)> views, Said? p, Color ground)
+    private static Picture? Lay(List<(BitmapSource Image, double St)> views, Said? p, Color ground)
     {
         var (first, top) = views[0];
         int wide = first.PixelWidth, high = first.PixelHeight;
@@ -227,7 +231,7 @@ internal static class QuestionExport
         png.Frames.Add(BitmapFrame.Create(bitmap));
         using var output = new MemoryStream();
         png.Save(output);
-        return new Shot(output.ToArray(), stitched ? views.Count : 1, tall, high);
+        return new Picture(output.ToArray(), stitched ? views.Count : 1, tall, high);
     }
 
     /// <summary>A script in the top frame (nothing if it fails: a page on its way out).</summary>
