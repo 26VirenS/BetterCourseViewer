@@ -225,7 +225,7 @@ struct LookQuizScreen: View {
                 GeometryReader { g in
                     ZStack {
                         if let url {
-                            ToolWebView(url: url, browser: browser, scripts: PageLook.scripts(front: true, dark: scheme == .dark),
+                            ToolWebView(url: url, browser: browser, scripts: PageLook.scripts(front: true, dark: scheme == .dark) + QuestionShot.scripts,
                                         messages: ["simplLook": rail.relay], externalTool: true, sendToolForm: sendForm, clear: true)
                         } else if let error {
                             ContentUnavailableView {
@@ -241,7 +241,9 @@ struct LookQuizScreen: View {
                     .onAppear { rail.fit(width: g.size.width) }
                     .onChange(of: g.size.width) { _, w in rail.fit(width: w) }
                 }
-                .padding(front ? 6 : 0)
+                // (1.3.214) the page is the glass: edge to edge and in its shape, not set in from its rim — whatever the
+                // page draws round the question is the glass's size (its margin is the page's own, the look's)
+                .clipShape(RoundedRectangle(cornerRadius: front ? 26 : 0, style: .continuous))
             }
             .padding(.horizontal, front ? 14 : 0)
             .padding(.top, front && !(rail.heard && rail.onItem) ? 14 : 0)

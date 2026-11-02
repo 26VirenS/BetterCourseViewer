@@ -1941,6 +1941,7 @@ final class AltaSession: ObservableObject {
         ucc.removeAllUserScripts()
         ucc.addUserScript(WKUserScript(source: flags, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         ucc.addUserScript(AltaHook.script)
+        for q in QuestionShot.scripts { ucc.addUserScript(q) } // (1.3.214: Export questions pictures the question whole)
         web.evaluateJavaScript(flags + " if (window.__simplFocusDark) window.__simplFocusDark(); if (window.__simplBrowserNow) window.__simplBrowserNow();", completionHandler: nil)
     }
 
@@ -2195,6 +2196,7 @@ final class AltaSession: ObservableObject {
         config.mediaTypesRequiringUserActionForPlayback = []
         config.applicationNameForUserAgent = "Version/18.4 Safari/605.1.15"
         config.userContentController.addUserScript(AltaHook.script)
+        for q in QuestionShot.scripts { config.userContentController.addUserScript(q) }
         let r = AltaRelay()
         config.userContentController.add(r, name: AltaHook.handler)
         let web = AltaWebView(frame: NSRect(x: 0, y: 0, width: 1000, height: 800), configuration: config)

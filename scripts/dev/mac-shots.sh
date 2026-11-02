@@ -1064,6 +1064,10 @@ look_check() {
   local x="$OUT_ABS/console-light-21x-macmillan-export.txt"
   if grep -q 'export questions: 4 of 4 pictured, saved to .* questions\.zip (macmillan)$' "$x" 2>/dev/null; then echo "ok   Export Questions pictured all 4 questions into a zip ($(grep -o 'saved to .*' "$x" | tail -1))" >> "$out"
   else echo "FAIL Export Questions did not picture all 4 questions ($(grep -o 'export questions: .*' "$x" 2>/dev/null | head -3 | tr '\n' ';'))" >> "$out"; fi
+  # (1.3.214) the whole question: the mock's fourth, a module of Macmillan's fixed height that scrolls in itself, pictured
+  # from more than one view laid together
+  if grep -qE 'export questions: question 4 pictured whole, [2-9][0-9]* views laid together' "$x" 2>/dev/null; then echo "ok   Export Questions pictured the long question whole ($(grep -o 'question 4 pictured whole.*' "$x" | tail -1))" >> "$out"
+  else echo "FAIL Export Questions did not picture the long question whole ($(grep -o 'export questions: .*' "$x" 2>/dev/null | head -4 | tr '\n' ';'))" >> "$out"; fi
   # (1.3.202) Macmillan's cover heard and drawn as the popup's own start page, Alta's way: its questions and its grading settings
   local d="$OUT_ABS/console-light-21d-macmillan.txt"
   if grep -q 'macmillan popup: cover heard, 4 questions, 5 grading settings' "$d" 2>/dev/null; then echo "ok   the popup's start page heard Macmillan's cover (4 questions, 5 grading settings)" >> "$out"
@@ -1278,7 +1282,7 @@ push_set() {
   shoot light-21o-macmillan-look-off 26 -SimplOpen macmillan:104:4006 -SimplMacmillanLook NO
   # (1.3.213) Export Questions run as the popup opens (-SimplExportQuestions): each of the mock's 4 questions opened in
   # turn and pictured, zipped into Downloads, and the alert saying where (look_check)
-  shoot light-21x-macmillan-export 40 -SimplOpen macmillan:104:4006 -SimplExportQuestions YES
+  shoot light-21x-macmillan-export 60 -SimplOpen macmillan:104:4006 -SimplExportQuestions YES
   # (1.3.198) Simpl's look over ALEKS's page (extension/tools/aleks/look.js), the mock's learning page with a wrong answer
   # checked: the light bar with the topic and its progress, the sheet, the tools' column beside it, Explanation and
   # Recheck under the answer — then with Simpl Look off, as ALEKS draws it (look_check)

@@ -48,11 +48,16 @@ final class QuestionExport: ObservableObject {
             for (i, q) in list.enumerated() {
                 done = i
                 if q > 0, await !open(q) { missed.append(q); continue }
-                guard let png = await Self.picture(web, ground: ground) else { missed.append(q); continue }
+                // (1.3.214: the whole question, however far it scrolls — QuestionShot)
+                guard let shot = await QuestionShot.picture(web, ground: ground) else { missed.append(q); continue }
                 let label = q > 0 ? "Question \(q)" : "Question"
                 do {
-                    try png.write(to: folder.appendingPathComponent("\(label).png"))
+                    try shot.png.write(to: folder.appendingPathComponent("\(label).png"))
                     pictured += 1
+                    if shot.views > 1 {
+                        NSLog("[Simpl] export questions: %@ pictured whole, %ld views laid together (%ld px tall, the view %ld)",
+                              label.lowercased(), shot.views, shot.height, shot.viewHeight)
+                    }
                 } catch { missed.append(q) }
             }
             done = list.count
@@ -80,26 +85,6 @@ final class QuestionExport: ObservableObject {
         NSLog("[Simpl] export questions: none saved (%@): %@", tool, why)
         failed = why
         running = false
-    }
-
-    /// The web view as it is on screen, laid on `ground`, as PNG.
-    private static func picture(_ web: WKWebView, ground: NSColor) async -> Data? {
-        // (in a time that can be waited for: a popup out of sight would otherwise hold the export for good)
-        let shot = await WebSnapshot.take(web)
-        guard let shot, shot.size.width > 0, shot.size.height > 0 else { return nil }
-        let scale = web.window?.backingScaleFactor ?? 2
-        let w = Int((shot.size.width * scale).rounded()), h = Int((shot.size.height * scale).rounded())
-        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: w, pixelsHigh: h, bitsPerSample: 8, samplesPerPixel: 4,
-                                         hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
-        else { return nil }
-        rep.size = shot.size
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-        ground.setFill()
-        NSRect(origin: .zero, size: shot.size).fill()
-        shot.draw(in: NSRect(origin: .zero, size: shot.size), from: .zero, operation: .sourceOver, fraction: 1)
-        NSGraphicsContext.restoreGraphicsState()
-        return rep.representation(using: .png, properties: [:])
     }
 
     /// The assignment's name made safe for a file name.

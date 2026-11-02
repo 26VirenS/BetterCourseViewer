@@ -255,6 +255,12 @@
     // answer fields and banks frosted over it)
     'html.simpl-mm.simpl-front-glass,html.simpl-mm.simpl-front-glass body,html.simpl-mm.simpl-front-glass #root,html.simpl-mm.simpl-front-glass #__next,html.simpl-mm.simpl-front-glass #main-content,html.simpl-mm.simpl-front-glass #sac,html.simpl-mm.simpl-front-glass #main{background:transparent!important}',
     'html.simpl-mm.simpl-front-glass #raptor-content-container .authoring-area>.parent-module-container,html.simpl-mm.simpl-front-glass #raptor-content-container .shared-module-container{background:transparent!important;box-shadow:none!important;border:0!important}',
+    // (Mac 1.3.214) the page is the glass, edge to edge and in its shape (the popup no longer sets it in from the glass's
+    // rim): nothing of Macmillan's round the question paints a box of its own on it — the hub's wrappers round the player,
+    // the player's own frame and the module's rooms — and the margin the popup took away is the page's own
+    'html.simpl-mm.simpl-front-glass [data-test-id="atom-hubbox"],html.simpl-mm.simpl-front-glass .hub_molecule_iframe,html.simpl-mm.simpl-front-glass .hub_molecule_iframe iframe,html.simpl-mm.simpl-front-glass #main-content>div,html.simpl-mm.simpl-front-glass .raptor-container,html.simpl-mm.simpl-front-glass #raptor-content-container,html.simpl-mm.simpl-front-glass #raptor-content-container .content-area,html.simpl-mm.simpl-front-glass #raptor-content-container .authoring-area{background:transparent!important;box-shadow:none!important;border-color:transparent!important}',
+    'html.simpl-mm.simpl-front-glass #sac{padding:12px 28px 0!important}',
+    'html.simpl-mm.simpl-front-glass .raptor-container{height:calc(100vh - 12px)!important}',
     'html.simpl-mm.simpl-front-glass .numeric-entry-border{background:rgba(255,255,255,.66)!important;border-color:rgba(60,60,67,.22)!important}',
     'html.simpl-mm.simpl-front-glass .labeling-answer-bank{background:rgba(255,255,255,.42)!important;border:1px solid rgba(255,255,255,.7)!important}',
     'html.simpl-mm.simpl-front-glass #attempts-holder.dropdown #attempts-button{background:rgba(255,255,255,.58)!important}',
@@ -395,7 +401,7 @@
       policy: !!document.querySelector('[data-test-id="show-policy-details-button"]'),
       // (the width the question wants, in the page's own pixels: its sheet and the margins round it)
       // (1.3.200: Macmillan's own page holds its body 1024 wide at the least — the width the popup must fit, not the sheet's)
-      wide: Math.ceil(Math.max((area ? parseFloat(getComputedStyle(area).width) || 960 : 960) + 48,
+      wide: Math.ceil(Math.max((area ? parseFloat(getComputedStyle(area).width) || 960 : 960) + (front === 'glass' ? 56 : 48),
         (document.body && parseFloat(getComputedStyle(document.body).minWidth)) || 0)) };
     if (front) o.front = buttons();
     var said = JSON.stringify(o);
