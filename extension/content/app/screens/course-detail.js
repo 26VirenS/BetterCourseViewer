@@ -58,34 +58,40 @@
    *  can call api.swap(make2) to turn it into something else in place (the card's Submit again), api.relayout() when what
    *  it holds changes height, api.close() to fold it back. `anchor` is where it grows from: 'right' (hung from a chip's
    *  corner at the end of a row), 'left' (from a button's start), or 'center' (out of the button's middle, every way). */
-  function growBox(ctx, from, { label = '', W = 400, H = 560, anchor = 'right', hover = false, onClosed = null, vars = null, within = null, beside = null, clear = null } = {}, make) {
+  function growBox(ctx, from, { label = '', W = 400, H = 560, anchor = 'right', hover = false, onClosed = null, vars = null, within = null, room = null } = {}, make) {
     const prev = document.querySelector('.bcv-sheet-ov');
     if (prev?.bcvReopen && prev.bcvCard === from && prev.classList.contains('is-folding')) { prev.bcvReopen(); return prev.bcvApi; } // (pressed again as it folds: it opens again from where it is)
-    if (prev) { clearTimeout(prev._bcvFoldT); prev.remove(); }
+    if (prev) { clearTimeout(prev._bcvFoldT); prev._bcvUnroom?.(); prev.remove(); }
     const ov = U.el('bcv-sheet-ov bcv-sheet-ov--card is-far', null, { role: 'dialog', 'aria-label': label }); // (is-far: the dim and blur start out wide, to close in on the box)
     let folding = false;
     let box = null; // (U.cardBox: the box laid out once where it goes, drawn through a clip that grows out of the button)
     let width = W, boxH = H; // (as tall as its content wants, up to H: measured once built)
     const M = 16;
+    // (2.99.137) `room`: the row the button stands in. The box hangs from the button — its top the button's, as wide as the
+    // row (320 at least, W at most) and on its middle — and what stands under the row moves down by as much as the box
+    // reaches past it (app.css .bcv-roomy, on the box's own spring), back up as it folds: the button grows into the panel
+    // in its own place, the due date and the rest still in view under it. (2.99.136 stood it apart, to the left of the
+    // rail, over the instructions, the button's place left empty.)
+    let roomPx = 0;
+    const makeRoom = (px) => { roomPx = Math.max(0, Math.round(px)); room.classList.add('bcv-roomy'); room.style.setProperty('--bcv-room', `${roomPx}px`); };
+    const unRoom = () => { if (room?.isConnected) room.style.setProperty('--bcv-room', '0px'); };
+    ov._bcvUnroom = unRoom;
     function geometry(back) {
       const r = from.getBoundingClientRect();
       if (back) return { x: r.left, y: r.top, w: r.width, h: r.height };
       const vw = innerWidth, vh = innerHeight, w = Math.min(width, vw - 2 * M), hgt = Math.min(boxH, vh - 2 * M);
+      const rr = room?.isConnected ? room.getBoundingClientRect() : null;
+      if (rr && rr.width) {
+        const w2 = Math.min(vw - 2 * M, Math.max(320, Math.min(width, rr.width)));
+        const g = { x: Math.max(M, Math.min(rr.left + rr.width / 2 - w2 / 2, vw - M - w2)), y: Math.max(M, Math.min(r.top, vh - M - hgt)), w: w2, h: hgt };
+        if (ov.isConnected && !folding) makeRoom(g.y + g.h - rr.bottom); // (laid out before the layer is in the page, to be measured: no room made for that)
+        return g;
+      }
       const x = anchor === 'center' ? r.left + r.width / 2 - w / 2 : anchor === 'left' ? r.left : r.right - w;
       const y = anchor === 'center' ? r.top + r.height / 2 - hgt / 2 : r.top; // (centre: the box's middle on the button's, growing out of it every way)
       // (2.99.15) `within`: kept inside the page's own card (over the assignment, not the course's rail beside it)
       const b = within?.isConnected ? within.getBoundingClientRect() : null;
       const lo = b ? Math.max(M, b.left + 16) : M, hi = b ? Math.min(vw - M, b.right - 16) : vw - M;
-      // (E7) `beside`: the box stands to the left of that column (the rail the button is in), its top level with the
-      // button's — over the instructions, never over the title above it or the facts beside it (the due date). Where the
-      // column has no room to its left (a narrow page: the rail over the instructions), it stands under `clear` (the facts).
-      const col = !back && beside?.isConnected ? beside.getBoundingClientRect() : null;
-      if (col && col.width) {
-        const top = Math.max(M, Math.min(r.top, vh - M - hgt));
-        if (col.left - 16 - w >= lo) return { x: col.left - 16 - w, y: top, w, h: hgt };
-        const u = clear?.isConnected ? clear.getBoundingClientRect() : null;
-        if (u && u.height) return { x: Math.max(lo, Math.min(col.left, hi - w)), y: Math.max(M, Math.min(u.bottom + 12, vh - M - hgt)), w, h: hgt };
-      }
       return { x: Math.max(lo, Math.min(x, hi - w)), y: Math.max(M, Math.min(y, vh - M - hgt)), w, h: hgt };
     }
     // Escape from anywhere on the page folds the box (a reply just sent leaves the cursor nowhere in particular); a file's viewer or a question over the box takes its own Escape first
@@ -104,6 +110,7 @@
       U.hoverCool(from, lastPt); // (a pointer still over the button as the box folds into it does not open it again until it has left)
       ov.classList.add('is-folding', 'is-far'); // (the focus lets go outward as the box folds)
       box.fold(); // (from wherever it is drawn — mid-growth too — back into the button, its word back to the button's)
+      unRoom(); // (what stands under the button moves back up with it)
       from.setAttribute?.('aria-expanded', 'false');
       clearTimeout(ov._bcvFoldT);
       ov._bcvFoldT = setTimeout(() => { ov.remove(); from.classList.remove('bcv-grow-src'); onClosed?.(); }, U.reducedMotion() ? 0 : 560);
@@ -123,6 +130,7 @@
       ov.classList.remove('is-folding', 'is-far');
       document.addEventListener('keydown', onKey);
       box.reopen();
+      if (room?.isConnected && roomPx) makeRoom(roomPx);
       from.classList.add('bcv-grow-src');
       from.setAttribute?.('aria-expanded', 'true');
       ov.focus();
@@ -593,7 +601,7 @@
         return { cls: 'bcv-hand', kids: [handScreen], measure: () => handScreen.scrollHeight + 2, after: () => setTimeout(() => (handScreen.querySelector('.bcv-sb__tab.is-active, .bcv-sb__tab, .bcv-sb__drop, .bcv-sb__ta') || handScreen).focus?.({ preventScroll: true }), 60) };
       };
       if (api) { api.swap(content, { W: 400 }); return; }
-      growBox(ctx, pill, { label: `${a.name}: hand in`, W: 380, H: 600, anchor: 'center', within: pill.closest('.bcv-asg__card'), beside: pill.closest('.bcv-asg__rail'), clear: pill.closest('.bcv-asg__rail')?.querySelector('.bcv-asg__facts'), onClosed: afterClose, vars: courseVars(c) }, content); // (E7: beside the rail, the title and the due date left in view)
+      growBox(ctx, pill, { label: `${a.name}: hand in`, W: 400, H: 600, anchor: 'center', within: pill.closest('.bcv-asg__card'), room: pill.closest('.bcv-asg__stepbtns'), onClosed: afterClose, vars: courseVars(c) }, content); // (2.99.137: hung from the button in its own place, what is under it moving down to make room)
     };
     let sentOff = false;
     const afterClose = () => { if (sentOff && ctx.alive()) app.go(`${c.url}/assignments/${a.id}`, { confirmed: true }); }; // (handed in: the page redraws, Submitted)

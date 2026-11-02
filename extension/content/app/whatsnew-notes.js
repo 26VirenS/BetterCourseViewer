@@ -28,6 +28,9 @@
     lock: 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.137', date: '2026-11-02', notes: [
+      { kind: 'fixed', title: 'Hand In Grows in Place', body: 'It opens from its button; the due date slides down.', icon: P.clip },
+    ] },
     { version: '2.99.136', date: '2026-11-01', notes: [
       { kind: 'improved', title: 'Due Date Stays in View', body: 'Handing in no longer covers the title or due date.', icon: P.clip },
       { kind: 'improved', title: 'Never a Dead End', body: 'Errors offer Try Again and Open in Canvas.', icon: P.arrows },
