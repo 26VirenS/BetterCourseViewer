@@ -1040,6 +1040,11 @@ look_check() {
     if grep -q 'aleks popup: rail heard, topic progress 0 of 5' "$c" 2>/dev/null; then echo "ok   the popup's rail heard ALEKS's topic progress ($(basename "$c" .txt))" >> "$out"
     else echo "FAIL the popup's rail heard nothing of ALEKS's topic ($(basename "$c" .txt): $(grep -o 'aleks popup: .*' "$c" 2>/dev/null | head -3 | tr '\n' ';'))" >> "$out"; fi
   done
+  # (1.3.215) More Details under the facts: what Canvas says of the assignment that the page shows nowhere else — the group
+  # it counts toward, peer reviews, the file types it takes, the similarity check
+  local mo="$OUT_ABS/console-light-10m-assignment-more.txt"
+  if grep -qF 'SimplMore group=Assignments | peer=2 classmates' "$mo" 2>/dev/null && grep -qF 'files=PDF, DOCX, PNG or JPG only | similarity=Turnitin checks it for copied work' "$mo" 2>/dev/null; then echo "ok   More Details stands under the facts ($(grep -o 'SimplMore .*' "$mo" | tail -1))" >> "$out"
+  else echo "FAIL More Details did not say the assignment's group, peer reviews, file types and similarity check ($(grep -o 'SimplMore .*' "$mo" 2>/dev/null | head -2 | tr '\n' ';'))" >> "$out"; fi
   # (1.3.201) an assignment launched on lmslink.bfwpub.com, as a school's Macmillan homework is, opens in the popup
   local r="$OUT_ABS/console-light-21r-macmillan-from-assignment.txt"
   if grep -q 'macmillan popup: opened from the assignment (its tool on lmslink.bfwpub.com)' "$r" 2>/dev/null; then echo "ok   a Macmillan assignment launched on lmslink.bfwpub.com opened in the popup" >> "$out"
@@ -1324,6 +1329,7 @@ push_set() {
   shoot light-10d-assignment-submitted 12 -SimplPlace course:101 -SimplPush /courses/101/assignments/1008
   SIZE=1440x900 shoot light-10e-assignment-wide 12 -SimplPlace course:101 -SimplPush /courses/101/assignments/1008
   SIZE=1440x900 shoot light-10f-assignment-wide-quiz 12 -SimplPlace course:101 -SimplPush /courses/101/assignments/1001
+  SIZE=1440x900 shoot light-10m-assignment-more 14 -SimplPlace course:104 -SimplPush /courses/104/assignments/4002 # (1.3.215: More Details under the facts)
   shoot light-32b-rubric-open 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1
   shoot light-19d-quiz-click 18 -SimplOpen quiz:101:9011:take:1 -SimplQuizClick 4
   shoot light-19f-quiz-feedback 24 -SimplOpen quiz:101:9001:feedback

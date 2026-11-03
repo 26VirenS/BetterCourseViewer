@@ -382,6 +382,7 @@ struct AssignmentView: View {
                 heldNote
             }
             factsCard(d)
+            moreCard(d)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
@@ -403,6 +404,7 @@ struct AssignmentView: View {
             } else if d.held == true {
                 heldNote
             }
+            moreCard(d)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
@@ -657,6 +659,97 @@ struct AssignmentView: View {
         // (1.3.78) a quiz's attempts as the quiz counts them, once its intro is in: the same count New Attempt follows
         if let at = quizIntro?.attemptsText ?? d.attemptsText, !at.isEmpty { out.append((symbol: "arrow.counterclockwise", label: "Attempts", value: at)) }
         return out
+    }
+
+    /// (1.3.215) More Details, under the facts: what Canvas says of the assignment that the page shows nowhere else — the
+    /// group it counts toward, peer reviews, the file types it takes, a similarity check, what its instructions hold that
+    /// no page here draws (the engine's `extras`, courseDetail.extraFacts). Its rows are the facts' own; one with somewhere
+    /// to go opens it: the school's own page in a window of its own, another site in Simpl's browser.
+    @ViewBuilder
+    private func moreCard(_ d: AssignmentData) -> some View {
+        let rows = d.extras ?? []
+        if !rows.isEmpty {
+            let color = courseTint(d)
+            VStack(alignment: .leading, spacing: 0) {
+                Text("More Details")
+                    .font(.sCallout.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 14)
+                    .padding(.top, 4)
+                    .padding(.bottom, 2)
+                    .accessibilityAddTraits(.isHeader)
+                ForEach(Array(rows.enumerated()), id: \.offset) { i, r in
+                    if i > 0 { RowDivider(inset: 56) }
+                    if let url = r.url, !url.isEmpty {
+                        Button { openExtra(url, r.label) } label: { moreLine(r, color, link: url) }
+                            .buttonStyle(.plain)
+                            .help(url.hasPrefix("/") ? "Open on \(d.context ?? "the school's site")" : url)
+                    } else {
+                        moreLine(r, color, link: nil)
+                    }
+                }
+            }
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .card()
+            .onAppear {
+                // (for the picture suite: what the panel says, row by row)
+                if UserDefaults.standard.string(forKey: "SimplShotFile") != nil { NSLog("SimplMore %@", rows.map { "\($0.kind)=\($0.value)" }.joined(separator: " | ")) }
+            }
+        }
+    }
+
+    private func moreLine(_ r: ExtraFact, _ color: Color, link: String?) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            IconTile(symbol: Self.moreSymbol(r.kind), color: color, size: 30)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(r.label.uppercased())
+                    .font(.sCaption.weight(.semibold))
+                    .tracking(0.6)
+                    .foregroundStyle(.secondary)
+                Text(r.value)
+                    .font(.sBody)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            if let link {
+                Image(systemName: link.hasPrefix("/") ? "chevron.right" : "arrow.up.right")
+                    .font(.sCaption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(link == nil ? [] : .isLink)
+    }
+
+    /// A More Details row's address: the school's own page for a path, Simpl's browser for another site.
+    private func openExtra(_ url: String, _ label: String) {
+        if url.hasPrefix("/") { engine.openWebScreen(url, title: label) } else { visit(url) }
+    }
+
+    /// Each kind of More Details row's symbol (the web's icons, extension/content/app/screens/course-detail.js MORE_ICON).
+    static func moreSymbol(_ kind: String) -> String {
+        switch kind {
+        case "group": return "chart.pie"
+        case "grading": return "checkmark.seal"
+        case "team": return "person.3"
+        case "peer": return "arrow.left.arrow.right"
+        case "files": return "doc"
+        case "lockdown": return "lock.shield"
+        case "similarity": return "doc.text.magnifyingglass"
+        case "anonymous": return "eye.slash"
+        case "moderated": return "checkmark.shield"
+        case "period": return "clock.badge.checkmark"
+        case "annotate": return "pencil.and.outline"
+        case "tool": return "globe"
+        case "link": return "link"
+        case "embed": return "chevron.left.forwardslash.chevron.right"
+        case "media": return "play.rectangle"
+        default: return "info.circle"
+        }
     }
 
     private func factLine(_ symbol: String, _ label: String, _ value: String, _ color: Color) -> some View {
