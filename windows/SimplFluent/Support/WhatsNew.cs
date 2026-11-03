@@ -28,6 +28,8 @@ public static class WhatsNew
 
     public static readonly List<Release> Releases = new()
     {
+        R("0.3.109", "2026-11-03",
+            ("new", "More details", "Extra assignment info sits in a panel under the due date.")),
         R("0.3.108", "2026-11-02",
             ("improved", "Whole questions", "Exported questions include the parts you scroll to see.")),
         R("0.3.107", "2026-11-01",

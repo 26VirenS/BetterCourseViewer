@@ -921,6 +921,20 @@ public sealed class AssignmentData
     public List<RubricRow> Rubric { get; set; } = new();
     public string? RubricTitle { get; set; }
     public string? RubricScore { get; set; }
+    // (Windows 0.3.109, Mac 1.3.215) The More Details card under the facts: what Canvas says of the assignment that the
+    // page shows nowhere else (courseDetail.extraFacts).
+    public List<ExtraFact>? Extras { get; set; }
+}
+
+// (Windows 0.3.109, Mac 1.3.215) One row of an assignment's More Details: `kind` picks its icon ("group", "peer", "files",
+// "embed"…), `label` and `value` its words ("Counts Toward", "Homework · 20% of your grade"), and `url`, when there is
+// one, where it leads (a path on the school's site, or another site's address).
+public sealed class ExtraFact
+{
+    public string Kind { get; set; } = "";
+    public string Label { get; set; } = "";
+    public string Value { get; set; } = "";
+    public string? Url { get; set; }
 }
 
 public sealed class PageRow

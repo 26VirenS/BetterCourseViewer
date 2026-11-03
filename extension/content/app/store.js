@@ -1058,6 +1058,11 @@
       return groups;
     }, { force, refresh, maxAge });
   }
+  /** (Windows 0.3.109) One assignment group on its own — its name, share of the grade and rules — for an assignment's More
+   *  Details (the whole list, with every assignment in it, is a slow answer to wait on for one line). */
+  function assignmentGroup(id, gid, { force = false, refresh = false, maxAge = 0 } = {}) {
+    return C.cached(`agroup:${id}:${gid}`, 10 * MIN, () => C.get(`/api/v1/courses/${id}/assignment_groups/${gid}`).catch(() => null), { force, refresh, maxAge });
+  }
   // ---- kept between page loads (2.98.92) ------------------------------------------------------------------
   // The Dashboard's grades skyline, Overdue and Graded this week all wait on every favourite course's assignments,
   // which Canvas is slow to send, and the per-page memo starts empty on every page load. So each course's last
@@ -1865,7 +1870,7 @@
     announcementsFeed, streamSeen, markStreamSeen, setColor, history, helpLinks,
     calendarContexts, ownContexts, selectedContexts, setSelectedContexts, calendarEvents, plannerRange, appointmentGroups, reserveAppointment, cancelReservation,
     conversations, conversation, markRead, setStarred, replyTo, compose, searchRecipients, invalidateInbox,
-    course, tabs, frontPage, syllabus, courseTodo, ignoreTodo, courseStream, assignments, assignment, submission, assignmentGroups, progress,
+    course, tabs, frontPage, syllabus, courseTodo, ignoreTodo, courseStream, assignments, assignment, submission, assignmentGroups, assignmentGroup, progress,
     announcements, discussions, discussion, discussionView, postEntry, markTopicRead, people, sections, courseGroups, pages, page,
     rootFolder, folderContents, folderByPath, file, courseFiles, COURSE_FILES_MAX, quizzes, quiz, quizSubmissions, quizApi, modules, moduleItemFor, markItemDone, assignmentNeighbours, itemNeighbours, gradeModel, fmtPts, roundHalfUp,
     notifications, notifState, setNotifState, notifUnread,

@@ -180,6 +180,7 @@ public sealed partial class AssignmentScreen
         if (d.Grade is { } g) v.Children.Add(GradeCard(g, d));
         else if (d.Held == true) v.Children.Add(HeldNote());
         v.Children.Add(FactsCard(d));
+        if (MoreCard(d) is { } more) v.Children.Add(more);
         return v;
     }
 
@@ -200,6 +201,7 @@ public sealed partial class AssignmentScreen
         v.Children.Add(top);
         if (d.Grade is { } g) v.Children.Add(GradeCard(g, d));
         else if (d.Held == true) v.Children.Add(HeldNote());
+        if (MoreCard(d) is { } more) v.Children.Add(more);
         v.Children.Add(main);
         return v;
     }
@@ -430,4 +432,82 @@ public sealed partial class AssignmentScreen
         }
         return K.Card(v, new Thickness(0, 6, 0, 6));
     }
+
+    /// <summary>(0.3.109) More details, under the facts: what Canvas says of the assignment that the page shows nowhere
+    /// else — the group it counts toward, peer reviews, the file types it takes, a similarity check, what its instructions
+    /// hold that no page here draws (the engine's extras, courseDetail.extraFacts). Its rows are the facts' own; one with
+    /// somewhere to go opens it: the school's own page in a window of its own, another site in Simpl's browser. Nothing to
+    /// say: no card.</summary>
+    private FrameworkElement? MoreCard(AssignmentData d)
+    {
+        if (d.Extras is not { Count: > 0 } rows) return null;
+        var color = Tint(d);
+        var v = new Stack { Orientation = Orientation.Vertical };
+        var head = K.Text("More details", Ty.BodyStrong, B.Text2);
+        head.Margin = new Thickness(14, 4, 14, 2);
+        System.Windows.Automation.AutomationProperties.SetHeadingLevel(head, System.Windows.Automation.AutomationHeadingLevel.Level3);
+        v.Children.Add(head);
+        for (var i = 0; i < rows.Count; i++)
+        {
+            if (i > 0) v.Children.Add(K.Divider(56));
+            var r = rows[i];
+            var label = Sentence(r.Label);
+            var tile = K.IconTile(MoreSymbol(r.Kind), color, 30);
+            tile.VerticalAlignment = VerticalAlignment.Top;
+            var words = K.V(2, K.Text(label, Ty.Caption, B.Text2), K.Wrapped(r.Value, Ty.Body));
+            FrameworkElement row;
+            if (r.Url is { Length: > 0 } url)
+            {
+                var arrow = K.Icon(url.StartsWith('/') ? SymbolRegular.ChevronRight24 : SymbolRegular.Open24, 14, B.Text3);
+                arrow.Margin = new Thickness(8, 0, 0, 0);
+                arrow.VerticalAlignment = VerticalAlignment.Center;
+                var line = K.Columns("auto, *, auto", tile.Margin(0, 0, 12, 0).Col(0), words.Col(1), arrow.Col(2));
+                var press = K.Subtle(line, () => OpenExtra(url, label), new Thickness(14, 9, 14, 9));
+                press.HorizontalContentAlignment = HorizontalAlignment.Stretch;
+                press.ToolTip = url.StartsWith('/') ? $"Open on {engine.LmsName}" : url;
+                row = press;
+            }
+            else
+            {
+                var line = K.Columns("auto, *", tile.Margin(0, 0, 12, 0).Col(0), words.Col(1));
+                line.Margin = new Thickness(14, 9, 14, 9);
+                row = line;
+            }
+            System.Windows.Automation.AutomationProperties.SetName(row, $"{label}: {r.Value}");
+            v.Children.Add(row);
+        }
+        Simpl.Support.Log.Write($"more details: {string.Join(" | ", rows.Select(x => $"{x.Kind}={x.Value}"))}");
+        return K.Card(v, new Thickness(0, 6, 0, 6));
+    }
+
+    /// <summary>A More details row's address: the school's own page for a path, Simpl's browser for another site.</summary>
+    private void OpenExtra(string url, string label)
+    {
+        if (url.StartsWith('/')) engine.OpenWebScreen(url, label); else engine.GoTo(url, label);
+    }
+
+    /// <summary>"Counts Toward" as Windows writes a label: "Counts toward".</summary>
+    private static string Sentence(string label) => label.Length < 2 ? label : char.ToUpper(label[0], CultureInfo.CurrentCulture) + label[1..].ToLower(CultureInfo.CurrentCulture);
+
+    /// <summary>Each kind of More details row's symbol (the web's icons, extension/content/app/screens/course-detail.js
+    /// MORE_ICON; the Mac's AssignmentView.moreSymbol).</summary>
+    private static SymbolRegular MoreSymbol(string kind) => kind switch
+    {
+        "group" => SymbolRegular.DataPie24,
+        "grading" => SymbolRegular.CheckmarkCircle24,
+        "team" => SymbolRegular.People24,
+        "peer" => SymbolRegular.ArrowSwap24,
+        "files" => SymbolRegular.Document24,
+        "lockdown" => SymbolRegular.ShieldLock24,
+        "similarity" => SymbolRegular.DocumentSearch24,
+        "anonymous" => SymbolRegular.EyeOff24,
+        "moderated" => SymbolRegular.ShieldCheckmark24,
+        "period" => SymbolRegular.Clock24,
+        "annotate" => SymbolRegular.Edit24,
+        "tool" => SymbolRegular.Globe24,
+        "link" => SymbolRegular.Link24,
+        "embed" => SymbolRegular.Code24,
+        "media" => SymbolRegular.Video24,
+        _ => SymbolRegular.Info24,
+    };
 }
