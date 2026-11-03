@@ -1157,6 +1157,9 @@ struct CourseGradesView: View {
     @State private var data: CourseGradesData?
     @State private var error: String?
     @State private var whatIf = false
+    /// (1.3.216) The screenshot suite's -SimplWhatIf YES, and whether this copy of the screen has acted on it.
+    private static let shotWhatIf = UserDefaults.standard.string(forKey: "SimplWhatIf") != nil
+    @State private var shotWhatIfTried = false
     @State private var drafts: [String: String] = [:]
     @State private var added: [AddedWork] = []
     @State private var sort: GradeSort = .groups
@@ -1228,8 +1231,11 @@ struct CourseGradesView: View {
         .toolbar { toolbarItems }
         .task(id: engine.dataVersion) {
             await load(fresh: true, animated: false)
-            // (the screenshot suite: -SimplWhatIf YES turns What-If on once the grades are in, nothing typed)
-            if data != nil, !whatIf, LaunchOpen.take("", key: "SimplWhatIf") != nil { setWhatIf(true) }
+            // (the screenshot suite: -SimplWhatIf YES turns What-If on once the grades are in, nothing typed. Each copy of the
+            // screen does it once for itself — 1.3.216: the window can make the screen twice as it opens on a place, and a
+            // flag taken once went to whichever copy loaded first, now and then the one put away, leaving What-If off on
+            // the one in the picture; a copy put away, its task cancelled, takes nothing)
+            if data != nil, !whatIf, !shotWhatIfTried, Self.shotWhatIf, !Task.isCancelled { shotWhatIfTried = true; setWhatIf(true) }
         }
         // (1.3.80) checked every ten minutes while it is on show — never while What-If is on: nothing changes under the
         // scores being tried, in this window or another
