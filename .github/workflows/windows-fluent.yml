@@ -574,6 +574,8 @@ jobs:
           Shot 'assignment-feedback' '1366x778' 50 ($mock + @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1008', '--open', 'feedback'))
           Shot 'assignment-held' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1006'))
           Shot 'hand-in' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'course:104', '--push', '/courses/104/assignments/4002', '--open', 'handin'))
+          # (0.3.109) More details under the facts: the group, peer reviews, file types and Turnitin of the mock's 4002
+          Shot 'assignment-more' '1366x778' 45 ($mock + @('--appearance', 'light', '--place', 'course:104', '--push', '/courses/104/assignments/4002'))
           # Send from Phone: its panel and code, light and dark, and as the first time (Windows will ask)
           Shot 'hand-in-phone' '1024x681' 45 ($mock + @('--appearance', 'light', '--place', 'course:101', '--push', '/courses/101/assignments/1012', '--open', 'handin', '--phone'))
           Shot 'hand-in-phone-dark' '1024x681' 45 ($mock + @('--appearance', 'dark', '--place', 'course:101', '--push', '/courses/101/assignments/1012', '--open', 'handin', '--phone'))
@@ -1480,6 +1482,13 @@ jobs:
             Write-Host "macmillan-export: the long question pictured whole — $($Matches[0])"
           }
           # (0.3.97) an assignment launched on lmslink.bfwpub.com, as a school's Macmillan homework is, opens in the popup
+          # (0.3.109) More details stands under the facts and says what the page shows nowhere else
+          if ($script:mine -contains 'assignment-more') {
+            $l = Get-Content 'shots/profile-assignment-more.log' -Raw -ErrorAction SilentlyContinue
+            if ("$l" -notmatch 'more details: group=Assignments \| peer=2 classmates') { Write-Host "::error::assignment-more: More details did not say the assignment's group and peer reviews (shots/profile-assignment-more.log)"; exit 1 }
+            if ("$l" -notmatch 'files=PDF, DOCX, PNG or JPG only \| similarity=Turnitin checks it for copied work') { Write-Host "::error::assignment-more: More details did not say the file types and the similarity check (shots/profile-assignment-more.log)"; exit 1 }
+            Write-Host "assignment-more: $([regex]::Match("$l", 'more details: [^\r\n]*').Value)"
+          }
           if ($script:mine -contains 'macmillan-from-assignment') {
             $l = Get-Content 'shots/profile-macmillan-from-assignment.log' -Raw -ErrorAction SilentlyContinue
             if ("$l" -notmatch 'macmillan popup: opened from the assignment \(its tool on lmslink\.bfwpub\.com\)') { Write-Host "::error::macmillan-from-assignment: a Macmillan assignment launched on lmslink.bfwpub.com did not open in the popup (shots/profile-macmillan-from-assignment.log)"; exit 1 }
