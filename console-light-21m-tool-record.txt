@@ -1,0 +1,27 @@
+2026-11-03 13:45:54.266 Simpl[20926:59346] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 13:45:55.339 Simpl[20926:59346] [Simpl] window: the app's screens (no page)
+2026-11-03 13:45:55.890 Simpl[20926:59346] [Simpl] appear Dashboard: 680 ms
+2026-11-03 13:45:56.296 Simpl[20926:59346] [Simpl] appear Dashboard: 1086 ms
+2026-11-03 13:45:59.393 Simpl[20926:59346] [Simpl] open Dashboard: 4182 ms (kept)
+2026-11-03 13:46:01.407 Simpl[20926:59346] [Simpl] call toolLaunch: 1101 ms
+2026-11-03 13:46:02.171 Simpl[20926:59346] [Simpl] call quietColors: 6279 ms
+2026-11-03 13:46:02.172 Simpl[20926:59346] [Simpl] call dashSkyline: 4143 ms
+2026-11-03 13:46:02.177 Simpl[20926:59346] [Simpl] call dashSkyline: 4182 ms
+2026-11-03 13:46:02.178 Simpl[20926:59346] [Simpl] call dashList: 4149 ms
+2026-11-03 13:46:02.179 Simpl[20926:59346] [Simpl] call dashList: 4183 ms
+2026-11-03 13:46:02.179 Simpl[20926:59346] [Simpl] call today: 2790 ms
+2026-11-03 13:46:02.188 Simpl[20926:59346] [Simpl] call today: 4158 ms
+2026-11-03 13:46:02.188 Simpl[20926:59346] [Simpl] call todayCounts: 2785 ms
+2026-11-03 13:46:02.188 Simpl[20926:59346] [Simpl] call todayCounts: 2785 ms
+2026-11-03 13:46:02.188 Simpl[20926:59346] [Simpl] call todayCounts: 2785 ms
+2026-11-03 13:46:02.188 Simpl[20926:59346] [Simpl] call todayCounts: 2785 ms
+2026-11-03 13:46:02.479 Simpl[20926:59346] [Simpl] call snapshot: 2796 ms
+2026-11-03 13:46:02.579 Simpl[20926:59346] [Simpl] open Dashboard: 7366 ms (live)
+2026-11-03 13:46:03.004 Simpl[20926:59346] [Simpl] recorder: on, into /tmp/simpl-shots.0Y1dkE/own-light-21m-tool-record/Downloads/Simpl Recordings/Smartwork- CH05HW (Part 2) 2026-11-03 at 13.46.03
+2026-11-03 13:46:03.013 Simpl[20926:59346] [Simpl] tool window: the school's page for the tool, its launch sent on in this window
+2026-11-03 13:46:03.344 Simpl[20926:59346] [Simpl] recorder: step 1 (0001 page.html.gz, 0001 screenshot.jpg, 0001 data.json), 41824 bytes so far
+2026-11-03 13:46:03.427 Simpl[20926:59346] [Simpl] call courses: 848 ms
+2026-11-03 13:46:03.713 Simpl[20926:59346] [Simpl] call groups: 286 ms
+2026-11-03 13:46:04.401 Simpl[20926:59346] [Simpl] call moreFromCanvas: 688 ms
+2026-11-03 13:46:04.633 Simpl[20926:59346] [Simpl] recorder: step 2 (0002 page.html.gz, 0002 data.json), 43210 bytes so far
+2026-11-03 13:46:28.623 Simpl[20926:59346] [Simpl] shot: another copy of the app is in front; brought forward again

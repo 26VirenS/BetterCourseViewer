@@ -1,0 +1,25 @@
+2026-11-03 13:42:00.536 Simpl[11465:34798] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 13:42:01.819 Simpl[11465:34798] [Simpl] window: the app's screens (no page)
+2026-11-03 13:42:02.231 Simpl[11465:34798] [Simpl] appear Dashboard: 620 ms
+2026-11-03 13:42:02.499 Simpl[11465:34798] [Simpl] appear Dashboard: 887 ms
+2026-11-03 13:42:07.877 Simpl[11465:34798] [Simpl] open Dashboard: 6263 ms (kept)
+2026-11-03 13:42:09.693 Simpl[11465:34798] [Simpl] calculator: its page loaded
+2026-11-03 13:42:11.986 Simpl[11465:34798] [Simpl] call quietColors: 9750 ms
+2026-11-03 13:42:11.991 Simpl[11465:34798] [Simpl] call todayCounts: 4836 ms
+2026-11-03 13:42:11.992 Simpl[11465:34798] [Simpl] call todayCounts: 4837 ms
+2026-11-03 13:42:11.994 Simpl[11465:34798] [Simpl] call today: 8169 ms
+2026-11-03 13:42:11.997 Simpl[11465:34798] [Simpl] call dashList: 8319 ms
+2026-11-03 13:42:12.000 Simpl[11465:34798] [Simpl] call today: 8177 ms
+2026-11-03 13:42:12.001 Simpl[11465:34798] [Simpl] call dashSkyline: 8324 ms
+2026-11-03 13:42:12.005 Simpl[11465:34798] [Simpl] call todayCounts: 4850 ms
+2026-11-03 13:42:12.007 Simpl[11465:34798] [Simpl] call todayCounts: 4852 ms
+2026-11-03 13:42:12.011 Simpl[11465:34798] [Simpl] call dashSkyline: 8265 ms
+2026-11-03 13:42:12.096 Simpl[11465:34798] [Simpl] call dashList: 8350 ms
+2026-11-03 13:42:12.314 Simpl[11465:34798] [Simpl] call snapshot: 416 ms
+2026-11-03 13:42:12.588 Simpl[11465:34798] [Simpl] open Dashboard: 10972 ms (live)
+2026-11-03 13:42:13.045 Simpl[11465:34798] [Simpl] call courses: 459 ms
+2026-11-03 13:42:13.160 Simpl[11465:34798] [Simpl] call groups: 114 ms
+2026-11-03 13:42:13.530 Simpl[11465:34798] [Simpl] call moreFromCanvas: 368 ms
+2026-11-03 13:42:17.067 Simpl[11465:34798] [Simpl] calculator: GeoGebra is ready
+2026-11-03 13:42:21.328 Simpl[11465:34798] [Simpl] calculator: its page loaded
+2026-11-03 13:42:22.687 Simpl[11465:34798] [Simpl] calculator: GeoGebra is ready

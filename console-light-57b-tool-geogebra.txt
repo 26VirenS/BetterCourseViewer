@@ -1,0 +1,11 @@
+2026-11-03 13:45:44.381 Simpl[18249:53006] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 13:45:45.562 Simpl[18249:53006] [Simpl] window: the app's screens (no page)
+2026-11-03 13:45:48.766 Simpl[18249:53006] [Simpl] popup tool: 900 × 608, 62 in from the window (sidebar out)
+2026-11-03 13:45:55.652 Simpl[18249:53006] [Simpl] popup tool: 900 × 589, 62 in from the window (sidebar out)
+2026-11-03 13:45:59.650 Simpl[18249:53006] [Simpl] calculator: its page loaded
+2026-11-03 13:46:00.725 Simpl[18249:53006] [Simpl] call quietColors: 13369 ms
+2026-11-03 13:46:00.816 Simpl[18249:53006] [Simpl] call snapshot: 461 ms
+2026-11-03 13:46:01.653 Simpl[18249:53006] [Simpl] call courses: 617 ms
+2026-11-03 13:46:01.926 Simpl[18249:53006] [Simpl] call groups: 272 ms
+2026-11-03 13:46:03.396 Simpl[18249:53006] [Simpl] call moreFromCanvas: 1468 ms
+2026-11-03 13:46:04.070 Simpl[18249:53006] [Simpl] calculator: GeoGebra is ready

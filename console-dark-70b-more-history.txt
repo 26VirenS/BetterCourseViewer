@@ -1,0 +1,25 @@
+2026-11-03 13:40:49.205 Simpl[7295:24849] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 13:40:50.537 Simpl[7295:24849] [Simpl] window: the app's screens (no page)
+2026-11-03 13:40:51.022 Simpl[7295:24849] [Simpl] appear Dashboard: 677 ms
+2026-11-03 13:40:51.264 Simpl[7295:24849] [Simpl] appear Dashboard: 920 ms
+2026-11-03 13:40:53.681 Simpl[7295:24849] [Simpl] open Dashboard: 3336 ms (kept)
+2026-11-03 13:40:54.369 Simpl[7295:24849] [Simpl] call quietColors: 3349 ms
+2026-11-03 13:40:54.370 Simpl[7295:24849] [Simpl] call dashList: 1637 ms
+2026-11-03 13:40:54.370 Simpl[7295:24849] [Simpl] call dashList: 1664 ms
+2026-11-03 13:40:54.447 Simpl[7295:24849] [Simpl] call moreHistory: 195 ms
+2026-11-03 13:40:54.686 Simpl[7295:24849] [Simpl] popup more: 440 × 208
+2026-11-03 13:40:54.688 Simpl[7295:24849] [Simpl] popup more: 440 × 260
+2026-11-03 13:40:54.690 Simpl[7295:24849] [Simpl] call today: 1812 ms
+2026-11-03 13:40:54.690 Simpl[7295:24849] [Simpl] call today: 1812 ms
+2026-11-03 13:40:54.690 Simpl[7295:24849] [Simpl] call todayCounts: 1051 ms
+2026-11-03 13:40:54.690 Simpl[7295:24849] [Simpl] call todayCounts: 1051 ms
+2026-11-03 13:40:54.690 Simpl[7295:24849] [Simpl] call todayCounts: 1052 ms
+2026-11-03 13:40:54.692 Simpl[7295:24849] [Simpl] call dashSkyline: 1958 ms
+2026-11-03 13:40:54.692 Simpl[7295:24849] [Simpl] call dashSkyline: 1986 ms
+2026-11-03 13:40:54.692 Simpl[7295:24849] [Simpl] call todayCounts: 1054 ms
+2026-11-03 13:40:54.693 Simpl[7295:24849] [Simpl] call snapshot: 441 ms
+2026-11-03 13:40:55.352 Simpl[7295:24849] [Simpl] open Dashboard: 5007 ms (live)
+2026-11-03 13:40:55.511 Simpl[7295:24849] [Simpl] call courses: 650 ms
+2026-11-03 13:40:55.635 Simpl[7295:24849] [Simpl] call groups: 123 ms
+2026-11-03 13:40:57.481 Simpl[7295:24849] [Simpl] call moreFromCanvas: 1845 ms
+2026-11-03 13:41:01.409 Simpl[7295:24849] NSQuitAlwaysKeepsWindows=NO

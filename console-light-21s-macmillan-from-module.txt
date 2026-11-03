@@ -1,0 +1,30 @@
+2026-11-03 13:45:28.815 Simpl[19931:56712] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 13:45:30.447 Simpl[19931:56712] [Simpl] window: the app's screens (no page)
+2026-11-03 13:45:30.940 Simpl[19931:56712] [Simpl] appear Dashboard: 664 ms
+2026-11-03 13:45:31.547 Simpl[19931:56712] [Simpl] appear Dashboard: 1271 ms
+2026-11-03 13:45:36.709 Simpl[19931:56712] [Simpl] open Dashboard: 6431 ms (kept)
+2026-11-03 13:45:37.560 Simpl[19931:56712] [Simpl] call today: 2657 ms
+2026-11-03 13:45:37.561 Simpl[19931:56712] [Simpl] call today: 2659 ms
+2026-11-03 13:45:37.766 Simpl[19931:56712] [Simpl] open Dashboard: 7487 ms (live)
+2026-11-03 13:45:37.819 Simpl[19931:56712] [Simpl] call quietColors: 6877 ms
+2026-11-03 13:45:37.827 Simpl[19931:56712] [Simpl] call dashList: 3138 ms
+2026-11-03 13:45:37.827 Simpl[19931:56712] [Simpl] call dashList: 3211 ms
+2026-11-03 13:45:37.827 Simpl[19931:56712] [Simpl] call todayCounts: 1121 ms
+2026-11-03 13:45:37.827 Simpl[19931:56712] [Simpl] call todayCounts: 1122 ms
+2026-11-03 13:45:37.827 Simpl[19931:56712] [Simpl] call todayCounts: 1121 ms
+2026-11-03 13:45:37.827 Simpl[19931:56712] [Simpl] call todayCounts: 1122 ms
+2026-11-03 13:45:37.828 Simpl[19931:56712] [Simpl] call dashSkyline: 3139 ms
+2026-11-03 13:45:37.828 Simpl[19931:56712] [Simpl] call dashSkyline: 3212 ms
+2026-11-03 13:45:37.828 Simpl[19931:56712] [Simpl] call snapshot: 933 ms
+2026-11-03 13:45:38.102 Simpl[19931:56712] [Simpl] call modules: 1207 ms
+2026-11-03 13:45:38.102 Simpl[19931:56712] [Simpl] macmillan popup: opened from a module (its tool on lmslink.bfwpub.com)
+2026-11-03 13:45:39.001 Simpl[19931:56712] [Simpl] popup look: 984 × 591, 20 in from the window (sidebar out)
+2026-11-03 13:45:40.301 Simpl[19931:56712] [Simpl] call toolLaunch: 689 ms
+2026-11-03 13:45:40.301 Simpl[19931:56712] [Simpl] macmillan popup: opened
+2026-11-03 13:45:40.580 Simpl[19931:56712] [Simpl] call courses: 2458 ms
+2026-11-03 13:45:41.083 Simpl[19931:56712] [Simpl] call groups: 501 ms
+2026-11-03 13:45:41.459 Simpl[19931:56712] [Simpl] macmillan popup: cover heard, 4 questions, 5 grading settings
+2026-11-03 13:45:41.459 Simpl[19931:56712] [Simpl] macmillan popup: rail heard, 0 questions, 0 done, question 0 open
+2026-11-03 13:45:41.459 Simpl[19931:56712] [Simpl] look popup: page at 69% (its 1024 wide in 703)
+2026-11-03 13:45:42.511 Simpl[19931:56712] [Simpl] call moreFromCanvas: 1427 ms
+2026-11-03 13:45:45.033 Simpl[19931:56712] [Simpl] shot: another copy of the app is in front; brought forward again

@@ -1,0 +1,4 @@
+2026-11-03 13:39:50.536 Simpl[4749:18053] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 13:40:02.498 Simpl[4749:18086] NSSpellServer dataFromGeneratingCandidatesForSelectedRange timed out, index is 0
+2026-11-03 13:40:03.120 Simpl[4749:18086] NSSpellServer dataFromGeneratingCandidatesForSelectedRange timed out, index is 0
+2026-11-03 13:40:14.435 Simpl[4749:18053] [Simpl] shot: another copy of the app is in front; brought forward again

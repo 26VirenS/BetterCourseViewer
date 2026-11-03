@@ -1,0 +1,27 @@
+2026-11-03 13:54:13.884 Simpl[36813:99143] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 13:54:14.939 Simpl[36813:99143] [Simpl] window: the app's screens (no page)
+2026-11-03 13:54:15.488 Simpl[36813:99143] [Simpl] appear Course home: 688 ms
+2026-11-03 13:54:16.006 Simpl[36813:99143] [Simpl] appear Course home: 1207 ms
+2026-11-03 13:54:19.080 Simpl[36813:99143] [Simpl] appear Assignment: 211 ms
+2026-11-03 13:54:20.488 Simpl[36813:99143] [Simpl] call quietColors: 5000 ms
+2026-11-03 13:54:20.489 Simpl[36813:99143] [Simpl] call home: 2360 ms
+2026-11-03 13:54:20.490 Simpl[36813:99143] [Simpl] call neighbours: 935 ms
+2026-11-03 13:54:20.491 Simpl[36813:99143] [Simpl] call home: 2205 ms
+2026-11-03 13:54:22.087 Simpl[36813:99143] [Simpl] call home: 3907 ms
+2026-11-03 13:54:22.095 Simpl[36813:99143] [Simpl] call snapshot: 3226 ms
+2026-11-03 13:54:22.233 Simpl[36813:99143] [Simpl] open Course home: 3365 ms (fetched)
+2026-11-03 13:54:22.953 Simpl[36813:99143] [Simpl] call assignment: 2601 ms
+2026-11-03 13:54:22.955 Simpl[36813:99143] SimplAssignment 1012: files 0, comments 0, steps Hand In, review 0, handIn 1, error -
+2026-11-03 13:54:24.182 Simpl[36813:99143] SimplMore group=Effort
+2026-11-03 13:54:25.649 Simpl[36813:99143] [Simpl] call courses: 3416 ms
+2026-11-03 13:54:25.675 Simpl[36813:99143] [Simpl] open Assignment: 6806 ms (fetched)
+2026-11-03 13:54:25.675 Simpl[36813:99143] [Simpl] popup handin:101/1012: 580 × 560
+2026-11-03 13:54:26.230 Simpl[36813:99143] SimplPhone ready http://192.168.64.7:63142/_A7Wi_GgpYFHaKlFvS1tTw/ (Ethernet)
+2026-11-03 13:54:28.906 Simpl[36813:99143] SimplPhone opened
+2026-11-03 13:54:29.426 Simpl[36813:99143] SimplPhone received Photo from phone.jpg 103579 bytes
+2026-11-03 13:54:29.550 Simpl[36813:99143] SimplHandIn added Photo from phone.jpg (1 files)
+2026-11-03 13:54:29.809 Simpl[36813:99143] [Simpl] call neighbours: 4759 ms
+2026-11-03 13:54:29.879 Simpl[36813:99143] SimplPhone received Notes.txt 37 bytes
+2026-11-03 13:54:29.955 Simpl[36813:99143] SimplHandIn added Notes.txt (2 files)
+2026-11-03 13:54:30.732 Simpl[36813:99143] [Simpl] call groups: 5082 ms
+2026-11-03 13:54:31.652 Simpl[36813:99143] [Simpl] call moreFromCanvas: 919 ms

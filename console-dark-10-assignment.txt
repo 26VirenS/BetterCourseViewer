@@ -1,0 +1,22 @@
+2026-11-03 13:38:40.727 Simpl[2631:11603] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 13:38:41.675 Simpl[2631:11603] [Simpl] window: the app's screens (no page)
+2026-11-03 13:38:41.964 Simpl[2631:11603] [Simpl] appear Course home: 372 ms
+2026-11-03 13:38:42.267 Simpl[2631:11603] [Simpl] appear Course home: 675 ms
+2026-11-03 13:38:44.188 Simpl[2631:11603] [Simpl] appear Assignment: 200 ms
+2026-11-03 13:38:45.677 Simpl[2631:11603] [Simpl] call quietColors: 3712 ms
+2026-11-03 13:38:45.677 Simpl[2631:11603] [Simpl] call neighbours: 808 ms
+2026-11-03 13:38:45.721 Simpl[2631:11603] [Simpl] call assignment: 260 ms
+2026-11-03 13:38:45.722 Simpl[2631:11603] [Simpl] call home: 2180 ms
+2026-11-03 13:38:45.722 Simpl[2631:11603] [Simpl] call home: 3451 ms
+2026-11-03 13:38:45.722 Simpl[2631:11603] [Simpl] call home: 2215 ms
+2026-11-03 13:38:46.647 Simpl[2631:11603] SimplMore group=Effort
+2026-11-03 13:38:47.578 Simpl[2631:11603] [Simpl] call snapshot: 3653 ms
+2026-11-03 13:38:47.635 Simpl[2631:11603] [Simpl] open Assignment: 3710 ms (fetched)
+2026-11-03 13:38:47.635 Simpl[2631:11603] [Simpl] open Course home: 3710 ms (fetched)
+2026-11-03 13:38:47.921 Simpl[2631:11603] [Simpl] call quizIntro: 2199 ms
+2026-11-03 13:38:47.922 Simpl[2631:11603] SimplAssignment 1001: files 0, comments 2, steps See Feedback+New Attempt, review 0, handIn 0, error -
+2026-11-03 13:38:48.128 Simpl[2631:11603] [Simpl] call neighbours: 1053 ms
+2026-11-03 13:38:48.179 Simpl[2631:11603] [Simpl] call courses: 546 ms
+2026-11-03 13:38:48.442 Simpl[2631:11603] [Simpl] call groups: 261 ms
+2026-11-03 13:38:48.996 Simpl[2631:11603] [Simpl] call moreFromCanvas: 551 ms
+2026-11-03 13:38:52.464 Simpl[2631:11603] [Simpl] shot: another copy of the app is in front; brought forward again

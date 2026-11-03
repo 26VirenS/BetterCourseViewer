@@ -1,0 +1,25 @@
+2026-11-03 14:20:44.375 Simpl[30613:84316] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 14:20:45.610 Simpl[30613:84316] [Simpl] window: the app's screens (no page)
+2026-11-03 14:20:46.160 Simpl[30613:84316] [Simpl] appear Dashboard: 775 ms
+2026-11-03 14:20:46.435 Simpl[30613:84316] [Simpl] appear Dashboard: 1050 ms
+2026-11-03 14:20:49.006 Simpl[30613:84316] [Simpl] open Dashboard: 3621 ms (kept)
+2026-11-03 14:20:50.562 Simpl[30613:84316] [Simpl] call quietColors: 4399 ms
+2026-11-03 14:20:50.569 Simpl[30613:84316] [Simpl] call dashList: 3012 ms
+2026-11-03 14:20:50.571 Simpl[30613:84316] [Simpl] call today: 2786 ms
+2026-11-03 14:20:50.615 Simpl[30613:84316] [Simpl] call dashList: 3179 ms
+2026-11-03 14:20:50.616 Simpl[30613:84316] [Simpl] call todayCounts: 1655 ms
+2026-11-03 14:20:50.616 Simpl[30613:84316] [Simpl] call todayCounts: 1655 ms
+2026-11-03 14:20:50.616 Simpl[30613:84316] [Simpl] call todayCounts: 1655 ms
+2026-11-03 14:20:50.617 Simpl[30613:84316] [Simpl] call todayCounts: 1655 ms
+2026-11-03 14:20:50.617 Simpl[30613:84316] [Simpl] call dashSkyline: 3181 ms
+2026-11-03 14:20:50.617 Simpl[30613:84316] [Simpl] call dashSkyline: 3060 ms
+2026-11-03 14:20:50.618 Simpl[30613:84316] [Simpl] call snapshot: 1046 ms
+2026-11-03 14:20:53.582 Simpl[30613:84316] [Simpl] call today: 5797 ms
+2026-11-03 14:20:53.710 Simpl[30613:84316] [Simpl] counter: tomorrow fades in (Reduce Motion)
+2026-11-03 14:20:53.723 Simpl[30613:84316] [Simpl] open Dashboard: 8338 ms (live)
+2026-11-03 14:20:54.809 Simpl[30613:84316] [Simpl] counter: tomorrow fades in (Reduce Motion)
+2026-11-03 14:20:54.827 Simpl[30613:84316] [Simpl] call courses: 2949 ms
+2026-11-03 14:20:55.311 Simpl[30613:84316] [Simpl] call todaySheet: 908 ms
+2026-11-03 14:20:56.004 Simpl[30613:84316] [Simpl] call groups: 1177 ms
+2026-11-03 14:20:57.234 Simpl[30613:84316] [Simpl] call moreFromCanvas: 1229 ms
+2026-11-03 14:21:02.065 Simpl[30613:84316] [Simpl] shot: another copy of the app is in front; brought forward again

@@ -1,0 +1,31 @@
+2026-11-03 13:51:38.842 Simpl[32274:89157] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 13:51:44.651 Simpl[32274:89157] [Simpl] window: the app's screens (no page)
+2026-11-03 13:51:45.707 Simpl[32274:89157] [Simpl] appear Course home: 3013 ms
+2026-11-03 13:51:46.451 Simpl[32274:89157] [Simpl] appear Course home: 3757 ms
+2026-11-03 13:51:53.955 Simpl[32274:89157] [Simpl] open Course home: 11261 ms (kept)
+2026-11-03 13:51:54.544 Simpl[32274:89157] [Simpl] appear Assignment: 328 ms
+2026-11-03 13:51:55.901 Simpl[32274:89157] [Simpl] call quietColors: 10195 ms
+2026-11-03 13:51:55.902 Simpl[32274:89157] [Simpl] call neighbours: 812 ms
+2026-11-03 13:51:55.964 Simpl[32274:89157] [Simpl] call home: 4801 ms
+2026-11-03 13:51:55.965 Simpl[32274:89157] [Simpl] call home: 4803 ms
+2026-11-03 13:51:55.966 Simpl[32274:89157] [Simpl] call snapshot: 1749 ms
+2026-11-03 13:51:56.075 Simpl[32274:89157] [Simpl] call home: 5210 ms
+2026-11-03 13:51:56.417 Simpl[32274:89157] [Simpl] open Course home: 2201 ms (live)
+2026-11-03 13:51:56.422 Simpl[32274:89157] [Simpl] call assignment: 677 ms
+2026-11-03 13:51:56.423 Simpl[32274:89157] SimplAssignment 1013: files 0, comments 0, steps Hand In, review 0, handIn 1, error -
+2026-11-03 13:51:57.321 Simpl[32274:89157] SimplMore group=Collaboration | files=PDF only
+2026-11-03 13:51:57.911 Simpl[32274:89157] [Simpl] open Assignment: 3695 ms (fetched)
+2026-11-03 13:51:57.913 Simpl[32274:89157] [Simpl] popup handin:101/1013: 580 × 560
+2026-11-03 13:51:57.923 Simpl[32274:89157] [Simpl] call convertInfo: 602 ms
+2026-11-03 13:51:57.932 Simpl[32274:89157] [Simpl] call courses: 1850 ms
+2026-11-03 13:52:00.807 Simpl[32274:89157] [Simpl] call neighbours: 3375 ms
+2026-11-03 13:52:00.915 Simpl[32274:89157] SimplPhone ready http://192.168.64.5:50509/HK5l2QJ23vQvDWg2YOvMnQ/ (Ethernet)
+2026-11-03 13:52:01.339 Simpl[32274:89157] [Simpl] call groups: 3368 ms
+2026-11-03 13:52:01.402 Simpl[32274:89157] SimplPhone opened
+2026-11-03 13:52:02.875 Simpl[32274:89157] SimplPhone received IMG_0001.jpg 103579 bytes
+2026-11-03 13:52:03.134 Simpl[32274:89157] SimplPhone received IMG_0002.jpg 103579 bytes
+IOServiceMatchingfailed for: AppleM2ScalerParavirtDriver
+2026-11-03 13:52:04.385 Simpl[32274:89157] SimplHandIn added Group project.pdf (1 files)
+2026-11-03 13:52:06.690 Simpl[32274:89157] [Simpl] call moreFromCanvas: 5350 ms
+2026-11-03 13:52:06.743 Simpl[32274:89157] SimplHandIn added Group project.pdf (1 files)
+2026-11-03 13:52:12.777 Simpl[32274:89157] [Simpl] shot: another copy of the app is in front; brought forward again

@@ -1,0 +1,21 @@
+2026-11-03 13:42:25.315 Simpl[12364:37195] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 13:42:26.866 Simpl[12364:37195] [Simpl] window: the app's screens (no page)
+2026-11-03 13:42:27.886 Simpl[12364:37195] [Simpl] appear Calendar: 1273 ms
+2026-11-03 13:42:28.670 Simpl[12364:37195] [Simpl] appear Calendar: 2057 ms
+2026-11-03 13:42:30.530 Simpl[12364:37195] [Simpl] call quietColors: 2642 ms
+2026-11-03 13:42:30.618 Simpl[12364:37195] [Simpl] call snapshot: 148 ms
+2026-11-03 13:42:30.735 Simpl[12364:37195] [Simpl] call calendar: 2063 ms
+2026-11-03 13:42:31.639 Simpl[12364:37195] [Simpl] calendar head: one line, its tools named: none
+2026-11-03 13:42:32.124 Simpl[12364:37195] [Simpl] call calendar: 4233 ms
+2026-11-03 13:42:32.128 Simpl[12364:37195] [Simpl] open Calendar: 5513 ms (fetched)
+2026-11-03 13:42:32.208 Simpl[12364:37195] [Simpl] call courses: 1557 ms
+2026-11-03 13:42:32.579 Simpl[12364:37195] [Simpl] call todo: 422 ms
+2026-11-03 13:42:32.581 Simpl[12364:37195] [Simpl] call todo: 453 ms
+2026-11-03 13:42:32.583 Simpl[12364:37195] [Simpl] call todo: 454 ms
+2026-11-03 13:42:33.047 Simpl[12364:37195] [Simpl] call groups: 838 ms
+2026-11-03 13:42:33.268 Simpl[12364:37195] [Simpl] call planDay: 687 ms
+2026-11-03 13:42:33.269 Simpl[12364:37195] [Simpl] call planDay: 686 ms
+2026-11-03 13:42:34.187 Simpl[12364:37195] [Simpl] call moreFromCanvas: 1138 ms
+2026-11-03 13:42:34.230 Simpl[12364:37195] [Simpl] call calendar: 960 ms
+2026-11-03 13:42:34.231 Simpl[12364:37195] [Simpl] call calendar: 960 ms
+2026-11-03 13:42:34.989 Simpl[12364:37195] [Simpl] call planDetail: 146 ms

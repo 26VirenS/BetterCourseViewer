@@ -1,0 +1,23 @@
+2026-11-03 14:21:40.051 Simpl[33057:90720] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 14:21:41.832 Simpl[33057:90720] [Simpl] window: the app's screens (no page)
+2026-11-03 14:21:43.869 Simpl[33057:90720] [Simpl] appear Course home: 2473 ms
+2026-11-03 14:21:44.788 Simpl[33057:90720] [Simpl] appear Course home: 3392 ms
+2026-11-03 14:21:50.568 Simpl[33057:90720] [Simpl] open Course home: 9172 ms (kept)
+2026-11-03 14:21:51.497 Simpl[33057:90720] [Simpl] appear Assignment: 336 ms
+2026-11-03 14:21:52.679 Simpl[33057:90720] [Simpl] call quietColors: 8812 ms
+2026-11-03 14:21:52.680 Simpl[33057:90720] [Simpl] call home: 4261 ms
+2026-11-03 14:21:52.857 Simpl[33057:90720] [Simpl] call home: 4434 ms
+2026-11-03 14:21:52.857 Simpl[33057:90720] [Simpl] call home: 4557 ms
+2026-11-03 14:21:52.857 Simpl[33057:90720] [Simpl] open Course home: 1697 ms (live)
+2026-11-03 14:21:53.160 Simpl[33057:90720] [Simpl] call neighbours: 1328 ms
+2026-11-03 14:21:53.160 Simpl[33057:90720] [Simpl] call snapshot: 1990 ms
+2026-11-03 14:21:53.437 Simpl[33057:90720] [Simpl] call assignment: 783 ms
+2026-11-03 14:21:55.698 Simpl[33057:90720] SimplMore group=Effort
+2026-11-03 14:21:58.486 Simpl[33057:90720] [Simpl] open Assignment: 7323 ms (fetched)
+2026-11-03 14:21:58.579 Simpl[33057:90720] [Simpl] call courses: 5284 ms
+2026-11-03 14:21:58.579 Simpl[33057:90720] [Simpl] call quizIntro: 5142 ms
+2026-11-03 14:21:58.580 Simpl[33057:90720] SimplAssignment 1001: files 0, comments 2, steps See Feedback+New Attempt, review 0, handIn 0, error -
+2026-11-03 14:21:59.226 Simpl[33057:90720] [Simpl] call neighbours: 3118 ms
+2026-11-03 14:21:59.320 Simpl[33057:90720] [Simpl] call groups: 741 ms
+2026-11-03 14:22:01.673 Simpl[33057:90720] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-11-03 14:22:02.411 Simpl[33057:90720] [Simpl] call moreFromCanvas: 3091 ms

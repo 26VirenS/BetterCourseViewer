@@ -1,0 +1,20 @@
+ok   drawn over the player, its 4 questions found and Q1 marked
+ok   not drawn with Simpl Look off
+ok   drawn over ALEKS's page, its Check and 5 tools found
+ok   ALEKS's page not drawn with Simpl Look off
+ok   the popup's rail heard Macmillan's questions (console-light-21n-macmillan-look)
+ok   the popup's rail heard Macmillan's questions (console-light-21o-macmillan-look-off)
+ok   the popup's rail heard ALEKS's topic progress (console-light-21p-aleks-look)
+ok   the popup's rail heard ALEKS's topic progress (console-light-21q-aleks-look-off)
+ok   More Details stands under the facts (SimplMore group=Assignments | peer=2 classmates’ work to review · assigned Nov 4 at 9:00 AM | files=PDF, DOCX, PNG or JPG only | similarity=Turnitin checks it for copied work)
+ok   a Macmillan assignment launched on lmslink.bfwpub.com opened in the popup
+ok   the popup's front end drew Macmillan's buttons
+ok   the popup's front end drew ALEKS's buttons
+ok   macmillan's question drawn for light glass (light-21n-macmillan-look)
+ok   aleks's question drawn for light glass (light-21p-aleks-look)
+ok   macmillan's question drawn for dark glass (dark-21n-macmillan-popup)
+ok   aleks's question drawn for dark glass (dark-21p-aleks-popup)
+ok   a module's Macmillan item opened in the popup, on its cover
+ok   Export Questions pictured all 4 questions into a zip (saved to W8 Homework Forces in Motion questions.zip (macmillan))
+ok   Export Questions pictured the long question whole (question 4 pictured whole, 3 views laid together (865 px tall, the view 441))
+ok   the popup's start page heard Macmillan's cover (4 questions, 5 grading settings)

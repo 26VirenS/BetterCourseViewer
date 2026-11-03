@@ -1,0 +1,14 @@
+2026-11-03 13:42:14.890 Simpl[11997:36187] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 13:42:17.498 Simpl[11997:36187] [Simpl] window: the app's screens (no page)
+2026-11-03 13:42:19.218 Simpl[11997:36187] [Simpl] appear Calendar: 1961 ms
+2026-11-03 13:42:19.859 Simpl[11997:36187] [Simpl] appear Calendar: 2601 ms
+2026-11-03 13:42:25.144 Simpl[11997:36187] [Simpl] call quietColors: 5923 ms
+2026-11-03 13:42:25.146 Simpl[11997:36187] [Simpl] call snapshot: 174 ms
+2026-11-03 13:42:25.982 Simpl[11997:36187] [Simpl] call calendar: 6113 ms
+2026-11-03 13:42:25.984 Simpl[11997:36187] [Simpl] call calendar: 6761 ms
+2026-11-03 13:42:27.996 Simpl[11997:36187] [Simpl] calendar head: one line, its tools named: none
+2026-11-03 13:42:28.969 Simpl[11997:36187] [Simpl] open Calendar: 11705 ms (fetched)
+2026-11-03 13:42:29.027 Simpl[11997:36187] [Simpl] call courses: 3713 ms
+2026-11-03 13:42:29.028 Simpl[11997:36187] [Simpl] call todo: 59 ms
+2026-11-03 13:42:29.596 Simpl[11997:36187] [Simpl] call groups: 568 ms
+2026-11-03 13:42:30.154 Simpl[11997:36187] [Simpl] call moreFromCanvas: 557 ms

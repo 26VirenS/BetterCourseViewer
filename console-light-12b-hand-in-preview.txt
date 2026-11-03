@@ -1,0 +1,26 @@
+2026-11-03 13:50:37.453 Simpl[29787:82677] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 13:50:38.527 Simpl[29787:82677] [Simpl] window: the app's screens (no page)
+2026-11-03 13:50:38.854 Simpl[29787:82677] [Simpl] appear Course home: 639 ms
+2026-11-03 13:50:39.155 Simpl[29787:82677] [Simpl] appear Course home: 940 ms
+2026-11-03 13:50:42.230 Simpl[29787:82677] [Simpl] open Course home: 4015 ms (kept)
+2026-11-03 13:50:43.012 Simpl[29787:82677] [Simpl] appear Assignment: 527 ms
+2026-11-03 13:50:46.688 Simpl[29787:82677] SimplMore group=Effort
+2026-11-03 13:50:48.469 Simpl[29787:82677] [Simpl] open Assignment: 5984 ms (kept)
+2026-11-03 13:50:48.590 Simpl[29787:82677] [Simpl] call quietColors: 9736 ms
+2026-11-03 13:50:48.590 Simpl[29787:82677] [Simpl] call neighbours: 4541 ms
+2026-11-03 13:50:48.605 Simpl[29787:82677] [Simpl] call neighbours: 1103 ms
+2026-11-03 13:50:48.700 Simpl[29787:82677] [Simpl] call home: 7598 ms
+2026-11-03 13:50:48.700 Simpl[29787:82677] [Simpl] call home: 7637 ms
+2026-11-03 13:50:48.700 Simpl[29787:82677] [Simpl] call snapshot: 6215 ms
+2026-11-03 13:50:48.951 Simpl[29787:82677] [Simpl] call home: 7933 ms
+2026-11-03 13:50:50.043 Simpl[29787:82677] [Simpl] call assignment: 4243 ms
+2026-11-03 13:50:50.044 Simpl[29787:82677] SimplAssignment 1012: files 0, comments 0, steps Hand In, review 0, handIn 1, error -
+2026-11-03 13:50:50.045 Simpl[29787:82677] [Simpl] open Course home: 7560 ms (live)
+2026-11-03 13:50:51.372 Simpl[29787:82677] [Simpl] open Assignment: 8887 ms (live)
+2026-11-03 13:50:51.380 Simpl[29787:82677] [Simpl] popup handin:101/1012: 580 × 560
+2026-11-03 13:50:51.505 Simpl[29787:82677] [Simpl] call courses: 2556 ms
+2026-11-03 13:50:52.326 Simpl[29787:82677] [Simpl] call groups: 819 ms
+2026-11-03 13:50:53.006 Simpl[29787:82677] SimplHandIn added calendar.png (1 files)
+2026-11-03 13:50:53.892 Simpl[29787:82677] SimplPreview: calendar.png in Quick Look
+2026-11-03 13:50:55.090 Simpl[29787:82677] [Simpl] popup handin:101/1012: 977 × 560
+2026-11-03 13:50:56.688 Simpl[29787:82677] [Simpl] call moreFromCanvas: 4362 ms

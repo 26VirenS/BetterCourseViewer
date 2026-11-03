@@ -1,0 +1,26 @@
+2026-11-03 13:41:00.993 Simpl[6504:21750] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 13:41:03.029 Simpl[6504:21750] [Simpl] window: the app's screens (no page)
+2026-11-03 13:41:03.561 Simpl[6504:21750] [Simpl] appear Dashboard: 855 ms
+2026-11-03 13:41:04.174 Simpl[6504:21750] [Simpl] appear Dashboard: 1467 ms
+2026-11-03 13:41:15.767 Simpl[6504:21750] [Simpl] open Dashboard: 13060 ms (kept)
+2026-11-03 13:41:17.342 Simpl[6504:21750] [Simpl] call quietColors: 13781 ms
+2026-11-03 13:41:17.500 Simpl[6504:21750] [Simpl] call dashList: 7738 ms
+2026-11-03 13:41:17.502 Simpl[6504:21750] [Simpl] call dashList: 7899 ms
+2026-11-03 13:41:17.502 Simpl[6504:21750] [Simpl] call today: 7334 ms
+2026-11-03 13:41:17.506 Simpl[6504:21750] [Simpl] call today: 7335 ms
+2026-11-03 13:41:17.506 Simpl[6504:21750] [Simpl] call todayCounts: 1770 ms
+2026-11-03 13:41:17.507 Simpl[6504:21750] [Simpl] call todayCounts: 1770 ms
+2026-11-03 13:41:17.510 Simpl[6504:21750] [Simpl] call dashSkyline: 7744 ms
+2026-11-03 13:41:17.510 Simpl[6504:21750] [Simpl] call todayCounts: 1773 ms
+2026-11-03 13:41:17.510 Simpl[6504:21750] [Simpl] call todayCounts: 1774 ms
+2026-11-03 13:41:17.511 Simpl[6504:21750] [Simpl] call snapshot: 244 ms
+2026-11-03 13:41:18.066 Simpl[6504:21750] [Simpl] call dashSkyline: 8463 ms
+2026-11-03 13:41:19.334 Simpl[6504:21750] [Simpl] counter: today fades in (Reduce Motion)
+2026-11-03 13:41:19.337 Simpl[6504:21750] [Simpl] open Dashboard: 16630 ms (live)
+2026-11-03 13:41:19.337 Simpl[6504:21750] [Simpl] counter: today fades in (Reduce Motion)
+2026-11-03 13:41:20.701 Simpl[6504:21750] [Simpl] call courses: 2636 ms
+2026-11-03 13:41:22.706 Simpl[6504:21750] [Simpl] call todaySheet: 2635 ms
+2026-11-03 13:41:25.090 Simpl[6504:21750] [Simpl] call groups: 4387 ms
+2026-11-03 13:41:29.142 Simpl[6504:21750] [Simpl] call moreFromCanvas: 4049 ms
+2026-11-03 13:41:29.151 Simpl[6504:21750] [Simpl] call assignment: 1337 ms
+2026-11-03 13:41:33.398 Simpl[6504:21750] [Simpl] shot: the window came back empty; asked again (1)

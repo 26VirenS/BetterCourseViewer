@@ -1,0 +1,25 @@
+2026-11-03 14:08:15.546 Simpl[2924:12340] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 14:08:18.142 Simpl[2924:12340] [Simpl] window: the app's screens (no page)
+2026-11-03 14:08:19.027 Simpl[2924:12340] [Simpl] appear Dashboard: 1665 ms
+2026-11-03 14:08:20.062 Simpl[2924:12340] [Simpl] appear Dashboard: 2700 ms
+2026-11-03 14:08:26.998 Simpl[2924:12340] [Simpl] open Dashboard: 9632 ms (kept)
+2026-11-03 14:08:29.084 Simpl[2924:12340] [Simpl] popup alta: 984 × 591, 20 in from the window (sidebar out)
+2026-11-03 14:08:30.858 Simpl[2924:12340] [Simpl] call quietColors: 11832 ms
+2026-11-03 14:08:30.864 Simpl[2924:12340] [Simpl] call dashList: 7622 ms
+2026-11-03 14:08:30.865 Simpl[2924:12340] [Simpl] call dashList: 7622 ms
+2026-11-03 14:08:30.865 Simpl[2924:12340] [Simpl] call today: 7622 ms
+2026-11-03 14:08:30.865 Simpl[2924:12340] [Simpl] call todayCounts: 3794 ms
+2026-11-03 14:08:30.865 Simpl[2924:12340] [Simpl] call todayCounts: 3794 ms
+2026-11-03 14:08:30.865 Simpl[2924:12340] [Simpl] call todayCounts: 3794 ms
+2026-11-03 14:08:30.866 Simpl[2924:12340] [Simpl] call today: 3891 ms
+2026-11-03 14:08:30.866 Simpl[2924:12340] [Simpl] call todayCounts: 3794 ms
+2026-11-03 14:08:30.866 Simpl[2924:12340] [Simpl] call dashSkyline: 7623 ms
+2026-11-03 14:08:30.868 Simpl[2924:12340] [Simpl] call dashSkyline: 7626 ms
+2026-11-03 14:08:31.016 Simpl[2924:12340] [Simpl] call toolLaunch: 431 ms
+2026-11-03 14:08:31.038 Simpl[2924:12340] [Simpl] open Dashboard: 13670 ms (live)
+2026-11-03 14:08:31.386 Simpl[2924:12340] [Simpl] call snapshot: 3304 ms
+2026-11-03 14:08:32.401 Simpl[2924:12340] [Simpl] call courses: 577 ms
+2026-11-03 14:08:32.759 Simpl[2924:12340] [Simpl] alta: view made 143 ms · asked 2830 ms · launch 3263 ms · page 4499 ms · cover 4648 ms · shown 4652 ms (overview, quiet 130 ms, 134 ms after DOMContentLoaded)
+2026-11-03 14:08:35.581 Simpl[2924:12340] [Simpl] call groups: 3177 ms
+2026-11-03 14:08:38.629 Simpl[2924:12340] [Simpl] call moreFromCanvas: 3044 ms
+2026-11-03 14:08:40.061 Simpl[2924:12340] NSQuitAlwaysKeepsWindows=NO

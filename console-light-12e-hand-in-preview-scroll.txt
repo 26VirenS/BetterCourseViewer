@@ -1,0 +1,27 @@
+2026-11-03 13:54:10.261 Simpl[36699:98779] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 13:54:13.585 Simpl[36699:98779] [Simpl] window: the app's screens (no page)
+2026-11-03 13:54:13.850 Simpl[36699:98779] [Simpl] appear Course home: 1452 ms
+2026-11-03 13:54:14.414 Simpl[36699:98779] [Simpl] appear Course home: 2016 ms
+2026-11-03 13:54:17.129 Simpl[36699:98779] [Simpl] open Course home: 4731 ms (kept)
+2026-11-03 13:54:17.838 Simpl[36699:98779] [Simpl] appear Assignment: 349 ms
+2026-11-03 13:54:19.841 Simpl[36699:98779] [Simpl] call quietColors: 5991 ms
+2026-11-03 13:54:19.843 Simpl[36699:98779] [Simpl] call neighbours: 1575 ms
+2026-11-03 13:54:19.845 Simpl[36699:98779] [Simpl] call home: 3562 ms
+2026-11-03 13:54:19.886 Simpl[36699:98779] [Simpl] call home: 3651 ms
+2026-11-03 13:54:19.887 Simpl[36699:98779] [Simpl] call home: 3702 ms
+2026-11-03 13:54:19.887 Simpl[36699:98779] [Simpl] call snapshot: 2399 ms
+2026-11-03 13:54:20.751 Simpl[36699:98779] [Simpl] open Course home: 3263 ms (live)
+2026-11-03 13:54:20.761 Simpl[36699:98779] [Simpl] call courses: 674 ms
+2026-11-03 13:54:21.017 Simpl[36699:98779] [Simpl] call assignment: 1376 ms
+2026-11-03 13:54:21.018 Simpl[36699:98779] SimplAssignment 1012: files 0, comments 0, steps Hand In, review 0, handIn 1, error -
+2026-11-03 13:54:22.539 Simpl[36699:98779] SimplMore group=Effort
+2026-11-03 13:54:24.089 Simpl[36699:98779] [Simpl] open Assignment: 6600 ms (fetched)
+2026-11-03 13:54:24.096 Simpl[36699:98779] [Simpl] popup handin:101/1012: 580 × 560
+2026-11-03 13:54:24.157 Simpl[36699:98779] SimplHandIn added long-reading.pdf (1 files)
+2026-11-03 13:54:24.306 Simpl[36699:98779] SimplPreview: long-reading.pdf in PDFKit (6 pages)
+IOServiceMatchingfailed for: AppleM2ScalerParavirtDriver
+2026-11-03 13:54:25.394 Simpl[36699:98779] [Simpl] popup handin:101/1012: 977 × 560
+2026-11-03 13:54:25.610 Simpl[36699:98779] [Simpl] call groups: 4849 ms
+2026-11-03 13:54:25.917 Simpl[36699:98779] [Simpl] call neighbours: 2640 ms
+2026-11-03 13:54:29.081 Simpl[36699:98779] [Simpl] call moreFromCanvas: 3454 ms
+2026-11-03 13:54:30.354 Simpl[36699:98779] SimplScrollProbe: PDF, pages 6, scrolled yes (4000 → 3624)

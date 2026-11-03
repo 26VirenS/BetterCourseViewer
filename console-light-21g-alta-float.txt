@@ -1,0 +1,33 @@
+2026-11-03 14:08:18.580 Simpl[3017:12564] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 14:08:21.280 Simpl[3017:12564] [Simpl] window: the app's screens (no page)
+2026-11-03 14:08:22.232 Simpl[3017:12564] [Simpl] appear Dashboard: 1419 ms
+2026-11-03 14:08:22.968 Simpl[3017:12564] [Simpl] appear Dashboard: 2155 ms
+2026-11-03 14:08:31.287 Simpl[3017:12564] [Simpl] open Dashboard: 10470 ms (kept)
+2026-11-03 14:08:32.160 Simpl[3017:12564] [Simpl] popup alta: 984 × 591, 20 in from the window (sidebar out)
+2026-11-03 14:08:35.155 Simpl[3017:12564] [Simpl] calculator: its page loaded
+2026-11-03 14:08:39.542 Simpl[3017:12564] [Simpl] call toolLaunch: 4705 ms
+2026-11-03 14:08:39.728 Simpl[3017:12564] [Simpl] call quietColors: 17303 ms
+2026-11-03 14:08:39.810 Simpl[3017:12564] [Simpl] call dashList: 13056 ms
+2026-11-03 14:08:39.833 Simpl[3017:12564] [Simpl] call dashList: 13082 ms
+2026-11-03 14:08:39.834 Simpl[3017:12564] [Simpl] call today: 11768 ms
+2026-11-03 14:08:39.836 Simpl[3017:12564] [Simpl] call today: 11770 ms
+2026-11-03 14:08:39.836 Simpl[3017:12564] [Simpl] call todayCounts: 8609 ms
+2026-11-03 14:08:39.838 Simpl[3017:12564] [Simpl] call todayCounts: 8609 ms
+2026-11-03 14:08:39.839 Simpl[3017:12564] [Simpl] call todayCounts: 8612 ms
+2026-11-03 14:08:39.839 Simpl[3017:12564] [Simpl] call todayCounts: 8613 ms
+2026-11-03 14:08:39.843 Simpl[3017:12564] [Simpl] call dashSkyline: 13089 ms
+2026-11-03 14:08:39.846 Simpl[3017:12564] [Simpl] call dashSkyline: 13094 ms
+2026-11-03 14:08:39.847 Simpl[3017:12564] [Simpl] call snapshot: 7896 ms
+2026-11-03 14:08:40.321 Simpl[3017:12564] NSQuitAlwaysKeepsWindows=NO
+2026-11-03 14:08:42.520 Simpl[3017:12564] [Simpl] calculator: GeoGebra is ready
+2026-11-03 14:08:42.625 Simpl[3017:12564] [Simpl] open Dashboard: 21803 ms (live)
+2026-11-03 14:08:42.965 Simpl[3017:12564] [Simpl] alta: view made 67 ms · asked 3183 ms · launch 7894 ms · page 10931 ms · overview 11098 ms · shown 11100 ms (overview, quiet 125 ms, 166 ms after DOMContentLoaded)
+2026-11-03 14:08:43.350 Simpl[3017:12564] [Simpl] call assignment: 3502 ms
+2026-11-03 14:08:43.350 Simpl[3017:12564] [Simpl] call courses: 3033 ms
+2026-11-03 14:08:43.516 Simpl[3017:12654] NSSpellServer dataFromGeneratingCandidatesForSelectedRange timed out, index is 0
+2026-11-03 14:08:43.646 Simpl[3017:12564] [Simpl] call groups: 295 ms
+2026-11-03 14:08:44.191 Simpl[3017:12654] NSSpellServer dataFromGeneratingCandidatesForSelectedRange timed out, index is 0
+2026-11-03 14:08:44.765 Simpl[3017:12654] NSSpellServer dataFromGeneratingCandidatesForSelectedRange timed out, index is 0
+2026-11-03 14:08:45.341 Simpl[3017:12654] NSSpellServer dataFromGeneratingCandidatesForSelectedRange timed out, index is 0
+2026-11-03 14:08:45.566 Simpl[3017:12564] [Simpl] call moreFromCanvas: 1918 ms
+2026-11-03 14:08:46.147 Simpl[3017:12927] NSSpellServer dataFromGeneratingCandidatesForSelectedRange timed out, index is 0

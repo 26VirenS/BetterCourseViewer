@@ -1,0 +1,27 @@
+2026-11-03 13:49:53.440 Simpl[28128:78232] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 13:49:57.270 Simpl[28128:78232] [Simpl] window: the app's screens (no page)
+2026-11-03 13:49:57.837 Simpl[28128:78232] [Simpl] appear Dashboard: 1353 ms
+2026-11-03 13:49:58.234 Simpl[28128:78232] [Simpl] appear Dashboard: 1750 ms
+2026-11-03 13:50:06.874 Simpl[28128:78232] [Simpl] open Dashboard: 10390 ms (kept)
+2026-11-03 13:50:07.402 Simpl[28128:78232] [Simpl] call quietColors: 9566 ms
+2026-11-03 13:50:07.408 Simpl[28128:78232] [Simpl] call dashList: 3403 ms
+2026-11-03 13:50:07.412 Simpl[28128:78232] [Simpl] call dashList: 3302 ms
+2026-11-03 13:50:07.490 Simpl[28128:78232] [Simpl] call today: 3177 ms
+2026-11-03 13:50:07.493 Simpl[28128:78232] [Simpl] call today: 3184 ms
+2026-11-03 13:50:07.494 Simpl[28128:78232] [Simpl] call todayCounts: 648 ms
+2026-11-03 13:50:07.494 Simpl[28128:78232] [Simpl] call todayCounts: 649 ms
+2026-11-03 13:50:07.494 Simpl[28128:78232] [Simpl] call todayCounts: 649 ms
+2026-11-03 13:50:07.494 Simpl[28128:78232] [Simpl] call todayCounts: 649 ms
+2026-11-03 13:50:07.495 Simpl[28128:78232] [Simpl] call snapshot: 283 ms
+2026-11-03 13:50:08.277 Simpl[28128:78232] [Simpl] open Dashboard: 11793 ms (live)
+2026-11-03 13:50:08.367 Simpl[28128:78232] [Simpl] call dashSkyline: 4258 ms
+2026-11-03 13:50:08.367 Simpl[28128:78232] [Simpl] call dashSkyline: 4367 ms
+2026-11-03 13:50:08.367 Simpl[28128:78232] [Simpl] call assignment: 1155 ms
+2026-11-03 13:50:08.367 Simpl[28128:78232] [Simpl] macmillan popup: opened from the assignment (its tool on lmslink.bfwpub.com)
+2026-11-03 13:50:08.436 Simpl[28128:78232] [Simpl] popup look: 984 × 591, 20 in from the window (sidebar out)
+2026-11-03 13:50:08.831 Simpl[28128:78232] [Simpl] call courses: 920 ms
+2026-11-03 13:50:09.035 Simpl[28128:78232] [Simpl] call toolLaunch: 384 ms
+2026-11-03 13:50:09.035 Simpl[28128:78232] [Simpl] macmillan popup: opened
+2026-11-03 13:50:09.270 Simpl[28128:78232] [Simpl] call groups: 439 ms
+2026-11-03 13:50:11.168 Simpl[28128:78232] [Simpl] call moreFromCanvas: 1896 ms
+2026-11-03 13:50:14.356 Simpl[28128:78232] [Simpl] popup look: 984 × 589, 20 in from the window (sidebar out)

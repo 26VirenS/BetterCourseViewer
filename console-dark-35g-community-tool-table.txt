@@ -1,0 +1,13 @@
+2026-11-03 13:45:07.554 Simpl[18893:54124] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 13:45:08.768 Simpl[18893:54124] [Simpl] window: the app's screens (no page)
+2026-11-03 13:45:23.488 Simpl[18893:54124] community tools: the gallery read: 14 tools, 13 to add, 1 needing a newer Simpl
+2026-11-03 13:45:23.522 Simpl[18893:54124] community tools: added mockcook (Oven Temperatures, version 1)
+2026-11-03 13:45:23.837 Simpl[18893:54124] [Simpl] popup tool: 984 × 589, 20 in from the window (sidebar out)
+2026-11-03 13:45:24.569 Simpl[18893:54124] community tools: mockcook worked out: In Celsius 218 °C
+2026-11-03 13:45:25.838 Simpl[18893:54124] [Simpl] popup tool: 984 × 591, 20 in from the window (sidebar out)
+2026-11-03 13:45:26.825 Simpl[18893:54124] [Simpl] call quietColors: 12929 ms
+2026-11-03 13:45:26.827 Simpl[18893:54124] [Simpl] call snapshot: 327 ms
+2026-11-03 13:45:27.415 Simpl[18893:54124] [Simpl] call courses: 522 ms
+2026-11-03 13:45:27.910 Simpl[18893:54124] [Simpl] call groups: 494 ms
+2026-11-03 13:45:28.886 Simpl[18893:54124] [Simpl] call moreFromCanvas: 975 ms
+2026-11-03 13:45:28.907 Simpl[18893:54124] [Simpl] popup tool: 984 × 589, 20 in from the window (sidebar out)

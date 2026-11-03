@@ -1,0 +1,24 @@
+2026-11-03 13:55:20.423 Simpl[39532:105843] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 13:55:22.869 Simpl[39532:105843] [Simpl] window: the app's screens (no page)
+2026-11-03 13:55:23.515 Simpl[39532:105843] [Simpl] appear Course home: 1337 ms
+2026-11-03 13:55:24.306 Simpl[39532:105843] [Simpl] appear Course home: 2128 ms
+2026-11-03 13:55:27.465 Simpl[39532:105843] [Simpl] open Course home: 5286 ms (kept)
+2026-11-03 13:55:28.821 Simpl[39532:105843] [Simpl] appear Assignment: 399 ms
+2026-11-03 13:55:30.812 Simpl[39532:105843] SimplMore group=Assignments
+2026-11-03 13:55:32.355 Simpl[39532:105843] [Simpl] call quietColors: 8838 ms
+2026-11-03 13:55:32.426 Simpl[39532:105843] [Simpl] open Assignment: 4004 ms (kept)
+2026-11-03 13:55:32.568 Simpl[39532:105843] [Simpl] call home: 6157 ms
+2026-11-03 13:55:32.569 Simpl[39532:105843] [Simpl] call home: 6231 ms
+2026-11-03 13:55:32.569 Simpl[39532:105843] [Simpl] call home: 6294 ms
+2026-11-03 13:55:33.196 Simpl[39532:105843] [Simpl] call neighbours: 4108 ms
+2026-11-03 13:55:33.197 Simpl[39532:105843] [Simpl] call neighbours: 2032 ms
+2026-11-03 13:55:33.197 Simpl[39532:105843] [Simpl] open Course home: 4775 ms (live)
+2026-11-03 13:55:33.267 Simpl[39532:105843] [Simpl] call snapshot: 4839 ms
+2026-11-03 13:55:35.017 Simpl[39532:105843] [Simpl] call assignment: 4823 ms
+2026-11-03 13:55:35.193 Simpl[39532:105843] [Simpl] popup rubric: 984 × 591, 20 in from the window (sidebar out)
+2026-11-03 13:55:35.882 Simpl[39532:105843] SimplAssignment 4001: files 1, comments 3, steps See Feedback+Hand In Again, review 0, handIn 0, error -
+2026-11-03 13:55:36.565 Simpl[39532:105843] [Simpl] open Assignment: 8143 ms (live)
+2026-11-03 13:55:36.772 Simpl[39532:105843] [Simpl] call courses: 3461 ms
+2026-11-03 13:55:37.414 Simpl[39532:105843] [Simpl] call groups: 641 ms
+2026-11-03 13:55:38.619 Simpl[39532:105843] [Simpl] call moreFromCanvas: 1205 ms
+2026-11-03 13:55:42.368 Simpl[39532:105843] [Simpl] popup rubric: 984 × 589, 20 in from the window (sidebar out)

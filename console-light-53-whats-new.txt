@@ -1,0 +1,23 @@
+2026-11-03 13:50:39.388 Simpl[29949:83052] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 13:50:40.276 Simpl[29949:83052] [Simpl] window: the app's screens (no page)
+2026-11-03 13:50:40.787 Simpl[29949:83052] [Simpl] appear Dashboard: 701 ms
+2026-11-03 13:50:41.111 Simpl[29949:83052] [Simpl] appear Dashboard: 1024 ms
+2026-11-03 13:50:49.086 Simpl[29949:83052] [Simpl] open Dashboard: 8999 ms (kept)
+2026-11-03 13:50:49.632 Simpl[29949:83052] [Simpl] call quietColors: 8847 ms
+2026-11-03 13:50:49.683 Simpl[29949:83052] [Simpl] call dashList: 4445 ms
+2026-11-03 13:50:49.683 Simpl[29949:83052] [Simpl] call dashList: 4554 ms
+2026-11-03 13:50:49.703 Simpl[29949:83052] [Simpl] call today: 3970 ms
+2026-11-03 13:50:49.703 Simpl[29949:83052] [Simpl] call today: 3972 ms
+2026-11-03 13:50:49.703 Simpl[29949:83052] [Simpl] call todayCounts: 703 ms
+2026-11-03 13:50:49.703 Simpl[29949:83052] [Simpl] call todayCounts: 704 ms
+2026-11-03 13:50:49.703 Simpl[29949:83052] [Simpl] call todayCounts: 704 ms
+2026-11-03 13:50:49.703 Simpl[29949:83052] [Simpl] call todayCounts: 704 ms
+2026-11-03 13:50:49.704 Simpl[29949:83052] [Simpl] call snapshot: 216 ms
+2026-11-03 13:50:52.502 Simpl[29949:83052] [Simpl] open Dashboard: 12416 ms (live)
+2026-11-03 13:50:57.491 Simpl[29949:83052] [Simpl] call dashSkyline: 12251 ms
+2026-11-03 13:50:57.491 Simpl[29949:83052] [Simpl] call dashSkyline: 12362 ms
+2026-11-03 13:50:57.494 Simpl[29949:83052] [Simpl] call courses: 7068 ms
+2026-11-03 13:50:58.557 Simpl[29949:83052] [Simpl] call groups: 1062 ms
+2026-11-03 13:50:59.230 Simpl[29949:83052] [Simpl] call moreFromCanvas: 671 ms
+2026-11-03 13:51:00.124 Simpl[29949:83052] [Simpl] what's new: 3 highlights of 3 notes from 2 versions (1.3.214 to 1.3.215), 0 for developers left out: More Details; Whole Questions; Question on the Glass
+2026-11-03 13:51:00.263 Simpl[29949:83052] [Simpl] popup whatsnew: 500 × 560

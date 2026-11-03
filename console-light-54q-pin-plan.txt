@@ -1,0 +1,26 @@
+2026-11-03 14:20:04.057 Simpl[29042:80265] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 14:20:05.950 Simpl[29042:80265] [Simpl] window: the app's screens (no page)
+2026-11-03 14:20:06.710 Simpl[29042:80265] [Simpl] appear Dashboard: 1038 ms
+2026-11-03 14:20:07.342 Simpl[29042:80265] [Simpl] appear Dashboard: 1669 ms
+2026-11-03 14:20:25.079 Simpl[29042:80265] [Simpl] open Dashboard: 19407 ms (kept)
+2026-11-03 14:20:28.003 Simpl[29042:80265] [Simpl] call quietColors: 21293 ms
+2026-11-03 14:20:28.036 Simpl[29042:80265] [Simpl] call dashList: 11756 ms
+2026-11-03 14:20:28.038 Simpl[29042:80265] [Simpl] call dashList: 11799 ms
+2026-11-03 14:20:28.128 Simpl[29042:80265] [Simpl] call reminders: 10597 ms
+2026-11-03 14:20:28.157 Simpl[29042:80265] [Simpl] call today: 10627 ms
+2026-11-03 14:20:28.158 Simpl[29042:80265] [Simpl] call today: 10629 ms
+2026-11-03 14:20:28.171 Simpl[29042:80265] [Simpl] call todayCounts: 3113 ms
+2026-11-03 14:20:28.171 Simpl[29042:80265] [Simpl] call todayCounts: 3114 ms
+2026-11-03 14:20:28.172 Simpl[29042:80265] [Simpl] call dashList: 45 ms
+2026-11-03 14:20:28.178 Simpl[29042:80265] [Simpl] call snapshot: 717 ms
+2026-11-03 14:20:29.273 Simpl[29042:80265] [Simpl] open Dashboard: 23600 ms (live)
+2026-11-03 14:20:29.451 Simpl[29042:80265] [Simpl] call todayCounts: 4392 ms
+2026-11-03 14:20:29.451 Simpl[29042:80265] [Simpl] call todayCounts: 4393 ms
+2026-11-03 14:20:29.453 Simpl[29042:80265] [Simpl] call dashSkyline: 13172 ms
+2026-11-03 14:20:29.454 Simpl[29042:80265] [Simpl] call dashSkyline: 13215 ms
+2026-11-03 14:20:29.510 Simpl[29042:80265] [Simpl] call courses: 1085 ms
+2026-11-03 14:20:29.637 Simpl[29042:80265] [Simpl] call calendar: 377 ms
+2026-11-03 14:20:29.654 Simpl[29042:80265] [Simpl] call groups: 144 ms
+2026-11-03 14:20:31.404 Simpl[29042:80265] [Simpl] call moreFromCanvas: 1749 ms
+2026-11-03 14:20:35.515 Simpl[29042:80265] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-11-03 14:20:40.588 Simpl[29042:80265] [Simpl] call reminders: 4218 ms

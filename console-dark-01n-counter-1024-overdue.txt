@@ -1,0 +1,24 @@
+2026-11-03 14:23:05.641 Simpl[36235:98871] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 14:23:07.018 Simpl[36235:98871] [Simpl] window: the app's screens (no page)
+2026-11-03 14:23:07.572 Simpl[36235:98871] [Simpl] appear Dashboard: 699 ms
+2026-11-03 14:23:07.965 Simpl[36235:98871] [Simpl] appear Dashboard: 1092 ms
+2026-11-03 14:23:11.399 Simpl[36235:98871] [Simpl] open Dashboard: 4525 ms (kept)
+2026-11-03 14:23:11.943 Simpl[36235:98871] [Simpl] call quietColors: 4372 ms
+2026-11-03 14:23:12.091 Simpl[36235:98871] [Simpl] call dashList: 2105 ms
+2026-11-03 14:23:12.093 Simpl[36235:98871] [Simpl] call dashList: 2398 ms
+2026-11-03 14:23:12.095 Simpl[36235:98871] [Simpl] call todayCounts: 710 ms
+2026-11-03 14:23:12.097 Simpl[36235:98871] [Simpl] call snapshot: 298 ms
+2026-11-03 14:23:12.402 Simpl[36235:98871] [Simpl] call todayCounts: 1060 ms
+2026-11-03 14:23:12.773 Simpl[36235:98871] [Simpl] call today: 2569 ms
+2026-11-03 14:23:12.774 Simpl[36235:98871] [Simpl] call today: 2570 ms
+2026-11-03 14:23:12.954 Simpl[36235:98871] [Simpl] counter: overdue fades in (Reduce Motion)
+2026-11-03 14:23:12.955 Simpl[36235:98871] [Simpl] open Dashboard: 6082 ms (live)
+2026-11-03 14:23:12.962 Simpl[36235:98871] [Simpl] call todayCounts: 1578 ms
+2026-11-03 14:23:12.962 Simpl[36235:98871] [Simpl] call todayCounts: 1620 ms
+2026-11-03 14:23:12.963 Simpl[36235:98871] [Simpl] call dashSkyline: 2977 ms
+2026-11-03 14:23:12.963 Simpl[36235:98871] [Simpl] call dashSkyline: 3269 ms
+2026-11-03 14:23:12.965 Simpl[36235:98871] [Simpl] call courses: 562 ms
+2026-11-03 14:23:13.840 Simpl[36235:98871] [Simpl] counter: overdue fades in (Reduce Motion)
+2026-11-03 14:23:13.967 Simpl[36235:98871] [Simpl] call groups: 1003 ms
+2026-11-03 14:23:14.865 Simpl[36235:98871] [Simpl] call todaySheet: 958 ms
+2026-11-03 14:23:15.352 Simpl[36235:98871] [Simpl] call moreFromCanvas: 1384 ms

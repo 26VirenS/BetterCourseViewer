@@ -1,0 +1,29 @@
+2026-11-03 14:20:52.347 Simpl[30887:85058] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 14:20:54.322 Simpl[30887:85058] [Simpl] window: the app's screens (no page)
+2026-11-03 14:20:55.075 Simpl[30887:85058] [Simpl] appear Dashboard: 1079 ms
+2026-11-03 14:20:55.677 Simpl[30887:85058] [Simpl] appear Dashboard: 1681 ms
+2026-11-03 14:21:08.772 Simpl[30887:85058] [Simpl] open Dashboard: 14776 ms (kept)
+2026-11-03 14:21:10.569 Simpl[30887:85058] [Simpl] popup look: 984 × 589, 20 in from the window (sidebar out)
+2026-11-03 14:21:11.336 Simpl[30887:85058] [Simpl] call quietColors: 16270 ms
+2026-11-03 14:21:11.337 Simpl[30887:85058] [Simpl] call dashList: 4811 ms
+2026-11-03 14:21:11.337 Simpl[30887:85058] [Simpl] call dashList: 4812 ms
+2026-11-03 14:21:11.448 Simpl[30887:85058] [Simpl] call today: 4806 ms
+2026-11-03 14:21:11.450 Simpl[30887:85058] [Simpl] call today: 4808 ms
+2026-11-03 14:21:11.451 Simpl[30887:85058] [Simpl] call todayCounts: 2737 ms
+2026-11-03 14:21:11.451 Simpl[30887:85058] [Simpl] call todayCounts: 2737 ms
+2026-11-03 14:21:11.451 Simpl[30887:85058] [Simpl] call toolLaunch: 693 ms
+2026-11-03 14:21:11.451 Simpl[30887:85058] [Simpl] aleks popup: opened
+2026-11-03 14:21:11.453 Simpl[30887:85058] [Simpl] call snapshot: 1355 ms
+2026-11-03 14:21:12.222 Simpl[30887:85058] [Simpl] open Dashboard: 18226 ms (live)
+2026-11-03 14:21:12.390 Simpl[30887:85058] [Simpl] call dashSkyline: 5863 ms
+2026-11-03 14:21:12.390 Simpl[30887:85058] [Simpl] call todayCounts: 3675 ms
+2026-11-03 14:21:12.390 Simpl[30887:85058] [Simpl] call todayCounts: 3675 ms
+2026-11-03 14:21:12.390 Simpl[30887:85058] [Simpl] call dashSkyline: 5865 ms
+2026-11-03 14:21:12.390 Simpl[30887:85058] [Simpl] call courses: 602 ms
+2026-11-03 14:21:13.411 Simpl[30887:85058] [Simpl] call groups: 1020 ms
+2026-11-03 14:21:13.816 Simpl[30887:85058] [Simpl] aleks popup: front end, buttons Explanation, Recheck
+2026-11-03 14:21:13.817 Simpl[30887:85058] [Simpl] aleks popup: the question drawn for light glass
+2026-11-03 14:21:13.817 Simpl[30887:85058] [Simpl] aleks popup: rail heard, topic progress 0 of 5
+2026-11-03 14:21:13.818 Simpl[30887:85058] [Simpl] look popup: page at 69% (its 1024 wide in 703)
+2026-11-03 14:21:13.818 Simpl[30887:85058] [Simpl] aleks look: drawn in localhost:8800, Check found, 5 tools
+2026-11-03 14:21:16.022 Simpl[30887:85058] [Simpl] call moreFromCanvas: 2610 ms

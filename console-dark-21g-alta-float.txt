@@ -1,0 +1,28 @@
+2026-11-03 13:38:49.960 Simpl[2915:12530] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 13:38:51.372 Simpl[2915:12530] [Simpl] window: the app's screens (no page)
+2026-11-03 13:38:51.809 Simpl[2915:12530] [Simpl] appear Dashboard: 613 ms
+2026-11-03 13:38:52.353 Simpl[2915:12530] [Simpl] appear Dashboard: 1156 ms
+2026-11-03 13:38:54.975 Simpl[2915:12530] [Simpl] open Dashboard: 3776 ms (kept)
+2026-11-03 13:38:55.734 Simpl[2915:12530] [Simpl] popup alta: 984 × 591, 20 in from the window (sidebar out)
+2026-11-03 13:38:56.208 Simpl[2915:12530] [Simpl] call quietColors: 4403 ms
+2026-11-03 13:38:56.808 Simpl[2915:12530] [Simpl] calculator: its page loaded
+2026-11-03 13:38:56.911 Simpl[2915:12530] [Simpl] call today: 2782 ms
+2026-11-03 13:38:56.911 Simpl[2915:12530] [Simpl] call today: 2783 ms
+2026-11-03 13:38:56.912 Simpl[2915:12530] [Simpl] call todayCounts: 1954 ms
+2026-11-03 13:38:56.917 Simpl[2915:12530] [Simpl] call todayCounts: 1954 ms
+2026-11-03 13:38:56.917 Simpl[2915:12530] [Simpl] call todayCounts: 1959 ms
+2026-11-03 13:38:56.917 Simpl[2915:12530] [Simpl] call dashSkyline: 2862 ms
+2026-11-03 13:38:56.918 Simpl[2915:12530] [Simpl] call todayCounts: 1960 ms
+2026-11-03 13:38:56.918 Simpl[2915:12530] [Simpl] call dashSkyline: 2863 ms
+2026-11-03 13:38:56.919 Simpl[2915:12530] [Simpl] call dashList: 2863 ms
+2026-11-03 13:38:56.920 Simpl[2915:12530] [Simpl] call dashList: 2865 ms
+2026-11-03 13:38:56.984 Simpl[2915:12530] [Simpl] call toolLaunch: 828 ms
+2026-11-03 13:38:56.989 Simpl[2915:12530] [Simpl] open Dashboard: 5790 ms (live)
+2026-11-03 13:38:59.953 Simpl[2915:12530] NSQuitAlwaysKeepsWindows=NO
+2026-11-03 13:39:00.532 Simpl[2915:12530] [Simpl] call snapshot: 4849 ms
+2026-11-03 13:39:01.472 Simpl[2915:12530] [Simpl] alta: view made 6 ms · asked 531 ms · launch 1360 ms · page 4860 ms · overview 5004 ms · shown 5007 ms (overview, quiet 125 ms, 144 ms after DOMContentLoaded)
+2026-11-03 13:39:01.614 Simpl[2915:12530] [Simpl] calculator: GeoGebra is ready
+2026-11-03 13:39:01.686 Simpl[2915:12530] [Simpl] call courses: 984 ms
+2026-11-03 13:39:01.826 Simpl[2915:12530] [Simpl] call assignment: 208 ms
+2026-11-03 13:39:01.834 Simpl[2915:12530] [Simpl] call groups: 147 ms
+2026-11-03 13:39:03.094 Simpl[2915:12530] [Simpl] call moreFromCanvas: 1259 ms

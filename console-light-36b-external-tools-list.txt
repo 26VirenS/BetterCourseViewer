@@ -1,0 +1,27 @@
+2026-11-03 13:45:32.791 Simpl[20137:57198] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 13:45:34.095 Simpl[20137:57198] [Simpl] window: the app's screens (no page)
+2026-11-03 13:45:34.661 Simpl[20137:57198] [Simpl] appear External Tools: 928 ms
+2026-11-03 13:45:35.240 Simpl[20137:57198] [Simpl] appear External Tools: 1507 ms
+2026-11-03 13:45:39.936 Simpl[20137:57198] [Simpl] call quietColors: 5272 ms
+2026-11-03 13:45:39.978 Simpl[20137:57198] [Simpl] call externalTools: 5313 ms
+2026-11-03 13:45:39.978 Simpl[20137:57198] [Simpl] tool list: opening Knewton Alta
+2026-11-03 13:45:39.978 Simpl[20137:57198] [Simpl] call externalTools: 4735 ms
+2026-11-03 13:45:39.978 Simpl[20137:57198] [Simpl] tool list: opening Knewton Alta
+2026-11-03 13:45:40.348 Simpl[20137:57198] [Simpl] tool list shown: Knewton Alta
+2026-11-03 13:45:40.348 Simpl[20137:57198] [Simpl] tool list shown: Knewton Alta
+2026-11-03 13:45:40.445 Simpl[20137:57198] [Simpl] tool list closed: Knewton Alta
+2026-11-03 13:45:40.680 Simpl[20137:57198] [Simpl] open External Tools: 6944 ms (fetched)
+2026-11-03 13:45:40.718 Simpl[20137:57198] [Simpl] call snapshot: 988 ms
+2026-11-03 13:45:41.108 Simpl[20137:57198] [Simpl] call courses: 179 ms
+2026-11-03 13:45:41.197 Simpl[20137:57198] [Simpl] call groups: 88 ms
+2026-11-03 13:45:42.563 Simpl[20137:57198] [Simpl] call moreFromCanvas: 1365 ms
+2026-11-03 13:45:44.761 Simpl[20137:57198] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-11-03 13:45:45.472 Simpl[20137:57198] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-11-03 13:45:46.188 Simpl[20137:57198] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-11-03 13:45:46.914 Simpl[20137:57198] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-11-03 13:45:48.341 Simpl[20137:57198] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-11-03 13:45:49.090 Simpl[20137:57198] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-11-03 13:45:49.810 Simpl[20137:57198] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-11-03 13:45:50.541 Simpl[20137:57198] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-11-03 13:45:51.257 Simpl[20137:57198] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-11-03 13:45:51.975 Simpl[20137:57198] [Simpl] shot: another copy of the app is in front; brought forward again

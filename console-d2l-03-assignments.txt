@@ -1,0 +1,27 @@
+2026-11-03 13:52:17.442 Simpl[34278:94112] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 13:52:19.637 Simpl[34278:94112] [Simpl] window: the app's screens (/d2l/home)
+2026-11-03 13:52:19.843 Simpl[34278:94112] [Simpl] appear Dashboard: 1356 ms
+2026-11-03 13:52:19.853 Simpl[34278:94112] [Simpl] appear Dashboard: 1366 ms
+2026-11-03 13:52:21.037 Simpl[34278:94112] [Simpl] appear Section Assignments: 2550 ms
+2026-11-03 13:52:21.186 Simpl[34278:94112] [Simpl] call quietColors: 1344 ms
+2026-11-03 13:52:21.188 Simpl[34278:94112] [Simpl] call dashSkyline: 236 ms
+2026-11-03 13:52:21.188 Simpl[34278:94112] [Simpl] call dashSkyline: 236 ms
+2026-11-03 13:52:21.189 Simpl[34278:94112] [Simpl] call today: 237 ms
+2026-11-03 13:52:21.190 Simpl[34278:94112] [Simpl] call snapshot: 250 ms
+2026-11-03 13:52:21.214 Simpl[34278:94112] [Simpl] call today: 262 ms
+2026-11-03 13:52:21.217 Simpl[34278:94112] [Simpl] call dashList: 264 ms
+2026-11-03 13:52:21.868 Simpl[34278:94112] [Simpl] call dashList: 916 ms
+2026-11-03 13:52:21.868 Simpl[34278:94112] [Simpl] open Dashboard: 3382 ms (fetched)
+2026-11-03 13:52:22.184 Simpl[34278:94112] [Simpl] call todayCounts: 1000 ms
+2026-11-03 13:52:22.185 Simpl[34278:94112] [Simpl] call todayCounts: 1002 ms
+2026-11-03 13:52:22.185 Simpl[34278:94112] [Simpl] call todayCounts: 1000 ms
+2026-11-03 13:52:22.185 Simpl[34278:94112] [Simpl] call todayCounts: 1000 ms
+2026-11-03 13:52:22.185 Simpl[34278:94112] [Simpl] call assignments: 1020 ms
+2026-11-03 13:52:22.185 Simpl[34278:94112] [Simpl] call home: 1021 ms
+2026-11-03 13:52:23.031 Simpl[34278:94112] [Simpl] call dashSkyline: 1842 ms
+2026-11-03 13:52:23.031 Simpl[34278:94112] [Simpl] call dashSkyline: 1843 ms
+2026-11-03 13:52:23.037 Simpl[34278:94112] [Simpl] call courses: 1822 ms
+2026-11-03 13:52:23.242 Simpl[34278:94112] [Simpl] open Section Assignments: 4755 ms (fetched)
+2026-11-03 13:52:23.602 Simpl[34278:94112] [Simpl] call groups: 360 ms
+2026-11-03 13:52:23.968 Simpl[34278:94112] [Simpl] call moreFromCanvas: 366 ms
+2026-11-03 13:52:26.282 Simpl[34278:94112] [Simpl] shot: another copy of the app is in front; brought forward again

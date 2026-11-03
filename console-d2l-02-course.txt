@@ -1,0 +1,26 @@
+2026-11-03 13:55:42.466 Simpl[40426:108012] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 13:55:48.895 Simpl[40426:108012] [Simpl] window: the app's screens (/d2l/home)
+2026-11-03 13:55:49.156 Simpl[40426:108012] [Simpl] appear Dashboard: 2505 ms
+2026-11-03 13:55:49.192 Simpl[40426:108012] [Simpl] appear Dashboard: 2541 ms
+2026-11-03 13:55:49.244 Simpl[40426:108012] [Simpl] appear Course home: 2593 ms
+2026-11-03 13:55:52.930 Simpl[40426:108012] [Simpl] call quietColors: 3776 ms
+2026-11-03 13:55:52.952 Simpl[40426:108012] [Simpl] call dashSkyline: 3740 ms
+2026-11-03 13:55:52.952 Simpl[40426:108012] [Simpl] call dashSkyline: 3742 ms
+2026-11-03 13:55:52.953 Simpl[40426:108012] [Simpl] call dashList: 3741 ms
+2026-11-03 13:55:52.953 Simpl[40426:108012] [Simpl] call today: 3741 ms
+2026-11-03 13:55:52.954 Simpl[40426:108012] [Simpl] call home: 554 ms
+2026-11-03 13:55:53.006 Simpl[40426:108012] [Simpl] call dashList: 3795 ms
+2026-11-03 13:55:53.007 Simpl[40426:108012] [Simpl] call snapshot: 3797 ms
+2026-11-03 13:55:54.183 Simpl[40426:108012] [Simpl] call home: 4938 ms
+2026-11-03 13:55:54.190 Simpl[40426:108012] [Simpl] call today: 4978 ms
+2026-11-03 13:55:58.384 Simpl[40426:108012] [Simpl] open Dashboard: 11732 ms (fetched)
+2026-11-03 13:55:58.415 Simpl[40426:108012] [Simpl] open Course home: 11763 ms (fetched)
+2026-11-03 13:55:58.434 Simpl[40426:108012] [Simpl] call todayCounts: 5600 ms
+2026-11-03 13:55:58.434 Simpl[40426:108012] [Simpl] call todayCounts: 5601 ms
+2026-11-03 13:55:58.434 Simpl[40426:108012] [Simpl] call todayCounts: 5601 ms
+2026-11-03 13:55:58.434 Simpl[40426:108012] [Simpl] call todayCounts: 5601 ms
+2026-11-03 13:55:58.595 Simpl[40426:108012] [Simpl] call dashSkyline: 5642 ms
+2026-11-03 13:55:58.596 Simpl[40426:108012] [Simpl] call dashSkyline: 5643 ms
+2026-11-03 13:55:58.638 Simpl[40426:108012] [Simpl] call courses: 4460 ms
+2026-11-03 13:56:00.431 Simpl[40426:108012] [Simpl] call groups: 1793 ms
+2026-11-03 13:56:00.718 Simpl[40426:108012] [Simpl] call moreFromCanvas: 287 ms

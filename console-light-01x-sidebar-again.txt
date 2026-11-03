@@ -1,0 +1,44 @@
+2026-11-03 13:50:14.653 Simpl[28893:80264] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/com.simplcourses.mac.savedState
+2026-11-03 13:50:15.738 Simpl[28893:80264] [Simpl] window: the app's screens (no page)
+2026-11-03 13:50:16.129 Simpl[28893:80264] [Simpl] appear Dashboard: 632 ms
+2026-11-03 13:50:16.533 Simpl[28893:80264] [Simpl] appear Dashboard: 1036 ms
+2026-11-03 13:50:19.778 Simpl[28893:80264] [Simpl] open Dashboard: 4282 ms (kept)
+2026-11-03 13:50:20.424 Simpl[28893:80264] [Simpl] call quietColors: 4301 ms
+2026-11-03 13:50:20.518 Simpl[28893:80264] [Simpl] call dashList: 2752 ms
+2026-11-03 13:50:20.518 Simpl[28893:80264] [Simpl] call dashList: 2827 ms
+2026-11-03 13:50:20.545 Simpl[28893:80264] [Simpl] call today: 2630 ms
+2026-11-03 13:50:20.546 Simpl[28893:80264] [Simpl] call today: 2634 ms
+2026-11-03 13:50:20.547 Simpl[28893:80264] [Simpl] call snapshot: 477 ms
+2026-11-03 13:50:22.535 Simpl[28893:80264] [Simpl] open Dashboard: 7027 ms (live)
+2026-11-03 13:50:22.538 Simpl[28893:80264] [Simpl] walk: on:/courses/101/assignments/1001
+2026-11-03 13:50:23.192 Simpl[28893:80264] [Simpl] appear Assignment: 654 ms
+2026-11-03 13:50:24.101 Simpl[28893:80264] [Simpl] call todayCounts: 4340 ms
+2026-11-03 13:50:24.101 Simpl[28893:80264] [Simpl] call todayCounts: 4344 ms
+2026-11-03 13:50:24.101 Simpl[28893:80264] [Simpl] call todayCounts: 4340 ms
+2026-11-03 13:50:24.101 Simpl[28893:80264] [Simpl] call todayCounts: 4345 ms
+2026-11-03 13:50:24.118 Simpl[28893:80264] [Simpl] call dashSkyline: 6341 ms
+2026-11-03 13:50:24.119 Simpl[28893:80264] [Simpl] call dashSkyline: 6428 ms
+2026-11-03 13:50:24.209 Simpl[28893:80264] [Simpl] call courses: 3119 ms
+2026-11-03 13:50:25.037 Simpl[28893:80264] [Simpl] call neighbours: 1681 ms
+2026-11-03 13:50:25.081 Simpl[28893:80264] [Simpl] call assignment: 1006 ms
+2026-11-03 13:50:25.717 Simpl[28893:80264] SimplMore group=Effort
+2026-11-03 13:50:26.327 Simpl[28893:80264] [Simpl] open Assignment: 3788 ms (fetched)
+2026-11-03 13:50:26.354 Simpl[28893:80264] [Simpl] call quizIntro: 1273 ms
+2026-11-03 13:50:26.354 Simpl[28893:80264] SimplAssignment 1001: files 0, comments 2, steps See Feedback+New Attempt, review 0, handIn 0, error -
+2026-11-03 13:50:26.572 Simpl[28893:80264] [Simpl] call groups: 2361 ms
+2026-11-03 13:50:27.248 Simpl[28893:80264] [Simpl] call neighbours: 1337 ms
+2026-11-03 13:50:27.601 Simpl[28893:80264] [Simpl] walk: at dashboard, 1 pushed
+2026-11-03 13:50:27.601 Simpl[28893:80264] [Simpl] walk: again
+2026-11-03 13:50:28.225 Simpl[28893:80264] [Simpl] open Dashboard: 624 ms (alive)
+2026-11-03 13:50:29.811 Simpl[28893:80264] [Simpl] call moreFromCanvas: 3238 ms
+2026-11-03 13:50:30.840 Simpl[28893:80264] [Simpl] walk: at dashboard, 0 pushed
+2026-11-03 13:50:30.840 Simpl[28893:80264] [Simpl] walk: done
+2026-11-03 13:50:31.265 Simpl[28893:80264] [Simpl] read ahead calView: 6 ms
+2026-11-03 13:50:31.277 Simpl[28893:80264] [Simpl] read ahead todo: 18 ms
+2026-11-03 13:50:31.334 Simpl[28893:80264] [Simpl] read ahead calendar: 65 ms
+2026-11-03 13:50:32.195 Simpl[28893:80264] [Simpl] read ahead notifications: 21 ms
+2026-11-03 13:50:32.197 Simpl[28893:80264] [Simpl] read ahead grades: 23 ms
+2026-11-03 13:50:34.053 Simpl[28893:80264] [Simpl] read ahead inbox: 65 ms
+2026-11-03 13:50:34.054 Simpl[28893:80264] [Simpl] read ahead allCourses: 65 ms
+2026-11-03 13:50:35.268 Simpl[28893:80264] [Simpl] read ahead coursesProgress: 24 ms
+2026-11-03 13:50:35.280 Simpl[28893:80264] [Simpl] read ahead home: 36 ms
