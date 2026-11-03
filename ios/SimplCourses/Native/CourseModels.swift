@@ -318,6 +318,19 @@ struct AssignmentData: Codable {
     var rubric: [RubricRow]
     var rubricTitle: String?
     var rubricScore: String?
+    /// (2.99.138, Mac 1.3.215) The More Details panel under the facts: what Canvas says of the assignment that the page
+    /// shows nowhere else (courseDetail.extraFacts).
+    var extras: [ExtraFact]?
+}
+
+/// (2.99.138, Mac 1.3.215) One row of an assignment's More Details: `kind` picks its icon ("group", "peer", "files",
+/// "embed"…), `label` and `value` its words ("Counts Toward", "Homework · 20% of your grade"), and `url`, when there is
+/// one, where it leads (a path on the school's site, or another site's address).
+struct ExtraFact: Codable, Hashable {
+    var kind: String
+    var label: String
+    var value: String
+    var url: String?
 }
 
 struct PageRow: Codable, Identifiable, Hashable {

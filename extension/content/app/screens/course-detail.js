@@ -26,6 +26,100 @@
   const attemptsFact = (a, s) => (a.allowed_attempts > 0 ? `${s.attempt || 0} of ${a.allowed_attempts}`
     : a.allowed_attempts === -1 ? `${s.attempt || 0} of unlimited` : null);
 
+  /** (2.99.138, Mac 1.3.215, Windows 0.3.109) What Canvas says of an assignment that its page shows nowhere else, for the
+   *  More Details panel under the facts: how it is marked when not in points, the group it counts toward (its share of
+   *  the grade, the scores it drops), group work, peer reviews, the file types it takes, LockDown Browser, a similarity
+   *  check, anonymous or moderated marking, a closed grading period, a document to annotate, the tool's site, the links
+   *  in a lock's note, and what its instructions hold that no page here can show (a file or player embedded the old way,
+   *  an old media comment). Each one { kind, label, value, url }: `kind` picks its icon on each platform, `url` (an
+   *  address on Canvas, or the embed's own) makes the row a link. `group` is its assignment group as Canvas sends it,
+   *  `weighted` whether the course weighs its groups; nothing to say: an empty list, and no panel. The web draws these
+   *  (railEl), and the Mac and Windows draw the engine's copy of them (native-app.js assignment → extras). */
+  function extraFacts(a, s = {}, { group = null, weighted = false, course = '' } = {}) {
+    if (!a) return [];
+    const out = [];
+    const seen = new Set();
+    const add = (kind, label, value, url = null) => {
+      const v = String(value || '').replace(/\s+/g, ' ').trim();
+      const key = `${kind}|${v}|${url || ''}`;
+      if (!v || seen.has(key)) return;
+      seen.add(key);
+      out.push({ kind, label, value: v, url: url || null });
+    };
+    const cid = String(course || a.course_id || '');
+    const onCanvas = cid && a.id ? `/courses/${cid}/assignments/${a.id}?bcv=native` : null;
+    const types = a.submission_types || [];
+    const listWords = (l) => (l.length <= 1 ? l.join('') : `${l.slice(0, -1).join(', ')} or ${l[l.length - 1]}`);
+    const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+    const when = (v) => { const d = U.parse(v); return d ? `${U.fmtShort(d)} at ${U.fmtTime(d)}` : ''; };
+    // an address worth opening: on this site (made whole) or another one, over http(s) only
+    const addressOf = (v) => {
+      const raw = String(v || '').trim();
+      if (!raw || /^(#|mailto:|tel:|data:)/i.test(raw) || /^javascript:/i.test(raw.replace(/[\u0000- ]/g, ''))) return null;
+      try { const u = new URL(raw, location.origin); return /^https?:$/.test(u.protocol) ? (u.origin === location.origin ? `${u.pathname}${u.search}${u.hash}` : u.href) : null; } catch { return null; }
+    };
+    const placeWord = (href) => (/\/modules\b/.test(href) ? 'Module' : /\/pages\//.test(href) ? 'Page' : /\/files\//.test(href) ? 'File' : /\/quizzes\//.test(href) ? 'Quiz' : /\/discussion_topics\//.test(href) ? 'Discussion' : /\/assignments\//.test(href) ? 'Assignment' : 'Link');
+    const nameOf = (href) => {
+      try {
+        const u = new URL(href, location.origin);
+        const last = decodeURIComponent(u.pathname.split('/').filter(Boolean).pop() || '');
+        return /\.\w{2,5}$/.test(last) ? last : u.origin === location.origin ? 'A file on Canvas' : u.hostname.replace(/^www\./, '');
+      } catch { return 'An embedded file'; }
+    };
+    // the group it counts toward: its share of the grade where the course weighs its groups, the scores it drops
+    if (group?.name || a.omit_from_final_grade) {
+      const r = group?.rules || {};
+      const low = num(r.drop_lowest), high = num(r.drop_highest), kept = (r.never_drop || []).map(String).includes(String(a.id));
+      const share = num(group?.group_weight);
+      add('group', 'Counts Toward', [
+        group?.name || '',
+        a.omit_from_final_grade ? 'not part of your final grade' : weighted && share > 0 ? `${store.fmtPts(share)}% of your grade` : '',
+        low > 0 ? `lowest ${low === 1 ? 'score' : `${low} scores`} dropped` : '',
+        high > 0 ? `highest ${high === 1 ? 'score' : `${high} scores`} dropped` : '',
+        kept && (low > 0 || high > 0) ? 'never this one' : '',
+      ].filter(Boolean).join(' · ').replace(/^not/, 'Not'));
+    }
+    const MARKED = { pass_fail: 'Complete or incomplete', percent: 'As a percentage', letter_grade: 'As a letter grade', gpa_scale: 'On a GPA scale', not_graded: 'Not graded' };
+    if (MARKED[a.grading_type] && !(a.grading_type === 'not_graded' && types.includes('not_graded'))) add('grading', 'Graded As', MARKED[a.grading_type]);
+    if (a.group_category_id) add('team', 'Group Work', a.grade_group_students_individually ? 'Handed in by your group, graded one by one' : 'Handed in and graded as a group');
+    if (a.peer_reviews) {
+      const n = num(a.peer_review_count);
+      add('peer', 'Peer Reviews', [n > 0 ? `${n} classmate${n === 1 ? '’s' : 's’'} work to review` : 'Classmates review each other’s work', a.peer_reviews_assign_at ? `assigned ${when(a.peer_reviews_assign_at)}` : ''].filter(Boolean).join(' · '), onCanvas);
+    }
+    const ext = (a.allowed_extensions || []).map((e) => String(e).replace(/^\./, '').trim().toUpperCase()).filter(Boolean);
+    if (types.includes('online_upload') && ext.length) add('files', 'File Types', `${listWords(ext)} only`);
+    if (a.require_lockdown_browser) add('lockdown', 'Browser', 'Needs Respondus LockDown Browser');
+    const check = a.turnitin_enabled ? 'Turnitin' : a.vericite_enabled ? 'VeriCite' : '';
+    if (check) add('similarity', 'Similarity Check', `${check} checks it for copied work`);
+    if (a.anonymous_grading) add('anonymous', 'Anonymous Grading', 'Marked without your name on it');
+    if (a.moderated_grading) add('moderated', 'Moderated', 'Marked by more than one grader');
+    if (a.in_closed_grading_period) add('period', 'Grading Period', 'Closed, so its grades are final');
+    if (types.includes('student_annotation') && a.annotatable_attachment_id) add('annotate', 'To Annotate', 'A document you mark up on Canvas', onCanvas);
+    if (types.includes('external_tool') && a.external_tool_tag_attributes?.url) {
+      try { add('tool', 'Tool Site', new URL(a.external_tool_tag_attributes.url, location.origin).hostname.replace(/^www\./, '')); } catch { /* not an address */ }
+    }
+    // the links in a lock's note (the module that opens it): the page says the note's words, the links fell out of them
+    const parse = (html) => (html && typeof DOMParser !== 'undefined' ? new DOMParser().parseFromString(String(html), 'text/html') : null);
+    const lockDoc = a.locked_for_user ? parse(a.lock_explanation) : null;
+    for (const l of [...(lockDoc?.querySelectorAll('a[href]') || [])].slice(0, 4)) {
+      const href = addressOf(l.getAttribute('href'));
+      if (href) add('link', placeWord(href), l.textContent || href, href);
+    }
+    // what the instructions hold that the page drops: a file or player embedded the old way (object, embed), and an old
+    // media comment (a link Canvas's own page swaps for its player)
+    const desc = parse(a.description);
+    let embeds = 0;
+    for (const el of desc?.querySelectorAll('object[data], embed[src]') || []) {
+      const href = addressOf(el.getAttribute('data') || el.getAttribute('src'));
+      if (href && embeds++ < 4) add('embed', 'Embedded', nameOf(href), href);
+    }
+    for (const el of [...(desc?.querySelectorAll('a.instructure_inline_media_comment, a[id^="media_comment_"]') || [])].slice(0, 4)) {
+      const words = (el.textContent || '').trim();
+      add('media', el.classList.contains('audio_comment') ? 'Recording' : 'Video', words && !/^this is a media comment/i.test(words) ? words : 'A recording on Canvas', onCanvas);
+    }
+    return out;
+  }
+
   /** The mark's destination. (2.98.55) Pressed on the page, the chip opens where it is: it grows into
    *  a box the way a Dashboard counter does — the page dims and blurs round it from the press, its
    *  words glide into the box's header — and the box holds the feedback screen's content (every
@@ -964,7 +1058,48 @@
         parts.push(U.el('bcv-asg__action bcv-asg__extras', [a.quiz_id && !typeList.includes('online_quiz') ? U.btn('Open quiz', { icon: IC.bolt, onClick: () => app.go(`${c.url}/quizzes/${a.quiz_id}`) }) : null, done].filter(Boolean)));
       }
       parts.push(factsEl(x));
+      parts.push(moreEl(x));
       return U.el('bcv-asg__rail', parts.filter(Boolean));
+    }
+    // (2.99.138) More Details, under the facts: what Canvas says of the assignment that the page shows nowhere else
+    // (extraFacts). The group it counts toward is asked for with the page and joins the panel when it lands; everything
+    // else is drawn at once. A row with somewhere to go is a link: Canvas's own page for this one, or the embed's address.
+    const MORE_ICON = {
+      group: 'M21 12A9 9 0 1112 3v9z', grading: 'M20 6L9 17l-5-5', team: 'M16 19v-1a4 4 0 00-4-4H6a4 4 0 00-4 4v1M9 10a3 3 0 100-6 3 3 0 000 6M22 19v-1a4 4 0 00-3-3.87M16 4.13a3 3 0 010 5.75',
+      peer: 'M7 7h11l-3-3M17 17H6l3 3', files: 'M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8zM14 3v5h5', lockdown: 'M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 017 0v3',
+      similarity: 'M11 4a7 7 0 100 14 7 7 0 000-14zM21 21l-4.35-4.35', anonymous: 'M3 3l18 18M10.6 5.1A10 10 0 0122 12s-1 2.2-3.2 4.2M6.4 6.4C3.8 8.1 2 12 2 12s3.5 7 10 7c1.8 0 3.4-.5 4.8-1.3',
+      moderated: 'M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6zM9 12l2 2 4-4', period: 'M12 4a8 8 0 100 16 8 8 0 000-16zM12 8v4l3 2', annotate: 'M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4',
+      tool: 'M12 3a9 9 0 100 18 9 9 0 000-18zM3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3',
+      link: 'M10 14a4 4 0 005.66 0l3-3a4 4 0 00-5.66-5.66l-1 1M14 10a4 4 0 00-5.66 0l-3 3a4 4 0 005.66 5.66l1-1', embed: 'M8 8l-4 4 4 4M16 8l4 4-4 4', media: 'M8 5v14l11-7z',
+    };
+    const MORE_INFO = 'M12 3a9 9 0 100 18 9 9 0 000-18zM12 11v5M12 8h.01';
+    const moreAsk = a.assignment_group_id ? Promise.all([store.assignmentGroup(c.id, a.assignment_group_id).catch(() => null), store.course(c.id).catch(() => null)]).then(([group, course]) => ({ group, weighted: !!course?.weighted })).catch(() => null) : Promise.resolve(null);
+    let moreGot = null;
+    const moreRow = (r) => {
+      const away = !!r.url && /^https?:/i.test(r.url); // (another site's address: a tab of its own; Canvas's page for this one: here)
+      const kids = [
+        h('span', { class: 'bcv-asg__facttile', 'aria-hidden': 'true' }, U.svg(MORE_ICON[r.kind] || MORE_INFO, { size: 15, stroke: 'currentColor', width: 2 })),
+        U.el('bcv-asg__facttext', [U.text('bcv-asg__factk', r.label, 'span'), U.text('bcv-asg__factv', r.value, 'span')]),
+        r.url ? h('span', { class: 'bcv-asg__moreout', 'aria-hidden': 'true' }, U.svg(away ? 'M9 6h9v9M18 6L7 17' : 'M9 6l6 6-6 6', { size: 13, stroke: 'currentColor', width: 2.2 })) : null,
+      ];
+      if (!r.url) return h('div', { class: 'bcv-asg__morerow', dataset: { kind: r.kind } }, kids);
+      return h('a', { class: 'bcv-asg__morerow is-link', href: r.url, dataset: { kind: r.kind }, target: away ? '_blank' : null, rel: away ? 'noopener noreferrer' : null, title: away ? r.url : `${r.label}: open on ${BCV.lms?.name || 'Canvas'}`,
+        onclick: away ? null : (e) => { e.preventDefault(); app.go(r.url, { confirmed: true }); } }, kids);
+    };
+    function moreEl(x) {
+      const rowsOf = (got) => extraFacts(a, x, { ...(got || {}), course: c.id });
+      const draw = (rows) => (rows.length ? U.el('bcv-asg__more', [h('div', { class: 'bcv-asg__morehead', role: 'heading', 'aria-level': '3', text: 'More Details' }), ...rows.map(moreRow)]) : null);
+      if (moreGot) return draw(rowsOf(moreGot));
+      const first = rowsOf(null);
+      const el = draw(first) || slot('bcv-asg__moreslot');
+      moreAsk.then((got) => {
+        moreGot = got || { group: null };
+        const rows = rowsOf(got);
+        if (!ctx.alive() || !el.parentNode || JSON.stringify(rows) === JSON.stringify(first)) return;
+        const made = draw(rows);
+        if (made) { made.classList.add('is-arriving'); el.replaceWith(made); } else el.remove();
+      });
+      return el;
     }
     // (2.99.53) files dropped on the page, as on the Mac's: the hand-in opens with them in
     const takeDrop = (files) => {
@@ -1264,6 +1399,7 @@
 
   D.openMark = openMark;
   D.attemptsFact = attemptsFact; // the phone draws the same five facts, from the same fields
+  D.extraFacts = extraFacts; // (2.99.138) the More Details panel's rows: the engine hands the Mac and Windows the same
   D.doneButton = doneButton;
   D.navRow = navRow;
 

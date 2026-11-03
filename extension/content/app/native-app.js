@@ -1837,6 +1837,11 @@
     const types = a.submission_types || [];
     const st = store.workStatus(a, sub);
     const held = sub.workflow_state === 'graded' && sub.posted_at === null;
+    // (2.99.138, Mac 1.3.215, Windows 0.3.109) More Details: the group it counts toward (asked for on its own, never long
+    // waited on) and whether the course weighs its groups, for the rows courseDetail.extraFacts says
+    const later = (p, ms) => Promise.race([p.catch(() => null), new Promise((r) => setTimeout(() => r(null), ms))]);
+    const [group, courseRow] = a.assignment_group_id ? await Promise.all([later(store.assignmentGroup(cid, a.assignment_group_id, age), 2500), later(store.course(cid, age), 2500)]) : [null, null];
+    const extras = (() => { try { return BCV.screens?.courseDetail?.extraFacts?.(a, sub, { group, weighted: !!courseRow?.weighted, course: cid }) || []; } catch { return []; } })();
     const scored = sub.workflow_state === 'graded' && sub.score !== null && sub.score !== undefined && !held;
     const attemptsLeft = !(a.allowed_attempts > 0) || (sub.attempt || 0) < a.allowed_attempts + (sub.extra_attempts || 0);
     const here = types.filter((t) => NATIVE_TYPES.includes(t));
@@ -1915,6 +1920,9 @@
       canvasUrl: `/courses/${cid}/assignments/${aid}?bcv=native`,
       comments: (sub.submission_comments || []).map((cm) => ({ id: String(cm.id), author: cm.author_name || cm.author?.display_name || 'Someone', avatar: cm.author?.avatar_image_url || null, when: whenText(cm.created_at), text: String(cm.comment || '').trim() || (cm.media_comment ? 'Media comment' : ''), /* (trimmed: Canvas keeps the blank lines round a comment) */ attempt: cm.attempt || null, attachments: (cm.attachments || []).map((x) => ({ name: x.display_name || x.filename || 'Attachment', url: absUrl(x.url) })).filter((x) => x.url) })),
       rubric, rubricTitle: a.rubric_settings?.title || 'Rubric', rubricScore: R?.rubricScore && a.rubric?.length && !held ? R.rubricScore(a.rubric, assess)?.text || '' : '',
+      // (2.99.138) the More Details panel's rows under the facts: { kind, label, value, url } (url: a Canvas path or another
+      // site's address; the apps open it as they open canvasUrl)
+      extras,
     };
   }
   /** Hand in from the phone: text, a web address, or files the app picked (base64 here, Files again for Canvas's upload). */

@@ -464,7 +464,7 @@ const A = {
   104: [
     ['4001', 'Week 1 reflection', 'Assignments', 10, 10, -6, 23.98, -7, { rubric: true }],
     // the mockup's example: file or text or link, four file types, open for a week, unlimited attempts
-    ['4002', 'Week 2 Post Class Assignment: GC articles', 'Assignments', 10, null, 0, 23.98, null, { types: ['online_upload', 'online_text_entry', 'online_url'], ext: ['pdf', 'docx', 'png', 'jpg'], window: true, attempts: -1, description: '<p>Submit the Grand Challenge you chose with an explanation of why it matters, plus three scientific papers or news articles in APA or MLA format. See the <a class="instructure_file_link" title="Course Syllabus.pdf" href="/courses/101/files/f1?wrap=1">citation guide</a> before you start.</p><p><span style="color: #2d3b45;">Bring the printed rubric to lab — the TA marks it in person.</span></p>' }],
+    ['4002', 'Week 2 Post Class Assignment: GC articles', 'Assignments', 10, null, 0, 23.98, null, { types: ['online_upload', 'online_text_entry', 'online_url'], ext: ['pdf', 'docx', 'png', 'jpg'], window: true, attempts: -1, peer: 2, turnitin: true, description: '<p>Submit the Grand Challenge you chose with an explanation of why it matters, plus three scientific papers or news articles in APA or MLA format. See the <a class="instructure_file_link" title="Course Syllabus.pdf" href="/courses/101/files/f1?wrap=1">citation guide</a> before you start.</p><p><span style="color: #2d3b45;">Bring the printed rubric to lab — the TA marks it in person.</span></p>' }],
     ['4003', 'Knewton Alta: Unit 2', 'Assignments', 20, null, 5, 23.98, null, { tool: 'https://tool.example.com/launch' }],
     // (Mac 1.3.77, Windows 0.2.8) more of Alta's units, for External Tools' list of every place a tool is used (outside
     // the next seven days, so the Dashboard's counts stay as they were)
@@ -474,7 +474,8 @@ const A = {
   ],
   105: [
     ['5001', 'Journal #1', 'Journals', 5, 5, -6, 23.98, -6, { gradingType: 'pass_fail' }], // (marked complete/incomplete: the grade is the word, not the points)
-    ['5002', 'Research Day Activity: Choosing a Field Site', 'Activities', 5, null, 0, 23.98, null, {}],
+    // (2.99.138) instructions with what no page here draws: a map embedded the old way, and an old media comment
+    ['5002', 'Research Day Activity: Choosing a Field Site', 'Activities', 5, null, 0, 23.98, null, { description: '<p>Pick a field site from the map and say in a paragraph why it suits your question.</p><object data="/courses/105/files/f52/field-sites.pdf" type="application/pdf" width="600" height="400"></object><p><a class="instructure_inline_media_comment video_comment" id="media_comment_m-5002" href="/media_objects/m-5002">this is a media comment</a></p>' }],
     ['5003', 'Journal #2', 'Journals', 5, null, 1, 23.98, null, { discussion: '7503' }], // a graded discussion, in its module as the topic (with a must_mark_done requirement)
   ],
   // (Mac 1.3.79, Windows 0.3.1) Macmillan Learning's homework as a school sets it up: each assignment a launch of the one
@@ -501,7 +502,7 @@ function assignmentObj(courseId, row) {
   const [id, name, group, possible, seeded, dueDay, dueHour, subDay, extra] = row;
   const earned = scoreOverrides.has(String(id)) ? scoreOverrides.get(String(id)) : seeded;
   const c = courseById(courseId);
-  const groups = (GROUPS[courseId] || [[Object.keys(groupNames(courseId))[0], 0]]);
+  const groups = GROUPS[courseId] || Object.keys(groupNames(courseId)).map((g) => [g, 0]); // (2.99.138: the same list assignmentGroups numbers, so each assignment names its own group — it named the first for every one)
   const gIdx = groups.findIndex(([g]) => g === group);
   const due = at(dueDay, Math.floor(dueHour), Math.round((dueHour % 1) * 60));
   const submitted = subDay !== null || (earned !== null && !extra.noSub); // (noSub: marked with nothing ever handed in — a tool's score sent back, a teacher's entry — as Canvas then reports it: graded, no submitted_at, missing)
@@ -545,6 +546,8 @@ function assignmentObj(courseId, row) {
     external_tool_tag_attributes: extra.tool ? { url: extra.tool, new_tab: false, resource_link_id: 'rl1', ...(extra.toolId ? { content_type: 'ContextExternalTool', content_id: extra.toolId } : {}) } : undefined,
     can_submit: extra.tool ? false : undefined, // (as Canvas says it of a tool's assignment: handed in through the tool, never its form)
     discussion_topic: extra.discussion ? { id: extra.discussion, title: name, html_url: `/courses/${courseId}/discussion_topics/${extra.discussion}` } : undefined, // a graded discussion: the assignment behind a topic
+    // (2.99.138) what the More Details panel says: peer reviews (how many, when they are handed out) and a similarity check
+    peer_reviews: !!extra.peer, peer_review_count: extra.peer || 0, peer_reviews_assign_at: extra.peer ? at(dueDay + 1, 9, 0) : null, turnitin_enabled: !!extra.turnitin,
     assignment_group_id: `g${courseId}-${Math.max(gIdx, 0)}`, omit_from_final_grade: !!extra.omit, allowed_attempts: extra.attempts ?? 2, rubric: extra.rubric ? rubric : undefined, rubric_settings: extra.rubric ? { title: 'Dis01 rubric' } : undefined,
     // POST /__mock/config {"ltiAttempts": ["4003"]}: a tool assignment handed in twice through the tool (New Quizzes'
     // shape), each attempt's url the tool's own launch point, which only a launch through Canvas can open
@@ -1534,6 +1537,8 @@ on('PUT', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)\/submissions\/self$/, 
 on('GET', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)$/, (url, m) => allAssignments(m[1]).find((a) => a.id === m[2]) || { __status: 404, errors: [{ message: 'The specified resource does not exist.' }] }); // (as Canvas answers for one that is not there)
 on('GET', /^\/api\/v1\/courses\/(\w+)\/assignments$/, (url, m) => allAssignments(m[1]));
 on('GET', /^\/api\/v1\/courses\/(\w+)\/assignment_groups$/, (url, m) => assignmentGroups(m[1]));
+// (2.99.138) one group on its own, without its assignments (an assignment's More Details: what it counts toward)
+on('GET', /^\/api\/v1\/courses\/(\w+)\/assignment_groups\/([\w-]+)$/, (url, m) => { const g = assignmentGroups(m[1]).find((x) => String(x.id) === m[2]); if (!g) return null; const { assignments, ...rest } = g; return rest; });
 on('GET', /^\/api\/v1\/courses\/(\w+)\/discussion_topics\/(\w+)\/view$/, (url, m) => viewFor(m[2]));
 on('POST', /^\/api\/v1\/courses\/(\w+)\/discussion_topics\/(\w+)\/entries$/, (url, m, body) => { const e = { id: `e${Date.now()}`, user_id: '7', created_at: new Date().toISOString(), message: body.message, replies: [] }; entries.set(m[2], [...(entries.get(m[2]) || []), e]); return e; });
 on('POST', /^\/api\/v1\/courses\/(\w+)\/discussion_topics\/(\w+)\/entries\/(\w+)\/replies$/, (url, m, body) => ({ id: `e${Date.now()}`, user_id: '7', created_at: new Date().toISOString(), message: body.message }));

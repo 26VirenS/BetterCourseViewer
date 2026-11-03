@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.137"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.138"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -2709,6 +2709,18 @@ html #bcv-app .bcv-asg__gradep .bcv-asg__pill.is-graded { flex-wrap: wrap; align
 .bcv-asg__rail .bcv-asg__fact + .bcv-asg__fact::before { content: ""; position: absolute; left: 60px; right: 0; top: 0; height: 1px; background: var(--bcv-edge); }
 @media (hover: hover) { .bcv-asg__rail button.bcv-asg__fact:hover { background: var(--bcv-hover); } }
 .bcv-asg__facttile { flex: none; width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: color-mix(in srgb, var(--bcv-cc) 15%, transparent); color: var(--bcv-cc-ink); }
+/* (2.99.138) More Details: a card of its own under the facts, its rows drawn as theirs, a heading over them; a row with
+   somewhere to go a link, an arrow at its end (› for Canvas's page, ↗ for another site) */
+.bcv-asg__rail .bcv-asg__more { display: flex; flex-direction: column; padding: 4px 0; border-radius: 18px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); animation: bcv-asg-in .4s cubic-bezier(.32,.72,0,1) .06s backwards; }
+.bcv-asg__morerow { position: relative; display: flex; align-items: center; gap: 12px; min-width: 0; margin: 0; padding: 9px 14px; text-align: left; font: inherit; color: inherit; box-sizing: border-box; }
+.bcv-asg__morerow + .bcv-asg__morerow::before { content: ""; position: absolute; left: 60px; right: 0; top: 0; height: 1px; background: var(--bcv-edge); }
+@media (prefers-reduced-motion: reduce) { .bcv-asg__rail .bcv-asg__more { animation: none; } }
+.bcv-asg__morehead { padding: 10px 16px 2px; font: 600 13px/1.3 var(--bcv-font); letter-spacing: -.01em; color: var(--bcv-ink2); }
+.bcv-asg__rail a.bcv-asg__morerow { text-decoration: none; color: inherit; cursor: pointer; transition: background-color .15s ease; }
+@media (hover: hover) { .bcv-asg__rail a.bcv-asg__morerow:hover { background: var(--bcv-hover); } }
+.bcv-asg__rail a.bcv-asg__morerow:focus-visible { outline: 2px solid var(--bcv-blue); outline-offset: -2px; border-radius: 12px; }
+.bcv-asg__moreout { flex: none; display: grid; place-items: center; color: var(--bcv-ink3); }
+.bcv-asg__morerow .bcv-asg__factv { overflow-wrap: anywhere; }
 .bcv-asg__rail .bcv-asg__factk { font-weight: 600; letter-spacing: .04em; }
 /* the comments */
 #bcv-app .bcv-asg__addcomment { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--bcv-edge); background: var(--bcv-fill); color: var(--bcv-ink); font: 500 13px/1 var(--bcv-font); cursor: pointer; }

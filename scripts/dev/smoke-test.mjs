@@ -3153,6 +3153,14 @@ try {
   const facts4002 = await texts('.bcv-asg__fact');
   const facts4002b = (await texts('.bcv-asg__facts .bcv-asg__fact')).map((f) => f.replace(/\s+/g, ' '));
   check(/^DUE [A-Z][a-z]{2} \d+ at \d+:\d\d [AP]M$/.test(facts4002b[0]) && facts4002b.includes('HANDED IN AS Text, file or link') && facts4002b.includes('ATTEMPTS Unlimited attempts') && /^AVAILABLE Opens .* · Closes /.test(facts4002b.find((f) => f.startsWith('AVAILABLE')) || '') && (await texts('.bcv-asg__drophint'))[0] === 'Or drop files on this page.', `the facts say when it opens and closes and how it is handed in, and files may be dropped on the page: ${facts4002b.join(' | ')}`);
+  // (2.99.138) More Details, under the facts: what Canvas says of the assignment that the page shows nowhere else — the
+  // group it counts toward (asked for on its own, joining when it lands), peer reviews (a link to Canvas's page for them),
+  // the file types it takes and a similarity check — each a row as the facts' are; nothing the facts already say
+  await page.waitForSelector('.bcv-asg__rail .bcv-asg__more .bcv-asg__morerow[data-kind="group"]', { timeout: 10000 });
+  const more4002 = await page.evaluate(() => { const box = document.querySelector('.bcv-asg__rail .bcv-asg__more'), facts = document.querySelector('.bcv-asg__rail .bcv-asg__facts'); return { head: box.querySelector('.bcv-asg__morehead')?.textContent, rows: [...box.querySelectorAll('.bcv-asg__morerow')].map((r) => ({ kind: r.dataset.kind, k: r.querySelector('.bcv-asg__factk').textContent, v: r.querySelector('.bcv-asg__factv').textContent, href: r.getAttribute('href') })), under: Math.round(box.getBoundingClientRect().top - facts.getBoundingClientRect().bottom), tile: !!box.querySelector('.bcv-asg__facttile svg') }; });
+  const kv4002 = more4002.rows.map((r) => `${r.k}: ${r.v}`);
+  check(more4002.head === 'More Details' && more4002.tile && more4002.under >= 8 && more4002.under <= 24 && kv4002[0] === 'Counts Toward: Assignments' && /^Peer Reviews: 2 classmates’ work to review · assigned [A-Z][a-z]{2} \d+ at \d+:\d\d [AP]M$/.test(kv4002[1]) && more4002.rows[1].href === '/courses/104/assignments/4002?bcv=native' && kv4002[2] === 'File Types: PDF, DOCX, PNG or JPG only' && kv4002[3] === 'Similarity Check: Turnitin checks it for copied work' && more4002.rows.length === 4, `More Details stands under the facts with what the page says nowhere else — the group, peer reviews (to Canvas's page), the file types, the similarity check: ${JSON.stringify(more4002)}`);
+  await shot(page, '16z-more-details');
   const pillAt = await page.$eval('.bcv-asg__pill', (e) => { const r = e.getBoundingClientRect(); return { cx: Math.round(r.left + r.width / 2), cy: Math.round(r.top + r.height / 2), top: Math.round(r.top) }; });
   await page.click('.bcv-asg__pill');
   await page.waitForSelector('.bcv-sheet-ov--card .bcv-hand #bcv-submit .bcv-sb__pane input[type=file]', { state: 'attached', timeout: 10000 });
@@ -3324,6 +3332,11 @@ try {
   const inView = (sel) => page.$eval(sel, (el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight && r.left >= 0 && r.right <= window.innerWidth; });
   const fromTodo = { url: page.url(), back: (await texts('.bcv-asg__back'))[0]?.trim(), inView: await eventually(() => inView('.bcv-sheet-ov--card .bcv-hand')), drop: (await texts('.bcv-sb__dropsub'))[0], tabs: (await texts('.bcv-sb__tab')).join(' | ') };
   check(fromTodo.url === `${BASE}/courses/105/assignments/5002?bcv=submit&from=todo` && fromTodo.back === 'To Do' && fromTodo.inView && fromTodo.drop.startsWith('Any file type') && fromTodo.tabs === 'File upload | Text entry', `a To Do row opens the assignment with the hand-in panel open, To Do the way back; no Other tab when the course has no tools: ${JSON.stringify(fromTodo)}`);
+  // (2.99.138) instructions holding what no page here draws — a map embedded the old way (object), an old media comment —
+  // say so in More Details, each a link: the file's own address, Canvas's page for the recording
+  await page.waitForSelector('.bcv-asg__rail .bcv-asg__more .bcv-asg__morerow[data-kind="group"]', { timeout: 10000 });
+  const more5002 = await page.$$eval('.bcv-asg__rail .bcv-asg__more .bcv-asg__morerow', (rows) => rows.map((r) => `${r.dataset.kind}|${r.querySelector('.bcv-asg__factk').textContent}|${r.querySelector('.bcv-asg__factv').textContent}|${r.getAttribute('href') || ''}`));
+  check(more5002.join(' ; ') === 'group|Counts Toward|Activities| ; embed|Embedded|field-sites.pdf|/courses/105/files/f52/field-sites.pdf ; media|Video|A recording on Canvas|/courses/105/assignments/5002?bcv=native', `what the instructions hold that the page cannot draw is listed in More Details, each a link: ${more5002.join(' ; ')}`);
   await shot(page, '09g-submit-from-todo');
   await page.keyboard.press('Escape');
   check(await eventually(() => page.evaluate(() => !document.querySelector('.bcv-sheet-ov')), 3000), 'Escape folds the panel back into the pill');
