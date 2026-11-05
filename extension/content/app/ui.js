@@ -37,6 +37,70 @@
   const el = (cls, children, attrs = {}) => h('div', { class: cls, ...attrs }, children);
   const text = (cls, str, tag = 'div') => h(tag, { class: cls, text: str });
 
+  // (2.99.139) A submission comment's words, its links working. A comment written in SpeedGrader's rich editor comes as HTML
+  // (store.js richComments: `comment_html`) and is drawn from a short list of what a comment holds — paragraphs, breaks,
+  // emphasis, lists, quotes, code, pictures and links — every attribute dropped but a link's address and a picture's,
+  // each checked (http, https, mailto; never script). A plain comment keeps its line breaks, and an address written in it
+  // is a link, as Canvas's own page makes it. Another site's link opens a tab of its own.
+  const COMMENT_KEEP = new Set(['P', 'BR', 'A', 'B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE', 'DEL', 'SUB', 'SUP', 'CODE', 'PRE', 'BLOCKQUOTE', 'UL', 'OL', 'LI', 'IMG']);
+  const COMMENT_DROP = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'IFRAME', 'OBJECT', 'EMBED', 'FORM', 'INPUT', 'BUTTON', 'TEXTAREA', 'SELECT', 'SVG', 'MATH', 'HEAD', 'TITLE', 'META', 'LINK']);
+  const commentHref = (v, img = false) => {
+    const raw = String(v || '').trim();
+    if (!raw || /^javascript:/i.test(raw.replace(/[\u0000-\u0020]/g, ''))) return null;
+    try { const u = new URL(raw, location.origin); return (img ? /^https?:$/ : /^(https?|mailto):$/).test(u.protocol) ? u.href : null; } catch { return null; }
+  };
+  const commentLink = (href, kids) => {
+    const away = /^https?:/i.test(href) && !href.startsWith(`${location.origin}/`);
+    const a = h('a', { class: 'bcv-commentlink', href, target: away ? '_blank' : null, rel: away ? 'noopener noreferrer' : null }, kids);
+    return a;
+  };
+  const URL_IN_TEXT = /\bhttps?:\/\/[^\s<>"]+/gi;
+  /** A plain comment's words, each web address in them made a link (a full stop or bracket after it left outside). */
+  function linkedWords(str) {
+    const out = [];
+    let at = 0;
+    for (const m of String(str).matchAll(URL_IN_TEXT)) {
+      let url = m[0];
+      const trail = /[.,;:!?'")\]}]+$/.exec(url);
+      if (trail && !(trail[0].includes(')') && url.includes('('))) url = url.slice(0, -trail[0].length);
+      const href = commentHref(url);
+      if (!href) continue;
+      if (m.index > at) out.push(document.createTextNode(str.slice(at, m.index)));
+      out.push(commentLink(href, [document.createTextNode(url)]));
+      at = m.index + url.length;
+    }
+    if (at < str.length) out.push(document.createTextNode(str.slice(at)));
+    return out;
+  }
+  /** A rich comment's HTML, rebuilt from what a comment may hold (an element not on the list gives up its words alone). */
+  function commentNodes(html) {
+    const doc = new DOMParser().parseFromString(String(html), 'text/html');
+    const walk = (n) => {
+      if (n.nodeType === 3) return [document.createTextNode(n.nodeValue)];
+      if (n.nodeType !== 1 || COMMENT_DROP.has(n.tagName)) return [];
+      const kids = [...n.childNodes].flatMap(walk);
+      const tag = n.tagName;
+      if (tag === 'A') { const href = commentHref(n.getAttribute('href')); return href ? [commentLink(href, kids)] : kids; }
+      if (tag === 'IMG') { const src = commentHref(n.getAttribute('src'), true); return src ? [h('img', { class: 'bcv-commentimg', src, alt: n.getAttribute('alt') || '', loading: 'lazy' })] : []; }
+      if (/^H[1-6]$/.test(tag)) return [h('p', { class: 'bcv-commenthead' }, kids)];
+      if (tag === 'DIV') return [h('p', {}, kids)];
+      if (!COMMENT_KEEP.has(tag)) return kids;
+      return [h(tag.toLowerCase(), {}, kids)];
+    };
+    return [...doc.body.childNodes].flatMap(walk);
+  }
+  /** A submission comment's body, as `cls` (a div): rich, its HTML drawn safely; plain, its words with their addresses linked. */
+  function commentBody(cm, cls) {
+    const html = cm?.comment_html;
+    if (html) {
+      try {
+        const kids = commentNodes(html);
+        if (kids.length) return h('div', { class: `${cls} bcv-comment is-rich` }, kids);
+      } catch { /* drawn as words below */ }
+    }
+    return h('div', { class: `${cls} bcv-comment` }, linkedWords(String(cm?.comment || '').trim()));
+  }
+
   function tile(icon, { color = 'var(--bcv-ink3)', tint = 'var(--bcv-fill2)', size = 30, iconSize = 15, width = 1.8, cls = '' } = {}) {
     const mod = size === 32 ? ' bcv-tile--32' : size === 28 ? ' bcv-tile--28' : '';
     return h('span', { class: `bcv-tile${mod} ${cls}`, style: { background: tint } }, svg(icon, { size: iconSize, stroke: color, width }));
@@ -1807,6 +1871,6 @@
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,
     fmtTime, fmtHour, fmtShort, fmtLong, fmtDateComma, fmtAt, fmtAtUpper, fmtBy, dayTitle, dayNamed, fmtDow, fmtRecent, whenShort, plural,
     hexToRgb, rgba, palette, quiet, FALLBACK_COLORS, initials, enter, still, isStill, roll, morphFrom, reducedMotion, flipList, drawCheck, collapsible, dpr, onDprChange, dismiss, recall,
-    afterMotion, onGone, watchLayout, anchor, keepOnScreen, boundsOf, hoverOpens, hoverCool, hoverHold, cardBox,
+    afterMotion, onGone, watchLayout, anchor, keepOnScreen, boundsOf, hoverOpens, hoverCool, hoverHold, cardBox, commentBody,
   };
 })();

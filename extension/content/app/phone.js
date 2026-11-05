@@ -1740,7 +1740,7 @@
       // Only where there is no chip to open: comments carry the attempt they belong to, and the sheet
       // is the one place that filters them. An unfiltered list beside it shows a first draft's
       // feedback as feedback on the final hand-in.
-      !posted && !held && !s.submitted_at && !s.excused && (s.submission_comments || []).length ? h('div', {}, [groupHead('Comments'), listCard(s.submission_comments.map((cm) => U.el('bcv-ph-comment', [U.el('bcv-ph-comment__head', [U.text('bcv-ph-comment__who', cm.author_name || cm.author?.display_name || 'Comment', 'span'), U.text('bcv-ph-comment__when', U.fmtAt(cm.created_at), 'span')]), U.text('bcv-ph-comment__body bcv-pretty', cm.comment || '')])))]) : null,
+      !posted && !held && !s.submitted_at && !s.excused && (s.submission_comments || []).length ? h('div', {}, [groupHead('Comments'), listCard(s.submission_comments.map((cm) => U.el('bcv-ph-comment', [U.el('bcv-ph-comment__head', [U.text('bcv-ph-comment__who', cm.author_name || cm.author?.display_name || 'Comment', 'span'), U.text('bcv-ph-comment__when', U.fmtAt(cm.created_at), 'span')]), U.commentBody(cm, 'bcv-ph-comment__body bcv-pretty')])))]) : null,
       block,
       // the assignments either side, last: where to go once this one is read or handed in
       (() => { const el = slot('bcv-ph-navslot'); fill(el, ({ nav }) => BCV.screens.courseDetail.navRow(app, c, nav, 'bcv-ph-nav')); return el; })(),

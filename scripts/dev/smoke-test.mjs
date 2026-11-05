@@ -2724,9 +2724,12 @@ try {
   // a comment of your own goes to Canvas from Add a Comment, pinned to the latest attempt, and comes back in the list
   await page.click('.bcv-asg__addcomment');
   await page.waitForSelector('.bcv-asg__composerbox', { timeout: 3000 });
-  await page.fill('.bcv-asg__composerbox', 'Could you say more about part b?');
+  await page.fill('.bcv-asg__composerbox', 'Could you say more about part b? My notes: https://example.com/notes.');
   await page.click('.bcv-asg__composerrow .bcv-btn--primary');
   check(await eventually(() => page.evaluate(() => [...document.querySelectorAll('.bcv-asg__commenttext')].some((e) => /part b\?/.test(e.textContent)) && !!document.querySelector('.bcv-asg__composer[hidden]')), 5000), 'a comment of your own is sent to Canvas and comes back in the list, the composer put away');
+  // (2.99.139) an address written in a plain comment is a link, the full stop after it left outside, opening a tab of its own
+  const typedLink = await page.evaluate(() => { const t = [...document.querySelectorAll('.bcv-asg__commenttext')].find((e) => /part b\?/.test(e.textContent)); const l = t?.querySelector('a.bcv-commentlink'); return l && { text: l.textContent, href: l.getAttribute('href'), target: l.target, rel: l.rel, words: t.textContent, underline: getComputedStyle(l).textDecorationLine }; });
+  check(typedLink && typedLink.text === 'https://example.com/notes' && typedLink.href === 'https://example.com/notes' && typedLink.target === '_blank' && /noopener/.test(typedLink.rel) && typedLink.words === 'Could you say more about part b? My notes: https://example.com/notes.' && typedLink.underline === 'underline', `an address written in a comment is a link, underlined, opening in a tab of its own: ${JSON.stringify(typedLink)}`);
   const posted = (await readSub('104', '4001')).submission_comments.find((cm) => /part b\?/.test(cm.comment));
   check(posted && Number(posted.attempt) === 2, `and Canvas has it against the latest attempt: ${JSON.stringify(posted && { attempt: posted.attempt })}`);
   // the screen of its own is still there for a link (and the phone): the same content, the way back out at its end
@@ -4754,6 +4757,11 @@ try {
   const fbLine2 = (await texts('.bcv-fb__scoreline'))[0];
   const fbComments = await texts('.bcv-fb__ctext');
   check(/^13 \/ 16 81% 3 of 4 correct · graded /.test(fbLine2) && fbComments.length === 1 && /^Nice work on the derivative questions/.test(fbComments[0]) && (await texts('.bcv-fb__avatar'))[0] === 'YL' && (await texts('.bcv-fb__btns .bcv-qz__big')).join('|') === 'Back to the quiz', `feedback from the quiz page: the instructor's comment (never your own reply), each question marked by its points though Canvas flags every one wrong: ${fbLine2} · ${fbComments.join(' | ')}`);
+  // (2.99.139) the instructor's comment was written in SpeedGrader's rich editor, a link in it (SR-MW2VF2JC-JXND: its words
+  // came with nowhere to go): asked for as HTML, it is drawn with the link working — underlined, in the link colour, set
+  // apart from the words round it — and nothing of its markup shows
+  const richLink = await page.evaluate(() => { const t = document.querySelector('.bcv-fb__ctext'); const l = t?.querySelector('a.bcv-commentlink'); const cs = l && getComputedStyle(l); return l && { rich: t.classList.contains('is-rich'), text: l.textContent, href: l.getAttribute('href'), target: l.target, underline: cs.textDecorationLine, own: cs.color !== getComputedStyle(t).color, tags: /<\/?(p|a)\b/.test(t.textContent), words: t.textContent.replace(/\s+/g, ' ').trim(), attrs: [...t.querySelectorAll('*')].flatMap((e) => [...e.attributes].map((x) => x.name)).filter((n) => !['class', 'href', 'target', 'rel'].includes(n)) }; });
+  check(richLink && richLink.rich && richLink.text === 'rates review sheet' && richLink.href === 'https://example.com/rates-review' && richLink.target === '_blank' && richLink.underline === 'underline' && richLink.own && !richLink.tags && /walks through it\.$/.test(richLink.words) && !richLink.attrs.length, `a comment written with a link in it shows the link, working and set apart, no markup showing: ${JSON.stringify(richLink)}`);
   check(/Question 2 Incorrect 0 \/ 4 .*Your answer 17\.68 m Correct answer -3\.15 m/i.test((await texts('.bcv-qfb__q'))[1]), `the seeded wrong answer with the correct one beside it: ${(await texts('.bcv-qfb__q'))[1]}`);
   check(/^Question 1 Correct 4 \/ 4/.test((await texts('.bcv-qfb__q'))[0]) && (await page.$eval('.bcv-qfb__sq[data-k="0"]', (b) => b.classList.contains('is-right'))), `an answer given full points is marked right, whatever Canvas's flag says: ${(await texts('.bcv-qfb__q'))[0].slice(0, 40)}`);
   await mockConfig({ staleFlag: false });

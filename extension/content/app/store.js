@@ -1066,8 +1066,35 @@
   }
   function submission(id, aid, { force = false, refresh = false, maxAge = 0 } = {}) {
     return C.cached(`submission:${id}:${aid}`, 5 * MIN, () =>
-      // submission_history carries per-question points for quiz attempts (the feedback screen reads it)
-      C.get(`/api/v1/courses/${id}/assignments/${aid}/submissions/self`, { params: { include: ['submission_comments', 'rubric_assessment', 'submission_history'] } }).catch(() => null), { force, refresh, maxAge });
+      // submission_history carries per-question points for quiz attempts (the feedback screen reads it); (2.99.139)
+      // submission_html_comments: a comment written in SpeedGrader's rich editor as its HTML, links and all (richComments)
+      C.get(`/api/v1/courses/${id}/assignments/${aid}/submissions/self`, { params: { include: ['submission_comments', 'rubric_assessment', 'submission_history', 'submission_html_comments'] } }).then(richComments).catch(() => null), { force, refresh, maxAge });
+  }
+  // (2.99.139) A teacher's comment written in SpeedGrader's rich editor is HTML. Without include[]=submission_html_comments
+  // Canvas sends it stripped to its words — a link's words with nowhere to go (Nokogiri's text, lib/api/v1/submission_comment.rb);
+  // with it, the HTML itself. Each such comment keeps its HTML as `comment_html` (drawn, links and all, by U.commentBody) and
+  // its words, line breaks kept, as `comment`, as every other reader of a comment has always had it (a row's line, a
+  // notification, the apps' engine). A plain comment — the most of them — is left as it came.
+  const RICH_TAG = /<(p|br|a|div|span|strong|em|b|i|u|s|ul|ol|li|h[1-6]|blockquote|img|pre|code|sub|sup|table)\b[^>]*>/i;
+  function commentWords(html) {
+    try {
+      const root = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html').body.firstElementChild;
+      root.querySelectorAll('script,style,noscript,template').forEach((n) => n.remove());
+      root.querySelectorAll('br').forEach((n) => n.replaceWith('\n'));
+      root.querySelectorAll('p,div,li,h1,h2,h3,h4,h5,h6,blockquote,pre,tr').forEach((n) => n.append('\n'));
+      return root.textContent.replace(/\u00a0/g, ' ').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+    } catch { return String(html).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(); }
+  }
+  function richComments(sub) {
+    for (const cm of sub?.submission_comments || []) {
+      if (!cm || cm.comment_html) continue;
+      const raw = typeof cm.comment === 'string' ? cm.comment : '';
+      const html = cm.html_comment || (RICH_TAG.test(raw) ? raw : ''); // (html_comment: Brightspace's feedback, lib/d2l-api.js)
+      if (!html) continue;
+      cm.comment_html = html;
+      cm.comment = commentWords(html);
+    }
+    return sub;
   }
   function assignmentGroups(id, { force = false, refresh = false, maxAge = 0 } = {}) {
     return C.cached(`agroups:${id}`, 10 * MIN, async () => {

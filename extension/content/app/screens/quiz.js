@@ -1963,7 +1963,7 @@
     function feedbackView(fb, btns) {
       const comments = fb.comments.map((c) => U.el('bcv-fb__comment', [
         h('span', { class: 'bcv-fb__avatar', text: U.initials(c.author_name || c.author?.display_name || '') || '·' }),
-        U.el('bcv-fb__cbody', [U.text('bcv-fb__ctitle', `Instructor comment${c.author_name ? ` · ${c.author_name}` : ''}`), h('p', { class: 'bcv-fb__ctext', text: c.comment || '' })]),
+        U.el('bcv-fb__cbody', [U.text('bcv-fb__ctitle', `Instructor comment${c.author_name ? ` · ${c.author_name}` : ''}`), U.commentBody(c, 'bcv-fb__ctext')]),
       ]));
       const notice = fb.released ? null : U.hint('Canvas has not released the question results for this attempt yet — your score and the questions are shown as they stand.', 'bcv-hint--narrow');
       let n = 1;

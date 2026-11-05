@@ -216,7 +216,9 @@ function assignmentObj(courseId, row) {
     submission_comments: id === '4001'
       ? [{ author_id: `t${courseId}`, author_name: c.teacher, created_at: at(dueDay - 2, 9, 0), attempt: 1, comment: 'This is only a first pass — attach the working before the deadline and I will mark it.' }, { author_id: `t${courseId}`, author_name: c.teacher, created_at: at(dueDay + 1, 9, 0), attempt: 2, comment: 'Nice work on the derivative questions. Watch the difference between an instantaneous reading and an interval total — that cost you question 2.' }, { author_id: '7', author_name: 'Sam Student', created_at: at(dueDay + 1, 10, 0), attempt: 2, comment: 'Thanks, I see it now.' }]
       : extra.rubric ? [] : id === '1001'
-        ? [{ author_id: `t${courseId}`, author_name: c.teacher, created_at: at(dueDay + 1, 9, 0), comment: 'Nice work on the derivative questions. Watch the difference between an instantaneous reading and an interval total — that cost you question 2.' }, { author_id: '7', author_name: 'Sam Student', created_at: at(dueDay + 1, 10, 0), comment: 'Thanks, I see it now.' }]
+        // (2.99.139) the teacher's comment written in SpeedGrader's rich editor, a link in it: Canvas sends it stripped to its
+        // words unless asked for include[]=submission_html_comments (the handler below), as Canvas's own API does
+        ? [{ author_id: `t${courseId}`, author_name: c.teacher, created_at: at(dueDay + 1, 9, 0), comment: 'Nice work on the derivative questions. Watch the difference between an instantaneous reading and an interval total — that cost you question 2. The rates review sheet walks through it.', _html: '<p>Nice work on the derivative questions. Watch the difference between an instantaneous reading and an interval total — that cost you question 2. The <a href="https://example.com/rates-review" target="_blank">rates review sheet</a> walks through it.</p>' }, { author_id: '7', author_name: 'Sam Student', created_at: at(dueDay + 1, 10, 0), comment: 'Thanks, I see it now.' }]
         : (earned !== null && id === '1002' ? [{ author_id: `t${courseId}`, author_name: c.teacher, created_at: at(dueDay + 1, 9, 0), attempt: 2, comment: 'Check the domain restrictions in question 3 — the rest was solid.' }, { author_id: `t${courseId}`, author_name: c.teacher, created_at: at(dueDay + 1, 9, 5), attempt: 2, comment: '', media_comment: { media_id: 'm-1002', media_type: 'audio', content_type: 'audio/mp4', display_name: 'Voice note on question 3', url: '/media_objects/m-1002/audio.mp4' } }] : []), // (a voice note: a comment with no words of its own)
     rubric_assessment: extra.rubric && earned !== null ? { c1: { points: 4, rating_id: 'r2', comments: 'Sign error in part b.' }, c2: { points: 4, rating_id: 'r3' } } : undefined,
     // quiz assignments: Canvas keeps each attempt's per-question grading in submission_history
@@ -1218,7 +1220,11 @@ const ownComments = new Map();
 on('GET', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)\/submissions\/self$/, (url, m) => {
   const sub = (allAssignments(m[1]).find((a) => a.id === m[2]) || {}).submission || null;
   const mine = ownComments.get(`${m[1]}:${m[2]}`) || [];
-  return sub && mine.length ? { ...sub, submission_comments: [...(sub.submission_comments || []), ...mine] } : sub;
+  if (!sub) return sub;
+  // (2.99.139) a comment written in rich text comes as its HTML only with include[]=submission_html_comments; else its words
+  const html = url.searchParams.getAll('include[]').includes('submission_html_comments');
+  const comments = [...(sub.submission_comments || []), ...mine].map(({ _html, ...cm }) => (html && _html ? { ...cm, comment: _html } : cm));
+  return { ...sub, submission_comments: comments };
 });
 on('PUT', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)\/submissions\/self$/, (url, m, body) => {
   const text = body?.comment?.text_comment;

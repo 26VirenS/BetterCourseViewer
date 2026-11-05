@@ -28,6 +28,9 @@
     lock: 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.139', date: '2026-11-05', notes: [
+      { kind: 'fixed', title: 'Links in Comments', body: 'Linked words in a teacher’s comment now open the link.', icon: P.check },
+    ] },
     { version: '2.99.138', date: '2026-11-03', notes: [
       { kind: 'new', title: 'More Details', body: 'Extra assignment info sits in a panel under the due date.', icon: P.layers },
     ] },

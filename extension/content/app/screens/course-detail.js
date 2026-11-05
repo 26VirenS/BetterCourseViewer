@@ -842,7 +842,7 @@
         U.avatar(cm.author?.avatar_image_url || cm.avatar_path || null, cm.author_name || cm.author?.display_name || '', 34),
         U.el('bcv-asg__commentbody', [
           U.el('bcv-asg__commenthead', [U.text('bcv-asg__commentwho', cm.author_name || cm.author?.display_name || 'Someone', 'span'), cm.attempt ? U.text('bcv-asg__commentatt', `Attempt ${cm.attempt}`, 'span') : null, cm.created_at ? U.text('bcv-asg__commentwhen', U.fmtAt(cm.created_at), 'span') : null]),
-          U.text('bcv-asg__commenttext', String(cm.comment || '').trim(), 'div'),
+          U.commentBody(cm, 'bcv-asg__commenttext'), // (2.99.139: its links working, a rich comment's and an address typed in a plain one)
         ]),
       ])));
     };
@@ -920,7 +920,7 @@
         list.length ? U.el('bcv-fbs__comments', list.map((cm) => U.el('bcv-fbs__comment', [
           U.el('bcv-fbs__commenthead', [U.text('bcv-fbs__who', cm.author_name || cm.author?.display_name || 'Someone', 'span'), cm.attempt ? U.text('bcv-fbs__attempt', `Attempt ${cm.attempt}`, 'span') : null]),
           cm.created_at ? U.text('bcv-fbs__when', U.fmtAt(cm.created_at), 'div') : null,
-          U.text('bcv-fbs__said', String(cm.comment || '').trim(), 'div'),
+          U.commentBody(cm, 'bcv-fbs__said'),
         ]))) : U.text('bcv-fbs__none', 'No comments yet.', 'div'),
       ]);
       const close = () => { ov.classList.add('is-closing'); document.removeEventListener('keydown', onKey, true); setTimeout(() => ov.remove(), 180); from?.focus?.({ preventScroll: true }); };

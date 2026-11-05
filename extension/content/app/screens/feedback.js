@@ -65,7 +65,7 @@
       h('span', { class: 'bcv-fb__avatar', text: U.initials(who) || '·' }),
       U.el('bcv-fb__cbody', [
         U.text('bcv-fb__ctitle', `${mine ? 'You' : who}${cm.created_at ? ` · ${U.fmtAt(cm.created_at)}` : ''}`),
-        cm.comment ? h('p', { class: 'bcv-fb__ctext bcv-pretty', text: cm.comment }) : null,
+        cm.comment || cm.comment_html ? U.commentBody(cm, 'bcv-fb__ctext bcv-pretty') : null, // (2.99.139: its links working)
         // a voice or video note: played where it is, or opened in a tab when the browser cannot
         media ? (media.url ? h(media.media_type === 'video' ? 'video' : 'audio', { class: 'bcv-fb__media', controls: '', preload: 'none', src: media.url }) : null) : null,
         media ? h('a', { class: 'bcv-fb__medialink', href: media.url || '#', target: '_blank', rel: 'noopener', text: `${media.media_type === 'video' ? 'Video' : 'Voice'} comment${media.display_name ? ` · ${media.display_name}` : ''}` }) : null,
