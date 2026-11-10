@@ -267,7 +267,7 @@ struct DashCounterTile: View {
         // (M17: its full name always — over its symbol in a narrow tile, on a second line where it must, else a little
         //  smaller; never cut short)
         let title = Text(name)
-            .font(.sCallout.weight(.medium))
+            .font(style == .over ? .system(size: nameSize, weight: .medium) : .sCallout.weight(.medium))
             .foregroundStyle(.secondary)
             .lineLimit(style == .beside ? 1 : 2)
             .minimumScaleFactor(style == .beside ? 0.85 : 0.75) // (a sidebar dragged wide: smaller, never cut short)
@@ -301,6 +301,17 @@ struct DashCounterTile: View {
     }
 
     // MARK: - Measuring
+
+    /// (1.3.216) The name's size over its symbol: 14 points, or smaller where its longest word would not fit a line of
+    /// the tile whole — a word is never broken across two (a 1,024-point window had "Announceme / nts").
+    private var nameSize: CGFloat {
+        guard width > 0 else { return 14 }
+        let room = width - Self.padding(style) * 2 - 2
+        let font = NSFont.systemFont(ofSize: 14, weight: .medium)
+        let widest = name.split(separator: " ").map { (String($0) as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
+        guard room > 0, widest > room else { return 14 }
+        return max(10, (14 * room / widest).rounded(.down))
+    }
 
     /// The tile's side padding: 1.3.77's 14 points; 12 where its symbol stands over its name (the narrowest tiles).
     static func padding(_ style: Style) -> CGFloat { style == .beside ? 14 : 12 }

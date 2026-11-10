@@ -518,7 +518,8 @@ struct DashboardView: View {
     }
 
     private var upcoming: some View {
-        PageSection(title: "Coming up", trailing: upcomingNote, accessory: { hideDoneButton }) {
+        // (1.3.216: in a narrow column beside the side one, the button alone — the count beside it cut it short)
+        PageSection(title: "Coming up", trailing: twoColumns && mainWidth < 480 ? nil : upcomingNote, accessory: { hideDoneButton }) {
             if let l = list {
                 // (1.3.216: in a narrow column beside the side one, each row's time over its points, the title keeping its room)
                 DashDayList(data: l, wide: mainWidth >= 760, stacked: mainWidth < 480) { row, done in toggleListRow(row, done) }
