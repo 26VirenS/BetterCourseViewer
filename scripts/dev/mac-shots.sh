@@ -1498,8 +1498,8 @@ the_set() {
     # as soon as it has settled, its wait only the longest)
     shoot "$MODE-01d-dashboard-counter" 30 -SimplSheet next
     shoot "$MODE-01q-counter-preview" 45 -SimplSheet today -SimplOpen preview:counter # (1.3.79: a panel row's card)
-    # (1.3.80) the tiles at 1024 points, the sidebar out (three across) and folded away (six); a tile half-way through
-    # growing into its panel
+    # (1.3.80) the tiles at 1024 points, the sidebar out and folded away — (1.3.216) six across and the two columns
+    # either way, as a wide window has them; a tile half-way through growing into its panel
     SIZE=1024x820 shoot "$MODE-01k-dashboard-1024" 14
     SIZE=1024x820 shoot "$MODE-01l-dashboard-1024-no-sidebar" 14 -SimplSidebar hidden
     shoot "$MODE-01m-counter-morph" 30 -SimplSheet tomorrow -SimplMorphHold 0.5

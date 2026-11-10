@@ -47,6 +47,8 @@ enum DashGlyph {
 struct DashDayList: View {
     let data: DashListData
     let wide: Bool
+    /// (1.3.216) A narrow column beside the side one: each row's time over its points.
+    var stacked = false
     let toggle: (DashRow, Bool) -> Void
 
     var body: some View {
@@ -60,7 +62,7 @@ struct DashDayList: View {
                     VStack(spacing: 0) {
                         ForEach(Array(day.rows.enumerated()), id: \.element.id) { i, row in
                             if i > 0 { RowDivider(inset: 92) }
-                            DashWorkLine(row: row, wide: wide, day: day.title) { done in toggle(row, done) }
+                            DashWorkLine(row: row, wide: wide, day: day.title, stacked: stacked) { done in toggle(row, done) }
                                 .transition(.opacity)
                         }
                     }
@@ -98,6 +100,8 @@ struct DashWorkLine: View {
     let wide: Bool
     /// The day it is under ("Today", "Saturday"), for its preview's due line.
     var day: String? = nil
+    /// (1.3.216) Its time over its points, in a narrow column.
+    var stacked = false
     let toggle: (Bool) -> Void
     // (1.3.78: the engine as a plain value, to act through — not drawn again each time it changes: EngineLink)
     @Environment(\.engineLink) private var link
@@ -112,7 +116,7 @@ struct DashWorkLine: View {
                              flags: row.flags ?? [], title: row.title, done: row.done)
                 Spacer(minLength: 8)
                 if let plan = row.plan, !row.done { PlanPill(plan: plan) } // (1.3.165) the time it is planned for
-                DashWorkFigures(time: row.due ?? row.time, points: row.points, stacked: false, wide: wide)
+                DashWorkFigures(time: row.due ?? row.time, points: row.points, stacked: stacked, wide: wide)
             }
             .animation(Motion.snappy, value: row.done)
         }

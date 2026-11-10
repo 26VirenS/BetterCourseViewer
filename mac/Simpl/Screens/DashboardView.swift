@@ -72,11 +72,16 @@ struct DashboardView: View {
 
     // MARK: - Widths
 
-    /// The side column's width on a wide window.
-    private var railWidth: CGFloat { min(440, max(340, (width * 0.3).rounded())) }
-    /// Wide enough for the view and the side column side by side.
-    private var twoColumns: Bool { width >= 900 }
-    private var mainWidth: CGFloat { twoColumns ? width - railWidth - 28 : width }
+    /// The side column's width on a wide window. (1.3.216: down to 250 on a smaller one, the grades skyline's towers
+    /// and the week's load narrowing with it.)
+    private var railWidth: CGFloat { min(440, max(250, (width * 0.3).rounded())) }
+    /// Wide enough for the view and the side column side by side. (1.3.216: from a 640-point page, not 900 — a window
+    /// about 1,000 wide with the sidebar showing (1,024 has it) keeps the six counters in a row and the two columns, as
+    /// a wide one has them; the owner: "make it so this format is available in smaller window sizes too")
+    private var twoColumns: Bool { width >= 640 }
+    /// The room between the two columns: a little less on a smaller window.
+    private var columnGap: CGFloat { width >= 900 ? 28 : 20 }
+    private var mainWidth: CGFloat { twoColumns ? width - railWidth - columnGap : width }
 
     var body: some View {
         let _ = LiveTrace.drew("dashboard") // (1.3.80: a live check's line says how many times it drew the page)
@@ -220,15 +225,16 @@ struct DashboardView: View {
     /// kept on the page; nothing under it moves. Closed, it folds back into its tile. (1.3.80: the popup over the window
     /// of 1.3.79, which faded in instead, is gone.)
     private func counters(_ d: Today) -> some View {
-        let cols = width >= 900 ? 6 : (width >= 520 ? 3 : 2)
+        let cols = width >= 640 ? 6 : (width >= 520 ? 3 : 2) // (1.3.216: six across wherever there are two columns)
         let list = DashboardView.ordered(d.counters)
         let rows: [[Counter]] = stride(from: 0, to: list.count, by: cols).map { start in
             Array(list[start..<min(start + cols, list.count)])
         }
         let tile = (width - Self.counterSpacing * CGFloat(cols - 1)) / CGFloat(cols)
         let style = Self.wording(list, tileWidth: tile)
-        // (a tile's line on one line in a row of six — the row as low as 1.3.77's; on two at most in a row of three or two)
-        let lines = cols == 6 ? 1 : 2
+        // (a tile's line on one line in a row of six — the row as low as 1.3.77's; on two at most in a row of three or two,
+        //  and (1.3.216) in a row of six too narrow for it on one)
+        let lines = cols == 6 && tile >= 150 ? 1 : 2
         return VStack(alignment: .leading, spacing: Self.counterSpacing) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 counterRow(row, cols: cols, style: style, tile: tile, lines: lines)
@@ -443,7 +449,7 @@ struct DashboardView: View {
     @ViewBuilder
     private func content(_ d: Today) -> some View {
         if twoColumns {
-            HStack(alignment: .top, spacing: 28) {
+            HStack(alignment: .top, spacing: columnGap) {
                 VStack(alignment: .leading, spacing: 26) { main(d) }
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                 VStack(alignment: .leading, spacing: 26) { rail(d, narrow: false) }
@@ -514,7 +520,8 @@ struct DashboardView: View {
     private var upcoming: some View {
         PageSection(title: "Coming up", trailing: upcomingNote, accessory: { hideDoneButton }) {
             if let l = list {
-                DashDayList(data: l, wide: mainWidth >= 760) { row, done in toggleListRow(row, done) }
+                // (1.3.216: in a narrow column beside the side one, each row's time over its points, the title keeping its room)
+                DashDayList(data: l, wide: mainWidth >= 760, stacked: mainWidth < 480) { row, done in toggleListRow(row, done) }
             } else if let listError {
                 EmptyNote(text: listError, symbol: "exclamationmark.triangle")
             } else {
@@ -567,16 +574,22 @@ struct DashboardView: View {
                     .buttonStyle(.link)
                     .font(.sCallout)
             }) {
-                DashSkyline(courses: s.courses)
+                DashSkyline(courses: s.courses, room: skylineRoom) // (1.3.216: its towers as narrow as its column needs)
             }
         }
     }
+
+    /// (1.3.216) How wide the skyline's card is: the side column's width, else (under the view) the page's.
+    private var skylineRoom: CGFloat { twoColumns ? railWidth : width }
+    /// (1.3.216) The week's load in a side column too narrow for "1 / 7 handed in" beside a course's name: "1 / 7" (the
+    /// section's caption says what is counted).
+    private var loadNarrow: Bool { twoColumns && railWidth < 340 }
 
     @ViewBuilder
     private func weekLoad(_ d: Today) -> some View {
         if let load = d.load, d.hasCourses ?? true {
             PageSection(title: "Week load", trailing: d.loadCaption ?? "Handed in this week") { // (home-22)
-                DashWeekLoad(load: load, idle: d.idle)
+                DashWeekLoad(load: load, idle: d.idle, narrow: loadNarrow)
             }
         }
     }

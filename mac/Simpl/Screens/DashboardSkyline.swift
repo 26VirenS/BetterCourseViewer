@@ -10,6 +10,9 @@ import SwiftUI
 struct DashSkyline: View {
     let courses: [DashSkyCourse]
     var height: CGFloat = 150
+    /// (1.3.216) How wide its card is, where the Dashboard knows: each tower no wider than its share of it, so a narrow
+    /// side column holds every course's tower whole.
+    var room: CGFloat? = nil
     // (1.3.78: the engine as a plain value, to act through — not drawn again each time it changes: EngineLink)
     @Environment(\.engineLink) private var link
     private var engine: Engine { link.acting }
@@ -19,9 +22,10 @@ struct DashSkyline: View {
     @State private var risen: Bool
     @State private var animateRise = false
 
-    init(courses: [DashSkyCourse], height: CGFloat = 150) {
+    init(courses: [DashSkyCourse], height: CGFloat = 150, room: CGFloat? = nil) {
         self.courses = courses
         self.height = height
+        self.room = room
         _risen = State(initialValue: DashSkyline.risenOnce)
     }
 
@@ -36,12 +40,17 @@ struct DashSkyline: View {
     }
 
     private var towerWidth: CGFloat {
+        let base: CGFloat
         switch courses.count {
-        case ...5: return 54
-        case 6: return 48
-        case 7...8: return 40
-        default: return 32
+        case ...5: base = 54
+        case 6: base = 48
+        case 7...8: base = 40
+        default: base = 32
         }
+        // (1.3.216: a column's share of the card inside its padding, less a little room either side of its tower)
+        guard let room, !courses.isEmpty else { return base }
+        let share = (room - 36) / CGFloat(courses.count) - 8
+        return max(18, min(base, share.rounded(.down)))
     }
 
     var body: some View {
@@ -136,26 +145,43 @@ struct DashSkyline: View {
         return "\(c.code ?? c.name): \(score) · \(lit) graded, \(w.count - lit - free) to come" + (free > 0 ? ", \(free) not counted" : "")
     }
 
+    /// (1.3.216) Its words and the swatches on one line where they fit; on a narrow card, the swatches under the words.
     private var legend: some View {
-        HStack(spacing: 12) {
-            Text("Window colour shows the grade")
-                .font(.sCaption)
-                .foregroundStyle(.secondary)
-            HStack(spacing: 8) {
-                ForEach(["A", "B", "C", "D", "F"], id: \.self) { b in
-                    HStack(spacing: 3) {
-                        RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-                            .fill(DashSkyline.litColor(b))
-                            .frame(width: 8, height: 8)
-                        Text(b)
-                            .font(.sCaption2.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                }
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                legendWords
+                swatches
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
+            VStack(alignment: .leading, spacing: 6) {
+                legendWords
+                swatches
+            }
         }
         .accessibilityElement(children: .combine)
+    }
+
+    private var legendWords: some View {
+        Text("Window colour shows the grade")
+            .font(.sCaption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var swatches: some View {
+        HStack(spacing: 8) {
+            ForEach(["A", "B", "C", "D", "F"], id: \.self) { b in
+                HStack(spacing: 3) {
+                    RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                        .fill(DashSkyline.litColor(b))
+                        .frame(width: 8, height: 8)
+                    Text(b)
+                        .font(.sCaption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .fixedSize()
     }
 
     private func rise() {
@@ -290,6 +316,8 @@ private struct DashWindows: View {
 struct DashWeekLoad: View {
     let load: [LoadRow]
     let idle: Int?
+    /// (1.3.216) In a narrow side column: each course's count as "1 / 7", its words left to the section's caption.
+    var narrow = false
     // (1.3.78: the engine as a plain value, to act through — not drawn again each time it changes: EngineLink)
     @Environment(\.engineLink) private var link
     private var engine: Engine { link.acting }
@@ -314,7 +342,8 @@ struct DashWeekLoad: View {
     }
 
     private func row(_ r: LoadRow) -> some View {
-        let text = PreviewFormat.text(r.text) ?? "\(r.done) / \(r.total) handed in"
+        let full = PreviewFormat.text(r.text) ?? "\(r.done) / \(r.total) handed in"
+        let text = narrow ? "\(r.done) / \(r.total)" : full
         return Button { engine.go(.section("courses/\(r.id)", "assignments")) } label: {
             HStack(spacing: 10) {
                 Circle().fill(Color(hex: r.color)).frame(width: 8, height: 8)
@@ -336,7 +365,7 @@ struct DashWeekLoad: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help("\(r.code): \(text). Open its assignments.")
+        .help("\(r.code): \(full). Open its assignments.")
     }
 }
 
