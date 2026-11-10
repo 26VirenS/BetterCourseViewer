@@ -72,9 +72,15 @@ struct DashboardView: View {
 
     // MARK: - Widths
 
-    /// The side column's width on a wide window. (1.3.216: down to 250 on a smaller one, the grades skyline's towers
-    /// and the week's load narrowing with it.)
-    private var railWidth: CGFloat { min(440, max(250, (width * 0.3).rounded())) }
+    /// The side column's width: 30% of the page, 340 to 440 — (1.3.218) and 340 for as long as the view keeps 400 beside
+    /// it, narrower (to 250) only on a page too small for both; the grades skyline shorter with it, so its towers keep
+    /// their shape. (1.3.216 let it narrow from a 1,133-point page, and on a 900-point one the skyline looked squished.)
+    private var railWidth: CGFloat {
+        let room = width - columnGap - 400
+        return min(440, max(250, max((width * 0.3).rounded(), min(340, room))))
+    }
+    /// (1.3.218) How tall the skyline's towers may stand: 150 points in a column 340 wide or wider, less in a narrower one.
+    private var skylineHeight: CGFloat { twoColumns ? (150 * min(1, max(0.75, railWidth / 340))).rounded() : 150 }
     /// Wide enough for the view and the side column side by side. (1.3.216: from a 640-point page, not 900 — a window
     /// about 1,000 wide with the sidebar showing (1,024 has it) keeps the six counters in a row and the two columns, as
     /// a wide one has them; the owner: "make it so this format is available in smaller window sizes too")
@@ -232,9 +238,9 @@ struct DashboardView: View {
         }
         let tile = (width - Self.counterSpacing * CGFloat(cols - 1)) / CGFloat(cols)
         let style = Self.wording(list, tileWidth: tile)
-        // (a tile's line on one line in a row of six — the row as low as 1.3.77's; on two at most in a row of three or two,
-        //  and (1.3.216) in a row of six too narrow for it on one)
-        let lines = cols == 6 && tile >= 150 ? 1 : 2
+        // (a tile's line on one line in a row of six — the row as low as 1.3.77's, a line too long for it left to the
+        //  tooltip (1.3.218: not wrapped, which made every tile in the row taller); on two at most in a row of three or two)
+        let lines = cols == 6 ? 1 : 2
         return VStack(alignment: .leading, spacing: Self.counterSpacing) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 counterRow(row, cols: cols, style: style, tile: tile, lines: lines)
@@ -575,7 +581,8 @@ struct DashboardView: View {
                     .buttonStyle(.link)
                     .font(.sCallout)
             }) {
-                DashSkyline(courses: s.courses, room: skylineRoom) // (1.3.216: its towers as narrow as its column needs)
+                // (1.3.216: its towers as narrow as its column needs; 1.3.218: as much shorter, keeping their shape)
+                DashSkyline(courses: s.courses, height: skylineHeight, room: skylineRoom)
             }
         }
     }
