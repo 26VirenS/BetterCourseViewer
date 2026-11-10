@@ -57,7 +57,8 @@
     // (2.99.27) the chosen course's own grading scale, where the student entered it on Grades; else the standard
     const scaleNow = () => {
       const G = BCV.screens?.gpa;
-      return st.course && G?.scaleOf ? G.scaleOf(st.course).filter(([l]) => l !== 'F').map(([l, cut]) => [l, cut]) : SCALE;
+      // (2.99.140) a letter taken off the scale is no goal; with no course, the student's scale for every course, if set
+      return G?.scaleOf && (st.course || G.hasScale?.(null)) ? G.scaleOf(st.course || null).filter(([l, cut]) => l !== 'F' && Number.isFinite(cut)).map(([l, cut]) => [l, cut]) : SCALE;
     };
     BCV.screens?.gpa?.loadScales?.().then(() => { if (p.alive?.()) paint(); }).catch(() => {});
     const body = U.el('bcv-need');

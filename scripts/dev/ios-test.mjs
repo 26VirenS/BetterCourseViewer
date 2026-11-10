@@ -471,6 +471,17 @@ try {
   await nc('setScale', { id: course.id, scale: null });
   const gBack = (await nc('grades')).rows.find((r) => r.id === course.id);
   check(setOk.ok && gOwn.letter === 'A' && gOwn.ownScale === true && gOwn.scale.find((x) => x.letter === 'A').min === cut && !!bad.error && gBack.ownScale === false && gBack.letter === course.letter, `a course's own grading scale letters its score (and a scale out of order is refused): ${JSON.stringify({ pct: course.pct, before: course.letter, own: gOwn.letter, back: gBack.letter, bad: bad.error })}`);
+  // (2.99.140) a letter left out of the scale (the web's bar takes letters off) is off it: the course's scale has no A+,
+  // a target of A+ aims at A, and the score's letter comes from the letters kept
+  const noTop = { ...own };
+  delete noTop['A+'];
+  const targetWas = gBefore.rows.find((r) => r.id === course.id).target;
+  await nc('setTarget', { id: course.id, letter: 'A+' });
+  const offOk = await nc('setScale', { id: course.id, scale: noTop });
+  const gOff = (await nc('grades')).rows.find((r) => r.id === course.id);
+  await nc('setScale', { id: course.id, scale: null });
+  await nc('setTarget', { id: course.id, letter: targetWas });
+  check(offOk.ok && gOff.scale.length === 10 && !gOff.scale.some((x) => x.letter === 'A+') && gOff.scale.every((x) => Number.isFinite(x.min)) && gOff.target === 'A' && gOff.letter === 'A' && gOff.ownScale === true, `a letter left out of a course's scale is off it: its target aims at the next one kept: ${JSON.stringify({ ok: offOk.ok, letters: gOff.scale.map((x) => x.letter).join(' '), target: gOff.target, letter: gOff.letter })}`);
   // (iPhone 1.6) an address the app has no screen for as it stands is opened where it leads: a module item is the item it names
   const viaItem = await nc('resolveUrl', { url: '/courses/102/modules/items/i2' });
   const viaPage = await nc('resolveUrl', { url: '/courses/102/modules/items/i1' });

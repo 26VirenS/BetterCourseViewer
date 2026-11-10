@@ -1174,7 +1174,9 @@
     const titleEl = bigTitle('Grades', { below: 'every course counts equally' });
     screen.append(titleEl, body);
     body.append(U.loading('rows', 4));
-    const [all, term, goalPref, hiddenPref, targetsPref, trackingPref, snapsPref, ownPref] = await Promise.all([store.courses().catch(() => null), store.currentTerm().catch(() => ''), store.pref('gpaGoal'), store.pref('gpaHidden'), store.pref('gradeTargets'), store.pref('gpaTracking'), store.pref('gpaSnapshots'), store.pref('gradeWeights')]);
+    const [all, term, goalPref, hiddenPref, targetsPref, trackingPref, snapsPref, ownPref] = await Promise.all([store.courses().catch(() => null), store.currentTerm().catch(() => ''), store.pref('gpaGoal'), store.pref('gpaHidden'), store.pref('gradeTargets'), store.pref('gpaTracking'), store.pref('gpaSnapshots'), store.pref('gradeWeights'), G.loadScales?.().catch(() => null)]);
+    // (2.99.140) each course's grading scale, where the student set one (its own, or theirs for every course), letters it
+    const scaleFor = (c) => (G.scaleOf ? G.scaleOf(c.id) : G.SCALE);
     // (2.98.59) a course's own weights, set on its Grades tab: its score here is worked out by them, not Canvas's
     const ownW = ownPref && typeof ownPref === 'object' ? ownPref : {};
     const ownFor = (c) => (ownW[c.id] && typeof ownW[c.id] === 'object' && Object.keys(ownW[c.id]).length ? ownW[c.id] : null);
@@ -1219,9 +1221,11 @@
       const tried = whatIf && Number.isFinite(whatIfVals[c.id]);
       const pct = tried ? whatIfVals[c.id] : base;
       const scored = pct !== null;
-      const letter = scored ? (tried || op !== null || !c.grade ? G.letterFor(pct)[0] : String(c.grade).replace(/-/g, '−')) : null;
-      const pts = scored ? (tried || op !== null ? G.letterFor(pct)[2] : G.pointsFor(c.grade, pct)) : null;
-      return { c, scored, pct, letter, pts, tried, ...gradedCount(c) };
+      const S = scaleFor(c);
+      const mine = tried || op !== null || !!G.hasScale?.(c.id); // (Simpl's letter from the scale, not Canvas's)
+      const letter = scored ? (mine || !c.grade ? G.letterFor(pct, S)[0] : String(c.grade).replace(/-/g, '−')) : null;
+      const pts = scored ? (mine ? G.letterFor(pct, S)[2] : G.pointsFor(c.grade, pct, S)) : null;
+      return { c, scored, pct, letter, pts, tried, S, ...gradedCount(c) };
     });
     const termGpaOf = (rows) => { const s = rows.filter((r) => r.scored); return s.length ? s.reduce((a, r) => a + r.pts, 0) / s.length : null; };
 
@@ -1298,8 +1302,8 @@
       const el = h('div', { class: `bcv-ph-gcard ${open ? 'is-open' : ''}`, dataset: { course: c.id } }, head);
       if (open) {
         const curIdx = G.targetIndex(targets[c.id]);
-        const defIdx = r.scored ? G.SCALE.indexOf(G.letterFor(r.pct)) : -1;
-        const idx = curIdx >= 0 ? curIdx : defIdx;
+        const defIdx = r.scored ? r.S.indexOf(G.letterFor(r.pct, r.S)) : -1;
+        const idx = G.snapIdx ? G.snapIdx(r.S, curIdx >= 0 ? curIdx : defIdx) : curIdx >= 0 ? curIdx : defIdx;
         const more = U.el('bcv-ph-gcard__more', [
           cats.length ? U.el('bcv-ph-cats', cats.slice(0, 4).map((ct) => U.el('bcv-ph-cat', [
             h('span', { class: 'bcv-ph-cat__dot', style: { background: ct.color } }),
@@ -1315,7 +1319,7 @@
           ]) : null,
           r.scored ? U.el('bcv-ph-target', [
             U.text('bcv-ph-target__k', 'Target', 'span'),
-            U.el('bcv-ph-target__seg', G.SCALE.map((s, k) => h('button', { type: 'button', class: `bcv-ph-target__btn ${k === idx ? 'is-on' : ''}`, text: s[0], onclick: () => { targets[c.id] = s[0].replace(/−/g, '-'); store.setPref('gradeTargets', targets); drawList(); } }))),
+            U.el('bcv-ph-target__seg', r.S.map((s, k) => (Number.isFinite(s[1]) ? h('button', { type: 'button', class: `bcv-ph-target__btn ${k === idx ? 'is-on' : ''}`, text: s[0], onclick: () => { targets[c.id] = s[0].replace(/−/g, '-'); store.setPref('gradeTargets', targets); drawList(); } }) : null)).filter(Boolean)),
           ]) : null,
         ]);
         el.append(more);

@@ -28,19 +28,30 @@
   // (2.99.27) a course's own grading scale, as its instructor set it (the syllabus's cutoffs): the student's entry, kept
   // per course in gradeScales ({ [course]: { 'A+': 97, A: 93, … } }); a letter left out keeps the standard cutoff. F is
   // always 0. Read with each screen that letters a score (loadScales); the same letters in the same order as SCALE.
+  // (2.99.140) a letter taken off the scale is saved as null: its cutoff is Infinity, never reached, so the letter under it
+  // runs up to the next one kept (the scale keeps SCALE's length and order, so an index into one is an index into the
+  // other). Under '*', the student's own scale for every course that has none of its own.
   let scales = {};
-  const scaleOf = (cid) => {
-    const own = cid != null ? scales[String(cid)] : null;
-    if (!own || typeof own !== 'object') return SCALE;
-    return SCALE.map(([l, min, pts]) => { const v = Number(own[norm(l)]); return [l, norm(l) === 'F' ? 0 : Number.isFinite(v) ? v : min, pts]; });
-  };
-  const hasScale = (cid) => cid != null && !!scales[String(cid)];
+  const ALL = '*';
+  const live = (s) => Number.isFinite(s[1]);
+  const scaleFrom = (own) => SCALE.map(([l, min, pts]) => {
+    const k = norm(l);
+    const v = own[k];
+    return [l, k === 'F' ? 0 : v === null ? Infinity : typeof v === 'number' && Number.isFinite(v) ? v : min, pts];
+  });
+  const ownOf = (cid) => { const o = cid != null ? scales[String(cid)] : null; return o && typeof o === 'object' ? o : null; };
+  /** The scale that letters a course's score: its own, else the student's scale for every course, else the standard. */
+  const scaleOf = (cid) => { const own = ownOf(cid) || ownOf(ALL); return own ? scaleFrom(own) : SCALE; };
+  /** A scale of the student's letters the course (its own, or theirs for every course): Simpl's letter, never Canvas's. */
+  const hasScale = (cid) => !!(ownOf(cid) || ownOf(ALL));
+  const ownScaleOf = (cid) => !!ownOf(cid); // (the course's very own, not the one for every course)
   const loadScales = async () => {
     const v = await store.pref('gradeScales', {}).catch(() => ({}));
     scales = v && typeof v === 'object' ? v : {};
     return scales;
   };
-  /** A course's scale saved ({ letter: min% }), or let go (null): the standard again. Cutoffs must fall letter by letter. */
+  /** A course's scale saved ({ letter: min% or null }), or let go (null): the standard again (or the one for every
+   *  course). Cutoffs must fall letter by letter. cid '*': the scale for every course. */
   const setScale = async (cid, map) => {
     await loadScales();
     const all = { ...scales };
@@ -49,6 +60,30 @@
     await store.setPref('gradeScales', all);
     return scaleOf(cid);
   };
+  /** (2.99.140) What is wrong with a scale ({ letter: min% or null }), or ''. Each letter kept a cutoff from 0 to 100,
+   *  each under the one kept above it; at least one letter kept besides F. */
+  const scaleError = (map) => {
+    let last = Infinity, kept = 0;
+    for (const [l] of SCALE) {
+      const k = norm(l);
+      if (k === 'F' || map[k] === null) continue;
+      const v = map[k];
+      if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 100) return `${l} needs a percentage from 0 to 100.`;
+      if (v >= last) return `${l}’s cutoff must be lower than the letter above it.`;
+      last = v;
+      kept++;
+    }
+    return kept ? '' : 'Keep at least one letter above F.';
+  };
+  /** (2.99.140) An index on a scale moved onto a letter kept: itself, else the nearest kept above it, else below. */
+  const snapIdx = (S, i) => {
+    if (i < 0 || live(S[i])) return i;
+    for (let j = i - 1; j >= 0; j--) if (live(S[j])) return j;
+    for (let j = i + 1; j < S.length; j++) if (live(S[j])) return j;
+    return S.length - 1;
+  };
+  /** The next letter kept from i, a step down (d 1) or up (d −1); i itself at the end. */
+  const stepIdx = (S, i, d) => { for (let j = i + d; j >= 0 && j < S.length; j += d) if (live(S[j])) return j; return i; };
   const isPassFail = (t) => typeof t === 'string' && /^p\s*\/\s*f$/i.test(t.trim()); // the setup's Pass/Fail switch, saved in place of a letter
   // Canvas's own letter when the course publishes one, else the standard scale
   const pointsFor = (letter, pct, scale = SCALE) => (norm(letter) in POINTS ? POINTS[norm(letter)] : letterFor(pct, scale)[2]);
@@ -336,10 +371,10 @@
         const letter = canvasLetter ? String(canvasLetter).replace(/-/g, '−') : letterFor(pct, S)[0];
         const pts = pointsFor(canvasLetter, pct, S);
         const m = courseMath(groupsBy.get(c.id), c.weighted, ownFor(c));
-        const found = S.findIndex((s) => norm(s[0]) === norm(letter));
+        const found = S.findIndex((s) => live(s) && norm(s[0]) === norm(letter));
         const defaultIdx = found >= 0 ? found : S.indexOf(letterFor(pct, S));
         const saved = targetIndex(targets[c.id]);
-        const idx = clamp(saved >= 0 ? saved : defaultIdx, 0, S.length - 1);
+        const idx = snapIdx(S, clamp(saved >= 0 ? saved : defaultIdx, 0, S.length - 1)); // (2.99.140: a letter taken off the scale aims at the next one up)
         const target = S[idx];
         const needed = m.known ? m.needed(target[1]) : null;
         const met = needed === null ? pct >= target[1] : needed <= 0;
@@ -722,7 +757,7 @@
         },
       });
       function bump(r, delta) {
-        targets[c.id] = SCALE[clamp(r.idx + delta, 0, SCALE.length - 1)][0].replace(/−/g, '-'); // saved as the letter
+        targets[c.id] = SCALE[stepIdx(r.S, r.idx, delta)][0].replace(/−/g, '-'); // saved as the letter (2.99.140: the next one kept)
         save();
         current = model();
         draw();
@@ -771,9 +806,9 @@
                 : h('span', { class: 'bcv-gpa-detail__letter', style: r || pfPct !== null ? { background: c.palette.tint, color: c.palette.text } : null, text: r ? r.letter : pf ? 'Pass/Fail' : 'No grade yet' }),
               r ? U.el('bcv-gpa-detail__target', [
                 U.text('bcv-gpa-detail__tlabel', 'Target', 'span'),
-                h('button', { type: 'button', class: 'bcv-gpa-detail__step', text: '−', 'aria-label': 'Lower the target', disabled: r.idx >= SCALE.length - 1 || null, onclick: () => bump(r, 1) }),
+                h('button', { type: 'button', class: 'bcv-gpa-detail__step', text: '−', 'aria-label': 'Lower the target', disabled: stepIdx(r.S, r.idx, 1) === r.idx || null, onclick: () => bump(r, 1) }),
                 h('span', { class: 'bcv-gpa-detail__tval', style: { background: c.palette.tint, color: c.palette.text }, text: `${r.target[0]} · ${r.target[1]}%` }),
-                h('button', { type: 'button', class: 'bcv-gpa-detail__step', text: '+', 'aria-label': 'Raise the target', disabled: r.idx <= 0 || null, onclick: () => bump(r, -1) }),
+                h('button', { type: 'button', class: 'bcv-gpa-detail__step', text: '+', 'aria-label': 'Raise the target', disabled: stepIdx(r.S, r.idx, -1) === r.idx || null, onclick: () => bump(r, -1) }),
               ]) : null,
             ]),
           ]),
@@ -1041,8 +1076,17 @@
       ]);
       trackBody.hidden = !on;
       const trackSwitch = U.switchEl(on, (v) => { on = v; trackBody.hidden = !on; }, 'Track GPA over time');
+      // (2.99.140) the student's own grading scale, for every course without one of its own: the bar, under a switch
+      let usualOn = !!ownOf(ALL), usualTouched = false;
+      const usualBar = scaleBar(scaleOf(ALL), { onChange: () => { usualTouched = true; } });
+      const usualBody = U.el('bcv-gpa-set__scale', [usualBar.el]);
+      usualBody.hidden = !usualOn;
+      const usualSwitch = U.switchEl(usualOn, (v) => { usualOn = v; usualBody.hidden = !v; usualTouched = true; }, 'Use my own grading scale');
       const close = () => { BCV.ui.dismiss(ov); if (histTouched) { histTouched = false; refresh(); } };
       const done = async () => {
+        const usualMap = usualTouched && usualOn ? usualBar.map() : null;
+        const usualBad = usualMap ? scaleError(usualMap) : '';
+        if (usualBad) { U.toast(usualBad, { error: true }); return; }
         if (goalTouched) goal = clamp(pendingGoal, 0, 4);
         if (on) {
           // the record before this term is optional: without it, cumulative fills in from snapshots
@@ -1058,6 +1102,7 @@
           const keepRecord = !blank && fromFile ? { record: pendingRecord } : {};
           tracking = blank ? { priorGpa: null, priorCourses: 0, since: tracking?.since || dayKey() } : { priorGpa: g, priorCourses: n, since: tracking?.since || dayKey(), ...keepRecord };
         } else tracking = null;
+        if (usualTouched) { if (usualMap) await setScale(ALL, usualMap); else if (ownOf(ALL)) await setScale(ALL, null); }
         await save();
         histTouched = false;
         close();
@@ -1083,6 +1128,11 @@
             U.el('bcv-gpa-set__body', [U.text('bcv-gpa-set__k', 'Track GPA over time'), U.text('bcv-gpa-set__s bcv-pretty', `${BCV.lms.name} stores no GPA and no history. With your record before this term, this page shows a cumulative GPA and keeps one snapshot a day from now on.`)]),
             trackSwitch,
             trackBody,
+          ]),
+          U.el('bcv-gpa-set__sec', [
+            U.el('bcv-gpa-set__body', [U.text('bcv-gpa-set__k', 'My grading scale'), U.text('bcv-gpa-set__s bcv-pretty', `Letter every course by your school’s cutoffs, not ${BCV.lms.name}’s. A course’s own scale, set on its Details, comes first.`)]),
+            usualSwitch,
+            usualBody,
           ]),
           U.el('bcv-gpa-set__sec bcv-gpa-set__sec--hist', [
             U.el('bcv-gpa-set__body', [U.text('bcv-gpa-set__k', 'Past points on the trend'), U.text('bcv-gpa-set__s bcv-pretty', 'The chart holds one snapshot a day from the day tracking came on. Put what came before it on the chart too: a day (or a term’s end) and the GPA you had then, or a CSV of dates and GPAs.')]),
@@ -1186,39 +1236,29 @@
   }
 
   /** (2.99.27) The course's grading scale, as its instructor set it: a cutoff per letter, entered from the syllabus;
-   *  Save keeps it (letters, targets and Grade needed follow it), Standard scale lets it go. */
+   *  Save keeps it (letters, targets and Grade needed follow it), Standard scale lets it go. (2.99.140) Set on the bar
+   *  (scaleBar), where a letter the course does not give can be taken off and put back. */
   function scaleSection(c, changed) {
     const S = scaleOf(c.id);
-    const own = hasScale(c.id);
+    const own = ownScaleOf(c.id);
+    const usual = !!ownOf(ALL); // (the student's scale for every course: what the course falls back to)
     const open = { on: own };
-    const inputs = new Map();
-    const status = U.text('bcv-gpa-detail__hsub', own ? 'Your instructor’s scale' : 'The standard scale', 'span');
-    const grid = U.el('bcv-scale__grid', S.filter(([l]) => norm(l) !== 'F').map(([l, min]) => {
-      const inp = h('input', { type: 'number', class: 'bcv-scale__input', min: '0', max: '100', step: '0.01', value: String(min), 'aria-label': `Lowest percentage for ${l}` });
-      inputs.set(norm(l), inp);
-      return h('label', { class: 'bcv-scale__cell' }, [U.text('bcv-scale__letter', l, 'span'), inp, U.text('bcv-scale__pct', '%', 'span')]);
-    }));
+    const status = U.text('bcv-gpa-detail__hsub', own ? 'Your instructor’s scale' : usual ? 'Your scale for every course' : 'The standard scale', 'span');
     const err = U.text('bcv-scale__err', '', 'div');
+    const bar = scaleBar(S, { onChange: () => { err.textContent = ''; } });
     const save = U.btn('Save scale', { kind: 'primary', onClick: async () => {
-      const map = {};
-      let last = Infinity;
-      for (const [l] of S) {
-        if (norm(l) === 'F') continue;
-        const v = Number(inputs.get(norm(l)).value);
-        if (!Number.isFinite(v) || v < 0 || v > 100) { err.textContent = `${l} needs a percentage from 0 to 100.`; return; }
-        if (v >= last) { err.textContent = `${l}’s cutoff must be lower than the letter above it.`; return; }
-        last = v;
-        map[norm(l)] = v;
-      }
+      const map = bar.map();
+      const bad = scaleError(map);
+      if (bad) { err.textContent = bad; return; }
       err.textContent = '';
       await setScale(c.id, map);
       U.toast(`Saved ${c.shortName || c.name}’s grading scale.`);
       changed();
     } });
-    const reset = U.btn('Standard scale', { onClick: async () => { await setScale(c.id, null); U.toast('Back to the standard scale.'); changed(); } });
+    const reset = U.btn(usual ? 'Use your usual scale' : 'Standard scale', { onClick: async () => { await setScale(c.id, null); U.toast(usual ? 'Back to your scale for every course.' : 'Back to the standard scale.'); changed(); } });
     const editor = U.el('bcv-scale__editor', [
-      U.text('bcv-gpa-detail__note', 'Enter the lowest percentage for each letter, as your syllabus or instructor sets it.'),
-      grid, err, U.el('bcv-scale__actions', [own ? reset : null, save]),
+      U.text('bcv-gpa-detail__note', 'Slide each letter to the lowest percentage it takes, as your syllabus or instructor sets it.'),
+      bar.el, err, U.el('bcv-scale__actions', [own ? reset : null, save]),
     ]);
     const fold = U.collapsible(editor, open.on, 'bcv-scale__fold'); // (Edit slides it open, Hide shut)
     const toggle = h('button', { type: 'button', class: 'bcv-scale__toggle', 'aria-expanded': String(open.on), text: open.on ? 'Hide' : 'Edit', onclick: () => { open.on = !open.on; fold.setOpen(open.on); toggle.textContent = open.on ? 'Hide' : 'Edit'; toggle.setAttribute('aria-expanded', String(open.on)); } });
@@ -1228,5 +1268,218 @@
     ]);
   }
 
-  BCV.screens.gpa = { render, skeleton, courseMath, SCALE, letterFor, pointsFor, targetIndex, prefetch, trendChart, gradedItems, MIN_Y, MAX_Y, scaleOf, hasScale, loadScales, setScale };
+  /** (2.99.140) A grading scale as a bar the student slides. Left to right it runs from `lo` (50%, or lower when a letter
+   *  starts lower) to 100%: a stretch in each kept letter's colour from its cutoff up to the next letter's, F under the
+   *  lowest, and on each cutoff a handle with its letter on a flag (above the bar and below it in turn, so neighbours
+   *  stay apart). A handle slides along the bar, held between the letters on either side, in half points (arrow keys
+   *  the same, Shift or Page Up/Down five at a time; the field under the bar takes any figure). Dragged up or down off
+   *  the bar, Remove, or Delete takes its letter off the scale — the letter under it then runs up to the next one kept —
+   *  and it waits under the bar, where a tap puts it back (at its usual cutoff when that still fits, else halfway
+   *  between its neighbours). bar.map(): { letter: min% or null } as it stands; onChange after each change. */
+  function scaleBar(S, { onChange = null } = {}) {
+    const letters = SCALE.filter(([l]) => norm(l) !== 'F').map(([l]) => l); // A+ … D as shown (A−, not A-)
+    const std = Object.fromEntries(SCALE.map(([l, min]) => [l, min]));
+    const cut = Object.fromEntries(letters.map((l) => { const s = S.find((x) => x[0] === l); return [l, s && Number.isFinite(s[1]) ? s[1] : s ? null : std[l]]; }));
+    const kept = () => letters.filter((l) => cut[l] !== null);
+    const OFF = 40; // px a handle goes up or down off the bar before letting go takes its letter off
+    const fig = (v) => String(+Number(v).toFixed(2)); // 90, 89.5, 89.45
+    const tone = (l) => (l.endsWith('+') ? 'is-plus' : l.endsWith('−') ? 'is-minus' : '');
+    let lo = 50, sel = null, drag = null;
+    const floorOf = () => { const k = kept(); const low = k.length ? cut[k[k.length - 1]] : 60; return clamp(Math.floor((low - 10) / 10) * 10, 0, 50); };
+    const xOf = (v) => ((clamp(v, lo, 100) - lo) / (100 - lo)) * 100;
+    /** Where a kept letter may go: over the letter kept under it, under the one kept over it (or 100 at the top). */
+    const room = (l) => {
+      const k = kept(), i = k.indexOf(l);
+      const up = i > 0 ? cut[k[i - 1]] : null, down = i >= 0 && i < k.length - 1 ? cut[k[i + 1]] : null;
+      return { up, down, min: down === null ? 0 : down + 0.5, max: up === null ? 100 : up - 0.5 };
+    };
+    const range = (l) => { const { up } = room(l); return up === null ? 'to 100%' : `to under ${fig(up)}%`; };
+
+    const track = h('div', { class: 'bcv-sbar__track', 'aria-hidden': 'true' });
+    const ticks = h('div', { class: 'bcv-sbar__ticks', 'aria-hidden': 'true' });
+    const lane = h('div', { class: 'bcv-sbar__lane' }, [track, ticks]);
+    const field = h('input', { type: 'text', inputmode: 'decimal', class: 'bcv-sbar__in', autocomplete: 'off' });
+    const chip = U.text('bcv-sbar__chip', '', 'span');
+    const span = U.text('bcv-sbar__range', '', 'span');
+    const rm = h('button', { type: 'button', class: 'bcv-sbar__rm', text: 'Remove' });
+    const pick = U.el('bcv-sbar__pick', [chip, U.text('bcv-sbar__from', 'from', 'span'), U.el('bcv-sbar__field', [field, U.text('bcv-sbar__pct', '%', 'span')]), span, rm]);
+    const idle = U.text('bcv-sbar__idle', 'Pick a letter on the bar to type its cutoff.', 'span');
+    const info = U.el('bcv-sbar__info', [idle, pick]);
+    const tray = U.el('bcv-sbar__tray');
+    const hint = U.text('bcv-sbar__hint', 'Drag a letter off the bar to take it off the scale.');
+    const root = h('div', { class: 'bcv-sbar', role: 'group', 'aria-label': 'Grading scale' }, [lane, info, tray, hint]);
+    const knobs = new Map();
+    const changed = () => onChange?.(map());
+    const map = () => Object.fromEntries(letters.map((l) => [norm(l), cut[l]]));
+
+    function render(fresh = null) {
+      lo = floorOf();
+      const k = kept();
+      for (const kn of knobs.values()) kn.remove();
+      knobs.clear();
+      k.forEach((l, i) => {
+        const kn = h('button', {
+          type: 'button', role: 'slider', class: `bcv-sbar__knob bcv-band--${l[0]} ${i % 2 ? 'is-down' : 'is-up'} ${l === fresh ? 'is-new' : ''}`,
+          'aria-label': `${l} cutoff`, 'aria-valuemin': '0', 'aria-valuemax': '100', dataset: { letter: norm(l) },
+        }, [h('span', { class: 'bcv-sbar__flag', text: l }), h('span', { class: 'bcv-sbar__stem' }), h('span', { class: 'bcv-sbar__dot' })]);
+        knobs.set(l, kn);
+        lane.append(kn);
+      });
+      track.replaceChildren(...[...k, 'F'].map((l) => h('span', { class: `bcv-sbar__seg bcv-band--${l[0]} ${tone(l)}`, dataset: { letter: norm(l) } })));
+      const tickAt = [];
+      for (let v = lo; v <= 100; v += 10) tickAt.push(v);
+      ticks.replaceChildren(...tickAt.map((v) => h('span', { class: 'bcv-sbar__tick', style: { left: `${xOf(v)}%` }, text: `${v}%` })));
+      if (sel && cut[sel] === null) sel = null;
+      place();
+      paintTray();
+      paintInfo();
+    }
+    /** Every handle and stretch where its cutoff puts it (a drag moves only these). */
+    function place() {
+      const k = kept();
+      [...k, 'F'].forEach((l, i) => {
+        const seg = track.children[i];
+        if (!seg) return;
+        const from = l === 'F' ? lo : cut[l];
+        const to = l === 'F' ? (k.length ? cut[k[k.length - 1]] : 100) : i > 0 ? cut[k[i - 1]] : 100;
+        seg.style.left = `${xOf(from)}%`;
+        seg.style.width = `${Math.max(0, xOf(to) - xOf(from))}%`;
+      });
+      for (const [l, kn] of knobs) {
+        kn.style.left = `${xOf(cut[l])}%`;
+        kn.setAttribute('aria-valuenow', String(cut[l]));
+        kn.setAttribute('aria-valuetext', `${l} from ${fig(cut[l])}% ${range(l)}`);
+        kn.classList.toggle('is-sel', l === sel);
+      }
+    }
+    function paintInfo() {
+      idle.hidden = !!sel;
+      pick.hidden = !sel;
+      if (!sel) return;
+      chip.textContent = sel;
+      chip.className = `bcv-sbar__chip bcv-band--${sel[0]}`;
+      if (document.activeElement !== field) field.value = fig(cut[sel]);
+      field.setAttribute('aria-label', `Lowest percentage for ${sel}`);
+      span.textContent = range(sel);
+      rm.disabled = kept().length <= 1;
+      rm.setAttribute('aria-label', `Take ${sel} off the scale`);
+    }
+    function paintTray() {
+      const gone = letters.filter((l) => cut[l] === null);
+      tray.hidden = !gone.length;
+      tray.replaceChildren(...(gone.length ? [U.text('bcv-sbar__trayk', 'Not on the scale', 'span'), ...gone.map((l) => h('button', {
+        type: 'button', class: `bcv-sbar__add bcv-band--${l[0]}`, dataset: { letter: norm(l) }, 'aria-label': `Put ${l} back on the scale`, onclick: () => add(l),
+      }, [U.svg(IC.plus, { size: 10, width: 2.6 }), h('span', { text: l })]))] : []));
+    }
+    function select(l) { sel = l; place(); paintInfo(); }
+    function set(l, v) {
+      if (cut[l] === v) return;
+      cut[l] = v;
+      if (floorOf() !== lo) { render(); knobs.get(l)?.focus({ preventScroll: true }); } else { place(); paintInfo(); }
+      changed();
+    }
+    function remove(l) {
+      if (cut[l] === null) return;
+      if (kept().length <= 1) { U.toast('Keep at least one letter above F.', { error: true }); return; }
+      const k = kept(), i = k.indexOf(l);
+      cut[l] = null;
+      sel = null;
+      render();
+      changed();
+      (knobs.get(k[i + 1]) || knobs.get(k[i - 1]))?.focus({ preventScroll: true });
+    }
+    function add(l) {
+      const above = letters.slice(0, letters.indexOf(l)).reverse().find((x) => cut[x] !== null);
+      const below = letters.slice(letters.indexOf(l) + 1).find((x) => cut[x] !== null);
+      const up = above ? cut[above] : null, down = below ? cut[below] : 0;
+      const fits = (v) => v > down && (up === null ? v <= 100 : v < up);
+      const mid = ((up === null ? 100 : up) + down) / 2;
+      const v = [std[l], Math.round(mid * 2) / 2, +mid.toFixed(2)].find(fits);
+      if (v === undefined) { U.toast(`No room for ${l} between ${above || 'the top'} and ${below || 'F'}.`, { error: true }); return; }
+      cut[l] = v;
+      sel = l;
+      render(l);
+      changed();
+      knobs.get(l)?.focus({ preventScroll: true });
+    }
+
+    // a handle: pressed, it is the one picked; dragged sideways it sets its cutoff, held where its grab was; dragged off
+    // the bar it says so, and letting go there takes its letter off
+    lane.addEventListener('pointerdown', (e) => {
+      const kn = e.target.closest('.bcv-sbar__knob');
+      if (!kn || e.button !== 0) return;
+      e.preventDefault();
+      const l = [...knobs].find(([, x]) => x === kn)?.[0];
+      if (!l) return;
+      kn.focus({ preventScroll: true });
+      select(l);
+      const r = lane.getBoundingClientRect();
+      drag = { kn, l, r, grab: e.clientX - (r.left + (xOf(cut[l]) / 100) * r.width), y0: e.clientY, off: false };
+      try { kn.setPointerCapture(e.pointerId); } catch {}
+      kn.classList.add('is-drag');
+      root.classList.add('is-dragging');
+    });
+    lane.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      const { kn, l, r } = drag;
+      const dy = clamp(e.clientY - drag.y0, -OFF - 16, OFF + 16); // (just past the line: the fold above clips no further)
+      const off = Math.abs(dy) > OFF && kept().length > 1;
+      kn.style.setProperty('--dy', `${dy}px`);
+      if (off !== drag.off) {
+        drag.off = off;
+        kn.classList.toggle('is-off', off);
+        hint.textContent = off ? `Let go to take ${l} off the scale.` : 'Drag a letter off the bar to take it off the scale.';
+      }
+      if (off) return;
+      const { min, max } = room(l);
+      if (min > max) return;
+      const v = clamp(Math.round((lo + ((e.clientX - drag.grab - r.left) / r.width) * (100 - lo)) * 2) / 2, min, max);
+      if (v !== cut[l]) { cut[l] = v; place(); paintInfo(); changed(); }
+    });
+    const end = () => {
+      if (!drag) return;
+      const { kn, l, off } = drag;
+      drag = null;
+      kn.classList.remove('is-drag', 'is-off');
+      kn.style.removeProperty('--dy');
+      root.classList.remove('is-dragging');
+      hint.textContent = 'Drag a letter off the bar to take it off the scale.';
+      if (off) remove(l);
+      else if (floorOf() !== lo) { render(); knobs.get(l)?.focus({ preventScroll: true }); } // (a letter brought low: the bar reaches further down)
+    };
+    lane.addEventListener('pointerup', end);
+    lane.addEventListener('pointercancel', end);
+    lane.addEventListener('focusin', (e) => { const kn = e.target.closest('.bcv-sbar__knob'); const l = kn && [...knobs].find(([, x]) => x === kn)?.[0]; if (l && l !== sel) select(l); });
+    lane.addEventListener('keydown', (e) => {
+      const kn = e.target.closest('.bcv-sbar__knob');
+      const l = kn && [...knobs].find(([, x]) => x === kn)?.[0];
+      if (!l) return;
+      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); remove(l); return; }
+      const { min, max } = room(l);
+      const by = e.shiftKey || e.key === 'PageUp' || e.key === 'PageDown' ? 5 : 0.5;
+      const to = e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'PageUp' ? cut[l] + by
+        : e.key === 'ArrowLeft' || e.key === 'ArrowDown' || e.key === 'PageDown' ? cut[l] - by
+        : e.key === 'Home' ? min : e.key === 'End' ? max : null;
+      if (to === null) return;
+      e.preventDefault();
+      if (min <= max) set(l, clamp(Math.round(to * 2) / 2, min, max));
+    });
+    // the field: any figure between the letters on either side, taken on Enter or as it loses focus
+    const take = () => {
+      if (!sel || field.value.trim() === fig(cut[sel])) return;
+      const v = Number(String(field.value).replace(/[^0-9.]/g, ''));
+      const { up, down } = room(sel);
+      const ok = field.value.trim() !== '' && Number.isFinite(v) && v >= 0 && v <= 100 && (up === null || v < up) && (down === null || v > down);
+      if (!ok) { U.toast(`${sel} needs a cutoff ${down === null ? 'from 0%' : `over ${fig(down)}%`} ${up === null ? 'up to 100%' : `and under ${fig(up)}%`}.`, { error: true }); field.value = fig(cut[sel]); return; }
+      set(sel, +v.toFixed(2));
+    };
+    field.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); take(); } else if (e.key === 'Escape' && sel) { field.value = fig(cut[sel]); } });
+    field.addEventListener('change', take);
+    rm.addEventListener('click', () => { if (sel) remove(sel); });
+
+    render();
+    return { el: root, map, reset(S2) { for (const l of letters) { const s = S2.find((x) => x[0] === l); cut[l] = s && Number.isFinite(s[1]) ? s[1] : s ? null : std[l]; } sel = null; render(); changed(); } };
+  }
+
+  BCV.screens.gpa = { render, skeleton, courseMath, SCALE, letterFor, pointsFor, targetIndex, prefetch, trendChart, gradedItems, MIN_Y, MAX_Y, scaleOf, hasScale, ownScaleOf, loadScales, setScale, scaleError, snapIdx, stepIdx, scaleBar, ALL };
 })();

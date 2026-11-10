@@ -26,8 +26,12 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
     cal: 'M5 6h14v14H5zM5 10h14M9 3v4M15 3v4',
     lock: 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z',
+    slider: 'M4 8h16M4 16h16M9 5v6M15 13v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.140', date: '2026-11-10', notes: [
+      { kind: 'new', title: 'Your Grading Scale', body: 'Slide letter cutoffs on a bar, or remove letters.', icon: P.slider },
+    ] },
     { version: '2.99.139', date: '2026-11-05', notes: [
       { kind: 'fixed', title: 'Links in Comments', body: 'Linked words in a teacher’s comment now open the link.', icon: P.check },
     ] },

@@ -1068,7 +1068,7 @@
       const counted = gradedOf(groups.get(c.id));
       const ti = G.targetIndex(targets[c.id]);
       const S = G.scaleOf ? G.scaleOf(c.id) : G.SCALE;
-      const ownScale = !!G.hasScale?.(c.id);
+      const ownScale = !!G.hasScale?.(c.id); // (a scale of the student's letters the score: the course's, or theirs for every course)
       const label = c.shortName || c.name;
       return {
         id: String(c.id), code: label, name: c.nickname ? c.originalName : (c.code && c.code !== c.name ? c.code : c.name), altName: otherName(label, c.nickname ? c.originalName : '', c.code, c.name), teacher: (c.teachers || [])[0] || '', color: c.color || GRAY, url: `/courses/${c.id}/grades`,
@@ -1079,8 +1079,9 @@
         points: scored ? (op !== null || ownScale ? G.letterFor(roundHalfUp(pct, 1), S)[2] : G.pointsFor(c.grade, roundHalfUp(pct, 1))) : null,
         // (2.99.33) one graded count, the course's own Grades page's too (courseGrades): `gradedText` says it in words
         graded: counted.graded, total: counted.total, gradedText: counted.text, own: op !== null,
-        target: ti >= 0 ? G.SCALE[ti][0] : null,
-        scale: S.map(([letter, min, points]) => ({ letter, min, points })), ownScale,
+        // (2.99.140) a letter taken off the scale is left out of it, and a target on one aims at the next letter kept
+        target: ti >= 0 ? G.SCALE[G.snapIdx ? G.snapIdx(S, ti) : ti][0] : null,
+        scale: keptSteps(S), ownScale: G.ownScaleOf ? G.ownScaleOf(c.id) : ownScale,
         cats: (gmFor(c).legend || []).slice(0, 4).map((ct) => ({ label: ct.label, weight: ct.weightText || '', value: ct.value, pct: ct.pct ?? null, color: ct.color })),
       };
     });
@@ -1094,7 +1095,7 @@
     const gpa = scoredRows.length ? scoredRows.reduce((a, r) => a + r.points, 0) / scoredRows.length : null;
     return {
       term: term || '', gpa, goal, ...gpaWords(gpa, goal), gpaNote: gpaNoteOf(rows),
-      scale: G.SCALE.map(([letter, min, points]) => ({ letter, min, points })),
+      scale: keptSteps(G.scaleOf ? G.scaleOf(null) : G.SCALE), // (2.99.140: the student's scale for every course, where set)
       rows,
       items: gi.map(({ c, g, band, pct }) => ({ course: c.shortName || c.name, color: c.color || GRAY, name: g.name, band, pct, pctText: pctFmt(pct), score: `${store.fmtPts(g.earned)}/${store.fmtPts(g.possible)}`, url: g.url || null })),
       counts,
@@ -1142,22 +1143,26 @@
       none.length ? `${and(none)} ${none.length === 1 ? 'has' : 'have'} no grade yet.` : '',
     ].filter(Boolean).join(' ');
   }
+  /** (2.99.140) A course's scale's steps for the apps: the letters kept, each with its cutoff and points. */
+  const keptSteps = (S) => S.filter(([, min]) => Number.isFinite(min)).map(([letter, min, points]) => ({ letter, min, points }));
   /** (2.99.27) A course's grading scale, as its instructor set it: { letter: min% } from A+ down to D (F is 0), or null for
-   *  the standard scale again. Cutoffs must fall letter by letter. */
+   *  the standard scale again. Cutoffs must fall letter by letter. (2.99.140) A letter left out (or null) is off the
+   *  scale: the apps send the letters the scale they were given has, and the web's bar can take letters off. */
   async function setScale({ id, scale = null } = {}) {
     const G = BCV.screens.gpa;
     if (!G?.setScale || id === null || id === undefined) return { ok: false };
     if (scale && typeof scale === 'object') {
       const map = {};
-      let last = Infinity;
       for (const [l] of G.SCALE) {
         const k = String(l).replace(/−/g, '-').toUpperCase();
         if (k === 'F') continue;
-        const v = Number(scale[k] ?? scale[l]);
-        if (!Number.isFinite(v) || v < 0 || v > 100 || v >= last) throw new Error(`${l} needs a cutoff from 0 to 100, lower than the letter above it.`);
-        last = v;
+        const raw = scale[k] ?? scale[l];
+        const v = raw === null || raw === undefined || raw === '' ? null : Number(raw);
+        if (v !== null && !Number.isFinite(v)) throw new Error(`${l} needs a cutoff from 0 to 100, lower than the letter above it.`);
         map[k] = v;
       }
+      const bad = G.scaleError ? G.scaleError(map) : '';
+      if (bad) throw new Error(bad);
       await G.setScale(String(id), map);
     } else {
       await G.setScale(String(id), null);
@@ -2910,7 +2915,7 @@
     return {
       id: key, code: entry.short, name: entry.c.name, altName: otherName(entry.short, entry.c.name, entry.c.code), color: entry.c.color || GRAY,
       total, totalText: total === null ? '–' : pctFmt(total), letter, note, estimateNote, final: (m.center?.final || '').replace(/ · ([A-F])-(?= )/, ' · $1−'), whatIf: on, weighted: !!m.weighted,
-      target: entry.target ? letterFmt(entry.target) : null, scale: S.map(([l, min, points]) => ({ letter: l, min, points })), ownScale,
+      target: entry.target ? letterFmt(entry.target) : null, scale: keptSteps(S), ownScale: G.ownScaleOf ? G.ownScaleOf(entry.c.id) : ownScale,
       groups, rows, gpa, gpaIf, gpaText: gpaFmt(gpa), gpaIfText: gpaFmt(gpaIf),
       // (2.99.33) the Grades overview's own count (grades → gradedOf), so the two screens agree
       graded: counted.graded, totalItems: counted.total, gradedText: counted.text,

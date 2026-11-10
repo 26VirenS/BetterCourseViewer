@@ -2542,6 +2542,78 @@ try {
   await page.click('.bcv-gpa-detail .bcv-whatif-btn');
   await page.waitForFunction(() => !document.querySelector('.bcv-gpa-detail .bcv-whatif__input'), null, { timeout: 5000 });
   check((await page.$$('.bcv-gpa-detail__arow.is-link')).length === 18 && (await texts('.bcv-gpa-detail__pct'))[0] === '92.4%' && (await texts('.bcv-gpa-detail .bcv-whatif-btn'))[0] === 'Try what-if scores', 'Exit what-if mode: the rows are links again and the score is Canvas’s own');
+  // (2.99.140) the course's grading scale on a bar: a handle per letter, slid to set where it starts, dragged off the
+  // bar to take the letter off (the tray keeps it to put back), the arrow keys and Delete the same, the field any figure
+  const scalePrefs = () => sw.evaluate(async () => Object.entries(await chrome.storage.local.get(null)).find(([k]) => k.startsWith('prefs:'))?.[1]?.gradeScales || {});
+  await page.click('.bcv-gpa-detail .bcv-scale__toggle');
+  await page.waitForFunction(() => { const l = document.querySelector('.bcv-gpa-detail .bcv-sbar__lane'); return l && l.getBoundingClientRect().height > 90 && getComputedStyle(l.closest('.bcv-collapsible__in')).opacity === '1'; }, null, { timeout: 5000 });
+  const sbarAt = () => page.evaluate(() => {
+    const bar = document.querySelector('.bcv-gpa-detail .bcv-sbar');
+    const lane = bar.querySelector('.bcv-sbar__lane').getBoundingClientRect();
+    const knobs = [...bar.querySelectorAll('.bcv-sbar__knob')].map((k) => { const d = k.querySelector('.bcv-sbar__dot').getBoundingClientRect(); return { l: k.querySelector('.bcv-sbar__flag').textContent, v: Number(k.getAttribute('aria-valuenow')), x: Math.round(d.left + d.width / 2), y: Math.round(d.top + d.height / 2), up: k.classList.contains('is-up'), sel: k.classList.contains('is-sel'), text: k.getAttribute('aria-valuetext') }; });
+    return { knobs, lane: { left: lane.left, width: lane.width }, segs: bar.querySelectorAll('.bcv-sbar__seg').length, ticks: [...bar.querySelectorAll('.bcv-sbar__tick')].map((t) => t.textContent).join(' '), tray: bar.querySelector('.bcv-sbar__tray').hidden ? null : [...bar.querySelectorAll('.bcv-sbar__add')].map((b) => b.textContent).join(' '), idle: !bar.querySelector('.bcv-sbar__idle').hidden, field: bar.querySelector('.bcv-sbar__in').value, range: bar.querySelector('.bcv-sbar__range').textContent, hint: bar.querySelector('.bcv-sbar__hint').textContent };
+  });
+  await page.$eval('.bcv-gpa-detail .bcv-sbar', (e) => e.scrollIntoView({ block: 'center' }));
+  await page.waitForTimeout(150);
+  const sb0 = await sbarAt();
+  const ppt = sb0.lane.width / 50; // (the bar runs 50% to 100%)
+  check(sb0.knobs.map((k) => k.l).join(' ') === 'A+ A A− B+ B B− C+ C C− D' && sb0.knobs.map((k) => k.v).join(' ') === '97 93 90 87 83 80 77 73 70 60' && sb0.knobs.every((k, i) => k.up === (i % 2 === 0) && (i === 0 || k.x < sb0.knobs[i - 1].x)) && sb0.knobs.every((k) => Math.abs(k.y - sb0.knobs[0].y) <= 1) && Math.abs(sb0.knobs[0].x - (sb0.lane.left + ppt * 47)) <= 2 && sb0.segs === 11 && sb0.ticks === '50% 60% 70% 80% 90% 100%' && sb0.tray === null && sb0.idle,
+    `the scale on a bar: a handle on each cutoff, A+ furthest right, the letters' flags above and below in turn, 50% to 100% along it: ${JSON.stringify({ knobs: sb0.knobs.map((k) => `${k.l}${k.v}${k.up ? '^' : 'v'}@${k.x}`), segs: sb0.segs, ticks: sb0.ticks, tray: sb0.tray })}`);
+  await shot(page, '16y-grading-scale-bar');
+  // A slid a point left: it starts at 92, the field says so; held between A+ and A− however far it is pulled
+  const kA = sb0.knobs[1];
+  await page.mouse.move(kA.x, kA.y);
+  await page.mouse.down();
+  await page.mouse.move(kA.x - ppt * 0.6, kA.y + 2, { steps: 4 });
+  await page.mouse.move(kA.x - ppt * 1, kA.y + 3, { steps: 4 });
+  await page.mouse.up();
+  const sb1 = await sbarAt();
+  await page.mouse.move(sb1.knobs[1].x, sb1.knobs[1].y);
+  await page.mouse.down();
+  await page.mouse.move(sb1.knobs[1].x - ppt * 20, sb1.knobs[1].y, { steps: 6 });
+  const held = (await sbarAt()).knobs[1].v;
+  await page.mouse.move(sb1.knobs[1].x, sb1.knobs[1].y, { steps: 6 });
+  await page.mouse.up();
+  check(sb1.knobs[1].v === 92 && sb1.knobs[1].sel && sb1.field === '92' && sb1.range === 'to under 97%' && !sb1.idle && held === 90.5 && (await sbarAt()).knobs[1].v === 92, `a handle slides along the bar to where its letter starts (A to 92%), the field shows it, and it stops short of the letter under it (${held}): ${JSON.stringify({ v: sb1.knobs[1].v, field: sb1.field, range: sb1.range })}`);
+  // A+ dragged down off the bar: it says letting go takes it off, and letting go does — the tray keeps it
+  const kAp = sb1.knobs[0];
+  await page.mouse.move(kAp.x, kAp.y);
+  await page.mouse.down();
+  await page.mouse.move(kAp.x, kAp.y + 30, { steps: 3 });
+  await page.mouse.move(kAp.x, kAp.y + 55, { steps: 3 });
+  const offing = await page.evaluate(() => ({ off: !!document.querySelector('.bcv-gpa-detail .bcv-sbar__knob.is-off'), hint: document.querySelector('.bcv-gpa-detail .bcv-sbar__hint').textContent }));
+  await page.mouse.up();
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-gpa-detail .bcv-sbar__knob').length === 9, null, { timeout: 3000 });
+  const sb2 = await sbarAt();
+  check(offing.off && offing.hint === 'Let go to take A+ off the scale.' && sb2.knobs.map((k) => k.l).join(' ') === 'A A− B+ B B− C+ C C− D' && sb2.tray === 'A+' && sb2.segs === 10, `A+ dragged off the bar leaves the scale (the bar said it would) and waits in the tray: ${JSON.stringify({ offing, knobs: sb2.knobs.map((k) => k.l).join(' '), tray: sb2.tray })}`);
+  // the keys: B+ two half points up, then Delete takes it off; the tray's B+ puts it back at its usual 87
+  await page.focus('.bcv-gpa-detail .bcv-sbar__knob[data-letter="B+"]');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  const bUp = (await sbarAt()).knobs.find((k) => k.l === 'B+');
+  await page.keyboard.press('Delete');
+  const sb3 = await sbarAt();
+  await page.click('.bcv-gpa-detail .bcv-sbar__add[data-letter="B+"]');
+  const sb4 = await sbarAt();
+  const backFocus = await page.evaluate(() => document.activeElement?.dataset?.letter);
+  check(bUp.v === 88 && /^B\+ from 88% to under 90%$/.test(bUp.text) && sb3.knobs.length === 8 && sb3.tray === 'A+ B+' && sb4.knobs.find((k) => k.l === 'B+')?.v === 87 && sb4.tray === 'A+' && backFocus === 'B+', `arrow keys move a handle by half points, Delete takes its letter off, and the tray puts it back where it usually starts: ${JSON.stringify({ bUp: bUp.text, after: sb3.tray, back: sb4.knobs.map((k) => `${k.l}${k.v}`).join(' '), backFocus })}`);
+  // the field: A− typed to 91; a figure past A is refused and the field goes back
+  await page.focus('.bcv-gpa-detail .bcv-sbar__knob[data-letter="A-"]');
+  await page.fill('.bcv-gpa-detail .bcv-sbar__in', '91');
+  await page.keyboard.press('Enter');
+  await page.fill('.bcv-gpa-detail .bcv-sbar__in', '95');
+  await page.keyboard.press('Enter');
+  const typed = await sbarAt();
+  check(typed.knobs.find((k) => k.l === 'A−').v === 91 && typed.field === '91' && /A− needs a cutoff over 87% and under 92%/.test((await texts('.bcv-toast')).join(' ')), `a cutoff typed in the field moves its handle, and one past its neighbours is refused: ${JSON.stringify({ field: typed.field, toasts: await texts('.bcv-toast') })}`);
+  // saved: 92.4% is an A on it now, the target (A) at 92, nothing above it to raise it to; Standard scale lets it all go
+  await page.click('.bcv-gpa-detail .bcv-scale__actions .bcv-btn--primary');
+  await page.waitForFunction(() => document.querySelector('.bcv-gpa-detail__letter')?.textContent === 'A' && /Your instructor/.test(document.querySelector('.bcv-gpa-detail .bcv-scale .bcv-gpa-detail__hsub')?.textContent || ''), null, { timeout: 5000 });
+  const savedScale = Object.values(await scalePrefs())[0];
+  const tgt = { val: (await texts('.bcv-gpa-detail__tval'))[0], up: await page.$eval('.bcv-gpa-detail__step:last-child', (b) => b.disabled) };
+  check(Object.entries({ 'A+': null, A: 92, 'A-': 91, 'B+': 87, B: 83, 'B-': 80, 'C+': 77, C: 73, 'C-': 70, D: 60 }).every(([k, v]) => savedScale?.[k] === v) && Object.keys(savedScale).length === 10 && tgt.val === 'A · 92%' && tgt.up === true && /^A F26-MATH 021 20/.test((await texts('.bcv-gpa__card'))[0]), `the scale saved, A+ off it: the course is an A, its target A from 92% with nothing above it, the card behind the same: ${JSON.stringify({ savedScale, tgt, card: (await texts('.bcv-gpa__card'))[0].slice(0, 30) })}`);
+  await page.locator('.bcv-gpa-detail .bcv-scale__actions .bcv-btn', { hasText: 'Standard scale' }).click();
+  await page.waitForFunction(() => document.querySelector('.bcv-gpa-detail__letter')?.textContent === 'A−', null, { timeout: 5000 });
+  check(!Object.keys(await scalePrefs()).length && (await texts('.bcv-gpa-detail__tval'))[0] === 'A · 93%' && /^A− F26-MATH 021 20/.test((await texts('.bcv-gpa__card'))[0]), `Standard scale lets the course's own go: A− again, the target back at 93%: ${(await texts('.bcv-gpa-detail__tval'))[0]}`);
   // the button on the left is the way through to the course's own Grades page, and it takes the sheet with it
   await page.click('.bcv-gpa-detail__go');
   await page.waitForFunction(() => /\/courses\/\d+\/grades$/.test(location.pathname) && !document.querySelector('.bcv-sheet-ov'), null, { timeout: 10000 });
@@ -2583,6 +2655,27 @@ try {
   const readPrefs = () => sw.evaluate(async () => Object.entries(await chrome.storage.local.get(null)).find(([k]) => k.startsWith('prefs:'))?.[1] || null);
   check(await eventually(async () => { const p = await readPrefs(); return Array.isArray(p?.gpaSnapshots) && p.gpaSnapshots.length === 1 && typeof p.gpaSnapshots[0].gpa === 'number' && /^\d{4}-\d{2}-\d{2}$/.test(p.gpaSnapshots[0].date) && p.gpaTracking?.priorCourses === 8 && p.gpaGoal === 3.95; }), `a first snapshot is recorded the day tracking starts: ${JSON.stringify((await readPrefs())?.gpaSnapshots)}`);
   check(!(await readPrefs())?.gpaTracking?.record, 'numbers typed over the file\'s are the record: its rows are not kept with them');
+  // (2.99.140) My grading scale, in GPA settings: the student's scale for every course without one of its own. On, A− taken
+  // off it (Delete on its handle), Done: 92.4% is a B+ (A from 93, B+ from 87) — off again, the course's own letter
+  await page.click('.bcv-gpa__gear');
+  await page.waitForSelector('.bcv-gpa-set .bcv-switch[aria-label="Use my own grading scale"]', { timeout: 5000 });
+  const usualSec = await page.evaluate(() => { const sw = document.querySelector('.bcv-gpa-set .bcv-switch[aria-label="Use my own grading scale"]'); const sec = sw.closest('.bcv-gpa-set__sec'); return { k: sec.querySelector('.bcv-gpa-set__k').textContent, on: sw.getAttribute('aria-checked'), body: sec.querySelector('.bcv-gpa-set__scale').hidden }; });
+  await page.click('.bcv-gpa-set .bcv-switch[aria-label="Use my own grading scale"]');
+  await page.waitForSelector('.bcv-gpa-set .bcv-sbar__knob[data-letter="A-"]', { state: 'visible', timeout: 3000 });
+  await page.focus('.bcv-gpa-set .bcv-sbar__knob[data-letter="A-"]');
+  await page.keyboard.press('Delete');
+  await shot(page, '16y-grading-scale-settings');
+  await page.click('.bcv-gpa-set__foot .bcv-btn');
+  await page.waitForFunction(() => !document.querySelector('.bcv-gpa-set') && /^B\+ F26-MATH 021 20/.test(document.querySelector('.bcv-gpa__card')?.innerText.replace(/\s+/g, ' ') || ''), null, { timeout: 5000 });
+  const usualSaved = (await readPrefs())?.gradeScales?.['*'];
+  check(usualSec.k === 'My grading scale' && usualSec.on === 'false' && usualSec.body === true && usualSaved?.['A-'] === null && usualSaved?.A === 93 && usualSaved?.['A+'] === 97, `My grading scale letters every course: A− off it, 92.4% is a B+ on the course's card: ${JSON.stringify({ usualSec, usualSaved })}`);
+  await page.click('.bcv-gpa__gear');
+  await page.waitForSelector('.bcv-gpa-set .bcv-switch[aria-label="Use my own grading scale"][aria-checked="true"]', { timeout: 5000 });
+  const usualBack = await page.$$eval('.bcv-gpa-set .bcv-sbar__knob', (els) => els.map((e) => e.dataset.letter).join(' '));
+  await page.click('.bcv-gpa-set .bcv-switch[aria-label="Use my own grading scale"]');
+  await page.click('.bcv-gpa-set__foot .bcv-btn');
+  await page.waitForFunction(() => !document.querySelector('.bcv-gpa-set') && /^A− F26-MATH 021 20/.test(document.querySelector('.bcv-gpa__card')?.innerText.replace(/\s+/g, ' ') || ''), null, { timeout: 5000 });
+  check(usualBack === 'A+ A B+ B B- C+ C C- D' && !(await readPrefs())?.gradeScales?.['*'], `the sheet opens on the scale saved (A− still off), and switched off it lets it go: the card's A− again: ${usualBack}`);
   // ---- past points on the trend: a day (or a term) and a GPA by hand, or a CSV of them, on the sheet ----
   // tracking keeps one snapshot a day from today; what came before goes on the chart from the sheet's
   // own History section, and the chart then spreads eight points across the whole, the first and the last always
