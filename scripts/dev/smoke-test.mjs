@@ -1701,8 +1701,11 @@ try {
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-evsheet'), null, { timeout: 3000 });
   // an assignment on the grid opens in the preview panel beside the month rather than leaving the page
-  const chipTitle = await page.$eval('.bcv-ev[href*="/assignments/"]', (e) => e.querySelector('.bcv-ev__label').textContent);
-  await page.click('.bcv-ev[href*="/assignments/"]');
+  // (a plain one: an external tool's previews as a Tool — and which is first on the month moves with the date, Knewton
+  // Alta's Unit 1, nine days back, on the grid only from the month's tenth)
+  const plainChip = await page.$$eval('.bcv-ev[href*="/assignments/"]', (els) => { const e = els.find((x) => !/Knewton Alta|^W\d|Lab 0 tool/.test(x.querySelector('.bcv-ev__label')?.textContent || '')); return e ? { href: e.getAttribute('href'), title: e.querySelector('.bcv-ev__label').textContent } : null; });
+  const chipTitle = plainChip?.title;
+  await page.click(`.bcv-ev[href="${plainChip?.href}"]`);
   await page.waitForSelector('.bcv-pv', { timeout: 10000 }); // (the panel stands beside the page here, the way the To Do list's does)
   await page.waitForFunction(() => !document.querySelector('.bcv-pv .bcv-skel'), null, { timeout: 10000 });
   check(/\/calendar/.test(page.url()) && (await page.$eval('.bcv-pv', (e) => e.classList.contains('bcv-pv--float') && e.classList.contains('bcv-pv--card'))) && /^Assignment · /.test((await texts('.bcv-pv__kicker'))[0]) && (await texts('.bcv-pv__title'))[0] === chipTitle && /^Due /.test((await texts('.bcv-pv__fact'))[0]) && (await page.$eval('.bcv-pv__go', (e) => e.getAttribute('aria-label'))) === 'Open the assignment' && (await page.$('.bcv-cal__grid')) !== null, `pressing an assignment on the calendar previews it beside the month: ${JSON.stringify({ chip: chipTitle, url: page.url(), html: await page.$eval('html', (e) => e.className), kicker: (await texts('.bcv-pv__kicker'))[0], title: (await texts('.bcv-pv__title'))[0], meta: (await texts('.bcv-pv__meta'))[0], go: (await texts('.bcv-pv__go'))[0], grid: !!(await page.$('.bcv-cal__grid')) })}`);
