@@ -25,7 +25,9 @@ concurrency:
 jobs:
   suites:
     name: Every suite
-    runs-on: ubuntu-latest
+    # (Ubuntu 24.04 by name: ubuntu-latest moved to 26.04, where the Playwright the suites are written against has no
+    #  Chromium — "Playwright does not support chromium on ubuntu26.04-x64" — and no suite ran)
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       # (the version the suites are written against; the browser it downloads is kept between runs under its number)
