@@ -114,10 +114,13 @@ private final class PreviewWindow: NSWindow {
     override func cancelOperation(_ sender: Any?) { close() }
 }
 
-/// The window's toolbar: its title (the file's name) at the left, and at the right Share, Open in its app and Download —
-/// Show in Finder once it is downloaded.
+/// The window's toolbar: its title (the file's name) at the left, and at the right Share and Open in its app, then
+/// (1.3.219) Download on its own — Show in Finder once it is downloaded.
 private final class PreviewToolbar: NSObject, NSToolbarDelegate {
     static let actions = NSToolbarItem.Identifier("SimplFilePreviewActions")
+    /// (1.3.219) Download on its own, apart from Share and Open in its app: the window's one big blue button, not one
+    /// inside their glass (the owner: "make the download button a standalone big blue button instead of inside").
+    static let downloadItem = NSToolbarItem.Identifier("SimplFilePreviewDownload")
     let model: FilePreviewWindow.Model
     let download: () -> Void
     let openInApp: () -> Void
@@ -130,25 +133,33 @@ private final class PreviewToolbar: NSObject, NSToolbarDelegate {
         self.reveal = reveal
     }
 
-    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { [.flexibleSpace, Self.actions] }
+    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { [.flexibleSpace, Self.actions, .space, Self.downloadItem] }
 
-    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { [.flexibleSpace, Self.actions] }
+    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { [.flexibleSpace, .space, Self.actions, Self.downloadItem] }
 
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier id: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
-        guard id == Self.actions else { return nil }
-        let item = NSToolbarItem(itemIdentifier: id)
-        item.label = "Actions"
-        item.view = NSHostingView(rootView: PreviewActions(model: model, download: download, openInApp: openInApp, reveal: reveal))
-        return item
+        switch id {
+        case Self.actions:
+            let item = NSToolbarItem(itemIdentifier: id)
+            item.label = "Actions"
+            item.view = NSHostingView(rootView: PreviewActions(model: model, openInApp: openInApp))
+            return item
+        case Self.downloadItem:
+            let item = NSToolbarItem(itemIdentifier: id)
+            item.label = "Download"
+            item.isBordered = false // (its own blue capsule, with no glass drawn round it)
+            item.view = NSHostingView(rootView: PreviewDownload(model: model, download: download, reveal: reveal))
+            return item
+        default:
+            return nil
+        }
     }
 }
 
-/// Share, Open in its app, and Download (⌘S) — or, downloaded, Show in Finder.
+/// Share and Open in its app, together in the toolbar's glass.
 private struct PreviewActions: View {
     @ObservedObject var model: FilePreviewWindow.Model
-    let download: () -> Void
     let openInApp: () -> Void
-    let reveal: () -> Void
 
     var body: some View {
         HStack(spacing: 8) {
@@ -161,6 +172,21 @@ private struct PreviewActions: View {
             }
             Button(FileKind.openTitle(for: model.name)) { openInApp() }
                 .help("A copy in Downloads, opened in its app")
+        }
+        .labelStyle(.titleAndIcon)
+        .fixedSize()
+        .padding(.horizontal, 4)
+    }
+}
+
+/// (1.3.219) Download (⌘S) on its own, a big blue button — or, downloaded, Show in Finder in its place.
+private struct PreviewDownload: View {
+    @ObservedObject var model: FilePreviewWindow.Model
+    let download: () -> Void
+    let reveal: () -> Void
+
+    var body: some View {
+        Group {
             if model.saved != nil {
                 Button { reveal() } label: {
                     Label("Show in Finder", systemImage: "checkmark.circle.fill")
@@ -170,30 +196,27 @@ private struct PreviewActions: View {
                 Button { download() } label: {
                     Label("Download", systemImage: "arrow.down.circle")
                 }
-                .buttonStyle(PreviewDownloadStyle())
                 .keyboardShortcut("s", modifiers: .command)
                 .help("Save it to your Downloads folder (⌘S)")
             }
         }
+        .buttonStyle(PreviewDownloadStyle())
         .labelStyle(.titleAndIcon)
         .fixedSize()
-        // (1.3.193) Download kept clear of the bar's rounded end, as far in from it as from its top and foot (it sat
-        //  flush against it before)
-        .padding(.leading, 4)
-        .padding(.trailing, 6)
     }
 }
 
-/// Download, the window's one blue button. Its fill is its own: in the toolbar's glass, `.borderedProminent` is drawn
-/// without one, its white words on white.
+/// Download, the window's one blue button: (1.3.219) big, and its own capsule. Its fill is its own: in the toolbar's
+/// glass, `.borderedProminent` is drawn without one, its white words on white.
 private struct PreviewDownloadStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 12, weight: .semibold))
+            .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(.white)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
+            .padding(.horizontal, 16)
+            .frame(minHeight: 32)
             .background(Capsule().fill(Color.accentColor.opacity(configuration.isPressed ? 0.75 : 1)))
+            .shadow(color: Color.accentColor.opacity(0.28), radius: 5, y: 1)
             .contentShape(Capsule())
     }
 }
