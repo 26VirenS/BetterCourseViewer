@@ -197,12 +197,14 @@ private struct PreviewDownload: View {
                     } icon: {
                         Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
                     }
+                    .modifier(PreviewDownloadLabel())
                 }
                 .glassButton()
                 .help("Downloaded: show it in Finder")
             } else {
                 Button { download() } label: {
                     Label("Download", systemImage: "arrow.down.circle")
+                        .modifier(PreviewDownloadLabel())
                 }
                 .glassButton(prominent: true, tint: .blue)
                 .keyboardShortcut("s", modifiers: .command)
@@ -210,10 +212,20 @@ private struct PreviewDownload: View {
             }
         }
         .controlSize(.large)
-        .font(.system(size: 13, weight: .semibold))
         .labelStyle(.titleAndIcon)
         .fixedSize()
         .padding(.trailing, 8) // (clear of the window's rounded corner)
+    }
+}
+
+/// (1.3.220) The button's words in bold, and the glass round them as tall as the bar beside it: set on the label
+/// itself, as the glass style sets its own font and height over what is put on the button from outside.
+private struct PreviewDownloadLabel: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .font(.system(size: 13, weight: .semibold))
+            .padding(.vertical, 4)
+            .padding(.horizontal, 2)
     }
 }
 
