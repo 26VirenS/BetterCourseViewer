@@ -179,7 +179,10 @@ private struct PreviewActions: View {
     }
 }
 
-/// (1.3.219) Download (⌘S) on its own, a big blue button — or, downloaded, Show in Finder in its place.
+/// (1.3.219) Download (⌘S) on its own, a big blue button — or, downloaded, Show in Finder in its place. (1.3.220) A
+/// button of Liquid Glass, tinted blue (glass: Show in Finder), as tall as the bar of glass beside it, and kept in from
+/// the window's rounded corner — the owner: "use a liquid blue glass button please and fix the padding on the side"
+/// (1.3.219's own capsule stood flush against the window's edge).
 private struct PreviewDownload: View {
     @ObservedObject var model: FilePreviewWindow.Model
     let download: () -> Void
@@ -189,35 +192,28 @@ private struct PreviewDownload: View {
         Group {
             if model.saved != nil {
                 Button { reveal() } label: {
-                    Label("Show in Finder", systemImage: "checkmark.circle.fill")
+                    Label {
+                        Text("Show in Finder")
+                    } icon: {
+                        Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                    }
                 }
+                .glassButton()
                 .help("Downloaded: show it in Finder")
             } else {
                 Button { download() } label: {
                     Label("Download", systemImage: "arrow.down.circle")
                 }
+                .glassButton(prominent: true, tint: .blue)
                 .keyboardShortcut("s", modifiers: .command)
                 .help("Save it to your Downloads folder (⌘S)")
             }
         }
-        .buttonStyle(PreviewDownloadStyle())
+        .controlSize(.large)
+        .font(.system(size: 13, weight: .semibold))
         .labelStyle(.titleAndIcon)
         .fixedSize()
-    }
-}
-
-/// Download, the window's one blue button: (1.3.219) big, and its own capsule. Its fill is its own: in the toolbar's
-/// glass, `.borderedProminent` is drawn without one, its white words on white.
-private struct PreviewDownloadStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 16)
-            .frame(minHeight: 32)
-            .background(Capsule().fill(Color.accentColor.opacity(configuration.isPressed ? 0.75 : 1)))
-            .shadow(color: Color.accentColor.opacity(0.28), radius: 5, y: 1)
-            .contentShape(Capsule())
+        .padding(.trailing, 8) // (clear of the window's rounded corner)
     }
 }
 
