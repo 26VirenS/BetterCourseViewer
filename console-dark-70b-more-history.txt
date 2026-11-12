@@ -1,0 +1,25 @@
+2026-11-12 08:57:16.864 Simpl[9779:30966] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 08:57:18.208 Simpl[9779:30966] [Simpl] window: the app's screens (no page)
+2026-11-12 08:57:18.640 Simpl[9779:30966] [Simpl] appear Dashboard: 532 ms
+2026-11-12 08:57:18.926 Simpl[9779:30966] [Simpl] appear Dashboard: 817 ms
+2026-11-12 08:57:23.787 Simpl[9779:30966] [Simpl] open Dashboard: 5672 ms (kept)
+2026-11-12 08:57:24.137 Simpl[9779:30966] [Simpl] call quietColors: 5495 ms
+2026-11-12 08:57:24.209 Simpl[9779:30966] [Simpl] call moreHistory: 269 ms
+2026-11-12 08:57:24.302 Simpl[9779:30966] [Simpl] call dashList: 3294 ms
+2026-11-12 08:57:24.302 Simpl[9779:30966] [Simpl] call dashList: 3418 ms
+2026-11-12 08:57:24.302 Simpl[9779:30966] [Simpl] call today: 2931 ms
+2026-11-12 08:57:24.303 Simpl[9779:30966] [Simpl] call today: 2933 ms
+2026-11-12 08:57:24.304 Simpl[9779:30966] [Simpl] call todayCounts: 530 ms
+2026-11-12 08:57:24.304 Simpl[9779:30966] [Simpl] call todayCounts: 530 ms
+2026-11-12 08:57:24.304 Simpl[9779:30966] [Simpl] call todayCounts: 530 ms
+2026-11-12 08:57:24.304 Simpl[9779:30966] [Simpl] call todayCounts: 530 ms
+2026-11-12 08:57:24.304 Simpl[9779:30966] [Simpl] call dashSkyline: 3297 ms
+2026-11-12 08:57:24.304 Simpl[9779:30966] [Simpl] call dashSkyline: 3420 ms
+2026-11-12 08:57:24.304 Simpl[9779:30966] [Simpl] call snapshot: 364 ms
+2026-11-12 08:57:24.619 Simpl[9779:30966] [Simpl] popup more: 440 × 208
+2026-11-12 08:57:24.625 Simpl[9779:30966] [Simpl] popup more: 440 × 260
+2026-11-12 08:57:25.276 Simpl[9779:30966] [Simpl] open Dashboard: 7164 ms (live)
+2026-11-12 08:57:25.620 Simpl[9779:30966] [Simpl] call courses: 1001 ms
+2026-11-12 08:57:26.276 Simpl[9779:30966] [Simpl] call groups: 655 ms
+2026-11-12 08:57:27.282 Simpl[9779:30966] [Simpl] call moreFromCanvas: 1005 ms
+2026-11-12 08:57:29.527 Simpl[9779:30966] [Simpl] shot: another copy of the app is in front; brought forward again

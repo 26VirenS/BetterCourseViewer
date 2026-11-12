@@ -1,0 +1,23 @@
+2026-11-12 09:08:37.001 Simpl[35952:97949] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 09:08:38.450 Simpl[35952:97949] [Simpl] window: the app's screens (no page)
+2026-11-12 09:08:39.164 Simpl[35952:97949] [Simpl] appear Course home: 978 ms
+2026-11-12 09:08:39.792 Simpl[35952:97949] [Simpl] appear Course home: 1606 ms
+2026-11-12 09:08:47.174 Simpl[35952:97949] [Simpl] open Course home: 8986 ms (kept)
+2026-11-12 09:08:48.708 Simpl[35952:97949] [Simpl] appear Assignment: 751 ms
+2026-11-12 09:08:50.712 Simpl[35952:97949] [Simpl] call quietColors: 11550 ms
+2026-11-12 09:08:50.714 Simpl[35952:97949] [Simpl] call home: 5481 ms
+2026-11-12 09:08:50.714 Simpl[35952:97949] [Simpl] call home: 5602 ms
+2026-11-12 09:08:50.976 Simpl[35952:97949] [Simpl] call home: 5743 ms
+2026-11-12 09:08:50.977 Simpl[35952:97949] [Simpl] call neighbours: 1640 ms
+2026-11-12 09:08:50.977 Simpl[35952:97949] [Simpl] call snapshot: 3021 ms
+2026-11-12 09:08:51.096 Simpl[35952:97949] [Simpl] open Course home: 3139 ms (live)
+2026-11-12 09:08:51.670 Simpl[35952:97949] [Simpl] call assignment: 1153 ms
+2026-11-12 09:08:51.670 Simpl[35952:97949] SimplAssignment 1008: files 1, comments 0, steps See Feedback+Hand In Again, review 1, handIn 0, error -
+2026-11-12 09:08:52.518 Simpl[35952:97949] [Simpl] popup feedback:101/1008: 984 × 591, 20 in from the window (sidebar out)
+2026-11-12 09:08:52.863 Simpl[35952:97949] SimplMore group=Effort
+2026-11-12 09:08:54.114 Simpl[35952:97949] [Simpl] open Assignment: 6157 ms (fetched)
+2026-11-12 09:08:54.356 Simpl[35952:97949] [Simpl] call courses: 3261 ms
+2026-11-12 09:08:55.008 Simpl[35952:97949] [Simpl] call neighbours: 1937 ms
+2026-11-12 09:08:55.102 Simpl[35952:97949] [Simpl] call groups: 745 ms
+2026-11-12 09:08:58.385 Simpl[35952:97949] [Simpl] call moreFromCanvas: 3283 ms
+2026-11-12 09:09:00.890 Simpl[35952:97949] [Simpl] shot: another copy of the app is in front; brought forward again

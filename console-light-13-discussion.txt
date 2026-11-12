@@ -1,0 +1,14 @@
+2026-11-12 08:54:54.160 Simpl[4185:16176] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 08:54:56.202 Simpl[4185:16176] [Simpl] window: the app's screens (no page)
+2026-11-12 08:54:56.631 Simpl[4185:16176] [Simpl] appear Course home: 753 ms
+2026-11-12 08:54:57.034 Simpl[4185:16176] [Simpl] appear Course home: 1157 ms
+2026-11-12 08:55:04.686 Simpl[4185:16176] [Simpl] appear Discussion: 554 ms
+2026-11-12 08:55:08.124 Simpl[4185:16176] [Simpl] call quietColors: 11488 ms
+2026-11-12 08:55:08.128 Simpl[4185:16176] [Simpl] call home: 5117 ms
+2026-11-12 08:55:08.129 Simpl[4185:16176] [Simpl] call home: 5956 ms
+2026-11-12 08:55:08.129 Simpl[4185:16176] [Simpl] call home: 6019 ms
+2026-11-12 08:55:09.014 Simpl[4185:16176] [Simpl] call snapshot: 4831 ms
+2026-11-12 08:55:15.081 Simpl[4185:16176] [Simpl] call topic: 7418 ms
+2026-11-12 08:55:15.084 Simpl[4185:16176] [Simpl] open Course home: 10947 ms (fetched)
+2026-11-12 08:55:28.252 Simpl[4185:16176] [Simpl] open Discussion: 24088 ms (fetched)
+2026-11-12 08:55:29.896 Simpl[4185:16176] [richtext] not measured after 12 s, shown as plain text: <p>Is there a discussion section this week or is

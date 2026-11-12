@@ -1,0 +1,13 @@
+2026-11-12 08:56:25.361 Simpl[8000:26203] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 08:56:28.837 Simpl[8000:26203] [Simpl] window: the app's screens (no page)
+2026-11-12 08:56:32.593 Simpl[8000:26203] [Simpl] popup tool: 984 × 607, 20 in from the window (sidebar out)
+2026-11-12 08:56:32.667 Simpl[8000:26203] [Simpl] bio launch: dna nucleotides:mol=DT:numbers:compare: style cartoon, grooves off, measure off, unzip 0.00, nucleotide DT (model3D), rna cloverleaf, step 1
+2026-11-12 08:56:43.681 Simpl[8000:26203] [Simpl] popup tool: 984 × 591, 20 in from the window (sidebar out)
+2026-11-12 08:56:45.450 Simpl[8000:26203] [Simpl] bio scene: nt|DT|ballStick|true|true|true|true|true|true made in 12053 ms, 76 objects
+2026-11-12 08:56:45.635 Simpl[8000:26203] [Simpl] bio frame nt|DT|ballStick|true|true|true|true|true|true: view 570 × 339, model 49% across, 75% up
+2026-11-12 08:56:59.085 Simpl[8000:26203] [Simpl] call snapshot: 1064 ms
+2026-11-12 08:57:16.705 Simpl[8000:26203] [Simpl] call courses: 17292 ms
+2026-11-12 08:57:17.566 Simpl[8000:26203] [Simpl] call groups: 859 ms
+2026-11-12 08:57:20.230 Simpl[8000:26203] [Simpl] call moreFromCanvas: 2662 ms
+2026-11-12 08:57:22.568 Simpl[8000:26203] [Simpl] popup tool: 984 × 589, 20 in from the window (sidebar out)
+2026-11-12 08:57:22.702 Simpl[8000:26203] [Simpl] bio frame nt|DT|ballStick|true|true|true|true|true|true: view 570 × 337, model 48% across, 75% up

@@ -1,0 +1,12 @@
+2026-11-12 08:58:46.181 Simpl[12262:37174] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 08:58:48.505 Simpl[12262:37174] [Simpl] window: the app's screens (no page)
+2026-11-12 08:58:54.630 Simpl[12262:37174] [Simpl] popup tool: 984 × 611, 20 in from the window (sidebar out)
+2026-11-12 08:58:54.733 Simpl[12262:37174] [Simpl] bio launch: dna rna:view=lshape: style cartoon, grooves off, measure off, unzip 0.00, nucleotide DA (model3D), rna lShape, step 1
+2026-11-12 08:59:03.886 Simpl[12262:37174] [Simpl] popup tool: 984 × 588, 20 in from the window (sidebar out)
+2026-11-12 08:59:07.009 Simpl[12262:37174] [Simpl] bio scene: trna|true made in 11770 ms, 98 objects
+2026-11-12 08:59:07.058 Simpl[12262:37174] [Simpl] bio frame trna|true: view 570 × 336, model 42% across, 84% up
+2026-11-12 08:59:11.434 Simpl[12262:37174] [Simpl] call quietColors: 19339 ms
+2026-11-12 08:59:11.441 Simpl[12262:37174] [Simpl] call snapshot: 1848 ms
+2026-11-12 08:59:13.296 Simpl[12262:37174] [Simpl] call courses: 1733 ms
+2026-11-12 08:59:14.397 Simpl[12262:37174] [Simpl] call groups: 1100 ms
+2026-11-12 08:59:15.796 Simpl[12262:37174] [Simpl] call moreFromCanvas: 1397 ms

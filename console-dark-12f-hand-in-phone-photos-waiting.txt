@@ -1,0 +1,23 @@
+2026-11-12 09:07:58.856 Simpl[34196:93544] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 09:08:01.167 Simpl[34196:93544] [Simpl] window: the app's screens (no page)
+2026-11-12 09:08:01.783 Simpl[34196:93544] [Simpl] appear Course home: 1268 ms
+2026-11-12 09:08:02.612 Simpl[34196:93544] [Simpl] appear Course home: 2097 ms
+2026-11-12 09:08:06.548 Simpl[34196:93544] [Simpl] open Course home: 6032 ms (kept)
+2026-11-12 09:08:07.711 Simpl[34196:93544] [Simpl] appear Assignment: 605 ms
+2026-11-12 09:08:10.884 Simpl[34196:93544] [Simpl] call quietColors: 9106 ms
+2026-11-12 09:08:10.964 Simpl[34196:93544] [Simpl] call home: 5908 ms
+2026-11-12 09:08:10.967 Simpl[34196:93544] [Simpl] call home: 6019 ms
+2026-11-12 09:08:10.972 Simpl[34196:93544] [Simpl] call home: 6083 ms
+2026-11-12 09:08:12.123 Simpl[34196:93544] [Simpl] open Course home: 5017 ms (live)
+2026-11-12 09:08:12.132 Simpl[34196:93544] [Simpl] call neighbours: 3759 ms
+2026-11-12 09:08:12.135 Simpl[34196:93544] [Simpl] call assignment: 1388 ms
+2026-11-12 09:08:12.157 Simpl[34196:93544] SimplAssignment 1013: files 0, comments 0, steps Hand In, review 0, handIn 1, error -
+2026-11-12 09:08:12.182 Simpl[34196:93544] [Simpl] call snapshot: 5076 ms
+2026-11-12 09:08:13.657 Simpl[34196:93544] SimplMore group=Collaboration | files=PDF only
+2026-11-12 09:08:17.499 Simpl[34196:93544] [Simpl] open Assignment: 10393 ms (fetched)
+2026-11-12 09:08:17.501 Simpl[34196:93544] [Simpl] popup handin:101/1013: 580 × 560
+2026-11-12 09:08:24.707 Simpl[34196:93544] [Simpl] call convertInfo: 9446 ms
+2026-11-12 09:08:25.356 Simpl[34196:93544] [Simpl] call neighbours: 9318 ms
+2026-11-12 09:08:25.356 Simpl[34196:93544] [Simpl] call courses: 10092 ms
+2026-11-12 09:08:25.793 Simpl[34196:93544] [Simpl] call groups: 392 ms
+2026-11-12 09:08:26.745 Simpl[34196:93544] [Simpl] call moreFromCanvas: 951 ms

@@ -1,0 +1,20 @@
+2026-11-12 09:00:14.323 Simpl[17303:50009] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 09:00:17.195 Simpl[17303:50009] [Simpl] window: the app's screens (no page)
+2026-11-12 09:00:17.844 Simpl[17303:50009] [Simpl] appear Course home: 937 ms
+2026-11-12 09:00:18.748 Simpl[17303:50009] [Simpl] appear Course home: 1841 ms
+2026-11-12 09:00:22.331 Simpl[17303:50009] [Simpl] appear Assignment: 363 ms
+2026-11-12 09:00:23.689 Simpl[17303:50009] [Simpl] call quietColors: 5849 ms
+2026-11-12 09:00:23.693 Simpl[17303:50009] [Simpl] call home: 2612 ms
+2026-11-12 09:00:23.693 Simpl[17303:50009] [Simpl] call home: 2614 ms
+2026-11-12 09:00:23.695 Simpl[17303:50009] [Simpl] call home: 2764 ms
+2026-11-12 09:00:24.738 Simpl[17303:50009] [Simpl] call neighbours: 1960 ms
+2026-11-12 09:00:24.740 Simpl[17303:50009] [Simpl] open Course home: 2773 ms (fetched)
+2026-11-12 09:00:24.741 Simpl[17303:50009] [Simpl] call snapshot: 2776 ms
+2026-11-12 09:00:24.978 Simpl[17303:50009] [Simpl] call assignment: 1327 ms
+2026-11-12 09:00:24.980 Simpl[17303:50009] SimplAssignment 4001: files 1, comments 3, steps See Feedback+Hand In Again, review 0, handIn 0, error -
+2026-11-12 09:00:25.457 Simpl[17303:50009] SimplMore group=Assignments
+2026-11-12 09:00:27.117 Simpl[17303:50009] [Simpl] open Assignment: 5151 ms (fetched)
+2026-11-12 09:00:27.404 Simpl[17303:50009] [Simpl] call courses: 2606 ms
+2026-11-12 09:00:30.330 Simpl[17303:50009] [Simpl] call neighbours: 4587 ms
+2026-11-12 09:00:30.508 Simpl[17303:50009] [Simpl] call groups: 3075 ms
+2026-11-12 09:00:31.366 Simpl[17303:50009] [Simpl] call moreFromCanvas: 855 ms

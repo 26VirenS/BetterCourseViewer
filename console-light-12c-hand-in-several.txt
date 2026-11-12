@@ -1,0 +1,29 @@
+2026-11-12 09:09:31.672 Simpl[36511:98939] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 09:09:32.885 Simpl[36511:98939] [Simpl] window: the app's screens (no page)
+2026-11-12 09:09:33.424 Simpl[36511:98939] [Simpl] appear Course home: 847 ms
+2026-11-12 09:09:33.877 Simpl[36511:98939] [Simpl] appear Course home: 1300 ms
+2026-11-12 09:09:43.567 Simpl[36511:98939] [Simpl] appear Assignment: 408 ms
+2026-11-12 09:09:44.936 Simpl[36511:98939] [Simpl] call quietColors: 11515 ms
+2026-11-12 09:09:44.939 Simpl[36511:98939] [Simpl] call home: 11061 ms
+2026-11-12 09:09:44.940 Simpl[36511:98939] [Simpl] call home: 2262 ms
+2026-11-12 09:09:44.942 Simpl[36511:98939] [Simpl] call home: 2314 ms
+2026-11-12 09:09:46.769 Simpl[36511:98939] [Simpl] open Course home: 3611 ms (fetched)
+2026-11-12 09:09:46.769 Simpl[36511:98939] [Simpl] call neighbours: 2631 ms
+2026-11-12 09:09:46.770 Simpl[36511:98939] [Simpl] call assignment: 2882 ms
+2026-11-12 09:09:46.779 Simpl[36511:98939] SimplAssignment 1012: files 0, comments 0, steps Hand In, review 0, handIn 1, error -
+2026-11-12 09:09:46.780 Simpl[36511:98939] [Simpl] call snapshot: 3621 ms
+2026-11-12 09:09:47.861 Simpl[36511:98939] SimplMore group=Effort
+2026-11-12 09:09:58.208 Simpl[36511:98939] [Simpl] open Assignment: 15043 ms (fetched)
+2026-11-12 09:09:58.208 Simpl[36511:98939] [Simpl] popup handin:101/1012: 580 × 560
+2026-11-12 09:09:58.221 Simpl[36511:98939] SimplHandIn adding 3 files at once
+2026-11-12 09:09:58.225 Simpl[36511:98939] SimplHandIn added calendar.png (1 files)
+2026-11-12 09:09:58.251 Simpl[36511:98939] SimplHandIn added grades.png (2 files)
+2026-11-12 09:09:58.285 Simpl[36511:98939] SimplHandIn added dashboard.png (3 files)
+2026-11-12 09:09:59.017 Simpl[36511:98939] SimplHandIn added 3 files at once: 3 in
+2026-11-12 09:09:59.249 Simpl[36511:98939] SimplPreview: dashboard.png in Quick Look
+2026-11-12 09:09:59.947 Simpl[36511:98939] [Simpl] popup handin:101/1012: 977 × 560
+2026-11-12 09:10:00.064 Simpl[36511:98939] [richtext] not measured after 12 s, shown as plain text: <p>Complete <strong>Composing functions</strong>
+2026-11-12 09:10:03.161 Simpl[36511:98939] [Simpl] call neighbours: 10339 ms
+2026-11-12 09:10:03.167 Simpl[36511:98939] [Simpl] call courses: 13668 ms
+2026-11-12 09:10:03.769 Simpl[36511:98939] [Simpl] call groups: 573 ms
+2026-11-12 09:10:04.712 Simpl[36511:98939] [Simpl] call moreFromCanvas: 942 ms

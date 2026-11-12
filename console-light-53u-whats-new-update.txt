@@ -1,0 +1,23 @@
+2026-11-12 09:09:42.875 Simpl[37034:100356] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 09:09:47.344 Simpl[37034:100356] [Simpl] window: the app's screens (no page)
+2026-11-12 09:09:49.682 Simpl[37034:100356] [Simpl] appear Dashboard: 3029 ms
+2026-11-12 09:09:51.674 Simpl[37034:100356] [Simpl] appear Dashboard: 5021 ms
+2026-11-12 09:10:01.478 Simpl[37034:100356] [Simpl] open Dashboard: 14824 ms (kept)
+2026-11-12 09:10:03.048 Simpl[37034:100356] [Simpl] call quietColors: 13372 ms
+2026-11-12 09:10:03.052 Simpl[37034:100356] [Simpl] call todayCounts: 1585 ms
+2026-11-12 09:10:03.059 Simpl[37034:100356] [Simpl] call todayCounts: 1593 ms
+2026-11-12 09:10:03.059 Simpl[37034:100356] [Simpl] call todayCounts: 1593 ms
+2026-11-12 09:10:03.059 Simpl[37034:100356] [Simpl] call todayCounts: 1593 ms
+2026-11-12 09:10:03.061 Simpl[37034:100356] [Simpl] call today: 2775 ms
+2026-11-12 09:10:03.064 Simpl[37034:100356] [Simpl] call dashSkyline: 3156 ms
+2026-11-12 09:10:03.072 Simpl[37034:100356] [Simpl] call dashSkyline: 3166 ms
+2026-11-12 09:10:03.099 Simpl[37034:100356] [Simpl] call dashList: 3190 ms
+2026-11-12 09:10:03.102 Simpl[37034:100356] [Simpl] call today: 2816 ms
+2026-11-12 09:10:03.116 Simpl[37034:100356] [Simpl] call dashList: 3208 ms
+2026-11-12 09:10:03.583 Simpl[37034:100356] [Simpl] call snapshot: 1854 ms
+2026-11-12 09:10:04.174 Simpl[37034:100356] [Simpl] open Dashboard: 17516 ms (live)
+2026-11-12 09:10:05.344 Simpl[37034:100356] [Simpl] call courses: 1181 ms
+2026-11-12 09:10:05.879 Simpl[37034:100356] [Simpl] call groups: 533 ms
+2026-11-12 09:10:07.386 Simpl[37034:100356] [Simpl] call moreFromCanvas: 1506 ms
+2026-11-12 09:10:09.366 Simpl[37034:100356] [Simpl] what's new: 5 highlights of 23 notes from 12 versions (1.3.207 to 1.3.220), 2 for developers left out: More Details; Export Questions; Every Question at Once; Community Tools; Try One Before Adding
+2026-11-12 09:10:09.709 Simpl[37034:100356] [Simpl] popup whatsnew: 500 × 560

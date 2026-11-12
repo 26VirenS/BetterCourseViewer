@@ -1,0 +1,25 @@
+2026-11-12 09:08:08.987 Simpl[36704:99064] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 09:08:10.518 Simpl[36704:99064] [Simpl] window: the app's screens (no page)
+2026-11-12 09:08:10.898 Simpl[36704:99064] [Simpl] appear Course home: 602 ms
+2026-11-12 09:08:11.083 Simpl[36704:99064] [Simpl] appear Course home: 786 ms
+2026-11-12 09:08:14.434 Simpl[36704:99064] [Simpl] open Course home: 4137 ms (kept)
+2026-11-12 09:08:15.274 Simpl[36704:99064] [Simpl] appear Assignment: 533 ms
+2026-11-12 09:08:17.133 Simpl[36704:99064] [Simpl] call quietColors: 6235 ms
+2026-11-12 09:08:17.143 Simpl[36704:99064] [Simpl] call neighbours: 1505 ms
+2026-11-12 09:08:17.144 Simpl[36704:99064] [Simpl] call home: 4026 ms
+2026-11-12 09:08:17.174 Simpl[36704:99064] [Simpl] call home: 4057 ms
+2026-11-12 09:08:17.175 Simpl[36704:99064] [Simpl] call home: 4112 ms
+2026-11-12 09:08:17.176 Simpl[36704:99064] [Simpl] call snapshot: 2435 ms
+2026-11-12 09:08:18.107 Simpl[36704:99064] [Simpl] open Course home: 3367 ms (live)
+2026-11-12 09:08:18.112 Simpl[36704:99064] [Simpl] call assignment: 1408 ms
+2026-11-12 09:08:18.115 Simpl[36704:99064] SimplAssignment 1012: files 0, comments 0, steps Hand In, review 0, handIn 1, error -
+2026-11-12 09:08:19.377 Simpl[36704:99064] SimplMore group=Effort
+2026-11-12 09:08:21.871 Simpl[36704:99064] [Simpl] open Assignment: 7130 ms (fetched)
+2026-11-12 09:08:21.871 Simpl[36704:99064] [Simpl] popup handin:101/1012: 580 × 560
+2026-11-12 09:08:21.902 Simpl[36704:99064] SimplHandIn added calendar.png (1 files)
+2026-11-12 09:08:22.539 Simpl[36704:99064] SimplPreview: calendar.png in Quick Look
+2026-11-12 09:08:28.381 Simpl[36704:99064] [Simpl] popup handin:101/1012: 977 × 560
+2026-11-12 09:08:28.808 Simpl[36704:99064] [Simpl] call courses: 11113 ms
+2026-11-12 09:08:29.157 Simpl[36704:99064] [Simpl] call neighbours: 9576 ms
+2026-11-12 09:08:29.243 Simpl[36704:99064] [Simpl] call groups: 435 ms
+2026-11-12 09:08:30.805 Simpl[36704:99064] [Simpl] call moreFromCanvas: 1562 ms

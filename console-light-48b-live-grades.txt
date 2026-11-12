@@ -1,0 +1,20 @@
+2026-11-12 09:08:21.805 Simpl[37421:101446] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 09:08:23.143 Simpl[37421:101446] [Simpl] window: the app's screens (no page)
+2026-11-12 09:08:23.339 Simpl[37421:101446] [Simpl] appear Grades: 313 ms
+2026-11-12 09:08:23.502 Simpl[37421:101446] [Simpl] appear Grades: 476 ms
+2026-11-12 09:08:26.063 Simpl[37421:101446] [Simpl] call quietColors: 2725 ms
+2026-11-12 09:08:26.237 Simpl[37421:101446] [Simpl] call snapshot: 413 ms
+2026-11-12 09:08:26.352 Simpl[37421:101446] [Simpl] call grades: 3008 ms
+2026-11-12 09:08:26.353 Simpl[37421:101446] [Simpl] call grades: 2851 ms
+2026-11-12 09:08:26.900 Simpl[37421:101446] [Simpl] open Grades: 3873 ms (fetched)
+2026-11-12 09:08:26.946 Simpl[37421:101446] [Simpl] call courses: 657 ms
+2026-11-12 09:08:27.046 Simpl[37421:101446] [Simpl] call courseGrades: 455 ms
+2026-11-12 09:08:27.056 Simpl[37421:101446] [Simpl] call groups: 110 ms
+2026-11-12 09:08:27.618 Simpl[37421:101446] [Simpl] live: grades waits (loading)
+2026-11-12 09:08:27.713 Simpl[37421:101446] [Simpl] call moreFromCanvas: 657 ms
+2026-11-12 09:08:29.262 Simpl[37421:101446] [Simpl] live: grades unchanged · 0 reads
+2026-11-12 09:08:31.198 Simpl[37421:101446] [Simpl] live: dev change grade made (101)
+2026-11-12 09:08:33.338 Simpl[37421:101446] [Simpl] live: grades updated grades · 13 reads
+2026-11-12 09:08:37.393 Simpl[37421:101446] [Simpl] live: grades unchanged · 13 reads
+2026-11-12 09:08:41.502 Simpl[37421:101446] [Simpl] live: grades unchanged · 13 reads
+2026-11-12 09:08:45.715 Simpl[37421:101446] [Simpl] live: grades unchanged · 13 reads

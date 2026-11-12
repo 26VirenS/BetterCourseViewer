@@ -1,0 +1,27 @@
+2026-11-12 09:01:34.218 Simpl[20459:58114] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 09:01:35.213 Simpl[20459:58114] [Simpl] window: the app's screens (no page)
+2026-11-12 09:01:35.434 Simpl[20459:58114] [Simpl] appear Dashboard: 406 ms
+2026-11-12 09:01:35.686 Simpl[20459:58114] [Simpl] appear Dashboard: 659 ms
+2026-11-12 09:01:42.826 Simpl[20459:58114] [Simpl] open Dashboard: 7799 ms (kept)
+2026-11-12 09:01:47.415 Simpl[20459:58114] [Simpl] call snapshot: 301 ms
+2026-11-12 09:01:49.304 Simpl[20459:58114] [Simpl] call todayCounts: 6559 ms
+2026-11-12 09:01:49.304 Simpl[20459:58114] [Simpl] call todayCounts: 6559 ms
+2026-11-12 09:01:49.304 Simpl[20459:58114] [Simpl] call todayCounts: 6559 ms
+2026-11-12 09:01:49.305 Simpl[20459:58114] [Simpl] call todayCounts: 6560 ms
+2026-11-12 09:01:49.305 Simpl[20459:58114] [Simpl] call quietColors: 13872 ms
+2026-11-12 09:01:49.305 Simpl[20459:58114] [Simpl] call today: 11327 ms
+2026-11-12 09:01:49.306 Simpl[20459:58114] [Simpl] call dashSkyline: 11427 ms
+2026-11-12 09:01:49.311 Simpl[20459:58114] [Simpl] call dashSkyline: 11433 ms
+2026-11-12 09:01:49.808 Simpl[20459:58114] [Simpl] call dashList: 11928 ms
+2026-11-12 09:01:49.809 Simpl[20459:58114] [Simpl] call dashList: 11931 ms
+2026-11-12 09:01:49.810 Simpl[20459:58114] [Simpl] call today: 11832 ms
+2026-11-12 09:01:49.811 Simpl[20459:58114] [Simpl] open Dashboard: 14784 ms (live)
+2026-11-12 09:01:50.516 Simpl[20459:58114] [Simpl] call courses: 2492 ms
+2026-11-12 09:01:50.775 Simpl[20459:58114] [Simpl] call groups: 259 ms
+2026-11-12 09:01:52.141 Simpl[20459:58114] [Simpl] graph: drew y=x^2 for the picture
+2026-11-12 09:01:52.284 Simpl[20459:58114] [Simpl] call moreFromCanvas: 1508 ms
+2026-11-12 09:02:00.757 Simpl[20459:58114] [Simpl] popup tool: 984 × 591, 20 in from the window (sidebar out)
+2026-11-12 09:02:01.651 Simpl[20459:58114] [Simpl] pin full screen: graph (carried: nothing)
+2026-11-12 09:02:02.515 Simpl[20459:58114] [Simpl] graph: the pin's graph read (463 characters)
+2026-11-12 09:02:05.855 Simpl[20459:58114] [Simpl] graph: the pin's graph put in the whole one
+2026-11-12 09:02:24.588 Simpl[20459:58114] [Simpl] shot: another copy of the app is in front; brought forward again

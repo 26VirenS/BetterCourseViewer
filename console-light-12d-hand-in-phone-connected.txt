@@ -1,0 +1,28 @@
+2026-11-12 09:09:39.031 Simpl[38417:104516] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 09:09:41.346 Simpl[38417:104516] [Simpl] window: the app's screens (no page)
+2026-11-12 09:09:41.767 Simpl[38417:104516] [Simpl] appear Course home: 676 ms
+2026-11-12 09:09:42.238 Simpl[38417:104516] [Simpl] appear Course home: 1143 ms
+2026-11-12 09:09:45.774 Simpl[38417:104516] [Simpl] open Course home: 4682 ms (kept)
+2026-11-12 09:09:47.160 Simpl[38417:104516] [Simpl] appear Assignment: 865 ms
+2026-11-12 09:09:49.119 Simpl[38417:104516] [Simpl] call quietColors: 7352 ms
+2026-11-12 09:09:49.120 Simpl[38417:104516] [Simpl] call neighbours: 1214 ms
+2026-11-12 09:09:49.121 Simpl[38417:104516] [Simpl] call home: 5338 ms
+2026-11-12 09:09:49.121 Simpl[38417:104516] [Simpl] call assignment: 1957 ms
+2026-11-12 09:09:49.127 Simpl[38417:104516] SimplAssignment 1012: files 0, comments 0, steps Hand In, review 0, handIn 1, error -
+2026-11-12 09:09:49.152 Simpl[38417:104516] [Simpl] call snapshot: 2856 ms
+2026-11-12 09:09:50.135 Simpl[38417:104516] SimplMore group=Effort
+2026-11-12 09:09:52.822 Simpl[38417:104516] [Simpl] call home: 8914 ms
+2026-11-12 09:09:52.822 Simpl[38417:104516] [Simpl] call home: 9101 ms
+2026-11-12 09:09:52.885 Simpl[38417:104516] [Simpl] open Assignment: 6589 ms (fetched)
+2026-11-12 09:09:52.887 Simpl[38417:104516] [Simpl] popup handin:101/1012: 580 × 560
+2026-11-12 09:09:54.167 Simpl[38417:104516] SimplPhone ready http://192.168.64.12:50729/O9DTnBOg_5dWgRHIGkFkTw/ (Ethernet)
+2026-11-12 09:09:54.168 Simpl[38417:104516] [Simpl] open Course home: 7872 ms (live)
+2026-11-12 09:09:55.624 Simpl[38417:104516] SimplPhone opened
+2026-11-12 09:09:57.003 Simpl[38417:104516] SimplPhone received Photo from phone.jpg 103579 bytes
+2026-11-12 09:09:57.122 Simpl[38417:104516] SimplHandIn added Photo from phone.jpg (1 files)
+2026-11-12 09:09:57.190 Simpl[38417:104516] [Simpl] call neighbours: 5162 ms
+2026-11-12 09:09:57.192 Simpl[38417:104516] [Simpl] call courses: 5836 ms
+2026-11-12 09:09:59.303 Simpl[38417:104516] SimplPhone received Notes.txt 37 bytes
+2026-11-12 09:09:59.376 Simpl[38417:104516] SimplHandIn added Notes.txt (2 files)
+2026-11-12 09:10:00.554 Simpl[38417:104516] [Simpl] call groups: 3200 ms
+2026-11-12 09:10:01.784 Simpl[38417:104516] [Simpl] call moreFromCanvas: 1229 ms

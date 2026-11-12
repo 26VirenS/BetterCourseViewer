@@ -1,0 +1,26 @@
+2026-11-12 09:05:31.759 Simpl[30255:83288] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 09:05:33.768 Simpl[30255:83288] [Simpl] window: the app's screens (no page)
+2026-11-12 09:05:34.826 Simpl[30255:83288] [Simpl] appear Dashboard: 1631 ms
+2026-11-12 09:05:35.508 Simpl[30255:83288] [Simpl] appear Dashboard: 2313 ms
+2026-11-12 09:05:48.326 Simpl[30255:83288] [Simpl] open Dashboard: 15130 ms (kept)
+2026-11-12 09:05:50.807 Simpl[30255:83288] [Simpl] call toolLaunch: 1327 ms
+2026-11-12 09:05:50.807 Simpl[30255:83288] [Simpl] call quietColors: 15981 ms
+2026-11-12 09:05:51.860 Simpl[30255:83288] [Simpl] call todayCounts: 3586 ms
+2026-11-12 09:05:51.861 Simpl[30255:83288] [Simpl] call todayCounts: 3586 ms
+2026-11-12 09:05:51.861 Simpl[30255:83288] [Simpl] call todayCounts: 3586 ms
+2026-11-12 09:05:51.861 Simpl[30255:83288] [Simpl] call todayCounts: 3587 ms
+2026-11-12 09:05:51.866 Simpl[30255:83288] [Simpl] call today: 9796 ms
+2026-11-12 09:05:51.867 Simpl[30255:83288] [Simpl] call today: 9797 ms
+2026-11-12 09:05:51.868 Simpl[30255:83288] [Simpl] call dashList: 10213 ms
+2026-11-12 09:05:51.869 Simpl[30255:83288] [Simpl] call dashList: 10215 ms
+2026-11-12 09:05:51.869 Simpl[30255:83288] [Simpl] call dashSkyline: 10214 ms
+2026-11-12 09:05:51.870 Simpl[30255:83288] [Simpl] call dashSkyline: 10216 ms
+2026-11-12 09:05:52.222 Simpl[30255:83288] [Simpl] open Dashboard: 19026 ms (live)
+2026-11-12 09:05:52.602 Simpl[30255:83288] [Simpl] call snapshot: 3909 ms
+2026-11-12 09:05:53.108 Simpl[30255:83288] [Simpl] call courses: 378 ms
+2026-11-12 09:05:53.597 Simpl[30255:83288] [Simpl] tool window: the school's page for the tool, its launch sent on in this window
+2026-11-12 09:05:53.619 Simpl[30255:83288] [Simpl] recorder: on, into /tmp/simpl-shots.TnRobM/own-light-21m-tool-record/Downloads/Simpl Recordings/Smartwork- CH05HW (Part 2) 2026-11-12 at 09.05.53
+2026-11-12 09:05:55.435 Simpl[30255:83288] [Simpl] call groups: 2324 ms
+2026-11-12 09:05:56.659 Simpl[30255:83288] [Simpl] recorder: step 1 (0001 page.html.gz, 0001 screenshot.jpg, 0001 data.json), 41826 bytes so far
+2026-11-12 09:05:57.043 Simpl[30255:83288] [Simpl] recorder: step 2 (0002 page.html.gz, 0002 data.json), 43212 bytes so far
+2026-11-12 09:05:57.182 Simpl[30255:83288] [Simpl] call moreFromCanvas: 1747 ms

@@ -1,0 +1,3 @@
+ok   a narrow month put To Do away and named its items: calendar month: To Do put away, to give the days room; calendar month: days 99 pt across, items by name
+ok   with To Do kept beside it, days too narrow for names showed dots: calendar month: To Do beside the month; calendar month: days 60 pt across, items as dots
+ok   the head named its tools where it had the room: calendar head: two lines, its tools named: To Do, Sync, Calendars

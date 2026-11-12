@@ -1,0 +1,25 @@
+2026-11-12 09:09:48.544 Simpl[40998:109851] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 09:09:50.858 Simpl[40998:109851] [Simpl] window: the app's screens (/d2l/home)
+2026-11-12 09:09:51.178 Simpl[40998:109851] [Simpl] appear Dashboard: 1469 ms
+2026-11-12 09:09:51.219 Simpl[40998:109851] [Simpl] appear Dashboard: 1510 ms
+2026-11-12 09:09:53.243 Simpl[40998:109851] [Simpl] call quietColors: 2066 ms
+2026-11-12 09:09:53.253 Simpl[40998:109851] [Simpl] call dashSkyline: 147 ms
+2026-11-12 09:09:53.256 Simpl[40998:109851] [Simpl] call snapshot: 2070 ms
+2026-11-12 09:09:53.361 Simpl[40998:109851] [Simpl] call dashSkyline: 2173 ms
+2026-11-12 09:09:53.396 Simpl[40998:109851] [Simpl] call dashList: 290 ms
+2026-11-12 09:09:53.401 Simpl[40998:109851] [Simpl] call dashList: 2214 ms
+2026-11-12 09:09:53.608 Simpl[40998:109851] [Simpl] call todayCounts: 365 ms
+2026-11-12 09:09:53.608 Simpl[40998:109851] [Simpl] call todayCounts: 366 ms
+2026-11-12 09:09:53.608 Simpl[40998:109851] [Simpl] call todayCounts: 365 ms
+2026-11-12 09:09:53.608 Simpl[40998:109851] [Simpl] call todayCounts: 366 ms
+2026-11-12 09:09:53.610 Simpl[40998:109851] [Simpl] call today: 504 ms
+2026-11-12 09:09:53.611 Simpl[40998:109851] [Simpl] call today: 506 ms
+2026-11-12 09:09:54.633 Simpl[40998:109851] [Simpl] open Dashboard: 4925 ms (fetched)
+2026-11-12 09:09:54.742 Simpl[40998:109851] [Simpl] call dashSkyline: 1381 ms
+2026-11-12 09:09:54.742 Simpl[40998:109851] [Simpl] call dashSkyline: 1489 ms
+2026-11-12 09:09:54.743 Simpl[40998:109851] [Simpl] call courses: 1382 ms
+2026-11-12 09:09:55.162 Simpl[40998:109851] [Simpl] call groups: 419 ms
+2026-11-12 09:09:55.417 Simpl[40998:109851] [Simpl] call moreFromCanvas: 254 ms
+2026-11-12 09:09:55.822 Simpl[40998:109851] [Simpl] call watchInfo: 8 ms
+activity-probe lms=d2l courses=4 events=7 [grades] Midterm Quiz graded / BIO 110: Cells and Systems / 41 / 50 -> /courses/31001/grades | [announcements] Lab 2 moved to Thursday / BIO 110: Cells and Systems / The osmosis lab is on Thursday this week. -> /courses/31001/discussion_topics/3000001102 | [grades] Participation graded / BIO 110: Cells and Systems / 9 / 10 -> /courses/31001/grades | [announcements] Reading for Monday / HIST 205: Modern Europe / Hobsbawm, chapter two. -> /courses/31002/discussion_topics/3000001121 | [grades] Lab 1: Microscopy graded / BIO 110: Cells and Systems / 18 / 20 -> /courses/31001/grades | [comments] Feedback on Lab 1: Microscopy / BIO 110: Cells and Systems / “Clear drawings. Label the nucleolus next time.” -> /courses/31001/grades | [announcements] Welcome to BIO 110 / BIO 110: Cells and Systems / The syllabus is under Content. Labs start in week two. -> /courses/31001/discussion_topics/3000001101
+2026-11-12 09:09:58.082 Simpl[40998:109851] [Simpl] shot: another copy of the app is in front; brought forward again

@@ -1,0 +1,23 @@
+2026-11-12 08:55:19.924 Simpl[4260:16244] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 08:55:21.564 Simpl[4260:16244] [Simpl] window: the app's screens (no page)
+2026-11-12 08:55:22.066 Simpl[4260:16244] [Simpl] appear Dashboard: 876 ms
+2026-11-12 08:55:22.913 Simpl[4260:16244] [Simpl] appear Dashboard: 1722 ms
+2026-11-12 08:55:28.354 Simpl[4260:16244] [Simpl] open Dashboard: 7160 ms (kept)
+2026-11-12 08:55:29.058 Simpl[4260:16244] [Simpl] call quietColors: 6989 ms
+2026-11-12 08:55:29.091 Simpl[4260:16244] [Simpl] call dashList: 4731 ms
+2026-11-12 08:55:29.092 Simpl[4260:16244] [Simpl] call dashList: 4650 ms
+2026-11-12 08:55:29.912 Simpl[4260:16244] [Simpl] call today: 5383 ms
+2026-11-12 08:55:29.913 Simpl[4260:16244] [Simpl] call today: 5384 ms
+2026-11-12 08:55:29.913 Simpl[4260:16244] [Simpl] call todayCounts: 1725 ms
+2026-11-12 08:55:29.913 Simpl[4260:16244] [Simpl] call todayCounts: 1725 ms
+2026-11-12 08:55:29.913 Simpl[4260:16244] [Simpl] call dashSkyline: 5471 ms
+2026-11-12 08:55:29.915 Simpl[4260:16244] [Simpl] call dashSkyline: 5556 ms
+2026-11-12 08:55:29.915 Simpl[4260:16244] [Simpl] call todayCounts: 1727 ms
+2026-11-12 08:55:29.916 Simpl[4260:16244] [Simpl] call todayCounts: 1728 ms
+2026-11-12 08:55:29.916 Simpl[4260:16244] [Simpl] call snapshot: 1020 ms
+2026-11-12 08:55:32.053 Simpl[4260:16244] [Simpl] open Dashboard: 10858 ms (live)
+2026-11-12 08:55:32.294 Simpl[4260:16244] [Simpl] call courses: 1617 ms
+2026-11-12 08:55:32.764 Simpl[4260:16244] [Simpl] call groups: 469 ms
+2026-11-12 08:55:34.057 Simpl[4260:16244] [Simpl] call moreFromCanvas: 1291 ms
+2026-11-12 08:55:34.066 Simpl[4260:16244] [Simpl] call watchInfo: 2 ms
+activity-probe lms=canvas courses=5 events=6 [discussions] Is there any discussion happening this week? / MATH 140: Calculus I / Last post by Alex Kim. -> /courses/101/discussion_topics/7003 | [grades] Pre-lecture quiz 5 graded / MATH 140: Calculus I / 19 / 19 -> /courses/101/assignments/1007 | [announcements] Field site sign-ups / SEM 101: First-Year Seminar / Sign up for a field site by Friday. -> /courses/104/announcements/8005 | [comments] Joon commented on Discussion 0 / MATH 140: Calculus I / “Good use of interval notation here.” -> /courses/101/assignments/1001 | [announcements] Prerequisite Skills Test / MATH 140: Calculus I / Good morning everyone, the results from the Skills check test have been posted… -> /courses/101/announcements/8001 | [messages] No submission for Acknowledge the student code of conduct / Inbox / Hello Laker! You are receiving this message because our records show… -> /conversations?id=c1

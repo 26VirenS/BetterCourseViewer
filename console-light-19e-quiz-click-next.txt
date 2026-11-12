@@ -1,0 +1,26 @@
+2026-11-12 09:09:06.785 Simpl[35599:96491] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 09:09:08.667 Simpl[35599:96491] [Simpl] window: the app's screens (no page)
+2026-11-12 09:09:09.436 Simpl[35599:96491] [Simpl] appear Dashboard: 1079 ms
+2026-11-12 09:09:10.025 Simpl[35599:96491] [Simpl] appear Dashboard: 1669 ms
+2026-11-12 09:09:24.163 Simpl[35599:96491] [Simpl] open Dashboard: 15806 ms (kept)
+2026-11-12 09:09:26.780 Simpl[35599:96491] [Simpl] call quietColors: 17345 ms
+2026-11-12 09:09:26.781 Simpl[35599:96491] [Simpl] call quizIntro: 633 ms
+2026-11-12 09:09:26.861 Simpl[35599:96491] [Simpl] call todayCounts: 2743 ms
+2026-11-12 09:09:26.861 Simpl[35599:96491] [Simpl] call todayCounts: 2743 ms
+2026-11-12 09:09:26.861 Simpl[35599:96491] [Simpl] call todayCounts: 2743 ms
+2026-11-12 09:09:26.862 Simpl[35599:96491] [Simpl] call todayCounts: 2743 ms
+2026-11-12 09:09:26.862 Simpl[35599:96491] [Simpl] call dashList: 9990 ms
+2026-11-12 09:09:26.862 Simpl[35599:96491] [Simpl] call dashList: 9989 ms
+2026-11-12 09:09:26.863 Simpl[35599:96491] [Simpl] call today: 8177 ms
+2026-11-12 09:09:26.864 Simpl[35599:96491] [Simpl] call dashSkyline: 9990 ms
+2026-11-12 09:09:26.864 Simpl[35599:96491] [Simpl] call today: 8177 ms
+2026-11-12 09:09:26.864 Simpl[35599:96491] [Simpl] call dashSkyline: 9993 ms
+2026-11-12 09:09:26.966 Simpl[35599:96491] [Simpl] call snapshot: 1395 ms
+2026-11-12 09:09:27.075 Simpl[35599:96491] [Simpl] open Dashboard: 18718 ms (live)
+2026-11-12 09:09:27.604 Simpl[35599:96491] [Simpl] call quizBegin: 822 ms
+2026-11-12 09:09:28.086 Simpl[35599:96491] [Simpl] call courses: 1012 ms
+2026-11-12 09:09:28.624 Simpl[35599:96491] [Simpl] call groups: 538 ms
+2026-11-12 09:09:30.649 Simpl[35599:96491] [Simpl] call moreFromCanvas: 2025 ms
+2026-11-12 09:09:30.950 Simpl[35599:96491] SimplQuizClick next at {899.5, 36.5} (frame {{863, 544.5}, {73, 28}}): active 0, key 0, sheet 1; hit SheetHostingView<SheetContent> < NSThemeFrame
+2026-11-12 09:09:34.218 Simpl[35599:96491] SimplQuizClick after: question 3 showing
+2026-11-12 09:09:34.283 Simpl[35599:96491] [Simpl] shot: another copy of the app is in front; brought forward again

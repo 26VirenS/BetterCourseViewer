@@ -1,0 +1,29 @@
+2026-11-12 09:07:00.974 Simpl[33795:91762] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 09:07:02.207 Simpl[33795:91762] [Simpl] window: the app's screens (no page)
+2026-11-12 09:07:02.531 Simpl[33795:91762] [Simpl] appear Dashboard: 509 ms
+2026-11-12 09:07:02.923 Simpl[33795:91762] [Simpl] appear Dashboard: 901 ms
+2026-11-12 09:07:07.521 Simpl[33795:91762] [Simpl] open Dashboard: 5499 ms (kept)
+2026-11-12 09:07:08.135 Simpl[33795:91762] [Simpl] popup look: 984 × 591, 20 in from the window (sidebar out)
+2026-11-12 09:07:09.176 Simpl[33795:91762] [Simpl] call quietColors: 6646 ms
+2026-11-12 09:07:09.176 Simpl[33795:91762] [Simpl] call toolLaunch: 797 ms
+2026-11-12 09:07:09.177 Simpl[33795:91762] [Simpl] macmillan popup: opened
+2026-11-12 09:07:09.555 Simpl[33795:91762] [Simpl] call dashList: 4745 ms
+2026-11-12 09:07:09.557 Simpl[33795:91762] [Simpl] call dashList: 4651 ms
+2026-11-12 09:07:09.565 Simpl[33795:91762] [Simpl] call dashSkyline: 4659 ms
+2026-11-12 09:07:09.570 Simpl[33795:91762] [Simpl] call dashSkyline: 4760 ms
+2026-11-12 09:07:09.570 Simpl[33795:91762] [Simpl] call today: 4602 ms
+2026-11-12 09:07:09.571 Simpl[33795:91762] [Simpl] call today: 4602 ms
+2026-11-12 09:07:09.572 Simpl[33795:91762] [Simpl] call todayCounts: 2113 ms
+2026-11-12 09:07:09.572 Simpl[33795:91762] [Simpl] call todayCounts: 2113 ms
+2026-11-12 09:07:09.572 Simpl[33795:91762] [Simpl] call todayCounts: 2113 ms
+2026-11-12 09:07:09.572 Simpl[33795:91762] [Simpl] call todayCounts: 2113 ms
+2026-11-12 09:07:09.572 Simpl[33795:91762] [Simpl] call snapshot: 1650 ms
+2026-11-12 09:07:11.302 Simpl[33795:91762] [Simpl] open Dashboard: 9266 ms (live)
+2026-11-12 09:07:11.878 Simpl[33795:91762] [Simpl] call courses: 1950 ms
+2026-11-12 09:07:12.070 Simpl[33795:91762] [Simpl] call groups: 191 ms
+2026-11-12 09:07:13.089 Simpl[33795:91762] [Simpl] macmillan popup: front end, buttons Resources, Solution, Next Question
+2026-11-12 09:07:13.089 Simpl[33795:91762] [Simpl] macmillan popup: the question drawn for light glass
+2026-11-12 09:07:13.089 Simpl[33795:91762] [Simpl] macmillan popup: rail heard, 4 questions, 1 done, question 1 open
+2026-11-12 09:07:13.089 Simpl[33795:91762] [Simpl] look popup: page at 72% (its 1016 wide in 731)
+2026-11-12 09:07:13.731 Simpl[33795:91762] [Simpl] call moreFromCanvas: 1660 ms
+2026-11-12 09:07:24.580 Simpl[33795:91762] [Simpl] popup look: 984 × 589, 20 in from the window (sidebar out)

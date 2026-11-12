@@ -1,0 +1,1 @@
+ok   the last row scrolls clear of What-If's bar (grades what-if: at the page's foot the last row ends 16 pt above the bar (at the foot, 2 scrolls))

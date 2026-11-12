@@ -1,0 +1,17 @@
+2026-11-12 09:08:33.552 Simpl[34113:92788] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 09:08:37.374 Simpl[34113:92788] [Simpl] window: the app's screens (no page)
+2026-11-12 09:08:38.916 Simpl[34113:92788] [Simpl] appear External Tools: 2027 ms
+2026-11-12 09:08:40.129 Simpl[34113:92788] [Simpl] appear External Tools: 3239 ms
+2026-11-12 09:08:46.162 Simpl[34113:92788] [Simpl] call quietColors: 7252 ms
+2026-11-12 09:08:46.278 Simpl[34113:92788] [Simpl] call snapshot: 164 ms
+2026-11-12 09:08:46.831 Simpl[34113:92788] [Simpl] call courses: 318 ms
+2026-11-12 09:08:46.831 Simpl[34113:92788] [Simpl] call externalTools: 6702 ms
+2026-11-12 09:08:46.832 Simpl[34113:92788] [Simpl] tool list: opening Macmillan Learning
+2026-11-12 09:08:46.832 Simpl[34113:92788] [Simpl] call externalTools: 7915 ms
+2026-11-12 09:08:46.832 Simpl[34113:92788] [Simpl] tool list: opening Macmillan Learning
+2026-11-12 09:08:47.633 Simpl[34113:92788] [Simpl] tool list shown: Macmillan Learning
+2026-11-12 09:08:47.633 Simpl[34113:92788] [Simpl] tool list shown: Macmillan Learning
+2026-11-12 09:08:47.866 Simpl[34113:92788] [Simpl] tool list closed: Macmillan Learning
+2026-11-12 09:08:48.519 Simpl[34113:92788] [Simpl] open External Tools: 11629 ms (fetched)
+2026-11-12 09:08:48.598 Simpl[34113:92788] [Simpl] call groups: 1767 ms
+2026-11-12 09:08:49.212 Simpl[34113:92788] [Simpl] call moreFromCanvas: 613 ms

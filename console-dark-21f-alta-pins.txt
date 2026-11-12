@@ -1,0 +1,25 @@
+2026-11-12 08:57:38.583 Simpl[9646:30201] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 08:57:40.557 Simpl[9646:30201] [Simpl] window: the app's screens (no page)
+2026-11-12 08:57:41.223 Simpl[9646:30201] [Simpl] appear Dashboard: 828 ms
+2026-11-12 08:57:41.903 Simpl[9646:30201] [Simpl] appear Dashboard: 1508 ms
+2026-11-12 08:57:49.356 Simpl[9646:30201] [Simpl] open Dashboard: 8957 ms (kept)
+2026-11-12 08:57:51.330 Simpl[9646:30201] [Simpl] popup alta: 984 × 591, 20 in from the window (sidebar out)
+2026-11-12 08:57:53.647 Simpl[9646:30201] [Simpl] call quietColors: 12420 ms
+2026-11-12 08:57:53.654 Simpl[9646:30201] [Simpl] call dashList: 6334 ms
+2026-11-12 08:57:53.654 Simpl[9646:30201] [Simpl] call today: 6108 ms
+2026-11-12 08:57:53.654 Simpl[9646:30201] [Simpl] call today: 6108 ms
+2026-11-12 08:57:53.654 Simpl[9646:30201] [Simpl] call todayCounts: 4309 ms
+2026-11-12 08:57:53.654 Simpl[9646:30201] [Simpl] call todayCounts: 4309 ms
+2026-11-12 08:57:53.654 Simpl[9646:30201] [Simpl] call todayCounts: 4309 ms
+2026-11-12 08:57:53.654 Simpl[9646:30201] [Simpl] call todayCounts: 4309 ms
+2026-11-12 08:57:53.655 Simpl[9646:30201] [Simpl] call dashSkyline: 6336 ms
+2026-11-12 08:57:53.655 Simpl[9646:30201] [Simpl] call dashSkyline: 6499 ms
+2026-11-12 08:57:53.657 Simpl[9646:30201] [Simpl] call toolLaunch: 219 ms
+2026-11-12 08:57:53.662 Simpl[9646:30201] [Simpl] call dashList: 6501 ms
+2026-11-12 08:57:53.817 Simpl[9646:30201] [Simpl] open Dashboard: 13416 ms (live)
+2026-11-12 08:57:53.913 Simpl[9646:30201] [Simpl] call snapshot: 3372 ms
+2026-11-12 08:57:54.495 Simpl[9646:30201] [Simpl] alta: view made 78 ms · asked 3317 ms · launch 3536 ms · page 3794 ms · overview 3990 ms · shown 3995 ms (overview, quiet 128 ms, 192 ms after DOMContentLoaded)
+2026-11-12 08:57:54.934 Simpl[9646:30201] [Simpl] call assignment: 1022 ms
+2026-11-12 08:57:54.935 Simpl[9646:30201] [Simpl] call courses: 866 ms
+2026-11-12 08:57:55.243 Simpl[9646:30201] [Simpl] call groups: 308 ms
+2026-11-12 08:57:56.493 Simpl[9646:30201] [Simpl] call moreFromCanvas: 1249 ms

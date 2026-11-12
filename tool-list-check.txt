@@ -1,0 +1,6 @@
+ok   dark-36b-external-tools-list: tool list shown: Knewton Alta
+ok   light-36b-external-tools-list: tool list shown: Knewton Alta
+ok   light-36c-external-tools-macmillan: tool list shown: Macmillan Learning
+ok   light-36d-external-tools-list-reread: tool list shown: Knewton Alta
+ok   the list was still open after the tools were read again under it: read again; Knewton Alta's list still open
+ok   no copy of the app crashed: 0 crash reports

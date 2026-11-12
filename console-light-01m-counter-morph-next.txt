@@ -1,0 +1,24 @@
+2026-11-12 09:08:05.024 Simpl[33068:90050] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 09:08:06.208 Simpl[33068:90050] [Simpl] window: the app's screens (no page)
+2026-11-12 09:08:06.875 Simpl[33068:90050] [Simpl] appear Dashboard: 907 ms
+2026-11-12 09:08:07.087 Simpl[33068:90050] [Simpl] appear Dashboard: 1120 ms
+2026-11-12 09:08:13.108 Simpl[33068:90050] [Simpl] open Dashboard: 7135 ms (kept)
+2026-11-12 09:08:14.233 Simpl[33068:90050] [Simpl] call quietColors: 7359 ms
+2026-11-12 09:08:14.253 Simpl[33068:90050] [Simpl] call today: 5254 ms
+2026-11-12 09:08:14.256 Simpl[33068:90050] [Simpl] call today: 5258 ms
+2026-11-12 09:08:14.257 Simpl[33068:90050] [Simpl] call todayCounts: 1184 ms
+2026-11-12 09:08:14.257 Simpl[33068:90050] [Simpl] call todayCounts: 1184 ms
+2026-11-12 09:08:14.258 Simpl[33068:90050] [Simpl] call dashList: 5601 ms
+2026-11-12 09:08:14.258 Simpl[33068:90050] [Simpl] call dashList: 5876 ms
+2026-11-12 09:08:14.258 Simpl[33068:90050] [Simpl] call todayCounts: 1185 ms
+2026-11-12 09:08:14.258 Simpl[33068:90050] [Simpl] call todayCounts: 1186 ms
+2026-11-12 09:08:14.259 Simpl[33068:90050] [Simpl] call dashSkyline: 5602 ms
+2026-11-12 09:08:14.259 Simpl[33068:90050] [Simpl] call dashSkyline: 5877 ms
+2026-11-12 09:08:14.670 Simpl[33068:90050] [Simpl] counter: next grows, held 0.5 of the way
+2026-11-12 09:08:14.673 Simpl[33068:90050] [Simpl] call snapshot: 804 ms
+2026-11-12 09:08:15.232 Simpl[33068:90050] [Simpl] open Dashboard: 9264 ms (live)
+2026-11-12 09:08:16.366 Simpl[33068:90050] [Simpl] counter: next grows, held 0.5 of the way
+2026-11-12 09:08:17.443 Simpl[33068:90050] [Simpl] call courses: 2228 ms
+2026-11-12 09:08:20.360 Simpl[33068:90050] [Simpl] call todaySheet: 3738 ms
+2026-11-12 09:08:22.821 Simpl[33068:90050] [Simpl] call groups: 5374 ms
+2026-11-12 09:08:25.252 Simpl[33068:90050] [Simpl] call moreFromCanvas: 2429 ms

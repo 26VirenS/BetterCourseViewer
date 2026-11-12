@@ -1,0 +1,12 @@
+2026-11-12 09:06:58.830 Simpl[33740:91606] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 09:07:01.599 Simpl[33740:91606] [Simpl] window: the app's screens (no page)
+2026-11-12 09:07:10.124 Simpl[33740:91606] community tools: the gallery read: 14 tools, 13 to add, 1 needing a newer Simpl
+2026-11-12 09:07:10.246 Simpl[33740:91606] community tools: added mocktip (Tip Splitter, version 1)
+2026-11-12 09:07:10.907 Simpl[33740:91606] [Simpl] popup tool: 740 × 591, 20 in from the window (sidebar away)
+2026-11-12 09:07:11.500 Simpl[33740:91606] community tools: mocktip worked out: Each pays, rounded up 26 $ · Tip 11.59 $ · Total 75.99 $
+2026-11-12 09:07:15.245 Simpl[33740:91606] [Simpl] call quietColors: 12039 ms
+2026-11-12 09:07:15.336 Simpl[33740:91606] [Simpl] call snapshot: 476 ms
+2026-11-12 09:07:15.874 Simpl[33740:91606] [Simpl] call courses: 441 ms
+2026-11-12 09:07:16.307 Simpl[33740:91606] [Simpl] call groups: 433 ms
+2026-11-12 09:07:16.894 Simpl[33740:91606] [Simpl] call moreFromCanvas: 585 ms
+2026-11-12 09:07:19.212 Simpl[33740:91606] [Simpl] popup tool: 740 × 589, 20 in from the window (sidebar away)

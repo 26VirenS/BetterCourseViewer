@@ -1,0 +1,6 @@
+2026-11-12 08:55:49.796 Simpl[6570:22333] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 08:55:59.186 Simpl[6570:22333] NSQuitAlwaysKeepsWindows=NO
+2026-11-12 08:56:01.953 Simpl[6570:22477] NSSpellServer dataFromGeneratingCandidatesForSelectedRange timed out, index is 0
+2026-11-12 08:56:02.587 Simpl[6570:22477] NSSpellServer dataFromGeneratingCandidatesForSelectedRange timed out, index is 0
+2026-11-12 08:56:03.105 Simpl[6570:22477] NSSpellServer dataFromGeneratingCandidatesForSelectedRange timed out, index is 0
+2026-11-12 08:56:03.692 Simpl[6570:22477] NSSpellServer dataFromGeneratingCandidatesForSelectedRange timed out, index is 0

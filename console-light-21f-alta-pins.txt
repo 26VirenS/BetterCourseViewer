@@ -1,0 +1,27 @@
+2026-11-12 08:55:31.262 Simpl[5907:20595] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 08:55:33.153 Simpl[5907:20595] [Simpl] window: the app's screens (no page)
+2026-11-12 08:55:34.259 Simpl[5907:20595] [Simpl] appear Dashboard: 1363 ms
+2026-11-12 08:55:35.482 Simpl[5907:20595] [Simpl] appear Dashboard: 2597 ms
+2026-11-12 08:55:44.050 Simpl[5907:20595] [Simpl] open Dashboard: 11160 ms (kept)
+2026-11-12 08:55:45.235 Simpl[5907:20595] [Simpl] popup alta: 984 × 591, 20 in from the window (sidebar out)
+2026-11-12 08:55:48.937 Simpl[5907:20595] [Simpl] call quietColors: 14689 ms
+2026-11-12 08:55:48.940 Simpl[5907:20595] [Simpl] call toolLaunch: 264 ms
+2026-11-12 08:55:48.996 Simpl[5907:20595] [Simpl] call today: 9705 ms
+2026-11-12 08:55:48.998 Simpl[5907:20595] [Simpl] call today: 9707 ms
+2026-11-12 08:55:48.999 Simpl[5907:20595] [Simpl] call dashSkyline: 9878 ms
+2026-11-12 08:55:48.999 Simpl[5907:20595] [Simpl] call dashSkyline: 9881 ms
+2026-11-12 08:55:49.000 Simpl[5907:20595] [Simpl] call dashList: 9879 ms
+2026-11-12 08:55:49.001 Simpl[5907:20595] [Simpl] call dashList: 9882 ms
+2026-11-12 08:55:49.002 Simpl[5907:20595] [Simpl] call todayCounts: 4961 ms
+2026-11-12 08:55:49.005 Simpl[5907:20595] [Simpl] call todayCounts: 4965 ms
+2026-11-12 08:55:49.008 Simpl[5907:20595] [Simpl] call todayCounts: 4968 ms
+2026-11-12 08:55:49.009 Simpl[5907:20595] [Simpl] call todayCounts: 4969 ms
+2026-11-12 08:55:49.009 Simpl[5907:20595] [Simpl] call snapshot: 4160 ms
+2026-11-12 08:55:55.217 Simpl[5907:20595] [Simpl] open Dashboard: 22323 ms (live)
+2026-11-12 08:55:55.481 Simpl[5907:20595] [Simpl] call assignment: 269 ms
+2026-11-12 08:55:55.482 Simpl[5907:20595] [Simpl] call courses: 5885 ms
+2026-11-12 08:55:55.933 Simpl[5907:20595] [Simpl] alta: view made 24 ms · asked 4235 ms · launch 4500 ms · page 10871 ms · overview 11071 ms · shown 11072 ms (overview, quiet 162 ms, 198 ms after DOMContentLoaded)
+2026-11-12 08:55:56.214 Simpl[5907:20595] [Simpl] call groups: 732 ms
+2026-11-12 08:55:58.739 Simpl[5907:20595] [Simpl] call moreFromCanvas: 2521 ms
+2026-11-12 08:55:59.144 Simpl[5907:20595] NSQuitAlwaysKeepsWindows=NO
+2026-11-12 08:56:09.645 Simpl[5907:20595] [Simpl] popup alta: 984 × 589, 20 in from the window (sidebar out)

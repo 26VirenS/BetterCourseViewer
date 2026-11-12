@@ -1,0 +1,25 @@
+2026-11-12 09:11:27.309 Simpl[41321:111178] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 09:11:29.603 Simpl[41321:111178] [Simpl] window: the app's screens (/d2l/home)
+2026-11-12 09:11:29.893 Simpl[41321:111178] [Simpl] appear Dashboard: 1364 ms
+2026-11-12 09:11:30.541 Simpl[41321:111178] [Simpl] appear Calendar: 2012 ms
+2026-11-12 09:11:30.550 Simpl[41321:111178] [Simpl] appear Dashboard: 2022 ms
+2026-11-12 09:11:30.550 Simpl[41321:111178] [Simpl] appear Calendar: 2022 ms
+2026-11-12 09:11:32.908 Simpl[41321:111178] [Simpl] call quietColors: 3017 ms
+2026-11-12 09:11:32.909 Simpl[41321:111178] [Simpl] call calView: 2357 ms
+2026-11-12 09:11:32.911 Simpl[41321:111178] [Simpl] call calView: 2361 ms
+2026-11-12 09:11:32.913 Simpl[41321:111178] [Simpl] call dashSkyline: 3001 ms
+2026-11-12 09:11:32.915 Simpl[41321:111178] [Simpl] call snapshot: 3007 ms
+2026-11-12 09:11:33.337 Simpl[41321:111178] [Simpl] call today: 3425 ms
+2026-11-12 09:11:33.337 Simpl[41321:111178] [Simpl] call dashList: 3426 ms
+2026-11-12 09:11:33.359 Simpl[41321:111178] [Simpl] call todayCounts: 455 ms
+2026-11-12 09:11:33.359 Simpl[41321:111178] [Simpl] call todayCounts: 456 ms
+2026-11-12 09:11:33.361 Simpl[41321:111178] [Simpl] call dashSkyline: 448 ms
+2026-11-12 09:11:33.362 Simpl[41321:111178] [Simpl] call calendar: 451 ms
+2026-11-12 09:11:33.366 Simpl[41321:111178] [Simpl] call courses: 363 ms
+2026-11-12 09:11:33.366 Simpl[41321:111178] [Simpl] call calendar: 456 ms
+2026-11-12 09:11:35.020 Simpl[41321:111178] [Simpl] calendar month: To Do put away, to give the days room
+2026-11-12 09:11:35.020 Simpl[41321:111178] [Simpl] calendar month: days 99 pt across, items by name
+2026-11-12 09:11:35.020 Simpl[41321:111178] [Simpl] calendar head: two lines, its tools named: To Do, Sync, Calendars
+2026-11-12 09:11:37.399 Simpl[41321:111178] [Simpl] open Calendar: 8871 ms (fetched)
+2026-11-12 09:11:37.479 Simpl[41321:111178] [Simpl] call groups: 4112 ms
+2026-11-12 09:11:38.046 Simpl[41321:111178] [Simpl] call moreFromCanvas: 567 ms

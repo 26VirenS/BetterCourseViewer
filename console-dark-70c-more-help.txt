@@ -1,0 +1,24 @@
+2026-11-12 08:58:04.917 Simpl[10551:32661] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-12 08:58:07.715 Simpl[10551:32661] [Simpl] window: the app's screens (no page)
+2026-11-12 08:58:08.105 Simpl[10551:32661] [Simpl] appear Dashboard: 1945 ms
+2026-11-12 08:58:08.345 Simpl[10551:32661] [Simpl] appear Dashboard: 2186 ms
+2026-11-12 08:58:17.853 Simpl[10551:32661] [Simpl] open Dashboard: 11693 ms (kept)
+2026-11-12 08:58:18.542 Simpl[10551:32661] [Simpl] call quietColors: 10438 ms
+2026-11-12 08:58:18.562 Simpl[10551:32661] [Simpl] call dashList: 6896 ms
+2026-11-12 08:58:18.563 Simpl[10551:32661] [Simpl] call dashList: 6898 ms
+2026-11-12 08:58:18.568 Simpl[10551:32661] [Simpl] call today: 4642 ms
+2026-11-12 08:58:18.568 Simpl[10551:32661] [Simpl] call today: 4643 ms
+2026-11-12 08:58:19.227 Simpl[10551:32661] [Simpl] open Dashboard: 13068 ms (live)
+2026-11-12 08:58:19.271 Simpl[10551:32661] [Simpl] call moreHelp: 770 ms
+2026-11-12 08:58:19.373 Simpl[10551:32661] [Simpl] call todayCounts: 1542 ms
+2026-11-12 08:58:19.373 Simpl[10551:32661] [Simpl] call todayCounts: 1543 ms
+2026-11-12 08:58:19.373 Simpl[10551:32661] [Simpl] call todayCounts: 1543 ms
+2026-11-12 08:58:19.374 Simpl[10551:32661] [Simpl] call todayCounts: 1543 ms
+2026-11-12 08:58:19.377 Simpl[10551:32661] [Simpl] call dashSkyline: 7711 ms
+2026-11-12 08:58:19.419 Simpl[10551:32661] [Simpl] call dashSkyline: 7754 ms
+2026-11-12 08:58:19.422 Simpl[10551:32661] [Simpl] popup more: 440 × 263
+2026-11-12 08:58:19.463 Simpl[10551:32661] [Simpl] call snapshot: 1260 ms
+2026-11-12 08:58:20.960 Simpl[10551:32661] [Simpl] call courses: 1234 ms
+2026-11-12 08:58:22.019 Simpl[10551:32661] [Simpl] call groups: 1059 ms
+2026-11-12 08:58:22.983 Simpl[10551:32661] [Simpl] call moreFromCanvas: 964 ms
+2026-11-12 08:58:26.363 Simpl[10551:32661] [Simpl] shot: another copy of the app is in front; brought forward again
