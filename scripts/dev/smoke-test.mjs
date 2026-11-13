@@ -213,7 +213,7 @@ try {
   } // install
   // the setup counts as done for the rest of the suite (until it is done, every page opens the card
   // — the guided-setup sections below clear the flag when that is what they are checking)
-  await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'welcome:search': true, 'tips:rubricRing': true, 'whatsnew:seen': v }), manifest.version);
+  await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'welcome:search': true, 'tips:rubricRing': true, 'whatsnew:seen': v, 'allsites:coach': 'seen' }), manifest.version); // (the every-site card before a first tool is the dashboard section's to drive)
   await sw.evaluate((base) => self.BCV.api.storage.local.set({ 'dev:wikiBase': base, 'dev:communityBase': base, 'dev:feedBase': base }), BASE); // (Wikipedia, Simpl Community and Simpl's calendar feed stand in the mock)
 
   page = await context.newPage();
@@ -500,11 +500,72 @@ try {
   await page.waitForSelector('.bcv-sheet-ov .bcv-xrow', { timeout: 10000 });
   check((await texts('.bcv-xrow__t')).join(',') === 'Search the Canvas Guides,IT Help Desk' && /Reporting a problem/.test((await texts('.bcv-sheet__foot'))[0]), `Help lists the school's help links, leaving Canvas-only forms to Canvas: ${(await texts('.bcv-xrow__t')).join(', ')}`);
   await page.keyboard.press('Escape');
+  // (2.99.141) the first tool opened where Simpl may not run on every site (this copy has every site as an
+  // option, not granted): a card points at where the extension sits — Chrome's top right — with the three
+  // presses, and waits; the toolbar panel has Allow on every site, first and marked, and its press asks the
+  // browser for every site. Not now closes it with nothing opened, for good.
+  const coachRead = () => page.evaluate(() => {
+    const c = document.querySelector('.bcv-allsites');
+    if (!c) return null;
+    const r = c.getBoundingClientRect(), a = c.querySelector('.bcv-allsites__arrow').getBoundingClientRect();
+    const t = (sel) => c.querySelector(sel)?.textContent.replace(/\s+/g, ' ').trim();
+    return { browser: c.dataset.browser, right: Math.round(document.documentElement.clientWidth - r.right), top: Math.round(r.top), arrowRight: Math.round(document.documentElement.clientWidth - a.right), arrowTop: Math.round(a.top - r.top), kicker: t('.bcv-allsites__kicker'), title: t('.bcv-allsites__title'), steps: [...c.querySelectorAll('.bcv-allsites__say')].map((e) => e.textContent.replace(/\s+/g, ' ').trim()), status: t('.bcv-allsites__wait'), foot: [...c.querySelectorAll('.bcv-allsites__foot button')].map((b) => b.textContent), bg: getComputedStyle(c).backgroundColor, dim: [...document.querySelectorAll('body > *')].some((e) => e !== c && getComputedStyle(e).position === 'fixed' && /rgba\(0, 0, 0, 0\.[1-9]/.test(getComputedStyle(e).backgroundColor) && e.getBoundingClientRect().width >= innerWidth - 2) };
+  });
+  const allFlags = () => sw.evaluate(async () => { const r = await self.BCV.api.storage.local.get(['allsites:coach', 'allsites:ask']); return { coach: r['allsites:coach'] || null, ask: r['allsites:ask'] || null }; });
+  await sw.evaluate(() => self.BCV.api.storage.local.remove(['allsites:coach', 'allsites:ask']));
+  const pagesBefore = context.pages().length;
   await page.click('.bcv-nav__item--more[data-extra="tool"]');
+  await page.waitForSelector('.bcv-allsites.is-in', { timeout: 8000 });
+  await page.waitForTimeout(300);
+  const coach1 = await coachRead();
+  const asked1 = await allFlags();
+  check(coach1?.browser === 'chrome' && coach1.right >= 8 && coach1.right <= 24 && coach1.top <= 24 && coach1.arrowRight <= 44 && coach1.arrowTop <= 16 && /^Opening /.test(coach1.kicker) && coach1.title === 'Allow Simpl on every site'
+    && coach1.steps[0] === 'Press Simpl Courses at the top right — or the puzzle piece there, then Simpl Courses.' && coach1.steps[1] === 'Press Allow on every site in its panel.' && coach1.steps[2] === 'Choose Allow when Chrome asks.'
+    && coach1.status === 'Waiting for you to allow it…' && coach1.foot.join('|') === 'Not now|Open without it' && !coach1.dim && context.pages().length === pagesBefore && asked1.ask && asked1.ask.tabId != null && !asked1.coach,
+  `the first tool, where every site is not allowed: a card at the top right, its arrow at Chrome's extensions, the three presses, nothing opened yet and nothing dimmed, the panel told the page is waiting: ${JSON.stringify({ coach1, asked1 })}`);
+  await shot(page, '01g-every-site-card');
+  {
+    const pop = await context.newPage();
+    await pop.addInitScript(() => { window.__asked = []; for (const o of [self.chrome, self.browser]) if (o?.permissions) o.permissions.request = (req) => { window.__asked.push(req); return Promise.resolve(true); }; });
+    await pop.goto(`chrome-extension://${extId}/popup/popup.html`);
+    await pop.waitForSelector('#allsites-card:not([hidden])', { timeout: 8000 });
+    const popAll = await pop.evaluate(() => { const c = document.getElementById('allsites-card'); const b = document.getElementById('allow-all'); const r = b.getBoundingClientRect(); return { first: [...document.querySelectorAll('body > section.card')].find((e) => !e.hidden)?.id, asked: c.classList.contains('is-asked'), note: document.getElementById('allsites-asked').hidden ? '' : document.getElementById('allsites-asked').textContent, button: b.textContent.trim(), seen: r.width > 100 && r.height >= 30 && getComputedStyle(b).visibility === 'visible', ring: getComputedStyle(c).boxShadow }; });
+    await pop.screenshot({ path: join(out, '11e-popup-every-site.png') });
+    await pop.click('#allow-all');
+    await eventually(async () => /Allowed|Not allowed|did not ask/.test(await pop.$eval('#allsites-msg', (e) => e.textContent).catch(() => 'Allowed')), 8000);
+    const popAsked = await pop.evaluate(() => ({ asked: window.__asked, msg: document.getElementById('allsites-msg').textContent })).catch(() => null);
+    check(popAll.first === 'allsites-card' && popAll.asked && popAll.note === 'The Canvas page sent you here.' && popAll.button === 'Allow on every site' && popAll.seen && /rgb\(10, (108|132), 255\) 0px 0px 0px 2px/.test(popAll.ring)
+      && JSON.stringify(popAsked?.asked) === JSON.stringify([{ origins: ['*://*/*'] }]) && /^Allowed\./.test(popAsked?.msg || ''),
+    `the toolbar panel has Allow on every site, first and ringed while the page waits on it, and its press asks the browser for every site: ${JSON.stringify({ popAll, popAsked })}`);
+    {
+      const src = readFileSync(join(root, 'extension', 'popup', 'popup.js'), 'utf8');
+      const from = src.indexOf("$('allow-all').addEventListener");
+      const to = src.indexOf('permissions.request(', from);
+      const code = src.slice(from, to).split('\n').filter((l) => !l.trim().startsWith('//')).join('\n').replace(/await api\.$/, '');
+      check(from >= 0 && to > from && !code.includes('await'), 'and asks straight from the press, awaiting nothing first (Safari refuses otherwise)');
+    }
+    await pop.close().catch(() => {});
+  }
+  await page.click('.bcv-allsites__later');
+  await page.waitForFunction(() => !document.querySelector('.bcv-allsites'), null, { timeout: 3000 });
+  const later = await allFlags();
+  check(context.pages().length === pagesBefore && later.coach === 'seen' && !later.ask, `Not now puts the card away with nothing opened, and it is not shown again: ${JSON.stringify(later)}`);
+  // shown again (the flag cleared): allowed meanwhile — the browser's yes stood in for — it says so and opens the tool itself
+  await sw.evaluate(() => self.BCV.api.storage.local.remove(['allsites:coach', 'allsites:ask']));
+  await page.reload();
+  await page.waitForSelector('.bcv-nav__item--more[data-extra="tool"]', { timeout: 15000 });
+  await page.click('.bcv-nav__item--more[data-extra="tool"]');
+  await page.waitForSelector('.bcv-allsites.is-in', { timeout: 8000 });
+  const doneText = page.waitForFunction(() => document.querySelector('.bcv-allsites.is-done .bcv-allsites__wait')?.textContent || null, null, { timeout: 10000 }).then((h) => h.jsonValue()).catch(() => null);
   // A tool is not framed over the page any more: it gets a tab, and the extension puts its own bar
   // across the top of the tool's own page. The bar lives in a shadow root of its own, so the tool's
   // styling cannot reach it — and it is read here the same way, through the host element.
-  const toolPage = await context.waitForEvent('page', { timeout: 20000 });
+  const [toolPage] = await Promise.all([context.waitForEvent('page', { timeout: 20000 }), sw.evaluate(() => self.BCV.api.storage.local.set({ 'dev:allSites': true }))]);
+  const allowedSaid = await doneText;
+  await sw.evaluate(() => self.BCV.api.storage.local.remove('dev:allSites'));
+  const afterAllowed = await allFlags();
+  const coachGone = await page.waitForFunction(() => !document.querySelector('.bcv-allsites'), null, { timeout: 3000 }).then(() => true, () => false);
+  check(/^Allowed\. Opening .+…$/.test(allowedSaid || '') && afterAllowed.coach === 'seen' && coachGone, `allowed while it waits: the card says so and opens the tool itself, and is not shown again: ${JSON.stringify({ allowedSaid, afterAllowed })}`);
   await toolPage.waitForLoadState('domcontentloaded');
   await eventually(async () => !!(await barRead(toolPage)), 20000);
   const acct = await barRead(toolPage);

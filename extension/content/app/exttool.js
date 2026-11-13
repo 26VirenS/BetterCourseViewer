@@ -71,8 +71,126 @@
     return u.href;
   }
 
-  /** Open a tool in a tab of its own, with the bar over it. */
-  function open({ title = 'External tool', url, page = null, newTab = null, note = '', from = null, icon = null } = {}) {
+  // ---- every site, asked for once (2.99.141) ----------------------------------------------------
+  // A tool opens on its own site, and Simpl's bar can follow it there only where the browser lets the
+  // extension in. Chrome's quiet build, Chrome with its site access cut back, and Safari have not been
+  // let onto every site — and a page cannot ask for that itself: the browser takes the request only
+  // from the extension's own panel. So the first time a tool is opened there, a card points at where
+  // the extension sits in the browser (Chrome's puzzle piece at the top right, Safari's button beside
+  // the address bar) and says what to press — Allow on every site, in its panel — and waits. Allowed,
+  // the tool opens; Open without it opens it as before. Either way the card is not shown again (the
+  // panel keeps the button for later). Nothing here where no background answers (the apps).
+  let allKnown = false; // (allowed, or the card seen: no asking again from this page)
+  let coachUp = null; // the card up, and the tool it is holding
+  /** The background asked, or null where it does not answer in time (a tool never waits long on it). */
+  function ask(msg, ms = 1500) {
+    return new Promise((resolve) => {
+      let done = false;
+      const end = (r) => { if (done) return; done = true; clearTimeout(t); resolve(r || null); };
+      const t = setTimeout(() => end(null), ms);
+      try { Promise.resolve(BCV.api.runtime.sendMessage(msg)).then(end, () => end(null)); } catch { end(null); }
+    });
+  }
+  /** The browser, as far as where its extensions sit goes. */
+  function browserKind() {
+    const ua = navigator.userAgent || '';
+    if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1 && /Safari\//.test(ua) && !/Chrome\//.test(ua))) return 'ios';
+    if (/Edg\//.test(ua)) return 'edge';
+    if (/Firefox\//.test(ua)) return 'firefox';
+    if (/Safari\//.test(ua) && !/(Chrome|Chromium|CriOS)\//.test(ua)) return 'safari';
+    return 'chrome';
+  }
+  const PUZZLE = 'M10 4.5a2 2 0 014 0V6h4v4h-1.5a2 2 0 000 4H18v4h-4v-1.5a2 2 0 00-4 0V18H6v-4h1.5a2 2 0 000-4H6V6h4z';
+  /** Before a tool's first opening: on its way at once where the extension may run on every site (or
+   *  the card has been seen); else the card, which settles whether it opens (true) or not. */
+  async function everySiteFirst(opts) {
+    if (allKnown || !BCV.api?.runtime?.id) return true;
+    const st = await ask({ type: 'allSitesState' });
+    if (!st || st.ok !== true || st.all !== false || st.seen) {
+      if (st?.ok && (st.all || st.seen)) allKnown = true;
+      return true;
+    }
+    if (coachUp) { coachUp.opts = opts; coachUp.say(); return false; } // (another tool pressed meanwhile: the card holds that one now)
+    return coach(opts);
+  }
+  /** The card: where the extension sits, the three presses, and a wait for the browser's yes. It opens
+   *  the tool itself (allowed, or Open without it) and resolves false: nothing left for the caller. */
+  function coach(opts) {
+    return new Promise((resolve) => {
+      const kind = browserKind();
+      const name = { chrome: 'Chrome', edge: 'Edge', firefox: 'Firefox', safari: 'Safari', ios: 'Safari' }[kind];
+      const b = (t) => h('b', { text: t });
+      const puzzle = () => h('span', { class: 'bcv-allsites__glyph', 'aria-label': 'the puzzle piece' }, U.svg(PUZZLE, { size: 13, stroke: 'currentColor', width: 2 }));
+      const first = kind === 'safari' ? ['Press ', b('Simpl Courses'), ' beside the address bar, up here.']
+        : kind === 'ios' ? ['Press the puzzle piece ', puzzle(), ' in the address bar, then ', b('Simpl Courses'), '.']
+          : ['Press ', b('Simpl Courses'), ' at the top right — or the puzzle piece ', puzzle(), ' there, then ', b('Simpl Courses'), '.'];
+      const step = (n, kids) => h('li', { class: 'bcv-allsites__step', dataset: { step: String(n) } }, [h('span', { class: 'bcv-allsites__num', text: String(n), 'aria-hidden': 'true' }), h('span', { class: 'bcv-allsites__say' }, kids)]);
+      const kicker = h('span', { class: 'bcv-allsites__kicker' });
+      const status = h('div', { class: 'bcv-allsites__status', role: 'status' }, [h('span', { class: 'bcv-allsites__spin', 'aria-hidden': 'true' }), h('span', { class: 'bcv-allsites__wait', text: 'Waiting for you to allow it…' })]);
+      const arrow = h('span', { class: 'bcv-allsites__arrow', 'aria-hidden': 'true' }, U.svg(kind === 'safari' ? 'M12 20V4M5 11l7-7 7 7' : kind === 'ios' ? 'M12 4v16M5 13l7 7 7-7' : 'M5 19L19 5M10 5h9v9', { size: 30, stroke: 'currentColor', width: 2.4 }));
+      const close = h('button', { type: 'button', class: 'bcv-allsites__later', text: 'Not now' });
+      const skip = h('button', { type: 'button', class: 'bcv-allsites__skip', text: 'Open without it' });
+      const card = h('div', { class: `bcv-allsites is-${kind === 'safari' ? 'top' : kind === 'ios' ? 'bottom' : 'right'}`, role: 'dialog', 'aria-label': 'Allow Simpl on every site', tabindex: '-1', dataset: { browser: kind } }, [
+        arrow,
+        h('div', { class: 'bcv-allsites__head' }, [kicker]),
+        h('div', { class: 'bcv-allsites__title', text: 'Allow Simpl on every site' }),
+        h('p', { class: 'bcv-allsites__why', text: 'Course tools open on their own sites. Allowed there, Simpl’s bar — Back to Canvas and your pinned tools — stays over them. Asked once.' }),
+        h('ol', { class: 'bcv-allsites__steps' }, [
+          step(1, first),
+          step(2, ['Press ', b('Allow on every site'), ' in its panel.']),
+          step(3, ['Choose ', b('Allow'), ` when ${name} asks.`]),
+        ]),
+        status,
+        h('div', { class: 'bcv-allsites__foot' }, [close, skip]),
+      ]);
+      const held = { opts, say: () => { kicker.textContent = `Opening ${held.opts.title || 'a tool'}`; } };
+      held.say();
+      coachUp = held;
+      let poll = 0, over = false;
+      const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); end(false); } };
+      function end(go, seen = true) {
+        if (over) return;
+        over = true;
+        clearInterval(poll);
+        document.removeEventListener('keydown', onKey, true);
+        if (seen) ask({ type: 'allSitesSeen' });
+        allKnown = true;
+        coachUp = null;
+        card.classList.add('is-out');
+        setTimeout(() => card.remove(), 220);
+        resolve(false); // (the card opens the tool itself: the one it holds now, which a later press may have changed)
+        if (go) launch(held.opts);
+      }
+      close.addEventListener('click', () => end(false));
+      skip.addEventListener('click', () => end(true));
+      document.addEventListener('keydown', onKey, true);
+      document.body.append(card);
+      requestAnimationFrame(() => card.classList.add('is-in'));
+      try { card.focus({ preventScroll: true }); } catch { /* it shows anyway */ }
+      ask({ type: 'allSitesAsk' }); // (the panel puts its button first, marked as the one the page sent you to)
+      // the browser's yes lands in the panel, not here: asked after, every second, until it has
+      poll = setInterval(async () => {
+        if (over) return;
+        if (!card.isConnected) { end(false, false); return; }
+        const st = await ask({ type: 'allSitesState' }, 1200);
+        if (over || !st?.ok || !st.all) return;
+        clearInterval(poll);
+        card.classList.add('is-done');
+        card.querySelector('.bcv-allsites__wait').textContent = `Allowed. Opening ${held.opts.title || 'the tool'}…`;
+        setTimeout(() => end(true), 900);
+      }, 1000);
+    });
+  }
+
+  /** Open a tool in a tab of its own, with the bar over it — (2.99.141) the first time where Simpl may
+   *  not run on every site, after the card that asks for it. */
+  function open(opts = {}) {
+    if (!opts.url) return null;
+    if (allKnown) return launch(opts);
+    everySiteFirst(opts).then((go) => { if (go) launch(opts); }, () => launch(opts));
+    return null;
+  }
+  function launch({ title = 'External tool', url, page = null, newTab = null, note = '', from = null, icon = null } = {}) {
     if (!url) return null;
     const target = launched(url);
     if (from) try { from.blur?.(); } catch { /* it went */ }

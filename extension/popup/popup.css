@@ -39,3 +39,8 @@ p { margin: 0 0 8px; }
 
 /* the tool card: its two presses side by side, wrapping where the popup is narrow */
 .btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+
+/* (2.99.141) Allow on every site: first in the panel, with a ring in the accent while a Canvas page is waiting on it */
+.card--all.is-asked { box-shadow: 0 0 0 2px var(--blue), var(--shadow); }
+.card__asked { margin: 0 0 6px; color: var(--blue); font-weight: 600; }
+.btn:disabled { opacity: .55; cursor: default; }

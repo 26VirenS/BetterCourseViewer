@@ -189,14 +189,54 @@
   }
 
 
+  // (2.99.141) Allow on every site: the one press that lets Simpl's bar follow a tool to its own site.
+  // A page cannot ask the browser for that — only this panel can — so a Canvas page about to open its
+  // first tool points here (content/app/exttool.js's card); the button is here whenever every site has
+  // not been allowed, and first, marked, while that page is waiting on it.
+  const offerAll = async () => {
+    let all = true;
+    try { all = await api.permissions.contains({ origins: ['*://*/*'] }); } catch { all = true; } // (a browser that cannot say: nothing to offer)
+    if (all) return;
+    let asked = null;
+    try { asked = (await api.storage.local.get('allsites:ask'))['allsites:ask'] || null; } catch { /* not marked, then */ }
+    const fresh = !!asked && Date.now() - (asked.at || 0) < 30 * 60 * 1000;
+    $('allsites-card').hidden = false;
+    $('allsites-card').classList.toggle('is-asked', fresh);
+    $('allsites-asked').hidden = !fresh;
+  };
+  $('allow-all').addEventListener('click', async () => {
+    const msg = $('allsites-msg');
+    msg.textContent = 'Asking for permission…';
+    // straight from the press, nothing awaited first: Safari takes the request only while the press is
+    // still a user gesture. Chrome closes this panel as its dialog opens: the background finishes from
+    // the browser's word (continuePending), and the page's card sees it and opens the tool.
+    let ok = false;
+    try {
+      ok = await api.permissions.request({ origins: ['*://*/*'] });
+    } catch (e) {
+      msg.textContent = `The browser did not ask (${e?.message || e}).`;
+      return;
+    }
+    if (!ok) {
+      msg.textContent = 'Not allowed. Tools still open, without Simpl’s bar on their own sites.';
+      return;
+    }
+    await send({ type: 'allSitesAllowed' });
+    $('allow-all').disabled = true;
+    msg.textContent = 'Allowed. Simpl’s bar follows your tools to any site now.';
+    setTimeout(() => window.close(), 1200);
+  });
+
   if (!onWeb) {
     status.textContent = 'Open a Canvas page to use it.';
+    await offerAll();
     return;
   }
   // A tool's own tab (opened from the interface, the bar over it). Where the browser has not let the
   // extension onto the tool's site, nothing of ours runs there and the bar is gone with the pinned
   // tools; the one thing that brings them back is the site being allowed — from a press here.
   const toolHere = (await send({ type: 'toolTabOf', tabId: tab?.id }))?.tool || null;
+  if (!toolHere) await offerAll(); // (a tool's own tab has its own every-site press, in its card)
   if (toolHere) {
     status.textContent = `A tool’s tab · ${toolHere.title || url.hostname}`;
     if (granted) {

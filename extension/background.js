@@ -202,7 +202,34 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
    *  and never asked again. */
   const TOOL_SITES = 'tool:sites'; // origin -> 'yes' | 'no'
   async function allSites() {
+    try { const dev = (await api.storage.local.get('dev:allSites'))['dev:allSites']; if (typeof dev === 'boolean') return dev; } catch { /* the browser's word, then */ } // (the suites' stand-in for the browser's yes)
     try { return await api.permissions.contains({ origins: ['*://*/*'] }); } catch { return true; } // (a browser that cannot say has the bar everywhere it is allowed)
+  }
+  /** (2.99.141) Every site, asked for once (content/app/exttool.js's card, the popup's Allow on every site):
+   *  whether it is allowed, and whether the card has been shown — then never again. 'allsites:ask' is the
+   *  card up on a tab now, so the popup puts its button first and says the page sent it. */
+  const ALL_SEEN = 'allsites:coach';
+  const ALL_ASK = 'allsites:ask';
+  async function allSitesState() {
+    const all = await allSites();
+    const kept = await api.storage.local.get(ALL_SEEN).catch(() => ({}));
+    return { ok: true, all, seen: !!kept?.[ALL_SEEN] };
+  }
+  async function allSitesAsk(sender) {
+    await api.storage.local.set({ [ALL_ASK]: { tabId: sender?.tab?.id ?? null, at: Date.now() } }).catch(() => {});
+    return { ok: true };
+  }
+  async function allSitesSeen() {
+    await api.storage.local.set({ [ALL_SEEN]: 'seen' }).catch(() => {});
+    await api.storage.local.remove(ALL_ASK).catch(() => {});
+    return { ok: true };
+  }
+  /** Every site allowed (the popup's press, or the browser telling of it when the popup was closed by its
+   *  dialog): the bar's script registered everywhere, so a tool's tab has the bar on any site it goes to. */
+  async function allSitesAllowed() {
+    const ok = await registerBarScript('*://*/*');
+    await api.storage.local.remove(ALL_ASK).catch(() => {});
+    return { ok };
   }
   async function toolOriginOf(url) {
     try {
@@ -567,6 +594,18 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
         return true;
       case 'toolTab': // the bar asking whether this tab is a tool's
         reply(toolTab(sender));
+        return true;
+      case 'allSitesState': // (2.99.141) the card before a tool's first opening: every site allowed yet, and has it been shown
+        reply(allSitesState());
+        return true;
+      case 'allSitesAsk': // (2.99.141) the card is up on this tab: the popup puts Allow on every site first
+        reply(allSitesAsk(sender));
+        return true;
+      case 'allSitesSeen': // (2.99.141) the card closed: never shown again
+        reply(allSitesSeen());
+        return true;
+      case 'allSitesAllowed': // (2.99.141) the popup: every site allowed from its press — the bar's script registered everywhere
+        reply(allSitesAllowed());
         return true;
       case 'toolTabOf': // the popup asking about the tab it is over
         reply(toolTabOf(msg.tabId));
@@ -1153,6 +1192,8 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
    *  permission lands, the rest happens here: the site registered, then the setup over that tab
    *  (or the tab reloaded). The note expires, and the popup clears it itself when it survives. */
   async function continuePending(added) {
+    // (2.99.141) every site allowed, from the popup's Allow on every site: the bar everywhere
+    if ((added?.origins || []).some((o) => o === '*://*/*' || o === '<all_urls>')) await allSitesAllowed().catch(() => {});
     try {
       // the popup on a tool's tab asked for the tool's site (or for every site): the bar registered for it and put over the page
       const tp = (await api.storage.local.get('tool:pending'))?.['tool:pending'];
