@@ -29,6 +29,9 @@
     slider: 'M4 8h16M4 16h16M9 5v6M15 13v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.142', date: '2026-11-14', notes: [
+      { kind: 'fixed', title: 'What-If Scores', body: 'Type a score, then Tab or click to the next: it sticks.', icon: P.check },
+    ] },
     { version: '2.99.141', date: '2026-11-13', notes: [
       { kind: 'new', title: 'Allow on Every Site', body: 'A tool’s first opening shows how to allow Simpl everywhere.', icon: P.pin },
     ] },

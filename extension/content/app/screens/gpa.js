@@ -864,9 +864,8 @@
             return el;
           }
           const input = h('input', { type: 'text', inputmode: 'decimal', placeholder: '—', class: `bcv-whatif__input ${g.hypothetical ? 'is-hyp' : ''}`, dataset: { wf: g.id }, 'aria-label': `What-if score for ${g.name}`, value: wf.values[g.id] === undefined ? (g.earned === null ? '' : String(g.earned)) : wf.values[g.id] });
-          input.addEventListener('focus', () => input.select());
-          input.addEventListener('change', () => { wf.values[g.id] = input.value.replace(/[^0-9.]/g, ''); focusId = null; repaint(); });
-          input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+          // (2.99.142: the caret back in the field it went to after the repaint; Tab from score to score — ui.whatIfField)
+          U.whatIfField(input, { take: (v) => { wf.values[g.id] = v; }, redraw: (next) => { if (!ov.isConnected) return; focusId = next; repaint(); }, scope: () => sheet });
           const wrap = U.el('bcv-whatif', [input, U.text('bcv-whatif__possible', `/ ${store.fmtPts(g.possible)}`, 'span')]);
           wrap.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); }); // typing a what-if is not opening the row
           return wrap;

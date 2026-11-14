@@ -2582,6 +2582,23 @@ try {
   const wfFields = await page.$$eval('.bcv-gpa-detail .bcv-whatif__input', (els) => ({ n: els.length, h: Math.round(els[0].getBoundingClientRect().height), w: Math.round(els[0].getBoundingClientRect().width), bg: getComputedStyle(els[0]).backgroundColor, hyp: els.filter((e) => e.classList.contains('is-hyp')).length, first: els[0].value, bannerH: Math.round(document.querySelector('.bcv-gpa-detail .bcv-banner--sm')?.getBoundingClientRect().height || 0) }));
   check(wfFields.n === 18 && wfFields.h >= 34 && wfFields.w >= 68 && wfFields.bg !== 'rgba(0, 0, 0, 0)' && !/^rgb\(255, 255, 255\)$/.test(wfFields.bg) && wfFields.hyp === 0 && wfFields.bannerH > 0 && wfFields.bannerH < 120 && (await texts('.bcv-gpa-detail .bcv-whatif-btn'))[0] === 'Exit what-if mode' && (await page.$eval('.bcv-gpa-detail__pct', (e) => e.classList.contains('is-hyp'))), `Try what-if scores: a bigger tinted field per assignment with the real score in it, the banner up: ${JSON.stringify(wfFields)}`);
   const pctBefore = (await texts('.bcv-gpa-detail__pct'))[0];
+  // (2.99.142) the sheet's fields the same: one pressed and typed over, Tab to the next — the caret there after the repaint
+  {
+    const sIds = await page.$$eval('.bcv-gpa-detail .bcv-whatif__input', (els) => els.map((e) => e.dataset.wf));
+    const s0 = page.locator(`.bcv-gpa-detail .bcv-whatif__input[data-wf="${sIds[0]}"]`);
+    await s0.scrollIntoViewIfNeeded();
+    const sb0 = await s0.boundingBox();
+    await page.mouse.click(sb0.x + sb0.width / 2, sb0.y + sb0.height / 2);
+    const s0Was = await s0.inputValue();
+    await page.keyboard.type('7');
+    await page.keyboard.press('Tab');
+    await page.waitForFunction(([id, first, was]) => document.activeElement?.dataset?.wf === id && (was === '7' || !!document.querySelector(`.bcv-gpa-detail .bcv-whatif__input.is-hyp[data-wf="${first}"]`)), [sIds[1], sIds[0], s0Was], { timeout: 3000 }).catch(() => {});
+    const sTab = await page.evaluate(() => document.activeElement?.dataset?.wf || null);
+    const sHyp = await page.$$eval('.bcv-gpa-detail .bcv-whatif__input.is-hyp', (els) => els.map((e) => e.dataset.wf));
+    check(sTab === sIds[1] && (s0Was === '7' || sHyp.includes(sIds[0])), `in the Grades page's sheet a score typed and Tab: the next field has the caret after the repaint: ${JSON.stringify({ sTab, want: sIds[1], sHyp })}`);
+    await page.click('.bcv-gpa-detail .bcv-banner--sm button');
+    await page.waitForFunction(() => !document.querySelector('.bcv-gpa-detail .bcv-whatif__input.is-hyp'), null, { timeout: 5000 });
+  }
   // every graded assignment zeroed (one alone could sit in a group that carries no weight): the total has to move
   const gradedWf = await page.$$eval('.bcv-gpa-detail__arow', (rows) => rows.filter((r) => r.querySelector('.bcv-whatif__input') && r.querySelector('.bcv-gpa__catdot')?.style.background === 'rgb(10, 132, 255)' && r.querySelector('.bcv-whatif__input').value !== '0').map((r) => r.querySelector('.bcv-whatif__input').dataset.wf)); // (a real 0 set to 0 is no change)
   for (const id of gradedWf) {
@@ -3997,6 +4014,37 @@ try {
   await page.click('.bcv-banner .bcv-btn');
   await page.waitForFunction(() => !document.querySelector('.bcv-row.is-wfadded'), null, { timeout: 5000 });
   check(!(await page.$('.bcv-whatif__input.is-hyp')), 'Clear all takes the made-up assignments with the changed scores');
+  // (2.99.142) what-if as a person types it: a score pressed with the mouse and typed over, Tab to the next score —
+  // the caret lands there, its figure selected, after the redraw the change brings — typed over too, then the fourth
+  // pressed straight on: the caret there, the row not opened. (The redraw used to come under that press or Tab, the
+  // field it went to replaced as it was focused: the caret went nowhere and the next score could not be typed.)
+  {
+    const wfIds = await page.$$eval('.bcv-grades__main .bcv-whatif__input', (els) => els.map((e) => e.dataset.wf));
+    const first = page.locator(`.bcv-grades__main .bcv-whatif__input[data-wf="${wfIds[0]}"]`);
+    await first.scrollIntoViewIfNeeded();
+    const fb = await first.boundingBox();
+    await page.mouse.click(fb.x + fb.width / 2, fb.y + fb.height / 2);
+    await page.keyboard.type('9');
+    await page.keyboard.press('Tab');
+    await page.waitForFunction(([id, first]) => document.activeElement?.dataset?.wf === id && !!document.querySelector(`.bcv-grades__main .bcv-whatif__input.is-hyp[data-wf="${first}"]`), [wfIds[1], wfIds[0]], { timeout: 3000 }).catch(() => {});
+    const tabbed = await page.evaluate(() => { const a = document.activeElement; return { wf: a?.dataset?.wf || null, all: a ? a.selectionStart === 0 && a.selectionEnd === a.value.length : false }; });
+    await page.keyboard.type('5');
+    const fourth = page.locator(`.bcv-grades__main .bcv-whatif__input[data-wf="${wfIds[3]}"]`);
+    await fourth.scrollIntoViewIfNeeded();
+    const qb = await fourth.boundingBox();
+    const at = page.url();
+    await page.mouse.click(qb.x + qb.width / 2, qb.y + qb.height / 2);
+    await page.waitForFunction((id) => document.activeElement?.dataset?.wf === id, wfIds[3], { timeout: 3000 }).catch(() => {});
+    const pressed = await page.evaluate(() => document.activeElement?.dataset?.wf || null);
+    await page.keyboard.type('2');
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => document.querySelectorAll('.bcv-grades__main .bcv-whatif__input.is-hyp').length >= 3, null, { timeout: 3000 }).catch(() => {});
+    const typed = await page.evaluate((ids) => ids.map((id) => document.querySelector(`.bcv-grades__main .bcv-whatif__input[data-wf="${id}"]`)?.value), [wfIds[0], wfIds[1], wfIds[3]]);
+    check(tabbed.wf === wfIds[1] && tabbed.all && pressed === wfIds[3] && page.url() === at && JSON.stringify(typed) === JSON.stringify(['9', '5', '2']),
+      `what-if typed as a person types it: a score pressed and typed over, Tab to the next (the caret there, its figure selected), a press straight on another — each one taken, nothing opened: ${JSON.stringify({ tabbed, pressed, typed, url: page.url() })}`);
+    await page.click('.bcv-banner .bcv-btn');
+    await page.waitForFunction(() => !document.querySelector('.bcv-whatif__input.is-hyp'), null, { timeout: 5000 });
+  }
   await page.click('.bcv-whatif-btn');
   await page.waitForFunction(() => !document.querySelector('.bcv-banner'), null, { timeout: 5000 });
   // (2.98.59) your own weights: a percent per group from the syllabus; the rings, the total, the

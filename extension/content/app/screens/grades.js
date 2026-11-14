@@ -231,9 +231,8 @@
           scoreEl.addEventListener('dblclick', () => { st.on = true; focusId = g.id; draw(); });
         } else {
           const input = h('input', { type: 'text', inputmode: 'decimal', placeholder: '—', class: `bcv-whatif__input ${g.hypothetical ? 'is-hyp' : ''}`, dataset: { wf: g.id }, value: st.values[g.id] === undefined ? (g.earned === null ? '' : String(g.earned)) : st.values[g.id] });
-          input.addEventListener('focus', () => input.select());
-          input.addEventListener('change', () => { st.values[g.id] = input.value.replace(/[^0-9.]/g, ''); focusId = null; draw(); });
-          input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+          // (2.99.142: the caret back in the field it went to after the redraw; Tab from score to score — ui.whatIfField)
+          U.whatIfField(input, { take: (v) => { st.values[g.id] = v; }, redraw: (next) => { if (!ctx.alive()) return; focusId = next; draw(); }, scope: () => b });
           scoreEl = U.el('bcv-whatif', [input, U.text('bcv-whatif__possible', `/ ${store.fmtPts(g.possible)}`, 'span')]);
           scoreEl.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); }); // typing a what-if is not opening the row
         }

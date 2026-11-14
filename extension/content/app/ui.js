@@ -1603,6 +1603,48 @@
     ]);
   }
   /** The X on a what-if assignment's row: it goes, and the grade with it (the row's own press is not a press on this). */
+  /** (2.99.142) A what-if score's field that keeps the caret in the person's hands. A change redraws the list —
+   *  the total, the rings, every row — and before, that redraw came under the very press (or Tab) that ended the
+   *  edit: the field it went to was replaced as it was being focused, and the caret went nowhere, so a second score
+   *  could not be typed without pressing its field again ("what-if doesn't even work"). Now the figure is taken at
+   *  once and the redraw waits for that press to finish (and for its click, which must not land on a row and open
+   *  it); then the field the caret went to is found again in the new list by its data-wf, and the caret put back
+   *  there, its figure selected. Tab and Shift-Tab go from score to score, not to the next row's link; Enter ends the
+   *  edit. `take(figure)` keeps it; `redraw(nextId)` draws the list again with the caret to go back into field
+   *  `nextId` (null: nowhere); `scope()` is what holds the fields. */
+  let pressing = false;
+  if (typeof document !== 'undefined') {
+    document.addEventListener('pointerdown', () => { pressing = true; }, true);
+    for (const t of ['pointerup', 'pointercancel']) document.addEventListener(t, () => { pressing = false; }, true);
+  }
+  function whatIfField(input, { take, redraw, scope = () => document }) {
+    input.addEventListener('focus', () => input.select());
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); input.blur(); return; }
+      if (e.key !== 'Tab' || e.altKey || e.ctrlKey || e.metaKey) return;
+      const all = [...(scope() || document).querySelectorAll('.bcv-whatif__input')];
+      const next = all[all.indexOf(input) + (e.shiftKey ? -1 : 1)];
+      if (!next) return; // (past the last or the first: the page's own order)
+      e.preventDefault();
+      next.focus();
+    });
+    input.addEventListener('change', () => {
+      take(input.value.replace(/[^0-9.]/g, ''));
+      const go = () => setTimeout(() => {
+        const a = document.activeElement;
+        const next = a && a !== input && a.classList?.contains('bcv-whatif__input') ? a : null;
+        // (whatever was typed into that field before the redraw — a quick hand after a Tab — goes with it, the caret too)
+        const carry = next ? { v: next.value, s: next.selectionStart, e: next.selectionEnd } : null;
+        redraw(next ? next.dataset.wf ?? null : null);
+        if (!carry || next.dataset.wf == null) return;
+        const n = (scope() || document).querySelector(`.bcv-whatif__input[data-wf="${CSS.escape(next.dataset.wf)}"]`);
+        if (!n || n === next || n.value === carry.v) return;
+        n.value = carry.v;
+        try { n.setSelectionRange(carry.s, carry.e); } catch { /* the caret where it lands */ }
+      }, 0);
+      if (pressing) document.addEventListener('pointerup', go, { once: true, capture: true }); else go();
+    });
+  }
   const whatIfRemove = (name, onRemove) => h('button', {
     type: 'button', class: 'bcv-wfadd__rm', 'aria-label': `Remove ${name}`, title: 'Remove this what-if assignment',
     onclick: (e) => { e.preventDefault(); e.stopPropagation(); onRemove(); },
@@ -1864,7 +1906,7 @@
   }
 
   BCV.ui = {
-    groupPicker, groupAttrs, BANDS, gradeBand, bandChip, bandSlider, whatIfAdder, whatIfRemove,
+    groupPicker, groupAttrs, BANDS, gradeBand, bandChip, bandSlider, whatIfAdder, whatIfRemove, whatIfField,
     svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, statusBadge, seg, segSlide, search, switchEl, btn, iconbtn, pill, placeDot, haptic,
     squircle, squirclePath, squircleFit, superPillPath, squircleAll,
     empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, picker, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField, promptSheet, askSheet,
