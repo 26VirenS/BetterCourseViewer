@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.142"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.143"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -2126,7 +2126,7 @@ html[data-bcv-theme="dark"] .bcv-rr-ov { --rr-dim0: .52; --rr-dim1: .78; }
 .bcv-row.is-selected { background: var(--bcv-blue-soft); }
 
 /* ---- grades ---------------------------------------------------------------- */
-.bcv-grades__main { flex: 1 1 440px; min-width: 0; max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+.bcv-grades__main { flex: 1 1 440px; min-width: 0; max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; container: bcv-grades / inline-size; } /* (2.99.143: was 760 wide, one column whatever the window — below, a wide page has the room side by side) */
 /* the grade card (mockup): rings + total, by group, how the grade is weighted */
 .bcv-gr { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
 .bcv-gr__top { display: flex; align-items: center; gap: 16px; }
@@ -6912,3 +6912,22 @@ html.bcv-on .bcv-screen.is-fit > .bcv-head, html.bcv-on:not(.bcv-phone):not(.bcv
 @media (hover: hover) and (pointer: fine) { .bcv-allsites__skip:hover { background: rgba(255,255,255,.22); } .bcv-allsites__later:hover { color: #fff; } }
 .bcv-allsites__later:focus-visible, .bcv-allsites__skip:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .bcv-allsites, .bcv-allsites.is-out, .bcv-allsites.is-bottom { transform: none; } .bcv-allsites__arrow, .bcv-allsites__spin { animation: none; } }
+
+/* (2.99.143) A course's Grades tab using a wide page, as the Mac's Grades section does (side by side from 800, two
+   columns from 900 of its page): from 720 across, the card's rings and total stand at its left with By group and How
+   the grade is weighted beside them; from 840 (a 1,440-wide window, the sidebar and the course's own panel out), the
+   assignments' groups flow into two columns, balanced, in their order, a group never split between them. */
+.bcv-gr__gcols { display: block; }
+.bcv-gr__gcols > .bcv-gr__gsec { break-inside: avoid; -webkit-column-break-inside: avoid; }
+@container bcv-grades (min-width: 720px) {
+  .bcv-gr { display: grid; grid-template-columns: minmax(220px, 340px) minmax(0, 1fr); column-gap: 28px; row-gap: 14px; align-items: start; padding: 22px 24px; }
+  .bcv-gr > .bcv-gr__top { grid-column: 1; grid-row: 1 / span 2; flex-direction: column; align-items: flex-start; gap: 18px; }
+  .bcv-gr > .bcv-gr__top .bcv-rings__svg { width: 140px; height: 140px; }
+  .bcv-gr > .bcv-gr__sec { grid-column: 2; }
+  .bcv-gr > .bcv-gr__sec:nth-child(2) { padding-top: 0; border-top: 0; }
+}
+@container bcv-grades (min-width: 840px) {
+  .bcv-gr > .bcv-gr__top .bcv-rings__svg { width: 150px; height: 150px; }
+  .bcv-gr__gcols { columns: 2; column-gap: 20px; }
+  .bcv-gr__gcols > .bcv-gr__gsec { display: inline-block; width: 100%; vertical-align: top; }
+}

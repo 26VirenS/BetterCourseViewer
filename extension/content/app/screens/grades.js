@@ -295,8 +295,10 @@
       const paintList = () => {
         const band = bandSt.band;
         const shown = band === 'all' ? rows : rows.filter((r) => r.dataset.band === band);
+        // (2.99.143) the groups in a column of their own, which a wide page flows into two, balanced, in their order
+        // (app.css: .bcv-gr__gcols) — the Mac's Grades section has had them side by side since 1.2
         listHost.replaceChildren(...(!rows.length ? [U.emptyCard('No assignments in this course.')]
-          : shown.length ? groupSections(shown)
+          : shown.length ? [h('div', { class: 'bcv-gr__gcols' }, groupSections(shown))]
             : [U.emptyCard(`No ${band} grades in this course${st.on ? ' with these what-if scores' : ''}.`)]));
       };
       paintList();
