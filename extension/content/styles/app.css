@@ -6914,20 +6914,23 @@ html.bcv-on .bcv-screen.is-fit > .bcv-head, html.bcv-on:not(.bcv-phone):not(.bcv
 @media (prefers-reduced-motion: reduce) { .bcv-allsites, .bcv-allsites.is-out, .bcv-allsites.is-bottom { transform: none; } .bcv-allsites__arrow, .bcv-allsites__spin { animation: none; } }
 
 /* (2.99.143) A course's Grades tab using a wide page, as the Mac's Grades section does (side by side from 800, two
-   columns from 900 of its page): from 720 across, the card's rings and total stand at its left with By group and How
-   the grade is weighted beside them; from 840 (a 1,440-wide window, the sidebar and the course's own panel out), the
+   columns from 900 of its page): the rings and the total in a card of their own, By group and How the grade is weighted
+   in another — from 720 across side by side, as tall as each other, one over the other below; from 840 (a 1,440-wide window, the sidebar and the course's own panel out), the
    assignments' groups flow into two columns, balanced, in their order, a group never split between them. */
 .bcv-gr__gcols { display: block; }
 .bcv-gr__gcols > .bcv-gr__gsec { break-inside: avoid; -webkit-column-break-inside: avoid; }
+.bcv-gr__cards { display: flex; flex-direction: column; gap: 18px; }
+.bcv-gr--groups > .bcv-gr__sec:first-child { padding-top: 0; border-top: 0; } /* (its own card now: no line over its first section) */
 @container bcv-grades (min-width: 720px) {
-  .bcv-gr { display: grid; grid-template-columns: minmax(220px, 340px) minmax(0, 1fr); column-gap: 28px; row-gap: 14px; align-items: start; padding: 22px 24px; }
-  .bcv-gr > .bcv-gr__top { grid-column: 1; grid-row: 1 / span 2; flex-direction: column; align-items: flex-start; gap: 18px; }
-  .bcv-gr > .bcv-gr__top .bcv-rings__svg { width: 140px; height: 140px; }
-  .bcv-gr > .bcv-gr__sec { grid-column: 2; }
-  .bcv-gr > .bcv-gr__sec:nth-child(2) { padding-top: 0; border-top: 0; }
+  .bcv-gr__cards { display: grid; grid-template-columns: minmax(220px, 320px) minmax(0, 1fr); gap: 18px; align-items: stretch; }
+  .bcv-gr__card { height: 100%; box-sizing: border-box; }
+  .bcv-gr--total { height: 100%; box-sizing: border-box; padding: 22px 24px; justify-content: center; }
+  .bcv-gr--total > .bcv-gr__top { flex-direction: column; align-items: flex-start; gap: 18px; }
+  .bcv-gr--total .bcv-rings__svg { width: 140px; height: 140px; }
+  .bcv-gr--groups { padding: 20px 22px; }
 }
 @container bcv-grades (min-width: 840px) {
-  .bcv-gr > .bcv-gr__top .bcv-rings__svg { width: 150px; height: 150px; }
+  .bcv-gr--total .bcv-rings__svg { width: 150px; height: 150px; }
   .bcv-gr__gcols { columns: 2; column-gap: 20px; }
   .bcv-gr__gcols > .bcv-gr__gsec { display: inline-block; width: 100%; vertical-align: top; }
 }

@@ -217,7 +217,12 @@
           U.el('bcv-gr__wbtns', [own ? U.btn(`Back to ${BCV.lms.name}’s weights`, { kind: 'danger', cls: 'bcv-gr__wclear', onClick: clear }) : null, h('span', { class: 'bcv-gr__wspace' }), U.btn('Cancel', { cls: 'bcv-gr__wcancel', onClick: cancel }), U.btn('Save', { kind: 'primary', cls: 'bcv-gr__wsave', onClick: save })]),
         ]);
       }
-      const ringsCard = U.card(U.el('bcv-gr', [U.el('bcv-gr__top', [svg, center]), byGroup, weightsSec]), 'bcv-card--22');
+      // (2.99.143) two cards, as the Mac's Grades section has them: the rings and the total in one, By group and How
+      // the grade is weighted in the other — side by side on a wide page, as tall as each other; one over the other
+      const ringsCard = U.el('bcv-gr__cards', [
+        U.card(U.el('bcv-gr bcv-gr--total', [U.el('bcv-gr__top', [svg, center])]), 'bcv-card--22 bcv-gr__card'),
+        U.card(U.el('bcv-gr bcv-gr--groups', [byGroup, weightsSec]), 'bcv-card--22 bcv-gr__card'),
+      ]);
 
       // ---- assignments ----------------------------------------------------------------
       const rows = gm.rows.map((g) => {
