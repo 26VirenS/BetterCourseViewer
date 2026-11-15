@@ -400,22 +400,28 @@ struct ColumnList<Left: View, Right: View, More: View>: View {
         self.more = more()
     }
 
+    /// The list's own width: a sheet on a wide screen can be narrower than the screen, and stays one column if so
+    @State private var room: CGFloat = 0
+
     var body: some View {
-        if wide {
-            HStack(alignment: .top, spacing: 0) {
+        Group {
+            if wide && (room == 0 || room >= 600) {
+                HStack(alignment: .top, spacing: 0) {
+                    column {
+                        left
+                        more
+                    }
+                    column { right }
+                }
+            } else {
                 column {
                     left
+                    right
                     more
                 }
-                column { right }
-            }
-        } else {
-            column {
-                left
-                right
-                more
             }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { room = $0 }
     }
 
     @ViewBuilder

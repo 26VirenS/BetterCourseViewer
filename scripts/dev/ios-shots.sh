@@ -127,7 +127,10 @@ collect end
 # cards, a course's grades and an assignment
 WIDE=$(xcrun simctl list devices available | grep -E "iPhone Duo \(" | head -1 | grep -oE "[0-9A-F-]{36}")
 WIDE_NAME="iPhone Duo"
-if [ -z "$WIDE" ]; then WIDE=$(xcrun simctl list devices available | grep -E "iPad mini" | head -1 | grep -oE "[0-9A-F-]{36}"); WIDE_NAME="iPad mini"; fi
+# (on the iPad, -SimplWideWidth holds the app to the Duo's inner display's 626 points across, so its columns are pictured
+# at the Duo's own width rather than the iPad's wider one)
+WARGS=""
+if [ -z "$WIDE" ]; then WIDE=$(xcrun simctl list devices available | grep -E "iPad mini" | head -1 | grep -oE "[0-9A-F-]{36}"); WIDE_NAME="iPad mini at the Duo's width"; WARGS="-SimplWideWidth 626"; fi
 if [ -n "$WIDE" ]; then
   echo "wide: $WIDE_NAME $WIDE" | tee "$OUT/wide-device.txt"
   xcrun simctl shutdown booted >/dev/null 2>&1 || true
@@ -135,14 +138,14 @@ if [ -n "$WIDE" ]; then
   xcrun simctl install booted "build/Build/Products/Debug-iphonesimulator/Simpl Courses.app"
   xcrun simctl status_bar booted override --time 9:41 --batteryState charged --batteryLevel 100 --wifiBars 3 >/dev/null 2>&1 || true
   xcrun simctl ui booted appearance light || true
-  launch wide-settle 40
+  launch wide-settle 40 $WARGS
   rm -f "$OUT/wide-settle.png" "$OUT/console-wide-settle.txt"
-  launch wide-01-today 24
-  launch wide-02-courses 16 -SimplTab courses
-  launch wide-03-todo 16 -SimplTab todo
-  launch wide-04-grades 16 -SimplTab grades
-  launch wide-10-assignment 22 -SimplTab todo -SimplPush /courses/101/assignments/1001
-  launch wide-11-grades-sheet 20 -SimplTab grades -SimplOpen grades:101
+  launch wide-01-today 24 $WARGS
+  launch wide-02-courses 16 -SimplTab courses $WARGS
+  launch wide-03-todo 16 -SimplTab todo $WARGS
+  launch wide-04-grades 16 -SimplTab grades $WARGS
+  launch wide-10-assignment 22 -SimplTab todo -SimplPush /courses/101/assignments/1001 $WARGS
+  launch wide-11-grades-sheet 20 -SimplTab grades -SimplOpen grades:101 $WARGS
   xcrun simctl terminate booted "$BID" >/dev/null 2>&1 || true
   collect wide
 else

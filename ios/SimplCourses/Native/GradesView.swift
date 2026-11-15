@@ -11,6 +11,7 @@ private struct DayGPA: Identifiable {
 /// you like, and what-if scores).
 struct GradesView: View {
     @EnvironmentObject private var engine: Engine
+    @Environment(\.wideScreen) private var wide
     @State private var data: GradesData?
     @State private var error: String?
     @State private var goal: Double = 4
@@ -138,7 +139,8 @@ struct GradesView: View {
                 NestedRings(bands: NestedRings.bands(total: r.pct, color: color, groups: r.cats.map { (pct: $0.pct, color: $0.color) }, limit: 3), key: "grades:\(r.id)")
                     .frame(width: 54, height: 54)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(r.code).font(.headline).lineLimit(1)
+                    // (a wide screen's column is narrower than the phone's list: the course's name takes a second line there)
+                    Text(r.code).font(.headline).lineLimit(wide ? 2 : 1)
                     Text("\(r.name ?? "") · \(r.total > 0 ? "\(r.graded) of \(r.total) graded" : "nothing graded")")
                         .font(.footnote).foregroundStyle(.secondary).lineLimit(1)
                 }
@@ -315,37 +317,36 @@ struct CourseGradesView: View {
         let rings = NestedRings.bands(total: d.total, color: whatIf ? .orange : color, groups: d.groups.map { (pct: $0.pct, color: $0.color) }, limit: 4)
         let legend = Array(d.groups.filter { $0.pct != nil }.prefix(rings.count - 1))
         return VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 18) {
-                NestedRings(bands: rings, outerWidth: 11, innerWidth: 7, gap: 2.5, key: "course-grades:\(courseId)")
-                    .frame(width: 124, height: 124)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(d.totalText)
-                        .font(.system(size: 34, weight: .bold, design: .rounded)).monospacedDigit()
-                        .contentTransition(.numericText(value: d.total ?? 0))
-                    if let l = d.letter {
-                        Text(whatIf ? "\(l) with what-if" : l)
-                            .font(.headline).foregroundStyle(whatIf ? .orange : color)
-                    }
-                    Menu {
-                        Picker("Target", selection: Binding(get: { d.target ?? "" }, set: { setTarget($0) })) {
-                            Text("No target").tag("")
-                            ForEach(d.scale, id: \.letter) { s in Text(s.letter).tag(s.letter) }
-                        }
-                    } label: {
-                        Label(d.target.map { "Target \($0)" } ?? "Set a target", systemImage: "scope").font(.subheadline)
-                    }
-                }
+            // (iPhone 1.8) the ring and the total side by side at the phone's size; in a wide screen's narrower column,
+            // a smaller ring and total, so the total is never cut short
+            ViewThatFits(in: .horizontal) {
+                totalRow(d, rings: rings, color: color, ring: 124, size: 34, gap: 18)
+                totalRow(d, rings: rings, color: color, ring: 96, size: 30, gap: 14)
+                totalRow(d, rings: rings, color: color, ring: 80, size: 26, gap: 12)
             }
-            // the legend: each ring's group, its weight and its score
+            // the legend: each ring's group, its weight and its score — the weight under the group's name where one line
+            // has no room for all three
             if !legend.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(Array(legend.enumerated()), id: \.offset) { i, g in
-                        HStack(spacing: 8) {
-                            Circle().fill(rings[i + 1].color).frame(width: 9, height: 9)
-                            Text(g.name).font(.subheadline).lineLimit(1)
-                            Spacer(minLength: 6)
-                            if let w = g.weightText, !w.isEmpty { Text(w).font(.caption).foregroundStyle(.secondary) }
-                            Text(g.value ?? "—").font(.subheadline.weight(.semibold).monospacedDigit())
+                        let weight = g.weightText.flatMap { $0.isEmpty ? nil : $0 }
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: 8) {
+                                Circle().fill(rings[i + 1].color).frame(width: 9, height: 9)
+                                Text(g.name).font(.subheadline).lineLimit(1)
+                                Spacer(minLength: 6)
+                                if let weight { Text(weight).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                                Text(g.value ?? "—").font(.subheadline.weight(.semibold).monospacedDigit())
+                            }
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Circle().fill(rings[i + 1].color).frame(width: 9, height: 9)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(g.name).font(.subheadline).lineLimit(2)
+                                    if let weight { Text(weight).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                                }
+                                Spacer(minLength: 6)
+                                Text(g.value ?? "—").font(.subheadline.weight(.semibold).monospacedDigit())
+                            }
                         }
                     }
                 }
@@ -356,6 +357,33 @@ struct CourseGradesView: View {
             }
         }
         .padding(.vertical, 8)
+    }
+
+    private func totalRow(_ d: CourseGradesData, rings: [NestedRings.Band], color: Color, ring: CGFloat, size: CGFloat, gap: CGFloat) -> some View {
+        HStack(spacing: gap) {
+            NestedRings(bands: rings, outerWidth: 11 * ring / 124, innerWidth: 7 * ring / 124, gap: 2.5, key: "course-grades:\(courseId)")
+                .frame(width: ring, height: ring)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(d.totalText)
+                    .font(.system(size: size, weight: .bold, design: .rounded)).monospacedDigit()
+                    .lineLimit(1)
+                    .contentTransition(.numericText(value: d.total ?? 0))
+                if let l = d.letter {
+                    Text(whatIf ? "\(l) with what-if" : l)
+                        .font(.headline).foregroundStyle(whatIf ? .orange : color)
+                        .lineLimit(1)
+                }
+                Menu {
+                    Picker("Target", selection: Binding(get: { d.target ?? "" }, set: { setTarget($0) })) {
+                        Text("No target").tag("")
+                        ForEach(d.scale, id: \.letter) { s in Text(s.letter).tag(s.letter) }
+                    }
+                } label: {
+                    Label(d.target.map { "Target \($0)" } ?? "Set a target", systemImage: "scope").font(.subheadline)
+                        .lineLimit(1)
+                }
+            }
+        }
     }
 
     // MARK: - The assignments
@@ -372,10 +400,18 @@ struct CourseGradesView: View {
                             Button { addingTo = g } label: { Label("Add What-If Assignment", systemImage: "plus.circle") }
                         }
                     } header: {
-                        HStack {
-                            Text(g.name)
-                            Spacer()
-                            Text([g.weightText, g.value].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")).textCase(nil)
+                        // (the group's weight and score beside its name, or under it where a wide screen's column is narrow)
+                        let detail = [g.weightText, g.value].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+                        ViewThatFits(in: .horizontal) {
+                            HStack {
+                                Text(g.name).lineLimit(1)
+                                Spacer()
+                                Text(detail).textCase(nil).lineLimit(1)
+                            }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(g.name)
+                                Text(detail).textCase(nil)
+                            }
                         }
                     } footer: {
                         if let detail = g.detail, !detail.isEmpty { Text(detail) }

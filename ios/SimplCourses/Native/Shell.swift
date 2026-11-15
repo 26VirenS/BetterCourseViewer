@@ -154,7 +154,15 @@ struct NativeShell: View {
         .environment(\.wideScreen, wide)
         // (iPhone 1.8: the Duo unfolded or folded, an iPad's window resized — every screen lays itself out again)
         .onGeometryChange(for: Bool.self) { min($0.size.width, $0.size.height) >= 600 } action: { wide = $0 }
+        // (the simulator suite only, scripts/dev/ios-shots.sh: -SimplWideWidth 626 holds the app to the Duo's inner
+        // display's width on an iPad, where Xcode has no Duo to picture)
+        .frame(maxWidth: Self.shotWidth ?? .infinity)
     }
+
+    private static let shotWidth: CGFloat? = {
+        let w = UserDefaults.standard.double(forKey: "SimplWideWidth")
+        return w >= 320 ? CGFloat(w) : nil
+    }()
 
     private func stack<Root: View>(_ tab: AppTab, @ViewBuilder _ root: () -> Root) -> some View {
         NavigationStack(path: $engine.paths[dynamicMember: \Paths.[tab]]) {
