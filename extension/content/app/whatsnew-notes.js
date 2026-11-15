@@ -29,6 +29,12 @@
     slider: 'M4 8h16M4 16h16M9 5v6M15 13v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.147', date: '2026-11-15', notes: [
+      { kind: 'improved', title: 'Easier On/Off Switch', body: 'Opens sideways; − and + set how long Simpl stays off.', icon: P.toggle },
+      { kind: 'improved', title: 'Tidier Course Menu', body: 'Campus tools fold under More until you need them.', icon: P.list },
+      { kind: 'improved', title: 'Report a Bug Is Back', body: 'In the top bar again, beside the power button.', icon: P.check },
+      { kind: 'fixed', title: 'Timer Lined Up', body: 'The focus timer sits level with your other tools.', icon: P.clock },
+    ] },
     { version: '2.99.146', date: '2026-11-15', notes: [
       { kind: 'improved', title: 'Out of Beta', body: 'Everything from the recent betas, now for everyone.', icon: P.check },
     ] },

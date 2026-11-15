@@ -630,16 +630,19 @@
     };
     const rail = h('nav', { class: `bcv-rail ${narrow ? 'is-narrow' : ''}`, 'aria-label': `${c.name} menu` }, [
       ...groups.filter((g) => g.items.length).map((g) => U.enter(U.el('bcv-rail__group', [U.text('bcv-rail__title', g.title), U.el('bcv-rail__list', g.items.map(item))]))),
-      external.length ? U.enter(U.el('bcv-rail__group bcv-rail__group--ext', [
-        U.text('bcv-rail__title', 'Campus tools'),
-        U.el('bcv-rail__list', external.map((t) => h('button', {
+      external.length ? U.enter(U.el('bcv-rail__group bcv-rail__group--ext', (() => {
+        const tools = external.map((t) => h('button', {
           type: 'button',
           class: `bcv-rail__ext ${t.id === activeId ? 'is-active' : ''}`,
           dataset: { tab: t.id },
           title: t.label,
           onclick: (e) => { if (BCV.exttool) BCV.exttool.openLink({ title: t.label, href: t.href, from: e.currentTarget }); else app.go(t.href); }, // (a tab of its own: this page stays where it is)
-        }, [h('span', { class: 'bcv-rail__label', text: t.label }), U.svg(EXT_ARROW, { size: 12, width: 2, style: { flex: 'none' } })]))),
-      ])) : null,
+        }, [h('span', { class: 'bcv-rail__label', text: t.label }), U.svg(EXT_ARROW, { size: 12, width: 2, style: { flex: 'none' } })]));
+        // (2.99.147) two or more: folded under the heading, a press away, as the sidebar's More
+        return external.length >= 2
+          ? U.moreFold(String(c.id), tools, { cls: 'bcv-rail__morehead', head: 'Campus tools', open: external.some((t) => t.id === activeId) })
+          : [U.text('bcv-rail__title', 'Campus tools'), U.el('bcv-rail__list', tools)];
+      })())) : null,
     ]);
     // the rail's own loading key (separate from the sidebar's): the row named fills with the course
     // colour; null clears it. A row already filling keeps its fill (the animation never restarts).

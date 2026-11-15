@@ -1517,6 +1517,43 @@
     return letter[0];
   }
   /** An item's letter, a small tag in the band's colour (an empty one keeps the column when there is none). */
+  /** (2.99.147) A course's campus tools folded a press away rather than listed at length: a More row (or, with `head`,
+   *  the group's own heading) with how many and a chevron, and under it the rows, drawn open or shut — opened, they
+   *  unfold (their height from nothing, on the house ease-out), and stay open for that course while the page lives,
+   *  in the sidebar and the course's own menu alike. Shut, they are out of the tab order. Returns [the row, the fold]. */
+  const moreOpen = new Set();
+  function moreFold(key, rows, { cls = '', color = null, head = null, open = false } = {}) {
+    if (open) moreOpen.add(key);
+    const isOpen = () => moreOpen.has(key);
+    const box = el(`bcv-more ${isOpen() ? 'is-open' : ''}`, [el('bcv-more__in', rows)]);
+    const chev = svg('M9 6l6 6-6 6', { size: 12, stroke: 'currentColor', width: 2.4 });
+    const btn = h('button', { type: 'button', class: `${cls} bcv-more__btn ${head ? 'bcv-more__btn--head' : ''} ${isOpen() ? 'is-open' : ''}`, 'aria-expanded': String(isOpen()), title: isOpen() ? 'Show fewer' : `Show ${rows.length} more` }, [
+      head ? null : h('span', { class: 'bcv-ctab__ic', style: color ? { color } : null }, svg('M5 12h.01M12 12h.01M19 12h.01', { size: 17, stroke: 'currentColor', width: 3 })),
+      h('span', { class: `bcv-ellip ${head ? 'bcv-rail__title' : ''}`, text: head || 'More' }),
+      h('span', { class: 'bcv-more__n', text: String(rows.length) }),
+      h('span', { class: 'bcv-more__chev' }, chev),
+    ]);
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const now = !isOpen();
+      if (now) moreOpen.add(key); else moreOpen.delete(key);
+      // every copy of this course's fold on the page (the sidebar's and the course menu's) together
+      for (const [b2, x] of folds.get(key) || []) {
+        if (!b2.isConnected) continue;
+        b2.classList.toggle('is-open', now);
+        b2.setAttribute('aria-expanded', String(now));
+        b2.title = now ? 'Show fewer' : `Show ${rows.length} more`;
+        x.classList.toggle('is-open', now);
+      }
+    });
+    if (!folds.has(key)) folds.set(key, []);
+    const list = folds.get(key).filter(([b2]) => b2.isConnected);
+    list.push([btn, box]);
+    folds.set(key, list);
+    return [btn, box];
+  }
+  const folds = new Map();
+
   function bandChip(band, title = null) {
     return h('span', { class: `bcv-bandchip ${band ? `bcv-band--${band}` : 'is-empty'}`, text: band || '', title: band ? title : null, 'aria-hidden': band ? null : 'true' });
   }
@@ -1906,7 +1943,7 @@
   }
 
   BCV.ui = {
-    groupPicker, groupAttrs, BANDS, gradeBand, bandChip, bandSlider, whatIfAdder, whatIfRemove, whatIfField,
+    groupPicker, groupAttrs, BANDS, gradeBand, bandChip, moreFold, bandSlider, whatIfAdder, whatIfRemove, whatIfField,
     svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, statusBadge, seg, segSlide, search, switchEl, btn, iconbtn, pill, placeDot, haptic,
     squircle, squirclePath, squircleFit, superPillPath, squircleAll,
     empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, picker, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField, promptSheet, askSheet,
