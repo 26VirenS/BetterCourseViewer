@@ -553,8 +553,9 @@ struct SplitColumnWidth: UIViewRepresentable {
         private var watchers: [NSKeyValueObservation] = []
         private var busy = false
         private var noted: Set<String> = []
-        /// (Build 43) When the width was last set again after something else changed it: more than a few times a second
-        /// is a tug of war (the system keeping the column off the Duo's fold by itself, say) — the width is left to it.
+        /// (Build 43) When the width was last set again after something else changed it: SwiftUI's own pass puts its
+        /// three widths back a few times over; dozens of times a second is a tug of war (the system keeping the column
+        /// off the Duo's fold by itself, say) — the width is left to it. (Build 44: 30, not 4, which left it at 320.)
         private var resets: [Date] = []
 
         override func didMoveToWindow() {
@@ -608,7 +609,7 @@ struct SplitColumnWidth: UIViewRepresentable {
             guard !busy, held === split, width >= 200, window != nil, off(split) else { return }
             let now = Date()
             resets = resets.filter { now.timeIntervalSince($0) < 1 } + [now]
-            if resets.count > 4 {
+            if resets.count > 30 {
                 note("tug", "split: the list column's width keeps being set elsewhere; left as it is")
                 watchers = []
                 return
