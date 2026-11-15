@@ -229,6 +229,7 @@ struct TabSplit<Root: View>: View {
             root
                 .environment(\.splitList, two)
                 .navigationSplitViewColumnWidth(min: 320, ideal: listWidth, max: listWidth)
+                .background(SplitColumnWidth(width: two ? listWidth : 0).allowsHitTesting(false)) // (build 38: the width iPadOS 26 otherwise keeps at 320)
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { r in engine.splitEdge[tab] = two ? r.maxX : nil }
         } detail: {
             if let first = path.first {

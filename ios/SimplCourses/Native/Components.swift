@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// A grade ring: the track, and the arc to the score in the course's colour, drawn (not a system gauge,
 /// so it shows in any list and any size). It fills once, with a spring, when it first appears, and moves
@@ -516,4 +517,56 @@ extension ColumnList where More == EmptyView {
 /// (iPhone 1.8) The width a wide screen's grid lays its cards out at: as many columns of at least `minimum` points as fit.
 func wideColumns(minimum: CGFloat = 280, spacing: CGFloat = 14) -> [GridItem] {
     [GridItem(.adaptive(minimum: minimum), spacing: spacing, alignment: .top)]
+}
+
+/// (iPhone 1.8.1, build 38) The list column's width, said to the split view controller under Apple's NavigationSplitView
+/// itself: iPadOS 26 holds a SwiftUI split view's list column to its own width (320 points) whatever
+/// navigationSplitViewColumnWidth asks, which left the right column the wider and the fold inside the list. A view in
+/// the column finds its split view controller up the responder chain and sets the primary column's width there,
+/// again whenever it is laid out (the Duo folding, an iPad's window resized).
+struct SplitColumnWidth: UIViewRepresentable {
+    let width: CGFloat
+
+    func makeUIView(context: Context) -> Probe {
+        let v = Probe()
+        v.isUserInteractionEnabled = false
+        v.backgroundColor = .clear
+        v.width = width
+        return v
+    }
+
+    func updateUIView(_ v: Probe, context: Context) {
+        v.width = width
+        v.apply()
+    }
+
+    final class Probe: UIView {
+        var width: CGFloat = 0
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            apply()
+        }
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            apply()
+        }
+
+        func apply() {
+            guard width >= 200, width.isFinite else { return }
+            var r: UIResponder? = self
+            while let x = r {
+                if let split = x as? UISplitViewController {
+                    if abs(split.preferredPrimaryColumnWidth - width) > 0.5 || abs(split.maximumPrimaryColumnWidth - width) > 0.5 {
+                        split.minimumPrimaryColumnWidth = min(320, width)
+                        split.maximumPrimaryColumnWidth = width
+                        split.preferredPrimaryColumnWidth = width
+                    }
+                    return
+                }
+                r = x.next
+            }
+        }
+    }
 }
