@@ -163,6 +163,14 @@ if [ -n "$WIDE" ]; then
   launch wide-l-02-courses 16 -SimplTab courses $LARGS
   launch wide-l-09-course 20 -SimplTab courses -SimplPush /courses/101 $LARGS
   launch wide-l-17-inbox 18 -SimplPush /conversations $LARGS
+  # (iPhone 1.8.1, build 43) folded and opened again and again on each tab, something opened on the way: the app must
+  # stay up through it and say "fold cycle: done" (NativeShell.foldCycle)
+  SETTLE=no launch wide-fold-cycle 70 -SimplFoldCycle YES $LARGS
+  if grep -q "fold cycle: done" "$OUT/console-wide-fold-cycle.txt"; then
+    echo "fold cycle: stayed up" | tee "$OUT/fold-cycle.txt"
+  else
+    { echo "fold cycle: DID NOT FINISH — last steps:"; grep "fold cycle\|rail:\|split:" "$OUT/console-wide-fold-cycle.txt" | tail -8; tail -40 "$OUT/console-wide-fold-cycle.txt"; } | tee "$OUT/fold-cycle.txt"
+  fi
   xcrun simctl terminate booted "$BID" >/dev/null 2>&1 || true
   collect wide
 else

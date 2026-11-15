@@ -550,6 +550,14 @@ final class Engine: ObservableObject, ShellListener {
     /// (iPhone 1.8.1, build 36) The window's own bounds, read from UIKit (TabBarProbe): the whole screen, whatever SwiftUI
     /// says of its safe areas — its middle is where the Duo folds.
     @Published private(set) var screen: CGRect = .zero
+    /// (iPhone 1.8.1, build 43) A rail down the screen's side (the iPhone Duo folded, or open on its side), where iOS
+    /// puts the bars' buttons one under another (TabBarProbe, ShellToolbar).
+    @Published private(set) var rail = false
+    func setRail(_ on: Bool) {
+        guard on != rail else { return }
+        rail = on
+        print("[Simpl Courses] rail: \(on ? "down the side" : "none")")
+    }
     func setScreen(_ r: CGRect) {
         guard TabBarProbe.usable(r), r.width > 0, abs(r.width - screen.width) > 0.5 || abs(r.height - screen.height) > 0.5 || abs(r.minX - screen.minX) > 0.5 else { return }
         screen = r

@@ -125,6 +125,9 @@ struct NativeShell: View {
     @State private var frame: CGRect = .zero
     /// (Build 42) The student's picture for the tab bar (AccountIcon), once made.
     @State private var accountIcon: UIImage?
+    /// (Build 43, the simulator suite only: -SimplFoldCycle YES) The width the app is held to as it is folded and opened
+    /// again and again (FoldCycle).
+    @State private var cycleWidth: CGFloat?
     /// (iPhone 1.8.1, build 36) The whole screen, in window coordinates: the window's own bounds as UIKit has them
     /// (Engine.screen) — the side tab bar, the camera's strip and every safe area inside it. Its middle is where the Duo
     /// folds. (Builds 33 to 35 measured it in SwiftUI with a view ignoring the safe areas; on the Duo that still came out
@@ -188,6 +191,7 @@ struct NativeShell: View {
         .environment(\.foldX, wide ? screen.midX : nil)
         .environment(\.twoPane, twoPane)
         .environment(\.screenRect, screen)
+        .environment(\.sideRail, engine.rail)
         .onChange(of: screen, initial: true) { _, _ in
             engine.foldX = wide ? screen.midX : nil
             engine.twoPane = twoPane
@@ -201,7 +205,40 @@ struct NativeShell: View {
         }
         // (the simulator suite only, scripts/dev/ios-shots.sh: -SimplWideWidth 626 holds the app to the Duo's inner
         // display's width on an iPad, where Xcode has no Duo to picture)
-        .frame(maxWidth: Self.shotWidth ?? .infinity)
+        .frame(maxWidth: cycleWidth ?? Self.shotWidth ?? .infinity)
+        .task { if UserDefaults.standard.bool(forKey: "SimplFoldCycle") { await foldCycle() } }
+    }
+
+    /// (Build 43, the simulator suite only) The iPhone Duo folded and opened again and again on each tab — the app held to
+    /// a phone's width, then the Duo's open width — with something opened on the way, each step said on the console and
+    /// "fold cycle: done" at the end: an app that does not stay up through it never says so.
+    private func foldCycle() async {
+        let say = { (s: String) in print("[Simpl Courses] fold cycle: \(s)") }
+        try? await Task.sleep(nanoseconds: 4_000_000_000)
+        for tab in [AppTab.today, .courses, .todo, .grades] {
+            engine.tab = tab
+            for round in 1...3 {
+                cycleWidth = 390
+                say("\(tab.rawValue) folded (\(round))")
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                cycleWidth = 890
+                say("\(tab.rawValue) open (\(round))")
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                if round == 1 {
+                    // something opened, to carry across the next fold
+                    switch tab {
+                    case .courses: engine.push(.section(ctx: "courses/101", kind: "assignments"))
+                    case .todo: engine.push(.assignment(course: "101", id: "1001"))
+                    case .grades: engine.push(.section(ctx: "courses/101", kind: "grades"))
+                    default: engine.push(.notifications)
+                    }
+                    say("\(tab.rawValue) opened \(engine.paths[tab].count) deep")
+                    try? await Task.sleep(nanoseconds: 1_200_000_000)
+                }
+            }
+        }
+        cycleWidth = nil
+        say("done")
     }
 
     private static let shotWidth: CGFloat? = {
@@ -306,7 +343,9 @@ struct TabSplit<Root: View>: View {
         .onChange(of: lead, initial: true) { _, n in engine.splitLead[tab] = n }
         // (build 41) Courses opened with two columns and no course yet: the first course's home on the left
         .task(id: two && path.isEmpty) {
-            guard tab == .courses, two, engine.paths[.courses].isEmpty,
+            guard tab == .courses, two else { return }
+            try? await Task.sleep(nanoseconds: 400_000_000) // (build 43: once the Duo has finished opening, not during it)
+            guard engine.paths[.courses].isEmpty,
                   let d = try? await engine.call("courses", as: CoursesData.self), let c = d.rows.first,
                   twoColumns, engine.paths[.courses].isEmpty else { return }
             engine.paths[.courses] = [.course(id: c.id)]
@@ -392,8 +431,15 @@ struct CourseStrip: View {
 }
 
 private struct CourseStripKey: EnvironmentKey { static let defaultValue = false }
+private struct SideRailKey: EnvironmentKey { static let defaultValue = false }
 
 extension EnvironmentValues {
+    /// (Build 43) A rail down the screen's side (Engine.rail): the bars' buttons go one under another in it.
+    var sideRail: Bool {
+        get { self[SideRailKey.self] }
+        set { self[SideRailKey.self] = newValue }
+    }
+
     /// (Build 41) A course's home on the left of Courses' split view: the course strip first in it (ContextHome).
     var courseStrip: Bool {
         get { self[CourseStripKey.self] }
@@ -483,6 +529,9 @@ struct ShellToolbar: ViewModifier {
     @EnvironmentObject private var engine: Engine
     /// (Build 42) A wide screen: the picture is in the tab bar (NativeShell), not here.
     @Environment(\.wideScreen) private var wide
+    /// (Build 43) The Duo's rail: the buttons each the bar's own item, which iOS stacks down it — the capsule of them
+    /// drawn here is one item, as wide as four buttons, and ran off the screen's edge there.
+    @Environment(\.sideRail) private var rail
 
     /// Buttons of the screen's own or the shell's in the capsule, the picture aside.
     private var buttons: Bool { menu != nil || calendar || add != nil || bell }
@@ -497,23 +546,36 @@ struct ShellToolbar: ViewModifier {
         // the buttons and the picture share one glass capsule, drawn here rather than by the bar's own grouping (1.5.1):
         // the bar pads every item it groups, which left the picture small and off the capsule's end. The screen's large
         // title sits on the same row, at the leading edge, rather than under it (inlineLarge).
-        if wide && !buttons {
-            content.toolbarTitleDisplayMode(.inlineLarge) // (nothing left for the capsule to hold)
-        } else if #available(iOS 26.0, *) {
+        // (build 43) one shape whatever the screen, its buttons in or out of it: switching between shapes as the Duo folds
+        // or opens made every screen afresh — what was open on it, where it was scrolled — in the middle of the change
+        if #available(iOS 26.0, *) {
             content
                 .toolbarTitleDisplayMode(.inlineLarge)
                 .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) { capsule }
-                        .sharedBackgroundVisibility(.hidden) // (the capsule is its own glass: no second one round it)
+                    if rail {
+                        ToolbarItemGroup(placement: .topBarTrailing) { railItems }
+                    }
+                    if !rail && showCapsule {
+                        ToolbarItem(placement: .topBarTrailing) { capsule }
+                            .sharedBackgroundVisibility(.hidden) // (the capsule is its own glass: no second one round it)
+                    }
                 }
         } else {
             content
                 .toolbarTitleDisplayMode(.inlineLarge)
                 .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) { capsule }
+                    if rail {
+                        ToolbarItemGroup(placement: .topBarTrailing) { railItems }
+                    }
+                    if !rail && showCapsule {
+                        ToolbarItem(placement: .topBarTrailing) { capsule }
+                    }
                 }
         }
     }
+
+    /// Something for the capsule to hold: on a wide screen, where the picture is in the tab bar, only the screen's buttons.
+    private var showCapsule: Bool { buttons || !wide }
 
     private var capsule: some View {
         HStack(spacing: 0) {
@@ -560,6 +622,34 @@ struct ShellToolbar: ViewModifier {
 
     private func icon(_ image: some View) -> some View {
         image.frame(width: 42, height: Self.height).contentShape(Rectangle())
+    }
+
+    /// The same buttons as the capsule's, as the bar's own items (the rail).
+    @ViewBuilder
+    private var railItems: some View {
+        if let menu { menu }
+        if calendar {
+            Button {
+                Haptics.tap()
+                engine.openCalendar()
+            } label: { Image(systemName: "calendar") }
+            .accessibilityLabel("Calendar")
+        }
+        if let add {
+            Button(action: add) { Image(systemName: "plus") }
+                .accessibilityLabel("Add a task")
+        }
+        if bell {
+            Button {
+                Haptics.tap()
+                engine.openNotifications()
+            } label: {
+                Image(systemName: (engine.snapshot?.notifUnread ?? 0) > 0 ? "bell.badge" : "bell")
+                    .symbolRenderingMode(.multicolor)
+            }
+            .accessibilityLabel("Notifications")
+        }
+        if !wide { AccountMenu(size: 32) }
     }
 }
 

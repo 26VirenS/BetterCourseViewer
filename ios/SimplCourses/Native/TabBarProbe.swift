@@ -34,6 +34,11 @@ struct TabBarProbe: UIViewRepresentable {
             measureSoon()
         }
 
+        override func safeAreaInsetsDidChange() {
+            super.safeAreaInsetsDidChange()
+            measureSoon() // (the Duo folded or opened: its rail comes or goes)
+        }
+
         private func measureSoon() {
             DispatchQueue.main.async { [weak self] in self?.measure() }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in self?.measure() } // (after a rotation settles)
@@ -42,6 +47,11 @@ struct TabBarProbe: UIViewRepresentable {
         private func measure() {
             guard let window else { return }
             engine?.setScreen(window.bounds)
+            // (build 43) a rail down one side — the iPhone Duo folded, or open on its side — where iOS puts the status bar,
+            // the tab bar and the bars' buttons: one side's safe area far wider than the other's (a phone on its side has
+            // the same on both)
+            let i = window.safeAreaInsets
+            engine?.setRail(abs(i.right - i.left) >= 40)
             let bar = TabBarProbe.bar(in: window, log: !logged)
             logged = true
             engine?.setBar(bar)
