@@ -22,7 +22,7 @@ struct LoginLayer: View {
                         .transition(.opacity)
                 }
             case .working:
-                LoggingInView(showPage: { assist.showPage() }, restart: { assist.restart() })
+                LoggingInView(stage: assist.stage, lms: AppSession.lmsName(host: assist.canvasHost), showPage: { assist.showPage() }, restart: { assist.restart() })
                     .transition(.opacity)
             case .capture(let host, let error):
                 LoginForm(assist: assist, host: host, error: error)
@@ -42,8 +42,11 @@ struct LoginLayer: View {
 }
 
 /// "Logging you in": a ring going round, over the whole screen, while the page underneath is filled
-/// in and sent — and, after a moment, "Show the page", for a sign-in that wants something done by hand.
+/// in and sent, with how far it has got under it (build 42) — and, after a while, "Show the page", for a sign-in that
+/// wants something done by hand.
 struct LoggingInView: View {
+    var stage: LoginAssist.Stage = .school
+    var lms = "Canvas"
     var showPage: () -> Void = {}
     var restart: () -> Void = {}
     @State private var turning = false
@@ -61,9 +64,16 @@ struct LoggingInView: View {
                     .animation(.linear(duration: 0.9).repeatForever(autoreverses: false), value: turning)
             }
             .frame(width: 54, height: 54)
-            Text("Logging you in")
-                .font(.headline)
-                .accessibilityAddTraits(.isHeader)
+            VStack(spacing: 6) {
+                Text("Logging you in")
+                    .font(.headline)
+                    .accessibilityAddTraits(.isHeader)
+                Text(stageText)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .contentTransition(.opacity)
+                    .animation(.easeOut(duration: 0.2), value: stage)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .overlay(alignment: .bottom) {
@@ -98,9 +108,18 @@ struct LoggingInView: View {
         .onAppear { turning = true }
         .task {
             // (a sign-in that goes through by itself never shows it; one that waits, a two-step code, a page the
-            // reader cannot see, gets a way to the page)
-            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            // reader cannot see, gets a way to the page. Build 42: after 8 seconds, not 2.5 — offered sooner, Start Over
+            // was pressed on sign-ins still going through, and the app seemed to need it)
+            try? await Task.sleep(nanoseconds: 8_000_000_000)
             withAnimation(.spring(duration: 0.45, bounce: 0.1)) { offer = true }
+        }
+    }
+
+    private var stageText: String {
+        switch stage {
+        case .school: return "Reaching your school"
+        case .sending: return "Checking your details"
+        case .opening: return "Opening \(lms)"
         }
     }
 }

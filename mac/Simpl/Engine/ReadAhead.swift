@@ -301,7 +301,7 @@ extension Engine {
             return reads(for: Place.notifications, engine: engine)
         case .calendar:
             return reads(for: Place.calendar, engine: engine)
-        case .topic, .conversation, .web:
+        case .topic, .conversation, .web, .account:
             return []
         }
     }

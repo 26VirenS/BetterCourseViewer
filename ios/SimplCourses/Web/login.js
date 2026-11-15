@@ -89,6 +89,11 @@
     setter.call(el, v);
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
+    // (a page that sets its fields from its own state may have put the old value back as it heard the input: once more)
+    if (el.value !== v) {
+      setter.call(el, v);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
     el.blur();
   }
   /** The form's own button: its submit, else a button that says sign in / log in / next / continue. */
@@ -116,6 +121,13 @@
       return { done: r.kind, pressed };
     },
     read: () => read().kind,
+    /** What the page asks for now, and whether its fields still hold something (a page that drew its form again over
+     *  what was typed, before it was ready, has them empty) — never what they hold. */
+    state() {
+      const r = read();
+      const has = (el) => !el || String(el.value || '').length > 0;
+      return { kind: r.kind, filled: has(r.user) && has(r.pass) };
+    },
   };
 
   // the page is read as it arrives, and as it keeps drawing (a sign-in page that is an app), for a while

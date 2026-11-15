@@ -107,6 +107,9 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
     }
 
     @Published var phase: Phase = .idle
+    /// (iPhone 1.8.1, build 42) How far "Logging you in" has got: at the school's page, the details sent, Canvas on its way.
+    enum Stage: Equatable { case school, sending, opening }
+    @Published private(set) var stage: Stage = .school
     @Published var askStay = false
     /// The school's page is shown in the middle of a sign-in, for the student to do a step of it (a two-factor
     /// code, a consent page, a page the reader could not fill, or one they asked to see): a note over it says so,
@@ -142,6 +145,13 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
     private var declined = false
     private var kindHere = "full"
     private var watchdog: DispatchWorkItem?
+    /// (Build 42) How many times the watchdog has waited on a page still loading (a few at most: a page with one thing on
+    /// it that never finishes kept "Logging you in" up until Start Over was pressed).
+    private var waits = 0
+    /// (Build 42) A look, a moment after the details were sent, at whether the page took them (Attempt).
+    private var check: DispatchWorkItem?
+    /// The details typed into this page once more already (it had drawn its form again over them).
+    private var refilled = false
 
     init(canvasHost: String) {
         self.canvasHost = canvasHost.lowercased()
@@ -183,18 +193,26 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
     /// The school's page says the request went stale: start again by itself — but not twice within a minute, so a
     /// page that keeps saying it cannot send the app round in a loop; then it stays shown, with Start Over on it.
     private func staleSeen() {
-        if let last = lastAutoRestart, Date().timeIntervalSince(last) < 60 {
+        guard mayRestart() else {
             if phase == .working { reveal() }
             return
         }
-        lastAutoRestart = Date()
         restart()
+    }
+
+    /// Starting again by itself is allowed: not within a minute of the last time (so a school that keeps failing cannot
+    /// send the app round in a loop); taken, if so.
+    private func mayRestart() -> Bool {
+        if let last = lastAutoRestart, Date().timeIntervalSince(last) < 60 { return false }
+        lastAutoRestart = Date()
+        return true
     }
 
     /// Start Over: whatever sign-in was under way forgotten, and Canvas loaded afresh (it sends the school a new
     /// request); saved details are tried again on the way.
     func restart() {
         watchdog?.cancel()
+        check?.cancel()
         attempt = nil
         navigatedSinceAttempt = false
         autoOff = false
@@ -243,6 +261,9 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
     private func fill(user: String, pass: String, host: String, step: String, auto: Bool) {
         guard let webView, webView.url?.host?.lowercased() == host else { reveal(); return }
         phase = .working
+        stage = .sending
+        let again = attempt.map { $0.host == host && $0.step == step && $0.user == user && $0.pass == pass } ?? false
+        if !again { refilled = false }
         attempt = Attempt(host: host, step: step, at: Date(), auto: auto, user: user, pass: pass)
         navigatedSinceAttempt = false
         guard let arg = JS.literal(["user": user, "pass": pass]) else { reveal(); return }
@@ -255,7 +276,28 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
                 self?.handOver()
             }
         }
-        arm(seconds: 25)
+        arm(seconds: 15)
+        checkTaken(after: 3)
+    }
+
+    /// (Build 42) A moment after the details went in: the page still there, not loading, asking the same — and its fields
+    /// empty again (it drew its form afresh over what was typed, not yet ready for it) — so typed and sent once more,
+    /// rather than waiting on a page that will never move by itself.
+    private func checkTaken(after seconds: Double) {
+        check?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.phase == .working, let a = self.attempt, !self.navigatedSinceAttempt, !self.refilled,
+                  let webView = self.webView, !webView.isLoading, webView.url?.host?.lowercased() == a.host else { return }
+            webView.evaluateJavaScript("SimplLogin.state()", in: nil, in: LoginAssist.world) { [weak self] result in
+                guard let self, case .success(let value) = result, let r = value as? [String: Any],
+                      (r["kind"] as? String) == a.step, (r["filled"] as? Bool) == false,
+                      self.phase == .working, !self.navigatedSinceAttempt else { return }
+                self.refilled = true
+                self.fill(user: a.user, pass: a.pass, host: a.host, step: a.step, auto: a.auto)
+            }
+        }
+        check = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: work)
     }
 
     private func failed(host: String, error: String?, auto: Bool) {
@@ -272,6 +314,7 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
     /// Lift whatever covers the page: the page itself is what the student needs now.
     func reveal() {
         watchdog?.cancel()
+        check?.cancel()
         if phase != .idle { phase = .idle }
     }
 
@@ -288,11 +331,28 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
     }
 
     private func arm(seconds: Double) {
+        waits = 0
+        schedule(seconds)
+    }
+
+    private func schedule(_ seconds: Double) {
         watchdog?.cancel()
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
-            if self.webView?.isLoading == true { self.arm(seconds: 2); return } // (a page still on its way: a little longer)
-            if self.phase == .working { self.handOver() }
+            // (a page still on its way: a little longer — four times at most, not for as long as anything on it loads)
+            if self.webView?.isLoading == true, self.waits < 4 {
+                self.waits += 1
+                self.schedule(2)
+                return
+            }
+            guard self.phase == .working else { return }
+            // (build 42) the saved details sent and nothing came of it — the page never moved: begun again from Canvas,
+            // as Start Over would be (once a minute at most); otherwise the page, to be finished by hand
+            if let a = self.attempt, a.auto, !self.navigatedSinceAttempt, self.mayRestart() {
+                self.restart()
+                return
+            }
+            self.handOver()
         }
         watchdog = work
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: work)
@@ -344,8 +404,18 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
         // the saved sign-in page coming up: covered from its first frame, not after it has shown
         if phase == .idle, !autoOff, host != canvasHost, let s = LoginVault.load(), s.host == host {
             phase = .working
+            stage = .school
             arm(seconds: 25)
         }
+        if phase == .working, host == canvasHost { stage = .opening }
+    }
+
+    /// (Build 42) A page's first bytes have arrived in the main frame: Canvas reached is signed in from this moment — the
+    /// cover lifts now, not once everything on the page has finished loading (which, with one thing on it slow or
+    /// hanging, could keep "Logging you in" up until Start Over was pressed).
+    func committed(_ url: URL?) {
+        guard let url, let host = url.host?.lowercased(), host == canvasHost, !LoginAssist.isSignIn(url.path) else { return }
+        arrived()
     }
 
     /// The school's own sign-in on its own host: Canvas's /login (and /login/ldap…), Brightspace's /d2l/login (and the
@@ -360,19 +430,24 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
         guard let url, let host = url.host?.lowercased() else { return }
         schoolPage(url)
         if host == canvasHost && !LoginAssist.isSignIn(url.path) {
-            // on Canvas: signed in
-            let viaForm = attempt != nil && attempt?.auto == false && typed != nil
-            attempt = nil
-            autoOff = false
-            handoff = false
-            reveal()
-            // details typed in the form got the student in: they are offered to be kept (or kept anew, where
-            // the saved ones had stopped working)
-            if viaForm { askStay = true } else { typed = nil }
+            arrived()
             return
         }
-        // a page the reader cannot see (it never reports): shown anyway, after a moment
-        if phase == .working { arm(seconds: 6) }
+        // a page the reader cannot see (it never reports): shown anyway, after a moment (build 42: not sooner than the
+        // details just sent into this very page have had to be taken)
+        if phase == .working, attempt == nil || navigatedSinceAttempt { arm(seconds: 6) }
+    }
+
+    /// On Canvas: signed in.
+    private func arrived() {
+        let viaForm = attempt != nil && attempt?.auto == false && typed != nil
+        attempt = nil
+        autoOff = false
+        handoff = false
+        reveal()
+        // details typed in the form got the student in: they are offered to be kept (or kept anew, where the saved ones
+        // had stopped working); kept until that is answered (this is said again as the page finishes loading)
+        if viaForm { askStay = true } else if !askStay { typed = nil }
     }
 
     /// Where the web view is: on the school's sign-in, Start Over is offered, and the edge swipe that goes Back is

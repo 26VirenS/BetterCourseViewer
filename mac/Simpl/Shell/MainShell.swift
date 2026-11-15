@@ -325,6 +325,7 @@ struct RouteScreen: View {
         case .notifications: NotificationsView()
         case .calendar: CalendarView()
         case .web(let url, let title): WebFallback(url: url, title: title)
+        case .account: EmptyView() // (the iPhone's account page, from its tab bar: never pushed on a Mac)
         }
     }
 }

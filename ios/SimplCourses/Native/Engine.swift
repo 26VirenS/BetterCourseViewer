@@ -129,7 +129,7 @@ final class Engine: ObservableObject, ShellListener {
         }
         // the simulator suite's screens (.github/workflows/ios-shots.yml): -SimplTab courses
         if let t = UserDefaults.standard.string(forKey: "SimplTab") {
-            if t == "calendar" { tab = .todo; paths[.todo] = [.calendar] } else if t == "search" { searchOpen = true } else if let first = AppTab(rawValue: t) { tab = first }
+            if t == "calendar" { tab = .todo; paths[.todo] = [.calendar] } else if t == "search" { searchOpen = true } else if let first = AppTab(rawValue: t), first != .account { tab = first }
         }
     }
 

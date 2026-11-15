@@ -254,6 +254,10 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
         onNavigationStart?()
     }
 
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        if case .canvas = mode { login.committed(webView.url) } // (build 42: signed in once Canvas starts to arrive)
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         isLoading = false
         pageTitle = webView.title ?? ""
