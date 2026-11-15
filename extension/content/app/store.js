@@ -1818,7 +1818,7 @@
     const finalScore = !whatIfOn && !own && courseInfo.finalScore !== null && courseInfo.finalScore !== undefined && !courseInfo.hideFinal ? round1(Number(courseInfo.finalScore)) : null;
     const gray = dark ? ['#8e8e93', '#7c7c82', '#6b6b71', '#5a5a60', '#96969c'] : ['#8e8e93', '#a0a0a6', '#b0b0b6', '#78787e', '#c0c0c6'];
     const colorOf = (i, color) => (whatIfOn ? gray[Math.min(i, gray.length - 1)] : color);
-    // rings: outer = total, then one per group with graded work (five at most; the rest are legend only)
+    // rings: outer = total, then one per group with graded work (five at most; the rest are listed, not ringed)
     const radii = [72, 56, 40, 24, 10];
     const widths = [12, 12, 12, 11, 7];
     const ringSrc = [{ id: null, pct: total, color: '#34c759', zero: false }].concat(scored.map((g) => ({ id: g.id, pct: g.pct, color: g.color, zero: g.zero })));
@@ -1845,7 +1845,7 @@
       else if (g.omitted.length > 1) bits.push(`${g.omitted.length} not counted`);
       if (g.dropped?.length) bits.push(g.dropped.length === 1 ? `${g.dropped[0]} dropped` : `${g.dropped.length} lowest dropped`);
       else if (g.rules?.drop_lowest) bits.push(`${BCV.lms.name} drops lowest ${g.rules.drop_lowest}`);
-      if (!ringed) bits.push('legend only');
+      // (2.99.143: a group past the fifth ring is simply not ringed — "legend only" said so in words nobody reads that way)
       return { id: g.id, label: g.name, detail: bits.join(' · '), weightText: weightText(g), value: g.pct === null ? '—' : `${g.pct}%`, pct: g.pct, weight: g.weight, color: colorOf(i + 1, g.color), ringed, zero: g.zero };
     });
     const ungraded = groupStats.filter((g) => !g.graded).map((g) => ({ id: g.id, name: g.name, weightText: weighted ? `${g.weight}%` : '' }));

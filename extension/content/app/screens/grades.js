@@ -105,33 +105,36 @@
       };
       for (const r of gm.rings) svg.append(ringOf(circle(r.r, r.track, null, null, r.w), r));
       for (const r of gm.rings) svg.append(ringOf(circle(r.r, r.arc, r.cap, r.dash, r.w), r));
+      // (2.99.143) the total beside its rings; under them what it is, and What-If — the total's card, as the Mac's
       const center = U.el('bcv-gr__center', [
         U.text('bcv-gr__label', gm.center.label),
         h('span', { class: 'bcv-gr__total', style: { color: gm.center.color }, text: gm.center.value }),
+      ]);
+      const totalFoot = [
         U.text('bcv-gr__note bcv-pretty', gm.center.note),
         whatIfAllowed ? h('button', { type: 'button', class: `bcv-whatif-btn ${st.on ? 'is-on' : ''}`, text: st.on ? 'Exit what-if mode' : 'Try what-if scores', onclick: () => { st.on = !st.on; draw(); } }) : null,
-      ]);
+      ];
 
-      // ---- by group ------------------------------------------------------------------
+      // ---- the groups ----------------------------------------------------------------
+      // (2.99.143: a group's dot is its colour whether or not it has a ring — five rings at most — as in the weight bar)
       const legendRow = (r) => U.el('bcv-legend__row', [
         h('span', { class: 'bcv-legend__dot', style: r.zero
           ? { background: `radial-gradient(${r.color} 34%, transparent 36%) 0 0 / 2.4px 2.4px` }
-          : (r.ringed ? { background: r.color } : { background: 'transparent', border: `1.5px solid ${r.color}` }) }),
+          : { background: r.color } }),
         U.el('bcv-legend__body', [U.text('bcv-legend__label', r.label, 'span'), U.text('bcv-legend__detail', r.detail, 'span')]),
         U.text('bcv-legend__weight', r.weightText, 'span'),
         U.text(`bcv-legend__value ${r.zero ? 'bcv-legend__value--muted' : ''}`, r.value, 'span'),
       ], U.groupAttrs(r.id, r.color, { pick: true, name: r.label }));
       const ungradedRow = (u) => U.el('bcv-legend__row bcv-legend__row--ungraded', [
         h('span', { class: 'bcv-legend__dot' }),
-        U.el('bcv-legend__body', [U.text('bcv-legend__label bcv-ungraded__name', u.name, 'span'), U.text('bcv-legend__detail', 'Nothing graded yet — no ring', 'span')]),
+        U.el('bcv-legend__body', [U.text('bcv-legend__label bcv-ungraded__name', u.name, 'span'), U.text('bcv-legend__detail', 'Nothing graded yet', 'span')]),
         U.text('bcv-legend__weight', u.weightText, 'span'),
         U.text('bcv-legend__value', '—', 'span'),
       ], U.groupAttrs(u.id, null, { pick: true, name: u.name }));
-      const byGroup = U.el('bcv-gr__sec', [
-        U.text('bcv-gr__h', 'By group'),
+      const groupRows = U.el('bcv-gr__list', [
         ...gm.legend.map(legendRow),
         ...gm.ungraded.map(ungradedRow),
-        gm.legend.length || gm.ungraded.length ? null : U.text('bcv-gr__note', 'No assignment groups in this course.'),
+        gm.legend.length || gm.ungraded.length ? null : U.text('bcv-gr__wnote', 'No assignment groups in this course.'),
       ]);
 
       // ---- how the grade is weighted ------------------------------------------------
@@ -143,26 +146,19 @@
         wEdit.vals = Object.fromEntries(groups.map((g) => [String(g.id), own ? (own[String(g.id)] ?? 0) : (Number(g.group_weight) || 0)]));
         draw();
       } });
+      // (2.99.143) one list, as the Mac's Assignment Groups card: its head (what the weights add up to), the weight bar
+      // over the groups' own lines — each its weight and its score — and what is worth saying under them. (By group and
+      // How the grade is weighted listed every group twice, one card over the other.) The editor takes the list's place.
       if (wEdit.on) weightsSec = weightEditor();
-      else if (gm.weighted) {
+      else {
         weightsSec = U.el('bcv-gr__sec bcv-gr__sec--w', [
-          U.el('bcv-gr__hrow', [U.text('bcv-gr__h', 'How the grade is weighted', 'span'), U.text('bcv-gr__hsub', gm.own ? `${gm.weightSum}% · your own weights` : `${gm.weightSum}% of final grade`, 'span')]),
-          gm.weightBar.length ? U.el('bcv-wbar', gm.weightBar.map((w) => { const ga = U.groupAttrs(w.id, w.color, { pick: true, name: w.name }); return h('div', { ...ga, class: `bcv-wbar__seg ${w.graded ? '' : 'bcv-wbar__seg--ungraded'}`, style: { ...ga.style, flex: `${w.weight} 1 0`, background: w.color || '' }, title: `${w.name} · ${w.weight}%` }); })) : null,
-          U.el('bcv-wbar__rows', gm.weightBar.map((w) => U.el('bcv-wbar__row', [
-            h('span', { class: `bcv-wbar__dot ${w.graded ? '' : 'bcv-wbar__dot--ungraded'}`, style: { background: w.color || '' } }),
-            U.text('bcv-wbar__name', w.name, 'span'),
-            U.text('bcv-wbar__w', `${w.weight}% of grade`, 'span'),
-            U.text(`bcv-wbar__score ${w.graded ? '' : 'bcv-wbar__score--ungraded'}`, w.scoreLabel, 'span'),
-          ], U.groupAttrs(w.id, w.color, { pick: true, name: w.name })))),
-          gm.weightBar.length ? null : U.text('bcv-gr__wnote bcv-pretty', 'No assignment group carries weight yet.'),
+          U.el('bcv-gr__hrow', [U.text('bcv-gr__h', 'Assignment groups', 'span'), U.text('bcv-gr__hsub', !gm.weighted ? 'by points' : gm.own ? `${gm.weightSum}% · your own weights` : `${gm.weightSum}% of final grade`, 'span')]),
+          gm.weighted && gm.weightBar.length ? U.el('bcv-wbar', gm.weightBar.map((w) => { const ga = U.groupAttrs(w.id, w.color, { pick: true, name: w.name }); return h('div', { ...ga, class: `bcv-wbar__seg ${w.graded ? '' : 'bcv-wbar__seg--ungraded'}`, style: { ...ga.style, flex: `${w.weight} 1 0`, background: w.color || '' }, title: `${w.name} · ${w.weight}%` }); })) : null,
+          groupRows,
+          gm.weighted && !gm.weightBar.length ? U.text('bcv-gr__wnote bcv-pretty', 'No assignment group carries weight yet.') : null,
+          gm.weighted ? null : h('p', { class: 'bcv-gr__wnote bcv-pretty', text: 'This course does not weight assignment groups: the total is points earned over points possible.' }),
           gm.weightNote ? h('p', { class: 'bcv-gr__wnote bcv-pretty', text: gm.weightNote }) : null,
           gm.own ? h('p', { class: 'bcv-gr__wnote bcv-gr__wnote--own bcv-pretty', text: `Your own weights, from the syllabus — not your instructor’s. They live on this device and never reach ${BCV.lms.name}.` }) : null,
-          ownBtn,
-        ]);
-      } else {
-        weightsSec = U.el('bcv-gr__sec', [
-          U.text('bcv-gr__h', 'How the grade is weighted'),
-          h('p', { class: 'bcv-gr__wnote bcv-pretty', text: 'This course does not weight assignment groups: the total is points earned over points possible.' }),
           ownBtn,
         ]);
       }
@@ -220,8 +216,8 @@
       // (2.99.143) two cards, as the Mac's Grades section has them: the rings and the total in one, By group and How
       // the grade is weighted in the other — side by side on a wide page, as tall as each other; one over the other
       const ringsCard = U.el('bcv-gr__cards', [
-        U.card(U.el('bcv-gr bcv-gr--total', [U.el('bcv-gr__top', [svg, center])]), 'bcv-card--22 bcv-gr__card'),
-        U.card(U.el('bcv-gr bcv-gr--groups', [byGroup, weightsSec]), 'bcv-card--22 bcv-gr__card'),
+        U.card(U.el('bcv-gr bcv-gr--total', [U.el('bcv-gr__top', [svg, center]), ...totalFoot]), 'bcv-card--22 bcv-gr__card'),
+        U.card(U.el('bcv-gr bcv-gr--groups', [weightsSec]), 'bcv-card--22 bcv-gr__card'),
       ]);
 
       // ---- assignments ----------------------------------------------------------------

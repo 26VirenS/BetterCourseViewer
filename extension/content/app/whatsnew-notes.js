@@ -29,6 +29,9 @@
     slider: 'M4 8h16M4 16h16M9 5v6M15 13v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.144', date: '2026-11-15', notes: [
+      { kind: 'improved', title: 'Clearer Grade Cards', body: 'Your total in one card; every group listed once.', icon: P.layers },
+    ] },
     { version: '2.99.143', date: '2026-11-14', notes: [
       { kind: 'improved', title: 'Wider Course Grades', body: 'Categories side by side on a wide window, as on the Mac.', icon: P.layers },
     ] },

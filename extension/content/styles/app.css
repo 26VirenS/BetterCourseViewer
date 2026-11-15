@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.143"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.144"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -6914,23 +6914,26 @@ html.bcv-on .bcv-screen.is-fit > .bcv-head, html.bcv-on:not(.bcv-phone):not(.bcv
 @media (prefers-reduced-motion: reduce) { .bcv-allsites, .bcv-allsites.is-out, .bcv-allsites.is-bottom { transform: none; } .bcv-allsites__arrow, .bcv-allsites__spin { animation: none; } }
 
 /* (2.99.143) A course's Grades tab using a wide page, as the Mac's Grades section does (side by side from 800, two
-   columns from 900 of its page): the rings and the total in a card of their own, By group and How the grade is weighted
-   in another — from 720 across side by side, as tall as each other, one over the other below; from 840 (a 1,440-wide window, the sidebar and the course's own panel out), the
+   columns from 900 of its page): the rings and the total in a card of their own, the assignment groups in another —
+   the weight bar over a line per group — from 720 across side by side, one over the other below; from 840 (a 1,440-wide window, the sidebar and the course's own panel out), the
    assignments' groups flow into two columns, balanced, in their order, a group never split between them. */
 .bcv-gr__gcols { display: block; }
 .bcv-gr__gcols > .bcv-gr__gsec { break-inside: avoid; -webkit-column-break-inside: avoid; }
 .bcv-gr__cards { display: flex; flex-direction: column; gap: 18px; }
 .bcv-gr--groups > .bcv-gr__sec:first-child { padding-top: 0; border-top: 0; } /* (its own card now: no line over its first section) */
+.bcv-gr__list { display: flex; flex-direction: column; gap: 7px; } /* (the groups' own lines, under the weight bar) */
+.bcv-gr--total { gap: 12px; }
+.bcv-gr--total > .bcv-whatif-btn { align-self: flex-start; }
 @container bcv-grades (min-width: 720px) {
-  .bcv-gr__cards { display: grid; grid-template-columns: minmax(220px, 320px) minmax(0, 1fr); gap: 18px; align-items: stretch; }
-  .bcv-gr__card { height: 100%; box-sizing: border-box; }
-  .bcv-gr--total { height: 100%; box-sizing: border-box; padding: 22px 24px; justify-content: center; }
-  .bcv-gr--total > .bcv-gr__top { flex-direction: column; align-items: flex-start; gap: 18px; }
-  .bcv-gr--total .bcv-rings__svg { width: 140px; height: 140px; }
+  /* (the two cards side by side, each as tall as what is in it: the total's no longer stretched to the groups' height) */
+  .bcv-gr__cards { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 18px; align-items: start; }
+  .bcv-gr--total { padding: 22px 24px; }
+  .bcv-gr--total > .bcv-gr__top { gap: 20px; }
+  .bcv-gr--total .bcv-rings__svg { width: 128px; height: 128px; }
   .bcv-gr--groups { padding: 20px 22px; }
 }
 @container bcv-grades (min-width: 840px) {
-  .bcv-gr--total .bcv-rings__svg { width: 150px; height: 150px; }
+  .bcv-gr--total .bcv-rings__svg { width: 140px; height: 140px; }
   .bcv-gr__gcols { columns: 2; column-gap: 20px; }
   .bcv-gr__gcols > .bcv-gr__gsec { display: inline-block; width: 100%; vertical-align: top; }
 }
