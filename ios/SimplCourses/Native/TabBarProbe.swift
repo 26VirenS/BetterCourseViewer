@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import UIKit.UIGestureRecognizerSubclass
 
 /// The tab bar's glass, measured where UIKit draws it — on any iPhone, in either orientation — so a bar a
 /// screen puts above it (Hand In) can take exactly its width and height. It looks for the bar's capsule
@@ -24,6 +25,7 @@ struct TabBarProbe: UIViewRepresentable {
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
+            if let window, let engine { PaneTouches.install(in: window, engine: engine) }
             measureSoon()
         }
 
@@ -116,5 +118,49 @@ struct TabBarProbe: UIViewRepresentable {
             if let t = find(type, in: s) { return t }
         }
         return nil
+    }
+}
+
+/// (iPhone 1.8.1) Which half of the window a press was on, for the two pages (Engine.push): a recogniser on the window
+/// that only looks — it never recognises, never delays a touch and never stops another recogniser — noting where each
+/// press begins, and whether it is in a sheet (a sheet's press opens what it opens as before).
+final class PaneTouches: UIGestureRecognizer, UIGestureRecognizerDelegate {
+    weak var engine: Engine?
+
+    static func install(in window: UIWindow, engine: Engine) {
+        if let mine = window.gestureRecognizers?.first(where: { $0 is PaneTouches }) as? PaneTouches {
+            mine.engine = engine
+            return
+        }
+        let g = PaneTouches(target: nil, action: nil)
+        g.engine = engine
+        g.cancelsTouchesInView = false
+        g.delaysTouchesBegan = false
+        g.delaysTouchesEnded = false
+        g.delegate = g
+        window.addGestureRecognizer(g)
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+        if let t = touches.first, let w = view {
+            let x = t.location(in: w).x
+            engine?.touched(x: x, inSheet: PaneTouches.inSheet(t.view))
+        }
+        state = .failed
+    }
+
+    override func canPrevent(_ preventedGestureRecognizer: UIGestureRecognizer) -> Bool { false }
+    override func canBePrevented(by preventingGestureRecognizer: UIGestureRecognizer) -> Bool { false }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool { true }
+
+    /// Whether a view is in something presented over the app (a sheet, the search, a tool).
+    static func inSheet(_ v: UIView?) -> Bool {
+        var r: UIResponder? = v
+        while let x = r {
+            if let vc = x as? UIViewController, vc.presentingViewController != nil { return true }
+            r = x.next
+        }
+        return false
     }
 }

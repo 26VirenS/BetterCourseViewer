@@ -158,6 +158,11 @@ if [ -n "$WIDE" ]; then
   launch wide-l-03-todo 16 -SimplTab todo $LARGS
   launch wide-l-04-grades 16 -SimplTab grades $LARGS
   launch wide-l-10-assignment 22 -SimplTab todo -SimplPush /courses/101/assignments/1001 $LARGS
+  # (1.8.1) two pages, meeting at the fold: the Courses cards a column each side of it; a course opened beside them;
+  # the Inbox beside Today
+  launch wide-l-02-courses 16 -SimplTab courses $LARGS
+  launch wide-l-09-course 20 -SimplTab courses -SimplPush /courses/101 $LARGS
+  launch wide-l-17-inbox 18 -SimplPush /conversations $LARGS
   xcrun simctl terminate booted "$BID" >/dev/null 2>&1 || true
   collect wide
 else

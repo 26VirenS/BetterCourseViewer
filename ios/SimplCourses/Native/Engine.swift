@@ -543,11 +543,29 @@ final class Engine: ObservableObject, ShellListener {
 
     func openCanvasPage(_ url: String, title: String) { openWebScreen(url, title: title) }
 
-    /// A native screen on the stack showing (not twice in a row).
+    /// (iPhone 1.8.1) Two pages side by side (PaneStack, Shell.swift) and where the fold runs, in window coordinates —
+    /// set by the shell from the window's size.
+    var twoPane = false
+    var foldX: CGFloat?
+    /// The last press on the app's own screens (none in a sheet): how far across the window, and when (PaneTouches).
+    private var lastTouch: (x: CGFloat, at: Date)?
+
+    func touched(x: CGFloat, inSheet: Bool) {
+        lastTouch = inSheet ? nil : (x, Date())
+    }
+
+    /// A native screen on the stack showing (not twice in a row). (1.8.1) With two pages showing, a screen opened from
+    /// the left page — another assignment in its list, another course — takes the right page's place rather than
+    /// pushing the right page across: the left page is the list, the right what was picked from it.
     func push(_ route: Route) {
         var path = paths[tab]
         if path.last == route { return }
+        if twoPane, !path.isEmpty, let fold = foldX, let t = lastTouch, Date().timeIntervalSince(t.at) < 3, t.x < fold {
+            path.removeLast()
+            if path.last == route { lastTouch = nil; paths[tab] = path; return }
+        }
         path.append(route)
+        lastTouch = nil
         paths[tab] = path
     }
 
@@ -580,18 +598,10 @@ final class Engine: ObservableObject, ShellListener {
         openWeb(raw, title: title)
     }
 
-    func openNotifications() {
-        var path = paths[tab]
-        if path.last != .notifications { path.append(.notifications) }
-        paths[tab] = path
-    }
+    func openNotifications() { push(.notifications) }
 
     /// The Calendar, pushed on the stack showing (it has no tab of its own).
-    func openCalendar() {
-        var path = paths[tab]
-        if path.last != .calendar { path.append(.calendar) }
-        paths[tab] = path
-    }
+    func openCalendar() { push(.calendar) }
 
     private func switchTab(_ name: String) {
         if name == "notifications" {

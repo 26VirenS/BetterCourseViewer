@@ -121,6 +121,10 @@ struct NativeShell: View {
     @EnvironmentObject private var engine: Engine
     /// (iPhone 1.8) Both of the window's sides 600 points or more: an iPhone Duo unfolded, or an iPad (`wideScreen`).
     @State private var wide = false
+    /// (iPhone 1.8.1) The app's frame in the window: its middle is the Duo's fold, and 750 points across or more (the Duo
+    /// on its side, an iPad) shows two pages.
+    @State private var frame: CGRect = .zero
+    private var twoPane: Bool { wide && frame.width >= 750 }
 
     var body: some View {
         // Search is a button in the tab bar, not a page (1.5.4): pressed, it raises the search sheet halfway over the
@@ -152,8 +156,15 @@ struct NativeShell: View {
         .background(TabBarProbe(engine: engine).allowsHitTesting(false))
         .sensoryFeedback(.selection, trigger: engine.tab)
         .environment(\.wideScreen, wide)
+        .environment(\.foldX, wide ? frame.midX : nil)
+        .environment(\.twoPane, twoPane)
         // (iPhone 1.8: the Duo unfolded or folded, an iPad's window resized — every screen lays itself out again)
-        .onGeometryChange(for: Bool.self) { min($0.size.width, $0.size.height) >= 600 } action: { wide = $0 }
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { f in
+            frame = f
+            wide = min(f.width, f.height) >= 600
+            engine.foldX = wide ? f.midX : nil
+            engine.twoPane = wide && f.width >= 750
+        }
         // (the simulator suite only, scripts/dev/ios-shots.sh: -SimplWideWidth 626 holds the app to the Duo's inner
         // display's width on an iPad, where Xcode has no Duo to picture)
         .frame(maxWidth: Self.shotWidth ?? .infinity)
@@ -165,38 +176,118 @@ struct NativeShell: View {
     }()
 
     private func stack<Root: View>(_ tab: AppTab, @ViewBuilder _ root: () -> Root) -> some View {
-        NavigationStack(path: $engine.paths[dynamicMember: \Paths.[tab]]) {
-            root()
-                .navigationDestination(for: Route.self) { route in
-                    switch route {
-                    case .web(let url, let title):
-                        WebScreen(url: url, title: title)
-                    case .notifications:
-                        NotificationsView()
-                    case .calendar:
-                        CalendarView()
-                    case .course(let id):
-                        ContextHome(ctx: "courses/\(id)")
-                    case .group(let id):
-                        ContextHome(ctx: "groups/\(id)")
-                    case .groups:
-                        GroupsView()
-                    case .section(let ctx, let kind):
-                        SectionScreen(ctx: ctx, kind: kind)
-                    case .topic(let ctx, let id):
-                        TopicView(ctx: ctx, id: id)
-                    case .assignment(let course, let id):
-                        AssignmentView(course: course, id: id)
-                    case .page(let ctx, let slug):
-                        PageView(ctx: ctx, slug: slug)
-                    case .folder(let ctx, let id, let name):
-                        FilesView(ctx: ctx, folder: id, name: name)
-                    case .inbox:
-                        InboxView()
-                    case .conversation(let id):
-                        ConversationView(id: id)
+        PaneStack(tab: tab, root: root())
+    }
+}
+
+/// A tab's stack. On a phone, and the Duo upright, Apple's own: one screen at a time, pushed and popped. (iPhone 1.8.1)
+/// With two pages (the Duo on its side, an iPad) the last two screens of the stack side by side, meeting at the fold:
+/// the tab's own screen alone across both halves (its sections in two columns, ColumnList), then — something opened —
+/// it on the left and what was opened on the right; opened from the right page, the right moves to the left and the new
+/// screen comes in on the right (a book's pages turning); opened from the left, it takes the right page's place
+/// (Engine.push). Back, on the right page, turns one page back. Each screen keeps itself as it moves from right to left.
+struct PaneStack<Root: View>: View {
+    let tab: AppTab
+    let root: Root
+    @EnvironmentObject private var engine: Engine
+    @Environment(\.twoPane) private var twoPane
+    @Environment(\.foldX) private var foldX
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var frame: CGRect = .zero
+
+    /// A page: the tab's own screen, or a screen of the stack (by its place in it, so the same screen twice is two).
+    enum Page: Hashable {
+        case root
+        case route(Route, depth: Int)
+    }
+
+    var body: some View {
+        if twoPane {
+            pages
+        } else {
+            NavigationStack(path: $engine.paths[dynamicMember: \Paths.[tab]]) {
+                root.navigationDestination(for: Route.self) { route in RouteScreen(route: route) }
+            }
+        }
+    }
+
+    private var pages: some View {
+        let path = engine.paths[tab]
+        let all: [Page] = [.root] + path.enumerated().map { Page.route($0.element, depth: $0.offset + 1) }
+        let shown = Array(all.suffix(2))
+        let split = FoldSplit<EmptyView, EmptyView>.leftWidth(frame, foldX)
+        return HStack(spacing: 0) {
+            ForEach(shown, id: \.self) { p in
+                let isLeft = shown.count == 2 && p == shown[0]
+                NavigationStack { page(p, back: !isLeft && p != .root) }
+                    .safeAreaPadding(isLeft ? Edge.Set.trailing : Edge.Set.leading, shown.count == 2 ? foldGutter : 0)
+                    .frame(width: isLeft ? split : nil)
+                    .frame(maxWidth: isLeft ? nil : CGFloat.infinity)
+                    .transition(reduceMotion ? AnyTransition.opacity : AnyTransition.asymmetric(insertion: AnyTransition.move(edge: .trailing).combined(with: .opacity), removal: AnyTransition.opacity))
+            }
+        }
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
+        .animation(reduceMotion ? Animation.easeInOut(duration: 0.2) : Animation.snappy(duration: 0.35), value: path)
+    }
+
+    @ViewBuilder
+    private func page(_ p: Page, back: Bool) -> some View {
+        switch p {
+        case .root:
+            root
+        case .route(let route, _):
+            RouteScreen(route: route)
+                .toolbar {
+                    if back {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button {
+                                Haptics.tap()
+                                var path = engine.paths[tab]
+                                if !path.isEmpty { path.removeLast() }
+                                engine.paths[tab] = path
+                            } label: {
+                                Image(systemName: "chevron.left")
+                            }
+                            .accessibilityLabel("Back")
+                        }
                     }
                 }
+        }
+    }
+}
+
+/// The screen a route opens.
+struct RouteScreen: View {
+    let route: Route
+
+    var body: some View {
+        switch route {
+        case .web(let url, let title):
+            WebScreen(url: url, title: title)
+        case .notifications:
+            NotificationsView()
+        case .calendar:
+            CalendarView()
+        case .course(let id):
+            ContextHome(ctx: "courses/\(id)")
+        case .group(let id):
+            ContextHome(ctx: "groups/\(id)")
+        case .groups:
+            GroupsView()
+        case .section(let ctx, let kind):
+            SectionScreen(ctx: ctx, kind: kind)
+        case .topic(let ctx, let id):
+            TopicView(ctx: ctx, id: id)
+        case .assignment(let course, let id):
+            AssignmentView(course: course, id: id)
+        case .page(let ctx, let slug):
+            PageView(ctx: ctx, slug: slug)
+        case .folder(let ctx, let id, let name):
+            FilesView(ctx: ctx, folder: id, name: name)
+        case .inbox:
+            InboxView()
+        case .conversation(let id):
+            ConversationView(id: id)
         }
     }
 }

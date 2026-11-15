@@ -381,6 +381,58 @@ extension EnvironmentValues {
     }
 }
 
+/// (iPhone 1.8.1) Where the Duo's fold runs, in window coordinates: down the middle of the inner display held on its
+/// side. The two halves of a wide layout meet there — a column, a card or a page never straddles the crease. nil on a
+/// phone. Set at the shell (NativeShell).
+private struct FoldKey: EnvironmentKey { static let defaultValue: CGFloat? = nil }
+/// (iPhone 1.8.1) Two pages side by side (the Duo on its side, an iPad): a screen opened from another shows on the right
+/// half, the one it was opened from staying on the left (PaneStack, Shell.swift).
+private struct TwoPaneKey: EnvironmentKey { static let defaultValue = false }
+extension EnvironmentValues {
+    var foldX: CGFloat? {
+        get { self[FoldKey.self] }
+        set { self[FoldKey.self] = newValue }
+    }
+    var twoPane: Bool {
+        get { self[TwoPaneKey.self] }
+        set { self[TwoPaneKey.self] = newValue }
+    }
+}
+
+/// (iPhone 1.8.1) What each half keeps clear of the fold: the two halves' content is twice this apart, the crease in
+/// the middle of the gap.
+let foldGutter: CGFloat = 14
+
+/// (iPhone 1.8.1) Two views side by side, meeting at the fold (not at the middle of whatever space they have: the tab
+/// bar on the Duo's side, a safe area, leave that off-centre), the left as wide as the room left of the fold.
+struct FoldSplit<Left: View, Right: View>: View {
+    @Environment(\.foldX) private var foldX
+    @State private var frame: CGRect = .zero
+    private let left: Left
+    private let right: Right
+
+    init(@ViewBuilder left: () -> Left, @ViewBuilder right: () -> Right) {
+        self.left = left()
+        self.right = right()
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 0) {
+            left.frame(width: FoldSplit.leftWidth(frame, foldX))
+            right.frame(maxWidth: .infinity)
+        }
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
+    }
+
+    /// The left half's width in a frame (window coordinates): to the fold, kept between three and seven tenths of it;
+    /// nil before the frame is known (the two then share it equally).
+    static func leftWidth(_ frame: CGRect, _ foldX: CGFloat?) -> CGFloat? {
+        guard frame.width > 0, frame.width.isFinite, frame.minX.isFinite else { return nil }
+        let x = (foldX ?? frame.midX) - frame.minX
+        return min(max(x, frame.width * 0.3), frame.width * 0.7).rounded()
+    }
+}
+
 /// (iPhone 1.8) A screen's sections, as an inset list: one list on an iPhone; on a wide screen two side by side, each
 /// scrolling on its own — what is read first on the left, the rest on the right — so the width the Duo unfolds to holds
 /// two columns of the phone's own sections rather than one stretched across it. Each column keeps its sections' swipes,
@@ -408,12 +460,16 @@ struct ColumnList<Left: View, Right: View, More: View>: View {
     var body: some View {
         Group {
             if wide && (room == 0 || room >= 750) {
-                HStack(alignment: .top, spacing: 0) {
+                // (1.8.1) the two columns meet at the fold, each keeping clear of it
+                FoldSplit {
                     column {
                         left
                         more
                     }
+                    .safeAreaPadding(.trailing, foldGutter)
+                } right: {
                     column { right }
+                        .safeAreaPadding(.leading, foldGutter)
                 }
             } else {
                 column {

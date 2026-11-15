@@ -11,6 +11,8 @@ struct CoursesView: View {
     @State private var nickname = ""
     /// (iPhone 1.8) An iPhone Duo unfolded, or an iPad: the courses as cards, as many across as fit.
     @Environment(\.wideScreen) private var wide
+    /// (iPhone 1.8.1) The cards' own width: 750 points or more (the Duo on its side), a column each side of the fold.
+    @State private var room: CGFloat = 0
 
     var body: some View {
         Group {
@@ -79,18 +81,18 @@ struct CoursesView: View {
                 if d.rows.isEmpty {
                     Text(d.empty ?? "No courses selected.").foregroundStyle(.secondary).padding(.horizontal, 8)
                 }
-                LazyVGrid(columns: wideColumns(minimum: 260), spacing: 14) {
-                    ForEach(d.rows) { c in
-                        Button { open(c) } label: {
-                            row(c)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 12)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                                .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                        }
-                        .buttonStyle(.plain)
-                        .contextMenu { menu(c) }
+                if room >= 750 {
+                    // (1.8.1) a column each side of the fold, the cards across both in order — never one on the crease
+                    FoldSplit {
+                        VStack(spacing: 14) { ForEach(Array(d.rows.enumerated()).filter { $0.offset % 2 == 0 }.map(\.element)) { c in card(c) } }
+                            .padding(.trailing, foldGutter)
+                    } right: {
+                        VStack(spacing: 14) { ForEach(Array(d.rows.enumerated()).filter { $0.offset % 2 == 1 }.map(\.element)) { c in card(c) } }
+                            .padding(.leading, foldGutter)
+                    }
+                } else {
+                    LazyVGrid(columns: wideColumns(minimum: 260), spacing: 14) {
+                        ForEach(d.rows) { c in card(c) }
                     }
                 }
                 if let hidden = d.hidden, !hidden.isEmpty {
@@ -102,6 +104,20 @@ struct CoursesView: View {
         }
         .background(Color(.systemGroupedBackground))
         .refreshable { await load(force: true) }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { room = $0 }
+    }
+
+    private func card(_ c: CourseRow) -> some View {
+        Button { open(c) } label: {
+            row(c)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .contextMenu { menu(c) }
     }
 
     private func row(_ c: CourseRow) -> some View {
