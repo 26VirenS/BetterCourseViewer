@@ -228,7 +228,7 @@ struct TabSplit<Root: View>: View {
         NavigationSplitView(columnVisibility: $visibility, preferredCompactColumn: $compactColumn) {
             root
                 .environment(\.splitList, two)
-                .navigationSplitViewColumnWidth(min: 320, ideal: listWidth, max: listWidth)
+                .navigationSplitViewColumnWidth(min: two ? listWidth : 320, ideal: listWidth, max: listWidth) // (build 39: all three, since iOS 26 shows the least)
                 .background(SplitColumnWidth(width: two ? listWidth : 0).allowsHitTesting(false)) // (build 38: the width iPadOS 26 otherwise keeps at 320)
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { r in engine.splitEdge[tab] = two ? r.maxX : nil }
         } detail: {

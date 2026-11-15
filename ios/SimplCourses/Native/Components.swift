@@ -538,6 +538,8 @@ struct SplitColumnWidth: UIViewRepresentable {
     func updateUIView(_ v: Probe, context: Context) {
         v.width = width
         v.apply()
+        // and again once SwiftUI has finished its own pass, which may set the column's width after this view's
+        DispatchQueue.main.async { v.apply() }
     }
 
     final class Probe: UIView {
@@ -553,20 +555,35 @@ struct SplitColumnWidth: UIViewRepresentable {
             apply()
         }
 
+        private var logged: CGFloat = -1
+
         func apply() {
-            guard width >= 200, width.isFinite else { return }
+            guard width >= 200, width.isFinite, window != nil else { return }
             var r: UIResponder? = self
+            var hops = 0
             while let x = r {
                 if let split = x as? UISplitViewController {
-                    if abs(split.preferredPrimaryColumnWidth - width) > 0.5 || abs(split.maximumPrimaryColumnWidth - width) > 0.5 {
-                        split.minimumPrimaryColumnWidth = min(320, width)
-                        split.maximumPrimaryColumnWidth = width
+                    let was = (split.minimumPrimaryColumnWidth, split.preferredPrimaryColumnWidth, split.maximumPrimaryColumnWidth, split.primaryColumnWidth)
+                    if abs(split.preferredPrimaryColumnWidth - width) > 0.5 || abs(split.maximumPrimaryColumnWidth - width) > 0.5 || abs(split.minimumPrimaryColumnWidth - width) > 0.5 {
+                        split.maximumPrimaryColumnWidth = max(width, split.maximumPrimaryColumnWidth)
+                        split.minimumPrimaryColumnWidth = width
                         split.preferredPrimaryColumnWidth = width
+                        split.maximumPrimaryColumnWidth = width
+                    }
+                    if logged != width {
+                        logged = width
+                        print("[Simpl Courses] split: \(type(of: split)) after \(hops) hops, in \(Int(split.view.bounds.width)) pt; was min \(was.0) ideal \(was.1) max \(was.2) shown \(was.3); asked \(width)")
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak split, weak self] in
+                            guard let split, let self else { return }
+                            print("[Simpl Courses] split: a second on, min \(split.minimumPrimaryColumnWidth) ideal \(split.preferredPrimaryColumnWidth) max \(split.maximumPrimaryColumnWidth) shown \(split.primaryColumnWidth); list view \(Int(self.superview?.bounds.width ?? -1)) pt")
+                        }
                     }
                     return
                 }
                 r = x.next
+                hops += 1
             }
+            if logged != -2 { logged = -2; print("[Simpl Courses] split: no split view controller above the list (\(hops) hops)") }
         }
     }
 }
