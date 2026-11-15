@@ -519,13 +519,16 @@ func wideColumns(minimum: CGFloat = 280, spacing: CGFloat = 14) -> [GridItem] {
     [GridItem(.adaptive(minimum: minimum), spacing: spacing, alignment: .top)]
 }
 
-/// (iPhone 1.8.1, build 38) The list column's width, said to the split view controller under Apple's NavigationSplitView
-/// itself: iPadOS 26 holds a SwiftUI split view's list column to its own width (320 points) whatever
-/// navigationSplitViewColumnWidth asks, which left the right column the wider and the fold inside the list. A view in
-/// the column finds its split view controller up the responder chain and sets the primary column's width there,
-/// again whenever it is laid out (the Duo folding, an iPad's window resized).
+/// (iPhone 1.8.1, builds 38–40) The list column's width, said to the split view controller under Apple's
+/// NavigationSplitView itself. On iPadOS 26 SwiftUI hands the controller no width from navigationSplitViewColumnWidth
+/// (it leaves it automatic, which UIKit draws at 320 points), so the right column came out the wider and the fold fell
+/// inside the list; and each time SwiftUI updates the split view (a page opened on the right) it puts automatic back.
+/// A view in the column finds its split view controller up the responder chain, sets the list column's width there,
+/// and watches those widths, setting them again the moment anything changes them; also whenever it is laid out (the
+/// Duo folding, an iPad's window resized) or what is open changes (revision).
 struct SplitColumnWidth: UIViewRepresentable {
     let width: CGFloat
+    var revision: Int = 0
 
     func makeUIView(context: Context) -> Probe {
         let v = Probe()
@@ -543,7 +546,13 @@ struct SplitColumnWidth: UIViewRepresentable {
     }
 
     final class Probe: UIView {
-        var width: CGFloat = 0
+        var width: CGFloat = 0 {
+            didSet { if width < 200 { watchers = []; held = nil } }
+        }
+        private weak var held: UISplitViewController?
+        private var watchers: [NSKeyValueObservation] = []
+        private var busy = false
+        private var noted: Set<String> = []
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
@@ -555,35 +564,69 @@ struct SplitColumnWidth: UIViewRepresentable {
             apply()
         }
 
-        private var logged: CGFloat = -1
-
         func apply() {
-            guard width >= 200, width.isFinite, window != nil else { return }
-            var r: UIResponder? = self
-            var hops = 0
-            while let x = r {
-                if let split = x as? UISplitViewController {
-                    let was = (split.minimumPrimaryColumnWidth, split.preferredPrimaryColumnWidth, split.maximumPrimaryColumnWidth, split.primaryColumnWidth)
-                    if abs(split.preferredPrimaryColumnWidth - width) > 0.5 || abs(split.maximumPrimaryColumnWidth - width) > 0.5 || abs(split.minimumPrimaryColumnWidth - width) > 0.5 {
-                        split.maximumPrimaryColumnWidth = max(width, split.maximumPrimaryColumnWidth)
-                        split.minimumPrimaryColumnWidth = width
-                        split.preferredPrimaryColumnWidth = width
-                        split.maximumPrimaryColumnWidth = width
-                    }
-                    if logged != width {
-                        logged = width
-                        print("[Simpl Courses] split: \(type(of: split)) after \(hops) hops, in \(Int(split.view.bounds.width)) pt; was min \(was.0) ideal \(was.1) max \(was.2) shown \(was.3); asked \(width)")
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak split, weak self] in
-                            guard let split, let self else { return }
-                            print("[Simpl Courses] split: a second on, min \(split.minimumPrimaryColumnWidth) ideal \(split.preferredPrimaryColumnWidth) max \(split.maximumPrimaryColumnWidth) shown \(split.primaryColumnWidth); list view \(Int(self.superview?.bounds.width ?? -1)) pt")
-                        }
-                    }
-                    return
-                }
-                r = x.next
-                hops += 1
+            guard width >= 200, width.isFinite, window != nil, let split = findSplit() else { return }
+            if held !== split {
+                hold(split)
+            } else if off(split) {
+                note("late", "split: the list column's width was changed unseen (ideal \(split.preferredPrimaryColumnWidth)); set again to \(width)")
             }
-            if logged != -2 { logged = -2; print("[Simpl Courses] split: no split view controller above the list (\(hops) hops)") }
+            pin(split)
+        }
+
+        private func findSplit() -> UISplitViewController? {
+            var r: UIResponder? = self
+            while let x = r {
+                if let split = x as? UISplitViewController { return split }
+                r = x.next
+            }
+            note("none", "split: no split view controller above the list")
+            return nil
+        }
+
+        private func hold(_ split: UISplitViewController) {
+            held = split
+            note("found", "split: \(type(of: split)) in \(Int(split.view.bounds.width)) pt, list column shown at \(split.primaryColumnWidth) (ideal \(split.preferredPrimaryColumnWidth)); asked \(width)")
+            let again: (UISplitViewController) -> Void = { [weak self] s in
+                MainActor.assumeIsolated { self?.reassert(s) }
+            }
+            watchers = [
+                split.observe(\.preferredPrimaryColumnWidth) { s, _ in again(s) },
+                split.observe(\.minimumPrimaryColumnWidth) { s, _ in again(s) },
+                split.observe(\.maximumPrimaryColumnWidth) { s, _ in again(s) },
+            ]
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak split, weak self] in
+                guard let split, let self else { return }
+                self.note("later", "split: two seconds on, list column shown at \(split.primaryColumnWidth) (ideal \(split.preferredPrimaryColumnWidth)); list view \(Int(self.bounds.width)) pt")
+            }
+        }
+
+        private func reassert(_ split: UISplitViewController) {
+            guard !busy, held === split, width >= 200, window != nil, off(split) else { return }
+            note("reset", "split: SwiftUI set the list column back (ideal \(split.preferredPrimaryColumnWidth)); set again to \(width)")
+            pin(split)
+        }
+
+        private func off(_ split: UISplitViewController) -> Bool {
+            abs(split.preferredPrimaryColumnWidth - width) > 0.5 || abs(split.minimumPrimaryColumnWidth - width) > 0.5
+                || abs(split.maximumPrimaryColumnWidth - width) > 0.5
+        }
+
+        private func pin(_ split: UISplitViewController) {
+            guard !busy, off(split) else { return }
+            busy = true
+            defer { busy = false }
+            split.maximumPrimaryColumnWidth = max(width, split.maximumPrimaryColumnWidth)
+            split.minimumPrimaryColumnWidth = width
+            split.preferredPrimaryColumnWidth = width
+            split.maximumPrimaryColumnWidth = width
+        }
+
+        /// Prints a line on the console once per kind (for the simulator run's log).
+        private func note(_ kind: String, _ line: @autoclosure () -> String) {
+            guard !noted.contains(kind) else { return }
+            noted.insert(kind)
+            print("[Simpl Courses] \(line())")
         }
     }
 }
