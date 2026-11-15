@@ -452,34 +452,31 @@ struct ColumnList<Left: View, Right: View, More: View>: View {
         self.more = more()
     }
 
-    /// The list's own width. Two columns only where each is at least the narrowest iPhone's 375 points: the Duo turned
-    /// on its side (890) or an iPad; the Duo upright (626) would make two columns narrower than any phone — its rows'
-    /// times and names broke and cut short — so there it is one column, as a sheet narrower than that is.
-    @State private var room: CGFloat = 0
+    /// The list's own frame (window coordinates). Two columns only where each is at least the narrowest iPhone's 375
+    /// points: the Duo turned on its side (890) or an iPad; the Duo upright (626) would make two columns narrower than any
+    /// phone — its rows' times and names broke and cut short — so there it is one column, as a sheet narrower than that is.
+    @State private var frame: CGRect = .zero
+    @Environment(\.foldX) private var foldX
 
     var body: some View {
-        Group {
-            if wide && (room == 0 || room >= 750) {
-                // (1.8.1) the two columns meet at the fold, each keeping clear of it
-                FoldSplit {
-                    column {
-                        left
-                        more
-                    }
-                    .safeAreaPadding(.trailing, foldGutter)
-                } right: {
-                    column { right }
-                        .safeAreaPadding(.leading, foldGutter)
-                }
-            } else {
-                column {
-                    left
-                    right
-                    more
-                }
+        let twoUp = wide && (frame.width == 0 || frame.width >= 750)
+        // (1.8.1) one shape either way — the first list keeps its place, its sections and how far it is scrolled, as the
+        // Duo folds and unfolds; on a wide screen the right-hand sections move into a second list beside it, the two
+        // meeting at the fold, each keeping clear of it
+        HStack(alignment: .top, spacing: 0) {
+            column {
+                left
+                if !twoUp { right }
+                more
+            }
+            .safeAreaPadding(.trailing, twoUp ? foldGutter : 0)
+            .frame(width: twoUp ? FoldSplit<EmptyView, EmptyView>.leftWidth(frame, foldX) : nil)
+            if twoUp {
+                column { right }
+                    .safeAreaPadding(.leading, foldGutter)
             }
         }
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { room = $0 }
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
     }
 
     @ViewBuilder

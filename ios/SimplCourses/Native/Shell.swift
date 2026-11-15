@@ -186,12 +186,16 @@ struct NativeShell: View {
     }
 }
 
-/// A tab's stack. On a phone, and the Duo upright, Apple's own: one screen at a time, pushed and popped. (iPhone 1.8.1)
-/// With two pages (the Duo on its side, an iPad) the last two screens of the stack side by side, meeting at the fold:
-/// the tab's own screen alone across both halves (its sections in two columns, ColumnList), then — something opened —
-/// it on the left and what was opened on the right; opened from the right page, the right moves to the left and the new
-/// screen comes in on the right (a book's pages turning); opened from the left, it takes the right page's place
-/// (Engine.push). Back, on the right page, turns one page back. Each screen keeps itself as it moves from right to left.
+/// A tab's stack: Apple's own, one screen at a time, pushed and popped — on a phone, the Duo folded or upright.
+/// (iPhone 1.8.1) With two pages (the Duo on its side, an iPad), the screen showing on the right and the one it was
+/// opened from on the left, meeting at the fold; the tab's own screen alone across both halves (its sections in two
+/// columns, ColumnList) until something is opened. The right page IS the stack — the same one the phone shows, at the
+/// same place in the view tree — so folding and unfolding keep what is open: the screen, where it is scrolled, a sheet
+/// or a menu up on it, what was typed; Back and the edge swipe are the stack's own. The left page is drawn from the
+/// stack's path (the screen under the top, or the tab's own): opened from the right, the right's screen turns to the
+/// left; opened from the left (another item in its list), the new one takes the right page's place (Engine.push).
+/// The pages are laid across the whole screen and split at its very middle — where the Duo folds — each given only the
+/// margins it has: the screen's own at its outer side (the camera's strip, the tab bar), the gutter at the fold.
 struct PaneStack<Root: View>: View {
     let tab: AppTab
     let root: Root
@@ -202,79 +206,73 @@ struct PaneStack<Root: View>: View {
     @State private var frame: CGRect = .zero
     @State private var full: CGRect = .zero
 
-    /// A page: the tab's own screen, or a screen of the stack (by its place in it, so the same screen twice is two).
+    /// The left page: the tab's own screen, or a screen of the stack (by its place in it, so the same screen twice is two).
     enum Page: Hashable {
         case root
         case route(Route, depth: Int)
     }
 
     var body: some View {
-        if twoPane {
-            pages
-        } else {
-            NavigationStack(path: $engine.paths[dynamicMember: \Paths.[tab]]) {
-                root.navigationDestination(for: Route.self) { route in RouteScreen(route: route) }
-            }
-        }
-    }
-
-    /// (1.8.1, build 34) The pages are laid across the whole screen and split at its very middle — where the Duo folds —
-    /// each given only the margins it has: the screen's own at its outer side (the camera's strip on the left, the tab
-    /// bar on the right), the gutter at the fold. (Each page's own stack was handed the screen's insets whole: the left
-    /// page kept the tab bar's 80 points clear at its right, by the fold, and the gap fell left of the crease.)
-    private var pages: some View {
         let path = engine.paths[tab]
-        let all: [Page] = [.root] + path.enumerated().map { Page.route($0.element, depth: $0.offset + 1) }
-        let shown = Array(all.suffix(2))
-        let two = shown.count == 2
-        // the screen's own insets at its sides: how far the safe frame sits in from the whole screen's
-        let inLeft = max(0, frame.minX - full.minX)
-        let inRight = max(0, full.maxX - frame.maxX)
+        let two = twoPane && !path.isEmpty
+        let inLeft = twoPane ? max(0, frame.minX - full.minX) : 0
+        let inRight = twoPane ? max(0, full.maxX - frame.maxX) : 0
         let half = full.width > 0 ? (full.width / 2).rounded() : nil
-        return ZStack {
+        let left: Page = path.count >= 2 ? .route(path[path.count - 2], depth: path.count - 1) : .root
+        // (one shape whether or not there are two pages: the stack keeps its place, and with it everything open on it)
+        ZStack {
             Color.clear
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
             Color.clear
                 .ignoresSafeArea()
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { full = $0 }
             HStack(spacing: 0) {
-                ForEach(shown, id: \.self) { p in
-                    let isLeft = two && p == shown[0]
-                    let isRight = two && !isLeft
-                    NavigationStack { page(p, back: isRight) }
-                        .safeAreaPadding(EdgeInsets(top: 0, leading: isRight ? foldGutter : inLeft, bottom: 0, trailing: isLeft ? foldGutter : inRight))
-                        .frame(width: isLeft ? half : nil)
-                        .frame(maxWidth: isLeft ? nil : CGFloat.infinity)
+                if two {
+                    NavigationStack { leftPage(left) }
+                        .id(left)
+                        .safeAreaPadding(EdgeInsets(top: 0, leading: inLeft, bottom: 0, trailing: foldGutter))
+                        .frame(width: half)
                         .transition(reduceMotion ? AnyTransition.opacity : AnyTransition.asymmetric(insertion: AnyTransition.move(edge: .trailing).combined(with: .opacity), removal: AnyTransition.opacity))
                 }
+                NavigationStack(path: $engine.paths[dynamicMember: \Paths.[tab]]) {
+                    root.navigationDestination(for: Route.self) { route in RouteScreen(route: route) }
+                }
+                .safeAreaPadding(EdgeInsets(top: 0, leading: two ? foldGutter : inLeft, bottom: 0, trailing: inRight))
+                .frame(maxWidth: .infinity)
             }
-            .ignoresSafeArea(.container, edges: .horizontal)
+            .ignoresSafeArea(.container, edges: twoPane ? Edge.Set.horizontal : Edge.Set())
         }
-        .animation(reduceMotion ? Animation.easeInOut(duration: 0.2) : Animation.snappy(duration: 0.35), value: path)
+        .animation(reduceMotion ? Animation.easeInOut(duration: 0.2) : Animation.snappy(duration: 0.35), value: two)
+        .animation(reduceMotion ? Animation.easeInOut(duration: 0.2) : Animation.snappy(duration: 0.35), value: left)
     }
 
     @ViewBuilder
-    private func page(_ p: Page, back: Bool) -> some View {
+    private func leftPage(_ p: Page) -> some View {
         switch p {
         case .root:
             root
         case .route(let route, _):
-            RouteScreen(route: route)
-                .toolbar {
-                    if back {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Button {
-                                Haptics.tap()
-                                var path = engine.paths[tab]
-                                if !path.isEmpty { path.removeLast() }
-                                engine.paths[tab] = path
-                            } label: {
-                                Image(systemName: "chevron.left")
-                            }
-                            .accessibilityLabel("Back")
-                        }
+            switch route {
+            case .web(_, let title):
+                // (one web view, and it is the right page's: a page of the web interface on the left says what it is,
+                // and a press turns back to it)
+                ContentUnavailableView {
+                    Label(title.isEmpty ? "Canvas Page" : title, systemImage: "globe")
+                } description: {
+                    Text("The page you came from.")
+                } actions: {
+                    Button("Go Back to It") {
+                        Haptics.tap()
+                        var path = engine.paths[tab]
+                        if !path.isEmpty { path.removeLast() }
+                        engine.paths[tab] = path
                     }
                 }
+                .navigationTitle(title)
+                .navigationBarTitleDisplayMode(.inline)
+            default:
+                RouteScreen(route: route)
+            }
         }
     }
 }
