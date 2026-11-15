@@ -29,6 +29,9 @@
     slider: 'M4 8h16M4 16h16M9 5v6M15 13v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.148', date: '2026-11-15', notes: [
+      { kind: 'improved', title: 'Simpler Switch', body: 'Green is a tick alone; the pill says just how long.', icon: P.toggle },
+    ] },
     { version: '2.99.147', date: '2026-11-15', notes: [
       { kind: 'improved', title: 'Easier On/Off Switch', body: 'Opens sideways; − and + set how long Simpl stays off.', icon: P.toggle },
       { kind: 'improved', title: 'Tidier Course Menu', body: 'Campus tools fold under More until you need them.', icon: P.list },

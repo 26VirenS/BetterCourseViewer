@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.147"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.148"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -284,10 +284,9 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 #bcv-look:is(:hover, .is-tour-open, .is-expanded, :has(:focus-visible)) .bcv-look__opt:not(.is-selected) { transition-delay: 0s, 40ms, 40ms, 0s; }
 /* words: the state's own unfold while open; the other's (green's Turn on) under the pointer */
 .bcv-look__optlbl { max-width: 0; padding: 0; opacity: 0; overflow: hidden; font: 600 12px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; transition: max-width .26s var(--bcv-ease-out, cubic-bezier(.23,1,.32,1)), opacity .15s ease, padding .26s var(--bcv-ease-out, cubic-bezier(.23,1,.32,1)); }
-#bcv-look:is(:hover, .is-tour-open, .is-expanded, :has(:focus-visible)) .bcv-look__opt.is-selected,
-.bcv-look__opt--on:is(:hover, :focus-visible, .is-hover) { max-width: 220px; }
-#bcv-look:is(:hover, .is-tour-open, .is-expanded, :has(:focus-visible)) .bcv-look__opt.is-selected .bcv-look__optlbl,
-.bcv-look__opt--on:is(:hover, :focus-visible, .is-hover) .bcv-look__optlbl { max-width: 180px; padding: 0 2px 0 11px; opacity: 1; }
+/* (2.99.148) green is its tick alone, never words; red says how it is off (Off until 3:42 PM) when that is the state */
+#bcv-look:is(:hover, .is-tour-open, .is-expanded, :has(:focus-visible)) .bcv-look__opt--off.is-selected { max-width: 220px; }
+#bcv-look:is(:hover, .is-tour-open, .is-expanded, :has(:focus-visible)) .bcv-look__opt--off.is-selected .bcv-look__optlbl { max-width: 180px; padding: 0 2px 0 11px; opacity: 1; }
 .bcv-look__opt:hover { box-shadow: 0 6px 20px rgba(0,0,0,.3); }
 .bcv-look__optdot { flex: none; width: var(--bcv-sw); height: var(--bcv-sw); display: flex; align-items: center; justify-content: center; }
 .bcv-look__optdot svg { display: block; width: calc(var(--bcv-sw) * .54); height: calc(var(--bcv-sw) * .54); fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
@@ -306,7 +305,7 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 @media (hover: hover) and (pointer: fine) { #bcv-look .bcv-look__stepbtn:hover:not(:disabled) { background: rgba(255,255,255,.34); } }
 #bcv-look .bcv-look__stepbtn:active:not(:disabled) { background: rgba(255,255,255,.44); }
 #bcv-look .bcv-look__stepbtn:disabled { opacity: .35; cursor: default; }
-#bcv-look .bcv-look__forbtn { flex: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box; min-width: 112px; height: calc(var(--bcv-sw) - 6px); padding: 0 10px; border-radius: calc((var(--bcv-sw) - 6px) / 2); background: transparent; color: #fff; font: 600 12px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; white-space: nowrap; text-align: center; font-variant-numeric: tabular-nums; transition: background .15s ease; }
+#bcv-look .bcv-look__forbtn { flex: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box; min-width: 64px; height: calc(var(--bcv-sw) - 6px); padding: 0 10px; border-radius: calc((var(--bcv-sw) - 6px) / 2); background: transparent; color: #fff; font: 600 12px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; white-space: nowrap; text-align: center; font-variant-numeric: tabular-nums; transition: background .15s ease; }
 @media (hover: hover) and (pointer: fine) { #bcv-look .bcv-look__forbtn:hover { background: rgba(255,255,255,.22); } }
 #bcv-look .bcv-look__forbtn:active { background: rgba(255,255,255,.32); }
 #bcv-look :is(.bcv-look__forbtn, .bcv-look__stepbtn):focus-visible { outline: 2px solid #fff; outline-offset: -2px; }

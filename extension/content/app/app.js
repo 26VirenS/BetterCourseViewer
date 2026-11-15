@@ -2103,18 +2103,19 @@
     { pos: -1, key: 'off', color: '#ff453a', label: 'Turn off Simpl', title: 'Turn Simpl Courses off: for this page, for a while, or indefinitely', glyph: 'M12 4v8M6.3 7.3a8 8 0 1011.4 0' },
   ];
   // how long red turns it off for: 'page' is this page view alone; a number is that long (ms); null is until turned on again.
-  // (2.99.147) The steps red's − and + walk, shortest first; `pill` is what its pill says for each.
+  // (2.99.147) The steps red's − and + walk, shortest first; `pill` is what its pill says for each (2.99.148: short — red and
+  // its power symbol already say off).
   const LOOK_FOR = [
-    { key: 'page', label: 'This page only', pill: 'Off for this page', ms: 'page' },
-    { key: '15m', label: 'For 15 minutes', pill: 'Off for 15 min', ms: 15 * 60000 },
-    { key: '30m', label: 'For 30 minutes', pill: 'Off for 30 min', ms: 30 * 60000 },
-    { key: '1h', label: 'For 1 hour', pill: 'Off for 1 hour', ms: 60 * 60000 },
-    { key: '2h', label: 'For 2 hours', pill: 'Off for 2 hours', ms: 2 * 60 * 60000 },
-    { key: '4h', label: 'For 4 hours', pill: 'Off for 4 hours', ms: 4 * 60 * 60000 },
-    { key: '8h', label: 'For 8 hours', pill: 'Off for 8 hours', ms: 8 * 60 * 60000 },
-    { key: '1d', label: 'For 1 day', pill: 'Off for 1 day', ms: 24 * 60 * 60000 },
-    { key: '1w', label: 'For 1 week', pill: 'Off for 1 week', ms: 7 * 24 * 60 * 60000 },
-    { key: 'ever', label: 'Indefinitely', pill: 'Off indefinitely', ms: null },
+    { key: 'page', label: 'This page only', pill: 'This page', ms: 'page' },
+    { key: '15m', label: 'For 15 minutes', pill: '15 min', ms: 15 * 60000 },
+    { key: '30m', label: 'For 30 minutes', pill: '30 min', ms: 30 * 60000 },
+    { key: '1h', label: 'For 1 hour', pill: '1 hr', ms: 60 * 60000 },
+    { key: '2h', label: 'For 2 hours', pill: '2 hrs', ms: 2 * 60 * 60000 },
+    { key: '4h', label: 'For 4 hours', pill: '4 hrs', ms: 4 * 60 * 60000 },
+    { key: '8h', label: 'For 8 hours', pill: '8 hrs', ms: 8 * 60 * 60000 },
+    { key: '1d', label: 'For 1 day', pill: '1 day', ms: 24 * 60 * 60000 },
+    { key: '1w', label: 'For 1 week', pill: '1 week', ms: 7 * 24 * 60 * 60000 },
+    { key: 'ever', label: 'Indefinitely', pill: 'No limit', ms: null },
   ];
   /** The step red's pill starts at: the one last chosen, else an hour. */
   const LOOK_STEP_KEY = 'bcv-look-step';
