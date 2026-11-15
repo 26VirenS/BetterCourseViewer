@@ -561,15 +561,22 @@ final class Engine: ObservableObject, ShellListener {
         lastTouch = inSheet ? nil : (x, Date())
     }
 
-    /// A native screen on the stack showing (not twice in a row). (1.8.1) With two pages showing, a screen opened from
-    /// the left page — another assignment in its list, another course — takes the right page's place rather than
-    /// pushing the right page across: the left page is the list, the right what was picked from it.
+    /// (iPhone 1.8.1, build 37) Per tab, where its split view's list column ends (window x) while two columns show; nil
+    /// when the split view is one stack (TabSplit).
+    var splitEdge: [AppTab: CGFloat] = [:]
+
+    /// A native screen on the stack showing (not twice in a row). (1.8.1, build 37) With the split view showing two
+    /// columns, a screen opened from the list column — another course, another assignment in Today — is the right
+    /// column's own, in place of whatever was open there (as a row picked in Mail's list); opened from the right column,
+    /// it is pushed there.
     func push(_ route: Route) {
         var path = paths[tab]
         if path.last == route { return }
-        if twoPane, !path.isEmpty, let fold = foldX, let t = lastTouch, Date().timeIntervalSince(t.at) < 3, t.x < fold {
-            path.removeLast()
-            if path.last == route { lastTouch = nil; paths[tab] = path; return }
+        if let edge = splitEdge[tab], let t = lastTouch, Date().timeIntervalSince(t.at) < 3, t.x < edge {
+            lastTouch = nil
+            if path == [route] { return }
+            paths[tab] = [route]
+            return
         }
         path.append(route)
         lastTouch = nil

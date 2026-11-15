@@ -12,6 +12,7 @@ private struct DayGPA: Identifiable {
 struct GradesView: View {
     @EnvironmentObject private var engine: Engine
     @Environment(\.wideScreen) private var wide
+    @Environment(\.splitList) private var splitList
     @State private var data: GradesData?
     @State private var error: String?
     @State private var goal: Double = 4
@@ -133,7 +134,8 @@ struct GradesView: View {
         let color = Color(hex: r.color)
         return Button {
             Haptics.tap()
-            sheet = r
+            // (build 37) beside the list in a split view, as anything else opened from it; a sheet over it on a phone
+            if splitList { engine.push(.section(ctx: "courses/\(r.id)", kind: "grades")) } else { sheet = r }
         } label: {
             HStack(spacing: 14) {
                 NestedRings(bands: NestedRings.bands(total: r.pct, color: color, groups: r.cats.map { (pct: $0.pct, color: $0.color) }, limit: 3), key: "grades:\(r.id)")

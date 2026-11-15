@@ -11,12 +11,13 @@ struct CoursesView: View {
     @State private var nickname = ""
     /// (iPhone 1.8) An iPhone Duo unfolded, or an iPad: the courses as cards, as many across as fit.
     @Environment(\.wideScreen) private var wide
+    @Environment(\.splitList) private var splitList
     /// (iPhone 1.8.1) The cards' own width: 750 points or more (the Duo on its side), a column each side of the fold.
     @State private var room: CGFloat = 0
 
     var body: some View {
         Group {
-            if let d = data, wide {
+            if let d = data, wide && !splitList {
                 grid(d)
             } else if let d = data {
                 List {
