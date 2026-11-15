@@ -20,11 +20,13 @@ struct GradesView: View {
     var body: some View {
         Group {
             if let d = data {
-                List {
+                // (iPhone 1.8) on a wide screen, the term GPA and its trend in one column, the courses in the other
+                ColumnList(refresh: { await load(force: true) }) {
                     Section { hero(d) }
                     if let trend = d.trend, trend.count >= 2 {
                         Section("Trend") { trendChart(trend, d) }
                     }
+                } right: {
                     Section {
                         if d.rows.isEmpty { Text("No current courses.").foregroundStyle(.secondary) }
                         ForEach(d.rows) { r in courseRow(r) }
@@ -33,13 +35,12 @@ struct GradesView: View {
                     } footer: {
                         Text("Press a course for each assignment's grade and what-if scores.")
                     }
+                } more: {
                     Section {
                         Text("Term GPA is worked out here from the scores \(engine.lmsName) reports, on a 4.0 scale with every course counting equally. It is not your school’s official GPA.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                 }
-                .listStyle(.insetGrouped)
-                .refreshable { await load(force: true) }
             } else {
                 LoadState(error: error) { Task { await load() } }
             }
@@ -239,7 +240,8 @@ struct CourseGradesView: View {
     var body: some View {
         Group {
             if let d = data {
-                List {
+                // (iPhone 1.8) on a wide screen, the course's total and What-If in one column, its assignments in the other
+                ColumnList(refresh: { await load(fresh: true) }) {
                     Section { header(d) }
                     Section {
                         Toggle(isOn: Binding(get: { whatIf }, set: { setWhatIf($0) })) {
@@ -262,10 +264,9 @@ struct CourseGradesView: View {
                             Button(role: .destructive) { reset() } label: { Label("Clear What-If Scores", systemImage: "arrow.uturn.backward") }
                         }
                     }
+                } right: {
                     rowsSections(d)
                 }
-                .listStyle(.insetGrouped)
-                .refreshable { await load(fresh: true) }
             } else {
                 LoadState(error: error) { Task { await load(fresh: true) } }
             }

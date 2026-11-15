@@ -122,6 +122,33 @@ unset BASE
 xcrun simctl terminate booted "$BID" >/dev/null 2>&1 || true
 collect end
 
+# (iPhone 1.8) the wide screen, in light: an iPhone Duo unfolded — or, where this Xcode has none, an iPad mini, its
+# sides both 600 points or more as the Duo's inner display's are — Today, Courses, To Do and Grades in two columns or
+# cards, a course's grades and an assignment
+WIDE=$(xcrun simctl list devices available | grep -E "iPhone Duo \(" | head -1 | grep -oE "[0-9A-F-]{36}")
+WIDE_NAME="iPhone Duo"
+if [ -z "$WIDE" ]; then WIDE=$(xcrun simctl list devices available | grep -E "iPad mini" | head -1 | grep -oE "[0-9A-F-]{36}"); WIDE_NAME="iPad mini"; fi
+if [ -n "$WIDE" ]; then
+  echo "wide: $WIDE_NAME $WIDE" | tee "$OUT/wide-device.txt"
+  xcrun simctl shutdown booted >/dev/null 2>&1 || true
+  xcrun simctl boot "$WIDE" && xcrun simctl bootstatus "$WIDE" -b
+  xcrun simctl install booted "build/Build/Products/Debug-iphonesimulator/Simpl Courses.app"
+  xcrun simctl status_bar booted override --time 9:41 --batteryState charged --batteryLevel 100 --wifiBars 3 >/dev/null 2>&1 || true
+  xcrun simctl ui booted appearance light || true
+  launch wide-settle 40
+  rm -f "$OUT/wide-settle.png" "$OUT/console-wide-settle.txt"
+  launch wide-01-today 24
+  launch wide-02-courses 16 -SimplTab courses
+  launch wide-03-todo 16 -SimplTab todo
+  launch wide-04-grades 16 -SimplTab grades
+  launch wide-10-assignment 22 -SimplTab todo -SimplPush /courses/101/assignments/1001
+  launch wide-11-grades-sheet 20 -SimplTab grades -SimplOpen grades:101
+  xcrun simctl terminate booted "$BID" >/dev/null 2>&1 || true
+  collect wide
+else
+  echo "wide: no iPhone Duo or iPad mini simulator on this Mac" | tee "$OUT/wide-device.txt"
+fi
+
 # smaller pictures (the contents API reads files up to 1 MB)
 for f in "$OUT"/*.png; do sips -Z 1400 "$f" >/dev/null 2>&1 || true; done
 ls -la "$OUT"

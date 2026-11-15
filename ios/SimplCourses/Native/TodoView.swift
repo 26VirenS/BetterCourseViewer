@@ -16,7 +16,10 @@ struct TodoView: View {
     var body: some View {
         Group {
             if let d = data {
-                List {
+                // (iPhone 1.8) on a wide screen two columns: the progress and the first days on the left, the later days on
+                // the right (balanced by how much is in them, in their order); on an iPhone one list, as before
+                let k = Self.half(d.sections.map { $0.rows.count + 2 })
+                ColumnList(refresh: { await load(force: true) }) {
                     Section {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack(alignment: .firstTextBaseline) {
@@ -32,26 +35,15 @@ struct TodoView: View {
                     if d.sections.isEmpty {
                         Section { Text(d.empty ?? "Nothing to do.").foregroundStyle(.secondary) }
                     }
-                    ForEach(d.sections) { section in
-                        Section {
-                            ForEach(section.rows) { row in
-                                todoRow(row, withCourse: d.group != "course")
-                            }
-                        } header: {
-                            HStack {
-                                Text(section.title)
-                                Spacer()
-                                if let note = section.note { Text(note).textCase(nil) }
-                            }
-                        }
-                    }
+                    ForEach(Array(d.sections.prefix(k))) { section in daySection(section, d) }
+                } right: {
+                    ForEach(Array(d.sections.dropFirst(k))) { section in daySection(section, d) }
+                } more: {
                     Section {
                         Text("Tap a task to open it. Swipe for quick actions. Priority is yours alone and never reaches \(engine.lmsName).")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                 }
-                .listStyle(.insetGrouped)
-                .refreshable { await load(force: true) }
             } else {
                 LoadState(error: error) { Task { await load() } }
             }
@@ -86,6 +78,35 @@ struct TodoView: View {
     }
 
     @ViewBuilder
+    /// A day's work (or the overdue's): its rows under its title and its note.
+    private func daySection(_ section: TodoSection, _ d: TodoData) -> some View {
+        Section {
+            ForEach(section.rows) { row in
+                todoRow(row, withCourse: d.group != "course")
+            }
+        } header: {
+            HStack {
+                Text(section.title)
+                Spacer()
+                if let note = section.note { Text(note).textCase(nil) }
+            }
+        }
+    }
+
+    /// (iPhone 1.8) Where a wide screen's two columns part: after the section that takes the left column past half of
+    /// the whole (each section weighed by its rows and its header), never leaving the right column empty while there are
+    /// two sections to share.
+    static func half(_ weights: [Int]) -> Int {
+        guard weights.count > 1 else { return weights.count }
+        let total = weights.reduce(0, +)
+        var run = 0
+        for (i, w) in weights.enumerated() {
+            run += w
+            if run * 2 >= total { return min(i + 1, weights.count - 1) }
+        }
+        return weights.count - 1
+    }
+
     private func todoRow(_ row: WorkRow, withCourse: Bool) -> some View {
         HStack(spacing: 12) {
             CheckCircle(done: row.done, color: .green) { toggle(row, !row.done) }

@@ -367,3 +367,77 @@ final class Loader<T: Decodable>: ObservableObject {
         }
     }
 }
+
+// MARK: - The wide screen (iPhone 1.8)
+
+/// (iPhone 1.8) The screen is wide: an iPhone Duo unfolded (its inner display about 626 by 890 points, either way up) or
+/// an iPad — both of the window's sides 600 points or more. Folded, the Duo is an iPhone, and an iPhone on its side
+/// (wide but not tall) stays as it is: one column. Set once at the shell (NativeShell), from the window's size.
+private struct WideScreenKey: EnvironmentKey { static let defaultValue = false }
+extension EnvironmentValues {
+    var wideScreen: Bool {
+        get { self[WideScreenKey.self] }
+        set { self[WideScreenKey.self] = newValue }
+    }
+}
+
+/// (iPhone 1.8) A screen's sections, as an inset list: one list on an iPhone; on a wide screen two side by side, each
+/// scrolling on its own — what is read first on the left, the rest on the right — so the width the Duo unfolds to holds
+/// two columns of the phone's own sections rather than one stretched across it. Each column keeps its sections' swipes,
+/// menus and pull to refresh. `more` goes under the left column on a wide screen, and last on an iPhone (so the phone's
+/// own order stays as it was: left, right, more).
+struct ColumnList<Left: View, Right: View, More: View>: View {
+    @Environment(\.wideScreen) private var wide
+    private let refresh: (() async -> Void)?
+    private let left: Left
+    private let right: Right
+    private let more: More
+
+    init(refresh: (() async -> Void)? = nil, @ViewBuilder left: () -> Left, @ViewBuilder right: () -> Right, @ViewBuilder more: () -> More) {
+        self.refresh = refresh
+        self.left = left()
+        self.right = right()
+        self.more = more()
+    }
+
+    var body: some View {
+        if wide {
+            HStack(alignment: .top, spacing: 0) {
+                column {
+                    left
+                    more
+                }
+                column { right }
+            }
+        } else {
+            column {
+                left
+                right
+                more
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func column<C: View>(@ViewBuilder _ content: () -> C) -> some View {
+        if let refresh {
+            List { content() }
+                .listStyle(.insetGrouped)
+                .refreshable { await refresh() }
+        } else {
+            List { content() }
+                .listStyle(.insetGrouped)
+        }
+    }
+}
+
+extension ColumnList where More == EmptyView {
+    init(refresh: (() async -> Void)? = nil, @ViewBuilder left: () -> Left, @ViewBuilder right: () -> Right) {
+        self.init(refresh: refresh, left: left, right: right, more: { EmptyView() })
+    }
+}
+
+/// (iPhone 1.8) The width a wide screen's grid lays its cards out at: as many columns of at least `minimum` points as fit.
+func wideColumns(minimum: CGFloat = 280, spacing: CGFloat = 14) -> [GridItem] {
+    [GridItem(.adaptive(minimum: minimum), spacing: spacing, alignment: .top)]
+}

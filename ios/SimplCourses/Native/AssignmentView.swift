@@ -26,7 +26,9 @@ struct AssignmentView: View {
         Group {
             if let d = model.data {
                 ScrollViewReader { proxy in
-                List {
+                // (iPhone 1.8) on a wide screen, the assignment and its instructions in one column, your work and the
+                // comments in the other; on an iPhone one list, as before
+                ColumnList(refresh: { await load() }) {
                     Section { header(d) }
                     if let g = d.grade { Section("Grade") { gradeBlock(g, d) }.id("grade") }
                     else if d.held == true {
@@ -45,6 +47,7 @@ struct AssignmentView: View {
                     if !d.html.isEmpty {
                         Section("Instructions") { RichText(html: d.html).padding(.vertical, 4) }
                     }
+                } right: {
                     workSection(d)
                     Section {
                         if d.comments.isEmpty { Text("No comments.").foregroundStyle(.secondary) }
@@ -54,8 +57,6 @@ struct AssignmentView: View {
                         Text("Comments")
                     }
                 }
-                .listStyle(.insetGrouped)
-                .refreshable { await load() }
                 .safeAreaInset(edge: .bottom) { action(d) }
                 .onChange(of: jump) {
                     guard let j = jump else { return }

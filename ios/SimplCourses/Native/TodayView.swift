@@ -21,7 +21,9 @@ struct TodayView: View {
     var body: some View {
         Group {
             if let d = data {
-                List {
+                // (iPhone 1.8) on a wide screen, the counters and the week's load in one column, the day's work in the other;
+                // on an iPhone as before: the counters, the day's work, the week's load
+                ColumnList(refresh: { await load(force: true) }) {
                     Section {
                         LazyVGrid(columns: columns, spacing: 10) {
                             ForEach(d.counters) { c in counterTile(c) }
@@ -34,6 +36,7 @@ struct TodayView: View {
                         // clipped its first letter). Before iOS 26 it stays the header.
                         if !TodayView.dateInBar, let line = d.dateLine { Text(line).textCase(nil) }
                     }
+                } right: {
                     Section {
                         if d.list.rows.isEmpty {
                             Text(d.list.empty ?? "Nothing due.").foregroundStyle(.secondary)
@@ -55,6 +58,7 @@ struct TodayView: View {
                             if let note = d.list.note, !note.isEmpty { Text(note).textCase(nil) }
                         }
                     }
+                } more: {
                     if let load = d.load, d.hasCourses ?? true {
                         Section("Week load") {
                             ForEach(load) { r in
@@ -75,8 +79,6 @@ struct TodayView: View {
                         }
                     }
                 }
-                .listStyle(.insetGrouped)
-                .refreshable { await load(force: true) }
             } else {
                 LoadState(error: error) { Task { await load() } }
             }

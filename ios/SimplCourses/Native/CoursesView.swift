@@ -9,10 +9,14 @@ struct CoursesView: View {
     @State private var error: String?
     @State private var naming: CourseRow?
     @State private var nickname = ""
+    /// (iPhone 1.8) An iPhone Duo unfolded, or an iPad: the courses as cards, as many across as fit.
+    @Environment(\.wideScreen) private var wide
 
     var body: some View {
         Group {
-            if let d = data {
+            if let d = data, wide {
+                grid(d)
+            } else if let d = data {
                 List {
                     Section {
                         if d.rows.isEmpty { Text(d.empty ?? "No courses selected.").foregroundStyle(.secondary) }
@@ -22,15 +26,7 @@ struct CoursesView: View {
                                 .swipeActions {
                                     Button { startNaming(c) } label: { Label("Nickname", systemImage: "pencil") }.tint(.indigo)
                                 }
-                                .contextMenu {
-                                    Button { open(c) } label: { Label("Open", systemImage: "arrow.up.right") }
-                                    Button { engine.openWeb("\(c.url)/grades", title: "Grades") } label: { Label("Grades", systemImage: "chart.bar") }
-                                    Button { engine.openWeb("\(c.url)/assignments", title: "Assignments") } label: { Label("Assignments", systemImage: "doc.text") }
-                                    Button { engine.openWeb("\(c.url)/modules", title: "Modules") } label: { Label("Modules", systemImage: "square.stack.3d.up") }
-                                    Button { engine.openWeb("\(c.url)/files", title: "Files") } label: { Label("Files", systemImage: "folder") }
-                                    Divider()
-                                    Button { startNaming(c) } label: { Label("Nickname…", systemImage: "pencil") }
-                                }
+                                .contextMenu { menu(c) }
                         }
                     } header: {
                         if let sub = d.sub { Text(sub).textCase(nil) }
@@ -58,6 +54,54 @@ struct CoursesView: View {
         } message: {
             Text("Shown instead of “\(naming?.original ?? "")” everywhere, \(engine.onBrightspace ? "on this iPhone only" : "in Canvas too").")
         }
+    }
+
+    /// A course's menu (a long press): open it, or one of its sections, or give it a nickname.
+    @ViewBuilder
+    private func menu(_ c: CourseRow) -> some View {
+        Button { open(c) } label: { Label("Open", systemImage: "arrow.up.right") }
+        Button { engine.openWeb("\(c.url)/grades", title: "Grades") } label: { Label("Grades", systemImage: "chart.bar") }
+        Button { engine.openWeb("\(c.url)/assignments", title: "Assignments") } label: { Label("Assignments", systemImage: "doc.text") }
+        Button { engine.openWeb("\(c.url)/modules", title: "Modules") } label: { Label("Modules", systemImage: "square.stack.3d.up") }
+        Button { engine.openWeb("\(c.url)/files", title: "Files") } label: { Label("Files", systemImage: "folder") }
+        Divider()
+        Button { startNaming(c) } label: { Label("Nickname…", systemImage: "pencil") }
+    }
+
+    /// (iPhone 1.8) The courses on a wide screen: a card each, as many across as fit (two on an iPhone Duo unfolded,
+    /// three on its side or on an iPad), on the grouped background the list has; a long press for the same menu.
+    private func grid(_ d: CoursesData) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 10) {
+                if let sub = d.sub {
+                    Text(sub).font(.footnote).foregroundStyle(.secondary).padding(.horizontal, 8)
+                }
+                if d.rows.isEmpty {
+                    Text(d.empty ?? "No courses selected.").foregroundStyle(.secondary).padding(.horizontal, 8)
+                }
+                LazyVGrid(columns: wideColumns(minimum: 260), spacing: 14) {
+                    ForEach(d.rows) { c in
+                        Button { open(c) } label: {
+                            row(c)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                                .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu { menu(c) }
+                    }
+                }
+                if let hidden = d.hidden, !hidden.isEmpty {
+                    Text(hidden).font(.footnote).foregroundStyle(.secondary).padding(.horizontal, 8)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+        }
+        .background(Color(.systemGroupedBackground))
+        .refreshable { await load(force: true) }
     }
 
     private func row(_ c: CourseRow) -> some View {

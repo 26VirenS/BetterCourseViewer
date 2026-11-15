@@ -119,6 +119,8 @@ struct Splash: View {
 /// four tabs and Search, so none is folded into More; the Calendar is pushed from Today and To Do.
 struct NativeShell: View {
     @EnvironmentObject private var engine: Engine
+    /// (iPhone 1.8) Both of the window's sides 600 points or more: an iPhone Duo unfolded, or an iPad (`wideScreen`).
+    @State private var wide = false
 
     var body: some View {
         // Search is a button in the tab bar, not a page (1.5.4): pressed, it raises the search sheet halfway over the
@@ -149,6 +151,9 @@ struct NativeShell: View {
         .minimizingTabBar(!engine.holdTabBar)
         .background(TabBarProbe(engine: engine).allowsHitTesting(false))
         .sensoryFeedback(.selection, trigger: engine.tab)
+        .environment(\.wideScreen, wide)
+        // (iPhone 1.8: the Duo unfolded or folded, an iPad's window resized — every screen lays itself out again)
+        .onGeometryChange(for: Bool.self) { min($0.size.width, $0.size.height) >= 600 } action: { wide = $0 }
     }
 
     private func stack<Root: View>(_ tab: AppTab, @ViewBuilder _ root: () -> Root) -> some View {
