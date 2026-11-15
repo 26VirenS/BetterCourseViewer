@@ -16,6 +16,9 @@
   const NS = 'http://www.w3.org/2000/svg';
 
   const whatIfState = new Map(); // courseId -> { on, values, added: [{ id, groupId, name, possible }], seq, addGroup }
+  // (2.99.145) the courses whose rings have filled from empty this page's life: once each, as the iPhone's do once a launch
+  const filledOnce = new Set();
+  const stillMotion = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
 
   async function render(ctx, shell) {
     const c = shell.course;
@@ -30,6 +33,9 @@
     // the course's groups, as the what-if's "add an assignment" offers them (the categories the grade is weighted by)
     const cats = groups.map((g) => ({ id: String(g.id), name: g.name, weight: Number(g.group_weight) || 0 }));
     const whatIfAllowed = (await store.pref('whatIfScores', true)) !== false; // Settings → Grades → Show what-if scores
+    // (2.99.145) the course's grading scale — its own, the student's, or the usual — for the letter beside the total
+    const G = BCV.screens.gpa;
+    try { await G?.loadScales?.(); } catch { /* (the usual scale, then) */ }
     if (!whatIfAllowed) st.on = false;
     // (2.98.59) the student's own weights for this course — a percent per group, from the syllabus,
     // for a course Canvas leaves unweighted or weighs another way — kept in the site's preferences
@@ -59,8 +65,33 @@
     const colorOf = (id) => gm?.legend.find((r) => r.id === id)?.color || gm?.weightBar.find((w) => w.id === id)?.color || null;
     const picker = U.groupPicker(b, pickSt, { onChange: notePick });
 
+    let shownTotal = null; // (the figure last drawn: a new one settles in, an unchanged one stays still)
     function draw() {
       gm = store.gradeModel(groups, c, st.values, st.on, dark, st.added, { ownWeights: own });
+      // (2.99.145, as the Mac's and the iPhone's since 2.99.33) What-If starts from Canvas's own total, not from Simpl's
+      // reading of the scores: turned on with nothing typed the grade stays the one the course shows (92.4% A− stayed
+      // 92.4% A−, where it jumped to 100%), and a score tried moves it by what that score changes in Simpl's reading
+      const lms = BCV.lms.name;
+      const typed = Object.keys(st.values).length > 0 || st.added.length > 0;
+      const canvasTotal = c.score !== null && c.score !== undefined && !own && !c.hideFinal ? store.roundHalfUp(Number(c.score), 1) : null;
+      let total = gm.total === null || gm.total === undefined ? null : Number(gm.total);
+      let note = gm.center.note;
+      let estimate = '';
+      let fromCanvas = !st.on;
+      if (st.on && canvasTotal !== null) {
+        const base = store.gradeModel(groups, c, {}, true, dark, [], { ownWeights: own }).total;
+        const gap = base !== null && base !== undefined ? store.roundHalfUp(Math.abs(store.roundHalfUp(base, 1) - canvasTotal), 1) : 0;
+        if (gap > 0) estimate = `Simpl’s own estimate differs from ${lms}’s total by ${store.fmtPts(gap)} ${gap === 1 ? 'point' : 'points'}.`;
+        if (!typed) { total = canvasTotal; fromCanvas = true; note = `${lms}’s total. Try a score to see where it would land.`; }
+        else if (base !== null && base !== undefined && total !== null) { total = Math.max(0, store.roundHalfUp(canvasTotal + (total - Number(base)), 1)); note = `${lms}’s total, moved by the scores you tried.`; }
+      }
+      const totalText = total === null ? '—' : `${store.fmtPts(total)}%`;
+      // the letter: Canvas's own beside its own total, else the course's scale's for the figure shown
+      const S = G?.scaleOf ? G.scaleOf(c.id) : G?.SCALE;
+      const canvasLetter = fromCanvas && c.grade && !own && !G?.hasScale?.(c.id) ? String(c.grade).trim() : null;
+      let letter = total === null ? null : canvasLetter || (S && G?.letterFor ? G.letterFor(total, S)[0] : null);
+      if (letter && /^[A-F][+\-−]?$/i.test(letter)) letter = letter.toUpperCase().replace('-', '−');
+      const letterBand = letter && /^[A-F]/.test(letter) ? letter[0] : null;
       const parts = [];
       if (st.on) {
         parts.push(U.el('bcv-banner', [
@@ -103,17 +134,31 @@
         }
         return el;
       };
-      for (const r of gm.rings) svg.append(ringOf(circle(r.r, r.track, null, null, r.w), r));
-      for (const r of gm.rings) svg.append(ringOf(circle(r.r, r.arc, r.cap, r.dash, r.w), r));
-      // (2.99.143) the total beside its rings; under them what it is, and What-If — the total's card, as the Mac's
+      const rings = gm.rings.map((r, i) => {
+        if (i !== 0 || total === gm.total) return r;
+        const C = 2 * Math.PI * r.r;
+        const pct = total === null ? 0 : Math.min(total, 100);
+        const filled = (pct / 100) * C;
+        return { ...r, dash: `${filled.toFixed(1)} ${(C - filled).toFixed(1)}`, cap: pct > 0 ? 'round' : 'butt', arc: pct > 0 ? r.color : 'transparent' };
+      });
+      for (const r of rings) svg.append(ringOf(circle(r.r, r.track, null, null, r.w), r));
+      for (const r of rings) { const arc = ringOf(circle(r.r, r.arc, r.cap, r.dash, r.w), r); arc.dataset.arc = String(r.r); svg.append(arc); }
+      // (2.99.145) the total's card, as a summary: the rings, then the figure — the one thing to read first, its letter
+      // beside it rather than in the small print — and what the figure is; What-If by it, the control by the figure it
+      // changes (at the card's foot when narrow, at its end when wide — app.css)
       const center = U.el('bcv-gr__center', [
         U.text('bcv-gr__label', gm.center.label),
-        h('span', { class: 'bcv-gr__total', style: { color: gm.center.color }, text: gm.center.value }),
+        h('div', { class: 'bcv-gr__fig' }, [
+          h('span', { class: 'bcv-gr__total', text: totalText }),
+          letter ? h('span', { class: `bcv-gr__letter ${letterBand ? `bcv-band--${letterBand}` : ''} ${st.on && !fromCanvas ? 'is-hyp' : ''}`, text: letter, title: st.on && !fromCanvas ? `${letter} with what-if` : letter }) : null,
+        ]),
+        U.text('bcv-gr__note bcv-pretty', note),
+        estimate ? U.text('bcv-gr__estimate bcv-pretty', estimate) : null,
       ]);
-      const totalFoot = [
-        U.text('bcv-gr__note bcv-pretty', gm.center.note),
-        whatIfAllowed ? h('button', { type: 'button', class: `bcv-whatif-btn ${st.on ? 'is-on' : ''}`, text: st.on ? 'Exit what-if mode' : 'Try what-if scores', onclick: () => { st.on = !st.on; draw(); } }) : null,
-      ];
+      const totalFoot = whatIfAllowed ? U.el('bcv-gr__foot', [
+        h('button', { type: 'button', class: `bcv-whatif-btn ${st.on ? 'is-on' : ''}`, 'aria-pressed': String(st.on), text: st.on ? 'Exit what-if mode' : 'Try what-if scores', onclick: () => { st.on = !st.on; draw(); } }),
+        U.text('bcv-gr__foothint', st.on ? 'Nothing is saved or sent.' : 'Nothing you try is saved.', 'span'),
+      ]) : null;
 
       // ---- the groups ----------------------------------------------------------------
       // (2.99.143: a group's dot is its colour whether or not it has a ring — five rings at most — as in the weight bar)
@@ -122,20 +167,28 @@
           ? { background: `radial-gradient(${r.color} 34%, transparent 36%) 0 0 / 2.4px 2.4px` }
           : { background: r.color } }),
         U.el('bcv-legend__body', [U.text('bcv-legend__label', r.label, 'span'), U.text('bcv-legend__detail', r.detail, 'span')]),
-        U.text('bcv-legend__weight', r.weightText, 'span'),
-        U.text(`bcv-legend__value ${r.zero ? 'bcv-legend__value--muted' : ''}`, r.value, 'span'),
+        // (2.99.145) one column of figures: the group's score, and under it what it weighs — two right-hand columns read
+        // as a table with no head
+        U.el('bcv-legend__num', [
+          U.text(`bcv-legend__value ${r.zero ? 'bcv-legend__value--muted' : ''}`, r.value, 'span'),
+          gm.weighted ? U.text('bcv-legend__weight', r.weightText, 'span') : null,
+        ]),
       ], U.groupAttrs(r.id, r.color, { pick: true, name: r.label }));
       const ungradedRow = (u) => U.el('bcv-legend__row bcv-legend__row--ungraded', [
         h('span', { class: 'bcv-legend__dot' }),
         U.el('bcv-legend__body', [U.text('bcv-legend__label bcv-ungraded__name', u.name, 'span'), U.text('bcv-legend__detail', 'Nothing graded yet', 'span')]),
-        U.text('bcv-legend__weight', u.weightText, 'span'),
-        U.text('bcv-legend__value', '—', 'span'),
+        U.el('bcv-legend__num', [
+          U.text('bcv-legend__value', '—', 'span'),
+          u.weightText ? U.text('bcv-legend__weight', u.weightText === '0%' ? 'not weighted' : `${u.weightText} of grade`, 'span') : null,
+        ]),
       ], U.groupAttrs(u.id, null, { pick: true, name: u.name }));
       const groupRows = U.el('bcv-gr__list', [
         ...gm.legend.map(legendRow),
         ...gm.ungraded.map(ungradedRow),
         gm.legend.length || gm.ungraded.length ? null : U.text('bcv-gr__wnote', 'No assignment groups in this course.'),
       ]);
+      // (2.99.145: a wide card lists the groups in two columns, down the first and then the second, in their order)
+      groupRows.style.setProperty('--bcv-gr-rows', String(Math.max(1, Math.ceil((gm.legend.length + gm.ungraded.length) / 2))));
 
       // ---- how the grade is weighted ------------------------------------------------
       // (2.98.59) and a button to weight the groups yourself, from the syllabus; the editor takes the section's place
@@ -213,16 +266,16 @@
           U.el('bcv-gr__wbtns', [own ? U.btn(`Back to ${BCV.lms.name}’s weights`, { kind: 'danger', cls: 'bcv-gr__wclear', onClick: clear }) : null, h('span', { class: 'bcv-gr__wspace' }), U.btn('Cancel', { cls: 'bcv-gr__wcancel', onClick: cancel }), U.btn('Save', { kind: 'primary', cls: 'bcv-gr__wsave', onClick: save })]),
         ]);
       }
-      // (2.99.143) two cards, as the Mac's Grades section has them: the rings and the total in one, By group and How
-      // the grade is weighted in the other — side by side on a wide page, as tall as each other; one over the other
+      // (2.99.143) two cards: the rings and the total in one, the assignment groups in the other. (2.99.145) One over the
+      // other at every width — the total a banner across the page when wide, the groups under it in two columns — so
+      // neither card is left short beside the other or stretched to its height
       const ringsCard = U.el('bcv-gr__cards', [
-        U.card(U.el('bcv-gr bcv-gr--total', [U.el('bcv-gr__top', [svg, center]), ...totalFoot]), 'bcv-card--22 bcv-gr__card'),
+        U.card(U.el('bcv-gr bcv-gr--total', [U.el('bcv-gr__top', [svg, center]), totalFoot]), 'bcv-card--22 bcv-gr__card'),
         U.card(U.el('bcv-gr bcv-gr--groups', [weightsSec]), 'bcv-card--22 bcv-gr__card'),
       ]);
 
       // ---- assignments ----------------------------------------------------------------
       const rows = gm.rows.map((g) => {
-        const dotEl = h('span', { class: 'bcv-dot bcv-dot--7', style: { background: g.earned !== null ? '#0a84ff' : 'transparent' } });
         let scoreEl;
         if (!st.on) {
           scoreEl = h('span', { class: 'bcv-grade__score', title: 'Double-click to test a what-if score', text: `${g.grade ? `${g.grade} · ` : ''}${g.earned === null ? '—' : store.fmtPts(g.earned)} / ${store.fmtPts(g.possible)}` }); // (a letter or pass/fail grade first, as Canvas names it)
@@ -246,9 +299,10 @@
             h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' } }, [U.text('bcv-grade__name bcv-pretty', g.name, 'span'), g.added ? U.badge('What-if', 'red', 'bcv-badge--xs') : g.badge ? U.badge(g.badge, g.badge === 'Late' ? 'orange' : g.badge === 'Missing' ? 'red' : '', 'bcv-badge--xs') : null]),
             // the group, the dates, and — on a marked assignment — how the class did (Canvas's own mean, high and low)
             // (2.99.36: the group is the section's head now, not said again in each row)
-            U.text('bcv-row__sub', g.added ? `made up to test, not in ${BCV.lms.name}` : [g.due ? `due ${U.fmtBy(g.due)}` : 'no due date', g.submitted ? `submitted ${U.fmtAt(g.submitted)}` : (g.due && U.parse(g.due) > new Date() ? 'not due yet' : 'not submitted'), g.stats && g.earned !== null ? `class mean ${store.fmtPts(g.stats.mean)} · high ${store.fmtPts(g.stats.max)} · low ${store.fmtPts(g.stats.min)}` : null].filter(Boolean).join(' · ')),
+            // (2.99.145: the class's high and low are the mark beside the score; its mean stays in words)
+            U.text('bcv-row__sub', g.added ? `made up to test, not in ${BCV.lms.name}` : [g.due ? `due ${U.fmtBy(g.due)}` : 'no due date', g.submitted ? `submitted ${U.fmtAt(g.submitted)}` : (g.due && U.parse(g.due) > new Date() ? 'not due yet' : 'not submitted'), g.stats && g.earned !== null ? `class mean ${store.fmtPts(g.stats.mean)}` : null].filter(Boolean).join(' · ')),
           ]),
-          dotEl,
+          spread(g, band),
           U.bandChip(band, band ? `${store.fmtPts(Math.round((g.effective / g.possible) * 1000) / 10)}% · ${band}` : null),
           scoreEl,
           g.added ? U.whatIfRemove(g.name, () => { st.added = st.added.filter((x) => x.id !== g.id); delete st.values[g.id]; draw(); }) : null,
@@ -328,8 +382,12 @@
         listHost,
       ]);
 
+      // (2.99.145) each ring as it stands on screen now — mid-glide if it is still moving — to glide on from
+      const was = new Map([...b.querySelectorAll('.bcv-rings__svg > circle[data-arc]')].map((el) => [el.dataset.group, getComputedStyle(el).strokeDasharray]));
       // The weights live in the grade card's "How the grade is weighted" section; no separate card.
       b.replaceChildren(...parts, U.el('bcv-grades__main', [ringsCard, tableCard]));
+      settle(svg, was, center.querySelector('.bcv-gr__fig'), shownTotal !== null && shownTotal !== totalText);
+      shownTotal = totalText;
       if (pickSt.pick && !gm.rows.some((r) => r.groupId === pickSt.pick) && !gm.legend.some((r) => r.id === pickSt.pick) && !gm.ungraded.some((u) => u.id === pickSt.pick)) pickSt.pick = null;
       picker.apply();
       if (focusId) {
@@ -342,6 +400,64 @@
         const first = b.querySelector('.bcv-gr__winput');
         if (first) { first.focus(); first.select(); }
       }
+    }
+    /** (2.99.145) The rings move as the scores do: on the course's first showing this page's life they fill from
+     *  empty; after, each ring glides from where it stands on screen to its new figure (a what-if typed, a weight
+     *  saved) — from the drawn value, so a second change mid-glide carries on from there rather than jumping. On the
+     *  app's own springs (motion.js: no overshoot). The figure settles in when it changes. With reduced motion, none of
+     *  it: the new figures simply show. */
+    function settle(svgEl, was, fig, changed) {
+      const first = !filledOnce.has(c.id);
+      filledOnce.add(c.id);
+      const M = BCV.motion;
+      if (stillMotion() || typeof Element.prototype.animate !== 'function') return;
+      const glide = (el, from, to, preset) => el.animate([{ strokeDasharray: from }, { strokeDasharray: to }], {
+        duration: Math.round((M?.duration?.(preset) || 0.42) * 1000),
+        easing: M?.cssEasing ? M.cssEasing(preset) : 'cubic-bezier(.23,1,.32,1)',
+      });
+      const nums = (v) => String(v).replace(/px|,/g, ' ').trim().split(/\s+/).map(Number).join(' ');
+      const moves = [];
+      for (const el of svgEl.querySelectorAll('circle[data-arc]')) {
+        const to = el.getAttribute('stroke-dasharray');
+        if (!to) continue;
+        const zero = `0 ${(2 * Math.PI * Number(el.dataset.arc)).toFixed(1)}`;
+        // (a ring new to the card — a group's first what-if score — fills from empty)
+        const from = was.get(el.dataset.group) || (first || was.size ? zero : null);
+        if (!from || from === 'none' || nums(from) === nums(to)) continue;
+        moves.push([el, from, to]);
+      }
+      if (!moves.length) { if (changed && fig) fig.animate([{ opacity: 0.4, transform: 'translateY(3px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'cubic-bezier(.23,1,.32,1)' }); return; }
+      if (svgEl.isConnected) {
+        for (const [el, from, to] of moves) glide(el, from, to, was.size ? 'morph' : 'gentle');
+        if (changed && fig) fig.animate([{ opacity: 0.4, transform: 'translateY(3px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'cubic-bezier(.23,1,.32,1)' });
+        return;
+      }
+      // the first drawing is made before the page holds it, and an animation on a node not yet in the page does not
+      // run: hold each ring empty until the page has it, then fill — in the same frame, so it never shows full first
+      for (const [el, from] of moves) el.style.strokeDasharray = from;
+      let tries = 0;
+      const wait = () => {
+        if (svgEl.isConnected || ++tries > 90) {
+          for (const [el, from, to] of moves) { el.style.strokeDasharray = ''; if (svgEl.isConnected) glide(el, from, to, 'gentle'); }
+          return;
+        }
+        requestAnimationFrame(wait);
+      };
+      requestAnimationFrame(wait);
+    }
+    /** (2.99.145) Where the score sits in the class: the class's low to high as a bar on the assignment's whole range,
+     *  the mean a tick, the student's own score a dot in its letter's colour — read at a glance, the figures on hover. */
+    function spread(g, band) {
+      const st2 = g.stats;
+      const you = g.effective ?? g.earned;
+      if (!st2 || g.earned === null || !(g.possible > 0) || ![st2.min, st2.max, st2.mean].every((v) => Number.isFinite(Number(v))) || you === null || you === undefined) return null;
+      const at = (v) => `${Math.max(0, Math.min(100, (Number(v) / g.possible) * 100)).toFixed(1)}%`;
+      const said = `Class low ${store.fmtPts(st2.min)}, mean ${store.fmtPts(st2.mean)}, high ${store.fmtPts(st2.max)} — you ${store.fmtPts(you)} of ${store.fmtPts(g.possible)}`;
+      return h('span', { class: `bcv-gr__spread ${band ? `bcv-band--${band}` : ''}`, role: 'img', 'aria-label': said, title: said }, [
+        h('span', { class: 'bcv-gr__spread-range', style: { left: at(st2.min), width: `max(2px, calc(${at(st2.max)} - ${at(st2.min)}))` } }),
+        h('span', { class: 'bcv-gr__spread-mean', style: { left: at(st2.mean) } }),
+        h('span', { class: 'bcv-gr__spread-you', style: { left: at(you) } }),
+      ]);
     }
     function ns(tag) {
       return document.createElementNS(NS, tag);

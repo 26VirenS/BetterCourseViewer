@@ -1810,7 +1810,8 @@
       note = total === null ? 'Nothing graded yet.' : `Weighted by your own weights, not your instructor’s${canvasTotal !== null ? ` — ${BCV.lms.name} shows ${fmtPts(canvasTotal)}%` : ''}.`;
     } else if (!whatIfOn && canvasTotal !== null) {
       total = canvasTotal;
-      note = `As shown in ${BCV.lms.name}${courseInfo.grade ? ` · ${courseInfo.grade}` : ''}. ${weighted ? 'Weighted across the groups that have graded work.' : 'Graded work only.'}`;
+      // (2.99.145: the letter is the big one beside the total now, not said again here — the Mac's and the iPhone's words)
+      note = `${BCV.lms.name}’s total, ${weighted ? 'weighted across the groups with graded work' : 'from graded work only'}.`;
     } else if (!whatIfOn && courseInfo.hideFinal) {
       note = `${total === null ? 'Nothing graded yet. ' : ''}${BCV.lms.name} hides the total for this course${total === null ? '' : ': this one is worked out from the graded work'}.`;
     }

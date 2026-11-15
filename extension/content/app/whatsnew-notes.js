@@ -29,6 +29,11 @@
     slider: 'M4 8h16M4 16h16M9 5v6M15 13v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.145', date: '2026-11-15', notes: [
+      { kind: 'improved', title: 'Redesigned Grades Page', body: 'Your total and letter up top; groups in two columns.', icon: P.layers },
+      { kind: 'fixed', title: 'Steadier What-If', body: 'What-If starts from your real total, not a jump.', icon: P.check },
+      { kind: 'new', title: 'Class Range Marks', body: 'A mark shows where each score sits in the class.', icon: P.steps },
+    ] },
     { version: '2.99.144', date: '2026-11-15', notes: [
       { kind: 'improved', title: 'Clearer Grade Cards', body: 'Your total in one card; every group listed once.', icon: P.layers },
     ] },
