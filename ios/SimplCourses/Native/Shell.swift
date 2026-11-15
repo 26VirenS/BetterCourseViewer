@@ -121,8 +121,9 @@ struct NativeShell: View {
     @EnvironmentObject private var engine: Engine
     /// (iPhone 1.8) Both of the window's sides 600 points or more: an iPhone Duo unfolded, or an iPad (`wideScreen`).
     @State private var wide = false
-    /// (iPhone 1.8.1) The app's frame in the window: its middle is the Duo's fold, and 750 points across or more (the Duo
-    /// on its side, an iPad) shows two pages.
+    /// (iPhone 1.8.1) The whole screen's frame in the window — safe areas, the tab bar on the side and the camera's strip
+    /// included: its middle is the Duo's fold (1.8.2: the frame inside the safe areas put it 40 points left of the crease),
+    /// and 750 points across or more (the Duo on its side, an iPad) shows two pages.
     @State private var frame: CGRect = .zero
     private var twoPane: Bool { wide && frame.width >= 750 }
 
@@ -159,11 +160,16 @@ struct NativeShell: View {
         .environment(\.foldX, wide ? frame.midX : nil)
         .environment(\.twoPane, twoPane)
         // (iPhone 1.8: the Duo unfolded or folded, an iPad's window resized — every screen lays itself out again)
-        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { f in
-            frame = f
-            wide = min(f.width, f.height) >= 600
-            engine.foldX = wide ? f.midX : nil
-            engine.twoPane = wide && f.width >= 750
+        .background {
+            Color.clear
+                .ignoresSafeArea()
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { f in
+                    frame = f
+                    wide = min(f.width, f.height) >= 600
+                    engine.foldX = wide ? f.midX : nil
+                    engine.twoPane = wide && f.width >= 750
+                }
+                .allowsHitTesting(false)
         }
         // (the simulator suite only, scripts/dev/ios-shots.sh: -SimplWideWidth 626 holds the app to the Duo's inner
         // display's width on an iPad, where Xcode has no Duo to picture)
