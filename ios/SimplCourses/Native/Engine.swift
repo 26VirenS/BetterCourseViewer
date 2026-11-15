@@ -564,23 +564,42 @@ final class Engine: ObservableObject, ShellListener {
     /// (iPhone 1.8.1, build 37) Per tab, where its split view's list column ends (window x) while two columns show; nil
     /// when the split view is one stack (TabSplit).
     var splitEdge: [AppTab: CGFloat] = [:]
+    /// (iPhone 1.8.1, build 41) Per tab, how many of its stack's first screens the left column shows itself while two
+    /// columns show: 1 for Courses with a course open (its home on the left, TabSplit), 0 otherwise (the tab's own list).
+    var splitLead: [AppTab: Int] = [:]
 
     /// A native screen on the stack showing (not twice in a row). (1.8.1, build 37) With the split view showing two
-    /// columns, a screen opened from the list column — another course, another assignment in Today — is the right
-    /// column's own, in place of whatever was open there (as a row picked in Mail's list); opened from the right column,
-    /// it is pushed there.
+    /// columns, a screen opened from the left column — another assignment in Today, a section of the course whose home
+    /// is there — is the right column's own, in place of whatever was open there (as a row picked in Mail's list);
+    /// opened from the right column, it is pushed there. (Build 41) Another course opened while a course's home is on
+    /// the left takes the left's place.
     func push(_ route: Route) {
         var path = paths[tab]
         if path.last == route { return }
+        let lead = splitEdge[tab] == nil ? 0 : (splitLead[tab] ?? 0)
+        if lead > 0, case .course = route {
+            lastTouch = nil
+            paths[tab] = [route]
+            return
+        }
         if let edge = splitEdge[tab], let t = lastTouch, Date().timeIntervalSince(t.at) < 3, t.x < edge {
             lastTouch = nil
-            if path == [route] { return }
-            paths[tab] = [route]
+            let next = Array(path.prefix(lead)) + [route]
+            if path == next { return }
+            paths[tab] = next
             return
         }
         path.append(route)
         lastTouch = nil
         paths[tab] = path
+    }
+
+    /// (iPhone 1.8.1, build 41) A course picked in the course strip (CourseStrip): its home, with nothing opened from
+    /// it yet.
+    func focusCourse(_ id: String) {
+        lastTouch = nil
+        let next = [Route.course(id: id)]
+        if paths[.courses] != next { paths[.courses] = next }
     }
 
     /// An external tool, in a sheet of its own over everything.

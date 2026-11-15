@@ -196,8 +196,9 @@ struct NativeShell: View {
 /// its side, an iPad): the tab's own screen in the list column on the left, whatever is opened from it on the right,
 /// with a stack of its own there (deeper screens push in that column, its Back turns back); pressing something else in
 /// the list puts it on the right in place of what was there (Engine.push). Nothing opened yet, the right column shows
-/// the tab's own companion (SplitHome): the Calendar beside Today and To Do, the first course beside Courses and
-/// Grades. Compact (a phone, the Duo folded, the Duo open upright — two columns there would each be narrower than any
+/// the tab's own companion (SplitHome): the Calendar beside Today and To Do, the first course's grades beside Grades.
+/// (Build 41) Courses instead puts a course's home on the left, the courses a strip at its top, and what is opened from
+/// it (else its grades) on the right. Compact (a phone, the Duo folded, the Duo open upright — two columns there would each be narrower than any
 /// iPhone), the split view collapses into one stack, the list then what was opened, as Apple's own apps do — and as it
 /// folds and unfolds it keeps what is open: the screen, a sheet or a menu on it, where it is scrolled. iOS places each
 /// column's bars itself (on the Duo, in its rail) and keeps them clear of the fold. The list column's edge sits on the
@@ -216,28 +217,51 @@ struct TabSplit<Root: View>: View {
     /// Two columns: the system's regular width, and room for two phone-wide columns (750 points).
     private var twoColumns: Bool { sizeClass == .regular && max(screen.width, frame.width) >= 750 }
 
+    /// (Build 41) How many of the stack's first screens the left column shows itself: with two columns, Courses puts the
+    /// open course's home on the left (the courses themselves a strip across its top, CourseStrip) and what is opened
+    /// from it on the right — the whole list of courses down the left was a poor use of half the screen. Otherwise the
+    /// tab's own list is on the left (0).
+    private func leadCount(_ path: [Route], two: Bool) -> Int {
+        guard two, tab == .courses, case .course? = path.first else { return 0 }
+        return 1
+    }
+
     var body: some View {
         let path = engine.paths[tab]
         let two = twoColumns
-        // the list column to the fold (from the split view's own left edge), never under 320 or over half
+        let lead = leadCount(path, two: two)
+        // the left column to the fold (from the split view's own left edge), never under 320 or over half
         let listWidth: CGFloat = {
             guard frame.width > 0 else { return 380 }
             let toFold = (foldX ?? frame.midX) - frame.minX
             return min(max(320, toFold), frame.width * 0.56).rounded()
         }()
         NavigationSplitView(columnVisibility: $visibility, preferredCompactColumn: $compactColumn) {
-            root
-                .environment(\.splitList, two)
-                .navigationSplitViewColumnWidth(min: two ? listWidth : 320, ideal: listWidth, max: listWidth) // (build 39: all three, since iOS 26 shows the least)
-                .background(SplitColumnWidth(width: two ? listWidth : 0, revision: path.hashValue).allowsHitTesting(false)) // (builds 38–40: the width iPadOS 26 otherwise keeps at 320)
-                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { r in engine.splitEdge[tab] = two ? r.maxX : nil }
-        } detail: {
-            if let first = path.first {
-                NavigationStack(path: rest) {
+            Group {
+                if lead == 1, let first = path.first {
                     RouteScreen(route: first)
+                        .id(first)
+                        .environment(\.courseStrip, true)
+                } else {
+                    root
+                }
+            }
+            .environment(\.splitList, two)
+            .navigationSplitViewColumnWidth(min: two ? listWidth : 320, ideal: listWidth, max: listWidth) // (build 39: all three, since iOS 26 shows the least)
+            .background(SplitColumnWidth(width: two ? listWidth : 0, revision: path.hashValue).allowsHitTesting(false)) // (builds 38–40: the width iPadOS 26 otherwise keeps at 320)
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { r in engine.splitEdge[tab] = two ? r.maxX : nil }
+        } detail: {
+            if path.count > lead {
+                let top = path[lead]
+                NavigationStack(path: rest(after: lead)) {
+                    RouteScreen(route: top)
                         .navigationDestination(for: Route.self) { route in RouteScreen(route: route) }
                 }
-                .id(first)
+                .id(top)
+            } else if lead == 1, case .course(let id)? = path.first {
+                // (build 41) nothing opened from the course yet: its grades beside its home
+                CourseGradesView(courseId: id)
+                    .id(id)
             } else {
                 SplitHome(tab: tab)
             }
@@ -255,19 +279,107 @@ struct TabSplit<Root: View>: View {
             if !on { engine.splitEdge[tab] = nil }
             if on { visibility = .all }
         }
+        .onChange(of: lead, initial: true) { _, n in engine.splitLead[tab] = n }
+        // (build 41) Courses opened with two columns and no course yet: the first course's home on the left
+        .task(id: two && path.isEmpty) {
+            guard tab == .courses, two, engine.paths[.courses].isEmpty,
+                  let d = try? await engine.call("courses", as: CoursesData.self), let c = d.rows.first,
+                  twoColumns, engine.paths[.courses].isEmpty else { return }
+            engine.paths[.courses] = [.course(id: c.id)]
+        }
     }
 
-    /// The right column's stack past its first screen.
-    private var rest: Binding<[Route]> {
-        Binding(get: { Array(engine.paths[tab].dropFirst()) }, set: { more in
-            guard let first = engine.paths[tab].first else { return }
-            engine.paths[tab] = [first] + more
+    /// The right column's stack past its first screen (the left column showing the first `lead` of the tab's stack).
+    private func rest(after lead: Int) -> Binding<[Route]> {
+        Binding(get: { Array(engine.paths[tab].dropFirst(lead + 1)) }, set: { more in
+            let p = engine.paths[tab]
+            guard p.count > lead else { return }
+            engine.paths[tab] = Array(p.prefix(lead + 1)) + more
         })
     }
 }
 
+/// (iPhone 1.8.1, build 41) The courses, small: a strip at the top of a course's home on the left of the split view
+/// (TabSplit, ContextHome) — each course a capsule with its colour and short name (its unread announcements counted),
+/// the open one tinted; pressed, that course's home takes the left. Scrolls sideways when they do not all fit. (In the
+/// home's list rather than a safe area bar, which iOS 26 draws over a large title.)
+struct CourseStrip: View {
+    let selected: String
+    @EnvironmentObject private var engine: Engine
+    @State private var rows: [CourseRow] = []
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(rows) { c in chip(c).id(c.id) }
+                }
+                .padding(.vertical, 2)
+            }
+            .scrollClipDisabled() // (the capsules slide out to the screen's edge, past the list's margins)
+            .onChange(of: rows.count) { proxy.scrollTo(selected, anchor: .center) }
+            .onAppear { proxy.scrollTo(selected, anchor: .center) }
+        }
+        .frame(minHeight: rows.isEmpty ? 0 : 36)
+        .task(id: engine.dataVersion) {
+            if let d = try? await engine.call("courses", as: CoursesData.self) { rows = d.rows }
+        }
+    }
+
+    private func chip(_ c: CourseRow) -> some View {
+        let on = c.id == selected
+        let tint = Color(hex: c.color)
+        return Button {
+            Haptics.tap()
+            engine.focusCourse(c.id)
+        } label: {
+            HStack(spacing: 6) {
+                Circle().fill(tint).frame(width: 8, height: 8)
+                Text(Self.short(c))
+                    .font(.subheadline.weight(on ? .semibold : .medium))
+                    .lineLimit(1)
+                if let n = c.unread, n > 0 {
+                    Text("\(n)")
+                        .font(.caption2.weight(.bold).monospacedDigit())
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Color.red, in: Capsule())
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(on ? tint.opacity(0.2) : Color(.tertiarySystemFill), in: Capsule())
+            .overlay(Capsule().strokeBorder(on ? tint.opacity(0.6) : .clear, lineWidth: 1))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(c.code)
+        .accessibilityValue(c.unreadLabel ?? "")
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    /// A course's label up to its colon ("MATH 140: Calculus I" → "MATH 140").
+    static func short(_ c: CourseRow) -> String {
+        let head = c.code.split(separator: ":", maxSplits: 1).first.map(String.init) ?? c.code
+        let t = head.trimmingCharacters(in: .whitespaces)
+        return t.isEmpty ? c.code : t
+    }
+}
+
+private struct CourseStripKey: EnvironmentKey { static let defaultValue = false }
+
+extension EnvironmentValues {
+    /// (Build 41) A course's home on the left of Courses' split view: the course strip first in it (ContextHome).
+    var courseStrip: Bool {
+        get { self[CourseStripKey.self] }
+        set { self[CourseStripKey.self] = newValue }
+    }
+}
+
 /// (iPhone 1.8.1, build 37) The right column with nothing opened in it yet: the tab's own companion — the Calendar beside
-/// Today and To Do; the first course's home beside Courses, its grades beside Grades (as Mail opens on the first message).
+/// Today and To Do; the first course's home beside Courses (only until build 41 puts that home on the left: TabSplit),
+/// its grades beside Grades (as Mail opens on the first message).
 struct SplitHome: View {
     let tab: AppTab
     @EnvironmentObject private var engine: Engine

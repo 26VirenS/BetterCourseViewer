@@ -8,6 +8,10 @@ struct ContextHome: View {
     @EnvironmentObject private var engine: Engine
     @StateObject private var model = Loader<HomeData>()
     @State private var grades = false
+    /// (iPhone 1.8.1, build 41) On the left of the split view (Courses with two columns, TabSplit): the ring opens the
+    /// course's grades on the right, as everything else here does, rather than in a sheet over both.
+    @Environment(\.splitList) private var splitList
+    @Environment(\.courseStrip) private var courseStrip
 
     private let columns = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
 
@@ -15,6 +19,14 @@ struct ContextHome: View {
         Group {
             if let d = model.data {
                 List {
+                    if courseStrip && d.kind == "courses" {
+                        // (build 41) the other courses, small, to switch to (CourseStrip)
+                        Section {
+                            CourseStrip(selected: ContextHome.id(of: ctx))
+                                .listRowInsets(EdgeInsets())
+                                .listRowBackground(Color.clear)
+                        }
+                    }
                     Section { header(d) }
                     if !d.sections.isEmpty {
                         Section {
@@ -121,7 +133,7 @@ struct ContextHome: View {
             if d.kind == "courses" {
                 Button {
                     Haptics.tap()
-                    grades = true
+                    if splitList { engine.push(.section(ctx: ctx, kind: "grades")) } else { grades = true }
                 } label: {
                     ZStack {
                         Ring(value: d.score, color: color, lineWidth: 6, key: "home:\(ctx)")
