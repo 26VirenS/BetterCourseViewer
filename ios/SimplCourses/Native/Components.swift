@@ -400,12 +400,14 @@ struct ColumnList<Left: View, Right: View, More: View>: View {
         self.more = more()
     }
 
-    /// The list's own width: a sheet on a wide screen can be narrower than the screen, and stays one column if so
+    /// The list's own width. Two columns only where each is at least the narrowest iPhone's 375 points: the Duo turned
+    /// on its side (890) or an iPad; the Duo upright (626) would make two columns narrower than any phone — its rows'
+    /// times and names broke and cut short — so there it is one column, as a sheet narrower than that is.
     @State private var room: CGFloat = 0
 
     var body: some View {
         Group {
-            if wide && (room == 0 || room >= 600) {
+            if wide && (room == 0 || room >= 750) {
                 HStack(alignment: .top, spacing: 0) {
                     column {
                         left

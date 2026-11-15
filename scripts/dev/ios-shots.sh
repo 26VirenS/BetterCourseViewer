@@ -127,10 +127,17 @@ collect end
 # cards, a course's grades and an assignment
 WIDE=$(xcrun simctl list devices available | grep -E "iPhone Duo \(" | head -1 | grep -oE "[0-9A-F-]{36}")
 WIDE_NAME="iPhone Duo"
-# (on the iPad, -SimplWideWidth holds the app to the Duo's inner display's 626 points across, so its columns are pictured
-# at the Duo's own width rather than the iPad's wider one)
+# (on an iPad, -SimplWideWidth holds the app to the Duo's inner display: 626 points across upright — one column there —
+# and 890 on its side, two; the largest iPad there is, so 890 fits across it upright)
 WARGS=""
-if [ -z "$WIDE" ]; then WIDE=$(xcrun simctl list devices available | grep -E "iPad mini" | head -1 | grep -oE "[0-9A-F-]{36}"); WIDE_NAME="iPad mini at the Duo's width"; WARGS="-SimplWideWidth 626"; fi
+LARGS=""
+if [ -z "$WIDE" ]; then
+  WIDE=$(xcrun simctl list devices available | grep -E "iPad Pro 13|iPad Air 13|iPad Pro \(12\.9" | head -1 | grep -oE "[0-9A-F-]{36}")
+  [ -z "$WIDE" ] && WIDE=$(xcrun simctl list devices available | grep -E "iPad" | head -1 | grep -oE "[0-9A-F-]{36}")
+  WIDE_NAME="$(xcrun simctl list devices available | grep "$WIDE" | sed -E 's/ \(.*//; s/^ +//') at the Duo's widths"
+  WARGS="-SimplWideWidth 626"
+  LARGS="-SimplWideWidth 890"
+fi
 if [ -n "$WIDE" ]; then
   echo "wide: $WIDE_NAME $WIDE" | tee "$OUT/wide-device.txt"
   xcrun simctl shutdown booted >/dev/null 2>&1 || true
@@ -146,6 +153,11 @@ if [ -n "$WIDE" ]; then
   launch wide-04-grades 16 -SimplTab grades $WARGS
   launch wide-10-assignment 22 -SimplTab todo -SimplPush /courses/101/assignments/1001 $WARGS
   launch wide-11-grades-sheet 20 -SimplTab grades -SimplOpen grades:101 $WARGS
+  # the Duo on its side: two columns
+  launch wide-l-01-today 18 $LARGS
+  launch wide-l-03-todo 16 -SimplTab todo $LARGS
+  launch wide-l-04-grades 16 -SimplTab grades $LARGS
+  launch wide-l-10-assignment 22 -SimplTab todo -SimplPush /courses/101/assignments/1001 $LARGS
   xcrun simctl terminate booted "$BID" >/dev/null 2>&1 || true
   collect wide
 else

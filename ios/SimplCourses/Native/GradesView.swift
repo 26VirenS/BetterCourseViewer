@@ -152,6 +152,7 @@ struct GradesView: View {
                             Text(l).font(.caption.weight(.bold)).foregroundStyle(GradesView.bandColor(String(l.prefix(1))))
                         }
                         Text(r.pct.map { String(format: "%.1f%%", $0) } ?? "N/A").font(.body.weight(.semibold).monospacedDigit())
+                            .lineLimit(1).fixedSize() // (never "92.4" over "%")
                     }
                     if let t = r.target { Text("Target \(t)").font(.caption2).foregroundStyle(.secondary) }
                 }
