@@ -41,6 +41,7 @@ struct TabBarProbe: UIViewRepresentable {
 
         private func measure() {
             guard let window else { return }
+            engine?.setScreen(window.bounds)
             let bar = TabBarProbe.bar(in: window, log: !logged)
             logged = true
             engine?.setBar(bar)

@@ -119,13 +119,18 @@ struct Splash: View {
 /// four tabs and Search, so none is folded into More; the Calendar is pushed from Today and To Do.
 struct NativeShell: View {
     @EnvironmentObject private var engine: Engine
-    /// (iPhone 1.8) Both of the window's sides 600 points or more: an iPhone Duo unfolded, or an iPad (`wideScreen`).
-    @State private var wide = false
-    /// (iPhone 1.8.1) The whole screen's frame in the window — safe areas, the tab bar on the side and the camera's strip
-    /// included: its middle is the Duo's fold (1.8.2: the frame inside the safe areas put it 40 points left of the crease),
-    /// and 750 points across or more (the Duo on its side, an iPad) shows two pages.
+    /// The shell's own frame as SwiftUI measures it — the screen only for the simulator suite, which holds the app to the
+    /// Duo's width on an iPad (-SimplWideWidth).
     @State private var frame: CGRect = .zero
-    private var twoPane: Bool { wide && frame.width >= 750 }
+    /// (iPhone 1.8.1, build 36) The whole screen, in window coordinates: the window's own bounds as UIKit has them
+    /// (Engine.screen) — the side tab bar, the camera's strip and every safe area inside it. Its middle is where the Duo
+    /// folds. (Builds 33 to 35 measured it in SwiftUI with a view ignoring the safe areas; on the Duo that still came out
+    /// as the space inside them, and the split stayed 40 points left of the crease.)
+    private var screen: CGRect { Self.shotWidth == nil && engine.screen.width > 0 ? engine.screen : frame }
+    /// (iPhone 1.8) Both of the screen's sides 600 points or more: an iPhone Duo unfolded, or an iPad (`wideScreen`).
+    private var wide: Bool { min(screen.width, screen.height) >= 600 }
+    /// 750 points across or more (the Duo on its side, an iPad): two pages.
+    private var twoPane: Bool { wide && screen.width >= 750 }
 
     var body: some View {
         // Search is a button in the tab bar, not a page (1.5.4): pressed, it raises the search sheet halfway over the
@@ -157,18 +162,18 @@ struct NativeShell: View {
         .background(TabBarProbe(engine: engine).allowsHitTesting(false))
         .sensoryFeedback(.selection, trigger: engine.tab)
         .environment(\.wideScreen, wide)
-        .environment(\.foldX, wide ? frame.midX : nil)
+        .environment(\.foldX, wide ? screen.midX : nil)
         .environment(\.twoPane, twoPane)
+        .environment(\.screenRect, screen)
+        .onChange(of: screen, initial: true) { _, _ in
+            engine.foldX = wide ? screen.midX : nil
+            engine.twoPane = twoPane
+        }
         // (iPhone 1.8: the Duo unfolded or folded, an iPad's window resized — every screen lays itself out again)
         .background {
             Color.clear
                 .ignoresSafeArea()
-                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { f in
-                    frame = f
-                    wide = min(f.width, f.height) >= 600
-                    engine.foldX = wide ? f.midX : nil
-                    engine.twoPane = wide && f.width >= 750
-                }
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
                 .allowsHitTesting(false)
         }
         // (the simulator suite only, scripts/dev/ios-shots.sh: -SimplWideWidth 626 holds the app to the Duo's inner
@@ -202,9 +207,11 @@ struct PaneStack<Root: View>: View {
     @EnvironmentObject private var engine: Engine
     @Environment(\.twoPane) private var twoPane
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// The stack's frame inside the safe areas, and the whole screen's (window coordinates).
+    /// The stack's frame inside the safe areas, and where the pages' row really is (laid out to ignore the safe areas side
+    /// to side: on the Duo that is the whole screen, or as far as the system lets it go) — window coordinates.
     @State private var frame: CGRect = .zero
-    @State private var full: CGRect = .zero
+    @State private var row: CGRect = .zero
+    @Environment(\.foldX) private var foldX
 
     /// The left page: the tab's own screen, or a screen of the stack (by its place in it, so the same screen twice is two).
     enum Page: Hashable {
@@ -215,17 +222,17 @@ struct PaneStack<Root: View>: View {
     var body: some View {
         let path = engine.paths[tab]
         let two = twoPane && !path.isEmpty
-        let inLeft = twoPane ? max(0, frame.minX - full.minX) : 0
-        let inRight = twoPane ? max(0, full.maxX - frame.maxX) : 0
-        let half = full.width > 0 ? (full.width / 2).rounded() : nil
+        // (build 36) every number from where things really are: the margin each outer side needs is how far the row reaches
+        // past the safe area there (none, if the system kept it inside), and the left page runs to the fold — the screen's
+        // middle (NativeShell, from UIKit) — from wherever the row starts
+        let inLeft = twoPane && row.width > 0 ? max(0, frame.minX - row.minX) : 0
+        let inRight = twoPane && row.width > 0 ? max(0, row.maxX - frame.maxX) : 0
+        let half: CGFloat? = row.width > 0 ? ((foldX ?? row.midX) - row.minX).rounded() : nil
         let left: Page = path.count >= 2 ? .route(path[path.count - 2], depth: path.count - 1) : .root
         // (one shape whether or not there are two pages: the stack keeps its place, and with it everything open on it)
         ZStack {
             Color.clear
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
-            Color.clear
-                .ignoresSafeArea()
-                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { full = $0 }
             HStack(spacing: 0) {
                 if two {
                     NavigationStack { leftPage(left) }
@@ -241,6 +248,7 @@ struct PaneStack<Root: View>: View {
                 .frame(maxWidth: .infinity)
             }
             .ignoresSafeArea(.container, edges: twoPane ? Edge.Set.horizontal : Edge.Set())
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { row = $0 }
         }
         .animation(reduceMotion ? Animation.easeInOut(duration: 0.2) : Animation.snappy(duration: 0.35), value: two)
         .animation(reduceMotion ? Animation.easeInOut(duration: 0.2) : Animation.snappy(duration: 0.35), value: left)

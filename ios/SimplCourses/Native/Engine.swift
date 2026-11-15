@@ -547,6 +547,13 @@ final class Engine: ObservableObject, ShellListener {
     /// set by the shell from the window's size.
     var twoPane = false
     var foldX: CGFloat?
+    /// (iPhone 1.8.1, build 36) The window's own bounds, read from UIKit (TabBarProbe): the whole screen, whatever SwiftUI
+    /// says of its safe areas — its middle is where the Duo folds.
+    @Published private(set) var screen: CGRect = .zero
+    func setScreen(_ r: CGRect) {
+        guard TabBarProbe.usable(r), r.width > 0, abs(r.width - screen.width) > 0.5 || abs(r.height - screen.height) > 0.5 || abs(r.minX - screen.minX) > 0.5 else { return }
+        screen = r
+    }
     /// The last press on the app's own screens (none in a sheet): how far across the window, and when (PaneTouches).
     private var lastTouch: (x: CGFloat, at: Date)?
 

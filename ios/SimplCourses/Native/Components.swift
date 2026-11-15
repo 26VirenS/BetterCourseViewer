@@ -388,7 +388,13 @@ private struct FoldKey: EnvironmentKey { static let defaultValue: CGFloat? = nil
 /// (iPhone 1.8.1) Two pages side by side (the Duo on its side, an iPad): a screen opened from another shows on the right
 /// half, the one it was opened from staying on the left (PaneStack, Shell.swift).
 private struct TwoPaneKey: EnvironmentKey { static let defaultValue = false }
+/// (iPhone 1.8.1, build 36) The whole screen, in window coordinates (NativeShell: the window's bounds from UIKit).
+private struct ScreenRectKey: EnvironmentKey { static let defaultValue: CGRect = .zero }
 extension EnvironmentValues {
+    var screenRect: CGRect {
+        get { self[ScreenRectKey.self] }
+        set { self[ScreenRectKey.self] = newValue }
+    }
     var foldX: CGFloat? {
         get { self[FoldKey.self] }
         set { self[FoldKey.self] = newValue }
