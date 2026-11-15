@@ -197,9 +197,10 @@ struct PaneStack<Root: View>: View {
     let root: Root
     @EnvironmentObject private var engine: Engine
     @Environment(\.twoPane) private var twoPane
-    @Environment(\.foldX) private var foldX
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The stack's frame inside the safe areas, and the whole screen's (window coordinates).
     @State private var frame: CGRect = .zero
+    @State private var full: CGRect = .zero
 
     /// A page: the tab's own screen, or a screen of the stack (by its place in it, so the same screen twice is two).
     enum Page: Hashable {
@@ -217,22 +218,38 @@ struct PaneStack<Root: View>: View {
         }
     }
 
+    /// (1.8.1, build 34) The pages are laid across the whole screen and split at its very middle — where the Duo folds —
+    /// each given only the margins it has: the screen's own at its outer side (the camera's strip on the left, the tab
+    /// bar on the right), the gutter at the fold. (Each page's own stack was handed the screen's insets whole: the left
+    /// page kept the tab bar's 80 points clear at its right, by the fold, and the gap fell left of the crease.)
     private var pages: some View {
         let path = engine.paths[tab]
         let all: [Page] = [.root] + path.enumerated().map { Page.route($0.element, depth: $0.offset + 1) }
         let shown = Array(all.suffix(2))
-        let split = FoldSplit<EmptyView, EmptyView>.leftWidth(frame, foldX)
-        return HStack(spacing: 0) {
-            ForEach(shown, id: \.self) { p in
-                let isLeft = shown.count == 2 && p == shown[0]
-                NavigationStack { page(p, back: !isLeft && p != .root) }
-                    .safeAreaPadding(isLeft ? Edge.Set.trailing : Edge.Set.leading, shown.count == 2 ? foldGutter : 0)
-                    .frame(width: isLeft ? split : nil)
-                    .frame(maxWidth: isLeft ? nil : CGFloat.infinity)
-                    .transition(reduceMotion ? AnyTransition.opacity : AnyTransition.asymmetric(insertion: AnyTransition.move(edge: .trailing).combined(with: .opacity), removal: AnyTransition.opacity))
+        let two = shown.count == 2
+        // the screen's own insets at its sides: how far the safe frame sits in from the whole screen's
+        let inLeft = max(0, frame.minX - full.minX)
+        let inRight = max(0, full.maxX - frame.maxX)
+        let half = full.width > 0 ? (full.width / 2).rounded() : nil
+        return ZStack {
+            Color.clear
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
+            Color.clear
+                .ignoresSafeArea()
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { full = $0 }
+            HStack(spacing: 0) {
+                ForEach(shown, id: \.self) { p in
+                    let isLeft = two && p == shown[0]
+                    let isRight = two && !isLeft
+                    NavigationStack { page(p, back: isRight) }
+                        .safeAreaPadding(EdgeInsets(top: 0, leading: isRight ? foldGutter : inLeft, bottom: 0, trailing: isLeft ? foldGutter : inRight))
+                        .frame(width: isLeft ? half : nil)
+                        .frame(maxWidth: isLeft ? nil : CGFloat.infinity)
+                        .transition(reduceMotion ? AnyTransition.opacity : AnyTransition.asymmetric(insertion: AnyTransition.move(edge: .trailing).combined(with: .opacity), removal: AnyTransition.opacity))
+                }
             }
+            .ignoresSafeArea(.container, edges: .horizontal)
         }
-        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
         .animation(reduceMotion ? Animation.easeInOut(duration: 0.2) : Animation.snappy(duration: 0.35), value: path)
     }
 
