@@ -165,7 +165,11 @@ if [ -n "$WIDE" ]; then
   launch wide-l-17-inbox 18 -SimplPush /conversations $LARGS
   # (iPhone 1.8.1, build 43) folded and opened again and again on each tab, something opened on the way: the app must
   # stay up through it and say "fold cycle: done" (NativeShell.foldCycle)
-  SETTLE=no launch wide-fold-cycle 70 -SimplFoldCycle YES $LARGS
+  # (the cycle takes about 45 seconds once the app's screens are up, which can itself take 40 on a slow simulator: up to
+  # 120 seconds, done as soon as it says so)
+  SETTLE=no launch wide-fold-cycle 1 -SimplFoldCycle YES $LARGS
+  t0=$SECONDS
+  while [ $((SECONDS - t0)) -lt 120 ] && ! grep -q "fold cycle: done" "$OUT/console-wide-fold-cycle.txt"; do sleep 1; done
   if grep -q "fold cycle: done" "$OUT/console-wide-fold-cycle.txt"; then
     echo "fold cycle: stayed up" | tee "$OUT/fold-cycle.txt"
   else
