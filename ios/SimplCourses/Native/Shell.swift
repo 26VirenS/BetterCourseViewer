@@ -515,7 +515,17 @@ struct ShellToolbar: ViewModifier {
     @Environment(\.sideRail) private var rail
 
     /// Buttons of the screen's own or the shell's in the capsule, the picture aside.
-    private var buttons: Bool { menu != nil || calendar || add != nil || bell }
+    private var buttons: Bool { menu != nil || showCalendar || add != nil || showBell }
+    /// (Build 53) Two columns showing, with the screen on the left: the bell is not shown while Notifications is what the
+    /// right column shows (Today's companion), nor the Calendar's button while the Calendar is (To Do's) — they would
+    /// open what is already open beside them. Something else opened there, they are back, to return to it.
+    @Environment(\.splitList) private var splitList
+    private var showBell: Bool { bell && !(splitList && besideIs(.notifications, in: .today)) }
+    private var showCalendar: Bool { calendar && !(splitList && besideIs(.calendar, in: .todo)) }
+    private func besideIs(_ route: Route, in tab: AppTab) -> Bool {
+        let path = engine.paths[tab]
+        return path.isEmpty || path.first == route
+    }
 
     /// The capsule's height (the bar's own glass buttons are 44 pt) and the glass left round the picture: 1 pt
     /// (1.5.5) — the picture meets the inside of the glass's rim, so it fills the end without bulging past it
@@ -560,7 +570,7 @@ struct ShellToolbar: ViewModifier {
             if let menu {
                 menu.frame(width: 42, height: Self.height).contentShape(Rectangle())
             }
-            if calendar {
+            if showCalendar {
                 Button {
                     Haptics.tap()
                     engine.openCalendar()
@@ -573,7 +583,7 @@ struct ShellToolbar: ViewModifier {
                 Button(action: add) { icon(Image(systemName: "plus")) }
                     .accessibilityLabel("Add a task")
             }
-            if bell {
+            if showBell {
                 Button {
                     Haptics.tap()
                     engine.openNotifications()
@@ -603,7 +613,7 @@ struct ShellToolbar: ViewModifier {
     @ViewBuilder
     private var railItems: some View {
         if let menu { menu }
-        if calendar {
+        if showCalendar {
             Button {
                 Haptics.tap()
                 engine.openCalendar()
@@ -614,7 +624,7 @@ struct ShellToolbar: ViewModifier {
             Button(action: add) { Image(systemName: "plus") }
                 .accessibilityLabel("Add a task")
         }
-        if bell {
+        if showBell {
             Button {
                 Haptics.tap()
                 engine.openNotifications()
