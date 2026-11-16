@@ -549,15 +549,28 @@ struct SplitColumnWatch: UIViewRepresentable {
             sayLater()
         }
 
+        /// The width last asked of the split view as a share of its own (set once for each new width, never again in
+        /// answer to anything — SwiftUI leaves that share alone, where it puts its own widths back: build 51).
+        private var shared: CGFloat = 0
+
+        private var split: UISplitViewController? {
+            var r: UIResponder? = self
+            while let x = r, !(x is UISplitViewController) { r = x.next }
+            return r as? UISplitViewController
+        }
+
         func sayLater() {
-            guard !said, window != nil, asked >= 200 else { return }
+            guard window != nil, asked >= 200, let split else { return }
+            let whole = split.view.bounds.width
+            if whole >= asked, abs(asked - shared) > 1 {
+                shared = asked
+                split.preferredPrimaryColumnWidthFraction = asked / whole
+            }
+            guard !said else { return }
             said = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
-                guard let self else { return }
-                var r: UIResponder? = self
-                while let x = r, !(x is UISplitViewController) { r = x.next }
-                guard let split = r as? UISplitViewController else { return }
-                print("[Simpl Courses] split: list column shown at \(split.primaryColumnWidth) of \(Int(split.view.bounds.width)) pt (asked \(self.asked); ideal \(split.preferredPrimaryColumnWidth))")
+                guard let self, let split = self.split else { return }
+                print("[Simpl Courses] split: list column shown at \(split.primaryColumnWidth) of \(Int(split.view.bounds.width)) pt (asked \(self.asked); share \(split.preferredPrimaryColumnWidthFraction), ideal \(split.preferredPrimaryColumnWidth), most \(split.maximumPrimaryColumnWidth))")
             }
         }
     }
