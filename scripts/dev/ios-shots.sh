@@ -170,6 +170,8 @@ if [ -n "$WIDE" ]; then
   SETTLE=no launch wide-fold-cycle 1 -SimplFoldCycle YES $LARGS
   t0=$SECONDS
   while [ $((SECONDS - t0)) -lt 120 ] && ! grep -q "fold cycle: done" "$OUT/console-wide-fold-cycle.txt"; do sleep 1; done
+  sleep 1
+  xcrun simctl io booted screenshot "$OUT/wide-fold-cycle.png" >/dev/null 2>&1 || true # (the app as the cycle left it)
   if grep -q "fold cycle: done" "$OUT/console-wide-fold-cycle.txt"; then
     echo "fold cycle: stayed up" | tee "$OUT/fold-cycle.txt"
   else
