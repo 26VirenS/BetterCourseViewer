@@ -120,6 +120,7 @@ struct Splash: View {
 /// four tabs and Search, so none is folded into More; the Calendar is pushed from Today and To Do.
 struct NativeShell: View {
     @EnvironmentObject private var engine: Engine
+    @EnvironmentObject private var session: AppSession
     /// The shell's own frame as SwiftUI measures it — the screen only for the simulator suite, which holds the app to the
     /// Duo's width on an iPad (-SimplWideWidth).
     @State private var frame: CGRect = .zero
@@ -162,6 +163,16 @@ struct NativeShell: View {
             SearchSheet()
                 .environmentObject(engine)
         }
+        // (build 48) Sign Out, from the picture's menu wherever it is (AccountMenu)
+        .confirmationDialog("Sign out of \(engine.lmsName) on this device?", isPresented: $engine.askSignOut, titleVisibility: .visible) {
+            Button("Sign Out", role: .destructive) {
+                Haptics.play("warning")
+                session.signOut()
+            }
+        } message: {
+            Text("Your \(engine.lmsName) session and any saved sign-in are cleared; settings stay.")
+        }
+        .task(id: engine.snapshot?.me) { await AccountPicture.shared.load(engine.snapshot?.me) }
         .minimizingTabBar(!engine.holdTabBar)
         .background(TabBarProbe(engine: engine).allowsHitTesting(false))
         .sensoryFeedback(.selection, trigger: engine.tab)
@@ -619,7 +630,7 @@ struct ShellToolbar: ViewModifier {
             }
             .accessibilityLabel("Notifications")
         }
-        AccountMenu(size: 32)
+        AccountMenu(plain: true)
     }
 }
 
@@ -631,55 +642,100 @@ extension View {
 /// Canvas profile, Sign out), as Apple's own menu. (No light/dark switch: the phone's own setting rules, 1.4.)
 struct AccountMenu: View {
     var size: CGFloat = 30
+    /// (Build 48) A bar button of the system's own, its picture an image (on the Duo's rail, AccountPicture): iOS moves
+    /// such an item into the rail, as it does the bell — a view drawn here (Avatar) it leaves in the bar at the top.
+    var plain = false
     @EnvironmentObject private var engine: Engine
     @EnvironmentObject private var session: AppSession
-    @State private var confirmSignOut = false
+    @ObservedObject private var picture = AccountPicture.shared
 
     var body: some View {
+        if plain {
+            Menu { items } label: {
+                Image(uiImage: picture.image).renderingMode(.original)
+            }
+            .accessibilityLabel("Account")
+        } else {
+            Menu { items } label: {
+                Avatar(person: engine.snapshot?.me, size: size)
+                    .contentShape(Circle())
+            }
+            // the picture alone, edge to edge: no bar-button padding round it (it sat 10 pt in from the capsule's end)
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .accessibilityLabel("Account")
+        }
+    }
+
+    @ViewBuilder
+    private var items: some View {
         let me = engine.snapshot?.me
         let inbox = engine.snapshot?.inboxUnread ?? 0
-        Menu {
-            Section(me.map { "\($0.name)\($0.email.map { "\n\($0)" } ?? "")" } ?? "Account") {
-                if !engine.onBrightspace { // (Brightspace has no Inbox or groups here, 2.99.22)
-                    Button { engine.push(.inbox) } label: {
-                        Label(inbox > 0 ? "Inbox (\(inbox) unread)" : "Inbox", systemImage: "tray")
-                    }
-                    Button { engine.push(.groups) } label: { Label("Groups", systemImage: "person.3") }
+        Section(me.map { "\($0.name)\($0.email.map { "\n\($0)" } ?? "")" } ?? "Account") {
+            if !engine.onBrightspace { // (Brightspace has no Inbox or groups here, 2.99.22)
+                Button { engine.push(.inbox) } label: {
+                    Label(inbox > 0 ? "Inbox (\(inbox) unread)" : "Inbox", systemImage: "tray")
                 }
-                // (no Tools on the iPhone yet, 1.2)
+                Button { engine.push(.groups) } label: { Label("Groups", systemImage: "person.3") }
             }
-            Section {
-                Button { session.showSettings = true } label: { Label("Settings", systemImage: "gearshape") }
-                Button {
-                    Task {
-                        if let wn = try? await engine.call("whatsNew", as: WhatsNewData.self) { engine.whatsNew = WhatsNewSheetItem(data: wn) }
-                    }
-                } label: { Label("What’s New", systemImage: "star") }
-                Button { engine.openWeb("/profile", title: "Profile") } label: { Label("\(engine.lmsName) Profile", systemImage: "person.crop.circle") }
-            }
-            Section {
-                Button(role: .destructive) { confirmSignOut = true } label: {
-                    Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+            // (no Tools on the iPhone yet, 1.2)
+        }
+        Section {
+            Button { session.showSettings = true } label: { Label("Settings", systemImage: "gearshape") }
+            Button {
+                Task {
+                    if let wn = try? await engine.call("whatsNew", as: WhatsNewData.self) { engine.whatsNew = WhatsNewSheetItem(data: wn) }
                 }
-            }
-        } label: {
-            Avatar(person: me, size: size)
-                .contentShape(Circle())
+            } label: { Label("What’s New", systemImage: "star") }
+            Button { engine.openWeb("/profile", title: "Profile") } label: { Label("\(engine.lmsName) Profile", systemImage: "person.crop.circle") }
         }
-        // the picture alone, edge to edge: no bar-button padding round it (it sat 10 pt in from the capsule's end)
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .accessibilityLabel("Account")
-        .confirmationDialog("Sign out of \(engine.lmsName) on this device?", isPresented: $confirmSignOut, titleVisibility: .visible) {
-            Button("Sign Out", role: .destructive) {
-                Haptics.play("warning")
-                session.signOut()
+        Section {
+            // (build 48: asked from the shell, NativeShell — a dialog on the menu itself made it a view of the app's own,
+            // which the rail does not take)
+            Button(role: .destructive) { engine.askSignOut = true } label: {
+                Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
             }
-        } message: {
-            Text("Your \(engine.lmsName) session and any saved sign-in are cleared; settings stay.")
         }
+    }
+}
+
+/// (iPhone 1.8.1, build 48) The student's picture as an image for a bar button of the system's own (AccountMenu on the
+/// Duo's rail): round, 30 points, drawn as it is rather than tinted. Their initials on the tint at once, their photo once
+/// it has come.
+final class AccountPicture: ObservableObject {
+    static let shared = AccountPicture()
+    static let side: CGFloat = 30
+    @Published private(set) var image: UIImage = UIImage(systemName: "person.crop.circle.fill")?
+        .withTintColor(.secondaryLabel, renderingMode: .alwaysOriginal) ?? UIImage()
+    private var made: Person?
+
+    @MainActor
+    func load(_ person: Person?) async {
+        guard let person, person != made else { return }
+        made = person
+        let renderer = ImageRenderer(content: Avatar(person: Person(name: person.name, initials: person.initials), size: Self.side))
+        renderer.scale = 3
+        if let initials = renderer.uiImage { image = initials.withRenderingMode(.alwaysOriginal) }
+        guard let s = person.avatar, let url = URL(string: s), url.host != nil,
+              let fetched = try? await URLSession.shared.data(from: url),
+              ((fetched.1 as? HTTPURLResponse)?.statusCode ?? 200) < 400, let photo = UIImage(data: fetched.0) else { return }
+        image = Self.round(photo)
+    }
+
+    private static func round(_ photo: UIImage) -> UIImage {
+        let size = CGSize(width: side, height: side)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 3
+        let image = UIGraphicsImageRenderer(size: size, format: format).image { _ in
+            UIBezierPath(ovalIn: CGRect(origin: .zero, size: size)).addClip()
+            // (filled, as the picture is everywhere else: the shorter side across the circle)
+            let k = max(size.width / max(photo.size.width, 1), size.height / max(photo.size.height, 1))
+            let w = photo.size.width * k, h = photo.size.height * k
+            photo.draw(in: CGRect(x: (size.width - w) / 2, y: (size.height - h) / 2, width: w, height: h))
+        }
+        return image.withRenderingMode(.alwaysOriginal)
     }
 }
 

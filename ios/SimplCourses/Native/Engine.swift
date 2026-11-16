@@ -90,6 +90,8 @@ final class Engine: ObservableObject, ShellListener {
         didSet { if !settingsOpen && oldValue { schedulePopups() } }
     }
     /// The search sheet, raised by the tab bar's search button (1.5.4: a sheet, not a page).
+    /// (iPhone 1.8.1, build 48) Sign Out pressed in the picture's menu: asked once more, by the shell (NativeShell).
+    @Published var askSignOut = false
     @Published var searchOpen = false {
         didSet { if !searchOpen && oldValue { schedulePopups() } }
     }
