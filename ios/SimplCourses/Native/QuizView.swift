@@ -472,8 +472,8 @@ struct PullEdges: ViewModifier {
         var down: CGFloat = 0
     }
 
-    static let line: CGFloat = 70
-    static let holdTime = 2.4 // (1.4.6: 0.9s, then 1.8s, now 2.4s — handing in is never an accident)
+    static let line: CGFloat = 54 // (1.8.1, build 55: 70 took too hard a pull)
+    static let holdTime = 1.8 // (1.4.6: 0.9s, then 1.8s, then 2.4s; 1.8.1, build 55: 1.8s again — still a hold, never an accident, but not a wait)
 
     func body(content: Content) -> some View {
         content
