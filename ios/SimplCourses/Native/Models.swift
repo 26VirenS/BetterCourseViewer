@@ -597,15 +597,10 @@ enum Route: Hashable {
     case folder(ctx: String, id: String, name: String)
     case inbox
     case conversation(id: String)
-    /// (iPhone 1.8.1, build 42) The account page: opened from the picture in the tab bar on a wide screen (NativeShell).
-    case account
 }
 
 /// The tab bar: four tabs and Search (iOS shows five at most before it folds the rest into More; the
 /// Calendar is pushed from Today and To Do instead, 1.1).
 enum AppTab: String, Hashable, CaseIterable {
     case today, courses, todo, grades, search
-    /// (Build 42) The picture in the tab bar on a wide screen: never a tab of its own — pressed, it opens the account
-    /// page (Route.account) where the student is, as Search raises its sheet.
-    case account
 }

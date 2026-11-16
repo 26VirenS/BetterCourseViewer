@@ -123,8 +123,6 @@ struct NativeShell: View {
     /// The shell's own frame as SwiftUI measures it — the screen only for the simulator suite, which holds the app to the
     /// Duo's width on an iPad (-SimplWideWidth).
     @State private var frame: CGRect = .zero
-    /// (Build 42) The student's picture for the tab bar (AccountIcon), once made.
-    @State private var accountIcon: UIImage?
     /// (Build 43, the simulator suite only: -SimplFoldCycle YES) The width the app is held to as it is folded and opened
     /// again and again (FoldCycle).
     @State private var cycleWidth: CGFloat?
@@ -142,9 +140,7 @@ struct NativeShell: View {
         // Search is a button in the tab bar, not a page (1.5.4): pressed, it raises the search sheet halfway over the
         // screen showing, and the tab stays where it was
         TabView(selection: Binding(get: { engine.tab }, set: { t in
-            if t == .search { Haptics.tap(); engine.searchOpen = true }
-            else if t == .account { Haptics.tap(); engine.push(.account) }
-            else { engine.tab = t }
+            if t == .search { Haptics.tap(); engine.searchOpen = true } else { engine.tab = t }
         })) {
             Tab("Today", systemImage: "sun.max.fill", value: AppTab.today) {
                 stack(.today) { TodayView() }
@@ -158,28 +154,10 @@ struct NativeShell: View {
             Tab("Grades", systemImage: "chart.bar.fill", value: AppTab.grades) {
                 stack(.grades) { GradesView() }
             }
-            // (build 42) on a wide screen (the Duo open, an iPad) the student's picture is in the tab bar — which iOS puts in
-            // the Duo's rail — rather than at the top of every screen; pressed, the account page opens where they are
-            if wide {
-                Tab(value: AppTab.account) {
-                    Color.clear // (never shown: pressing it opens the account page instead)
-                } label: {
-                    Label {
-                        Text("Account")
-                    } icon: {
-                        if let icon = accountIcon {
-                            Image(uiImage: icon).renderingMode(.original)
-                        } else {
-                            Image(systemName: "person.crop.circle.fill")
-                        }
-                    }
-                }
-            }
             Tab(value: AppTab.search, role: .search) {
                 Color.clear // (never shown: the sheet below is the search)
             }
         }
-        .task(id: engine.snapshot?.me) { accountIcon = await AccountIcon.make(for: engine.snapshot?.me) }
         .sheet(isPresented: $engine.searchOpen) {
             SearchSheet()
                 .environmentObject(engine)
@@ -460,7 +438,7 @@ struct SplitHome: View {
         switch tab {
         case .today:
             NotificationsView() // (build 42: what is new beside Today, rather than what is coming — Today has that)
-        case .todo, .search, .account:
+        case .todo, .search:
             CalendarView()
         case .courses, .grades:
             Group {
@@ -512,8 +490,6 @@ struct RouteScreen: View {
             InboxView()
         case .conversation(let id):
             ConversationView(id: id)
-        case .account:
-            AccountView()
         }
     }
 }
@@ -527,10 +503,10 @@ struct ShellToolbar: ViewModifier {
     /// A screen's own menu (To Do's grouping), first in the capsule: with the title on the bar's row, nothing sits at its leading edge.
     var menu: AnyView? = nil
     @EnvironmentObject private var engine: Engine
-    /// (Build 42) A wide screen: the picture is in the tab bar (NativeShell), not here.
-    @Environment(\.wideScreen) private var wide
     /// (Build 43) The Duo's rail: the buttons each the bar's own item, which iOS stacks down it — the capsule of them
-    /// drawn here is one item, as wide as four buttons, and ran off the screen's edge there.
+    /// drawn here is one item, as wide as four buttons, and ran off the screen's edge there. (Build 46) The picture is
+    /// one of them, in the rail on the Duo open on its side as well as folded: no longer an item of the tab bar's (one
+    /// added to it only on a wide screen — build 42 — is the likeliest of what crashed the app there).
     @Environment(\.sideRail) private var rail
 
     /// Buttons of the screen's own or the shell's in the capsule, the picture aside.
@@ -555,7 +531,7 @@ struct ShellToolbar: ViewModifier {
                     if rail {
                         ToolbarItemGroup(placement: .topBarTrailing) { railItems }
                     }
-                    if !rail && showCapsule {
+                    if !rail {
                         ToolbarItem(placement: .topBarTrailing) { capsule }
                             .sharedBackgroundVisibility(.hidden) // (the capsule is its own glass: no second one round it)
                     }
@@ -567,15 +543,12 @@ struct ShellToolbar: ViewModifier {
                     if rail {
                         ToolbarItemGroup(placement: .topBarTrailing) { railItems }
                     }
-                    if !rail && showCapsule {
+                    if !rail {
                         ToolbarItem(placement: .topBarTrailing) { capsule }
                     }
                 }
         }
     }
-
-    /// Something for the capsule to hold: on a wide screen, where the picture is in the tab bar, only the screen's buttons.
-    private var showCapsule: Bool { buttons || !wide }
 
     private var capsule: some View {
         HStack(spacing: 0) {
@@ -606,13 +579,10 @@ struct ShellToolbar: ViewModifier {
                 }
                 .accessibilityLabel("Notifications")
             }
-            if !wide {
-                AccountMenu(size: Self.height - Self.ring * 2)
-                    .padding(Self.ring)
-            }
+            AccountMenu(size: Self.height - Self.ring * 2)
+                .padding(Self.ring)
         }
         .padding(.leading, buttons ? 6 : 0)
-        .padding(.trailing, buttons && wide ? 6 : 0)
         .buttonStyle(.plain)
         .foregroundStyle(.primary)
         .font(.system(size: 17, weight: .medium))
@@ -649,7 +619,7 @@ struct ShellToolbar: ViewModifier {
             }
             .accessibilityLabel("Notifications")
         }
-        if !wide { AccountMenu(size: 32) }
+        AccountMenu(size: 32)
     }
 }
 
@@ -710,107 +680,6 @@ struct AccountMenu: View {
         } message: {
             Text("Your \(engine.lmsName) session and any saved sign-in are cleared; settings stay.")
         }
-    }
-}
-
-/// (iPhone 1.8.1, build 42) The account page, opened from the student's picture in the tab bar on a wide screen (on the
-/// Duo, its rail): who is signed in, and what the picture's menu holds on a phone — Inbox, Groups, Settings, What's New,
-/// the school's profile, Sign Out.
-struct AccountView: View {
-    @EnvironmentObject private var engine: Engine
-    @EnvironmentObject private var session: AppSession
-    @State private var confirmSignOut = false
-
-    var body: some View {
-        let me = engine.snapshot?.me
-        let inbox = engine.snapshot?.inboxUnread ?? 0
-        List {
-            Section {
-                HStack(spacing: 14) {
-                    Avatar(person: me, size: 60)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(me?.name ?? "Signed in").font(.title3.weight(.semibold)).lineLimit(2)
-                        if let e = me?.email, !e.isEmpty { Text(e).font(.subheadline).foregroundStyle(.secondary).lineLimit(1) }
-                        if let p = me?.pronouns, !p.isEmpty { Text(p).font(.footnote).foregroundStyle(.secondary) }
-                    }
-                }
-                .padding(.vertical, 6)
-            }
-            if !engine.onBrightspace { // (Brightspace has no Inbox or groups here, 2.99.22)
-                Section {
-                    Button { engine.push(.inbox) } label: {
-                        row("Inbox", "tray") { if inbox > 0 { Text("\(inbox)").foregroundStyle(.secondary) } }
-                    }
-                    Button { engine.push(.groups) } label: { row("Groups", "person.3") { EmptyView() } }
-                }
-            }
-            Section {
-                Button { session.showSettings = true } label: { row("Settings", "gearshape") { EmptyView() } }
-                Button {
-                    Task { if let wn = try? await engine.call("whatsNew", as: WhatsNewData.self) { engine.whatsNew = WhatsNewSheetItem(data: wn) } }
-                } label: { row("What’s New", "star") { EmptyView() } }
-                Button { engine.openWeb("/profile", title: "Profile") } label: { row("\(engine.lmsName) Profile", "person.crop.circle") { EmptyView() } }
-            }
-            Section {
-                Button(role: .destructive) { confirmSignOut = true } label: {
-                    Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
-                }
-            }
-        }
-        .listStyle(.insetGrouped)
-        .navigationTitle("Account")
-        .navigationBarTitleDisplayMode(.large)
-        .confirmationDialog("Sign out of \(engine.lmsName) on this device?", isPresented: $confirmSignOut, titleVisibility: .visible) {
-            Button("Sign Out", role: .destructive) {
-                Haptics.play("warning")
-                session.signOut()
-            }
-        } message: {
-            Text("Your \(engine.lmsName) session and any saved sign-in are cleared; settings stay.")
-        }
-    }
-
-    private func row(_ title: String, _ symbol: String, @ViewBuilder trailing: () -> some View) -> some View {
-        HStack {
-            Label(title, systemImage: symbol).foregroundStyle(.primary)
-            Spacer(minLength: 8)
-            trailing()
-            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
-        }
-        .contentShape(Rectangle())
-    }
-}
-
-/// (Build 42) The student's picture as a tab bar item's image: round, 28 points, drawn as it is (not tinted as a
-/// symbol is). Their photo where they have one, else their initials on the tint.
-enum AccountIcon {
-    static let side: CGFloat = 28
-
-    @MainActor
-    static func make(for person: Person?) async -> UIImage? {
-        guard let person else { return nil }
-        if let s = person.avatar, let url = URL(string: s),
-           let fetched = try? await URLSession.shared.data(from: url),
-           ((fetched.1 as? HTTPURLResponse)?.statusCode ?? 200) < 400, let photo = UIImage(data: fetched.0) {
-            return round(photo)
-        }
-        let renderer = ImageRenderer(content: Avatar(person: Person(name: person.name, initials: person.initials), size: side))
-        renderer.scale = 3
-        return renderer.uiImage?.withRenderingMode(.alwaysOriginal)
-    }
-
-    private static func round(_ photo: UIImage) -> UIImage {
-        let size = CGSize(width: side, height: side)
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = 3
-        let image = UIGraphicsImageRenderer(size: size, format: format).image { _ in
-            UIBezierPath(ovalIn: CGRect(origin: .zero, size: size)).addClip()
-            // (filled, as the picture is everywhere else: the shorter side across the circle)
-            let k = max(size.width / max(photo.size.width, 1), size.height / max(photo.size.height, 1))
-            let w = photo.size.width * k, h = photo.size.height * k
-            photo.draw(in: CGRect(x: (size.width - w) / 2, y: (size.height - h) / 2, width: w, height: h))
-        }
-        return image.withRenderingMode(.alwaysOriginal)
     }
 }
 
