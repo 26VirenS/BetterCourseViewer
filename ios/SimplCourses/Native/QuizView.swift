@@ -877,12 +877,15 @@ private struct QuestionView: View {
         }
         .fileImporter(isPresented: $importing, allowedContentTypes: [.item], allowsMultipleSelection: false) { result in
             guard case .success(let urls) = result, let u = urls.first else { return }
-            let scoped = u.startAccessingSecurityScopedResource()
-            defer { if scoped { u.stopAccessingSecurityScopedResource() } }
-            guard let d = try? Data(contentsOf: u) else { run.say("\(u.lastPathComponent) could not be read.", error: true); return }
-            let mime = UTType(filenameExtension: u.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
-            let picked = PickedFile(name: u.lastPathComponent, type: mime, data: d)
-            Task { await run.upload(q.id, picked) }
+            // (build 56) read through the file's coordinator, which brings a sheet that is only in OneDrive or iCloud
+            // down first (PickedFile.read)
+            Task {
+                guard let picked = await PickedFile.read(u) else {
+                    run.say("\(u.lastPathComponent) could not be read. If it is in OneDrive or iCloud, open it there once, then choose it again.", error: true)
+                    return
+                }
+                await run.upload(q.id, picked)
+            }
         }
         .onChange(of: photos) {
             guard let item = photos.first else { return }

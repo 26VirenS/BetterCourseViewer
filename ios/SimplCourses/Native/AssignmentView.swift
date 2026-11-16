@@ -299,6 +299,30 @@ struct PickedFile: Identifiable, Hashable {
     let data: Data
 
     var sizeText: String { ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file) }
+
+    /// (iPhone 1.8.1, build 56) A file chosen in the Files app, read the way the system's own file pickers read one:
+    /// through its file coordinator, which brings it down first where it is only in the cloud — a sheet from Excel or
+    /// OneDrive is, until opened. Read straight off its address it "could not be read", and a quiz would not take a
+    /// Microsoft sheet that Canvas's own page took (its picker brings the file down). A folder-like document (a package)
+    /// comes as a zip of it. Off the main thread; nil when it cannot be had.
+    static func read(_ u: URL) async -> PickedFile? {
+        await Task.detached(priority: .userInitiated) { () -> PickedFile? in
+            let scoped = u.startAccessingSecurityScopedResource()
+            defer { if scoped { u.stopAccessingSecurityScopedResource() } }
+            var data: Data?
+            var zipped = false
+            var problem: NSError?
+            NSFileCoordinator(filePresenter: nil).coordinate(readingItemAt: u, options: [.forUploading], error: &problem) { local in
+                data = try? Data(contentsOf: local)
+                zipped = local.pathExtension.lowercased() == "zip" && u.pathExtension.lowercased() != "zip"
+            }
+            if data == nil { data = try? Data(contentsOf: u) }
+            guard let d = data else { return nil }
+            if zipped { return PickedFile(name: u.lastPathComponent + ".zip", type: "application/zip", data: d) }
+            let mime = UTType(filenameExtension: u.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
+            return PickedFile(name: u.lastPathComponent, type: mime, data: d)
+        }.value
+    }
 }
 
 /// Hand In: the kinds this assignment takes from the phone (text, a web address, files), an optional
@@ -446,12 +470,11 @@ struct SubmitSheet: View {
     private func pickedFiles(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
-            for u in urls {
-                let scoped = u.startAccessingSecurityScopedResource()
-                defer { if scoped { u.stopAccessingSecurityScopedResource() } }
-                guard let d = try? Data(contentsOf: u) else { error = "\(u.lastPathComponent) could not be read."; continue }
-                let mime = UTType(filenameExtension: u.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
-                add(PickedFile(name: u.lastPathComponent, type: mime, data: d))
+            Task {
+                for u in urls {
+                    guard let f = await PickedFile.read(u) else { error = "\(u.lastPathComponent) could not be read."; continue }
+                    add(f)
+                }
             }
         case .failure(let e):
             error = e.localizedDescription
