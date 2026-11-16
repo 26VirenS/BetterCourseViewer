@@ -173,7 +173,7 @@ struct NativeShell: View {
             Text("Your \(engine.lmsName) session and any saved sign-in are cleared; settings stay.")
         }
         .task(id: engine.snapshot?.me) { await AccountPicture.shared.load(engine.snapshot?.me) }
-        .minimizingTabBar(!engine.holdTabBar)
+        .minimizingTabBar(!engine.holdTabBar && !engine.rail) // (build 54: on the Duo's rail a minimised tab bar went altogether)
         .background(TabBarProbe(engine: engine).allowsHitTesting(false))
         .sensoryFeedback(.selection, trigger: engine.tab)
         .environment(\.wideScreen, wide)
@@ -304,17 +304,23 @@ struct TabSplit<Root: View>: View {
             .background(SplitColumnWatch(asked: two ? listWidth : 0).allowsHitTesting(false))
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { r in engine.splitEdge[tab] = two ? r.maxX : nil }
         } detail: {
-            if path.count > lead {
-                let top = path[lead]
-                NavigationStack(path: rest(after: lead)) {
-                    RouteScreen(route: top)
+            if two {
+                // (build 54) two columns: the right column's own page (its companion) at the bottom of its stack, and
+                // what is opened pushed over it — so it has a Back button and the swipe back, to the companion. (Builds
+                // 37–53 made what was opened the stack's first screen: nothing under it, no Back, no swipe — an
+                // announcement opened beside Today could not be left.)
+                NavigationStack(path: rest(from: lead)) {
+                    companion(path, lead: lead)
                         .navigationDestination(for: Route.self) { route in RouteScreen(route: route) }
                 }
-                .id(top)
-            } else if lead == 1, case .course(let id)? = path.first {
-                // (build 41) nothing opened from the course yet: its grades beside its home
-                CourseGradesView(courseId: id)
-                    .id(id)
+                .id(companionKey(path, lead: lead))
+            } else if let first = path.first {
+                // one column: the list, then what was opened from it (Back from it closes it — onChange below)
+                NavigationStack(path: rest(after: 0)) {
+                    RouteScreen(route: first)
+                        .navigationDestination(for: Route.self) { route in RouteScreen(route: route) }
+                }
+                .id(first)
             } else {
                 SplitHome(tab: tab)
             }
@@ -342,6 +348,30 @@ struct TabSplit<Root: View>: View {
                   twoColumns, engine.paths[.courses].isEmpty else { return }
             engine.paths[.courses] = [.course(id: c.id)]
         }
+    }
+
+    /// (Build 54) The right column's own page with nothing opened over it: a course's grades beside its home (Courses), the
+    /// tab's companion otherwise (SplitHome).
+    @ViewBuilder
+    private func companion(_ path: [Route], lead: Int) -> some View {
+        if lead == 1, case .course(let id)? = path.first {
+            CourseGradesView(courseId: id)
+        } else {
+            SplitHome(tab: tab)
+        }
+    }
+
+    /// The right column's stack is a new one when its companion changes (another course's home on the left).
+    private func companionKey(_ path: [Route], lead: Int) -> String {
+        if lead == 1, case .course(let id)? = path.first { return "course:\(id)" }
+        return "home"
+    }
+
+    /// (Build 54) What is opened over the right column's companion: the tab's stack past what the left column shows.
+    private func rest(from lead: Int) -> Binding<[Route]> {
+        Binding(get: { Array(engine.paths[tab].dropFirst(lead)) }, set: { more in
+            engine.paths[tab] = Array(engine.paths[tab].prefix(lead)) + more
+        })
     }
 
     /// The right column's stack past its first screen (the left column showing the first `lead` of the tab's stack).
