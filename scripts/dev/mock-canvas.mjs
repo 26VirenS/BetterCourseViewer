@@ -8,6 +8,7 @@
 import { MACMILLAN_HUB_HTML, MACMILLAN_SAC_HTML } from './mock-macmillan.mjs';
 import { ALEKS_LEARN_HTML } from './mock-aleks.mjs';
 import http from 'node:http';
+import { createHash } from 'node:crypto';
 import { renameNames } from './site-names.mjs';
 import { communityMock } from './mock-community.mjs'; // (2.99.106: Simpl Community, as simplcourses.com has it)
 import { feedMock } from './mock-feed.mjs'; // (2.99.110: Simpl's own calendar feed, as simplcourses.com has it)
@@ -362,7 +363,7 @@ const files = {
   f101b: [{ id: 'f4', display_name: 'Dis01 worksheet.pdf', filename: 'dis01.pdf', 'content-type': 'application/pdf', size: 80000, updated_at: ago(3 * D), url: '/files/f4/download' }],
   f101c: [],
 };
-const quizzes = (courseId) => allAssignments(courseId).filter((a) => a.is_quiz_assignment).map((a, i) => ({ id: a.quiz_id, title: a.name, due_at: a.due_at, points_possible: a.points_possible, question_count: (mockConfig.richQuestions ? 7 : 4) + (mockConfig.moreTypes ? 2 : 0), quiz_type: a.quiz_survey || (a.name === 'Skills_Check' ? 'practice_quiz' : 'assignment'), time_limit: 20, allowed_attempts: mockConfig.richQuestions ? 5 : 1, description: `<p>${a.name}: four questions on the pre-lecture reading.</p>`, html_url: `/courses/${courseId}/quizzes/${a.quiz_id}`, locked_for_user: false, assignment_id: a.id, one_question_at_a_time: a.name === 'Lec07-PreQuiz', cant_go_back: a.name === 'Lec07-PreQuiz', hide_results: null, show_correct_answers: true, shuffle_answers: false, has_access_code: !!a.quiz_access_code && !a.quiz_code_hidden, ip_filter: a.quiz_ip_filter || null, require_lockdown_browser: !!a.quiz_lockdown }));
+const quizzes = (courseId) => allAssignments(courseId).filter((a) => a.is_quiz_assignment).map((a, i) => ({ id: a.quiz_id, title: a.name, due_at: a.due_at, points_possible: a.points_possible, question_count: (mockConfig.richQuestions ? 7 : 4) + (mockConfig.moreTypes ? 2 : 0) + (mockConfig.typedBlanks ? 1 : 0), quiz_type: a.quiz_survey || (a.name === 'Skills_Check' ? 'practice_quiz' : 'assignment'), time_limit: 20, allowed_attempts: mockConfig.richQuestions ? 5 : 1, description: `<p>${a.name}: four questions on the pre-lecture reading.</p>`, html_url: `/courses/${courseId}/quizzes/${a.quiz_id}`, locked_for_user: false, assignment_id: a.id, one_question_at_a_time: a.name === 'Lec07-PreQuiz', cant_go_back: a.name === 'Lec07-PreQuiz', hide_results: null, show_correct_answers: true, shuffle_answers: false, has_access_code: !!a.quiz_access_code && !a.quiz_code_hidden, ip_filter: a.quiz_ip_filter || null, require_lockdown_browser: !!a.quiz_lockdown }));
 
 // ---- quiz attempts (stateful, like Canvas's quiz submission API) --------------------------
 // quiz 9001 was taken once: q1 right, q2 wrong (17.68 m), q3 right, q4 right = 13 of 16
@@ -395,6 +396,16 @@ const quizQuestionBank = (quizId) => {
       ] },
     // an essay: Canvas keeps the answer as the editor's HTML (paragraphs, lists), which is what comes back
     { id: `${quizId}7`, position: 7, question_name: 'Question 7', question_type: 'essay_question', question_text: '<p>What are the pros and cons of group work?</p>', points_possible: 2, answers: [] }] : []),
+    // (typedBlanks, test-only; 2.99.149, SR-MWITRPSK-SFHL) blanks typed into, as a real one was written: its answers
+    // listed word2's first (Canvas lists a blank each in that order, the sentence's own the other way round), and none of
+    // them handed to the student (censor)
+    ...(mockConfig.typedBlanks ? [{ id: `${quizId}20`, position: 20, question_name: 'Question 20', question_type: 'fill_in_multiple_blanks_question', question_text: '<p>Faint edges sharpen as neurons in your [word1] begin to fire. This is [word2] in your visual cortex filling in missing edges.</p>', points_possible: 0.5,
+      answers: [
+        { id: Number(`${quizId}201`), text: 'v2', blank_id: 'word2', weight: 100 },
+        { id: Number(`${quizId}202`), text: 'V2', blank_id: 'word2', weight: 100 },
+        { id: Number(`${quizId}203`), text: 'V1', blank_id: 'word1', weight: 100 },
+        { id: Number(`${quizId}204`), text: 'primary visual cortex', blank_id: 'word1', weight: 100 },
+      ] }] : []),
     // (moreTypes, test-only) a formula question — its variables already put in the text for this student, as Canvas does — and a file to hand in
     ...(mockConfig.moreTypes ? [
       { id: `${quizId}8`, position: 8, question_name: 'Question 8', question_type: 'calculated_question', question_text: '<p>A cart travels 12 m in 4 s. What is its speed in m/s?</p>', points_possible: 2, answer_tolerance: 0.05, formula_decimal_places: 1, variables: [{ name: 'd', min: 10, max: 20, scale: 0 }, { name: 't', min: 2, max: 5, scale: 0 }], formulas: [{ formula: 'd/t' }], answers: [{ id: Number(`${quizId}81`), variables: [{ name: 'd', value: 12 }, { name: 't', value: 4 }], answer: 3 }] },
@@ -459,7 +470,8 @@ const codeRefused = (s, body) => { const need = codeOf(s); return need && (body 
 // does here, the point being that the name is not the blank). So the only thing that says which
 // blank a dropdown belongs to is the set of answers it offers, which is what the interface reads.
 const BLANK_KINDS = new Set(['multiple_dropdowns_question', 'fill_in_multiple_blanks_question']);
-const blankTag = (b) => [...String(b)].reduce((n, c) => Math.imul(n, 33) + c.charCodeAt(0) >>> 0, 5381).toString(16).padStart(8, '0');
+// (2.99.149) Canvas's own: md5("dropdown,<blank>,instructure-key") (canvas-lms AssessmentQuestion.variable_id)
+const blankTag = (b) => createHash('md5').update(`dropdown,${b},instructure-key`).digest('hex');
 const blankFields = (q, held = {}) => {
   if (!BLANK_KINDS.has(q.question_type)) return q.question_text;
   const drops = q.question_type === 'multiple_dropdowns_question';

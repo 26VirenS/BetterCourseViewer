@@ -32,6 +32,9 @@
   // attempt whose assignment submission is not posted (posted_at null; absent means posted) shows
   // nothing of its grading here either.
   const heldBack = (asub) => !!asub && asub.posted_at === null && !!(asub.submitted_at || asub.workflow_state === 'graded' || asub.workflow_state === 'pending_review');
+  // (2.99.149) A quiz's points to two places, as Canvas shows them: a quarter point is 0.25, not the 0.3 the one place
+  // every other figure takes made it (SR-MWITRPSK-SFHL)
+  const qpts = (n) => { const r = BCV.store?.roundHalfUp?.(n, 2); return r === null || r === undefined ? String(n) : String(r); };
   const HELD_LINE = 'Your instructor hasn’t released the results yet. Your score and which answers were right show here once they do.';
 
   const pad = (n) => String(n).padStart(2, '0');
@@ -119,11 +122,79 @@
   /** A question with its answer as picked: the rows and blanks Canvas lists with nothing in them taken out. */
   function tidy(q) {
     if (MATCH.has(q.question_type)) { const p = pairsOf(q.answer); q.answer = p.length ? p : null; }
-    else if (BLANKS.has(q.question_type) && q.answer && typeof q.answer === 'object' && !Array.isArray(q.answer)) { const f = filledOf(q.answer); q.answer = Object.keys(f).length ? f : null; }
+    else if (BLANKS.has(q.question_type) && q.answer && typeof q.answer === 'object' && !Array.isArray(q.answer)) {
+      // (2.99.149) every blank, by the name Canvas takes an answer under, kept before the empty ones go: for blanks typed
+      // into, Canvas lists a student no answers (they would give the words away), and this is the one place left that
+      // names them (SR-MWITRPSK-SFHL)
+      if (!q.blanks?.length && !(q.answers || []).some((a) => a.blank_id)) q.blanks = Object.keys(q.answer);
+      const f = filledOf(q.answer); q.answer = Object.keys(f).length ? f : null;
+    }
     return q;
   }
   /** The blanks a question has, as Canvas's page names them or as its own answers say. */
-  const blanksOf = (q) => (q.blanks?.length ? q.blanks : [...new Set((q.answers || []).map((a) => a.blank_id).filter(Boolean))]);
+  /* (2.99.149) Failing both, the blanks the question's own text names in brackets ("… neurons in your [word1] begin to
+   * fire"): Canvas lists a student no answers for blanks typed into — they would give the right words away — so a
+   * fill-in-the-blanks question read from the API knew of no blanks, and showed its words with nowhere to write
+   * (SR-MWITRPSK-SFHL). In the order the text names them. */
+  const blanksOf = (q) => {
+    if (q.blanks?.length) return q.blanks;
+    const listed = [...new Set((q.answers || []).map((a) => a.blank_id).filter(Boolean))];
+    if (listed.length || !BLANKS.has(q.question_type)) return listed;
+    return [...new Set([...String(q.question_text || '').matchAll(/\[([^\]\s<>"]+)\]/g)].map((m) => m[1]))];
+  };
+  /* (2.99.149) MD5 (RFC 1321), for the one thing Canvas names with it that a reader must match: a blank's field in the
+   * sentence is question_<id>_<md5("dropdown,<blank>,instructure-key")> (canvas-lms AssessmentQuestion.variable_id),
+   * so a field typed into is put in its own blank's place rather than the next free one's. */
+  const md5 = (() => {
+    const K = Array.from({ length: 64 }, (_, i) => Math.floor(Math.abs(Math.sin(i + 1)) * 2 ** 32) | 0);
+    const S = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21];
+    return (str) => {
+      const bytes = new TextEncoder().encode(str);
+      const n = ((bytes.length + 8) >>> 6) + 1;
+      const w = new Int32Array(n * 16);
+      for (let i = 0; i < bytes.length; i++) w[i >> 2] |= bytes[i] << ((i % 4) * 8);
+      w[bytes.length >> 2] |= 0x80 << ((bytes.length % 4) * 8);
+      w[n * 16 - 2] = bytes.length * 8;
+      let a0 = 0x67452301, b0 = 0xefcdab89 | 0, c0 = 0x98badcfe | 0, d0 = 0x10325476;
+      for (let blk = 0; blk < w.length; blk += 16) {
+        let a = a0, b = b0, c = c0, d = d0;
+        for (let i = 0; i < 64; i++) {
+          let f, g;
+          if (i < 16) { f = (b & c) | (~b & d); g = i; } else if (i < 32) { f = (d & b) | (~d & c); g = (5 * i + 1) % 16; } else if (i < 48) { f = b ^ c ^ d; g = (3 * i + 5) % 16; } else { f = c ^ (b | ~d); g = (7 * i) % 16; }
+          const x = (a + f + K[i] + w[blk + g]) | 0;
+          const sh = S[(i >> 4) * 4 + (i % 4)];
+          a = d; d = c; c = b;
+          b = (b + ((x << sh) | (x >>> (32 - sh)))) | 0;
+        }
+        a0 = (a0 + a) | 0; b0 = (b0 + b) | 0; c0 = (c0 + c) | 0; d0 = (d0 + d) | 0;
+      }
+      return [a0, b0, c0, d0].map((v) => [0, 8, 16, 24].map((k) => ((v >>> k) & 0xff).toString(16).padStart(2, '0')).join('')).join('');
+    };
+  })();
+  /** The blank a field Canvas named question_<id>_<hash> fills, among the names given — or none. */
+  const blankOfHash = (hash, names) => names.find((b) => md5(`dropdown,${b},instructure-key`) === String(hash).toLowerCase()) ?? null;
+  /** A blank's place among the question's blanks in the sentence — named in brackets, or a field Canvas put there — for
+   *  listing answers in the sentence's order (2.99.149: Canvas lists blanks in the order their answers were written). */
+  const blankRank = (q) => {
+    const text = String(q.question_text || '');
+    const names = blanksOf(q).map(String);
+    const fields = [...text.matchAll(new RegExp(`name="question_${q.id}_([0-9a-f]{32})"`, 'g'))].map((m) => blankOfHash(m[1], names)).filter(Boolean);
+    const order = [...new Set([...[...text.matchAll(/\[([^\]\s<>"]+)\]/g)].map((m) => m[1]), ...fields, ...names])];
+    return (b) => { const i = order.indexOf(String(b)); return i < 0 ? order.length : i; };
+  };
+  /** Answers named for their blanks, a line per blank: "word1: V1 / primary visual cortex" rather than the blank's
+   *  name again before every answer it takes (the same words in another case counted once). */
+  const byBlank = (q, entries) => {
+    const rank = blankRank(q);
+    const groups = new Map();
+    for (const e of entries) {
+      const k = String(e.blank);
+      if (!groups.has(k)) groups.set(k, []);
+      const g = groups.get(k);
+      if (!g.some((x) => x.toLowerCase() === e.text.toLowerCase())) g.push(e.text);
+    }
+    return [...groups.entries()].sort(([a], [b]) => rank(a) - rank(b)).map(([b, texts]) => ({ text: `${b}: ${texts.join(' / ')}`, html: '' }));
+  };
   /* The question as something to read rather than answer. Canvas's own page writes a blank's field
    * into the sentence, so the review row and the feedback would otherwise carry a live dropdown —
    * and read it as its whole list of options run together. A blank shows there as a gap instead;
@@ -250,7 +321,12 @@
       if (a.left && a.right) return { text: `${a.left} → ${a.right}`, html: '' };
       return null;
     };
-    const parts = (q.answers || []).filter((a) => Number(a.weight) === 100).map(one).filter(Boolean);
+    const rightOnes = (q.answers || []).filter((a) => Number(a.weight) === 100);
+    if (BLANKS.has(q.question_type) && rightOnes.some((a) => a.blank_id)) {
+      const entries = rightOnes.map((a) => ({ blank: a.blank_id, text: one(a)?.text || '' })).filter((e) => e.blank && String(e.text).trim());
+      return entries.length ? byBlank(q, entries) : null;
+    }
+    const parts = rightOnes.map(one).filter(Boolean);
     return parts.length ? parts : null;
   }
   /** Solution html from the question data: the neutral comment, else the one for this outcome. */
@@ -265,6 +341,13 @@
   function pageRight(q, pq) {
     if (!pq?.right?.length) return null;
     const opts = new Map((q.answers || []).map((a) => [String(a.id), a]));
+    if (BLANKS.has(q.question_type) && pq.right.some((x) => x.blank)) {
+      const entries = pq.right.map((x) => {
+        const o = opts.get(String(x.id));
+        return { blank: x.blank, text: String((o && String(o.text || '').trim()) ? o.text : (x.text || htmlToText(x.html || '', 60) || '')).trim() };
+      }).filter((e) => e.blank && e.text);
+      if (entries.length) return byBlank(q, entries);
+    }
     const parts = pq.right.map((x) => {
       const o = opts.get(String(x.id));
       const own = o && (String(o.text || '').trim() || String(o.html || '').trim()) ? { text: o.text || '', html: o.html || '' } : { text: x.text || '', html: x.html || '' };
@@ -293,7 +376,8 @@
     }
     // one value per blank, named for the blank it fills
     if (BLANKS.has(q.question_type)) {
-      const filled = Object.entries(filledOf(a));
+      const rank = blankRank(q);
+      const filled = Object.entries(filledOf(a)).sort(([x], [y]) => rank(x) - rank(y)); // (2.99.149: word1 before word2)
       if (!filled.length) return null;
       return filled.map(([blank, v]) => {
         const named = !/^[0-9a-f]{8,}$/i.test(blank); // a quiz read from Canvas's own page knows the blank only as a hash of its name
@@ -795,7 +879,7 @@
     /** (2.99.55) Every finished attempt, newest first, with its score (where Canvas shows results) and when it was handed
      *  in, and the one Canvas keeps by the quiz's scoring rule — the Mac's intro's (native-app.js quizAttempts). */
     function introAttempts(survey) {
-      const possible = store.fmtPts(quiz.points_possible || 0);
+      const possible = qpts(quiz.points_possible || 0);
       const seen = new Set();
       const hist = (st.asub?.submission_history || [])
         .filter((x) => x && Number(x.attempt) > 0 && (x.submitted_at || (x.score !== null && x.score !== undefined)))
@@ -805,7 +889,7 @@
       const scored = (x) => !survey && !hidden && x.workflow_state !== 'pending_review' && x.score !== null && x.score !== undefined;
       const rows = hist.map((x) => ({
         attempt: Number(x.attempt),
-        score: scored(x) ? `${store.fmtPts(x.score)} / ${possible}` : null,
+        score: scored(x) ? `${qpts(x.score)} / ${possible}` : null,
         when: x.submitted_at ? `Handed in ${U.fmtAt(x.submitted_at)}` : '',
         why: scored(x) ? '' : (survey ? 'Survey' : hidden ? 'Hidden' : x.workflow_state === 'pending_review' ? 'Waiting to be graded' : ''),
         kept: false,
@@ -844,7 +928,7 @@
       if (needsCode && !(st.code || '').trim()) st.code = remembered(); // (an attempt resumed in this tab: the code is still known)
       const lockdown = !!quiz.require_lockdown_browser;
       const canStart = introCanStart();
-      const pts = quiz.points_possible !== null && quiz.points_possible !== undefined ? `${store.fmtPts(quiz.points_possible)} ${Number(quiz.points_possible) === 1 ? 'point' : 'points'}` : 'Ungraded';
+      const pts = quiz.points_possible !== null && quiz.points_possible !== undefined ? `${qpts(quiz.points_possible)} ${Number(quiz.points_possible) === 1 ? 'point' : 'points'}` : 'Ungraded';
       const facts = [
         [IC.list || IC.task, U.plural(quiz.question_count || 0, 'question')],
         [IC.star, survey ? (gradedSurvey ? `${pts} for taking part` : 'Not graded') : pts],
@@ -1069,7 +1153,7 @@
         if (q) el.textContent = qofText(q);
       }
     }
-    const qofText = (q) => `of ${st.questions.length}${hasNum(q.points_possible) ? ` · ${store.fmtPts(q.points_possible)} ${Number(q.points_possible) === 1 ? 'point' : 'points'}` : ''}`;
+    const qofText = (q) => `of ${st.questions.length}${hasNum(q.points_possible) ? ` · ${qpts(q.points_possible)} ${Number(q.points_possible) === 1 ? 'point' : 'points'}` : ''}`;
     /** A page of Canvas's quiz page folded into the attempt: its question list is the spine (every
      *  question in order, with what Canvas knows of each) and the question shown is filled in; the
      *  others keep what was read of them before, or stay stubs until their turn. */
@@ -1171,6 +1255,8 @@
         }
         const tail = (w.getAttribute('name') || '').replace(`question_${q.id}_`, '');
         if (holds.has(tail) && !holds.get(tail).placed) return tail;
+        const hashed = /^[0-9a-f]{32}$/i.test(tail) ? blankOfHash(tail, free()) : null; // (2.99.149: its own blank, by Canvas's hash of the name)
+        if (hashed) return hashed;
         return free()[0] || null;
       };
       const head = `question_${q.id}_`;
@@ -1669,8 +1755,8 @@
           h('p', { class: 'bcv-qz__lead bcv-pretty', text: `${quiz.title} · submitted ${U.fmtAtUpper(d.finished_at || new Date())}. ${survey ? (gradedSurvey ? 'Thanks for taking part — the points for it post to your grades.' : 'Thanks for taking part.') : scoreVisible ? '' : 'Your score posts once your instructor releases it.'}` }),
         ]),
         U.el('bcv-qz__donecard', [h('span', { class: 'bcv-qz__donek', text: 'Questions answered' }), h('span', { class: 'bcv-qz__donev', text: answeredLabel() })]),
-        scoreVisible ? U.el('bcv-qz__donecard', [h('span', { class: 'bcv-qz__donek', text: 'Score' }), h('span', { class: 'bcv-qz__donev', text: `${store.fmtPts(d.kept_score ?? d.score)} / ${store.fmtPts(quiz.points_possible || 0)}` })]) : null,
-        gradedSurvey && quiz.points_possible ? U.el('bcv-qz__donecard', [h('span', { class: 'bcv-qz__donek', text: 'For taking part' }), h('span', { class: 'bcv-qz__donev', text: `${store.fmtPts(quiz.points_possible)} ${Number(quiz.points_possible) === 1 ? 'point' : 'points'}` })]) : null,
+        scoreVisible ? U.el('bcv-qz__donecard', [h('span', { class: 'bcv-qz__donek', text: 'Score' }), h('span', { class: 'bcv-qz__donev', text: `${qpts(d.kept_score ?? d.score)} / ${qpts(quiz.points_possible || 0)}` })]) : null,
+        gradedSurvey && quiz.points_possible ? U.el('bcv-qz__donecard', [h('span', { class: 'bcv-qz__donek', text: 'For taking part' }), h('span', { class: 'bcv-qz__donev', text: `${qpts(quiz.points_possible)} ${Number(quiz.points_possible) === 1 ? 'point' : 'points'}` })]) : null,
         U.el('bcv-qz__donebtns', [
           // feedback only once Canvas has released it (hide_results); the receipt says so otherwise. A survey has none.
           feedbackOn ? h('button', { type: 'button', class: 'bcv-qz__big bcv-qz__big--primary', text: 'See feedback', onclick: () => openFeedback(d, 'done') }) : null,
@@ -1903,8 +1989,8 @@
       const [ink, tint] = inkOf(v);
       const part = v === 'partial';
       // (the points a question was worth come from Canvas or are left out — never a "/ 0" standing in for them)
-      const worth = r.possible !== null ? `${store.fmtPts(r.possible)} pts` : '';
-      const scoreLbl = r.earned !== null ? (r.possible !== null ? `${store.fmtPts(r.earned)} / ${store.fmtPts(r.possible)}` : `${store.fmtPts(r.earned)} ${Number(r.earned) === 1 ? 'pt' : 'pts'}`) : part ? (worth ? `Partial · ${worth}` : 'Partial') : worth;
+      const worth = r.possible !== null ? `${qpts(r.possible)} pts` : '';
+      const scoreLbl = r.earned !== null ? (r.possible !== null ? `${qpts(r.earned)} / ${qpts(r.possible)}` : `${qpts(r.earned)} ${Number(r.earned) === 1 ? 'pt' : 'pts'}`) : part ? (worth ? `Partial · ${worth}` : 'Partial') : worth;
       const sol = r.sol;
       const card = U.el(`bcv-fb__q bcv-qfb__q is-${v}`, [
         U.el('bcv-fb__qhead', [
@@ -1942,7 +2028,7 @@
         U.el('bcv-qfb__score', [
           U.text('bcv-qz__railh', `Attempt ${sub.attempt || 1}`, 'div'),
           U.el('bcv-fb__scoreline', [
-            h('span', { class: 'bcv-fb__big', text: `${fb.score !== null ? store.fmtPts(fb.score) : '—'} / ${store.fmtPts(fb.possible)}` }),
+            h('span', { class: 'bcv-fb__big', text: `${fb.score !== null ? qpts(fb.score) : '—'} / ${qpts(fb.possible)}` }),
             pct !== null ? h('span', { class: 'bcv-fb__pct', text: `${pct}%` }) : null,
             h('span', { class: 'bcv-fb__summary', text: `${fb.released ? `${nRight} of ${rows.length} correct · ` : ''}${when}` }),
           ]),

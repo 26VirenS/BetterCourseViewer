@@ -5321,6 +5321,33 @@ try {
   await page.goto(`${BASE}/courses/101/quizzes/9001`);
   await page.waitForSelector('.bcv-qzi', { timeout: 20000 });
   } // quiz: matching and blanks
+  if (on('quiz: typed blanks')) {
+  // (2.99.149, SR-MWITRPSK-SFHL) Blanks typed into, as Canvas hands them to a student: no answers listed (they would give
+  // the words away), each field already in the sentence under a hash of its blank's name, and the answer a blank each
+  // with nothing in it — listed in another order than the sentence's. The question showed its words with nowhere to
+  // write; now each blank is a box where the sentence has it, and what is typed goes up under that blank's own name.
+  console.log('quiz: typed blanks');
+  await noteApi('POST', '/__mock/config', { typedBlanks: true });
+  await page.goto(`${BASE}/courses/101/quizzes/9007`);
+  await page.waitForSelector('.bcv-qz__begin', { timeout: 20000 });
+  await page.click('.bcv-qz__begin');
+  await page.waitForSelector('.bcv-qz__pill', { timeout: 20000 });
+  const typedN = (await page.$$('.bcv-qz__pill')).length;
+  await page.click(`.bcv-qz__pill:nth-child(${typedN})`);
+  await waitText('.bcv-qz__qnum', new RegExp(`Question ${typedN}$`));
+  const typedBoxes = await page.$$eval('.bcv-qz__qtext .bcv-qz__inblank', (els) => els.map((e) => `${e.tagName}:${e.getAttribute('aria-label')}`));
+  check(typedN === 5 && typedBoxes.join(' ') === 'INPUT:word1 INPUT:word2' && !(await page.$('.bcv-qz__blanks')), `a blank typed into is a box where the sentence has it, each its own blank's (word1 first, as the sentence reads), nothing left underneath: ${typedN} | ${typedBoxes.join(' ')}`);
+  await page.fill('.bcv-qz__qtext .bcv-qz__inblank >> nth=0', 'primary visual cortex');
+  await page.fill('.bcv-qz__qtext .bcv-qz__inblank >> nth=1', 'V2');
+  await waitText('.bcv-qz__answered', /1 of 5 answered · Saved/);
+  const typedSent = (await noteApi('GET', '/__mock/quizsub/qs9007-1')).answers['900720'] || {};
+  check(typedSent.word1 === 'primary visual cortex' && typedSent.word2 === 'V2' && Object.keys(typedSent).length === 2, `what is typed goes up under each blank's own name: ${JSON.stringify(typedSent)}`);
+  await page.click('.bcv-qz__foot .bcv-qz__btn--primary');
+  await page.waitForSelector('.bcv-qz__sum', { timeout: 10000 });
+  const typedSum = await page.$eval(`.bcv-qz__sum:nth-child(${typedN}) .bcv-qz__suma`, (e) => e.textContent.replace(/\s+/g, ' ').trim());
+  check(typedSum === 'word1: primary visual cortex, word2: V2', `the review lists the blanks in the sentence's order: ${typedSum}`);
+  await noteApi('POST', '/__mock/config', { typedBlanks: false });
+  } // quiz: typed blanks
   if (on('native pages')) {
 
   // ---- hybrid (native) page inside the shell ----------------------------------------------------

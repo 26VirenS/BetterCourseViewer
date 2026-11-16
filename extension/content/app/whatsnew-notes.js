@@ -29,6 +29,10 @@
     slider: 'M4 8h16M4 16h16M9 5v6M15 13v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.149', date: '2026-11-16', notes: [
+      { kind: 'fixed', title: 'Fill-in Blanks Work', body: 'Type into each blank right where the sentence has it.', icon: P.pen },
+      { kind: 'fixed', title: 'Exact Quiz Points', body: 'Quarter points show as 0.25, the way Canvas has them.', icon: P.check },
+    ] },
     { version: '2.99.148', date: '2026-11-15', notes: [
       { kind: 'improved', title: 'Simpler Switch', body: 'Green is a tick alone; the pill says just how long.', icon: P.toggle },
     ] },
