@@ -19,14 +19,6 @@ struct ContextHome: View {
         Group {
             if let d = model.data {
                 List {
-                    if courseStrip && d.kind == "courses" {
-                        // (build 41) the other courses, small, to switch to (CourseStrip)
-                        Section {
-                            CourseStrip(selected: ContextHome.id(of: ctx))
-                                .listRowInsets(EdgeInsets())
-                                .listRowBackground(Color.clear)
-                        }
-                    }
                     Section { header(d) }
                     if !d.sections.isEmpty {
                         Section {
@@ -97,6 +89,11 @@ struct ContextHome: View {
         .navigationTitle(model.data?.title ?? "")
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
+            // (build 52) on the left of Courses' split view: the other courses behind a button at the top, rather than a
+            // strip of them across the page (CourseSwitcher)
+            if courseStrip && model.data?.kind != "groups" {
+                ToolbarItem(placement: .topBarTrailing) { CourseSwitcher(selected: ContextHome.id(of: ctx)) }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button { engine.openWebScreen("/\(ctx)?bcv=native", title: model.data?.title ?? "") } label: { Label("Open \(engine.lmsName)’s Page", systemImage: "globe") }

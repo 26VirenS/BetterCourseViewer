@@ -268,7 +268,7 @@ struct TabSplit<Root: View>: View {
     private var twoColumns: Bool { sizeClass == .regular && max(screen.width, frame.width) >= 750 }
 
     /// (Build 41) How many of the stack's first screens the left column shows itself: with two columns, Courses puts the
-    /// open course's home on the left (the courses themselves a strip across its top, CourseStrip) and what is opened
+    /// open course's home on the left (the other courses behind a button at its top, CourseSwitcher) and what is opened
     /// from it on the right — the whole list of courses down the left was a poor use of half the screen. Otherwise the
     /// tab's own list is on the left (0).
     private func leadCount(_ path: [Route], two: Bool) -> Int {
@@ -297,6 +297,7 @@ struct TabSplit<Root: View>: View {
                 }
             }
             .environment(\.splitList, two)
+            .modifier(SolidColumn(on: two))
             // (build 50) the width SwiftUI's own, fixed — nothing of the app's sets it on the split view controller any more
             // (SplitColumnWatch says what it came out at)
             .navigationSplitViewColumnWidth(two ? listWidth : 320)
@@ -353,71 +354,61 @@ struct TabSplit<Root: View>: View {
     }
 }
 
-/// (iPhone 1.8.1, build 41) The courses, small: a strip at the top of a course's home on the left of the split view
-/// (TabSplit, ContextHome) — each course a capsule with its colour and short name (its unread announcements counted),
-/// the open one tinted; pressed, that course's home takes the left. Scrolls sideways when they do not all fit. (In the
-/// home's list rather than a safe area bar, which iOS 26 draws over a large title.)
-struct CourseStrip: View {
+/// (iPhone 1.8.1, build 52) The other courses, behind a button at the top of a course's home on the left of the split
+/// view (TabSplit, ContextHome): a menu of them, each with its colour and its unread announcements, the open one ticked;
+/// picked, that course's home takes the left. (Builds 41–51: a strip of capsules across the page, under the title.)
+struct CourseSwitcher: View {
     let selected: String
     @EnvironmentObject private var engine: Engine
     @State private var rows: [CourseRow] = []
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(rows) { c in chip(c).id(c.id) }
+        Menu {
+            Picker("Course", selection: Binding(get: { selected }, set: { id in
+                Haptics.tap()
+                engine.focusCourse(id)
+            })) {
+                ForEach(rows) { c in
+                    Label {
+                        Text((c.unread ?? 0) > 0 ? "\(c.code) · \(c.unread ?? 0) new" : c.code)
+                    } icon: {
+                        Image(uiImage: Self.dot(c.color))
+                    }
+                    .tag(c.id)
                 }
-                .padding(.vertical, 2)
             }
-            .scrollClipDisabled() // (the capsules slide out to the screen's edge, past the list's margins)
-            .onChange(of: rows.count) { proxy.scrollTo(selected, anchor: .center) }
-            .onAppear { proxy.scrollTo(selected, anchor: .center) }
+            .pickerStyle(.inline)
+        } label: {
+            Label("Switch Course", systemImage: "books.vertical")
         }
-        .frame(minHeight: rows.isEmpty ? 0 : 36)
+        .accessibilityLabel("Switch course")
         .task(id: engine.dataVersion) {
             if let d = try? await engine.call("courses", as: CoursesData.self) { rows = d.rows }
         }
     }
 
-    private func chip(_ c: CourseRow) -> some View {
-        let on = c.id == selected
-        let tint = Color(hex: c.color)
-        return Button {
-            Haptics.tap()
-            engine.focusCourse(c.id)
-        } label: {
-            HStack(spacing: 6) {
-                Circle().fill(tint).frame(width: 8, height: 8)
-                Text(Self.short(c))
-                    .font(.subheadline.weight(on ? .semibold : .medium))
-                    .lineLimit(1)
-                if let n = c.unread, n > 0 {
-                    Text("\(n)")
-                        .font(.caption2.weight(.bold).monospacedDigit())
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(Color.red, in: Capsule())
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(on ? tint.opacity(0.2) : Color(.tertiarySystemFill), in: Capsule())
-            .overlay(Capsule().strokeBorder(on ? tint.opacity(0.6) : .clear, lineWidth: 1))
-            .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(c.code)
-        .accessibilityValue(c.unreadLabel ?? "")
-        .accessibilityAddTraits(on ? .isSelected : [])
+    /// A course's colour as a dot for a menu, drawn as it is (a menu draws a symbol in its own colour).
+    static func dot(_ hex: String?) -> UIImage {
+        let size = CGSize(width: 12, height: 12)
+        return UIGraphicsImageRenderer(size: size).image { ctx in
+            UIColor(Color(hex: hex)).setFill()
+            ctx.cgContext.fillEllipse(in: CGRect(origin: .zero, size: size))
+        }.withRenderingMode(.alwaysOriginal)
     }
+}
 
-    /// A course's label up to its colon ("MATH 140: Calculus I" → "MATH 140").
-    static func short(_ c: CourseRow) -> String {
-        let head = c.code.split(separator: ":", maxSplits: 1).first.map(String.init) ?? c.code
-        let t = head.trimmingCharacters(in: .whitespaces)
-        return t.isEmpty ? c.code : t
+/// (Build 52) The left column of a split view showing two: the page's own background under it, not the sidebar's glass —
+/// in dark mode the glass is a light grey, which greyed the column's lighter words (a course's term, its teachers, what
+/// is still to do) almost into it.
+struct SolidColumn: ViewModifier {
+    let on: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .scrollContentBackground(on ? .hidden : .automatic)
+            .background {
+                if on { Color(.systemGroupedBackground).ignoresSafeArea() }
+            }
     }
 }
 
@@ -431,7 +422,8 @@ extension EnvironmentValues {
         set { self[SideRailKey.self] = newValue }
     }
 
-    /// (Build 41) A course's home on the left of Courses' split view: the course strip first in it (ContextHome).
+    /// (Build 41) A course's home on the left of Courses' split view: the button to switch courses at its top
+    /// (ContextHome, CourseSwitcher).
     var courseStrip: Bool {
         get { self[CourseStripKey.self] }
         set { self[CourseStripKey.self] = newValue }
