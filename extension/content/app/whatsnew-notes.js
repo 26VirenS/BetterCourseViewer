@@ -29,6 +29,10 @@
     slider: 'M4 8h16M4 16h16M9 5v6M15 13v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.150', date: '2026-11-16', notes: [
+      { kind: 'improved', title: 'A Tour to Read', body: 'Read each step, then Next or Back. Skip it any time.', icon: P.steps },
+      { kind: 'fixed', title: 'Color Picker Fits', body: 'A course’s color picker stays on screen.', icon: P.check },
+    ] },
     { version: '2.99.149', date: '2026-11-16', notes: [
       { kind: 'fixed', title: 'Fill-in Blanks Work', body: 'Type into each blank right where the sentence has it.', icon: P.pen },
       { kind: 'fixed', title: 'Exact Quiz Points', body: 'Quarter points show as 0.25, the way Canvas has them.', icon: P.check },

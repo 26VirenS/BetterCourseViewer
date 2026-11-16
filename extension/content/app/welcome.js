@@ -1,10 +1,10 @@
-/* The guided tour (2.99.130: made again). Simpl's main things, each learnt by doing it on the page as it is: one
- * thing at a time is ringed, a small glass card beside it names it in a word or two and says the one thing to do,
- * and a pointer shows the gesture (a press, a hover, typing, a drag). The step waits for it, says what it did in a
- * few words and moves on by itself; only the first card and the last have a button. There is no Skip: the page
- * round the ring is held still (a press there leans the card towards the ring), and inside it only the thing the
- * step asks for takes a press. A thing out of sight (a short window, a sidebar that scrolls) is pointed to: the
- * card says which way to scroll and waits for it.
+/* The tour (2.99.130: made again; 2.99.150: a tour to read). Simpl's main things, one at a time: each is ringed
+ * where it is on the page, and a glass card beside it says what it is and what it does, in a sentence or two. Next
+ * and Back (or → and ←) go through it; Skip tour (or Esc) leaves it. Nothing has to be done on the page to go on —
+ * the page round the ring is held still while it shows (a press there leans the card towards the ring). A thing out
+ * of sight (a short window, a sidebar that scrolls) is scrolled into view. (Builds 2.99.130–149 asked for each
+ * thing to be done — typed into, dragged, pinned — before moving on, with no way past; the rubric ring's own run
+ * still does, its steps being the ring worked by hand.)
  *
  * The motion is the page's own physics, not a script: the ring, the card and the pointer each follow their goal on
  * a critically damped spring (no overshoot), solved exactly each frame from where they are and how fast they are
@@ -65,35 +65,15 @@
   const $ = (sel) => drawn(document.querySelector(sel));
   const look = () => $('#bcv-look');
   const inLook = (sel) => drawn(document.getElementById('bcv-look')?.querySelector(sel));
-  const lookOpen = () => { const m = document.querySelector('#bcv-look .bcv-look__menu'); return !!m && getComputedStyle(m).visibility === 'visible'; };
   const navRow = (key) => $(`#bcv-side .bcv-nav__item[data-nav="${key}"]`);
   const onScreen = (key) => !!document.querySelector(`#bcv-side .bcv-nav__item.is-active[data-nav="${key}"]`) || (key === 'calendar' && !!$('#bcv-main .bcv-cal__todo'));
   const weekCard = () => $('#bcv-app .bcv-stat[data-stat="week"]') || $('.bcv-ph-stats .bcv-ph-stat:nth-child(2)'); // (the Dashboard's Next 7 days, on a phone Today's)
   const sheet = () => $('.bcv-sheet-ov .bcv-sheet');
-  const sheetClose = () => $('.bcv-sheet-ov .bcv-sheet__close');
-  const firstRow = () => $('.bcv-sheet-ov .bcv-sheet__row');
   const searchBox = () => $('#bcv-omni-box');
-  const searchPanel = () => $('#bcv-omni-panel');
-  const silentOn = () => html.classList.contains('bcv-silent-on') || !!$('#bcv-main .bcv-silent');
   const accountBtn = () => $('#bcv-account'); // (2.99.53: Appearance… is in the account's ⋯ menu, as the Mac's)
   /** The first of the Grades page's cards whose ring opens into groups (a course with groups to show). */
   const ringCard = () => [...document.querySelectorAll('.bcv-gpa__card')].find((c) => drawn(c.querySelector('.bcv-gpa__ringbox[title]'))) || null;
-  const pinnedN = () => document.querySelectorAll('.bcv-tool-card.is-pinned').length;
-  const todoCol = () => $('#bcv-main .bcv-cal__todo');
-  const todoRow = () => [...document.querySelectorAll('#bcv-main .bcv-cal__todo .bcv-tdrag:not(.is-planned):not(.is-done)')].map(drawn).find(Boolean) || null;
   const plans = () => Object.keys(BCV.plan?.all?.() || {});
-  /** Somewhere on the calendar a task is let go: a day two days on in the month, else the week's day after today. */
-  function dropPoint() {
-    const days = [...document.querySelectorAll('#bcv-main .bcv-cal__day[data-day]:not(.bcv-cal__day--off)')].map(drawn).filter(Boolean);
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const later = days.filter((d) => Number(d.dataset.day) > today.getTime());
-    const cell = later[1] || later[0] || days[days.length - 1];
-    if (cell) { const r = cell.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height * 0.62 }; }
-    const col = [...document.querySelectorAll('#bcv-main .bcv-week__day')].map(drawn).find((c) => Number(c.dataset.day) > today.getTime());
-    if (col) { const r = col.getBoundingClientRect(); return { x: r.left + r.width / 2, y: Math.min(innerHeight - 80, r.top + Math.max(60, r.height / 3)) }; }
-    return null;
-  }
-  const centreOf = (el) => { if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
   /** A press the tour makes itself (a run started part way, the sheet put away): let through its own guard. */
   function press(el) { if (!el || !ui) return; ui.passing = true; try { el.click(); } finally { ui.passing = false; } }
   const go = (key) => { if (!onScreen(key)) press(navRow(key)); };
@@ -110,123 +90,54 @@
   // sheet closes with a tap outside it). allow: the other things a press may land on (any row, any pin).
   const LIB = {
     hello: () => [
-      { id: 'hello', target: null, title: 'Welcome to Simpl', body: 'A one-minute tour. Try each thing as you go.', act: 'next', nextLabel: 'Start' },
+      { id: 'hello', target: null, title: 'Welcome to Simpl', body: 'Here’s a quick look at what Simpl adds to Canvas, and where to find it. It takes about a minute.', act: 'next', nextLabel: 'Start' },
     ],
     search: () => [
-      { id: 'search', name: 'the search box', screen: 'dashboard', target: searchBox, area: () => [searchBox(), searchPanel()], wait: 4000,
-        title: 'Search everything', body: 'Courses, work, files — or / for commands.', act: 'type', doing: 'Type anything',
-        done: () => (document.getElementById('bcv-omni')?.value || '').trim().length >= 2, after: 'Results as you type.',
-        leave: () => {
-          const i = document.getElementById('bcv-omni');
-          if (i && i.value) { i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); }
-          BCV.search?.close?.();
-          BCV.search?.unfloat?.();
-          if (document.activeElement === i) i.blur();
-        } },
+      { id: 'search', name: 'the search box', screen: 'dashboard', target: searchBox, wait: 4000, act: 'next',
+        title: 'Search everything', body: 'Find any course, assignment, file or page from wherever you are — press / to jump straight here. Start with / for commands, like opening a tool.' },
     ],
     // the Dashboard's way in: a card's own sheet, an item previewed beside the list
     cards: () => [
-      { id: 'week', name: 'Next 7 days', screen: 'dashboard', target: weekCard, wait: 6000,
-        title: 'Every card opens', body: '', act: 'click', doing: phone() ? 'Tap Next 7 days' : 'Click Next 7 days',
-        done: () => !!sheet() },
-      { id: 'peek', name: 'an item', screen: 'dashboard', target: firstRow, area: () => [sheet()], when: () => !phone(), allow: '.bcv-sheet-ov .bcv-sheet__row, .bcv-sheet-ov .bcv-sheet__qrow',
-        prep: () => { if (!sheet()) press(weekCard()); },
-        title: 'Peek', body: 'See it without leaving the page.', act: 'click', doing: 'Click an item',
-        done: () => !!$('.bcv-sheet-ov .bcv-pv'), after: 'Esc closes it.',
-        leave: () => press(sheetClose()) },
-      { id: 'peek-close', target: () => $('.bcv-sheet-ov .bcv-ph-sheet__handle') || sheet(), area: () => [sheet()], free: true, when: phone,
-        title: 'Close it', body: '', act: 'click', doing: 'Swipe it down',
-        done: () => !document.querySelector('.bcv-sheet-ov') },
+      { id: 'week', name: 'Next 7 days', screen: 'dashboard', target: weekCard, wait: 6000, act: 'next', title: 'Every card opens',
+        body: () => (phone() ? 'Each card opens into its list. Tap Next 7 days for everything due this week.' : 'Each card on the Dashboard opens into its list. Next 7 days shows what’s due this week — click any item there to preview it without leaving the page.') },
     ],
     // Silent mode (2.99.124): the Dashboard down to what is next, on black; Exit at its top right
     silent: () => [
-      { id: 'silent', name: 'Silent', screen: 'dashboard', target: () => $('#bcv-main .bcv-dash__silent'), when: () => !phone() && !!$('#bcv-main .bcv-dash__silent'),
-        title: 'Silent mode', body: 'Just what’s next. Nothing else.', act: 'click', doing: 'Click Silent',
-        done: silentOn },
-      { id: 'silent-exit', name: 'Exit', screen: 'dashboard', target: () => $('#bcv-main .bcv-silent__exit'), when: () => !phone(), wait: 4000,
-        prep: () => { if (!silentOn()) press($('#bcv-main .bcv-dash__silent')); },
-        title: 'Back any time', body: '', act: 'click', doing: 'Click Exit Silent Mode',
-        done: () => !silentOn() },
+      { id: 'silent', name: 'Silent', screen: 'dashboard', target: () => $('#bcv-main .bcv-dash__silent'), when: () => !phone() && !!$('#bcv-main .bcv-dash__silent'), act: 'next',
+        title: 'Silent mode', body: 'One click takes the Dashboard down to just what’s next, on a calm black screen. Exit Silent Mode brings everything back.' },
     ],
     // the switch: on, or plain Canvas for a while
     look: () => [
-      { id: 'look', name: 'the switch', target: () => inLook('.bcv-look__main'), area: () => [look(), inLook('.bcv-look__menu')], when: () => !!look() && !phone(),
-        title: 'Simpl on or off', body: `Red shows plain ${BCV.lms?.name || 'Canvas'} for a while.`, act: 'hover', doing: 'Hover over the switch',
-        done: lookOpen, after: 'Green keeps Simpl on.' },
+      { id: 'look', name: 'the switch', target: () => inLook('.bcv-look__main'), when: () => !!look() && !phone(), act: 'next',
+        title: 'Simpl on or off', body: () => `Green means Simpl is on. Switch it to red to see plain ${BCV.lms?.name || 'Canvas'} for a while; − and + set how long, and Simpl comes back on by itself.` },
     ],
-    // To Do & Calendar: a task dragged onto a day is planned there; its plan dragged back onto To Do is taken off
-    plan: () => {
-      let before = [];
-      let made = null;
-      const mine = () => (made && document.querySelector(`#bcv-main [data-plan="${CSS.escape(made)}"]`)) || null;
-      let asked = false;
-      /** To Do beside the calendar: shown for the drag if it was folded away (once a step). */
-      const withTodo = () => {
-        const b = $('#bcv-main .bcv-cal__todobtn');
-        if (!asked && b && b.getAttribute('aria-pressed') === 'false') { asked = true; press(b); }
-        return todoRow();
-      };
-      return [
-        { id: 'calendar', name: 'To Do & Calendar', where: 'sidebar', target: () => navRow('calendar'), skip: () => onScreen('calendar'), when: () => !!navRow('calendar') && !phone(),
-          title: 'Plan your week', body: 'To Do and your calendar, side by side.', act: 'click', doing: 'Click To Do & Calendar',
-          done: () => onScreen('calendar') },
-        { id: 'plan', name: 'a task', screen: 'calendar', target: withTodo, area: () => [todoCol(), $('#bcv-main .bcv-cal--month, #bcv-main .bcv-cal--week')], when: () => !phone(), wait: 8000,
-          start: () => { before = plans(); made = null; asked = false; }, dragTo: dropPoint,
-          title: 'Drag to plan', body: 'Drop a task on a day.', act: 'drag', doing: 'Drag a task onto the calendar',
-          done: () => { made = plans().find((k) => !before.includes(k)) || null; return !!made; }, after: 'Planned.' },
-        { id: 'unplan', name: 'your plan', screen: 'calendar', target: () => drawn(mine()), area: () => [mine(), todoCol()], when: () => !phone(), wait: 5000,
-          skip: () => !made, dragTo: () => centreOf(todoCol()),
-          title: 'Changed your mind?', body: 'Drag it back to To Do.', act: 'drag', doing: 'Drag it onto To Do',
-          done: () => !!made && !BCV.plan?.get?.(made), after: 'Unplanned.' },
-      ];
-    },
-    // Grades: the row pressed, then a ring's breakdown (what-if comes on the first Grades opened after the tour)
+    // To Do & Calendar: tasks dragged onto days to plan them
+    plan: () => [
+      { id: 'calendar', name: 'To Do & Calendar', where: 'sidebar', target: () => navRow('calendar'), when: () => !!navRow('calendar') && !phone(), act: 'next',
+        title: 'Plan your week', body: 'To Do & Calendar puts your work beside your calendar. Drag a task onto a day to plan when you’ll do it; drag it back to To Do to take the plan off.' },
+    ],
+    // Grades: every course's, its ring's parts and what-if scores (shown on the page the first time Grades opens after)
     grades: () => [
-      { id: 'grades', name: 'Grades', where: 'sidebar', target: () => navRow('gpa'), skip: () => onScreen('gpa'), when: () => !!navRow('gpa') && !phone(),
-        title: 'Grades', body: 'Every course in one place.', act: 'click', doing: 'Click Grades',
-        done: () => onScreen('gpa') },
-      ...(phone() ? [] : LIB.gradeHover()), // (a phone's run has no Grades)
+      { id: 'grades', name: 'Grades', where: 'sidebar', target: () => navRow('gpa'), when: () => !!navRow('gpa') && !phone(), act: 'next',
+        title: 'Grades', body: 'Every course’s grade in one place. Each ring breaks a grade into its parts, and what-if scores let you try grades you haven’t got yet.' },
     ],
     gradeHover: () => [
-      { id: 'grade-ring', name: 'a ring', screen: 'gpa', target: () => drawn(ringCard()?.querySelector('.bcv-gpa__ringbox')), area: () => [ringCard()], wait: 9000, grades: true,
-        title: 'What makes a grade', body: 'Each ring breaks it down.', act: 'hover', doing: 'Hover over a ring',
-        done: () => !!document.querySelector('.bcv-gpa__card.is-hover') },
+      { id: 'grade-ring', name: 'a ring', screen: 'gpa', target: () => drawn(ringCard()?.querySelector('.bcv-gpa__ringbox')), wait: 9000, grades: true, act: 'next',
+        title: 'What makes a grade', body: 'Each ring breaks a course’s grade into its parts — point at one to see each part’s score and what it’s worth.' },
     ],
     whatIf: () => [
-      { id: 'grade-details', name: 'Details', screen: 'gpa', target: () => drawn((ringCard() || document).querySelector('.bcv-gpa__details')), grades: true,
-        title: 'What if?', body: 'Try scores before you get them.', act: 'click', doing: 'Click Details',
-        done: () => !!sheet() },
-      { id: 'grade-try', name: 'the what-if button', target: () => $('.bcv-sheet-ov .bcv-whatif-btn'), area: () => [sheet()], grades: true,
-        title: 'Try a score', body: '', act: 'click', doing: 'Click “Try what-if scores”',
-        done: () => !!$('.bcv-sheet-ov .bcv-whatif-btn.is-on') },
-      { id: 'grade-field', name: 'a score', target: () => $('.bcv-sheet-ov .bcv-whatif__input'), area: () => [sheet()], grades: true, allow: '.bcv-sheet-ov .bcv-whatif__input',
-        title: 'Change a score', body: 'Nothing is saved.', act: 'type', doing: 'Type a score',
-        on: { input: (e) => !!e.target.closest?.('.bcv-sheet-ov .bcv-whatif__input') }, after: 'Your grade follows.' },
-      { id: 'grade-close', name: 'the close button', target: sheetClose, area: () => [sheet()], grades: true,
-        title: 'Back to real', body: '', act: 'click', doing: 'Close it',
-        done: () => !document.querySelector('.bcv-sheet-ov') },
+      { id: 'grade-details', name: 'Details', screen: 'gpa', target: () => drawn((ringCard() || document).querySelector('.bcv-gpa__details')), wait: 6000, grades: true, act: 'next',
+        title: 'What if?', body: 'Details opens a course’s assignments. Turn on what-if scores there and type a score you haven’t got yet to see where your grade would land. Nothing is saved.' },
     ],
-    // Tools: the row pressed, then any tool's pin pressed (a pin beside the switch); a press on a card itself is held
-    // while the pin is asked for, so no tool opens over the page instead
-    tools: () => {
-      let before = 0;
-      return [
-        { id: 'tools', name: 'Tools', where: 'sidebar', target: () => navRow('tools'), skip: () => onScreen('tools'), when: () => !!navRow('tools') && !phone(),
-          title: 'Tools', body: [['A ', ''], ['PDF editor', '#ff9f0a'], [', ', ''], ['flashcards', '#2f7cf6'], [', ', ''], ['calculators', '#bf5af2'], [' and more.', '']], act: 'click', doing: 'Click Tools',
-          done: () => onScreen('tools') },
-        { id: 'pin', name: 'a pin', screen: 'tools', target: () => $('.bcv-tool-card[data-tool="pomo"] .bcv-tool-card__pin') || $('.bcv-tool-card__pin'), area: () => [$('#bcv-main .bcv-tools-page'), $('#bcv-pins')], wait: 8000, allow: '#bcv-main .bcv-tool-card__pin',
-          when: () => !phone() && !self.BCVBridge?.native, // (the pins sit beside the switch: none on a phone or in the app)
-          start: () => { before = pinnedN(); },
-          title: 'Pin one', body: 'Pinned tools stay a click away.', act: 'click', doing: 'Press a pin',
-          on: { click: (e) => { if (e.target.closest?.('.bcv-tool-card') && !e.target.closest('.bcv-tool-card__pin')) { e.preventDefault(); e.stopImmediatePropagation(); } return false; } },
-          done: () => pinnedN() > before, after: 'Pinned by the switch.' },
-      ];
-    },
+    // Tools: what they are, and pins beside the switch
+    tools: () => [
+      { id: 'tools', name: 'Tools', where: 'sidebar', target: () => navRow('tools'), when: () => !!navRow('tools') && !phone(), act: 'next', title: 'Tools',
+        body: () => [['A ', ''], ['PDF editor', '#ff9f0a'], [', ', ''], ['flashcards', '#2f7cf6'], [', ', ''], ['calculators', '#bf5af2'], [self.BCVBridge?.native ? ' and more, for your classes.' : ' and more. Pin the ones you use and they sit beside the switch, a click away.', '']] },
+    ],
     // the account's ⋯ (Appearance…), after Personalize was tried from the theme invitation
     appearance: () => [
-      { id: 'appearance', name: 'the ⋯ button', where: 'sidebar', target: accountBtn, wait: 4000,
-        title: 'Themes live here', body: 'Appearance… is in this menu.', act: 'click', doing: 'Click ⋯',
-        done: () => !!$('.bcv-menu--account, .bcv-menu--theme'), after: 'Change colors and photos any time.' },
+      { id: 'appearance', name: 'the ⋯ button', where: 'sidebar', target: accountBtn, wait: 4000, act: 'next',
+        title: 'Themes live here', body: 'Appearance… in this menu changes Simpl’s colors, photos and theme whenever you like.' },
     ],
     // the rubric ring's own (2.98.85): on the first ring opened (rubric-ring.js), the ring worked by the student — a
     // color hovered, one opened into its bar, a dot pressed, the little ring pressed to go back
@@ -261,7 +172,7 @@
     },
     // the setup's last
     end: () => [
-      { id: 'end', target: null, title: 'You’re all set', body: 'Replay it any time from Settings.', act: 'next', nextLabel: 'Done' },
+      { id: 'end', target: null, title: 'You’re all set', body: 'You can take this tour again any time from Settings.', act: 'next', nextLabel: 'Done' },
     ],
   };
   /** The setup's run (and the tour played again, or simulated). */
@@ -333,6 +244,8 @@
       h('div', { class: 'bcv-tour__foot' }, [
         h('span', { class: 'bcv-tour__dots', 'aria-hidden': 'true' }),
         h('span', { class: 'bcv-tour__count' }),
+        h('button', { type: 'button', class: 'bcv-tour__skip', text: 'Skip tour', onclick: () => finish() }),
+        h('button', { type: 'button', class: 'bcv-tour__back', text: 'Back', onclick: () => back() }),
         h('button', { type: 'button', class: 'bcv-tour__next', text: 'Next', onclick: () => next() }),
       ]),
     ]);
@@ -369,12 +282,15 @@
         if (e.key === ']' || e.key === '[') { e.preventDefault(); jump(ui.i + (e.key === ']' ? 1 : -1)); return; }
         if (e.key === 'Escape' && !document.querySelector('.bcv-sheet-ov, .bcv-spot-ov')) { e.preventDefault(); finish(); return; }
       }
-      if (e.key !== 'Enter') return;
-      const nb = card.querySelector('.bcv-tour__next');
+      if (!['Enter', 'ArrowRight', 'ArrowLeft', 'Escape'].includes(e.key)) return;
+      if (e.key.startsWith('Arrow') && ui.keysFrom) return; // (over a layer of its own — the rubric ring's — the arrows are that layer's)
       const t = e.target;
-      if (nb.hidden || (t && t !== document.body && !card.contains(t) && !ui.keysFrom?.contains(t))) return; // (Enter in a field is the field's; keysFrom: a layer whose focus is the tour's too, the rubric ring's)
+      if (t && t !== document.body && !card.contains(t) && !ui.keysFrom?.contains(t)) return; // (a key in a field is the field's; keysFrom: a layer whose focus is the tour's too, the rubric ring's)
+      const btn = { Enter: '.bcv-tour__next', ArrowRight: '.bcv-tour__next', ArrowLeft: '.bcv-tour__back', Escape: '.bcv-tour__skip' }[e.key];
+      const b = card.querySelector(btn);
+      if (!b || b.hidden || (e.key === 'Escape' && document.querySelector('.bcv-sheet-ov, .bcv-spot-ov'))) return;
       e.preventDefault();
-      next();
+      b.click();
     };
     // a press anywhere but where the step wants one is held, the lit place included: only the step's own thing takes
     // a press, and only while it is waited for — a step that asks for a hover or only tells takes none, and neither
@@ -494,7 +410,15 @@
   /** On from a step to another: what it leaves out put away first (the search box emptied, the sheet closed) — not
    *  as the run ends, when what was done is left as it is. */
   function leaveCur() { const d = ui?.cur?.def; if (d && !d.left) { d.left = true; if (ui.i < ui.steps.length - 1) try { d.leave?.(); } catch { /* the page moved on */ } } }
-  function next() { if (!ui?.cur) return; ui.cur.completed = true; leaveCur(); begin(ui.i + 1); }
+  function next() {
+    if (!ui?.cur) return;
+    const n = ui.i + 1;
+    const to = ui.steps[n];
+    if (to && to.act === 'next' && to.screen && !onScreen(to.screen)) { jump(n); return; } // (2.99.150: a step to read on another screen: that screen first)
+    ui.cur.completed = true; leaveCur(); begin(n);
+  }
+  /** (2.99.150) Back a step: to the one before, where it is (a step to read only — one done by hand is not undone). */
+  function back() { if (!ui?.cur || ui.i < 1) return; jump(ui.i - 1); }
   /** The simulator's strip, and a run started part way: to step i, with its screen and what it needs first. */
   function jump(i) {
     if (!ui) return;
@@ -554,6 +478,11 @@
       const nb = card.querySelector('.bcv-tour__next');
       nb.hidden = def.act !== 'next' || !read; // (a told step's button comes in once the card has been up a moment)
       nb.textContent = def.nextLabel || (last ? 'Done' : 'Next');
+      // (2.99.150) Back where the step before was one to read too; Skip tour on every step but the last of a run of more
+      // than one
+      const prev = ui.steps[ui.i - 1];
+      card.querySelector('.bcv-tour__back').hidden = def.act !== 'next' || !prev || prev.act !== 'next' || def.nextLabel === 'Start';
+      card.querySelector('.bcv-tour__skip').hidden = last || ui.steps.length < 2;
       card.classList.toggle('is-away', !!away);
       card.classList.toggle('is-told', def.act === 'next');
       if (ui.cur.completed) return;
@@ -592,6 +521,8 @@
     if (target && st.clipFor !== target) { st.clipFor = target; st.clips = clipEls(target); } // (the boxes that clip it, read once per element)
     st.clip = target ? clipRect(st.clips) : null;
     const away = t ? awayOf(t, st.clip) : null;
+    // (2.99.150) a step to read whose thing is out of sight: brought into view, once (a step done by hand says which way)
+    if (away && base.act === 'next' && !st.scrolled) { st.scrolled = true; target.scrollIntoView({ block: 'center', inline: 'nearest', behavior: reduced() ? 'auto' : 'smooth' }); }
     const read = !base.read || now - st.at >= base.read;
     const key = [def.id || base.id, ready, away, read, st.completed].join('|');
     if (key !== ui.key) { ui.key = key; paintCard(def, away, read); }

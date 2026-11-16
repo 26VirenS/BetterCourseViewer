@@ -963,10 +963,8 @@
   // the step picked, practising or not, with its strip of steps or not. The steps as the tour has them (its SETUP run,
   // on a desktop: a phone's has fewer).
   const TOUR_STEPS = [
-    ['hello', 'Welcome'], ['search', 'Search everything'], ['week', 'Every card opens'], ['peek', 'Peek'],
-    ['silent', 'Silent mode'], ['silent-exit', 'Back any time'], ['look', 'Simpl on or off'],
-    ['calendar', 'Plan your week'], ['plan', 'Drag to plan'], ['unplan', 'Changed your mind?'],
-    ['grades', 'Grades'], ['grade-ring', 'What makes a grade'], ['tools', 'Tools'], ['pin', 'Pin one'], ['end', 'You’re all set'],
+    ['hello', 'Welcome'], ['search', 'Search everything'], ['week', 'Every card opens'], ['silent', 'Silent mode'],
+    ['look', 'Simpl on or off'], ['calendar', 'Plan your week'], ['grades', 'Grades'], ['tools', 'Tools'], ['end', 'You’re all set'],
   ];
   $('devTourFrom').replaceChildren(...TOUR_STEPS.map(([id, name], i) => h('option', { value: id, text: `${i + 1}. ${name}` })));
   const devTourSub = () => { $('devTourSub').textContent = `${TOUR_STEPS.length} steps. Opens in a new Canvas tab.`; };

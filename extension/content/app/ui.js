@@ -732,7 +732,7 @@
   const COURSE_COLORS = [['#BD3C14', 'Brick'], ['#FF2717', 'Red'], ['#E71F63', 'Magenta'], ['#8F3E97', 'Purple'], ['#65499D', 'Deep purple'], ['#4554A4', 'Indigo'], ['#1770AB', 'Blue'], ['#0B9BE3', 'Light blue'], ['#06A3B7', 'Cyan'], ['#009688', 'Teal'], ['#009606', 'Green'], ['#8D9900', 'Olive'], ['#D97900', 'Pumpkin'], ['#FD5D10', 'Orange'], ['#F06291', 'Pink']];
   /** (2.99.118) `title`: what it colours ("Course colour" by default); `reset`: { label, onPick } — a first swatch that
    *  puts back the colour it had of its own (a card's or the sidebar's: the theme's), marked while nothing else is. */
-  function colorMenu(anchor, current, onPick, { title = 'Course colour', reset = null } = {}) {
+  function colorMenu(at, current, onPick, { title = 'Course colour', reset = null } = {}) {
     closeMenus();
     const cur = String(current || '').toLowerCase();
     const custom = h('input', { type: 'color', class: 'bcv-swatch__input', value: /^#[0-9a-f]{6}$/i.test(cur) ? cur : '#8e8e93', 'aria-label': 'Custom colour' });
@@ -749,12 +749,14 @@
       ]),
     ]);
     m.addEventListener('click', (e) => e.stopPropagation());
-    const r = anchor.getBoundingClientRect();
-    const left = Math.max(8, Math.min(r.left, window.innerWidth - 230));
-    // (it grows out of the dot that opened it, not from its own middle: bcv-pop scales from the origin)
-    Object.assign(m.style, { position: 'fixed', top: `${r.bottom + 6}px`, left: `${left}px`, transformOrigin: `${Math.round(r.left + r.width / 2 - left)}px top` });
-    overSheet(m, anchor);
+    const r = at.getBoundingClientRect();
+    overSheet(m, at);
     overlayRoot().append(m);
+    // (2.99.150) under the dot that opened it — or over it when there is no room under it, as every other menu: a course
+    // low in the sidebar had its colours cut off at the window's foot. It grows out of the dot, not its own middle.
+    anchor(m, r, { side: 'below', gap: 6 });
+    const left = parseFloat(m.style.left) || 0;
+    m.style.transformOrigin = `${Math.round(r.left + r.width / 2 - left)}px ${(parseFloat(m.style.top) || 0) < r.top ? 'bottom' : 'top'}`;
     setTimeout(() => document.addEventListener('click', closeMenus, { once: true }), 0);
     return m;
   }
