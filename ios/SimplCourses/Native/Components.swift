@@ -632,8 +632,10 @@ struct SplitColumnWidth: UIViewRepresentable {
 
         private func pin(_ split: UISplitViewController) {
             guard !busy, !Self.yielded.contains(split), off(split) else { return }
-            // (build 47) set again more than a dozen times within one turn of the run loop — each setting answered by its
-            // undoing in the same layout pass — or hundreds of times in two seconds: a tug of war, which the system wins
+            // (build 47) set again dozens of times within one turn of the run loop — each setting answered by its undoing
+            // in the same layout pass — or a thousand times in two seconds: a tug of war, which the system wins. (Build 49:
+            // 40 a turn, not 12 — a launch in the simulator sets it 13 times in its first turn and then stops; the Duo's
+            // loop never stops, and passes 40 in a moment.)
             pinsThisTurn += 1
             if !turnEnds {
                 turnEnds = true
@@ -644,7 +646,7 @@ struct SplitColumnWidth: UIViewRepresentable {
             }
             let now = Date()
             recent = recent.filter { now.timeIntervalSince($0) < 2 } + [now]
-            if pinsThisTurn > 12 || recent.count > 600 {
+            if pinsThisTurn > 40 || recent.count > 1000 {
                 Self.yielded.add(split)
                 watchers = []
                 held = nil
