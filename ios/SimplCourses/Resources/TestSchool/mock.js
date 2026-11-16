@@ -667,7 +667,7 @@ const files = {
   f101b: [{ id: 'f4', display_name: 'Dis01 worksheet.pdf', filename: 'dis01.pdf', 'content-type': 'application/pdf', size: 80000, updated_at: ago(3 * D), url: '/files/f4/download' }],
   f101c: [],
 };
-const quizzes = (courseId) => allAssignments(courseId).filter((a) => a.is_quiz_assignment).map((a, i) => ({ id: a.quiz_id, title: a.name, due_at: a.due_at, points_possible: a.points_possible, question_count: (mockConfig.richQuestions ? 7 : 4) + (mockConfig.moreTypes ? 2 : 0), quiz_type: a.quiz_survey || (a.name === 'Skills_Check' ? 'practice_quiz' : 'assignment'), time_limit: 20, allowed_attempts: mockConfig.richQuestions ? 5 : 1, description: `<p>${a.name}: four questions on the pre-lecture reading.</p>`, html_url: `/courses/${courseId}/quizzes/${a.quiz_id}`, locked_for_user: false, assignment_id: a.id, one_question_at_a_time: a.name === 'Lec07-PreQuiz', cant_go_back: a.name === 'Lec07-PreQuiz', hide_results: null, show_correct_answers: true, shuffle_answers: false, has_access_code: !!a.quiz_access_code && !a.quiz_code_hidden, ip_filter: a.quiz_ip_filter || null, require_lockdown_browser: !!a.quiz_lockdown }));
+const quizzes = (courseId) => allAssignments(courseId).filter((a) => a.is_quiz_assignment).map((a, i) => ({ id: a.quiz_id, title: a.name, due_at: a.due_at, points_possible: a.points_possible, question_count: (mockConfig.richQuestions ? 7 : 4) + (mockConfig.moreTypes ? 2 : 0) + (mockConfig.typedBlanks ? 1 : 0), quiz_type: a.quiz_survey || (a.name === 'Skills_Check' ? 'practice_quiz' : 'assignment'), time_limit: 20, allowed_attempts: mockConfig.richQuestions ? 5 : 1, description: `<p>${a.name}: four questions on the pre-lecture reading.</p>`, html_url: `/courses/${courseId}/quizzes/${a.quiz_id}`, locked_for_user: false, assignment_id: a.id, one_question_at_a_time: a.name === 'Lec07-PreQuiz', cant_go_back: a.name === 'Lec07-PreQuiz', hide_results: null, show_correct_answers: true, shuffle_answers: false, has_access_code: !!a.quiz_access_code && !a.quiz_code_hidden, ip_filter: a.quiz_ip_filter || null, require_lockdown_browser: !!a.quiz_lockdown }));
 
 // ---- quiz attempts (stateful, like Canvas's quiz submission API) --------------------------
 // quiz 9001 was taken once: q1 right, q2 wrong (17.68 m), q3 right, q4 right = 13 of 16
@@ -700,6 +700,16 @@ const quizQuestionBank = (quizId) => {
       ] },
     // an essay: Canvas keeps the answer as the editor's HTML (paragraphs, lists), which is what comes back
     { id: `${quizId}7`, position: 7, question_name: 'Question 7', question_type: 'essay_question', question_text: '<p>What are the pros and cons of group work?</p>', points_possible: 2, answers: [] }] : []),
+    // (typedBlanks, test-only; 2.99.149, SR-MWITRPSK-SFHL) blanks typed into, as a real one was written: its answers
+    // listed word2's first (Canvas lists a blank each in that order, the sentence's own the other way round), and none of
+    // them handed to the student (censor)
+    ...(mockConfig.typedBlanks ? [{ id: `${quizId}20`, position: 20, question_name: 'Question 20', question_type: 'fill_in_multiple_blanks_question', question_text: '<p>Faint edges sharpen as neurons in your [word1] begin to fire. This is [word2] in your visual cortex filling in missing edges.</p>', points_possible: 0.5,
+      answers: [
+        { id: Number(`${quizId}201`), text: 'v2', blank_id: 'word2', weight: 100 },
+        { id: Number(`${quizId}202`), text: 'V2', blank_id: 'word2', weight: 100 },
+        { id: Number(`${quizId}203`), text: 'V1', blank_id: 'word1', weight: 100 },
+        { id: Number(`${quizId}204`), text: 'primary visual cortex', blank_id: 'word1', weight: 100 },
+      ] }] : []),
     // (moreTypes, test-only) a formula question — its variables already put in the text for this student, as Canvas does — and a file to hand in
     ...(mockConfig.moreTypes ? [
       { id: `${quizId}8`, position: 8, question_name: 'Question 8', question_type: 'calculated_question', question_text: '<p>A cart travels 12 m in 4 s. What is its speed in m/s?</p>', points_possible: 2, answer_tolerance: 0.05, formula_decimal_places: 1, variables: [{ name: 'd', min: 10, max: 20, scale: 0 }, { name: 't', min: 2, max: 5, scale: 0 }], formulas: [{ formula: 'd/t' }], answers: [{ id: Number(`${quizId}81`), variables: [{ name: 'd', value: 12 }, { name: 't', value: 4 }], answer: 3 }] },
@@ -764,7 +774,35 @@ const codeRefused = (s, body) => { const need = codeOf(s); return need && (body 
 // does here, the point being that the name is not the blank). So the only thing that says which
 // blank a dropdown belongs to is the set of answers it offers, which is what the interface reads.
 const BLANK_KINDS = new Set(['multiple_dropdowns_question', 'fill_in_multiple_blanks_question']);
-const blankTag = (b) => [...String(b)].reduce((n, c) => Math.imul(n, 33) + c.charCodeAt(0) >>> 0, 5381).toString(16).padStart(8, '0');
+// (2.99.149) Canvas's own: md5("dropdown,<blank>,instructure-key") (canvas-lms AssessmentQuestion.variable_id). MD5 written out
+// (RFC 1321) rather than node:crypto's, as the test school runs this mock in the iPhone app (make-test-school.mjs).
+const md5 = (() => {
+  const K = Array.from({ length: 64 }, (_, i) => Math.floor(Math.abs(Math.sin(i + 1)) * 2 ** 32) | 0);
+  const S = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21];
+  return (str) => {
+    const bytes = new TextEncoder().encode(str);
+    const n = ((bytes.length + 8) >>> 6) + 1;
+    const w = new Int32Array(n * 16);
+    for (let i = 0; i < bytes.length; i++) w[i >> 2] |= bytes[i] << ((i % 4) * 8);
+    w[bytes.length >> 2] |= 0x80 << ((bytes.length % 4) * 8);
+    w[n * 16 - 2] = bytes.length * 8;
+    let a0 = 0x67452301, b0 = 0xefcdab89 | 0, c0 = 0x98badcfe | 0, d0 = 0x10325476;
+    for (let blk = 0; blk < w.length; blk += 16) {
+      let a = a0, b = b0, c = c0, d = d0;
+      for (let i = 0; i < 64; i++) {
+        let f, g;
+        if (i < 16) { f = (b & c) | (~b & d); g = i; } else if (i < 32) { f = (d & b) | (~d & c); g = (5 * i + 1) % 16; } else if (i < 48) { f = b ^ c ^ d; g = (3 * i + 5) % 16; } else { f = c ^ (b | ~d); g = (7 * i) % 16; }
+        const x = (a + f + K[i] + w[blk + g]) | 0;
+        const sh = S[(i >> 4) * 4 + (i % 4)];
+        a = d; d = c; c = b;
+        b = (b + ((x << sh) | (x >>> (32 - sh)))) | 0;
+      }
+      a0 = (a0 + a) | 0; b0 = (b0 + b) | 0; c0 = (c0 + c) | 0; d0 = (d0 + d) | 0;
+    }
+    return [a0, b0, c0, d0].map((v) => [0, 8, 16, 24].map((k) => ((v >>> k) & 0xff).toString(16).padStart(2, '0')).join('')).join('');
+  };
+})();
+const blankTag = (b) => md5(`dropdown,${b},instructure-key`);
 const blankFields = (q, held = {}) => {
   if (!BLANK_KINDS.has(q.question_type)) return q.question_text;
   const drops = q.question_type === 'multiple_dropdowns_question';

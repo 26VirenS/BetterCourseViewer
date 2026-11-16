@@ -8,7 +8,6 @@
 import { MACMILLAN_HUB_HTML, MACMILLAN_SAC_HTML } from './mock-macmillan.mjs';
 import { ALEKS_LEARN_HTML } from './mock-aleks.mjs';
 import http from 'node:http';
-import { createHash } from 'node:crypto';
 import { renameNames } from './site-names.mjs';
 import { communityMock } from './mock-community.mjs'; // (2.99.106: Simpl Community, as simplcourses.com has it)
 import { feedMock } from './mock-feed.mjs'; // (2.99.110: Simpl's own calendar feed, as simplcourses.com has it)
@@ -470,8 +469,35 @@ const codeRefused = (s, body) => { const need = codeOf(s); return need && (body 
 // does here, the point being that the name is not the blank). So the only thing that says which
 // blank a dropdown belongs to is the set of answers it offers, which is what the interface reads.
 const BLANK_KINDS = new Set(['multiple_dropdowns_question', 'fill_in_multiple_blanks_question']);
-// (2.99.149) Canvas's own: md5("dropdown,<blank>,instructure-key") (canvas-lms AssessmentQuestion.variable_id)
-const blankTag = (b) => createHash('md5').update(`dropdown,${b},instructure-key`).digest('hex');
+// (2.99.149) Canvas's own: md5("dropdown,<blank>,instructure-key") (canvas-lms AssessmentQuestion.variable_id). MD5 written out
+// (RFC 1321) rather than node:crypto's, as the test school runs this mock in the iPhone app (make-test-school.mjs).
+const md5 = (() => {
+  const K = Array.from({ length: 64 }, (_, i) => Math.floor(Math.abs(Math.sin(i + 1)) * 2 ** 32) | 0);
+  const S = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21];
+  return (str) => {
+    const bytes = new TextEncoder().encode(str);
+    const n = ((bytes.length + 8) >>> 6) + 1;
+    const w = new Int32Array(n * 16);
+    for (let i = 0; i < bytes.length; i++) w[i >> 2] |= bytes[i] << ((i % 4) * 8);
+    w[bytes.length >> 2] |= 0x80 << ((bytes.length % 4) * 8);
+    w[n * 16 - 2] = bytes.length * 8;
+    let a0 = 0x67452301, b0 = 0xefcdab89 | 0, c0 = 0x98badcfe | 0, d0 = 0x10325476;
+    for (let blk = 0; blk < w.length; blk += 16) {
+      let a = a0, b = b0, c = c0, d = d0;
+      for (let i = 0; i < 64; i++) {
+        let f, g;
+        if (i < 16) { f = (b & c) | (~b & d); g = i; } else if (i < 32) { f = (d & b) | (~d & c); g = (5 * i + 1) % 16; } else if (i < 48) { f = b ^ c ^ d; g = (3 * i + 5) % 16; } else { f = c ^ (b | ~d); g = (7 * i) % 16; }
+        const x = (a + f + K[i] + w[blk + g]) | 0;
+        const sh = S[(i >> 4) * 4 + (i % 4)];
+        a = d; d = c; c = b;
+        b = (b + ((x << sh) | (x >>> (32 - sh)))) | 0;
+      }
+      a0 = (a0 + a) | 0; b0 = (b0 + b) | 0; c0 = (c0 + c) | 0; d0 = (d0 + d) | 0;
+    }
+    return [a0, b0, c0, d0].map((v) => [0, 8, 16, 24].map((k) => ((v >>> k) & 0xff).toString(16).padStart(2, '0')).join('')).join('');
+  };
+})();
+const blankTag = (b) => md5(`dropdown,${b},instructure-key`);
 const blankFields = (q, held = {}) => {
   if (!BLANK_KINDS.has(q.question_type)) return q.question_text;
   const drops = q.question_type === 'multiple_dropdowns_question';
