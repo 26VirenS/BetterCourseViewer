@@ -553,8 +553,19 @@ final class Engine: ObservableObject, ShellListener {
     /// (iPhone 1.8.1, build 43) A rail down the screen's side (the iPhone Duo folded, or open on its side), where iOS
     /// puts the bars' buttons one under another (TabBarProbe, ShellToolbar).
     @Published private(set) var rail = false
+    /// (Build 47) When the rail last came or went: more than a few times in a few seconds (the screen's bars moving into
+    /// it or out of it changing the very safe areas it is told by) and it is held as it is.
+    private var railChanges: [Date] = []
+    private var railHeld = false
     func setRail(_ on: Bool) {
-        guard on != rail else { return }
+        guard on != rail, !railHeld else { return }
+        let now = Date()
+        railChanges = railChanges.filter { now.timeIntervalSince($0) < 3 } + [now]
+        if railChanges.count > 6 {
+            railHeld = true
+            print("[Simpl Courses] rail: came and went \(railChanges.count) times in 3 s; held as it is")
+            return
+        }
         rail = on
         print("[Simpl Courses] rail: \(on ? "down the side" : "none")")
     }

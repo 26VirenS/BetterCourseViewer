@@ -553,6 +553,15 @@ struct SplitColumnWidth: UIViewRepresentable {
         private var watchers: [NSKeyValueObservation] = []
         private var busy = false
         private var noted: Set<String> = []
+        /// (Build 47) Times the width was set in this turn of the main run loop, and in the last two seconds.
+        private var pinsThisTurn = 0
+        private var turnEnds = false
+        private var recent: [Date] = []
+        /// (Build 47) Split views whose width is left to the system: on an iPhone Duo (iOS 27.3), something puts the list
+        /// column's width back in every layout pass, and setting it again from here set off the next pass — the screen
+        /// laid itself out for ever, and iOS ended the app for not finishing a change of the screen within 5 seconds
+        /// (0x8BADF00D). Kept for the split view, whatever view in it asks next.
+        private static let yielded = NSHashTable<UISplitViewController>.weakObjects()
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
@@ -565,7 +574,7 @@ struct SplitColumnWidth: UIViewRepresentable {
         }
 
         func apply() {
-            guard width >= 200, width.isFinite, window != nil, let split = findSplit() else { return }
+            guard width >= 200, width.isFinite, window != nil, let split = findSplit(), !Self.yielded.contains(split) else { return }
             if held !== split {
                 hold(split)
             } else if off(split) {
@@ -602,7 +611,7 @@ struct SplitColumnWidth: UIViewRepresentable {
         }
 
         private func reassert(_ split: UISplitViewController) {
-            guard !busy, held === split, width >= 200, window != nil, off(split) else { return }
+            guard !busy, held === split, width >= 200, window != nil, !Self.yielded.contains(split), off(split) else { return }
             // (build 45) SwiftUI only ever puts "automatic" back (every frame of an animation on the screen, sometimes); a
             // width of its own set by something else — the system keeping the column off the Duo's fold, say — is left
             // to it, rather than fought over. (Builds 43–44 counted resets a second instead, which an animation passed.)
@@ -622,7 +631,26 @@ struct SplitColumnWidth: UIViewRepresentable {
         }
 
         private func pin(_ split: UISplitViewController) {
-            guard !busy, off(split) else { return }
+            guard !busy, !Self.yielded.contains(split), off(split) else { return }
+            // (build 47) set again more than a dozen times within one turn of the run loop — each setting answered by its
+            // undoing in the same layout pass — or hundreds of times in two seconds: a tug of war, which the system wins
+            pinsThisTurn += 1
+            if !turnEnds {
+                turnEnds = true
+                DispatchQueue.main.async { [weak self] in
+                    self?.pinsThisTurn = 0
+                    self?.turnEnds = false
+                }
+            }
+            let now = Date()
+            recent = recent.filter { now.timeIntervalSince($0) < 2 } + [now]
+            if pinsThisTurn > 12 || recent.count > 600 {
+                Self.yielded.add(split)
+                watchers = []
+                held = nil
+                print("[Simpl Courses] split: the list column's width is undone as soon as it is set (\(pinsThisTurn) this turn, \(recent.count) in 2 s); left to the system")
+                return
+            }
             busy = true
             defer { busy = false }
             split.maximumPrimaryColumnWidth = max(width, split.maximumPrimaryColumnWidth)

@@ -111,6 +111,14 @@ final class CrashCatcher: NSObject, ObservableObject, MXMetricManagerSubscriber 
                 Self.store(kind: "MetricKit crash report", lines.joined(separator: "\n"))
                 any = true
             }
+            // (build 47) a freeze the app came through — or did not (iOS ending an app that froze is a crash report of
+            // its own, 0x8BADF00D, above)
+            for h in payload.hangDiagnostics ?? [] {
+                var lines: [String] = ["build \(h.metaData.applicationBuildVersion)", "froze for \(h.hangDuration)"]
+                lines.append(contentsOf: Self.calls(h.callStackTree))
+                Self.store(kind: "MetricKit hang report", lines.joined(separator: "\n"))
+                any = true
+            }
         }
         guard any else { return }
         DispatchQueue.main.async { self.report = UserDefaults.standard.string(forKey: Self.key) }
