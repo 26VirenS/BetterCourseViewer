@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Today: the six counters (each opens what it counted), the day's work with its ticks, and the week's
 /// load per course — the web Today's numbers, drawn by the phone.
@@ -227,36 +228,54 @@ struct WorkRowView: View {
     }
 }
 
-/// (iPhone 1.9) A counter's sheet says what its list is ("Past due with nothing handed in") in its bar, on the leading
-/// side across from Done, beside the title — words, not a button: no glass round them.
+/// (iPhone 1.9) A counter's sheet says what its list is ("Past due with nothing handed in", "35 points across 3 courses ·
+/// Tue, Nov 17") in its bar, on the leading side across from Done, beside the title — words, not a button: no glass round
+/// them. (Build 61) As wide as the room the title leaves it (the bar squeezed words left to size themselves down to a
+/// sliver, "Tue, / Nov…"): one line where they fit, else two, broken at the "·" when there is one.
 private struct SheetNote: ViewModifier {
     let note: String?
-    @Environment(\.wideScreen) private var wide
+    let title: String
+    /// The sheet's own width.
+    let width: CGFloat
 
     private var text: String? { note.flatMap { $0.isEmpty ? nil : $0 } }
+    private static let font = UIFont.preferredFont(forTextStyle: .footnote)
+
+    /// The room on the title's leading side: half of what the title leaves, less the bar's margins.
+    private var room: CGFloat {
+        let titleW = (title as NSString).size(withAttributes: [.font: UIFont.preferredFont(forTextStyle: .headline)]).width
+        return max(84, min(420, (width - titleW) / 2 - 34))
+    }
+
+    /// The words, broken at the "·" (onto two lines) when they do not fit on one.
+    private func lines(_ s: String) -> String {
+        let one = (s as NSString).size(withAttributes: [.font: Self.font]).width
+        guard one > room, let r = s.range(of: " · ") else { return s }
+        return s.replacingCharacters(in: r, with: "\n")
+    }
 
     private func label(_ s: String) -> some View {
-        Text(s)
+        Text(lines(s))
             .font(.footnote.weight(.medium))
             .foregroundStyle(.secondary)
             .lineLimit(2)
+            .minimumScaleFactor(0.8)
             .multilineTextAlignment(.leading)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: wide ? 300 : 128, alignment: .leading)
-            .accessibilityAddTraits(.isStaticText)
+            .frame(width: room, alignment: .leading)
+            .accessibilityLabel(s)
     }
 
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
             content.toolbar {
-                if let s = text {
+                if let s = text, width > 0 {
                     ToolbarItem(placement: .topBarLeading) { label(s) }
                         .sharedBackgroundVisibility(.hidden)
                 }
             }
         } else {
             content.toolbar {
-                if let s = text {
+                if let s = text, width > 0 {
                     ToolbarItem(placement: .topBarLeading) { label(s) }
                 }
             }
@@ -275,6 +294,8 @@ struct ItemsSheet: View {
     /// Half the screen first, every time (1.4): a sheet left to pick its own height came up at the top
     /// whenever its list was long enough to scroll; a swipe up on the list takes it to the top first.
     @State private var detent: PresentationDetent = .medium
+    /// (Build 61) The sheet's width: the room its bar's note has (SheetNote).
+    @State private var sheetWidth: CGFloat = 0
 
     var body: some View {
         NavigationStack {
@@ -319,7 +340,8 @@ struct ItemsSheet: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
-            .modifier(SheetNote(note: data?.note)) // (1.9: what the list is, in the bar across from Done, not over the list)
+            .modifier(SheetNote(note: data?.note, title: data?.title ?? "", width: sheetWidth)) // (1.9: what the list is, in the bar across from Done)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { sheetWidth = $0 }
         }
         .presentationDetents([.medium, .large], selection: $detent)
         .presentationContentInteraction(.resizes)
