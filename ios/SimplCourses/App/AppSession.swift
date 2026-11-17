@@ -123,7 +123,9 @@ final class AppSession: ObservableObject {
     func changeSchool() {
         Task { await Reminders.shared.clear() } // (another school's work: none of these reminders are its)
         Task { await Activity.shared.reset() }
-        SavedAnswers.shared.eraseAll() // (1.9: what the screens last showed was that school's)
+        #if os(iOS)
+        SavedAnswers.shared.eraseAll() // (iPhone 1.9: what the screens last showed was that school's)
+        #endif
         #if os(iOS)
         TestSchool.signOut() // (the test school, picked again, asks for its sign-in again)
         #endif
@@ -137,7 +139,9 @@ final class AppSession: ObservableObject {
     func signOut(completion: @escaping () -> Void = {}) {
         Task { await Reminders.shared.clear() } // (the next account's work is not this one's)
         Task { await Activity.shared.reset() }
-        SavedAnswers.shared.eraseAll() // (1.9: nor is what the screens last showed)
+        #if os(iOS)
+        SavedAnswers.shared.eraseAll() // (iPhone 1.9: nor is what the screens last showed)
+        #endif
         CookieJar.shared.clear()
         LoginVault.clear()
         #if os(iOS)
