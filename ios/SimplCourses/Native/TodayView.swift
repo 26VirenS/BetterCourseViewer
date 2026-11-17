@@ -227,6 +227,43 @@ struct WorkRowView: View {
     }
 }
 
+/// (iPhone 1.9) A counter's sheet says what its list is ("Past due with nothing handed in") in its bar, on the leading
+/// side across from Done, beside the title — words, not a button: no glass round them.
+private struct SheetNote: ViewModifier {
+    let note: String?
+    @Environment(\.wideScreen) private var wide
+
+    private var text: String? { note.flatMap { $0.isEmpty ? nil : $0 } }
+
+    private func label(_ s: String) -> some View {
+        Text(s)
+            .font(.footnote.weight(.medium))
+            .foregroundStyle(.secondary)
+            .lineLimit(2)
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: wide ? 300 : 128, alignment: .leading)
+            .accessibilityAddTraits(.isStaticText)
+    }
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.toolbar {
+                if let s = text {
+                    ToolbarItem(placement: .topBarLeading) { label(s) }
+                        .sharedBackgroundVisibility(.hidden)
+                }
+            }
+        } else {
+            content.toolbar {
+                if let s = text {
+                    ToolbarItem(placement: .topBarLeading) { label(s) }
+                }
+            }
+        }
+    }
+}
+
 /// A counter's list (Due today, Next 7 days, Unread, Overdue, Tomorrow, Graded), as Apple's sheet.
 struct ItemsSheet: View {
     let key: String
@@ -244,9 +281,6 @@ struct ItemsSheet: View {
             Group {
                 if let d = data {
                     List {
-                        if let note = d.note, !note.isEmpty {
-                            Section { Text(note).font(.subheadline).foregroundStyle(.secondary) }
-                        }
                         if d.sections.isEmpty {
                             ContentUnavailableView(d.empty ?? "Nothing here.", systemImage: "checkmark.circle")
                         }
@@ -285,6 +319,7 @@ struct ItemsSheet: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
+            .modifier(SheetNote(note: data?.note)) // (1.9: what the list is, in the bar across from Done, not over the list)
         }
         .presentationDetents([.medium, .large], selection: $detent)
         .presentationContentInteraction(.resizes)
