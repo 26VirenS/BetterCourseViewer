@@ -797,6 +797,28 @@ try {
     && ch1.courses.filter((c) => c.on).map((c) => c.id).join() === chKeep.join() && !(chTab.rows || []).some((r) => r.id === chDropped) && /at least one/.test(chNone.error || '')
     && chBack.ok && ch2.courses.filter((c) => c.on).map((c) => c.id).join() === chWas.join(),
     `the selected courses chosen on their own: every current course listed, the ticked ones selected exactly, the Courses tab without the one left out, none refused: ${JSON.stringify({ was: chWas, keep: chKeep, after: ch1.courses?.filter((c) => c.on).map((c) => c.id), tab: chTab.rows?.map((r) => r.id), none: chNone })}`);
+  // (iPhone 1.9) On the iPhone (its web view says Mobile/15E148) the selected courses are the app's own: Canvas's favourites
+  // cleared — none starred, so Canvas calls every course one — leave Today, Courses and Grades on the courses chosen; and a
+  // choice the app had not kept yet comes back from the courses the iPhone's setup gave targets to
+  const favsOff = (ids) => sp.evaluate(async (list) => { for (const id of list) await fetch(`/api/v1/users/self/favorites/courses/${id}`, { method: 'DELETE' }); }, ids);
+  const ownRows = async () => { await nc('refresh'); const [c, g, t] = await Promise.all([nc('courses'), nc('grades'), nc('courseChoices')]); return { courses: (c.rows || []).map((r) => r.id).join(), grades: (g.rows || []).map((r) => r.id).join(), ticked: (t.courses || []).filter((x) => x.on).map((x) => x.id).join() }; };
+  const targetsWas = await sp.evaluate(() => self.BCV.store.pref('gradeTargets'));
+  await sp.evaluate(() => { self.__ua = navigator.userAgent; Object.defineProperty(Navigator.prototype, 'userAgent', { get: () => `${self.__ua} Mobile/15E148`, configurable: true }); });
+  await sp.evaluate(() => Promise.all([self.BCV.store.setPref('selectedCourses', null), self.BCV.store.setPref('gradeTargets', { 101: 'A', 102: 'B+' })]));
+  await favsOff(chWas);
+  const restored = await ownRows();
+  const keptPick = await sp.evaluate(() => self.BCV.store.pref('selectedCourses'));
+  check(restored.courses === '101,102' && restored.grades === '101,102' && restored.ticked === '101,102' && JSON.stringify(keptPick) === '["101","102"]',
+    `with none starred in Canvas, the iPhone's choice comes back from the courses its setup gave targets to — on Courses, on Grades, in Choose Courses — and is kept: ${JSON.stringify({ ...restored, kept: keptPick })}`);
+  const pickedOwn = await nc('chooseCourses', { courses: ['101', '103'] });
+  await favsOff(['101', '103']);
+  const afterPick = await ownRows();
+  check(pickedOwn.ok && afterPick.courses === '101,103' && afterPick.grades === '101,103' && afterPick.ticked === '101,103',
+    `a choice made in Choose Courses holds on Courses and Grades even once Canvas's stars are cleared: ${JSON.stringify(afterPick)}`);
+  await nc('chooseCourses', { courses: chWas });
+  await sp.evaluate((t) => Promise.all([self.BCV.store.setPref('selectedCourses', null), self.BCV.store.setPref('gradeTargets', t)]), targetsWas);
+  await sp.evaluate(() => { Object.defineProperty(Navigator.prototype, 'userAgent', { get: () => self.__ua, configurable: true }); });
+  await nc('refresh');
   // (1.3) What's New after an update is marked seen when the app's sheet is really up, not when it is asked for:
   // a sheet held back (a sign-in still under way) comes up later, still due
   await sp.evaluate(() => self.BCV.api.storage.local.set({ 'whatsnew:seen': '2.99.2' }));

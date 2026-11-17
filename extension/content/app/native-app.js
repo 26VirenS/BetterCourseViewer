@@ -190,9 +190,45 @@
    *  up from the figure shown (92.5 is 93; null without one) for a figure of whole percents. */
   const scoreFigures = (v) => { const has = v !== null && v !== undefined && Number.isFinite(Number(v)); return { scoreText: has ? pctFmt(v) : '–', scoreWhole: has ? wholeOf(v) : null }; };
   const byDate = (a, b) => a.date - b.date;
+  // ---- the selected courses (iPhone 1.9: the iPhone's own) ------------------------------------------------------------
+  // On the iPhone the courses chosen (its setup, Choose Courses) are kept by the app itself ('selectedCourses'), and every
+  // screen — Today, Courses, Grades and the GPA — shows those, whatever Canvas's favourites say: Canvas calls every course
+  // a favourite when none is starred (and starring them one at a time from there starred them all), so a choice kept only
+  // there could come back as every course. Before any was kept: the courses the iPhone's setup gave a target to (it gives
+  // one to each course it is told counts), where those are some of the current courses rather than all of them; else
+  // Canvas's favourites, as before. (The Mac app, which runs this page too, keeps Canvas's favourites as its choice.)
+  const iPhoneApp = () => /\bMobile\/15E148\b/.test(navigator.userAgent || '');
+  async function ownSelection(age = NO_AGE) {
+    if (!iPhoneApp()) return null;
+    const [all, kept] = await Promise.all([store.courses(age).catch(() => []), store.pref('selectedCourses')]);
+    const current = (all || []).filter((c) => c.state === 'current').map((c) => String(c.id));
+    const cur = new Set(current);
+    if (Array.isArray(kept)) {
+      const ids = kept.map(String).filter((id) => cur.has(id));
+      return ids.length ? ids : null; // (none of them current — a new term: Canvas's favourites, until chosen again)
+    }
+    const [targetsPref, done] = await Promise.all([store.pref('gradeTargets'), setupDone()]);
+    if (!done) return null;
+    const aimed = Object.keys(targetsPref && typeof targetsPref === 'object' ? targetsPref : {}).filter((id) => cur.has(id));
+    if (!aimed.length || aimed.length >= current.length) return null;
+    await store.setPref('selectedCourses', aimed).catch(() => {});
+    return aimed;
+  }
   async function selection(age = NO_AGE) {
-    const favs = await store.favorites(age).catch(() => []);
-    return { list: favs, ids: new Set(favs.map((c) => String(c.id))) };
+    const [favs, own] = await Promise.all([store.favorites(age).catch(() => []), ownSelection(age).catch(() => null)]);
+    if (!own) return { list: favs, ids: new Set(favs.map((c) => String(c.id))) };
+    const all = await store.courses(age).catch(() => []);
+    const favBy = new Map((favs || []).map((c) => [String(c.id), c]));
+    const allBy = new Map((all || []).map((c) => [String(c.id), c]));
+    const want = new Set(own);
+    // in the dashboard's order (Canvas's favourites, its cards) where it has them; the rest after, in the order chosen
+    const order = [...(favs || []).map((c) => String(c.id)).filter((id) => want.has(id)), ...own.filter((id) => !favBy.has(id))];
+    const list = order.map((id) => {
+      if (favBy.has(id)) return favBy.get(id);
+      const c = allBy.get(id);
+      return c ? { ...c, shortName: c.name, subtitle: (c.sections || [])[0] || '', cardTerm: c.term, links: [] } : null;
+    }).filter(Boolean);
+    return { list, ids: new Set(list.map((c) => String(c.id))) };
   }
   const inSelection = (sel, it) => !!it.custom || !it.courseId || sel.ids.has(String(it.courseId));
   const flagOf = (it) => { const f = store.workFlags(it)[0]; return f ? { word: f.word, kind: f.kind || '' } : null; };
@@ -328,6 +364,8 @@
   async function setupInfo() {
     const [all, favs, targetsPref, goal, tracking, done] = await Promise.all([store.courses({ force: true }), store.favorites({ force: true }).catch(() => []), store.pref('gradeTargets'), store.pref('gpaGoal'), store.pref('gpaTracking'), setupDone()]);
     const favIds = new Set((favs || []).map((c) => String(c.id)));
+    const own = await ownSelection().catch(() => null); // (iPhone 1.9: the iPhone's own choice, ticked as it is)
+    const ownIds = own ? new Set(own) : null;
     const targets = targetsPref && typeof targetsPref === 'object' ? targetsPref : {};
     const courses = (all || []).filter((c) => c.state === 'current').map((c) => {
       const code = c.code || c.name || 'Course';
@@ -340,7 +378,7 @@
         label, sub: [otherName(label, c.originalName, c.code), c.term, (c.teachers || [])[0]].filter(Boolean).join(' · '),
         // (2.99.33) a first run starts with every current course ticked — what the sidebar shows when nothing is chosen, so
         // the setup can be left as it stands — and run again, from today's choice
-        on: done ? (!!c.favorite || favIds.has(String(c.id))) : true,
+        on: ownIds ? ownIds.has(String(c.id)) : done ? (!!c.favorite || favIds.has(String(c.id))) : true,
         target: letterFmt(aimOf(targets[c.id])),
       };
     });
@@ -365,6 +403,7 @@
     // (2.99.152) exactly the courses ticked (one star at a time, from none starred, left every course starred)
     const was = all.filter((c) => !!c.favorite || favs.has(String(c.id))).map((c) => String(c.id));
     if (was.length !== on.size || was.some((id) => !on.has(id))) await store.setFavorites([...on]).catch(() => {});
+    if (on.size) await store.setPref('selectedCourses', [...on]).catch(() => {}); // (iPhone 1.9: the app's own choice)
     for (const [id, name] of Object.entries(nicknames || {})) {
       const c = all.find((x) => String(x.id) === String(id));
       if (c && String(name).trim() !== (c.nickname || '')) await store.setNickname(c.id, String(name).trim()).catch(() => {});
@@ -383,13 +422,15 @@
     const [all, favs] = await Promise.all([store.courses({ force: true }), store.favorites({ force: true }).catch(() => [])]);
     const current = (all || []).filter((c) => c.state === 'current');
     const favIds = new Set((favs || []).map((c) => String(c.id)));
+    const own = await ownSelection().catch(() => null);
+    const ownIds = own ? new Set(own) : null;
     const starred = current.some((c) => !!c.favorite || favIds.has(String(c.id)));
     const courses = current.map((c) => {
       const code = c.code || c.name || 'Course';
       const label = c.nickname || c.name || code;
       return {
         id: String(c.id), label, sub: [otherName(label, c.originalName, c.code), c.term, (c.teachers || [])[0]].filter(Boolean).join(' · '),
-        color: c.color || GRAY, on: starred ? (!!c.favorite || favIds.has(String(c.id))) : true,
+        color: c.color || GRAY, on: ownIds ? ownIds.has(String(c.id)) : starred ? (!!c.favorite || favIds.has(String(c.id))) : true,
       };
     });
     return { courses };
@@ -398,7 +439,8 @@
   async function chooseCourses({ courses: chosen = [] } = {}) {
     const ids = (Array.isArray(chosen) ? chosen : []).map(String);
     if (!ids.length) return { error: 'Choose at least one course.' };
-    await store.setFavorites(ids);
+    await store.setPref('selectedCourses', ids); // (the app's own choice, first: what every screen shows)
+    await store.setFavorites(ids).catch(() => {}); // (and Canvas's favourites, so its dashboard shows the same)
     await store.setPref('setupDone', true).catch(() => {});
     await BCV.api.storage.local.set({ 'setup:done': true, 'setup:offered': true }).catch(() => {});
     gradeCache.clear();
@@ -1080,7 +1122,10 @@
     const ownFor = (c) => (ownW[c.id] && typeof ownW[c.id] === 'object' && Object.keys(ownW[c.id]).length ? ownW[c.id] : null);
     const hidden = new Set(Array.isArray(hiddenPref) ? hiddenPref.map(String) : []);
     const currentAll = all.filter((c) => c.state === 'current');
-    const starred = currentAll.filter((c) => c.favorite);
+    // (iPhone 1.9) the courses selected, as Today and Courses have them (selection: the iPhone's own choice) — not Canvas's
+    // stars, which say none (so every course) once none is starred. (The Mac: Canvas's stars, as before.)
+    const sel = iPhoneApp() ? await selection(age).catch(() => null) : null;
+    const starred = sel ? currentAll.filter((c) => sel.ids.has(String(c.id))) : currentAll.filter((c) => c.favorite);
     const list = (starred.length ? starred : currentAll).filter((c) => !hidden.has(String(c.id)));
     const goal = Number.isFinite(goalPref) ? goalPref : 4;
     const targets = targetsPref && typeof targetsPref === 'object' ? targetsPref : {};
