@@ -337,14 +337,14 @@ struct TabSplit<Root: View>: View {
                 // announcement opened beside Today could not be left.)
                 NavigationStack(path: rest(from: lead)) {
                     companion(path, lead: lead)
-                        .navigationDestination(for: Route.self) { route in RouteScreen(route: route) }
+                        .navigationDestination(for: Route.self) { route in RouteScreen(route: route).id(route) } // (build 62: a screen of its own per address — another course in its place is a new one, not the last one's)
                 }
                 .id(companionKey(path, lead: lead))
             } else if let first = path.first {
                 // one column: the list, then what was opened from it (Back from it closes it — onChange below)
                 NavigationStack(path: rest(after: 0)) {
                     RouteScreen(route: first)
-                        .navigationDestination(for: Route.self) { route in RouteScreen(route: route) }
+                        .navigationDestination(for: Route.self) { route in RouteScreen(route: route).id(route) } // (build 62: a screen of its own per address — another course in its place is a new one, not the last one's)
                 }
                 .id(first)
             } else {

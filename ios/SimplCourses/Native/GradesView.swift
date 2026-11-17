@@ -236,6 +236,8 @@ struct CourseGradesView: View {
     @State private var sort: Sort = .groups
     @State private var addingTo: CGGroup?
     @State private var applying: Task<Void, Never>?
+    /// (Build 62) The course whose grades are showing.
+    @State private var shownCourse: String?
     @FocusState private var focused: String?
 
     enum Sort: String, CaseIterable, Identifiable {
@@ -311,7 +313,21 @@ struct CourseGradesView: View {
             }
         }
         .onChange(of: sort) { Haptics.select() }
-        .task(id: engine.dataVersion) { await load(fresh: true) } // (1.9: Refresh reads it again too)
+        // (1.9: Refresh reads it again too) (build 62) and so does another course put in its place — the screen kept, its
+        // course changed (the right column, another course pressed on the left): what was tried for the last one goes
+        .task(id: "\(courseId)|\(engine.dataVersion)") {
+            if shownCourse != courseId {
+                if shownCourse != nil {
+                    data = nil
+                    error = nil
+                    whatIf = false
+                    drafts = [:]
+                    added = []
+                }
+                shownCourse = courseId
+            }
+            await load(fresh: true)
+        }
         .sheet(item: $addingTo) { g in
             AddWhatIfSheet(group: g, lmsName: engine.lmsName) { name, possible, score in
                 let id = "whatif-\(UUID().uuidString.prefix(8))"
