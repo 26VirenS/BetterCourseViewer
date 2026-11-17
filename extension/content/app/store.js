@@ -336,6 +336,21 @@
     await Promise.all([C.invalidate('courses:all'), C.invalidate('cards')]);
   }
 
+  /** (2.99.152) The current courses starred exactly as chosen: each one given starred, every other current course not —
+   *  as Canvas's own Customize Dashboard leaves them. (setFavorite, for one star at a time, stars what is shown with it
+   *  when nothing was starred yet, so a set chosen one by one from there came out as every course.) Past courses' stars
+   *  are left as they are. None chosen leaves none starred: Canvas then shows every current course, as for a student
+   *  who never chose. */
+  async function setFavorites(ids) {
+    const on = new Set((ids || []).map(String));
+    const all = (await courses({ force: true }).catch(() => [])).filter((c) => c.state === 'current');
+    for (const c of all) {
+      if (on.has(String(c.id))) await C.post(`/api/v1/users/self/favorites/courses/${c.id}`, {}).catch(() => {});
+      else await C.del(`/api/v1/users/self/favorites/courses/${c.id}`).catch(() => {}); // (not starred: Canvas says so, and nothing changes)
+    }
+    await Promise.all([C.invalidate('courses:all'), C.invalidate('cards')]);
+  }
+
   /** A course nickname, Canvas's own: every course list then carries it as the name (the real
    *  name stays as original_name). An empty name removes it. */
   async function setNickname(courseId, name) {
@@ -2008,7 +2023,7 @@
   BCV.store = {
     keptAssignments, // (2.98.92)
     restoreKept, forgetKept, // (2.99.33)
-    env, pref, prefNow, setPref, mergePref, me, account, colors, courses, favorites, cards, setFavorite, setNickname, currentTerm, dashboardView, setDashboardView, freshness, invalidateGrades,
+    env, pref, prefNow, setPref, mergePref, me, account, colors, courses, favorites, cards, setFavorite, setFavorites, setNickname, currentTerm, dashboardView, setDashboardView, freshness, invalidateGrades,
     planner, classify, todo, todoWindow, setComplete, dismiss, restore, invalidatePlanner, plannerOverrides, createNote, createNotes, deleteNote, deleteNotes, REPEATS, repeatDates, activity, activitySummary, unreadCount, groups, group, workStatus, workFlags,
     announcementsFeed, streamSeen, markStreamSeen, setColor, history, helpLinks,
     calendarContexts, ownContexts, selectedContexts, setSelectedContexts, calendarEvents, plannerRange, appointmentGroups, reserveAppointment, cancelReservation,

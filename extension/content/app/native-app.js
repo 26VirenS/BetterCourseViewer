@@ -362,10 +362,9 @@
       store.setPref('gpaTracking', tracking ? (before && typeof before === 'object' ? before : { priorGpa: null, priorCourses: 0, since: new Date().toISOString().slice(0, 10) }) : null),
       store.setPref('gradeTargets', targets),
     ]);
-    for (const c of all) {
-      const was = !!c.favorite || favs.has(String(c.id));
-      if (was !== on.has(String(c.id))) await store.setFavorite(c.id, on.has(String(c.id))).catch(() => {});
-    }
+    // (2.99.152) exactly the courses ticked (one star at a time, from none starred, left every course starred)
+    const was = all.filter((c) => !!c.favorite || favs.has(String(c.id))).map((c) => String(c.id));
+    if (was.length !== on.size || was.some((id) => !on.has(id))) await store.setFavorites([...on]).catch(() => {});
     for (const [id, name] of Object.entries(nicknames || {})) {
       const c = all.find((x) => String(x.id) === String(id));
       if (c && String(name).trim() !== (c.nickname || '')) await store.setNickname(c.id, String(name).trim()).catch(() => {});
@@ -375,6 +374,35 @@
     await BCV.api.storage.local.set({ 'setup:done': true, 'setup:offered': true, 'welcome:search': true, ...(installed ? { 'whatsnew:seen': installed } : {}) });
     gradeCache.clear();
     return { ok: true, courses: on.size };
+  }
+
+  // ---- the selected courses, chosen on their own (iPhone 1.9: Settings, and the Courses tab) -----------------------------
+  /** Every current course, ticked where it is selected (a Canvas favourite; every one, where none is starred yet — what the
+   *  app shows then), each named as the app shows it. */
+  async function courseChoices() {
+    const [all, favs] = await Promise.all([store.courses({ force: true }), store.favorites({ force: true }).catch(() => [])]);
+    const current = (all || []).filter((c) => c.state === 'current');
+    const favIds = new Set((favs || []).map((c) => String(c.id)));
+    const starred = current.some((c) => !!c.favorite || favIds.has(String(c.id)));
+    const courses = current.map((c) => {
+      const code = c.code || c.name || 'Course';
+      const label = c.nickname || c.name || code;
+      return {
+        id: String(c.id), label, sub: [otherName(label, c.originalName, c.code), c.term, (c.teachers || [])[0]].filter(Boolean).join(' · '),
+        color: c.color || GRAY, on: starred ? (!!c.favorite || favIds.has(String(c.id))) : true,
+      };
+    });
+    return { courses };
+  }
+  /** The courses chosen, selected exactly (Canvas's favourites, the current courses' alone); the setup counts as done. */
+  async function chooseCourses({ courses: chosen = [] } = {}) {
+    const ids = (Array.isArray(chosen) ? chosen : []).map(String);
+    if (!ids.length) return { error: 'Choose at least one course.' };
+    await store.setFavorites(ids);
+    await store.setPref('setupDone', true).catch(() => {});
+    await BCV.api.storage.local.set({ 'setup:done': true, 'setup:offered': true }).catch(() => {});
+    gradeCache.clear();
+    return { ok: true, courses: ids.length };
   }
 
   // Today: the six counters, the list for the day, the week's load per course — phone.js today()'s numbers
@@ -3330,7 +3358,7 @@
 
   const CALLS = { quietColors, calSync, feedState, feedOn, feedOff, feedSend, feedEvents, calLink, calShow, calUnlink, calRefresh, planSlots, planPut, planMove, planClear, planDay, planDetail, planEdit, planJoin, setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashSilent, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, setColor, todo, todoDismiss, todoRestore, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, appointments, reserveAppointment, cancelReservation, notifications, notifMark, search, searchLocal, searchWarm, searchRecent, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, fileInfo, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage, messageUpload,
-    toolLaunch, externalTools, resolveUrl, pageFor, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizAssignment, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback, neighbours };
+    toolLaunch, externalTools, resolveUrl, pageFor, setupInfo, setupSave, courseChoices, chooseCourses, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizAssignment, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback, neighbours };
   // (Mac 1.2) Grade needed: a course's score now (by the student's own weights where set, as the Grades screen) and each
   // piece of work not yet graded with its share of the final grade — tools/need.js pieces(), for the Mac's own tool
   async function gradeNeeded({ id, age = NO_AGE } = {}) {

@@ -781,6 +781,22 @@ try {
   const keptMinus = await sp.evaluate((id) => self.BCV.store.pref('gradeTargets').then((t) => t?.[id] ?? null), first);
   await nc('setupSave', { courses: onIds, nicknames: {}, targets: { [first]: su.courses.find((c) => c.id === first)?.target || 'A+' }, tracking: su.tracking, goal: su.goal });
   check(savedMinus.ok && suMinus.courses.find((c) => c.id === first)?.target === 'A−' && keptMinus === 'A-', `a setup target sent back as "A−" is kept as "A-" and read back as "A−": ${JSON.stringify({ read: suMinus.courses?.find((c) => c.id === first)?.target, kept: keptMinus })}`);
+  // (iPhone 1.9) the selected courses, chosen on their own (Settings, and the Courses tab): every current course, ticked
+  // where it is selected; a choice saved is the selection exactly (Canvas's favourites), and the Courses tab follows it
+  const ch0 = await nc('courseChoices');
+  const chWas = (ch0.courses || []).filter((c) => c.on).map((c) => c.id);
+  const chKeep = chWas.slice(0, -1);
+  const chDropped = chWas[chWas.length - 1];
+  const chSaved = await nc('chooseCourses', { courses: chKeep });
+  const ch1 = await nc('courseChoices');
+  const chTab = await nc('courses');
+  const chNone = await nc('chooseCourses', { courses: [] });
+  const chBack = await nc('chooseCourses', { courses: chWas }); // (back as it was)
+  const ch2 = await nc('courseChoices');
+  check(!ch0.error && (ch0.courses || []).length > chWas.length && chWas.length >= 2 && ch0.courses.every((c) => c.id && c.label && /^#/.test(c.color || '')) && chSaved.ok && chSaved.courses === chKeep.length
+    && ch1.courses.filter((c) => c.on).map((c) => c.id).join() === chKeep.join() && !(chTab.rows || []).some((r) => r.id === chDropped) && /at least one/.test(chNone.error || '')
+    && chBack.ok && ch2.courses.filter((c) => c.on).map((c) => c.id).join() === chWas.join(),
+    `the selected courses chosen on their own: every current course listed, the ticked ones selected exactly, the Courses tab without the one left out, none refused: ${JSON.stringify({ was: chWas, keep: chKeep, after: ch1.courses?.filter((c) => c.on).map((c) => c.id), tab: chTab.rows?.map((r) => r.id), none: chNone })}`);
   // (1.3) What's New after an update is marked seen when the app's sheet is really up, not when it is asked for:
   // a sheet held back (a sign-in still under way) comes up later, still due
   await sp.evaluate(() => self.BCV.api.storage.local.set({ 'whatsnew:seen': '2.99.2' }));

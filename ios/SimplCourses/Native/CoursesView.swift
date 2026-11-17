@@ -9,6 +9,8 @@ struct CoursesView: View {
     @State private var error: String?
     @State private var naming: CourseRow?
     @State private var nickname = ""
+    /// (iPhone 1.9) The course picker is up (CoursePickerSheet).
+    @State private var choosing = false
     /// (iPhone 1.8) An iPhone Duo unfolded, or an iPad: the courses as cards, as many across as fit.
     @Environment(\.wideScreen) private var wide
     @Environment(\.splitList) private var splitList
@@ -36,6 +38,10 @@ struct CoursesView: View {
                     } footer: {
                         if let hidden = d.hidden, !hidden.isEmpty { Text(hidden) }
                     }
+                    // (1.9) which courses these are, changed here
+                    Section {
+                        Button { choose() } label: { Label("Choose Courses…", systemImage: "checklist") }
+                    }
                 }
                 .listStyle(.insetGrouped)
                 .refreshable { await load(force: true) }
@@ -44,8 +50,16 @@ struct CoursesView: View {
             }
         }
         .navigationTitle("Courses")
-        .shellToolbar()
+        // (1.9) Choose Courses, first in the bar's capsule
+        .shellToolbar(menu: AnyView(
+            Button { choose() } label: { Image(systemName: "checklist") }
+                .accessibilityLabel("Choose Courses")
+        ))
         .task(id: engine.dataVersion) { await load() }
+        .sheet(isPresented: $choosing) {
+            CoursePickerSheet()
+                .environmentObject(engine)
+        }
         .alert("Nickname", isPresented: Binding(get: { naming != nil }, set: { if !$0 { naming = nil } })) {
             TextField(naming?.original ?? "Nickname", text: $nickname)
                 .textInputAutocapitalization(.words)
@@ -57,6 +71,11 @@ struct CoursesView: View {
         } message: {
             Text("Shown instead of “\(naming?.original ?? "")” everywhere, \(engine.onBrightspace ? "on this iPhone only" : "in Canvas too").")
         }
+    }
+
+    private func choose() {
+        Haptics.tap()
+        choosing = true
     }
 
     /// A course's menu (a long press): open it, or one of its sections, or give it a nickname.
@@ -99,6 +118,9 @@ struct CoursesView: View {
                 if let hidden = d.hidden, !hidden.isEmpty {
                     Text(hidden).font(.footnote).foregroundStyle(.secondary).padding(.horizontal, 8)
                 }
+                Button { choose() } label: { Label("Choose Courses…", systemImage: "checklist") } // (1.9)
+                    .padding(.horizontal, 8)
+                    .padding(.top, 4)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
@@ -192,5 +214,161 @@ struct CoursesView: View {
         } catch {
             if data == nil { self.error = error.localizedDescription }
         }
+    }
+}
+
+// MARK: - Choosing the courses (iPhone 1.9)
+
+/// Every current course, ticked where it is selected (`courseChoices`).
+struct CourseChoices: Codable {
+    struct Course: Codable, Identifiable {
+        var id: String
+        var label: String
+        var sub: String
+        var color: String
+        var on: Bool
+    }
+
+    var courses: [Course]
+}
+
+/// (iPhone 1.9) The selected courses, chosen on their own — from Settings, and from the Courses tab — rather than through
+/// the whole setup: every current course with a tick, Select All, and Done. What is ticked is what Simpl shows (Today,
+/// Courses, Grades, the GPA); saved as the student's Canvas favourites, exactly (`chooseCourses`), so Canvas's own
+/// dashboard shows the same.
+struct CoursePickerSheet: View {
+    @EnvironmentObject private var engine: Engine
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var model = Loader<CourseChoices>()
+    @State private var chosen: Set<String> = []
+    /// A tick changed by hand: a fresher list landing does not undo it.
+    @State private var touched = false
+    @State private var saving = false
+    @State private var error: String?
+
+    /// What is selected now, as the list says.
+    private var initial: Set<String> { Set(model.data?.courses.filter(\.on).map(\.id) ?? []) }
+    private var changed: Bool { model.data != nil && chosen != initial }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if let d = model.data {
+                    list(d)
+                } else {
+                    LoadState(error: model.error) { Task { await model.load(engine, "courseChoices") } }
+                }
+            }
+            .navigationTitle("Choose Courses")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }.disabled(saving)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if saving {
+                        ProgressView()
+                    } else {
+                        Button("Done") { Task { await save() } }
+                            .fontWeight(.semibold)
+                            .disabled(chosen.isEmpty || !changed)
+                    }
+                }
+            }
+        }
+        .interactiveDismissDisabled(changed || saving) // (ticks changed are not swiped away by accident: Cancel says so)
+        .task { await model.load(engine, "courseChoices") }
+        // the list as it is (the one kept from last time first, then the fresh one): its ticks, until one is changed here
+        .onChange(of: model.data?.courses.map { "\($0.id):\($0.on)" } ?? [], initial: true) {
+            if !touched { chosen = initial }
+        }
+    }
+
+    private func list(_ d: CourseChoices) -> some View {
+        List {
+            if d.courses.isEmpty {
+                Section {
+                    Text("No current courses right now.").foregroundStyle(.secondary)
+                }
+            } else {
+                Section {
+                    ForEach(d.courses) { c in row(c) }
+                } header: {
+                    HStack {
+                        Text("\(chosen.count) of \(d.courses.count) selected")
+                        Spacer()
+                        Button(chosen.count == d.courses.count ? "Clear All" : "Select All") {
+                            Haptics.select()
+                            touched = true
+                            chosen = chosen.count == d.courses.count ? [] : Set(d.courses.map(\.id))
+                        }
+                        .font(.footnote.weight(.semibold))
+                        .textCase(nil)
+                    }
+                } footer: {
+                    if let error {
+                        Text(error).foregroundStyle(.red)
+                    } else if chosen.isEmpty {
+                        Text("Choose at least one course.")
+                    } else {
+                        Text(engine.onBrightspace
+                            ? "Selected courses are the ones Simpl shows: on Today, Courses and Grades, and in your GPA. They’re your pinned courses, so Brightspace shows the same."
+                            : "Selected courses are the ones Simpl shows: on Today, Courses and Grades, and in your GPA. They’re your \(engine.lmsName) favorites, so \(engine.lmsName)’s dashboard shows the same.")
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .disabled(saving)
+    }
+
+    private func row(_ c: CourseChoices.Course) -> some View {
+        let on = chosen.contains(c.id)
+        return Button {
+            Haptics.select()
+            touched = true
+            if on { chosen.remove(c.id) } else { chosen.insert(c.id) }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: on ? "checkmark.circle.fill" : "circle")
+                    .font(.title2)
+                    .foregroundStyle(on ? Color.accentColor : Color(.tertiaryLabel))
+                    .contentTransition(.symbolEffect(.replace))
+                Circle().fill(Color(hex: c.color)).frame(width: 10, height: 10)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(c.label).font(.body.weight(.semibold)).lineLimit(2)
+                    if !c.sub.isEmpty {
+                        Text(c.sub).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.vertical, 3)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(on ? [.isButton, .isSelected] : .isButton)
+    }
+
+    /// Done: the ticked courses selected (and no others), every screen reading again; the list kept as it now is, so
+    /// it opens on these ticks next time.
+    private func save() async {
+        saving = true
+        error = nil
+        do {
+            _ = try await engine.call("chooseCourses", ["courses": Array(chosen)], as: OK.self)
+            if var d = model.data {
+                for i in d.courses.indices { d.courses[i].on = chosen.contains(d.courses[i].id) }
+                if let data = try? JSONEncoder().encode(d) { SavedAnswers.shared.keep(data, for: SavedAnswers.key("courseChoices", [:])) }
+            }
+            Haptics.success()
+            engine.changed()
+            dismiss()
+        } catch {
+            self.error = error.localizedDescription
+            Haptics.error()
+        }
+        saving = false
     }
 }

@@ -11,6 +11,8 @@ struct SettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     @State private var confirmSignOut = false
+    /// (1.9) The course picker is up (CoursePickerSheet).
+    @State private var choosingCourses = false
     @State private var confirmReset = false
     @State private var saved = LoginVault.load()
     @State private var info: SimplSettingsInfo?
@@ -74,6 +76,10 @@ struct SettingsSheet: View {
                 activity.checkRefresh()
             }
             .onReceive(NotificationCenter.default.publisher(for: .simplLoginChanged)) { _ in saved = LoginVault.load() }
+            .sheet(isPresented: $choosingCourses) {
+                CoursePickerSheet()
+                    .environmentObject(engine)
+            }
             .fileImporter(isPresented: $importing, allowedContentTypes: importKind.types, allowsMultipleSelection: false) { result in
                 picked(importKind, result)
             }
@@ -128,13 +134,24 @@ struct SettingsSheet: View {
 
     @ViewBuilder private var simplSection: some View {
         if live {
-            Section("Simpl Courses") {
+            Section {
+                // (1.9) the selected courses on their own, without going through the whole setup again
+                Button {
+                    Haptics.tap()
+                    choosingCourses = true
+                } label: {
+                    Label("Choose Courses", systemImage: "books.vertical")
+                }
                 Button {
                     dismiss()
                     NotificationCenter.default.post(name: .simplOpenSetup, object: nil)
                 } label: {
                     Label("Courses and Goals", systemImage: "checklist")
                 }
+            } header: {
+                Text("Simpl Courses")
+            } footer: {
+                Text("Choose Courses picks the courses Simpl shows. Courses and Goals goes through the whole setup again: courses, nicknames, grade goals.")
             }
         }
     }
