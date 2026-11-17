@@ -1103,6 +1103,82 @@
       return groups;
     }, { force, refresh, maxAge });
   }
+  // ---- standards (2.99.151) ---------------------------------------------------------------------------
+  // A course graded on standards (standards-based grading) marks each piece of work — an exam above all — against the
+  // course's outcomes, each on a mastery scale (4 Exceeds, 3 Meets, 2 Near, …), and Canvas keeps the student's level on
+  // each as the work is marked: its Learning Mastery. Read the way Canvas's own Grades page reads it (the student's own
+  // rollups, and the results behind them with the work that gave each), and given back as one list: null for a course
+  // with no outcomes, or one whose results are not shown to students.
+  /** Canvas's own colours for its default mastery scale, by a level's place against mastery: above it, at it, then
+   *  one, two and more below. A scale that names its own colours is shown in them. */
+  const MASTERY_HUES = ['#127A1B', '#0B874B', '#C98A00', '#E35A0C', '#E0061F'];
+  function levelOf(ratings, score) {
+    if (score === null || score === undefined || !Number.isFinite(Number(score)) || !ratings.length) return null;
+    const n = Number(score);
+    const i = ratings.findIndex((r) => n >= r.points);
+    return ratings[i >= 0 ? i : ratings.length - 1];
+  }
+  function standards(id, { force = false, refresh = false, maxAge = 0 } = {}) {
+    return C.cached(`standards:${id}`, 10 * MIN, async () => {
+      if (BCV.lms?.kind === 'd2l') return null; // (Brightspace keeps no such thing in Canvas's shape)
+      const u = await me().catch(() => null);
+      if (!u?.id) return null;
+      const [roll, res] = await Promise.all([
+        C.get(`/api/v1/courses/${id}/outcome_rollups`, { params: { user_ids: [u.id], include: ['outcomes', 'outcome_paths'], per_page: 100 } }).catch(() => null),
+        C.get(`/api/v1/courses/${id}/outcome_results`, { params: { user_ids: [u.id], include: ['alignments'], per_page: 100 } }).catch(() => null),
+      ]);
+      const outcomes = Array.isArray(roll?.linked?.outcomes) ? roll.linked.outcomes : [];
+      if (!outcomes.length) return null;
+      const scores = new Map();
+      for (const r of roll.rollups || []) for (const sc of r.scores || []) if (sc?.links?.outcome !== undefined) scores.set(String(sc.links.outcome), sc);
+      const paths = new Map((roll.linked.outcome_paths || []).map((p) => [String(p.id), (p.parts || []).map((x) => x.name).filter(Boolean)]));
+      const aligned = new Map((res?.linked?.alignments || []).map((al) => [String(al.id), al]));
+      const byOutcome = new Map();
+      for (const r of res?.outcome_results || []) {
+        const oid = String(r.links?.learning_outcome ?? '');
+        if (!oid || r.hidden) continue;
+        const key = String(r.links?.alignment || r.links?.assignment || '');
+        const al = aligned.get(key);
+        const aid = /^assignment_(\d+)$/.exec(key)?.[1] || /\/assignments\/(\d+)/.exec(al?.html_url || '')?.[1] || null;
+        if (!byOutcome.has(oid)) byOutcome.set(oid, []);
+        byOutcome.get(oid).push({ assignmentId: aid, name: al?.name || 'Assessed work', url: al?.html_url || (aid ? `/courses/${id}/assignments/${aid}` : null), score: r.score ?? null, possible: r.possible ?? null, at: r.submitted_or_assessed_at || null, hidePoints: !!r.hide_points });
+      }
+      const list = outcomes.map((o) => {
+        const oid = String(o.id);
+        const possible = Number(o.points_possible) || 0;
+        const mastery = Number(o.mastery_points) || 0;
+        const ratings = (Array.isArray(o.ratings) ? o.ratings : []).map((r) => ({ points: Number(r.points) || 0, description: String(r.description || '').trim(), color: /^#?[0-9a-f]{6}$/i.test(r.color || '') ? `#${String(r.color).replace('#', '')}` : null }))
+          .sort((x, y) => y.points - x.points);
+        // each level's colour: the scale's own, else Canvas's default for its place against mastery
+        const below = ratings.filter((r) => r.points < mastery);
+        for (const r of ratings) if (!r.color) r.color = MASTERY_HUES[r.points > mastery ? 0 : r.points >= mastery ? 1 : Math.min(MASTERY_HUES.length - 1, 2 + below.indexOf(r))];
+        const sc = scores.get(oid);
+        const score = sc && sc.score !== null && sc.score !== undefined && Number.isFinite(Number(sc.score)) ? Number(sc.score) : null;
+        const level = levelOf(ratings, score);
+        const results = (byOutcome.get(oid) || []).map((x) => ({ ...x, level: levelOf(ratings, x.score), met: x.score === null ? null : Number(x.score) >= mastery }))
+          .sort((x, y) => (U.parse(y.at)?.getTime() || 0) - (U.parse(x.at)?.getTime() || 0));
+        // what it is part of: its groups under the course's own (the root, the course's name), without its own name
+        let path = (paths.get(oid) || []).slice(1);
+        if (path.length && [o.title, o.display_name].includes(path[path.length - 1])) path = path.slice(0, -1);
+        return {
+          id: oid, title: String(o.display_name || o.title || 'Standard').trim(), fullTitle: String(o.title || '').trim(), group: path.join(' › '),
+          description: BCV.utils.htmlToText(o.description || '', 400), possible, mastery, ratings, score, level,
+          met: score === null ? null : score >= mastery, count: Number(sc?.count) || results.length, hidePoints: !!sc?.hide_points || results.some((x) => x.hidePoints),
+          latest: sc?.submitted_at || results[0]?.at || null, results,
+        };
+      });
+      const assessed = list.filter((x) => x.score !== null);
+      return { list, assessed: assessed.length, met: assessed.filter((x) => x.met).length };
+    }, { force, refresh, maxAge });
+  }
+  /** The standards one piece of work was marked against (an exam's, on its own page): each with the level it gave. */
+  async function standardsOf(courseId, assignmentId, opts = {}) {
+    const all = await standards(courseId, opts).catch(() => null);
+    if (!all) return [];
+    const out = [];
+    for (const sd of all.list) for (const r of sd.results) if (r.assignmentId && String(r.assignmentId) === String(assignmentId)) out.push({ standard: sd, result: r });
+    return out;
+  }
   /** (2.99.138) One assignment group on its own — its name, share of the grade and rules — for an assignment's More Details
    *  (the whole list, with every assignment in it, is a slow answer to wait on for one line). */
   function assignmentGroup(id, gid, { force = false, refresh = false, maxAge = 0 } = {}) {
@@ -1296,7 +1372,7 @@
   async function invalidateGrades() {
     await Promise.all([
       C.invalidate('courses:all'), C.invalidate('cards'), C.invalidatePrefix('course:'),
-      C.invalidatePrefix('assignments:'), C.invalidatePrefix('agroups:'), C.invalidatePrefix('assignment:'), C.invalidatePrefix('submission:'),
+      C.invalidatePrefix('assignments:'), C.invalidatePrefix('agroups:'), C.invalidatePrefix('standards:'), C.invalidatePrefix('assignment:'), C.invalidatePrefix('submission:'),
       C.invalidate('activity'), C.invalidate('activity:summary'), invalidatePlanner(),
     ]);
   }
@@ -1937,7 +2013,7 @@
     announcementsFeed, streamSeen, markStreamSeen, setColor, history, helpLinks,
     calendarContexts, ownContexts, selectedContexts, setSelectedContexts, calendarEvents, plannerRange, appointmentGroups, reserveAppointment, cancelReservation,
     conversations, conversation, markRead, setStarred, replyTo, compose, searchRecipients, invalidateInbox,
-    course, tabs, frontPage, syllabus, courseTodo, ignoreTodo, courseStream, assignments, assignment, submission, assignmentGroups, assignmentGroup, progress,
+    course, tabs, frontPage, syllabus, courseTodo, ignoreTodo, courseStream, assignments, assignment, submission, assignmentGroups, assignmentGroup, standards, standardsOf, progress,
     announcements, discussions, discussion, discussionView, postEntry, markTopicRead, people, sections, courseGroups, pages, page,
     rootFolder, folderContents, folderByPath, file, courseFiles, COURSE_FILES_MAX, quizzes, quiz, quizSubmissions, quizApi, modules, moduleItemFor, markItemDone, assignmentNeighbours, itemNeighbours, gradeModel, fmtPts, roundHalfUp,
     notifications, notifState, setNotifState, notifUnread,

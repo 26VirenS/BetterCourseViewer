@@ -29,6 +29,9 @@
     slider: 'M4 8h16M4 16h16M9 5v6M15 13v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.151', date: '2026-11-17', notes: [
+      { kind: 'new', title: 'Standards-Based Grades', body: 'See your level on each standard, and what each exam gave.', icon: P.steps },
+    ] },
     { version: '2.99.150', date: '2026-11-16', notes: [
       { kind: 'improved', title: 'A Tour to Read', body: 'Read each step, then Next or Back. Skip it any time.', icon: P.steps },
       { kind: 'fixed', title: 'Color Picker Fits', body: 'A course’s color picker stays on screen.', icon: P.check },

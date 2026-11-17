@@ -3562,6 +3562,53 @@ try {
   const settled = (await texts('.bcv-body > div > .bcv-label')).join(',').toLowerCase();
   check(settled === 'current groups,previous groups', `the courses fold in behind them, and Previous groups appears once a group's course can be called past: ${settled}`);
   } // groups
+  if (on('standards')) {
+
+  // ---- standards (2.99.151): a course graded on standards — Canvas's outcomes — shows the student's level on each ------
+  console.log('standards');
+  // a course with no standards has no card for them
+  await page.goto(`${BASE}/courses/101/grades`);
+  await page.waitForSelector('.bcv-gr__total', { timeout: 15000 });
+  await page.waitForTimeout(800);
+  check(!(await page.$('.bcv-gr--std')), 'a course with no standards shows no Standards card');
+  await mockConfig({ standards: true });
+  await page.goto(`${BASE}/courses/102/grades`);
+  await page.waitForSelector('.bcv-gr--std .bcv-std', { timeout: 15000 });
+  const stdRows = () => page.$$eval('.bcv-gr--std .bcv-std', (els) => els.map((e) => ({ name: e.querySelector('.bcv-std__name').textContent, level: e.querySelector('.bcv-std__level').textContent, score: e.querySelector('.bcv-std__score')?.textContent || '', met: e.classList.contains('is-met'), sub: e.querySelector('.bcv-std__sub').textContent, head: e.querySelector('.bcv-std__head').tagName, fill: e.querySelector('.bcv-std__fill')?.style.width || '', dot: getComputedStyle(e.querySelector('.bcv-std__dot') || e).backgroundColor })));
+  const stds = await stdRows();
+  const stdSum = (await texts('.bcv-gr--std .bcv-gr__hsub'))[0];
+  check(stdSum === '2 of 3 met' && stds.length === 4
+    && stds[0].name === 'Motion in one dimension' && stds[0].level === 'Meets Mastery' && stds[0].score === '3.65 / 4' && stds[0].met && stds[0].sub === 'Mechanics · 2 assessments · mastery at 3' && stds[0].fill === '91.3%' && stds[0].dot === 'rgb(11, 135, 75)'
+    && stds[1].name === 'PHYS.2 Apply Newton’s laws to a system' && stds[1].level === 'Near Mastery' && stds[1].score === '2 / 4' && !stds[1].met
+    && stds[2].name === 'Graphs of motion' && stds[2].level === 'Exceeds Mastery' && stds[2].met
+    && stds[3].name === 'Conservation of energy' && stds[3].level === 'Not assessed yet' && stds[3].score === '' && stds[3].head === 'DIV',
+    `the course's Grades lists its standards: each one's level in words and colour, its score, a bar to mastery; 2 of the 3 assessed met: ${JSON.stringify({ stdSum, stds })}`);
+  // pressed, a standard opens to the work that marked it, each piece with the level it gave
+  await page.click('.bcv-gr--std .bcv-std[data-std="901"] .bcv-std__head');
+  const stdWork = await page.$$eval('.bcv-std[data-std="901"] .bcv-std__wrow', (els) => els.map((e) => ({ name: e.querySelector('.bcv-std__wname').textContent, level: e.querySelector('.bcv-std__level').textContent, score: e.querySelector('.bcv-std__score')?.textContent || '', href: e.getAttribute('href') })));
+  check(stdWork.length === 2 && stdWork.map((w) => `${w.name}: ${w.level} ${w.score}`).sort().join(' | ') === 'Lab 1 report: Meets Mastery 3 / 4 | Lab safety check: Exceeds Mastery 4 / 4' && stdWork.every((w) => /\/courses\/102\/assignments\/20(01|18)$/.test(w.href || '')) && (await page.getAttribute('.bcv-std[data-std="901"] .bcv-std__head', 'aria-expanded')) === 'true', `pressed, it opens to the work that marked it: ${JSON.stringify(stdWork)}`);
+  await shot(page, '09e-standards');
+  // the assignments it marked say so in their rows
+  const labRow = await page.$$eval('.bcv-gr__gsec .bcv-row', (rows) => rows.map((r) => r.textContent).find((t) => /Lab 1 report/.test(t)) || '');
+  check(/3 standards, 2 met/.test(labRow), `an assignment marked against standards says how it did on them in its row: ${labRow.slice(0, 160)}`);
+  // the work's own page: the standards it was marked against, each with the level it gave, under the grade
+  await page.goto(`${BASE}/courses/102/assignments/2001`);
+  await page.waitForSelector('.bcv-asg__stdp .bcv-asg__std', { timeout: 15000 });
+  const asgStd = await page.evaluate(() => ({ sum: document.querySelector('.bcv-asg__stdsum')?.textContent, rows: [...document.querySelectorAll('.bcv-asg__stdp .bcv-asg__std')].map((e) => `${e.querySelector('.bcv-std__name').textContent}: ${e.querySelector('.bcv-std__level').textContent} ${e.querySelector('.bcv-std__score')?.textContent || ''}${e.querySelector('.bcv-asg__stdnow') ? ` (${e.querySelector('.bcv-asg__stdnow').textContent})` : ''}`), afterGrade: !!document.querySelector('.bcv-asg__gradep ~ .bcv-asg__stdp') }));
+  check(asgStd.sum === '2 of 3 met' && asgStd.rows.join(' | ') === 'Motion in one dimension: Meets Mastery 3 / 4 | PHYS.2 Apply Newton’s laws to a system: Near Mastery 2 / 4 | Graphs of motion: Exceeds Mastery 4 / 4' && asgStd.afterGrade, `the assignment's page lists the standards it was marked against under its grade: ${JSON.stringify(asgStd)}`);
+  await shot(page, '09f-standards-assignment');
+  // where this work's level is not where the student stands now (a later piece moved it), the panel says both
+  await page.goto(`${BASE}/courses/102/assignments/2018`);
+  await page.waitForSelector('.bcv-asg__stdp .bcv-asg__std', { timeout: 15000 });
+  const nowStd = await page.evaluate(() => [...document.querySelectorAll('.bcv-asg__stdp .bcv-asg__std')].map((e) => `${e.querySelector('.bcv-std__name').textContent}: ${e.querySelector('.bcv-std__level').textContent} · ${e.querySelector('.bcv-asg__stdnow')?.textContent || ''}`).join(' | '));
+  check(nowStd === 'Motion in one dimension: Exceeds Mastery · now Meets Mastery', `a level this work gave that is not where the student stands now says where they stand: ${nowStd}`);
+  // work marked against none has no such panel
+  await page.goto(`${BASE}/courses/102/assignments/2003`);
+  await page.waitForSelector('.bcv-asg__rail', { timeout: 15000 });
+  await page.waitForTimeout(800);
+  check(!(await page.$('.bcv-asg__stdp')), 'work marked against no standard has no Standards panel');
+  await mockConfig({ standards: false });
+  } // standards
   if (on('one sidebar')) {
 
   // ---- (2.99.39) one sidebar, and the chooser that offers it -------------------------------------------------------

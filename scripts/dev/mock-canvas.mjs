@@ -1276,6 +1276,36 @@ on('PUT', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)\/submissions\/self$/, 
 on('GET', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)$/, (url, m) => allAssignments(m[1]).find((a) => a.id === m[2]) || { __status: 404, errors: [{ message: 'The specified resource does not exist.' }] }); // (as Canvas answers for one that is not there)
 on('GET', /^\/api\/v1\/courses\/(\w+)\/assignments$/, (url, m) => allAssignments(m[1]));
 on('GET', /^\/api\/v1\/courses\/(\w+)\/assignment_groups$/, (url, m) => assignmentGroups(m[1]));
+// (2.99.151) a course graded on standards — Canvas's outcomes, on its default mastery scale (POST /__mock/config
+// {"standards": true}): PHYS 008's four, three of them marked on its two marked labs, one not yet; the student's own
+// rollups (a level on each, as Canvas works it out) and the results behind them, with the work that gave each
+const STD_SCALE = [{ points: 4, description: 'Exceeds Mastery' }, { points: 3, description: 'Meets Mastery' }, { points: 2, description: 'Near Mastery' }, { points: 1, description: 'Below Mastery' }, { points: 0, description: 'No Evidence' }];
+const STANDARDS = {
+  102: [
+    { id: '901', title: 'PHYS.1 Describe motion in one dimension', display_name: 'Motion in one dimension', group: 'Mechanics', rollup: 3.65, results: [['2001', 3, 9], ['2018', 4, 9]] },
+    { id: '902', title: 'PHYS.2 Apply Newton’s laws to a system', display_name: null, group: 'Mechanics', rollup: 2, results: [['2001', 2, 8]] },
+    { id: '903', title: 'PHYS.3 Read and make graphs of motion', display_name: 'Graphs of motion', group: 'Skills', rollup: 4, results: [['2001', 4, 8]] },
+    { id: '904', title: 'PHYS.4 Conservation of energy', display_name: 'Conservation of energy', group: 'Energy', rollup: null, results: [] },
+  ],
+};
+const standardsOf = (courseId) => (mockConfig.standards ? STANDARDS[courseId] || [] : []);
+on('GET', /^\/api\/v1\/courses\/(\w+)\/outcome_rollups$/, (url, m) => {
+  const list = standardsOf(m[1]);
+  return {
+    rollups: [{ scores: list.filter((o) => o.rollup !== null).map((o) => ({ score: o.rollup, title: o.title, submitted_at: ago(o.results.length ? Math.min(...o.results.map((r) => r[2])) * D : D), count: o.results.length, hide_points: false, links: { outcome: o.id } })), links: { user: '7', section: 's102', status: 'active' } }],
+    linked: {
+      outcomes: list.map((o) => ({ id: Number(o.id), title: o.title, display_name: o.display_name, description: `<p>${o.title.replace(/^\S+ /, '')}, as the unit's exam asks it.</p>`, points_possible: 4, mastery_points: 3, ratings: STD_SCALE, calculation_method: 'decaying_average', calculation_int: 65 })),
+      outcome_paths: list.map((o) => ({ id: Number(o.id), parts: [{ name: courseById(m[1])?.name || '' }, { name: o.group }, { name: o.title }] })),
+    },
+  };
+});
+on('GET', /^\/api\/v1\/courses\/(\w+)\/outcome_results$/, (url, m) => {
+  const list = standardsOf(m[1]);
+  const work = allAssignments(m[1]);
+  const results = list.flatMap((o) => o.results.map(([aid, score, daysAgo], i) => ({ id: Number(`${o.id}${i}`), score, possible: 4, percent: score / 4, mastery: score >= 3, hide_points: false, hidden: false, submitted_or_assessed_at: ago(daysAgo * D), links: { user: '7', learning_outcome: o.id, alignment: `assignment_${aid}`, assignment: `assignment_${aid}` } })));
+  const ids = [...new Set(results.map((r) => r.links.alignment))];
+  return { outcome_results: results, linked: { alignments: ids.map((id) => { const a = work.find((x) => `assignment_${x.id}` === id); return { id, name: a?.name || id, html_url: `/courses/${m[1]}/assignments/${id.replace('assignment_', '')}` }; }) } };
+});
 // (2.99.138) one group on its own, without its assignments (an assignment's More Details: what it counts toward)
 on('GET', /^\/api\/v1\/courses\/(\w+)\/assignment_groups\/([\w-]+)$/, (url, m) => { const g = assignmentGroups(m[1]).find((x) => String(x.id) === m[2]); if (!g) return null; const { assignments, ...rest } = g; return rest; });
 on('GET', /^\/api\/v1\/courses\/(\w+)\/discussion_topics\/(\w+)\/view$/, (url, m) => viewFor(m[2]));

@@ -1051,6 +1051,7 @@
       const parts = [stepsEl(x)];
       if (postedOf(x)) parts.push(U.el('bcv-asg__panel bcv-asg__gradep', [h('div', { class: 'bcv-asg__panelk', text: 'Grade' }), U.el('bcv-asg__graderow', [gradeRing(x), actionEl(x)]), classLine(), a.rubric?.length ? rubricFact() : null].filter(Boolean)));
       else if (heldOf(x)) parts.push(U.el('bcv-asg__panel bcv-asg__held', [h('div', { class: 'bcv-asg__why' }, [U.svg('M3 3l18 18M10.6 5.1A10 10 0 0122 12s-1 2.2-3.2 4.2M6.4 6.4C3.8 8.1 2 12 2 12s3.5 7 10 7c1.8 0 3.4-.5 4.8-1.3', { size: 15, stroke: 'currentColor', width: 2 }), h('span', { text: 'Graded, but your teacher has not released the grade yet.' })])]));
+      parts.push(standardsSlot());
       // (a module's Mark as done, and a quiz's Open quiz, kept under the steps till there is a grade card to hold them)
       if (!postedOf(x)) {
         const done = slot('bcv-detail__doneslot');
@@ -1061,6 +1062,29 @@
       parts.push(moreEl(x));
       return U.el('bcv-asg__rail', parts.filter(Boolean));
     }
+    // (2.99.151) In a course graded on standards, the standards this work was marked against — an exam's, above all — each
+    // with the level it gave and its score, under the grade; asked for with the page, drawn in when it lands (most work
+    // has none, and then nothing is drawn)
+    const stdAsk = store.standardsOf(c.id, a.id).catch(() => []);
+    function standardsSlot() {
+      const el = h('span', { class: 'bcv-asg__stdslot', hidden: '' });
+      stdAsk.then((got) => {
+        if (!ctx.alive() || !el.parentNode) return;
+        const G = BCV.screens.grades;
+        if (!got.length || !G?.stdLevel) { el.remove(); return; }
+        const met = got.filter((x) => x.result.met).length;
+        el.replaceWith(U.el('bcv-asg__panel bcv-asg__stdp', [
+          U.el('bcv-asg__stdhead', [h('div', { class: 'bcv-asg__panelk', text: 'Standards' }), U.text('bcv-asg__stdsum', `${met} of ${got.length} met`, 'span')]),
+          ...got.map(({ standard: sd, result: r }) => U.el('bcv-asg__std', [
+            U.text('bcv-std__name bcv-pretty', sd.title, 'span'),
+            U.el('bcv-asg__stdrow', [G.stdLevel(r.level, r.met), stdNote(sd, r), G.stdScore(sd, r.score)]),
+          ], { dataset: { std: sd.id } })),
+        ]));
+      });
+      return el;
+    }
+    /** Where the student stands on the standard over all the work that marked it, when that is not what this work gave. */
+    const stdNote = (sd, r) => (sd.level && sd.level.description !== r.level?.description ? U.text('bcv-asg__stdnow', `now ${sd.level.description}`, 'span') : null);
     // (2.99.138) More Details, under the facts: what Canvas says of the assignment that the page shows nowhere else
     // (extraFacts). The group it counts toward is asked for with the page and joins the panel when it lands; everything
     // else is drawn at once. A row with somewhere to go is a link: Canvas's own page for this one, or the embed's address.

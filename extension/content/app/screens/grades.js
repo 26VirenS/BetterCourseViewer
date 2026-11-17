@@ -20,6 +20,75 @@
   const filledOnce = new Set();
   const stillMotion = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
 
+  // ---- standards (2.99.151) ------------------------------------------------------------------------------
+  // A course graded on standards (store.standards): each standard with the level the student stands at — its name in its
+  // level's colour, a bar filled to the score with a tick where mastery starts, the score — and, pressed, the work that
+  // marked it, each piece with the level it gave. Shared with an assignment's page (its own standards).
+  const ptsOf = (v) => String(Math.round(Number(v) * 100) / 100); // (to two places, as Canvas shows a level: 3.65, not 3.7)
+  /** The bar: the score on the standard's whole range, in the level's colour, mastery's place ticked. */
+  function stdBar(sd, score, level) {
+    if (!(sd.possible > 0)) return null;
+    const at = (v) => `${Math.max(0, Math.min(100, (Number(v) / sd.possible) * 100)).toFixed(1)}%`;
+    return h('span', { class: 'bcv-std__bar', 'aria-hidden': 'true' }, [
+      score === null || score === undefined ? null : h('span', { class: 'bcv-std__fill', style: { width: at(score), background: level?.color || 'var(--bcv-ink3)' } }),
+      sd.mastery > 0 ? h('span', { class: 'bcv-std__tick', style: { left: at(sd.mastery) } }) : null,
+    ]);
+  }
+  /** The level, in words, by a dot of its colour (a level at or past mastery says so to a screen reader too). */
+  function stdLevel(level, met) {
+    if (!level) return U.text('bcv-std__level is-none', 'Not assessed yet', 'span');
+    return h('span', { class: `bcv-std__level ${met ? 'is-met' : ''}`, style: { '--bcv-lvl': level.color }, title: met ? `${level.description} — mastery met` : level.description }, [
+      h('span', { class: 'bcv-std__dot', 'aria-hidden': 'true' }), h('span', { class: 'bcv-std__word', text: level.description || ptsOf(level.points) }),
+    ]);
+  }
+  const stdScore = (sd, score) => (score === null || score === undefined || sd.hidePoints ? null : U.text('bcv-std__score', `${ptsOf(score)} / ${ptsOf(sd.possible)}`, 'span'));
+  /** One standard: a row that opens to the work that marked it. */
+  function stdRow(sd, open) {
+    const id = `bcv-std-${sd.id}`;
+    const shut = !open.has(sd.id);
+    const work = sd.results.length ? U.el('bcv-std__work', sd.results.map((r) => U.row([
+      U.el('bcv-row__body', [U.text('bcv-std__wname bcv-pretty', r.name, 'span'), r.at ? U.text('bcv-row__sub', `marked ${U.fmtAt(r.at)}`) : null]),
+      stdLevel(r.level, r.met),
+      stdScore(sd, r.score),
+      r.url ? U.chev() : null,
+    ], { href: r.url || null, cls: 'bcv-std__wrow' }))) : null;
+    if (work) { work.id = id; work.hidden = shut; }
+    const head = h(work ? 'button' : 'div', { class: 'bcv-std__head', ...(work ? { type: 'button', 'aria-expanded': String(!shut), 'aria-controls': id, onclick: (e) => {
+      const btn = e.currentTarget;
+      const now = btn.getAttribute('aria-expanded') !== 'true';
+      btn.setAttribute('aria-expanded', String(now));
+      work.hidden = !now;
+      if (now) open.add(sd.id); else open.delete(sd.id);
+    } } : {}) }, [
+      U.el('bcv-std__body', [
+        U.text('bcv-std__name bcv-pretty', sd.title, 'span'),
+        U.text('bcv-std__sub', [sd.group, sd.score === null ? null : U.plural(sd.count || sd.results.length || 1, 'assessment'), sd.mastery ? `mastery at ${ptsOf(sd.mastery)}` : null].filter(Boolean).join(' · '), 'span'),
+      ]),
+      stdBar(sd, sd.score, sd.level),
+      stdLevel(sd.level, sd.met),
+      stdScore(sd, sd.score),
+      work ? h('span', { class: 'bcv-std__chev', 'aria-hidden': 'true' }, [U.svg('M9 6l6 6-6 6', { size: 14, stroke: 'currentColor', width: 2.2 })]) : null,
+    ]);
+    return h('div', { class: `bcv-std ${sd.met ? 'is-met' : ''}`, dataset: { std: sd.id } }, [head, work]);
+  }
+  /** The Grades tab's card: what the standards are, how many are met, each standard. */
+  function standardsSec(std, open) {
+    const sub = std.assessed ? `${std.met} of ${std.assessed} met` : 'none assessed yet';
+    return U.el('bcv-gr__sec bcv-gr__sec--std', [
+      U.el('bcv-gr__hrow', [U.text('bcv-gr__h', 'Standards', 'span'), U.text('bcv-gr__hsub', sub, 'span')]),
+      U.text('bcv-gr__wnote bcv-pretty', 'This course marks work against standards. Each shows the level you’re at now; press one to see the work that marked it.'),
+      U.el('bcv-std__list', std.list.map((sd) => stdRow(sd, open))),
+    ]);
+  }
+  /** An assignment's row: how it did on the standards it was marked against, in a few words. */
+  function stdLine(std, assignmentId) {
+    if (!std) return null;
+    const got = std.list.flatMap((sd) => sd.results.filter((r) => r.assignmentId && String(r.assignmentId) === String(assignmentId)));
+    if (!got.length) return null;
+    const met = got.filter((r) => r.met).length;
+    return `${U.plural(got.length, 'standard')}, ${met} met`;
+  }
+
   async function render(ctx, shell) {
     const c = shell.course;
     const dark = shell.dark;
@@ -33,6 +102,12 @@
     // the course's groups, as the what-if's "add an assignment" offers them (the categories the grade is weighted by)
     const cats = groups.map((g) => ({ id: String(g.id), name: g.name, weight: Number(g.group_weight) || 0 }));
     const whatIfAllowed = (await store.pref('whatIfScores', true)) !== false; // Settings → Grades → Show what-if scores
+    // (2.99.151) a course graded on standards: the student's level on each, asked for beside the scores and drawn in when
+    // it lands (most courses have none, and the page is not held for it)
+    let std = null;
+    let drawn = false; // (the page's first drawing made: the standards landing before it are simply in it)
+    const stdOpen = new Set(); // (the standards opened to their work, kept across redraws)
+    store.standards(c.id, { maxAge: store.freshness.grades }).then((got) => { if (!got || !ctx.alive()) return; std = got; if (drawn) draw(); }).catch(() => {});
     // (2.99.145) the course's grading scale — its own, the student's, or the usual — for the letter beside the total
     const G = BCV.screens.gpa;
     try { await G?.loadScales?.(); } catch { /* (the usual scale, then) */ }
@@ -272,6 +347,7 @@
       const ringsCard = U.el('bcv-gr__cards', [
         U.card(U.el('bcv-gr bcv-gr--total', [U.el('bcv-gr__top', [svg, center]), totalFoot]), 'bcv-card--22 bcv-gr__card'),
         U.card(U.el('bcv-gr bcv-gr--groups', [weightsSec]), 'bcv-card--22 bcv-gr__card'),
+        std ? U.card(U.el('bcv-gr bcv-gr--groups bcv-gr--std', [standardsSec(std, stdOpen)]), 'bcv-card--22 bcv-gr__card bcv-gr__card--std') : null,
       ]);
 
       // ---- assignments ----------------------------------------------------------------
@@ -300,7 +376,7 @@
             // the group, the dates, and — on a marked assignment — how the class did (Canvas's own mean, high and low)
             // (2.99.36: the group is the section's head now, not said again in each row)
             // (2.99.145: the class's high and low are the mark beside the score; its mean stays in words)
-            U.text('bcv-row__sub', g.added ? `made up to test, not in ${BCV.lms.name}` : [g.due ? `due ${U.fmtBy(g.due)}` : 'no due date', g.submitted ? `submitted ${U.fmtAt(g.submitted)}` : (g.due && U.parse(g.due) > new Date() ? 'not due yet' : 'not submitted'), g.stats && g.earned !== null ? `class mean ${store.fmtPts(g.stats.mean)}` : null].filter(Boolean).join(' · ')),
+            U.text('bcv-row__sub', g.added ? `made up to test, not in ${BCV.lms.name}` : [g.due ? `due ${U.fmtBy(g.due)}` : 'no due date', g.submitted ? `submitted ${U.fmtAt(g.submitted)}` : (g.due && U.parse(g.due) > new Date() ? 'not due yet' : 'not submitted'), g.stats && g.earned !== null ? `class mean ${store.fmtPts(g.stats.mean)}` : null, stdLine(std, g.id)].filter(Boolean).join(' · ')),
           ]),
           spread(g, band),
           U.bandChip(band, band ? `${store.fmtPts(Math.round((g.effective / g.possible) * 1000) / 10)}% · ${band}` : null),
@@ -475,8 +551,9 @@
       return el;
     }
     draw();
+    drawn = true;
     return b;
   }
 
-  BCV.screens.grades = { render };
+  BCV.screens.grades = { render, stdRow, stdLevel, stdScore };
 })();

@@ -93,7 +93,7 @@ try {
     return false;
   };
   // the guided tour (welcome.js): the step on show and a wait for a step
-  const tourAt = () => page.evaluate(() => { const t = document.getElementById('bcv-tour'); if (!t) return null; const c = t.querySelector('.bcv-tour__card'); const ring = t.querySelector('.bcv-tour__ring'); const rr = ring.hidden ? null : ring.getBoundingClientRect(); const cr = c.getBoundingClientRect(); const nb = c.querySelector('.bcv-tour__next'); return { step: t.dataset.step, steps: t.dataset.steps, title: c.querySelector('.bcv-tour__title').textContent, doing: c.querySelector('.bcv-tour__dotext').textContent, next: nb.hidden ? null : nb.textContent, bg: getComputedStyle(t).backgroundColor, ring: rr && { x: rr.left, y: rr.top, w: rr.width, h: rr.height }, card: { x: cr.left, y: cr.top, w: cr.width, h: cr.height }, fits: cr.left >= 0 && cr.right <= innerWidth + 1 && cr.top >= 0 && cr.bottom <= innerHeight + 1 }; });
+  const tourAt = () => page.evaluate(() => { const t = document.getElementById('bcv-tour'); if (!t) return null; const c = t.querySelector('.bcv-tour__card'); const ring = t.querySelector('.bcv-tour__ring'); const rr = ring.hidden ? null : ring.getBoundingClientRect(); const cr = c.getBoundingClientRect(); const nb = c.querySelector('.bcv-tour__next'); return { step: t.dataset.step, steps: t.dataset.steps, title: c.querySelector('.bcv-tour__title').textContent, body: c.querySelector('.bcv-tour__body').textContent, doing: c.querySelector('.bcv-tour__dotext').textContent, next: nb.hidden ? null : nb.textContent, bg: getComputedStyle(t).backgroundColor, ring: rr && { x: rr.left, y: rr.top, w: rr.width, h: rr.height }, card: { x: cr.left, y: cr.top, w: cr.width, h: cr.height }, fits: cr.left >= 0 && cr.right <= innerWidth + 1 && cr.top >= 0 && cr.bottom <= innerHeight + 1 }; });
   // (the step, then its lit place settled where it goes — data-still — and a moment for the card's words)
   const tourStep = (id, ms = 15000) => page.waitForFunction((x) => document.getElementById('bcv-tour')?.dataset.step === x, id, { timeout: ms })
     .then(() => page.waitForFunction(() => { const t = document.getElementById('bcv-tour'); return !t || t.dataset.still === '1'; }, null, { timeout: 5000 }).catch(() => {}))
@@ -861,36 +861,30 @@ try {
   await page.waitForSelector('#bcv-setup #pzOpen', { timeout: 10000 });
   check((await page.$eval('#bcv-setup .pz__doneh1', (e) => e.textContent)) === 'Saved' && (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.theme?.name)) === 'Regular', 'Saved, with Regular kept');
   await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click('#bcv-setup #pzOpen')]); // Open Canvas: the page reloads
-  // …and comes back with the tour on it (2.99.130). A phone gets what it has — no switch, no sidebar: the hello, Today's
-  // search box, the counters and their sheet, and the end
+  // …and comes back with the tour on it (2.99.130; 2.99.150 a tour to read). A phone gets what it has — no switch, no
+  // sidebar: the hello, Today's search box, the counters, and the end; each told, Next through it
   await tourStep('hello', 20000);
   const ph0 = await tourAt();
-  check((await page.$('#bcv-setup')) === null && page.url() === `${BASE}/` && /^(reload|navigate)$/.test(await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) && ph0.steps === 'hello,search,week,peek-close,end' && ph0.bg === 'rgba(0, 0, 0, 0)' && ph0.title === 'Welcome to Simpl' && ph0.next === 'Start' && ph0.fits && !ph0.ring,
+  check((await page.$('#bcv-setup')) === null && page.url() === `${BASE}/` && /^(reload|navigate)$/.test(await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) && ph0.steps === 'hello,search,week,end' && ph0.bg === 'rgba(0, 0, 0, 0)' && ph0.title === 'Welcome to Simpl' && ph0.next === 'Start' && ph0.fits && !ph0.ring,
     `the reload comes back with the tour over Today — what a phone has, the hello card on the screen: ${JSON.stringify(ph0)}`);
   await page.click('#bcv-tour .bcv-tour__next');
   // (2.98.37) Today has the search box
   await tourStep('search');
   const searchStage = await tourAt();
-  check(searchStage.title === 'Search everything' && searchStage.doing === 'Type anything' && searchStage.fits && !!searchStage.ring, `Start, then Today's search box, lit: ${JSON.stringify(searchStage)}`);
+  check(searchStage.title === 'Search everything' && searchStage.doing === '' && searchStage.next === 'Next' && searchStage.fits && !!searchStage.ring, `Start, then Today's search box, lit and told — nothing to do but read: ${JSON.stringify(searchStage)}`);
   await page.waitForTimeout(300);
   await page.screenshot({ path: join(out, 'phone-12c-welcome-search.png') });
-  await page.click('#bcv-omni');
-  await page.keyboard.type('lab', { delay: 30 });
+  await page.click('#bcv-tour .bcv-tour__next');
   await tourStep('week');
   const ph1 = await tourAt();
-  check(ph1.title === 'Every card opens' && ph1.doing === 'Tap Next 7 days' && ph1.fits && !!ph1.ring && (await page.$eval('#bcv-omni', (e) => e.value)) === '', `typing done, the box emptied; then This week's counter, a tap asked for: ${JSON.stringify(ph1)}`);
+  check(ph1.title === 'Every card opens' && /Tap Next 7 days/.test(ph1.body || '') && ph1.doing === '' && ph1.fits && !!ph1.ring, `then This week's counter, what it opens told: ${JSON.stringify(ph1)}`);
   await page.waitForTimeout(300);
   await page.screenshot({ path: join(out, 'phone-12b-welcome-peek.png') });
-  await page.click('.bcv-ph-stats .bcv-ph-stat:nth-child(2)');
-  await tourStep('peek-close');
-  const ph2 = await tourAt();
-  check(!!(await page.$('.bcv-sheet-ov .bcv-ph-sheet')) && ph2.title === 'Close it' && ph2.doing === 'Swipe it down' && ph2.fits, `the tap opens its sheet; then closing it is asked for: ${JSON.stringify(ph2)}`);
-  await page.mouse.click(20, 40); // (above the sheet: the scrim)
+  await page.click('#bcv-tour .bcv-tour__next');
   await tourStep('end');
-  check(!(await page.$('.bcv-sheet-ov')), 'the sheet closed with a tap above it; then the end');
+  check(!(await page.$('.bcv-sheet-ov')), 'Next, and the end: nothing opened on the way');
   await page.click('#bcv-tour .bcv-tour__next');
   await tourGone();
-  await page.fill('#bcv-omni', '').catch(() => {});
   check(!(await page.$('html.bcv-touring')) && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('welcome:pending'))['welcome:pending'])) === undefined && (await page.$('.bcv-ph-stats')) !== null, 'Done ends the tour: Today, and the tour does not come back');
   await page.click('.bcv-ph-avatar');
   await sheet();
