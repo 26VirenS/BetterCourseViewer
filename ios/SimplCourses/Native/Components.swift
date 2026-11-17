@@ -339,6 +339,8 @@ enum LaunchOpen {
 
 /// A screen's data, read through the engine: its first answer, its error, and a reload. Screens hold one
 /// and show `LoadState` until it has an answer; a reload keeps what is shown until the new answer is in.
+/// (iPhone 1.9) What it showed last time comes first, at once (Engine.saved), and the fresh answer replaces it as it
+/// lands (Engine.fetch: kept for next time, the bar at the top running while it comes).
 @MainActor
 final class Loader<T: Decodable>: ObservableObject {
     @Published var data: T?
@@ -348,8 +350,16 @@ final class Loader<T: Decodable>: ObservableObject {
     /// rows come and go on the house spring (under Reduce Motion a short fade, as `Arrive`'s, 1.7.5). Every
     /// other load is a redraw, not an arrival.
     func load(_ engine: Engine, _ name: String, _ args: [String: Any] = [:], animated: Bool = false) async {
+        if data == nil, let kept = engine.saved(name, args, as: T.self) {
+            var t = Transaction()
+            t.disablesAnimations = true
+            withTransaction(t) {
+                data = kept
+                error = nil
+            }
+        }
         do {
-            let d = try await engine.call(name, args, as: T.self)
+            let d = try await engine.fetch(name, args, as: T.self)
             if animated {
                 withAnimation(UIAccessibility.isReduceMotionEnabled ? .easeOut(duration: 0.2) : .snappy) {
                     data = d

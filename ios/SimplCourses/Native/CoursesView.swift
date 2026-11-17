@@ -180,10 +180,13 @@ struct CoursesView: View {
 
     private func load(force: Bool = false) async {
         if force { _ = try? await engine.call("refresh", as: OK.self) }
+        // (1.9) what it showed last time, at once
+        if data == nil { data = engine.saved("courses", as: CoursesData.self) }
+        if progress.isEmpty, let p = engine.saved("coursesProgress", as: [String: CourseProgress].self) { progress = p }
         do {
-            data = try await engine.call("courses", as: CoursesData.self)
+            data = try await engine.fetch("courses", as: CoursesData.self)
             error = nil
-            if let p = try? await engine.call("coursesProgress", as: [String: CourseProgress].self) {
+            if let p = try? await engine.fetch("coursesProgress", as: [String: CourseProgress].self) {
                 withAnimation { progress = p }
             }
         } catch {

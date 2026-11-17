@@ -183,8 +183,18 @@ struct GradesView: View {
 
     private func load(force: Bool = false) async {
         if force { _ = try? await engine.call("refresh", as: OK.self) }
+        // (1.9) what it showed last time, at once
+        if data == nil, let kept = engine.saved("grades", as: GradesData.self) {
+            var t = Transaction()
+            t.disablesAnimations = true
+            withTransaction(t) {
+                goal = kept.goal
+                data = kept
+                error = nil
+            }
+        }
         do {
-            let d = try await engine.call("grades", as: GradesData.self)
+            let d = try await engine.fetch("grades", as: GradesData.self)
             var t = Transaction()
             // a redraw is not an arrival — but a term GPA that really changed rolls to its new value, as the rings beside it do
             if let old = data, old.gpa != d.gpa { t.animation = .snappy } else { t.disablesAnimations = true }
@@ -301,7 +311,7 @@ struct CourseGradesView: View {
             }
         }
         .onChange(of: sort) { Haptics.select() }
-        .task { await load(fresh: true) }
+        .task(id: engine.dataVersion) { await load(fresh: true) } // (1.9: Refresh reads it again too)
         .sheet(item: $addingTo) { g in
             AddWhatIfSheet(group: g, lmsName: engine.lmsName) { name, possible, score in
                 let id = "whatif-\(UUID().uuidString.prefix(8))"
@@ -621,8 +631,17 @@ struct CourseGradesView: View {
             tried[k] = t
         }
         let extra: [[String: Any]] = added.map { ["id": $0.id, "groupId": $0.groupId, "name": $0.name, "possible": $0.possible] }
+        // (1.9) the course's grades as they stood last time, at once; kept as they are (what-if scores tried are not)
+        let plain = !whatIf && tried.isEmpty && extra.isEmpty
+        if data == nil, let kept = engine.saved("courseGrades", ["id": courseId], as: CourseGradesData.self) { data = kept }
         do {
-            let d = try await engine.call("courseGrades", ["id": courseId, "tried": tried, "added": extra, "on": whatIf, "fresh": fresh], as: CourseGradesData.self)
+            let args: [String: Any] = ["id": courseId, "tried": tried, "added": extra, "on": whatIf, "fresh": fresh]
+            let d: CourseGradesData
+            if plain {
+                d = try await engine.fetch("courseGrades", args, as: CourseGradesData.self, keepAs: ["id": courseId])
+            } else {
+                d = try await engine.call("courseGrades", args, as: CourseGradesData.self)
+            }
             withAnimation(.snappy) { data = d }
             error = nil
         } catch {

@@ -7,36 +7,46 @@ struct LoginLayer: View {
     @ObservedObject var assist: LoginAssist
     /// The web view is what is on screen (the app's own screens are not up over it).
     var pageShown = true
+    /// (iPhone 1.9) Start Over over the school's page (the sign-in's sheet has its own, in its bar).
+    var startOver = true
+    /// (iPhone 1.9) Anything over the screen at all: the app signing in behind its own screens shows none of it there —
+    /// the bar at the top says how it goes, and the sign-in's sheet shows it (TopStatusBar, SignInSheet).
+    var covers = true
+    /// (iPhone 1.9) "Stay logged in?" asked from here (not while the sign-in's sheet, which asks it, is up).
+    var alerts = true
 
     var body: some View {
         ZStack {
-            switch assist.phase {
-            case .idle:
-                // (a view, not nothing: "Stay logged in?" is asked from here once the cover is gone)
-                Color.clear.allowsHitTesting(false)
-                if pageShown && assist.handoff {
-                    HandoffNote(restart: assist.restart) { assist.handoff = false }
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                } else if pageShown && assist.onSchoolPage {
-                    StartOverButton(action: assist.restart)
-                        .transition(.opacity)
-                }
-            case .working:
-                LoggingInView(stage: assist.stage, lms: AppSession.lmsName(host: assist.canvasHost), showPage: { assist.showPage() }, restart: { assist.restart() })
-                    .transition(.opacity)
-            case .capture(let host, let error):
-                LoginForm(assist: assist, host: host, error: error)
-                    .transition(.opacity)
-            }
+            Color.clear.allowsHitTesting(false) // (always a view: "Stay logged in?" is asked from here, covers or not)
+            if covers { cover }
         }
         .animation(.easeInOut(duration: 0.22), value: assist.phase)
         .animation(.spring(duration: 0.4, bounce: 0.15), value: assist.handoff)
         .animation(.easeOut(duration: 0.2), value: assist.onSchoolPage)
-        .alert("Stay logged in?", isPresented: $assist.askStay) {
+        .alert("Stay logged in?", isPresented: alerts ? $assist.askStay : .constant(false)) {
             Button("Not now", role: .cancel) { assist.stay(false) }
             Button("Stay logged in") { assist.stay(true) }
         } message: {
             Text("Simpl keeps your username and password on this iPhone only, locked in its Keychain, and signs you in when your school asks again. Two-step codes still come to you.")
+        }
+    }
+
+    @ViewBuilder private var cover: some View {
+        switch assist.phase {
+        case .idle:
+            if pageShown && assist.handoff {
+                HandoffNote(restart: assist.restart) { assist.handoff = false }
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            } else if pageShown && startOver && assist.onSchoolPage {
+                StartOverButton(action: assist.restart)
+                    .transition(.opacity)
+            }
+        case .working:
+            LoggingInView(stage: assist.stage, lms: AppSession.lmsName(host: assist.canvasHost), showPage: { assist.showPage() }, restart: { assist.restart() })
+                .transition(.opacity)
+        case .capture(let host, let error):
+            LoginForm(assist: assist, host: host, error: error)
+                .transition(.opacity)
         }
     }
 }

@@ -202,8 +202,9 @@ struct TodoView: View {
         var args: [String: Any] = [:]
         if let g = group { args["group"] = g }
         if let s = showDone { args["showDone"] = s }
+        if data == nil { data = engine.saved("todo", args, as: TodoData.self) } // (1.9: what it showed last time, at once)
         do {
-            let d = try await engine.call("todo", args, as: TodoData.self)
+            let d = try await engine.fetch("todo", args, as: TodoData.self)
             withAnimation(.snappy) { data = d }
             error = nil
         } catch {

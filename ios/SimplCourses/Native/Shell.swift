@@ -31,7 +31,9 @@ struct RootView: View {
             }
         }
         .environmentObject(engine)
-        .overlay { LoginLayer(assist: engine.web.login, pageShown: engine.phase != .native) } // (the app's sign-in form, "Logging you in", "Stay logged in?", Start Over)
+        // the app's sign-in form, "Logging you in", "Stay logged in?", Start Over — and (1.9) the bar at the very top, the
+        // sign-in going on behind the screens and the screens' reads, with the sign-in's own page when it is pressed
+        .overlay { SignInLayers(engine: engine, status: engine.status, pageShown: engine.phase != .native, background: engine.background) }
         .sheet(isPresented: $session.showSettings) {
             SettingsSheet()
                 .environmentObject(engine)
@@ -69,10 +71,12 @@ struct RootView: View {
         // (1.7.6) a link that opened the app: opened as a notification's is, the sign-in asked after first
         .onOpenURL { engine.openFromOutside($0) }
         .onReceive(NotificationCenter.default.publisher(for: .simplSignedOut)) { _ in
+            engine.signedOut() // (1.9: the screens kept go with the account; the school's sign-in is the whole screen)
             engine.web.login.forget()
             engine.web.load() // back to the login page
         }
         .onReceive(NotificationCenter.default.publisher(for: .simplInterfaceToggled)) { _ in
+            if !Bridge.shared.interfaceOn { engine.leaveBackground() } // (1.9: Canvas's own page is what shows now)
             engine.reload() // Canvas's own bundles are allowed or blocked per page; a fresh load applies it
         }
         // a reminder or an alert pressed: its work opens once the school is known to have the student signed in and the
@@ -95,6 +99,28 @@ struct RootView: View {
         guard let url = reminders.opening else { return }
         reminders.opening = nil
         engine.openChecked(url)
+    }
+}
+
+/// (iPhone 1.9) Over everything the app shows: the sign-in's covers (on the first run, the school's page itself), the bar
+/// at the very top (TopStatusBar), and the sign-in's own page when the bar's strip is pressed (SignInSheet). Signing in
+/// behind the app's screens, nothing covers them: "Stay logged in?" is still asked from here (or from the sheet, while up).
+private struct SignInLayers: View {
+    let engine: Engine
+    @ObservedObject var status: EngineStatus
+    let pageShown: Bool
+    let background: Bool
+
+    var body: some View {
+        LoginLayer(assist: engine.web.login, pageShown: pageShown, covers: !background, alerts: !status.signInOpen)
+            .overlay(alignment: .top) {
+                TopStatusBar(status: status, open: { engine.showSignIn() }, retry: { engine.retrySignIn() })
+                    .ignoresSafeArea(edges: .top)
+            }
+            .sheet(isPresented: Binding(get: { status.signInOpen }, set: { status.signInOpen = $0 })) {
+                SignInSheet(status: status, assist: engine.web.login)
+                    .environmentObject(engine)
+            }
     }
 }
 
@@ -343,9 +369,10 @@ struct TabSplit<Root: View>: View {
         .task(id: two && path.isEmpty) {
             guard tab == .courses, two else { return }
             try? await Task.sleep(nanoseconds: 400_000_000) // (build 43: once the Duo has finished opening, not during it)
-            guard engine.paths[.courses].isEmpty,
-                  let d = try? await engine.call("courses", as: CoursesData.self), let c = d.rows.first,
-                  twoColumns, engine.paths[.courses].isEmpty else { return }
+            guard engine.paths[.courses].isEmpty else { return }
+            var list = engine.saved("courses", as: CoursesData.self) // (1.9: the list kept, at once)
+            if list == nil { list = try? await engine.call("courses", as: CoursesData.self, keep: true) }
+            guard let c = list?.rows.first, twoColumns, engine.paths[.courses].isEmpty else { return }
             engine.paths[.courses] = [.course(id: c.id)]
         }
     }
@@ -413,7 +440,8 @@ struct CourseSwitcher: View {
         }
         .accessibilityLabel("Switch course")
         .task(id: engine.dataVersion) {
-            if let d = try? await engine.call("courses", as: CoursesData.self) { rows = d.rows }
+            if rows.isEmpty, let d = engine.saved("courses", as: CoursesData.self) { rows = d.rows } // (1.9: at once)
+            if let d = try? await engine.call("courses", as: CoursesData.self, keep: true) { rows = d.rows }
         }
     }
 
@@ -486,7 +514,8 @@ struct SplitHome: View {
                 }
             }
             .task {
-                if let d = try? await engine.call("courses", as: CoursesData.self) { first = d.rows.first }
+                if let d = engine.saved("courses", as: CoursesData.self) { first = d.rows.first; loaded = true } // (1.9: at once)
+                if let d = try? await engine.call("courses", as: CoursesData.self, keep: true) { first = d.rows.first }
                 loaded = true
             }
         }
@@ -717,6 +746,8 @@ struct AccountMenu: View {
             // (no Tools on the iPhone yet, 1.2)
         }
         Section {
+            // (1.9) everything read afresh from the school, whatever screen is showing
+            Button { Task { await engine.forceRefresh() } } label: { Label("Refresh", systemImage: "arrow.clockwise") }
             Button { session.showSettings = true } label: { Label("Settings", systemImage: "gearshape") }
             Button {
                 Task {

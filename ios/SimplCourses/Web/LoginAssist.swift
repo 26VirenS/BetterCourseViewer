@@ -117,6 +117,9 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
     @Published var handoff = false
     /// The web view is on the school's sign-in (another host, or Canvas's own /login): Start Over is offered there.
     @Published private(set) var onSchoolPage = false
+    /// (iPhone 1.9) Why the last page could not be loaded at all (offline, the school not answering), until the next one
+    /// is asked for: the app signing in behind its screens says Login Failed with it.
+    @Published private(set) var failure: String?
     /// Starts the sign-in again from Canvas (WebController: a fresh load of Canvas, which sends a new request).
     var onRestart: (() -> Void)?
     private var lastAutoRestart: Date?
@@ -218,6 +221,7 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
         autoOff = false
         declined = false
         handoff = false
+        failure = nil
         if phase != .idle { phase = .idle }
         onRestart?()
     }
@@ -391,6 +395,7 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
         autoOff = false
         prefillUser = ""
         handoff = false
+        failure = nil
         reveal()
     }
 
@@ -400,6 +405,7 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
     func willLoad(_ url: URL) {
         let host = url.host?.lowercased() ?? ""
         if attempt != nil { navigatedSinceAttempt = true }
+        if failure != nil, url.scheme != "about", url.scheme != "data" { failure = nil } // (a page asked for again: a new try)
         schoolPage(url)
         // the saved sign-in page coming up: covered from its first frame, not after it has shown
         if phase == .idle, !autoOff, host != canvasHost, let s = LoginVault.load(), s.host == host {
@@ -459,9 +465,10 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
         webView?.allowsBackForwardNavigationGestures = !on
     }
 
-    /// The page could not be loaded at all.
-    func pageFailed() {
+    /// The page could not be loaded at all (`reason`: what WebKit said, for the app's Login Failed).
+    func pageFailed(reason: String? = nil) {
         attempt = nil
+        failure = reason ?? "Your school’s site could not be reached."
         handOver()
     }
 }

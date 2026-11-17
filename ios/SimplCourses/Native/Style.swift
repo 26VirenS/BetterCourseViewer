@@ -296,6 +296,7 @@ struct CheckCircle: View {
 struct LoadState: View {
     let error: String?
     let retry: () -> Void
+    @State private var shown = false
 
     var body: some View {
         if let error = error {
@@ -307,7 +308,13 @@ struct LoadState: View {
                 Button("Try again", action: retry).glassButton()
             }
         } else {
+            // (1.9) a moment before it shows: a screen with something saved fills in first, and never flashes it
             ProgressView().controlSize(.large).frame(maxWidth: .infinity, maxHeight: .infinity)
+                .opacity(shown ? 1 : 0)
+                .task {
+                    try? await Task.sleep(nanoseconds: 250_000_000)
+                    withAnimation(.easeOut(duration: 0.2)) { shown = true }
+                }
         }
     }
 }

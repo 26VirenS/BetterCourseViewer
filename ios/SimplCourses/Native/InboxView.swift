@@ -216,7 +216,7 @@ struct ConversationView: View {
                 }
             }
         }
-        .task { await load() }
+        .task(id: engine.dataVersion) { await load() } // (1.9: Refresh reads it again too)
     }
 
     private func bubble(_ m: Message) -> some View {

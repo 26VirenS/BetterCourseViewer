@@ -117,17 +117,49 @@ final class Engine: ObservableObject, ShellListener {
     private var lastSignedIn: Date?
     private var signingBackIn = false
 
+    /// (iPhone 1.9) The app's screens are up from the first moment, on what they last showed (SavedAnswers), and the
+    /// sign-in goes on behind them — the bar at the very top saying how it goes (status, TopStatusBar). So once anything
+    /// has been kept for this school; the very first sign-in, with nothing kept, is the school's page itself, as before.
+    private(set) var background: Bool
+    /// (iPhone 1.9) The bar at the top: the sign-in behind the screens, and the screens' reads.
+    let status = EngineStatus()
+    /// (iPhone 1.9) A screen's read gave up waiting while the sign-in went on: every screen reads again once it is done.
+    private var waitedOut = false
+    /// (iPhone 1.9) The sign-in has gone on too long for anything to come of it (signInTimer): Login Failed, until the
+    /// next page is asked for.
+    private var tooLong = false
+    private var signInTimer: DispatchWorkItem?
+    /// (iPhone 1.9) Since when the school's sign-in has stood still with nothing being done to it, and since when
+    /// Canvas's own page has stood loaded with the app's screens not on it (updateLink).
+    private var schoolStillSince: Date?
+    private var canvasStillSince: Date?
+
     init(host: String) {
         self.host = host
         web = WebController(mode: .canvas(host: host))
+        // (iPhone 1.9) what this school's screens last showed: up at once, signing in behind them
+        SavedAnswers.shared.use(host: host)
+        let kept = Engine.savedAnswer("snapshot", [:], as: Snapshot.self)
+        // (with Simpl's own interface turned off, the page is what shows: nothing to put up over it)
+        background = kept != nil && Bridge.shared.interfaceOn && !UserDefaults.standard.bool(forKey: "SimplNoSaved")
+        if background {
+            snapshot = kept
+            lms = kept?.lms
+            phase = .native
+            status.link = .signingIn
+        }
         Bridge.shared.shell = self
         hostView.take(web.webView, revealed: true)
         web.onNavigationStart = { [weak self] in self?.navigationStarted() }
         web.onFinish = { [weak self] url in self?.pageFinished(url) }
         web.onOpenInShell = { [weak self] url in self?.openWeb(url.absoluteString, title: "") }
-        // the sign-in moving on (its cover lifting, "Stay logged in?" answered): a popup waiting may go up now
+        // the sign-in moving on (its cover lifting, "Stay logged in?" answered): a popup waiting may go up now; and, signing
+        // in behind the screens, the bar at the top says where it has got
         loginWatch = web.login.objectWillChange.sink { [weak self] _ in
-            DispatchQueue.main.async { self?.schedulePopups() }
+            DispatchQueue.main.async {
+                self?.schedulePopups()
+                self?.updateLink()
+            }
         }
         // the simulator suite's screens (.github/workflows/ios-shots.yml): -SimplTab courses
         if let t = UserDefaults.standard.string(forKey: "SimplTab") {
@@ -136,6 +168,7 @@ final class Engine: ObservableObject, ShellListener {
     }
 
     func start() {
+        if background { armSignInTimer() }
         web.loadIfNeeded()
         // a page that never says (a school's sign-in on another host, a page that failed): shown as it is
         Task { [weak self] in
@@ -191,17 +224,20 @@ final class Engine: ObservableObject, ShellListener {
                     Task { await self.firstNative() }
                 }
                 // (1.7.6) up on a page the school drew for the student: signed in. After a sign-in the check sent the
-                // page back to, every screen reads again (what it asked meanwhile came back empty)
+                // page back to, every screen reads again (what it asked meanwhile came back empty) — and (1.9) after one
+                // behind the screens that a screen gave up waiting on
                 lastSignedIn = Date()
-                if signingBackIn {
+                if signingBackIn || waitedOut {
                     signingBackIn = false
+                    waitedOut = false
                     changed()
                 }
+                updateLink()
                 openPending()
             } else {
                 ready = false
                 if let id = active { detach(id) }
-                setPhase(.web)
+                if background { updateLink() } else { setPhase(.web) } // (1.9: the screens stay; the bar says it)
             }
         case "shell.page":
             pageDrawn(body)
@@ -224,11 +260,130 @@ final class Engine: ObservableObject, ShellListener {
     private func navigationStarted() {
         ready = false
         if asked != nil { asked?.navigated = true }
+        tooLong = false // (a page on its way: the sign-in is going somewhere again)
+        updateLink()
     }
 
     private func pageFinished(_ url: URL?) {
         // the school's sign-in, on its own host: nothing of ours runs there to say so
         if phase == .starting, let h = url?.host?.lowercased(), h != host.lowercased() { setPhase(.web) }
+        updateLink()
+    }
+
+    // MARK: - Signing in behind the screens (iPhone 1.9)
+
+    /// Where the sign-in has got, for the bar at the top (only while the app signs in behind its own screens): signed
+    /// in; on its way (the page loading, the saved details going in); waiting on the student (a form with nothing saved
+    /// for it, a two-step code, a school page standing still with nothing to fill); or failed (the saved details refused,
+    /// the school not reached, too long).
+    func updateLink() {
+        guard background else { return }
+        if ready && web.shellOn {
+            schoolStillSince = nil
+            canvasStillSince = nil
+            tooLong = false
+            setLink(.on)
+            return
+        }
+        let l = web.login
+        if let why = l.failure { setLink(.failed(why)); return }
+        if case .capture(_, let error) = l.phase {
+            setLink(error.map { .failed($0) } ?? .needsInput)
+            return
+        }
+        if l.handoff { setLink(.needsInput); return }
+        if l.phase == .working {
+            schoolStillSince = nil
+            setLink(.signingIn)
+            return
+        }
+        if tooLong { setLink(.failed("Signing in is taking longer than it should.")); return }
+        // the school's page, loaded and left as it is (nothing saved to fill it with, nothing it asks that the reader
+        // can see): the student's to finish — after a moment, so a page that only passes through on its way to Canvas
+        // is not taken for one
+        if l.onSchoolPage && !web.webView.isLoading {
+            let since = schoolStillSince ?? Date()
+            schoolStillSince = since
+            if Date().timeIntervalSince(since) >= 2.5 {
+                setLink(.needsInput)
+            } else {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) { [weak self] in self?.updateLink() }
+                if status.link != .needsInput { setLink(.signingIn) }
+            }
+            return
+        }
+        schoolStillSince = nil
+        // Canvas's own page, loaded, and the app's screens never coming on over it (Simpl turned off on it): the page shown
+        // as it is, as before 1.9, rather than a sign-in that never ends
+        if let u = web.webView.url, u.host?.lowercased() == host.lowercased(), !LoginAssist.isSignIn(u.path), !web.webView.isLoading {
+            let since = canvasStillSince ?? Date()
+            canvasStillSince = since
+            if Date().timeIntervalSince(since) >= 12 {
+                leaveBackground()
+                return
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 12.1) { [weak self] in self?.updateLink() }
+        } else {
+            canvasStillSince = nil
+        }
+        setLink(.signingIn)
+    }
+
+    /// Back to the way before 1.9: the page is what shows while the app's screens are not on (Simpl turned off).
+    func leaveBackground() {
+        guard background else { return }
+        background = false
+        signInTimer?.cancel()
+        canvasStillSince = nil
+        status.link = .on
+        status.signInOpen = false
+        setPhase(.web)
+    }
+
+    private func setLink(_ l: EngineStatus.Link) {
+        guard status.link != l else { return }
+        status.link = l
+        if l == .signingIn { armSignInTimer() } else { signInTimer?.cancel() }
+    }
+
+    /// Signing in for 45 seconds with nothing to show for it: Login Failed (Try Again, or the page to see why).
+    private func armSignInTimer() {
+        signInTimer?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.background, !(self.ready && self.web.shellOn), self.status.link == .signingIn else { return }
+            self.tooLong = true
+            self.updateLink()
+        }
+        signInTimer = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 45, execute: work)
+    }
+
+    /// Try Again, on the bar's red strip or the sign-in's sheet: the sign-in begun afresh from Canvas.
+    func retrySignIn() {
+        tooLong = false
+        schoolStillSince = nil
+        web.login.restart() // (Canvas loaded afresh: it sends the school a new request; saved details are tried again)
+        if background { setLink(.signingIn) }
+    }
+
+    /// The bar's strip pressed: the sign-in's page up over the app (SignInSheet).
+    func showSignIn() {
+        searchOpen = false
+        status.signInOpen = true
+    }
+
+    /// Signed out (Settings): the screens go, and the school's sign-in is the whole screen, as on the app's first run.
+    func signedOut() {
+        background = false
+        signInTimer?.cancel()
+        status.link = .on
+        status.signInOpen = false
+        snapshot = nil
+        if let id = active { detach(id) }
+        ready = false
+        web.shellOn = false
+        shownNative = false
+        setPhase(.starting)
     }
 
     private func firstNative() async {
@@ -286,6 +441,7 @@ final class Engine: ObservableObject, ShellListener {
     /// good answer, it is taken as still good.
     func checkSignIn() {
         guard phase == .native, !checking else { return }
+        if background && status.link != .on { return } // (1.9: signing in behind the screens already — that is the check)
         if let last = lastSignedIn, Date().timeIntervalSince(last) < 30 {
             openPending()
             return
@@ -331,6 +487,12 @@ final class Engine: ObservableObject, ShellListener {
         if let id = active { detach(id) }
         ready = false
         web.shellOn = false
+        if background { // (1.9: the screens stay as they are, the bar at the top running, while it signs back in)
+            tooLong = false
+            setLink(.signingIn)
+            web.load()
+            return
+        }
         setPhase(.starting)
         web.load()
         Task { [weak self] in
@@ -380,7 +542,7 @@ final class Engine: ObservableObject, ShellListener {
     }
 
     func refreshSnapshot() async {
-        if let s = try? await call("snapshot", as: Snapshot.self) {
+        if let s = try? await call("snapshot", as: Snapshot.self, keep: true) {
             snapshot = s
             if let k = s.lms, k != lms { lms = k; NotificationCenter.default.post(name: .simplLMSKnown, object: nil, userInfo: ["lms": k]) }
         }
@@ -404,7 +566,7 @@ final class Engine: ObservableObject, ShellListener {
 
     /// A call into the page's engine (BCVNative.call), its answer decoded. Waits for the page to be ready
     /// (a page load under way), and tries once more if the page went away mid-call.
-    func call<T: Decodable>(_ name: String, _ args: [String: Any] = [:], as type: T.Type) async throws -> T {
+    func call<T: Decodable>(_ name: String, _ args: [String: Any] = [:], as type: T.Type, keep: Bool = false, keepAs: [String: Any]? = nil) async throws -> T {
         shotBusy += 1 // (the simulator suite's picture waits for the page's answers: watchForSettled)
         shotActivity = Date()
         defer {
@@ -422,7 +584,9 @@ final class Engine: ObservableObject, ShellListener {
                 let raw = try await web.webView.callAsyncJavaScript("return JSON.stringify(await BCVNative.call(name, args))", arguments: ["name": name, "args": args], in: nil, contentWorld: .defaultClient)
                 guard let text = raw as? String, let data = text.data(using: .utf8) else { throw EngineError.unreadable }
                 if let box = try? JSONDecoder().decode(ErrorBox.self, from: data), let message = box.error { throw EngineError.page(message) }
-                return try JSONDecoder().decode(T.self, from: data)
+                let answer = try JSONDecoder().decode(T.self, from: data)
+                if keep { SavedAnswers.shared.keep(data, for: SavedAnswers.key(name, keepAs ?? args)) } // (1.9: shown at once next time)
+                return answer
             } catch let e as EngineError {
                 if case .page = e { checkSignIn() } // (1.7.6: the page could not read it — the sign-in may have ended)
                 throw e
@@ -435,6 +599,36 @@ final class Engine: ObservableObject, ShellListener {
             }
         }
         throw lastError
+    }
+
+    /// (iPhone 1.9) A screen's read: the fresh answer, kept on the phone for the next time the screen opens (`saved`),
+    /// the bar at the very top running while it comes.
+    /// `keepAs`: the arguments it is kept under, where they are not the ones asked with (a read forced afresh is kept
+    /// as the plain read the screen asks for next time).
+    func fetch<T: Decodable>(_ name: String, _ args: [String: Any] = [:], as type: T.Type, keepAs: [String: Any]? = nil) async throws -> T {
+        status.began()
+        defer { status.ended() }
+        return try await call(name, args, as: type, keep: true, keepAs: keepAs)
+    }
+
+    /// (iPhone 1.9) What this read answered last time, kept on the phone: shown at once while `fetch` reads it afresh.
+    func saved<T: Decodable>(_ name: String, _ args: [String: Any] = [:], as type: T.Type) -> T? {
+        Engine.savedAnswer(name, args, as: type)
+    }
+
+    nonisolated static func savedAnswer<T: Decodable>(_ name: String, _ args: [String: Any], as type: T.Type) -> T? {
+        guard let d = SavedAnswers.shared.data(SavedAnswers.key(name, args)) else { return nil }
+        return try? JSONDecoder().decode(T.self, from: d)
+    }
+
+    /// (iPhone 1.9) Refresh: everything read afresh from Canvas — the page's own caches emptied, then every screen
+    /// showing reads again (changed) — the bar at the top running from the press.
+    func forceRefresh() async {
+        Haptics.tap()
+        status.began()
+        _ = try? await call("refresh", as: OK.self)
+        status.ended()
+        changed()
     }
 
     /// An action whose answer is only whether it worked.
@@ -454,6 +648,7 @@ final class Engine: ObservableObject, ShellListener {
         while !ready && Date().timeIntervalSince(start) < timeout {
             try? await Task.sleep(nanoseconds: 100_000_000)
         }
+        if !ready && background { waitedOut = true } // (1.9: read again once the sign-in behind the screens is done)
     }
 
     // MARK: - Navigation

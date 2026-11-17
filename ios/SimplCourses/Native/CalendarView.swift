@@ -4,12 +4,17 @@ import SwiftUI
 /// by day, or the next three weeks as a list — on the calendars chosen (Canvas shows ten at most).
 struct CalendarView: View {
     @EnvironmentObject private var engine: Engine
-    @State private var view = "month"
+    /// (1.9) Month, week or list: the one last chosen on this phone at once (kept beside the page's own, calView).
+    @State private var view = UserDefaults.standard.string(forKey: CalendarView.viewKey) ?? "month"
+    static let viewKey = "SimplCalView"
     @State private var anchor = CalendarView.monthStart(Date())
     @State private var weekStart = CalendarView.sunday(Date())
     @State private var selected = Calendar.current.startOfDay(for: Date())
     @State private var data: CalendarData?
     @State private var error: String?
+    /// (1.9) The stretch of days the screen shows now (its saved answer's key).
+    @State private var shownKey: String?
+    @State private var viewKnown = false
     @State private var loading = false
     @State private var choosing = false
     /// The way the last move went (the month slides in from that side): set a frame before the move itself,
@@ -75,11 +80,16 @@ struct CalendarView: View {
             }
         }
         .refreshable { await load() }
-        .task {
-            if let v = try? await engine.call("calView", as: OK.self).view { view = v }
+        .task(id: engine.dataVersion) { // (1.9: Refresh reads it again too)
+            if !viewKnown { // (the view chosen, asked once: a pick made here since is not undone)
+                showKept() // (1.9: the days as they were, at once, while it is asked)
+                if let v = try? await engine.call("calView", as: OK.self).view, v != view { view = v }
+                viewKnown = true
+            }
             await load()
         }
         .onChange(of: view) {
+            UserDefaults.standard.set(view, forKey: CalendarView.viewKey)
             Haptics.select()
             Task {
                 await engine.act("calView", ["view": view])
@@ -156,13 +166,31 @@ struct CalendarView: View {
         }
     }
 
+    private func rangeArgs(_ s: Date, _ e: Date) -> [String: Any] {
+        let iso = ISO8601DateFormatter()
+        return ["from": iso.string(from: s), "to": iso.string(from: e)]
+    }
+
+    /// (1.9) A stretch of days shown before comes up at once as it was (another month: in place of the last one's).
+    private func showKept() {
+        let (s, e) = range
+        let args = rangeArgs(s, e)
+        let key = SavedAnswers.key("calendar", args)
+        if shownKey != key, let kept = engine.saved("calendar", args, as: CalendarData.self) {
+            data = kept
+            error = nil
+        }
+        shownKey = key
+    }
+
     private func load() async {
         let (s, e) = range
-        let iso = ISO8601DateFormatter()
         loading = true
         defer { loading = false }
+        let args = rangeArgs(s, e)
+        showKept()
         do {
-            let d = try await engine.call("calendar", ["from": iso.string(from: s), "to": iso.string(from: e)], as: CalendarData.self)
+            let d = try await engine.fetch("calendar", args, as: CalendarData.self)
             withAnimation(.snappy) { data = d }
             error = nil
         } catch {

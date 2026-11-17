@@ -95,12 +95,8 @@ struct ContextHome: View {
                 ToolbarItem(placement: .topBarTrailing) { CourseSwitcher(selected: ContextHome.id(of: ctx)) }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button { engine.openWebScreen("/\(ctx)?bcv=native", title: model.data?.title ?? "") } label: { Label("Open \(engine.lmsName)’s Page", systemImage: "globe") }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                }
-                .accessibilityLabel("More")
+                // (1.9) Refresh, where the menu with Canvas's page was; held, Canvas's page is still there
+                RefreshButton { engine.openWebScreen("/\(ctx)?bcv=native", title: model.data?.title ?? "") }
             }
         }
         .task(id: engine.dataVersion) { await load() }

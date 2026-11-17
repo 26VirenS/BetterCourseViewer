@@ -59,7 +59,7 @@ struct NotificationsView: View {
                 } label: { Image(systemName: "ellipsis.circle") }
             }
         }
-        .task { await load() }
+        .task(id: engine.dataVersion) { await load() } // (1.9: Refresh reads it again too)
     }
 
     private func chip(_ key: String, _ label: String, _ count: Int) -> some View {
@@ -127,8 +127,9 @@ struct NotificationsView: View {
     }
 
     private func load(force: Bool = false) async {
+        if data == nil { data = engine.saved("notifications", as: NotificationsData.self) } // (1.9: at once)
         do {
-            let d = try await engine.call("notifications", force ? ["force": true] : [:], as: NotificationsData.self)
+            let d = try await engine.fetch("notifications", force ? ["force": true] : [:], as: NotificationsData.self, keepAs: [:])
             withAnimation(.snappy) { data = d }
             error = nil
         } catch {

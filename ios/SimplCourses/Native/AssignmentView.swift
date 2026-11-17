@@ -72,12 +72,10 @@ struct AssignmentView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
+                // (1.9) Refresh, where Canvas's page was; held, Canvas's page is still there
+                RefreshButton {
                     engine.openWebScreen(model.data?.canvasUrl ?? "/courses/\(course)/assignments/\(id)?bcv=native", title: model.data?.title ?? "")
-                } label: {
-                    Image(systemName: "globe")
                 }
-                .accessibilityLabel("Open \(engine.lmsName)’s Page")
             }
         }
         .task(id: engine.dataVersion) { await load() }

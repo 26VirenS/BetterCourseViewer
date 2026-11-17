@@ -310,13 +310,18 @@ struct SettingsSheet: View {
     // MARK: - Calls
 
     private func loadInfo() async {
+        // (1.9) the settings as they were last read, at once; then as they are
+        if info == nil, let kept = engine.saved("settingsInfo", as: SimplSettingsInfo.self) {
+            info = kept
+            goal = kept.goal
+        }
         do {
-            let i = try await engine.call("settingsInfo", as: SimplSettingsInfo.self)
+            let i = try await engine.fetch("settingsInfo", as: SimplSettingsInfo.self)
             withAnimation(.snappy) { info = i } // (the grade and data sections slide in where "Reading your settings…" was)
             goal = i.goal
             infoError = nil
         } catch {
-            infoError = error.localizedDescription
+            if info == nil { infoError = error.localizedDescription }
         }
     }
 
@@ -425,6 +430,7 @@ struct SettingsSheet: View {
         defer { busy = false }
         do {
             _ = try await engine.call("resetEverything", as: OK.self)
+            SavedAnswers.shared.eraseAll() // (1.9: nor what the screens last showed)
             Haptics.success()
             dismiss()
             engine.reload()

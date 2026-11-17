@@ -281,7 +281,7 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
         if e.code == NSURLErrorCancelled || (e.domain == "WebKitErrorDomain" && e.code == 102) { return }
         // Something else is already loading (a redirect, a retry): let it land rather than covering it.
         if webView.isLoading { return }
-        login.pageFailed()
+        login.pageFailed(reason: error.localizedDescription)
         showUnreachable(error)
     }
 

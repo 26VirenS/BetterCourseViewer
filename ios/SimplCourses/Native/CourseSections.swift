@@ -397,13 +397,11 @@ struct PageView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
+                // (1.9) Refresh, where Canvas's page was; held, Canvas's page is still there
+                RefreshButton {
                     let s = model.data?.slug ?? slug
                     engine.openWebScreen(s.isEmpty ? "/\(ctx)/wiki?bcv=native" : "/\(ctx)/pages/\(s)?bcv=native", title: model.data?.title ?? "Page")
-                } label: {
-                    Image(systemName: "globe")
                 }
-                .accessibilityLabel("Open \(engine.lmsName)’s Page")
             }
         }
         .task(id: engine.dataVersion) { await load() }

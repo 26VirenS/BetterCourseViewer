@@ -133,8 +133,14 @@ struct TodayView: View {
     /// any other load is a redraw, not an arrival.
     private func load(force: Bool = false, animated: Bool = false) async {
         if force { _ = try? await engine.call("refresh", as: OK.self) }
+        // (1.9) what it showed last time, at once; then the fresh answer
+        if data == nil, let kept = engine.saved("today", as: Today.self) {
+            data = kept
+            error = nil
+        }
+        if counts == nil { counts = engine.saved("todayCounts", ["kept": false], as: TodayCounts.self) }
         do {
-            let d = try await engine.call("today", as: Today.self)
+            let d = try await engine.fetch("today", as: Today.self)
             if animated { withAnimation(.snappy) { data = d } } else { data = d }
             error = nil
             // (the simulator suite: -SimplSheet next opens a counter's list)
@@ -144,7 +150,7 @@ struct TodayView: View {
             }
             Task {
                 if let kept = try? await engine.call("todayCounts", ["kept": true], as: TodayCounts.self), kept.overdue != nil { counts = kept }
-                if let fresh = try? await engine.call("todayCounts", ["kept": false], as: TodayCounts.self) { counts = fresh }
+                if let fresh = try? await engine.fetch("todayCounts", ["kept": false], as: TodayCounts.self) { counts = fresh }
             }
         } catch {
             if data == nil { self.error = error.localizedDescription }
@@ -287,11 +293,12 @@ struct ItemsSheet: View {
     }
 
     private func load() async {
+        if data == nil { data = engine.saved("todaySheet", ["key": key], as: ItemsSheetData.self) } // (1.9: at once)
         do {
-            data = try await engine.call("todaySheet", ["key": key], as: ItemsSheetData.self)
+            data = try await engine.fetch("todaySheet", ["key": key], as: ItemsSheetData.self)
             error = nil
         } catch {
-            self.error = error.localizedDescription
+            if data == nil { self.error = error.localizedDescription }
         }
     }
 
