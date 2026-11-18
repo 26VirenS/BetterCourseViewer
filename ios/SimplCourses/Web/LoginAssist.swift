@@ -186,7 +186,9 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
         #endif
         let secure = origin.protocol == "https" || host == "localhost" || host == "127.0.0.1" || ownSchool
         let error = (body["error"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-        if (body["stale"] as? Bool) == true, host != canvasHost {
+        // (a school page gone stale; or, build 63, Canvas's own login page turning the school's answer away — the reader
+        // runs on no other page of Canvas's)
+        if (body["stale"] as? Bool) == true {
             staleSeen()
             return
         }

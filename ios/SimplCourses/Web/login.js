@@ -66,8 +66,10 @@
   }
 
   // A single sign-on page that says the sign-in it was asked for has gone stale (Shibboleth's "Stale Request" after a
-  // Back, or a request that expired while the app sat in the background): only starting again from Canvas mends it.
-  const STALE = /\bstale request\b|\b(saml|authentication|login|sign-?in) request (has )?(expired|is no longer valid)\b|\brequest (has )?expired\b/i;
+  // Back, or a request that expired while the app sat in the background): only starting again from Canvas mends it. And
+  // (iPhone 1.9, build 63) Canvas's own login page turning the school's answer away ("Unknown request failure. You can try
+  // to log in again." — the school answered a request Canvas no longer holds): the same, Start Over.
+  const STALE = /\bstale request\b|\b(saml|authentication|login|sign-?in) request (has )?(expired|is no longer valid)\b|\brequest (has )?expired\b|\bunknown request failure\b|\btry to log ?in again\b|\bthere was a problem logging in\b/i;
   const stale = () => { try { return STALE.test(`${document.title || ''} ${(document.body?.innerText || '').slice(0, 1500)}`); } catch { return false; } };
 
   let said = '';
