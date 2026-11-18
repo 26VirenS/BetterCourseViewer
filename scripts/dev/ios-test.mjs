@@ -819,6 +819,16 @@ try {
   await sp.evaluate((t) => Promise.all([self.BCV.store.setPref('selectedCourses', null), self.BCV.store.setPref('gradeTargets', t)]), targetsWas);
   await sp.evaluate(() => { Object.defineProperty(Navigator.prototype, 'userAgent', { get: () => self.__ua, configurable: true }); });
   await nc('refresh');
+  // (iPhone 1.9) the widgets' feed: the open work due over the next two weeks, soonest first, each with its due time, its
+  // course's colour and a full address of the school's; what is overdue; the term GPA and each course's score as Grades has them
+  const wfd = await nc('widgetFeed');
+  const wfGrades = await nc('grades');
+  const wfDue = (wfd.work || []).map((w) => w.dueMs);
+  check(!wfd.error && wfDue.length > 0 && wfDue.length <= 16 && wfDue.every((d, i) => Number.isFinite(d) && d >= wfd.madeMs - 1000 && d < wfd.madeMs + 16 * 864e5 && (i === 0 || d >= wfDue[i - 1]))
+    && wfd.work.every((w) => w.id && w.title && /^#/.test(w.color || '') && (!w.url || /^https?:\/\//.test(w.url)))
+    && (wfd.overdue === null || Number.isInteger(wfd.overdue)) && wfd.gpaText === wfGrades.gpaText && wfd.goalLine === wfGrades.goalLine && wfd.site && /^https?:\/\/[^/]+$/.test(wfd.base || '')
+    && (wfd.courses || []).map((c) => c.id).join() === (wfGrades.rows || []).map((r) => r.id).join() && wfd.courses.every((c) => /^https?:\/\/.+\/courses\/\d+\/grades$/.test(c.url || '')),
+    `the widgets' feed: the next two weeks' open work soonest first, the overdue count, the GPA and the courses as Grades has them: ${JSON.stringify({ n: wfDue.length, first: wfd.work?.[0], overdue: wfd.overdue, gpa: wfd.gpaText, grades: wfGrades.gpaText, courses: wfd.courses?.map((c) => c.id), rows: wfGrades.rows?.map((r) => r.id), error: wfd.error })}`);
   // (1.3) What's New after an update is marked seen when the app's sheet is really up, not when it is asked for:
   // a sheet held back (a sign-in still under way) comes up later, still due
   await sp.evaluate(() => self.BCV.api.storage.local.set({ 'whatsnew:seen': '2.99.2' }));

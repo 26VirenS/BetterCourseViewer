@@ -13,7 +13,7 @@ settings:
   base:
     SWIFT_VERSION: "5.9"
     MARKETING_VERSION: "1.9" # the iPhone app's own version, from 1.0 up (the interface it carries is numbered by extension/manifest.json)
-    CURRENT_PROJECT_VERSION: "64"
+    CURRENT_PROJECT_VERSION: "65"
     CODE_SIGN_STYLE: Automatic
 targets:
   SimplCourses:
@@ -39,6 +39,13 @@ targets:
       - path: ../extension
         type: folder
         buildPhase: resources
+      - path: Shared # (1.9: what the widgets show, written by the app — the widgets compile it too)
+    dependencies:
+      - target: SimplWidgets # (1.9: the Home Screen and Lock Screen widgets, embedded in the app)
+    entitlements:
+      path: SimplCourses/SimplCourses.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.simplcourses.app] # (the container the app and its widgets share)
     info:
       path: SimplCourses/Info.plist
       properties:
@@ -74,3 +81,33 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1,2"
         GENERATE_INFOPLIST_FILE: false
+  # (1.9) The Home Screen and Lock Screen widgets: Up Next and Grades (SimplWidgets/), drawn from the feed the app keeps in
+  # the container the two share (Shared/WidgetFeed.swift; the page's widgetFeed makes it).
+  SimplWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: SimplWidgets
+        excludes:
+          - "Info.plist"
+      - path: Shared
+    entitlements:
+      path: SimplWidgets/SimplWidgets.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.simplcourses.app]
+    info:
+      path: SimplWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Simpl Courses
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.simplcourses.app.widgets
+        PRODUCT_NAME: SimplWidgets
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: false
+        APPLICATION_EXTENSION_API_ONLY: true
+        SKIP_INSTALL: true

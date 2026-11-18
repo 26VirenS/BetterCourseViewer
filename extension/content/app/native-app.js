@@ -491,7 +491,7 @@
     const readRecently = feed ? feed.filter((a) => a.read_state !== 'unread' && inSelFeed(a) && U.parse(a.posted_at) >= readSince).sort((x, y) => U.parse(y.posted_at) - U.parse(x.posted_at)) : [];
     const weekAll = live.filter((it) => it.isDue && it.date >= weekStart && it.date < weekEnd && (it.points === null || it.points > 0));
     const dayLine = (d) => `${U.DAYS_LONG[d.getDay()]}, ${U.MONTHS_LONG[d.getMonth()]} ${d.getDate()}`;
-    const state = { W, Wf, now, todayStart, weekStart, dueToday, dueNext, dueTomorrow, unread, readRecently, dayLine, sel, counts: null, since };
+    const state = { W, Wf, now, todayStart, weekStart, dueToday, dueNext, dueTomorrow, unread, readRecently, dayLine, sel, open, counts: null, since };
     todayState = state;
     const list = dueToday.length ? dueToday : upcoming.slice(0, 6);
     const latest = dueToday.length ? dueToday[dueToday.length - 1].date : null;
@@ -657,6 +657,28 @@
     return { ok: true, overdue: left, overdueNote: overdueNote(left) };
   }
   const overdueNote = (n) => (n ? `${n} not submitted` : 'Nothing overdue');
+
+  // ---- the widgets (iPhone 1.9) ---------------------------------------------------------------------------------------
+  /** What the Home Screen and Lock Screen widgets show, made while the app is open and kept by it for them: the open work
+   *  due over the next two weeks in the selected courses, soonest first — each with its due time in milliseconds, so a
+   *  widget moves on by itself as the day goes — what is overdue, and the term GPA with each course's score, as Grades
+   *  shows them. */
+  async function widgetFeed({ age = NO_AGE } = {}) {
+    const now = new Date();
+    const end = U.addDays(U.startOfDay(now), 15);
+    const [st, gr] = await Promise.all([stateFor(age), grades({ age }).catch(() => null)]);
+    const counts = await todayCounts({ kept: false, age }).catch(() => null);
+    const work = (st?.open || []).filter((it) => it.isDue && it.date && !it.excused && it.date >= now && it.date < end).sort(byDate).slice(0, 16).map((it) => ({
+      id: String(it.id), title: it.title || 'Untitled', course: it.course?.shortName || it.courseName || '',
+      color: it.custom && !it.course ? TASK : (it.course?.color || GRAY), dueMs: it.date.getTime(),
+      kind: it.custom ? 'My task' : (it.kind || ''), url: it.url ? absUrl(it.url) : null,
+    }));
+    const courses = (gr?.rows || []).map((r) => ({ id: r.id, code: r.code, color: r.color, pct: r.pct, pctText: r.pctText, letter: r.letter, url: absUrl(r.url) }));
+    return {
+      madeMs: now.getTime(), site: app()?.siteName?.() || location.hostname, base: location.origin, work, overdue: Number.isFinite(counts?.overdue) ? counts.overdue : null,
+      gpa: gr && Number.isFinite(gr.gpaShown) ? gr.gpaShown : null, gpaText: gr?.gpaText || '–', goal: gr && Number.isFinite(gr.goal) ? gr.goal : null, goalText: gr?.goalText || '', goalLine: gr?.goalLine || '', courses,
+    };
+  }
 
   // ---- the Mac's Dashboard (Simpl for Mac 1.2) ------------------------------------------------------------------------
   // What the web Dashboard shows beyond Today's counters, by its rules (screens/dashboard.js): the courses as cards, the
@@ -3403,7 +3425,7 @@
 
   const CALLS = { quietColors, calSync, feedState, feedOn, feedOff, feedSend, feedEvents, calLink, calShow, calUnlink, calRefresh, planSlots, planPut, planMove, planClear, planDay, planDetail, planEdit, planJoin, setScale, convertInfo, convertFile, snapshot, today, todayCounts, todaySheet, clearOverdue, dashCourses, dashList, dashSilent, dashActivity, dashSeen, dashSkyline, courses, allCourses, coursesProgress, setNickname, setColor, todo, todoDismiss, todoRestore, reminders, watchInfo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, appointments, reserveAppointment, cancelReservation, notifications, notifMark, search, searchLocal, searchWarm, searchRecent, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, fileInfo, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage, messageUpload,
-    toolLaunch, externalTools, resolveUrl, pageFor, setupInfo, setupSave, courseChoices, chooseCourses, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizAssignment, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback, neighbours };
+    toolLaunch, externalTools, resolveUrl, pageFor, setupInfo, setupSave, courseChoices, chooseCourses, widgetFeed, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizAssignment, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback, neighbours };
   // (Mac 1.2) Grade needed: a course's score now (by the student's own weights where set, as the Grades screen) and each
   // piece of work not yet graded with its share of the final grade — tools/need.js pieces(), for the Mac's own tool
   async function gradeNeeded({ id, age = NO_AGE } = {}) {

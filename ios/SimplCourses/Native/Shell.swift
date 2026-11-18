@@ -92,6 +92,7 @@ struct RootView: View {
             guard engine.phase == .native else { return }
             Task { await Reminders.shared.reschedule(engine) }
             Task { await Activity.shared.sync(engine) }
+            WidgetFeeder.shared.refresh(engine, after: 3) // (1.9: the widgets, once the sign-in is asked after)
         }
     }
 

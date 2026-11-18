@@ -88,6 +88,7 @@ final class SavedAnswers {
         lock.unlock()
         let r = root
         queue.async { try? FileManager.default.removeItem(at: r) }
+        WidgetFeeder.eraseAll() // (and what the widgets show: it was that account's)
     }
 
     /// Answers not refreshed in six weeks let go, then the oldest until the whole is under 60 MB.

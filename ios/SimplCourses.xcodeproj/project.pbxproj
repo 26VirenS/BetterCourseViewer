@@ -57,7 +57,39 @@
 		9058FF99027A13078E174731 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF5BE4BEC40EA70097C6AB35 /* SetupView.swift */; };
 		458DF6144E5763DFEACDF228 /* TestSchool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0885763A074B3A79969D1CE1 /* TestSchool.swift */; };
 		37F013F0F3FFD99CBD797D87 /* TestSchool in Resources */ = {isa = PBXBuildFile; fileRef = 2D8B496502628DA2297412A1 /* TestSchool */; };
+		7E7BDBC93FF67F987344C1D7 /* WidgetFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3753480951C32A632CCF15AF /* WidgetFeed.swift */; };
+		611284B9BCAD66D2DC79F7F5 /* Widgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE9E92BCBE09F9574C798939 /* Widgets.swift */; };
+		7BA59DFE034180BE4C21305F /* SimplWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = DAC129B2B816B5917F53999C /* SimplWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		CCBBEC9E51E24B1F92D26BC6 /* WidgetFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3753480951C32A632CCF15AF /* WidgetFeed.swift */; };
+		33E3616100F8D42348570970 /* SimplWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 157D4EB984880977238EE1DE /* SimplWidgets.swift */; };
+		1FEDD4296C8E703FC3DC179A /* UpNextWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67797740BE68B94CA329D52D /* UpNextWidget.swift */; };
+		9DB51932E04978DB512EA5FE /* GradesWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = FECFF311A09DDEC024A99584 /* GradesWidget.swift */; };
+		17EE80F6F0E5F08856CC0D80 /* WidgetParts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0538989F88E35B46317AA36A /* WidgetParts.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		92C69B1B9715AFCE29AE92A0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 6A2E471440D899B435ACCDD2 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2CB1D886FF2FD6C45B6C48DB;
+			remoteInfo = SimplWidgets;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		DABF47B0609E73CBE98D6612 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				7BA59DFE034180BE4C21305F /* SimplWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		11F8ABC65325789350307D00 /* CookieJar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookieJar.swift; sourceTree = "<group>"; };
@@ -111,6 +143,16 @@
 		AF5BE4BEC40EA70097C6AB35 /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupView.swift; sourceTree = "<group>"; };
 		0885763A074B3A79969D1CE1 /* TestSchool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSchool.swift; sourceTree = "<group>"; };
 		2D8B496502628DA2297412A1 /* TestSchool */ = {isa = PBXFileReference; lastKnownFileType = folder; path = TestSchool; sourceTree = "<group>"; };
+		3753480951C32A632CCF15AF /* WidgetFeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetFeed.swift; sourceTree = "<group>"; };
+		AE9E92BCBE09F9574C798939 /* Widgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Widgets.swift; sourceTree = "<group>"; };
+		348F98D0E3B9EC45303B23EF /* SimplCourses.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SimplCourses.entitlements; sourceTree = "<group>"; };
+		157D4EB984880977238EE1DE /* SimplWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimplWidgets.swift; sourceTree = "<group>"; };
+		67797740BE68B94CA329D52D /* UpNextWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpNextWidget.swift; sourceTree = "<group>"; };
+		FECFF311A09DDEC024A99584 /* GradesWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GradesWidget.swift; sourceTree = "<group>"; };
+		0538989F88E35B46317AA36A /* WidgetParts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetParts.swift; sourceTree = "<group>"; };
+		DBEE9EB5D57B8B57C775374C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		CED510687A632F681C3DF7E6 /* SimplWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SimplWidgets.entitlements; sourceTree = "<group>"; };
+		DAC129B2B816B5917F53999C /* SimplWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SimplWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -130,6 +172,7 @@
 				4B9CEA0859C292B7324D9EE6 /* Native */,
 				B34B17DF83C652606E99B175 /* Resources */,
 				96982B358650411695437B58 /* Web */,
+				348F98D0E3B9EC45303B23EF /* SimplCourses.entitlements */,
 			);
 			path = SimplCourses;
 			sourceTree = "<group>";
@@ -151,6 +194,7 @@
 			isa = PBXGroup;
 			children = (
 				A7818DFF5DF19044080F0A6B /* SimplCourses.app */,
+				DAC129B2B816B5917F53999C /* SimplWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -160,6 +204,8 @@
 			children = (
 				016FEAAC20B478980D5865E1 /* BetterCourseViewer */,
 				07FBD2A4A7D5AF419E62350F /* SimplCourses */,
+				C03A1FCE19E2E616F83D10EB /* Shared */,
+				17B7A329AF43D7BA497F32E7 /* SimplWidgets */,
 				5C52BFD4CC64EE9E250A9E33 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -224,8 +270,30 @@
 				5E1D0A7B3C9F4E2A8B6D1C04 /* Activity.swift */,
 				FA39D269F874824A865B8166 /* ToolSheet.swift */,
 				AF5BE4BEC40EA70097C6AB35 /* SetupView.swift */,
+				AE9E92BCBE09F9574C798939 /* Widgets.swift */,
 			);
 			path = Native;
+			sourceTree = "<group>";
+		};
+		C03A1FCE19E2E616F83D10EB /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				3753480951C32A632CCF15AF /* WidgetFeed.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		17B7A329AF43D7BA497F32E7 /* SimplWidgets */ = {
+			isa = PBXGroup;
+			children = (
+				FECFF311A09DDEC024A99584 /* GradesWidget.swift */,
+				DBEE9EB5D57B8B57C775374C /* Info.plist */,
+				CED510687A632F681C3DF7E6 /* SimplWidgets.entitlements */,
+				157D4EB984880977238EE1DE /* SimplWidgets.swift */,
+				67797740BE68B94CA329D52D /* UpNextWidget.swift */,
+				0538989F88E35B46317AA36A /* WidgetParts.swift */,
+			);
+			path = SimplWidgets;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -237,10 +305,12 @@
 			buildPhases = (
 				C33ADEBBFACB26FBB8432E48 /* Sources */,
 				8C7D3B39D55BA176D6D00734 /* Resources */,
+				DABF47B0609E73CBE98D6612 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				C5123EB9612264A988097CCC /* PBXTargetDependency */,
 			);
 			name = SimplCourses;
 			packageProductDependencies = (
@@ -248,6 +318,23 @@
 			productName = SimplCourses;
 			productReference = A7818DFF5DF19044080F0A6B /* SimplCourses.app */;
 			productType = "com.apple.product-type.application";
+		};
+		2CB1D886FF2FD6C45B6C48DB /* SimplWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A8BA558539FC75BD9E1A93A6 /* Build configuration list for PBXNativeTarget "SimplWidgets" */;
+			buildPhases = (
+				99BD8F428F6C4D0D741B083F /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SimplWidgets;
+			packageProductDependencies = (
+			);
+			productName = SimplWidgets;
+			productReference = DAC129B2B816B5917F53999C /* SimplWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -259,6 +346,9 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					26F3924A7C1C3690879088AF = {
+						ProvisioningStyle = Automatic;
+					};
+					2CB1D886FF2FD6C45B6C48DB = {
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -278,6 +368,7 @@
 			projectRoot = "";
 			targets = (
 				26F3924A7C1C3690879088AF /* SimplCourses */,
+				2CB1D886FF2FD6C45B6C48DB /* SimplWidgets */,
 			);
 		};
 /* End PBXProject section */
@@ -347,10 +438,32 @@
 				BB26A260BED650E07132CA16 /* SettingsSheet.swift in Sources */,
 				5B59F23116F3AF8F361D0845 /* SimplCoursesApp.swift in Sources */,
 				2C9206E01EDAD1D07FC3380C /* WebController.swift in Sources */,
+				611284B9BCAD66D2DC79F7F5 /* Widgets.swift in Sources */,
+				7E7BDBC93FF67F987344C1D7 /* WidgetFeed.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		99BD8F428F6C4D0D741B083F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				33E3616100F8D42348570970 /* SimplWidgets.swift in Sources */,
+				1FEDD4296C8E703FC3DC179A /* UpNextWidget.swift in Sources */,
+				9DB51932E04978DB512EA5FE /* GradesWidget.swift in Sources */,
+				17EE80F6F0E5F08856CC0D80 /* WidgetParts.swift in Sources */,
+				CCBBEC9E51E24B1F92D26BC6 /* WidgetFeed.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		C5123EB9612264A988097CCC /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 2CB1D886FF2FD6C45B6C48DB /* SimplWidgets */;
+			targetProxy = 92C69B1B9715AFCE29AE92A0 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		6FE6864354D2FCF35542E513 /* Debug */ = {
@@ -388,7 +501,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 64;
+				CURRENT_PROJECT_VERSION = 65;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -423,6 +536,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = SimplCourses/SimplCourses.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SimplCourses/Info.plist;
@@ -441,6 +555,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = SimplCourses/SimplCourses.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SimplCourses/Info.plist;
@@ -490,7 +605,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 64;
+				CURRENT_PROJECT_VERSION = 65;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -514,6 +629,48 @@
 			};
 			name = Release;
 		};
+		2AC47ACCA2AB39511AE10AF7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = SimplWidgets/SimplWidgets.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SimplWidgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.simplcourses.app.widgets;
+				PRODUCT_NAME = SimplWidgets;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		AB32CC40BE8AB7F88CB9D5C7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = SimplWidgets/SimplWidgets.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SimplWidgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.simplcourses.app.widgets;
+				PRODUCT_NAME = SimplWidgets;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -531,6 +688,15 @@
 			buildConfigurations = (
 				6FE6864354D2FCF35542E513 /* Debug */,
 				FEED5B383A73265B208F2FC7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A8BA558539FC75BD9E1A93A6 /* Build configuration list for PBXNativeTarget "SimplWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2AC47ACCA2AB39511AE10AF7 /* Debug */,
+				AB32CC40BE8AB7F88CB9D5C7 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
