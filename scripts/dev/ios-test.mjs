@@ -1185,6 +1185,9 @@ try {
     register: '<form><input name="email" type="email"><input name="pw1" type="password"><input name="pw2" type="password"><button>Create account</button></form>',
     code: '<form><label>Enter the code we sent <input name="code" inputmode="numeric"></label><button>Verify</button></form>',
     error: '<div class="alert-danger">Invalid username or password.</div><form method="post" action="/login/submit"><input name="username" type="text"><input name="password" type="password"><button type="submit">Sign in</button></form>',
+    wentWrong: '<h1>Sign in</h1><p>Something went wrong. We could not complete your sign-in request.</p><p><a href="/idp/login">Start again</a></p>',
+    serverError: '<h1>500 Internal Server Error</h1><p>The server encountered an unexpected condition.</p>',
+    codeWithError: '<h1>Something went wrong with the push</h1><form><label>Or enter a passcode <input name="passcode" inputmode="numeric"></label><button>Verify</button></form>',
     canvasFailed: '<div class="ic-flash-error" role="alert"><p>Unknown request failure</p><p>You can try to <a href="/login">log in again</a>.</p></div><footer><a href="/help">Help</a> | <a href="/privacy">Privacy Policy</a></footer>',
     stale: '<h1>UC MERCED Single Sign On</h1><h2>Web Login Service - Stale Request</h2><p>You may be seeing this page because you used the Back button while browsing a secure web site or application.</p>',
   };
@@ -1222,10 +1225,19 @@ try {
   check(m.length === 1 && m[0].kind === 'none' && m[0].stale === true, `a single sign-on page saying the request went stale (Shibboleth's "Stale Request") is said as stale, for the app to start the sign-in again: ${JSON.stringify(m)}`);
   m = await open('canvasFailed');
   check(m.length === 1 && m[0].kind === 'none' && m[0].stale === true, `(build 63) Canvas's own login page turning the school's answer away ("Unknown request failure. You can try to log in again.") is said as stale too, for the app to start over by itself: ${JSON.stringify(m)}`);
+  // (build 64) any page of the sign-in that says it went wrong, with nothing on it to fill in, is said as failed — with
+  // what it said, for the app's Login Failed — for the app to begin the sign-in again by itself; one with something to
+  // fill in (a passcode) is the student's, and a wrong password comes with its form
+  m = await open('wentWrong');
+  check(m.length === 1 && m[0].kind === 'none' && m[0].failed === true && m[0].stale === false && /^Something went wrong$/.test(m[0].problem), `a sign-in page saying "Something went wrong", with nothing to fill in, is said as failed, with its words: ${JSON.stringify(m)}`);
+  m = await open('serverError');
+  check(m.length === 1 && m[0].failed === true && /internal server error/i.test(m[0].problem), `a server's error page in the middle of the sign-in is said as failed too: ${JSON.stringify(m)}`);
+  m = await open('codeWithError');
+  check(m.length === 1 && m[0].failed === false, `a page with something to fill in (a passcode) is not, whatever it says: ${JSON.stringify(m)}`);
   m = await open('code');
-  check(m.length === 1 && m[0].stale === false, `a code page is not stale: ${JSON.stringify(m)}`);
+  check(m.length === 1 && m[0].stale === false && m[0].failed === false, `a code page is not stale, nor failed: ${JSON.stringify(m)}`);
   m = await open('error');
-  check(m.length === 1 && m[0].kind === 'full' && /Invalid username or password/.test(m[0].error), `the sign-in shown again with an error carries the error's words: ${JSON.stringify(m)}`);
+  check(m.length === 1 && m[0].kind === 'full' && /Invalid username or password/.test(m[0].error) && m[0].failed === false, `the sign-in shown again with an error carries the error's words (and is not a page to begin again from: the password is the student's to put right): ${JSON.stringify(m)}`);
   // a press that leaves the same form standing while the page works is not news; an error that then shows is
   await p2.evaluate(() => { const f = document.querySelector('form'); f.addEventListener('submit', (e) => { e.preventDefault(); setTimeout(() => { const d = document.createElement('div'); d.className = 'login-error'; d.textContent = 'Your password is incorrect.'; f.before(d); }, 600); }); document.querySelector('.alert-danger').remove(); });
   await p2.waitForTimeout(500);

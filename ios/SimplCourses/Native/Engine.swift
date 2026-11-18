@@ -227,6 +227,7 @@ final class Engine: ObservableObject, ShellListener {
                 // page back to, every screen reads again (what it asked meanwhile came back empty) — and (1.9) after one
                 // behind the screens that a screen gave up waiting on
                 lastSignedIn = Date()
+                web.login.signedIn() // (build 64: the sign-in's tries by itself start afresh)
                 if signingBackIn || waitedOut {
                     signingBackIn = false
                     waitedOut = false
@@ -316,6 +317,12 @@ final class Engine: ObservableObject, ShellListener {
         // Canvas's own page, loaded, and the app's screens never coming on over it (Simpl turned off on it): the page shown
         // as it is, as before 1.9, rather than a sign-in that never ends
         if let u = web.webView.url, u.host?.lowercased() == host.lowercased(), !LoginAssist.isSignIn(u.path), !web.webView.isLoading {
+            // (build 64) Canvas reached only to answer with an error: the sign-in begun again by itself, not the page shown
+            if web.login.canvasErrored {
+                canvasStillSince = nil
+                setLink(web.login.retry("\(lmsName) answered with an error.") ? .signingIn : .failed("\(lmsName) answered with an error."))
+                return
+            }
             let since = canvasStillSince ?? Date()
             canvasStillSince = since
             if Date().timeIntervalSince(since) >= 12 {
@@ -346,11 +353,16 @@ final class Engine: ObservableObject, ShellListener {
         if l == .signingIn { armSignInTimer() } else { signInTimer?.cancel() }
     }
 
-    /// Signing in for 45 seconds with nothing to show for it: Login Failed (Try Again, or the page to see why).
+    /// Signing in for 45 seconds with nothing to show for it: (build 64) begun again by itself, as any sign-in gone wrong is
+    /// (LoginAssist.retry); once those tries are spent, Login Failed (Try Again, or the page to see why).
     private func armSignInTimer() {
         signInTimer?.cancel()
         let work = DispatchWorkItem { [weak self] in
             guard let self, self.background, !(self.ready && self.web.shellOn), self.status.link == .signingIn else { return }
+            if self.web.login.retry("Signing in was taking too long.") {
+                self.armSignInTimer()
+                return
+            }
             self.tooLong = true
             self.updateLink()
         }

@@ -70,10 +70,29 @@
   // (iPhone 1.9, build 63) Canvas's own login page turning the school's answer away ("Unknown request failure. You can try
   // to log in again." — the school answered a request Canvas no longer holds): the same, Start Over.
   const STALE = /\bstale request\b|\b(saml|authentication|login|sign-?in) request (has )?(expired|is no longer valid)\b|\brequest (has )?expired\b|\bunknown request failure\b|\btry to log ?in again\b|\bthere was a problem logging in\b/i;
-  const stale = () => { try { return STALE.test(`${document.title || ''} ${(document.body?.innerText || '').slice(0, 1500)}`); } catch { return false; } };
+  const pageText = () => { try { return `${document.title || ''} ${(document.body?.innerText || '').slice(0, 1500)}`; } catch { return ''; } };
+  const stale = () => STALE.test(pageText());
+  // (build 64) Any page of the sign-in that says it went wrong — an error that occurred, something that went wrong, a
+  // request that could not be completed, a bad request, a server error, a service unavailable, a session that ran out, a
+  // page not found — with nothing on it to fill in (a code, a choice: those are the student's to do): the app begins the
+  // sign-in again by itself. (A wrong password comes with its form, and is the student's to put right.)
+  const FAILED = /\b(an? )?(unexpected |unknown |internal )?(server )?error (has )?(occurred|happened)\b|\bsomething went wrong\b|\b(unable|could ?n[o’']t|cannot|can[’']t) (to )?(complete|process|finish|verify|handle) (your |the |this )?(sign-?in|log-?in|login|request|authentication)\b|\bbad request\b|\binternal server error\b|\bservice (is )?(temporarily )?unavailable\b|\bsession (has )?(expired|timed out)\b|\b(invalid|expired) (saml|authentication|login|sign-?in) (request|response|session)\b|\bauthentication (has )?failed\b|\bpage (could )?not (be )?found\b|\btoo many redirects\b|\bgateway time-?out\b/i;
+  const nothingToFill = () => !fields().some((el) => shown(el) && !['submit', 'button', 'hidden', 'checkbox', 'radio', 'image', 'reset'].includes(el.type));
+  const failedPage = () => FAILED.test(pageText()) && nothingToFill();
+  /** What the page says went wrong, in a few words, for the app to say. */
+  const problemText = () => {
+    const said = errorText();
+    if (said) return said;
+    const m = FAILED.exec(pageText()) || STALE.exec(pageText());
+    return m ? m[0].charAt(0).toUpperCase() + m[0].slice(1) : '';
+  };
 
   let said = '';
-  const msgOf = (r) => ({ kind: r.kind, host: location.hostname, path: location.pathname, title: document.title || '', error: r.kind === 'none' ? '' : errorText(), secure: location.protocol === 'https:', stale: r.kind === 'none' && stale() });
+  const msgOf = (r) => {
+    const isStale = r.kind === 'none' && stale();
+    const failed = r.kind === 'none' && !isStale && failedPage();
+    return { kind: r.kind, host: location.hostname, path: location.pathname, title: document.title || '', error: r.kind === 'none' ? '' : errorText(), secure: location.protocol === 'https:', stale: isStale, failed, problem: isStale || failed ? problemText() : '' };
+  };
   function report(final = false) {
     const r = read();
     if (r.kind === 'none' && !final) return; // ("none" is only said once the page has finished drawing)

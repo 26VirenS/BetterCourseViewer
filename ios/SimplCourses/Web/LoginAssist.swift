@@ -108,7 +108,8 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
 
     @Published var phase: Phase = .idle
     /// (iPhone 1.8.1, build 42) How far "Logging you in" has got: at the school's page, the details sent, Canvas on its way.
-    enum Stage: Equatable { case school, sending, opening }
+    /// (Build 64) `retrying`: something went wrong, and it is about to be begun again by itself (retry).
+    enum Stage: Equatable { case school, sending, opening, retrying }
     @Published private(set) var stage: Stage = .school
     @Published var askStay = false
     /// The school's page is shown in the middle of a sign-in, for the student to do a step of it (a two-factor
@@ -122,7 +123,16 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
     @Published private(set) var failure: String?
     /// Starts the sign-in again from Canvas (WebController: a fresh load of Canvas, which sends a new request).
     var onRestart: (() -> Void)?
-    private var lastAutoRestart: Date?
+    /// (Build 64) How many times the sign-in has been begun again by itself since it last got through, was begun again by
+    /// hand, or five quiet minutes passed (retry); when the last was; the one waiting to go; and what went wrong last.
+    @Published private(set) var retries = 0
+    private var lastRetry: Date?
+    private var retryWork: DispatchWorkItem?
+    private var retryPending = false
+    static let maxRetries = 3
+    /// (Build 64) The last page's answer, as it came (WebController): a sign-in page that answered with an error (400 and
+    /// up) is one to begin again from.
+    private var lastResponse: (host: String, path: String, code: Int)?
     @Published var prefillUser = ""
 
     static let world = WKContentWorld.world(name: "SimplLogin")
@@ -186,36 +196,89 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
         #endif
         let secure = origin.protocol == "https" || host == "localhost" || host == "127.0.0.1" || ownSchool
         let error = (body["error"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-        // (a school page gone stale; or, build 63, Canvas's own login page turning the school's answer away — the reader
-        // runs on no other page of Canvas's)
-        if (body["stale"] as? Bool) == true {
-            staleSeen()
+        // a page that says the sign-in went wrong — a school page gone stale; (build 63) Canvas's own login page turning the
+        // school's answer away; (build 64) any page of the sign-in that says it failed, with nothing on it to fill in, or
+        // that came back as an error — the reader runs on no page of Canvas's but its login — is begun again by itself
+        let problem = (body["problem"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        if (body["stale"] as? Bool) == true || (body["failed"] as? Bool) == true {
+            problemSeen(problem ?? "The sign-in page said something went wrong.")
+            return
+        }
+        if kind == "none", let r = lastResponse, r.host == host, r.code >= 400 {
+            problemSeen(problem ?? "\(host) answered with an error (\(r.code)).")
             return
         }
         handle(kind: kind, host: host, error: error, secure: secure)
     }
 
-    /// The school's page says the request went stale: start again by itself — but not twice within a minute, so a
-    /// page that keeps saying it cannot send the app round in a loop; then it stays shown, with Start Over on it.
-    private func staleSeen() {
-        guard mayRestart() else {
-            if phase == .working { reveal() }
-            return
-        }
-        restart()
+    // MARK: - Trying again by itself (build 64)
+
+    /// Something went wrong on the way (a page that says so, an error answer, no network, a page that never moved): begun
+    /// again by itself; once the tries are spent, the page is shown, and the app says Login Failed with why (`failure`).
+    private func problemSeen(_ why: String) {
+        if retry(why) { return }
+        failure = why
+        if phase == .working { handOver() }
     }
 
-    /// Starting again by itself is allowed: not within a minute of the last time (so a school that keeps failing cannot
-    /// send the app round in a loop); taken, if so.
-    private func mayRestart() -> Bool {
-        if let last = lastAutoRestart, Date().timeIntervalSince(last) < 60 { return false }
-        lastAutoRestart = Date()
+    /// The sign-in begun again from Canvas by itself, after a short wait that grows each time (2, 5, then 12 seconds) —
+    /// three times at most, so a school that keeps failing cannot send the app round in a loop. The count starts afresh
+    /// once the student is through, Start Over is pressed, or five minutes have passed since the last try. Returns whether
+    /// it will try again.
+    @discardableResult
+    func retry(_ why: String) -> Bool {
+        if retryPending { return true } // (one already on its way: the same trouble, said again)
+        if let last = lastRetry, Date().timeIntervalSince(last) > 300 { retries = 0 }
+        guard retries < LoginAssist.maxRetries else { return false }
+        retries += 1
+        lastRetry = Date()
+        let wait = [2.0, 5.0, 12.0][min(retries - 1, 2)]
+        print("[Simpl Courses] sign-in: \(why) — trying again (\(retries) of \(LoginAssist.maxRetries)) in \(Int(wait)) s")
+        watchdog?.cancel()
+        check?.cancel()
+        attempt = nil
+        if phase == .working { stage = .retrying } // ("Trying again" under "Logging you in")
+        retryWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.startOver() }
+        retryWork = work
+        retryPending = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + wait, execute: work)
         return true
     }
 
-    /// Start Over: whatever sign-in was under way forgotten, and Canvas loaded afresh (it sends the school a new
-    /// request); saved details are tried again on the way.
+    /// Signed in, as the app's own screens coming on say (Engine): the tries start afresh.
+    func signedIn() {
+        retries = 0
+        lastRetry = nil
+        retryWork?.cancel()
+        retryPending = false
+        if failure != nil { failure = nil }
+    }
+
+    /// The main frame's answer (WebController), for what a page that answered with an error is (`lastResponse`).
+    func responded(_ url: URL?, status: Int) {
+        lastResponse = (url?.host?.lowercased() ?? "", url?.path ?? "", status)
+    }
+
+    /// The last page answered with an error, and was Canvas's own page (not its login): a sign-in that reached Canvas only
+    /// to be refused (the app's screens never come on over it — Engine).
+    var canvasErrored: Bool {
+        guard let r = lastResponse, r.code >= 400 else { return false }
+        return r.host == canvasHost && !LoginAssist.isSignIn(r.path)
+    }
+
+    /// Start Over, pressed: whatever sign-in was under way forgotten, and Canvas loaded afresh (it sends the school a new
+    /// request); saved details are tried again on the way. The tries made by itself start afresh.
     func restart() {
+        retries = 0
+        lastRetry = nil
+        startOver()
+    }
+
+    /// Canvas loaded afresh, whatever sign-in was under way forgotten (Start Over, or a try again by itself).
+    private func startOver() {
+        retryWork?.cancel()
+        retryPending = false
         watchdog?.cancel()
         check?.cancel()
         attempt = nil
@@ -353,9 +416,9 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
             }
             guard self.phase == .working else { return }
             // (build 42) the saved details sent and nothing came of it — the page never moved: begun again from Canvas,
-            // as Start Over would be (once a minute at most); otherwise the page, to be finished by hand
-            if let a = self.attempt, a.auto, !self.navigatedSinceAttempt, self.mayRestart() {
-                self.restart()
+            // as Start Over would be (build 64: by itself, as any sign-in gone wrong is); otherwise the page, to be
+            // finished by hand
+            if let a = self.attempt, a.auto, !self.navigatedSinceAttempt, self.retry("The school's page did not take the details.") {
                 return
             }
             self.handOver()
@@ -470,7 +533,6 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
     /// The page could not be loaded at all (`reason`: what WebKit said, for the app's Login Failed).
     func pageFailed(reason: String? = nil) {
         attempt = nil
-        failure = reason ?? "Your school’s site could not be reached."
-        handOver()
+        problemSeen(reason ?? "Your school’s site could not be reached.") // (build 64: tried again by itself first)
     }
 }

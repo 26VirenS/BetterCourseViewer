@@ -226,6 +226,10 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+        // (build 64) the page's answer, for the sign-in: one that came back as an error is begun again by itself
+        if case .canvas = mode, navigationResponse.isForMainFrame, let http = navigationResponse.response as? HTTPURLResponse {
+            login.responded(http.url, status: http.statusCode)
+        }
         if navigationResponse.isForMainFrame, !navigationResponse.canShowMIMEType {
             #if os(iOS)
             // (a file of the test school's: asked of the school itself, as WebKit's downloads go to the network)

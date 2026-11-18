@@ -130,6 +130,7 @@ struct LoggingInView: View {
         case .school: return "Reaching your school"
         case .sending: return "Checking your details"
         case .opening: return "Opening \(lms)"
+        case .retrying: return "Something went wrong. Trying again…" // (build 64: begun again by itself)
         }
     }
 }
