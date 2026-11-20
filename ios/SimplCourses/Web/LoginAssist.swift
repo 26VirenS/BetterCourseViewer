@@ -128,7 +128,9 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
     @Published private(set) var retries = 0
     private var lastRetry: Date?
     private var retryWork: DispatchWorkItem?
-    private var retryPending = false
+    /// (Build 66) A try again by itself waiting to go: the app says it is still signing in meanwhile, not that the page is
+    /// the student's to finish.
+    @Published private(set) var retryPending = false
     static let maxRetries = 3
     /// (Build 64) The last page's answer, as it came (WebController): a sign-in page that answered with an error (400 and
     /// up) is one to begin again from.

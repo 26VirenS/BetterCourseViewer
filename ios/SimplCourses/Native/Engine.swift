@@ -288,6 +288,13 @@ final class Engine: ObservableObject, ShellListener {
         }
         let l = web.login
         if let why = l.failure { setLink(.failed(why)); return }
+        // (build 66) a try again by itself on its way (2, 5 or 12 seconds after a page that said something went wrong):
+        // still signing in — not Finish Login over a failed page the app is about to leave by itself
+        if l.retryPending {
+            schoolStillSince = nil
+            setLink(.signingIn)
+            return
+        }
         if case .capture(_, let error) = l.phase {
             setLink(error.map { .failed($0) } ?? .needsInput)
             return

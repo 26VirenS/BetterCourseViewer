@@ -79,9 +79,20 @@
   const FAILED = /\b(an? )?(unexpected |unknown |internal )?(server )?error (has )?(occurred|happened)\b|\bsomething went wrong\b|\b(unable|could ?n[o’']t|cannot|can[’']t) (to )?(complete|process|finish|verify|handle) (your |the |this )?(sign-?in|log-?in|login|request|authentication)\b|\bbad request\b|\binternal server error\b|\bservice (is )?(temporarily )?unavailable\b|\bsession (has )?(expired|timed out)\b|\b(invalid|expired) (saml|authentication|login|sign-?in) (request|response|session)\b|\bauthentication (has )?failed\b|\bpage (could )?not (be )?found\b|\btoo many redirects\b|\bgateway time-?out\b/i;
   const nothingToFill = () => !fields().some((el) => shown(el) && !['submit', 'button', 'hidden', 'checkbox', 'radio', 'image', 'reset'].includes(el.type));
   const failedPage = () => FAILED.test(pageText()) && nothingToFill();
+  // (build 66) Canvas's own /login showing nothing to fill in is its "Failed to Log In" page (login/new.html.erb): the
+  // school's sign-in sent Canvas an error instead of the student (an OpenID sign-in's error_description — "Unknown request
+  // failure", "It took too long to login", "Missing nonce…" — or a SAML one's), whatever the words. Canvas's own sign-in
+  // form is at /login/canvas, its own code page at /login/otp, and a school's sign-in leaves /login for the school's site:
+  // none of them is this. Started over, as a stale page is.
+  const canvasFailed = () => onCanvas && /^\/login\/?$/i.test(location.pathname) && nothingToFill();
+  /** The words Canvas's "Failed to Log In" page gives (what the school's sign-in answered it with). */
+  const canvasMessage = () => {
+    const p = document.querySelector('#unauthorized_message p');
+    return p ? (p.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 160) : '';
+  };
   /** What the page says went wrong, in a few words, for the app to say. */
   const problemText = () => {
-    const said = errorText();
+    const said = (canvasFailed() && canvasMessage()) || errorText();
     if (said) return said;
     const m = FAILED.exec(pageText()) || STALE.exec(pageText());
     return m ? m[0].charAt(0).toUpperCase() + m[0].slice(1) : '';
@@ -89,14 +100,23 @@
 
   let said = '';
   const msgOf = (r) => {
-    const isStale = r.kind === 'none' && stale();
+    const isStale = r.kind === 'none' && (stale() || canvasFailed());
     const failed = r.kind === 'none' && !isStale && failedPage();
     return { kind: r.kind, host: location.hostname, path: location.pathname, title: document.title || '', error: r.kind === 'none' ? '' : errorText(), secure: location.protocol === 'https:', stale: isStale, failed, problem: isStale || failed ? problemText() : '' };
   };
+  let finalSaid = false;
   function report(final = false) {
     const r = read();
-    if (r.kind === 'none' && !final) return; // ("none" is only said once the page has finished drawing)
-    const msg = msgOf(r);
+    // ("none" is only said once the page has finished drawing; after that, (build 66) only when what the page says went
+    // wrong arrives late — drawn by its script after it loaded — not for a form drawn again, or a spinner while it works)
+    let msg = null;
+    if (r.kind === 'none' && !final) {
+      if (!finalSaid) return;
+      msg = msgOf(r);
+      if (!msg.stale && !msg.failed) return;
+    }
+    if (final) finalSaid = true;
+    msg = msg || msgOf(r);
     const key = JSON.stringify(msg);
     if (key === said) return;
     said = key;

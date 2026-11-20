@@ -1258,6 +1258,20 @@ try {
   await p2.waitForTimeout(900);
   m = await said();
   check(mid === before2 && m.length === before2 + 1 && /incorrect/.test(m[m.length - 1].error), `the form busy with the press is not said again; the error it then shows is: ${JSON.stringify({ before2, mid, last: m[m.length - 1] })}`);
+  // (build 66) a page that draws what went wrong late (its script, after it loaded): said again once it does — and a page
+  // that draws a form again, or a spinner, after it was said to have nothing to fill, is not news
+  await p2.goto('https://sso.example.edu/idp/login?k=code');
+  await p2.waitForLoadState('load');
+  await p2.evaluate(() => { document.body.innerHTML = '<p>One moment…</p>'; setTimeout(() => { document.body.insertAdjacentHTML('beforeend', '<p>Something went wrong. Please try again later.</p>'); }, 1500); });
+  await p2.waitForTimeout(1000);
+  const lateBefore = await said();
+  await p2.waitForTimeout(1500);
+  m = await said();
+  check(lateBefore.length >= 1 && lateBefore.every((x) => !x.failed && !x.stale) && m.length === lateBefore.length + 1 && m[m.length - 1].kind === 'none' && m[m.length - 1].failed === true && /something went wrong/i.test(m[m.length - 1].problem),
+    `a sign-in page whose error is drawn after it loaded is said again, as failed, once the error shows: ${JSON.stringify({ before: lateBefore, after: m })}`);
+  await p2.evaluate(() => { document.body.insertAdjacentHTML('beforeend', '<div class="spinner">Working…</div>'); });
+  await p2.waitForTimeout(700);
+  check((await said()).length === m.length, 'and what the page draws after that, saying nothing new, is not said again');
   // Canvas's own pages are left alone (apart from its login)
   const p3 = await context.newPage();
   await p3.addInitScript(() => { self.__said = []; self.webkit = self.webkit || { messageHandlers: {} }; self.webkit.messageHandlers.bcvLogin = { postMessage: (x) => self.__said.push(x) }; });
@@ -1266,6 +1280,18 @@ try {
   await p3.waitForTimeout(1200);
   check((await p3.evaluate(() => self.__said.length)) === 0 && (await p3.evaluate(() => typeof self.SimplLogin)) === 'undefined', 'on Canvas\'s own pages (other than its login) the reader does nothing at all');
   await p3.close();
+  // (build 66) Canvas's "Failed to Log In" page (login/new.html.erb, at /login): the school's sign-in answered Canvas with an
+  // error, whatever its words — said as stale, with them, for the app to start over by itself
+  const p4 = await context.newPage();
+  await p4.addInitScript(() => { self.__said = []; self.webkit = self.webkit || { messageHandlers: {} }; self.webkit.messageHandlers.bcvLogin = { postMessage: (x) => self.__said.push(x) }; });
+  await p4.route(`${BASE}/login?bcvtest=failed`, (route) => route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><head><title>Failed to Log In</title></head><body><div id="unauthorized_holder"><div id="unauthorized_message"><h2 class="ui-state-error">Failed to Log In</h2><p>Missing nonce from external authentication service</p><p>You can try to <a href="/login">log in again</a>.</p></div></div></body></html>' }));
+  await p4.goto(`${BASE}/login?bcvtest=failed`);
+  await p4.addScriptTag({ content: reader });
+  await p4.waitForTimeout(1200);
+  const failedSaid = await p4.evaluate(() => self.__said);
+  check(failedSaid.length === 1 && failedSaid[0].kind === 'none' && failedSaid[0].stale === true && failedSaid[0].problem === 'Missing nonce from external authentication service',
+    `Canvas's "Failed to Log In" page is said as stale with the school's words, whatever they are: ${JSON.stringify(failedSaid)}`);
+  await p4.close();
   await sso.close();
 } catch (e) {
   console.error('ios test crashed:', e);
