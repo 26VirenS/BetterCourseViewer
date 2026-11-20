@@ -1,0 +1,4 @@
+IOSurfaceClientSetSurfaceNotify failed e00002c7
+[Simpl Courses] split: list column shown at 416.0 of 890 pt (asked 445.0; share 0.5, ideal -3.4028234663852886e+38, most -3.4028234663852886e+38)
+[Simpl Courses] shot: settled at 13.0 s
+com.simplcourses.app: 46223
