@@ -176,7 +176,8 @@ final class EngineStatus: ObservableObject {
 }
 
 /// (iPhone 1.9) A thin bar along the very top edge of the screen, over everything: it runs while the app signs in
-/// behind its screens and while a screen reads its fresh answer. When the sign-in needs the student it turns yellow and
+/// behind its screens (purple, build 67) and while a screen reads its fresh answer (the app's blue, as everything else).
+/// When the sign-in needs the student it turns yellow and
 /// grows down into a strip that says Finish Login; when it fails, red, saying Login Failed (with Try Again). Pressed,
 /// either strip brings up the sign-in's page (SignInSheet).
 struct TopStatusBar: View {
@@ -194,9 +195,10 @@ struct TopStatusBar: View {
 
     private var tint: Color {
         switch status.link {
+        case .signingIn: return Color(.systemPurple) // (build 67: signing in told apart from a screen reading afresh)
         case .needsInput: return Color(.systemYellow)
         case .failed: return Color(.systemRed)
-        default: return .accentColor
+        case .on: return .accentColor
         }
     }
 
